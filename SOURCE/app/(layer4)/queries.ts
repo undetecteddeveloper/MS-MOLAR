@@ -17,6 +17,8 @@ export type MyExamListItem = {
   questionCount: number;
   status: string;
   createdAt: string;
+  /** Mốc publish (set bởi publishExam) — null nếu chưa publish. */
+  reviewedAt: string | null;
 };
 
 /**
@@ -34,7 +36,9 @@ export async function listMyExams(): Promise<MyExamListItem[]> {
 
   const { data, error } = await supabase
     .from("exams")
-    .select("id, title, subject, grade, question_ids, status, created_at")
+    .select(
+      "id, title, subject, grade, question_ids, status, created_at, reviewed_at"
+    )
     .eq("author_id", user.id)
     .order("created_at", { ascending: false });
   if (error) throw error;
@@ -48,6 +52,7 @@ export async function listMyExams(): Promise<MyExamListItem[]> {
       question_ids: string[];
       status: string;
       created_at: string;
+      reviewed_at: string | null;
     }>
   ).map((r) => ({
     id: r.id,
@@ -57,6 +62,7 @@ export async function listMyExams(): Promise<MyExamListItem[]> {
     questionCount: r.question_ids?.length ?? 0,
     status: r.status,
     createdAt: r.created_at,
+    reviewedAt: r.reviewed_at,
   }));
 }
 

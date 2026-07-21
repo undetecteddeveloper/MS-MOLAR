@@ -13,9 +13,12 @@ interface DeleteDialogProps {
   examTitle: string;
   /** Sau khi xoá xong điều hướng về đâu (mặc định /me/exams). */
   redirectTo?: string;
-  /** Kiểu trigger: link nhỏ (trong hàng) hay nút. */
+  /** Kiểu trigger: link nhỏ (trong hàng) hay nút. Bỏ qua khi open được điều khiển từ ngoài (vd: context menu). */
   triggerClassName?: string;
   triggerLabel?: string;
+  /** Mở/đóng có kiểm soát từ ngoài (vd: mục "Xóa" trong context menu) — khi truyền, nút trigger riêng không render. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export function DeleteDialog({
@@ -24,8 +27,13 @@ export function DeleteDialog({
   redirectTo = "/me/exams",
   triggerClassName,
   triggerLabel = "Delete",
+  open: controlledOpen,
+  onOpenChange,
 }: DeleteDialogProps) {
-  const [open, setOpen] = useState(false);
+  const isControlled = controlledOpen !== undefined;
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const open = isControlled ? controlledOpen : uncontrolledOpen;
+  const setOpen = onOpenChange ?? setUncontrolledOpen;
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -40,7 +48,7 @@ export function DeleteDialog({
     window.addEventListener("keydown", onKey);
     confirmRef.current?.focus();
     return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
+  }, [open, setOpen]);
 
   function closeAndReturnFocus() {
     setOpen(false);
@@ -62,17 +70,19 @@ export function DeleteDialog({
 
   return (
     <>
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={() => setOpen(true)}
-        className={
-          triggerClassName ??
-          "text-sm text-muted-foreground underline-offset-4 transition-colors hover:text-brand hover:underline"
-        }
-      >
-        {triggerLabel}
-      </button>
+      {!isControlled && (
+        <button
+          ref={triggerRef}
+          type="button"
+          onClick={() => setOpen(true)}
+          className={
+            triggerClassName ??
+            "text-sm text-muted-foreground underline-offset-4 transition-colors hover:text-brand hover:underline"
+          }
+        >
+          {triggerLabel}
+        </button>
+      )}
 
       {open && (
         <div

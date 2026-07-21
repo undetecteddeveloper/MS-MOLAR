@@ -1,10 +1,34 @@
+"use client";
+
 // MyExamsList — danh sách đề của user (UI Spec §MyExamsList / Task 6.3).
 // Mới nhất trước (query đã order); empty → khối gạch đứt + link Upload.
-// Banner ?published=1 (D13) do page truyền `justPublished`. Server-safe.
+// Banner ?published=1 (D13) do page truyền `justPublished`.
+//
+// Layout theo template SCREENSHOT/design_reference/ReviewPage_Layer4: 2 tab
+// Pending/Published (underline, base-ui Tabs) — Pending = mọi status CHƯA
+// published (processing/failed/review/draft), Published = status published.
+// Danh sách mỗi tab cuộn trong container riêng (max-height + overflow-y-auto)
+// — trang ngoài không cuộn thêm. Client Component vì cần state tab hiện tại.
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 import type { MyExamListItem } from "@/app/(layer4)/queries";
 import { ExamRow } from "./ExamRow";
+import {
+  Tabs,
+  TabsIndicator,
+  TabsList,
+  TabsPanel,
+  TabsTab,
+} from "@/components/ui/tabs";
+
+function ExamListScroll({ children }: { children: ReactNode }) {
+  return (
+    <ul className="flex max-h-[30rem] flex-col gap-3 overflow-y-auto pr-2">
+      {children}
+    </ul>
+  );
+}
 
 export function MyExamsList({
   exams,
@@ -13,6 +37,9 @@ export function MyExamsList({
   exams: MyExamListItem[];
   justPublished: boolean;
 }) {
+  const pending = exams.filter((exam) => exam.status !== "published");
+  const published = exams.filter((exam) => exam.status === "published");
+
   return (
     <div className="flex flex-col gap-6">
       {justPublished && (
@@ -24,14 +51,20 @@ export function MyExamsList({
         </div>
       )}
 
-      <div className="flex items-center justify-between">
+      <div>
         <h1 className="text-2xl text-foreground">My exams</h1>
-        <Link
-          href="/upload"
-          className="rounded-[4px] bg-brand px-4 py-2 text-xs font-medium uppercase tracking-[0.14em] text-brand-foreground transition-opacity hover:opacity-90"
-        >
-          Upload an exam
-        </Link>
+        <div className="mt-3 h-0.5 w-10 bg-[#B8863B]" aria-hidden />
+        <div className="mt-3 flex items-center justify-between gap-4">
+          <p className="text-sm text-muted-foreground">
+            Check your exams before they go live.
+          </p>
+          <Link
+            href="/upload"
+            className="shrink-0 rounded-[4px] bg-brand px-4 py-2 text-xs font-medium uppercase tracking-[0.14em] text-brand-foreground transition-opacity hover:opacity-90"
+          >
+            Upload an exam
+          </Link>
+        </div>
       </div>
 
       {exams.length === 0 ? (
@@ -47,11 +80,41 @@ export function MyExamsList({
           </Link>
         </div>
       ) : (
-        <ul className="flex flex-col gap-3">
-          {exams.map((exam) => (
-            <ExamRow key={exam.id} item={exam} />
-          ))}
-        </ul>
+        <Tabs defaultValue="pending">
+          <TabsList>
+            <TabsTab value="pending">Pending ({pending.length})</TabsTab>
+            <TabsTab value="published">Published ({published.length})</TabsTab>
+            <TabsIndicator />
+          </TabsList>
+
+          <TabsPanel value="pending" className="mt-4">
+            {pending.length === 0 ? (
+              <p className="py-12 text-center text-sm text-muted-foreground">
+                Nothing pending — nice and tidy.
+              </p>
+            ) : (
+              <ExamListScroll>
+                {pending.map((exam) => (
+                  <ExamRow key={exam.id} item={exam} />
+                ))}
+              </ExamListScroll>
+            )}
+          </TabsPanel>
+
+          <TabsPanel value="published" className="mt-4">
+            {published.length === 0 ? (
+              <p className="py-12 text-center text-sm text-muted-foreground">
+                No exams published yet.
+              </p>
+            ) : (
+              <ExamListScroll>
+                {published.map((exam) => (
+                  <ExamRow key={exam.id} item={exam} />
+                ))}
+              </ExamListScroll>
+            )}
+          </TabsPanel>
+        </Tabs>
       )}
     </div>
   );
