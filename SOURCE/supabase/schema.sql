@@ -462,3 +462,101 @@ update public.exams
 -- không cần backfill.
 -- v2.1: part_number default 1 / sub_answers null / exams.parts null — row cũ
 -- (seed + UGC v2.0) tự đúng, không cần backfill (AC-033).
+
+-- ============================================================================
+-- Exam Difficulty Rating (ADR-0008, Backend Design Doc) — 1 rating / user / đề,
+-- SỬA ĐƯỢC (upsert). Idempotent. KHÔNG cột trên exams, KHÔNG trigger, KHÔNG backfill.
+-- Mô phỏng shape exam_reports; khác biệt: có update-own (rating sửa được) + 3 điểm phần.
+-- ============================================================================
+create table if not exists public.exam_difficulty_ratings (
+  id          uuid primary key default gen_random_uuid(),
+  exam_id     text not null references public.exams(id) on delete cascade,
+  user_id     uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  score_part1 int not null,                       -- Phần I  (mcq)          1..10
+  score_part2 int not null,                       -- Phần II (true_false)   1..10
+  score_part3 int not null,                       -- Phần III(short_answer) 1..10
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now(),
+  unique (exam_id, user_id)                        -- 1 rating / user / đề (upsert khoá)
+);
+
+-- Mỗi điểm phần là số nguyên trong [1,10] (AC-002). Một CHECK gộp cả 3 cột.
+alter table public.exam_difficulty_ratings drop constraint if exists ratings_scores_range_check;
+alter table public.exam_difficulty_ratings add constraint ratings_scores_range_check
+  check (
+    score_part1 between 1 and 10
+    and score_part2 between 1 and 10
+    and score_part3 between 1 and 10
+  );
+
+-- RLS: mỗi write policy AND 3 điều kiện — (a) user_id = auth.uid(); (b) đề đã
+-- published (EXISTS, tiền lệ reports_insert_own); (c) đã có attempt 'submitted'
+-- (EXISTS cross-table, tiền lệ answers_insert_own). Khác biệt chủ đích so với
+-- exam_reports (không có update-own): rating SỬA ĐƯỢC (upsert) nên cần cả
+-- insert-own VÀ update-own VÀ select-own.
+alter table public.exam_difficulty_ratings enable row level security;
+
+-- INSERT: chỉ chủ nhân + đề published + đã có attempt 'submitted' (eligibility).
+drop policy if exists "ratings_insert_own" on public.exam_difficulty_ratings;
+create policy "ratings_insert_own" on public.exam_difficulty_ratings
+  for insert to authenticated with check (
+    user_id = auth.uid()
+    and exists (
+      select 1 from public.exams e
+      where e.id = exam_difficulty_ratings.exam_id and e.status = 'published'
+    )
+    and exists (
+      select 1 from public.exam_attempts a
+      where a.exam_id = exam_difficulty_ratings.exam_id
+        and a.user_id = auth.uid()
+        and a.status = 'submitted'
+    )
+  );
+
+-- UPDATE (upsert path): USING chọn row của mình; WITH CHECK giữ nguyên 3 điều kiện
+-- (chủ nhân + published + eligibility) cho row kết quả.
+drop policy if exists "ratings_update_own" on public.exam_difficulty_ratings;
+create policy "ratings_update_own" on public.exam_difficulty_ratings
+  for update to authenticated
+  using (user_id = auth.uid())
+  with check (
+    user_id = auth.uid()
+    and exists (
+      select 1 from public.exams e
+      where e.id = exam_difficulty_ratings.exam_id and e.status = 'published'
+    )
+    and exists (
+      select 1 from public.exam_attempts a
+      where a.exam_id = exam_difficulty_ratings.exam_id
+        and a.user_id = auth.uid()
+        and a.status = 'submitted'
+    )
+  );
+
+-- SELECT = chỉ rating của mình (cho prefill "đã đánh giá" — AC-013). Aggregate
+-- toàn cục KHÔNG đọc qua policy này mà qua view (definer) — xem view bên dưới.
+drop policy if exists "ratings_select_own" on public.exam_difficulty_ratings;
+create policy "ratings_select_own" on public.exam_difficulty_ratings
+  for select to authenticated using (user_id = auth.uid());
+
+-- View đọc: exams.* + rating_count + avg_overall (NULL khi < 3 rating).
+-- Encoding NULL-dưới-ngưỡng cho phép nulls-last order + lọc bucket qua toán tử
+-- PostgREST thường, KHÔNG cần HAVING/RPC. Ngưỡng N=3 nằm ở ĐÂY (SQL) và ở
+-- SOURCE/lib/rating (TS, RATING_THRESHOLD) — giữ đồng bộ bằng test (không có
+-- hằng số vật lý chung băng qua ranh giới SQL/TS). Số '3' dưới đây là bản sao
+-- SQL của RATING_THRESHOLD.
+create or replace view public.exams_with_difficulty as
+select
+  e.*,
+  coalesce(agg.rating_count, 0) as rating_count,
+  case when coalesce(agg.rating_count, 0) >= 3 then agg.avg_overall end as avg_overall
+from public.exams e
+left join (
+  select
+    exam_id,
+    count(*) as rating_count,
+    -- overall mỗi user = mean 3 phần; community = mean các overall.
+    avg((score_part1 + score_part2 + score_part3) / 3.0) as avg_overall
+  from public.exam_difficulty_ratings
+  group by exam_id
+) agg on agg.exam_id = e.id;
