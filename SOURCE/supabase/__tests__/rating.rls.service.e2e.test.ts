@@ -12,58 +12,11 @@
 // + signed-in anon clients per user — see ensureUser/signInAs in that file). The
 // PREFERRED implementation is to append these cases directly into test-rls.ts
 // following its existing pattern (mirroring R-i/R-j/R-k at :429-473), so there is a
-// single source of RLS truth. This file exists to record the two
-// service-integration-e2e-lane candidates selected by ROI for traceability; if the
-// implementer appends to test-rls.ts instead, delete this file rather than
-// double-asserting the same behavior.
-
-// =============================================================================
-// Test SE1 [RESERVED SLOT — real-DB write correctness the reserved fixture-e2e
-//   journey (FE1) cannot verify with mocks] —
-//   Eligibility gate + upsert against real Supabase RLS
-// =============================================================================
-// AC-008 (PRD metric 1): "...the write is rejected at the server/database layer and
-//   no rating row is created or updated."
-// AC-009: "...eligibility is satisfied and the rating persists."
-// AC-012 (PRD metric 2): "...their existing rating row is updated in place (no second
-//   row is created) and the new three scores replace the old ones."
-// PRD Security: "...only on published exams..."
-// Mirrors backend Design Doc RLS cases R-p, R-q, R-r, R-s, R-t.
-// ROI: 90 (BV:10 x Freq:8 + Legal:0 + Defect:10) — reserved regardless of score: this
-//   is the security-critical DB-layer guarantee (PRD metric 1 requires 100%) that no
-//   mock can validate (Test Boundaries: "Supabase DB + RLS + view — Mock? No — RLS...
-//   cannot be validated by mocks").
-// Behavior: against a real local Supabase project, seed a published exam with a
-//   submitted exam_attempts row for user A, a published exam with NO submitted
-//   attempt for user A, and a non-published exam with a submitted attempt for user A
-//   -> attempt rating writes as each user/exam combination.
-// @category: core-functionality
-// @lane: service-integration-e2e
-// @dependency: full-system — live local Supabase (Postgres + RLS), exam_difficulty_ratings
-//   table + ratings_insert_own / ratings_update_own / ratings_select_own policies
-// @complexity: high
-// @real-dependency: Supabase Postgres + RLS — this is the sanctioned real-dependency
-//   boundary; per backend Design Doc Test Boundaries, RLS/CHECK/unique-constraint
-//   enforcement "cannot be validated by mocks" (no mock is used anywhere in this test)
-// Primary failure mode: a missed AND-clause in the insert/update RLS with-check
-//   (user_id = auth.uid() AND published EXISTS AND submitted-attempt EXISTS) lets an
-//   ineligible or non-published-exam write persist a row, defeating PRD metric 1; OR
-//   the update-own policy is missing/misconfigured so a re-rate INSERTs a second row
-//   instead of upserting in place, defeating PRD metric 2; OR the unique(exam_id,
-//   user_id) constraint is absent so a raw duplicate INSERT succeeds.
-// Proof obligation — assert row counts/content read directly from the database after
-//   each attempt (not from the client's return value alone):
-//   (a) an eligible user's insert succeeds: exactly 1 row exists for (examId, userId)
-//       with the submitted scores (AC-009; R-p);
-//   (b) a user with no submitted attempt on the exam: the insert is rejected by RLS
-//       and 0 rows exist for that (examId, userId) (AC-008, metric 1; R-q);
-//   (c) the same eligible user submits new scores a second time: exactly 1 row exists
-//       for (examId, userId), and its scores equal only the latest submission, never
-//       the first (AC-012, metric 2; R-r);
-//   (d) an otherwise-eligible user attempts a write against a non-published exam: the
-//       write is rejected (PRD Security; R-s);
-//   (e) a raw duplicate INSERT (not upsert) for the same (exam_id, user_id) fails with
-//       a unique-constraint violation (metric 2 uniqueness; R-t).
+// single source of RLS truth. This file originally recorded two
+// service-integration-e2e-lane candidates selected by ROI for traceability; Test SE1
+// (R-p..R-t eligibility gate + upsert) has been ported into test-rls.ts (R-p..R-u, the
+// select-own confinement obligation added there as (f)) and removed from here to avoid
+// double-asserting the same behavior. Test SE2 remains reserved below for a future task.
 
 // =============================================================================
 // Test SE2 [additional slot, ROI > 50] —

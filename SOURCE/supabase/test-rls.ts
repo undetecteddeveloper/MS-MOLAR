@@ -54,6 +54,22 @@ const REVIEW_IMAGE_PATH = `${REVIEW_EXAM_ID}/q1.png`;
 const PUBLISHED_IMAGE_PATH = `${PUBLISHED_EXAM_ID}/q1.png`;
 const REVIEW_UPLOAD_PATH = `${REVIEW_EXAM_ID}/questions.pdf`;
 
+// Fixture Rating (ADR-0008, Backend Design Doc §Test Boundaries) — id prefix riêng,
+// setup/cleanup idempotent như fixture UGC ở trên. Người rate = User A (đã có
+// submitted attempt trên 2 trong 3 đề dưới đây) để R-u khớp đúng ngữ nghĩa Design
+// Doc ("user B đọc rating của user A"); tác giả cũng = A (RLS không cấm tự rate đề
+// của mình — chỉ cần published + có submitted attempt).
+const RATING_PUBLISHED_EXAM_ID = "rls-rating-published"; // published, A CÓ submitted attempt (R-p/R-r/R-t/R-u)
+const RATING_NO_ATTEMPT_EXAM_ID = "rls-rating-no-attempt"; // published, A KHÔNG có attempt (R-q)
+const RATING_NON_PUBLISHED_EXAM_ID = "rls-rating-review"; // status='review', A CÓ submitted attempt (R-s)
+const RATING_EXAM_IDS = [
+  RATING_PUBLISHED_EXAM_ID,
+  RATING_NO_ATTEMPT_EXAM_ID,
+  RATING_NON_PUBLISHED_EXAM_ID,
+];
+const INITIAL_RATING_SCORES = { score_part1: 5, score_part2: 6, score_part3: 7 };
+const UPDATED_RATING_SCORES = { score_part1: 9, score_part2: 3, score_part3: 8 };
+
 let failures = 0;
 function assert(cond: boolean, msg: string) {
   if (cond) console.log(`  ✓ ${msg}`);
@@ -182,6 +198,65 @@ async function setupUgcFixtures(admin: SupabaseClient, authorId: string) {
   }
 }
 
+/** Xóa sạch fixture Rating (chạy trước VÀ sau để idempotent). */
+async function cleanupRatingFixtures(admin: SupabaseClient) {
+  await admin.from("exam_difficulty_ratings").delete().in("exam_id", RATING_EXAM_IDS);
+  await admin.from("exam_attempts").delete().in("exam_id", RATING_EXAM_IDS);
+  await admin.from("exams").delete().in("id", RATING_EXAM_IDS);
+}
+
+/** Tạo fixture Rating qua service_role (bypass RLS): 3 đề của A + submitted attempts. */
+async function setupRatingFixtures(admin: SupabaseClient, authorId: string, raterId: string) {
+  const baseExam = {
+    duration_minutes: 45,
+    subject: "Toán",
+    grade: 10,
+    author_id: authorId,
+    author_display_name: "RLS Test Author",
+    question_ids: [] as string[],
+  };
+  const exams = await admin.from("exams").insert([
+    {
+      ...baseExam,
+      id: RATING_PUBLISHED_EXAM_ID,
+      title: "[RLS] Đề rating - đã published",
+      status: "published",
+    },
+    {
+      ...baseExam,
+      id: RATING_NO_ATTEMPT_EXAM_ID,
+      title: "[RLS] Đề rating - đã published, chưa có attempt",
+      status: "published",
+    },
+    {
+      ...baseExam,
+      id: RATING_NON_PUBLISHED_EXAM_ID,
+      title: "[RLS] Đề rating - chưa published",
+      status: "review",
+    },
+  ]);
+  if (exams.error) throw exams.error;
+
+  // A có submitted attempt trên đề published (R-p/R-r/R-t/R-u) VÀ trên đề chưa
+  // published (R-s, "otherwise-eligible"); KHÔNG có attempt nào trên
+  // RATING_NO_ATTEMPT_EXAM_ID (R-q).
+  const attempts = await admin.from("exam_attempts").insert([
+    {
+      user_id: raterId,
+      exam_id: RATING_PUBLISHED_EXAM_ID,
+      status: "submitted",
+      submitted_at: new Date().toISOString(),
+    },
+    {
+      user_id: raterId,
+      exam_id: RATING_NON_PUBLISHED_EXAM_ID,
+      status: "submitted",
+      submitted_at: new Date().toISOString(),
+    },
+  ]);
+  if (attempts.error) throw attempts.error;
+}
+
 async function main() {
   const env = loadEnv();
   const url = env.NEXT_PUBLIC_SUPABASE_URL;
@@ -280,6 +355,10 @@ async function main() {
   console.log("\nUGC Gate A — setup fixture (service_role)…");
   await cleanupUgcFixtures(admin);
   await setupUgcFixtures(admin, userAId);
+
+  console.log("\nRating — setup fixture (service_role)…");
+  await cleanupRatingFixtures(admin);
+  await setupRatingFixtures(admin, userAId, userAId);
 
   console.log("\nRLS checks (UGC R-a…R-l):");
 
@@ -531,6 +610,123 @@ async function main() {
     ro.error != null && ro.data == null,
     "R-o: Non-author KHÔNG đọc được file gốc (exam-uploads) của người khác",
   );
+
+  console.log("\nRLS checks (Rating R-p…R-u):");
+
+  // R-p. User đủ điều kiện (đề published + đã có submitted attempt) insert rating
+  //      thành công (positive control).
+  const rp = await userA.from("exam_difficulty_ratings").insert({
+    exam_id: RATING_PUBLISHED_EXAM_ID,
+    ...INITIAL_RATING_SCORES,
+  });
+  const rpRow = await admin
+    .from("exam_difficulty_ratings")
+    .select("score_part1, score_part2, score_part3")
+    .eq("exam_id", RATING_PUBLISHED_EXAM_ID)
+    .eq("user_id", userAId);
+  assert(
+    rp.error == null &&
+      rpRow.data?.length === 1 &&
+      rpRow.data[0].score_part1 === INITIAL_RATING_SCORES.score_part1 &&
+      rpRow.data[0].score_part2 === INITIAL_RATING_SCORES.score_part2 &&
+      rpRow.data[0].score_part3 === INITIAL_RATING_SCORES.score_part3,
+    "R-p: User đủ điều kiện insert rating thành công (đúng 1 row, đúng điểm)",
+  );
+
+  // R-q. User KHÔNG có submitted attempt trên đề (dù đề đã published) → insert bị
+  //      chặn, 0 row.
+  const rq = await userA.from("exam_difficulty_ratings").insert({
+    exam_id: RATING_NO_ATTEMPT_EXAM_ID,
+    ...INITIAL_RATING_SCORES,
+  });
+  const rqRow = await admin
+    .from("exam_difficulty_ratings")
+    .select("id")
+    .eq("exam_id", RATING_NO_ATTEMPT_EXAM_ID)
+    .eq("user_id", userAId);
+  assert(
+    rq.error != null && (rqRow.data?.length ?? 0) === 0,
+    "R-q: User KHÔNG có submitted attempt → insert rating bị chặn (0 row)",
+  );
+
+  // R-r. Cùng user đủ điều kiện rate lại (upsert) với điểm mới → vẫn đúng 1 row,
+  //      điểm là điểm MỚI NHẤT (update-own path), không tạo row thứ hai.
+  const rr = await userA.from("exam_difficulty_ratings").upsert(
+    {
+      exam_id: RATING_PUBLISHED_EXAM_ID,
+      user_id: userAId,
+      ...UPDATED_RATING_SCORES,
+    },
+    { onConflict: "exam_id,user_id" },
+  );
+  const rrRow = await admin
+    .from("exam_difficulty_ratings")
+    .select("score_part1, score_part2, score_part3")
+    .eq("exam_id", RATING_PUBLISHED_EXAM_ID)
+    .eq("user_id", userAId);
+  assert(
+    rr.error == null &&
+      rrRow.data?.length === 1 &&
+      rrRow.data[0].score_part1 === UPDATED_RATING_SCORES.score_part1 &&
+      rrRow.data[0].score_part2 === UPDATED_RATING_SCORES.score_part2 &&
+      rrRow.data[0].score_part3 === UPDATED_RATING_SCORES.score_part3,
+    "R-r: Rate lại (upsert) → vẫn đúng 1 row, điểm là điểm mới nhất",
+  );
+
+  // R-s. User đủ điều kiện (CÓ submitted attempt) nhưng đề CHƯA published → write
+  //      bị chặn (with-check published clause), 0 row.
+  const rs = await userA.from("exam_difficulty_ratings").insert({
+    exam_id: RATING_NON_PUBLISHED_EXAM_ID,
+    ...INITIAL_RATING_SCORES,
+  });
+  const rsRow = await admin
+    .from("exam_difficulty_ratings")
+    .select("id")
+    .eq("exam_id", RATING_NON_PUBLISHED_EXAM_ID)
+    .eq("user_id", userAId);
+  assert(
+    rs.error != null && (rsRow.data?.length ?? 0) === 0,
+    "R-s: Đề CHƯA published → write rating bị chặn dù user đủ điều kiện khác (0 row)",
+  );
+
+  // R-t. Raw duplicate INSERT (không phải upsert) trên cùng (exam_id, user_id) đã có
+  //      row (từ R-p/R-r) → vi phạm unique constraint (23505), vẫn giữ đúng 1 row.
+  const rt = await userA.from("exam_difficulty_ratings").insert({
+    exam_id: RATING_PUBLISHED_EXAM_ID,
+    ...INITIAL_RATING_SCORES,
+  });
+  const rtRow = await admin
+    .from("exam_difficulty_ratings")
+    .select("id")
+    .eq("exam_id", RATING_PUBLISHED_EXAM_ID)
+    .eq("user_id", userAId);
+  assert(
+    rt.error != null &&
+      rt.error.code === "23505" &&
+      rtRow.data?.length === 1,
+    "R-t: Raw duplicate INSERT bị chặn bởi unique(exam_id, user_id) (23505), vẫn 1 row",
+  );
+
+  // R-u. select-own confinement: B KHÔNG đọc được rating của A; A đọc được rating
+  //      của chính mình.
+  const ruB = await userB
+    .from("exam_difficulty_ratings")
+    .select("id")
+    .eq("exam_id", RATING_PUBLISHED_EXAM_ID);
+  const ruA = await userA
+    .from("exam_difficulty_ratings")
+    .select("id")
+    .eq("exam_id", RATING_PUBLISHED_EXAM_ID);
+  assert(
+    !ruB.error &&
+      (ruB.data?.length ?? 0) === 0 &&
+      !ruA.error &&
+      (ruA.data?.length ?? 0) === 1,
+    "R-u: B KHÔNG đọc được rating của A (0 row); A đọc được rating của chính mình (1 row)",
+  );
+
+  // Dọn dẹp fixture Rating.
+  await cleanupRatingFixtures(admin);
 
   // Dọn dẹp fixture UGC.
   await cleanupUgcFixtures(admin);
