@@ -4,6 +4,7 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
+import { communityDifficultyFrom, RATING_MIN } from "@/lib/rating";
 import { resolveSignedImageUrl } from "@/lib/ugc/imageUrl";
 import type { Exam } from "@/types/exam";
 import type { Choice, PublicQuestion } from "@/types/question";
@@ -23,12 +24,17 @@ type ExamRow = {
   semester: string | null;
   author_display_name: string | null;
   parts: { number: number; title: string }[] | null;
+  /** Rating System (ADR-0008): từ view exams_with_difficulty, không phải bảng exams. */
+  rating_count: number;
+  avg_overall: number | null;
 };
 
 // Cột đề dùng chung cho mọi query exams (S#27: school/school_year/semester;
-// UGC v2.0: author_display_name cho byline; v2.1: parts cho heading phần).
+// UGC v2.0: author_display_name cho byline; v2.1: parts cho heading phần;
+// Rating System: rating_count/avg_overall — chỉ tồn tại khi đọc qua view
+// exams_with_difficulty, KHÔNG phải cột trên bảng exams (ADR-0008 Decision 1/2).
 const EXAM_COLUMNS =
-  "id, title, question_ids, duration_minutes, subject, grade, school, school_year, semester, author_display_name, parts";
+  "id, title, question_ids, duration_minutes, subject, grade, school, school_year, semester, author_display_name, parts, rating_count, avg_overall";
 
 function toExam(row: ExamRow): Exam {
   return {
@@ -43,13 +49,26 @@ function toExam(row: ExamRow): Exam {
     semester: row.semester ?? undefined,
     authorDisplayName: row.author_display_name ?? undefined,
     parts: row.parts ?? undefined,
+    communityDifficulty: communityDifficultyFrom(row.avg_overall, row.rating_count),
   };
 }
 
 // --- Reads ----------------------------------------------------------------
 
-/** Sort cho Exam Browser: theo created_at. "hardest" TẠM BỎ QUA (chờ rating). */
-export type ExamSort = "newest" | "oldest";
+/** Sort cho Exam Browser: theo created_at, hoặc "hardest" theo avg_overall (Rating System). */
+export type ExamSort = "newest" | "oldest" | "hardest";
+
+/** Bucket độ khó cộng đồng cho Level filter (khớp lowercase slug FE — IP-6). */
+export type ExamLevel = "easy" | "medium" | "hard";
+
+// Ranh giới avg_overall theo bucket (nửa-mở, khớp SOURCE/lib/rating's bucket()):
+// [1,4) Easy / [4,7) Medium / [7,10] Hard. Lọc DB-side (ADR-0008 Implementation
+// Guidance — không merge/lọc aggregate ở JS); cận dưới Easy tái dùng RATING_MIN.
+const LEVEL_RANGES: Record<ExamLevel, { gte: number; lt?: number }> = {
+  easy: { gte: RATING_MIN, lt: 4 },
+  medium: { gte: 4, lt: 7 },
+  hard: { gte: 7 },
+};
 
 export interface ExamFilters {
   subject?: string;
@@ -58,14 +77,17 @@ export interface ExamFilters {
   schoolYear?: number;
   semester?: string;
   sort?: ExamSort;
+  level?: ExamLevel;
 }
 
-/** Đề cho Exam Browser, lọc tuỳ chọn theo môn/lớp/trường/niên khóa/học kỳ (S#27). */
+/** Đề cho Exam Browser, lọc tuỳ chọn theo môn/lớp/trường/niên khóa/học kỳ/độ khó (S#27, Rating System). */
 export async function listExams(filters?: ExamFilters): Promise<Exam[]> {
   const supabase = await createClient();
   // R-7 guard (UGC v2.0): chỉ đề published vào catalog — dù RLS cho tác giả đọc
   // đề chưa published của mình, filter tường minh này chặn nó lọt vào browser.
-  let query = supabase.from("exams").select(EXAM_COLUMNS).eq("status", "published");
+  // Đọc qua view exams_with_difficulty (ADR-0008 Decision 2) — exams.* + 2 cột
+  // aggregate; .eq('status','published') giữ nguyên trên view (R-3).
+  let query = supabase.from("exams_with_difficulty").select(EXAM_COLUMNS).eq("status", "published");
   if (filters?.subject) query = query.eq("subject", filters.subject);
   if (filters?.grade !== undefined && !Number.isNaN(filters.grade)) {
     query = query.eq("grade", filters.grade);
@@ -75,11 +97,23 @@ export async function listExams(filters?: ExamFilters): Promise<Exam[]> {
     query = query.eq("school_year", filters.schoolYear);
   }
   if (filters?.semester) query = query.eq("semester", filters.semester);
-  // Newest/Oldest theo created_at; mặc định giữ order id (ổn định như trước).
+  // Level filter: bucket avg_overall DB-side; NULL (dưới ngưỡng) tự loại (AC-021).
+  if (filters?.level) {
+    const range = LEVEL_RANGES[filters.level];
+    query = query.gte("avg_overall", range.gte);
+    if (range.lt !== undefined) query = query.lt("avg_overall", range.lt);
+  }
+  // Newest/Oldest theo created_at; Hardest theo avg_overall (nulls-last, tie-break
+  // created_at/id — AC-019/020); mặc định giữ order id (ổn định như trước).
   if (filters?.sort === "newest") {
     query = query.order("created_at", { ascending: false });
   } else if (filters?.sort === "oldest") {
     query = query.order("created_at", { ascending: true });
+  } else if (filters?.sort === "hardest") {
+    query = query
+      .order("avg_overall", { ascending: false, nullsFirst: false })
+      .order("created_at")
+      .order("id");
   } else {
     query = query.order("id");
   }
@@ -124,17 +158,32 @@ export async function listExamFacets(): Promise<{
   return { subjects, grades, schools, years, semesters };
 }
 
-/** Một đề published theo id, hoặc null. R-7 guard: chỉ published (catalog/player). */
+/** Một đề published theo id, hoặc null. R-7 guard: chỉ published (catalog/player).
+ * Đọc qua view exams_with_difficulty — cùng nguồn quan hệ với listExams (ADR-0008). */
 export async function getExam(id: string): Promise<Exam | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
-    .from("exams")
+    .from("exams_with_difficulty")
     .select(EXAM_COLUMNS)
     .eq("id", id)
     .eq("status", "published")
     .maybeSingle();
   if (error) throw error;
   return data ? toExam(data as unknown as ExamRow) : null;
+}
+
+/**
+ * Set các examId mà user hiện tại đã nộp bài (Rating System — bật/tắt nút Rate, R4).
+ * Một round-trip, không N+1 mỗi thẻ đề (NFR Performance); rỗng nếu user chưa nộp bài nào.
+ */
+export async function listMySubmittedExamIds(): Promise<Set<string>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("exam_attempts")
+    .select("exam_id")
+    .eq("status", "submitted");
+  if (error) throw error;
+  return new Set((data as unknown as { exam_id: string }[]).map((row) => row.exam_id));
 }
 
 /**

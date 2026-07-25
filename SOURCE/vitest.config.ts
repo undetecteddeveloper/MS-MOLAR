@@ -4,6 +4,10 @@ import { defineConfig } from "vitest/config";
 // Nền test cho MS-MOLAR. Mặc định môi trường node (module thuần lib/ugc);
 // test component (RichText/QuestionFigure) tự khai `// @vitest-environment jsdom`
 // ở docblock đầu file. Alias "@/..." khớp tsconfig paths.
+// app/**: thu các *.test.ts dưới __tests__/ trong route groups (vd (layer2)/
+// __tests__/rating.int.test.ts) — trước đây chỉ lib/**+components/** được thu,
+// khiến các integration test app-layer không chạy dưới `npm test` (Rating
+// System backend task 4; quyết định dùng chung cho task 6/8 cùng file).
 export default defineConfig({
   resolve: {
     alias: {
@@ -12,6 +16,6 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["lib/**/*.test.{ts,tsx}", "components/**/*.test.{ts,tsx}"],
+    include: ["lib/**/*.test.{ts,tsx}", "components/**/*.test.{ts,tsx}", "app/**/*.test.{ts,tsx}"],
   },
 });

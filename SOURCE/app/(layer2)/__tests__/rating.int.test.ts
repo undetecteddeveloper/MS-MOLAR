@@ -3,10 +3,47 @@
 // PRD: docs/prd/rating-system-prd.md (v1.1, AC-001..AC-026)
 // Generated: 2026-07-24 | Budget Used: integration 3/3, fixture-e2e 2/3, service-integration-e2e 2/2
 //
-// Skeleton only — comments describing what the implementer must write. No imports, no
-// describe/it blocks yet (this file must stay green under tsc/eslint/build before the
-// referenced modules exist). Convert each block to a real vitest test alongside the
-// implementation task that creates the module it targets.
+// Test 2 converted to real vitest (backend task 4) — imports/describe/it blocks apply
+// only to Test 2 below. Test 1/Test 3 remain skeleton-only until their own
+// implementation tasks (rateExam / RatingModalController) create the targeted modules;
+// this file stays green under tsc/eslint/build for those two until converted.
+
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { fromMock } = vi.hoisted(() => ({ fromMock: vi.fn() }));
+
+// queries.ts imports "server-only" (throws outside a Next server/react-server bundle)
+// → stub, same pattern as SOURCE/lib/ugc/__tests__/extractMeta.test.ts.
+vi.mock("server-only", () => ({}));
+
+// Mock boundary: Supabase client only (backend DD Test Boundaries) — proves JS call
+// construction; real Postgres NULL/order/range semantics are covered by Task 1's
+// spike (S1-S4) and Task 9-backend's SE2, not by this mock.
+vi.mock("@/lib/supabase/server", () => ({
+  createClient: vi.fn(async () => ({ from: fromMock })),
+}));
+
+const { listExams } = await import("../queries");
+
+type BuilderCall = { method: string; args: unknown[] };
+
+/** Chainable + awaitable fake mirroring the Supabase query-builder surface listExams uses. */
+function createQueryBuilder(result: { data: unknown[]; error: null }) {
+  const calls: BuilderCall[] = [];
+  const builder: Record<string, unknown> = {};
+  const chain =
+    (method: string) =>
+    (...args: unknown[]) => {
+      calls.push({ method, args });
+      return builder;
+    };
+  for (const method of ["select", "eq", "gte", "lt", "order"]) {
+    builder[method] = chain(method);
+  }
+  builder.then = (onFulfilled: (value: typeof result) => unknown) =>
+    Promise.resolve(result).then(onFulfilled);
+  return { builder, calls };
+}
 
 // =============================================================================
 // Test 1 — rateExam: validation gate, upsert call shape, non-leaking error mapping
@@ -82,6 +119,141 @@
 //   (c) for sort:"newest"/"oldest" and no level filter, assert the pre-existing chain
 //       is unchanged (regression guard for AC-023 continuity — no accidental
 //       difficulty-filtering side effect on unrelated calls).
+
+describe("listExams — Hardest-sort and Level-filter query construction (Test 2)", () => {
+  beforeEach(() => {
+    fromMock.mockReset();
+  });
+
+  it("sort:'hardest' chains .order(avg_overall desc, nullsFirst:false).order(created_at).order(id) (AC-019/020, obligation a)", async () => {
+    const { builder, calls } = createQueryBuilder({ data: [], error: null });
+    fromMock.mockReturnValue(builder);
+
+    await listExams({ sort: "hardest" });
+
+    const orderCalls = calls.filter((c) => c.method === "order");
+    expect(orderCalls).toEqual([
+      { method: "order", args: ["avg_overall", { ascending: false, nullsFirst: false }] },
+      { method: "order", args: ["created_at"] },
+      { method: "order", args: ["id"] },
+    ]);
+  });
+
+  it.each([
+    ["easy", 1, 4],
+    ["medium", 4, 7],
+  ] as const)(
+    "level:'%s' chains .gte(avg_overall,%d).lt(avg_overall,%d) and preserves .eq(status,published) (AC-017/021, obligation b)",
+    async (level, gte, lt) => {
+      const { builder, calls } = createQueryBuilder({ data: [], error: null });
+      fromMock.mockReturnValue(builder);
+
+      await listExams({ level });
+
+      expect(calls).toContainEqual({ method: "gte", args: ["avg_overall", gte] });
+      expect(calls).toContainEqual({ method: "lt", args: ["avg_overall", lt] });
+      expect(calls).toContainEqual({ method: "eq", args: ["status", "published"] });
+    }
+  );
+
+  it("level:'hard' chains .gte(avg_overall,7) with no upper bound and preserves .eq(status,published) (AC-017/021, obligation b)", async () => {
+    const { builder, calls } = createQueryBuilder({ data: [], error: null });
+    fromMock.mockReturnValue(builder);
+
+    await listExams({ level: "hard" });
+
+    expect(calls).toContainEqual({ method: "gte", args: ["avg_overall", 7] });
+    expect(calls.some((c) => c.method === "lt")).toBe(false);
+    expect(calls).toContainEqual({ method: "eq", args: ["status", "published"] });
+  });
+
+  it("sort:'newest' leaves the pre-existing chain unchanged, with no gte/lt (AC-023 regression guard, obligation c)", async () => {
+    const { builder, calls } = createQueryBuilder({ data: [], error: null });
+    fromMock.mockReturnValue(builder);
+
+    await listExams({ sort: "newest" });
+
+    expect(calls).toContainEqual({ method: "order", args: ["created_at", { ascending: false }] });
+    expect(calls.some((c) => c.method === "gte" || c.method === "lt")).toBe(false);
+  });
+
+  it("sort:'oldest' leaves the pre-existing chain unchanged, with no gte/lt (AC-023 regression guard, obligation c)", async () => {
+    const { builder, calls } = createQueryBuilder({ data: [], error: null });
+    fromMock.mockReturnValue(builder);
+
+    await listExams({ sort: "oldest" });
+
+    expect(calls).toContainEqual({ method: "order", args: ["created_at", { ascending: true }] });
+    expect(calls.some((c) => c.method === "gte" || c.method === "lt")).toBe(false);
+  });
+
+  it("no sort/no level falls back to .order(id), with no gte/lt (AC-023 regression guard, obligation c)", async () => {
+    const { builder, calls } = createQueryBuilder({ data: [], error: null });
+    fromMock.mockReturnValue(builder);
+
+    await listExams({});
+
+    expect(calls).toContainEqual({ method: "order", args: ["id"] });
+    expect(calls.some((c) => c.method === "gte" || c.method === "lt")).toBe(false);
+  });
+});
+
+describe("toExam — communityDifficulty mapping is additive, byte-identical below threshold (backend DD Output Comparison)", () => {
+  beforeEach(() => {
+    fromMock.mockReset();
+  });
+
+  const baseRow = {
+    id: "exam-1",
+    title: "Đề kiểm tra",
+    question_ids: ["q1", "q2"],
+    duration_minutes: 45,
+    subject: "Toán",
+    grade: 10,
+    school: "THPT A",
+    school_year: 2025,
+    semester: "HK1",
+    author_display_name: "Cô B",
+    parts: null,
+  };
+
+  it("below-threshold row (rating_count<3) maps to communityDifficulty:null with every pre-existing field byte-identical", async () => {
+    const { builder } = createQueryBuilder({
+      data: [{ ...baseRow, rating_count: 2, avg_overall: null }],
+      error: null,
+    });
+    fromMock.mockReturnValue(builder);
+
+    const [exam] = await listExams();
+
+    expect(exam).toEqual({
+      id: "exam-1",
+      title: "Đề kiểm tra",
+      questionIds: ["q1", "q2"],
+      durationMinutes: 45,
+      subject: "Toán",
+      grade: 10,
+      school: "THPT A",
+      schoolYear: 2025,
+      semester: "HK1",
+      authorDisplayName: "Cô B",
+      parts: undefined,
+      communityDifficulty: null,
+    });
+  });
+
+  it("at-threshold row (rating_count=3) maps avg_overall/rating_count through communityDifficultyFrom without re-deriving bucket logic locally", async () => {
+    const { builder } = createQueryBuilder({
+      data: [{ ...baseRow, rating_count: 3, avg_overall: 6.0 }],
+      error: null,
+    });
+    fromMock.mockReturnValue(builder);
+
+    const [exam] = await listExams();
+
+    expect(exam.communityDifficulty).toEqual({ bucket: "Medium", mean: 6.0, count: 3 });
+  });
+});
 
 // =============================================================================
 // Test 3 — RatingModalController: idempotent ?rate=auto open condition

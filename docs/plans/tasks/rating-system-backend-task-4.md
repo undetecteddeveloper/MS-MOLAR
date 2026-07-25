@@ -11,10 +11,10 @@ Metadata:
 **Known gap to resolve first**: `SOURCE/vitest.config.ts`'s `include` glob (`["lib/**/*.test.{ts,tsx}", "components/**/*.test.{ts,tsx}"]`) does not currently collect `SOURCE/app/(layer2)/__tests__/**`, where `rating.int.test.ts` lives, and `npm test` runs `vitest run` against that config. Extend the `include` glob (or confirm/introduce the project's actual mechanism for running app-layer integration tests) before asserting Test 2 passes under `npm test` — this decision is shared with Tasks 6 and 8, which convert the other two blocks in the same file; do not have them re-decide it.
 
 ## Target Files
-- [ ] `SOURCE/types/exam.ts` (`Exam.communityDifficulty`)
-- [ ] `SOURCE/app/(layer2)/queries.ts` (`ExamRow`/`EXAM_COLUMNS`/`toExam`, `listExams`/`getExam`, `ExamSort`, `ExamFilters`, `listMySubmittedExamIds`)
-- [ ] `SOURCE/app/(layer2)/__tests__/rating.int.test.ts` (convert Test 2 only)
-- [ ] `SOURCE/vitest.config.ts` (extend `include` if needed to collect the integration test — resolve the known gap above)
+- [x] `SOURCE/types/exam.ts` (`Exam.communityDifficulty`)
+- [x] `SOURCE/app/(layer2)/queries.ts` (`ExamRow`/`EXAM_COLUMNS`/`toExam`, `listExams`/`getExam`, `ExamSort`, `ExamFilters`, `listMySubmittedExamIds`)
+- [x] `SOURCE/app/(layer2)/__tests__/rating.int.test.ts` (convert Test 2 only)
+- [x] `SOURCE/vitest.config.ts` (extend `include` if needed to collect the integration test — resolve the known gap above)
 
 ## Investigation Targets
 - `SOURCE/app/(layer2)/queries.ts:30-47` (`EXAM_COLUMNS`/`toExam` — single mapping point to extend)
@@ -59,21 +59,51 @@ Metadata:
 ## Investigation Notes
 (Record the vitest.config.ts resolution decision, and each Binding Decision / Reference Contract Compliance Check result, here before marking complete.)
 
+**Investigation Targets — key observations:**
+- `queries.ts:30-47` (pre-change): `ExamRow`/`EXAM_COLUMNS`/`toExam` are the single mapping point (as the task description states); `EXAM_COLUMNS` was a plain comma string selected from `"exams"`; `toExam` maps every snake_case DB column to a camelCase `Exam` field with `?? undefined` for nullable DB columns.
+- `queries.ts:52-89` (pre-change): `listExams` built the query via `let query = supabase.from("exams").select(EXAM_COLUMNS).eq("status","published")` then conditionally chained `.eq(...)` for subject/grade/school/schoolYear/semester, then a 3-branch sort (`newest`/`oldest`/default `.order("id")`); `hardest` was not a member of `ExamSort` (comment: "hardest TẠM BỎ QUA (chờ rating)") — confirms AC-019/020 was a documented no-op before this task.
+- `queries.ts:128-138` (pre-change, `getExam`): same shape as `listExams`, single-row `.maybeSingle()` against `"exams"`.
+- `types/exam.ts` (pre-change): every prior additive field (`school?`, `schoolYear?`, `semester?`, `authorDisplayName?`, `parts?`) is TS-optional; none of the existing fields is required-added.
+- Backend DD Data Flow / Data Contracts / Field Propagation Map / Interface Change Matrix / Data Representation Decision / Minimal Surface Alternatives / Security Considerations / Integration Point Map: read and applied verbatim — the exact `.gte`/`.lt`/`.order` chains implemented below are copied from § Data Flow's Read block, not re-derived.
+- Frontend DD § IP-6 (Field Propagation Map row for `level`): confirms `level` is the lowercase slug `easy|medium|hard` on the URL boundary (RESOLVED, backend DD already matches) — implemented `ExamLevel = "easy"|"medium"|"hard"` accordingly.
+- `rating.int.test.ts` Test 2 skeleton: proof obligations (a)-(c) transcribed into real `it` blocks; obligation (d) (byte-identical below-threshold `Exam`) added per this task's own Proof Obligations section.
+- `SOURCE/lib/ugc/__tests__/extractMeta.test.ts`/`extractors.test.ts`: repo-wide precedent for stubbing `server-only` in vitest (`vi.mock("server-only", () => ({}))`) — followed verbatim since `queries.ts` imports `server-only` and would otherwise throw when loaded under plain Node/vitest (no `react-server` condition).
+- `ExamFilters.tsx`/`exams/page.tsx` (read-only awareness only, Task 5 owns edits): both currently reference only `sort`/existing filters; no `level` wiring yet — confirms this task does not need to touch them.
+
+**vitest.config.ts known-gap resolution:** extended `include` to add `"app/**/*.test.{ts,tsx}"` alongside the existing `"lib/**/*.test.{ts,tsx}"` and `"components/**/*.test.{ts,tsx}"` globs. This collects `SOURCE/app/(layer2)/__tests__/rating.int.test.ts` (and any future `app/**/__tests__` test the same file gains when Tasks 6/8 convert Test 1/Test 3) without narrowing to one file path — shared decision, not to be re-litigated by Tasks 6/8. Verified: `npx vitest run app` now collects and passes the 9 Test 2 cases; `npm test` (`vitest run`, full `SOURCE` root) also collects and runs them (see Operation Verification below).
+
+**Binding Decisions — Compliance Check evaluation:**
+- Row 1 (ADR-0008 § Decision, `data_flow` axis — community difficulty computed on-read only, no denormalized cache/trigger/backfill): planned approach — `listExams`/`getExam` read `communityDifficulty` exclusively via `communityDifficultyFrom(row.avg_overall, row.rating_count)` inside `toExam`, sourced from the `exams_with_difficulty` view's two selected columns; no write to any `exams` column anywhere in this task's diff, no client-side aggregate merge (the aggregate arrives pre-computed from the view). Evaluation: **Y** — grep of the diff confirms no `.update`/`.insert` on `exams`, and `toExam` only reads `row.avg_overall`/`row.rating_count`, never recomputes an aggregate from multiple raw rating rows in JS.
+- Row 2 (ADR-0008 § Implementation Guidance, `placement` axis — ordering/threshold/filtering must stay DB-side): planned approach — `hardest` sort and `level` filter are implemented exclusively as chained `.order`/`.gte`/`.lt` calls on the Supabase query builder against `exams_with_difficulty`; no `.filter()`/`.sort()`/`.reduce()` JS-side post-processing of the returned rows anywhere in `listExams`. Evaluation: **Y** — confirmed by reading the final `listExams` body: the only JS-side step after `await query` is `.map(toExam)`, which is a per-row field transform, not an aggregate-based sort/filter.
+
+**Reference Contracts — Compliance Check evaluation:**
+- Row 1 (derived-display, bucket mapping via `communityDifficultyFrom`): planned approach — `toExam` calls `communityDifficultyFrom(row.avg_overall, row.rating_count)` (imported from `@/lib/rating`), no local re-implementation of `bucket()`/threshold comparison. Evaluation: **Y** — verified by reading `toExam`'s single line; also covered by the added test "at-threshold row … maps … through communityDifficultyFrom" (`communityDifficultyFrom(6.0,3) → {bucket:"Medium",mean:6.0,count:3}`, matching `SOURCE/lib/rating`'s own fixture).
+- Row 2 (state-lifecycle-negative, `avg_overall=null` → `communityDifficulty=null`): planned approach — same `communityDifficultyFrom` call; the helper itself (Task 3, already unit-tested) returns `null` when `avgOverall===null` or `ratingCount<RATING_THRESHOLD`. Evaluation: **Y** — verified by the added test "below-threshold row (rating_count<3) maps to communityDifficulty:null …", which passed.
+- Row 3 (derived-display, exact `hardest` `.order` chain): planned approach — literal `.order("avg_overall",{ascending:false,nullsFirst:false}).order("created_at").order("id")`, copied verbatim from backend DD § Data Flow. Evaluation: **Y** — verified by the added test asserting `orderCalls` equals exactly that 3-call sequence in that order; test passed.
+- Row 4 (derived-display, exact `.gte`/`.lt` boundary pairs per bucket): planned approach — `LEVEL_RANGES` table `{easy:{gte:RATING_MIN(=1),lt:4}, medium:{gte:4,lt:7}, hard:{gte:7}}`. Evaluation: **Y** — verified by the added parametrized test (`easy`→gte 1/lt 4, `medium`→gte 4/lt 7) and the separate `hard` test (gte 7, no `.lt` call); all passed.
+
+**Change Category sweep (boundary-change, bug-fix) — Proof Obligation 3/4 baselines and results:**
+- Baseline (pre-change, recorded above): `newest`/`oldest`/no-filter chains and the below-threshold `Exam` shape (no `communityDifficulty` field at all, since the field didn't exist).
+- Post-change: added tests assert `newest`/`oldest`/no-sort-no-level chains contain no `gte`/`lt` calls and the same `.order` call as before (`created_at` desc/asc, or `.order("id")`), i.e. unaffected by the relation swap or the 2 new selected columns — all passed (Proof Obligation 3, AC-023 continuity).
+- Post-change: added test asserts a below-threshold fixture row maps to an `Exam` object whose every pre-existing field is byte-identical to what `toExam` would have produced pre-change, plus the additive `communityDifficulty: null` — passed via `toEqual` on the full object (Proof Obligation 4, backend DD Output Comparison).
+
+**Design decision beyond the task's literal text — `Exam.communityDifficulty` typed optional (`?:`), not required:** the backend DD's Data Contract writes the type without a TS `?` modifier. Making it a *required* field broke `tsc --noEmit` on `SOURCE/lib/fake-data/exams.ts` (a GĐ1 "TẠM THỜI" fixture, still consumed by `supabase/seed.ts` and a `RichText` regression test, typed as `Exam[]`), which is out of this task's Target Files. Every other additive `Exam` field in the codebase (`school?`, `schoolYear?`, `semester?`, `authorDisplayName?`, `parts?`) is optional — Reference Representativeness check confirms this is the repo-wide, not just nearby, convention for this exact interface. Chose optional: (1) matches the established pattern for every prior additive field on this interface, (2) `toExam` (the sole producer this task's Reference Contracts govern) always assigns the field explicitly to `null` or the computed object — never omits it — so the Reference Contracts' "null exactly when …" guarantee holds byte-for-byte regardless of the TS modifier, (3) avoids an edit to an out-of-scope file for a purely mechanical, non-functional compile fix. Did not touch `lib/fake-data/exams.ts`.
+
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
-- [ ] Read all Investigation Targets and record key observations
-- [ ] Resolve the `vitest.config.ts` known gap (see above) so the converted Test 2 can actually run under `npm test`
-- [ ] Sweep the adjacent cases per Change Category: confirm what the current `newest`/`oldest`/no-filter query chain looks like (so Proof Obligation 3 has a concrete "before" baseline) and what the current below-threshold `Exam` shape looks like (so Proof Obligation 4 has a concrete baseline)
-- [ ] Review dependency deliverables: Task 1's view/RPC column names; Task 3's `communityDifficultyFrom`/`bucket`/`formatMean` signatures
-- [ ] Convert Test 2's skeleton comments into real `describe`/`it` blocks against a mocked Supabase query-builder chain; run and confirm failure (module/branches don't exist yet)
+- [x] Read all Investigation Targets and record key observations
+- [x] Resolve the `vitest.config.ts` known gap (see above) so the converted Test 2 can actually run under `npm test`
+- [x] Sweep the adjacent cases per Change Category: confirm what the current `newest`/`oldest`/no-filter query chain looks like (so Proof Obligation 3 has a concrete "before" baseline) and what the current below-threshold `Exam` shape looks like (so Proof Obligation 4 has a concrete baseline)
+- [x] Review dependency deliverables: Task 1's view/RPC column names; Task 3's `communityDifficultyFrom`/`bucket`/`formatMean` signatures
+- [x] Convert Test 2's skeleton comments into real `describe`/`it` blocks against a mocked Supabase query-builder chain; run and confirm failure (module/branches don't exist yet)
 
 ### 2. Green Phase
-- [ ] Add the minimal `queries.ts`/`types/exam.ts` changes to pass the converted Test 2
-- [ ] Run only the added tests and confirm they pass
+- [x] Add the minimal `queries.ts`/`types/exam.ts` changes to pass the converted Test 2
+- [x] Run only the added tests and confirm they pass
 
 ### 3. Refactor Phase
-- [ ] Improve code (maintain passing tests) — confirm `EXAM_COLUMNS` selects from the view/RPC consistently between `listExams` and `getExam`
-- [ ] Confirm added tests still pass
+- [x] Improve code (maintain passing tests) — confirm `EXAM_COLUMNS` selects from the view/RPC consistently between `listExams` and `getExam`
+- [x] Confirm added tests still pass
 
 ## Quality Assurance Mechanisms
 - ESLint / Prettier / `tsc` strict — Enforces: style, formatting, types — Config: project root
@@ -112,12 +142,12 @@ Metadata:
   - **Residual**: none.
 
 ## Completion Criteria
-- [ ] All added tests pass
-- [ ] Operation verified per Operation Verification Methods above
-- [ ] Each Proof Obligation is met
-- [ ] Every Binding Decision Compliance Check evaluates to `Y`, with evidence recorded in Investigation Notes
-- [ ] Every Reference Contract Compliance Check evaluates to `Y`, with evidence recorded in Investigation Notes
-- [ ] The `vitest.config.ts` known gap is resolved and recorded (extended include glob, or documented alternative mechanism)
+- [x] All added tests pass
+- [x] Operation verified per Operation Verification Methods above
+- [x] Each Proof Obligation is met
+- [x] Every Binding Decision Compliance Check evaluates to `Y`, with evidence recorded in Investigation Notes
+- [x] Every Reference Contract Compliance Check evaluates to `Y`, with evidence recorded in Investigation Notes
+- [x] The `vitest.config.ts` known gap is resolved and recorded (extended include glob, or documented alternative mechanism)
 
 ## Notes
 - Impact scope: `SOURCE/types/exam.ts`, `SOURCE/app/(layer2)/queries.ts`, the Test 2 block of `rating.int.test.ts`, and (if needed) `SOURCE/vitest.config.ts`.

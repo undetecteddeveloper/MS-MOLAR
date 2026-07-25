@@ -1,6 +1,8 @@
 // Data model — Exam (Layer 2 Core Loop).
 // Contract giữ vào production (xem PROJECT_ROADMAP.md M1.1).
 
+import type { CommunityDifficulty } from "@/lib/rating";
+
 export interface Exam {
   id: string;
   title: string;
@@ -28,4 +30,13 @@ export interface Exam {
    * nhóm câu hỏi ở player/review. undefined/null = đề 1 phần (không heading).
    */
   parts?: { number: number; title: string }[];
+  /**
+   * Độ khó do cộng đồng đánh giá (Rating System, ADR-0008) — derived on read
+   * từ view `exams_with_difficulty`, KHÔNG lưu trên bảng `exams`. `toExam`
+   * (queries.ts) luôn gán giá trị này — `null` khi đề có < `RATING_THRESHOLD`
+   * lượt đánh giá (frontend hiển thị "—", R6/R7/R8). Optional (như các field
+   * bổ sung khác trên `Exam`: `school?`/`parts?`) để không bắt buộc các nguồn
+   * `Exam` khác `toExam` (vd GĐ1 fake-data) phải khai báo field này.
+   */
+  communityDifficulty?: CommunityDifficulty | null;
 }
