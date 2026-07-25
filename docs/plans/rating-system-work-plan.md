@@ -266,14 +266,14 @@ flowchart TD
 **Verification**: integration Test 1 (mocked Supabase client); vitest (jsdom) `CircleScale`.
 
 #### Tasks
-- [ ] **Task 6 — Backend write path**: `rateExam(examId, scores)` — validates via `isValidPartScore`, early eligibility precheck (UX; RLS remains authoritative), `.upsert(..., {onConflict:'exam_id,user_id'})`, maps DB errors to `{error:"server"}` without leaking, logs `console.error("[rateExam]", ...)`. `getMyRating(examId)` — reads the caller's own row via `ratings_select_own` RLS, returns `{partI,partII,partIII}|null`, throws on infra error. Both added beside `SOURCE/app/(layer2)/actions.ts`. Convert integration Test 1 (`rating.int.test.ts`) into a real vitest test against a mocked Supabase client boundary.
+- [x] **Task 6 — Backend write path**: `rateExam(examId, scores)` — validates via `isValidPartScore`, early eligibility precheck (UX; RLS remains authoritative), `.upsert(..., {onConflict:'exam_id,user_id'})`, maps DB errors to `{error:"server"}` without leaking, logs `console.error("[rateExam]", ...)`. `getMyRating(examId)` — reads the caller's own row via `ratings_select_own` RLS, returns `{partI,partII,partIII}|null`, throws on infra error. Both added beside `SOURCE/app/(layer2)/actions.ts`. Convert integration Test 1 (`rating.int.test.ts`) into a real vitest test against a mocked Supabase client boundary.
   - Proof obligations: skeleton `rating.int.test.ts` Test 1 proof obligations (a)-(c).
 - [ ] **Task 7 — Frontend rating form**: `SOURCE/components/rating/CircleScale.tsx` (+ jsdom test: roving tabindex, Arrow/Home/End/Space/Enter, `aria-checked`, no out-of-range value) and the shared client core `RatingForm` (+ `RatingOverview`/`PartCard`/`PartDetail`) implementing the 5-state machine (Empty/Partial/Complete/Submitting/Saved/Error) with the live `readoutModel` readout; `RatePageShell` (bubble-expand) + new route `SOURCE/app/(layer2)/exams/[id]/rate/page.tsx` (getExam → 404; server-side eligibility gate via `listMySubmittedExamIds()`; `getMyRating` prefill via `mapFromMyRating`); `submitRating.ts` adapter mapping `PartId→partI/II/III` and the error union to `rateErrorMessage` copy. Add `PART_META`, `readoutModel`, `rateErrorMessage`, `mapFromMyRating` to `SOURCE/lib/rating/` (node vitest).
   - Proof obligations: frontend DD Acceptance Criteria — Rating form section (AC-001, AC-002/024, AC-006/013, Golden State 1, AC-003/009/012, AC-025/008 UI side).
 - [ ] Quality check (staged): lint, typecheck, vitest (node+jsdom) — zero errors.
 
 #### Phase Completion Criteria
-- [ ] `rateExam`/`getMyRating` contracts match the backend DD exactly (status object, never redirect; non-leaking error mapping)
+- [x] `rateExam`/`getMyRating` contracts match the backend DD exactly (status object, never redirect; non-leaking error mapping)
 - [ ] `CircleScale` meets the WCAG 2.1 AA keyboard model; standalone `/exams/[id]/rate` rates an eligible user end-to-end and rejects a direct-URL ineligible visit server-side
 
 ### Phase 3: Vertical Slice C — Result-page modal integration (Estimated commits: 1)

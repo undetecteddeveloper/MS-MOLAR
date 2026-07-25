@@ -24,6 +24,7 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 
 const { listExams } = await import("../queries");
+const { rateExam, getMyRating } = await import("../actions");
 
 type BuilderCall = { method: string; args: unknown[] };
 
@@ -80,6 +81,171 @@ function createQueryBuilder(result: { data: unknown[]; error: null }) {
 //   (c) a simulated Supabase error on upsert resolves to exactly { error: "server" } —
 //       assert the returned object has no other keys and does not contain the mocked
 //       error's message/code (AC-025, non-leaking mapping).
+
+describe("rateExam — validation gate, upsert call shape, non-leaking error mapping (Test 1)", () => {
+  beforeEach(() => {
+    fromMock.mockReset();
+  });
+
+  const validScores = { partI: 8, partII: 7, partIII: 9 };
+
+  /** Wires fromMock so the eligibility precheck (exam_attempts) finds a submitted
+   * attempt and the upsert (exam_difficulty_ratings) resolves via upsertMock. */
+  function mockEligibleWithUpsert(upsertMock: ReturnType<typeof vi.fn>) {
+    fromMock.mockImplementation((table: string) => {
+      if (table === "exam_attempts") {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => Promise.resolve({ count: 1, error: null }),
+            }),
+          }),
+        };
+      }
+      if (table === "exam_difficulty_ratings") {
+        return { upsert: upsertMock };
+      }
+      throw new Error(`unexpected table: ${table}`);
+    });
+  }
+
+  it("obligation (a): a non-integer or out-of-range part score resolves to {error:'invalid'} without touching the Supabase client (AC-002)", async () => {
+    const outOfRange = await rateExam("exam-1", { partI: 11, partII: 5, partIII: 5 });
+    expect(outOfRange).toEqual({ error: "invalid" });
+
+    const nonInteger = await rateExam("exam-1", { partI: 5.5, partII: 5, partIII: 5 });
+    expect(nonInteger).toEqual({ error: "invalid" });
+
+    expect(fromMock).not.toHaveBeenCalled();
+  });
+
+  it("obligation (b): three valid scores invoke upsert(..., {onConflict:'exam_id,user_id'}) exactly once with score_part1/2/3 mapped from partI/partII/partIII (AC-012)", async () => {
+    const upsertMock = vi.fn(async () => ({ error: null }));
+    mockEligibleWithUpsert(upsertMock);
+
+    const result = await rateExam("exam-1", validScores);
+
+    expect(result).toEqual({});
+    expect(upsertMock).toHaveBeenCalledTimes(1);
+    // Exact match (not objectContaining): proves user_id is absent from the payload
+    // (DB-defaulted to auth.uid(), never taken from input — backend DD Security
+    // Considerations). objectContaining would let a leaked client-supplied user_id
+    // pass through this assertion undetected.
+    expect(upsertMock).toHaveBeenCalledWith(
+      { exam_id: "exam-1", score_part1: 8, score_part2: 7, score_part3: 9 },
+      { onConflict: "exam_id,user_id" }
+    );
+  });
+
+  it("obligation (c): a simulated Supabase error on upsert resolves to exactly {error:'server'} with no leaked message/code (AC-025)", async () => {
+    const upsertMock = vi.fn(async () => ({
+      error: { code: "23503", message: "secret constraint detail" },
+    }));
+    mockEligibleWithUpsert(upsertMock);
+
+    const result = await rateExam("exam-1", validScores);
+
+    expect(result).toEqual({ error: "server" });
+    expect(Object.keys(result)).toEqual(["error"]);
+    expect(JSON.stringify(result)).not.toContain("secret constraint detail");
+    expect(JSON.stringify(result)).not.toContain("23503");
+  });
+
+  // AC-003 (backend DD Data Contracts, rateExam): eligibility precheck (exists
+  //   submitted attempt) -> else { error: "ineligible" } (UX; RLS with-check
+  //   remains the authoritative gate per ADR-0008 Decision 3 — not covered by the
+  //   skeleton's obligations (a)-(c), added for the Binding Decision compliance
+  //   check).
+  // Behavior: rateExam(examId, validScores) is called with a mocked exam_attempts
+  //   count of 0 (no submitted attempt) -> the precheck short-circuits before any
+  //   upsert call.
+  // @category: edge-case
+  // @dependency: SOURCE/app/(layer2)/actions.ts (rateExam) + mocked Supabase
+  //   client (createClient() boundary)
+  it("no submitted attempt resolves to {error:'ineligible'} without invoking upsert (backend DD eligibility precheck; UX-only, RLS remains authoritative)", async () => {
+    const upsertMock = vi.fn();
+    fromMock.mockImplementation((table: string) => {
+      if (table === "exam_attempts") {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => Promise.resolve({ count: 0, error: null }),
+            }),
+          }),
+        };
+      }
+      if (table === "exam_difficulty_ratings") {
+        return { upsert: upsertMock };
+      }
+      throw new Error(`unexpected table: ${table}`);
+    });
+
+    const result = await rateExam("exam-1", validScores);
+
+    expect(result).toEqual({ error: "ineligible" });
+    expect(upsertMock).not.toHaveBeenCalled();
+  });
+});
+
+// AC-013: "...getMyRating(examId) returns their currently stored three scores (or
+//   null if none)..." — not in the skeleton's Test 1 proof obligations (a)-(c);
+//   added per this task's Proof Obligations (derived from AC-013).
+// Behavior: getMyRating(examId) is called against a mocked Supabase client
+//   boundary -> reads only the caller's own row (ratings_select_own RLS scope) ->
+//   maps score_part1/2/3 to partI/partII/partIII, or returns null if absent, or
+//   throws on infra error (Server Component boundary, consistent with getExam).
+// @category: core-functionality
+// @lane: integration
+// @dependency: SOURCE/app/(layer2)/actions.ts (getMyRating) + mocked Supabase
+//   client (createClient() boundary)
+// @real-dependency: none — same sanctioned mock boundary as rateExam; cross-user
+//   select-own isolation is proven by Task 2's RLS suite (R-u), not this test.
+describe("getMyRating — caller's own three stored scores, or null (Test 1 extension, AC-013)", () => {
+  beforeEach(() => {
+    fromMock.mockReset();
+  });
+
+  function mockRow(row: { score_part1: number; score_part2: number; score_part3: number } | null) {
+    fromMock.mockReturnValue({
+      select: () => ({
+        eq: () => ({
+          maybeSingle: async () => ({ data: row, error: null }),
+        }),
+      }),
+    });
+  }
+
+  it("returns {partI,partII,partIII} mapped from score_part1/2/3 when a row exists", async () => {
+    mockRow({ score_part1: 8, score_part2: 7, score_part3: 9 });
+
+    const result = await getMyRating("exam-1");
+
+    expect(result).toEqual({ partI: 8, partII: 7, partIII: 9 });
+  });
+
+  it("returns null when the caller has not rated this exam", async () => {
+    mockRow(null);
+
+    const result = await getMyRating("exam-1");
+
+    expect(result).toBeNull();
+  });
+
+  it("throws on infrastructure error instead of swallowing it", async () => {
+    fromMock.mockReturnValue({
+      select: () => ({
+        eq: () => ({
+          maybeSingle: async () => ({
+            data: null,
+            error: { code: "500", message: "infra failure" },
+          }),
+        }),
+      }),
+    });
+
+    await expect(getMyRating("exam-1")).rejects.toBeTruthy();
+  });
+});
 
 // =============================================================================
 // Test 2 — listExams: Hardest-sort and Level-filter query construction
