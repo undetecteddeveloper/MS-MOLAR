@@ -8,9 +8,16 @@
 //    (khớp bề ngang navbar) để lưới hiển thị tới 3 card/hàng.
 // Visual language "tờ giấy trắng / focused". Bộ lọc qua URL searchParams → re-query.
 
-import { listExams, listExamFacets, type ExamSort } from "@/app/(layer2)/queries";
+import {
+  listExams,
+  listExamFacets,
+  listMySubmittedExamIds,
+  type ExamSort,
+  type ExamLevel,
+} from "@/app/(layer2)/queries";
 import { ExamBrowser } from "@/app/(layer2)/_components/ExamBrowser";
 import { ExamFilters } from "@/app/(layer2)/_components/ExamFilters";
+import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 
 type SearchParams = Promise<{
   subject?: string;
@@ -19,7 +26,7 @@ type SearchParams = Promise<{
   year?: string;
   semester?: string;
   sort?: string;
-  hardest?: string;
+  level?: string;
 }>;
 
 export default async function ExamsPage({
@@ -33,16 +40,25 @@ export default async function ExamsPage({
   const school = sp.school || undefined;
   const year = sp.year ? Number(sp.year) : undefined;
   const semester = sp.semester || undefined;
-  // Chỉ nhận giá trị sort hợp lệ. Hardest (S#28) là param RIÊNG độc lập với
-  // sort — chỉ giữ state UI checkbox, KHÔNG truyền vào listExams (chưa có data
-  // độ khó để sắp xếp — chờ tính năng rating).
+  // D002 (Rating System frontend DD): MỘT trục ?sort= — newest/oldest/hardest
+  // loại trừ nhau, forward thẳng vào listExams (thay ?hardest=1 độc lập cũ,
+  // vốn là no-op). Giá trị lạ → undefined (Field Propagation Map: "unknown
+  // value → no sort", không crash, không lọc/sort ngoài ý muốn).
   const sort: ExamSort | undefined =
-    sp.sort === "newest" || sp.sort === "oldest" ? sp.sort : undefined;
-  const hardest = sp.hardest === "1";
+    sp.sort === "newest" || sp.sort === "oldest" || sp.sort === "hardest"
+      ? sp.sort
+      : undefined;
+  // Level — lowercase slug (IP-6), giá trị lạ → undefined ("no Level filter applied").
+  const level: ExamLevel | undefined =
+    sp.level === "easy" || sp.level === "medium" || sp.level === "hard"
+      ? sp.level
+      : undefined;
 
-  const [exams, facets] = await Promise.all([
-    listExams({ subject, grade, school, schoolYear: year, semester, sort }),
+  const [exams, facets, submittedExamIds, user] = await Promise.all([
+    listExams({ subject, grade, school, schoolYear: year, semester, sort, level }),
     listExamFacets(),
+    listMySubmittedExamIds(),
+    getCurrentUser(),
   ]);
 
   return (
@@ -59,9 +75,8 @@ export default async function ExamsPage({
             schools={facets.schools}
             years={facets.years}
             semesters={facets.semesters}
-            selected={{ subject, grade, school, year, semester }}
+            selected={{ subject, grade, school, year, semester, level }}
             sort={sort}
-            hardest={hardest}
           />
 
           {/* preload order 2 — lưới card fade sau navbar (0) + filter (1) (S#21). */}
@@ -69,7 +84,11 @@ export default async function ExamsPage({
             className="preload-fade min-w-0 flex-1 px-4 py-5"
             style={{ "--preload-order": 2 } as React.CSSProperties}
           >
-            <ExamBrowser exams={exams} />
+            <ExamBrowser
+              exams={exams}
+              submittedExamIds={submittedExamIds}
+              isLoggedIn={user !== null}
+            />
           </div>
         </div>
       </main>

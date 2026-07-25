@@ -11,6 +11,7 @@ import { hasReported } from "@/app/(layer4)/queries";
 import { StartAttemptButton } from "@/app/(layer2)/_components/StartAttemptButton";
 import { ReportExam } from "@/app/(layer2)/_components/ReportExam";
 import { AuthorByline } from "@/components/shared/AuthorByline";
+import { DifficultyBadge } from "@/components/rating/DifficultyBadge";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 
 export default async function ExamDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -49,8 +50,9 @@ export default async function ExamDetailPage({ params }: { params: Promise<{ id:
 
           {/* S#28: điền data DB thật vào page — thêm School/Year/Semester
               (null → "None"). 6 ô = lưới 2×3 đều → bỏ hack căn giữa col-span
-              của ô Difficulty (S#26, chỉ cần khi lẻ ô). Difficulty giữ "—"
-              (tính năng chưa xây — tính từ rating user, tương lai). */}
+              của ô Difficulty (S#26, chỉ cần khi lẻ ô). Difficulty giờ hiển
+              thị DifficultyBadge (Rating System, ADR-0008) — "—" khi < 3
+              lượt đánh giá (AC-016). */}
           <dl className="mt-8 grid w-full max-w-md grid-cols-2 gap-4">
             <div className="border-border bg-card rounded-lg border p-5">
               <dt className="eyebrow">Questions</dt>
@@ -96,7 +98,7 @@ export default async function ExamDetailPage({ params }: { params: Promise<{ id:
             </div>
             <div className="border-border bg-card rounded-lg border p-5">
               <dt className="eyebrow">Difficulty</dt>
-              <dd className="text-muted-foreground mt-2 font-serif text-2xl">—</dd>
+              <DifficultyBadge communityDifficulty={exam.communityDifficulty} variant="detail" />
             </div>
           </dl>
 

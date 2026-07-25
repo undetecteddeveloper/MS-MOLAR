@@ -10,11 +10,18 @@
 //  - Mỗi filter có toggle riêng; mở "bảng chọn" cũng là overlay (absolute) nên
 //    KHÔNG làm xê dịch bố cục các filter khác.
 // State lọc ở URL searchParams (UI-LAYER-MAP Mục 9) → Server Component re-query.
-// S#27: Subject/Grade/School/Year/Semester lọc thật từ DB; Level tượng trưng
-// (chờ rating). Quick sort: Newest/Oldest gắn ?sort=; Hardest chưa gắn (chờ rating).
+// S#27: Subject/Grade/School/Year/Semester lọc thật từ DB. Rating System
+// (D002, frontend DD): Level giờ lọc thật (avg_overall bucket, DB-side);
+// Hardest gộp vào MỘT trục ?sort= (newest|oldest|hardest, loại trừ nhau) —
+// KHÔNG còn ?hardest=1 độc lập (thay đổi hành vi có chủ đích, đã xác nhận
+// tại design [Stop], thay thế thiết kế Hardest-độc-lập cũ ở S#28).
 
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
+
+/** Rating System — khớp ExamSort (queries.ts) + ExamLevel lowercase slug (IP-6). */
+type ExamSort = "newest" | "oldest" | "hardest";
+type ExamLevel = "easy" | "medium" | "hard";
 
 interface ExamFiltersProps {
   subjects: string[];
@@ -28,20 +35,25 @@ interface ExamFiltersProps {
     school?: string;
     year?: number;
     semester?: string;
+    level?: ExamLevel;
   };
-  sort?: string;
-  hardest?: boolean;
+  sort?: ExamSort;
 }
 
-// Lọc nhanh — 3 ô checkbox NGOÀI dropdown, xếp dọc.
-// S#28: 2 chiều ĐỘC LẬP — Newest/Oldest dùng chung ?sort= (loại trừ nhau);
-// Hardest dùng ?hardest=1 riêng → tick được đồng thời với Newest HOẶC Oldest.
-// Hardest chỉ lưu state URL, CHƯA đổi thứ tự (chưa có data độ khó — chờ rating).
-const QUICK = [
-  { value: "newest", label: "Newest", kind: "sort" },
-  { value: "oldest", label: "Oldest", kind: "sort" },
-  { value: "hardest", label: "Hardest", kind: "hardest" },
-] as const;
+// Lọc nhanh — 3 ô checkbox NGOÀI dropdown, xếp dọc, tất cả CÙNG trục ?sort=
+// (D002): chọn 1 tự loại trừ 2 cái còn lại (toggle lại chính nó → bỏ sort).
+const QUICK: { value: ExamSort; label: string }[] = [
+  { value: "newest", label: "Newest" },
+  { value: "oldest", label: "Oldest" },
+  { value: "hardest", label: "Hardest" },
+];
+
+const LEVEL_OPTIONS: { value: ExamLevel | ""; label: string }[] = [
+  { value: "", label: "All" },
+  { value: "easy", label: "Easy" },
+  { value: "medium", label: "Medium" },
+  { value: "hard", label: "Hard" },
+];
 
 // rgba khai báo tường minh trong source (theo #Yêu cầu) để làm nổi bật *Filter.
 // Tông ngà #EDE1C8 theo theme Mực & Sơn mài (S#17) thay trắng thuần.
@@ -57,7 +69,6 @@ export function ExamFilters({
   semesters,
   selected,
   sort,
-  hardest = false,
 }: ExamFiltersProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -85,7 +96,8 @@ export function ExamFilters({
     selected.grade !== undefined ||
     selected.school !== undefined ||
     selected.year !== undefined ||
-    selected.semester !== undefined;
+    selected.semester !== undefined ||
+    selected.level !== undefined;
 
   return (
     <>
@@ -228,28 +240,33 @@ export function ExamFilters({
                 ]}
                 onSelect={(v) => setParam("semester", v)}
               />
-              {/* Tượng trưng — Level tính từ rating user, tính năng tương lai
-                  (quyết định C&D S#27 #2). */}
-              <FilterRow label="Level" symbolic last />
+              {/* Level — bucket độ khó cộng đồng (Rating System, D002 sibling
+                  change: real FilterRow thay panel "Coming soon"). */}
+              <FilterRow
+                label="Level"
+                selectedLabel={
+                  LEVEL_OPTIONS.find((o) => o.value === (selected.level ?? ""))
+                    ?.label || undefined
+                }
+                currentValue={selected.level ?? ""}
+                options={LEVEL_OPTIONS}
+                onSelect={(v) => setParam("level", v)}
+                last
+              />
             </div>
           )}
 
-          {/* Lọc nhanh — 3 ô CHECKBOX (chưa gắn hành vi). Mép phải mỗi ô canh
-              đúng viền phải tay nắm: đặt absolute right-0 trong .relative
-              (right-0 = mép phải handle = đường kẻ). w-max nới text sang TRÁI,
-              checkbox luôn ghim mép phải nên cả 3 ô thẳng hàng trên đường kẻ. */}
+          {/* Lọc nhanh — 3 ô CHECKBOX, CÙNG trục ?sort= (D002): chọn 1 tự bỏ
+              chọn 2 cái còn lại (dùng chung param, loại trừ nhau). Mép phải
+              mỗi ô canh đúng viền phải tay nắm: đặt absolute right-0 trong
+              .relative (right-0 = mép phải handle = đường kẻ). w-max nới text
+              sang TRÁI, checkbox luôn ghim mép phải nên cả 3 ô thẳng hàng. */}
           <div className="absolute right-0 top-full mt-3 flex w-max flex-col gap-2">
             {QUICK.map((q) => {
-              const checked =
-                q.kind === "sort" ? sort === q.value : hardest;
+              const checked = sort === q.value;
               return (
                 <label
                   key={q.value}
-                  title={
-                    q.kind === "hardest"
-                      ? "Difficulty ranking coming soon"
-                      : undefined
-                  }
                   className="flex cursor-pointer items-center justify-between gap-2 whitespace-nowrap text-sm text-foreground"
                 >
                   {q.label}
@@ -258,14 +275,9 @@ export function ExamFilters({
                     className="size-4 accent-brand"
                     checked={checked}
                     onChange={() => {
-                      if (q.kind === "sort") {
-                        // Toggle: chọn lại chính nó → bỏ sort; Newest/Oldest
-                        // loại trừ nhau vì dùng chung param.
-                        setParam("sort", sort === q.value ? "" : q.value);
-                      } else {
-                        // Hardest — param riêng, độc lập với sort (S#28).
-                        setParam("hardest", hardest ? "" : "1");
-                      }
+                      // Toggle: chọn lại chính nó → bỏ sort; 3 giá trị dùng
+                      // chung param nên chọn 1 tự loại 2 cái còn lại.
+                      setParam("sort", sort === q.value ? "" : q.value);
                     }}
                   />
                 </label>
@@ -289,15 +301,13 @@ function FilterRow({
   currentValue,
   options,
   onSelect,
-  symbolic = false,
   last = false,
 }: {
   label: string;
   selectedLabel?: string;
   currentValue?: string;
-  options?: Option[];
-  onSelect?: (value: string) => void;
-  symbolic?: boolean;
+  options: Option[];
+  onSelect: (value: string) => void;
   last?: boolean;
 }) {
   const [rowOpen, setRowOpen] = useState(false);
@@ -327,42 +337,36 @@ function FilterRow({
           className="absolute inset-x-0 top-full z-30 border-x border-b border-border"
           style={{ backgroundColor: OPTIONS_BG }}
         >
-          {symbolic ? (
-            <p className="px-4 py-3 font-serif text-sm italic text-muted-foreground">
-              Coming soon — available in a future release.
-            </p>
-          ) : (
-            <ul className="py-1">
-              {options!.map((opt) => {
-                const active = opt.value === currentValue;
-                return (
-                  <li key={opt.value || "all"}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onSelect!(opt.value);
-                        setRowOpen(false);
-                      }}
-                      aria-pressed={active}
-                      className={`flex w-full items-center gap-2 px-4 py-2 text-left font-serif text-base transition-colors ${
-                        active
-                          ? "text-brand"
-                          : "text-muted-foreground hover:text-foreground"
+          <ul className="py-1">
+            {options.map((opt) => {
+              const active = opt.value === currentValue;
+              return (
+                <li key={opt.value || "all"}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onSelect(opt.value);
+                      setRowOpen(false);
+                    }}
+                    aria-pressed={active}
+                    className={`flex w-full items-center gap-2 px-4 py-2 text-left font-serif text-base transition-colors ${
+                      active
+                        ? "text-brand"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <span
+                      aria-hidden
+                      className={`h-px w-3 shrink-0 transition-colors ${
+                        active ? "bg-brand" : "bg-transparent"
                       }`}
-                    >
-                      <span
-                        aria-hidden
-                        className={`h-px w-3 shrink-0 transition-colors ${
-                          active ? "bg-brand" : "bg-transparent"
-                        }`}
-                      />
-                      {opt.label}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+                    />
+                    {opt.label}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
         </div>
       )}
     </div>

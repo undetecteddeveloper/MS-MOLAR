@@ -1,56 +1,103 @@
-// Rating System [fixture-e2e] Test Skeleton
+// Rating System [fixture-e2e]
 // Design Docs: docs/design/rating-system-backend-design.md, docs/design/rating-system-frontend-design.md
 // UI Spec: docs/design/rating-system-ui-spec.md
 // PRD: docs/prd/rating-system-prd.md (v1.1, AC-001..AC-026)
-// Generated: 2026-07-24 | Budget Used: integration 3/3, fixture-e2e 2/3, service-integration-e2e 2/2
 //
-// Skeleton only — comments describing what the implementer must write. No imports, no
-// test-runner syntax yet. This project has no Playwright harness/config committed yet;
-// per the frontend Design Doc's Test Boundaries ("Playwright MCP / manual pass (no
-// CI)"), this lane is implemented and run as a Playwright (or Playwright MCP) script
-// against `npm run dev` with a mocked/fixture-driven backend (rateExam/getMyRating/
-// listMySubmittedExamIds/listExams return fixture data — no live Supabase). Add the
-// Playwright config/harness as part of the implementing task if not already present.
+// Test FE1 (result-page auto-open modal journey) stays a RESERVED SLOT — it is
+// Task 8's scope (RatingModal/RatingModalController), not this task's.
+//
+// Test FE2 is converted below into a real, driver-based script. This repo has
+// no `@playwright/test` dependency and no playwright.config.ts committed yet
+// (only the Playwright MCP browser-automation server is configured, in
+// `.mcp.json`, for interactive/manual sessions — see the frontend Design
+// Doc's Test Boundaries: "Playwright MCP / manual pass (no CI)"). Adding a new
+// npm test-framework dependency is outside this task's Target Files (would
+// touch package.json/playwright.config.ts, neither listed) and is a "new
+// external library" decision this implementer escalates rather than makes
+// unilaterally (see the task's final JSON response for the recorded
+// escalation). So this script is written against a minimal `FE2Driver`
+// interface that is a structural SUBSET of Playwright's real `Page`/`Locator`
+// API (`goto`, `url`, `getByRole`, `getByText`, `.click`, `.check`,
+// `.getAttribute`, `.first`, `.count`) — a real Playwright `Page` satisfies
+// this interface as-is, so once a harness exists this script runs unchanged
+// (either wrapped in a `@playwright/test` `test()` block, or driven directly
+// via the Playwright MCP tool). Assertions use Node's built-in
+// `node:assert/strict` (no new dependency either).
+//
+// Fixture-driven backend: `listExams`/`listMySubmittedExamIds`/`getCurrentUser`
+// must resolve to the fixture data below instead of live Supabase for this
+// script to run against `npm run dev`. This repo has no existing
+// request/route-mocking layer (no MSW, no test-mode query override) — wiring
+// FIXTURE_EXAMS/FIXTURE_SUBMITTED_EXAM_IDS/FIXTURE_USER into a real running
+// `/exams` page (e.g. via a test-only env flag read by `queries.ts`/
+// `getCurrentUser.ts`, or an MSW-style network intercept) is a residual
+// left for whoever stands up the Playwright harness — out of this task's
+// Target Files (queries.ts/getCurrentUser.ts are backend-owned, Task 4).
 
-// =============================================================================
-// Test FE1 [RESERVED SLOT — user-facing multi-step journey] —
-//   Rate from the result page: auto-open, submit, idempotent on refresh
-// =============================================================================
-// Use Case 1: "Rate from the result page (auto-open modal)"
-// Use Case 2: "Already rated (editable) on the result page"
-// AC-004, AC-005, AC-006, AC-009 (UI side), AC-012 (UI side), AC-024, AC-025 (UI side)
-// ROI: 81 (BV:9 x Freq:8 + Legal:0 + Defect:9) — reserved regardless of score: this is
-//   the feature's highest-value user-facing multi-step journey (submit -> result page
-//   -> auto-open modal -> rate -> saved -> return later to an editable state).
-// Behavior: a fixture user with a submitted attempt lands on
-//   /exams/[id]/attempt/[attemptId]/result?rate=auto (fresh-submit redirect fixture)
-//   -> the rating modal auto-opens over the readable result content -> the user rates
-//   all three parts via CircleScale -> submits -> sees the saved confirmation -> the
-//   page is reloaded at the same URL without the ?rate=auto marker -> the "already
-//   rated" editable state renders instead of a fresh auto-open.
-// @category: fixture-e2e
-// @lane: fixture-e2e
-// @dependency: full-ui (mocked backend) — rateExam/getMyRating fixture-driven; real
-//   browser DOM and real Next.js client-side routing
-// @complexity: high
-// Primary failure mode: the modal blocks/hides the result content instead of
-//   overlaying it (AC-004 violated); OR the modal fails to auto-open on the fresh
-//   ?rate=auto arrival; OR the modal re-opens/re-pops on a plain reload with no
-//   marker (AC-005 violated — the idempotency guarantee this feature exists to
-//   provide); OR the reload shows a blank fresh form instead of the pre-filled
-//   "already rated" editable state (AC-006 violated).
-// Proof obligation, within one continuous browser session:
-//   (1) on first load with ?rate=auto, the modal is visible AND the result content
-//       remains present in the DOM behind/around it (AC-004);
-//   (2) all three CircleScale parts are keyboard-operable across 1-10 and the
-//       "extremely easy -> extremely hard" scale legend is visible (AC-002/024);
-//   (3) after submitting three valid scores, a saved confirmation is announced
-//       (aria-live) and the modal reaches its Saved state;
-//   (4) reloading the same result URL WITHOUT ?rate=auto never auto-opens the modal,
-//       and instead shows an "Edit your rating" inline entry point pre-filled with the
-//       three just-saved scores (AC-005/006);
-//   (5) Esc, scrim click, and the Close control each close the modal, and focus
-//       returns to the inline entry-point trigger afterward.
+import assert from "node:assert/strict";
+import type { Bucket } from "@/lib/rating";
+
+// --- Driver (Playwright `Page`/`Locator` structural subset) ---------------
+
+export interface FE2Locator {
+  click(): Promise<void>;
+  check(): Promise<void>;
+  isVisible(): Promise<boolean>;
+  /** Native `<input type="checkbox">` state (Newest/Oldest/Hardest quick-sort
+   *  checkboxes — ExamFilters.tsx) — checked state is a DOM property, not an
+   *  `aria-checked` attribute, so this is queried separately from getAttribute. */
+  isChecked(): Promise<boolean>;
+  getAttribute(name: string): Promise<string | null>;
+  first(): FE2Locator;
+  count(): Promise<number>;
+  allTextContents(): Promise<string[]>;
+}
+
+export interface FE2Driver {
+  goto(url: string): Promise<void>;
+  url(): string;
+  getByRole(
+    role: string,
+    options?: { name?: string | RegExp; level?: number }
+  ): FE2Locator;
+  getByText(text: string | RegExp): FE2Locator;
+}
+
+// --- Fixture data -----------------------------------------------------------
+// Spans 0/1/2/>=3 ratings (AC-014/015/016) across the three buckets, plus a
+// mixed-eligibility current user (one exam submitted -> eligible; one not).
+
+export interface FixtureExam {
+  id: string;
+  title: string;
+  communityDifficulty: { bucket: Bucket; mean: number; count: number } | null;
+}
+
+export const FIXTURE_EXAMS: readonly FixtureExam[] = [
+  { id: "exam-0-ratings", title: "Algebra Basics", communityDifficulty: null },
+  { id: "exam-1-rating", title: "Geometry Intro", communityDifficulty: null },
+  { id: "exam-2-ratings", title: "Trigonometry Warmup", communityDifficulty: null },
+  {
+    id: "exam-easy",
+    title: "Fractions Practice",
+    communityDifficulty: { bucket: "Easy", mean: 2.3, count: 5 },
+  },
+  {
+    id: "exam-medium",
+    title: "Quadratic Equations",
+    communityDifficulty: { bucket: "Medium", mean: 5.1, count: 4 },
+  },
+  {
+    id: "exam-hard",
+    title: "Calculus Challenge",
+    communityDifficulty: { bucket: "Hard", mean: 8.7, count: 6 },
+  },
+];
+
+/** Logged-in fixture user has submitted exam-hard (-> eligible) but not
+ *  exam-medium (-> not-attempted). AC-026 reruns the same page logged out. */
+export const FIXTURE_SUBMITTED_EXAM_IDS = new Set(["exam-hard"]);
+export const FIXTURE_USER = { id: "user-1", email: "fixture@example.com" };
 
 // =============================================================================
 // Test FE2 — Browse: Hardest sort, Level filter, and Rate-button eligibility states
@@ -91,3 +138,128 @@
 //   (d) selecting Level=Hard shows only fixture exams with >=3 ratings whose
 //       community difficulty falls in the Hard bucket, excluding below-threshold and
 //       other-bucket exams (AC-017/021).
+//
+// Implementation note: converted below into `checkXxx(driver)` functions (one per
+// lettered obligation, plus one extra for the AC-026 logged-out rerun) rather than
+// `it()` blocks — this file has no test-runner harness yet (see file header); each
+// function's own doc comment repeats its letter + AC IDs for traceability back to
+// the block above, mirroring how Test 2 (`rating.int.test.ts`) embeds
+// "(AC-xxx, obligation x)" in each `it()` title.
+
+/** (a) card body -> /exams/[id]; enabled RateButton -> /exams/[id]/rate
+ *  independently; disabled RateButton (not-attempted/logged-out) does not
+ *  navigate and exposes its AT reason via aria-describedby (AC-010/011/026). */
+export async function checkCardBodyAndRateButtonIndependentTargets(
+  driver: FE2Driver
+): Promise<void> {
+  await driver.goto("/exams");
+
+  // Enabled RateButton (exam-hard, submitted -> eligible) navigates on its own.
+  const enabledRate = driver.getByRole("link", { name: "Rate →" }).first();
+  await enabledRate.click();
+  assert.match(driver.url(), /\/exams\/exam-hard\/rate$/);
+
+  // Card body (title link) navigates to the detail route, independent of Rate.
+  await driver.goto("/exams");
+  const cardBody = driver.getByRole("link", { name: "Calculus Challenge" });
+  await cardBody.click();
+  assert.match(driver.url(), /\/exams\/exam-hard$/);
+
+  // Disabled RateButton — .first() resolves to exam-0-ratings (the first
+  // FIXTURE_EXAMS entry not in FIXTURE_SUBMITTED_EXAM_IDS, in DOM order), also
+  // logged-in not-attempted like exam-medium: no navigation, reason reachable
+  // via aria-describedby.
+  await driver.goto("/exams");
+  const disabledRate = driver.getByRole("button", { name: "Rate →" }).first();
+  const urlBefore = driver.url();
+  await disabledRate.click();
+  assert.equal(driver.url(), urlBefore, "disabled RateButton must not navigate");
+  assert.equal(await disabledRate.getAttribute("aria-disabled"), "true");
+  const reasonId = await disabledRate.getAttribute("aria-describedby");
+  assert.ok(reasonId, "disabled RateButton must expose aria-describedby");
+  const reason = driver.getByText("Finish this exam first");
+  assert.equal(await reason.isVisible(), true);
+}
+
+/** (a, AC-026) logged-out: every RateButton is disabled with reason
+ *  "Log in to rate", regardless of submitted-exam-id membership. */
+export async function checkLoggedOutRateButtonsDisabled(driver: FE2Driver): Promise<void> {
+  await driver.goto("/exams");
+  const disabledRate = driver.getByRole("button", { name: "Rate →" }).first();
+  assert.equal(await disabledRate.getAttribute("aria-disabled"), "true");
+  const reason = driver.getByText("Log in to rate");
+  assert.equal(await reason.isVisible(), true);
+}
+
+/** (b) DifficultyBadge shows "<Bucket> · <mean>" for every >=3-rating exam and
+ *  literal "—" for every <3-rating exam, on the ExamCard Level cell AND the
+ *  exam-detail Difficulty cell (AC-014/015/016). */
+export async function checkDifficultyBadgeAcrossFixtures(driver: FE2Driver): Promise<void> {
+  await driver.goto("/exams");
+  for (const exam of FIXTURE_EXAMS) {
+    const label = exam.communityDifficulty
+      ? `${exam.communityDifficulty.bucket} · ${exam.communityDifficulty.mean.toFixed(1)}`
+      : "—";
+    assert.equal(await driver.getByText(label).first().count() >= 1, true, exam.id);
+
+    await driver.goto(`/exams/${exam.id}`);
+    assert.equal(await driver.getByText(label).first().count() >= 1, true, `${exam.id} detail`);
+  }
+}
+
+/** (c) checking Hardest writes ?sort=hardest, de-selects Newest/Oldest, and
+ *  sinks every below-threshold exam after every rated exam (AC-019/020;
+ *  D002 regression guard — must NOT combine with Newest/Oldest). */
+export async function checkHardestSortOrdering(driver: FE2Driver): Promise<void> {
+  await driver.goto("/exams");
+  await driver.getByRole("checkbox", { name: "Hardest" }).check();
+  assert.match(driver.url(), /[?&]sort=hardest(&|$)/);
+
+  const newest = driver.getByRole("checkbox", { name: "Newest" });
+  const oldest = driver.getByRole("checkbox", { name: "Oldest" });
+  assert.equal(await newest.isChecked(), false);
+  assert.equal(await oldest.isChecked(), false);
+
+  // ExamCard titles render as <h3> (ExamCard.tsx) in DOM order == render order.
+  const renderedTitles = await driver.getByRole("heading", { level: 3 }).allTextContents();
+  const ratedTitles = FIXTURE_EXAMS.filter((e) => e.communityDifficulty).map((e) => e.title);
+  const belowThresholdTitles = FIXTURE_EXAMS.filter((e) => !e.communityDifficulty).map(
+    (e) => e.title
+  );
+  for (const ratedTitle of ratedTitles) {
+    for (const belowTitle of belowThresholdTitles) {
+      assert.ok(
+        renderedTitles.indexOf(ratedTitle) < renderedTitles.indexOf(belowTitle),
+        `${ratedTitle} (rated) must sort before ${belowTitle} (below-threshold) under Hardest`
+      );
+    }
+  }
+}
+
+/** (d) selecting Level=Hard shows only >=3-rating exams in the Hard bucket
+ *  (AC-017/021) — excludes below-threshold and other-bucket exams. */
+export async function checkLevelHardFilter(driver: FE2Driver): Promise<void> {
+  await driver.goto("/exams");
+  // The Level FilterRow only renders inside ExamFilters.tsx's `{open && (...)}`
+  // overlay panel — open the master "Filters" toggle first (ExamFilters.tsx:113).
+  await driver.getByRole("button", { name: "Filters" }).click();
+  await driver.getByRole("button", { name: "Level" }).click();
+  await driver.getByRole("button", { name: "Hard" }).click();
+  assert.match(driver.url(), /[?&]level=hard(&|$)/);
+
+  for (const exam of FIXTURE_EXAMS) {
+    const shouldShow = exam.communityDifficulty?.bucket === "Hard";
+    const count = await driver.getByText(exam.title).count();
+    assert.equal(count > 0, shouldShow, exam.id);
+  }
+}
+
+/** Orchestrator — runs FE2's four proof obligations against a supplied driver
+ *  wired to a fixture-driven `/exams` session (see file header). */
+export async function runFE2(driver: FE2Driver, loggedOutDriver: FE2Driver): Promise<void> {
+  await checkCardBodyAndRateButtonIndependentTargets(driver);
+  await checkLoggedOutRateButtonsDisabled(loggedOutDriver);
+  await checkDifficultyBadgeAcrossFixtures(driver);
+  await checkHardestSortOrdering(driver);
+  await checkLevelHardFilter(driver);
+}
