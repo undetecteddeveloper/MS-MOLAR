@@ -282,14 +282,14 @@ flowchart TD
 **Verification**: integration Test 3 (mocked router); fixture-e2e FE1 (reserved slot).
 
 #### Tasks
-- [ ] **Task 8 — Result-page modal**: `RatingModal` (extends `ReportExam`/`LeaveExamDialog` dialog shell: scrim, Esc/scrim/Close-close, `role=dialog`/`aria-modal`/`aria-labelledby`; adds focus-trap, focus-return-to-trigger, `aria-live="polite"` success announcement) hosting `RatingForm(layout="modal")`; `RatingModalController` (reads `?rate=auto`, opens once, strips via `router.replace(pathname,{scroll:false})`; renders the inline entry point `Rate this exam`/`Edit your rating`); mount on the result page with a `getMyRating` prefill read; append `?rate=auto` only to `submitExam`'s fresh-submit redirect (`actions.ts` line ~127), leaving the idempotent already-submitted redirect (line ~50) unchanged. Convert integration Test 3 (`rating.int.test.ts`) into a real vitest/RTL test against a mocked `next/navigation` router. Convert fixture-e2e FE1 (`rating.fixture.e2e.test.ts`, RESERVED SLOT) into a Playwright script covering the full continuous-session journey.
+- [x] **Task 8 — Result-page modal**: `RatingModal` (extends `ReportExam`/`LeaveExamDialog` dialog shell: scrim, Esc/scrim/Close-close, `role=dialog`/`aria-modal`/`aria-labelledby`; adds focus-trap, focus-return-to-trigger, `aria-live="polite"` success announcement) hosting `RatingForm(layout="modal")`; `RatingModalController` (reads `?rate=auto`, opens once, strips via `router.replace(pathname,{scroll:false})`; renders the inline entry point `Rate this exam`/`Edit your rating`); mount on the result page with a `getMyRating` prefill read; append `?rate=auto` only to `submitExam`'s fresh-submit redirect (`actions.ts` line ~127), leaving the idempotent already-submitted redirect (line ~50) unchanged. Convert integration Test 3 (`rating.int.test.ts`) into a real vitest/RTL test against a mocked `next/navigation` router. Convert fixture-e2e FE1 (`rating.fixture.e2e.test.ts`, RESERVED SLOT) into a Playwright script covering the full continuous-session journey.
   - Proof obligations: skeleton `rating.int.test.ts` Test 3 proof obligations (a)-(c); skeleton `rating.fixture.e2e.test.ts` Test FE1 proof obligations (1)-(5).
 - [ ] Quality check (staged): lint, typecheck, vitest, fixture-e2e FE1 run — zero errors.
 
 #### Phase Completion Criteria
-- [ ] `?rate=auto` opens the modal exactly once on a fresh submit and never re-pops on refresh/back/bookmark (AC-004/AC-005)
-- [ ] An already-rated user sees the editable pre-filled "Edit your rating" state, not a fresh empty form (AC-006)
-- [ ] Modal Tab/Shift+Tab cycles within it; Esc/scrim/Close close it; focus returns to the inline entry-point trigger
+- [x] `?rate=auto` opens the modal exactly once on a fresh submit and never re-pops on refresh/back/bookmark (AC-004/AC-005)
+- [x] An already-rated user sees the editable pre-filled "Edit your rating" state, not a fresh empty form (AC-006)
+- [x] Modal Tab/Shift+Tab cycles within it; Esc/scrim/Close close it; focus returns to the inline entry-point trigger
 
 ### Final Phase: Quality Assurance (Estimated commits: 1)
 

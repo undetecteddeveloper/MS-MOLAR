@@ -1,14 +1,25 @@
+// @vitest-environment jsdom
+
 // Rating System [integration] Test Skeleton
 // Design Docs: docs/design/rating-system-backend-design.md, docs/design/rating-system-frontend-design.md
 // PRD: docs/prd/rating-system-prd.md (v1.1, AC-001..AC-026)
 // Generated: 2026-07-24 | Budget Used: integration 3/3, fixture-e2e 2/3, service-integration-e2e 2/2
 //
-// Test 2 converted to real vitest (backend task 4) — imports/describe/it blocks apply
-// only to Test 2 below. Test 1/Test 3 remain skeleton-only until their own
-// implementation tasks (rateExam / RatingModalController) create the targeted modules;
-// this file stays green under tsc/eslint/build for those two until converted.
+// Test 2 converted to real vitest (backend task 4). Test 3 converted to real
+// RTL/vitest (frontend task 8, RatingModalController) below. Test 1 remains
+// skeleton-only until its own implementation task; this file stays green under
+// tsc/eslint/build for it until converted.
+//
+// File-level environment switched node -> jsdom (docblock above) so Test 3 can
+// render RatingModalController via @testing-library/react. Test 1/2 do not
+// depend on the environment being strictly "node" (no DOM-absence assumption),
+// so this is safe for them.
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createElement } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+
+afterEach(cleanup);
 
 const { fromMock } = vi.hoisted(() => ({ fromMock: vi.fn() }));
 
@@ -23,8 +34,21 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(async () => ({ from: fromMock })),
 }));
 
+// Mock boundary: next/navigation router (Test 3, frontend DD Mock Boundary
+// Decisions / task 8 sanctioned mock) — proves the open-condition branching
+// logic in-process; full focus-trap/focus-return/aria-live is browser-level,
+// proven by fixture-e2e FE1 instead.
+const { replaceMock } = vi.hoisted(() => ({ replaceMock: vi.fn() }));
+let mockSearchParams = new URLSearchParams();
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: replaceMock, push: vi.fn() }),
+  usePathname: () => "/exams/exam-1/attempt/attempt-1/result",
+  useSearchParams: () => mockSearchParams,
+}));
+
 const { listExams } = await import("../queries");
 const { rateExam, getMyRating } = await import("../actions");
+const { RatingModalController } = await import("../_components/rating/RatingModalController");
 
 type BuilderCall = { method: string; args: unknown[] };
 
@@ -455,3 +479,76 @@ describe("toExam — communityDifficulty mapping is additive, byte-identical bel
 //   (c) when initialScores is provided, the inline entry-point label reads
 //       "Edit your rating" (not the fresh "Rate this exam" prompt), and if the modal
 //       is opened its form is seeded with those three scores (AC-006).
+
+describe("RatingModalController — idempotent ?rate=auto open condition (Test 3)", () => {
+  beforeEach(() => {
+    replaceMock.mockReset();
+    mockSearchParams = new URLSearchParams();
+  });
+
+  it("obligation (a): with rate=auto, the modal opens on mount and router.replace(pathname,{scroll:false}) strips it exactly once (AC-004)", () => {
+    mockSearchParams = new URLSearchParams("rate=auto");
+
+    render(createElement(RatingModalController, { examId: "exam-1" }));
+
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(replaceMock).toHaveBeenCalledTimes(1);
+    expect(replaceMock).toHaveBeenCalledWith("/exams/exam-1/attempt/attempt-1/result", {
+      scroll: false,
+    });
+  });
+
+  it("obligation (b): with no rate marker, the modal stays closed on mount regardless of initialScores (AC-005)", () => {
+    mockSearchParams = new URLSearchParams();
+
+    const { unmount } = render(createElement(RatingModalController, { examId: "exam-1" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(replaceMock).not.toHaveBeenCalled();
+    unmount();
+
+    render(
+      createElement(RatingModalController, {
+        examId: "exam-1",
+        initialScores: { mcq: 8, true_false: 7, short_answer: 9 },
+      })
+    );
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(replaceMock).not.toHaveBeenCalled();
+  });
+
+  it("obligation (c): initialScores present -> entry point reads 'Edit your rating', and the opened form is seeded with the three scores (AC-006)", () => {
+    mockSearchParams = new URLSearchParams("rate=auto");
+
+    render(
+      createElement(RatingModalController, {
+        examId: "exam-1",
+        initialScores: { mcq: 8, true_false: 7, short_answer: 9 },
+      })
+    );
+
+    expect(screen.getByRole("button", { name: "Edit your rating" })).toBeTruthy();
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(screen.getByText("8/10")).toBeTruthy();
+    expect(screen.getByText("7/10")).toBeTruthy();
+    expect(screen.getByText("9/10")).toBeTruthy();
+  });
+
+  it("obligation (c, fresh): no initialScores -> entry point reads 'Rate this exam' (AC-006 contrast case)", () => {
+    mockSearchParams = new URLSearchParams();
+
+    render(createElement(RatingModalController, { examId: "exam-1" }));
+
+    expect(screen.getByRole("button", { name: "Rate this exam" })).toBeTruthy();
+  });
+
+  it("manual open via the inline entry point also opens the modal (AC-006, independent of the marker)", () => {
+    mockSearchParams = new URLSearchParams();
+
+    render(createElement(RatingModalController, { examId: "exam-1" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Rate this exam" }));
+
+    expect(screen.getByRole("dialog")).toBeTruthy();
+  });
+});

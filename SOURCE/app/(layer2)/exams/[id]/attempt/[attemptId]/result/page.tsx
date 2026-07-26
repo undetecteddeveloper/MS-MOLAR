@@ -6,10 +6,13 @@
 
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { getMyRating } from "@/app/(layer2)/actions";
 import { getResult } from "@/app/(layer2)/queries";
 import { ScoreCard } from "@/app/(layer2)/_components/ScoreCard";
 import { TopicBreakdown } from "@/app/(layer2)/_components/TopicBreakdown";
 import { ResultActions } from "@/app/(layer2)/_components/ResultActions";
+import { RatingModalController } from "@/app/(layer2)/_components/rating/RatingModalController";
+import { mapFromMyRating } from "@/lib/rating";
 
 export default async function ResultPage({
   params,
@@ -24,15 +27,15 @@ export default async function ResultPage({
   }
 
   const { examTitle, result } = data;
+  // Prefill for the modal's "already rated" editable state (AC-006/013) —
+  // same mapFromMyRating(getMyRating(id)) pattern as /exams/[id]/rate/page.tsx.
+  const initialScores = mapFromMyRating(await getMyRating(id));
 
   return (
     <div className="bg-background">
       <main className="mx-auto flex w-full max-w-xl flex-col gap-5 px-6 py-8">
         {/* preload order 1–3 — các block fade lần lượt sau navbar (S#21). */}
-        <div
-          className="preload-fade"
-          style={{ "--preload-order": 1 } as React.CSSProperties}
-        >
+        <div className="preload-fade" style={{ "--preload-order": 1 } as React.CSSProperties}>
           <ScoreCard examTitle={examTitle} result={result} />
         </div>
 
@@ -50,7 +53,7 @@ export default async function ResultPage({
             {/* Return → ExamBrowser (S#26 — đổi từ Home→"/" cũ). */}
             <Link
               href="/exams"
-              className="flex items-center justify-center rounded-xl border border-border bg-card px-3 py-4 text-center text-sm text-foreground transition-colors hover:border-brand"
+              className="border-border bg-card text-foreground hover:border-brand flex items-center justify-center rounded-xl border px-3 py-4 text-center text-sm transition-colors"
             >
               Return
             </Link>
@@ -64,16 +67,23 @@ export default async function ResultPage({
         >
           <Link
             href={`/exams/${id}/attempt/${attemptId}/result/detail`}
-            className="rounded-lg border border-brand bg-brand px-4 py-3 text-center text-sm font-medium text-brand-foreground transition-opacity hover:opacity-90"
+            className="border-brand bg-brand text-brand-foreground rounded-lg border px-4 py-3 text-center text-sm font-medium transition-opacity hover:opacity-90"
           >
             View details
           </Link>
           <Link
             href={`/exams/${id}`}
-            className="rounded-lg border border-border bg-card px-4 py-3 text-center text-sm font-medium text-foreground transition-colors hover:border-brand"
+            className="border-border bg-card text-foreground hover:border-brand rounded-lg border px-4 py-3 text-center text-sm font-medium transition-colors"
           >
             Try again
           </Link>
+        </div>
+
+        {/* Rating System — auto-opens once on a fresh submit via ?rate=auto
+            (stripped on mount); on refresh/return only the inline entry point
+            renders (frontend DD § Data-Fetching Plan — result page). */}
+        <div className="preload-fade" style={{ "--preload-order": 4 } as React.CSSProperties}>
+          <RatingModalController examId={id} initialScores={initialScores} />
         </div>
       </main>
     </div>

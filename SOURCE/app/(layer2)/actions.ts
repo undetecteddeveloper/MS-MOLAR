@@ -125,7 +125,11 @@ export async function submitExam(
     .eq("id", attemptId);
   if (updErr) throw updErr;
 
-  redirect(`/exams/${examId}/attempt/${attemptId}/result`);
+  // Fresh-submit redirect ONLY — carries the transient ?rate=auto marker so
+  // RatingModalController auto-opens once (Rating System, frontend DD code:F6).
+  // The idempotent already-submitted redirect above (:51) stays unchanged —
+  // returning to an already-submitted result must never auto-pop the modal.
+  redirect(`/exams/${examId}/attempt/${attemptId}/result?rate=auto`);
 }
 
 /**
