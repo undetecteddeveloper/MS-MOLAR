@@ -43,9 +43,7 @@ describe("DifficultyBadge", () => {
   });
 
   it('renders literal "—" when communityDifficulty is null (fail-safe, AC-015)', () => {
-    const { container } = render(
-      <DifficultyBadge communityDifficulty={null} variant="card" />
-    );
+    const { container } = render(<DifficultyBadge communityDifficulty={null} variant="card" />);
     expect(container.querySelector("dd")?.textContent).toBe("—");
   });
 
@@ -64,10 +62,7 @@ describe("DifficultyBadge", () => {
     // recomputed client-side): the component must still render the given
     // bucket "Hard" verbatim, proving it never recomputes bucket(mean).
     const { container } = render(
-      <DifficultyBadge
-        communityDifficulty={{ bucket: "Hard", mean: 2, count: 3 }}
-        variant="card"
-      />
+      <DifficultyBadge communityDifficulty={{ bucket: "Hard", mean: 2, count: 3 }} variant="card" />
     );
     expect(container.querySelector("dd")?.textContent).toBe("Hard · 2.0");
   });

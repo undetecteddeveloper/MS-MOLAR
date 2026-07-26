@@ -24,13 +24,13 @@ export function ExamCard({ exam, eligibility }: ExamCardProps) {
       <Link
         href={`/exams/${exam.id}`}
         aria-label={exam.title}
-        className="absolute inset-0 z-0 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--block-hover)]"
+        className="absolute inset-0 z-0 rounded-lg focus-visible:ring-2 focus-visible:ring-[color:var(--block-hover)] focus-visible:outline-none"
       />
 
       {/* hover shadow (S#26): engineer yêu cầu đích danh — exception quy tắc
           "không đổ bóng" DESIGN.md cho riêng ExamCard; tông ấm đen sơn mài
           thay đen lạnh. */}
-      <div className="flex h-full flex-col gap-3 rounded-lg border border-[color:var(--block-border)] bg-[var(--block-bg)] p-5 transition-[border-color,box-shadow] duration-200 group-hover:border-[color:var(--block-hover)] group-hover:shadow-[0_8px_24px_rgba(27,21,18,0.12)] group-focus-within:border-[color:var(--block-hover)]">
+      <div className="flex h-full flex-col gap-3 rounded-lg border border-[color:var(--block-border)] bg-[var(--block-bg)] p-5 transition-[border-color,box-shadow] duration-200 group-focus-within:border-[color:var(--block-hover)] group-hover:border-[color:var(--block-hover)] group-hover:shadow-[0_8px_24px_rgba(27,21,18,0.12)]">
         <div className="flex items-baseline justify-between gap-3">
           <span className="eyebrow text-[var(--block-fg-muted)]">{exam.subject}</span>
           <span className="eyebrow text-[var(--block-fg-muted)] tabular-nums">

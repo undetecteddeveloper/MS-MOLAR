@@ -127,21 +127,18 @@ export function ExamFilters({
             aria-label="Filters"
             aria-expanded={open}
             onClick={() => setOpen((v) => !v)}
-            className="flex flex-col items-center gap-2 rounded-md border-r border-border py-4 pl-3 pr-2.5 transition-colors duration-200 hover:bg-accent"
+            className="border-border hover:bg-accent flex flex-col items-center gap-2 rounded-md border-r py-4 pr-2.5 pl-3 transition-colors duration-200"
           >
             <span className="relative">
               <Triangle open={open} />
               {hasFilters && (
                 <span
                   aria-hidden
-                  className="absolute -right-1.5 -top-1 size-1.5 rounded-full bg-brand"
+                  className="bg-brand absolute -top-1 -right-1.5 size-1.5 rounded-full"
                 />
               )}
             </span>
-            <span
-              className="eyebrow"
-              style={{ writingMode: "vertical-rl" }}
-            >
+            <span className="eyebrow" style={{ writingMode: "vertical-rl" }}>
               Filters
             </span>
           </button>
@@ -150,28 +147,26 @@ export function ExamFilters({
               không đè lên filter button nữa), đè lên exam list (không đẩy bố cục). */}
           {open && (
             <div
-              className="absolute left-full top-0 z-20 w-[84vw] max-w-xs border border-border"
+              className="border-border absolute top-0 left-full z-20 w-[84vw] max-w-xs border"
               style={{ backgroundColor: PANEL_BG }}
             >
               {/* Header bảng: toggle (nhãn, S#26 bỏ tam giác trong dropdown)
                   bên trái · nút Clear bên phải ngang hàng tiêu đề (S#22 —
                   thay nút "Clear filters" cũ ở cuối panel). */}
-              <div className="flex w-full items-center justify-between gap-3 border-b border-border bg-background/60 px-4 py-3">
+              <div className="border-border bg-background/60 flex w-full items-center justify-between gap-3 border-b px-4 py-3">
                 <button
                   type="button"
                   aria-expanded
                   onClick={() => setOpen(false)}
                   className="flex items-center gap-3"
                 >
-                  <span className="eyebrow">
-                    Filters{hasFilters ? " · active" : ""}
-                  </span>
+                  <span className="eyebrow">Filters{hasFilters ? " · active" : ""}</span>
                 </button>
                 <button
                   type="button"
                   onClick={clearAll}
                   disabled={!hasFilters}
-                  className="text-xs text-muted-foreground underline-offset-4 transition-colors hover:text-brand hover:underline disabled:pointer-events-none disabled:opacity-40"
+                  className="text-muted-foreground hover:text-brand text-xs underline-offset-4 transition-colors hover:underline disabled:pointer-events-none disabled:opacity-40"
                 >
                   Clear
                 </button>
@@ -189,14 +184,8 @@ export function ExamFilters({
               />
               <FilterRow
                 label="Grade"
-                selectedLabel={
-                  selected.grade !== undefined
-                    ? `Grade ${selected.grade}`
-                    : undefined
-                }
-                currentValue={
-                  selected.grade !== undefined ? String(selected.grade) : ""
-                }
+                selectedLabel={selected.grade !== undefined ? `Grade ${selected.grade}` : undefined}
+                currentValue={selected.grade !== undefined ? String(selected.grade) : ""}
                 options={[
                   { value: "", label: "All" },
                   ...grades.map((g) => ({
@@ -218,12 +207,8 @@ export function ExamFilters({
               />
               <FilterRow
                 label="Year"
-                selectedLabel={
-                  selected.year !== undefined ? String(selected.year) : undefined
-                }
-                currentValue={
-                  selected.year !== undefined ? String(selected.year) : ""
-                }
+                selectedLabel={selected.year !== undefined ? String(selected.year) : undefined}
+                currentValue={selected.year !== undefined ? String(selected.year) : ""}
                 options={[
                   { value: "", label: "All" },
                   ...years.map((y) => ({ value: String(y), label: String(y) })),
@@ -245,8 +230,7 @@ export function ExamFilters({
               <FilterRow
                 label="Level"
                 selectedLabel={
-                  LEVEL_OPTIONS.find((o) => o.value === (selected.level ?? ""))
-                    ?.label || undefined
+                  LEVEL_OPTIONS.find((o) => o.value === (selected.level ?? ""))?.label || undefined
                 }
                 currentValue={selected.level ?? ""}
                 options={LEVEL_OPTIONS}
@@ -261,18 +245,18 @@ export function ExamFilters({
               mỗi ô canh đúng viền phải tay nắm: đặt absolute right-0 trong
               .relative (right-0 = mép phải handle = đường kẻ). w-max nới text
               sang TRÁI, checkbox luôn ghim mép phải nên cả 3 ô thẳng hàng. */}
-          <div className="absolute right-0 top-full mt-3 flex w-max flex-col gap-2">
+          <div className="absolute top-full right-0 mt-3 flex w-max flex-col gap-2">
             {QUICK.map((q) => {
               const checked = sort === q.value;
               return (
                 <label
                   key={q.value}
-                  className="flex cursor-pointer items-center justify-between gap-2 whitespace-nowrap text-sm text-foreground"
+                  className="text-foreground flex cursor-pointer items-center justify-between gap-2 text-sm whitespace-nowrap"
                 >
                   {q.label}
                   <input
                     type="checkbox"
-                    className="size-4 accent-brand"
+                    className="accent-brand size-4"
                     checked={checked}
                     onChange={() => {
                       // Toggle: chọn lại chính nó → bỏ sort; 3 giá trị dùng
@@ -313,7 +297,7 @@ function FilterRow({
   const [rowOpen, setRowOpen] = useState(false);
 
   return (
-    <div className={`relative ${last ? "" : "border-b border-border"}`}>
+    <div className={`relative ${last ? "" : "border-border border-b"}`}>
       {/* S#26: bỏ tam giác trong dropdown (RowTriangle) — row chỉ còn nhãn. */}
       <button
         type="button"
@@ -324,9 +308,7 @@ function FilterRow({
         <span className="flex flex-col gap-0.5">
           <span className="eyebrow">{label}</span>
           {selectedLabel && (
-            <span className="font-serif text-base text-foreground">
-              {selectedLabel}
-            </span>
+            <span className="text-foreground font-serif text-base">{selectedLabel}</span>
           )}
         </span>
       </button>
@@ -334,7 +316,7 @@ function FilterRow({
       {/* Bảng chọn của filter — OVERLAY absolute (đè row dưới, không xê dịch). */}
       {rowOpen && (
         <div
-          className="absolute inset-x-0 top-full z-30 border-x border-b border-border"
+          className="border-border absolute inset-x-0 top-full z-30 border-x border-b"
           style={{ backgroundColor: OPTIONS_BG }}
         >
           <ul className="py-1">
@@ -350,9 +332,7 @@ function FilterRow({
                     }}
                     aria-pressed={active}
                     className={`flex w-full items-center gap-2 px-4 py-2 text-left font-serif text-base transition-colors ${
-                      active
-                        ? "text-brand"
-                        : "text-muted-foreground hover:text-foreground"
+                      active ? "text-brand" : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
                     <span
@@ -379,7 +359,7 @@ function Triangle({ open }: { open: boolean }) {
     <svg
       aria-hidden
       viewBox="0 0 12 12"
-      className={`size-3.5 shrink-0 fill-foreground transition-transform ${
+      className={`fill-foreground size-3.5 shrink-0 transition-transform ${
         open ? "rotate-90" : ""
       }`}
     >
@@ -387,5 +367,3 @@ function Triangle({ open }: { open: boolean }) {
     </svg>
   );
 }
-
-

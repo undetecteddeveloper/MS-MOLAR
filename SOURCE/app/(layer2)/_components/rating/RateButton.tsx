@@ -8,6 +8,18 @@
 // lý do lộ cho AT qua aria-describedby, AC-011/026). relative z-10 (tự thân)
 // để nhận click độc lập, không bị Link stretched (after:inset-0, z-index auto)
 // đè lên (ExamCard.tsx).
+//
+// Task 9-frontend axe/manual a11y audit finding (WCAG 1.4.3, AA): the enabled
+// state renders on ExamCard's ivory `--block-bg`/`--card` (#ede1c8), where
+// literal copper (`--sidebar-accent` #b8863b, the token frontend DD code:F3
+// otherwise reserves for "Rate →") measures ~2.49:1 — far under the 4.5:1
+// normal-text floor (worse still with the previous `hover:opacity-80` dim,
+// ~3.87:1). Copper only clears AA against the DARK `--sidebar` surfaces it is
+// used on elsewhere (PartCard/PartDetail/CircleScale, ~5.3-5.6:1). Fixed here
+// by reusing `--brand` (5.37:1 on ivory) — already this exact file tree's
+// on-light interactive-text color (ExamCard's own title `group-hover:text-
+// [var(--block-hover)]`, ExamFilters' "Clear" link, RatingModal's "Close"
+// button), so no new design token is introduced.
 
 import Link from "next/link";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -32,7 +44,7 @@ export function RateButton({ examId, eligibility }: RateButtonProps) {
     return (
       <Link
         href={`/exams/${examId}/rate`}
-        className={`${RATE_BUTTON_CLASS} text-[var(--sidebar-accent)] hover:opacity-80`}
+        className={`${RATE_BUTTON_CLASS} text-brand hover:underline`}
       >
         Rate →
       </Link>
@@ -48,7 +60,7 @@ export function RateButton({ examId, eligibility }: RateButtonProps) {
         type="button"
         aria-disabled="true"
         aria-describedby={reasonId}
-        className={`${RATE_BUTTON_CLASS} cursor-default text-muted-foreground hover:opacity-100`}
+        className={`${RATE_BUTTON_CLASS} text-muted-foreground cursor-default hover:opacity-100`}
       >
         Rate →
       </TooltipTrigger>
