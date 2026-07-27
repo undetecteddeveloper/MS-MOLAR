@@ -1,9 +1,15 @@
-// ResultActions — 2 ô Save PDF + Share ở màn Result (Layer 2). GĐ 3 M3.1 Task 4.
-// S#26: icon THẬT (download/share, SVG inline đồng bộ style icon site) thay ô
-// vuông trống; BỎ text hiển thị — thay bằng tooltip native (title) khi hover
-// + text sr-only cho screen reader. Vẫn là placeholder disabled (chưa có
-// function — sẽ gắn ở milestone sau).
+// ResultActions — Save PDF + Share buttons ở màn Result (Layer 2). GĐ 3 M3.1
+// Task 4. S#26: icon THẬT (download/share, SVG inline đồng bộ style icon
+// site) thay ô vuông trống; BỎ text hiển thị — thay bằng tooltip native
+// (title) khi hover + text sr-only cho screen reader. Vẫn là placeholder
+// disabled (chưa có function — sẽ gắn ở milestone sau).
 // Visual "tờ giấy trắng": card hairline, KHÔNG fill màu.
+//
+// Renders its two buttons as siblings (no wrapping grid of its own) — the
+// caller (result/page.tsx) places them inside its own 3-column row alongside
+// "Return", so all three sit at the same height/width instead of Save/Share
+// being sized by an aspect-square ratio that depended on a since-removed
+// taller neighbor (Topics breakdown) to bound it.
 
 const ACTIONS = [
   { key: "save", label: "Save", Icon: DownloadIcon },
@@ -12,20 +18,20 @@ const ACTIONS = [
 
 export function ResultActions() {
   return (
-    <div className="grid grid-cols-2 gap-3">
+    <>
       {ACTIONS.map(({ key, label, Icon }) => (
         <button
           key={key}
           type="button"
           disabled
           title={`${label} — coming soon`}
-          className="flex aspect-square items-center justify-center rounded-xl border border-border bg-card text-muted-foreground transition-colors hover:border-brand/40 disabled:cursor-not-allowed disabled:opacity-70"
+          className="flex items-center justify-center rounded-xl border border-border bg-card px-3 py-4 text-muted-foreground transition-colors hover:border-brand/40 disabled:cursor-not-allowed disabled:opacity-70"
         >
           <Icon className="size-6" />
           <span className="sr-only">{label}</span>
         </button>
       ))}
-    </div>
+    </>
   );
 }
 

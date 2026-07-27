@@ -125,16 +125,12 @@ export async function submitExam(
     .eq("id", attemptId);
   if (updErr) throw updErr;
 
-  // Fresh-submit redirect ONLY — carries the transient ?rate=auto marker so
-  // RatingModalController auto-opens once (Rating System, frontend DD code:F6).
-  // The idempotent already-submitted redirect above (:51) stays unchanged —
-  // returning to an already-submitted result must never auto-pop the modal.
-  redirect(`/exams/${examId}/attempt/${attemptId}/result?rate=auto`);
+  redirect(`/exams/${examId}/attempt/${attemptId}/result`);
 }
 
 /**
  * Đánh giá độ khó đề (Rating System, ADR-0008 Decision 3). Trả status object
- * (KHÔNG redirect) để modal giữ nguyên 3 điểm đã nhập khi lỗi (AC-025).
+ * (KHÔNG redirect) để RatingRubric giữ nguyên 3 điểm đã nhập khi lỗi (AC-025).
  * UPSERT theo (exam_id,user_id) — 1 rating/user/đề, sửa được (AC-012).
  *
  * Eligibility precheck (đã có attempt 'submitted') chỉ là UX; RLS

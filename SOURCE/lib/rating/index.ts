@@ -66,7 +66,7 @@ interface PartMeta {
   description: string;
 }
 
-/** Copy verbatim từ UI Spec (Component: PartCard / PartDetail) — KHÔNG diễn giải lại. */
+/** Copy verbatim từ UI Spec (rubric row eyebrow/name/description) — KHÔNG diễn giải lại. */
 export const PART_META: Record<PartId, PartMeta> = {
   mcq: {
     eyebrow: "PART I · MULTIPLE CHOICE",
@@ -113,7 +113,7 @@ export function readoutModel(scores: Partial<Record<PartId, PartScore>>): Readou
  *  (không import file "use server") để giữ lib/rating thuần. */
 export type RateExamError = "ineligible" | "invalid" | "server";
 
-/** Copy verbatim UI Spec (Component: RatingForm, bảng rateExam error → Message). */
+/** Copy verbatim UI Spec (RatingRubric, bảng rateExam error → Message). */
 export function rateErrorMessage(error: RateExamError): string {
   switch (error) {
     case "ineligible":

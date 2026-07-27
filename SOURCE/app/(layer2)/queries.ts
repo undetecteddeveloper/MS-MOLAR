@@ -61,6 +61,18 @@ export type ExamSort = "newest" | "oldest" | "hardest";
 /** Bucket độ khó cộng đồng cho Level filter (khớp lowercase slug FE — IP-6). */
 export type ExamLevel = "easy" | "medium" | "hard";
 
+/** Chiều hiển thị của trục ?sort= đang chọn (ExamFilters direction toggle) —
+ *  không tự có ý nghĩa nếu thiếu `sort`. */
+export type SortDirection = "asc" | "desc";
+
+/** Chiều mặc định của mỗi trục sort khi không truyền `dir` — khớp hành vi cũ
+ *  trước khi có direction toggle (Newest=desc, Oldest=asc, Hardest=desc). */
+const DEFAULT_ASCENDING: Record<ExamSort, boolean> = {
+  newest: false,
+  oldest: true,
+  hardest: false,
+};
+
 // Ranh giới avg_overall theo bucket (nửa-mở, khớp SOURCE/lib/rating's bucket()):
 // [1,4) Easy / [4,7) Medium / [7,10] Hard. Lọc DB-side (ADR-0008 Implementation
 // Guidance — không merge/lọc aggregate ở JS); cận dưới Easy tái dùng RATING_MIN.
@@ -78,6 +90,8 @@ export interface ExamFilters {
   semester?: string;
   sort?: ExamSort;
   level?: ExamLevel;
+  /** Đảo chiều trục `sort` đang chọn — bỏ qua nếu `sort` không được truyền. */
+  dir?: SortDirection;
 }
 
 /** Đề cho Exam Browser, lọc tuỳ chọn theo môn/lớp/trường/niên khóa/học kỳ/độ khó (S#27, Rating System). */
@@ -103,17 +117,21 @@ export async function listExams(filters?: ExamFilters): Promise<Exam[]> {
     query = query.gte("avg_overall", range.gte);
     if (range.lt !== undefined) query = query.lt("avg_overall", range.lt);
   }
-  // Newest/Oldest theo created_at; Hardest theo avg_overall (nulls-last, tie-break
-  // created_at/id — AC-019/020); mặc định giữ order id (ổn định như trước).
-  if (filters?.sort === "newest") {
-    query = query.order("created_at", { ascending: false });
-  } else if (filters?.sort === "oldest") {
-    query = query.order("created_at", { ascending: true });
-  } else if (filters?.sort === "hardest") {
-    query = query
-      .order("avg_overall", { ascending: false, nullsFirst: false })
-      .order("created_at")
-      .order("id");
+  // Newest/Oldest theo created_at; Hardest theo avg_overall (nulls-last luôn —
+  // đề dưới ngưỡng sink xuống cuối bất kể chiều, AC-019/020 — tie-break
+  // created_at/id); mặc định giữ order id (ổn định như trước). `dir` đảo chiều
+  // ascending của trục đang chọn, mặc định theo DEFAULT_ASCENDING khi không
+  // truyền (khớp hành vi cũ).
+  if (filters?.sort) {
+    const ascending = filters.dir ? filters.dir === "asc" : DEFAULT_ASCENDING[filters.sort];
+    if (filters.sort === "hardest") {
+      query = query
+        .order("avg_overall", { ascending, nullsFirst: false })
+        .order("created_at")
+        .order("id");
+    } else {
+      query = query.order("created_at", { ascending });
+    }
   } else {
     query = query.order("id");
   }

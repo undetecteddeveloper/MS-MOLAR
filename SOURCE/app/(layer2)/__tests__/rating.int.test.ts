@@ -1,25 +1,21 @@
-// @vitest-environment jsdom
-
 // Rating System [integration] Test Skeleton
 // Design Docs: docs/design/rating-system-backend-design.md, docs/design/rating-system-frontend-design.md
 // PRD: docs/prd/rating-system-prd.md (v1.1, AC-001..AC-026)
 // Generated: 2026-07-24 | Budget Used: integration 3/3, fixture-e2e 2/3, service-integration-e2e 2/2
 //
-// Test 2 converted to real vitest (backend task 4). Test 3 converted to real
-// RTL/vitest (frontend task 8, RatingModalController) below. Test 1 remains
-// skeleton-only until its own implementation task; this file stays green under
-// tsc/eslint/build for it until converted.
+// Test 2 converted to real vitest (backend task 4). Test 1 remains
+// skeleton-only until its own implementation task; this file stays green
+// under tsc/eslint/build for it until converted.
 //
-// File-level environment switched node -> jsdom (docblock above) so Test 3 can
-// render RatingModalController via @testing-library/react. Test 1/2 do not
-// depend on the environment being strictly "node" (no DOM-absence assumption),
-// so this is safe for them.
+// Test 3 (RatingEntry — the result-page auto-open ?rate=auto dialog) was
+// removed 2026-07-27: the Result page's rating button now navigates straight
+// to the standalone /exams/[id]/rate page instead of opening a popup there,
+// so RatingEntry/the dialog/the ?rate=auto marker it tested no longer exist.
+// That's also why this file's environment reverted from jsdom back to plain
+// node and the @testing-library/react + next/navigation mocking it needed are
+// gone — nothing left in this file renders a component.
 
-import { createElement } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-
-afterEach(cleanup);
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { fromMock } = vi.hoisted(() => ({ fromMock: vi.fn() }));
 
@@ -34,21 +30,8 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(async () => ({ from: fromMock })),
 }));
 
-// Mock boundary: next/navigation router (Test 3, frontend DD Mock Boundary
-// Decisions / task 8 sanctioned mock) — proves the open-condition branching
-// logic in-process; full focus-trap/focus-return/aria-live is browser-level,
-// proven by fixture-e2e FE1 instead.
-const { replaceMock } = vi.hoisted(() => ({ replaceMock: vi.fn() }));
-let mockSearchParams = new URLSearchParams();
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ replace: replaceMock, push: vi.fn() }),
-  usePathname: () => "/exams/exam-1/attempt/attempt-1/result",
-  useSearchParams: () => mockSearchParams,
-}));
-
 const { listExams } = await import("../queries");
 const { rateExam, getMyRating } = await import("../actions");
-const { RatingModalController } = await import("../_components/rating/RatingModalController");
 
 type BuilderCall = { method: string; args: unknown[] };
 
@@ -388,6 +371,55 @@ describe("listExams — Hardest-sort and Level-filter query construction (Test 2
   });
 });
 
+describe("listExams — dir overrides a sort axis's default direction (ExamFilters direction toggle)", () => {
+  beforeEach(() => {
+    fromMock.mockReset();
+  });
+
+  it("sort:'hardest', dir:'asc' flips avg_overall to ascending, nullsFirst still false (easiest-first, below-threshold still sinks)", async () => {
+    const { builder, calls } = createQueryBuilder({ data: [], error: null });
+    fromMock.mockReturnValue(builder);
+
+    await listExams({ sort: "hardest", dir: "asc" });
+
+    const orderCalls = calls.filter((c) => c.method === "order");
+    expect(orderCalls).toEqual([
+      { method: "order", args: ["avg_overall", { ascending: true, nullsFirst: false }] },
+      { method: "order", args: ["created_at"] },
+      { method: "order", args: ["id"] },
+    ]);
+  });
+
+  it("sort:'newest', dir:'asc' flips created_at to ascending (same effective order as 'oldest')", async () => {
+    const { builder, calls } = createQueryBuilder({ data: [], error: null });
+    fromMock.mockReturnValue(builder);
+
+    await listExams({ sort: "newest", dir: "asc" });
+
+    expect(calls).toContainEqual({ method: "order", args: ["created_at", { ascending: true }] });
+  });
+
+  it("sort:'oldest', dir:'desc' flips created_at to descending (same effective order as 'newest')", async () => {
+    const { builder, calls } = createQueryBuilder({ data: [], error: null });
+    fromMock.mockReturnValue(builder);
+
+    await listExams({ sort: "oldest", dir: "desc" });
+
+    expect(calls).toContainEqual({ method: "order", args: ["created_at", { ascending: false }] });
+  });
+
+  it("dir without sort is a no-op — falls back to .order(id) same as no filters at all", async () => {
+    const { builder, calls } = createQueryBuilder({ data: [], error: null });
+    fromMock.mockReturnValue(builder);
+
+    await listExams({ dir: "asc" });
+
+    expect(calls).toContainEqual({ method: "order", args: ["id"] });
+    expect(calls.some((c) => c.method === "order" && c.args[0] === "avg_overall")).toBe(false);
+    expect(calls.some((c) => c.method === "order" && c.args[0] === "created_at")).toBe(false);
+  });
+});
+
 describe("toExam — communityDifficulty mapping is additive, byte-identical below threshold (backend DD Output Comparison)", () => {
   beforeEach(() => {
     fromMock.mockReset();
@@ -445,110 +477,3 @@ describe("toExam — communityDifficulty mapping is additive, byte-identical bel
   });
 });
 
-// =============================================================================
-// Test 3 — RatingModalController: idempotent ?rate=auto open condition
-// =============================================================================
-// AC-004: "...the shared rating form auto-opens as a modal over the result content..."
-// AC-005: "...the modal does not re-pop disruptively (a user who has already rated
-//   sees the 'already rated' state per R5, not a forced fresh rating)."
-// AC-006: "...it shows an 'already rated' state that is editable (pre-filled with the
-//   existing three scores) rather than an empty fresh form."
-// ROI: 57 (BV:7 x Freq:7 + Legal:0 + Defect:8)
-// Behavior: render RatingModalController (RTL, jsdom) with a mocked next/navigation
-//   router and varying searchParams (`rate=auto` present/absent) and `initialScores`
-//   (present/absent) -> assert open state and the router.replace call.
-// @category: edge-case
-// @lane: integration
-// @dependency: SOURCE/app/(layer2)/_components/rating/RatingModalController.tsx +
-//   mocked next/navigation router (useRouter/useSearchParams/usePathname)
-// @complexity: medium
-// @real-dependency: none — full focus-trap/focus-return/aria-live behavior is a
-//   browser-level concern verified in the fixture-e2e lane (Test FE1); this test
-//   proves only the open-condition branching logic in-process.
-// Primary failure mode: the ?rate=auto marker is re-consulted on every render instead
-//   of exactly once (open-loop or repeated router.replace calls); OR the marker is not
-//   stripped so a subsequent render (simulating refresh) re-triggers the open
-//   condition; OR a user with initialScores present is shown an empty fresh form
-//   instead of the editable pre-filled entry point.
-// Proof obligation:
-//   (a) with searchParams.rate === "auto", the modal opens on mount and
-//       router.replace(pathname, { scroll: false }) is called exactly once to strip
-//       the marker (AC-004);
-//   (b) with no `rate` marker present (simulating refresh/back/bookmark), the modal
-//       stays closed on mount regardless of initialScores (AC-005);
-//   (c) when initialScores is provided, the inline entry-point label reads
-//       "Edit your rating" (not the fresh "Rate this exam" prompt), and if the modal
-//       is opened its form is seeded with those three scores (AC-006).
-
-describe("RatingModalController — idempotent ?rate=auto open condition (Test 3)", () => {
-  beforeEach(() => {
-    replaceMock.mockReset();
-    mockSearchParams = new URLSearchParams();
-  });
-
-  it("obligation (a): with rate=auto, the modal opens on mount and router.replace(pathname,{scroll:false}) strips it exactly once (AC-004)", () => {
-    mockSearchParams = new URLSearchParams("rate=auto");
-
-    render(createElement(RatingModalController, { examId: "exam-1" }));
-
-    expect(screen.getByRole("dialog")).toBeTruthy();
-    expect(replaceMock).toHaveBeenCalledTimes(1);
-    expect(replaceMock).toHaveBeenCalledWith("/exams/exam-1/attempt/attempt-1/result", {
-      scroll: false,
-    });
-  });
-
-  it("obligation (b): with no rate marker, the modal stays closed on mount regardless of initialScores (AC-005)", () => {
-    mockSearchParams = new URLSearchParams();
-
-    const { unmount } = render(createElement(RatingModalController, { examId: "exam-1" }));
-    expect(screen.queryByRole("dialog")).toBeNull();
-    expect(replaceMock).not.toHaveBeenCalled();
-    unmount();
-
-    render(
-      createElement(RatingModalController, {
-        examId: "exam-1",
-        initialScores: { mcq: 8, true_false: 7, short_answer: 9 },
-      })
-    );
-    expect(screen.queryByRole("dialog")).toBeNull();
-    expect(replaceMock).not.toHaveBeenCalled();
-  });
-
-  it("obligation (c): initialScores present -> entry point reads 'Edit your rating', and the opened form is seeded with the three scores (AC-006)", () => {
-    mockSearchParams = new URLSearchParams("rate=auto");
-
-    render(
-      createElement(RatingModalController, {
-        examId: "exam-1",
-        initialScores: { mcq: 8, true_false: 7, short_answer: 9 },
-      })
-    );
-
-    expect(screen.getByRole("button", { name: "Edit your rating" })).toBeTruthy();
-    expect(screen.getByRole("dialog")).toBeTruthy();
-    expect(screen.getByText("8/10")).toBeTruthy();
-    expect(screen.getByText("7/10")).toBeTruthy();
-    expect(screen.getByText("9/10")).toBeTruthy();
-  });
-
-  it("obligation (c, fresh): no initialScores -> entry point reads 'Rate this exam' (AC-006 contrast case)", () => {
-    mockSearchParams = new URLSearchParams();
-
-    render(createElement(RatingModalController, { examId: "exam-1" }));
-
-    expect(screen.getByRole("button", { name: "Rate this exam" })).toBeTruthy();
-  });
-
-  it("manual open via the inline entry point also opens the modal (AC-006, independent of the marker)", () => {
-    mockSearchParams = new URLSearchParams();
-
-    render(createElement(RatingModalController, { examId: "exam-1" }));
-    expect(screen.queryByRole("dialog")).toBeNull();
-
-    fireEvent.click(screen.getByRole("button", { name: "Rate this exam" }));
-
-    expect(screen.getByRole("dialog")).toBeTruthy();
-  });
-});

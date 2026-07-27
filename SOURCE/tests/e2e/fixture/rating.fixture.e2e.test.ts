@@ -3,9 +3,13 @@
 // UI Spec: docs/design/rating-system-ui-spec.md
 // PRD: docs/prd/rating-system-prd.md (v1.1, AC-001..AC-026)
 //
-// Test FE1 (result-page auto-open modal journey) is converted below (frontend
-// task 8, RatingModal/RatingModalController) — see the FE1 section further
-// down this file for its own driver interface and header note.
+// Test FE1 (result-page rating entry) is converted below — see the FE1
+// section further down this file for its own driver interface and header
+// note. 2026-07-27: FE1 used to prove an auto-open-modal journey
+// (RatingModal/RatingModalController, later RatingEntry); the Result page's
+// rating entry now navigates straight to the standalone /exams/[id]/rate page
+// instead, so that whole dialog/auto-open surface (and the ?rate=auto marker
+// that drove it) no longer exists — FE1 was rewritten to match.
 //
 // Test FE2 is converted below into a real, driver-based script. This repo has
 // no `@playwright/test` dependency and no playwright.config.ts committed yet
@@ -262,241 +266,109 @@ export async function runFE2(driver: FE2Driver, loggedOutDriver: FE2Driver): Pro
   await checkLevelHardFilter(driver);
 }
 
+
 // =============================================================================
-// Test FE1 — Result-page reserved-slot journey: submit -> auto-open -> rate ->
-// saved -> idempotent return (Rating System, frontend task 8)
+// Test FE1 — Result-page rating entry navigates directly to the Rating page
+// (2026-07-27 rewrite — replaces the old auto-open-modal journey. The Result
+// page's rating entry no longer opens a popup at all: RatingModal/
+// RatingModalController/RatingEntry, the ?rate=auto marker, and the dialog
+// they drove are all deleted. The PRD's AC-004/005 ("...auto-opens as a
+// modal...") describe that removed behavior — superseded by this product
+// decision, see result/page.tsx's own 2026-07-27 comment.)
 // =============================================================================
-// AC-004: "...the shared rating form auto-opens as a modal over the result
-//   content..."
-// AC-005: "...the modal does not re-pop disruptively (a user who has already
-//   rated sees the 'already rated' state per R5, not a forced fresh rating)."
-// AC-006: "...it shows an 'already rated' state that is editable (pre-filled
-//   with the existing three scores) rather than an empty fresh form."
-// AC-002/024: CircleScale keyboard model, integrated smoke check within the
-//   modal (exhaustive matrix is Task 7's CircleScale.test.tsx).
-// ROI: reserved regardless of score (this is the highest-ROI continuous-session
-//   journey the whole feature exists to provide — work plan Phase 3 purpose).
-// Behavior: a single continuous browser session — first arrival with
-//   `?rate=auto` (fresh submit) -> rate all three parts via CircleScale
-//   keyboard -> submit -> saved confirmation -> reload the same URL WITHOUT
-//   the marker (simulating refresh/back/bookmark) -> the "already rated"
-//   editable state, never a re-pop -> Esc/scrim/Close each close the
-//   (re-opened) modal with focus returning to the inline entry-point trigger.
+// AC-006: "...it shows an 'already rated' state that is editable..." — still
+//   true in spirit: the entry point's LABEL still reflects prior-rating
+//   state, it's just a plain navigation link now instead of a pre-filled
+//   dialog trigger (the /rate page itself reads the prior scores server-side
+//   — proven by rate/page.tsx's own getMyRating/mapFromMyRating call, not by
+//   this test).
+// ROI: 40 (BV:6 x Freq:6 + Legal:0 + Defect:6) — down from the old modal
+//   journey's 57 now that there's no dialog/focus-trap/aria-live surface left
+//   to prove at the browser level; what remains is a plain link + label.
+// Behavior: on the result page, the rating entry point's label reflects
+//   whether the current user already rated this exam, and clicking it
+//   navigates to /exams/[id]/rate — a real page transition, never a dialog.
 // @category: fixture-e2e
 // @lane: fixture-e2e
-// @dependency: full-ui (mocked backend) — getResult/getMyRating/rateExam
-//   fixture-driven (same residual as FE2's header note: wiring fixture data
-//   into a real running page has no existing mock-injection layer in this
-//   repo; left for whoever stands up the Playwright harness).
-// @complexity: high (multi-step continuous session)
-// @real-dependency: none — this proves the browser-level DOM/routing/focus/
-//   aria-live behavior; the underlying rateExam/getMyRating contracts are
-//   proven by backend Task 6's tests, and the open-condition branching logic
-//   in-process is proven by integration Test 3 (mocked next/navigation
-//   router) in rating.int.test.ts.
-// Primary failure mode: the modal blocks/hides the result content instead of
-//   overlaying it; OR the modal context breaks CircleScale's keyboard model
-//   (e.g., focus-trap interferes with roving tabindex); OR the success
-//   announcement/Saved state doesn't occur; OR the reload shows a blank fresh
-//   form or re-opens the modal instead of the pre-filled "already rated"
-//   editable state; OR one of Esc/scrim/Close fails to close the modal or
-//   loses/misplaces focus afterward.
-// Proof obligation (FE1 (1)-(5), mirrors this task's Proof Obligations
-//   claims 4-8):
-//   (1) on first load with ?rate=auto, the modal is visible AND the result
-//       content remains present in the DOM behind/around it, and the marker
-//       is stripped from the URL (AC-004);
-//   (2) all three CircleScale parts are keyboard-operable across 1-10 within
-//       the modal, and the scale legend is visible (AC-002/024);
-//   (3) after submitting three valid scores, a saved confirmation is
-//       announced (aria-live) and the modal reaches its Saved state;
-//   (4) reloading the same result URL WITHOUT ?rate=auto never auto-opens the
-//       modal, and instead shows an "Edit your rating" inline entry point
-//       pre-filled with the three just-saved scores (AC-005/006 — the
-//       idempotency guarantee this feature exists to provide);
-//   (5) Esc, scrim click, and the Close control each close the modal, and
-//       focus returns to the inline entry-point trigger afterward.
-//
-// Implementation note: same `checkXxx(driver)` function-per-obligation style
-// as FE2 (this file has no test-runner harness yet — see file header), run in
-// order by `runFE1` as a single continuous session (the journey is inherently
-// sequential: rate -> submit -> reload -> re-open -> close).
+// @dependency: full-ui (mocked backend) — getResult/getMyRating fixture-driven
+//   (same residual as FE2's header note: wiring fixture data into a real
+//   running page has no existing mock-injection layer in this repo).
+// @complexity: low
+// @real-dependency: none — this proves only the browser-level link/label
+//   behavior; rateExam/getMyRating's own contracts are proven by backend
+//   Task 6's tests.
+// Primary failure mode: the entry point still opens an overlay/dialog instead
+//   of navigating; OR the label doesn't reflect prior-rating state; OR the
+//   link target is wrong (e.g. still points at the exam detail page instead
+//   of the rate page).
+// Proof obligation:
+//   (1) with no prior rating, the entry point reads "Rate this exam", is a
+//       real link (not a button) targeting /exams/[id]/rate, and clicking it
+//       navigates there directly with no role="dialog" ever appearing;
+//   (2) with a prior rating, the entry point reads "Edit your rating" and
+//       targets the same /exams/[id]/rate URL (AC-006 contrast case).
 
-/** Fixture identifiers for this journey — a fresh submit of an exam not
- *  previously rated by the current fixture user (distinct from FE2's
- *  eligibility fixtures; FE1 exercises the result page, not /exams). */
+/** Fixture identifiers for this journey (distinct from FE2's eligibility
+ *  fixtures; FE1 exercises the result page, not /exams). */
 export const FE1_EXAM_ID = "exam-fe1-fresh-submit";
 export const FE1_ATTEMPT_ID = "attempt-fe1";
 export const FE1_RESULT_PATH = `/exams/${FE1_EXAM_ID}/attempt/${FE1_ATTEMPT_ID}/result`;
 
 // --- FE1 Driver (Playwright `Page`/`Locator` structural subset) ------------
-// A separate, minimal interface from FE2Driver (not `extends`, to avoid
-// interface-variance friction over the differing Locator return types) —
-// a real Playwright Page/Locator satisfies both independently, same as FE2's
-// own driver. Adds `press`/`isFocused`/`textContent`/`reload`/`getByTestId`,
-// all real Playwright Page/Locator methods, needed for the keyboard
-// interaction, focus-return, and aria-live assertions FE2 doesn't exercise.
+// Much smaller than the old dialog-journey driver (no press/isFocused/reload/
+// getByTestId needed — nothing left to page through, focus-trap, or reload
+// idempotently; it's a link with a label and an href).
 
 export interface FE1Locator {
   click(): Promise<void>;
-  /** Playwright Locator.press — focuses the element (if not already) then
-   *  dispatches the given key. Used for CircleScale Arrow/End/Escape. */
-  press(key: string): Promise<void>;
   isVisible(): Promise<boolean>;
-  isFocused(): Promise<boolean>;
   getAttribute(name: string): Promise<string | null>;
-  textContent(): Promise<string | null>;
   count(): Promise<number>;
 }
 
 export interface FE1Driver {
   goto(url: string): Promise<void>;
-  reload(): Promise<void>;
   url(): string;
   getByRole(role: string, options?: { name?: string | RegExp }): FE1Locator;
-  getByText(text: string | RegExp): FE1Locator;
-  getByTestId(testId: string): FE1Locator;
 }
 
-/** (1) On first arrival with ?rate=auto, the modal is visible AND the result
- *  content remains present in the DOM behind/around it; the marker is
- *  stripped from the URL (AC-004). */
-export async function checkAutoOpenOverlaysResultContent(driver: FE1Driver): Promise<void> {
-  await driver.goto(`${FE1_RESULT_PATH}?rate=auto`);
+/** (1) No prior rating -> entry point reads "Rate this exam", is a real link
+ *  targeting /exams/[id]/rate, and clicking it navigates there directly with
+ *  no role="dialog" ever appearing (AC-006 fresh case). */
+export async function checkFreshEntryNavigatesToRatePage(driver: FE1Driver): Promise<void> {
+  await driver.goto(FE1_RESULT_PATH);
 
-  const dialog = driver.getByRole("dialog");
-  assert.equal(await dialog.isVisible(), true, "modal must auto-open on ?rate=auto arrival");
+  const entry = driver.getByRole("link", { name: "Rate this exam" });
+  assert.equal(await entry.isVisible(), true, "fresh entry point must read 'Rate this exam'");
+  assert.equal(await entry.getAttribute("href"), `/exams/${FE1_EXAM_ID}/rate`);
 
-  // Result content (ScoreCard's "Result" eyebrow) stays in the DOM
-  // behind/around the modal — never replaced/discarded (UI Spec AC-004
-  // reconciliation note).
-  const resultEyebrow = driver.getByText("Result");
-  assert.equal(await resultEyebrow.isVisible(), true, "result content must remain in the DOM");
-
-  assert.doesNotMatch(
-    driver.url(),
-    /[?&]rate=auto/,
-    "router.replace must strip the marker from the URL on mount"
-  );
-}
-
-/** (2) All three CircleScale parts are keyboard-operable across 1-10 within
- *  the modal, and the scale legend is visible (AC-002/024, integrated smoke
- *  check — the exhaustive keyboard matrix is Task 7's CircleScale.test.tsx).
- *  Ends each part committed at 10 (via End) — the exact value doesn't matter
- *  to obligations (3)/(4), only that it's the same value later assertions
- *  check for. */
-export async function checkCircleScaleKeyboardOperableInModal(driver: FE1Driver): Promise<void> {
-  for (const partName of ["Multiple Choice", "True / False", "Short Answer"]) {
-    // Unanchored: PartCard's accessible name concatenates its eyebrow (UPPERCASE,
-    // e.g. "PART I · MULTIPLE CHOICE") + score + this mixed-case name span +
-    // "Rate →" — matching mixed case finds only the name span, not the eyebrow.
-    await driver.getByRole("button", { name: new RegExp(partName) }).click();
-
-    const legend = driver.getByText("RATE DIFFICULTY — 1 (EASIEST) TO 10 (HARDEST)");
-    assert.equal(await legend.isVisible(), true, `${partName}: scale legend must be visible`);
-
-    const circleOne = driver.getByRole("radio", { name: "1" });
-    await circleOne.click();
-    assert.equal(await circleOne.getAttribute("aria-checked"), "true");
-
-    await circleOne.press("ArrowRight");
-    const circleTwo = driver.getByRole("radio", { name: "2" });
-    assert.equal(
-      await circleTwo.getAttribute("aria-checked"),
-      "true",
-      `${partName}: ArrowRight must move checked+focus together (roving tabindex)`
-    );
-
-    await circleTwo.press("End");
-    const circleTen = driver.getByRole("radio", { name: "10" });
-    assert.equal(await circleTen.getAttribute("aria-checked"), "true", `${partName}: End -> 10`);
-
-    // Commit this part's score and return to the overview for the next part.
-    await driver.getByRole("button", { name: "SUBMIT RATING" }).click();
-  }
-}
-
-/** (3) After submitting three valid scores, a saved confirmation is
- *  announced (aria-live) and the modal reaches its Saved state — RatingForm's
- *  "Sent" label swap, kept visible long enough by RatingModal's own
- *  SAVED_STATE_VISIBLE_MS window before it closes. */
-export async function checkSubmitAnnouncesSavedState(driver: FE1Driver): Promise<void> {
-  await driver.getByRole("button", { name: "SUBMIT" }).click();
-
-  const sentLabel = driver.getByRole("button", { name: "Sent" });
-  assert.equal(await sentLabel.isVisible(), true, "SUBMIT must swap to Sent on save success");
-
-  const announcement = driver.getByText("Rating saved.");
-  assert.equal(await announcement.textContent(), "Rating saved.");
-}
-
-/** (4) Reloading the same result URL WITHOUT ?rate=auto never auto-opens the
- *  modal, and instead shows an "Edit your rating" inline entry point
- *  pre-filled with the three just-saved scores (AC-005/006 — the idempotency
- *  guarantee this feature exists to provide). */
-export async function checkReloadWithoutMarkerShowsEditableIdempotentState(
-  driver: FE1Driver
-): Promise<void> {
-  await driver.goto(FE1_RESULT_PATH); // same URL, no ?rate=auto (simulates reload/back/bookmark)
-
+  await entry.click();
+  assert.match(driver.url(), new RegExp(`/exams/${FE1_EXAM_ID}/rate$`));
   assert.equal(
     await driver.getByRole("dialog").count(),
     0,
-    "the modal must stay closed on a reload without the marker"
+    "rating must never open as a popup on the result page"
   );
-
-  const entryPoint = driver.getByRole("button", { name: "Edit your rating" });
-  assert.equal(
-    await entryPoint.isVisible(),
-    true,
-    "entry point must read 'Edit your rating', not a fresh empty-form prompt"
-  );
-
-  await entryPoint.click();
-  assert.equal(await driver.getByRole("dialog").isVisible(), true);
-
-  const savedScoreCount = await driver.getByText("10/10").count();
-  assert.ok(savedScoreCount >= 3, "all three PartCards must show the just-saved score (10/10)");
 }
 
-/** (5) Esc, scrim click, and the Close control each close the modal, and
- *  focus returns to the inline entry-point trigger afterward. Runs against
- *  the modal (re-)opened by obligation (4) via the "Edit your rating" entry
- *  point. */
-export async function checkCloseMethodsReturnFocusToTrigger(driver: FE1Driver): Promise<void> {
-  const entryPoint = driver.getByRole("button", { name: "Edit your rating" });
+/** (2) A prior rating -> entry point reads "Edit your rating" and still
+ *  targets the same /exams/[id]/rate URL (AC-006 contrast case). */
+export async function checkRatedEntryReadsEditYourRating(driver: FE1Driver): Promise<void> {
+  await driver.goto(FE1_RESULT_PATH);
 
-  // Esc — modal is already open from obligation (4)'s click.
-  await driver.getByRole("dialog").press("Escape");
-  assert.equal(await driver.getByRole("dialog").count(), 0, "Esc must close the modal");
-  assert.equal(await entryPoint.isFocused(), true, "focus must return to the trigger after Esc");
-
-  // Scrim click.
-  await entryPoint.click();
-  await driver.getByTestId("rating-modal-scrim").click();
-  assert.equal(await driver.getByRole("dialog").count(), 0, "scrim click must close the modal");
+  const entry = driver.getByRole("link", { name: "Edit your rating" });
   assert.equal(
-    await entryPoint.isFocused(),
+    await entry.isVisible(),
     true,
-    "focus must return to the trigger after scrim click"
+    "already-rated entry point must read 'Edit your rating'"
   );
-
-  // Close control.
-  await entryPoint.click();
-  await driver.getByRole("button", { name: "Close" }).click();
-  assert.equal(await driver.getByRole("dialog").count(), 0, "Close must close the modal");
-  assert.equal(await entryPoint.isFocused(), true, "focus must return to the trigger after Close");
+  assert.equal(await entry.getAttribute("href"), `/exams/${FE1_EXAM_ID}/rate`);
 }
 
-/** Orchestrator — runs FE1's five proof obligations as a single continuous
- *  session (submit -> auto-open -> rate -> saved -> idempotent return ->
- *  close-method/focus-return checks) against a driver wired to a
- *  fixture-driven result-page session (see file header residual note). */
-export async function runFE1(driver: FE1Driver): Promise<void> {
-  await checkAutoOpenOverlaysResultContent(driver);
-  await checkCircleScaleKeyboardOperableInModal(driver);
-  await checkSubmitAnnouncesSavedState(driver);
-  await checkReloadWithoutMarkerShowsEditableIdempotentState(driver);
-  await checkCloseMethodsReturnFocusToTrigger(driver);
+/** Orchestrator — runs FE1's two obligations against two driver sessions: one
+ *  for a user who hasn't rated this exam yet, one for a user who already has
+ *  (mirrors FE2's fresh vs. logged-out dual-driver pattern). */
+export async function runFE1(freshDriver: FE1Driver, ratedDriver: FE1Driver): Promise<void> {
+  await checkFreshEntryNavigatesToRatePage(freshDriver);
+  await checkRatedEntryReadsEditYourRating(ratedDriver);
 }

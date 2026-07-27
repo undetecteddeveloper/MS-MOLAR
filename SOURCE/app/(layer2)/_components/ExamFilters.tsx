@@ -22,6 +22,8 @@ import { useState, useTransition } from "react";
 /** Rating System — khớp ExamSort (queries.ts) + ExamLevel lowercase slug (IP-6). */
 type ExamSort = "newest" | "oldest" | "hardest";
 type ExamLevel = "easy" | "medium" | "hard";
+/** Direction toggle — đảo chiều trục `sort` đang chọn (queries.ts SortDirection). */
+type SortDirection = "asc" | "desc";
 
 interface ExamFiltersProps {
   subjects: string[];
@@ -38,7 +40,15 @@ interface ExamFiltersProps {
     level?: ExamLevel;
   };
   sort?: ExamSort;
+  dir?: SortDirection;
 }
+
+/** Chiều mặc định của mỗi trục khi không có `dir` — khớp queries.ts. */
+const DEFAULT_ASCENDING: Record<ExamSort, boolean> = {
+  newest: false,
+  oldest: true,
+  hardest: false,
+};
 
 // Lọc nhanh — 3 ô checkbox NGOÀI dropdown, xếp dọc, tất cả CÙNG trục ?sort=
 // (D002): chọn 1 tự loại trừ 2 cái còn lại (toggle lại chính nó → bỏ sort).
@@ -69,6 +79,7 @@ export function ExamFilters({
   semesters,
   selected,
   sort,
+  dir,
 }: ExamFiltersProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -85,6 +96,29 @@ export function ExamFilters({
         scroll: false,
       });
     });
+  }
+
+  // Đổi trục sort (checkbox) → luôn bỏ `dir` cũ, trục mới bắt đầu ở chiều mặc
+  // định của chính nó thay vì kế thừa chiều của trục trước.
+  function setSort(value: ExamSort) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (sort === value) params.delete("sort");
+    else params.set("sort", value);
+    params.delete("dir");
+    startTransition(() => {
+      router.push(params.toString() ? `${pathname}?${params}` : pathname, {
+        scroll: false,
+      });
+    });
+  }
+
+  // Chiều hiệu lực của trục đang chọn — undefined khi chưa chọn trục nào
+  // (direction toggle vô nghĩa, bị disable).
+  const ascending = sort ? (dir ? dir === "asc" : DEFAULT_ASCENDING[sort]) : undefined;
+
+  function toggleDirection() {
+    if (!sort || ascending === undefined) return;
+    setParam("dir", ascending ? "desc" : "asc");
   }
 
   function clearAll() {
@@ -258,15 +292,26 @@ export function ExamFilters({
                     type="checkbox"
                     className="accent-brand size-4"
                     checked={checked}
-                    onChange={() => {
-                      // Toggle: chọn lại chính nó → bỏ sort; 3 giá trị dùng
-                      // chung param nên chọn 1 tự loại 2 cái còn lại.
-                      setParam("sort", sort === q.value ? "" : q.value);
-                    }}
+                    onChange={() => setSort(q.value)}
                   />
                 </label>
               );
             })}
+
+            {/* Direction toggle — đảo chiều trục ?sort= đang chọn (nhỏ-lớn/
+                ngược lại), thay vì cần thêm checkbox riêng cho từng chiều
+                (vd "Easiest" cho trục Hardest). Vô hiệu khi chưa chọn trục
+                nào — direction không có ý nghĩa nếu không có gì để đảo. */}
+            <button
+              type="button"
+              onClick={toggleDirection}
+              disabled={!sort}
+              aria-label="Toggle sort direction"
+              className="text-muted-foreground hover:text-brand mt-1 flex items-center justify-end gap-1.5 border-t border-border pt-2 text-xs whitespace-nowrap transition-colors disabled:pointer-events-none disabled:opacity-40"
+            >
+              <span aria-hidden>{ascending ? "↑" : "↓"}</span>
+              {ascending ? "Ascending" : "Descending"}
+            </button>
           </div>
         </div>
       </div>

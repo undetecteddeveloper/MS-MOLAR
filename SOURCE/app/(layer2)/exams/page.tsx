@@ -14,6 +14,7 @@ import {
   listMySubmittedExamIds,
   type ExamSort,
   type ExamLevel,
+  type SortDirection,
 } from "@/app/(layer2)/queries";
 import { ExamBrowser } from "@/app/(layer2)/_components/ExamBrowser";
 import { ExamFilters } from "@/app/(layer2)/_components/ExamFilters";
@@ -27,6 +28,7 @@ type SearchParams = Promise<{
   semester?: string;
   sort?: string;
   level?: string;
+  dir?: string;
 }>;
 
 export default async function ExamsPage({
@@ -53,9 +55,13 @@ export default async function ExamsPage({
     sp.level === "easy" || sp.level === "medium" || sp.level === "hard"
       ? sp.level
       : undefined;
+  // Direction toggle (ExamFilters) — đảo chiều trục `sort` đang chọn; giá trị
+  // lạ → undefined (dùng chiều mặc định của trục, giữ hành vi cũ).
+  const dir: SortDirection | undefined =
+    sp.dir === "asc" || sp.dir === "desc" ? sp.dir : undefined;
 
   const [exams, facets, submittedExamIds, user] = await Promise.all([
-    listExams({ subject, grade, school, schoolYear: year, semester, sort, level }),
+    listExams({ subject, grade, school, schoolYear: year, semester, sort, level, dir }),
     listExamFacets(),
     listMySubmittedExamIds(),
     getCurrentUser(),
@@ -77,6 +83,7 @@ export default async function ExamsPage({
             semesters={facets.semesters}
             selected={{ subject, grade, school, year, semester, level }}
             sort={sort}
+            dir={dir}
           />
 
           {/* preload order 2 — lưới card fade sau navbar (0) + filter (1) (S#21). */}

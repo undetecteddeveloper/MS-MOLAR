@@ -1,20 +1,15 @@
 // @vitest-environment jsdom
 
-// CircleScale — Reference Contracts (rating-system-frontend-task-7.md Proof
-// Obligation #2, AC-002/024): roving tabindex, Arrow/Home/End/Space/Enter,
-// aria-checked, no out-of-range value representable. Harness owns the value
-// state (parent-controlled component, matching CircleScaleProps.value/onChange).
+// ScoreScale — roving tabindex, Arrow/Home/End/Space/Enter, aria-checked, no
+// out-of-range value representable (AC-002/024). Harness owns the value state
+// (parent-controlled component, matching ScoreScaleProps.value/onChange).
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import type { PartScore } from "@/lib/rating";
-import { CircleScale } from "./CircleScale";
+import { ScoreScale } from "./ScoreScale";
 
-// vitest.config.ts không bật `test.globals`, nên @testing-library/react không
-// tự đăng ký afterEach(cleanup) — cần gọi tay để mỗi test render trên DOM sạch
-// (khác convention DifficultyBadge.test.tsx vì test này cần screen.getAllByRole
-// toàn-document, không scope theo container).
 afterEach(cleanup);
 
 function Harness({ initial }: { initial?: PartScore }) {
@@ -22,12 +17,12 @@ function Harness({ initial }: { initial?: PartScore }) {
   return (
     <>
       <span id="scale-label">Rate difficulty</span>
-      <CircleScale name="mcq" value={value} onChange={setValue} labelledBy="scale-label" />
+      <ScoreScale value={value} onChange={setValue} labelledBy="scale-label" />
     </>
   );
 }
 
-describe("CircleScale", () => {
+describe("ScoreScale", () => {
   it("renders exactly ten radios labelled 1..10 in order — no out-of-range value representable", () => {
     render(<Harness />);
     const radios = screen.getAllByRole("radio");
