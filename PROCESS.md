@@ -3436,4 +3436,30 @@ Engineer: "Thêm route cho Layer 3" — `(layer3)` route group tồn tại từ 
 - Vẫn **CHƯA COMMIT** — cùng branch `feat/rating-system`, giờ đã gộp 4 mảng việc (Rating System + History + front-adjust History + Analytics Layer 3) chưa tách/commit.
 - Chưa test account nào có 0 lịch sử thật để xác nhận trực quan nhánh empty-state ("No data yet") — logic đã có unit test (input rỗng → mọi range `[]`) và code review (`data.length===0` guard trước khi gọi chart), nhưng chưa tận mắt xác nhận qua browser thật với 1 tài khoản trắng.
 - Chưa test tooltip bám chuột (hidden feature #2) và hover-dim 35%/200ms (#7) qua Playwright — 2 hành vi này thuộc `BarChartCard.tsx` (file "frozen", không đụng tới ở pass này) nên rủi ro thấp, nhưng chưa xác nhận trực quan trong phiên này.
+
+---
+
+# [Rating System + History + Analytics Layer 3] — Commit + push toàn bộ 4 mảng việc gộp (S#42, 2026-07-31, branch `feat/rating-system`)
+
+## Yêu cầu
+Engineer: "Hãy push hết các thay đổi chưa được commit lên repo và cập nhật PROCESS.md như các phiên trước." Đây là lần commit ĐẦU TIÊN cho toàn bộ khối việc đã tích luỹ qua S#38→S#41 (Rating System rebuild, History feature 18-task, History front-adjust, Analytics Layer 3) — tất cả trước đó đều ở trạng thái "CHƯA COMMIT" trên working tree.
+
+## Rà soát trước khi commit
+- `git status` liệt kê ~13 file modified + ~90 file untracked (source + docs + task-plan artifacts của cả 4 mảng việc).
+- Phát hiện 2 thư mục untracked KHÔNG nên vào repo: `node_modules/` gốc (không phải `SOURCE/node_modules` đã gitignore — chỉ chứa cache Vite rỗng 1KB, rác) và `test_data/` gốc (3 file PDF + 1 screenshot dùng test thủ công, không được code nào `grep` tham chiếu — xác nhận qua `Grep "test_data"` trong `SOURCE/` ra 0 match). Cả hai bị loại khỏi commit, thêm vào `.gitignore` gốc (`/node_modules/`, `/test_data/`) để không còn báo untracked mỗi lần `git status`.
+- Rà `git diff --cached` cho `package.json` (chỉ thêm `jspdf`/`html2canvas`, khớp ADR-0009) và `supabase/test-rls.ts` (chỉ thêm fixture/case H-a, không có credential/secret hardcode) — sạch, không có gì nhạy cảm.
+- `.vscode/launch.json` (mới, debug config cho `scripts/dev-status.mjs`) và `.claude/commands/*.md` (18 recipe slash-command, `.claude/MEMORY.md`) đều là tooling dùng chung cho team, không phải config cá nhân nhạy cảm — giữ lại commit.
+
+## Việc đã làm
+1. Thêm 2 dòng vào `.gitignore` gốc: `/node_modules/`, `/test_data/`.
+2. `git add -A -- . ":(exclude)node_modules" ":(exclude)test_data"` — stage toàn bộ trừ 2 thư mục rác.
+3. 1 commit duy nhất (`43398cc`, 106 file, +11499/-81 dòng) gộp cả 4 mảng việc — không tách nhỏ vì cả 4 đã đan xen sẵn trên cùng working tree từ trước khi được yêu cầu commit (không phải quyết định thiết kế của phiên này).
+4. `git push origin feat/rating-system` — thành công, `7c94622..43398cc`.
+
+## Verify & kết quả
+`git status` sau push: working tree sạch (trừ `node_modules/`/`test_data/` giờ đã bị ignore, không còn hiện untracked). Remote `origin/feat/rating-system` đã cập nhật tới `43398cc`. Nhánh `feat/rating-system` **chưa merge vào `main`** — `main` hiện ở `276c043` (nhánh riêng, ahead-1 so với `origin/main`, không liên quan tới khối việc này).
+
+## CÒN NỢ / lưu ý cho phiên sau
+- `feat/rating-system` vẫn là feature branch, chưa có PR/merge vào `main` — nếu cần ship, phải mở PR riêng (chưa được yêu cầu ở phiên này).
+- Toàn bộ "CÒN NỢ" liệt kê ở S#38/S#39/S#40/S#41 (contrast a11y, mobile overflow 360px, cross-browser thật, empty-state Analytics chưa xác nhận trực quan, 2 hidden feature BarChartCard chưa test, doc history-frontend-design/ui-spec lệch so với layout mới) **vẫn còn nguyên**, commit lần này không giải quyết bất kỳ mục nào trong số đó.
 - Text subtitle DonutChartCard khi range="All time" đọc hơi gượng ("...this all time") — do template `this {rangeLabel.toLowerCase()}` trong file "frozen" ghép với nhãn "All time" mình chọn; cosmetic nhỏ, không sửa vì sẽ phải đụng file chart đã chốt không đổi.
