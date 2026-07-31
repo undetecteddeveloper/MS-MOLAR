@@ -3285,3 +3285,155 @@ ERR_DLOPEN_FAILED: The specified procedure could not be found.
 ## CÒN NỢ sau S#36
 - Task 7/E1 phần còn lại: a11y (axe/keyboard) S-01/02/03; e2e đoạn publish→attempt→report (upload→extract→review + delete ĐÃ pass); AC-027 count; OCR trên ảnh CHỤP/scan thật (fixture hiện là PDF text sạch).
 - Nhắc vận hành: nếu gặp "Failed to fetch" → kiểm tra terminal dev server còn sống trước tiên (`curl localhost:3000`).
+
+---
+
+# [UGC] — extractQuestions EXTRACTION_FAILED, root cause 503 transient + bật SDK retry (S#37, 2026-07-20)
+
+## Sự cố & chẩn đoán
+`extractQuestions` (stage 5/8 upload đề) fail mã generic `EXTRACTION_FAILED`, rollback cả pipeline; 2 call khác (`gemini-3.1-flash-lite`) sống. Log `[ugc-extract] extractQuestions:catch` xác nhận `ApiError status 503 UNAVAILABLE "high demand… try again later"` — model `gemini-3.5-flash` quá tải tạm thời, retryable. Các giả thuyết ban đầu (MAX_TOKENS/429 quota/404/concurrency) đều sai.
+Lý do 503 thoáng qua thành chí mạng: SDK `@google/genai` 2.12.0 có sẵn retry cho 408/429/500/502/503/504 nhưng **TẮT mặc định** — chỉ chạy khi truyền `httpOptions.retryOptions`. Client tạo bằng `{ apiKey }` trơn ⇒ 0 retry ⇒ 1 cú 503 rollback cả pipeline.
+
+## Fix đã áp
+1. `lib/ugc/gemini.ts` — tạo client với `httpOptions: { retryOptions: { attempts: 3 } }`.
+2. Nới `FATAL_CALL_DEADLINE_MS` 15s→30s (để chuỗi retry chạy xong trước khi AbortController deadline cắt).
+3. Thêm `logExtractorExit`/`sdkErrorDetail` + instrument 4 lối thoát ở cả 3 extractor (log server-side, không log payload) — chính nhờ đây mới đọc được 503.
+
+## Verify & kết quả
+tsc sạch, 102 UGC test pass (+4 test hồi quy). Probe trực tiếp 3 vòng cùng key: `gemini-3.5-flash` 503 mọi lần, `gemini-3.1-flash-lite` OK mọi lần <1s ⇒ Google overload riêng model 3.5-flash, code sạch. **Đã commit + push origin/main** (`971a4fe` feat(layer4/ugc), `227e3c3` chore(assets)). Quyết định: không thêm fallback model — theo dõi tiếp nếu 503 lặp lại thường xuyên trên `gemini-3.5-flash` thì mới cân nhắc ADR fallback.
+
+---
+
+# [Rating System] — Frontend teardown + rebuild toàn bộ thành academic-rubric layout (S#38, 2026-07-27, branch `feat/rating-system`)
+
+## Yêu cầu
+Xoá toàn bộ UI Rating Page cũ (không để dead code), redesign sau khi nghiên cứu layout minimalist/academic. Backend (`actions.ts`/`queries.ts`/`lib/rating`) giữ nguyên xuyên suốt.
+
+## Việc đã làm (cùng 1 phiên, nhiều bước nối tiếp)
+1. **Redesign nền tảng**: xoá `RatingForm`/`RatingOverview`/`PartCard`/`PartDetail`/`RatingModal`/`RatingModalController`/`CircleScale` (port demo dark-sidebar bubble-expand cũ) → xây lại khớp ngôn ngữ "paper" sẵn có của app (ScoreCard/TopicBreakdown/DifficultyBadge). Component mới: `ScoreScale.tsx`, `RatingRubric.tsx` (gộp Form+Overview+PartCard+PartDetail), `RatingEntry.tsx` (gộp Modal+Controller).
+2. **Phân trang từng phần**: `RatingRubric` đổi từ hiển thị cả 3 phần → 1 phần/lần + Prev/Next ("Part n of 3"), Overall + Submit luôn hiện. Bug ARIA phát hiện qua Playwright (không phải vitest): `aria-labelledby` đè `aria-label` cùng element → tên group luôn sai — fix bằng cách bỏ `aria-labelledby`.
+3. **Fix phụ cùng phiên**: `computeScore.ts` chưa implement true_false re-enable scoring (fix, 8/8 test); `lib/fake-data/analytics.ts` thiếu hoàn toàn làm block `next build` (tạo lại tối giản — xem mục Analytics Layer 3 bên dưới, CHƯA đầy đủ theo design doc).
+4. **Audit tích hợp Layer 2 ↔ rating**: không có regression ở `RateButton`/`DifficultyBadge`/`ExamBrowser`/`ExamFilters`. Thêm toggle hướng sort (`?dir=asc|desc`) cho "Hardest" trong `ExamFilters.tsx` + `queries.ts` (`SortDirection`, `DEFAULT_ASCENDING`), backward-compatible khi thiếu `dir`.
+5. **Điều tra "Level không có data"** — KHÔNG phải bug: ngưỡng N=3 rating (ADR-0008) đúng thiết kế, chỉ chưa đủ dữ liệu thật trong DB dev. Test thật bằng 2 tài khoản se2rater, xác nhận `exam-hoa-10` đạt 3 rating → hiển thị đúng "Hard · 7.9", filter/sort đúng.
+6. **UX nút Submit**: rút còn 2 state ("Submit rating"/"Submitting…", bỏ "Saved"); thêm `SuccessToast.tsx` (bottom-center, aria-live) thay label thứ 3. Thêm transition motion-safe cho Prev/Next + dialog entrance. Bug timing phát hiện qua Playwright: bỏ state `announcement` nội bộ của RatingRubric (bị unmount trước khi commit DOM trong biến thể dialog) — dùng SuccessToast làm nguồn thông báo accessible duy nhất.
+7. **Xoá popup kết quả, chuyển sang điều hướng thẳng**: xoá hẳn `RatingEntry.tsx` (dialog) và `TopicBreakdown.tsx` (Result page). Entry point Result page giờ là `<Link href="/exams/[id]/rate">` server-rendered thuần, không còn `?rate=auto`. `ResultActions` sửa thành 3 nút đều nhau (Save/Share/Return).
+8. **Back có ngữ cảnh**: `/rate` nhận `?returnTo=` từ nơi gọi, validate chống open-redirect (`safeBackHref` — chỉ nhận path bắt đầu `/`, chặn `//`/`://`/backslash). Từ ExamBrowser (không `returnTo`) → mặc định `/exams`.
+
+## Verify & kết quả
+223/223 vitest pass, `tsc --noEmit` sạch, `next build` chạy được. Verified live nhiều lần bằng Playwright (`exam-hoa-10`/`exam-ly-10`). **CHƯA COMMIT** — toàn bộ vẫn nằm trên branch `feat/rating-system`.
+
+## CÒN NỢ / lưu ý cho phiên sau
+- Chưa commit nhánh `feat/rating-system` — cần rà lại diff tổng thể trước khi commit/PR.
+- Bước 7 (bỏ auto-open dialog sau khi submit) là quyết định tạm — chưa xác nhận lại với engineer liệu có cần giữ nudge "vừa nộp bài xong thì tự mời rate" hay không.
+- **Analytics Layer 3 (`/me/dashboard`) — CHƯA HOÀN THÀNH**, phát hiện tình cờ khi build bị block bởi module thiếu. Chỉ tồn tại `layout.tsx`, `BarChartCard.tsx`, `DonutChartCard.tsx`. `AnalyticsDashboard.tsx` và `me/dashboard/page.tsx` KHÔNG tồn tại dù 2 design doc (`docs/design/analytics-layer3-design.md` UI-only, `analytics-layer3-data-logic-design.md` real-data) liệt kê chúng là "existing". `lib/fake-data/analytics.ts` được tạo lại tối giản (chỉ 6 export mà 2 chart component cần) chỉ để unblock build — thiếu `ANALYTICS_BY_RANGE`/`getSubjectStats`/`TimeRange`/... theo design doc. Khi làm tiếp: đọc lại cả 2 design doc, đừng giả định phần UI-only đã xong.
+
+---
+
+# [Layer HM: History] — Doc chain đầy đủ + implement 18 task (7 phase) — trang History + Save/Share PDF (S#39, 2026-07-31, branch `feat/rating-system`)
+
+## Yêu cầu
+"Tạo page History có chức năng lưu lịch sử làm bài (attempt) của user, có thể share + lưu về máy một PDF file format riêng." Navbar đã có navlink "History" (trỏ `#`). Page tính là Layer riêng, tên **HM** trong `SOURCE/app/`. Trước khi vào workflow chính, research UX pattern trên internet (không chỉ đọc doc nội bộ) để có context. Feature cỡ trung — hạn chế viết doc dài, chỉ vừa đủ để implement. Playwright + Supabase MCP đang bật.
+
+## Doc chain (đầy đủ, theo quy trình chuẩn của repo)
+`docs/prd/history-prd.md` (R1-R10, AC-001→019) → `docs/ui-spec/history-ui-spec.md` (8 component, quyết định D1-D5) → `docs/adr/ADR-0009-pdf-generation-library-choice.md` (chọn **jsPDF + html2canvas**, không dùng `@react-pdf/renderer` vì rủi ro tương thích Next 16/React 19) → `docs/design/history-backend-design.md` + `docs/design/history-frontend-design.md` → `docs/plans/history-work-plan.md` (7 phase) → 18 task file (`docs/plans/tasks/history-work-plan-task-01..18.md` + 6 file `*-phaseN-completion.md`). `PROJECT_OVERVIEW.md` đã sửa §3/§5/§10 (thêm Layer HM).
+
+## Việc đã làm (18 task, TDD Red-Green-Refactor từng task)
+1. **Backend**: `app/(layer2)/queries.ts` — `getResult()` mở rộng thêm `startedAt`/`submittedAt`. `app/(HM)/queries.ts` (mới) — `listMyHistory()`: 3 select tuần tự (exam_results → exam_attempts lọc `status='submitted'` order `submitted_at desc` → exams lọc **`.eq("status","published")`** — bug D001 phát hiện khi thiết kế: thiếu filter này thì History có thể hiện dòng attempt của đề đã unpublish, link "View details" 404; đã sửa trước khi code).
+2. **Route Layer HM**: `app/(HM)/layout.tsx` (nhại `(layer3)`/`(layer4)`, user nullable, `<SiteHeader>`), `app/(HM)/history/page.tsx` (guard `getCurrentUser()` + `redirect("/?auth=signin")` trước khi query — chặn guest theo AC), `loading.tsx`, `error.tsx` (role="alert" + nút Retry).
+3. **UI History**: `HistoryList.tsx`/`HistoryRow.tsx` (row-list theo pattern `ExamRow`/`MyExamsList`, empty-state CTA → `/exams`).
+4. **Module PDF dùng chung** (`lib/pdf/generateAttemptPdf.ts` — `generateAttemptPdfFile`/`downloadPdfFile`/`canShareFile`; `components/pdf/AttemptPdfTemplate.tsx` — style hex/rgba thuần, không Tailwind/oklch theo ràng buộc ADR-0009): import `jspdf`/`html2canvas`/`react-dom` **chỉ dynamic-import trong thân hàm** (kỷ luật bundle-size). `lib/history/format.ts` (`formatSubmittedDate`/`formatCompletionTime`/`buildPdfFilename` — nguồn format duy nhất).
+5. **`ActionButton.tsx`** (atom Save/Share dùng chung, state machine 4 phase idle/busy/error/fallback-confirmed): bug D002 (CSS thật) phát hiện qua test — span lỗi/status là **sibling** của `TooltipTrigger` (Tooltip base-ui không render wrapper) nên lọt vào `grid-cols-3` của caller làm lệch layout 2/4 phase; sửa bằng cách đưa span thành `position:absolute` descendant của chính button (`position:relative`).
+6. **Rewire Result page**: `ResultActions.tsx` (bỏ placeholder disabled "coming soon", giờ render 2 `ActionButton` Save/Share thật), `ScoreCard.tsx` (thêm `completionTimeLabel` thay `"—"` cứng), `exams/[id]/attempt/[attemptId]/result/page.tsx` (tính `pdfInput`/`completionTimeLabel` truyền xuống).
+7. **Nav wiring**: `SiteHeader.tsx:27` + `HomeSidebar.tsx:22` — `href: "#"` → `href: "/history"` (literal-value only, `isActive` không đổi).
+8. **RLS regression thật**: `supabase/test-rls.ts` — thêm case **H-a** (exams-visibility edge case) chạy trên Postgres local thật, pass 2 lần liên tiếp (idempotency).
+9. **Fixture-e2e**: `tests/e2e/fixture/history.fixture.e2e.test.ts` (mới, 500+ dòng, pattern `HistoryDriver`/`FixtureBackend` nhại `rating.fixture.e2e.test.ts`) — HE1/HE2/HE3, phát hiện + sửa 1 assertion cũ (HE1(f) hardcode "expected-pending" từ lúc nav chưa wire, nay thay bằng assertion `aria-current="page"` thật).
+
+## Gate chặn: Task 11 (Early Verification Point) — user chọn dừng chờ MCP thay vì evidence cấp code
+Task 11 cần xác minh live-browser nhưng subagent `task-executor-frontend` **không có quyền Playwright MCP** (gap propagation tool đã biết, lặp lại nhiều lần trong phiên). Hỏi user: chấp nhận evidence cấp code (đọc code + suy luận) hay dừng chờ MCP reconnect — **user chọn "Dừng lại, chờ Playwright MCP kết nối lại"**. Sau khi user báo "Đã reconnect", agent chính (không phải subagent) tự chạy Playwright MCP thật (navigate/click/snapshot/console/screenshot) để verify Task 11, 12, và về sau luôn dùng agent chính cho mọi bước cần browser thật — không fabricate pass/fail.
+
+## Verify & kết quả
+**285/285 vitest pass** · `test-rls.ts` (kể cả case H-a) exit 0 · `tsc`/ESLint sạch trên toàn bộ file chạm tới · bundle-size: `/exams` 225,331B vs `/history` 226,939B (+0.7%), Result route +0.3% — xác nhận jspdf/html2canvas không lọt vào initial bundle · grep `from "jspdf"`/`"html2canvas"` ngoài dynamic-import = 0 match. Verify live bằng Playwright MCP thật (Chromium, không có Firefox/Safari/Android engine thật trong môi trường): PDF thật tạo & tải được từ cả 2 điểm vào (History row + Result page), nav History active-highlight đúng, keyboard-only hoạt động (Tab→Enter tải PDF thật), axe-core audit thật, CDP 4x CPU throttle mô phỏng Android tầm trung (2.15s→9.2s, cả 2 đều thành công).
+
+## 2 phát hiện escalate — KHÔNG sửa trong task này (site-wide, có sẵn từ trước, ngoài scope History)
+1. **Color contrast (WCAG AA, serious)**: text `#a62c2b` active-nav trên nền `#211b17` (2.44:1, cần 4.5:1) + `text-muted-foreground` `#6b655c` trên `#ede1c8` (4.45:1, hụt sát nút). Tái hiện y hệt trên `/exams` đã ship — token `globals.css`/DESIGN.md toàn site, sửa cần quyết định design-system ảnh hưởng mọi trang.
+2. **Mobile horizontal scroll 360px**: nút profile "AnhPhat" trong `SiteHeader` tràn ~17px. Tái hiện y hệt trên `/exams`.
+
+## CÒN NỢ / lưu ý cho phiên sau
+- **CHƯA COMMIT** — toàn bộ nằm trên branch `feat/rating-system` cùng với Rating System (S#38) chưa commit. Cần rà diff tổng thể (2 feature gộp) trước khi commit/PR.
+- Cross-browser thật (Firefox/Safari/Android) chưa test được — môi trường chỉ có Chromium qua Playwright MCP. Nếu cần verify trước khi ship, phải nhờ engineer tay hoặc CI thật.
+- 2 phát hiện a11y/layout escalate ở trên chưa quyết định fix khi nào/ai làm.
+- Work Plan `docs/plans/history-work-plan.md` còn đúng 1 checkbox mở: "User review approval obtained" — chờ engineer sign-off.
+
+---
+
+# [Layer HM: History] — front-adjust: sửa bug scroll vô tận + filter sidebar + gộp 3 nút thành menu ⋯ (S#40, 2026-07-31, branch `feat/rating-system`)
+
+## Yêu cầu (qua `/recipe-front-adjust`)
+"Làm riêng một scroll side bar cho History, nhất quán với design hiện tại + gộp ba nút 'save', 'share' và 'view detail' vào một tooltip button (dấu ba chấm) + trình duyệt bị kéo dài vô tận dù content trong page không dài như thế + filter component." Hỏi lại qua AskUserQuestion: user chọn (1) sidebar kiểu **sticky filter rail giống ExamFilters** (không phải sidebar-luôn-mở kiểu HomeSidebar), (2) filter theo **cả 4 tiêu chí** (đề thi, khoảng điểm, môn học, khoảng ngày nộp bài).
+
+## Chẩn đoán bug "scroll vô tận" — root cause thật, không phải D3's bounded-list
+Đo trực tiếp qua Playwright MCP (`document.documentElement.scrollHeight` = 4142px dù `body.scrollHeight`/viewport chỉ 709px, dù `<ul>` nội bộ đã có `max-h-[30rem] overflow-y-auto` từ D3 — cái đó vẫn hoạt động đúng, KHÔNG phải nguyên nhân). Truy theo `getBoundingClientRect`/`getComputedStyle` từng phần tử `position:absolute`: `ActionButton.tsx`'s sr-only `reasonId` span (aria-describedby target) là **sibling của `TooltipTrigger`**, không phải descendant — theo đúng comment cũ "safe vì sr-only", nhưng comment đó SAI: không có ancestor `position:relative` nào chứa span này (`@base-ui/react`'s Tooltip Root không render wrapper), nên browser đặt nó theo "hypothetical static position" so với containing block gốc = `<html>`. Với tài khoản test có 36 dòng lịch sử thật, dòng cuối cùng đẩy span đó xuống ~4000px trong flow CHƯA bị cắt bởi `overflow-y:auto` của `<ul>` (vì "static position" tính trên toàn bộ flow trước khi container cha clip) → `documentElement.scrollHeight` bị kéo giãn theo, dù nội dung HIỂN THỊ chỉ cao ~700px — đúng y hệt mô tả của user. Bug này ẩn ở Result page (chỉ 2 button, lệch không đáng kể) nhưng lộ rõ ở `/history` (30+ dòng).
+
+## Việc đã làm
+1. **Fix D2 thật**: `ActionButton.tsx` — dời `<span id={reasonId}>` vào bên TRONG `<TooltipTrigger>` (descendant của chính button, được `position:relative` của button chứa) thay vì sibling. `aria-describedby` không đổi hành vi a11y (resolve theo id, không phụ thuộc vị trí DOM) — chỉ đổi layout.
+2. **Tách `usePdfAction` hook** (`components/history/usePdfAction.ts` — KHÔNG đặt trong `lib/pdf/` vì `generateAttemptPdf.test.ts` có tripwire ADR-0009 khoá cứng "lib/pdf/ chỉ chứa đúng 1 module + test của nó"): gộp state machine busy/error/fallback-confirmed + `busyRef` guard từ `ActionButton` cũ, dùng chung cho `ActionButton` (Result page) VÀ `HistoryRowMenu` (History) — vẫn đúng AC-007 (một pipeline PDF duy nhất).
+3. **`HistoryRowMenu.tsx`** (mới): gộp Save/Share/View details thành 1 trigger "⋯" (`MoreHorizontal`) + dropdown `role="menu"`, nhại đúng pattern dropdown có sẵn của `HeaderProfile.tsx` (scrim + panel ivory) thay vì thêm primitive Menu mới. Busy/error/fallback render thành text TRONG DÒNG bên trong menu item (không phải overlay absolute) — nhờ vậy không lặp lại lớp bug D2 ở component mới này. Auto-đóng menu khi Save/Share xong thành công; giữ mở khi lỗi (retry được) hoặc fallback (đọc được thông báo) — dùng pattern "adjust state during render" (so sánh phase trước/sau) thay vì `useEffect` set-state (repo bật `react-hooks/set-state-in-effect`, chặn thẳng nếu dùng effect).
+4. **`HistoryRow.tsx`**: bỏ 2×`ActionButton` + `Link` "View details" cũ, thay bằng 1 `<HistoryRowMenu>`.
+5. **Backend**: `app/(HM)/queries.ts` — `listMyHistory()`/`MyHistoryEntry` thêm field `subject` (mở rộng `.select("id, title, subject")`, không đổi filter/RLS hiện có).
+6. **`lib/history/filterEntries.ts`** (mới, pure function): lọc mảng `MyHistoryEntry[]` đã fetch theo subject/examId/scoreMin/scoreMax/dateFrom/dateTo (AND). Chủ ý lọc client-side-của-server-fetch (không thêm WHERE-clause cho `listMyHistory()`) vì lịch sử của 1 user vốn đã nhỏ/bounded qua RLS.
+7. **`HistoryFilters.tsx`** (mới, `app/(HM)/history/_components/`): sticky filter rail — copy 1:1 ngôn ngữ thị giác của `ExamFilters.tsx` (tay nắm ▶ + nhãn dọc "FILTERS", overlay panel ngà đè lên list, `FilterRow` dropdown). Thêm mới: Subject/Exam là `FilterRow` dropdown; Score/Submitted là cặp input number/date commit-on-blur (key theo value để tự re-sync khi Clear điều hướng). State lọc qua URL searchParams → Server Component re-query, đúng convention `sort`/`level` của `ExamsPage`.
+8. **`history/page.tsx`/`HistoryList.tsx` viết lại layout**: `page.tsx` giờ sở hữu `<main className="mx-auto max-w-6xl">` + `relative flex items-start` (y hệt `ExamsPage`), chứa `HistoryFilters` (trái) + `HistoryList` (phải, flex-1) — `HistoryList` không còn tự render `<main>` riêng (tránh 2 `<main>` landmark). Thêm `isFiltered` để phân biệt "chưa có lịch sử" (CTA Browse exams) với "lọc ra 0 kết quả" (chỉ gợi ý bỏ filter, không có CTA sai ngữ cảnh).
+9. **Cập nhật test đi kèm** (TDD, không có test nào bị nới lỏng để né lỗi): `ActionButton.test.tsx` (8/8 vẫn xanh, sửa lại obligation "(g cross-file)" theo kiến trúc mới — trỏ qua `usePdfAction` thay vì `ActionButton`/`HistoryRow` trực tiếp), `HistoryRowMenu.test.tsx` (mới, 8/8 — mở/đóng menu, Save/Share/fallback/error/retry/scrim-click/AC-010), `history.int.test.ts` (9/9, thêm field `subject` vào fixture + expected literal), `filterEntries.test.ts` (mới, 6/6). `tests/e2e/fixture/history.fixture.e2e.test.ts` (driver script thủ công, không chạy qua `npm test`) cũng được cập nhật để không còn dạy sai — obligation (b)/(c) của HE1 và HE3(b) giờ mở menu "⋯" trước khi tìm nút Save/Share/View details thay vì tìm trực tiếp.
+
+## Sự cố nhỏ trong lúc làm
+- Đặt `usePdfAction.ts` vào `lib/pdf/` lúc đầu → vỡ ngay tripwire ADR-0009 ("lib/pdf/ contains only this module and its test file") — dời sang `components/history/usePdfAction.ts`, sửa lại toàn bộ import.
+- `HistoryRowMenu`'s auto-close-on-success viết bằng `useEffect` lúc đầu → ESLint chặn (`react-hooks/set-state-in-effect`, rule mới của React Compiler). Sửa theo pattern React khuyến nghị: so sánh phase hiện tại với phase lưu ở state trước đó NGAY TRONG render, gọi `setState` trực tiếp (không qua effect) khi phát hiện transition.
+
+## Verify & kết quả
+299/299 vitest pass (tăng từ 285 — +8 HistoryRowMenu, +6 filterEntries, +1 test H-a giữ nguyên từ trước) · `tsc --noEmit` sạch · ESLint sạch trên toàn bộ file History-feature (kể cả rule mới `set-state-in-effect`) · `next build` qua · `check:bundle` PASS · grep xác nhận 0 static import `jspdf`/`html2canvas` ngoài dynamic-import. Verify LIVE bằng Playwright MCP thật trên tài khoản có 36 dòng lịch sử thật:
+- `documentElement.scrollHeight` = 709px (đúng bằng viewport), so với 4142px TRƯỚC fix — bug scroll vô tận đã hết, kể cả khi mở filter panel.
+- Filter sidebar render đúng design (ivory overlay, tay nắm sticky) — chọn Subject "Toán" → URL đổi `?subject=To%C3%A1n` → danh sách lọc còn đúng 3/36 dòng khớp subject đó (real round trip, không phải state ảo client).
+- Click "⋯" → menu hiện Save/Share/View details → Save tải PDF thật (`ki-m-tra-h-c-k-i_20260727.pdf`) → menu tự đóng sau khi thành công.
+
+## CÒN NỢ / lưu ý cho phiên sau
+- Vẫn **CHƯA COMMIT** — cùng branch `feat/rating-system` với S#38/S#39, 3 feature (Rating System + History + front-adjust này) đang gộp chung, chưa tách/commit.
+- Dữ liệu `exams.subject` trong DB dev không nhất quán (vừa có "Toán" tiếng Việt vừa có "Math" tiếng Anh cho nội dung tương tự) — không phải bug của filter, filter chỉ phản ánh đúng data thật; nếu cần chuẩn hoá là việc của seed/authoring exam, ngoài phạm vi front-adjust này.
+- `docs/design/history-frontend-design.md`/`history-ui-spec.md` KHÔNG được cập nhật theo layout mới (filter sidebar, menu ⋯) — đúng tinh thần "feature cỡ trung, hạn chế viết doc dài" của `/recipe-front-adjust`, nhưng nghĩa là 2 doc đó giờ mô tả UI cũ (3 nút rời, không sidebar). Nếu sau này cần đối chiếu Design Doc ↔ code, cần biết điểm lệch này trước.
+
+## Bổ sung cùng phiên — custom scrollbar TOÀN SITE (engineer feedback kèm ảnh)
+Engineer chê thanh cuộn mặc định của hệ điều hành (to bản, có nút mũi tên trắng) hiện ra trên `<ul>` nội bộ của HistoryList — "trông giống cái lấy sẵn", yêu cầu 1 thanh cuộn tự thiết kế tối giản (chỉ 1 hình chữ nhật kéo, không bo góc, màu ít nổi bật) và áp dụng đồng bộ cho toàn site chứ không riêng History.
+- `app/globals.css`: thêm rule global (`* { scrollbar-width: thin; scrollbar-color: ...; } *::-webkit-scrollbar{...}`) — track trong suốt, thumb `rgb(107 101 92 / 0.35)` (tông `--muted-foreground`) không bo góc, đậm hơn khi hover (`/0.55`), rộng 8px (so với ~17px mặc định OS). Áp dụng qua bộ chọn `*` nên MỌI phần tử `overflow` trên toàn site đều nhận, không cần sửa từng component.
+- **Sự cố dev server**: sau khi sửa, đổi CSS không lên dù đã reload — điều tra bằng cách fetch trực tiếp CSS chunk qua Playwright (bypasses browser cache) thấy chunk phục vụ KHÔNG chứa "scrollbar" dù đã save file. Log `.next/dev/logs/next-development.log` cho thấy compile cuối cùng dừng từ nhiều giờ trước dù nhiều file khác vẫn đổi được qua HMR trong phiên — dev server (`next dev`, đã chạy liên tục suốt session) bị "kẹt", không compile lại nữa. Fix: kill process cũ (PID trên port 3000) + `npm run dev` lại — chunk mới có "scrollbar" ngay, verify lại bằng screenshot thật: thanh cuộn giờ mảnh, không nút mũi tên, màu mờ hợp tông ngà.
+- **Lưu ý cho phiên sau**: nếu một thay đổi (đặc biệt CSS/global file) không lên dù code đã sửa đúng và đã reload trình duyệt, nghi ngay dev server bị kẹt (không phải bug code) — kiểm bằng cách fetch trực tiếp asset chunk qua `page.evaluate`/`fetch` (bypass cache của `<link>`) thay vì chỉ nhìn UI, rồi khởi động lại `next dev` nếu xác nhận đúng.
+
+---
+
+# [Layer 3: Analytics] — Dựng route /me/dashboard thật (real data, không fake) (S#41, 2026-07-31)
+
+## Yêu cầu
+Engineer: "Thêm route cho Layer 3" — `(layer3)` route group tồn tại từ trước (layout.tsx + 2 chart component `BarChartCard`/`DonutChartCard`) nhưng chưa có `page.tsx` nào, nên `/me/dashboard` (đích có sẵn của nav "Analytics") 404. Đây là nợ kỹ thuật đã ghi nhận từ S#38.
+
+## Đọc lại 2 design doc có sẵn trước khi làm (đã tồn tại, chưa từng implement)
+- `docs/design/analytics-layer3-design.md` (UI-only, v1.0) — kế hoạch 6 file, 8 hidden feature (tooltip bám chuột, "NEEDS REVIEW" tự động <75%, trục Y nice-number, màu cố định theo môn, filter "Filter" placeholder cho tới khi chạm, dim hover 35%/200ms, 3 dataset độc lập theo range...).
+- `docs/design/analytics-layer3-data-logic-design.md` (v1.0, **supersedes** doc trên phần "Non-scope: Real data") — bản đầy đủ hơn, bỏ qua fake-data hoàn toàn, dựng thẳng pipeline thật: Supabase → reducer thuần → chart. Có sẵn AC-01..13, thuật toán tham chiếu, edge case, risk — bám sát 100% theo đây thay vì tự thiết kế lại.
+- Quan trọng: `lib/fake-data/analytics.ts` hiện tại (từ S#38, tạo lại tối giản khi cứu build) **cố tình KHÔNG có** `ANALYTICS_BY_RANGE`/`getSubjectStats`/`TimeRange`/`RANGE_LABELS`/`DEFAULT_RANGE` — comment đầu file ghi rõ "không thêm để tránh export không ai gọi". Vì data-logic doc đã chốt đi thẳng real-data, bỏ qua bước fake-data-trước-rồi-thay-sau — tiết kiệm được một vòng làm-rồi-bỏ.
+
+## Việc đã làm (bám sát data-logic doc, KHÔNG đụng 2 file chart đã "frozen")
+1. **`lib/fake-data/analytics.ts`**: bổ sung `RANGE_ORDER`/`TimeRange`/`RANGE_LABELS`/`DEFAULT_RANGE` (chưa tồn tại, cần cho AnalyticsDashboard) — giữ nguyên mọi export cũ (`SUBJECT_ORDER`, `SubjectStats`, `SUBJECT_COLORS`, `NEEDS_REVIEW_THRESHOLD`, `niceCeil`, `computeShares`). Sửa lại comment đầu file (không còn nói "chưa dựng tiếp"), không rename path (giữ nguyên naming-smell đã ghi nhận — 3 file import, rename sẽ lan diff không cần thiết, đúng khuyến nghị doc).
+2. **`lib/analytics/aggregateAttempts.ts`** (mới, pure reducer, KHÔNG I/O — đặt ngoài `app/**` vì `vitest.config.ts`'s include glob không quét `app/**`): `aggregateAttemptsByRange(rows, now)` — loại môn ngoài union 7 môn (không có bucket "Other"), bỏ qua môn 0 lượt trong range, thứ tự luôn theo `SUBJECT_ORDER` (không theo thứ tự row đến), `wrong` luôn tính `total-correct` chứ không đọc field lưu sẵn, quy tắc phòng thủ `submittedAt` null (tính vào "all", bỏ qua "week"/"month", không throw).
+3. **`lib/analytics/__tests__/aggregateAttempts.test.ts`** (mới, 7/7): cover AC-01/02/03 (sum/wrong/sessions), AC-04 (loại môn ngoài union), AC-05 (bỏ qua 0-lượt + đúng thứ tự SUBJECT_ORDER dù row đến ngược), AC-06 (biên range 3/20/200 ngày trước), quy tắc phòng thủ submittedAt null, input rỗng.
+4. **`app/(layer3)/queries.ts`** (mới, server-only): `getAnalyticsByRange()` — 1 query duy nhất `exam_results.select("correct, total, exam_attempts!inner(submitted_at, status, exams!inner(subject))").eq("exam_attempts.status","submitted")`, RLS tự scope theo `auth.uid()` (không cần predicate thủ công, giống `getResult()`), normalize → gọi reducer thuần → trả `Record<TimeRange, SubjectStats[]>` (fetch 1 lần cho cả 3 range, không round-trip riêng mỗi lần đổi filter).
+5. **`app/(layer3)/_components/AnalyticsDashboard.tsx`** (mới, client — file này CHƯA từng tồn tại dù cả 2 design doc coi là "đã có"): state `tab`/`range`/`filterTouched`; tab bar BAR/DONUT kiểu underline giống SiteHeader nav; `filterSlot` (`<select>` native) hiện placeholder "Filter" cho tới khi user chạm (hidden feature #1) dù `range` nội bộ đã mặc định "week" ngay từ đầu; nhánh empty-state ("No data yet") thay hẳn chart card khi `data.length===0`, KHÔNG bao giờ gọi `DonutChartCard`/`BarChartCard` với mảng rỗng (tránh `computeShares` chia 0 phiên).
+6. **`app/(layer3)/me/dashboard/page.tsx`** (mới — route đích thật của nav "Analytics" có sẵn từ lâu, route group pathless nên không cần sửa nav): auth guard `getCurrentUser()`+redirect trước fetch (giống `(HM)/history/page.tsx`), gọi `getAnalyticsByRange()`, render `<AnalyticsDashboard>`.
+
+## Verify & kết quả
+306/306 vitest pass (tăng từ 299, +7 aggregateAttempts) · `tsc --noEmit` sạch · ESLint sạch · `next build` qua, route `/me/dashboard` xuất hiện thật trong bảng route (trước đây không có, 404) · **`git diff --stat` của `BarChartCard.tsx`/`DonutChartCard.tsx` rỗng** (AC-12, xác nhận 2 file chart "frozen" không bị đụng). Verify LIVE bằng Playwright MCP trên tài khoản có lịch sử thật:
+- Tab BAR: cột Correct/Wrong thật theo môn (Math/Physics/Chemistry), auto-tag "NEEDS REVIEW" hiện đúng cho các môn <75% accuracy, nav "Analytics" active (đỏ son + underline).
+- Tab DONUT: donut + legend % thật (Math 50%/Physics 25%/Chemistry 25% ở range Week).
+- Đổi filter sang "All time" (dispatch real `change` event qua Playwright, không phải giả lập tay) → dữ liệu đổi NGAY không reload/loading state (Physics 61%/Math 24%/Chemistry 15%) — xác nhận round-trip fetch-1-lần-cho-cả-3-range hoạt động đúng, filter hiện đúng giá trị thật ("All time") thay placeholder sau khi đã chạm (hidden feature #1 xác nhận đúng).
+
+## CÒN NỢ / lưu ý cho phiên sau
+- Vẫn **CHƯA COMMIT** — cùng branch `feat/rating-system`, giờ đã gộp 4 mảng việc (Rating System + History + front-adjust History + Analytics Layer 3) chưa tách/commit.
+- Chưa test account nào có 0 lịch sử thật để xác nhận trực quan nhánh empty-state ("No data yet") — logic đã có unit test (input rỗng → mọi range `[]`) và code review (`data.length===0` guard trước khi gọi chart), nhưng chưa tận mắt xác nhận qua browser thật với 1 tài khoản trắng.
+- Chưa test tooltip bám chuột (hidden feature #2) và hover-dim 35%/200ms (#7) qua Playwright — 2 hành vi này thuộc `BarChartCard.tsx` (file "frozen", không đụng tới ở pass này) nên rủi ro thấp, nhưng chưa xác nhận trực quan trong phiên này.
+- Text subtitle DonutChartCard khi range="All time" đọc hơi gượng ("...this all time") — do template `this {rangeLabel.toLowerCase()}` trong file "frozen" ghép với nhãn "All time" mình chọn; cosmetic nhỏ, không sửa vì sẽ phải đụng file chart đã chốt không đổi.

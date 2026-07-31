@@ -297,6 +297,11 @@ export type ExamResult = {
   result: ScoreResult;
   /** questionId → nội dung + lựa chọn (để render Chi tiết từng câu, Task 4). */
   questions: Record<string, ResultQuestion>;
+  /** Luôn có mặt — exam_attempts.started_at NOT NULL DEFAULT now() (History). */
+  startedAt: string;
+  /** null khi truy cập trực tiếp URL attempt trong khoảng hở trước khi
+   * submitExam() cập nhật xong status/submitted_at (History). */
+  submittedAt: string | null;
 };
 
 /**
@@ -316,7 +321,7 @@ export async function getResult(attemptId: string): Promise<ExamResult | null> {
 
   const { data: attempt, error: attemptErr } = await supabase
     .from("exam_attempts")
-    .select("exam_id")
+    .select("exam_id, started_at, submitted_at")
     .eq("id", attemptId)
     .maybeSingle();
   if (attemptErr) throw attemptErr;
@@ -367,5 +372,12 @@ export async function getResult(attemptId: string): Promise<ExamResult | null> {
     };
   }
 
-  return { examId: exam.id, examTitle: exam.title, result, questions };
+  return {
+    examId: exam.id,
+    examTitle: exam.title,
+    result,
+    questions,
+    startedAt: attempt.started_at as string,
+    submittedAt: attempt.submitted_at as string | null,
+  };
 }

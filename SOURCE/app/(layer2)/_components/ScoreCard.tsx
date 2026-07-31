@@ -8,9 +8,11 @@ import type { ScoreResult } from "@/types/result";
 export function ScoreCard({
   examTitle,
   result,
+  completionTimeLabel,
 }: {
   examTitle: string;
   result: ScoreResult;
+  completionTimeLabel: string;
 }) {
   const wrong = result.total - result.correct;
 
@@ -29,7 +31,9 @@ export function ScoreCard({
         <span className="font-serif text-2xl text-muted-foreground">/10</span>
       </p>
 
-      {/* Thống kê: đúng · sai · thời gian (thời gian tượng trưng — Q1). */}
+      {/* Thống kê: đúng · sai · thời gian. Time cell nhận completionTimeLabel
+          đã format sẵn từ caller (Task 12) — component này chỉ hiển thị, không
+          tự tính toán ngày giờ (xem lib/history/format.ts). */}
       <dl className="mt-6 grid grid-cols-3 gap-3 border-t border-border pt-5 text-center">
         <div className="flex flex-col gap-1">
           <dt className="eyebrow">Correct</dt>
@@ -46,7 +50,7 @@ export function ScoreCard({
         <div className="flex flex-col gap-1">
           <dt className="eyebrow">Time</dt>
           <dd className="font-serif text-xl text-muted-foreground tabular-nums">
-            —
+            {completionTimeLabel}
           </dd>
         </div>
       </dl>

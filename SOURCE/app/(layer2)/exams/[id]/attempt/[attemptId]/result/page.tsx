@@ -17,6 +17,8 @@ import { getResult } from "@/app/(layer2)/queries";
 import { ScoreCard } from "@/app/(layer2)/_components/ScoreCard";
 import { ResultActions } from "@/app/(layer2)/_components/ResultActions";
 import { mapFromMyRating } from "@/lib/rating";
+import { formatCompletionTime } from "@/lib/history/format";
+import type { AttemptPdfData } from "@/lib/pdf/generateAttemptPdf";
 
 export default async function ResultPage({
   params,
@@ -37,12 +39,27 @@ export default async function ResultPage({
   const initialScores = mapFromMyRating(await getMyRating(id));
   const hasRated = initialScores !== undefined;
 
+  // Task 12: computed once here (no extra round trip, AC-009) and passed
+  // down to ScoreCard/ResultActions — same shared formatter/type HistoryRow
+  // (Task 13) and generateAttemptPdf.ts use, so all surfaces stay in sync.
+  const completionTimeLabel = formatCompletionTime(data.startedAt, data.submittedAt);
+  const pdfInput: AttemptPdfData = {
+    examTitle,
+    totalScore: result.totalScore,
+    startedAt: data.startedAt,
+    submittedAt: data.submittedAt,
+  };
+
   return (
     <div className="bg-background">
       <main className="mx-auto flex w-full max-w-xl flex-col gap-5 px-6 py-8">
         {/* preload order 1–4 — các block fade lần lượt sau navbar (S#21). */}
         <div className="preload-fade" style={{ "--preload-order": 1 } as React.CSSProperties}>
-          <ScoreCard examTitle={examTitle} result={result} />
+          <ScoreCard
+            examTitle={examTitle}
+            result={result}
+            completionTimeLabel={completionTimeLabel}
+          />
         </div>
 
         {/* Save · Share · Return — 3 ô ngang bằng nhau, không còn phụ thuộc
@@ -51,7 +68,7 @@ export default async function ResultPage({
           className="preload-fade grid grid-cols-3 gap-3"
           style={{ "--preload-order": 2 } as React.CSSProperties}
         >
-          <ResultActions />
+          <ResultActions pdfInput={pdfInput} />
           {/* Return → ExamBrowser (S#26 — đổi từ Home→"/" cũ). */}
           <Link
             href="/exams"

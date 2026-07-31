@@ -5,6 +5,11 @@
 //   cách ly exam/question/report chưa published (bảng + Storage), positive
 //   controls, write policies tác giả, backfill. ĐÂY LÀ GATE A (ADR-0001 kill
 //   criterion) — không sang Phase 4/5/6 khi chưa xanh.
+// Phần 3 (History feature, backend Design Doc v1.2, case H-a) — required,
+//   blocking trước khi listMyHistory() coi là hoàn thành (xem block bên dưới,
+//   sau Phần 2 Rating). Không có mock nào chứng minh được hành vi RLS thật
+//   (chỉ Postgres thật mới chứng minh được) — history.int.test.ts obligation
+//   (e) (mocked) chỉ chứng minh JS-assembly/omit-logic.
 //
 // 2 user test được tạo qua Admin API (service_role, email_confirm=true) để KHÔNG
 // gửi email xác nhận. Việc TEST RLS sau đó chỉ dùng ANON key + đăng nhập thật.
@@ -69,6 +74,11 @@ const RATING_EXAM_IDS = [
 ];
 const INITIAL_RATING_SCORES = { score_part1: 5, score_part2: 6, score_part3: 7 };
 const UPDATED_RATING_SCORES = { score_part1: 9, score_part2: 3, score_part3: 8 };
+
+// Fixture History (backend Design Doc v1.2, case H-a) — id prefix riêng, setup/
+// cleanup idempotent như 2 fixture trên. A vừa là tác giả vừa là người làm bài
+// (published, có 1 submitted attempt + exam_results tương ứng).
+const HISTORY_EXAM_ID = "rls-history-h-a";
 
 let failures = 0;
 function assert(cond: boolean, msg: string) {
@@ -255,6 +265,53 @@ async function setupRatingFixtures(admin: SupabaseClient, authorId: string, rate
     },
   ]);
   if (attempts.error) throw attempts.error;
+}
+
+/** Xóa sạch fixture History (chạy trước VÀ sau để idempotent). exam_results dọn
+ *  theo cascade của exam_attempts (schema.sql: `attempt_id ... on delete cascade`). */
+async function cleanupHistoryFixtures(admin: SupabaseClient) {
+  await admin.from("exam_attempts").delete().eq("exam_id", HISTORY_EXAM_ID);
+  await admin.from("exams").delete().eq("id", HISTORY_EXAM_ID);
+}
+
+/** Tạo fixture History qua service_role (bypass RLS): 1 đề published của A, A vừa
+ *  là tác giả vừa là người làm bài, với 1 submitted attempt + 1 exam_results khớp. */
+async function setupHistoryFixtures(admin: SupabaseClient, authorId: string) {
+  const exam = await admin.from("exams").insert({
+    id: HISTORY_EXAM_ID,
+    title: "[RLS] Đề History H-a - published rồi bị unpublish",
+    duration_minutes: 45,
+    subject: "Toán",
+    grade: 10,
+    author_id: authorId,
+    author_display_name: "RLS Test Author",
+    question_ids: [] as string[],
+    status: "published",
+  });
+  if (exam.error) throw exam.error;
+
+  const attempt = await admin
+    .from("exam_attempts")
+    .insert({
+      user_id: authorId,
+      exam_id: HISTORY_EXAM_ID,
+      status: "submitted",
+      submitted_at: new Date().toISOString(),
+    })
+    .select("id")
+    .single();
+  if (attempt.error) throw attempt.error;
+
+  const result = await admin.from("exam_results").insert({
+    attempt_id: attempt.data.id as string,
+    user_id: authorId,
+    total_score: 10,
+    correct: 1,
+    total: 1,
+    per_question: [],
+    topic_breakdown: [],
+  });
+  if (result.error) throw result.error;
 }
 
 async function main() {
@@ -724,6 +781,42 @@ async function main() {
       (ruA.data?.length ?? 0) === 1,
     "R-u: B KHÔNG đọc được rating của A (0 row); A đọc được rating của chính mình (1 row)",
   );
+
+  // ==========================================================================
+  // Phần 3 — History Gate (backend Design Doc v1.2, docs/design/history-backend-design.md,
+  // case H-a) — REQUIRED, BLOCKING. Chứng minh duy nhất trên Postgres thật rằng
+  // exams_select_visible RLS + filter tường minh .eq("status","published") loại
+  // bỏ đúng hàng của một đề tự-tác-giả sau khi bị unpublish (R-1) — mock trong
+  // history.int.test.ts obligation (e) chỉ chứng minh được JS-assembly/omit-logic.
+  // ==========================================================================
+  console.log("\nHistory H-a — setup fixture (service_role)…");
+  await cleanupHistoryFixtures(admin);
+  await setupHistoryFixtures(admin, userAId);
+
+  console.log("\nRLS checks (History H-a):");
+
+  // H-a. Tác giả đổi status đề khỏi 'published' (service_role) -> lookup title
+  //      tương đương listMyHistory() bước 3, chạy dưới danh nghĩa chính User A
+  //      (tác giả kiêm người làm bài) -> phải trả về 0 row, chứng minh việc loại
+  //      bỏ là do RLS + filter tường minh, không phải do application-code (JS-side).
+  const haRevert = await admin
+    .from("exams")
+    .update({ status: "draft" })
+    .eq("id", HISTORY_EXAM_ID);
+  if (haRevert.error) throw haRevert.error;
+
+  const ha = await userA
+    .from("exams")
+    .select("id")
+    .in("id", [HISTORY_EXAM_ID])
+    .eq("status", "published");
+  assert(
+    !ha.error && (ha.data?.length ?? 0) === 0,
+    "H-a: Đề tự-tác-giả sau khi bị unpublish -> lookup title (bước 3 listMyHistory()) trả về 0 row cho đề đó (RLS + filter tường minh, không phải application-code)",
+  );
+
+  // Dọn dẹp fixture History.
+  await cleanupHistoryFixtures(admin);
 
   // Dọn dẹp fixture Rating.
   await cleanupRatingFixtures(admin);

@@ -24,7 +24,7 @@ const NAV: NavItem[] = [
   { label: "Home", href: "/" },
   { label: "Exams", href: "/exams" },
   { label: "Analytics", href: "/me/dashboard" },
-  { label: "History", href: "#" },
+  { label: "History", href: "/history" },
   // UGC v2.0 (Task 6.1): Import→Upload cho MỌI user; KHÔNG có mục admin.
   { label: "Upload", href: "/upload" },
 ];

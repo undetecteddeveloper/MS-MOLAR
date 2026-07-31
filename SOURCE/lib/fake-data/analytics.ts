@@ -1,15 +1,16 @@
 // lib/fake-data/analytics — hằng số/helper thuần cho Analytics (Layer 3),
-// dùng bởi BarChartCard.tsx/DonutChartCard.tsx (docs/design/analytics-layer3-design.md
-// component plan #6). Union 7 môn (khác SUBJECTS 10 môn của lib/ugc/subjects.ts —
-// Geography/Informatics/Civic Education nằm ngoài phạm vi Analytics theo
+// dùng bởi BarChartCard.tsx/DonutChartCard.tsx/AnalyticsDashboard.tsx (docs/
+// design/analytics-layer3-design.md component plan #6). Union 7 môn (khác
+// SUBJECTS 10 môn của lib/ugc/subjects.ts — Geography/Informatics/Civic
+// Education nằm ngoài phạm vi Analytics theo
 // docs/design/analytics-layer3-data-logic-design.md).
 //
-// File này CHỈ chứa phần types/constants/helpers hai chart card cần để build —
-// dữ liệu giả lập theo range (ANALYTICS_BY_RANGE/getSubjectStats) cùng
-// AnalyticsDashboard/me/dashboard/page.tsx tiêu thụ chúng CHƯA được tạo trong
-// cây source này (khác mô tả trong design doc) — không thêm ở đây để tránh
-// export không ai gọi; xem docs/design/analytics-layer3-design.md nếu cần dựng
-// tiếp trang dashboard.
+// Dù tên file còn "fake-data" (naming-smell đã ghi nhận, cố tình CHƯA rename —
+// xem data-logic design doc § Naming-smell follow-up, path này bị 3 file import
+// nên rename sẽ lan diff không cần thiết), file KHÔNG còn chứa dữ liệu giả lập
+// nào — chỉ types/constants/helpers thuần. Dữ liệu thật đến từ
+// (layer3)/queries.ts (getAnalyticsByRange, đọc Supabase RLS-scoped) qua
+// lib/analytics/aggregateAttempts.ts (reducer thuần, có test riêng).
 
 export const SUBJECT_ORDER = [
   "Math",
@@ -69,3 +70,17 @@ export function computeShares(
     pct: Math.round((d.sessions / totalSessions) * 100),
   }));
 }
+
+/** 3 khoảng thời gian AnalyticsDashboard cho chọn — "all" = không giới hạn dưới. */
+export const RANGE_ORDER = ["week", "month", "all"] as const;
+export type TimeRange = (typeof RANGE_ORDER)[number];
+
+export const RANGE_LABELS: Record<TimeRange, string> = {
+  week: "Week",
+  month: "Month",
+  all: "All time",
+};
+
+/** Range dùng để tính dữ liệu ngay từ đầu — bất kể filter đã "touched" hay
+ *  chưa (hidden feature #1, AnalyticsDashboard.tsx). */
+export const DEFAULT_RANGE: TimeRange = "week";

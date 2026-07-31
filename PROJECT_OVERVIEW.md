@@ -63,7 +63,6 @@ Xem `WORKFLOW.md` Mục 1 để biết quy tắc dependency và điều kiện h
 - Nộp bài: xem đáp án + breakdown theo chủ đề
 
 ### Layer 3 — Reflection *(xây sau khi Layer 1–2 ổn định)*
-- Lịch sử làm bài
 - Phân tích điểm yếu, gợi ý ôn tập
 
 ### Layer 4 — Content Infrastructure *(xây sau)*
@@ -71,6 +70,10 @@ Xem `WORKFLOW.md` Mục 1 để biết quy tắc dependency và điều kiện h
 - Version control cho từng câu hỏi
 - Confidence scoring + quarantine system
 - Thiết kế như plugin độc lập — không hardcode vào core
+
+### Layer HM — History *(độc lập với Layer 3, không phụ thuộc tiến độ Analytics)*
+- Lịch sử làm bài: trang liệt kê các attempt đã nộp và có điểm
+- Phạm vi: danh sách history của các attempt đã submit + lưu/chia sẻ PDF kết quả (save/share)
 
 ---
 
@@ -156,7 +159,8 @@ TrangNguyenDigi/
 │   │   ├── (layer1)/        # Entry & Identity routes
 │   │   ├── (layer2)/        # Core Loop routes
 │   │   ├── (layer3)/        # Reflection routes
-│   │   └── (layer4)/        # Content Infrastructure routes
+│   │   ├── (layer4)/        # Content Infrastructure routes
+│   │   └── (HM)/            # History — lịch sử làm bài (attempt history)
 │   ├── components/          # Shared UI components
 │   │   ├── ui/              # shadcn/ui primitives
 │   │   └── [feature]/       # Feature-specific components
@@ -292,5 +296,6 @@ Ghi lại các quyết định kỹ thuật quan trọng để tránh revisit kh
 | — | Three.js chỉ trên desktop | Mobile mid-range VN không đủ GPU để chạy WebGL ổn định |
 | — | shadcn/ui thay vì MUI/Antd | Unstyled primitives dễ customize hơn cho visual language riêng từng layer |
 | — | Testing Pha 0 là thủ công | Chưa đủ codebase để viết test có ý nghĩa; tránh over-engineering sớm |
+| 2026-07-27 | History (lịch sử làm bài) tách thành layer riêng `(HM)` thay vì gộp vào Layer 3 (Reflection) | Layer 3 hiện đang dở dang cho Analytics (chưa commit); tách History thành layer riêng để triển khai độc lập, không phụ thuộc tiến độ Analytics; quyết định theo yêu cầu sản phẩm trực tiếp |
 
 > Agent: Khi engineer ra quyết định kỹ thuật mới trong quá trình làm việc, thêm vào bảng này và ghi ngày.

@@ -119,6 +119,40 @@
 }
 
 /* ============================================================
+   SCROLLBAR — thanh cuộn tự thiết kế, thay thanh cuộn mặc định của
+   hệ điều hành (to bản, có nút mũi tên, không khớp theme ngà/mực).
+   Chỉ còn đúng 1 hình chữ nhật (thumb) kéo lên/xuống, không bo góc,
+   track trong suốt (hoà vào nền), màu muted mờ để không nổi bật.
+   Áp dụng TOÀN SITE (mọi phần tử overflow, không riêng History).
+   ============================================================ */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(107 101 92 / 0.35) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: rgb(107 101 92 / 0.35);
+  border-radius: 0;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(107 101 92 / 0.55);
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ============================================================
    THEME HOOKS — hệ thống theme per-layer/per-trang.
    Mỗi UI Layer (hoặc trang) override các biến này trong SCOPE
    riêng (class .theme-*) → KHÔNG kế thừa theme của nhau.

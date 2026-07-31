@@ -28,3 +28,7 @@ SCREENSHOT/temporary_screenshot/
 # Tooling / máy cục bộ
 .playwright-mcp/
 .claude/settings.local.json
+
+# Root-level local artifacts (không phải source, không được code tham chiếu)
+/node_modules/
+/test_data/
