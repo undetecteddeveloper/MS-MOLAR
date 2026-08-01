@@ -80,13 +80,23 @@ export function sdkErrorDetail(err: unknown): Record<string, unknown> {
 /**
  * Deadline (ms) TỔNG cho mỗi call FATAL (extractQuestions/extractAnswers) —
  * bao trùm cả chuỗi retry của SDK (abortSignal truyền vào fetch dùng chung mọi
- * lần thử). Đặt ĐỦ RỘNG để 3 lần gọi + backoff chạy xong (~24s ước tính từ
- * elapsedMs 7.5s/attempt), nhưng vẫn CHẶN một call treo vô hạn (fetch của SDK
- * không có timeout mặc định; httpOptions.timeout thì lỗi — js-genai #1277 —
- * nên phải dùng AbortController). extractMeta NON-FATAL (AC-040) cố tình KHÔNG
- * dùng deadline; retry-exhaustion tự bó nó lại.
+ * lần thử), nhưng vẫn CHẶN một call treo vô hạn (fetch của SDK không có
+ * timeout mặc định; httpOptions.timeout thì lỗi — js-genai #1277 — nên phải
+ * dùng AbortController). extractMeta NON-FATAL (AC-040) cố tình KHÔNG dùng
+ * deadline; retry-exhaustion tự bó nó lại.
+ *
+ * SỰ CỐ 2026-08 (recipe-diagnose): mốc 30s cũ ước tính từ tốc độ RETRY
+ * ("~24s cho 3 lần gọi + backoff, 7.5s/attempt") — sai giả định, vì với đề
+ * NHIỀU CÂU/NHIỀU TRANG một lần gọi ĐƠN đã vượt 30s, nên extractQuestions
+ * fail 100% (AbortError) ngay từ 1 lần gọi, chưa kịp tới retry. Đo thực tế
+ * trên file thật (4 trang, 22 câu/3 phần, đề chuẩn quốc gia 2025):
+ * extractQuestions mất 42.21s để hoàn tất — tức bản thân 1 lần gọi THÀNH CÔNG
+ * bình thường đã gần gấp rưỡi mốc cũ. LIMITS.MAX_PDF_PAGES=30/MAX_QUESTIONS=50
+ * (limits.ts) còn lớn hơn nhiều so với file đo được (30/4 ≈ 7.5x trang,
+ * 50/22 ≈ 2.3x câu) — 150s cho biên an toàn ~3.5x so với số đo thật, đủ dư
+ * cho input gần mức tối đa mà không treo vô hạn khi có sự cố thật.
  */
-export const FATAL_CALL_DEADLINE_MS = 30_000;
+export const FATAL_CALL_DEADLINE_MS = 150_000;
 
 /**
  * Tạo AbortSignal tự abort sau `ms`. Trả kèm `clear()` để hủy timer trong
