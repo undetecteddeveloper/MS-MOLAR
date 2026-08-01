@@ -3463,3 +3463,26 @@ Engineer: "Hãy push hết các thay đổi chưa được commit lên repo và 
 - `feat/rating-system` vẫn là feature branch, chưa có PR/merge vào `main` — nếu cần ship, phải mở PR riêng (chưa được yêu cầu ở phiên này).
 - Toàn bộ "CÒN NỢ" liệt kê ở S#38/S#39/S#40/S#41 (contrast a11y, mobile overflow 360px, cross-browser thật, empty-state Analytics chưa xác nhận trực quan, 2 hidden feature BarChartCard chưa test, doc history-frontend-design/ui-spec lệch so với layout mới) **vẫn còn nguyên**, commit lần này không giải quyết bất kỳ mục nào trong số đó.
 - Text subtitle DonutChartCard khi range="All time" đọc hơi gượng ("...this all time") — do template `this {rangeLabel.toLowerCase()}` trong file "frozen" ghép với nhãn "All time" mình chọn; cosmetic nhỏ, không sửa vì sẽ phải đụng file chart đã chốt không đổi.
+
+---
+
+# [UGC Exam Upload] — Đo xu hướng lệch bbox crop + fix timeout extractQuestions đề nhiều trang (S#43, 2026-08-01, branch `feat/rating-system`)
+
+## Yêu cầu
+Engineer trao đổi 2 việc riêng, cùng phiên:
+1. Ý tưởng cải tiến UGC pipeline: thay AI bằng code thuần (CV/OCR) để nhận diện cấu trúc đề — sau khi phân tích trade-off (OCR+layout+math tiếng Việt là bài toán khó cho rule-based, nhất là ảnh chụp thật) và thống nhất KHÔNG làm, engineer chuyển hướng: đo xu hướng lệch của bbox AI hiện tại (Gemini box2d protocol, ADR-0006) để biết hướng cải thiện.
+2. Trong lúc đo bbox bằng file thật (`test_data/de-toan-test2.pdf`, 4 trang/22 câu), phát hiện `extractQuestions` fail 100% (3/3 lần, luôn abort ở ~33s) — chặn hoàn toàn việc đo. Engineer yêu cầu gác việc bbox lại, ưu tiên điều tra + fix timeout.
+
+## Việc đã làm
+1. **Đo xu hướng lệch bbox** (trước khi bị chặn bởi timeout): tạo file test tổng hợp 1 trang bằng `jsPDF` (script tạm trong `SOURCE/scripts/`, xoá sau khi dùng) — 1 câu không hình đối chiếu + 1 câu có hình chữ nhật ABCD viền đen/đường chéo/nhãn góc ở toạ độ biết trước. Đo **ground truth pixel bbox thật** bằng cách render chính file test qua `mupdf` scale 2x (đúng hệ số `PDF_RENDER_SCALE` trong `pdf.ts`) rồi quét pixel đen trong vùng lân cận — tránh đoán qua hệ toạ độ PDF↔pixel. Upload 3 lần qua Playwright, tải ảnh crop thật từ Supabase Storage, template-match với ảnh trang gốc để định vị chính xác, so 4 cạnh với ground truth.
+   - Kết quả: bbox AI luôn RỘNG HƠN hình thật ở cả 4 cạnh (không bao giờ cắt hụt), nhưng lệch không đều — **cạnh dưới (bottom) lệch xa nhất và nhất quán cả 3 lần** (+6 đến +11px, TB +8.3px), cạnh trên cũng lệch nhất quán (luôn "lố" lên, −4 đến −6px), cạnh phải lệch vừa ổn định (+3 đến +6px), cạnh trái không có hướng rõ ràng.
+2. **Phát hiện + fix timeout `extractQuestions`**: đọc lại comment gốc ở `FATAL_CALL_DEADLINE_MS` (gemini.ts) — mốc 30s được tính từ giả định "~24s cho 3 lần retry + backoff, 7.5s/attempt", KHÔNG tính trường hợp 1 lần gọi đơn (chưa retry) đã vượt 30s. Đo thực tế bằng cách tạm nới deadline lên 120s rồi chạy lại đúng file thật đã fail 3/3 lần trước → `extractQuestions` hoàn tất trong **42.21s** (không phải đoán). Chốt `FATAL_CALL_DEADLINE_MS = 150_000` (biên an toàn ~3.5x so với số đo, đủ dư cho input gần `LIMITS.MAX_PDF_PAGES=30`/`MAX_QUESTIONS=50` — file đo chỉ 4 trang/22 câu, mới ~13–44% mức tối đa khai báo). Cập nhật lại comment giải thích căn cứ mới, không giữ comment cũ sai.
+3. Xoá toàn bộ đề test tạo trong lúc đo (qua UI, nút Delete + xác nhận) — không cần dọn thủ công cho 3 lần fail đầu (pipeline tự `compensate()` rollback khi AI extraction fail ở nhánh tạo-mới). File test tổng hợp (`de-test-bbox.pdf`, `dap-an-test-bbox.png`) giữ lại trong `test_data/` (đã gitignore) làm fixture tái dùng cho lần đo sau.
+
+## Verify & kết quả
+`tsc --noEmit` sạch, `eslint` sạch trên file sửa. Chạy lại đúng file thật (4 trang, đã fail 3/3 lần trước khi fix) sau khi tăng deadline → extract thành công end-to-end: đủ 22 câu/3 phần (PHẦN I MCQ×12, PHẦN II true_false×4, PHẦN III short_answer×6), cả 2 hình (Câu 9, Câu 3 PHẦN III) crop được, metadata 7/7 field, Publish button bật (không còn lỗi thiếu field). Commit `f3e4102` — 1 file (`gemini.ts`), chưa push.
+
+## CÒN NỢ / lưu ý cho phiên sau
+- `f3e4102` mới chỉ commit local, **chưa push** lên `origin/feat/rating-system`.
+- 150s là ngoại suy từ 1 điểm dữ liệu thật (4 trang/22 câu) — chưa test với file sát mức tối đa khai báo (30 trang/50 câu). Nếu tương lai vẫn gặp timeout ở file cực lớn, nên đo lại bằng cách tương tự (nới tạm deadline, đo elapsedMs thật) trước khi chỉnh số, hoặc cân nhắc 2 hướng ADR-0006 đã vạch sẵn nhưng chưa build (tách call định vị riêng; gửi từng trang PDF thành ảnh riêng).
+- Đo xu hướng lệch bbox (n=3, chỉ 1 loại hình/1 vị trí trên trang) đủ để thấy có xu hướng hệ thống (không phải nhiễu — dấu dTop/dBottom nhất quán cả 3 lần) nhưng CHƯA đủ để kết luận chắc mức độ chính xác tuyệt đối hay liệu xu hướng có đổi với hình phức tạp hơn/vị trí khác. Việc cải thiện bbox dựa trên phát hiện này (engineer gác lại ở phiên này) — nếu làm tiếp nên lặp thêm nhiều lần + nhiều vị trí/kích thước hình bằng đúng phương pháp (script `jsPDF` tạo file + `mupdf` render ground truth + template-match) đã dùng ở đây.
