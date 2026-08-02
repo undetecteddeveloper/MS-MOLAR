@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed — 2026-07-17. **Amends** ADR-0004 (extraction/assembly contract) and the Design Doc v2.0 data model. Triggered by a real-world test failure: uploading the official 2025 national high-school graduation exam (đề thi tốt nghiệp THPT 2025, môn Toán) produced 18/21 assembly errors and silently dropped answers, because the v2.0 data model cannot represent the exam's structure.
+Proposed — 2026-07-17. **Amends** ADR-0004 (extraction/assembly contract) and the Design Doc v2.0 data model. Triggered by a real-world test failure: uploading the official 2025 national high-school graduation exam (đề thi tốt nghiệp THPT 2025, môn Toán) produced 18/21 assembly errors and silently dropped answers, because the v2.0 data model cannot represent the exam's structure. **Amended 2026-08-01** — see "Amendment — 2026-08-01" section below: the auto-scoring decision (original Decision line below) is superseded for `true_false` (retroactively — shipped 2026-07-27, commit `f1e665093`) and `short_answer` (prospectively — `docs/design/short-answer-scoring-backend-design.md`); the schema/identity/display decisions in this ADR are unaffected.
 
 - PRD: `docs/prd/ugc-exam-upload-prd.md` (v2.1 amendment) — scope now includes the national 3-part format.
 - Sibling ADRs: ADR-0004 (extraction + assembly — join rule amended here), ADR-0006 (Gemini extraction protocol).
@@ -36,7 +36,7 @@ Introduce **parts** as a first-class axis and **two new question types**, keepin
   - `short_answer`: the expected value from the answer file is stored in the existing `essay_answer` column (it is "the model answer as text"; a short numeric string is a degenerate case). No new column.
 - **DB schema delta (idempotent)**: `questions.part_number int not null default 1`; widen `questions_type_check` to the 4 values; add `questions.sub_answers jsonb`; add `exams.parts jsonb` (nullable; `[{number, title}]` captured from the printed part headers for display grouping — null for single-part exams). Row id scheme for new uploads: `<examId>-p<part>q<n>` (old `<examId>-q<n>` rows remain valid; the id parser accepts both).
 - **Extraction contract (amends ADR-0004)**: the question extractor returns `part` per question and the list of part headers; the answer extractor returns `(part, number, type-specific answer)` including the Đúng/Sai grid of PHẦN II answer tables and short-answer values. The single-call question+image principle of ADR-0004 is unchanged.
-- **Display/scoring**: `true_false` and `short_answer` render in review, player, and result with real inputs (toggle Đ/S per sub-item; short text box) but are **not auto-scored** — labeled like essay. `computeScore` continues to score MCQ only; a task verifies it degrades gracefully when non-MCQ types are present.
+- **Display/scoring**: `true_false` and `short_answer` render in review, player, and result with real inputs (toggle Đ/S per sub-item; short text box) but are **not auto-scored** — labeled like essay. `computeScore` continues to score MCQ only; a task verifies it degrades gracefully when non-MCQ types are present. **[Superseded 2026-08-01 — see "Amendment — 2026-08-01" below: both `true_false` and `short_answer` ARE auto-scored as of their respective amendments; only `essay` remains permanently unscored.]**
 
 ### Decision Details
 
@@ -55,6 +55,27 @@ Introduce **parts** as a first-class axis and **two new question types**, keepin
 **Negative**: touched surface is wide — types, schema, both extractors' prompts/schemas, assembler, actions/queries/fromRows, review editor, player renderer, result page. Mitigated by the degenerate-case design (old format exercises the same code) and by task-level regression fixtures.
 
 **Neutral**: scoring for the new types is deferred by product decision; `PublicQuestion` must additionally omit `sub_answers`.
+
+## Amendment — 2026-08-01
+
+**Trigger**: `docs/design/short-answer-scoring-backend-design.md` (short_answer auto-scoring backend Design Doc) and its preceding UI Spec's document-reviewer flagged that this ADR's Decision line "`computeScore` continues to score MCQ only" (Decision section, "Display/scoring" bullet) had already been silently superseded once for `true_false` — shipped in commit `f1e665093` on **2026-07-27** (independently verified via `git log -1 --format=%ad f1e665093` during the second document-review round; `SOURCE/lib/scoring/computeScore.ts`'s own `v2.1 ... true_false re-enable 2026-07-21` header comment and `computeScore.test.ts`'s `"computeScore — true_false (2026-07-21 re-enable)"` describe-block title both carry an inherited, unverified `2026-07-21` date that predates this correction and should be updated to `2026-07-27` the next time either file is edited) — without a recorded ADR amendment at the time. This amendment records that supersession retroactively and records a second, prospective supersession for `short_answer`, so the governance record does not go stale a second time.
+
+**Superseded claim** (original "Display/scoring" bullet): *"`true_false` and `short_answer` render in review, player, and result with real inputs ... but are **not auto-scored** — labeled like essay. `computeScore` continues to score MCQ only ..."*
+
+**Current state**:
+
+| Question type | Auto-scored? | Since | Rule |
+|---|---|---|---|
+| `mcq` | Yes (always was) | v2.0 baseline | Exact equality against `correct_answer`. |
+| `true_false` | Yes (retroactive amendment) | 2026-07-27, commit `f1e665093` (verified via `git log`; see Trigger note above) | Binary whole-question grading — every sub-item a–d must match `sub_answers`; one mismatch = whole question wrong. Gated by an `isScored()` ground-truth-presence guard: empty `sub_answers` (AI-extraction failure) → `scored:false`, not penalized. |
+| `short_answer` | Yes (this amendment) | `docs/design/short-answer-scoring-backend-design.md` | Normalized-text-match-or-numeric-equivalence comparison against `essay_answer`. Gated by the same ground-truth-presence-guard pattern: missing/blank `essay_answer` → `scored:false`. See that Design Doc for the full matching algorithm and rationale. |
+| `essay` | No — permanently | Unchanged since v2.0 | No player input UI exists for essay answers; there is nothing to auto-score. |
+
+**Why the product decision changed**: the 2026-07-17 "auto-scoring is a separate future feature" call was a scope-narrowing decision made to ship the multi-part format safely first. Once the format's data model landed (each type already has its own ground-truth column — `correct_answer`, `sub_answers`, `essay_answer`), auto-scoring each data-representable type became a natural, low-risk continuation of the same per-type dispatch `computeScore` already used for `mcq`, rather than a new architectural decision.
+
+**Impact on this ADR's other decisions**: none. The schema delta, composite `(part, number)` identity, `sub_answers`/`essay_answer` column reuse, and part-header display are unaffected — only the "Display/scoring" bullet's scoring claim is superseded.
+
+**Process note**: to avoid a third silent supersession, any future change to `computeScore`'s per-type scoring gate (`isScored()`) should update this table rather than leave this ADR's Decision text stale.
 
 ## Related Information
 
