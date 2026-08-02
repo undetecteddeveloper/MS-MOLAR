@@ -4,7 +4,7 @@
 |---|---|
 | **Version** | 1.0 |
 | **Date** | 2026-08-01 |
-| **Status** | Draft — implements the display slice specified by `docs/ui-spec/short-answer-scoring-ui-spec.md` (v1.0, Draft) and consumes the data contracts confirmed by `docs/design/short-answer-scoring-backend-design.md` (v1.0, Draft, code-verifier result: `consistent`, score 85). |
+| **Status** | Draft — implements the display slice specified by `docs/ui-spec/short-answer-scoring-ui-spec.md` (v1.0, Draft) and consumes the data contracts confirmed by `docs/design/short-answer-scoring-backend-design.md` (v1.1, Draft, code-verifier result: `consistent`, score 85). |
 | **PRD** | None — Medium-scale feature, PRD not required per this project's scale rules. Substitute source: `requirement_analysis` (resolved after user Q&A with the engineer), reproduced verbatim in the Agreement Checklist. |
 | **UI Spec** | `docs/ui-spec/short-answer-scoring-ui-spec.md` (v1.0, Draft) — canonical source for component structure, state design, visual convention, and AC-001–AC-009. This Design Doc inherits those decisions and adds only the technical implementation method (exact code structure, contract-level rationale, regression guarding, and the TBD-04/TBD-05 resolutions the UI Spec deferred to this document). |
 | **Codebase re-verification** | All facts inherited from the UI Spec were independently re-verified against the live files during this Design Doc's own investigation (`page.tsx`, `QuestionRenderer.tsx`, `queries.ts`, `types/result.ts`, `types/question.ts`, `SOURCE/app/(layer4)/actions.ts`) — see Existing Codebase Analysis. |
@@ -664,7 +664,7 @@ None required. No schema change, no feature flag, no new data shape. Already-per
 ## References
 
 - `docs/ui-spec/short-answer-scoring-ui-spec.md` — canonical UI Spec this document implements (v1.0, Draft).
-- `docs/design/short-answer-scoring-backend-design.md` — companion backend Design Doc (v1.0, Draft, code-verifier: consistent, 85) whose Data Contracts this document depends on.
+- `docs/design/short-answer-scoring-backend-design.md` — companion backend Design Doc (v1.1, Draft, code-verifier: consistent, 85) whose Data Contracts this document depends on.
 - `docs/adr/ADR-0005-multi-part-national-exam-format.md` — introduces `short_answer`, amended 2026-08-01 to supersede the "not auto-scored" decision.
 - `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx`, `SOURCE/app/(layer2)/_components/QuestionRenderer.tsx`, `SOURCE/app/(layer2)/queries.ts`, `SOURCE/types/result.ts`, `SOURCE/types/question.ts`, `SOURCE/app/(layer4)/actions.ts`, `SOURCE/supabase/schema.sql` — directly read/grepped during this document's investigation (see Code Inspection Evidence).
 

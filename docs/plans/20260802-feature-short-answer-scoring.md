@@ -283,8 +283,8 @@ Ship automatic scoring for `short_answer` questions end-to-end: `computeScore()`
 - [ ] Execute all tests: `computeScore.test.ts`, `submitExam.int.test.ts`, `QuestionRenderer.test.tsx`, `short-answer-scoring.fixture.e2e.test.ts` — zero failures
 - [ ] Coverage: confirm no regression in existing coverage for `computeScore.ts`/`actions.ts` (diagnostic signal, not a gate — per testing-principles)
 - [ ] Document updates:
-  - [ ] Confirm `docs/adr/ADR-0005-multi-part-national-exam-format.md`'s amendment remains accurate post-implementation (dates, commit references)
-  - [ ] **Frontend DD citation-precision fix (non-blocking approval condition)**: correct `docs/design/short-answer-scoring-frontend-design.md`'s citations of the backend Design Doc's version — currently reads "v1.0, Draft, code-verifier result: consistent, score 85" in the header table, Overview, Prior-Layer Verification Review, and References sections — update to reference v1.1 (the version actually approved and implemented)
+  - [x] Confirm `docs/adr/ADR-0005-multi-part-national-exam-format.md`'s amendment remains accurate post-implementation (dates, commit references) — confirmed accurate, no drift found (see `docs/plans/tasks/20260802-feature-short-answer-scoring-task-01.md` Investigation Notes)
+  - [x] **Frontend DD citation-precision fix (non-blocking approval condition)**: correct `docs/design/short-answer-scoring-frontend-design.md`'s citations of the backend Design Doc's version — currently reads "v1.0, Draft, code-verifier result: consistent, score 85" in the header table, Overview, Prior-Layer Verification Review, and References sections — update to reference v1.1 (the version actually approved and implemented)
   - [ ] Manual/Playwright MCP golden-state walkthrough performed once, covering all 5 Golden States from the UI Spec's Visual Acceptance section
 
 ### Quality Assurance
