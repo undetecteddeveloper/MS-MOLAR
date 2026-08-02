@@ -124,6 +124,11 @@ export default async function ResultDetailPage({
                 ? { label: "Wrong", cls: "text-destructive" }
                 : { label: "Skipped", cls: "text-muted-foreground" };
 
+            // TBD-04 resolution: reuse `status.cls` (already computed above for
+            // the status chip) for the "Your answer" line's color — avoids a
+            // second copy of the fern/destructive/muted branch.
+            const isShortAnswer = q?.questionType === "short_answer";
+
             return (
               <li
                 key={r.questionId}
@@ -143,53 +148,70 @@ export default async function ResultDetailPage({
                   />
                 )}
 
-                <ul className="flex flex-col gap-2">
-                  {q?.choices.map((choice) => {
-                    const isCorrect = choice.id === r.correct;
-                    const isSelectedWrong =
-                      choice.id === r.selected && r.selected !== r.correct;
+                {isShortAnswer ? (
+                  <div className="flex flex-col gap-1 text-sm">
+                    <p className="text-muted-foreground">
+                      Your answer:{" "}
+                      <span className={status.cls}>
+                        {r.selected || "— skipped —"}
+                      </span>
+                    </p>
+                    <p className="text-muted-foreground">
+                      Correct answer:{" "}
+                      <span className="text-[#4F7942]">
+                        {q?.essayAnswer || "—"}
+                      </span>
+                    </p>
+                  </div>
+                ) : (
+                  <ul className="flex flex-col gap-2">
+                    {q?.choices.map((choice) => {
+                      const isCorrect = choice.id === r.correct;
+                      const isSelectedWrong =
+                        choice.id === r.selected && r.selected !== r.correct;
 
-                    const rowCls = isCorrect
-                      ? "border-[#4F7942] bg-[#4F7942]/10"
-                      : isSelectedWrong
-                        ? "border-destructive bg-destructive/8"
-                        : "border-border bg-card";
-                    const badgeCls = isCorrect
-                      ? "border-[#4F7942] bg-[#4F7942] text-[#EDE1C8]"
-                      : isSelectedWrong
-                        ? "border-destructive bg-destructive text-brand-foreground"
-                        : "border-border text-muted-foreground";
+                      const rowCls = isCorrect
+                        ? "border-[#4F7942] bg-[#4F7942]/10"
+                        : isSelectedWrong
+                          ? "border-destructive bg-destructive/8"
+                          : "border-border bg-card";
+                      const badgeCls = isCorrect
+                        ? "border-[#4F7942] bg-[#4F7942] text-[#EDE1C8]"
+                        : isSelectedWrong
+                          ? "border-destructive bg-destructive text-brand-foreground"
+                          : "border-border text-muted-foreground";
 
-                    return (
-                      <li
-                        key={choice.id}
-                        className={`flex items-start gap-3 rounded-lg border p-3 ${rowCls}`}
-                      >
-                        <span
-                          aria-hidden
-                          className={`flex size-7 shrink-0 items-center justify-center rounded-md border font-mono text-sm font-medium ${badgeCls}`}
+                      return (
+                        <li
+                          key={choice.id}
+                          className={`flex items-start gap-3 rounded-lg border p-3 ${rowCls}`}
                         >
-                          {choice.id}
-                        </span>
-                        <RichText
-                          text={choice.text}
-                          inline
-                          className="pt-0.5 text-base leading-relaxed text-card-foreground"
-                        />
-                        {isCorrect && (
-                          <span className="ml-auto shrink-0 self-center font-mono text-[0.65rem] uppercase tracking-wide text-[#4F7942]">
-                            Correct answer
+                          <span
+                            aria-hidden
+                            className={`flex size-7 shrink-0 items-center justify-center rounded-md border font-mono text-sm font-medium ${badgeCls}`}
+                          >
+                            {choice.id}
                           </span>
-                        )}
-                        {isSelectedWrong && (
-                          <span className="ml-auto shrink-0 self-center font-mono text-[0.65rem] uppercase tracking-wide text-destructive">
-                            Your choice
-                          </span>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
+                          <RichText
+                            text={choice.text}
+                            inline
+                            className="pt-0.5 text-base leading-relaxed text-card-foreground"
+                          />
+                          {isCorrect && (
+                            <span className="ml-auto shrink-0 self-center font-mono text-[0.65rem] uppercase tracking-wide text-[#4F7942]">
+                              Correct answer
+                            </span>
+                          )}
+                          {isSelectedWrong && (
+                            <span className="ml-auto shrink-0 self-center font-mono text-[0.65rem] uppercase tracking-wide text-destructive">
+                              Your choice
+                            </span>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
               </li>
             );
           })}

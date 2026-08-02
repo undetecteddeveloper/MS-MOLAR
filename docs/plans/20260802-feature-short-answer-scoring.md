@@ -207,7 +207,7 @@ Ship automatic scoring for `short_answer` questions end-to-end: `computeScore()`
   - Files: `SOURCE/types/result.ts`
   - Completion: Implementation Complete = comment corrected; Quality Complete = `tsc`/ESLint pass (no behavior change, doc-only); Integration Complete = N/A.
 
-- [ ] **Task 1.5 — Frontend: `ResultDetailPage`'s `short_answer` scored sub-branch (AC-001–006)**
+- [🔄] **Task 1.5 — Frontend: `ResultDetailPage`'s `short_answer` scored sub-branch (AC-001–006)**
   - Implementation: In `page.tsx`'s scored branch (lines 127-194), add a `questionType === 'short_answer'` sub-branch before the existing `q?.choices.map(...)` MCQ render. Reuse the already-computed `status.cls` local variable for the "Your answer" line's color (TBD-04 resolution — no new helper/token). Render exactly:
     ```tsx
     const isShortAnswer = q?.questionType === "short_answer";
@@ -230,7 +230,7 @@ Ship automatic scoring for `short_answer` questions end-to-end: `computeScore()`
   - Proof Obligations: AC-001 (`r.selected` displayed), AC-002 (`q.essayAnswer` displayed, never `r.correct`), AC-003 (fern when correct), AC-004 (destructive when wrong-with-answer, correct-answer line stays fern), AC-005 (muted "— skipped —" when wrong-and-unanswered) — see Reference Contract Values for exact color/label rules.
   - No ordering dependency on the backend change (dormant, degrades safely to the old blank render until `scored:true` rows exist) — included in this phase for early cross-slice integration verification via Task 1.6.
   - Files: `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx`
-  - Completion: Implementation Complete = sub-branch added per the markup above; Quality Complete = ESLint/`tsc`/`next build` pass; Integration Complete = renders correctly once fed a `scored:true` `short_answer` `PerQuestionResult` (proven by Task 1.6).
+  - Completion: Implementation Complete = sub-branch added per the markup above [x] done; Quality Complete = ESLint/`tsc`/`next build` pass [x] done; Integration Complete = renders correctly once fed a `scored:true` `short_answer` `PerQuestionResult` (proven by Task 1.6) [ ] pending — manual/Playwright MCP live confirmation not executed in this run (no MCP/browser tool or confirmed seeded dev attempt in this execution context); code-level review confirms the guard/color/fallback logic matches the required states.
 
 - [ ] **Task 1.6 — fixture-e2e: `short-answer-scoring.fixture.e2e.test.ts` (Test 1 + Test 2)**
   - Convert the existing comment-only skeleton `SOURCE/tests/e2e/fixture/short-answer-scoring.fixture.e2e.test.ts` into an executable test against the minimal Playwright-Page-compatible driver interface already established by `rating.fixture.e2e.test.ts` (structural subset: goto/url/getByRole/getByText/click/getAttribute/first/count); backend state (attempt, questions, exam_results) is fixture-driven, not live Supabase.
