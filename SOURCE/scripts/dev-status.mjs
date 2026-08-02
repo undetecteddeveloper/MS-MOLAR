@@ -51,8 +51,8 @@ function banner() {
   console.log("    1/6  Load attempt      theo attemptId, RLS-scoped, idempotent nếu đã nộp");
   console.log("    2/6  Load questions    kèm correct_answer + sub_answers (server-only)");
   console.log("    3/6  Upsert answers    batch-insert attempt_answers");
-  console.log("    4/6  computeScore()    pure — mcq + true_false auto-scored;");
-  console.log("                          short_answer/essay: stored, not auto-scored");
+  console.log("    4/6  computeScore()    pure — mcq + true_false + short_answer auto-scored;");
+  console.log("                          essay: stored, not auto-scored");
   console.log("    5/6  Insert result     exam_results (total_score, per_question, topic)");
   console.log("    6/6  Lock attempt      status=submitted");
   console.log("");

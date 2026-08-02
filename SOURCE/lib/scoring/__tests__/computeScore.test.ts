@@ -50,7 +50,7 @@ function trueFalse(
 function shortAnswer(
   id: string,
   topic = "Topic C",
-  essayAnswer: string | undefined = "1260",
+  essayAnswer: string | undefined,
 ): Question {
   return {
     id,

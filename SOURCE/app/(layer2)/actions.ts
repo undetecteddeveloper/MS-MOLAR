@@ -64,11 +64,12 @@ export async function submitExam(
   // (true_false/short_answer/essay — stored, not auto-scored).
   const { data: qRows, error: qErr } = await supabase
     .from("questions")
-    // sub_answers: đáp án Đ/S từng ý của true_false — cần cho computeScore
-    // chấm (v2.1 true_false auto-scored, 2026-07-21). Không lộ ra client player
-    // (PublicQuestion Omit) — chỉ dùng server-side ngay trong hàm này.
+    // sub_answers/essay_answer: ground truth của true_false/short_answer —
+    // cần cho computeScore chấm (v2.1 true_false auto-scored, 2026-07-27).
+    // Không lộ ra client player (PublicQuestion Omit) — chỉ dùng server-side
+    // ngay trong hàm này.
     .select(
-      "id, content, choices, correct_answer, subject, grade, topic, question_type, sub_answers"
+      "id, content, choices, correct_answer, subject, grade, topic, question_type, sub_answers, essay_answer"
     )
     .in("id", questionIds);
   if (qErr) throw qErr;
@@ -86,6 +87,7 @@ export async function submitExam(
         topic: r.topic as string,
         questionType: (r.question_type as Question["questionType"]) ?? "mcq",
         subAnswers: (r.sub_answers as Question["subAnswers"]) ?? undefined,
+        essayAnswer: (r.essay_answer as string | null) ?? undefined,
       } satisfies Question,
     ])
   );
