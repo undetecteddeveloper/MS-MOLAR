@@ -195,7 +195,7 @@ Ship automatic scoring for `short_answer` questions end-to-end: `computeScore()`
   - Files: `SOURCE/lib/scoring/computeScore.ts`, `SOURCE/app/(layer2)/actions.ts`, `SOURCE/scripts/dev-status.mjs`
   - Completion: Implementation Complete = branch + guard + select + mapping + both comment/string corrections done; Quality Complete = `vitest run` green with zero regressions, `tsc`/ESLint pass; Integration Complete = `computeScore()`'s new branch is reachable in production via `actions.ts`'s newly-fetched `essayAnswer` (proven by Task 1.3).
 
-- [ ] **Task 1.3 — Integration test: `submitExam.int.test.ts` (SA-BE-012, required scope)**
+- [x] **Task 1.3 — Integration test: `submitExam.int.test.ts` (SA-BE-012, required scope)**
   - Convert the existing comment-only skeleton `SOURCE/app/(layer2)/__tests__/submitExam.int.test.ts` into an executable Vitest test using the sanctioned Supabase-client-mock boundary (pattern: `getResult.int.test.ts`/`rating.int.test.ts`).
   - Proof Obligations (from skeleton): (a) query-shape — mocked `.select(...)` call string includes `"essay_answer"` alongside the pre-existing 8 columns (`.includes("sub_answers")` also true, proving additive, not replacing); (b) mapping correctness, non-null — `essay_answer: "1260"` → `Question.essayAnswer === "1260"` via an independently-authored literal `toEqual`/`toMatchObject`; (c) mapping correctness, null — `essay_answer: null` → `essayAnswer === undefined` strictly (key present, `toBeUndefined()`), never `null`/coerced `""`; (d) regression guard — the 8 pre-existing mapped fields stay byte-identical.
   - Dependency: Task 1.2 (the fix must exist to assert against).
