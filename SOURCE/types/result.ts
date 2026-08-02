@@ -11,8 +11,10 @@ export interface PerQuestionResult {
   /** Đáp án đúng — CHỈ câu mcq (câu không chấm để undefined). */
   correct?: ChoiceId;
   isCorrect: boolean;
-  /** false = câu KHÔNG tính điểm (true_false/short_answer/essay — v2.1,
-   * "stored, not auto-scored"). undefined (row cũ trước v2.1) = true. */
+  /** false = câu KHÔNG tính điểm. true_false/short_answer chấm điểm CÓ ĐIỀU
+   * KIỆN (chỉ khi có ground truth — subAnswers/essayAnswer; thiếu ground
+   * truth → scored:false). essay LUÔN false ("stored, not auto-scored" —
+   * không có ground truth để chấm). undefined (row cũ trước v2.1) = true. */
   scored?: boolean;
 }
 
