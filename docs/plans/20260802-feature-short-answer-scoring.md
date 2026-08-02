@@ -261,7 +261,7 @@ Ship automatic scoring for `short_answer` questions end-to-end: `computeScore()`
   - Files: `SOURCE/app/(layer2)/_components/QuestionRenderer.tsx`
   - Completion: Implementation Complete = string updated exactly; Quality Complete = ESLint/`tsc` pass; Integration Complete = verified by Task 2.2.
 
-- [ ] **Task 2.2 — Integration test: `QuestionRenderer.test.tsx` (AC-008/AC-009 regression guard)**
+- [x] **Task 2.2 — Integration test: `QuestionRenderer.test.tsx` (AC-008/AC-009 regression guard)**
   - Convert the existing comment-only skeleton `SOURCE/app/(layer2)/_components/__tests__/QuestionRenderer.test.tsx` into an executable RTL/jsdom test (`// @vitest-environment jsdom` docblock convention, matching `RichText`'s test suite).
   - Proof Obligations (from skeleton): (a) `short_answer` footnote renders exactly `"Short answer — auto-scored after you submit."`, no match for "not auto-scored yet"; (b) `essay` footnote renders exactly the byte-identical pre-change string `"Essay question — answer on paper. Stored, not auto-scored yet."`; (c) `true_false` footnote renders exactly the byte-identical pre-change string `"True/False — stored, not auto-scored yet."`; (d) the `short_answer` `<input>`'s `maxLength="100"`, placeholder, and `onChange`→`onSelectAnswer` wiring are unaffected.
   - Files: `SOURCE/app/(layer2)/_components/__tests__/QuestionRenderer.test.tsx`
@@ -269,7 +269,7 @@ Ship automatic scoring for `short_answer` questions end-to-end: `computeScore()`
 
 #### Phase Completion Criteria
 - [ ] AC-008/AC-009 satisfied
-- [ ] `QuestionRenderer.test.tsx` green
+- [x] `QuestionRenderer.test.tsx` green
 - [ ] Manual/Playwright smoke check performed with both Phase 1 and Phase 2 live (UI Spec Golden State 5)
 
 ### Final Phase: Quality Assurance (Required) (Estimated commits: 1)
