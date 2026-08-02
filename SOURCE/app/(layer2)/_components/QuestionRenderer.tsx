@@ -147,7 +147,7 @@ export function QuestionRenderer({
               placeholder="e.g. 1260 / 1,04"
             />
             <p className="text-muted-foreground mt-1 text-xs italic">
-              Short answer — stored, not auto-scored yet.
+              Short answer — auto-scored after you submit.
             </p>
           </div>
         )}

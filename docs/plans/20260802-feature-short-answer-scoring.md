@@ -255,7 +255,7 @@ Ship automatic scoring for `short_answer` questions end-to-end: `computeScore()`
 
 #### Tasks
 
-- [ ] **Task 2.1 — `QuestionRenderer.tsx` footnote copy fix (AC-008/AC-009)**
+- [x] **Task 2.1 — `QuestionRenderer.tsx` footnote copy fix (AC-008/AC-009)**
   - Update line 150's `short_answer` footnote string from `"Short answer — stored, not auto-scored yet."` to `"Short answer — auto-scored after you submit."`. Do not touch the `true_false` footnote (129-131), the `essay` footnote (156-160), or the `<input>`'s `maxLength`/`placeholder`/`onChange` wiring.
   - Sequencing constraint (not a code dependency): must not land before Phase 1's backend change is live.
   - Files: `SOURCE/app/(layer2)/_components/QuestionRenderer.tsx`
