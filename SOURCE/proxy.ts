@@ -11,5 +11,13 @@ export const config = {
   // Loại trừ static asset: _next, favicon, và mọi path có phần mở rộng (chứa dấu
   // chấm) — vd `/models/*.glb` của homepage 3D. Nếu không, request model sẽ bị
   // route guard redirect `/login` với khách chưa đăng nhập (homepage là public).
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)"],
+  //
+  // `opengraph-image` phải liệt kê RIÊNG: Next.js phục vụ nó ở `/opengraph-image`
+  // KHÔNG có phần mở rộng, nên luật "chứa dấu chấm" không đỡ được — để lọt thì
+  // crawler của Zalo/Facebook nhận 307 về `/?auth=signin` và link chia sẻ mất
+  // ảnh preview. (`robots.txt`, `sitemap.xml`, `icon.png`, `apple-icon.png` đều
+  // có đuôi nên đã được luật dấu chấm loại trừ sẵn.)
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|opengraph-image|.*\\..*).*)",
+  ],
 };
