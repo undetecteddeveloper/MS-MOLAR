@@ -119,23 +119,29 @@ cấp sẵn (`ms-molar.vercel.app`) — đúng cho tới khi có domain riêng, 
 `ADMIN_USER_IDS` để trống thì trang `/admin` báo "chưa cấu hình" và không ai thao
 tác được. Điền SAU khi đã đăng ký tài khoản admin trên site prod (Phần 3.3).
 
-**Hiện trạng (kiểm bằng `vercel env ls` ngày 2026-08-04): Preview deploy KHÔNG
-chạy được.** Ba biến Supabase chỉ có scope `Production`, trong khi
-`GEMINI_API_KEY` và `ADMIN_USER_IDS` có cả `Preview` — lệch scope này gần như
-chắc là vô ý. Hệ quả đã chứng thực: preview deploy trả **500 ở mọi route động**
-(`lib/supabase/*` khẳng định non-null trên env, không có thì ném ngay). Route
-tĩnh — `/robots.txt`, `/sitemap.xml`, `/opengraph-image`, icon — vẫn 200.
+### Preview deploy trỏ vào project DEV — cố ý
 
-⚠ Đừng "sửa" bằng cách chép thẳng key prod sang scope Preview: làm vậy là mọi
-preview của mọi feature branch đều ghi vào **DB người dùng thật**, đúng thứ mà
-quyết định "Supabase project riêng cho production" ở đầu tài liệu này dựng lên
-để tránh. Hai lối đi đúng, chọn một:
+Ba biến Supabase được khai HAI LẦN, khác giá trị theo scope:
 
-- **Trỏ Preview sang project Supabase dev** — thêm 3 biến với scope `Preview`
-  dùng URL/key của project dev. Preview chạy được, dữ liệu thật không bị đụng.
-- **Chấp nhận Preview không chạy** — chỉ dùng `npm run dev` ở máy để thử feature
-  branch. Không cần làm gì thêm, nhưng phải biết trước để lần sau mở link
-  preview thấy 500 thì không đi truy lỗi nhầm chỗ.
+| Scope | Project Supabase | Vì sao |
+| --- | --- | --- |
+| `Production` | `pebjdlbgbmizgfpuptjl` (prod) | dữ liệu người dùng thật |
+| `Preview` | `hynwleaxtbtjzkvpjsug` (dev) | preview của feature branch phải chạy được mà không đụng dữ liệu thật |
+
+⚠ **Đừng chép key prod sang scope Preview.** Làm vậy là mọi preview của mọi
+feature branch đều ghi thẳng vào DB người dùng thật — đúng thứ mà quyết định
+"Supabase project riêng cho production" ở đầu tài liệu này dựng lên để tránh.
+
+*(Lịch sử: tới 2026-08-04 ba biến này chỉ có scope `Production`, nên preview
+deploy trả **500 ở mọi route động** — `lib/supabase/*` khẳng định non-null trên
+env, không có thì ném ngay. Route tĩnh vẫn 200, nên triệu chứng dễ bị đọc nhầm
+thành lỗi code. Đã vá cùng ngày, xác nhận preview trả 200 và CSP hiện đúng
+origin dev.)*
+
+`ADMIN_USER_IDS` hiện CHỈ có scope `Production`. Nghĩa là `/admin` trên preview
+luôn 404 — chấp nhận được, vì uuid admin của project prod vô nghĩa với project
+dev. Cần thử `/admin` trên preview thì thêm biến scope `Preview` với uuid của
+user trong project DEV.
 
 Hai key bí mật không có tiền tố `NEXT_PUBLIC_` nên không bao giờ xuống bundle
 client — có `npm run check:bundle` gác việc này, chạy được ở CI.
