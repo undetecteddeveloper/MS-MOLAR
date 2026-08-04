@@ -12,6 +12,32 @@ mục khi đã trả nợ (ghi lại trong PROCESS.md).
 
 ## Đang mở
 
+### TD-011 — `verify-schema.ts` không soi được `on delete` của khoá ngoại
+**Từ:** 2026-08-04 (sau khi bug xoá đề nổ trên production)
+**Loại:** cổng phát hiện có lỗ
+
+Bug vừa rồi — `exam_attempts.exam_id` và `attempt_answers.question_id` thiếu
+`on delete cascade`, khiến tác giả vĩnh viễn không xoá được đề đã có người làm —
+là ĐÚNG loại lệch schema mà `verify-schema.ts` sinh ra để bắt, nhưng nó không
+bắt được.
+
+**Vì sao không bắt được:** script cố ý CHỈ ĐỌC (không insert/update/delete,
+không DDL). Cách duy nhất quan sát được `on delete` từ phía client là **thật sự
+xoá một dòng cha rồi xem dòng con có đi theo không** — vi phạm chính ràng buộc
+làm script an toàn để chạy trên production. PostgREST cũng không phơi
+`information_schema`, và OpenAPI spec chỉ nói có khoá ngoại chứ không nói hành
+vi xoá.
+
+**Sẽ nổ thế nào (lần nữa):** mỗi khoá ngoại mới thêm vào mà quên `on delete` sẽ
+lại đi qua mọi cổng hiện có — tsc xanh, test xanh, `verify:schema` xanh — rồi
+chỉ lộ ra khi có người dùng thật đi đúng vào đường xoá. Bug này sống từ lúc
+dựng §L2 tới tận khi smoke test production ngày 2026-08-04.
+
+**Cách trả:** cần một đường chạy SQL đọc `information_schema.referential_
+constraints` (Supabase CLI với DB password, hoặc một RPC `SECURITY DEFINER` chỉ
+đọc metadata). Có nó rồi thì so trực tiếp với `schema.sql` được, không phải suy
+từ hành vi. Khi làm, phủ luôn toàn bộ khoá ngoại chứ không riêng 2 cái vừa vá.
+
 ### TD-010 — 2 lỗi `react-hooks` trong source, nên bước lint ở CI không chặn được
 **Từ:** 2026-08-04 (khi dựng `.github/workflows/ci.yml`)
 **Loại:** cổng chất lượng chưa siết được

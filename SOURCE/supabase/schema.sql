@@ -99,7 +99,10 @@ alter table public.exams add constraint exams_semester_check
 create table if not exists public.exam_attempts (
   id           uuid primary key default gen_random_uuid(),
   user_id      uuid not null default auth.uid() references auth.users (id) on delete cascade,
-  exam_id      text not null references public.exams (id),
+  -- `on delete cascade`: xoá đề thì mọi lượt làm bài đi theo (xem §15 — DB đã
+  -- dựng trước 2026-08-04 KHÔNG nhận thay đổi này qua `create table if not
+  -- exists`, phải nhờ khối alter ở §15).
+  exam_id      text not null references public.exams (id) on delete cascade,
   status       text not null default 'in_progress',  -- 'in_progress' | 'submitted'
   started_at   timestamptz not null default now(),
   submitted_at timestamptz
@@ -108,7 +111,8 @@ create table if not exists public.exam_attempts (
 create table if not exists public.attempt_answers (
   id          uuid primary key default gen_random_uuid(),
   attempt_id  uuid not null references public.exam_attempts (id) on delete cascade,
-  question_id text not null references public.questions (id),
+  -- `on delete cascade`: xoá câu hỏi thì ô trả lời đi theo (xem §15).
+  question_id text not null references public.questions (id) on delete cascade,
   answer      text check (answer in ('A', 'B', 'C', 'D')),  -- null = bỏ trống
   flagged     boolean not null default false,
   unique (attempt_id, question_id)
@@ -1036,3 +1040,41 @@ create index if not exists exam_moderation_log_exam_idx
 
 alter table public.exam_moderation_log enable row level security;
 revoke all on public.exam_moderation_log from anon, authenticated;
+
+-- ----------------------------------------------------------------------------
+-- 15. Khoá ngoại của luồng làm bài — bổ sung `on delete cascade` (2026-08-04).
+--
+--     BUG THẬT, phát hiện lúc smoke test trên production:
+--     hai khoá ngoại dưới đây khai lúc dựng §L2 mà KHÔNG có `on delete`, nên
+--     mặc định là NO ACTION. Hệ quả: ngay khi có MỘT người làm bài, tác giả
+--     VĨNH VIỄN không xoá được đề của mình — `deleteExam` chết ở bước xoá
+--     questions với 23503, im lặng với người dùng cho tới khi đọc kỹ dialog.
+--
+--     Vì sao cascade là đúng chứ không phải chặn xoá: hai bảng dữ liệu-người-
+--     dùng-khác đã gắn với đề từ trước — `exam_reports` (§3) và
+--     `exam_difficulty_ratings` (§12) — ĐỀU đã `on delete cascade`. Ý đồ
+--     thiết kế sẵn có là "xoá đề thì mọi thứ phái sinh đi theo"; hai khoá này
+--     chỉ là chỗ bị bỏ sót, không phải một quyết định ngược lại.
+--
+--     `exam_results` không cần đụng: nó đã cascade qua `attempt_id`
+--     (→ exam_attempts → exams), nên chuỗi tự đủ khi mắt xích trên thông.
+--
+--     Idempotent: drop constraint theo tên mặc định của Postgres rồi tạo lại.
+--     Chạy lại nhiều lần không lỗi nhờ `if exists`.
+-- ----------------------------------------------------------------------------
+
+-- Xoá đề → xoá luôn mọi lượt làm bài của mọi người trên đề đó.
+alter table public.exam_attempts
+  drop constraint if exists exam_attempts_exam_id_fkey;
+alter table public.exam_attempts
+  add constraint exam_attempts_exam_id_fkey
+  foreign key (exam_id) references public.exams (id) on delete cascade;
+
+-- Xoá câu hỏi → xoá luôn các ô trả lời trỏ vào nó. Đây chính là mắt xích làm
+-- deleteExam chết, vì questions bị xoá TRƯỚC exams (policy delete của questions
+-- cần row exams còn tồn tại — xem §L4 deleteExam).
+alter table public.attempt_answers
+  drop constraint if exists attempt_answers_question_id_fkey;
+alter table public.attempt_answers
+  add constraint attempt_answers_question_id_fkey
+  foreign key (question_id) references public.questions (id) on delete cascade;

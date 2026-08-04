@@ -935,29 +935,47 @@ export async function deleteExam(examId: string): Promise<{ error?: UgcActionFai
     return failure("server", "Exam not found or you are not its author.");
   }
 
-  // Storage: gom mọi object dưới {examId}/ ở cả 2 bucket rồi xoá.
-  for (const bucket of [IMAGES_BUCKET, UPLOADS_BUCKET]) {
-    const { data: objects } = await supabase.storage.from(bucket).list(examId);
-    const paths = (objects ?? []).map((o) => `${examId}/${o.name}`);
-    if (paths.length > 0) {
-      await supabase.storage.from(bucket).remove(paths);
-    }
-  }
+  // ⚠ THỨ TỰ QUAN TRỌNG — DB TRƯỚC, Storage SAU.
+  //
+  // Trước 2026-08-04 thứ tự ngược lại và đã gây hỏng dữ liệu thật trên
+  // production: xoá file xong mới đụng DB, DB fail (khoá ngoại attempt_answers
+  // → questions thiếu `on delete cascade`, xem schema.sql §L2) → đề vẫn
+  // `published` nhưng ảnh đã bay sạch. Học sinh mở đề thấy câu "như hình vẽ
+  // bên" mà không còn hình nào.
+  //
+  // Không có transaction bao được cả hai (Storage nằm ngoài Postgres), nên
+  // chọn chiều fail ÍT HẠI HƠN: DB fail trước → chưa xoá gì, đề còn nguyên
+  // vẹn; Storage fail sau → còn file mồ côi, tốn dung lượng nhưng không ai
+  // nhìn thấy và dọn lại được bất cứ lúc nào.
 
   // Questions xoá TRƯỚC exams (policy delete của questions cần row exams còn).
   const questionIds = (examRow.question_ids as string[]) ?? [];
   if (questionIds.length > 0) {
     const { error } = await supabase.from("questions").delete().in("id", questionIds);
     if (error) {
-      console.error("[deleteExam] questions:", error.message);
+      console.error("[deleteExam] questions:", error.code, error.message);
       return failure("server", "Could not delete the questions. Try again.");
     }
   }
 
   const { error } = await supabase.from("exams").delete().eq("id", examId);
   if (error) {
-    console.error("[deleteExam] exam:", error.message);
+    console.error("[deleteExam] exam:", error.code, error.message);
     return failure("server", "Could not delete the exam. Try again.");
+  }
+
+  // Từ đây DB đã sạch — đề không còn tồn tại với bất kỳ ai. File rác không
+  // ảnh hưởng người dùng, nên lỗi ở bước này chỉ log, KHÔNG báo fail (báo fail
+  // sẽ khiến người dùng bấm Delete lại trên một đề đã biến mất).
+  for (const bucket of [IMAGES_BUCKET, UPLOADS_BUCKET]) {
+    const { data: objects } = await supabase.storage.from(bucket).list(examId);
+    const paths = (objects ?? []).map((o) => `${examId}/${o.name}`);
+    if (paths.length > 0) {
+      const { error: rmError } = await supabase.storage.from(bucket).remove(paths);
+      if (rmError) {
+        console.error(`[deleteExam] storage ${bucket} (đã mồ côi):`, rmError.message);
+      }
+    }
   }
 
   revalidatePath("/me/exams");
