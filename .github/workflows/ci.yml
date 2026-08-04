@@ -1,0 +1,84 @@
+# CI cho MS-MOLAR.
+#
+# Vercel build mỗi lần push vào `main` nhưng KHÔNG chạy test/lint — build xanh
+# không có nghĩa là code đúng. Workflow này lấp đúng khoảng đó.
+#
+# App nằm ở thư mục con `SOURCE/`, không phải repo root (xem docs/DEPLOYMENT.md
+# § 2.1) — nên mọi job đều đặt working-directory.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Push liên tiếp lên cùng branch: huỷ lượt cũ, chỉ chạy lượt mới nhất.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: SOURCE
+
+jobs:
+  verify:
+    name: Lint · Types · Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Khớp với Node.js Version khai ở Vercel project settings.
+          node-version: 22
+          cache: npm
+          cache-dependency-path: SOURCE/package-lock.json
+
+      - run: npm ci
+
+      # KHÔNG chặn — source còn 2 lỗi react-hooks có sẵn (ExamTimer,
+      # SuccessToast) mà sửa đúng cách phải đổi cấu trúc component, không nên
+      # độn vào lượt dựng CI. Chi tiết + điều kiện để bỏ dòng continue-on-error:
+      # docs/TECH-DEBT.md § TD-010. Bước này vẫn in đủ log để thấy lỗi mới.
+      - name: ESLint
+        run: npm run lint
+        continue-on-error: true
+
+      - name: TypeScript
+        run: npx tsc --noEmit
+
+      - name: Unit + integration tests
+        run: npm test
+
+  bundle-secrets:
+    name: Server secrets stay off the client
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: SOURCE/package-lock.json
+
+      - run: npm ci
+
+      # Env ở đây là GIÁ TRỊ GIẢ, cố ý — build chỉ cần biến tồn tại, và job này
+      # không gọi Supabase/Gemini thật. Không đặt secret thật vào CI: rò một key
+      # service-role là mất sạch mọi tầng RLS (xem đầu file check script).
+      - name: Build
+        run: npx next build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+          SUPABASE_SERVICE_ROLE_KEY: ci-placeholder-service-role-key
+          GEMINI_API_KEY: ci-placeholder-gemini-key
+
+      # Quét client bundle tìm GEMINI_API_KEY + SUPABASE_SERVICE_ROLE_KEY.
+      # Không có env thật thì script tự chuyển sang chế độ chỉ quét marker —
+      # nó được viết sẵn cho tình huống CI này (scripts/check-ai-key-bundle.mjs).
+      - name: Check bundle for leaked server secrets
+        run: npm run check:bundle

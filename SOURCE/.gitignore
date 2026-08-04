@@ -40,3 +40,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+.vercel
+.env*
+
+# ...trừ bản mẫu chỉ chứa placeholder. Phải đặt SAU mọi luật `.env*` ở trên,
+# nếu không luật cuối cùng thắng và file vẫn bị bỏ qua.
+!.env.example

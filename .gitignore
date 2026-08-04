@@ -32,3 +32,4 @@ SCREENSHOT/temporary_screenshot/
 # Root-level local artifacts (không phải source, không được code tham chiếu)
 /node_modules/
 /test_data/
+.vercel
