@@ -20,6 +20,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { guard } from "@/lib/security/rateLimit";
 import { assembleExamLenient, validateAssembledExam } from "@/lib/ugc/assembleExam";
 import { cropImagesLenient } from "@/lib/ugc/cropImages";
 import { makeUgcError } from "@/lib/ugc/errorCopy";
@@ -594,6 +595,12 @@ export async function saveExam(
   if (!examRow) {
     return failure("server", "Exam not found or you are not its author.");
   }
+  // Đề bị gỡ: RLS exams_update_author/questions_*_author sẽ chặn mọi lệnh ghi
+  // bên dưới, nhưng chặn kiểu "update khớp 0 dòng" là im lặng — tác giả sẽ thấy
+  // Save thành công mà nội dung không đổi. Dừng sớm với lý do rõ ràng.
+  if (examRow.status === "removed") {
+    return failure("validation", "This exam was removed by a moderator and can no longer be edited.");
+  }
 
   // --- Validate metadata patch (v2.2, ADR-0007) --------------------------
   // Đề CHƯA publish: sentinel (""/0) được phép — "còn thiếu" là trạng thái
@@ -699,12 +706,11 @@ export async function saveExam(
   }
 
   const questionIds = (examRow.question_ids as string[]) ?? [];
-  const { data: qRows } = await supabase
-    .from("questions")
-    .select(
-      "id, content, choices, correct_answer, sub_answers, essay_answer, image_url, question_type, part_number, topic"
-    )
-    .in("id", questionIds.length > 0 ? questionIds : ["__none__"]);
+  // exam_answer_key() thay cho select thẳng `questions`: 3 cột đáp án đã bị
+  // REVOKE khỏi role `authenticated` (Security review 2026-08-03 #1, schema.sql
+  // §10). Nhánh "tác giả" của hàm tái kiểm tra author_id ở tầng DB.
+  const { data: qData } = await supabase.rpc("exam_answer_key", { p_exam_id: examId });
+  const qRows = (qData ?? []) as Array<Record<string, unknown>>;
 
   // Khớp patch theo DANH TÍNH (part, number) chứ không theo chuỗi id thô —
   // row v2.0 cũ (`-q{n}`) vẫn nhận được patch id dạng v2.1 (`-p1q{n}`).
@@ -862,17 +868,20 @@ export async function publishExam(examId: string): Promise<{ error?: UgcActionFa
       "validation",
       examRow.status === "published"
         ? "This exam is already published."
-        : "Fix the extraction issues before publishing."
+        : examRow.status === "removed"
+          ? // Takedown (Security review #7): RLS cũng chặn ở tầng DB
+            // (exams_update_author loại trừ 'removed'), đây chỉ là câu thông báo
+            // rõ ràng thay cho một lỗi ghi im lặng.
+            "This exam was removed by a moderator and cannot be published."
+          : "Fix the extraction issues before publishing."
     );
   }
 
   const questionIds = (examRow.question_ids as string[]) ?? [];
-  const { data: qRows } = await supabase
-    .from("questions")
-    .select(
-      "id, content, choices, correct_answer, sub_answers, essay_answer, image_url, question_type, part_number, topic"
-    )
-    .in("id", questionIds.length > 0 ? questionIds : ["__none__"]);
+  // Xem ghi chú ở saveExam: đáp án chỉ ra khỏi DB qua exam_answer_key()
+  // (schema.sql §10a), nhánh "tác giả".
+  const { data: qData } = await supabase.rpc("exam_answer_key", { p_exam_id: examId });
+  const qRows = (qData ?? []) as Array<Record<string, unknown>>;
 
   const assembled = assembledFromRows(
     {
@@ -960,8 +969,13 @@ export async function deleteExam(examId: string): Promise<{ error?: UgcActionFai
 export async function reportExam(
   examId: string,
   reason: string
-): Promise<{ error?: "duplicate" | "empty" | "server" }> {
+): Promise<{ error?: "duplicate" | "empty" | "rate_limited" | "server" }> {
   const { supabase, user } = await requireUser();
+
+  // Rate limit (Security review Low). unique(exam_id, reporter_id) chỉ chặn
+  // report TRÙNG trên CÙNG một đề — không chặn được việc quét qua nhiều đề.
+  const rl = guard("reportExam", user.id);
+  if (!rl.ok) return { error: "rate_limited" };
 
   const trimmed = reason.trim().slice(0, LIMITS.MAX_REPORT_REASON);
   if (trimmed.length === 0) return { error: "empty" };

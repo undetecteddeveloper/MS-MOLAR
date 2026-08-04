@@ -111,15 +111,19 @@ export function readoutModel(scores: Partial<Record<PartId, PartScore>>): Readou
 
 /** Discriminated error union của rateExam ((layer2)/actions.ts) — copy độc lập
  *  (không import file "use server") để giữ lib/rating thuần. */
-export type RateExamError = "ineligible" | "invalid" | "server";
+export type RateExamError = "ineligible" | "invalid" | "rate_limited" | "server";
 
-/** Copy verbatim UI Spec (RatingRubric, bảng rateExam error → Message). */
+/** Copy verbatim UI Spec (RatingRubric, bảng rateExam error → Message).
+ *  `rate_limited` thêm 2026-08-03 (Security review Low) — không có trong UI Spec
+ *  gốc vì lúc đó chưa có rate limit; giọng văn giữ đồng bộ với 3 case cũ. */
 export function rateErrorMessage(error: RateExamError): string {
   switch (error) {
     case "ineligible":
       return "You need to finish this exam before you can rate it.";
     case "invalid":
       return "Please rate all three parts from 1 to 10.";
+    case "rate_limited":
+      return "You're rating too quickly. Please wait a moment and try again.";
     case "server":
       return "Couldn't save your rating right now. Please try again.";
   }

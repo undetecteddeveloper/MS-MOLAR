@@ -98,15 +98,17 @@ export async function getMyExam(id: string): Promise<MyExamDetail | null> {
   if (!examRow) return null;
 
   const questionIds = (examRow.question_ids as string[]) ?? [];
-  // v2.1: thêm part_number + sub_answers — màn review là surface CỦA TÁC GIẢ,
-  // được xem đáp án (khác player, nơi sub_answers KHÔNG BAO GIỜ được select).
-  const { data: qRows, error: qErr } = await supabase
-    .from("questions")
-    .select(
-      "id, content, choices, correct_answer, sub_answers, essay_answer, image_url, question_type, part_number, topic"
-    )
-    .in("id", questionIds.length > 0 ? questionIds : ["__none__"]);
+  // Màn review là surface CỦA TÁC GIẢ nên được xem đáp án (khác player, nơi
+  // correct_answer/sub_answers/essay_answer KHÔNG BAO GIỜ được select). Từ
+  // Security review 2026-08-03 #1, 3 cột đó bị REVOKE khỏi role `authenticated`
+  // (RLS lọc dòng chứ không lọc cột) → đọc qua exam_answer_key(), nhánh "tác
+  // giả" của nó (schema.sql §10a) tái kiểm tra author_id ở tầng DB, độc lập với
+  // .eq("author_id", user.id) trên query exams phía trên.
+  const { data: qData, error: qErr } = await supabase.rpc("exam_answer_key", {
+    p_exam_id: id,
+  });
   if (qErr) throw qErr;
+  const qRows = (qData ?? []) as Array<Record<string, unknown>>;
 
   const exam = assembledFromRows(
     {
@@ -120,7 +122,7 @@ export async function getMyExam(id: string): Promise<MyExamDetail | null> {
       question_ids: questionIds,
       parts: (examRow.parts as { number: number; title: string }[] | null) ?? null,
     },
-    (qRows as Array<Record<string, unknown>>) ?? []
+    qRows
   );
 
   // Đổi image_url đã lưu → signed URL để <img> đọc được từ bucket private.

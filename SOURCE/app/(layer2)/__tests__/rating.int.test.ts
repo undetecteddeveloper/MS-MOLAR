@@ -96,15 +96,31 @@ describe("rateExam — validation gate, upsert call shape, non-leaking error map
 
   const validScores = { partI: 8, partII: 7, partIII: 9 };
 
+  // Khoá rate-limit lấy từ chính dòng attempt của precheck. Mỗi test dùng một
+  // id RIÊNG (ngẫu nhiên) để bộ đếm in-memory của lib/security/rateLimit không
+  // rò rỉ giữa các case — cả file chạy trong cùng một tiến trình.
+  const RATER_ID = `rater-${Math.random().toString(36).slice(2)}`;
+
   /** Wires fromMock so the eligibility precheck (exam_attempts) finds a submitted
-   * attempt and the upsert (exam_difficulty_ratings) resolves via upsertMock. */
+   * attempt and the upsert (exam_difficulty_ratings) resolves via upsertMock.
+   *
+   * 2026-08-03 (Security review Low): the precheck changed from a count-head
+   * query to `.select("user_id").limit(1).maybeSingle()`. Same single round
+   * trip, but it now also yields the rate-limit key — the alternative was an
+   * extra `auth.getUser()` network call on every rate. Eligibility semantics
+   * are unchanged: a row means eligible, null means not. */
   function mockEligibleWithUpsert(upsertMock: ReturnType<typeof vi.fn>) {
     fromMock.mockImplementation((table: string) => {
       if (table === "exam_attempts") {
         return {
           select: () => ({
             eq: () => ({
-              eq: () => Promise.resolve({ count: 1, error: null }),
+              eq: () => ({
+                limit: () => ({
+                  maybeSingle: () =>
+                    Promise.resolve({ data: { user_id: RATER_ID }, error: null }),
+                }),
+              }),
             }),
           }),
         };
@@ -176,7 +192,12 @@ describe("rateExam — validation gate, upsert call shape, non-leaking error map
         return {
           select: () => ({
             eq: () => ({
-              eq: () => Promise.resolve({ count: 0, error: null }),
+              eq: () => ({
+                // No submitted attempt → maybeSingle() yields null (was count:0).
+                limit: () => ({
+                  maybeSingle: () => Promise.resolve({ data: null, error: null }),
+                }),
+              }),
             }),
           }),
         };

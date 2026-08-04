@@ -4,7 +4,12 @@
 // — see docs/design/history-frontend-design.md § Data Contracts.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { buildPdfFilename, formatCompletionTime, formatSubmittedDate } from "./format";
+import {
+  buildPdfFilename,
+  formatCompletionTime,
+  formatOvertime,
+  formatSubmittedDate,
+} from "./format";
 
 describe("formatSubmittedDate", () => {
   it("formats an ISO timestamp as DD/MM/YYYY", () => {
@@ -78,6 +83,40 @@ describe("formatCompletionTime", () => {
     expect(
       formatCompletionTime("2026-07-15T09:05:00.000Z", "2026-07-15T09:00:00.000Z"),
     ).toBe("—");
+  });
+});
+
+// Security review 2026-08-03 #6 — nhãn "Submitted after time" trên trang Result.
+// Giá trị đầu vào do DB tính (record_exam_result), hàm này chỉ định dạng.
+describe("formatOvertime", () => {
+  it("formats sub-minute overtime as seconds", () => {
+    expect(formatOvertime(12)).toBe("12s");
+    expect(formatOvertime(59)).toBe("59s");
+  });
+
+  it("formats minute-scale overtime as Mm Ss, matching formatCompletionTime's ladder", () => {
+    expect(formatOvertime(60)).toBe("1m 0s");
+    expect(formatOvertime(125)).toBe("2m 5s");
+    expect(formatOvertime(3599)).toBe("59m 59s");
+  });
+
+  it("formats hour-scale overtime as Hh Mm", () => {
+    expect(formatOvertime(3600)).toBe("1h 0m");
+    expect(formatOvertime(3780)).toBe("1h 3m");
+  });
+
+  // Caller chỉ render khi > 0; các giá trị này phải trả "" chứ không throw và
+  // không sinh nhãn vô nghĩa như "-5s" / "NaNs".
+  it("returns empty string for zero, negative, and non-finite input", () => {
+    expect(formatOvertime(0)).toBe("");
+    expect(formatOvertime(-30)).toBe("");
+    expect(formatOvertime(Number.NaN)).toBe("");
+    expect(formatOvertime(Number.POSITIVE_INFINITY)).toBe("");
+  });
+
+  it("floors fractional seconds rather than emitting decimals", () => {
+    expect(formatOvertime(12.9)).toBe("12s");
+    expect(formatOvertime(90.7)).toBe("1m 30s");
   });
 });
 

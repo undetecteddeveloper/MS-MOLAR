@@ -4,6 +4,7 @@
 
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { SESSION_COOKIE_OPTIONS } from "./cookieOptions";
 
 /**
  * Tạo Supabase client phía server từ cookie request.
@@ -16,6 +17,9 @@ export async function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      // httpOnly — xem cookieOptions.ts. Không có JS phía trình duyệt nào cần
+      // đọc cookie session, nên khoá hẳn khỏi tầm với của XSS.
+      cookieOptions: SESSION_COOKIE_OPTIONS,
       cookies: {
         getAll() {
           return cookieStore.getAll();

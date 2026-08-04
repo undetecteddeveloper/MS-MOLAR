@@ -4,6 +4,7 @@
 
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { SESSION_COOKIE_OPTIONS } from "./cookieOptions";
 
 /** Các path không yêu cầu đăng nhập. `/auth/callback` (S#23): điểm về của
  * OAuth + email link — request tới đây CHƯA có cookie session, không whitelist
@@ -18,6 +19,10 @@ export async function updateSession(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      // Phải khớp server.ts: middleware là nơi refresh token nên cũng GHI LẠI
+      // cookie session. Thiếu ở đây thì mỗi lần refresh sẽ ghi đè bằng cookie
+      // KHÔNG httpOnly và âm thầm huỷ tác dụng của server.ts.
+      cookieOptions: SESSION_COOKIE_OPTIONS,
       cookies: {
         getAll() {
           return request.cookies.getAll();

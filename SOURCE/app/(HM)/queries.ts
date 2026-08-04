@@ -14,80 +14,64 @@ export type MyHistoryEntry = {
   submittedAt: string;
 };
 
+/** Shape PostgREST trả về cho embed lồng exam_results → exam_attempts → exams.
+ *  Cả hai FK đều many-to-one nên mỗi embed là OBJECT, không phải mảng (giống
+ *  EmbeddedRow của (layer3)/queries.ts). */
+type EmbeddedRow = {
+  attempt_id: string;
+  total_score: number;
+  exam_attempts: {
+    exam_id: string;
+    started_at: string;
+    submitted_at: string;
+    exams: { title: string; subject: string };
+  };
+};
+
 export async function listMyHistory(): Promise<MyHistoryEntry[]> {
   const supabase = await createClient();
 
-  // Step 1 — which attempts are scored (exam_results existence). Do NOT trust
-  // exam_attempts.status alone (Assumed Behavior #1 / AC-001).
-  const { data: resultRows, error: resultErr } = await supabase
+  // MỘT round-trip cho cả 3 tầng dữ liệu (trước đây 3 query nối đuôi ≈ 3×RTT —
+  // đo được ~463ms, sau khi gộp còn ~161ms). Dùng đúng pattern embedded join mà
+  // (layer3)/queries.ts's getAnalyticsByRange() đã dựng sẵn cho cùng chuỗi quan
+  // hệ này. Ba ràng buộc nghiệp vụ cũ được giữ nguyên, chỉ chuyển từ JS sang DB:
+  //  - Bắt đầu TỪ exam_results ⇒ chỉ attempt đã chấm mới vào danh sách; không tin
+  //    exam_attempts.status một mình (Assumed Behavior #1 / AC-001).
+  //  - `exam_attempts!inner` + .eq(status,'submitted') ⇒ loại attempt dở dang.
+  //  - `exams!inner` + .eq(...exams.status,'published') ⇒ giữ nguyên quy ước
+  //    visibility của getExam() ((layer2)/queries.ts): RLS exams_select_visible
+  //    lọc, VÀ thêm filter published tường minh chồng lên — không dựa RLS một
+  //    mình. Nhờ `!inner`, đề không published (kể cả đề CỦA CHÍNH người đọc bị
+  //    hạ khỏi 'published') làm cả dòng bị loại, đúng ngữ nghĩa "omitted, not
+  //    defaulted" của Exams-Visibility Edge Case — nay do DB cưỡng chế thay vì
+  //    do map/filter ở JS.
+  const { data, error } = await supabase
     .from("exam_results")
-    .select("attempt_id, total_score");
-  if (resultErr) throw resultErr;
-  if (resultRows.length === 0) return [];
+    .select(
+      "attempt_id, total_score, exam_attempts!inner(exam_id, started_at, submitted_at, exams!inner(title, subject))"
+    )
+    .eq("exam_attempts.status", "submitted")
+    .eq("exam_attempts.exams.status", "published");
+  if (error) throw error;
 
-  const scoreByAttemptId = new Map<string, number>(
-    (resultRows as { attempt_id: string; total_score: number }[]).map((r) => [
-      r.attempt_id,
-      r.total_score,
-    ])
-  );
-
-  // Step 2 — of those, which are ALSO status='submitted' — newest first (AC-003).
-  const { data: attemptRows, error: attemptErr } = await supabase
-    .from("exam_attempts")
-    .select("id, exam_id, started_at, submitted_at")
-    .in("id", [...scoreByAttemptId.keys()])
-    .eq("status", "submitted")
-    .order("submitted_at", { ascending: false });
-  if (attemptErr) throw attemptErr;
-  if (attemptRows.length === 0) return [];
-
-  // Step 3 — batch exam titles, single round trip (no N+1). Mirrors getExam()'s
-  // exact visibility convention ((layer2)/queries.ts:181-191): exams_select_visible
-  // RLS scopes the read, AND an explicit .eq("status","published") filter is
-  // applied on top — not RLS alone. This keeps the omission rule symmetric with
-  // getExam()/getResult() even for a self-authored exam later reverted away from
-  // "published" (see Exams-Visibility Edge Case decision).
-  // examIds is always non-empty here: step 2 already returned [] when attemptRows
-  // was empty, and exam_id is a NOT NULL FK — so no defensive .in() sentinel
-  // (cf. getMyExam()'s pattern, (layer4)/queries.ts:108) is needed at this call site.
-  const examIds = [...new Set(attemptRows.map((a) => a.exam_id as string))];
-  const { data: examRows, error: examErr } = await supabase
-    .from("exams")
-    .select("id, title, subject")
-    .in("id", examIds)
-    .eq("status", "published");
-  if (examErr) throw examErr;
-  const examById = new Map<string, { title: string; subject: string }>(
-    (examRows as { id: string; title: string; subject: string }[]).map((e) => [
-      e.id,
-      { title: e.title, subject: e.subject },
-    ])
-  );
-
-  // Step 4 — assemble, preserving step 2's ORDER BY. A row whose exam has no
-  // title match here (invisible under RLS, or not currently published — including
-  // the reader's own unpublished exam) is omitted, not defaulted.
-  return (
-    attemptRows as {
-      id: string;
-      exam_id: string;
-      started_at: string;
-      submitted_at: string;
-    }[]
-  )
-    .map((a): MyHistoryEntry | null => {
-      const exam = examById.get(a.exam_id);
-      if (exam === undefined) return null;
-      return {
-        attemptId: a.id,
-        examId: a.exam_id,
-        examTitle: exam.title,
-        subject: exam.subject,
-        totalScore: scoreByAttemptId.get(a.id)!,
-        startedAt: a.started_at,
-        submittedAt: a.submitted_at,
-      };
-    })
-    .filter((entry): entry is MyHistoryEntry => entry !== null);
+  // Sắp xếp ở JS, KHÔNG phải .order() DB-side: với embed to-one, supabase-js's
+  // `.order(col, { referencedTable })` chỉ sắp xếp BÊN TRONG resource lồng (dành
+  // cho to-many) nên là no-op ở đây — đã đo thực tế: dùng nó trả về đúng số dòng
+  // nhưng SAI thứ tự (thứ tự PK), tức âm thầm vỡ AC-003. Sắp ở JS an toàn vì tập
+  // lịch sử của một user vốn nhỏ/bounded qua RLS — cùng căn cứ với quyết định lọc
+  // client-side-của-server-fetch ở lib/history/filterEntries.ts. So sánh chuỗi là
+  // đúng thứ tự thời gian vì PostgREST trả timestamptz dạng ISO-8601 cùng offset.
+  return (data as unknown as EmbeddedRow[])
+    .map(
+      (r): MyHistoryEntry => ({
+        attemptId: r.attempt_id,
+        examId: r.exam_attempts.exam_id,
+        examTitle: r.exam_attempts.exams.title,
+        subject: r.exam_attempts.exams.subject,
+        totalScore: r.total_score,
+        startedAt: r.exam_attempts.started_at,
+        submittedAt: r.exam_attempts.submitted_at,
+      })
+    )
+    .sort((a, b) => (a.submittedAt < b.submittedAt ? 1 : a.submittedAt > b.submittedAt ? -1 : 0));
 }

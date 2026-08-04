@@ -6,6 +6,8 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { validatePassword } from "@/lib/auth/passwordPolicy";
+import { guard } from "@/lib/security/rateLimit";
 
 // `info` (S#23): message trung tính không phải lỗi — vd "check your email".
 export type AuthState = { error?: string; info?: string } | null;
@@ -23,6 +25,12 @@ export async function signUp(
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
   const displayName = String(formData.get("displayName") ?? "");
+
+  // Trước đây signUp KHÔNG kiểm gì, thả cho mặc định 6 ký tự của Supabase —
+  // lỏng hơn cả updatePassword (Security review 2026-08-03, Low). Nay cả hai
+  // dùng chung lib/auth/passwordPolicy.
+  const passwordError = validatePassword(password);
+  if (passwordError) return { error: passwordError };
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({
@@ -111,8 +119,8 @@ export async function updatePassword(
 ): Promise<AuthState> {
   const password = String(formData.get("password") ?? "");
   const confirm = String(formData.get("confirm") ?? "");
-  if (password.length < 6)
-    return { error: "Password must be at least 6 characters" };
+  const passwordError = validatePassword(password);
+  if (passwordError) return { error: passwordError };
   if (password !== confirm) return { error: "Passwords do not match" };
 
   const supabase = await createClient();
@@ -163,6 +171,13 @@ export async function updateProfile(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Your session has expired" };
+
+  // Rate limit (Security review Low) — user_profiles.update không có ràng buộc
+  // nào chặn ghi lặp, nên đây là action rẻ nhất để gọi dồn.
+  const rl = guard("updateProfile", user.id);
+  if (!rl.ok) {
+    return { error: `Too many updates. Try again in ${rl.retryAfterSeconds} seconds.` };
+  }
 
   const { error } = await supabase
     .from("user_profiles")

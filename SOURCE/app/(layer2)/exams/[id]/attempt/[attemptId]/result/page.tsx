@@ -17,7 +17,7 @@ import { getResult } from "@/app/(layer2)/queries";
 import { ScoreCard } from "@/app/(layer2)/_components/ScoreCard";
 import { ResultActions } from "@/app/(layer2)/_components/ResultActions";
 import { mapFromMyRating } from "@/lib/rating";
-import { formatCompletionTime } from "@/lib/history/format";
+import { formatCompletionTime, formatOvertime } from "@/lib/history/format";
 import type { AttemptPdfData } from "@/lib/pdf/generateAttemptPdf";
 
 export default async function ResultPage({
@@ -61,6 +61,21 @@ export default async function ResultPage({
             completionTimeLabel={completionTimeLabel}
           />
         </div>
+
+        {/* Quá giờ (Security review #6). DB tự tính overtime_seconds trong
+            record_exam_result() từ started_at + duration_minutes, nên nhãn này
+            không nói dối được kể cả khi người làm tắt JS để vô hiệu hoá đồng hồ.
+            Điểm vẫn được chấm bình thường — chỉ nói rõ là ngoài thời gian. */}
+        {data.overtimeSeconds > 0 && (
+          <div
+            className="preload-fade border-border bg-card text-muted-foreground rounded-lg border border-dashed px-4 py-3 text-sm"
+            style={{ "--preload-order": 2 } as React.CSSProperties}
+          >
+            <span className="text-foreground font-medium">Submitted after time.</span>{" "}
+            This attempt went {formatOvertime(data.overtimeSeconds)} over the{" "}
+            allotted time, so the score is not a valid timed result.
+          </div>
+        )}
 
         {/* Save · Share · Return — 3 ô ngang bằng nhau, không còn phụ thuộc
             cột Topics đã xóa để định chiều cao/chiều rộng. */}

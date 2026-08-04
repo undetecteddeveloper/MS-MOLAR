@@ -5,11 +5,24 @@
 //   cách ly exam/question/report chưa published (bảng + Storage), positive
 //   controls, write policies tác giả, backfill. ĐÂY LÀ GATE A (ADR-0001 kill
 //   criterion) — không sang Phase 4/5/6 khi chưa xanh.
-// Phần 3 (History feature, backend Design Doc v1.2, case H-a) — required,
+// Phần 3 (Answer-key lockdown, Security review 2026-08-03 Critical #1, cases
+//   R-v…R-z) — required, blocking. Quyền CỘT + 2 hàm SECURITY DEFINER
+//   (schema.sql §10) chỉ tồn tại trong Postgres thật; R-v là hồi quy trực tiếp
+//   của lỗ hổng "học sinh đọc đáp án qua REST trước khi nộp bài".
+// Phần 4 (Score write lockdown, Security review 2026-08-03 Critical #2, cases
+//   S-a…S-e) — required, blocking. Quyền bảng (§11a) + EXECUTE grant của
+//   record_exam_result (§11b) chỉ Postgres thật mới chứng minh được; S-a là hồi
+//   quy trực tiếp của "học sinh POST điểm bịa vào /rest/v1/exam_results".
+// Phần 5 (Takedown UGC, Security review 2026-08-03 Medium #7, cases M-a…M-d) —
+//   required, blocking. Lệnh gỡ chỉ có nghĩa nếu tác giả không tự đưa ngược lại
+//   được, và điều đó do RLS quyết định chứ không phải Server Action.
+// Phần 6 (History feature, backend Design Doc v1.2, case H-a) — required,
 //   blocking trước khi listMyHistory() coi là hoàn thành (xem block bên dưới,
-//   sau Phần 2 Rating). Không có mock nào chứng minh được hành vi RLS thật
+//   sau Phần 5). Không có mock nào chứng minh được hành vi RLS thật
 //   (chỉ Postgres thật mới chứng minh được) — history.int.test.ts obligation
-//   (e) (mocked) chỉ chứng minh JS-assembly/omit-logic.
+//   (e) (mocked) chỉ chứng minh predicate còn được gắn vào query. Từ 2026-08-03
+//   case này chạy trên chính embedded join mà listMyHistory() phát sau khi gộp
+//   round-trip, kèm một positive control đi trước.
 //
 // 2 user test được tạo qua Admin API (service_role, email_confirm=true) để KHÔNG
 // gửi email xác nhận. Việc TEST RLS sau đó chỉ dùng ANON key + đăng nhập thật.
@@ -135,8 +148,16 @@ const MCQ_CHOICES = [
   { id: "D", text: "4" },
 ];
 
+/** Xóa attempt mà Phần 3 (answer-key lockdown, R-y/R-z) tạo trên đề UGC — chạy
+ *  trước VÀ sau để idempotent. PHẢI chạy trước khi xóa exams: exam_attempts.exam_id
+ *  là FK KHÔNG cascade, attempt sót lại sẽ chặn cleanupUgcFixtures của lần chạy sau. */
+async function cleanupAnswerKeyFixtures(admin: SupabaseClient) {
+  await admin.from("exam_attempts").delete().in("exam_id", UGC_EXAM_IDS);
+}
+
 /** Xóa sạch fixture UGC (chạy trước VÀ sau để idempotent). */
 async function cleanupUgcFixtures(admin: SupabaseClient) {
+  await cleanupAnswerKeyFixtures(admin);
   await admin.from("exam_reports").delete().in("exam_id", UGC_EXAM_IDS);
   await admin.from("exams").delete().in("id", UGC_EXAM_IDS);
   await admin.from("questions").delete().in("id", UGC_QUESTION_IDS);
@@ -327,7 +348,7 @@ async function main() {
   });
 
   const userAId = await ensureUser(admin, EMAIL_A);
-  await ensureUser(admin, EMAIL_B);
+  const userBId = await ensureUser(admin, EMAIL_B);
 
   const userA = await signInAs(url, anon, EMAIL_A); // TÁC GIẢ
   const userB = await signInAs(url, anon, EMAIL_B); // non-author
@@ -783,11 +804,468 @@ async function main() {
   );
 
   // ==========================================================================
-  // Phần 3 — History Gate (backend Design Doc v1.2, docs/design/history-backend-design.md,
+  // Phần 3 — Answer-key lockdown Gate (Security review 2026-08-03 Critical #1,
+  // schema.sql §10): R-v…R-z. REQUIRED, BLOCKING.
+  //
+  // Đây là tầng bảo vệ mà KHÔNG mock nào chứng minh được: quyền CỘT
+  // (GRANT/REVOKE) và 2 hàm SECURITY DEFINER chỉ tồn tại trong Postgres thật.
+  // Mock trong submitExam.int.test.ts/getResult.int.test.ts chỉ chứng minh
+  // được app code GỌI đúng RPC, không chứng minh được rằng đường cũ
+  // (`GET /rest/v1/questions?select=correct_answer`) đã thực sự bị đóng.
+  //
+  // R-v là hồi quy trực tiếp của chính lỗ hổng được báo cáo: học sinh đăng nhập
+  // đọc thẳng đáp án của đề published qua REST API.
+  // ==========================================================================
+  console.log("\nAnswer-key lockdown — setup fixture (service_role)…");
+  await cleanupAnswerKeyFixtures(admin);
+
+  console.log("\nRLS checks (answer-key lockdown R-v…R-z):");
+
+  // R-v. CHÍNH LỖ HỔNG: B (đã đăng nhập, không phải tác giả) đọc thẳng cột đáp
+  //      án của một đề ĐÃ PUBLISHED → phải LỖI quyền (42501), không phải trả
+  //      dữ liệu. Kèm positive control: cột an toàn vẫn đọc được bình thường —
+  //      chứng minh REVOKE nhắm đúng cột chứ không khoá cả bảng.
+  const rvDenied = await userB
+    .from("questions")
+    .select("id, correct_answer")
+    .eq("id", PUBLISHED_Q1);
+  const rvAllowed = await userB
+    .from("questions")
+    .select("id, content, choices, question_type, part_number, image_url")
+    .eq("id", PUBLISHED_Q1);
+  assert(
+    rvDenied.error !== null &&
+      !rvAllowed.error &&
+      (rvAllowed.data?.length ?? 0) === 1,
+    `R-v: Học sinh KHÔNG đọc được questions.correct_answer qua REST (lỗi: ${rvDenied.error?.code ?? "KHÔNG CÓ LỖI — LỖ HỔNG CÒN MỞ"}); cột an toàn vẫn đọc được`,
+  );
+
+  // R-v2. Hai cột đáp án còn lại đóng cùng cơ chế (sub_answers Đ/S từng ý,
+  //       essay_answer dùng cho cả short_answer) — cột nào lọt cũng đủ hỏng
+  //       tính toàn vẹn của đề.
+  const rvSub = await userB.from("questions").select("sub_answers").eq("id", PUBLISHED_Q1);
+  const rvEssay = await userB.from("questions").select("essay_answer").eq("id", PUBLISHED_Q1);
+  assert(
+    rvSub.error !== null && rvEssay.error !== null,
+    "R-v2: sub_answers + essay_answer cũng KHÔNG đọc được qua REST",
+  );
+
+  // R-w. exam_answer_key(): người không phải tác giả VÀ chưa nộp bài đề đó →
+  //      0 dòng (không lỗi — hàm fail-closed bằng WHERE, không bằng exception).
+  //      Anonymous thì không gọi được (EXECUTE chỉ cấp cho `authenticated`).
+  const rwB = await userB.rpc("exam_answer_key", { p_exam_id: PUBLISHED_EXAM_ID });
+  const rwAnon = await anonClient.rpc("exam_answer_key", { p_exam_id: PUBLISHED_EXAM_ID });
+  assert(
+    !rwB.error && (rwB.data?.length ?? 0) === 0 && rwAnon.error?.code === "42501",
+    `R-w: Chưa nộp bài + không phải tác giả -> exam_answer_key trả 0 dòng; anonymous bị chặn EXECUTE (mong đợi 42501, nhận: ${rwAnon.error?.code ?? "KHÔNG CÓ LỖI — anon vẫn gọi được hàm"})`,
+  );
+
+  // R-x. Positive control nhánh TÁC GIẢ: A đọc được đáp án đề CHƯA published
+  //      của mình (màn review S-03 của Layer 4 sống nhờ nhánh này).
+  const rxA = await userA.rpc("exam_answer_key", { p_exam_id: REVIEW_EXAM_ID });
+  const rxRow = (rxA.data as Array<{ id: string; correct_answer: string }> | null)?.[0];
+  assert(
+    !rxA.error && rxA.data?.length === 1 && rxRow?.id === REVIEW_Q1 && rxRow?.correct_answer === "A",
+    "R-x: Tác giả đọc được đáp án đề chưa published của mình qua exam_answer_key (positive control)",
+  );
+
+  // R-y. claim_attempt_answer_key() trên attempt CỦA NGƯỜI KHÁC → 0 dòng, VÀ
+  //      attempt của nạn nhân không bị đụng tới (không bị nộp hộ).
+  const aAttempt = await admin
+    .from("exam_attempts")
+    .insert({ user_id: userAId, exam_id: PUBLISHED_EXAM_ID, status: "in_progress" })
+    .select("id")
+    .single();
+  if (aAttempt.error) throw aAttempt.error;
+  const ryB = await userB.rpc("claim_attempt_answer_key", {
+    p_attempt_id: aAttempt.data.id as string,
+  });
+  const ryStatus = await admin
+    .from("exam_attempts")
+    .select("status")
+    .eq("id", aAttempt.data.id as string)
+    .single();
+  assert(
+    !ryB.error &&
+      (ryB.data?.length ?? 0) === 0 &&
+      (ryStatus.data as { status: string } | null)?.status === "in_progress",
+    "R-y: claim_attempt_answer_key trên attempt của người khác -> 0 dòng, attempt nạn nhân vẫn 'in_progress'",
+  );
+
+  // R-z. Nhánh chính: B claim attempt CỦA MÌNH → nhận được đáp án, VÀ attempt
+  //      bị khóa 'submitted' trong cùng transaction. Chính tính atomic này làm
+  //      cho việc trả đáp án cho JWT học sinh trở nên an toàn — lấy được đáp án
+  //      thì bài đã nộp xong, không dùng để gian lận được nữa.
+  const bAttempt = await admin
+    .from("exam_attempts")
+    .insert({ user_id: userBId, exam_id: PUBLISHED_EXAM_ID, status: "in_progress" })
+    .select("id")
+    .single();
+  if (bAttempt.error) throw bAttempt.error;
+  const rzClaim = await userB.rpc("claim_attempt_answer_key", {
+    p_attempt_id: bAttempt.data.id as string,
+  });
+  const rzStatus = await admin
+    .from("exam_attempts")
+    .select("status, submitted_at")
+    .eq("id", bAttempt.data.id as string)
+    .single();
+  const rzRow = (rzClaim.data as Array<{ correct_answer: string }> | null)?.[0];
+  assert(
+    !rzClaim.error &&
+      rzClaim.data?.length === 1 &&
+      rzRow?.correct_answer === "A" &&
+      (rzStatus.data as { status: string } | null)?.status === "submitted",
+    "R-z: B claim attempt của chính mình -> nhận đáp án VÀ attempt bị khóa 'submitted' cùng lúc (atomic)",
+  );
+
+  // R-z1. Leo thang mà chính bản vá này có thể mở ra nếu làm ẩu: attempt tạo
+  //       được trên đề BẤT KỲ (attempts_insert_own chỉ soi user_id; startAttempt
+  //       chưa gate published), còn claim_attempt_answer_key là SECURITY DEFINER
+  //       nên không còn RLS che. Nếu nhánh (2) của exam_answer_key thiếu điều
+  //       kiện `status = 'published'` thì B tự nộp một attempt trên ĐỀ NHÁP của
+  //       A là đọc được đáp án bản nháp. Phải trả 0 dòng.
+  const bDraftAttempt = await admin
+    .from("exam_attempts")
+    .insert({ user_id: userBId, exam_id: REVIEW_EXAM_ID, status: "in_progress" })
+    .select("id")
+    .single();
+  if (bDraftAttempt.error) throw bDraftAttempt.error;
+  const rz1Claim = await userB.rpc("claim_attempt_answer_key", {
+    p_attempt_id: bDraftAttempt.data.id as string,
+  });
+  const rz1Read = await userB.rpc("exam_answer_key", { p_exam_id: REVIEW_EXAM_ID });
+  assert(
+    !rz1Claim.error &&
+      (rz1Claim.data?.length ?? 0) === 0 &&
+      !rz1Read.error &&
+      (rz1Read.data?.length ?? 0) === 0,
+    "R-z1: Tự tạo+nộp attempt trên đề CHƯA published của người khác -> vẫn 0 dòng (không leo thang qua SECURITY DEFINER)",
+  );
+
+  // R-z2. Sau khi đã nộp, nhánh (2) của exam_answer_key mở ra: màn Chi tiết đọc
+  //       được đáp án. Cùng một user, cùng một đề, khác kết quả so với R-w —
+  //       chứng minh gate là "đã nộp bài", không phải "đã đăng nhập".
+  const rz2 = await userB.rpc("exam_answer_key", { p_exam_id: PUBLISHED_EXAM_ID });
+  assert(
+    !rz2.error &&
+      rz2.data?.length === 1 &&
+      (rz2.data as Array<{ correct_answer: string }>)[0].correct_answer === "A",
+    "R-z2: Sau khi nộp bài, chính user đó đọc được đáp án qua exam_answer_key (màn Chi tiết)",
+  );
+
+  await cleanupAnswerKeyFixtures(admin);
+
+  // ==========================================================================
+  // Phần 4 — Score write lockdown Gate (Security review 2026-08-03 Critical #2,
+  // schema.sql §11): S-a…S-e. REQUIRED, BLOCKING.
+  //
+  // Trước bản vá, `results_insert_own` chỉ check `user_id = auth.uid()`, nên
+  // học sinh POST thẳng một dòng điểm bịa vào /rest/v1/exam_results là có ngay
+  // 10 điểm — và vì attempt_id là UNIQUE, còn chiếm được chỗ attempt của người
+  // khác khiến lần nộp bài thật của họ chết vì 23505.
+  //
+  // Cưỡng chế nay nằm ở QUYỀN BẢNG (§11a thu hồi INSERT của client) + hàm
+  // record_exam_result chỉ service_role gọi được (§11b). Cả hai chỉ Postgres
+  // thật mới chứng minh được; mock trong submitExam.int.test.ts chỉ chứng minh
+  // được app code GỌI đúng đường.
+  // ==========================================================================
+  console.log("\nScore write lockdown — setup fixture (service_role)…");
+  await cleanupAnswerKeyFixtures(admin);
+
+  // Attempt ĐÃ NỘP của A, chưa có exam_results — bối cảnh "đáng lẽ hợp lệ nhất"
+  // để ghi điểm. Nếu ngay cả nó cũng bị chặn thì client không còn đường nào.
+  const scoredAttempt = await admin
+    .from("exam_attempts")
+    .insert({
+      user_id: userAId,
+      exam_id: PUBLISHED_EXAM_ID,
+      status: "submitted",
+      submitted_at: new Date().toISOString(),
+    })
+    .select("id")
+    .single();
+  if (scoredAttempt.error) throw scoredAttempt.error;
+  const scoredAttemptId = scoredAttempt.data.id as string;
+
+  // Attempt CÒN DỞ của A — dùng cho S-d.
+  const openAttempt = await admin
+    .from("exam_attempts")
+    .insert({ user_id: userAId, exam_id: PUBLISHED_EXAM_ID, status: "in_progress" })
+    .select("id")
+    .single();
+  if (openAttempt.error) throw openAttempt.error;
+
+  const FAKE_SCORE = {
+    total_score: 10,
+    correct: 40,
+    total: 40,
+    per_question: [] as unknown[],
+    topic_breakdown: [] as unknown[],
+  };
+
+  console.log("\nRLS checks (score write lockdown S-a…S-e):");
+
+  // S-a. CHÍNH LỖ HỔNG: chủ nhân tự ghi điểm cho attempt ĐÃ NỘP của mình.
+  //      Kèm biến thể chiếm chỗ attempt người khác (B ghi cho attempt của A).
+  //      Hiện cả hai bị chặn ngay ở tầng quyền bảng, nên test này KHÔNG tách
+  //      bạch được lớp policy §11a-2; policy là lưới thứ hai cho trường hợp ai
+  //      đó lỡ cấp lại INSERT, và chỉ kiểm được nếu tự cấp lại quyền (không làm).
+  const saOwn = await userA.from("exam_results").insert({
+    attempt_id: scoredAttemptId,
+    ...FAKE_SCORE,
+  });
+  const saForeign = await userB.from("exam_results").insert({
+    attempt_id: scoredAttemptId,
+    ...FAKE_SCORE,
+  });
+  assert(
+    saOwn.error !== null && saForeign.error !== null,
+    `S-a: Học sinh KHÔNG ghi được exam_results — kể cả cho attempt đã nộp của CHÍNH MÌNH (lỗi: ${saOwn.error?.code ?? "KHÔNG CÓ LỖI — LỖ HỔNG CÒN MỞ"}), lẫn cho attempt của người khác (lỗi: ${saForeign.error?.code ?? "KHÔNG CÓ LỖI — LỖ HỔNG CÒN MỞ"})`,
+  );
+
+  // S-b. UPDATE/DELETE cũng đã bị thu hồi — trước nay chỉ được chặn nhờ "chưa
+  //      ai viết policy", một lý do quá mỏng cho bảng chứa điểm số.
+  const sbUpd = await userA
+    .from("exam_results")
+    .update({ total_score: 10 })
+    .eq("attempt_id", scoredAttemptId);
+  const sbDel = await userA.from("exam_results").delete().eq("attempt_id", scoredAttemptId);
+  assert(
+    sbUpd.error !== null && sbDel.error !== null,
+    "S-b: Học sinh KHÔNG sửa/xoá được exam_results (quyền bảng bị thu hồi, không chỉ dựa vào 'không có policy')",
+  );
+
+  // S-c. record_exam_result chỉ cấp EXECUTE cho service_role → học sinh bị chặn
+  //      NGAY Ở CỬA HÀM, phải là 42501.
+  //      Probe bằng attempt KHÔNG TỒN TẠI là cố ý: với attempt có thật, hàm chạy
+  //      tới INSERT rồi mới chết 42501 (do §11a) — cùng mã lỗi, khác lý do, nên
+  //      không phân biệt được EXECUTE có bị thu hồi hay không. Với attempt giả,
+  //      nếu EXECUTE còn thì hàm chạy và raise 23514; chỉ 42501 mới chứng minh
+  //      nó bị chặn trước khi vào thân hàm. (Bẫy này đã bỏ lọt thật một lần —
+  //      Supabase default privileges, xem schema.sql §10b.)
+  const NIL_UUID = "00000000-0000-0000-0000-000000000000";
+  const sc = await userA.rpc("record_exam_result", {
+    p_attempt_id: NIL_UUID,
+    p_total_score: 10,
+    p_correct: 40,
+    p_total: 40,
+    p_per_question: [],
+    p_topic_breakdown: [],
+  });
+  assert(
+    sc.error?.code === "42501",
+    `S-c: Học sinh bị chặn EXECUTE record_exam_result (mong đợi 42501, nhận: ${sc.error?.code ?? "KHÔNG CÓ LỖI"}${sc.error?.code === "23514" ? " = hàm VẪN CHẠY, EXECUTE chưa bị thu hồi khỏi authenticated" : ""})`,
+  );
+
+  // S-d. Ngay cả service_role cũng không ghi được điểm cho attempt CHƯA NỘP —
+  //      luật "điểm chỉ tồn tại cho bài đã đóng" nằm trong DB, không nằm ở
+  //      call site.
+  const sd = await admin.rpc("record_exam_result", {
+    p_attempt_id: openAttempt.data.id as string,
+    p_total_score: 10,
+    p_correct: 40,
+    p_total: 40,
+    p_per_question: [],
+    p_topic_breakdown: [],
+  });
+  assert(
+    sd.error !== null,
+    `S-d: record_exam_result TỪ CHỐI attempt chưa 'submitted', kể cả với service_role (lỗi: ${sd.error?.code ?? "KHÔNG CÓ LỖI"})`,
+  );
+
+  // S-e. Positive control + tính chất then chốt: người gọi KHÔNG khai user_id,
+  //      hàm tự suy ra từ attempt. service_role không có auth.uid() nào cả, mà
+  //      dòng ghi ra vẫn phải thuộc về A.
+  const se = await admin.rpc("record_exam_result", {
+    p_attempt_id: scoredAttemptId,
+    p_total_score: 7.5,
+    p_correct: 3,
+    p_total: 4,
+    p_per_question: [],
+    p_topic_breakdown: [],
+  });
+  const seRow = await admin
+    .from("exam_results")
+    .select("user_id, total_score, correct, total")
+    .eq("attempt_id", scoredAttemptId);
+  const seData = (seRow.data as Array<{ user_id: string; total_score: number }> | null) ?? [];
+  assert(
+    !se.error &&
+      seData.length === 1 &&
+      seData[0].user_id === userAId &&
+      Number(seData[0].total_score) === 7.5,
+    "S-e: service_role ghi được điểm qua record_exam_result, và user_id được SUY RA từ attempt (không nhận từ tham số)",
+  );
+
+  // S-f. overtime_seconds (Security review #6) do DB TỰ TÍNH từ
+  //      started_at + exams.duration_minutes, KHÔNG nhận từ tham số — hệt như
+  //      user_id. Đây là toàn bộ nội dung của "timer server-side": đồng hồ ở
+  //      client chỉ là UX, tắt JS thì nó biến mất, còn dòng này thì không.
+  //      Hai fixture chỉ khác nhau ở started_at nên chênh lệch quan sát được
+  //      chắc chắn đến từ phép tính trong hàm.
+  const examDuration = await admin
+    .from("exams")
+    .select("duration_minutes")
+    .eq("id", PUBLISHED_EXAM_ID)
+    .single();
+  if (examDuration.error) throw examDuration.error;
+  const durationMin = examDuration.data.duration_minutes as number;
+
+  /** Tạo attempt đã nộp, bắt đầu cách đây `startedMinutesAgo` phút. */
+  const seedFinishedAttempt = async (startedMinutesAgo: number) => {
+    const now = Date.now();
+    const row = await admin
+      .from("exam_attempts")
+      .insert({
+        user_id: userAId,
+        exam_id: PUBLISHED_EXAM_ID,
+        status: "submitted",
+        started_at: new Date(now - startedMinutesAgo * 60_000).toISOString(),
+        submitted_at: new Date(now).toISOString(),
+      })
+      .select("id")
+      .single();
+    if (row.error) throw row.error;
+    return row.data.id as string;
+  };
+
+  // Trong giờ: bắt đầu cách đây (duration - 5) phút.
+  const inTimeId = await seedFinishedAttempt(Math.max(1, durationMin - 5));
+  // Quá giờ: bắt đầu cách đây (duration + 30) phút → phải ra ~1800s.
+  const lateId = await seedFinishedAttempt(durationMin + 30);
+
+  const scorePayload = {
+    p_total_score: 9,
+    p_correct: 9,
+    p_total: 10,
+    p_per_question: [],
+    p_topic_breakdown: [],
+  };
+  const wInTime = await admin.rpc("record_exam_result", { p_attempt_id: inTimeId, ...scorePayload });
+  const wLate = await admin.rpc("record_exam_result", { p_attempt_id: lateId, ...scorePayload });
+  if (wInTime.error) throw wInTime.error;
+  if (wLate.error) throw wLate.error;
+
+  const sfRows = await admin
+    .from("exam_results")
+    .select("attempt_id, overtime_seconds")
+    .in("attempt_id", [inTimeId, lateId]);
+  const byAttempt = new Map(
+    ((sfRows.data as Array<{ attempt_id: string; overtime_seconds: number }> | null) ?? []).map(
+      (r) => [r.attempt_id, r.overtime_seconds],
+    ),
+  );
+  const inTimeOvertime = byAttempt.get(inTimeId);
+  const lateOvertime = byAttempt.get(lateId);
+  assert(
+    inTimeOvertime === 0 && typeof lateOvertime === "number" && lateOvertime > 1700 && lateOvertime < 1900,
+    `S-f: overtime_seconds do DB tự tính — nộp trong giờ = 0 (nhận ${inTimeOvertime}); nộp quá ${durationMin + 30}' trên đề ${durationMin}' ≈ 1800s (nhận ${lateOvertime})`,
+  );
+
+  await cleanupAnswerKeyFixtures(admin);
+
+  // ==========================================================================
+  // Phần 5 — Takedown UGC (Security review 2026-08-03 Medium #7, schema.sql §14):
+  // M-a…M-d. REQUIRED, BLOCKING.
+  //
+  // Gỡ nội dung chỉ có nghĩa nếu tác giả KHÔNG tự đưa ngược lại được. Toàn bộ
+  // việc đó nằm ở RLS (exams_update_author/exams_delete_author loại trừ
+  // 'removed') — app code không cưỡng chế được, vì tác giả gọi thẳng REST API
+  // bằng JWT của mình là bỏ qua mọi guard trong Server Action.
+  // ==========================================================================
+  console.log("\nTakedown UGC — setup fixture (service_role)…");
+  const REMOVED_EXAM_ID = "rls-ugc-removed";
+  const cleanupRemoved = async () => {
+    await admin.from("exam_moderation_log").delete().eq("exam_id", REMOVED_EXAM_ID);
+    await admin.from("exams").delete().eq("id", REMOVED_EXAM_ID);
+  };
+  await cleanupRemoved();
+  const removedSeed = await admin.from("exams").insert({
+    id: REMOVED_EXAM_ID,
+    title: "[RLS] Đề đã bị gỡ",
+    question_ids: [] as string[],
+    duration_minutes: 45,
+    subject: "Toán",
+    grade: 10,
+    author_id: userAId,
+    author_display_name: "RLS Test Author",
+    status: "removed",
+  });
+  if (removedSeed.error) throw removedSeed.error;
+
+  console.log("\nRLS checks (takedown M-a…M-d):");
+
+  // M-a. Tác giả KHÔNG sửa được đề đã bị gỡ — kể cả đổi status về 'published'
+  //      (đúng nước đi của người muốn lách lệnh gỡ).
+  const maRepublish = await userA
+    .from("exams")
+    .update({ status: "published" })
+    .eq("id", REMOVED_EXAM_ID)
+    .select("id");
+  const maTitle = await userA
+    .from("exams")
+    .update({ title: "[RLS] Đổi tên lách lệnh gỡ" })
+    .eq("id", REMOVED_EXAM_ID)
+    .select("id");
+  const maAfter = await admin
+    .from("exams")
+    .select("status, title")
+    .eq("id", REMOVED_EXAM_ID)
+    .single();
+  const maRow = maAfter.data as { status: string; title: string } | null;
+  assert(
+    (maRepublish.data?.length ?? 0) === 0 &&
+      (maTitle.data?.length ?? 0) === 0 &&
+      maRow?.status === "removed" &&
+      maRow?.title === "[RLS] Đề đã bị gỡ",
+    `M-a: Tác giả KHÔNG tự publish lại / sửa được đề đã bị gỡ (status còn '${maRow?.status}')`,
+  );
+
+  // M-b. Cũng không xoá được để phi tang.
+  const mbDel = await userA.from("exams").delete().eq("id", REMOVED_EXAM_ID).select("id");
+  const mbStill = await admin.from("exams").select("id").eq("id", REMOVED_EXAM_ID);
+  assert(
+    (mbDel.data?.length ?? 0) === 0 && (mbStill.data?.length ?? 0) === 1,
+    "M-b: Tác giả KHÔNG xoá được đề đã bị gỡ",
+  );
+
+  // M-c. Đề đã gỡ biến mất khỏi catalog với người khác, nhưng CHÍNH tác giả vẫn
+  //      thấy (nhánh author_id của exams_select_visible) — chủ đích: họ cần biết
+  //      bài bị gỡ, chứ không phải thấy nó bốc hơi không lời giải thích.
+  const mcOther = await userB.from("exams_with_difficulty").select("id").eq("id", REMOVED_EXAM_ID);
+  const mcAuthor = await userA.from("exams").select("id, status").eq("id", REMOVED_EXAM_ID);
+  assert(
+    (mcOther.data?.length ?? 0) === 0 && (mcAuthor.data?.length ?? 0) === 1,
+    "M-c: Đề đã gỡ ẩn với người khác (kể cả qua view) nhưng tác giả vẫn thấy trạng thái",
+  );
+
+  // M-d. Nhật ký kiểm duyệt là dữ liệu vận hành — không ai ngoài service_role
+  //      đọc được (RLS bật, KHÔNG policy nào + thu hồi quyền bảng).
+  const mdUser = await userA.from("exam_moderation_log").select("id");
+  const mdAnon = await anonClient.from("exam_moderation_log").select("id");
+  assert(
+    (mdUser.error !== null || (mdUser.data?.length ?? 0) === 0) &&
+      (mdAnon.error !== null || (mdAnon.data?.length ?? 0) === 0),
+    "M-d: exam_moderation_log KHÔNG đọc được bởi user thường lẫn anonymous",
+  );
+
+  await cleanupRemoved();
+
+  // ==========================================================================
+  // Phần 6 — History Gate (backend Design Doc v1.2, docs/design/history-backend-design.md,
   // case H-a) — REQUIRED, BLOCKING. Chứng minh duy nhất trên Postgres thật rằng
   // exams_select_visible RLS + filter tường minh .eq("status","published") loại
   // bỏ đúng hàng của một đề tự-tác-giả sau khi bị unpublish (R-1) — mock trong
-  // history.int.test.ts obligation (e) chỉ chứng minh được JS-assembly/omit-logic.
+  // history.int.test.ts obligation (e) chỉ chứng minh được predicate còn được
+  // GẮN vào query, không chứng minh được Postgres tôn trọng nó.
+  //
+  // 2026-08-03 (perf pass): listMyHistory() đã gộp 3 query tuần tự thành MỘT
+  // embedded join, nên case này cũng đổi theo để chạy đúng shape production
+  // đang phát — bản cũ query thẳng bảng `exams` theo shape "bước 3", một bước
+  // không còn tồn tại, tức vẫn xanh nhưng chứng minh nhầm thứ. Nhờ chạy trên
+  // chính join đó, nay chứng minh được mạnh hơn: cả DÒNG biến mất khỏi kết quả
+  // (do `exams!inner`), chứ không chỉ "lookup title trả 0 row".
   // ==========================================================================
   console.log("\nHistory H-a — setup fixture (service_role)…");
   await cleanupHistoryFixtures(admin);
@@ -795,24 +1273,41 @@ async function main() {
 
   console.log("\nRLS checks (History H-a):");
 
-  // H-a. Tác giả đổi status đề khỏi 'published' (service_role) -> lookup title
-  //      tương đương listMyHistory() bước 3, chạy dưới danh nghĩa chính User A
-  //      (tác giả kiêm người làm bài) -> phải trả về 0 row, chứng minh việc loại
-  //      bỏ là do RLS + filter tường minh, không phải do application-code (JS-side).
+  /** Đúng query listMyHistory() phát (app/(HM)/queries.ts), thu hẹp về fixture H-a. */
+  const haJoin = () =>
+    userA
+      .from("exam_results")
+      .select(
+        "attempt_id, total_score, exam_attempts!inner(exam_id, started_at, submitted_at, exams!inner(title, subject))",
+      )
+      .eq("exam_attempts.status", "submitted")
+      .eq("exam_attempts.exams.status", "published")
+      .eq("exam_attempts.exam_id", HISTORY_EXAM_ID);
+
+  // H-a (positive control). Khi đề CÒN published, dòng fixture phải đi qua được
+  // join. Thiếu bước này, assertion "0 row" bên dưới có thể xanh vì lý do sai
+  // (fixture hỏng, filter viết nhầm tên cột, RLS giấu sạch) chứ không phải vì
+  // quy tắc omission hoạt động.
+  const haBefore = await haJoin();
+  assert(
+    !haBefore.error && (haBefore.data?.length ?? 0) === 1,
+    "H-a (positive control): đề CÒN published -> join của listMyHistory() trả đúng 1 row cho attempt của fixture",
+  );
+
+  // H-a. Tác giả đổi status đề khỏi 'published' (service_role) -> chạy lại đúng
+  //      join đó dưới danh nghĩa chính User A (tác giả kiêm người làm bài) ->
+  //      phải trả về 0 row, chứng minh việc loại bỏ là do RLS + filter tường
+  //      minh + `exams!inner` ở tầng DB, không phải do application-code (JS-side).
   const haRevert = await admin
     .from("exams")
     .update({ status: "draft" })
     .eq("id", HISTORY_EXAM_ID);
   if (haRevert.error) throw haRevert.error;
 
-  const ha = await userA
-    .from("exams")
-    .select("id")
-    .in("id", [HISTORY_EXAM_ID])
-    .eq("status", "published");
+  const ha = await haJoin();
   assert(
     !ha.error && (ha.data?.length ?? 0) === 0,
-    "H-a: Đề tự-tác-giả sau khi bị unpublish -> lookup title (bước 3 listMyHistory()) trả về 0 row cho đề đó (RLS + filter tường minh, không phải application-code)",
+    "H-a: Đề tự-tác-giả sau khi bị unpublish -> cả dòng bị loại khỏi join của listMyHistory() (RLS + filter tường minh + !inner, không phải application-code)",
   );
 
   // Dọn dẹp fixture History.

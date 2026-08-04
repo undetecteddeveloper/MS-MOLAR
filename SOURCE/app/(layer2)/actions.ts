@@ -5,6 +5,8 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { recordExamResult } from "@/lib/supabase/service-role";
+import { guard } from "@/lib/security/rateLimit";
 import { isValidPartScore } from "@/lib/rating";
 import { computeScore } from "@/lib/scoring/computeScore";
 import type { ChoiceId, Question } from "@/types/question";
@@ -15,6 +17,25 @@ import type { ChoiceId, Question } from "@/types/question";
  */
 export async function startAttempt(examId: string) {
   const supabase = await createClient();
+
+  // Đề phải ĐANG PUBLISHED mới cho bắt đầu làm (Security review 2026-08-03 Low).
+  // Trước đây thiếu: attempts_insert_own chỉ soi user_id, còn FK chỉ đòi đề tồn
+  // tại — nên tạo được attempt trên đề nháp/đề của người khác nếu biết id.
+  // Tự nó không lộ dữ liệu (câu hỏi của đề chưa published vẫn bị RLS chặn, và
+  // exam_answer_key §10a đòi published ở nhánh "đã nộp"), nhưng để lại attempt
+  // rác trỏ vào đề không xem được, và lệch với guard "chỉ published" mà mọi
+  // đường đọc khác đều áp. `.eq("status","published")` chồng lên RLS
+  // exams_select_visible — RLS còn cho tác giả thấy đề nháp CỦA MÌNH, filter
+  // này chặn cả trường hợp đó.
+  const { data: exam, error: examErr } = await supabase
+    .from("exams")
+    .select("id")
+    .eq("id", examId)
+    .eq("status", "published")
+    .maybeSingle();
+  if (examErr) throw examErr;
+  if (!exam) redirect("/exams");
+
   const { data, error } = await supabase
     .from("exam_attempts")
     .insert({ exam_id: examId })
@@ -26,8 +47,9 @@ export async function startAttempt(examId: string) {
 }
 
 /**
- * Nộp bài: batch-insert answers, chấm điểm server-side với đáp án từ DB,
- * lưu exam_results, khóa attempt. Idempotent — đã nộp thì redirect thẳng kết quả.
+ * Nộp bài: khóa attempt + lấy đáp án (một RPC atomic), batch-insert answers,
+ * chấm điểm server-side, lưu exam_results. Idempotent — đã nộp thì redirect
+ * thẳng kết quả.
  */
 export async function submitExam(
   attemptId: string,
@@ -39,19 +61,29 @@ export async function submitExam(
   // 1. Lấy attempt (RLS đảm bảo thuộc về user hiện tại).
   const { data: attempt, error: attemptErr } = await supabase
     .from("exam_attempts")
-    .select("id, exam_id, status")
+    .select("id, exam_id, status, user_id")
     .eq("id", attemptId)
     .maybeSingle();
   if (attemptErr) throw attemptErr;
   if (!attempt) redirect("/exams");
   const examId = attempt.exam_id as string;
 
+  // Rate limit (Security review Low). Khoá lấy từ chính dòng attempt vừa đọc —
+  // RLS đã lọc về attempt của người gọi nên user_id này đáng tin, và không tốn
+  // thêm round-trip nào (khác với gọi auth.getUser()).
+  const rl = guard("submitExam", attempt.user_id as string);
+  if (!rl.ok) {
+    throw new Error(
+      `Too many submissions. Try again in ${rl.retryAfterSeconds} seconds.`
+    );
+  }
+
   // Đã nộp rồi → không chấm lại.
   if (attempt.status === "submitted") {
     redirect(`/exams/${examId}/attempt/${attemptId}/result`);
   }
 
-  // 2. Lấy câu hỏi ĐẦY ĐỦ (kèm correct_answer) theo thứ tự đề — server-only.
+  // 2. Thứ tự câu hỏi trong đề (đáp án lấy ở bước 3, không phải ở đây).
   const { data: examRow, error: examErr } = await supabase
     .from("exams")
     .select("question_ids")
@@ -60,19 +92,27 @@ export async function submitExam(
   if (examErr) throw examErr;
   const questionIds = examRow.question_ids as string[];
 
-  // v2.1: thêm question_type để computeScore biết câu nào KHÔNG chấm
-  // (true_false/short_answer/essay — stored, not auto-scored).
-  const { data: qRows, error: qErr } = await supabase
-    .from("questions")
-    // sub_answers/essay_answer: ground truth của true_false/short_answer —
-    // cần cho computeScore chấm (v2.1 true_false auto-scored, 2026-07-27).
-    // Không lộ ra client player (PublicQuestion Omit) — chỉ dùng server-side
-    // ngay trong hàm này.
-    .select(
-      "id, content, choices, correct_answer, subject, grade, topic, question_type, sub_answers, essay_answer"
-    )
-    .in("id", questionIds);
+  // 3. KHÓA attempt + lấy đáp án — một RPC, atomic (schema.sql §10b).
+  //
+  // Không select thẳng từ `questions` được nữa: correct_answer/sub_answers/
+  // essay_answer đã bị REVOKE khỏi role `authenticated` (Security review
+  // 2026-08-03 #1) vì Server Action này chạy bằng chính JWT của học sinh —
+  // cái gì code này đọc được thì devtools cũng đọc được. claim_attempt_answer_
+  // key() đóng attempt TRƯỚC rồi mới trả đáp án, nên "lấy được đáp án" và "còn
+  // làm bài được" loại trừ lẫn nhau ở tầng DB, không phải ở tầng app.
+  //
+  // Hệ quả về thứ tự: attempt chuyển 'submitted' TẠI ĐÂY, không phải ở cuối
+  // hàm nữa (bước 6 cũ đã bỏ). Câu trả lời + kết quả ghi sau — an toàn vì RLS
+  // answers_insert_own/results_insert_own chỉ soi quyền sở hữu, không soi status.
+  const { data: qRows, error: qErr } = await supabase.rpc("claim_attempt_answer_key", {
+    p_attempt_id: attemptId,
+  });
   if (qErr) throw qErr;
+  // 0 dòng = attempt bị nộp mất giữa chừng bởi một request song song (bước 1 đã
+  // xác nhận nó là của user và còn in_progress) → xử như nhánh idempotent ở trên.
+  if (!qRows || (qRows as unknown[]).length === 0) {
+    redirect(`/exams/${examId}/attempt/${attemptId}/result`);
+  }
 
   const byId = new Map<string, Question>(
     (qRows as Array<Record<string, unknown>>).map((r) => [
@@ -95,7 +135,7 @@ export async function submitExam(
     .map((id) => byId.get(id))
     .filter((q): q is Question => q !== undefined);
 
-  // 3. Batch-insert answers (null nếu bỏ trống; cắt 500 ký tự khớp CHECK v2.1).
+  // 4. Batch-insert answers (null nếu bỏ trống; cắt 500 ký tự khớp CHECK v2.1).
   const answerRows = questions.map((q) => ({
     attempt_id: attemptId,
     question_id: q.id,
@@ -106,26 +146,20 @@ export async function submitExam(
     .upsert(answerRows, { onConflict: "attempt_id,question_id" });
   if (ansErr) throw ansErr;
 
-  // 4. Chấm điểm server-side (tracer code computeScore — M1.6).
+  // 5. Chấm điểm server-side (tracer code computeScore — M1.6).
   const score = computeScore(questions, answers);
 
-  // 5. Lưu kết quả (user_id default auth.uid()).
-  const { error: resErr } = await supabase.from("exam_results").insert({
-    attempt_id: attemptId,
-    total_score: score.totalScore,
-    correct: score.correct,
-    total: score.total,
-    per_question: score.perQuestion,
-    topic_breakdown: score.topicBreakdown,
-  });
-  if (resErr) throw resErr;
-
-  // 6. Khóa attempt.
-  const { error: updErr } = await supabase
-    .from("exam_attempts")
-    .update({ status: "submitted", submitted_at: new Date().toISOString() })
-    .eq("id", attemptId);
-  if (updErr) throw updErr;
+  // 6. Lưu kết quả. KHÔNG ghi bằng `supabase` (JWT của học sinh) được nữa:
+  // role `authenticated` đã mất hẳn INSERT trên exam_results (Security review
+  // 2026-08-03 #2, schema.sql §11a) vì trước đây học sinh POST thẳng một dòng
+  // điểm bịa vào REST API là xong. Điểm nay chỉ đi qua service role, và
+  // record_exam_result() tự suy ra user_id từ attempt + đòi attempt đã
+  // 'submitted' (§11b) — call site không tự khai được gì.
+  const { error: resErr } = await recordExamResult(attemptId, score);
+  if (resErr) {
+    console.error("[submitExam] recordExamResult", resErr.code, resErr.message);
+    throw new Error("Could not save your result. Try again.");
+  }
 
   redirect(`/exams/${examId}/attempt/${attemptId}/result`);
 }
@@ -143,7 +177,7 @@ export async function submitExam(
 export async function rateExam(
   examId: string,
   scores: { partI: number; partII: number; partIII: number }
-): Promise<{ error?: "ineligible" | "invalid" | "server" }> {
+): Promise<{ error?: "ineligible" | "invalid" | "rate_limited" | "server" }> {
   if (
     !isValidPartScore(scores.partI) ||
     !isValidPartScore(scores.partII) ||
@@ -157,12 +191,24 @@ export async function rateExam(
   // Precheck UX (không phải gate): đã có attempt 'submitted' cho đề này chưa.
   // exam_attempts đã tự lọc về của chính mình qua RLS attempts_select_own
   // (cùng tiền lệ listMySubmittedExamIds) — không cần .eq("user_id", ...).
-  const { count } = await supabase
+  //
+  // Lấy user_id thay vì count-head (2026-08-03): cùng MỘT round-trip như trước,
+  // nhưng trả luôn khoá cho rate limit bên dưới. Cách khác là gọi
+  // auth.getUser() — thêm hẳn một round-trip mạng cho mỗi lần rate, đắt hơn
+  // nhiều so với việc đổi hình dạng của query vốn đã phải chạy.
+  const { data: eligible } = await supabase
     .from("exam_attempts")
-    .select("id", { count: "exact", head: true })
+    .select("user_id")
     .eq("exam_id", examId)
-    .eq("status", "submitted");
-  if (!count) return { error: "ineligible" };
+    .eq("status", "submitted")
+    .limit(1)
+    .maybeSingle();
+  if (!eligible) return { error: "ineligible" };
+
+  // Rate limit (Security review Low) — rateExam là UPSERT nên unique
+  // (exam_id,user_id) KHÔNG chặn được việc gọi lại liên tục để sửa điểm.
+  const rl = guard("rateExam", eligible.user_id as string);
+  if (!rl.ok) return { error: "rate_limited" };
 
   // user_id KHÔNG truyền vào — cột default auth.uid() (không nhận từ input).
   const { error } = await supabase.from("exam_difficulty_ratings").upsert(

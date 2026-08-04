@@ -51,6 +51,24 @@ export function formatCompletionTime(startedAt: string, submittedAt: string | nu
   return `${totalSeconds}s`;
 }
 
+/**
+ * Số giây quá giờ → nhãn người đọc được ("2m 5s", "1h 3m", "12s").
+ * Dùng cho nhãn "Submitted after time" trên trang Result (Security review #6).
+ * Cùng bậc thang đơn vị với formatCompletionTime để hai nhãn cạnh nhau không
+ * lệch phong cách. `<= 0` → "" (caller chỉ render khi > 0).
+ */
+export function formatOvertime(overtimeSeconds: number): string {
+  if (!Number.isFinite(overtimeSeconds) || overtimeSeconds <= 0) return "";
+  const total = Math.floor(overtimeSeconds);
+  if (total >= 3600) {
+    return `${Math.floor(total / 3600)}h ${Math.floor((total % 3600) / 60)}m`;
+  }
+  if (total >= 60) {
+    return `${Math.floor(total / 60)}m ${total % 60}s`;
+  }
+  return `${total}s`;
+}
+
 const MAX_SLUG_LENGTH = 60;
 
 /** Lowercase, non-alphanumeric runs collapsed to single hyphens, <=60 chars, no leading/trailing hyphen. */

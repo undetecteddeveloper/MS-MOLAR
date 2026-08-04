@@ -58,10 +58,19 @@
 //   total/perQuestion/topicBreakdown, or questions); OR a null submitted_at is
 //   coerced to an empty string or omitted from the returned object instead of
 //   staying exactly `null` on ExamResult.submittedAt.
+// Round-trip collapse (2026-08-03 perf pass): getResult() previously issued 4
+//   sequential round trips (exam_results -> exam_attempts -> exams_with_difficulty
+//   via getExam() -> questions, measured ~816ms). The first 3 are now a single
+//   PostgREST request embedding exam_attempts and, through it, the
+//   exams_with_difficulty view (~385ms, verified output-identical against the old
+//   chain on the real DB). Obligations (a)-(c) below are unchanged in substance;
+//   (a)'s columns simply moved into the embed, and (d)/(e) were added because the
+//   collapse gave this function two new responsibilities of its own: carrying
+//   getExam()'s published-visibility guard, and staying collapsed.
 // Proof obligation:
-//   (a) Additive extension (query shape) — the exam_attempts mock is invoked
-//       with .select("exam_id, started_at, submitted_at"), not the old
-//       .select("exam_id") 1-column form.
+//   (a) Additive extension (query shape) — the exam_results select embeds
+//       exam_attempts!inner(...) and that projection still carries both
+//       started_at and submitted_at (dropping either still breaks AC-009).
 //   (b) Output Comparison — with a fixture attempt/result/exam/questions row
 //       set, the returned ExamResult's pre-existing sub-object
 //       { examId, examTitle, result, questions } is toEqual an independently
@@ -75,6 +84,13 @@
 //       submitted_at is null, ExamResult.submittedAt === null exactly (not
 //       coerced to "" and not omitted as a missing key from the returned
 //       object).
+//   (d) Visibility guard survived the collapse — the join applies
+//       .eq("exam_attempts.exams_with_difficulty.status", "published"), the guard
+//       previously owned by getExam(). Without it an unpublished/withdrawn exam's
+//       result would become readable: a visibility regression, not a perf one.
+//   (e) Round-trip no-regression guard — exactly 2 .from() calls are issued, in
+//       order: "exam_results" then "questions". Re-splitting the join would undo
+//       the optimization while every output assertion still passed.
 // Verification points / expected results / pass criteria:
 //   - Obligation (a): the exam_attempts mock's recorded .select() call
 //     argument equals the exact literal string
@@ -90,9 +106,17 @@
 //     (Object.prototype.hasOwnProperty.call(result, "submittedAt") === true),
 //     not silently absent.
 
+// Answer-key lockdown (2026-08-03, Security review Critical #1): round trip 2 is
+// now supabase.rpc("exam_answer_key") instead of .from("questions") —
+// sub_answers/essay_answer are REVOKEd from the `authenticated` role, so the
+// SECURITY DEFINER function (schema.sql §10a) is the only path that still yields
+// them, and only to the exam's author or someone who has already submitted an
+// attempt on it. Obligation (e) below still counts 2 round trips; it just counts
+// one .from() and one .rpc() instead of two .from()s.
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { fromMock } = vi.hoisted(() => ({ fromMock: vi.fn() }));
+const { fromMock, rpcMock } = vi.hoisted(() => ({ fromMock: vi.fn(), rpcMock: vi.fn() }));
 
 // queries.ts imports "server-only" (throws outside a Next server/react-server bundle)
 // → stub, same pattern as rating.int.test.ts.
@@ -101,7 +125,7 @@ vi.mock("server-only", () => ({}));
 // Mock boundary: Supabase client only (backend DD Test Boundaries) — proves JS call
 // construction; no real-Postgres semantics are newly introduced by this additive change.
 vi.mock("@/lib/supabase/server", () => ({
-  createClient: vi.fn(async () => ({ from: fromMock })),
+  createClient: vi.fn(async () => ({ from: fromMock, rpc: rpcMock })),
 }));
 
 const { getResult } = await import("../queries");
@@ -117,22 +141,9 @@ const RESULT_ROW = {
   topic_breakdown: [{ topic: "Algebra", correct: 1, total: 1 }],
 };
 
-// exams_with_difficulty row (DB shape) — getResult() surfaces only id/title from this.
-const EXAM_ROW = {
-  id: "exam-1",
-  title: "Sample Exam",
-  question_ids: ["q1"],
-  duration_minutes: 45,
-  subject: "Math",
-  grade: 10,
-  school: null,
-  school_year: null,
-  semester: null,
-  author_display_name: null,
-  parts: null,
-  rating_count: 0,
-  avg_overall: null,
-};
+// Embedded exams_with_difficulty projection — getResult() selects only id/title
+// through the join, because those are the only two fields it surfaces.
+const EMBEDDED_EXAM = { id: "exam-1", title: "Sample Exam" };
 
 // questions row (DB shape).
 const QUESTION_ROWS = [
@@ -178,79 +189,109 @@ const EXPECTED_PRE_EXISTING_OUTPUT = {
   },
 };
 
-/** Wires fromMock for getResult()'s call chain: exam_results -> exam_attempts ->
- * exams_with_difficulty (via getExam()) -> questions. `attemptRow` drives the
- * extension under test (started_at/submitted_at); the returned
- * `examAttemptsSelectMock` records the exact .select() call argument for
- * obligation (a). */
+/** Wires fromMock for getResult()'s call chain, now 2 round trips instead of 4:
+ * exam_results (with exam_attempts -> exams_with_difficulty embedded in the same
+ * request) -> questions. `attemptRow` drives the extension under test
+ * (started_at/submitted_at); the returned mocks/recorders back obligations
+ * (a)/(d)/(e). */
 function mockGetResultChain(attemptRow: {
-  exam_id: string;
   started_at: string;
   submitted_at: string | null;
 }) {
-  const examAttemptsSelectMock = vi.fn(() => ({
-    eq: () => ({
-      maybeSingle: async () => ({ data: attemptRow, error: null }),
-    }),
-  }));
+  const examResultsSelectMock = vi.fn();
+  const eqCalls: unknown[][] = [];
+
+  rpcMock.mockImplementation(async (fn: string) => {
+    if (fn === "exam_answer_key") return { data: QUESTION_ROWS, error: null };
+    throw new Error(`unexpected rpc: ${fn}`);
+  });
 
   fromMock.mockImplementation((table: string) => {
     if (table === "exam_results") {
-      return {
-        select: () => ({
-          eq: () => ({
-            maybeSingle: async () => ({ data: RESULT_ROW, error: null }),
-          }),
+      const builder: Record<string, unknown> = {
+        select: (...args: unknown[]) => {
+          examResultsSelectMock(...args);
+          return builder;
+        },
+        eq: (...args: unknown[]) => {
+          eqCalls.push(args);
+          return builder;
+        },
+        maybeSingle: async () => ({
+          data: {
+            ...RESULT_ROW,
+            exam_attempts: { ...attemptRow, exams_with_difficulty: EMBEDDED_EXAM },
+          },
+          error: null,
         }),
       };
-    }
-    if (table === "exam_attempts") {
-      return { select: examAttemptsSelectMock };
-    }
-    if (table === "exams_with_difficulty") {
-      return {
-        select: () => ({
-          eq: () => ({
-            eq: () => ({
-              maybeSingle: async () => ({ data: EXAM_ROW, error: null }),
-            }),
-          }),
-        }),
-      };
-    }
-    if (table === "questions") {
-      return {
-        select: () => ({
-          in: async () => ({ data: QUESTION_ROWS, error: null }),
-        }),
-      };
+      return builder;
     }
     throw new Error(`unexpected table: ${table}`);
   });
 
-  return { examAttemptsSelectMock };
+  return { examResultsSelectMock, eqCalls };
 }
 
 describe("getResult() — additive select extension, byte-identical pre-existing output, correctly-mapped new fields, null-submittedAt path (Test 2)", () => {
   beforeEach(() => {
     fromMock.mockReset();
+    rpcMock.mockReset();
   });
 
-  it('obligation (a): the exam_attempts mock is invoked with .select("exam_id, started_at, submitted_at")', async () => {
-    const { examAttemptsSelectMock } = mockGetResultChain({
-      exam_id: "exam-1",
+  it("obligation (a): the embedded exam_attempts projection still carries started_at and submitted_at", async () => {
+    const { examResultsSelectMock } = mockGetResultChain({
       started_at: "2026-07-20T10:00:00.000Z",
       submitted_at: "2026-07-20T10:30:00.000Z",
     });
 
     await getResult(ATTEMPT_ID);
 
-    expect(examAttemptsSelectMock).toHaveBeenCalledWith("exam_id, started_at, submitted_at");
+    // The 2 columns are now requested through the embed rather than a separate
+    // exam_attempts round trip, but dropping either still breaks AC-009 — so the
+    // obligation is unchanged in substance, only in where the columns appear.
+    const selectArg = examResultsSelectMock.mock.calls[0][0] as string;
+    expect(selectArg).toContain("exam_attempts!inner(");
+    expect(selectArg).toContain("started_at");
+    expect(selectArg).toContain("submitted_at");
+  });
+
+  it("obligation (d): the published-visibility filter is applied on the embedded exam (round-trip collapse must not drop getExam()'s guard)", async () => {
+    const { eqCalls } = mockGetResultChain({
+      started_at: "2026-07-20T10:00:00.000Z",
+      submitted_at: "2026-07-20T10:30:00.000Z",
+    });
+
+    await getResult(ATTEMPT_ID);
+
+    // Collapsing the getExam() call into this join moved its
+    // .eq("status","published") guard here. Losing it would surface results for
+    // an unpublished/withdrawn exam — a visibility regression, not a perf one.
+    expect(eqCalls).toContainEqual(["attempt_id", ATTEMPT_ID]);
+    expect(eqCalls).toContainEqual(["exam_attempts.exams_with_difficulty.status", "published"]);
+  });
+
+  it("obligation (e): exactly 2 round trips are issued — exam_results (joined) then the exam_answer_key RPC (no-regression guard on the round-trip collapse)", async () => {
+    mockGetResultChain({
+      started_at: "2026-07-20T10:00:00.000Z",
+      submitted_at: "2026-07-20T10:30:00.000Z",
+    });
+
+    await getResult(ATTEMPT_ID);
+
+    // Was 4 sequential round trips (exam_results -> exam_attempts -> exams_with_
+    // difficulty -> questions, ~816ms measured); the embed collapses the first 3
+    // into one (~385ms). A future edit that re-splits them would silently undo
+    // that without failing any output assertion. The 2nd trip became an RPC when
+    // the answer columns were locked down (Critical #1) — still one trip, and
+    // still keyed off the exam the join already resolved (no extra lookup).
+    expect(fromMock.mock.calls.map(([table]) => table)).toEqual(["exam_results"]);
+    expect(rpcMock).toHaveBeenCalledTimes(1);
+    expect(rpcMock).toHaveBeenCalledWith("exam_answer_key", { p_exam_id: "exam-1" });
   });
 
   it("obligation (b): Output Comparison — pre-existing fields toEqual an independently-authored fixture; startedAt/submittedAt correctly mapped (non-null case)", async () => {
     mockGetResultChain({
-      exam_id: "exam-1",
       started_at: "2026-07-20T10:00:00.000Z",
       submitted_at: "2026-07-20T10:30:00.000Z",
     });
@@ -268,7 +309,6 @@ describe("getResult() — additive select extension, byte-identical pre-existing
 
   it("obligation (c): a null submitted_at maps to ExamResult.submittedAt === null exactly (not coerced, not omitted)", async () => {
     mockGetResultChain({
-      exam_id: "exam-1",
       started_at: "2026-07-20T10:00:00.000Z",
       submitted_at: null,
     });

@@ -302,6 +302,10 @@ export type ExamResult = {
   /** null khi truy cập trực tiếp URL attempt trong khoảng hở trước khi
    * submitExam() cập nhật xong status/submitted_at (History). */
   submittedAt: string | null;
+  /** Số giây nộp QUÁ thời gian cho phép; 0 = trong giờ (Security review #6).
+   * DB tự tính trong record_exam_result() từ started_at + duration_minutes —
+   * client không khai được, kể cả khi tắt JS để vô hiệu hoá đồng hồ đếm ngược. */
+  overtimeSeconds: number;
 };
 
 /**
@@ -311,26 +315,42 @@ export type ExamResult = {
 export async function getResult(attemptId: string): Promise<ExamResult | null> {
   const supabase = await createClient();
 
-  const { data: resultRow, error: resultErr } = await supabase
+  // Vòng 1 — MỘT request cho cả 3 tầng: exam_results + attempt (FK) + đề (view).
+  // Trước đây là 3 query nối đuôi (exam_results → exam_attempts → getExam) rồi
+  // mới tới questions, tức 4×RTT; nay còn 2×RTT. Embed xuyên qua VIEW
+  // exams_with_difficulty đã được kiểm chứng thực tế chạy được (view không có FK
+  // metadata riêng nên KHÔNG hiển nhiên — đừng đổi sang bảng `exams`: bảng gốc
+  // không có rating_count/avg_overall, hai cột đó chỉ tồn tại trên view, ADR-0008).
+  //
+  // Bốn nhánh trả null của bản cũ hội tụ về đúng một nhánh ở đây, không đổi kết
+  // quả quan sát được: thiếu exam_results, hoặc attempt không tồn tại, hoặc đề
+  // không published → `!inner` loại cả dòng → maybeSingle() trả null.
+  // `.eq(...exams_with_difficulty.status,'published')` giữ đúng quy ước visibility
+  // của getExam() (RLS lọc, VÀ thêm filter published tường minh chồng lên).
+  // Chỉ lấy id/title của đề vì đó là tất cả những gì hàm này dùng — cố ý KHÔNG
+  // kéo cả EXAM_COLUMNS để không ngụ ý rằng có sẵn nguyên contract `Exam`.
+  const { data: joined, error: joinedErr } = await supabase
     .from("exam_results")
-    .select("total_score, correct, total, per_question, topic_breakdown")
+    .select(
+      "total_score, correct, total, per_question, topic_breakdown, overtime_seconds, exam_attempts!inner(started_at, submitted_at, exams_with_difficulty!inner(id, title))"
+    )
     .eq("attempt_id", attemptId)
+    .eq("exam_attempts.exams_with_difficulty.status", "published")
     .maybeSingle();
-  if (resultErr) throw resultErr;
-  if (!resultRow) return null;
+  if (joinedErr) throw joinedErr;
+  if (!joined) return null;
 
-  const { data: attempt, error: attemptErr } = await supabase
-    .from("exam_attempts")
-    .select("exam_id, started_at, submitted_at")
-    .eq("id", attemptId)
-    .maybeSingle();
-  if (attemptErr) throw attemptErr;
-  if (!attempt) return null;
+  const row = joined as unknown as ResultRow & {
+    overtime_seconds: number | null;
+    exam_attempts: {
+      started_at: string;
+      submitted_at: string | null;
+      exams_with_difficulty: { id: string; title: string };
+    };
+  };
+  const attempt = row.exam_attempts;
+  const exam = attempt.exams_with_difficulty;
 
-  const exam = await getExam(attempt.exam_id as string);
-  if (!exam) return null;
-
-  const row = resultRow as ResultRow;
   const result: ScoreResult = {
     totalScore: row.total_score,
     correct: row.correct,
@@ -339,18 +359,25 @@ export async function getResult(attemptId: string): Promise<ExamResult | null> {
     topicBreakdown: row.topic_breakdown,
   };
 
-  // Nội dung + lựa chọn câu hỏi để render Chi tiết (post-submit nên hiển thị được).
-  // v2.1: kèm question_type + đáp án lưu trữ cho câu không chấm (hiển thị sau nộp).
-  const { data: qs, error: qErr } = await supabase
-    .from("questions")
-    .select("id, content, choices, question_type, sub_answers, essay_answer")
-    .in(
-      "id",
-      result.perQuestion.map((p) => p.questionId)
-    );
+  // Vòng 2 — questions phụ thuộc vòng 1 (cần exam.id) nên buộc phải tuần tự.
+  // Không gộp được vào vòng 1: liên kết đề↔câu hỏi đi qua mảng `question_ids`
+  // (text[]) / `per_question` (jsonb), không phải FK, nên PostgREST không embed
+  // được. Nội dung + lựa chọn để render Chi tiết (post-submit nên hiển thị được);
+  // v2.1 kèm question_type + đáp án lưu trữ cho câu không chấm.
+  //
+  // RPC chứ không phải .from("questions"): sub_answers/essay_answer đã bị REVOKE
+  // khỏi role `authenticated` (Security review 2026-08-03 #1 — RLS lọc dòng chứ
+  // không lọc cột, nên đọc thẳng bảng thì devtools cũng đọc được đáp án của đề
+  // chưa làm). exam_answer_key() chỉ nhả đáp án cho tác giả hoặc người ĐÃ nộp
+  // bài đề đó (schema.sql §10a) — đúng điều kiện của màn Chi tiết này.
+  // Vẫn đúng 1 round-trip: hàm trả cả đề một lượt, map theo id như trước
+  // (dư vài câu ngoài per_question là vô hại — UI tra cứu theo questionId).
+  const { data: qs, error: qErr } = await supabase.rpc("exam_answer_key", {
+    p_exam_id: exam.id,
+  });
   if (qErr) throw qErr;
   const questions: Record<string, ResultQuestion> = {};
-  for (const q of qs as Array<{
+  for (const q of (qs ?? []) as Array<{
     id: string;
     content: string;
     choices: Choice[];
@@ -377,7 +404,9 @@ export async function getResult(attemptId: string): Promise<ExamResult | null> {
     examTitle: exam.title,
     result,
     questions,
-    startedAt: attempt.started_at as string,
-    submittedAt: attempt.submitted_at as string | null,
+    startedAt: attempt.started_at,
+    submittedAt: attempt.submitted_at,
+    // Dòng cũ (trước khi có cột) đọc lên null → coi như trong giờ.
+    overtimeSeconds: row.overtime_seconds ?? 0,
   };
 }
