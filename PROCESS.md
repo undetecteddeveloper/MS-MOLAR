@@ -3516,3 +3516,38 @@ RLS trên `public.questions` chỉ lọc theo hàng (ai xem được đề nào)
 - Golden State walkthrough bằng Playwright MCP thật (5 Golden State theo UI Spec § Visual Acceptance) CHƯA chạy trực tiếp trên `npm run dev` — mọi verify ở phiên này dừng ở mức code-level (vitest/tsc/build/review), chưa xác nhận trực quan bằng browser thật.
 - `docs/design/ugc-exam-upload-design.md`'s v2.1 Amendment section vẫn còn ghi "short_answer/true_false không tự động chấm" — đã lỗi thời sau ADR-0005 amendment 2026-08-01 nhưng engineer chọn bỏ qua, làm sau (design-sync candidate-001, không ảnh hưởng code).
 - Vẫn **CHƯA PUSH** lên `origin/feat/rating-system` — nhánh local đã vượt xa remote (tính cả các mảng việc Rating System/History/Analytics từ trước).
+
+---
+
+# [Deploy] — Rà soát site đã lên Vercel, bổ sung phần còn thiếu (S#45, 2026-08-04, branch `main`)
+
+## Yêu cầu
+Engineer: "Website đã được deploy trên Vercel. Kiểm tra xem có gì còn thiếu mà bạn có thể tự thêm được hay không." — tự rà, tự làm những gì làm được, cái gì cần quyết định thì hỏi.
+
+## Hiện trạng trước khi sửa
+`https://ms-molar.vercel.app` sống, security header đủ (CSP/HSTS/X-Frame-Options/Permissions-Policy). Nhưng thiếu toàn bộ lớp "mặt tiền" và lớp gác chất lượng.
+
+## Việc đã làm
+1. **Region function — phát hiện lớn nhất, đo chứ không đoán.** `X-Vercel-Id` cho thấy function chạy `iad1` (US East) trong khi Supabase prod ở `ap-southeast-1` (xác định qua IPv6 của `db.<ref>.supabase.co` thuộc dải AWS Asia Pacific `2406:da1a::`, cộng TTFB 95ms từ VN — loại trừ dứt khoát khả năng US). Mọi route đều dynamic và hầu hết có hỏi Supabase → mỗi request đi VN → Mỹ → Singapore → về. TTFB `/` đo được ~420ms (warm, 4 lần). Ghim `"regions": ["sin1"]` vào `vercel.json`. **Đã kiểm chứng bằng preview deploy thật** (engineer chọn phương án này qua AskUserQuestion, vì có plan Vercel giới hạn chọn region): deploy READY, `X-Vercel-Id: sin1::…` — plan chấp nhận.
+2. **`maxDuration = 300`** ở `app/(layer4)/upload/page.tsx` — trả đúng món nợ mà `docs/DEPLOYMENT.md` § "Đã biết trước" mục 2 tự ghi ("hiện code KHÔNG export maxDuration ở đâu cả, đang sống nhờ mặc định"). Server Action kế thừa segment config của route gọi nó, nên đặt ở page là phủ `extractAndAssemble`.
+3. **Icon thương hiệu** — `app/favicon.ico` vẫn là favicon mặc định của Next.js (md5 `c30c7d42…`, 25931 byte, từ lúc scaffold 2026-06-04). Thêm `scripts/generate-icons.mjs` (dùng `sharp` có sẵn) sinh favicon.ico 16/32/48 + `app/icon.png` 512 + `app/apple-icon.png` 180 + `public/images/brand-mark.png` 256 từ `brand_logo.png`. Logo gốc là hình chữ nhật nên đệm nền đỏ son `#A62C2B` cho vuông thay vì resize méo chữ. ICO viết tay container nhúng payload PNG (sharp không xuất .ico).
+4. **Metadata + OG image** — `app/layout.tsx` trước chỉ có title/description trần. Thêm `metadataBase`, title template, `openGraph`, `twitter`, `viewport.themeColor`. Thêm `app/opengraph-image.tsx` (next/og) — dán link vào Zalo/Messenger trước đây ra ô trắng. Thêm `lib/siteUrl.ts` đọc `NEXT_PUBLIC_SITE_URL` → `VERCEL_PROJECT_PRODUCTION_URL` → localhost (cố ý dùng biến production-URL chứ không phải `VERCEL_URL`, để preview deploy vẫn sinh canonical trỏ domain chính).
+5. **BUG bắt được nhờ tự test, không phải suy luận**: `/opengraph-image` bị `proxy.ts` chặn → **307**. Matcher chỉ loại trừ path CHỨA DẤU CHẤM, mà Next.js phục vụ OG image ở path KHÔNG có đuôi → crawler nhận redirect về `/?auth=signin`, ảnh preview chết. (`robots.txt`/`sitemap.xml`/`icon.png` thoát nhờ có đuôi.) Thêm `opengraph-image` vào danh sách loại trừ; xác nhận lại 200 image/png cả ở local lẫn preview deploy thật.
+6. **Trang lỗi** — chỉ `(HM)/history` có error.tsx. Thêm `app/error.tsx`, `app/not-found.tsx`, `app/global-error.tsx` theo theme "Mực & Sơn mài", giữ precedent của history (role="alert" + nhận focus + Retry nối reset()). 404 không phải màn hiếm: `notFound()` gọi ở 5 chỗ, gồm cả cổng `/admin` (ADR-0001 cố ý dùng 404 thay vì "cấm truy cập").
+7. **`robots.ts` + `sitemap.ts`** — trước đều 404. Chỉ `/` là public thật nên sitemap đúng 1 URL, robots disallow các nhánh sau đăng nhập.
+8. **CI (`.github/workflows/ci.yml`)** — repo chưa từng có `.github/`. Vercel build mỗi lần push nhưng không chạy test/lint. Job `verify` (lint · tsc · vitest) + job `bundle-secrets` (build với env GIẢ rồi `npm run check:bundle` — script vốn đã viết sẵn cho tình huống CI, tự chuyển sang chế độ quét marker khi không có key thật).
+9. **`npm run lint` hoá ra đang hỏng**: `eslint.config.mjs` ignore `.next/**` nhưng KHÔNG ignore `.next-build/**` — chính distDir prod riêng của dự án (S#36). Lệnh này đang lint cả output đã minify: **18775 vấn đề (787 lỗi) toàn đồ giả**, che sạch lỗi thật. Thêm `.next-build/**` + `.vercel/**` → còn đúng 3 vấn đề thật.
+10. **`.env.example`** — trả một nửa TD-009 (mục đó tự ghi cách trả là thêm file này). Phải thêm `!.env.example` vào `.gitignore` SAU luật `.env*`. Nhân tiện phát hiện 2 cờ debug chưa được ghi ở đâu: `UGC_PIPELINE_LOG`, `UGC_QUOTA_LOG`.
+11. Xoá 5 SVG scaffold Next.js không chỗ nào dùng (`next/vercel/file/globe/window.svg`).
+12. Cập nhật `docs/DEPLOYMENT.md` (§2.2b region kèm số đo, §2.2 biến mới + hiện trạng Preview, checklist sau deploy thêm 6 mục) và `docs/TECH-DEBT.md` (TD-010 mới, TD-009 đánh dấu trả một nửa).
+
+## Verify
+`tsc --noEmit` sạch · `npm test` 348/348 pass · `next build` qua · `check:bundle` PASS · preview deploy thật trên Vercel: `/robots.txt` `/sitemap.xml` `/opengraph-image` `/icon.png` `/favicon.ico` đều 200 đúng content-type, `X-Vercel-Id` = `sin1`.
+
+## CÒN NỢ / lưu ý cho phiên sau
+- **CHƯA COMMIT, CHƯA PUSH.** Toàn bộ nằm ở working tree trên `main`. Region + OG image chỉ có hiệu lực sau khi push (preview deploy đã chứng minh chúng chạy, nhưng production hiện vẫn là bản cũ ở iad1).
+- **TD-010 (mới)**: bước ESLint ở CI đặt `continue-on-error: true` vì source còn 2 lỗi react-hooks có sẵn — `ExamTimer.tsx:23` (gán ref trong render) và `SuccessToast.tsx:34` (setState trong effect). Cố ý KHÔNG sửa trong phiên này: cả hai là code đang chạy đúng, cái đầu nằm trên đường bấm giờ làm bài, sửa đúng cách là đổi cấu trúc component chứ không phải dán `eslint-disable`. Sửa xong nhớ **bỏ `continue-on-error`** — đó mới là lúc nợ được trả.
+- **Preview deploy đang 500 ở mọi route động** (`vercel env ls`): 3 biến Supabase chỉ có scope `Production`, còn `GEMINI_API_KEY`/`ADMIN_USER_IDS` lại có cả `Preview` — lệch scope gần như vô ý. ĐỪNG chép key prod sang Preview (mọi preview sẽ ghi vào DB thật). Hai lối đúng đã ghi ở `DEPLOYMENT.md` §2.2. Cần engineer quyết.
+- Preview deployment dùng để kiểm region (`ms-molar-883wd4vjd-…`) vẫn còn trên Vercel, `X-Robots-Tag: noindex`, để lại vô hại — xoá bằng `vercel remove` nếu muốn dọn.
+- Chưa đo lại TTFB sau khi đổi sang `sin1` trên PRODUCTION (preview không đo được vì 500 do thiếu env). Sau khi push nên đo lại `/` để xác nhận con số thực sự giảm từ ~420ms.
+- Nợ bảo mật RLS column-level từ S#44 vẫn còn nguyên, không đụng tới trong phiên này.

@@ -107,12 +107,60 @@ Lấy giá trị từ Supabase prod: Dashboard → Project Settings → **API**.
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase → API → service_role key | **BÍ MẬT** — bypass toàn bộ RLS |
 | `GEMINI_API_KEY` | Google AI Studio | **BÍ MẬT** — dùng cho UGC extract |
 | `ADMIN_USER_IDS` | uuid của user trong `auth.users` | Danh sách phân cách bằng dấu phẩy |
+| `NEXT_PUBLIC_SITE_URL` | domain chính thức, vd `https://msmolar.vn` | **Tuỳ chọn** — chỉ cần khi đã gắn custom domain (Phần 3.4) |
+
+Danh sách đầy đủ kèm ghi chú nằm ở `SOURCE/.env.example`.
+
+`NEXT_PUBLIC_SITE_URL` quyết định canonical URL / Open Graph / sitemap
+(`lib/siteUrl.ts`). Bỏ trống thì tự lấy `VERCEL_PROJECT_PRODUCTION_URL` do Vercel
+cấp sẵn (`ms-molar.vercel.app`) — đúng cho tới khi có domain riêng, lúc đó phải
+điền, nếu không mọi link chia sẻ vẫn trỏ về domain `.vercel.app` cũ.
 
 `ADMIN_USER_IDS` để trống thì trang `/admin` báo "chưa cấu hình" và không ai thao
 tác được. Điền SAU khi đã đăng ký tài khoản admin trên site prod (Phần 3.3).
 
+**Hiện trạng (kiểm bằng `vercel env ls` ngày 2026-08-04): Preview deploy KHÔNG
+chạy được.** Ba biến Supabase chỉ có scope `Production`, trong khi
+`GEMINI_API_KEY` và `ADMIN_USER_IDS` có cả `Preview` — lệch scope này gần như
+chắc là vô ý. Hệ quả đã chứng thực: preview deploy trả **500 ở mọi route động**
+(`lib/supabase/*` khẳng định non-null trên env, không có thì ném ngay). Route
+tĩnh — `/robots.txt`, `/sitemap.xml`, `/opengraph-image`, icon — vẫn 200.
+
+⚠ Đừng "sửa" bằng cách chép thẳng key prod sang scope Preview: làm vậy là mọi
+preview của mọi feature branch đều ghi vào **DB người dùng thật**, đúng thứ mà
+quyết định "Supabase project riêng cho production" ở đầu tài liệu này dựng lên
+để tránh. Hai lối đi đúng, chọn một:
+
+- **Trỏ Preview sang project Supabase dev** — thêm 3 biến với scope `Preview`
+  dùng URL/key của project dev. Preview chạy được, dữ liệu thật không bị đụng.
+- **Chấp nhận Preview không chạy** — chỉ dùng `npm run dev` ở máy để thử feature
+  branch. Không cần làm gì thêm, nhưng phải biết trước để lần sau mở link
+  preview thấy 500 thì không đi truy lỗi nhầm chỗ.
+
 Hai key bí mật không có tiền tố `NEXT_PUBLIC_` nên không bao giờ xuống bundle
 client — có `npm run check:bundle` gác việc này, chạy được ở CI.
+
+### 2.2b Region của function — `sin1`, không phải mặc định
+
+`SOURCE/vercel.json` ghim `"regions": ["sin1"]` (Singapore). Đây KHÔNG phải tuỳ
+chọn thẩm mỹ, và cũng không phải phỏng đoán — đo ngày 2026-08-04:
+
+| | |
+| --- | --- |
+| Supabase prod | `ap-southeast-1` / Singapore (IPv6 của `db.<ref>.supabase.co` thuộc dải AWS Asia Pacific `2406:da1a::`; TTFB từ VN ≈ 95ms) |
+| Function Vercel lúc đầu | `iad1` — **US East**, mặc định của Vercel |
+| TTFB `/` từ VN khi ở iad1 | ~420ms (đã warm, đo 4 lần) |
+
+Mọi route trong app đều là dynamic (ƒ) và hầu hết đều hỏi Supabase ít nhất một
+lần, nên mỗi request đang đi: người dùng VN → iad1 (Mỹ) → Supabase (Singapore) →
+ngược lại. Vượt Thái Bình Dương hai lần cho một truy vấn mà cả người dùng lẫn DB
+đều ở Đông Nam Á.
+
+`sin1` đặt function cạnh DB **và** cạnh người dùng cùng lúc. Hobby plan cho chọn
+một region, đúng bằng những gì cần ở đây.
+
+⚠ Nếu sau này đổi Supabase project sang region khác, phải sửa lại dòng này cho
+khớp — để lệch thì mất đúng phần lợi vừa lấy được.
 
 ### 2.3 Deploy
 
@@ -168,6 +216,16 @@ Sau khi domain sống, quay lại **3.1 cập nhật Site URL**.
 - [ ] `/admin` nhận đúng quyền admin, và từ chối tài khoản thường
 - [ ] Response headers có `Content-Security-Policy` và `Strict-Transport-Security`
       (HSTS chỉ xuất hiện khi `NODE_ENV=production` — tức là trên Vercel, không có ở local)
+- [ ] `X-Vercel-Id` ở response có dạng `sin1::sin1::…` (function đã chạy đúng
+      region — xem 2.2b). Thấy `iad1` ở vế thứ hai là `vercel.json` chưa ăn.
+- [ ] `/robots.txt` và `/sitemap.xml` trả 200, trỏ về đúng domain (không phải
+      `localhost` — nếu sai thì thiếu `NEXT_PUBLIC_SITE_URL`)
+- [ ] `/opengraph-image` trả **200 image/png**, KHÔNG phải 307. Bị 307 nghĩa là
+      matcher trong `proxy.ts` lại chặn nó và mọi link chia sẻ sẽ mất ảnh preview.
+- [ ] Dán link site vào Zalo/Messenger → hiện thẻ preview có logo + tiêu đề
+- [ ] Favicon trên tab là logo PAGS (không phải logo Next.js)
+- [ ] Vào một URL không tồn tại khi ĐANG đăng nhập → thấy trang 404 theo theme
+      (chưa đăng nhập sẽ bị proxy đẩy về `/` trước, không tới được 404)
 
 ---
 
@@ -193,8 +251,9 @@ Không phải bug, nhưng cần biết trước khi có người dùng thật:
    Hai việc cần làm nếu gặp:
    - Giữ **fluid compute BẬT** (Settings → Functions). Tắt đi là rơi về trần cũ
      thấp hơn nhiều và đường upload gãy ngay.
-   - Đặt `export const maxDuration = 300` ở route/action tương ứng cho tường minh
-     — hiện code KHÔNG export `maxDuration` ở đâu cả, đang sống nhờ mặc định.
+   - ~~Đặt `export const maxDuration = 300` ở route/action tương ứng~~ — **đã
+     làm 2026-08-04**, ở `app/(layer4)/upload/page.tsx` (Server Action kế thừa
+     cấu hình segment của route gọi nó). Không còn sống nhờ mặc định nữa.
 
 3. **`serverExternalPackages: ["mupdf", "sharp"]`** — hai package này require ở
    runtime chứ không bundle. File tracing của Vercel thường bắt được, nhưng nếu

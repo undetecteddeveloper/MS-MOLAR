@@ -12,6 +12,35 @@ mục khi đã trả nợ (ghi lại trong PROCESS.md).
 
 ## Đang mở
 
+### TD-010 — 2 lỗi `react-hooks` trong source, nên bước lint ở CI không chặn được
+**Từ:** 2026-08-04 (khi dựng `.github/workflows/ci.yml`)
+**Loại:** cổng chất lượng chưa siết được
+
+Sau khi thêm `.next-build/**` vào `globalIgnores` (trước đó `npm run lint` đi
+lint cả output đã minify → ~18.8k lỗi giả, che sạch lỗi thật nên lệnh này coi
+như không dùng được), source lộ ra đúng 2 lỗi + 1 cảnh báo:
+
+| File | Rule | Nội dung |
+| --- | --- | --- |
+| `app/(layer2)/_components/ExamTimer.tsx:23` | `react-hooks/refs` | gán `onTimeUpRef.current` ngay trong thân render (latest-ref pattern) |
+| `components/ui/SuccessToast.tsx:34` | `react-hooks/set-state-in-effect` | `setVisible(true)` trong thân effect để phát lại animation mỗi lần `trigger` đổi |
+| `components/pdf/AttemptPdfTemplate.tsx:30` | `@next/next/no-img-element` | cảnh báo, cố ý — template chụp bằng html2canvas không dùng được `next/image` |
+
+**Vì sao chưa sửa:** cả hai đều là code đang chạy đúng, và cái thứ nhất nằm trên
+đường bấm giờ làm bài (hết giờ → tự nộp). Sửa đúng cách là đổi cấu trúc
+component chứ không phải thêm `eslint-disable`; việc đó cần một phiên riêng có
+kiểm chứng trên trình duyệt thật, không nên độn vào lượt dựng CI.
+
+**Hệ quả đang chịu:** bước `ESLint` trong CI đặt `continue-on-error: true`. Log
+vẫn hiện đủ, nhưng lint KHÔNG chặn được merge — chỉ `tsc`, `vitest` và
+`check:bundle` mới chặn. Nghĩa là lỗi lint mới sẽ lẫn vào giữa 2 lỗi cũ này mà
+không ai thấy.
+
+**Cách trả:** sửa 2 file trên (ExamTimer: chuyển gán ref vào `useEffect`;
+SuccessToast: bỏ state trung gian, dùng `key` để remount hoặc dẫn xuất từ
+`trigger`), chạy lại test bấm giờ + toast, rồi **bỏ `continue-on-error` khỏi
+ci.yml** — đó mới là lúc nợ này được trả.
+
 ### TD-008 — Rate limit nằm trong RAM tiến trình, không dùng chung giữa instance
 **Từ:** 2026-08-03 (bản vá Security review Low)
 **Loại:** phòng thủ chỉ đúng một phần
@@ -34,6 +63,9 @@ sang Redis/Upstash hoặc một bảng Postgres. Đừng nhầm cái hiện tạ
 ### TD-009 — `ADMIN_USER_IDS` là cấu hình bắt buộc, không có ở đâu ngoài env
 **Từ:** 2026-08-03 (bản vá Security review Medium #7)
 **Loại:** cấu hình ngầm
+**Trạng thái:** đã trả một nửa (2026-08-04) — `SOURCE/.env.example` nay liệt kê
+đủ biến kèm ghi chú; vẫn CHƯA có check lúc khởi động, nên quên biến thì tính
+năng vẫn im lặng biến mất chứ không báo.
 
 Trang `/admin` chỉ hoạt động khi biến môi trường `ADMIN_USER_IDS` chứa user id
 (UUID Supabase, phân cách bằng dấu phẩy). Không đặt → không ai là admin →
