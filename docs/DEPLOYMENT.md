@@ -160,10 +160,21 @@ Không phải bug, nhưng cần biết trước khi có người dùng thật:
    và cold start reset bộ đếm. Bản thân file đã ghi rõ điều này. Muốn siết thật thì
    dùng rate limit ở biên (Vercel Firewall / Cloudflare) hoặc chuyển sang Redis.
 
-2. **UGC extract có thể chạm trần thời gian.** `extractQuestions` đặt deadline 150s
-   (commit `f3e4102`). Vercel Hobby giới hạn function 60s, Pro 300s. **Hobby sẽ
-   timeout trước khi code kịp timeout** → cần Pro plan, hoặc chuyển extract sang
-   background job.
+2. **UGC extract nằm gần trần thời gian function.** `FATAL_CALL_DEADLINE_MS = 150s`
+   (`lib/ugc/gemini.ts:99`, commit `f3e4102`) là deadline cho RIÊNG call Gemini.
+   Với fluid compute (Vercel bật mặc định) trần function là **300s ở cả Hobby lẫn
+   Pro** — nên 150s vừa đủ, KHÔNG cần nâng plan.
+
+   Nhưng biên mỏng hơn con số gợi ý: 300s phải bọc TOÀN BỘ Server Action —
+   upload file, mupdf parse, extractQuestions (≤150s), extractAnswers (≤150s
+   nữa), rồi ghi DB. Hai lần extract nối tiếp là đã 300s. Nếu `/upload` chết
+   im lặng với đề dài, đây là nghi phạm số một.
+
+   Hai việc cần làm nếu gặp:
+   - Giữ **fluid compute BẬT** (Settings → Functions). Tắt đi là rơi về trần cũ
+     thấp hơn nhiều và đường upload gãy ngay.
+   - Đặt `export const maxDuration = 300` ở route/action tương ứng cho tường minh
+     — hiện code KHÔNG export `maxDuration` ở đâu cả, đang sống nhờ mặc định.
 
 3. **`serverExternalPackages: ["mupdf", "sharp"]`** — hai package này require ở
    runtime chứ không bundle. File tracing của Vercel thường bắt được, nhưng nếu
