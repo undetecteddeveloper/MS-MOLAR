@@ -3551,3 +3551,44 @@ Engineer: "Website đã được deploy trên Vercel. Kiểm tra xem có gì cò
 - Preview deployment dùng để kiểm region (`ms-molar-883wd4vjd-…`) vẫn còn trên Vercel, `X-Robots-Tag: noindex`, để lại vô hại — xoá bằng `vercel remove` nếu muốn dọn.
 - Chưa đo lại TTFB sau khi đổi sang `sin1` trên PRODUCTION (preview không đo được vì 500 do thiếu env). Sau khi push nên đo lại `/` để xác nhận con số thực sự giảm từ ~420ms.
 - Nợ bảo mật RLS column-level từ S#44 vẫn còn nguyên, không đụng tới trong phiên này.
+
+---
+
+# [Deploy] — Đưa đợt rà soát lên production, nối OAuth cho project prod, phát hiện bug xoá đề (S#46, 2026-08-04, branch `main`)
+
+## Yêu cầu
+Nối tiếp S#45. Engineer báo Google/Facebook sign-in trả `"Unsupported provider: provider is not enabled"`, nhờ xử lý; sau đó yêu cầu "sắp xếp bốn việc còn treo theo mức độ quan trọng với việc vận hành và làm luôn cả bốn".
+
+## OAuth — nguyên nhân và cách xử lý
+Project Supabase **prod** (`pebjdlbgbmizgfpuptjl`) là project MỚI, tách hẳn khỏi project **dev** (`hynwleaxtbtjzkvpjsug`) nơi OAuth đã cấu hình xong từ S#23. **Cấu hình provider không tự sao chép sang project mới** — đó là toàn bộ nguyên nhân. Agent KHÔNG có quyền vào Supabase Dashboard / Google Cloud Console / Meta for Developers, nên chỉ hướng dẫn từng bước; engineer tự thao tác:
+1. Google Cloud Console → dùng LẠI OAuth Client cũ, THÊM redirect URI `https://pebjdlbgbmizgfpuptjl.supabase.co/auth/v1/callback` (giữ URI dev — một Client nhận nhiều URI).
+2. Google ẩn hẳn client secret cũ ("Viewing and downloading client secrets is no longer available") → phải `+ Add secret` tạo secret mới, copy ngay lúc hiện.
+3. Meta → app MS-MOLAR → Trường hợp sử dụng → Đăng nhập bằng Facebook → thêm cùng URI vào "URI chuyển hướng OAuth hợp lệ".
+4. Supabase prod → Authentication → **Sign In / Providers** (KHÔNG phải "OAuth Apps" — mục đó là Supabase đóng vai provider cho bên thứ ba, engineer vào nhầm chỗ này một lần) → bật Google + Facebook, dán ID/Secret.
+Kết quả: engineer xác nhận cả hai phương thức chạy được.
+
+## Bốn việc treo — thứ tự đã chốt và kết quả
+1. **Push (nền tảng)** — 5 commit từ S#45 vẫn nằm ở working tree, production vẫn là bản cũ. Đã tách thành 5 commit theo chủ đề rồi push `main`. Đo lại trên domain thật: `X-Vercel-Id` từ `sin1::iad1` → **`sin1::sin1`**, TTFB `/` từ ~420ms → **~210ms** (3 lần đo). robots/sitemap/opengraph-image/icon/favicon đều 200.
+2. **Admin** — tra `auth.users` prod qua Admin API (service-role): đúng 3 tài khoản. Engineer chọn cấp quyền cho `smithnguyen247@gmail.com` (`a5b86928-…`). Đặt `ADMIN_USER_IDS` scope Production + redeploy (đổi env var KHÔNG tự rebuild). Xác nhận tài khoản test bị chặn đúng (404).
+3. **Smoke test** — chạy Playwright trên domain thật bằng tài khoản test. Luồng chính OK: đăng nhập → upload PDF → **Gemini + mupdf + sharp chạy được trên serverless, crop hình thành công** → publish → làm bài (timer + KaTeX OK) → chấm đúng 5.0/10 → trang chi tiết đúng. **Nhưng phát hiện bug xoá đề (mục dưới).**
+4. **Preview deploy** — 3 biến Supabase chỉ có scope Production → preview 500 ở mọi route động. Đã thêm 3 biến scope Preview trỏ project **dev** (không phải prod — preview của mọi branch mà ghi vào DB thật là đúng thứ quyết định "project riêng cho prod" dựng lên để tránh). Verify bằng preview deploy thật: 200, CSP hiện đúng origin dev.
+
+## BUG phát hiện được — chỉ lộ vì lần này đề ĐÃ CÓ người làm bài
+Hai lỗi chồng nhau, đều có sẵn từ trước, không phải do đợt thay đổi này:
+1. **Thiếu `on delete`**: `exam_attempts.exam_id → exams(id)` và `attempt_answers.question_id → questions(id)` khai từ §L2 mà không có `on delete` → mặc định NO ACTION. Ngay khi có MỘT lượt làm bài, tác giả **vĩnh viễn không xoá được đề của mình** (`deleteExam` chết ở bước xoá questions với 23503). Các lần xoá ở S#43 thành công vì đề chưa ai đụng — nên bug sống im từ lúc dựng §L2.
+2. **Thứ tự xoá phá dữ liệu**: `deleteExam` xoá Storage TRƯỚC các lệnh DB có thể fail, không rollback. Khi (1) làm DB fail → **đề vẫn `published` nhưng ảnh bay sạch**. Đã kiểm chứng bằng service-role: cả 2 bucket về 0 object, questions + exams còn nguyên, câu 2 còn chữ "như hình vẽ bên" mà không còn hình.
+
+Chi tiết đáng ghi về cách phát hiện: lần bấm Delete đầu tiên tưởng là "thất bại im lặng" vì snapshot ngay sau khi bấm thấy dialog đóng, list không đổi. Thực ra **có** thông báo lỗi ("Could not delete the questions. Try again.") nhưng nó render BÊN TRONG dialog và xuất hiện chậm hơn snapshot. Phải bấm lại lần hai, snapshot đúng node dialog mới thấy. Bài học: đừng kết luận "im lặng" từ một lần snapshot sớm.
+
+**Cách vá:** cascade (không phải chặn xoá) — vì hai bảng dữ liệu-người-dùng-khác đã gắn với đề từ trước, `exam_reports` (§3) và `exam_difficulty_ratings` (§12), ĐỀU đã `on delete cascade`. Ý đồ thiết kế sẵn có là "xoá đề thì mọi thứ phái sinh đi theo"; hai khoá này chỉ bị bỏ sót. `exam_results` không cần đụng (đã cascade qua `attempt_id`). Thêm §15 (khối alter idempotent cho DB đã dựng) + sửa định nghĩa gốc §L2 cho DB dựng mới. Đảo thứ tự `deleteExam`: DB trước, Storage sau — không transaction nào bao được cả hai (Storage ngoài Postgres) nên chọn chiều fail ít hại hơn (fail sớm = chưa mất gì; fail muộn = file mồ côi, không ai thấy).
+
+## Verify & kết quả
+`tsc --noEmit` sạch · 348/348 vitest pass · eslint sạch trên file sửa · production deploy Ready. 7 commit đã push `main`: `2e6bfbc`(seo) `8469aeb`(error pages) `de7df7a`(region+maxDuration) `d0689b8`(ci) `3c30c98`(docs) `e35e240`(fix xoá đề) `6d1a6d1`(docs preview).
+
+## CÒN NỢ / lưu ý cho phiên sau
+- **[CHẶN] Migration §15 CHƯA ÁP lên DB prod.** Agent không có management token lẫn DB password → không chạy được DDL. Engineer phải paste khối alter §15 vào Supabase prod SQL Editor. **Cho tới lúc đó bug xoá đề vẫn còn nguyên trên production** (phần code đã vá nên không còn phá ảnh nữa, nhưng vẫn không xoá được).
+- **Đề test hỏng còn nằm trong DB prod**: `KIEM TRA THU NGHIEM BBOX` (`ugc-4dc7cd29-…`), đang `published`, đã mất hết ảnh, có 2 attempt. Áp §15 xong thì xoá được bằng chính nút Delete trên `/me/exams` — và đó cũng là cách verify bản vá.
+- `ADMIN_USER_IDS` mất scope Preview khi agent `vercel env rm` + `add` lại (Vercel rm gỡ cả hai scope chứ không chỉ scope chỉ định). Hệ quả nhỏ: `/admin` trên preview luôn 404. Cần thì thêm lại với uuid của user trong project DEV.
+- **TD-011 (mới)**: `verify-schema.ts` không soi được `on delete` của khoá ngoại — nó cố ý chỉ-đọc, mà cách duy nhất quan sát cascade từ client là thật sự xoá. Bug này đi lọt qua tsc + test + `verify:schema`. Trả nợ cần đường chạy SQL đọc `information_schema.referential_constraints`.
+- Engineer CHƯA tự đăng nhập tài khoản chính để xác nhận `/admin` mở được (agent cố ý không dùng tài khoản thật).
+- Nợ bảo mật RLS column-level từ S#44 vẫn còn nguyên.
