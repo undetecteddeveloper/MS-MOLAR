@@ -36,18 +36,38 @@ trigger `user_profiles`, và storage policies (§8).
 
 ### 1.3 Tạo storage buckets
 
-Script đọc key từ `SOURCE/.env.local`, nên phải tạm trỏ file đó sang project prod:
+Script đọc key từ `SOURCE/.env.local`, nên phải tạm trỏ file đó sang project prod.
 
-```bash
+**PowerShell** (shell mặc định trên máy này — `mv`/`cp` là alias của
+`Move-Item`/`Copy-Item`; `Move-Item` KHÔNG tự ghi đè, phải thêm `-Force` khi
+trả file về, nếu không sẽ gặp lỗi "Cannot create a file when that file
+already exists"):
+
+```powershell
 cd SOURCE
-# Backup .env.local dev trước khi sửa
-cp .env.local .env.local.dev-backup
+Copy-Item .env.local .env.local.dev-backup   # backup dev trước khi sửa
 # Sửa .env.local → điền URL + service role key của project PROD
 npx tsx supabase/setup-storage.ts   # tạo exam-images, exam-uploads (private)
 npx tsx supabase/verify-schema.ts   # xác nhận schema khớp
-# Trả .env.local về dev
-mv .env.local.dev-backup .env.local
+Move-Item .env.local.dev-backup .env.local -Force   # trả về dev, -Force bắt buộc
 ```
+
+**Git Bash / macOS / Linux**:
+
+```bash
+cd SOURCE
+cp .env.local .env.local.dev-backup
+# Sửa .env.local → điền URL + service role key của project PROD
+npx tsx supabase/setup-storage.ts
+npx tsx supabase/verify-schema.ts
+mv .env.local.dev-backup .env.local   # cp/mv Unix ghi đè mặc định, không cần -f
+```
+
+⚠ Cả hai script đọc key TẠI THỜI ĐIỂM CHẠY — nếu quên bước "sửa .env.local"
+ở giữa, script sẽ chạy nhầm vào project dev. Không nguy hiểm (bucket tạo
+idempotent, bỏ qua nếu đã tồn tại) nhưng vô nghĩa: kiểm tra lại bằng
+`curl "$URL/storage/v1/bucket" -H "apikey: $KEY"` xem bucket có xuất hiện ở
+đúng project prod chưa.
 
 Cả 2 bucket đều `public=false`; quyền đọc/ghi do RLS trên `storage.objects` quyết định.
 
