@@ -1,4 +1,3 @@
-import path from "node:path";
 import type { NextConfig } from "next";
 import { LIMITS } from "./lib/ugc/limits";
 
@@ -88,12 +87,15 @@ const nextConfig: NextConfig = {
   // `.next` của dev server → trạng thái trộn lẫn từng làm dev server chết /
   // lỗi manifest (gotcha đã ghi trong PROCESS). `next start` cũng chạy với
   // NODE_ENV=production nên đọc đúng `.next-build`.
-  distDir: process.env.NODE_ENV === "production" ? ".next-build" : ".next",
-  // Root nằm ở thư mục cha (TrangNguyenDigi) để Turbopack/next-font đọc được
-  // font trong `ASSETS/` — theo UI-LAYER-MAP Mục 11 (static asset sống ở ASSETS/).
-  turbopack: {
-    root: path.join(process.cwd(), ".."),
-  },
+  //
+  // TRỪ trên Vercel: ở đó không có dev server nào để tránh đè, nên lý do tách
+  // biến mất — trong khi build cache của Vercel lại gắn cứng với `.next/cache`.
+  // Giữ `.next-build` trên Vercel = mất cache mỗi lần deploy (build chậm hơn)
+  // đổi lấy con số không. `VERCEL` là env var Vercel luôn đặt sẵn.
+  distDir:
+    process.env.NODE_ENV === "production" && !process.env.VERCEL
+      ? ".next-build"
+      : ".next",
   // mupdf (WASM) + sharp (native) KHÔNG được để Turbopack bundle vào server
   // build — phải require ở runtime, nếu không file .wasm/.node không nạp được
   // (mupdf.Document.openDocument throw → "the PDF could not be read").
