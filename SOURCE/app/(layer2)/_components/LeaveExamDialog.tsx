@@ -7,6 +7,7 @@
 // "Cancel" outline phụ. Esc hoặc click scrim = Cancel.
 
 import { useEffect } from "react";
+import { useT } from "@/lib/i18n/client";
 
 interface LeaveExamDialogProps {
   open: boolean;
@@ -14,11 +15,8 @@ interface LeaveExamDialogProps {
   onLeave: () => void;
 }
 
-export function LeaveExamDialog({
-  open,
-  onCancel,
-  onLeave,
-}: LeaveExamDialogProps) {
+export function LeaveExamDialog({ open, onCancel, onLeave }: LeaveExamDialogProps) {
+  const t = useT();
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) {
@@ -44,31 +42,27 @@ export function LeaveExamDialog({
         onClick={onCancel}
         className="absolute inset-0 cursor-default bg-[#1B1512]/40"
       />
-      <div className="relative w-full max-w-sm rounded-lg border border-border bg-background p-6">
-        <h2
-          id="leave-exam-title"
-          className="font-serif text-xl text-foreground"
-        >
-          Leave this exam?
+      <div className="border-border bg-background relative w-full max-w-sm rounded-lg border p-6">
+        <h2 id="leave-exam-title" className="text-foreground font-serif text-xl">
+          {t("player.leaveTitle")}
         </h2>
-        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          Your answers haven&apos;t been submitted yet. If you leave now, the
-          progress of this attempt will be lost.
+        <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
+          {t("player.leaveBody")}
         </p>
         <div className="mt-6 flex justify-end gap-3">
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-[4px] border border-border px-4 py-2 text-xs font-medium uppercase tracking-[0.14em] text-foreground transition-colors hover:bg-accent"
+            className="border-border text-foreground hover:bg-accent rounded-[4px] border px-4 py-2 text-xs font-medium tracking-[0.14em] uppercase transition-colors"
           >
-            Cancel
+            {t("common.cancel")}
           </button>
           <button
             type="button"
             onClick={onLeave}
-            className="rounded-[4px] bg-brand px-4 py-2 text-xs font-medium uppercase tracking-[0.14em] text-brand-foreground transition-opacity hover:opacity-90"
+            className="bg-brand text-brand-foreground rounded-[4px] px-4 py-2 text-xs font-medium tracking-[0.14em] uppercase transition-opacity hover:opacity-90"
           >
-            Leave
+            {t("player.leave")}
           </button>
         </div>
       </div>

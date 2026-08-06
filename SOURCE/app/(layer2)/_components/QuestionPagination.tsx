@@ -3,6 +3,12 @@
 // một ô vuông — đang xem = viền 2px accent, đã làm = nền brand, chưa làm =
 // hairline; câu đánh dấu có chấm nhỏ ở góc trên-phải.
 // (Swipe cho mobile — UI-LAYER-MAP 8.2 — xử lý ở ExamPlayer.)
+//
+// KHÔNG có "use client" nhưng đây LÀ client component: nó nhận prop `onJump`
+// là hàm, nên chỉ render được bên trong ranh giới client của ExamPlayer. Vì
+// vậy phải tra từ điển bằng `useT()`, không dùng `getTranslate()` của server.
+
+import { useT } from "@/lib/i18n/client";
 
 interface QuestionPaginationProps {
   current: number; // index 0-based của câu đang xem
@@ -21,12 +27,13 @@ export function QuestionPagination({
   flaggedIndices,
   onJump,
 }: QuestionPaginationProps) {
+  const t = useT();
   const answered = new Set(answeredIndices);
   const flagged = new Set(flaggedIndices);
 
   return (
-    <div className="rounded-lg border border-border p-5">
-      <div className="eyebrow mb-3.5">Questions</div>
+    <div className="border-border rounded-lg border p-5">
+      <div className="eyebrow mb-3.5">{t("common.questions")}</div>
       <nav>
         <ol className="grid grid-cols-4 gap-2">
           {Array.from({ length: total }, (_, i) => {
@@ -44,17 +51,17 @@ export function QuestionPagination({
                   }`}
                   className={`relative flex aspect-square w-full items-center justify-center rounded text-sm tabular-nums transition-colors ${
                     isCurrent
-                      ? "border-2 border-ring text-foreground"
+                      ? "border-ring text-foreground border-2"
                       : isAnswered
-                        ? "border border-transparent bg-brand text-brand-foreground hover:opacity-90"
-                        : "border border-border text-muted-foreground hover:border-ring/50 hover:text-foreground"
+                        ? "bg-brand text-brand-foreground border border-transparent hover:opacity-90"
+                        : "border-border text-muted-foreground hover:border-ring/50 hover:text-foreground border"
                   }`}
                 >
                   {i + 1}
                   {isFlagged && (
                     <span
                       aria-hidden
-                      className="absolute -top-1 -right-1 size-2 rounded-full bg-ring ring-2 ring-background"
+                      className="bg-ring ring-background absolute -top-1 -right-1 size-2 rounded-full ring-2"
                     />
                   )}
                 </button>

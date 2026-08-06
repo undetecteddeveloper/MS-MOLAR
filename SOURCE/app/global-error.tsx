@@ -26,6 +26,10 @@ export default function GlobalError({
   }, [error]);
 
   return (
+    // `lang="en"` cố định ở đây là CỐ Ý, không phải sót lượt i18n: file này
+    // thay thế toàn bộ cây <html> nên I18nProvider của root layout không còn
+    // tồn tại, và nội dung bên dưới cũng luôn là tiếng Anh. Khai đúng thứ tiếng
+    // đang thực sự hiển thị vẫn tốt hơn khai theo cookie rồi đọc sai giọng.
     <html lang="en">
       <body
         style={{
@@ -60,8 +64,7 @@ export default function GlobalError({
           </h1>
 
           <p style={{ margin: "0.75rem 0 0", fontSize: "0.95rem", opacity: 0.75 }}>
-            Reloading usually clears this. If it keeps happening, try again in a
-            few minutes.
+            Reloading usually clears this. If it keeps happening, try again in a few minutes.
           </p>
 
           {error.digest && (

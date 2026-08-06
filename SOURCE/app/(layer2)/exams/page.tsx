@@ -31,11 +31,7 @@ type SearchParams = Promise<{
   dir?: string;
 }>;
 
-export default async function ExamsPage({
-  searchParams,
-}: {
-  searchParams: SearchParams;
-}) {
+export default async function ExamsPage({ searchParams }: { searchParams: SearchParams }) {
   const sp = await searchParams;
   const subject = sp.subject || undefined;
   const grade = sp.grade ? Number(sp.grade) : undefined;
@@ -47,18 +43,13 @@ export default async function ExamsPage({
   // vốn là no-op). Giá trị lạ → undefined (Field Propagation Map: "unknown
   // value → no sort", không crash, không lọc/sort ngoài ý muốn).
   const sort: ExamSort | undefined =
-    sp.sort === "newest" || sp.sort === "oldest" || sp.sort === "hardest"
-      ? sp.sort
-      : undefined;
+    sp.sort === "newest" || sp.sort === "oldest" || sp.sort === "hardest" ? sp.sort : undefined;
   // Level — lowercase slug (IP-6), giá trị lạ → undefined ("no Level filter applied").
   const level: ExamLevel | undefined =
-    sp.level === "easy" || sp.level === "medium" || sp.level === "hard"
-      ? sp.level
-      : undefined;
+    sp.level === "easy" || sp.level === "medium" || sp.level === "hard" ? sp.level : undefined;
   // Direction toggle (ExamFilters) — đảo chiều trục `sort` đang chọn; giá trị
   // lạ → undefined (dùng chiều mặc định của trục, giữ hành vi cũ).
-  const dir: SortDirection | undefined =
-    sp.dir === "asc" || sp.dir === "desc" ? sp.dir : undefined;
+  const dir: SortDirection | undefined = sp.dir === "asc" || sp.dir === "desc" ? sp.dir : undefined;
 
   const [exams, facets, submittedExamIds, user] = await Promise.all([
     listExams({ subject, grade, school, schoolYear: year, semester, sort, level, dir }),
@@ -72,6 +63,12 @@ export default async function ExamsPage({
     // lấy từ biến mặc định ở :root (globals.css).
     <div className="bg-background">
       <main className="mx-auto w-full max-w-6xl">
+        {/* Trang này CỐ Ý không có tiêu đề nhìn thấy được — bố cục là bộ lọc +
+            lưới thẻ, thêm chữ "Exams" to sẽ thừa. Nhưng đây là trang duy nhất
+            của site không có <h1> nào, nên người dùng trình đọc màn hình mất mốc
+            định vị và mất luôn khả năng nhảy theo tiêu đề (WCAG 1.3.1 / 2.4.6).
+            sr-only giữ nguyên thiết kế mà vẫn trả lại mốc đó. */}
+        <h1 className="sr-only">Exams</h1>
         {/* MỘT block căn giữa: *Filter (trái, sticky, overlay) + lưới ExamCard
             tối đa 3 cột (phải, flex-1). mx-auto của <main> giữ block căn giữa. */}
         <div className="relative flex items-start">

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { getTranslate } from "@/lib/i18n/server";
 
 // Trang 404 toàn site. Trước đây rơi vào bản mặc định của Next.js (chữ đen
 // trên nền trắng, font hệ thống) — lạc hẳn khỏi theme "Mực & Sơn mài".
@@ -13,32 +14,32 @@ export const metadata: Metadata = {
   title: "Page not found",
 };
 
-export default function NotFound() {
+export default async function NotFound() {
+  const t = await getTranslate();
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center bg-background px-6 py-16 text-center">
-      <p className="font-mono text-sm uppercase tracking-[0.28em] text-brand">404</p>
+    <main className="bg-background flex min-h-dvh flex-col items-center justify-center px-6 py-16 text-center">
+      <p className="text-brand font-mono text-sm tracking-[0.28em] uppercase">404</p>
 
-      <h1 className="mt-5 font-heading text-4xl text-foreground sm:text-5xl">
-        This page doesn&apos;t exist
+      <h1 className="font-heading text-foreground mt-5 text-4xl sm:text-5xl">
+        {t("error.notFound")}
       </h1>
 
-      <p className="mt-4 max-w-md text-sm leading-relaxed text-muted-foreground">
-        The link may be broken, or the exam may have been unpublished or deleted
-        by its author.
+      <p className="text-muted-foreground mt-4 max-w-md text-sm leading-relaxed">
+        {t("error.notFoundBody")}
       </p>
 
       <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
         <Link
           href="/exams"
-          className="rounded-[4px] bg-brand px-5 py-2.5 text-xs font-medium uppercase tracking-[0.14em] text-brand-foreground transition-opacity hover:opacity-90"
+          className="bg-brand text-brand-foreground rounded-[4px] px-5 py-2.5 text-xs font-medium tracking-[0.14em] uppercase transition-opacity hover:opacity-90"
         >
-          Browse exams
+          {t("common.browseExams")}
         </Link>
         <Link
           href="/"
-          className="rounded-[4px] border border-border px-5 py-2.5 text-xs font-medium uppercase tracking-[0.14em] text-foreground transition-colors hover:bg-secondary"
+          className="border-border text-foreground hover:bg-secondary rounded-[4px] border px-5 py-2.5 text-xs font-medium tracking-[0.14em] uppercase transition-colors"
         >
-          Home
+          {t("common.home")}
         </Link>
       </div>
     </main>

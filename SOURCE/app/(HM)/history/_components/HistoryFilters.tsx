@@ -1,4 +1,5 @@
 "use client";
+import { useT } from "@/lib/i18n/client";
 
 // HistoryFilters — front-adjust: inline filter trigger for /history, sitting
 // beside the "History" heading (engineer feedback: the earlier sticky
@@ -35,6 +36,7 @@ const OPTIONS_BG = "rgba(237, 225, 200, 0.99)";
 const SCRIM_BG = "rgba(27, 21, 18, 0.08)";
 
 export function HistoryFilters({ subjects, exams, selected }: HistoryFiltersProps) {
+  const t = useT();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -79,10 +81,10 @@ export function HistoryFilters({ subjects, exams, selected }: HistoryFiltersProp
       <div className="relative" data-pending={isPending ? "" : undefined}>
         <button
           type="button"
-          aria-label="Filters"
+          aria-label={t("common.filters")}
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
-          className="border-border bg-card hover:border-brand/40 flex items-center gap-2 rounded-xl border px-3 py-2 text-sm text-foreground transition-colors"
+          className="border-border bg-card hover:border-brand/40 text-foreground flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition-colors"
         >
           <Triangle open={open} />
           Filters
@@ -134,7 +136,7 @@ export function HistoryFilters({ subjects, exams, selected }: HistoryFiltersProp
                 min={0}
                 max={10}
                 step={0.1}
-                placeholder="Min"
+                placeholder={t("history.min")}
                 onCommit={(v) => setParam("scoreMin", v)}
               />
               <span className="text-muted-foreground text-xs">–</span>
@@ -144,7 +146,7 @@ export function HistoryFilters({ subjects, exams, selected }: HistoryFiltersProp
                 min={0}
                 max={10}
                 step={0.1}
-                placeholder="Max"
+                placeholder={t("history.max")}
                 onCommit={(v) => setParam("scoreMax", v)}
               />
             </RangeRow>
@@ -190,7 +192,7 @@ function FilterRow({
   const [rowOpen, setRowOpen] = useState(false);
 
   return (
-    <div className="relative border-border border-b">
+    <div className="border-border relative border-b">
       <button
         type="button"
         aria-expanded={rowOpen}

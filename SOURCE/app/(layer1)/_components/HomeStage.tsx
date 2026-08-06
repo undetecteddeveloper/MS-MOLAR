@@ -10,11 +10,13 @@
 // chốt vòng sửa 1) — hero trượt ra trái, form trượt vào từ phải.
 import Image from "next/image";
 import Link from "next/link";
+import { useT } from "@/lib/i18n/client";
 import { AuthForm } from "./AuthForm";
 
 export type AuthMode = "signin" | "signup" | null;
 
 export function HomeStage({ auth }: { auth: AuthMode }) {
+  const t = useT();
   const showAuth = auth !== null;
 
   return (
@@ -27,13 +29,11 @@ export function HomeStage({ auth }: { auth: AuthMode }) {
       <section
         inert={showAuth || undefined}
         className={`col-start-1 row-start-1 w-full self-center transition-all duration-500 ease-out ${
-          showAuth
-            ? "pointer-events-none -translate-x-6 opacity-0"
-            : "translate-x-0 opacity-100"
+          showAuth ? "pointer-events-none -translate-x-6 opacity-0" : "translate-x-0 opacity-100"
         }`}
       >
-        <p className="font-sans text-xs font-medium uppercase tracking-[0.2em] text-[#6B655C]">
-          Online exam practice platform
+        <p className="font-sans text-xs font-medium tracking-[0.2em] text-[color:var(--muted-foreground)] uppercase">
+          {t("home.eyebrow")}
         </p>
         {/* Copper rule-divider (40px × 2px) — DESIGN.md section-opening mark,
             at most one per viewport. */}
@@ -45,9 +45,8 @@ export function HomeStage({ auth }: { auth: AuthMode }) {
             18.5vw×18.5vh (16.5 +12%, S#26) + object-contain giữ tỉ lệ 715×650 (không méo).
             flex-wrap: màn quá hẹp thì logo xuống dòng thay vì tràn/bóp méo. */}
         <div className="mt-5 flex flex-wrap items-center gap-6 lg:gap-8">
-          <h1 className="min-w-0 max-w-3xl flex-1 basis-64 font-serif text-xl leading-[1.2] font-semibold tracking-tight text-[#1B1512] sm:text-3xl lg:text-4xl">
-            Multi-Subject &amp; Multi-Grade Online Learning Platform with
-            Digital Footprint Analytics and User-Generated Content Synthesis
+          <h1 className="max-w-3xl min-w-0 flex-1 basis-64 font-serif text-xl leading-[1.2] font-semibold tracking-tight text-[#1B1512] sm:text-3xl lg:text-4xl">
+            {t("home.headline")}
           </h1>
           <Image
             src="/images/brand_logo.png"
@@ -61,16 +60,15 @@ export function HomeStage({ auth }: { auth: AuthMode }) {
         </div>
 
         <p className="mt-5 max-w-xl font-sans text-sm leading-[1.7] text-[#1B1512]/80 sm:text-lg">
-          A{" "}
+          {t("home.bodyPart1")}
           <span className="border-b-2 border-[#B8863B] pb-0.5 font-medium text-[#1B1512]">
-            continuously updated
-          </span>{" "}
-          question bank for secondary and high school, with{" "}
+            {t("home.continuouslyUpdated")}
+          </span>
+          {t("home.bodyPart2")}
           <span className="border-b-2 border-[#B8863B] pb-0.5 font-medium text-[#1B1512]">
-            instant grading
-          </span>{" "}
-          and weakness analysis so you study the right things and improve
-          faster.
+            {t("home.instantGrading")}
+          </span>
+          {t("home.bodyPart3")}
         </p>
 
         <div className="mt-8">
@@ -78,11 +76,8 @@ export function HomeStage({ auth }: { auth: AuthMode }) {
             href="/exams"
             className="group inline-flex items-center gap-3 rounded-[4px] border-2 border-[#1B1512] px-8 py-3 font-sans text-xs font-medium tracking-[0.16em] text-[#1B1512] uppercase transition-colors hover:border-[#A62C2B] hover:bg-[#A62C2B] hover:text-[#EDE1C8]"
           >
-            Get started
-            <span
-              aria-hidden
-              className="transition-transform group-hover:translate-x-1"
-            >
+            {t("home.getStarted")}
+            <span aria-hidden className="transition-transform group-hover:translate-x-1">
               →
             </span>
           </Link>
@@ -93,16 +88,14 @@ export function HomeStage({ auth }: { auth: AuthMode }) {
       <section
         inert={!showAuth || undefined}
         className={`col-start-1 row-start-1 flex max-w-3xl flex-col self-center transition-all duration-500 ease-out ${
-          showAuth
-            ? "translate-x-0 opacity-100"
-            : "pointer-events-none translate-x-6 opacity-0"
+          showAuth ? "translate-x-0 opacity-100" : "pointer-events-none translate-x-6 opacity-0"
         }`}
       >
         <Link
           href="/"
-          className="mb-4 inline-flex items-center gap-2 self-start font-sans text-xs font-medium uppercase tracking-[0.16em] text-[#6B655C] transition-colors hover:text-[#1B1512]"
+          className="mb-4 inline-flex items-center gap-2 self-start font-sans text-xs font-medium tracking-[0.16em] text-[color:var(--muted-foreground)] uppercase transition-colors hover:text-[#1B1512]"
         >
-          <span aria-hidden>←</span> Back
+          <span aria-hidden>←</span> {t("common.back")}
         </Link>
         {/* key theo mode: deep-link ?auth=signup mở đúng tab (AuthForm giữ mode
             trong state nội bộ, chỉ đọc initialMode lúc mount). */}

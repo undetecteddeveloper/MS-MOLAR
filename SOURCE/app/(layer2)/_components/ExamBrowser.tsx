@@ -6,6 +6,7 @@
 // MỘT set submittedExamIds + isLoggedIn nhận từ ExamsPage — KHÔNG per-card
 // fetch (Minimal Surface Alternatives Element 1, frontend DD).
 
+import { getTranslate } from "@/lib/i18n/server";
 import type { Exam } from "@/types/exam";
 import { ExamCard } from "./ExamCard";
 import type { RateEligibility } from "./rating/RateButton";
@@ -16,14 +17,13 @@ interface ExamBrowserProps {
   isLoggedIn: boolean;
 }
 
-export function ExamBrowser({ exams, submittedExamIds, isLoggedIn }: ExamBrowserProps) {
+export async function ExamBrowser({ exams, submittedExamIds, isLoggedIn }: ExamBrowserProps) {
+  const t = await getTranslate();
   if (exams.length === 0) {
     return (
-      <div className="flex min-h-50 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border py-16 text-center">
-        <p className="font-serif text-lg text-foreground">No matching exams</p>
-        <p className="text-sm text-muted-foreground">
-          Try removing some filters to see more exams.
-        </p>
+      <div className="border-border flex min-h-50 flex-col items-center justify-center gap-2 rounded-lg border border-dashed py-16 text-center">
+        <p className="text-foreground font-serif text-lg">{t("exams.noMatch")}</p>
+        <p className="text-muted-foreground text-sm">{t("exams.noMatchHint")}</p>
       </div>
     );
   }

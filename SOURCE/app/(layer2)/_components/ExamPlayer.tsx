@@ -10,6 +10,7 @@
 
 import { useEffect, useRef, useTransition } from "react";
 import { submitExam } from "@/app/(layer2)/actions";
+import { useT } from "@/lib/i18n/client";
 import { ExamTimer } from "./ExamTimer";
 import { LeaveExamDialog } from "./LeaveExamDialog";
 import { QuestionRenderer } from "./QuestionRenderer";
@@ -35,8 +36,10 @@ export function ExamPlayer({
   questions,
   parts,
 }: ExamPlayerProps) {
-  const { current, answers, flags, selectAnswer, toggleFlag, goto, next, prev } =
-    useExamPlayer(questions.length);
+  const t = useT();
+  const { current, answers, flags, selectAnswer, toggleFlag, goto, next, prev } = useExamPlayer(
+    questions.length
+  );
   const [submitting, startSubmit] = useTransition();
   const submittedRef = useRef(false);
 
@@ -53,7 +56,7 @@ export function ExamPlayer({
     () => () => {
       if (advanceRef.current) clearTimeout(advanceRef.current);
     },
-    [],
+    []
   );
 
   // Mobile: vuốt trái → câu sau, vuốt phải → câu trước (gắn lên vùng đọc câu hỏi).
@@ -75,19 +78,14 @@ export function ExamPlayer({
   const question = questions[current];
 
   // v2.1: nhãn PHẦN của câu hiện tại (đề nhiều phần) — trên card câu hỏi.
-  const multiPart =
-    (parts?.length ?? 0) > 0 || questions.some((q) => (q.partNumber ?? 1) !== 1);
+  const multiPart = (parts?.length ?? 0) > 0 || questions.some((q) => (q.partNumber ?? 1) !== 1);
   const currentPartTitle = multiPart
     ? (parts?.find((p) => p.number === (question.partNumber ?? 1))?.title ??
       `Phần ${question.partNumber ?? 1}`)
     : null;
 
-  const answeredIndices = questions
-    .map((q, i) => (answers[q.id] ? i : -1))
-    .filter((i) => i >= 0);
-  const flaggedIndices = questions
-    .map((q, i) => (flags[q.id] ? i : -1))
-    .filter((i) => i >= 0);
+  const answeredIndices = questions.map((q, i) => (answers[q.id] ? i : -1)).filter((i) => i >= 0);
+  const flaggedIndices = questions.map((q, i) => (flags[q.id] ? i : -1)).filter((i) => i >= 0);
 
   // Nộp bài — chống gọi trùng (nút thủ công + auto-submit hết giờ).
   function submit() {
@@ -101,11 +99,7 @@ export function ExamPlayer({
   return (
     <div className="bg-background">
       {/* S#28: modal xác nhận rời trang (mở khi guard chặn một click nav). */}
-      <LeaveExamDialog
-        open={pendingHref !== null}
-        onCancel={cancelLeave}
-        onLeave={confirmLeave}
-      />
+      <LeaveExamDialog open={pendingHref !== null} onCancel={cancelLeave} onLeave={confirmLeave} />
 
       <main className="mx-auto flex w-full max-w-[1100px] flex-col gap-6 px-6 py-10">
         {/* Header — tên đề (trái) · đồng hồ + nút Nộp bài (phải). Không sticky:
@@ -116,23 +110,23 @@ export function ExamPlayer({
           style={{ "--preload-order": 1 } as React.CSSProperties}
         >
           <div>
-            <h1 className="font-serif text-2xl font-semibold text-foreground sm:text-3xl">
+            <h1 className="text-foreground font-serif text-2xl font-semibold sm:text-3xl">
               {examTitle}
             </h1>
-            <div className="mt-3 h-0.5 w-10 bg-ring" />
+            <div className="bg-ring mt-3 h-0.5 w-10" />
           </div>
           <div className="flex items-center gap-4">
-            <div className="min-w-[130px] rounded-md border border-border px-4 py-2 text-center">
-              <span className="eyebrow block">Time remaining</span>
+            <div className="border-border min-w-[130px] rounded-md border px-4 py-2 text-center">
+              <span className="eyebrow block">{t("player.timeRemaining")}</span>
               <ExamTimer durationMinutes={durationMinutes} onTimeUp={submit} />
             </div>
             <button
               type="button"
               onClick={submit}
               disabled={submitting}
-              className="rounded-md bg-brand px-5 py-3 text-xs font-medium tracking-[0.04em] text-brand-foreground uppercase transition-opacity hover:opacity-90 disabled:opacity-50"
+              className="bg-brand text-brand-foreground rounded-md px-5 py-3 text-xs font-medium tracking-[0.04em] uppercase transition-opacity hover:opacity-90 disabled:opacity-50"
             >
-              {submitting ? "Submitting…" : "Submit"}
+              {submitting ? t("player.submitting") : t("player.submit")}
             </button>
           </div>
         </div>
@@ -171,12 +165,12 @@ export function ExamPlayer({
               onToggleFlag={() => toggleFlag(question.id)}
             />
 
-            <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
+            <div className="border-border mt-4 flex items-center justify-between border-t pt-4">
               <button
                 type="button"
                 onClick={prev}
                 disabled={current === 0}
-                className="rounded-md border border-border px-4 py-2.5 text-xs font-medium tracking-[0.04em] text-foreground uppercase transition-colors hover:border-ring disabled:cursor-default disabled:opacity-40 disabled:hover:border-border"
+                className="border-border text-foreground hover:border-ring disabled:hover:border-border rounded-md border px-4 py-2.5 text-xs font-medium tracking-[0.04em] uppercase transition-colors disabled:cursor-default disabled:opacity-40"
               >
                 ← Previous
               </button>
@@ -184,14 +178,14 @@ export function ExamPlayer({
                 type="button"
                 onClick={next}
                 disabled={current === questions.length - 1}
-                className="rounded-md border border-border px-4 py-2.5 text-xs font-medium tracking-[0.04em] text-foreground uppercase transition-colors hover:border-ring disabled:cursor-default disabled:opacity-40 disabled:hover:border-border"
+                className="border-border text-foreground hover:border-ring disabled:hover:border-border rounded-md border px-4 py-2.5 text-xs font-medium tracking-[0.04em] uppercase transition-colors disabled:cursor-default disabled:opacity-40"
               >
-                Next →
+                {t("common.next")}
               </button>
             </div>
           </div>
 
-          <div className="w-full basis-[260px] sm:min-w-[240px] sm:w-auto">
+          <div className="w-full basis-[260px] sm:w-auto sm:min-w-[240px]">
             <QuestionPagination
               current={current}
               total={questions.length}

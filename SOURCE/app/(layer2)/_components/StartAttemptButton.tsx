@@ -6,17 +6,19 @@
 // hơn (#8F2523); bỏ glow shadow (quy tắc "không đổ bóng").
 
 import { startAttempt } from "@/app/(layer2)/actions";
+import { getTranslate } from "@/lib/i18n/server";
 
-export function StartAttemptButton({ examId }: { examId: string }) {
+export async function StartAttemptButton({ examId }: { examId: string }) {
+  const t = await getTranslate();
   const start = startAttempt.bind(null, examId);
 
   return (
     <form action={start}>
       <button
         type="submit"
-        className="w-full rounded-[4px] bg-brand px-6 py-3 font-medium text-brand-foreground transition-colors duration-200 hover:bg-[#8F2523] sm:w-auto sm:px-12"
+        className="bg-brand text-brand-foreground w-full rounded-[4px] px-6 py-3 font-medium transition-colors duration-200 hover:bg-[#8F2523] sm:w-auto sm:px-12"
       >
-        Start
+        {t("exams.start")}
       </button>
     </form>
   );

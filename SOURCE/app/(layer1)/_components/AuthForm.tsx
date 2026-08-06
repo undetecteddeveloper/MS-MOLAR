@@ -16,40 +16,27 @@
 // card giãn/nở mượt khi số field thay đổi giữa 2 tab, thay vì nhảy khựng.
 "use client";
 
-import {
-  useActionState,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react";
-import {
-  requestPasswordReset,
-  signIn,
-  signInWithOAuth,
-  signUp,
-  type AuthState,
-} from "../actions";
+import { useActionState, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { requestPasswordReset, signIn, signInWithOAuth, signUp, type AuthState } from "../actions";
+import { useT } from "@/lib/i18n/client";
 
 type Mode = "signin" | "signup";
 
 export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
+  const t = useT();
   const [mode, setMode] = useState<Mode>(initialMode);
   // View reset mật khẩu — đè lên form sign in/up; tab nào bấm cũng thoát reset.
   const [resetOpen, setResetOpen] = useState(false);
   const action = mode === "signin" ? signIn : signUp;
-  const [state, formAction, pending] = useActionState<AuthState, FormData>(
-    action,
-    null,
+  const [state, formAction, pending] = useActionState<AuthState, FormData>(action, null);
+  const [oauthState, oauthAction, oauthPending] = useActionState<AuthState, FormData>(
+    signInWithOAuth,
+    null
   );
-  const [oauthState, oauthAction, oauthPending] = useActionState<
-    AuthState,
-    FormData
-  >(signInWithOAuth, null);
-  const [resetState, resetAction, resetPending] = useActionState<
-    AuthState,
-    FormData
-  >(requestPasswordReset, null);
+  const [resetState, resetAction, resetPending] = useActionState<AuthState, FormData>(
+    requestPasswordReset,
+    null
+  );
 
   const isSignup = mode === "signup";
 
@@ -65,7 +52,7 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
           aria-hidden
           className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden"
         >
-          <div className="flex select-none font-serif leading-none text-[9rem] text-[#A62C2B]/[0.16] sm:text-[11rem]">
+          <div className="flex font-serif text-[9rem] leading-none text-[#A62C2B]/[0.16] select-none sm:text-[11rem]">
             <span className="-mr-4 sm:-mr-6">M</span>
             <span className="mt-10 sm:mt-14">S</span>
           </div>
@@ -78,7 +65,7 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
               setMode("signin");
               setResetOpen(false);
             }}
-            label="Sign in"
+            label={t("auth.signIn")}
           />
           <TabButton
             active={isSignup && !resetOpen}
@@ -86,7 +73,7 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
               setMode("signup");
               setResetOpen(false);
             }}
-            label="Sign up"
+            label={t("auth.signUp")}
           />
         </div>
       </div>
@@ -100,8 +87,8 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
           </div>
         </div>
 
-        <h1 className="mb-6 text-center text-2xl font-serif tracking-wide text-[#1B1512]">
-          {resetOpen ? "Reset password" : isSignup ? "Sign up" : "Sign in"}
+        <h1 className="mb-6 text-center font-serif text-2xl tracking-wide text-[#1B1512]">
+          {resetOpen ? t("auth.resetPassword") : isSignup ? t("auth.signUp") : t("auth.signIn")}
         </h1>
 
         {/* S#25: bọc toàn bộ phần THÂN thay đổi chiều cao (reset view ⇄
@@ -110,17 +97,14 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
             reset. h1 phía trên giữ nguyên (luôn 1 dòng, không cần đo). */}
         <AutoHeightPanel measureKey={resetOpen ? "reset" : mode}>
           {resetOpen ? (
-            <div className="duration-300 animate-in fade-in slide-in-from-right-3">
-              <p className="text-sm text-[#6B655C]">
-                Enter your account email and we&apos;ll send you a link to
-                reset your password.
-              </p>
+            <div className="animate-in fade-in slide-in-from-right-3 duration-300">
+              <p className="text-sm text-[color:var(--muted-foreground)]">{t("auth.resetIntro")}</p>
               <form action={resetAction} className="mt-5">
                 <Field
                   id="reset-email"
                   name="email"
                   type="email"
-                  placeholder="Email"
+                  placeholder={t("auth.email")}
                   required
                   icon={<MailIcon className="size-4" />}
                 />
@@ -130,7 +114,7 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
                   </p>
                 )}
                 {resetState?.info && (
-                  <p role="status" className="mt-4 text-sm text-[#6B655C]">
+                  <p role="status" className="mt-4 text-sm text-[color:var(--muted-foreground)]">
                     {resetState.info}
                   </p>
                 )}
@@ -138,16 +122,16 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
                   <button
                     type="button"
                     onClick={() => setResetOpen(false)}
-                    className="text-xs text-[#6B655C] transition-colors hover:text-[#1B1512]"
+                    className="text-xs text-[color:var(--muted-foreground)] transition-colors hover:text-[#1B1512]"
                   >
-                    ← Back to sign in
+                    {t("auth.backToSignIn")}
                   </button>
                   <button
                     type="submit"
                     disabled={resetPending}
-                    className="rounded-[4px] bg-[#A62C2B] px-7 py-2.5 text-xs font-medium uppercase tracking-[0.14em] text-[#EDE1C8] transition-colors hover:bg-[#8F2523] disabled:opacity-60"
+                    className="rounded-[4px] bg-[#A62C2B] px-7 py-2.5 text-xs font-medium tracking-[0.14em] text-[#EDE1C8] uppercase transition-colors hover:bg-[#8F2523] disabled:opacity-60"
                   >
-                    {resetPending ? "Sending…" : "Send reset link"}
+                    {resetPending ? t("common.sending") : t("auth.sendResetLink")}
                   </button>
                 </div>
               </form>
@@ -159,14 +143,14 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
                     xuất hiện/ẩn tự nhiên theo remount. */}
                 <div
                   key={mode}
-                  className="space-y-5 duration-300 animate-in fade-in slide-in-from-right-3"
+                  className="animate-in fade-in slide-in-from-right-3 space-y-5 duration-300"
                 >
                   {isSignup && (
                     <Field
                       id="displayName"
                       name="displayName"
                       type="text"
-                      placeholder="Display name"
+                      placeholder={t("common.displayName")}
                       icon={<UserIcon className="size-4" />}
                     />
                   )}
@@ -174,7 +158,7 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
                     id="email"
                     name="email"
                     type="email"
-                    placeholder="Email"
+                    placeholder={t("auth.email")}
                     required
                     icon={<MailIcon className="size-4" />}
                   />
@@ -182,7 +166,7 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
                     id="password"
                     name="password"
                     type="password"
-                    placeholder="Password"
+                    placeholder={t("auth.password")}
                     required
                     icon={<LockIcon className="size-4" />}
                   />
@@ -195,7 +179,7 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
                 )}
                 {/* info — message trung tính (vd signup cần xác nhận email, S#23). */}
                 {state?.info && (
-                  <p role="status" className="mt-4 text-sm text-[#6B655C]">
+                  <p role="status" className="mt-4 text-sm text-[color:var(--muted-foreground)]">
                     {state.info}
                   </p>
                 )}
@@ -204,17 +188,21 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
                   <button
                     type="button"
                     onClick={() => setResetOpen(true)}
-                    className="text-xs text-[#6B655C] transition-colors hover:text-[#1B1512]"
+                    className="text-xs text-[color:var(--muted-foreground)] transition-colors hover:text-[#1B1512]"
                   >
-                    Forgot password?
+                    {t("auth.forgotPassword")}
                   </button>
                   {/* button-primary DESIGN.md: nền đỏ son, chữ ngà, label-caps, bo 4px. */}
                   <button
                     type="submit"
                     disabled={pending}
-                    className="rounded-[4px] bg-[#A62C2B] px-7 py-2.5 text-xs font-medium uppercase tracking-[0.14em] text-[#EDE1C8] transition-colors hover:bg-[#8F2523] disabled:opacity-60"
+                    className="rounded-[4px] bg-[#A62C2B] px-7 py-2.5 text-xs font-medium tracking-[0.14em] text-[#EDE1C8] uppercase transition-colors hover:bg-[#8F2523] disabled:opacity-60"
                   >
-                    {pending ? "Processing…" : isSignup ? "Sign up" : "Sign in"}
+                    {pending
+                      ? t("common.processing")
+                      : isSignup
+                        ? t("auth.signUp")
+                        : t("auth.signIn")}
                   </button>
                 </div>
               </form>
@@ -225,10 +213,10 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
                   ngay dưới hàng nút. */}
               <form
                 action={oauthAction}
-                className="mt-6 flex flex-col gap-3 border-t border-[#D8C9A8] pt-4 text-xs text-[#6B655C]"
+                className="mt-6 flex flex-col gap-3 border-t border-[#D8C9A8] pt-4 text-xs text-[color:var(--muted-foreground)]"
               >
                 <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-between">
-                  <span>Or {isSignup ? "sign up" : "sign in"} with</span>
+                  <span>{isSignup ? t("auth.orSignUpWith") : t("auth.orSignInWith")}</span>
                   <div className="flex items-center gap-4">
                     <SocialButton
                       provider="google"
@@ -263,8 +251,7 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
 // useLayoutEffect gây warning khi chạy trong SSR ("does nothing on the
 // server") — dùng bản isomorphic (useEffect trên server, useLayoutEffect
 // trên client) để đo/set height NGAY trước paint đầu tiên, không nháy.
-const useIsomorphicLayoutEffect =
-  typeof window !== "undefined" ? useLayoutEffect : useEffect;
+const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 /**
  * AutoHeightPanel — bọc nội dung có thể đổi chiều cao (số field khác nhau
@@ -301,10 +288,7 @@ function AutoHeightPanel({
   }, []);
 
   return (
-    <div
-      ref={outerRef}
-      className="overflow-hidden transition-[height] duration-500 ease-out"
-    >
+    <div ref={outerRef} className="overflow-hidden transition-[height] duration-500 ease-out">
       <div ref={innerRef}>{children}</div>
     </div>
   );
@@ -325,9 +309,7 @@ function TabButton({
       onClick={onClick}
       aria-pressed={active}
       className={`rounded-[4px] px-5 py-2 text-sm font-medium tracking-wide transition-all duration-300 sm:-mr-8 sm:rounded-r-none sm:py-2.5 sm:text-left ${
-        active
-          ? "bg-[#B8863B]/50 text-[#EDE1C8]"
-          : "text-[#EDE1C8]/55 hover:text-[#EDE1C8]"
+        active ? "bg-[#B8863B]/50 text-[#EDE1C8]" : "text-[#EDE1C8]/55 hover:text-[#EDE1C8]"
       }`}
     >
       {label}
@@ -346,10 +328,12 @@ function Field({
   id: string;
   name: string;
   type: string;
+  /** Nhãn ĐÃ DỊCH — component cha tra từ điển rồi truyền xuống. */
   placeholder: string;
   icon: React.ReactNode;
   required?: boolean;
 }) {
+  const t = useT();
   // S#24: toggle hiện/ẩn — chỉ áp dụng cho field password.
   const [show, setShow] = useState(false);
   const isPassword = type === "password";
@@ -358,7 +342,7 @@ function Field({
   return (
     <label
       htmlFor={id}
-      className="flex items-center gap-3 border-b border-[#D8C9A8] pb-1 text-[#6B655C] transition-colors focus-within:border-[#B8863B] focus-within:text-[#1B1512]"
+      className="flex items-center gap-3 border-b border-[color:var(--input)] pb-1 text-[color:var(--muted-foreground)] transition-colors focus-within:border-[color:var(--ring)] focus-within:text-[#1B1512]"
     >
       <span className="shrink-0">{icon}</span>
       <input
@@ -367,14 +351,14 @@ function Field({
         type={inputType}
         required={required}
         placeholder={placeholder}
-        className="w-full bg-transparent py-2 text-[#1B1512] outline-none placeholder:text-[#6B655C]/70"
+        className="w-full bg-transparent py-2 text-[#1B1512] outline-none placeholder:text-[color:var(--muted-foreground)]/70"
       />
       {isPassword && (
         <button
           type="button"
           onClick={() => setShow((v) => !v)}
-          aria-label={show ? "Hide password" : "Show password"}
-          className="shrink-0 text-[#6B655C] transition-colors hover:text-[#1B1512]"
+          aria-label={show ? t("auth.hidePassword") : t("auth.showPassword")}
+          className="shrink-0 text-[color:var(--muted-foreground)] transition-colors hover:text-[#1B1512]"
         >
           {show ? <EyeOffIcon className="size-4" /> : <EyeIcon className="size-4" />}
         </button>
@@ -400,7 +384,7 @@ function SocialButton({
       name="provider"
       value={provider}
       disabled={pending}
-      className="flex items-center gap-1.5 text-[#6B655C] transition-colors hover:text-[#1B1512] disabled:opacity-60"
+      className="flex items-center gap-1.5 text-[color:var(--muted-foreground)] transition-colors hover:text-[#1B1512] disabled:opacity-60"
     >
       {icon}
       <span>{label}</span>
@@ -413,13 +397,7 @@ function SocialButton({
 function UserIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" aria-hidden className={className}>
-      <circle
-        cx="12"
-        cy="8"
-        r="4"
-        stroke="currentColor"
-        strokeWidth="1.8"
-      />
+      <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.8" />
       <path
         d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6"
         stroke="currentColor"
@@ -433,15 +411,7 @@ function UserIcon({ className }: { className?: string }) {
 function MailIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" aria-hidden className={className}>
-      <rect
-        x="3"
-        y="5"
-        width="18"
-        height="14"
-        rx="2"
-        stroke="currentColor"
-        strokeWidth="1.8"
-      />
+      <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="1.8" />
       <path
         d="m4 7 8 6 8-6"
         stroke="currentColor"
@@ -456,15 +426,7 @@ function MailIcon({ className }: { className?: string }) {
 function LockIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" aria-hidden className={className}>
-      <rect
-        x="4"
-        y="10"
-        width="16"
-        height="10"
-        rx="2"
-        stroke="currentColor"
-        strokeWidth="1.8"
-      />
+      <rect x="4" y="10" width="16" height="10" rx="2" stroke="currentColor" strokeWidth="1.8" />
       <path
         d="M8 10V7a4 4 0 0 1 8 0v3"
         stroke="currentColor"

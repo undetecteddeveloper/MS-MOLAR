@@ -11,6 +11,7 @@
 // sẽ vỡ bố cục nếu giữ nguyên grid đó).
 
 import Link from "next/link";
+import { getTranslate } from "@/lib/i18n/server";
 import { redirect } from "next/navigation";
 import { getMyRating } from "@/app/(layer2)/actions";
 import { getResult } from "@/app/(layer2)/queries";
@@ -25,6 +26,7 @@ export default async function ResultPage({
 }: {
   params: Promise<{ id: string; attemptId: string }>;
 }) {
+  const t = await getTranslate();
   const { id, attemptId } = await params;
   const data = await getResult(attemptId);
 
@@ -71,9 +73,9 @@ export default async function ResultPage({
             className="preload-fade border-border bg-card text-muted-foreground rounded-lg border border-dashed px-4 py-3 text-sm"
             style={{ "--preload-order": 2 } as React.CSSProperties}
           >
-            <span className="text-foreground font-medium">Submitted after time.</span>{" "}
-            This attempt went {formatOvertime(data.overtimeSeconds)} over the{" "}
-            allotted time, so the score is not a valid timed result.
+            <span className="text-foreground font-medium">{t("result.submittedAfterTime")}</span>{" "}
+            This attempt went {formatOvertime(data.overtimeSeconds)} over the allotted time, so the
+            score is not a valid timed result.
           </div>
         )}
 
@@ -89,7 +91,7 @@ export default async function ResultPage({
             href="/exams"
             className="border-border bg-card text-foreground hover:border-brand flex items-center justify-center rounded-xl border px-3 py-4 text-center text-sm transition-colors"
           >
-            Return
+            {t("result.return")}
           </Link>
         </div>
 
@@ -102,13 +104,13 @@ export default async function ResultPage({
             href={`/exams/${id}/attempt/${attemptId}/result/detail`}
             className="border-brand bg-brand text-brand-foreground rounded-lg border px-4 py-3 text-center text-sm font-medium transition-opacity hover:opacity-90"
           >
-            View details
+            {t("common.viewDetails")}
           </Link>
           <Link
             href={`/exams/${id}`}
             className="border-border bg-card text-foreground hover:border-brand rounded-lg border px-4 py-3 text-center text-sm font-medium transition-colors"
           >
-            Try again
+            {t("common.tryAgain")}
           </Link>
         </div>
 
@@ -123,7 +125,7 @@ export default async function ResultPage({
             )}`}
             className="border-border bg-card text-foreground hover:border-brand block w-full rounded-lg border px-4 py-3 text-center text-sm font-medium transition-colors"
           >
-            {hasRated ? "Edit your rating" : "Rate this exam"}
+            {hasRated ? t("result.editRating") : t("result.rateThisExam")}
           </Link>
         </div>
       </main>

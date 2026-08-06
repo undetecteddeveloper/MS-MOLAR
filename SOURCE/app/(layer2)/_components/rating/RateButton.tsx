@@ -1,4 +1,5 @@
 "use client";
+import { useT } from "@/lib/i18n/client";
 
 // RateButton — điều khiển "Rate" trên mỗi ExamCard (Rating System, R4). LÀ
 // sibling của Link thẻ đề (stretched-link restructure, code:F1) — KHÔNG lồng
@@ -12,7 +13,7 @@
 // Task 9-frontend axe/manual a11y audit finding (WCAG 1.4.3, AA): the enabled
 // state renders on ExamCard's ivory `--block-bg`/`--card` (#ede1c8), where
 // literal copper (`--sidebar-accent` #b8863b, the token frontend DD code:F3
-// otherwise reserves for "Rate →") measures ~2.49:1 — far under the 4.5:1
+// otherwise reserves for "{t("rating.rate")}") measures ~2.49:1 — far under the 4.5:1
 // normal-text floor (worse still with the previous `hover:opacity-80` dim,
 // ~3.87:1). Copper only clears AA against the DARK `--sidebar` surfaces it is
 // used on elsewhere (PartCard/PartDetail/CircleScale, ~5.3-5.6:1). Fixed here
@@ -40,13 +41,14 @@ const RATE_BUTTON_CLASS =
   "relative z-10 text-xs font-medium uppercase tracking-[0.14em] transition-opacity";
 
 export function RateButton({ examId, eligibility }: RateButtonProps) {
+  const t = useT();
   if (eligibility === "eligible") {
     return (
       <Link
         href={`/exams/${examId}/rate`}
         className={`${RATE_BUTTON_CLASS} text-brand hover:underline`}
       >
-        Rate →
+        {t("rating.rate")}
       </Link>
     );
   }
@@ -62,7 +64,7 @@ export function RateButton({ examId, eligibility }: RateButtonProps) {
         aria-describedby={reasonId}
         className={`${RATE_BUTTON_CLASS} text-muted-foreground cursor-default hover:opacity-100`}
       >
-        Rate →
+        {t("rating.rate")}
       </TooltipTrigger>
       <TooltipContent>{reason}</TooltipContent>
       {/* Fallback AT-exposed lý do (Risk R-3, frontend DD Assumed Behaviors) —

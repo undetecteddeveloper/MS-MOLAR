@@ -1,7 +1,8 @@
 "use client";
+import { useT } from "@/lib/i18n/client";
 
 // ReportExam — kênh báo cáo đề published (UGC v2.0, AC-025/026 / Task 5.2).
-// Nút "Report this exam" mở dialog (khuôn LeaveExamDialog: scrim đen sơn mài,
+// Nút "{t("report.title")}" mở dialog (khuôn LeaveExamDialog: scrim đen sơn mài,
 // Esc/click scrim = đóng, focus trap tối thiểu). Đã report (từ hasReported hoặc
 // sau khi gửi/trùng) → trạng thái tĩnh "✓ You reported this exam".
 // Chỉ render cho user đã đăng nhập trên đề published (parent quyết định).
@@ -17,6 +18,7 @@ interface ReportExamProps {
 }
 
 export function ReportExam({ examId, initiallyReported }: ReportExamProps) {
+  const t = useT();
   const [reported, setReported] = useState(initiallyReported);
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
@@ -73,7 +75,7 @@ export function ReportExam({ examId, initiallyReported }: ReportExamProps) {
         onClick={() => setOpen(true)}
         className="text-muted-foreground hover:text-brand text-sm underline-offset-4 transition-colors hover:underline"
       >
-        Report this exam
+        {t("report.title")}
       </button>
 
       {open && (
@@ -91,7 +93,7 @@ export function ReportExam({ examId, initiallyReported }: ReportExamProps) {
           />
           <div className="border-border bg-background relative w-full max-w-sm rounded-lg border p-6">
             <h2 id="report-exam-title" className="text-foreground font-serif text-xl">
-              Report this exam
+              {t("report.title")}
             </h2>
             <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
               Tell us what&apos;s wrong with this exam (incorrect answers, inappropriate content,
@@ -104,7 +106,7 @@ export function ReportExam({ examId, initiallyReported }: ReportExamProps) {
               maxLength={LIMITS.MAX_REPORT_REASON}
               rows={4}
               className="border-border bg-card text-foreground focus:border-brand mt-4 w-full resize-none rounded-[4px] border p-3 text-sm outline-none"
-              placeholder="Describe the problem…"
+              placeholder={t("report.placeholder")}
             />
             {error && (
               <p className="text-brand mt-2 text-sm" role="alert">
@@ -125,7 +127,7 @@ export function ReportExam({ examId, initiallyReported }: ReportExamProps) {
                 disabled={submitting}
                 className="bg-brand text-brand-foreground rounded-[4px] px-4 py-2 text-xs font-medium tracking-[0.14em] uppercase transition-opacity hover:opacity-90 disabled:opacity-60"
               >
-                {submitting ? "Submitting…" : "Submit report"}
+                {submitting ? t("report.submitting") : t("report.submit")}
               </button>
             </div>
           </div>

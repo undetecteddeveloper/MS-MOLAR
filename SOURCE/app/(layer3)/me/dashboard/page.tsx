@@ -7,10 +7,12 @@
 
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
+import { getTranslate } from "@/lib/i18n/server";
 import { getAnalyticsByRange } from "@/app/(layer3)/queries";
 import { AnalyticsDashboard } from "@/app/(layer3)/_components/AnalyticsDashboard";
 
 export default async function DashboardPage() {
+  const t = await getTranslate();
   const user = await getCurrentUser();
   if (!user) redirect("/?auth=signin");
 
@@ -18,10 +20,8 @@ export default async function DashboardPage() {
 
   return (
     <main className="mx-auto w-full max-w-4xl px-6 py-10">
-      <h1 className="font-serif text-2xl text-foreground">Analytics</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Track correct/incorrect answers by subject and practice frequency.
-      </p>
+      <h1 className="text-foreground font-serif text-2xl">{t("analytics.title")}</h1>
+      <p className="text-muted-foreground mt-1 text-sm">{t("analytics.subtitle")}</p>
 
       <div className="mt-6">
         <AnalyticsDashboard dataByRange={dataByRange} />

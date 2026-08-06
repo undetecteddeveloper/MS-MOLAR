@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getTranslate } from "@/lib/i18n/server";
 import type { Exam } from "@/types/exam";
 import { AuthorByline } from "@/components/shared/AuthorByline";
 import { DifficultyBadge } from "@/components/rating/DifficultyBadge";
@@ -11,7 +12,8 @@ interface ExamCardProps {
   eligibility: RateEligibility;
 }
 
-export function ExamCard({ exam, eligibility }: ExamCardProps) {
+export async function ExamCard({ exam, eligibility }: ExamCardProps) {
+  const t = await getTranslate();
   return (
     <li className="group relative h-full">
       {/* Stretched link (code:F1): Link phủ toàn thẻ (absolute inset-0),
@@ -49,9 +51,9 @@ export function ExamCard({ exam, eligibility }: ExamCardProps) {
             hiển thị DifficultyBadge (Rating System, ADR-0008) — bucket+mean
             cộng đồng, "—" khi < RATING_THRESHOLD lượt đánh giá (AC-014/015). */}
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-          <dt className="text-[var(--block-fg-muted)]">School</dt>
-          <dd className="text-[var(--block-fg-muted)]">{exam.school ?? "None"}</dd>
-          <dt className="text-[var(--block-fg-muted)]">Level</dt>
+          <dt className="text-[var(--block-fg-muted)]">{t("common.school")}</dt>
+          <dd className="text-[var(--block-fg-muted)]">{exam.school ?? t("common.none")}</dd>
+          <dt className="text-[var(--block-fg-muted)]">{t("exams.level")}</dt>
           <DifficultyBadge communityDifficulty={exam.communityDifficulty} variant="card" />
         </dl>
 

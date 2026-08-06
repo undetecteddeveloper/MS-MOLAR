@@ -1,4 +1,5 @@
 "use client";
+import { useT } from "@/lib/i18n/client";
 
 // AnalyticsDashboard — client island for /me/dashboard (Layer 3). Owns
 // activeTab/range/filterTouched state per docs/design/analytics-layer3-design.md
@@ -44,6 +45,7 @@ export function AnalyticsDashboard({
 }: {
   dataByRange: Record<TimeRange, SubjectStats[]>;
 }) {
+  const t = useT();
   const [tab, setTab] = useState<Tab>("bar");
   const [range, setRange] = useState<TimeRange>(DEFAULT_RANGE);
   const [filterTouched, setFilterTouched] = useState(false);
@@ -52,7 +54,7 @@ export function AnalyticsDashboard({
 
   const filterSlot = (
     <select
-      aria-label="Time range filter"
+      aria-label={t("analytics.timeRangeFilter")}
       value={filterTouched ? range : ""}
       onChange={(e) => {
         setFilterTouched(true);
@@ -85,7 +87,7 @@ export function AnalyticsDashboard({
               onClick={() => setTab(t.value)}
               className={[
                 "relative pb-3 font-sans text-xs font-medium tracking-[0.2em] uppercase transition-colors",
-                "after:absolute after:-bottom-px after:left-0 after:h-[2px] after:w-full after:origin-center after:scale-x-0 after:bg-brand after:transition-transform after:content-['']",
+                "after:bg-brand after:absolute after:-bottom-px after:left-0 after:h-[2px] after:w-full after:origin-center after:scale-x-0 after:transition-transform after:content-['']",
                 isActive
                   ? "text-brand after:scale-x-100"
                   : "text-muted-foreground hover:text-foreground",
@@ -102,16 +104,14 @@ export function AnalyticsDashboard({
           <div>
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h2 className="font-serif text-2xl text-foreground">{TITLES[tab]}</h2>
-                <p className="mt-1 text-sm text-muted-foreground">No data yet</p>
+                <h2 className="text-foreground font-serif text-2xl">{TITLES[tab]}</h2>
+                <p className="text-muted-foreground mt-1 text-sm">{t("analytics.noData")}</p>
               </div>
               {filterSlot}
             </div>
             <div className="border-border bg-card mt-4 rounded-md border p-5">
-              <p className="font-serif text-lg text-foreground">No data yet</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Complete a submitted attempt in this range to see analytics.
-              </p>
+              <p className="text-foreground font-serif text-lg">{t("analytics.noData")}</p>
+              <p className="text-muted-foreground mt-1 text-sm">{t("analytics.noDataHint")}</p>
             </div>
           </div>
         ) : tab === "bar" ? (

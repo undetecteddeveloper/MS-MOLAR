@@ -6,6 +6,7 @@
 // giữa các dòng.
 
 "use client";
+import { useT } from "@/lib/i18n/client";
 
 import type { ReactNode } from "react";
 import {
@@ -36,6 +37,7 @@ export function DonutChartCard({
   filterSlot: ReactNode;
   donutHighlightCount?: number;
 }) {
+  const t = useT();
   // Sort giảm dần theo % — donut segment bắt đầu từ 12h theo chiều kim đồng hồ,
   // legend liệt kê cùng thứ tự (khớp design reference).
   const shares = [...computeShares(data)].sort((a, b) => b.pct - a.pct);
@@ -43,33 +45,34 @@ export function DonutChartCard({
 
   const segments = shares.reduce<Array<{ subject: Subject; pct: number; cumulative: number }>>(
     (acc, s) => {
-      const cumulative = acc.length > 0 ? acc[acc.length - 1].cumulative + acc[acc.length - 1].pct : 0;
+      const cumulative =
+        acc.length > 0 ? acc[acc.length - 1].cumulative + acc[acc.length - 1].pct : 0;
       acc.push({ subject: s.subject, pct: s.pct, cumulative });
       return acc;
     },
-    [],
+    []
   );
 
   return (
     <div>
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="font-serif text-2xl text-foreground">Most Frequently Practiced Subject</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h2 className="text-foreground font-serif text-2xl">{t("analytics.donutTitle")}</h2>
+          <p className="text-muted-foreground mt-1 text-sm">
             % share of practice sessions by subject, this {rangeLabel.toLowerCase()}
           </p>
         </div>
         {filterSlot}
       </div>
 
-      <div className="mt-4 rounded-md border border-border bg-card p-5">
+      <div className="border-border bg-card mt-4 rounded-md border p-5">
         <div className="flex flex-col items-center gap-10 sm:flex-row">
           <svg
             width={SIZE}
             height={SIZE}
             viewBox={`0 0 ${SIZE} ${SIZE}`}
             role="img"
-            aria-label="Practice session share by subject"
+            aria-label={t("analytics.donutAlt")}
             className="shrink-0"
           >
             <g transform={`translate(${SIZE / 2}, ${SIZE / 2}) rotate(-90)`}>
@@ -105,13 +108,13 @@ export function DonutChartCard({
               x={SIZE / 2}
               y={SIZE / 2 + 16}
               textAnchor="middle"
-              className="fill-foreground font-sans text-xs uppercase tracking-wide"
+              className="fill-foreground font-sans text-xs tracking-wide uppercase"
             >
               {top.subject}
             </text>
           </svg>
 
-          <ul className="w-full flex-1 divide-y divide-border">
+          <ul className="divide-border w-full flex-1 divide-y">
             {shares.map((s) => (
               <li key={s.subject} className="flex items-center justify-between gap-3 py-3 text-sm">
                 <span className="flex items-center gap-2.5">

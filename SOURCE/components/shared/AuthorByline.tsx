@@ -2,6 +2,7 @@
 // Render CHỈ khi có author_display_name; đề seed (author_id null) → trả null,
 // KHÔNG chiếm chỗ trống (AC-021). Server-safe, thuần.
 
+import { getTranslate } from "@/lib/i18n/server";
 import { cn } from "@/lib/utils";
 
 interface AuthorBylineProps {
@@ -10,12 +11,13 @@ interface AuthorBylineProps {
   className?: string;
 }
 
-export function AuthorByline({ name, className }: AuthorBylineProps) {
+export async function AuthorByline({ name, className }: AuthorBylineProps) {
   const trimmed = name?.trim();
   if (!trimmed) return null;
+  const t = await getTranslate();
   return (
     <p className={cn("text-sm text-[var(--block-fg-muted)]", className)}>
-      by <span className="text-foreground">{trimmed}</span>
+      {t("common.by")} <span className="text-foreground">{trimmed}</span>
     </p>
   );
 }
