@@ -7,6 +7,7 @@
 // của user + đáp án lưu trữ, nhãn "Not auto-scored" — không tô đúng/sai.
 
 import Link from "next/link";
+import { getTranslate } from "@/lib/i18n/server";
 import { redirect } from "next/navigation";
 import { getResult } from "@/app/(layer2)/queries";
 import { decodeTfAnswer, formatSubAnswers } from "@/lib/ugc/tfCodec";
@@ -17,6 +18,7 @@ export default async function ResultDetailPage({
 }: {
   params: Promise<{ id: string; attemptId: string }>;
 }) {
+  const t = await getTranslate();
   const { id, attemptId } = await params;
   const data = await getResult(attemptId);
 
@@ -35,12 +37,10 @@ export default async function ResultDetailPage({
           className="preload-fade flex flex-col gap-2"
           style={{ "--preload-order": 1 } as React.CSSProperties}
         >
-          <span className="eyebrow">Attempt details</span>
-          <h1 className="font-serif text-2xl leading-snug text-foreground">
-            {examTitle}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            <span className="font-medium text-foreground tabular-nums">
+          <span className="eyebrow">{t("result.attemptDetails")}</span>
+          <h1 className="text-foreground font-serif text-2xl leading-snug">{examTitle}</h1>
+          <p className="text-muted-foreground text-sm">
+            <span className="text-foreground font-medium tabular-nums">
               {result.correct}/{result.total}
             </span>{" "}
             correct
@@ -65,20 +65,17 @@ export default async function ResultDetailPage({
                   ? formatSubAnswers(q.subAnswers)
                   : (q?.essayAnswer ?? "");
               return (
-                <li
-                  key={r.questionId}
-                  className="flex flex-col gap-4 border-t border-border pt-6"
-                >
+                <li key={r.questionId} className="border-border flex flex-col gap-4 border-t pt-6">
                   <div className="flex items-baseline justify-between gap-3">
                     <span className="eyebrow">Question {i + 1}</span>
-                    <span className="text-xs font-medium text-muted-foreground">
-                      Not auto-scored
+                    <span className="text-muted-foreground text-xs font-medium">
+                      {t("result.notAutoScored")}
                     </span>
                   </div>
                   {q && (
                     <RichText
                       text={q.content}
-                      className="font-serif text-lg leading-relaxed text-foreground"
+                      className="text-foreground font-serif text-lg leading-relaxed"
                     />
                   )}
                   {q?.questionType === "true_false" && (
@@ -86,15 +83,15 @@ export default async function ResultDetailPage({
                       {q.subItems?.map((s) => (
                         <li
                           key={s.id}
-                          className="flex items-start gap-3 rounded-lg border border-border bg-card p-3"
+                          className="border-border bg-card flex items-start gap-3 rounded-lg border p-3"
                         >
-                          <span className="w-4 shrink-0 pt-0.5 font-mono text-sm text-muted-foreground">
+                          <span className="text-muted-foreground w-4 shrink-0 pt-0.5 font-mono text-sm">
                             {s.id})
                           </span>
                           <RichText
                             text={s.text}
                             inline
-                            className="pt-0.5 text-base leading-relaxed text-card-foreground"
+                            className="text-card-foreground pt-0.5 text-base leading-relaxed"
                           />
                         </li>
                       ))}
@@ -102,14 +99,11 @@ export default async function ResultDetailPage({
                   )}
                   <div className="flex flex-col gap-1 text-sm">
                     <p className="text-muted-foreground">
-                      Your answer:{" "}
-                      <span className="text-foreground">
-                        {studentInput || "— skipped —"}
-                      </span>
+                      {t("result.yourAnswerLabel")}{" "}
+                      <span className="text-foreground">{studentInput || "— skipped —"}</span>
                     </p>
                     <p className="text-muted-foreground">
-                      Stored answer:{" "}
-                      <span className="text-[#4F7942]">{storedAnswer || "—"}</span>
+                      Stored answer: <span className="text-[#4F7942]">{storedAnswer || "—"}</span>
                     </p>
                   </div>
                 </li>
@@ -130,45 +124,35 @@ export default async function ResultDetailPage({
             const isShortAnswer = q?.questionType === "short_answer";
 
             return (
-              <li
-                key={r.questionId}
-                className="flex flex-col gap-4 border-t border-border pt-6"
-              >
+              <li key={r.questionId} className="border-border flex flex-col gap-4 border-t pt-6">
                 <div className="flex items-baseline justify-between gap-3">
                   <span className="eyebrow">Question {i + 1}</span>
-                  <span className={`text-xs font-medium ${status.cls}`}>
-                    {status.label}
-                  </span>
+                  <span className={`text-xs font-medium ${status.cls}`}>{status.label}</span>
                 </div>
 
                 {q && (
                   <RichText
                     text={q.content}
-                    className="font-serif text-lg leading-relaxed text-foreground"
+                    className="text-foreground font-serif text-lg leading-relaxed"
                   />
                 )}
 
                 {isShortAnswer ? (
                   <div className="flex flex-col gap-1 text-sm">
                     <p className="text-muted-foreground">
-                      Your answer:{" "}
-                      <span className={status.cls}>
-                        {r.selected || "— skipped —"}
-                      </span>
+                      {t("result.yourAnswerLabel")}{" "}
+                      <span className={status.cls}>{r.selected || t("result.skipped")}</span>
                     </p>
                     <p className="text-muted-foreground">
-                      Correct answer:{" "}
-                      <span className="text-[#4F7942]">
-                        {q?.essayAnswer || "—"}
-                      </span>
+                      {t("result.correctAnswerLabel")}{" "}
+                      <span className="text-[#4F7942]">{q?.essayAnswer || "—"}</span>
                     </p>
                   </div>
                 ) : (
                   <ul className="flex flex-col gap-2">
                     {q?.choices.map((choice) => {
                       const isCorrect = choice.id === r.correct;
-                      const isSelectedWrong =
-                        choice.id === r.selected && r.selected !== r.correct;
+                      const isSelectedWrong = choice.id === r.selected && r.selected !== r.correct;
 
                       const rowCls = isCorrect
                         ? "border-[#4F7942] bg-[#4F7942]/10"
@@ -195,15 +179,15 @@ export default async function ResultDetailPage({
                           <RichText
                             text={choice.text}
                             inline
-                            className="pt-0.5 text-base leading-relaxed text-card-foreground"
+                            className="text-card-foreground pt-0.5 text-base leading-relaxed"
                           />
                           {isCorrect && (
-                            <span className="ml-auto shrink-0 self-center font-mono text-[0.65rem] uppercase tracking-wide text-[#4F7942]">
+                            <span className="ml-auto shrink-0 self-center font-mono text-[0.65rem] tracking-wide text-[#4F7942] uppercase">
                               Correct answer
                             </span>
                           )}
                           {isSelectedWrong && (
-                            <span className="ml-auto shrink-0 self-center font-mono text-[0.65rem] uppercase tracking-wide text-destructive">
+                            <span className="text-destructive ml-auto shrink-0 self-center font-mono text-[0.65rem] tracking-wide uppercase">
                               Your choice
                             </span>
                           )}
@@ -218,12 +202,12 @@ export default async function ResultDetailPage({
         </ol>
 
         <div
-          className="preload-fade mt-10 border-t border-border pt-6"
+          className="preload-fade border-border mt-10 border-t pt-6"
           style={{ "--preload-order": 3 } as React.CSSProperties}
         >
           <Link
             href={resultHref}
-            className="inline-block rounded-lg border border-border bg-card px-5 py-2.5 text-sm font-medium text-foreground transition-colors hover:border-brand"
+            className="border-border bg-card text-foreground hover:border-brand inline-block rounded-lg border px-5 py-2.5 text-sm font-medium transition-colors"
           >
             ← Back to results
           </Link>

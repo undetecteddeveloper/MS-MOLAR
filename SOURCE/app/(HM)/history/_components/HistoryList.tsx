@@ -15,10 +15,11 @@
 // responsibility, both already applied by the caller.
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { getTranslate } from "@/lib/i18n/server";
 import type { MyHistoryEntry } from "@/app/(HM)/queries";
 import { HistoryRow } from "./HistoryRow";
 
-export function HistoryList({
+export async function HistoryList({
   entries,
   isFiltered = false,
   filters,
@@ -27,34 +28,33 @@ export function HistoryList({
   isFiltered?: boolean;
   filters?: ReactNode;
 }) {
+  const t = await getTranslate();
   return (
     <div className="mx-auto w-full max-w-2xl">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="font-serif text-2xl text-foreground">History</h1>
+          <h1 className="text-foreground font-serif text-2xl">{t("history.title")}</h1>
           <div className="mt-3 h-0.5 w-10 bg-[#B8863B]" aria-hidden />
         </div>
         {filters}
       </div>
 
       {entries.length === 0 ? (
-        <div className="mt-6 flex flex-col items-center gap-2 rounded-lg border border-dashed border-border px-6 py-16 text-center">
+        <div className="border-border mt-6 flex flex-col items-center gap-2 rounded-lg border border-dashed px-6 py-16 text-center">
           {isFiltered ? (
             <>
-              <p className="font-serif text-lg text-foreground">No matches</p>
-              <p className="text-sm text-muted-foreground">
-                Try adjusting or clearing your filters.
-              </p>
+              <p className="text-foreground font-serif text-lg">{t("history.noMatches")}</p>
+              <p className="text-muted-foreground text-sm">{t("history.noMatchesHint")}</p>
             </>
           ) : (
             <>
-              <p className="font-serif text-lg text-foreground">No results yet</p>
-              <p className="text-sm text-muted-foreground">Finish an exam to see it here.</p>
+              <p className="text-foreground font-serif text-lg">{t("history.noResults")}</p>
+              <p className="text-muted-foreground text-sm">{t("history.noResultsHint")}</p>
               <Link
                 href="/exams"
-                className="mt-2 rounded-[4px] bg-brand px-4 py-2 text-xs font-medium uppercase tracking-[0.14em] text-brand-foreground transition-opacity hover:opacity-90"
+                className="bg-brand text-brand-foreground mt-2 rounded-[4px] px-4 py-2 text-xs font-medium tracking-[0.14em] uppercase transition-opacity hover:opacity-90"
               >
-                Browse exams
+                {t("common.browseExams")}
               </Link>
             </>
           )}

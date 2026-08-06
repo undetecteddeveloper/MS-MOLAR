@@ -12,12 +12,14 @@ import Link from "next/link";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut, updateProfile, type AuthState } from "@/app/(layer1)/actions";
+import { useT } from "@/lib/i18n/client";
 
 export type MenuUser = { displayName: string };
 
 const AVATAR = "/images/user-avatar-placeholder.png";
 
 export function HeaderProfile({ displayName: initial }: { displayName: string }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [displayName, setDisplayName] = useState(initial);
@@ -87,7 +89,7 @@ export function HeaderProfile({ displayName: initial }: { displayName: string })
                 }}
                 className="block w-full rounded-[4px] px-3 py-2 text-center font-sans text-sm text-[#1B1512] transition-colors hover:bg-[#E3D5B6]"
               >
-                Edit
+                {t("common.edit")}
               </button>
               {/* My exams (UGC v2.0, Task 6.1) — giữa Edit và Sign out (D7). */}
               <Link
@@ -96,21 +98,21 @@ export function HeaderProfile({ displayName: initial }: { displayName: string })
                 onClick={close}
                 className="block w-full rounded-[4px] px-3 py-2 text-center font-sans text-sm text-[#1B1512] transition-colors hover:bg-[#E3D5B6]"
               >
-                My exams
+                {t("common.myExams")}
               </Link>
               <form action={signOut}>
                 <button
                   type="submit"
                   className="block w-full rounded-[4px] px-3 py-2 text-center font-sans text-sm text-[#1B1512] transition-colors hover:bg-[#E3D5B6]"
                 >
-                  Sign out
+                  {t("common.signOut")}
                 </button>
               </form>
             </>
           ) : (
             <form action={formAction} className="flex flex-col items-center gap-2 p-2">
               <label htmlFor="header-profile-display-name" className="sr-only">
-                Display name
+                {t("common.displayName")}
               </label>
               <input
                 id="header-profile-display-name"
@@ -123,10 +125,10 @@ export function HeaderProfile({ displayName: initial }: { displayName: string })
                 }}
                 maxLength={12}
                 autoFocus
-                className="w-full rounded-[4px] border border-[#D8C9A8] bg-transparent px-3 py-2 text-center font-sans text-sm text-[#1B1512] outline-none focus:border-[#B8863B]"
+                className="w-full rounded-[4px] border border-[color:var(--input)] bg-transparent px-3 py-2 text-center font-sans text-sm text-[#1B1512] outline-none focus:border-[color:var(--ring)]"
               />
-              <p className="px-1 text-center font-sans text-[0.65rem] text-[#6B655C]">
-                Max 12 characters, letters and dots only.
+              <p className="px-1 text-center font-sans text-[0.65rem] text-[color:var(--muted-foreground)]">
+                {t("common.displayNameHint")}
               </p>
               {state?.error && (
                 <p className="px-1 text-center font-sans text-xs text-[#A62C2B]">{state.error}</p>
@@ -137,14 +139,14 @@ export function HeaderProfile({ displayName: initial }: { displayName: string })
                   disabled={pending || draft.length === 0}
                   className="flex-1 rounded-[4px] bg-[#A62C2B] px-3 py-1.5 font-sans text-xs font-medium text-[#EDE1C8] transition-colors hover:bg-[#8F2523] disabled:opacity-60"
                 >
-                  {pending ? "Saving…" : "Save"}
+                  {pending ? t("common.saving") : t("common.save")}
                 </button>
                 <button
                   type="button"
                   onClick={() => setEditing(false)}
                   className="flex-1 rounded-[4px] border border-[#D8C9A8] px-3 py-1.5 font-sans text-xs text-[#1B1512] transition-colors hover:bg-[#E3D5B6]"
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </button>
               </div>
             </form>

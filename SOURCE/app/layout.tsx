@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist_Mono, Source_Serif_4, Be_Vietnam_Pro } from "next/font/google";
+import { I18nProvider } from "@/lib/i18n/client";
+import { getLocale } from "@/lib/i18n/server";
 import { SITE_URL } from "@/lib/siteUrl";
 import "./globals.css";
 
@@ -71,17 +73,26 @@ export const viewport: Viewport = {
   themeColor: "#1B1512",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // `lang` PHẢI khớp ngôn ngữ đang hiển thị (WCAG 3.1.1 Language of Page).
+  // Trước đây hard-code "en" — khi người dùng chọn tiếng Việt, trình đọc màn
+  // hình vẫn phát âm bằng bộ tổng hợp giọng Anh, ra thứ tiếng Việt gần như
+  // không nghe hiểu được. Trình dịch tự động của trình duyệt cũng đọc thuộc
+  // tính này để quyết định có mời dịch trang hay không.
+  const locale = await getLocale();
+
   return (
     <html
-      lang="en"
+      lang={locale}
       className={`${geistMono.variable} ${sourceSerif.variable} ${beVietnamPro.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="flex min-h-full flex-col">
+        <I18nProvider locale={locale}>{children}</I18nProvider>
+      </body>
     </html>
   );
 }

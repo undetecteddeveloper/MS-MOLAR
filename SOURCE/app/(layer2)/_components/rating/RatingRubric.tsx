@@ -1,4 +1,5 @@
 "use client";
+import { useT } from "@/lib/i18n/client";
 
 // RatingRubric — shared core of the standalone Rating Page (academic-rubric
 // redesign, replaces the old RatingForm/RatingOverview/PartCard/PartDetail
@@ -47,6 +48,7 @@ export interface RatingRubricProps {
 type SubmitState = "idle" | "submitting" | "error";
 
 export function RatingRubric({ examId, initialScores }: RatingRubricProps) {
+  const t = useT();
   const [scores, setScores] = useState<Partial<Record<PartId, PartScore>>>(initialScores ?? {});
   const [activeIndex, setActiveIndex] = useState(0);
   const [direction, setDirection] = useState<1 | -1>(1);
@@ -94,10 +96,10 @@ export function RatingRubric({ examId, initialScores }: RatingRubricProps) {
   const submitLabel = submitState === "submitting" ? "Submitting…" : "Submit rating";
 
   return (
-    <div className="rounded-xl border border-border bg-card p-6 sm:p-8">
+    <div className="border-border bg-card rounded-xl border p-6 sm:p-8">
       <div className="flex items-baseline justify-between gap-4">
         <h2 id={headingId} className="eyebrow">
-          Difficulty rubric
+          {t("rating.rubric")}
         </h2>
         <span className="eyebrow text-muted-foreground">
           Part {activeIndex + 1} of {PART_IDS.length}
@@ -106,10 +108,8 @@ export function RatingRubric({ examId, initialScores }: RatingRubricProps) {
 
       <div
         key={activePart}
-        className={`mt-3 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300 motion-safe:ease-out ${
-          direction === 1
-            ? "motion-safe:slide-in-from-right-3"
-            : "motion-safe:slide-in-from-left-3"
+        className={`motion-safe:animate-in motion-safe:fade-in mt-3 motion-safe:duration-300 motion-safe:ease-out ${
+          direction === 1 ? "motion-safe:slide-in-from-right-3" : "motion-safe:slide-in-from-left-3"
         }`}
         role="group"
         aria-label={meta.name}
@@ -117,14 +117,14 @@ export function RatingRubric({ examId, initialScores }: RatingRubricProps) {
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
           <div>
             <p className="eyebrow">{meta.eyebrow}</p>
-            <p className="mt-1 font-serif text-lg text-foreground">{meta.name}</p>
+            <p className="text-foreground mt-1 font-serif text-lg">{meta.name}</p>
           </div>
-          <p className="font-serif text-lg tabular-nums text-brand transition-colors duration-200">
+          <p className="text-brand font-serif text-lg tabular-nums transition-colors duration-200">
             {score !== undefined ? formatMean(score) : "—"}
-            <span className="text-sm font-sans text-muted-foreground">/10</span>
+            <span className="text-muted-foreground font-sans text-sm">/10</span>
           </p>
         </div>
-        <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-muted-foreground">
+        <p className="text-muted-foreground mt-1.5 max-w-prose text-sm leading-relaxed">
           {meta.description}
         </p>
         <div className="mt-3.5">
@@ -139,12 +139,12 @@ export function RatingRubric({ examId, initialScores }: RatingRubricProps) {
         </div>
       </div>
 
-      <div className="mt-5 flex items-center justify-between border-t border-border pt-4">
+      <div className="border-border mt-5 flex items-center justify-between border-t pt-4">
         <button
           type="button"
           onClick={goPrev}
           disabled={isFirst}
-          className="text-xs font-medium tracking-[0.14em] text-foreground uppercase transition-all hover:text-brand disabled:opacity-30 disabled:hover:text-foreground"
+          className="text-foreground hover:text-brand disabled:hover:text-foreground text-xs font-medium tracking-[0.14em] uppercase transition-all disabled:opacity-30"
         >
           ← Prev
         </button>
@@ -152,18 +152,21 @@ export function RatingRubric({ examId, initialScores }: RatingRubricProps) {
           type="button"
           onClick={goNext}
           disabled={isLast}
-          className="text-xs font-medium tracking-[0.14em] text-foreground uppercase transition-all hover:text-brand disabled:opacity-30 disabled:hover:text-foreground"
+          className="text-foreground hover:text-brand disabled:hover:text-foreground text-xs font-medium tracking-[0.14em] uppercase transition-all disabled:opacity-30"
         >
-          Next →
+          {t("common.next")}
         </button>
       </div>
 
-      <div className="mt-5 flex items-center justify-between gap-4 border-t border-border pt-5">
+      <div className="border-border mt-5 flex items-center justify-between gap-4 border-t pt-5">
         <div>
-          <span className="eyebrow">Overall</span>
-          <p className="mt-1 font-serif text-3xl tabular-nums text-foreground">
+          <span className="eyebrow">{t("rating.overall")}</span>
+          <p className="text-foreground mt-1 font-serif text-3xl tabular-nums">
             {readout.value}
-            <span className="text-base font-sans text-muted-foreground"> /10 · {readout.status}</span>
+            <span className="text-muted-foreground font-sans text-base">
+              {" "}
+              /10 · {readout.status}
+            </span>
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
@@ -172,15 +175,13 @@ export function RatingRubric({ examId, initialScores }: RatingRubricProps) {
             onClick={handleSubmit}
             disabled={submitDisabled}
             aria-busy={submitState === "submitting"}
-            aria-describedby={submitDisabled && submitState !== "submitting" ? submitHintId : undefined}
-            className="flex items-center gap-2 rounded-[4px] bg-brand px-5 py-2.5 text-xs font-medium tracking-[0.14em] text-brand-foreground uppercase transition-all duration-200 hover:opacity-90 disabled:opacity-50"
+            aria-describedby={
+              submitDisabled && submitState !== "submitting" ? submitHintId : undefined
+            }
+            className="bg-brand text-brand-foreground flex items-center gap-2 rounded-[4px] px-5 py-2.5 text-xs font-medium tracking-[0.14em] uppercase transition-all duration-200 hover:opacity-90 disabled:opacity-50"
           >
             {submitState === "submitting" && (
-              <svg
-                aria-hidden
-                viewBox="0 0 24 24"
-                className="h-3 w-3 motion-safe:animate-spin"
-              >
+              <svg aria-hidden viewBox="0 0 24 24" className="h-3 w-3 motion-safe:animate-spin">
                 <circle
                   cx="12"
                   cy="12"
@@ -202,13 +203,13 @@ export function RatingRubric({ examId, initialScores }: RatingRubricProps) {
             {submitLabel}
           </button>
           <span id={submitHintId} className="sr-only">
-            Rate all three parts to submit.
+            {t("rating.rateAllParts")}
           </span>
         </div>
       </div>
 
       {errorMessage && (
-        <p role="alert" className="mt-3 text-sm text-brand">
+        <p role="alert" className="text-brand mt-3 text-sm">
           {errorMessage}
         </p>
       )}

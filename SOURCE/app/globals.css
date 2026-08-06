@@ -9,6 +9,7 @@
   --color-foreground: var(--foreground);
   --color-brand: var(--brand);
   --color-brand-foreground: var(--brand-foreground);
+  --color-brand-on-dark: var(--brand-on-dark);
   --font-sans: var(--font-be-vietnam);
   --font-serif: var(--font-source-serif);
   --font-mono: var(--font-geist-mono);
@@ -63,6 +64,11 @@
   /* Accent hành động duy nhất — đỏ son (DESIGN.md primary). */
   --brand: #a62c2b;
   --brand-foreground: #ede1c8;
+  /* Đỏ son làm sáng — CHỈ dùng khi đặt trên nền đen sơn mài (navbar, sidebar).
+     Đỏ son gốc #a62c2b trên #1b1512 chỉ đạt 2.44:1, dưới cả ngưỡng 4.5:1 của
+     WCAG 1.4.3 lẫn quy tắc "không đặt đỏ son trên đen ở cỡ < 24px" mà chính
+     DESIGN.md đặt ra. Biến thể này đạt 5.75:1. Trên nền ngà vẫn dùng --brand. */
+  --brand-on-dark: #e86b5c;
   --popover: #ede1c8;
   --popover-foreground: #1b1512;
   --primary: #a62c2b;
@@ -70,14 +76,23 @@
   --secondary: #e3d5b6;
   --secondary-foreground: #1b1512;
   --muted: #e3d5b6;
-  --muted-foreground: #6b655c;
+  /* Xám khói đậm hơn nửa nấc so với #6b655c gốc: bản cũ chỉ đạt 4.45:1 trên nền
+     ngà (hụt 4.5:1) và 3.97:1 khi đặt trên khối --muted #e3d5b6. Giá trị này đạt
+     5.26:1 / 4.69:1 — qua WCAG 1.4.3 trên CẢ HAI nền. */
+  --muted-foreground: #605a52;
   --accent: #e3d5b6;
   --accent-foreground: #1b1512;
   --destructive: #8f2523;
+  /* --border: kẻ phân cách trang trí giữa các khối — không mang thông tin nên
+     không chịu ngưỡng 1.4.11, giữ nguyên ngà đậm cho đúng tinh thần hairline. */
   --border: #d8c9a8;
-  --input: #d8c9a8;
-  /* Focus ring = vàng đồng (DESIGN.md accent — viền/underline, không phủ mảng). */
-  --ring: #b8863b;
+  /* --input: viền Ô NHẬP LIỆU — đây là ranh giới nhận dạng component nên PHẢI
+     đạt 3:1 (WCAG 1.4.11). #d8c9a8 cũ chỉ 1.26:1, gần như vô hình. Nay 3.40:1. */
+  --input: #877748;
+  /* Focus ring = vàng đồng đậm. #b8863b gốc chỉ đạt 2.49:1 trên nền ngà — chỉ
+     báo tiêu điểm của TOÀN BỘ button/input đều hụt ngưỡng 3:1 (WCAG 1.4.11).
+     #8a6222 đạt 4.21:1 trên ngà, 3.75:1 trên --muted, 3.31:1 trên nền đen. */
+  --ring: #8a6222;
   --chart-1: #a62c2b;
   --chart-2: #b8863b;
   --chart-3: #6b655c;
@@ -97,6 +112,14 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+  }
+  /* SiteHeader là `sticky top-0` cao 60px (h-15). Khi tab tới một phần tử nằm
+     ngay dưới mép trên viewport, trình duyệt cuộn nó lên đúng mép 0 → nó chui
+     xuống dưới navbar và tiêu điểm bị che hoàn toàn (WCAG 2.4.11 Focus Not
+     Obscured). scroll-padding-top dặn trình duyệt chừa sẵn chiều cao navbar cho
+     MỌI thao tác cuộn tự động (tab, anchor link, scrollIntoView). */
+  html {
+    scroll-padding-top: 4.5rem;
   }
   body {
     @apply bg-background text-foreground font-sans;

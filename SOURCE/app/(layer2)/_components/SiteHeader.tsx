@@ -16,23 +16,29 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { HeaderProfile, type MenuUser } from "@/components/shared/HeaderProfile";
+import { LanguageToggle } from "@/components/shared/LanguageToggle";
+import { useT } from "@/lib/i18n/client";
+import type { MessageKey } from "@/lib/i18n/translate";
 
-type NavItem = { label: string; href: string };
+// Nhãn giữ dưới dạng KHOÁ i18n chứ không phải chuỗi sẵn: mảng này nằm ở cấp
+// module nên chỉ chạy một lần lúc nạp, không thể tra từ điển tại đó được.
+type NavItem = { key: MessageKey; href: string };
 
 // Cùng bộ nav với HomeSidebar (L1) — đồng bộ 100% (engineer chốt S#19 Q2).
 const NAV: NavItem[] = [
-  { label: "Home", href: "/" },
-  { label: "Exams", href: "/exams" },
-  { label: "Analytics", href: "/me/dashboard" },
-  { label: "History", href: "/history" },
+  { key: "nav.home", href: "/" },
+  { key: "nav.exams", href: "/exams" },
+  { key: "nav.analytics", href: "/me/dashboard" },
+  { key: "nav.history", href: "/history" },
   // UGC v2.0 (Task 6.1): Import→Upload cho MỌI user; KHÔNG có mục admin.
-  { label: "Upload", href: "/upload" },
+  { key: "nav.upload", href: "/upload" },
 ];
 
-const GUEST_NAV: NavItem[] = [...NAV, { label: "Account", href: "/?auth=signin" }];
+const GUEST_NAV: NavItem[] = [...NAV, { key: "nav.account", href: "/?auth=signin" }];
 
 export function SiteHeader({ user = null }: { user?: MenuUser | null }) {
   const pathname = usePathname();
+  const t = useT();
   const items = user ? NAV : GUEST_NAV;
 
   return (
@@ -45,7 +51,7 @@ export function SiteHeader({ user = null }: { user?: MenuUser | null }) {
             chủ. Ẩn ở màn hẹp nhất (nav 5 tag không đủ chỗ; tag "Home" đã gánh
             vai trò neo nên không mất chức năng). Ảnh gốc 715×650 — height
             38px (+6%, S#21), width auto theo tỉ lệ. */}
-        <Link href="/" aria-label="Home" className="shrink-0 max-sm:hidden">
+        <Link href="/" aria-label={t("nav.home")} className="shrink-0 max-sm:hidden">
           <Image
             src="/images/brand_logo.png"
             alt="Trạng Nguyên"
@@ -65,23 +71,33 @@ export function SiteHeader({ user = null }: { user?: MenuUser | null }) {
               (item.href === "/" ? pathname === "/" : pathname.startsWith(item.href));
             return (
               <Link
-                key={item.label}
+                key={item.key}
                 href={item.href}
                 aria-current={isActive ? "page" : undefined}
                 className={[
-                  "relative font-sans text-xs font-medium tracking-[0.2em] whitespace-nowrap uppercase transition-colors max-sm:text-[10px] max-sm:tracking-[0.08em]",
+                  // `flex items-center py-2` (thay vì text trần): chữ 12px chỉ cao
+                  // ~16px nên vùng bấm hụt ngưỡng 24×24px CSS của WCAG 2.5.8
+                  // Target Size (Minimum). py-2 nâng lên 32px mà không dịch layout
+                  // vì header đã là flex căn giữa.
+                  "relative flex items-center py-2 font-sans text-xs font-medium tracking-[0.2em] whitespace-nowrap uppercase transition-colors max-sm:text-[10px] max-sm:tracking-[0.08em]",
                   // Underline đỏ son: origin-center + scale-x nên "nở" ra hai bên
                   // thay vì kéo từ một cạnh — hover/active(click)/isActive đều mở.
-                  "after:absolute after:-bottom-1.5 after:left-1/2 after:h-[2px] after:w-full after:origin-center after:-translate-x-1/2 after:scale-x-0 after:bg-[#A62C2B] after:transition-transform after:duration-300 after:content-['']",
+                  // Màu lấy --brand-on-dark: đỏ son gốc #A62C2B trên nền navbar đen
+                  // chỉ đạt 2.44:1, hụt cả 4.5:1 (chữ, WCAG 1.4.3) lẫn 3:1 (gạch
+                  // chân là chỉ báo phi văn bản, WCAG 1.4.11).
+                  "after:absolute after:bottom-0 after:left-1/2 after:h-[2px] after:w-full after:origin-center after:-translate-x-1/2 after:scale-x-0 after:bg-[color:var(--brand-on-dark)] after:transition-transform after:duration-300 after:content-['']",
                   isActive
-                    ? "text-[#A62C2B] after:scale-x-100"
-                    : "text-[#EDE1C8]/55 hover:text-[#EDE1C8] hover:after:scale-x-100 active:text-[#A62C2B] active:after:scale-x-100",
+                    ? "text-[color:var(--brand-on-dark)] after:scale-x-100"
+                    : "text-[#EDE1C8]/55 hover:text-[#EDE1C8] hover:after:scale-x-100 active:text-[color:var(--brand-on-dark)] active:after:scale-x-100",
                 ].join(" ")}
               >
-                {item.label}
+                {t(item.key)}
               </Link>
             );
           })}
+
+          {/* Nút chuyển ngôn ngữ — nằm cuối dãy tag, trước ô profile. */}
+          <LanguageToggle />
 
           {/* Ô profile — chỉ khi đã đăng nhập (guest dùng tag Account ở trên). */}
           {user && <HeaderProfile displayName={user.displayName} />}

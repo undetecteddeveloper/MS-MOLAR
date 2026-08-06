@@ -9,6 +9,7 @@
 // riêng); KHÔNG đáp án nào có mặt ở client (PublicQuestion đã Omit).
 
 "use client";
+import { useT } from "@/lib/i18n/client";
 
 import type { ChoiceId, PublicQuestion, SubItemId } from "@/types/question";
 import { decodeTfAnswer, encodeTfAnswer } from "@/lib/ugc/tfCodec";
@@ -39,6 +40,7 @@ export function QuestionRenderer({
   flagged,
   onToggleFlag,
 }: QuestionRendererProps) {
+  const t = useT();
   const type = question.questionType ?? "mcq";
 
   return (
@@ -63,7 +65,7 @@ export function QuestionRenderer({
       <div className="h-[238px] overflow-y-auto pr-2">
         {type === "mcq" && (
           <fieldset className="flex flex-col gap-2.5 border-0 p-0">
-            <legend className="sr-only">Choose an answer</legend>
+            <legend className="sr-only">{t("player.chooseAnswer")}</legend>
             {question.choices.map((choice) => (
               <AnswerChoice
                 key={choice.id}
@@ -109,9 +111,7 @@ export function QuestionRenderer({
                           key={String(v)}
                           type="button"
                           aria-pressed={active}
-                          onClick={() =>
-                            onSelectAnswer(encodeTfAnswer({ ...sel, [sid]: v }))
-                          }
+                          onClick={() => onSelectAnswer(encodeTfAnswer({ ...sel, [sid]: v }))}
                           className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
                             active
                               ? "border-foreground bg-foreground text-background"
@@ -126,9 +126,7 @@ export function QuestionRenderer({
                 </div>
               );
             })}
-            <p className="text-muted-foreground mt-1 text-xs italic">
-              True/False — stored, not auto-scored yet.
-            </p>
+            <p className="text-muted-foreground mt-1 text-xs italic">{t("player.tfNotScored")}</p>
           </div>
         )}
 
@@ -136,7 +134,7 @@ export function QuestionRenderer({
         {type === "short_answer" && (
           <div className="flex flex-col gap-2">
             <label htmlFor={`short-${question.id}`} className="text-muted-foreground text-xs">
-              Your answer
+              {t("player.yourAnswer")}
             </label>
             <input
               id={`short-${question.id}`}
@@ -147,16 +145,14 @@ export function QuestionRenderer({
               placeholder="e.g. 1260 / 1,04"
             />
             <p className="text-muted-foreground mt-1 text-xs italic">
-              Short answer — auto-scored after you submit.
+              {t("player.shortAnswerScored")}
             </p>
           </div>
         )}
 
         {/* essay: người làm bài không nhập bài luận trong player MVP. */}
         {type === "essay" && (
-          <p className="text-muted-foreground text-sm italic">
-            Essay question — answer on paper. Stored, not auto-scored yet.
-          </p>
+          <p className="text-muted-foreground text-sm italic">{t("player.essayNotScored")}</p>
         )}
       </div>
     </div>

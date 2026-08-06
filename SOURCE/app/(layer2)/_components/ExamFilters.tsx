@@ -1,4 +1,5 @@
 "use client";
+import { useT } from "@/lib/i18n/client";
 
 // ExamFilters — bộ lọc Exam Browser (Layer 2). GĐ 3 M3.1 (LÀM LẠI #2).
 // Bám sát TEMPLATE/L2/L2_mobile.png + #Yêu cầu engineer:
@@ -81,6 +82,7 @@ export function ExamFilters({
   sort,
   dir,
 }: ExamFiltersProps) {
+  const t = useT();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -158,7 +160,7 @@ export function ExamFilters({
           {/* Tay nắm (master toggle) — tam giác đen, nhãn dọc. Luôn render = mỏ neo sticky. */}
           <button
             type="button"
-            aria-label="Filters"
+            aria-label={t("common.filters")}
             aria-expanded={open}
             onClick={() => setOpen((v) => !v)}
             className="border-border hover:bg-accent flex flex-col items-center gap-2 rounded-md border-r py-4 pr-2.5 pl-3 transition-colors duration-200"
@@ -173,7 +175,7 @@ export function ExamFilters({
               )}
             </span>
             <span className="eyebrow" style={{ writingMode: "vertical-rl" }}>
-              Filters
+              {t("common.filters")}
             </span>
           </button>
 
@@ -306,11 +308,11 @@ export function ExamFilters({
               type="button"
               onClick={toggleDirection}
               disabled={!sort}
-              aria-label="Toggle sort direction"
-              className="text-muted-foreground hover:text-brand mt-1 flex items-center justify-end gap-1.5 border-t border-border pt-2 text-xs whitespace-nowrap transition-colors disabled:pointer-events-none disabled:opacity-40"
+              aria-label={t("exams.toggleSortDirection")}
+              className="text-muted-foreground hover:text-brand border-border mt-1 flex items-center justify-end gap-1.5 border-t pt-2 text-xs whitespace-nowrap transition-colors disabled:pointer-events-none disabled:opacity-40"
             >
               <span aria-hidden>{ascending ? "↑" : "↓"}</span>
-              {ascending ? "Ascending" : "Descending"}
+              {ascending ? t("exams.ascending") : t("exams.descending")}
             </button>
           </div>
         </div>

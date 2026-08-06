@@ -10,6 +10,7 @@
 
 import { useEffect, useRef } from "react";
 import Link from "next/link";
+import { useT } from "@/lib/i18n/client";
 
 export default function GlobalRouteError({
   error,
@@ -18,6 +19,7 @@ export default function GlobalRouteError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const t = useT();
   const alertRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -26,32 +28,29 @@ export default function GlobalRouteError({
   }, [error]);
 
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center bg-background px-6 py-16">
+    <main className="bg-background flex min-h-dvh flex-col items-center justify-center px-6 py-16">
       <div
         ref={alertRef}
         role="alert"
         tabIndex={-1}
-        className="w-full max-w-md rounded-lg border border-brand bg-brand/8 px-6 py-6 text-center outline-none"
+        className="border-brand bg-brand/8 w-full max-w-md rounded-lg border px-6 py-6 text-center outline-none"
       >
-        <p className="font-mono text-xs uppercase tracking-[0.28em] text-brand">
-          Something broke
+        <p className="text-brand font-mono text-xs tracking-[0.28em] uppercase">
+          {t("error.somethingBroke")}
         </p>
 
-        <h1 className="mt-4 font-heading text-2xl text-foreground">
-          We couldn&apos;t load this page
-        </h1>
+        <h1 className="font-heading text-foreground mt-4 text-2xl">{t("error.couldntLoad")}</h1>
 
-        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-          The problem is on our side, not yours. Trying again usually works — if
-          it doesn&apos;t, come back in a few minutes.
+        <p className="text-muted-foreground mt-3 text-sm leading-relaxed">
+          {t("error.couldntLoadBody")}
         </p>
 
         {/* digest là handle duy nhất để dò log server: Next.js che stack thật
             trên production, chỉ trả về mã băm này. Hiện ra để người dùng còn
             có cái mà báo lại. */}
         {error.digest && (
-          <p className="mt-4 font-mono text-[11px] text-muted-foreground">
-            Reference: {error.digest}
+          <p className="text-muted-foreground mt-4 font-mono text-[11px]">
+            {t("error.reference")} {error.digest}
           </p>
         )}
 
@@ -59,15 +58,15 @@ export default function GlobalRouteError({
           <button
             type="button"
             onClick={reset}
-            className="rounded-[4px] bg-brand px-5 py-2.5 text-xs font-medium uppercase tracking-[0.14em] text-brand-foreground transition-opacity hover:opacity-90"
+            className="bg-brand text-brand-foreground rounded-[4px] px-5 py-2.5 text-xs font-medium tracking-[0.14em] uppercase transition-opacity hover:opacity-90"
           >
-            Try again
+            {t("common.tryAgain")}
           </button>
           <Link
             href="/"
-            className="rounded-[4px] border border-border px-5 py-2.5 text-xs font-medium uppercase tracking-[0.14em] text-foreground transition-colors hover:bg-secondary"
+            className="border-border text-foreground hover:bg-secondary rounded-[4px] border px-5 py-2.5 text-xs font-medium tracking-[0.14em] uppercase transition-colors"
           >
-            Home
+            {t("common.home")}
           </Link>
         </div>
       </div>

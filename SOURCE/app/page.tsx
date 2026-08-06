@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { HomeSidebar } from "@/app/(layer1)/_components/HomeSidebar";
 import { HomeStage, type AuthMode } from "@/app/(layer1)/_components/HomeStage";
+import { SkipLink } from "@/components/shared/SkipLink";
 import { getCurrentUserProfile } from "@/lib/auth/getCurrentUser";
 
 // Homepage (Layer 1 — Entry). Bố cục theo template Hyperspace (HTML5 UP):
@@ -11,20 +12,12 @@ import { getCurrentUserProfile } from "@/lib/auth/getCurrentUser";
 // transition ngay trong trang (không tách page /login riêng). URL sync qua
 // `?auth=signin|signup` để deep-link và middleware redirect hoạt động;
 // logic swap nằm trong HomeStage (client). Toàn bộ nội dung tiếng Anh.
-export default async function Home({
-  searchParams,
-}: {
-  searchParams: Promise<{ auth?: string }>;
-}) {
+export default async function Home({ searchParams }: { searchParams: Promise<{ auth?: string }> }) {
   // Fetch user cho ô account đáy sidebar (avatar + tên). Đọc cookie auth mỗi
   // request → `/` là dynamic (ƒ), đánh đổi hợp lý cho cá nhân hoá.
-  const [{ auth }, user] = await Promise.all([
-    searchParams,
-    getCurrentUserProfile(),
-  ]);
+  const [{ auth }, user] = await Promise.all([searchParams, getCurrentUserProfile()]);
 
-  const authMode: AuthMode =
-    auth === "signup" ? "signup" : auth === "signin" ? "signin" : null;
+  const authMode: AuthMode = auth === "signup" ? "signup" : auth === "signin" ? "signin" : null;
 
   // Đã đăng nhập mà mở form auth → vào thẳng /exams (parity với /login cũ).
   if (user && authMode) redirect("/exams");
@@ -34,10 +27,15 @@ export default async function Home({
     // homepage nằm gọn trong viewport. Content area tự cuộn NỘI BỘ
     // (overflow-y-auto) chỉ khi màn quá thấp, để không bị cắt nội dung.
     <div className="flex h-dvh flex-col overflow-hidden bg-[#1B1512] lg:flex-row">
+      <SkipLink />
       <HomeSidebar user={user} authOpen={authMode !== null} />
 
-      {/* preload order 1 — content area fade sau sidebar (S#21). */}
+      {/* preload order 1 — content area fade sau sidebar (S#21).
+          id + tabIndex={-1} = đích nhảy của SkipLink (WCAG 2.4.1) — homepage
+          dùng thẳng <main> làm đích vì nó không có wrapper riêng như các layer. */}
       <main
+        id="main-content"
+        tabIndex={-1}
         className="preload-fade relative flex min-h-0 flex-1 flex-col overflow-y-auto bg-[#EDE1C8] px-6 py-8 sm:px-12 lg:px-16 lg:py-10"
         style={{ "--preload-order": 1 } as React.CSSProperties}
       >

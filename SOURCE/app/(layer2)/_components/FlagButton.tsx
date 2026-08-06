@@ -4,22 +4,23 @@
 // TEMPLATE/L2/ExamPage) — active = viền/chữ brand.
 "use client";
 
+import { useT } from "@/lib/i18n/client";
+
 interface FlagButtonProps {
   flagged: boolean;
   onToggle: () => void;
 }
 
 export function FlagButton({ flagged, onToggle }: FlagButtonProps) {
+  const t = useT();
   return (
     <button
       type="button"
       onClick={onToggle}
       aria-pressed={flagged}
-      title={flagged ? "Unflag this question" : "Flag this question for review"}
-      className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium uppercase tracking-[0.04em] transition-colors ${
-        flagged
-          ? "border-brand text-brand"
-          : "border-border text-muted-foreground hover:bg-accent"
+      title={flagged ? t("player.unflagHint") : t("player.flagHint")}
+      className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium tracking-[0.04em] uppercase transition-colors ${
+        flagged ? "border-brand text-brand" : "border-border text-muted-foreground hover:bg-accent"
       }`}
     >
       <svg
@@ -34,7 +35,7 @@ export function FlagButton({ flagged, onToggle }: FlagButtonProps) {
         <path d="M3.5 1.5v13" strokeLinecap="round" />
         <path d="M3.5 2.5h8.5l-2 3 2 3H3.5z" />
       </svg>
-      <span>{flagged ? "Flagged" : "Flag"}</span>
+      <span>{flagged ? t("player.flagged") : t("player.flag")}</span>
     </button>
   );
 }

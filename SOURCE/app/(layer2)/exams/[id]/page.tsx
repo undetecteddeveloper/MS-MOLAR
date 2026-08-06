@@ -13,8 +13,10 @@ import { ReportExam } from "@/app/(layer2)/_components/ReportExam";
 import { AuthorByline } from "@/components/shared/AuthorByline";
 import { DifficultyBadge } from "@/components/rating/DifficultyBadge";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
+import { getTranslate } from "@/lib/i18n/server";
 
 export default async function ExamDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const t = await getTranslate();
   const { id } = await params;
   const exam = await getExam(id);
 
@@ -55,49 +57,50 @@ export default async function ExamDetailPage({ params }: { params: Promise<{ id:
               lượt đánh giá (AC-016). */}
           <dl className="mt-8 grid w-full max-w-md grid-cols-2 gap-4">
             <div className="border-border bg-card rounded-lg border p-5">
-              <dt className="eyebrow">Questions</dt>
+              <dt className="eyebrow">{t("common.questions")}</dt>
               <dd className="text-foreground mt-2 font-serif text-2xl tabular-nums">
                 {exam.questionIds.length}
               </dd>
             </div>
             <div className="border-border bg-card rounded-lg border p-5">
-              <dt className="eyebrow">Duration</dt>
+              <dt className="eyebrow">{t("exams.duration")}</dt>
               <dd className="text-foreground mt-2 font-serif text-2xl tabular-nums">
-                {exam.durationMinutes} <span className="text-muted-foreground text-base">min</span>
+                {exam.durationMinutes}{" "}
+                <span className="text-muted-foreground text-base">{t("exams.minutesShort")}</span>
               </dd>
             </div>
             <div className="border-border bg-card rounded-lg border p-5">
-              <dt className="eyebrow">School</dt>
+              <dt className="eyebrow">{t("common.school")}</dt>
               <dd
                 className={`mt-2 font-serif text-lg leading-snug ${
                   exam.school ? "text-foreground" : "text-muted-foreground"
                 }`}
               >
-                {exam.school ?? "None"}
+                {exam.school ?? t("common.none")}
               </dd>
             </div>
             <div className="border-border bg-card rounded-lg border p-5">
-              <dt className="eyebrow">Year</dt>
+              <dt className="eyebrow">{t("common.year")}</dt>
               <dd
                 className={`mt-2 font-serif text-2xl tabular-nums ${
                   exam.schoolYear !== undefined ? "text-foreground" : "text-muted-foreground"
                 }`}
               >
-                {exam.schoolYear ?? "None"}
+                {exam.schoolYear ?? t("common.none")}
               </dd>
             </div>
             <div className="border-border bg-card rounded-lg border p-5">
-              <dt className="eyebrow">Semester</dt>
+              <dt className="eyebrow">{t("common.semester")}</dt>
               <dd
                 className={`mt-2 font-serif text-2xl ${
                   exam.semester ? "text-foreground" : "text-muted-foreground"
                 }`}
               >
-                {exam.semester ?? "None"}
+                {exam.semester ?? t("common.none")}
               </dd>
             </div>
             <div className="border-border bg-card rounded-lg border p-5">
-              <dt className="eyebrow">Difficulty</dt>
+              <dt className="eyebrow">{t("exams.difficulty")}</dt>
               <DifficultyBadge communityDifficulty={exam.communityDifficulty} variant="detail" />
             </div>
           </dl>

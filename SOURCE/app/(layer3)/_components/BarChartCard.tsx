@@ -6,13 +6,10 @@
 // nhóm khác khi hover 35%/200ms (#7).
 
 "use client";
+import { useT } from "@/lib/i18n/client";
 
 import { useRef, useState, type ReactNode } from "react";
-import {
-  NEEDS_REVIEW_THRESHOLD,
-  niceCeil,
-  type SubjectStats,
-} from "@/lib/fake-data/analytics";
+import { NEEDS_REVIEW_THRESHOLD, niceCeil, type SubjectStats } from "@/lib/fake-data/analytics";
 
 // Hệ toạ độ nội bộ (viewBox) — SVG scale theo bề ngang card qua w-full.
 const VB_WIDTH = 920;
@@ -51,6 +48,7 @@ export function BarChartCard({
   filterSlot: ReactNode;
   highlightWeakest?: boolean;
 }) {
+  const t = useT();
   const [hovered, setHovered] = useState<string | null>(null);
   const [tooltip, setTooltip] = useState<Tooltip | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -84,22 +82,25 @@ export function BarChartCard({
     <div>
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="font-serif text-2xl text-foreground">Correct vs. Incorrect by Subject</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Hover a subject for details</p>
+          <h2 className="text-foreground font-serif text-2xl">{t("analytics.barTitle")}</h2>
+          <p className="text-muted-foreground mt-1 text-sm">{t("analytics.barHint")}</p>
         </div>
         {filterSlot}
       </div>
 
-      <div className="mt-4 rounded-md border border-border bg-card p-5">
+      <div className="border-border bg-card mt-4 rounded-md border p-5">
         <div className="flex justify-end">
           <div className="flex items-center gap-4 text-xs">
             <span className="flex items-center gap-1.5">
-              <span className="inline-block h-2.5 w-2.5" style={{ backgroundColor: CORRECT_COLOR }} />
-              <span className="uppercase tracking-wide text-muted-foreground">Correct</span>
+              <span
+                className="inline-block h-2.5 w-2.5"
+                style={{ backgroundColor: CORRECT_COLOR }}
+              />
+              <span className="text-muted-foreground tracking-wide uppercase">Correct</span>
             </span>
             <span className="flex items-center gap-1.5">
               <span className="inline-block h-2.5 w-2.5" style={{ backgroundColor: WRONG_COLOR }} />
-              <span className="uppercase tracking-wide text-muted-foreground">Wrong</span>
+              <span className="text-muted-foreground tracking-wide uppercase">Wrong</span>
             </span>
           </div>
         </div>
@@ -107,7 +108,7 @@ export function BarChartCard({
         <div ref={containerRef} className="relative mt-4">
           <svg
             role="img"
-            aria-label="Correct vs. incorrect answers by subject"
+            aria-label={t("analytics.barAlt")}
             viewBox={`0 0 ${VB_WIDTH} ${VB_HEIGHT}`}
             preserveAspectRatio="xMidYMid meet"
             className="h-auto w-full"
@@ -160,7 +161,13 @@ export function BarChartCard({
                   }}
                   onMouseMove={(e) => handleMouseMove(e, stat)}
                 >
-                  <rect x={slotX} y={PLOT_TOP} width={slotWidth} height={PLOT_HEIGHT} fill="transparent" />
+                  <rect
+                    x={slotX}
+                    y={PLOT_TOP}
+                    width={slotWidth}
+                    height={PLOT_HEIGHT}
+                    fill="transparent"
+                  />
                   <rect
                     x={pairStart}
                     y={correctY}
@@ -188,9 +195,9 @@ export function BarChartCard({
                       x={centerX}
                       y={PLOT_BOTTOM + 36}
                       textAnchor="middle"
-                      className="fill-[#A62C2B] font-sans text-[10px] font-semibold uppercase tracking-wide"
+                      className="fill-[#A62C2B] font-sans text-[10px] font-semibold tracking-wide uppercase"
                     >
-                      Needs review
+                      {t("analytics.needsReview")}
                     </text>
                   )}
                 </g>
@@ -200,7 +207,7 @@ export function BarChartCard({
 
           {tooltip && (
             <div
-              className="pointer-events-none absolute z-10 w-max whitespace-nowrap rounded-sm border border-border bg-foreground px-2 py-1 font-sans text-xs text-background"
+              className="border-border bg-foreground text-background pointer-events-none absolute z-10 w-max rounded-sm border px-2 py-1 font-sans text-xs whitespace-nowrap"
               style={
                 tooltip.x > tooltip.containerWidth - TOOLTIP_FLIP_THRESHOLD
                   ? { right: tooltip.containerWidth - tooltip.x + 12, top: tooltip.y - 12 }

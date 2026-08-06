@@ -1,4 +1,5 @@
 "use client";
+import { useT } from "@/lib/i18n/client";
 
 // ResetPasswordForm — form đặt mật khẩu mới (Layer 1, S#23). User tới đây từ
 // link email reset (recovery session đã có nhờ /auth/callback). Submit →
@@ -11,27 +12,15 @@ import { useActionState, useState } from "react";
 import { updatePassword, type AuthState } from "@/app/(layer1)/actions";
 
 export function ResetPasswordForm() {
-  const [state, formAction, pending] = useActionState<AuthState, FormData>(
-    updatePassword,
-    null,
-  );
+  const t = useT();
+  const [state, formAction, pending] = useActionState<AuthState, FormData>(updatePassword, null);
 
   return (
     <form action={formAction} className="flex flex-col gap-5">
-      <Field
-        id="password"
-        name="password"
-        label="New password"
-        autoComplete="new-password"
-      />
-      <Field
-        id="confirm"
-        name="confirm"
-        label="Confirm new password"
-        autoComplete="new-password"
-      />
+      <Field id="password" name="password" label="New password" autoComplete="new-password" />
+      <Field id="confirm" name="confirm" label="Confirm new password" autoComplete="new-password" />
 
-      <p className="text-xs text-[#6B655C]">At least 6 characters.</p>
+      <p className="text-xs text-[color:var(--muted-foreground)]">{t("auth.passwordHint")}</p>
 
       {state?.error && (
         <p role="alert" className="text-sm text-[#A62C2B]">
@@ -42,9 +31,9 @@ export function ResetPasswordForm() {
       <button
         type="submit"
         disabled={pending}
-        className="self-start rounded-[4px] bg-[#A62C2B] px-7 py-2.5 text-xs font-medium uppercase tracking-[0.14em] text-[#EDE1C8] transition-colors hover:bg-[#8F2523] disabled:opacity-60"
+        className="self-start rounded-[4px] bg-[#A62C2B] px-7 py-2.5 text-xs font-medium tracking-[0.14em] text-[#EDE1C8] uppercase transition-colors hover:bg-[#8F2523] disabled:opacity-60"
       >
-        {pending ? "Saving…" : "Set new password"}
+        {pending ? t("common.saving") : t("auth.setNewPassword")}
       </button>
     </form>
   );
@@ -61,14 +50,15 @@ function Field({
   label: string;
   autoComplete: string;
 }) {
+  const t = useT();
   const [show, setShow] = useState(false);
 
   return (
     <label htmlFor={id} className="flex flex-col gap-1.5">
-      <span className="text-xs font-medium uppercase tracking-[0.08em] text-[#6B655C]">
+      <span className="text-xs font-medium tracking-[0.08em] text-[color:var(--muted-foreground)] uppercase">
         {label}
       </span>
-      <span className="flex items-center gap-3 border-b border-[#D8C9A8] transition-colors focus-within:border-[#B8863B]">
+      <span className="flex items-center gap-3 border-b border-[color:var(--input)] transition-colors focus-within:border-[color:var(--ring)]">
         <input
           id={id}
           name={name}
@@ -81,8 +71,8 @@ function Field({
         <button
           type="button"
           onClick={() => setShow((v) => !v)}
-          aria-label={show ? "Hide password" : "Show password"}
-          className="shrink-0 text-[#6B655C] transition-colors hover:text-[#1B1512]"
+          aria-label={show ? t("auth.hidePassword") : t("auth.showPassword")}
+          className="shrink-0 text-[color:var(--muted-foreground)] transition-colors hover:text-[#1B1512]"
         >
           {show ? <EyeOffIcon className="size-4" /> : <EyeIcon className="size-4" />}
         </button>
