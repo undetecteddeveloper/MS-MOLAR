@@ -15,6 +15,13 @@
 //      phải đọc được, cột đáp án phải trả 42501.
 //   5. Hai RPC phải tồn tại và authenticated phải gọi được.
 //   6. `on delete` của MỌI khoá ngoại  <- catalog thật, qua RPC §16a (TD-011)
+//   7. DB đang chạy BẢN NÀO của schema.sql <- vân tay §17 (TD-005)
+//
+// (1)–(6) soi từng mảnh cụ thể, và chỉ bắt được đúng những thứ đã từng hỏng.
+// (7) soi phần còn lại: gộp toàn bộ file thành một vân tay, nên một bản vá nằm
+// trong git mà chưa chạy trên DB sẽ lộ ra dù nó chạm vào chỗ nào. Đó chính là
+// chuyện đã xảy ra 2026-08-04 → 08-07: bản vá cascade áp lên prod, quên dev, và
+// (1)–(6) trên dev vẫn xanh vì chúng không biết phải hỏi về mảnh đó.
 //
 // (6) là ngoại lệ có chủ đích với "không đọc DDL từ DB": nó KHÔNG suy từ hành vi
 // mà đọc thẳng pg_constraint qua một hàm chỉ-đọc chỉ service_role gọi được. Đây
@@ -35,6 +42,11 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { fkKey, resolveForeignKeys } from "../lib/schema/parseForeignKeys";
+import {
+  SCHEMA_FINGERPRINT,
+  computeSchemaFingerprint,
+  parseDeclaredFingerprint,
+} from "../lib/schema/schemaFingerprint";
 
 /** Một dòng của `public.schema_foreign_keys()` (§16a). */
 interface DbForeignKey {
@@ -492,9 +504,63 @@ async function main() {
     );
   }
 
+  // ==========================================================================
+  // 7. §17 — DB đang chạy bản schema.sql nào (TD-005)
+  //
+  // Sáu check ở trên đều soi MỘT mảnh cụ thể: quyền cột, RPC, `on delete`...
+  // Chúng bắt được đúng những thứ đã từng hỏng, và không bắt được thứ chưa
+  // từng. Check này soi mảnh còn lại: TOÀN BỘ file, gộp thành một vân tay.
+  //
+  // Vì sao cần, dù đã có 6 check kia: 2026-08-04 → 2026-08-07 bản vá cascade
+  // được áp lên prod nhưng QUÊN dev. Lệch đó chỉ lộ ra vì tình cờ có người soi
+  // hai DB cạnh nhau. Vân tay làm nó lộ ra ngay lượt verify đầu tiên.
+  // ==========================================================================
+  console.log("\nPhiên bản schema (§17, TD-005):");
+
+  const declaredFp = parseDeclaredFingerprint(schemaSql);
+  const computedFp = computeSchemaFingerprint(schemaSql);
+
+  // Ba bên phải khớp: file tự khai, tính lại từ nội dung, và hằng số TS mà
+  // server dùng lúc khởi động. Lệch ở đây là lỗi của REPO, chưa dính gì tới DB
+  // — nói tách bạch để người đọc không đi paste SQL một cách vô ích.
+  assert(
+    declaredFp === computedFp && SCHEMA_FINGERPRINT === computedFp,
+    declaredFp === computedFp && SCHEMA_FINGERPRINT === computedFp
+      ? `schema.sql tự khai đúng vân tay của chính nó (${computedFp})`
+      : `REPO lệch, chưa cần đụng DB — schema.sql khai \`${declaredFp}\`, hằng số TS là \`${SCHEMA_FINGERPRINT}\`, nội dung thật là \`${computedFp}\`. Sửa cả hai về ${computedFp} (chi tiết: npx vitest run lib/schema)`
+  );
+
+  const versionRes = await admin
+    .from("schema_version")
+    .select("fingerprint, applied_at")
+    .eq("id", 1)
+    .maybeSingle();
+
+  if (versionRes.error) {
+    // Bảng chưa tồn tại = §17 chưa hề chạy ở đây, tức DB ở một bản trước
+    // 2026-08-07. Nói thẳng thế thay vì in mã lỗi PostgREST.
+    const missing = versionRes.error.code === "42P01" || versionRes.error.code === "PGRST205";
+    assert(
+      false,
+      missing
+        ? "public.schema_version chưa tồn tại — DB đang ở bản TRƯỚC §17 (2026-08-07). Paste lại toàn bộ schema.sql."
+        : `Không đọc được schema_version: ${versionRes.error.code ?? ""} ${versionRes.error.message}`
+    );
+  } else {
+    const dbFp = versionRes.data?.fingerprint ?? null;
+    assert(
+      dbFp === computedFp,
+      dbFp === computedFp
+        ? `DB đang chạy đúng bản schema.sql trong git (${computedFp}, apply lúc ${versionRes.data?.applied_at})`
+        : dbFp === null
+          ? "schema_version RỖNG — lần paste schema.sql gần nhất đứt trước câu lệnh cuối. Paste lại toàn bộ file."
+          : `DB đang ở bản \`${dbFp}\`, git đang ở \`${computedFp}\` — có bản vá trong git CHƯA chạy trên DB này. Đây đúng là hình dạng TD-005; paste lại toàn bộ schema.sql vào SQL Editor của môi trường này.`
+    );
+  }
+
   console.log(
     failures === 0
-      ? "\n✅ Schema verify: DB khớp schema.sql §10 + §11 + §12 + khoá ngoại (§15/§16)."
+      ? "\n✅ Schema verify: DB khớp schema.sql §10 + §11 + §12 + khoá ngoại (§15/§16) + phiên bản (§17)."
       : `\n❌ Schema verify: ${failures} check FAIL — DB và schema.sql đang lệch nhau.`
   );
   process.exit(failures === 0 ? 0 : 1);

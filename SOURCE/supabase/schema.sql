@@ -223,11 +223,12 @@ create policy "results_insert_own" on public.exam_results
 -- 1. exams — cột lifecycle/tác giả/file nguồn + CHECK status
 -- ----------------------------------------------------------------------------
 alter table public.exams add column if not exists status text not null default 'processing';
--- `on delete no action` viết RÕ chứ không để mặc định — xem §16: mọi khoá ngoại
--- phải khai hành vi xoá, và `verify:schema` fail nếu có cái nào bỏ trống.
--- (Chuẩn hoá tên constraint ở §16b vì `add column if not exists` không chạy lại
--- trên DB đã có cột.)
-alter table public.exams add column if not exists author_id uuid references auth.users(id) on delete no action;
+-- `on delete` viết RÕ chứ không để mặc định — xem §16: mọi khoá ngoại phải khai
+-- hành vi xoá, và `verify:schema` fail nếu có cái nào bỏ trống.
+-- Dòng này CHỈ có hiệu lực trên DB trắng; §16b mới là nơi sở hữu hành vi thật
+-- (`add column if not exists` không chạy lại trên DB đã có cột, nên đổi ở đây
+-- không đủ). Giữ hai chỗ NÓI CÙNG MỘT THỨ để đọc §L4 không hiểu nhầm.
+alter table public.exams add column if not exists author_id uuid references auth.users(id) on delete set null;
 alter table public.exams add column if not exists author_display_name text;   -- ADR-0003: snapshot tên tác giả
 alter table public.exams add column if not exists reviewed_at timestamptz;    -- set khi publish
 alter table public.exams add column if not exists question_file_path text;    -- path trong exam-uploads (nguồn re-run)
@@ -1035,9 +1036,10 @@ create table if not exists public.exam_moderation_log (
   id         uuid primary key default gen_random_uuid(),
   exam_id    text not null references public.exams(id) on delete cascade,
   action     text not null check (action in ('remove','restore')),
-  -- `no action` viết rõ (§16): nhật ký kiểm toán KHÔNG được biến mất theo tài
-  -- khoản người đã bấm gỡ, nên không cascade.
-  actor_id   uuid references auth.users(id) on delete no action,
+  -- `set null` (§16b, TD-012): nhật ký kiểm toán KHÔNG được biến mất theo tài
+  -- khoản người đã bấm gỡ, nên KHÔNG cascade. Mất DANH TÍNH actor thì chịu
+  -- được; mất cả DÒNG thì biến "xoá tài khoản" thành "xoá dấu vết".
+  actor_id   uuid references auth.users(id) on delete set null,
   reason     text,
   created_at timestamptz not null default now()
 );
@@ -1179,29 +1181,79 @@ $$;
 revoke all on function public.schema_foreign_keys() from public, anon, authenticated;
 grant execute on function public.schema_foreign_keys() to service_role;
 
--- 16b. Hai khoá ngoại duy nhất còn để `on delete` mặc định — viết rõ thành
---      `no action`. KHÔNG đổi hành vi (mặc định vốn đã là no action); mục đích
---      là để ý định nằm trong file thay vì nằm trong đầu người viết, và để quy
---      ước "mọi references phải có on delete" đúng với 100% khoá ngoại.
+-- 16b. Hai khoá ngoại duy nhất trỏ `auth.users` mà không cascade —
+--      `on delete set null` (TECH-DEBT TD-012, sửa 2026-08-07).
 --
---      ⚠ Hệ quả đang chịu, ghi ra để lần sau không phải suy lại: `no action` ở
---      đây nghĩa là KHÔNG xoá được một tài khoản auth.users nếu tài khoản đó đã
---      đăng đề hoặc đã từng bấm gỡ/khôi phục đề — Postgres sẽ chặn bằng 23503,
---      đúng hình dạng của bug 2026-08-04 nhưng ở tầng tài khoản. Hiện KHÔNG có
---      đường nào trong app xoá tài khoản (chỉ xoá tay trên Supabase dashboard),
---      nên đây là ràng buộc đã biết chứ chưa phải bug. Nếu sau này làm tính năng
---      xoá tài khoản: đổi cả hai sang `set null` (cả hai cột đều nullable, và
---      ADR-0003 đã snapshot `author_display_name` chính là để đề sống sót qua
---      tác giả) — ĐỪNG đổi sang cascade, cascade sẽ xoá sạch đề công khai và
---      nhật ký kiểm toán theo một lần bấm xoá tài khoản.
+--      Lịch sử ngắn, vì nó giải thích vì sao dòng dưới KHÔNG phải `no action`:
+--      2026-08-04 mục này viết rõ `no action` (đúng bằng hành vi mặc định đang
+--      có) và ghi lại thành TD-012 với nhận định "chưa chạm tới được, ngày làm
+--      tính năng xoá tài khoản thì đổi sang set null". 2026-08-07 đổi luôn.
+--      Lý do đổi sớm: `no action` KHÔNG mua được gì hôm nay (không có đường nào
+--      trong app xoá tài khoản — đã grep `deleteUser`/`admin.deleteUser`), nó
+--      chỉ hẹn giờ một lần 23503 cho người viết tính năng đó. Còn `set null`
+--      hôm nay cũng KHÔNG đổi hành vi gì, vì không có lệnh xoá nào để chạm tới.
+--      Hai lựa chọn cùng giá ở hiện tại; một cái đúng sẵn ở tương lai.
+--
+--      Vì sao `set null` là đáp án chứ không phải cascade:
+--      - `exams.author_id` nullable, và ADR-0003 đã snapshot `author_display_name`
+--        ngay trên hàng đề — chính là để đề sống sót qua việc tác giả biến mất.
+--        Cascade sẽ xoá sạch đề CÔNG KHAI của người khác đang làm dở.
+--      - `exam_moderation_log.actor_id` nullable. Nhật ký kiểm toán mất DANH
+--        TÍNH người bấm còn chấp nhận được; mất cả DÒNG thì không — cascade
+--        biến "xoá tài khoản" thành "xoá luôn dấu vết mình đã làm gì".
 alter table public.exams
   drop constraint if exists exams_author_id_fkey;
 alter table public.exams
   add constraint exams_author_id_fkey
-  foreign key (author_id) references auth.users (id) on delete no action;
+  foreign key (author_id) references auth.users (id) on delete set null;
 
 alter table public.exam_moderation_log
   drop constraint if exists exam_moderation_log_actor_id_fkey;
 alter table public.exam_moderation_log
   add constraint exam_moderation_log_actor_id_fkey
-  foreign key (actor_id) references auth.users (id) on delete no action;
+  foreign key (actor_id) references auth.users (id) on delete set null;
+
+-- ----------------------------------------------------------------------------
+-- 17. Phiên bản schema — DB tự khai nó đang chạy bản nào (2026-08-07).
+--
+--     Vì sao có phần này (TECH-DEBT TD-005): file này được paste TAY vào SQL
+--     Editor. Không có bản ghi "môi trường nào đang ở phiên bản nào", nên code
+--     và DB lệch nhau mà KHÔNG có gì báo. Đã xảy ra thật hai lần:
+--       - bản vá §10: code chuyển sang RPC trong khi DB chưa có hàm;
+--       - bản vá cascade 2026-08-04 (bug xoá đề): áp lên prod, QUÊN dev. Suốt
+--         3 ngày Preview deploy vẫn chết 23503 trong khi tsc/vitest/verify đều
+--         xanh — vì không cổng nào biết dev đang chạy bản nào.
+--
+--     Từ nay `verify:schema` và `instrumentation.ts` đọc bảng này và so với vân
+--     tay của schema.sql trong git. Lệch = có người quên paste, và nó nói ra.
+--
+--     ⚠ ĐÂY KHÔNG PHẢI MIGRATION TOOL. Không thứ tự áp, không rollback, không
+--     biết đi từ bản A sang bản B. Nó trả lời đúng MỘT câu: "DB này có đang
+--     chạy đúng file schema.sql trong git không?". Trả nợ trọn vẹn TD-005 vẫn
+--     là Supabase CLI migrations.
+-- ----------------------------------------------------------------------------
+create table if not exists public.schema_version (
+  id          smallint primary key default 1 check (id = 1),
+  fingerprint text not null,
+  applied_at  timestamptz not null default now()
+);
+
+-- Sơ đồ hệ thống, không phải dữ liệu người dùng — không có lý do gì để trình
+-- duyệt đọc được. RLS bật + KHÔNG policy nào = anon/authenticated không thấy
+-- gì; service_role bỏ qua RLS nên `verify:schema` và server vẫn đọc được.
+alter table public.schema_version enable row level security;
+revoke all on public.schema_version from anon, authenticated;
+
+-- Khối dưới đây PHẢI là câu lệnh CUỐI CÙNG của file, cố ý: nếu paste bị đứt
+-- giữa chừng (timeout, lỗi ở §nào đó), vân tay KHÔNG được ghi — DB thà không
+-- biết mình là bản nào, còn hơn khai nhận một bản nó chưa chạy hết.
+--
+-- Nội dung giữa hai marker KHÔNG tính vào vân tay (nếu tính thì băm chứa chính
+-- nó — xem lib/schema/schemaFingerprint.ts).
+-- @schema-fingerprint-begin
+insert into public.schema_version (id, fingerprint)
+values (1, 'bbe1ee9326c9')
+on conflict (id) do update
+  set fingerprint = excluded.fingerprint,
+      applied_at  = now();
+-- @schema-fingerprint-end

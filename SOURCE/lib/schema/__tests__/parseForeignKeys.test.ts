@@ -220,9 +220,15 @@ describe("schema.sql", () => {
 
   it("nhật ký kiểm toán và quyền tác giả KHÔNG cascade theo tài khoản", () => {
     // Xoá tài khoản mà cuốn theo đề công khai + nhật ký gỡ bài là mất dữ liệu
-    // của người khác. `no action` ở đây là chủ đích, và §16b ghi rõ hệ quả.
-    expect(resolved.get("public.exams(author_id)")?.onDelete).toBe("no action");
-    expect(resolved.get("public.exam_moderation_log(actor_id)")?.onDelete).toBe("no action");
+    // của người khác. Cả hai phải `set null` (TD-012, đổi 2026-08-07 từ
+    // `no action`): đề sống sót nhờ snapshot `author_display_name` (ADR-0003),
+    // nhật ký giữ nguyên DÒNG và chỉ mất danh tính actor.
+    //
+    // Test này CỐ Ý ghim giá trị chính xác chứ không chỉ "khác cascade": hai
+    // giá trị sai theo hai kiểu khác nhau. `cascade` là mất dữ liệu người khác;
+    // `no action` là một lần 23503 cho ngày làm tính năng xoá tài khoản.
+    expect(resolved.get("public.exams(author_id)")?.onDelete).toBe("set null");
+    expect(resolved.get("public.exam_moderation_log(actor_id)")?.onDelete).toBe("set null");
   });
 
   it("fkKey chuẩn hoá giống hệt cách verify-schema.ts khoá dữ liệu từ catalog", () => {
