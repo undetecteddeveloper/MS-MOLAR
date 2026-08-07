@@ -62,12 +62,15 @@ describe("checkRateLimit", () => {
 });
 
 describe("guard", () => {
-  it("uses per-action buckets, so hitting one action does not block another", () => {
+  // Không cấu hình KV_REST_API_* trong test → `guard` dừng ở lớp RAM. Đó đúng
+  // là nhánh cần ghim ở đây: hành vi khi Redis vắng mặt phải y hệt trước
+  // 2026-08-07, vì đó là lưới đỡ khi Upstash chết (xem rateLimitStore.ts).
+  it("uses per-action buckets, so hitting one action does not block another", async () => {
     for (let i = 0; i < RATE_LIMITS.reportExam.limit; i += 1) {
-      expect(guard("reportExam", "u1").ok).toBe(true);
+      expect((await guard("reportExam", "u1")).ok).toBe(true);
     }
-    expect(guard("reportExam", "u1").ok).toBe(false);
-    expect(guard("submitExam", "u1").ok).toBe(true);
+    expect((await guard("reportExam", "u1")).ok).toBe(false);
+    expect((await guard("submitExam", "u1")).ok).toBe(true);
   });
 
   it("every configured limit is generous enough not to hit a real user", () => {

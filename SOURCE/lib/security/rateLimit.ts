@@ -1,21 +1,30 @@
-// Rate limit tối giản, trong bộ nhớ tiến trình (Security review 2026-08-03, Low).
+// Rate limit (Security review 2026-08-03, Low; nâng lên bộ đếm dùng chung
+// 2026-08-07 khi trả TD-008).
 //
 // ⚠ ĐỌC PHẦN NÀY TRƯỚC KHI TIN VÀO NÓ ⚠
 //
-// Đây là sliding-window đếm trong RAM của TIẾN TRÌNH ĐANG CHẠY. Nghĩa là:
+// File này giữ lớp sliding-window đếm trong RAM của TIẾN TRÌNH ĐANG CHẠY. Một
+// mình nó thì:
 //   - Deploy nhiều instance (Vercel serverless, autoscale) → mỗi instance một
 //     bộ đếm riêng; trần thực tế = limit × số instance.
 //   - Cold start / restart → bộ đếm về 0.
-//   - KHÔNG chống được flood từ client CHƯA đăng nhập, vì khoá là user id.
 //
-// Nó KHÔNG phải tầng chống DoS thật. Tầng đó là hạ tầng (Vercel/Cloudflare rate
-// limit ở biên). Cái này giải quyết đúng một việc, và giải quyết tốt: chặn một
-// tài khoản ĐÃ ĐĂNG NHẬP gọi dồn dập một Server Action — spam report, spam
-// rating, nộp bài liên tục — mà không cần thêm bảng DB hay round-trip nào.
+// Từ 2026-08-07, `guard()` KHÔNG còn chỉ dựa vào nó: bộ đếm có thẩm quyền nằm
+// trên Upstash Redis (`rateLimitStore.ts`), lớp RAM còn lại hai vai — chặn sớm
+// để khỏi tốn lượt mạng, và làm lưới khi Redis không trả lời. Hai giới hạn đầu
+// vì thế KHÔNG còn đúng với `guard()`, nhưng vẫn đúng với `checkRateLimit()`
+// nếu ai gọi thẳng nó.
 //
-// Chọn RAM thay vì DB có chủ đích: mọi action ở đây đều nằm trên đường người
-// dùng đang chờ, và dự án đã tối ưu round-trip khá kỹ (xem getResult). Thêm một
-// query đếm cho MỖI lần gọi là đánh đổi tệ cho một guard mức Low.
+// CÒN NGUYÊN, và Redis không sửa được: khoá là user id, nên đây KHÔNG chặn được
+// flood từ client CHƯA đăng nhập. Tầng đó là hạ tầng (rate limit ở biên), và nó
+// đang bị khoá sau plan Pro của Vercel — xem TECH-DEBT TD-008. Đừng nhầm cái
+// này là chống DoS.
+//
+// Việc nó làm tốt, và vẫn là việc duy nhất nó nhận: chặn một tài khoản ĐÃ ĐĂNG
+// NHẬP gọi dồn dập một Server Action — spam report, spam rating, nộp bài liên
+// tục.
+
+import { hitSharedStore, isSharedStoreConfigured } from "./rateLimitStore";
 
 /** Bản ghi thời điểm các lần gọi gần đây của một khoá. */
 const hits = new Map<string, number[]>();
@@ -97,11 +106,46 @@ export const RATE_LIMITS = {
   updateProfile: { limit: 20, windowMs: 60 * 60 * 1000 },
 } as const;
 
-/** Tiện ích gộp: `guard("reportExam", userId)`. */
-export function guard(
+/**
+ * Tiện ích gộp: `await guard("reportExam", userId)`.
+ *
+ * HAI LỚP, và thứ tự có chủ đích (TD-008, 2026-08-07):
+ *
+ *   1. RAM trước. Nếu instance này đã thấy user vượt trần thì trả lời ngay —
+ *      không tốn lượt mạng nào. Đây là lớp rẻ, và nó xử đúng trường hợp tốn
+ *      kém nhất: một vòng lặp tự động đang nện liên tục.
+ *   2. Redis sau, và nó là câu trả lời CÓ THẨM QUYỀN. RAM chỉ thấy phần lưu
+ *      lượng đi qua đúng instance này; trần thật phải đếm chung.
+ *
+ * Redis hỏng thì tụt về kết quả của lớp RAM — KHÔNG mở cổng. Một sự cố Upstash
+ * làm rate limit yếu đi (về đúng mức trước 2026-08-07) thì chấp nhận được; làm
+ * nó biến mất thì không. Đổi lại, ta chấp nhận nói "ok" khi Redis chết dù bộ
+ * đếm chung có thể đã đầy — đó là đánh đổi đúng cho một guard mức Low nằm trên
+ * đường người dùng đang chờ nộp bài.
+ *
+ * ⚠ Lớp RAM ĐÃ ghi nhận lần gọi trước khi hỏi Redis. Nghĩa là một lần gọi bị
+ * Redis chặn vẫn tốn một suất trong bộ đếm RAM của instance này. Cố ý chấp
+ * nhận: RAM chỉ còn là lưới dự phòng, lệch một chút theo hướng CHẶT hơn không
+ * gây hại, và sửa cho khớp sẽ cần một lượt ghi ngược làm phức tạp đường nóng.
+ */
+export async function guard(
   action: keyof typeof RATE_LIMITS,
   userId: string
-): RateLimitResult {
+): Promise<RateLimitResult> {
   const { limit, windowMs } = RATE_LIMITS[action];
-  return checkRateLimit(`${action}:${userId}`, limit, windowMs);
+  const key = `${action}:${userId}`;
+
+  const local = checkRateLimit(key, limit, windowMs);
+  if (!local.ok) return local;
+
+  if (!isSharedStoreConfigured()) return local;
+
+  try {
+    return await hitSharedStore(key, limit, windowMs);
+  } catch (err) {
+    // Ồn một dòng là đúng: chạy dài ngày với Redis chết mà không ai biết thì
+    // TD-008 quay lại y như cũ, chỉ khác là nay có một file bảo rằng đã trả.
+    console.warn("! RATE LIMIT: Redis không trả lời, tụt về bộ đếm RAM —", err);
+    return local;
+  }
 }

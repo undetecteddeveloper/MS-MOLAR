@@ -33,3 +33,4 @@ SCREENSHOT/temporary_screenshot/
 /node_modules/
 /test_data/
 .vercel
+.env*

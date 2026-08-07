@@ -992,7 +992,7 @@ export async function reportExam(
 
   // Rate limit (Security review Low). unique(exam_id, reporter_id) chỉ chặn
   // report TRÙNG trên CÙNG một đề — không chặn được việc quét qua nhiều đề.
-  const rl = guard("reportExam", user.id);
+  const rl = await guard("reportExam", user.id);
   if (!rl.ok) return { error: "rate_limited" };
 
   const trimmed = reason.trim().slice(0, LIMITS.MAX_REPORT_REASON);

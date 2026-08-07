@@ -174,7 +174,7 @@ export async function updateProfile(
 
   // Rate limit (Security review Low) — user_profiles.update không có ràng buộc
   // nào chặn ghi lặp, nên đây là action rẻ nhất để gọi dồn.
-  const rl = guard("updateProfile", user.id);
+  const rl = await guard("updateProfile", user.id);
   if (!rl.ok) {
     return { error: `Too many updates. Try again in ${rl.retryAfterSeconds} seconds.` };
   }

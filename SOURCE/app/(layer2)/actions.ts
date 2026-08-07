@@ -71,7 +71,7 @@ export async function submitExam(
   // Rate limit (Security review Low). Khoá lấy từ chính dòng attempt vừa đọc —
   // RLS đã lọc về attempt của người gọi nên user_id này đáng tin, và không tốn
   // thêm round-trip nào (khác với gọi auth.getUser()).
-  const rl = guard("submitExam", attempt.user_id as string);
+  const rl = await guard("submitExam", attempt.user_id as string);
   if (!rl.ok) {
     throw new Error(
       `Too many submissions. Try again in ${rl.retryAfterSeconds} seconds.`
@@ -207,7 +207,7 @@ export async function rateExam(
 
   // Rate limit (Security review Low) — rateExam là UPSERT nên unique
   // (exam_id,user_id) KHÔNG chặn được việc gọi lại liên tục để sửa điểm.
-  const rl = guard("rateExam", eligible.user_id as string);
+  const rl = await guard("rateExam", eligible.user_id as string);
   if (!rl.ok) return { error: "rate_limited" };
 
   // user_id KHÔNG truyền vào — cột default auth.uid() (không nhận từ input).

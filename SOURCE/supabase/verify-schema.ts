@@ -81,7 +81,14 @@ function loadEnv(): Record<string, string> {
     if (!t || t.startsWith("#")) continue;
     const eq = t.indexOf("=");
     if (eq === -1) continue;
-    env[t.slice(0, eq).trim()] = t.slice(eq + 1).trim();
+    // Bóc nháy bao ngoài: `vercel env pull` ghi giá trị dạng "..." trong khi
+    // các biến gõ tay thì không, nên một file .env.local có thể trộn cả hai.
+    // Parser của Next tự bóc; parser tối giản ở đây thì không, và hệ quả là một
+    // URL kèm nháy đi thẳng vào client rồi hỏng ở chỗ chẳng nhắc gì tới env.
+    env[t.slice(0, eq).trim()] = t
+      .slice(eq + 1)
+      .trim()
+      .replace(/^(["'])(.*)\1$/, "$2");
   }
   return env;
 }
