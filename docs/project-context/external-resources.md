@@ -23,7 +23,7 @@ This file records the external resources available to this project and how to ac
 ### Guidelines
 - Status: present
 - Source type: project files
-- Location: `DESIGN.md` (visual rules), plus `PROJECT_OVERVIEW.md` and `PROCESS.md` (repo root) for process conventions
+- Location: `DESIGN.md` (visual rules), plus `PROJECT_OVERVIEW.md` (repo root) for process conventions. Session progress: Notion (see `.claude/MEMORY.md`); technical debt: `TECH-DEBT.md`
 - Access method: file read
 
 ### Visual Verification Environment

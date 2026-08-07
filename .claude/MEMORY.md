@@ -33,7 +33,11 @@ Ba pha, chạy theo thứ tự. Pha 2 tồn tại để pha 1 của phiên SAU t
 
 Tạo/cập nhật row trong database MS-MOLAR. Thuộc tính: `Tên nhiệm vụ`, `Trạng thái` (Chưa bắt đầu/Đang thực hiện/Hoàn tất), `Mô tả`, `Loại nhiệm vụ`, `Mức độ ưu tiên`, `Mức độ công sức`. Thân page ghi **số đo và lý do**, không chỉ liệt kê việc — phiên sau đọc lại cần hiểu *tại sao*, không chỉ *cái gì*.
 
-`PROCESS.md` (root, >3000 dòng) từ 2026-08-06 là **lịch sử chỉ-đọc**, không append nữa. Cần tra quyết định cũ thì đọc ~200 dòng cuối (`tail -n 200`), đừng đọc hết.
+`PROCESS.md` — lịch sử chỉ-đọc từ 2026-08-06 — đã **xoá hẳn 2026-08-07**: mọi
+nợ kỹ thuật còn mở trong đó (rà toàn bộ ~3700 dòng, không chỉ phần cuối) đã
+chuyển vào `TECH-DEBT.md`; các mục còn lại đều đã được phiên sau giải quyết
+(xác minh từng mục bằng code/DB thật, không chép mù). Quyết định cũ giờ tra ở
+Notion database MS-MOLAR (row đã đóng) hoặc git log, không còn ở PROCESS.md.
 
 ### Pha 3 — Implementation
 

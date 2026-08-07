@@ -61,7 +61,7 @@ export async function signUp(
  * (route handler đổi code lấy session). Code verifier nằm trong cookie do
  * @supabase/ssr tự quản lý.
  * ⚠️ Chỉ hoạt động khi engineer đã bật provider + dán credentials trong
- * Supabase Dashboard (xem checklist PROCESS.md S#23).
+ * Supabase Dashboard (xem `docs/DEPLOYMENT.md` § 3.2 OAuth providers).
  */
 export async function signInWithOAuth(
   _prev: AuthState,

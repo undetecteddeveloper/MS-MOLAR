@@ -1,9 +1,11 @@
 # PROJECT_OVERVIEW — TrangNguyenDigi (MS-MOLAR)
 
-> Tài liệu nền tảng cho agent và engineer. Đọc file này trước khi đọc `PROCESS.md`.
+> Tài liệu nền tảng cho agent và engineer.
 > Cập nhật file này khi có quyết định kỹ thuật mới — xoá phần đã lỗi thời thay vì
 > để nó tồn tại song song với sự thật (rà soát 2026-08-06: đã bỏ toàn bộ phần mô
-> tả tầm nhìn 3D ban đầu — xem §10).
+> tả tầm nhìn 3D ban đầu — xem §10; 2026-08-07: `PROCESS.md` — nhật ký từng phiên
+> — đã bị xoá, nợ kỹ thuật còn mở đã chuyển hết sang `TECH-DEBT.md`; tiến độ theo
+> phiên nay ghi ở Notion, xem `.claude/MEMORY.md`).
 
 ---
 
@@ -15,7 +17,7 @@
 | **Repo** | `github.com/undetecteddeveloper/TrangNguyenDigi.git` |
 | **Giao tiếp agent ↔ engineer** | Tiếng Việt |
 | **Solo hay team** | Solo (1 engineer) |
-| **Tài liệu liên quan** | `PROCESS.md` (nhật ký từng phiên), `DESIGN.md` (design token), `docs/TECH-DEBT.md`, `docs/DEPLOYMENT.md` |
+| **Tài liệu liên quan** | `DESIGN.md` (design token), `TECH-DEBT.md`, `docs/DEPLOYMENT.md`. Tiến độ từng phiên: Notion (xem `.claude/MEMORY.md`) |
 
 ---
 
@@ -85,7 +87,7 @@ MS-MOLAR/
 ├── docs/                    # PRD, ADR, Design Doc, UI Spec, work plan theo từng feature
 ├── SCREENSHOT/              # Ảnh tham chiếu thiết kế + screenshot tạm (Playwright MCP)
 ├── DESIGN.md                # Design token — nguồn duy nhất, xem §2
-├── PROCESS.md                # Nhật ký từng phiên implementation
+├── TECH-DEBT.md             # Sổ ghi nợ kỹ thuật
 └── PROJECT_OVERVIEW.md      # File này
 ```
 
