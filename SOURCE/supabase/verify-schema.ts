@@ -61,8 +61,20 @@ interface DbForeignKey {
   on_update: string;
 }
 
+/**
+ * Đọc env từ `.env.local`, hoặc từ file khác nếu đặt `SCHEMA_ENV_FILE`.
+ *
+ * Có cái override này vì script cần chạy được với TỪNG môi trường: dự án có 2
+ * Supabase project (dev + prod) và TD-005 sinh ra chính từ việc một bản vá chỉ
+ * được áp lên một trong hai. Trước đây kiểm prod phải đổi tên file `.env.local`
+ * qua lại bằng tay — một thao tác vừa dễ quên bước đổi ngược, vừa để lại cây
+ * làm việc trỏ nhầm DB nếu lệnh giữa chừng hỏng. Nay:
+ *
+ *   SCHEMA_ENV_FILE=.env.local.prod-backup npm run verify:schema
+ */
 function loadEnv(): Record<string, string> {
-  const raw = readFileSync(resolve(__dirname, "../.env.local"), "utf8");
+  const file = process.env.SCHEMA_ENV_FILE?.trim() || ".env.local";
+  const raw = readFileSync(resolve(__dirname, "..", file), "utf8");
   const env: Record<string, string> = {};
   for (const line of raw.split("\n")) {
     const t = line.trim();
