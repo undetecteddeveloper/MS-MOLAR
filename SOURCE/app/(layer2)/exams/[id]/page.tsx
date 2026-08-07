@@ -4,7 +4,6 @@
 // môn/lớp + tiêu đề serif + ô meta (số câu/thời gian) + nút brand. Mobile-first.
 // Feedback: bỏ eyebrow môn/lớp + dòng hướng dẫn; back link "Trang trước"; căn giữa toàn bộ.
 
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getExam } from "@/app/(layer2)/queries";
 import { hasReported } from "@/app/(layer4)/queries";
@@ -14,6 +13,9 @@ import { AuthorByline } from "@/components/shared/AuthorByline";
 import { DifficultyBadge } from "@/components/rating/DifficultyBadge";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { getTranslate } from "@/lib/i18n/server";
+import { PageContainer } from "@/components/layout/PageContainer";
+import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
+import { BentoGrid, BentoCell } from "@/components/layout/BentoGrid";
 
 export default async function ExamDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const t = await getTranslate();
@@ -30,15 +32,16 @@ export default async function ExamDetailPage({ params }: { params: Promise<{ id:
 
   return (
     <div className="bg-background">
-      <main className="mx-auto flex w-full max-w-xl flex-col px-6 py-10">
-        {/* "Trang trước" canh TRÁI block tổng quan (self-start), nội dung dưới căn giữa. */}
-        <Link
-          href="/exams"
-          className="preload-fade eyebrow hover:text-brand inline-flex items-center gap-1 self-start transition-colors"
+      <PageContainer as="main" size="small" className="flex flex-col">
+        {/* Breadcrumbs thay link "← Back" trần (quy tắc Supabase Studio: dải
+            định vị luôn nằm trên cùng). Khác biệt thực chất, không chỉ hình
+            thức: "← Back" chỉ nói ĐI ĐÂU chứ không nói ĐANG Ở ĐÂU, và người
+            vào thẳng từ link chia sẻ thì không có "trang trước" nào cả. */}
+        <Breadcrumbs
+          items={[{ label: t("nav.exams"), href: "/exams" }, { label: exam.title }]}
+          className="preload-fade self-start text-xs"
           style={{ "--preload-order": 1 } as React.CSSProperties}
-        >
-          ← Back
-        </Link>
+        />
 
         {/* preload order 2 — khối tổng quan fade sau navbar + back link (S#21). */}
         <div
@@ -50,60 +53,64 @@ export default async function ExamDetailPage({ params }: { params: Promise<{ id:
           {/* Byline UGC (Task 5.2) — dưới tiêu đề, chỉ hiện với đề có tác giả. */}
           <AuthorByline name={exam.authorDisplayName} className="mt-2" />
 
-          {/* S#28: điền data DB thật vào page — thêm School/Year/Semester
-              (null → "None"). 6 ô = lưới 2×3 đều → bỏ hack căn giữa col-span
-              của ô Difficulty (S#26, chỉ cần khi lẻ ô). Difficulty giờ hiển
-              thị DifficultyBadge (Rating System, ADR-0008) — "—" khi < 3
-              lượt đánh giá (AC-016). */}
-          <dl className="mt-8 grid w-full max-w-md grid-cols-2 gap-4">
-            <div className="border-border bg-card rounded-lg border p-5">
-              <dt className="eyebrow">{t("common.questions")}</dt>
-              <dd className="text-foreground mt-2 font-serif text-2xl tabular-nums">
-                {exam.questionIds.length}
-              </dd>
-            </div>
-            <div className="border-border bg-card rounded-lg border p-5">
-              <dt className="eyebrow">{t("exams.duration")}</dt>
-              <dd className="text-foreground mt-2 font-serif text-2xl tabular-nums">
-                {exam.durationMinutes}{" "}
-                <span className="text-muted-foreground text-base">{t("exams.minutesShort")}</span>
-              </dd>
-            </div>
-            <div className="border-border bg-card rounded-lg border p-5">
-              <dt className="eyebrow">{t("common.school")}</dt>
-              <dd
-                className={`mt-2 font-serif text-lg leading-snug ${
-                  exam.school ? "text-foreground" : "text-muted-foreground"
-                }`}
-              >
-                {exam.school ?? t("common.none")}
-              </dd>
-            </div>
-            <div className="border-border bg-card rounded-lg border p-5">
-              <dt className="eyebrow">{t("common.year")}</dt>
-              <dd
-                className={`mt-2 font-serif text-2xl tabular-nums ${
-                  exam.schoolYear !== undefined ? "text-foreground" : "text-muted-foreground"
-                }`}
-              >
-                {exam.schoolYear ?? t("common.none")}
-              </dd>
-            </div>
-            <div className="border-border bg-card rounded-lg border p-5">
-              <dt className="eyebrow">{t("common.semester")}</dt>
-              <dd
-                className={`mt-2 font-serif text-2xl ${
-                  exam.semester ? "text-foreground" : "text-muted-foreground"
-                }`}
-              >
-                {exam.semester ?? t("common.none")}
-              </dd>
-            </div>
-            <div className="border-border bg-card rounded-lg border p-5">
-              <dt className="eyebrow">{t("exams.difficulty")}</dt>
-              <DifficultyBadge communityDifficulty={exam.communityDifficulty} variant="detail" />
-            </div>
-          </dl>
+          {/* Lưới Bento (docs/market/UI-Design-Research.md §2). Trước đây là 6 ô
+              đều nhau 2×3 với chuỗi class `border-border bg-card rounded-lg
+              border p-5` chép tay 6 lần; nay là BentoCell, và bề rộng mỗi ô
+              chạy theo NỘI DUNG chứ không chia đều máy móc:
+                hàng 1  số câu (3) · thời lượng (3) · độ khó (6)
+                hàng 2  trường (6) · năm (3) · học kỳ (3)
+              School và Difficulty lấy nửa hàng vì chúng chứa chuỗi/chỉ báo dài,
+              còn các ô số thì một con số ngắn không cần chỗ rộng.
+              Thứ tự JSX = thứ tự đọc = thứ tự nhìn thấy (không dùng order-*). */}
+          <BentoGrid as="dl" className="mt-8 w-full">
+              <BentoCell span="quarter">
+                <dt className="eyebrow">{t("common.questions")}</dt>
+                <dd className="text-foreground mt-2 font-serif text-2xl tabular-nums">
+                  {exam.questionIds.length}
+                </dd>
+              </BentoCell>
+              <BentoCell span="quarter">
+                <dt className="eyebrow">{t("exams.duration")}</dt>
+                <dd className="text-foreground mt-2 font-serif text-2xl tabular-nums">
+                  {exam.durationMinutes}{" "}
+                  <span className="text-muted-foreground text-base">{t("exams.minutesShort")}</span>
+                </dd>
+              </BentoCell>
+              <BentoCell span="half">
+                <dt className="eyebrow">{t("exams.difficulty")}</dt>
+                <DifficultyBadge communityDifficulty={exam.communityDifficulty} variant="detail" />
+              </BentoCell>
+              <BentoCell span="half">
+                <dt className="eyebrow">{t("common.school")}</dt>
+                <dd
+                  className={`mt-2 font-serif text-lg leading-snug ${
+                    exam.school ? "text-foreground" : "text-muted-foreground"
+                  }`}
+                >
+                  {exam.school ?? t("common.none")}
+                </dd>
+              </BentoCell>
+              <BentoCell span="quarter">
+                <dt className="eyebrow">{t("common.year")}</dt>
+                <dd
+                  className={`mt-2 font-serif text-2xl tabular-nums ${
+                    exam.schoolYear !== undefined ? "text-foreground" : "text-muted-foreground"
+                  }`}
+                >
+                  {exam.schoolYear ?? t("common.none")}
+                </dd>
+              </BentoCell>
+              <BentoCell span="quarter">
+                <dt className="eyebrow">{t("common.semester")}</dt>
+                <dd
+                  className={`mt-2 font-serif text-2xl ${
+                    exam.semester ? "text-foreground" : "text-muted-foreground"
+                  }`}
+                >
+                  {exam.semester ?? t("common.none")}
+                </dd>
+              </BentoCell>
+          </BentoGrid>
 
           <div className="mt-8">
             <StartAttemptButton examId={exam.id} />
@@ -116,7 +123,7 @@ export default async function ExamDetailPage({ params }: { params: Promise<{ id:
             </div>
           )}
         </div>
-      </main>
+      </PageContainer>
     </div>
   );
 }

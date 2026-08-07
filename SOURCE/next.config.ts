@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { LIMITS } from "./lib/ugc/limits";
+import { buildCsp, supabaseOriginFromEnv } from "./lib/security/csp";
 
 // ---------------------------------------------------------------------------
 // Security response headers (Security review 2026-08-03, Medium #5)
@@ -9,11 +10,15 @@ import { LIMITS } from "./lib/ugc/limits";
 // (lib/supabase/cookieOptions.ts đặt httpOnly:true, làm được vì dự án không
 // dùng Supabase client trình duyệt). CSP dưới đây là tầng phòng thủ THỨ HAI.
 //
-// ⚠ `script-src` cố ý CÓ 'unsafe-inline'. Next.js chèn script inline để hydrate
-// (flight data); chặn nó mà không có nonce là trang trắng. Làm nonce đúng cách
-// cần proxy.ts sinh nonce mỗi request và Next đọc lại — chưa làm, ghi ở
-// docs/TECH-DEBT.md. Nghĩa là CSP này KHÔNG chặn được inline-XSS; giá trị thật
-// của nó nằm ở các directive còn lại:
+// CSP ở ĐÂY là chính sách NỀN, có `'unsafe-inline'`. Chính sách THẬT của mọi
+// trang HTML do `proxy.ts` đặt đè, kèm nonce sinh riêng từng request (TD-006 đã
+// trả 2026-08-04) — xem lib/security/csp.ts. Nền này chỉ còn hiệu lực ở những
+// path proxy.ts không chạy qua (`_next/static`, ảnh, `robots.txt`, …), nơi
+// không có script inline nào để bảo vệ. Giữ nó lại thay vì xoá vì nó là lưới
+// an toàn: middleware không chạy → trang vẫn có CSP, chỉ là bản yếu hơn, chứ
+// KHÔNG phải trang trắng.
+//
+// Các directive còn lại (đúng ở cả hai chính sách):
 //   - script-src 'self'  → không nạp được script từ domain lạ (kênh exfil phổ biến nhất)
 //   - frame-ancestors    → chống clickjacking (thay X-Frame-Options, mạnh hơn)
 //   - base-uri 'self'    → chặn <base> hijack đổi đích mọi URL tương đối
@@ -22,42 +27,11 @@ import { LIMITS } from "./lib/ugc/limits";
 // ---------------------------------------------------------------------------
 const isProd = process.env.NODE_ENV === "production";
 
-// Ảnh đề nằm ở Supabase Storage (signed URL) → img-src phải cho phép origin đó.
-// Lấy từ env thay vì hard-code để không lệch khi đổi project.
-const supabaseOrigin = (() => {
-  const raw = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!raw) return "";
-  try {
-    return new URL(raw).origin;
-  } catch {
-    return "";
-  }
-})();
-
-const csp = [
-  "default-src 'self'",
-  // 'unsafe-eval' chỉ ở dev: Turbopack/HMR cần. Production thì không.
-  `script-src 'self' 'unsafe-inline'${isProd ? "" : " 'unsafe-eval'"}`,
-  // Tailwind + KaTeX sinh style inline; next/font nhúng @font-face inline.
-  "style-src 'self' 'unsafe-inline'",
-  // data: cho ảnh nhúng của html2canvas; blob: cho PDF (jspdf) tạo ở client.
-  `img-src 'self' data: blob:${supabaseOrigin ? ` ${supabaseOrigin}` : ""}`,
-  "font-src 'self' data:",
-  `connect-src 'self'${supabaseOrigin ? ` ${supabaseOrigin}` : ""}`,
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "frame-ancestors 'none'",
-  // CỐ Ý KHÔNG có `upgrade-insecure-requests`: nó ép mọi request http → https,
-  // kể cả khi chạy `next start` ở localhost (NODE_ENV=production nhưng phục vụ
-  // qua http) → ERR_SSL_PROTOCOL_ERROR, không test được bản production tại máy.
-  // Đổi lại gần như không mất gì: HSTS bên dưới đã ép https ở mức domain thật,
-  // và img-src/connect-src vốn chỉ cho phép 'self' + origin Supabase (https),
-  // nên không còn đường nào sinh mixed content.
-].join("; ");
-
 const securityHeaders = [
-  { key: "Content-Security-Policy", value: csp },
+  {
+    key: "Content-Security-Policy",
+    value: buildCsp({ nonce: null, isProd, supabaseOrigin: supabaseOriginFromEnv() }),
+  },
   // Legacy, cho trình duyệt chưa hiểu frame-ancestors.
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Content-Type-Options", value: "nosniff" },

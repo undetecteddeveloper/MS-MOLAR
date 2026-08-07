@@ -6,6 +6,7 @@
 // second implementation. ActionButton keeps its own UI shell and now simply
 // delegates to this hook.
 import { useRef, useState } from "react";
+import { useT } from "@/lib/i18n/client";
 import {
   canShareFile,
   downloadPdfFile,
@@ -37,6 +38,7 @@ async function attemptShare(file: File): Promise<"shared" | "fallback"> {
 }
 
 export function usePdfAction(action: "save" | "share", pdfInput: AttemptPdfData) {
+  const t = useT();
   const [phase, setPhase] = useState<PdfActionPhase>("idle");
   const busyRef = useRef(false); // synchronous guard — aria-disabled does not block the click event (D4/AC-010)
 
@@ -45,7 +47,13 @@ export function usePdfAction(action: "save" | "share", pdfInput: AttemptPdfData)
     busyRef.current = true;
     setPhase("busy");
     try {
-      const file = await generateAttemptPdfFile(pdfInput);
+      // Chân trang dịch ở ĐÂY chứ không ở nơi dựng pdfInput: HistoryRow là
+      // server component, còn hook này luôn chạy client nên bắt được ngôn ngữ
+      // đang bật mà không phải kéo `t` qua props từng chỗ gọi.
+      const file = await generateAttemptPdfFile({
+        ...pdfInput,
+        footerPrefix: t("history.pdfFooterPrefix"),
+      });
       if (action === "save") {
         downloadPdfFile(file);
         setPhase("idle");

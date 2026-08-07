@@ -11,14 +11,15 @@
 // hover hiện tooltip theo con trỏ (HIDDEN_FEATURES.md) — nút action chính nằm
 // NGOÀI vùng trigger nên hover/right-click nút không kích hoạt tooltip/menu
 // của hàng. Hàng published: read-only, không context menu (đã publish).
-// Toàn bộ copy hệ thống giữ tiếng Anh (khớp ngôn ngữ hiện có của app) — bản
-// mock tiếng Việt trong design_reference chỉ là copy minh hoạ, không phải yêu
-// cầu ngôn ngữ.
+// Copy đi qua `t()` — nhãn action, badge trạng thái và dòng meta đều theo ngôn
+// ngữ đang chọn.
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { MyExamListItem } from "@/app/(layer4)/queries";
+import { useT } from "@/lib/i18n/client";
+import type { MessageKey, Translate } from "@/lib/i18n/translate";
 import { StatusBadge } from "./StatusBadge";
 import { DeleteDialog } from "./DeleteDialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -32,19 +33,30 @@ import {
 const REVIEW_HREF = (id: string) => `/me/exams/${id}`;
 
 /** Nhãn hành động chính theo status (null = không có action chính). */
-function primaryAction(item: MyExamListItem): { label: string; href: string } | null {
+function primaryAction(item: MyExamListItem): { labelKey: MessageKey; href: string } | null {
   switch (item.status) {
     case "failed":
-      return { label: "Review & fix", href: REVIEW_HREF(item.id) };
+      return { labelKey: "upload.actionReviewFix", href: REVIEW_HREF(item.id) };
     case "review":
-      return { label: "Continue review", href: REVIEW_HREF(item.id) };
+      return { labelKey: "upload.actionContinueReview", href: REVIEW_HREF(item.id) };
     case "draft":
-      return { label: "Continue", href: REVIEW_HREF(item.id) };
+      return { labelKey: "upload.actionContinue", href: REVIEW_HREF(item.id) };
     case "published":
-      return { label: "Edit", href: REVIEW_HREF(item.id) };
+      return { labelKey: "common.edit", href: REVIEW_HREF(item.id) };
     default:
       return null; // processing
   }
+}
+
+/** Dòng meta dưới tiêu đề: môn · lớp · số câu · thời điểm tạo. */
+function metaLine(t: Translate, item: MyExamListItem, createdAt: string): string {
+  const subject = item.subject !== "" ? item.subject : "—";
+  const grade = item.grade !== 0 ? String(item.grade) : "—";
+  const questions =
+    item.questionCount === 1
+      ? t("upload.oneQuestion")
+      : t("upload.questionCount", { count: item.questionCount });
+  return `${subject} · ${t("upload.gradeShort", { grade })} · ${questions} · ${createdAt}`;
 }
 
 /** Badge trái kiểu "file type" — viết tắt 3 ký tự từ môn học (sentinel "" → "EXM"). */
@@ -60,6 +72,7 @@ function formatDateTime(iso: string): string {
 }
 
 export function ExamRow({ item }: { item: MyExamListItem }) {
+  const t = useT();
   const primary = primaryAction(item);
   const isPublished = item.status === "published";
   // Published: tiêu đề trỏ tới đề live; còn lại trỏ màn review (nếu có action).
@@ -92,13 +105,11 @@ export function ExamRow({ item }: { item: MyExamListItem }) {
         {/* v2.2: subject/grade có thể còn sentinel (""/0 — Automatic, AI chưa
             đọc được) → hiện "—" thay vì "Grade 0". */}
         <p className="mt-1 text-sm text-muted-foreground">
-          {item.subject !== "" ? item.subject : "—"} · Grade{" "}
-          {item.grade !== 0 ? item.grade : "—"} · {item.questionCount} question
-          {item.questionCount === 1 ? "" : "s"} · {formatDateTime(item.createdAt)}
+          {metaLine(t, item, formatDateTime(item.createdAt))}
         </p>
         {isPublished && item.reviewedAt && (
           <p className="mt-0.5 text-sm text-brand">
-            Published {formatDateTime(item.reviewedAt)}
+            {t("upload.publishedAt", { date: formatDateTime(item.reviewedAt) })}
           </p>
         )}
       </div>
@@ -118,18 +129,18 @@ export function ExamRow({ item }: { item: MyExamListItem }) {
             >
               {content}
             </ContextMenuTrigger>
-            <TooltipContent>Right-click to open actions</TooltipContent>
+            <TooltipContent>{t("upload.rightClickHint")}</TooltipContent>
             <ContextMenuContent>
               {primary && (
                 <ContextMenuItem onClick={() => router.push(primary.href)}>
-                  Edit
+                  {t("common.edit")}
                 </ContextMenuItem>
               )}
               <ContextMenuItem
                 variant="destructive"
                 onClick={() => setDeleteOpen(true)}
               >
-                Delete
+                {t("common.delete")}
               </ContextMenuItem>
             </ContextMenuContent>
           </ContextMenu>
@@ -142,7 +153,7 @@ export function ExamRow({ item }: { item: MyExamListItem }) {
             href={primary.href}
             className="rounded-[4px] bg-brand px-4 py-2 text-xs font-medium uppercase tracking-[0.14em] text-brand-foreground transition-opacity duration-200 hover:opacity-90"
           >
-            {primary.label}
+            {t(primary.labelKey)}
           </Link>
         )}
         {isPublished && <DeleteDialog examId={item.id} examTitle={item.title} />}

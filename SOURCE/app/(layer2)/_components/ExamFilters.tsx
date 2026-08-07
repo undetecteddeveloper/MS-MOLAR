@@ -1,5 +1,6 @@
 "use client";
 import { useT } from "@/lib/i18n/client";
+import type { MessageKey } from "@/lib/i18n/translate";
 
 // ExamFilters — bộ lọc Exam Browser (Layer 2). GĐ 3 M3.1 (LÀM LẠI #2).
 // Bám sát TEMPLATE/L2/L2_mobile.png + #Yêu cầu engineer:
@@ -53,17 +54,17 @@ const DEFAULT_ASCENDING: Record<ExamSort, boolean> = {
 
 // Lọc nhanh — 3 ô checkbox NGOÀI dropdown, xếp dọc, tất cả CÙNG trục ?sort=
 // (D002): chọn 1 tự loại trừ 2 cái còn lại (toggle lại chính nó → bỏ sort).
-const QUICK: { value: ExamSort; label: string }[] = [
-  { value: "newest", label: "Newest" },
-  { value: "oldest", label: "Oldest" },
-  { value: "hardest", label: "Hardest" },
+const QUICK: { value: ExamSort; labelKey: MessageKey }[] = [
+  { value: "newest", labelKey: "exams.sortNewest" },
+  { value: "oldest", labelKey: "exams.sortOldest" },
+  { value: "hardest", labelKey: "exams.sortHardest" },
 ];
 
-const LEVEL_OPTIONS: { value: ExamLevel | ""; label: string }[] = [
-  { value: "", label: "All" },
-  { value: "easy", label: "Easy" },
-  { value: "medium", label: "Medium" },
-  { value: "hard", label: "Hard" },
+const LEVEL_OPTIONS: { value: ExamLevel | ""; labelKey: MessageKey }[] = [
+  { value: "", labelKey: "common.all" },
+  { value: "easy", labelKey: "exams.levelEasy" },
+  { value: "medium", labelKey: "exams.levelMedium" },
+  { value: "hard", labelKey: "exams.levelHard" },
 ];
 
 // rgba khai báo tường minh trong source (theo #Yêu cầu) để làm nổi bật *Filter.
@@ -204,59 +205,63 @@ export function ExamFilters({
                   disabled={!hasFilters}
                   className="text-muted-foreground hover:text-brand text-xs underline-offset-4 transition-colors hover:underline disabled:pointer-events-none disabled:opacity-40"
                 >
-                  Clear
+                  {t("common.clear")}
                 </button>
               </div>
 
               <FilterRow
-                label="Subject"
+                label={t("common.subject")}
                 selectedLabel={selected.subject}
                 currentValue={selected.subject ?? ""}
                 options={[
-                  { value: "", label: "All" },
+                  { value: "", label: t("common.all") },
                   ...subjects.map((s) => ({ value: s, label: s })),
                 ]}
                 onSelect={(v) => setParam("subject", v)}
               />
               <FilterRow
-                label="Grade"
-                selectedLabel={selected.grade !== undefined ? `Grade ${selected.grade}` : undefined}
+                label={t("common.grade")}
+                selectedLabel={
+                  selected.grade !== undefined
+                    ? t("exams.gradeValue", { grade: selected.grade })
+                    : undefined
+                }
                 currentValue={selected.grade !== undefined ? String(selected.grade) : ""}
                 options={[
-                  { value: "", label: "All" },
+                  { value: "", label: t("common.all") },
                   ...grades.map((g) => ({
                     value: String(g),
-                    label: `Grade ${g}`,
+                    label: t("exams.gradeValue", { grade: g }),
                   })),
                 ]}
                 onSelect={(v) => setParam("grade", v)}
               />
               <FilterRow
-                label="School"
+                label={t("common.school")}
                 selectedLabel={selected.school}
                 currentValue={selected.school ?? ""}
                 options={[
-                  { value: "", label: "All" },
+                  { value: "", label: t("common.all") },
                   ...schools.map((s) => ({ value: s, label: s })),
                 ]}
                 onSelect={(v) => setParam("school", v)}
               />
               <FilterRow
-                label="Year"
+                label={t("common.year")}
                 selectedLabel={selected.year !== undefined ? String(selected.year) : undefined}
                 currentValue={selected.year !== undefined ? String(selected.year) : ""}
                 options={[
-                  { value: "", label: "All" },
+                  { value: "", label: t("common.all") },
                   ...years.map((y) => ({ value: String(y), label: String(y) })),
                 ]}
                 onSelect={(v) => setParam("year", v)}
               />
               <FilterRow
-                label="Semester"
+                label={t("common.semester")}
                 selectedLabel={selected.semester}
                 currentValue={selected.semester ?? ""}
                 options={[
-                  { value: "", label: "All" },
+                  { value: "", label: t("common.all") },
                   ...semesters.map((s) => ({ value: s, label: s })),
                 ]}
                 onSelect={(v) => setParam("semester", v)}
@@ -264,12 +269,17 @@ export function ExamFilters({
               {/* Level — bucket độ khó cộng đồng (Rating System, D002 sibling
                   change: real FilterRow thay panel "Coming soon"). */}
               <FilterRow
-                label="Level"
+                label={t("exams.level")}
                 selectedLabel={
-                  LEVEL_OPTIONS.find((o) => o.value === (selected.level ?? ""))?.label || undefined
+                  selected.level !== undefined
+                    ? t(
+                        LEVEL_OPTIONS.find((o) => o.value === selected.level)?.labelKey ??
+                          "common.all"
+                      )
+                    : undefined
                 }
                 currentValue={selected.level ?? ""}
-                options={LEVEL_OPTIONS}
+                options={LEVEL_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
                 onSelect={(v) => setParam("level", v)}
                 last
               />
@@ -289,7 +299,7 @@ export function ExamFilters({
                   key={q.value}
                   className="text-foreground flex cursor-pointer items-center justify-between gap-2 text-sm whitespace-nowrap"
                 >
-                  {q.label}
+                  {t(q.labelKey)}
                   <input
                     type="checkbox"
                     className="accent-brand size-4"

@@ -10,6 +10,7 @@
 
 import { useEffect, useRef } from "react";
 import { useT } from "@/lib/i18n/client";
+import { PageContainer } from "@/components/layout/PageContainer";
 
 export default function Error({
   error,
@@ -27,7 +28,8 @@ export default function Error({
   }, [error]);
 
   return (
-    <main className="mx-auto w-full max-w-2xl px-6 py-10">
+    // Khớp size + padding của history/page.tsx — xem ghi chú ở loading.tsx.
+    <PageContainer as="main" size="small" padding="compact">
       <div
         ref={alertRef}
         role="alert"
@@ -38,11 +40,11 @@ export default function Error({
         <button
           type="button"
           onClick={reset}
-          className="bg-brand text-brand-foreground mt-3 rounded-[4px] px-4 py-2 text-xs font-medium tracking-[0.14em] uppercase transition-opacity hover:opacity-90"
+          className="bg-brand text-brand-foreground mt-3 rounded-full px-4 py-2 text-xs font-medium tracking-[0.14em] uppercase transition-opacity hover:opacity-90"
         >
           {t("common.retry")}
         </button>
       </div>
-    </main>
+    </PageContainer>
   );
 }

@@ -19,6 +19,7 @@ import { useExamPlayer } from "@/hooks/useExamPlayer";
 import { useLeaveGuard } from "@/hooks/useLeaveGuard";
 import { useSwipe } from "@/hooks/useSwipe";
 import type { PublicQuestion } from "@/types/question";
+import { PageContainer } from "@/components/layout/PageContainer";
 
 interface ExamPlayerProps {
   attemptId: string;
@@ -101,7 +102,10 @@ export function ExamPlayer({
       {/* S#28: modal xác nhận rời trang (mở khi guard chặn một click nav). */}
       <LeaveExamDialog open={pendingHref !== null} onCancel={cancelLeave} onLeave={confirmLeave} />
 
-      <main className="mx-auto flex w-full max-w-[1100px] flex-col gap-6 px-6 py-10">
+      {/* `full` (72rem = 1152px) thay số ma thuật max-w-[1100px] cũ — chênh
+          52px, không đổi bố cục, nhưng màn làm bài không còn là bề rộng ngoại
+          lệ duy nhất của app và mép nội dung thẳng hàng mép navbar. */}
+      <PageContainer as="main" size="full" className="flex flex-col gap-6">
         {/* Header — tên đề (trái) · đồng hồ + nút Nộp bài (phải). Không sticky:
             khu vực trả lời đã tự cuộn trong khung 238px (QuestionRenderer) nên
             trang hiếm khi cần cuộn dài. preload order 1 — fade sau navbar (S#21). */}
@@ -124,7 +128,7 @@ export function ExamPlayer({
               type="button"
               onClick={submit}
               disabled={submitting}
-              className="bg-brand text-brand-foreground rounded-md px-5 py-3 text-xs font-medium tracking-[0.04em] uppercase transition-opacity hover:opacity-90 disabled:opacity-50"
+              className="bg-brand text-brand-foreground rounded-full px-5 py-3 text-xs font-medium tracking-[0.04em] uppercase transition-opacity hover:opacity-90 disabled:opacity-50"
             >
               {submitting ? t("player.submitting") : t("player.submit")}
             </button>
@@ -172,7 +176,7 @@ export function ExamPlayer({
                 disabled={current === 0}
                 className="border-border text-foreground hover:border-ring disabled:hover:border-border rounded-md border px-4 py-2.5 text-xs font-medium tracking-[0.04em] uppercase transition-colors disabled:cursor-default disabled:opacity-40"
               >
-                ← Previous
+                ← {t("player.previous")}
               </button>
               <button
                 type="button"
@@ -195,7 +199,7 @@ export function ExamPlayer({
             />
           </div>
         </div>
-      </main>
+      </PageContainer>
     </div>
   );
 }

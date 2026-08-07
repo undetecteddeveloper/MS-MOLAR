@@ -87,7 +87,7 @@ export function HistoryFilters({ subjects, exams, selected }: HistoryFiltersProp
           className="border-border bg-card hover:border-brand/40 text-foreground flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition-colors"
         >
           <Triangle open={open} />
-          Filters
+          {t("common.filters")}
           {hasFilters && <span aria-hidden className="bg-brand size-1.5 shrink-0 rounded-full" />}
         </button>
 
@@ -97,41 +97,44 @@ export function HistoryFilters({ subjects, exams, selected }: HistoryFiltersProp
             style={{ backgroundColor: PANEL_BG }}
           >
             <div className="border-border bg-background/60 flex w-full items-center justify-between gap-3 border-b px-4 py-3">
-              <span className="eyebrow">Filters{hasFilters ? " · active" : ""}</span>
+              <span className="eyebrow">
+                {t("common.filters")}
+                {hasFilters ? ` · ${t("common.active")}` : ""}
+              </span>
               <button
                 type="button"
                 onClick={clearAll}
                 disabled={!hasFilters}
                 className="text-muted-foreground hover:text-brand text-xs underline-offset-4 transition-colors hover:underline disabled:pointer-events-none disabled:opacity-40"
               >
-                Clear
+                {t("common.clear")}
               </button>
             </div>
 
             <FilterRow
-              label="Subject"
+              label={t("common.subject")}
               selectedLabel={selected.subject}
               currentValue={selected.subject ?? ""}
               options={[
-                { value: "", label: "All" },
+                { value: "", label: t("common.all") },
                 ...subjects.map((s) => ({ value: s, label: s })),
               ]}
               onSelect={(v) => setParam("subject", v)}
             />
             <FilterRow
-              label="Exam"
+              label={t("history.exam")}
               selectedLabel={selectedExamTitle}
               currentValue={selected.examId ?? ""}
               options={[
-                { value: "", label: "All" },
+                { value: "", label: t("common.all") },
                 ...exams.map((e) => ({ value: e.id, label: e.title })),
               ]}
               onSelect={(v) => setParam("examId", v)}
             />
 
-            <RangeRow label="Score">
+            <RangeRow label={t("history.score")}>
               <NumberField
-                ariaLabel="Minimum score"
+                ariaLabel={t("history.minimumScore")}
                 value={selected.scoreMin}
                 min={0}
                 max={10}
@@ -141,7 +144,7 @@ export function HistoryFilters({ subjects, exams, selected }: HistoryFiltersProp
               />
               <span className="text-muted-foreground text-xs">–</span>
               <NumberField
-                ariaLabel="Maximum score"
+                ariaLabel={t("history.maximumScore")}
                 value={selected.scoreMax}
                 min={0}
                 max={10}
@@ -151,15 +154,15 @@ export function HistoryFilters({ subjects, exams, selected }: HistoryFiltersProp
               />
             </RangeRow>
 
-            <RangeRow label="Submitted" last>
+            <RangeRow label={t("history.submitted")} last>
               <DateField
-                ariaLabel="Submitted from date"
+                ariaLabel={t("history.submittedFrom")}
                 value={selected.dateFrom}
                 onCommit={(v) => setParam("dateFrom", v)}
               />
               <span className="text-muted-foreground text-xs">–</span>
               <DateField
-                ariaLabel="Submitted to date"
+                ariaLabel={t("history.submittedTo")}
                 value={selected.dateTo}
                 onCommit={(v) => setParam("dateTo", v)}
               />

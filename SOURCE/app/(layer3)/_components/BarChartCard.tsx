@@ -96,11 +96,11 @@ export function BarChartCard({
                 className="inline-block h-2.5 w-2.5"
                 style={{ backgroundColor: CORRECT_COLOR }}
               />
-              <span className="text-muted-foreground tracking-wide uppercase">Correct</span>
+              <span className="text-muted-foreground tracking-wide uppercase">{t("common.correct")}</span>
             </span>
             <span className="flex items-center gap-1.5">
               <span className="inline-block h-2.5 w-2.5" style={{ backgroundColor: WRONG_COLOR }} />
-              <span className="text-muted-foreground tracking-wide uppercase">Wrong</span>
+              <span className="text-muted-foreground tracking-wide uppercase">{t("common.wrong")}</span>
             </span>
           </div>
         </div>
@@ -215,8 +215,12 @@ export function BarChartCard({
               }
             >
               <div className="font-medium">{tooltip.subject}</div>
-              <div>Correct: {tooltip.correct}</div>
-              <div>Wrong: {tooltip.wrong}</div>
+              <div>
+                {t("common.correct")}: {tooltip.correct}
+              </div>
+              <div>
+                {t("common.wrong")}: {tooltip.wrong}
+              </div>
             </div>
           )}
         </div>

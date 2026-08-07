@@ -1,10 +1,15 @@
+"use client";
+
 // ExtractionProgress — trạng thái đang trích xuất (UI Spec §ExtractionProgress,
 // AC-029 / Task 6.2 + v2.2). role="status" polite, không chặn thao tác đọc.
 // v2.2: metaStep (chế độ Automatic) — nêu tên bước đọc thông tin đề như MỘT
 // NHÃN trong cùng trạng thái tiến trình (chạy song song, không phải giai đoạn
 // tuần tự riêng — UI Spec §v2.2 ExtractionProgress).
 
+import { useT } from "@/lib/i18n/client";
+
 export function ExtractionProgress({ metaStep }: { metaStep?: boolean }) {
+  const t = useT();
   return (
     <div
       role="status"
@@ -16,10 +21,8 @@ export function ExtractionProgress({ metaStep }: { metaStep?: boolean }) {
         className="size-4 shrink-0 animate-spin rounded-full border-2 border-[#B8863B]/40 border-t-[#B8863B]"
       />
       <span>
-        {metaStep
-          ? "Reading your exam details, questions and answers… this can take a moment. "
-          : "Reading your files and assembling the exam… this can take a moment. "}
-        You&apos;ll review everything before it&apos;s published.
+        {metaStep ? t("upload.extractingWithMeta") : t("upload.extractingFiles")}{" "}
+        {t("upload.reviewBeforePublish")}
       </span>
     </div>
   );

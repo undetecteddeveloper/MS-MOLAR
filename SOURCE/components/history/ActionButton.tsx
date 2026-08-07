@@ -30,9 +30,14 @@
 import { Download, Loader2, Share2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { usePdfAction } from "@/components/history/usePdfAction";
+import { useT } from "@/lib/i18n/client";
+import type { MessageKey } from "@/lib/i18n/translate";
 import type { AttemptPdfData } from "@/lib/pdf/generateAttemptPdf";
 
-const LABEL = { save: "Save", share: "Share" } as const;
+const LABEL_KEY = { save: "common.save", share: "common.share" } as const satisfies Record<
+  "save" | "share",
+  MessageKey
+>;
 const ICON = { save: Download, share: Share2 } as const;
 
 export interface ActionButtonProps {
@@ -43,9 +48,11 @@ export interface ActionButtonProps {
 }
 
 export function ActionButton({ action, pdfInput, idPrefix }: ActionButtonProps) {
+  const t = useT();
   const { phase, run } = usePdfAction(action, pdfInput);
   const reasonId = `${idPrefix}-${action}-reason`;
   const Icon = ICON[action];
+  const label = t(LABEL_KEY[action]);
 
   return (
     <Tooltip>
@@ -65,13 +72,13 @@ export function ActionButton({ action, pdfInput, idPrefix }: ActionButtonProps) 
         ) : (
           <Icon className="size-6" aria-hidden />
         )}
-        <span className="sr-only">{LABEL[action]}</span>
+        <span className="sr-only">{label}</span>
         {phase === "error" && (
           <span
             role="alert"
             className="text-brand absolute top-full left-1/2 z-10 mt-1 w-max max-w-40 -translate-x-1/2 text-center text-sm"
           >
-            Couldn&apos;t generate the PDF. Try again.
+            {t("history.pdfError")}
           </span>
         )}
         {phase === "fallback-confirmed" && action === "share" && (
@@ -80,16 +87,16 @@ export function ActionButton({ action, pdfInput, idPrefix }: ActionButtonProps) 
             aria-live="polite"
             className="text-muted-foreground absolute top-full left-1/2 z-10 mt-1 w-max max-w-40 -translate-x-1/2 text-center text-sm"
           >
-            Downloaded — sharing isn&apos;t supported in this browser.
+            {t("history.downloadedNoShare")}
           </span>
         )}
         {/* Descendant of the button (not a Tooltip-level sibling, see D2 above) — aria-describedby resolves it
             by id regardless of DOM containment, so this move has no a11y-semantics effect, only a layout one. */}
         <span id={reasonId} className="sr-only">
-          {phase === "busy" ? "Generating your PDF, please wait" : ""}
+          {phase === "busy" ? t("history.generatingPdf") : ""}
         </span>
       </TooltipTrigger>
-      <TooltipContent>{LABEL[action]}</TooltipContent>
+      <TooltipContent>{label}</TooltipContent>
     </Tooltip>
   );
 }

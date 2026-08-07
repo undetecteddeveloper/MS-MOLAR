@@ -20,6 +20,8 @@ import { ResultActions } from "@/app/(layer2)/_components/ResultActions";
 import { mapFromMyRating } from "@/lib/rating";
 import { formatCompletionTime, formatOvertime } from "@/lib/history/format";
 import type { AttemptPdfData } from "@/lib/pdf/generateAttemptPdf";
+import { PageContainer } from "@/components/layout/PageContainer";
+import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 
 export default async function ResultPage({
   params,
@@ -54,8 +56,18 @@ export default async function ResultPage({
 
   return (
     <div className="bg-background">
-      <main className="mx-auto flex w-full max-w-xl flex-col gap-5 px-6 py-8">
+      <PageContainer as="main" size="small" className="flex flex-col gap-5">
         {/* preload order 1–4 — các block fade lần lượt sau navbar (S#21). */}
+        <Breadcrumbs
+          className="preload-fade text-xs"
+          style={{ "--preload-order": 1 } as React.CSSProperties}
+          items={[
+            { label: t("nav.exams"), href: "/exams" },
+            { label: examTitle, href: `/exams/${id}` },
+            { label: t("result.title") },
+          ]}
+        />
+
         <div className="preload-fade" style={{ "--preload-order": 1 } as React.CSSProperties}>
           <ScoreCard
             examTitle={examTitle}
@@ -74,8 +86,7 @@ export default async function ResultPage({
             style={{ "--preload-order": 2 } as React.CSSProperties}
           >
             <span className="text-foreground font-medium">{t("result.submittedAfterTime")}</span>{" "}
-            This attempt went {formatOvertime(data.overtimeSeconds)} over the allotted time, so the
-            score is not a valid timed result.
+            {t("result.overtimeBody", { time: formatOvertime(data.overtimeSeconds) })}
           </div>
         )}
 
@@ -102,7 +113,7 @@ export default async function ResultPage({
         >
           <Link
             href={`/exams/${id}/attempt/${attemptId}/result/detail`}
-            className="border-brand bg-brand text-brand-foreground rounded-lg border px-4 py-3 text-center text-sm font-medium transition-opacity hover:opacity-90"
+            className="border-brand bg-brand text-brand-foreground rounded-full border px-4 py-3 text-center text-sm font-medium transition-opacity hover:opacity-90"
           >
             {t("common.viewDetails")}
           </Link>
@@ -128,7 +139,7 @@ export default async function ResultPage({
             {hasRated ? t("result.editRating") : t("result.rateThisExam")}
           </Link>
         </div>
-      </main>
+      </PageContainer>
     </div>
   );
 }

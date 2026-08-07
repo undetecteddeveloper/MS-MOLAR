@@ -50,6 +50,20 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+  /* Bề rộng scaffold — xem §"KIẾN TRÚC BỐ CỤC" bên dưới. Đăng ký vào @theme để
+     dùng được dưới dạng utility `max-w-scaffold-*` thay vì bracket syntax. */
+  --container-scaffold-small: 42rem;
+  --container-scaffold-default: 48rem;
+  --container-scaffold-full: 72rem;
+  /* Bảng màu "ngủ đông" — đăng ký thành `text-dormant-*`/`bg-dormant-*`. */
+  --color-dormant-clay: var(--dormant-clay);
+  --color-dormant-sky: var(--dormant-sky);
+  --color-dormant-cactus: var(--dormant-cactus);
+  --color-dormant-fig: var(--dormant-fig);
+  --color-dormant-olive: var(--dormant-olive);
+  --color-dormant-heather: var(--dormant-heather);
+  --color-dormant-kelp: var(--dormant-kelp);
+  --color-dormant-slate: var(--dormant-slate);
 }
 
 :root {
@@ -109,6 +123,73 @@
   --sidebar-ring: #b8863b;
 }
 
+/* ============================================================
+   KIẾN TRÚC BỐ CỤC (docs/market/UI-Design-Research.md §2)
+   Áp mô hình layout của Supabase + Anthropic lên theme "Mực &
+   Sơn mài" sẵn có. Phần bảng màu / typography của tài liệu đó
+   THEME NÀY ĐÃ ĐẠT từ trước (nền ngà + mực đen tương phản cực
+   đại, serif chủ đạo, phẳng - hairline không đổ bóng), nên khối
+   này chỉ bổ sung đúng những gì còn thiếu: hệ bề rộng trang,
+   tương phản hình học, thang chữ hiển thị, và bảng màu ngủ đông.
+   ============================================================ */
+:root {
+  /* --- Hệ bề rộng scaffold (Supabase Studio: small | default | full) ------
+     Trước đây mỗi trang tự chọn max-w-2xl/3xl/4xl/6xl rời rạc → cùng một cấp
+     nội dung mà hai trang lại rộng khác nhau. Ba nấc này là TOÀN BỘ bề rộng
+     hợp lệ; component PageContainer là nơi duy nhất đọc chúng.
+       small   42rem — trang một-tác-vụ, luồng đọc hẹp (kết quả, rate, form).
+       default 48rem — trang nội dung tiêu chuẩn (upload, đề của tôi, admin).
+       full    72rem — lưới dữ liệu dày; KHỚP ĐÚNG max-w-6xl của SiteHeader để
+                       mép nội dung thẳng hàng với mép navbar. */
+  --scaffold-small: 42rem;
+  --scaffold-default: 48rem;
+  --scaffold-full: 72rem;
+
+  /* --- Tương phản hình học (Supabase) ------------------------------------
+     Nút hành động = viên thuốc bo tròn tuyệt đối, đặt cạnh thẻ nội dung góc
+     8–12px sắc cạnh. Chính sự đối lập này (chứ không phải màu) là thứ kéo mắt
+     về hành động chính. Anthropic dùng cùng thủ pháp: CTA là viên thuốc đen
+     đặc, không màu rực rỡ.
+     KHÔNG có token `--radius-pill`: `rounded-full` của Tailwind đã đúng bằng
+     9999px mà tài liệu yêu cầu, thêm một token nữa chỉ tạo hai đường làm cùng
+     một việc rồi sớm muộn lệch nhau.
+     Trước thay đổi này, 11 nút hành động chính trong app dùng LẪN LỘN
+     rounded-[4px] / rounded-md / rounded-lg cho cùng một vai trò. */
+  /* Thẻ nội dung giữ nguyên nấc sắc cạnh của Supabase (8–12px), KHÔNG dùng
+     --radius (10px) chung với input/button để hai họ hình không lẫn vào nhau. */
+  --radius-card: 0.625rem;
+
+  /* --- Thang chữ hiển thị (Supabase hero: 72px / line-height 1.00) --------
+     Mật độ dọc bị ép sát để câu tiêu đề thành một khối đặc. clamp() thay cho
+     3 breakpoint thủ công; trần 4.5rem = 72px đúng như tài liệu.
+     Tracking âm mượn từ OpenAI (-0.02em ở cỡ lớn) để bù khoảng hở tự nhiên
+     nở ra khi phóng chữ. */
+  --text-display: clamp(2.25rem, 6vw, 4.5rem);
+  --leading-display: 1;
+  --tracking-display: -0.02em;
+
+  /* --- Bảng màu "ngủ đông" (Anthropic dormant palette) --------------------
+     8 màu VÔ HÌNH trên toàn bộ bề mặt tiếp thị/điều hướng — không nút, không
+     nhãn, không viền nào được dùng chúng. Chỉ "đánh thức" trong biểu đồ và sơ
+     đồ dữ liệu, nơi màu là kênh thông tin thật.
+     Mọi giá trị đã hạ độ sáng khỏi hex gốc của Anthropic (clay #d97757 chỉ đạt
+     2.41:1) để đạt ≥3:1 trên CẢ nền ngà #ede1c8 LẪN khối --muted #e3d5b6 —
+     ngưỡng WCAG 1.4.11 cho đồ hoạ mang thông tin. Tỉ lệ thấp nhất: clay
+     3.87:1 trên ngà / 3.45:1 trên muted. */
+  --dormant-clay: #b4522f; /* 3.87 / 3.45 */
+  --dormant-sky: #3d6fa3; /* 4.05 / 3.61 */
+  --dormant-cactus: #4f6b51; /* 4.56 / 4.07 */
+  --dormant-fig: #7d4a5f; /* 5.37 / 4.79 */
+  --dormant-olive: #6b6833; /* 4.44 / 3.96 */
+  --dormant-heather: #6f6490; /* 4.15 / 3.71 */
+  --dormant-kelp: #2f6f68; /* 4.51 / 4.02 */
+  /* slate = chuỗi TRUNG TÍNH (mốc, "khác", đường tham chiếu), không phải một
+     hạng mục ngang hàng: sắc độ của nó chỉ lệch sky 3° nên nếu xếp cạnh nhau
+     trong cùng một biểu đồ phân loại sẽ đọc thành một màu. Thứ tự phân loại
+     bên dưới đã đẩy hai màu này ra xa nhau. */
+  --dormant-slate: #566878; /* 4.44 / 3.96 */
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -138,6 +219,16 @@
   /* Nhãn nhỏ dạng small-caps tracked — label-caps DESIGN.md (Be Vietnam Pro). */
   .eyebrow {
     @apply font-sans text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground;
+  }
+  /* Chữ hiển thị đặc (Supabase hero) — CHỈ dùng cho câu tiêu đề chính của một
+     trang, tối đa MỘT lần mỗi trang. Dùng lại ở tiêu đề phụ sẽ phá thứ bậc mà
+     chính nó tạo ra. text-wrap:balance chia đều các dòng để khối chữ vuông
+     vức thay vì rớt lại một từ lẻ ở dòng cuối. */
+  .text-display {
+    font-size: var(--text-display);
+    line-height: var(--leading-display);
+    letter-spacing: var(--tracking-display);
+    text-wrap: balance;
   }
 }
 

@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { deleteExam } from "@/app/(layer4)/actions";
+import { useT } from "@/lib/i18n/client";
 
 interface DeleteDialogProps {
   examId: string;
@@ -26,10 +27,11 @@ export function DeleteDialog({
   examTitle,
   redirectTo = "/me/exams",
   triggerClassName,
-  triggerLabel = "Delete",
+  triggerLabel,
   open: controlledOpen,
   onOpenChange,
 }: DeleteDialogProps) {
+  const t = useT();
   const isControlled = controlledOpen !== undefined;
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const open = isControlled ? controlledOpen : uncontrolledOpen;
@@ -80,7 +82,7 @@ export function DeleteDialog({
             "text-sm text-muted-foreground underline-offset-4 transition-colors hover:text-brand hover:underline"
           }
         >
-          {triggerLabel}
+          {triggerLabel ?? t("common.delete")}
         </button>
       )}
 
@@ -102,11 +104,10 @@ export function DeleteDialog({
               id="delete-exam-title"
               className="font-serif text-xl text-foreground"
             >
-              Delete this exam?
+              {t("upload.deleteTitle")}
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              “{examTitle}” and its questions and files will be permanently
-              removed. This can&apos;t be undone.
+              {t("upload.deleteBody", { title: examTitle })}
             </p>
             {error && (
               <p className="mt-2 text-sm text-brand" role="alert">
@@ -119,7 +120,7 @@ export function DeleteDialog({
                 onClick={closeAndReturnFocus}
                 className="rounded-[4px] border border-border px-4 py-2 text-xs font-medium uppercase tracking-[0.14em] text-foreground transition-colors hover:bg-accent"
               >
-                Cancel
+                {t("common.cancel")}
               </button>
               <button
                 ref={confirmRef}
@@ -128,7 +129,7 @@ export function DeleteDialog({
                 disabled={deleting}
                 className="rounded-[4px] bg-brand px-4 py-2 text-xs font-medium uppercase tracking-[0.14em] text-brand-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
               >
-                {deleting ? "Deleting…" : "Delete"}
+                {deleting ? t("upload.deleting") : t("common.delete")}
               </button>
             </div>
           </div>

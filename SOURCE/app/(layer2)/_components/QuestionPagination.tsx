@@ -46,9 +46,11 @@ export function QuestionPagination({
                   type="button"
                   onClick={() => onJump(i)}
                   aria-current={isCurrent ? "true" : undefined}
-                  aria-label={`Question ${i + 1}${isAnswered ? " (answered)" : ""}${
-                    isFlagged ? " (flagged)" : ""
-                  }`}
+                  aria-label={
+                    t("upload.questionLabel", { number: i + 1 }) +
+                    (isAnswered ? ` (${t("player.answeredStatus")})` : "") +
+                    (isFlagged ? ` (${t("player.flagged")})` : "")
+                  }
                   className={`relative flex aspect-square w-full items-center justify-center rounded text-sm tabular-nums transition-colors ${
                     isCurrent
                       ? "border-ring text-foreground border-2"

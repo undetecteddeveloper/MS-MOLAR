@@ -91,5 +91,8 @@
   },
   "enabledMcpjsonServers": [
     "playwright"
-  ]
+  ],
+  "enabledPlugins": {
+    "composio@composio": true
+  }
 }

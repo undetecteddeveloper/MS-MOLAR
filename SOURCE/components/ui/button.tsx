@@ -32,10 +32,24 @@ const buttonVariants = cva(
           "size-7 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg",
         "icon-lg": "size-9",
       },
+      // Tương phản hình học (docs/market/UI-Design-Research.md §2 — Supabase +
+      // Anthropic): nút hành động bo tròn tuyệt đối đặt cạnh thẻ nội dung góc
+      // 8–12px sắc cạnh. Sự đối lập HÌNH DẠNG là thứ dẫn mắt về hành động
+      // chính, nhờ đó không phải bôi thêm màu rực rỡ để gây chú ý.
+      //
+      // Khai báo SAU `size` là chủ ý: `size` xs/sm cũng đặt lớp `rounded-*`,
+      // mà cva nối chuỗi theo đúng thứ tự khoá khai báo còn tailwind-merge thì
+      // giữ lớp CUỐI trong mỗi nhóm xung đột. Đặt trước sẽ bị `size` ghi đè và
+      // nút pill cỡ nhỏ lặng lẽ mất độ bo.
+      shape: {
+        default: "",
+        pill: "rounded-full",
+      },
     },
     defaultVariants: {
       variant: "default",
       size: "default",
+      shape: "default",
     },
   }
 )
@@ -44,12 +58,13 @@ function Button({
   className,
   variant = "default",
   size = "default",
+  shape = "default",
   ...props
 }: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
   return (
     <ButtonPrimitive
       data-slot="button"
-      className={cn(buttonVariants({ variant, size, className }))}
+      className={cn(buttonVariants({ variant, size, shape, className }))}
       {...props}
     />
   )

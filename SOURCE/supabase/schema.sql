@@ -223,7 +223,11 @@ create policy "results_insert_own" on public.exam_results
 -- 1. exams — cột lifecycle/tác giả/file nguồn + CHECK status
 -- ----------------------------------------------------------------------------
 alter table public.exams add column if not exists status text not null default 'processing';
-alter table public.exams add column if not exists author_id uuid references auth.users(id);
+-- `on delete no action` viết RÕ chứ không để mặc định — xem §16: mọi khoá ngoại
+-- phải khai hành vi xoá, và `verify:schema` fail nếu có cái nào bỏ trống.
+-- (Chuẩn hoá tên constraint ở §16b vì `add column if not exists` không chạy lại
+-- trên DB đã có cột.)
+alter table public.exams add column if not exists author_id uuid references auth.users(id) on delete no action;
 alter table public.exams add column if not exists author_display_name text;   -- ADR-0003: snapshot tên tác giả
 alter table public.exams add column if not exists reviewed_at timestamptz;    -- set khi publish
 alter table public.exams add column if not exists question_file_path text;    -- path trong exam-uploads (nguồn re-run)
@@ -1031,7 +1035,9 @@ create table if not exists public.exam_moderation_log (
   id         uuid primary key default gen_random_uuid(),
   exam_id    text not null references public.exams(id) on delete cascade,
   action     text not null check (action in ('remove','restore')),
-  actor_id   uuid references auth.users(id),
+  -- `no action` viết rõ (§16): nhật ký kiểm toán KHÔNG được biến mất theo tài
+  -- khoản người đã bấm gỡ, nên không cascade.
+  actor_id   uuid references auth.users(id) on delete no action,
   reason     text,
   created_at timestamptz not null default now()
 );
@@ -1078,3 +1084,124 @@ alter table public.attempt_answers
 alter table public.attempt_answers
   add constraint attempt_answers_question_id_fkey
   foreign key (question_id) references public.questions (id) on delete cascade;
+
+-- ----------------------------------------------------------------------------
+-- 16. Khoá ngoại: khai hành vi xoá RÕ RÀNG + đường đọc metadata (2026-08-04).
+--
+--     Vì sao có phần này (TECH-DEBT TD-011): bug xoá đề ngày 2026-08-04 là một
+--     khoá ngoại thiếu `on delete` — mặc định NO ACTION — và nó đi lọt qua MỌI
+--     cổng đang có: tsc xanh, vitest xanh, `verify:schema` xanh. Lý do rất cụ
+--     thể: `verify-schema.ts` chỉ quan sát được DB qua PostgREST, mà PostgREST
+--     KHÔNG phơi `information_schema`; cách duy nhất suy ra `on delete` từ phía
+--     client là thật sự xoá một dòng cha rồi xem dòng con có đi theo không —
+--     đúng thứ bị cấm vì script phải an toàn để chạy trên production.
+--
+--     §16a mở một đường ĐỌC metadata thật, để `verify:schema` so thẳng
+--     `on delete` của mọi khoá ngoại với schema.sql thay vì suy từ hành vi.
+--     §16b chuẩn hoá hai khoá ngoại duy nhất còn để mặc định.
+--
+--     Quy ước từ nay: MỌI `references` trong file này phải viết kèm `on delete`,
+--     kể cả khi hành vi mong muốn đúng bằng mặc định. `verify:schema` fail nếu
+--     có cái nào bỏ trống. Đây mới là chỗ bắt được bug — nó bắt lúc ĐỌC DIFF,
+--     trước khi SQL kịp chạy ở đâu.
+-- ----------------------------------------------------------------------------
+
+-- 16a. Metadata khoá ngoại, đọc được qua PostgREST.
+--
+--      SECURITY INVOKER (mặc định), CỐ Ý — không phải SECURITY DEFINER: pg_catalog
+--      vốn đã đọc được với mọi role, nên definer chỉ thêm một hàm leo quyền vào
+--      bề mặt tấn công mà không mua được gì. EXECUTE bị khoá về service_role vì
+--      sơ đồ khoá ngoại là thông tin về cấu trúc hệ thống, không phải dữ liệu
+--      người dùng — không có lý do gì để trình duyệt hỏi được.
+--
+--      Hàm CHỈ ĐỌC catalog: không DML, không DDL, chạy trên production vô hại.
+create or replace function public.schema_foreign_keys()
+returns table (
+  constraint_name  text,
+  child_schema     text,
+  child_table      text,
+  child_columns    text[],
+  parent_schema    text,
+  parent_table     text,
+  parent_columns   text[],
+  on_delete        text,
+  on_update        text
+)
+language sql
+stable
+set search_path = ''
+as $$
+  select
+    c.conname::text,
+    cn.nspname::text,
+    ct.relname::text,
+    (select pg_catalog.array_agg(a.attname::text order by k.ord)
+       from pg_catalog.unnest(c.conkey) with ordinality as k(attnum, ord)
+       join pg_catalog.pg_attribute a
+         on a.attrelid = c.conrelid and a.attnum = k.attnum),
+    pn.nspname::text,
+    pt.relname::text,
+    (select pg_catalog.array_agg(a.attname::text order by k.ord)
+       from pg_catalog.unnest(c.confkey) with ordinality as k(attnum, ord)
+       join pg_catalog.pg_attribute a
+         on a.attrelid = c.confrelid and a.attnum = k.attnum),
+    -- pg_constraint lưu hành vi xoá thành MỘT KÝ TỰ; dịch ra chữ để so trực
+    -- tiếp với cú pháp viết trong schema.sql, không phải tra bảng khi đọc log.
+    case c.confdeltype
+      when 'a' then 'no action'
+      when 'r' then 'restrict'
+      when 'c' then 'cascade'
+      when 'n' then 'set null'
+      when 'd' then 'set default'
+      else c.confdeltype::text
+    end,
+    case c.confupdtype
+      when 'a' then 'no action'
+      when 'r' then 'restrict'
+      when 'c' then 'cascade'
+      when 'n' then 'set null'
+      when 'd' then 'set default'
+      else c.confupdtype::text
+    end
+  from pg_catalog.pg_constraint c
+  join pg_catalog.pg_class     ct on ct.oid = c.conrelid
+  join pg_catalog.pg_namespace cn on cn.oid = ct.relnamespace
+  join pg_catalog.pg_class     pt on pt.oid = c.confrelid
+  join pg_catalog.pg_namespace pn on pn.oid = pt.relnamespace
+  where c.contype = 'f'
+    and cn.nspname = 'public'
+  order by ct.relname, c.conname
+$$;
+
+-- Supabase cấp sẵn EXECUTE cho anon/authenticated qua default privileges, và
+-- `revoke from public` KHÔNG gỡ được cái đó — phải gọi tên hai role (bài học
+-- §10b, chỗ đã một lần bỏ lọt đúng lỗi này).
+revoke all on function public.schema_foreign_keys() from public, anon, authenticated;
+grant execute on function public.schema_foreign_keys() to service_role;
+
+-- 16b. Hai khoá ngoại duy nhất còn để `on delete` mặc định — viết rõ thành
+--      `no action`. KHÔNG đổi hành vi (mặc định vốn đã là no action); mục đích
+--      là để ý định nằm trong file thay vì nằm trong đầu người viết, và để quy
+--      ước "mọi references phải có on delete" đúng với 100% khoá ngoại.
+--
+--      ⚠ Hệ quả đang chịu, ghi ra để lần sau không phải suy lại: `no action` ở
+--      đây nghĩa là KHÔNG xoá được một tài khoản auth.users nếu tài khoản đó đã
+--      đăng đề hoặc đã từng bấm gỡ/khôi phục đề — Postgres sẽ chặn bằng 23503,
+--      đúng hình dạng của bug 2026-08-04 nhưng ở tầng tài khoản. Hiện KHÔNG có
+--      đường nào trong app xoá tài khoản (chỉ xoá tay trên Supabase dashboard),
+--      nên đây là ràng buộc đã biết chứ chưa phải bug. Nếu sau này làm tính năng
+--      xoá tài khoản: đổi cả hai sang `set null` (cả hai cột đều nullable, và
+--      ADR-0003 đã snapshot `author_display_name` chính là để đề sống sót qua
+--      tác giả) — ĐỪNG đổi sang cascade, cascade sẽ xoá sạch đề công khai và
+--      nhật ký kiểm toán theo một lần bấm xoá tài khoản.
+alter table public.exams
+  drop constraint if exists exams_author_id_fkey;
+alter table public.exams
+  add constraint exams_author_id_fkey
+  foreign key (author_id) references auth.users (id) on delete no action;
+
+alter table public.exam_moderation_log
+  drop constraint if exists exam_moderation_log_actor_id_fkey;
+alter table public.exam_moderation_log
+  add constraint exam_moderation_log_actor_id_fkey
+  foreign key (actor_id) references auth.users (id) on delete no action;

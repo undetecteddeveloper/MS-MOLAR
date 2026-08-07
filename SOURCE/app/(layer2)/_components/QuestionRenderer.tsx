@@ -46,7 +46,7 @@ export function QuestionRenderer({
   return (
     <div className="border-border flex flex-col gap-5 rounded-lg border p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <span className="eyebrow">Question {index}</span>
+        <span className="eyebrow">{t("upload.questionLabel", { number: index })}</span>
         <FlagButton flagged={flagged} onToggle={onToggleFlag} />
       </div>
 

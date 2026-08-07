@@ -24,9 +24,8 @@ Ba pha, chạy theo thứ tự. Pha 2 tồn tại để pha 1 của phiên SAU t
 
 ### Pha 1 — Checking (đầu phiên)
 
-1. **Tool**: xác nhận thứ sắp dùng còn sống, đừng giả định. Supabase/Playwright/Composio là MCP — gọi thử một lệnh đọc rẻ tiền trước khi dựa vào nó.
-   - `vercel` CLI: đã cài, đã đăng nhập (`undetecteddeveloper`), `SOURCE/.vercel` đã link project `ms-molar`. Kiểm nhanh bằng `vercel whoami`.
-   - `composio` CLI: **KHÔNG cài được trên Windows** — installer chính chủ từ chối, đòi WSL. Dùng Composio MCP thay thế (`COMPOSIO_SEARCH_TOOLS` → `COMPOSIO_MULTI_EXECUTE_TOOL`, toolkit `notion` đã connected). Đừng phí lượt thử cài lại.
+1. **Tool**: xác nhận thứ sắp dùng còn sống, đừng giả định. 
+   - `composio` MCP: Dùng Composio MCP (`COMPOSIO_SEARCH_TOOLS` → `COMPOSIO_MULTI_EXECUTE_TOOL`, toolkit `notion`, `supabase`, `vercel`, `google drive` đã connected). Composio CLI không được hỗ trợ trên Window. Bỏ qua thay vì cố cài.
 2. **Việc dang dở**: đọc Notion database **MS-MOLAR** (`3b378ba6-ae12-803c-8500-c572b6fc745f`) — lọc row khác trạng thái "Hoàn tất". Kèm `docs/TECH-DEBT.md` và `docs/plans/`.
 3. Chỉ tiếp tục việc cũ khi engineer yêu cầu; mặc định hỏi trước khi tự nối tiếp.
 
@@ -38,13 +37,13 @@ Tạo/cập nhật row trong database MS-MOLAR. Thuộc tính: `Tên nhiệm v�
 
 ### Pha 3 — Implementation
 
-1. **Code**: theo recipe của plugin `dev-workflows-fullstack` (skills `recipe-plan` / `recipe-implement` / `recipe-fullstack-build` / `recipe-front-*` / `recipe-review`; agent chuyên biệt như `quality-fixer`, `code-reviewer` gọi qua Agent tool khi engineer yêu cầu).
+1. **Code**: theo recipe của plugin `dev-workflows-fullstack` + cập nhật bảng trong Notion cho mỗi task (skills `recipe-plan` / `recipe-implement` / `recipe-fullstack-build` / `recipe-front-*` / `recipe-review`; agent chuyên biệt như `quality-fixer`, `code-reviewer` gọi qua Agent tool khi engineer yêu cầu).
 2. **Cổng verify** — chạy đủ 4, trong `SOURCE/`, TRƯỚC khi commit:
    `npx tsc --noEmit` · `npx eslint --max-warnings 0` · `npx vitest run` · `npm run build`
    `next build` bắt lỗi ranh giới server/client mà `tsc` không thấy — đừng bỏ.
 3. **Commit + push**: branch trước, không commit thẳng `main` trừ khi engineer bảo thế.
    ⚠️ Cây làm việc thường có sẵn thay đổi CHƯA COMMIT của engineer. Trước mọi `git checkout -- <file>` / `git restore`, đối chiếu `git status` đầu phiên xem file đó đã bẩn từ trước chưa — revert nhầm là xoá việc của họ, không hoàn lại được.
-4. **Deploy**: **tự làm bằng `vercel` CLI** (đã cài + đăng nhập + link sẵn), chạy trong `SOURCE/`:
+4. **Deploy**: **tự làm bằng `vercel` qua `composio MCP`** (đã cài + đăng nhập + link sẵn), chạy trong `SOURCE/`:
    - Preview: `vercel` → trả link, gửi engineer duyệt.
    - Production: `vercel --prod`, hoặc promote bản preview đã duyệt.
    - Mặc định đi preview trước với thay đổi diện rộng (theme, i18n, auth); chỉ vào thẳng prod khi engineer bảo.

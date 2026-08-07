@@ -13,6 +13,9 @@ export interface AttemptPdfData {
   totalScore: number;
   startedAt: string;
   submittedAt: string | null;
+  /** Câu chân trang đã dịch — usePdfAction bơm vào từ `t`. Bỏ trống thì
+   *  template dùng bản tiếng Anh mặc định của nó. */
+  footerPrefix?: string;
 }
 
 function pad2(n: number): string {
@@ -61,6 +64,7 @@ export async function generateAttemptPdfFile(data: AttemptPdfData): Promise<File
           submittedDateLabel,
           completionTimeLabel,
           generatedAtLabel: formatGeneratedAt(new Date()),
+          footerPrefix: data.footerPrefix,
         }),
       );
     });

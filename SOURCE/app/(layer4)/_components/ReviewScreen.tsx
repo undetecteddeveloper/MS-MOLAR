@@ -19,6 +19,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { saveExam, publishExam } from "@/app/(layer4)/actions";
+import { useT } from "@/lib/i18n/client";
 import { validateAssembledExam } from "@/lib/ugc/assembleExam";
 import { validateMetaForPublish } from "@/lib/ugc/normalizeMeta";
 import type {
@@ -97,6 +98,7 @@ export function ReviewScreen({
   initialExam,
   srcAuto,
 }: ReviewScreenProps) {
+  const t = useT();
   const [exam, setExam] = useState<AssembledExam>(initialExam);
   const [status, setStatus] = useState(initialStatus);
   const [dirty, setDirty] = useState(false);
@@ -213,21 +215,21 @@ export function ReviewScreen({
           href="/me/exams"
           className="eyebrow hover:text-brand inline-flex items-center gap-1 transition-colors"
         >
-          ← My exams
+          ← {t("common.myExams")}
         </Link>
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-foreground text-2xl">
-            {exam.meta.title.trim() === "" ? "Untitled exam" : exam.meta.title}
+            {exam.meta.title.trim() === "" ? t("upload.untitledExam") : exam.meta.title}
           </h1>
           <StatusBadge status={status} />
         </div>
         <p className="text-muted-foreground mt-1 text-sm">
-          {exam.questions.length} question{exam.questions.length === 1 ? "" : "s"}
+          {exam.questions.length === 1
+            ? t("upload.oneQuestion")
+            : t("upload.questionCount", { count: exam.questions.length })}
         </p>
         {isPublished && (
-          <p className="text-muted-foreground mt-2 text-sm">
-            This exam is published. Edits are saved live and stay complete.
-          </p>
+          <p className="text-muted-foreground mt-2 text-sm">{t("upload.publishedNotice")}</p>
         )}
       </div>
 
@@ -235,7 +237,7 @@ export function ReviewScreen({
 
       {/* v2.2: khối metadata sửa được — anchor cho link lỗi META_*. */}
       <section id="exam-details" className="rounded-[4px] border border-border p-4">
-        <h2 className="mb-4 text-sm font-medium text-foreground">Exam details</h2>
+        <h2 className="mb-4 text-sm font-medium text-foreground">{t("upload.examDetails")}</h2>
         <MetadataFields
           value={toFormValue(exam)}
           onChange={onChangeMeta}
@@ -244,9 +246,7 @@ export function ReviewScreen({
           aiFilled={aiFilled}
         />
         {isPublished && (
-          <p className="mt-3 text-xs text-muted-foreground">
-            Subject and grade are fixed after publishing.
-          </p>
+          <p className="mt-3 text-xs text-muted-foreground">{t("upload.fixedAfterPublish")}</p>
         )}
       </section>
 

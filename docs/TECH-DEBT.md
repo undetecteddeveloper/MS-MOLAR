@@ -12,60 +12,25 @@ mục khi đã trả nợ (ghi lại trong PROCESS.md).
 
 ## Đang mở
 
-### TD-011 — `verify-schema.ts` không soi được `on delete` của khoá ngoại
-**Từ:** 2026-08-04 (sau khi bug xoá đề nổ trên production)
-**Loại:** cổng phát hiện có lỗ
+### TD-012 — Xoá tài khoản `auth.users` sẽ bị chặn, nếu sau này làm tính năng đó
+**Từ:** 2026-08-04 (lộ ra khi dựng cổng khoá ngoại của TD-011)
+**Loại:** ràng buộc đã biết, chưa chạm tới được
 
-Bug vừa rồi — `exam_attempts.exam_id` và `attempt_answers.question_id` thiếu
-`on delete cascade`, khiến tác giả vĩnh viễn không xoá được đề đã có người làm —
-là ĐÚNG loại lệch schema mà `verify-schema.ts` sinh ra để bắt, nhưng nó không
-bắt được.
+`exams.author_id` và `exam_moderation_log.actor_id` là hai khoá ngoại duy nhất
+trỏ `auth.users` mà KHÔNG cascade. §16b nay ghi rõ `on delete no action` (trước
+đó là mặc định ngầm, tức là cùng hành vi nhưng không ai chọn nó cả). Hệ quả:
+xoá một tài khoản đã đăng đề hoặc đã từng bấm gỡ/khôi phục đề sẽ chết với
+`23503` — **đúng hình dạng bug 2026-08-04 nhưng ở tầng tài khoản.**
 
-**Vì sao không bắt được:** script cố ý CHỈ ĐỌC (không insert/update/delete,
-không DDL). Cách duy nhất quan sát được `on delete` từ phía client là **thật sự
-xoá một dòng cha rồi xem dòng con có đi theo không** — vi phạm chính ràng buộc
-làm script an toàn để chạy trên production. PostgREST cũng không phơi
-`information_schema`, và OpenAPI spec chỉ nói có khoá ngoại chứ không nói hành
-vi xoá.
+**Vì sao chưa phải nợ phải trả ngay:** không có đường nào trong app xoá tài
+khoản (đã grep: không có `deleteUser`/`admin.deleteUser`). Chỉ chạm tới được
+bằng cách xoá tay trên Supabase dashboard.
 
-**Sẽ nổ thế nào (lần nữa):** mỗi khoá ngoại mới thêm vào mà quên `on delete` sẽ
-lại đi qua mọi cổng hiện có — tsc xanh, test xanh, `verify:schema` xanh — rồi
-chỉ lộ ra khi có người dùng thật đi đúng vào đường xoá. Bug này sống từ lúc
-dựng §L2 tới tận khi smoke test production ngày 2026-08-04.
-
-**Cách trả:** cần một đường chạy SQL đọc `information_schema.referential_
-constraints` (Supabase CLI với DB password, hoặc một RPC `SECURITY DEFINER` chỉ
-đọc metadata). Có nó rồi thì so trực tiếp với `schema.sql` được, không phải suy
-từ hành vi. Khi làm, phủ luôn toàn bộ khoá ngoại chứ không riêng 2 cái vừa vá.
-
-### TD-010 — 2 lỗi `react-hooks` trong source, nên bước lint ở CI không chặn được
-**Từ:** 2026-08-04 (khi dựng `.github/workflows/ci.yml`)
-**Loại:** cổng chất lượng chưa siết được
-
-Sau khi thêm `.next-build/**` vào `globalIgnores` (trước đó `npm run lint` đi
-lint cả output đã minify → ~18.8k lỗi giả, che sạch lỗi thật nên lệnh này coi
-như không dùng được), source lộ ra đúng 2 lỗi + 1 cảnh báo:
-
-| File | Rule | Nội dung |
-| --- | --- | --- |
-| `app/(layer2)/_components/ExamTimer.tsx:23` | `react-hooks/refs` | gán `onTimeUpRef.current` ngay trong thân render (latest-ref pattern) |
-| `components/ui/SuccessToast.tsx:34` | `react-hooks/set-state-in-effect` | `setVisible(true)` trong thân effect để phát lại animation mỗi lần `trigger` đổi |
-| `components/pdf/AttemptPdfTemplate.tsx:30` | `@next/next/no-img-element` | cảnh báo, cố ý — template chụp bằng html2canvas không dùng được `next/image` |
-
-**Vì sao chưa sửa:** cả hai đều là code đang chạy đúng, và cái thứ nhất nằm trên
-đường bấm giờ làm bài (hết giờ → tự nộp). Sửa đúng cách là đổi cấu trúc
-component chứ không phải thêm `eslint-disable`; việc đó cần một phiên riêng có
-kiểm chứng trên trình duyệt thật, không nên độn vào lượt dựng CI.
-
-**Hệ quả đang chịu:** bước `ESLint` trong CI đặt `continue-on-error: true`. Log
-vẫn hiện đủ, nhưng lint KHÔNG chặn được merge — chỉ `tsc`, `vitest` và
-`check:bundle` mới chặn. Nghĩa là lỗi lint mới sẽ lẫn vào giữa 2 lỗi cũ này mà
-không ai thấy.
-
-**Cách trả:** sửa 2 file trên (ExamTimer: chuyển gán ref vào `useEffect`;
-SuccessToast: bỏ state trung gian, dùng `key` để remount hoặc dẫn xuất từ
-`trigger`), chạy lại test bấm giờ + toast, rồi **bỏ `continue-on-error` khỏi
-ci.yml** — đó mới là lúc nợ này được trả.
+**Vì sao vẫn ghi lại:** ngày làm tính năng "xoá tài khoản của tôi", nó sẽ hỏng
+ngay lần thử đầu, và người sửa cần biết cascade KHÔNG phải câu trả lời — cascade
+sẽ cuốn theo đề công khai của người khác đang làm và toàn bộ nhật ký kiểm toán.
+Đáp án đúng là `set null` (cả hai cột đều nullable; ADR-0003 snapshot
+`author_display_name` chính là để đề sống sót qua tác giả).
 
 ### TD-008 — Rate limit nằm trong RAM tiến trình, không dùng chung giữa instance
 **Từ:** 2026-08-03 (bản vá Security review Low)
@@ -86,77 +51,6 @@ round-trip khá kỹ, xem getResult).
 chưa đăng nhập; nếu cần chính xác theo user across-instance thì chuyển bộ đếm
 sang Redis/Upstash hoặc một bảng Postgres. Đừng nhầm cái hiện tại là chống DoS.
 
-### TD-009 — `ADMIN_USER_IDS` là cấu hình bắt buộc, không có ở đâu ngoài env
-**Từ:** 2026-08-03 (bản vá Security review Medium #7)
-**Loại:** cấu hình ngầm
-**Trạng thái:** đã trả một nửa (2026-08-04) — `SOURCE/.env.example` nay liệt kê
-đủ biến kèm ghi chú; vẫn CHƯA có check lúc khởi động, nên quên biến thì tính
-năng vẫn im lặng biến mất chứ không báo.
-
-Trang `/admin` chỉ hoạt động khi biến môi trường `ADMIN_USER_IDS` chứa user id
-(UUID Supabase, phân cách bằng dấu phẩy). Không đặt → không ai là admin →
-`/admin` trả 404. Fail-closed là chủ đích, nhưng nghĩa là:
-- Dự án KHÔNG có file `.env.example`, nên biến này không được ghi ở đâu ngoài
-  đây và trong `lib/auth/admin.ts`.
-- Đổi môi trường (máy mới, deploy mới) mà quên → công cụ gỡ nội dung im lặng
-  biến mất, và chỉ phát hiện ra đúng lúc cần gỡ gấp.
-
-**Cách trả:** thêm `.env.example` liệt kê đủ biến bắt buộc
-(`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
-`SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`, `ADMIN_USER_IDS`), và một check
-lúc khởi động cảnh báo khi thiếu.
-
-### TD-007 — `npm audit` còn 3 high, KHÔNG được "sửa" bằng `npm audit fix --force`
-**Từ:** 2026-08-03 (bản vá Security review High #3)
-**Loại:** cảnh báo còn sót, đã đánh giá là không với tới được
-
-Sau khi nâng `next` 16.2.7→16.2.12 và `sharp` 0.34.5→0.35.3, `npm audit` vẫn báo
-3 high. Chúng nằm ở BẢN LỒNG bên trong `next`, không phải bản top-level:
-
-```
-next/node_modules/sharp    0.34.5   (libvips CVEs)
-next/node_modules/postcss  8.4.31   (XSS </style>, đọc file qua sourceMappingURL)
-```
-
-⚠ **Đừng chạy `npm audit fix --force` lần nữa.** npm hiện đề xuất "fix" bằng cách
-hạ `next` xuống **9.3.3** — phá nát dự án để làm sạch một cảnh báo.
-
-**Vì sao chấp nhận được (đã kiểm 2026-08-03, không phải phỏng đoán):**
-- `sharp` mà CODE CỦA DỰ ÁN dùng (`lib/ugc/cropImages.ts` — đường duy nhất xử lý
-  file người dùng tải lên) resolve về **top-level 0.35.3, đã vá**. Xác nhận bằng
-  `require.resolve('sharp')`.
-- Bản `sharp` lồng trong next chỉ phục vụ image optimizer của `next/image`. Toàn
-  bộ `next/image` trong repo chỉ nạp 2 file tĩnh của chính dự án
-  (`/images/brand_logo.png`, `/images/user-avatar-placeholder.png`), và
-  `next.config.ts` KHÔNG cấu hình `images.remotePatterns` → next/image từ chối
-  mọi URL từ xa. Ảnh đề do người dùng tải lên đi bằng `<img>` thường trong
-  `QuestionFigure` (có allowlist origin), KHÔNG qua optimizer.
-- `postcss` chỉ chạy lúc BUILD trên CSS do lập trình viên viết, không nhận đầu
-  vào từ người dùng.
-
-**Cách trả:** chờ next phát hành bản nâng 2 dependency lồng đó, rồi nâng `next`
-là hết. Kiểm lại bằng `npm audit` + `require.resolve('sharp')`.
-
-### TD-006 — CSP còn `'unsafe-inline'` cho script (chưa làm nonce)
-**Từ:** 2026-08-03 (bản vá Security review Medium #5, `SOURCE/next.config.ts`)
-**Loại:** phòng thủ chưa đầy đủ
-
-`script-src` phải giữ `'unsafe-inline'` vì Next.js chèn script inline để hydrate;
-chặn mà không có nonce là trang trắng. Nghĩa là CSP hiện tại KHÔNG chặn được
-inline-XSS — nó chỉ chặn script từ domain lạ, clickjacking, `<base>` hijack,
-form bẻ hướng, và plugin embed.
-
-**Vì sao chấp nhận được (hiện tại):** rủi ro mà review lo — "XSS = chiếm tài
-khoản" — đã đóng ở NGUỒN chứ không nhờ CSP: cookie session nay là `httpOnly`
-(`lib/supabase/cookieOptions.ts`), đã kiểm thực tế trên trình duyệt
-`document.cookie === ""` khi đang đăng nhập. Cộng thêm: không có
-`dangerouslySetInnerHTML` nào trong repo, và RichText đã sanitize.
-
-**Cách trả:** proxy.ts sinh nonce mỗi request, set vào cả request header lẫn
-response header để Next gắn nonce cho script của nó, rồi bỏ `'unsafe-inline'`.
-Phải kiểm lại bằng trình duyệt thật (build + `next start` + xem console) vì sai
-một bước là trang trắng toàn site.
-
 ### TD-005 — `schema.sql` áp bằng tay, không có migration tool
 **Từ:** trước 2026-08-03 (nợ cũ, ghi lại cho rõ)
 **Loại:** vận hành
@@ -175,9 +69,16 @@ schema.sql với hành vi thật của DB cho phần khoá đáp án (§10) và 
 `23503` (vướng khoá ngoại, quyền INSERT vẫn còn) không được tính là đã vá, chỉ
 `42501` mới tính. Chạy sau mỗi lần apply schema.sql và trước khi deploy.
 
-**Còn thiếu:** script chỉ phủ §10/§11, và vẫn phải nhớ chạy nó. Trả nợ thật =
-Supabase CLI migrations, hoặc tối thiểu bảng `schema_version` + check lúc khởi
-động ứng dụng.
+**Còn thiếu:** vẫn phải NHỚ chạy nó. Trả nợ thật = Supabase CLI migrations, hoặc
+tối thiểu bảng `schema_version` + check lúc khởi động ứng dụng.
+
+**Phủ rộng thêm 2026-08-04 (TD-011):** script nay còn so `on delete` của TOÀN BỘ
+khoá ngoại với schema.sql, qua RPC chỉ-đọc `public.schema_foreign_keys()` (§16a).
+Đối chiếu hai chiều — khai-mà-DB-không-có, và DB-có-mà-không-khai.
+
+⚠ **§16 CHƯA ĐƯỢC APPLY lên DB nào** (phiên 2026-08-04 không có quyền chạy SQL).
+Cho tới khi paste `schema.sql` vào SQL Editor, `npm run verify:schema` sẽ FAIL ở
+bước khoá ngoại với `PGRST202` — đó là hành vi đúng, không phải lỗi script.
 
 **Đã tái phát 2026-08-03 (lần 2):** §12a dùng `drop function` cho
 `exam_rating_aggregate()`, nhưng view `exams_with_difficulty` phụ thuộc nó → lần
@@ -198,6 +99,99 @@ một lần chạy lại toàn file trên DB có dữ liệu đại diện, mớ
 ---
 
 ## Đã trả
+
+### ~~TD-011 — `verify-schema.ts` không soi được `on delete` của khoá ngoại~~
+Bug xoá đề 2026-08-04 (`exam_attempts.exam_id` + `attempt_answers.question_id`
+thiếu `on delete cascade`) đi lọt qua MỌI cổng: tsc xanh, vitest xanh,
+`verify:schema` xanh. Lý do: PostgREST không phơi `information_schema`, và cách
+duy nhất suy ra `on delete` từ client là thật sự xoá một dòng cha — vi phạm
+nguyên tắc chỉ-đọc làm script an toàn trên production.
+
+**Đã trả 2026-08-04** — đóng ở HAI tầng, cố ý:
+- **Tầng văn bản (không cần DB, chạy trong CI):**
+  `lib/schema/parseForeignKeys.ts` đọc mọi khoá ngoại khai trong schema.sql;
+  `lib/schema/__tests__/parseForeignKeys.test.ts` FAIL nếu có khoá ngoại nào
+  không viết `on delete`. Đây là chỗ rẻ nhất để bắt — nó nổ lúc mở PR, trước khi
+  SQL kịp chạy ở đâu. Quy ước mới: mọi `references` phải khai `on delete`, kể cả
+  khi hành vi mong muốn đúng bằng mặc định.
+- **Tầng DB:** §16a mở RPC chỉ-đọc `public.schema_foreign_keys()` (EXECUTE chỉ
+  `service_role`); `verify-schema.ts` mục 6 so hai chiều với schema.sql và kiểm
+  riêng chuỗi xoá đề trên DB THẬT — file đúng mà DB chưa apply thì bug vẫn sống,
+  đó đúng là chuyện đã xảy ra.
+
+Lỗ hổng của parser KHÔNG im lặng: khoá ngoại parser bỏ sót sẽ hiện ra ở chiều
+"DB có mà schema.sql không khai" và làm script FAIL.
+⚠ Còn một bước tay: **§16 phải được apply lên DB** thì tầng thứ hai mới sống.
+
+### ~~TD-010 — 2 lỗi `react-hooks` trong source, nên bước lint ở CI không chặn được~~
+`continue-on-error: true` ở bước ESLint nghĩa là lỗi lint MỚI lẫn vào giữa 2 lỗi
+cũ mà không ai thấy.
+**Đã trả 2026-08-04** — sửa cả hai bằng cách đổi cấu trúc, KHÔNG bằng
+`eslint-disable`:
+- `ExamTimer` → `useEffectEvent` thay latest-ref-ghi-trong-render. Ghi ref lúc
+  render không an toàn với concurrent rendering; `useEffectEvent` cho đúng hai
+  tính chất cần (thấy props mới nhất, không là dependency).
+- `SuccessToast` → hiện/ẩn là giá trị DẪN XUẤT lúc render; state chỉ còn lưu
+  "trigger nào đã hết hạn" và chỉ được set trong callback của `setTimeout`.
+- Cảnh báo `<img>` cố ý của `AttemptPdfTemplate` tắt TẠI CHỖ kèm lý do, để
+  `--max-warnings 0` bắt được cảnh báo mới.
+
+Kèm 15 test hồi quy mới (`ExamTimer.test.tsx`, `SuccessToast.test.tsx`) — trước
+đó cả hai component không có test nào, dù một cái nằm trên đường auto-submit.
+`npm run lint` nay là `eslint --max-warnings 0` và bước ESLint trong CI đã bỏ
+`continue-on-error` → lint CHẶN merge.
+
+### ~~TD-009 — `ADMIN_USER_IDS` là cấu hình bắt buộc, không có ở đâu ngoài env~~
+Mọi biến env của dự án fail-closed một cách IM LẶNG: quên `ADMIN_USER_IDS` thì
+`/admin` trả 404 y hệt như khi đăng nhập nhầm tài khoản.
+**Đã trả 2026-08-04** — nửa đầu là `.env.example` (đã có); nửa sau là
+`instrumentation.ts` → `lib/env/checkEnv.ts`, chạy MỘT LẦN lúc server khởi động.
+Phân biệt `error` (biến bắt buộc) với `warn` (mảng chức năng lặng lẽ tắt), và
+bắt cả hai kiểu hỏng ngầm mà `.env.example` không bắt được: id không phải UUID
+trong `ADMIN_USER_IDS` (không bao giờ khớp, không phân biệt được với "chưa cấu
+hình"), và `NEXT_PUBLIC_SUPABASE_URL` sai định dạng (`next.config.ts` nuốt lỗi
+parse → CSP rụng origin Supabase → ảnh đề biến mất). CỐ Ý không throw: một deploy
+thiếu `GEMINI_API_KEY` mà làm sập trang chủ là đổi hỏng hóc cục bộ lấy sự cố toàn
+site. Đã kiểm bằng `next start` thật với env cố tình sai.
+
+### ~~TD-007 — `npm audit` còn 3 high trong bản lồng của `next`~~
+Đánh giá 2026-08-03 là "không với tới được, chờ next phát hành bản nâng".
+**Đã trả 2026-08-04** — bản đó đã có: `next` 16.3.0 nằm NGOÀI dải advisory
+(`... - 16.3.0-preview.10`) và bỏ hẳn `next/node_modules/{sharp,postcss}`.
+`npm audit fix` (KHÔNG `--force`) nâng next 16.2.12→16.3.0, postcss
+8.5.19→8.5.23, undici 7.28.0→7.29.0, ip-address 10.2.0→10.4.0 → **0
+vulnerabilities**. Kiểm sau khi nâng: tsc, lint, 396 test, `next build`,
+`check:bundle`, và trình duyệt thật — tất cả xanh.
+
+Ghi lại vì đánh giá cũ đã MỤC mà không ai biết: tới 2026-08-04, advisory postcss
+nới lên `<=8.5.22`, tức bản TOP-LEVEL (8.5.19) cũng đã dính — câu "chúng chỉ nằm
+ở bản lồng" đúng lúc viết và sai 1 ngày sau. Một đánh giá "chấp nhận được" có
+hạn sử dụng; phải soi lại chứ không đọc lại.
+
+⚠ Cảnh báo cũ vẫn giữ nguyên giá trị: **đừng chạy `npm audit fix --force`** — nó
+từng đề xuất hạ `next` xuống 9.3.3.
+
+### ~~TD-006 — CSP còn `'unsafe-inline'` cho script (chưa làm nonce)~~
+CSP cũ KHÔNG chặn được inline-XSS; nó chỉ chặn script từ domain lạ, clickjacking,
+`<base>` hijack, form bẻ hướng và plugin embed.
+**Đã trả 2026-08-04** — `lib/security/csp.ts` là nguồn chân lý duy nhất;
+`proxy.ts` sinh nonce 128-bit mỗi request, đặt CSP có nonce lên **request**
+header (Next đọc header này để gắn `nonce=` vào script của nó) rồi đặt cùng chuỗi
+đó lên response.
+- `next.config.ts` giữ chính sách NỀN có `'unsafe-inline'`, nhưng chỉ còn hiệu
+  lực ở path proxy.ts không chạy qua (`_next/static`, ảnh, `robots.txt`) — nơi
+  không có script inline nào để bảo vệ. Giữ lại làm lưới an toàn: middleware
+  không chạy → CSP yếu hơn, chứ KHÔNG phải trang trắng.
+- KHÔNG dùng `'strict-dynamic'`: nó làm trình duyệt bỏ qua `'self'`, đổi lấy
+  gần như không gì ở dự án không có script bên thứ ba.
+- Dev vẫn `'unsafe-inline'`: Turbopack/HMR chèn script inline không qua đường
+  gắn nonce của Next.
+
+Đã kiểm trên bản production build + trình duyệt thật: đúng MỘT header CSP (đè
+được nền), nonce khác nhau từng request, 17/17 thẻ script mang đúng nonce của
+header, trang hydrate (điều hướng client-side chạy), 0 lỗi CSP trong console,
+response 307 của route guard cũng mang CSP, `/robots.txt` giữ chính sách nền, và
+`next dev` không hỏng.
 
 ### ~~TD-001 — Quyền cột trên `questions` không tự áp cho cột mới~~
 Postgres không tự cấp cột mới cho column-level GRANT, nên thêm cột vào

@@ -12,8 +12,37 @@ import { SESSION_COOKIE_OPTIONS } from "./cookieOptions";
  * (`/reset-password` KHÔNG public — cần recovery session từ email link.) */
 const PUBLIC_PATHS = ["/", "/login", "/auth/callback"];
 
-export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request });
+/** CSP của lượt request này, do proxy.ts sinh (TD-006). */
+export interface CspContext {
+  nonce: string;
+  csp: string;
+}
+
+export async function updateSession(request: NextRequest, cspContext?: CspContext) {
+  // Header của request được DỰNG LẠI mỗi lần thay vì tính sẵn một lần: callback
+  // `setAll` bên dưới ghi cookie session mới bằng `request.cookies.set()`, mà
+  // hàm đó mutate chính `request.headers`. Chụp headers một lần từ trước sẽ
+  // đông cứng cookie CŨ vào response và làm hỏng vòng refresh token.
+  const requestHeaders = () => {
+    const headers = new Headers(request.headers);
+    if (cspContext) {
+      // Next.js đọc ĐÚNG header này của request để rút nonce ra và gắn vào các
+      // thẻ script nó render. Thiếu nó = script hydrate không có nonce = trang trắng.
+      headers.set("content-security-policy", cspContext.csp);
+      // Tiện ích cho code phía server muốn tự render thẻ script/style có nonce.
+      headers.set("x-nonce", cspContext.nonce);
+    }
+    return headers;
+  };
+
+  /** Gắn CSP thật lên response — đây mới là bản trình duyệt thực thi. Nó ĐÈ
+   *  chính sách nền của next.config.ts (`headers.set`, không phải append). */
+  const withCsp = <T extends NextResponse>(response: T): T => {
+    if (cspContext) response.headers.set("Content-Security-Policy", cspContext.csp);
+    return response;
+  };
+
+  let supabaseResponse = NextResponse.next({ request: { headers: requestHeaders() } });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -31,7 +60,7 @@ export async function updateSession(request: NextRequest) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value),
           );
-          supabaseResponse = NextResponse.next({ request });
+          supabaseResponse = NextResponse.next({ request: { headers: requestHeaders() } });
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options),
           );
@@ -63,8 +92,8 @@ export async function updateSession(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     url.search = "?auth=signin";
-    return NextResponse.redirect(url);
+    return withCsp(NextResponse.redirect(url));
   }
 
-  return supabaseResponse;
+  return withCsp(supabaseResponse);
 }

@@ -74,7 +74,7 @@ export function HomeStage({ auth }: { auth: AuthMode }) {
         <div className="mt-8">
           <Link
             href="/exams"
-            className="group inline-flex items-center gap-3 rounded-[4px] border-2 border-[#1B1512] px-8 py-3 font-sans text-xs font-medium tracking-[0.16em] text-[#1B1512] uppercase transition-colors hover:border-[#A62C2B] hover:bg-[#A62C2B] hover:text-[#EDE1C8]"
+            className="group inline-flex items-center gap-3 rounded-full border-2 border-[#1B1512] px-8 py-3 font-sans text-xs font-medium tracking-[0.16em] text-[#1B1512] uppercase transition-colors hover:border-[#A62C2B] hover:bg-[#A62C2B] hover:text-[#EDE1C8]"
           >
             {t("home.getStarted")}
             <span aria-hidden className="transition-transform group-hover:translate-x-1">

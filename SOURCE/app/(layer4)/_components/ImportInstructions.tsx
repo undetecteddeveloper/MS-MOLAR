@@ -7,11 +7,13 @@
 // height cứng nên không cần đo nội dung.
 
 import { useState } from "react";
+import { useT } from "@/lib/i18n/client";
 import { LIMITS } from "@/lib/ugc/limits";
 
 const MAX_MB = Math.round(LIMITS.MAX_FILE_BYTES / (1024 * 1024));
 
 export function ImportInstructions() {
+  const t = useT();
   const [open, setOpen] = useState(true);
 
   return (
@@ -22,7 +24,7 @@ export function ImportInstructions() {
         aria-expanded={open}
         className="flex w-full items-center justify-between gap-4 px-4 py-3.5 text-left text-sm font-medium text-foreground"
       >
-        Import Instructions
+        {t("upload.instructionsTitle")}
         <span
           aria-hidden
           className={[
@@ -41,19 +43,17 @@ export function ImportInstructions() {
       >
         <div className="overflow-hidden">
           <ul className="list-disc space-y-2 px-4 pb-4 pl-9 text-sm leading-relaxed text-foreground">
-            <li>Supported formats: PNG, JPEG, WebP, or PDF.</li>
+            <li>{t("upload.supportedFormats")}</li>
             <li>
-              Choose <span className="font-medium">Automatic</span> to let AI scan and
-              extract the exam — no manual entry needed.
+              {t("upload.choose")} <span className="font-medium">{t("upload.automatic")}</span>{" "}
+              {t("upload.automaticHint")}
             </li>
             <li>
-              Choose <span className="font-medium">Manual</span> to fill in the exam
-              details yourself.
+              {t("upload.choose")} <span className="font-medium">{t("upload.manual")}</span>{" "}
+              {t("upload.manualHint")}
             </li>
-            <li>Answers always come from your answer file — never guessed by AI.</li>
-            <li>
-              Maximum file size: {MAX_MB}MB each · PDF up to {LIMITS.MAX_PDF_PAGES} pages.
-            </li>
+            <li>{t("upload.answersNeverGuessed")}</li>
+            <li>{t("upload.maxFileSize", { mb: MAX_MB, pages: LIMITS.MAX_PDF_PAGES })}</li>
           </ul>
         </div>
       </div>

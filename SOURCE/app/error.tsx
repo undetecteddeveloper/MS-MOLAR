@@ -58,7 +58,7 @@ export default function GlobalRouteError({
           <button
             type="button"
             onClick={reset}
-            className="bg-brand text-brand-foreground rounded-[4px] px-5 py-2.5 text-xs font-medium tracking-[0.14em] uppercase transition-opacity hover:opacity-90"
+            className="bg-brand text-brand-foreground rounded-full px-5 py-2.5 text-xs font-medium tracking-[0.14em] uppercase transition-opacity hover:opacity-90"
           >
             {t("common.tryAgain")}
           </button>

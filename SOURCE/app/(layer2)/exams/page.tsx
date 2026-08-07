@@ -19,6 +19,8 @@ import {
 import { ExamBrowser } from "@/app/(layer2)/_components/ExamBrowser";
 import { ExamFilters } from "@/app/(layer2)/_components/ExamFilters";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
+import { getTranslate } from "@/lib/i18n/server";
+import { PageContainer } from "@/components/layout/PageContainer";
 
 type SearchParams = Promise<{
   subject?: string;
@@ -51,6 +53,7 @@ export default async function ExamsPage({ searchParams }: { searchParams: Search
   // lạ → undefined (dùng chiều mặc định của trục, giữ hành vi cũ).
   const dir: SortDirection | undefined = sp.dir === "asc" || sp.dir === "desc" ? sp.dir : undefined;
 
+  const t = await getTranslate();
   const [exams, facets, submittedExamIds, user] = await Promise.all([
     listExams({ subject, grade, school, schoolYear: year, semester, sort, level, dir }),
     listExamFacets(),
@@ -62,13 +65,17 @@ export default async function ExamsPage({ searchParams }: { searchParams: Search
     // Theme root "Mực & Sơn mài" (S#17) — scope .theme-ebp đã xóa, block/nav
     // lấy từ biến mặc định ở :root (globals.css).
     <div className="bg-background">
-      <main className="mx-auto w-full max-w-6xl">
+      {/* padding="none": trang này tự quản lý khoảng đệm bên trong — cột
+          *Filter phải dính mép trái để sticky/overlay đúng chỗ, còn lưới card
+          có padding riêng. Đây chính là lối thoát tường minh mà PageContainer
+          chừa sẵn, thay vì phải bỏ container để lách. */}
+      <PageContainer as="main" size="full" padding="none">
         {/* Trang này CỐ Ý không có tiêu đề nhìn thấy được — bố cục là bộ lọc +
             lưới thẻ, thêm chữ "Exams" to sẽ thừa. Nhưng đây là trang duy nhất
             của site không có <h1> nào, nên người dùng trình đọc màn hình mất mốc
             định vị và mất luôn khả năng nhảy theo tiêu đề (WCAG 1.3.1 / 2.4.6).
             sr-only giữ nguyên thiết kế mà vẫn trả lại mốc đó. */}
-        <h1 className="sr-only">Exams</h1>
+        <h1 className="sr-only">{t("exams.title")}</h1>
         {/* MỘT block căn giữa: *Filter (trái, sticky, overlay) + lưới ExamCard
             tối đa 3 cột (phải, flex-1). mx-auto của <main> giữ block căn giữa. */}
         <div className="relative flex items-start">
@@ -95,7 +102,7 @@ export default async function ExamsPage({ searchParams }: { searchParams: Search
             />
           </div>
         </div>
-      </main>
+      </PageContainer>
     </div>
   );
 }

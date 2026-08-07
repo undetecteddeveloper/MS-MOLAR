@@ -60,7 +60,7 @@ export function LeaveExamDialog({ open, onCancel, onLeave }: LeaveExamDialogProp
           <button
             type="button"
             onClick={onLeave}
-            className="bg-brand text-brand-foreground rounded-[4px] px-4 py-2 text-xs font-medium tracking-[0.14em] uppercase transition-opacity hover:opacity-90"
+            className="bg-brand text-brand-foreground rounded-full px-4 py-2 text-xs font-medium tracking-[0.14em] uppercase transition-opacity hover:opacity-90"
           >
             {t("player.leave")}
           </button>

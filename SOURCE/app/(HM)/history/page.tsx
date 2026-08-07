@@ -18,6 +18,7 @@ import { listMyHistory } from "@/app/(HM)/queries";
 import { filterHistoryEntries, type HistoryEntryFilters } from "@/lib/history/filterEntries";
 import { HistoryFilters } from "./_components/HistoryFilters";
 import { HistoryList } from "./_components/HistoryList";
+import { PageContainer } from "@/components/layout/PageContainer";
 
 type SearchParams = Promise<{
   subject?: string;
@@ -67,13 +68,17 @@ export default async function HistoryPage({ searchParams }: { searchParams: Sear
 
   return (
     <div className="bg-background">
-      <main className="mx-auto w-full max-w-6xl px-4 py-5">
+      {/* `small` là bề rộng THẬT của trang này: khung ngoài trước đây khai
+          max-w-6xl nhưng HistoryList bên trong lại tự ghim max-w-2xl, nên con
+          số 6xl chưa bao giờ có tác dụng. Khai đúng nấc thay vì để hai lớp
+          container mâu thuẫn nhau. */}
+      <PageContainer as="main" size="small" padding="compact">
         <HistoryList
           entries={filteredEntries}
           isFiltered={entries.length > 0 && filteredEntries.length !== entries.length}
           filters={<HistoryFilters subjects={subjects} exams={exams} selected={selected} />}
         />
-      </main>
+      </PageContainer>
     </div>
   );
 }

@@ -16,6 +16,7 @@ import { ArrowUpRight, Download, Loader2, MoreHorizontal, Share2 } from "lucide-
 import Link from "next/link";
 import { useState } from "react";
 import { usePdfAction } from "@/components/history/usePdfAction";
+import { useT } from "@/lib/i18n/client";
 import type { AttemptPdfData } from "@/lib/pdf/generateAttemptPdf";
 
 export interface HistoryRowMenuProps {
@@ -26,6 +27,7 @@ export interface HistoryRowMenuProps {
 }
 
 export function HistoryRowMenu({ pdfInput, resultHref, examTitle }: HistoryRowMenuProps) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const save = usePdfAction("save", pdfInput);
   const share = usePdfAction("share", pdfInput);
@@ -66,7 +68,7 @@ export function HistoryRowMenu({ pdfInput, resultHref, examTitle }: HistoryRowMe
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={`More actions for ${examTitle}`}
+        aria-label={t("history.moreActionsFor", { title: examTitle })}
         onClick={() => setOpen((v) => !v)}
         className="flex items-center justify-center rounded-xl border border-border bg-card p-3 text-brand transition-colors hover:border-brand/40"
       >
@@ -79,19 +81,21 @@ export function HistoryRowMenu({ pdfInput, resultHref, examTitle }: HistoryRowMe
           className="border-border bg-card absolute top-full right-0 z-20 mt-2 w-56 rounded-md border p-1 shadow-sm"
         >
           <MenuAction
-            label="Save"
-            busyLabel="Saving…"
+            label={t("common.save")}
+            busyLabel={t("common.saving")}
+            errorText={t("history.pdfError")}
             icon={Download}
             phase={save.phase}
             onClick={save.run}
           />
           <MenuAction
-            label="Share"
-            busyLabel="Sharing…"
+            label={t("common.share")}
+            busyLabel={t("history.sharing")}
+            errorText={t("history.pdfError")}
             icon={Share2}
             phase={share.phase}
             onClick={share.run}
-            fallbackText="Downloaded — sharing isn't supported in this browser."
+            fallbackText={t("history.downloadedNoShare")}
           />
           <Link
             role="menuitem"
@@ -100,7 +104,7 @@ export function HistoryRowMenu({ pdfInput, resultHref, examTitle }: HistoryRowMe
             className="hover:bg-accent flex w-full items-center gap-2 rounded-[4px] px-3 py-2 text-left text-sm text-foreground transition-colors"
           >
             <ArrowUpRight className="size-4 shrink-0" aria-hidden />
-            View details
+            {t("common.viewDetails")}
           </Link>
         </div>
       )}
@@ -111,6 +115,7 @@ export function HistoryRowMenu({ pdfInput, resultHref, examTitle }: HistoryRowMe
 function MenuAction({
   label,
   busyLabel,
+  errorText,
   icon: Icon,
   phase,
   onClick,
@@ -118,6 +123,7 @@ function MenuAction({
 }: {
   label: string;
   busyLabel: string;
+  errorText: string;
   icon: typeof Download;
   phase: "idle" | "busy" | "error" | "fallback-confirmed";
   onClick: () => void;
@@ -143,7 +149,7 @@ function MenuAction({
       </button>
       {phase === "error" && (
         <p role="alert" className="text-brand px-3 pb-1 text-xs">
-          Couldn&apos;t generate the PDF. Try again.
+          {errorText}
         </p>
       )}
       {phase === "fallback-confirmed" && fallbackText && (

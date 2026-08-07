@@ -3,6 +3,9 @@
 // "Phần N"); đề 1 phần render phẳng như v2.0 (không heading). Mỗi câu là một
 // QuestionEditor, định danh (part, number). Client-safe (con là client).
 
+"use client";
+
+import { useT } from "@/lib/i18n/client";
 import type { AssembledQuestion, ExtractedPart, UgcError } from "@/lib/ugc/types";
 import { QuestionEditor } from "./QuestionEditor";
 
@@ -23,6 +26,7 @@ export function AssembledQuestionList({
   errors,
   onChangeQuestion,
 }: AssembledQuestionListProps) {
+  const t = useT();
   // Khoá lỗi composite — khớp validateAssembledExam (partNumber null = đề 1 phần).
   const errorKeys = new Set(
     errors
@@ -55,7 +59,7 @@ export function AssembledQuestionList({
       {partNumbers.map((pn) => (
         <section key={pn} aria-labelledby={`part-${pn}`}>
           <h2 id={`part-${pn}`} className="eyebrow mb-3">
-            {titleByPart.get(pn) ?? `Phần ${pn}`}
+            {titleByPart.get(pn) ?? t("upload.partLabel", { part: pn })}
           </h2>
           <ul className="flex flex-col gap-4">
             {questions

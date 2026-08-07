@@ -1,5 +1,6 @@
 "use client";
 import { useT } from "@/lib/i18n/client";
+import type { MessageKey } from "@/lib/i18n/translate";
 
 // AnalyticsDashboard — client island for /me/dashboard (Layer 3). Owns
 // activeTab/range/filterTouched state per docs/design/analytics-layer3-design.md
@@ -22,7 +23,6 @@ import { BarChartCard } from "./BarChartCard";
 import { DonutChartCard } from "./DonutChartCard";
 import {
   DEFAULT_RANGE,
-  RANGE_LABELS,
   RANGE_ORDER,
   type SubjectStats,
   type TimeRange,
@@ -30,14 +30,20 @@ import {
 
 type Tab = "bar" | "donut";
 
-const TABS: { value: Tab; label: string }[] = [
-  { value: "bar", label: "BAR" },
-  { value: "donut", label: "DONUT" },
+const TABS: { value: Tab; labelKey: MessageKey }[] = [
+  { value: "bar", labelKey: "analytics.tabBar" },
+  { value: "donut", labelKey: "analytics.tabDonut" },
 ];
 
-const TITLES: Record<Tab, string> = {
-  bar: "Correct vs. Incorrect by Subject",
-  donut: "Most Frequently Practiced Subject",
+const TITLE_KEY: Record<Tab, MessageKey> = {
+  bar: "analytics.barTitle",
+  donut: "analytics.donutTitle",
+};
+
+const RANGE_LABEL_KEY: Record<TimeRange, MessageKey> = {
+  week: "analytics.rangeWeek",
+  month: "analytics.rangeMonth",
+  all: "analytics.rangeAll",
 };
 
 export function AnalyticsDashboard({
@@ -64,12 +70,12 @@ export function AnalyticsDashboard({
     >
       {!filterTouched && (
         <option value="" disabled>
-          Filter
+          {t("common.filter")}
         </option>
       )}
       {RANGE_ORDER.map((r) => (
         <option key={r} value={r}>
-          {RANGE_LABELS[r]}
+          {t(RANGE_LABEL_KEY[r])}
         </option>
       ))}
     </select>
@@ -78,13 +84,14 @@ export function AnalyticsDashboard({
   return (
     <div>
       <div className="border-border flex items-center gap-6 border-b">
-        {TABS.map((t) => {
-          const isActive = tab === t.value;
+        {/* `tabDef` chứ không phải `t` — biến map cũ che mất hàm dịch. */}
+        {TABS.map((tabDef) => {
+          const isActive = tab === tabDef.value;
           return (
             <button
-              key={t.value}
+              key={tabDef.value}
               type="button"
-              onClick={() => setTab(t.value)}
+              onClick={() => setTab(tabDef.value)}
               className={[
                 "relative pb-3 font-sans text-xs font-medium tracking-[0.2em] uppercase transition-colors",
                 "after:bg-brand after:absolute after:-bottom-px after:left-0 after:h-[2px] after:w-full after:origin-center after:scale-x-0 after:transition-transform after:content-['']",
@@ -93,7 +100,7 @@ export function AnalyticsDashboard({
                   : "text-muted-foreground hover:text-foreground",
               ].join(" ")}
             >
-              {t.label}
+              {t(tabDef.labelKey)}
             </button>
           );
         })}
@@ -104,7 +111,7 @@ export function AnalyticsDashboard({
           <div>
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h2 className="text-foreground font-serif text-2xl">{TITLES[tab]}</h2>
+                <h2 className="text-foreground font-serif text-2xl">{t(TITLE_KEY[tab])}</h2>
                 <p className="text-muted-foreground mt-1 text-sm">{t("analytics.noData")}</p>
               </div>
               {filterSlot}
@@ -117,7 +124,11 @@ export function AnalyticsDashboard({
         ) : tab === "bar" ? (
           <BarChartCard data={data} filterSlot={filterSlot} />
         ) : (
-          <DonutChartCard data={data} rangeLabel={RANGE_LABELS[range]} filterSlot={filterSlot} />
+          <DonutChartCard
+            data={data}
+            rangeLabel={t(RANGE_LABEL_KEY[range])}
+            filterSlot={filterSlot}
+          />
         )}
       </div>
     </div>

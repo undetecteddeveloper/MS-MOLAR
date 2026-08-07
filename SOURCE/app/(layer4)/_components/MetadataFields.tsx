@@ -16,6 +16,7 @@
 // Restyle theo prototype UI_Layer4_main: nhãn eyebrow, viền focus vàng đồng
 // (--ring); đỏ dành riêng cho lỗi.
 
+import { useT } from "@/lib/i18n/client";
 import { LIMITS } from "@/lib/ugc/limits";
 import { SUBJECTS, SUBJECT_LABELS } from "@/lib/ugc/subjects";
 import type { MetaFieldName } from "@/lib/ugc/types";
@@ -60,6 +61,7 @@ export function MetadataFields({
   optionalMode,
   aiFilled,
 }: MetadataFieldsProps) {
+  const t = useT();
   const req = optionalMode ? null : <span className="text-brand">*</span>;
   const ariaReq = !optionalMode;
 
@@ -70,7 +72,7 @@ export function MetadataFields({
     return {
       caption: (
         <span id={id} className={aiCls}>
-          from your file
+          {t("upload.fromYourFile")}
         </span>
       ),
       describedBy: id,
@@ -89,7 +91,7 @@ export function MetadataFields({
     <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
       <div className="sm:col-span-2">
         <label htmlFor="meta-title" className={labelCls}>
-          Title {req}
+          {t("upload.fieldTitle")} {req}
         </label>
         <input
           id="meta-title"
@@ -108,7 +110,7 @@ export function MetadataFields({
 
       <div>
         <label htmlFor="meta-subject" className={labelCls}>
-          Subject {req}
+          {t("upload.fieldSubject")} {req}
         </label>
         <select
           id="meta-subject"
@@ -120,7 +122,9 @@ export function MetadataFields({
           aria-required={ariaReq}
           aria-describedby={subjectAi.describedBy}
         >
-          <option value="">{optionalMode ? "From file" : "Select a subject"}</option>
+          <option value="">
+            {optionalMode ? t("upload.fromFile") : t("upload.selectSubject")}
+          </option>
           {SUBJECTS.map((s) => (
             <option key={s} value={s}>
               {SUBJECT_LABELS[s]} ({s})
@@ -133,7 +137,7 @@ export function MetadataFields({
 
       <div>
         <label htmlFor="meta-grade" className={labelCls}>
-          Grade {req}
+          {t("upload.fieldGrade")} {req}
         </label>
         <input
           id="meta-grade"
@@ -155,7 +159,7 @@ export function MetadataFields({
 
       <div>
         <label htmlFor="meta-school" className={labelCls}>
-          School
+          {t("common.school")}
         </label>
         <input
           id="meta-school"
@@ -173,7 +177,7 @@ export function MetadataFields({
 
       <div>
         <label htmlFor="meta-semester" className={labelCls}>
-          Semester
+          {t("common.semester")}
         </label>
         <select
           id="meta-semester"
@@ -184,7 +188,7 @@ export function MetadataFields({
           aria-invalid={!!fieldErrors?.semester}
           aria-describedby={semesterAi.describedBy}
         >
-          <option value="">None</option>
+          <option value="">{t("common.none")}</option>
           <option value="HK1">HK1</option>
           <option value="HK2">HK2</option>
         </select>
@@ -194,7 +198,7 @@ export function MetadataFields({
 
       <div>
         <label htmlFor="meta-year" className={labelCls}>
-          School Year
+          {t("upload.schoolYear")}
         </label>
         <input
           id="meta-year"
@@ -215,7 +219,7 @@ export function MetadataFields({
 
       <div className="sm:col-span-2">
         <label htmlFor="meta-duration" className={labelCls}>
-          Exam Duration {req}
+          {t("upload.examDuration")} {req}
         </label>
         <div className="mt-1.5 flex items-center gap-3">
           <input
@@ -235,7 +239,7 @@ export function MetadataFields({
             aria-required={ariaReq}
             aria-describedby={durationAi.describedBy}
           />
-          <span className="text-sm text-muted-foreground">minutes</span>
+          <span className="text-sm text-muted-foreground">{t("upload.minutes")}</span>
         </div>
         {durationAi.caption}
         {fieldErrors?.durationMinutes && (

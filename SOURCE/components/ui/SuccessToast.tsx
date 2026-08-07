@@ -27,12 +27,19 @@ interface SuccessToastProps {
 }
 
 export function SuccessToast({ message, trigger, durationMs = 3000 }: SuccessToastProps) {
-  const [visible, setVisible] = useState(false);
+  // Trạng thái được lưu là "trigger nào ĐÃ hết hạn", không phải "đang hiện".
+  // Hiện/ẩn là giá trị DẪN XUẤT lúc render, nên không cần một lượt setState để
+  // bật toast lên — trước đây effect gọi `setVisible(true)` ngay trong thân nó,
+  // tức là mỗi lần trigger đổi thì render một lần ở trạng thái ẩn rồi lập tức
+  // render lại ở trạng thái hiện (cascading render — `react-hooks/
+  // set-state-in-effect`). Nay chỉ còn setState trong callback của setTimeout,
+  // là đúng thứ effect được sinh ra để làm.
+  const [expiredTrigger, setExpiredTrigger] = useState(0);
+  const visible = trigger !== 0 && trigger !== expiredTrigger;
 
   useEffect(() => {
     if (trigger === 0) return;
-    setVisible(true);
-    const timer = setTimeout(() => setVisible(false), durationMs);
+    const timer = setTimeout(() => setExpiredTrigger(trigger), durationMs);
     return () => clearTimeout(timer);
   }, [trigger, durationMs]);
 
@@ -49,7 +56,7 @@ export function SuccessToast({ message, trigger, durationMs = 3000 }: SuccessToa
             : "translate-y-3 opacity-0 duration-200 ease-in"
         }`}
       >
-        <div className="flex items-center gap-2 rounded-md border border-border bg-foreground px-4 py-2.5 text-sm font-medium text-background">
+        <div className="border-border bg-foreground text-background flex items-center gap-2 rounded-md border px-4 py-2.5 text-sm font-medium">
           <Check className="h-4 w-4 shrink-0 text-[color:var(--ring)]" />
           {message}
         </div>

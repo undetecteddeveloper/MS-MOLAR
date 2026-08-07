@@ -59,7 +59,7 @@ export function DonutChartCard({
         <div>
           <h2 className="text-foreground font-serif text-2xl">{t("analytics.donutTitle")}</h2>
           <p className="text-muted-foreground mt-1 text-sm">
-            % share of practice sessions by subject, this {rangeLabel.toLowerCase()}
+            {t("analytics.donutSubtitle", { range: rangeLabel.toLowerCase() })}
           </p>
         </div>
         {filterSlot}

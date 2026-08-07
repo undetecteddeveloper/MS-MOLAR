@@ -135,7 +135,7 @@ export function SidebarProfile({ displayName: initial }: { displayName: string }
                 <button
                   type="submit"
                   disabled={pending || draft.length === 0}
-                  className="flex-1 rounded-[4px] bg-[#A62C2B] px-3 py-1.5 font-sans text-xs font-medium text-[#EDE1C8] transition-colors hover:bg-[#8F2523] disabled:opacity-60"
+                  className="flex-1 rounded-full bg-[#A62C2B] px-3 py-1.5 font-sans text-xs font-medium text-[#EDE1C8] transition-colors hover:bg-[#8F2523] disabled:opacity-60"
                 >
                   {pending ? t("common.saving") : t("common.save")}
                 </button>

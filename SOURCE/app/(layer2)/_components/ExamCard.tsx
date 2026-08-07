@@ -36,7 +36,7 @@ export async function ExamCard({ exam, eligibility }: ExamCardProps) {
         <div className="flex items-baseline justify-between gap-3">
           <span className="eyebrow text-[var(--block-fg-muted)]">{exam.subject}</span>
           <span className="eyebrow text-[var(--block-fg-muted)] tabular-nums">
-            Grade {exam.grade}
+            {t("exams.gradeValue", { grade: exam.grade })}
           </span>
         </div>
 

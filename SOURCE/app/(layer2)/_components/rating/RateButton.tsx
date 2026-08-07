@@ -1,5 +1,6 @@
 "use client";
 import { useT } from "@/lib/i18n/client";
+import type { MessageKey } from "@/lib/i18n/translate";
 
 // RateButton — điều khiển "Rate" trên mỗi ExamCard (Rating System, R4). LÀ
 // sibling của Link thẻ đề (stretched-link restructure, code:F1) — KHÔNG lồng
@@ -27,9 +28,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 
 export type RateEligibility = "eligible" | "not-attempted" | "logged-out";
 
-const DISABLED_REASON: Record<Exclude<RateEligibility, "eligible">, string> = {
-  "not-attempted": "Finish this exam first",
-  "logged-out": "Log in to rate",
+const DISABLED_REASON_KEY: Record<Exclude<RateEligibility, "eligible">, MessageKey> = {
+  "not-attempted": "rating.finishExamFirst",
+  "logged-out": "rating.logInToRate",
 };
 
 interface RateButtonProps {
@@ -54,7 +55,7 @@ export function RateButton({ examId, eligibility }: RateButtonProps) {
   }
 
   const reasonId = `rate-reason-${examId}`;
-  const reason = DISABLED_REASON[eligibility];
+  const reason = t(DISABLED_REASON_KEY[eligibility]);
 
   return (
     <Tooltip>

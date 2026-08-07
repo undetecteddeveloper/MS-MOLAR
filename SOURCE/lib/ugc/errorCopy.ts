@@ -3,27 +3,11 @@
 // UgcError để UI chỉ việc hiển thị. v2.1: nhãn câu nhận biết PHẦN — caller
 // truyền partNumber CHỈ với đề nhiều phần (đề 1 phần giữ nguyên "Câu N").
 
+import type { Translate } from "../i18n/translate";
 import { LIMITS } from "./limits";
-import type { MetaFieldName, UgcError, UgcErrorCode } from "./types";
+import type { MetaFieldName, UgcError, UgcErrorCode, UgcErrorParams } from "./types";
 
-/** Tham số tuỳ code — chỉ dùng field liên quan. */
-export type UgcErrorParams = {
-  /** Phần chứa câu lỗi — CHỈ truyền với đề nhiều phần (nhãn "Phần P Câu N");
-   * bỏ qua với đề 1 phần (nhãn "Câu N" như v2.0). */
-  partNumber?: number;
-  /** WRONG_CHOICE_COUNT: số lựa chọn đọc được. */
-  choiceCount?: number;
-  /** WRONG_SUB_ITEM_COUNT: số ý đọc được. */
-  subItemCount?: number;
-  /** EMPTY_CHOICE / CHOICE_TOO_LONG: nhãn lựa chọn (A–D). */
-  choiceLabel?: string;
-  /** ANSWER_COUNT_MISMATCH: số đáp án / số câu hỏi / số không khớp. */
-  answerCount?: number;
-  questionCount?: number;
-  unmatchedCount?: number;
-  /** META_INCOMPLETE / META_INVALID: field metadata bị lỗi (v2.2, ADR-0007). */
-  field?: MetaFieldName;
-};
+export type { UgcErrorParams };
 
 /** Nhãn hiển thị của field metadata trong copy lỗi META_*. */
 const META_FIELD_LABELS: Record<MetaFieldName, string> = {
@@ -112,6 +96,113 @@ export function makeUgcError(
     questionNumber,
     partNumber: params.partNumber ?? null,
     message: message(code, questionNumber, params),
+    params,
     ...(params.field !== undefined && { field: params.field }),
   };
+}
+
+// --- Bản dịch lúc render ---------------------------------------------------
+//
+// `message` ở trên bake sẵn tiếng Anh lúc TẠO error, nên nó đóng băng ngôn ngữ
+// tại thời điểm sai sót chứ không theo lựa chọn của người đọc. UI vì vậy dựng
+// lại câu từ `code` + `params` bằng `t` — cùng một error hiển thị đúng thứ
+// tiếng đang bật, kể cả khi người dùng đổi ngôn ngữ giữa chừng.
+
+/** Khoá i18n của nhãn field metadata trong copy lỗi META_*. */
+const META_FIELD_KEYS = {
+  title: "ugcError.fieldTitle",
+  subject: "ugcError.fieldSubject",
+  grade: "ugcError.fieldGrade",
+  durationMinutes: "ugcError.fieldDuration",
+  school: "ugcError.fieldSchool",
+  schoolYear: "ugcError.fieldSchoolYear",
+  semester: "ugcError.fieldSemester",
+} as const satisfies Record<MetaFieldName, string>;
+
+/** Nhãn định danh câu theo ngôn ngữ: "Phần 2 Câu 3" / "Part 2 Question 3". */
+function labelOf(t: Translate, n: number | null, part: number | undefined): string {
+  if (n == null) return "";
+  return part != null
+    ? t("upload.partQuestionLabel", { part, number: n })
+    : t("upload.questionLabel", { number: n });
+}
+
+/** Dựng câu lỗi theo ngôn ngữ hiện hành. Dùng ở MỌI chỗ hiển thị UgcError. */
+export function formatUgcError(t: Translate, e: UgcError): string {
+  const p = e.params ?? {};
+  const q = labelOf(t, e.questionNumber, p.partNumber ?? undefined);
+  const fieldLabel = p.field ? t(META_FIELD_KEYS[p.field]) : null;
+
+  switch (e.code) {
+    case "NO_QUESTIONS_FOUND":
+      return t("ugcError.noQuestionsFound");
+    case "TOO_MANY_QUESTIONS":
+      return t("ugcError.tooManyQuestions", { max: LIMITS.MAX_QUESTIONS });
+    case "WRONG_CHOICE_COUNT":
+      return t("ugcError.wrongChoiceCount", { q, count: p.choiceCount ?? 0 });
+    case "EMPTY_STEM":
+      return t("ugcError.emptyStem", { q });
+    case "EMPTY_CHOICE":
+      return t("ugcError.emptyChoice", { q, choice: p.choiceLabel ?? "?" });
+    case "ANSWER_COUNT_MISMATCH":
+      return t("ugcError.answerCountMismatch", {
+        answers: p.answerCount ?? 0,
+        questions: p.questionCount ?? 0,
+        unmatched: p.unmatchedCount ?? 0,
+      });
+    case "ANSWER_MISSING":
+      return t("ugcError.answerMissing", { q });
+    case "IMAGE_CROP_FAILED":
+      return t("ugcError.imageCropFailed", { q });
+    case "EXTRACTION_FAILED":
+      return t("ugcError.extractionFailed");
+    case "FILE_TOO_LARGE":
+      return t("ugcError.fileTooLarge", {
+        mb: Math.round(LIMITS.MAX_FILE_BYTES / (1024 * 1024)),
+      });
+    case "TOO_MANY_PAGES":
+      return t("ugcError.tooManyPages", { max: LIMITS.MAX_PDF_PAGES });
+    case "STEM_TOO_LONG":
+      return t("ugcError.stemTooLong", { q, max: LIMITS.MAX_STEM });
+    case "CHOICE_TOO_LONG":
+      return t("ugcError.choiceTooLong", {
+        q,
+        choice: p.choiceLabel ?? "?",
+        max: LIMITS.MAX_CHOICE,
+      });
+    case "ESSAY_ANSWER_TOO_LONG":
+      return t("ugcError.essayAnswerTooLong", { q, max: LIMITS.MAX_ESSAY_ANSWER });
+    case "WRONG_SUB_ITEM_COUNT":
+      return t("ugcError.wrongSubItemCount", {
+        q,
+        count: p.subItemCount ?? 0,
+        min: LIMITS.MIN_SUB_ITEMS,
+        max: LIMITS.MAX_SUB_ITEMS,
+      });
+    case "SHORT_ANSWER_TOO_LONG":
+      return t("ugcError.shortAnswerTooLong", { q, max: LIMITS.MAX_SHORT_ANSWER });
+    case "META_INCOMPLETE":
+      return t("ugcError.metaIncomplete", { field: fieldLabel ?? t("ugcError.fieldRequired") });
+    case "META_INVALID": {
+      // Khoảng hợp lệ dựng tại chỗ chứ không dùng META_FIELD_RANGES: khoảng
+      // thời lượng có kèm chữ "minutes", phải theo ngôn ngữ đang bật.
+      const range =
+        p.field === "grade"
+          ? `${LIMITS.MIN_GRADE}–${LIMITS.MAX_GRADE}`
+          : p.field === "durationMinutes"
+            ? t("ugcError.durationRange", {
+                min: LIMITS.MIN_DURATION,
+                max: LIMITS.MAX_DURATION,
+              })
+            : p.field === "schoolYear"
+              ? `${LIMITS.MIN_YEAR}–${LIMITS.MAX_YEAR}`
+              : undefined;
+      const label = fieldLabel ?? t("ugcError.fieldGeneric");
+      return range
+        ? t("ugcError.metaInvalidRange", { field: label, range })
+        : t("ugcError.metaInvalid", { field: label });
+    }
+    case "META_EXTRACTION_FAILED":
+      return t("ugcError.metaExtractionFailed");
+  }
 }

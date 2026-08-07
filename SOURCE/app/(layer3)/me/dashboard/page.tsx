@@ -10,6 +10,8 @@ import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { getTranslate } from "@/lib/i18n/server";
 import { getAnalyticsByRange } from "@/app/(layer3)/queries";
 import { AnalyticsDashboard } from "@/app/(layer3)/_components/AnalyticsDashboard";
+import { PageContainer } from "@/components/layout/PageContainer";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 export default async function DashboardPage() {
   const t = await getTranslate();
@@ -19,13 +21,19 @@ export default async function DashboardPage() {
   const dataByRange = await getAnalyticsByRange();
 
   return (
-    <main className="mx-auto w-full max-w-4xl px-6 py-10">
-      <h1 className="text-foreground font-serif text-2xl">{t("analytics.title")}</h1>
-      <p className="text-muted-foreground mt-1 text-sm">{t("analytics.subtitle")}</p>
+    // `full` (72rem) thay max-w-4xl cũ: đây là trang lưới dữ liệu — biểu đồ có
+    // càng nhiều bề ngang thì các cột càng đọc được, và mép nội dung thẳng hàng
+    // mép navbar (cùng 72rem).
+    <PageContainer as="main" size="full">
+      <PageHeader
+        breadcrumbs={[{ label: t("nav.home"), href: "/" }, { label: t("nav.analytics") }]}
+        title={t("analytics.title")}
+        description={t("analytics.subtitle")}
+      />
 
       <div className="mt-6">
         <AnalyticsDashboard dataByRange={dataByRange} />
       </div>
-    </main>
+    </PageContainer>
   );
 }

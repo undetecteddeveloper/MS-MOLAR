@@ -1,6 +1,6 @@
 # External Resources
 
-Last updated: 2026-07-14
+Last updated: 2026-08-06
 
 This file records the external resources available to this project and how to access them. AI agents and contributors consult this file when work depends on resources outside the repository. Feature-specific identifiers belong in the consuming UI Spec or Design Doc, not here — this file holds environment-stable facts only.
 
@@ -23,7 +23,7 @@ This file records the external resources available to this project and how to ac
 ### Guidelines
 - Status: present
 - Source type: project files
-- Location: `DESIGN.md` (visual rules), plus `PROCESS.md` and `WORKFLOW.md` (repo root) for process conventions
+- Location: `DESIGN.md` (visual rules), plus `PROJECT_OVERVIEW.md` and `PROCESS.md` (repo root) for process conventions
 - Access method: file read
 
 ### Visual Verification Environment

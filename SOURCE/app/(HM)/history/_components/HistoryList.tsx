@@ -30,7 +30,10 @@ export async function HistoryList({
 }) {
   const t = await getTranslate();
   return (
-    <div className="mx-auto w-full max-w-2xl">
+    // Bề rộng KHÔNG còn đặt ở đây (trước là `mx-auto w-full max-w-2xl`): trang
+    // /history đã khai `PageContainer size="small"`, để cả hai cùng giới hạn bề
+    // rộng thì đổi nấc scaffold sẽ không có tác dụng vì lớp trong vẫn ghim 2xl.
+    <div className="w-full">
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-foreground font-serif text-2xl">{t("history.title")}</h1>
@@ -52,7 +55,7 @@ export async function HistoryList({
               <p className="text-muted-foreground text-sm">{t("history.noResultsHint")}</p>
               <Link
                 href="/exams"
-                className="bg-brand text-brand-foreground mt-2 rounded-[4px] px-4 py-2 text-xs font-medium tracking-[0.14em] uppercase transition-opacity hover:opacity-90"
+                className="bg-brand text-brand-foreground mt-2 rounded-full px-4 py-2 text-xs font-medium tracking-[0.14em] uppercase transition-opacity hover:opacity-90"
               >
                 {t("common.browseExams")}
               </Link>

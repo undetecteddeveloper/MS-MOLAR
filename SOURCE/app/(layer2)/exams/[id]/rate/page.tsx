@@ -19,7 +19,9 @@ import { notFound } from "next/navigation";
 import { getMyRating } from "@/app/(layer2)/actions";
 import { RatingRubric } from "@/app/(layer2)/_components/rating/RatingRubric";
 import { getExam, listMySubmittedExamIds } from "@/app/(layer2)/queries";
+import { getTranslate } from "@/lib/i18n/server";
 import { mapFromMyRating } from "@/lib/rating";
+import { PageContainer } from "@/components/layout/PageContainer";
 
 function safeBackHref(returnTo: string | undefined): string {
   if (
@@ -44,6 +46,7 @@ export default async function RatePage({
   const { id } = await params;
   const { returnTo } = await searchParams;
   const backHref = safeBackHref(returnTo);
+  const t = await getTranslate();
 
   const exam = await getExam(id);
   if (!exam) {
@@ -54,18 +57,16 @@ export default async function RatePage({
   if (!submittedExamIds.has(id)) {
     return (
       <div className="bg-background">
-        <main className="mx-auto flex w-full max-w-xl flex-col items-center px-6 py-16 text-center">
-          <h1 className="font-serif text-2xl">You need to finish this exam first</h1>
-          <p className="text-muted-foreground mt-2 text-sm">
-            Complete an attempt on this exam before you can rate its difficulty.
-          </p>
+        <PageContainer as="main" size="small" className="flex flex-col items-center text-center">
+          <h1 className="font-serif text-2xl">{t("rating.needAttemptTitle")}</h1>
+          <p className="text-muted-foreground mt-2 text-sm">{t("rating.needAttemptBody")}</p>
           <Link
             href={backHref}
             className="text-brand mt-6 text-xs font-medium tracking-[0.14em] uppercase hover:underline"
           >
-            ← Back
+            ← {t("common.back")}
           </Link>
-        </main>
+        </PageContainer>
       </div>
     );
   }
@@ -74,24 +75,28 @@ export default async function RatePage({
 
   return (
     <div className="bg-background">
-      <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-6 py-12 sm:py-16">
+      {/* Giữ nguyên link "← Back" thay vì đổi sang Breadcrumbs: đích của nó là
+          `?returnTo=` phụ thuộc ngữ cảnh (vào từ /exams thì về /exams, vào từ
+          trang kết quả thì về đúng trang kết quả đó) và đã qua kiểm tra chống
+          open-redirect ở safeBackHref. Breadcrumbs là đường dẫn TĨNH theo cây
+          route nên không diễn đạt được hành vi đó. */}
+      <PageContainer as="main" size="small" className="flex flex-col gap-6 py-12 sm:py-16">
         <div>
           <Link
             href={backHref}
             className="text-muted-foreground hover:text-foreground text-sm transition-colors"
           >
-            ← Back
+            ← {t("common.back")}
           </Link>
-          <span className="eyebrow mt-6 block">Difficulty rating</span>
+          <span className="eyebrow mt-6 block">{t("rating.title")}</span>
           <h1 className="mt-2 font-serif text-3xl leading-snug">{exam.title}</h1>
           <p className="text-muted-foreground mt-2 max-w-prose text-sm leading-relaxed">
-            Rate each part from 1 (easiest) to 10 (hardest). Your overall score is the average of
-            the three.
+            {t("rating.intro")}
           </p>
         </div>
 
         <RatingRubric examId={id} initialScores={initialScores} />
-      </main>
+      </PageContainer>
     </div>
   );
 }

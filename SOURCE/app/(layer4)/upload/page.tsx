@@ -4,6 +4,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { UploadForm } from "@/app/(layer4)/_components/UploadForm";
+import { PageContainer } from "@/components/layout/PageContainer";
 
 // Trần thời gian cho function chạy Server Action của route này — chủ yếu là
 // `extractAndAssemble` (app/(layer4)/actions.ts), đường dài nhất trong app:
@@ -21,8 +22,8 @@ export default async function UploadPage() {
   if (!user) redirect("/?auth=signin");
 
   return (
-    <main className="mx-auto w-full max-w-3xl px-6 py-10">
+    <PageContainer as="main" size="default">
       <UploadForm />
-    </main>
+    </PageContainer>
   );
 }

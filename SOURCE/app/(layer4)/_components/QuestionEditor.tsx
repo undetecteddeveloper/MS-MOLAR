@@ -15,17 +15,19 @@
 
 import { useState } from "react";
 import { QuestionFigure } from "@/components/shared/QuestionFigure";
+import { useT } from "@/lib/i18n/client";
+import type { MessageKey } from "@/lib/i18n/translate";
 import { LIMITS } from "@/lib/ugc/limits";
 import type { AssembledQuestion, ChoiceId, SubItemId } from "@/lib/ugc/types";
 
 const CHOICE_IDS: ChoiceId[] = ["A", "B", "C", "D"];
 const SUB_ITEM_IDS: SubItemId[] = ["a", "b", "c", "d"];
 
-const TYPE_LABEL: Record<AssembledQuestion["type"], string> = {
-  mcq: "Multiple choice",
-  essay: "Essay",
-  true_false: "True/False (Đúng/Sai)",
-  short_answer: "Short answer",
+const TYPE_LABEL_KEY: Record<AssembledQuestion["type"], MessageKey> = {
+  mcq: "upload.typeMcq",
+  essay: "upload.typeEssay",
+  true_false: "upload.typeTrueFalse",
+  short_answer: "upload.typeShortAnswer",
 };
 
 interface QuestionEditorProps {
@@ -41,8 +43,10 @@ export function QuestionEditor({
   onChange,
   hasError,
 }: QuestionEditorProps) {
+  const t = useT();
   const [editing, setEditing] = useState(false);
   const q = question;
+  const empty = <span className="text-brand">{t("upload.emptyPlaceholder")}</span>;
 
   return (
     <li
@@ -52,15 +56,15 @@ export function QuestionEditor({
       }`}
     >
       <div className="flex items-center justify-between gap-3">
-        <span className="eyebrow">Câu {q.number}</span>
+        <span className="eyebrow">{t("upload.questionLabel", { number: q.number })}</span>
         <div className="flex items-center gap-3">
-          <span className="text-xs text-muted-foreground">{TYPE_LABEL[q.type]}</span>
+          <span className="text-xs text-muted-foreground">{t(TYPE_LABEL_KEY[q.type])}</span>
           <button
             type="button"
             onClick={() => setEditing((v) => !v)}
             className="text-xs text-muted-foreground underline-offset-4 hover:text-brand hover:underline"
           >
-            {editing ? "Done" : "Edit"}
+            {editing ? t("common.done") : t("common.edit")}
           </button>
         </div>
       </div>
@@ -73,7 +77,7 @@ export function QuestionEditor({
           maxLength={LIMITS.MAX_STEM}
           rows={3}
           className="mt-3 w-full resize-y rounded-[4px] border border-border bg-card p-3 text-sm text-foreground outline-none focus:border-brand"
-          placeholder="Question text"
+          placeholder={t("upload.questionText")}
         />
       ) : (
         <p className="mt-3 whitespace-pre-wrap text-foreground">{q.stem}</p>
@@ -93,7 +97,7 @@ export function QuestionEditor({
               onClick={() => onChange({ imageUrl: undefined })}
               className="mt-1 text-xs text-muted-foreground underline-offset-4 hover:text-brand hover:underline"
             >
-              Remove image
+              {t("upload.removeImage")}
             </button>
           )}
         </div>
@@ -110,7 +114,7 @@ export function QuestionEditor({
                 <button
                   type="button"
                   aria-pressed={isCorrect}
-                  aria-label={`Mark choice ${cid} correct`}
+                  aria-label={t("upload.markChoiceCorrect", { choice: cid })}
                   onClick={() => onChange({ correctAnswer: cid })}
                   className={`flex size-6 shrink-0 items-center justify-center rounded-full border text-xs font-medium transition-colors ${
                     isCorrect
@@ -138,27 +142,25 @@ export function QuestionEditor({
                     }}
                     maxLength={LIMITS.MAX_CHOICE}
                     className="flex-1 rounded-[4px] border border-border bg-card px-3 py-1.5 text-sm text-foreground outline-none focus:border-brand"
-                    placeholder={`Choice ${cid}`}
+                    placeholder={t("upload.choicePlaceholder", { choice: cid })}
                   />
                 ) : (
                   <span className="flex-1 text-sm text-foreground">
-                    {choice?.text ?? (
-                      <span className="text-brand">— empty —</span>
-                    )}
+                    {choice?.text ?? empty}
                   </span>
                 )}
               </div>
             );
           })}
           <p className="mt-1 text-xs text-muted-foreground">
-            Correct answer{" "}
+            {t("upload.correctAnswer")}{" "}
             {q.correctAnswer ? (
               <>
-                <span className="text-foreground">{q.correctAnswer}</span> — from
-                your answer file
+                <span className="text-foreground">{q.correctAnswer}</span>{" "}
+                {t("upload.fromYourAnswerFile")}
               </>
             ) : (
-              <span className="text-brand">not set</span>
+              <span className="text-brand">{t("upload.notSet")}</span>
             )}
           </p>
         </div>
@@ -188,15 +190,17 @@ export function QuestionEditor({
                     }}
                     maxLength={LIMITS.MAX_CHOICE}
                     className="flex-1 rounded-[4px] border border-border bg-card px-3 py-1.5 text-sm text-foreground outline-none focus:border-brand"
-                    placeholder={`Statement ${sid})`}
+                    placeholder={t("upload.statementPlaceholder", { item: sid })}
                   />
                 ) : (
-                  <span className="flex-1 text-sm text-foreground">
-                    {item?.text ?? <span className="text-brand">— empty —</span>}
-                  </span>
+                  <span className="flex-1 text-sm text-foreground">{item?.text ?? empty}</span>
                 )}
                 {/* Toggle Đ/S — đáp án của ý này (từ file đáp án, sửa được). */}
-                <div className="flex shrink-0 gap-1" role="group" aria-label={`Answer for ${sid})`}>
+                <div
+                  className="flex shrink-0 gap-1"
+                  role="group"
+                  aria-label={t("upload.answerForItem", { item: sid })}
+                >
                   {([true, false] as const).map((v) => {
                     const active = answer === v;
                     return (
@@ -222,8 +226,8 @@ export function QuestionEditor({
             );
           })}
           <p className="mt-1 text-xs text-muted-foreground">
-            Đ/S per statement — from your answer file.{" "}
-            <span className="italic">Stored, not auto-scored yet.</span>
+            {t("upload.tfPerStatement")}{" "}
+            <span className="italic">{t("upload.storedNotScored")}</span>
           </p>
         </div>
       )}
@@ -231,24 +235,22 @@ export function QuestionEditor({
       {/* short_answer (v2.1): giá trị mong đợi */}
       {q.type === "short_answer" && (
         <div className="mt-4">
-          <p className="text-xs text-muted-foreground">
-            Expected answer — from your answer file
-          </p>
+          <p className="text-xs text-muted-foreground">{t("upload.expectedAnswer")}</p>
           {editing ? (
             <input
               value={q.essayAnswer ?? ""}
               onChange={(e) => onChange({ essayAnswer: e.target.value })}
               maxLength={LIMITS.MAX_SHORT_ANSWER}
               className="mt-1 w-full rounded-[4px] border border-border bg-card px-3 py-1.5 text-sm text-foreground outline-none focus:border-brand"
-              placeholder="e.g. 1260 / 1,04"
+              placeholder={t("upload.shortAnswerExample")}
             />
           ) : (
             <p className="mt-1 rounded-[4px] border border-border bg-card px-3 py-1.5 text-sm text-foreground">
-              {q.essayAnswer ?? <span className="text-brand">— empty —</span>}
+              {q.essayAnswer ?? empty}
             </p>
           )}
           <p className="mt-1 text-xs italic text-muted-foreground">
-            Short answer — stored, not auto-scored yet.
+            {t("upload.shortAnswerStored")}
           </p>
         </div>
       )}
@@ -256,7 +258,7 @@ export function QuestionEditor({
       {/* Essay: đáp án mẫu */}
       {q.type === "essay" && (
         <div className="mt-4">
-          <p className="text-xs text-muted-foreground">Model answer</p>
+          <p className="text-xs text-muted-foreground">{t("upload.modelAnswer")}</p>
           {editing ? (
             <textarea
               value={q.essayAnswer ?? ""}
@@ -267,12 +269,10 @@ export function QuestionEditor({
             />
           ) : (
             <p className="mt-1 whitespace-pre-wrap rounded-[4px] border border-border bg-card p-3 text-sm text-foreground">
-              {q.essayAnswer ?? <span className="text-brand">— empty —</span>}
+              {q.essayAnswer ?? empty}
             </p>
           )}
-          <p className="mt-1 text-xs italic text-muted-foreground">
-            Essay — stored, not auto-scored yet.
-          </p>
+          <p className="mt-1 text-xs italic text-muted-foreground">{t("upload.essayStored")}</p>
         </div>
       )}
     </li>

@@ -14,6 +14,12 @@
 //   4. Mỗi cột được probe bằng một user THẬT (anon key + đăng nhập): cột an toàn
 //      phải đọc được, cột đáp án phải trả 42501.
 //   5. Hai RPC phải tồn tại và authenticated phải gọi được.
+//   6. `on delete` của MỌI khoá ngoại  <- catalog thật, qua RPC §16a (TD-011)
+//
+// (6) là ngoại lệ có chủ đích với "không đọc DDL từ DB": nó KHÔNG suy từ hành vi
+// mà đọc thẳng pg_constraint qua một hàm chỉ-đọc chỉ service_role gọi được. Đây
+// là khoảng hở đã để lọt bug xoá đề 2026-08-04 — thiếu `on delete cascade` là
+// loại lệch mà mọi cổng khác (tsc, vitest, các mục 1–5) đều mù.
 //
 // Vì (1) lấy từ DB chứ không hard-code, THÊM CỘT MỚI vào questions mà quên phân
 // loại sẽ làm script FAIL kèm hướng dẫn — thay vì lặng lẽ trở thành trang trắng
@@ -28,6 +34,20 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { fkKey, resolveForeignKeys } from "../lib/schema/parseForeignKeys";
+
+/** Một dòng của `public.schema_foreign_keys()` (§16a). */
+interface DbForeignKey {
+  constraint_name: string;
+  child_schema: string;
+  child_table: string;
+  child_columns: string[];
+  parent_schema: string;
+  parent_table: string;
+  parent_columns: string[];
+  on_delete: string;
+  on_update: string;
+}
 
 function loadEnv(): Record<string, string> {
   const raw = readFileSync(resolve(__dirname, "../.env.local"), "utf8");
@@ -371,9 +391,110 @@ async function main() {
     await admin.from("exams").delete().eq("id", PROBE_EXAM);
   }
 
+  // ==========================================================================
+  // 6. §15/§16 — hành vi `on delete` của MỌI khoá ngoại (TD-011)
+  //
+  // Đây là khoảng hở đã để lọt bug xoá đề 2026-08-04. Trước đây script không
+  // thể chạm tới `on delete`: PostgREST không phơi information_schema, OpenAPI
+  // spec chỉ nói CÓ khoá ngoại chứ không nói hành vi xoá, và cách duy nhất suy
+  // ra từ hành vi là thật sự xoá một dòng cha — vi phạm nguyên tắc chỉ-đọc làm
+  // script an toàn trên production. §16a mở một đường đọc catalog trực tiếp,
+  // nên nay so được THẲNG với schema.sql thay vì suy đoán.
+  //
+  // Đối chiếu HAI CHIỀU là chỗ quan trọng: chiều "DB có mà schema.sql không
+  // khai" vừa bắt được DB trôi khỏi file, vừa bắt được chính parser bị mù một
+  // dạng cú pháp — lỗ hổng của công cụ biến thành báo động thay vì im lặng.
+  // ==========================================================================
+  console.log("\nĐối chiếu `on delete` của mọi khoá ngoại (schema.sql vs catalog thật):");
+
+  const fkRes = await admin.rpc("schema_foreign_keys");
+  if (fkRes.error) {
+    assert(
+      false,
+      fkRes.error.code === "PGRST202"
+        ? "schema_foreign_keys() chưa tồn tại — apply schema.sql §16a (không có nó thì `on delete` KHÔNG được kiểm bởi bất cứ cổng nào chạm tới DB)"
+        : `schema_foreign_keys() không gọi được: ${fkRes.error.code ?? ""} ${fkRes.error.message}`
+    );
+  } else {
+    const declared = resolveForeignKeys(schemaSql);
+    const live = new Map<string, DbForeignKey>();
+    for (const row of (fkRes.data ?? []) as DbForeignKey[]) {
+      live.set(fkKey(`${row.child_schema}.${row.child_table}`, row.child_columns), row);
+    }
+
+    console.log(`     schema.sql khai ${declared.size} khoá ngoại, DB đang có ${live.size}`);
+
+    // Khai trong file nhưng DB chưa có = file đã sửa, DB chưa apply. Chính xác
+    // kiểu lệch mà TD-005 nói tới, chỉ khác là nay nhìn thấy được.
+    const notApplied = [...declared.keys()].filter((k) => !live.has(k));
+    assert(
+      notApplied.length === 0,
+      notApplied.length === 0
+        ? "Mọi khoá ngoại khai trong schema.sql đều tồn tại thật trên DB"
+        : `Khoá ngoại có trong schema.sql nhưng KHÔNG có trên DB: ${notApplied.join(", ")} — schema.sql chưa được apply`
+    );
+
+    const undeclared = [...live.keys()].filter((k) => !declared.has(k));
+    assert(
+      undeclared.length === 0,
+      undeclared.length === 0
+        ? "Mọi khoá ngoại trên DB đều có trong schema.sql (không có cái nào tạo tay ngoài file)"
+        : `DB có khoá ngoại KHÔNG khai trong schema.sql: ${undeclared.join(", ")} — hoặc ai đó tạo tay trên dashboard, hoặc parser bỏ sót một dạng cú pháp (lib/schema/parseForeignKeys.ts)`
+    );
+
+    // Trái tim của TD-011: so từng hành vi xoá một.
+    const mismatched: string[] = [];
+    const implicit: string[] = [];
+    for (const [key, fk] of declared) {
+      const row = live.get(key);
+      if (!row) continue; // đã báo ở notApplied
+      if (fk.onDelete === null) {
+        implicit.push(`${key} (DB đang: ${row.on_delete})`);
+        continue;
+      }
+      if (fk.onDelete !== row.on_delete) {
+        mismatched.push(`${key}: schema.sql nói \`${fk.onDelete}\`, DB đang \`${row.on_delete}\``);
+      }
+    }
+
+    assert(
+      implicit.length === 0,
+      implicit.length === 0
+        ? "Không khoá ngoại nào bỏ trống `on delete` trong schema.sql"
+        : `schema.sql bỏ trống \`on delete\` ở: ${implicit.join("; ")} — viết rõ hành vi mong muốn (§16)`
+    );
+
+    assert(
+      mismatched.length === 0,
+      mismatched.length === 0
+        ? `\`on delete\` của cả ${declared.size} khoá ngoại khớp schema.sql — TD-011 đang đóng`
+        : `LỆCH \`on delete\`: ${mismatched.join(" | ")} — apply lại schema.sql (§15/§16). Lệch kiểu này KHÔNG lộ ra ở tsc/vitest, chỉ lộ khi có người dùng thật đi vào đường xoá`
+    );
+
+    // Chuỗi xoá đề: mắt xích nào không cascade là một lần 23503 cho tác giả.
+    // Kiểm trên DB THẬT chứ không chỉ trên file — file đúng mà DB chưa apply
+    // thì bug vẫn sống, đó đúng là chuyện đã xảy ra ngày 2026-08-04.
+    const deleteChain = [
+      "public.exam_attempts(exam_id)",
+      "public.attempt_answers(attempt_id)",
+      "public.attempt_answers(question_id)",
+      "public.exam_results(attempt_id)",
+      "public.exam_reports(exam_id)",
+      "public.exam_difficulty_ratings(exam_id)",
+      "public.exam_moderation_log(exam_id)",
+    ];
+    const broken = deleteChain.filter((k) => live.get(k)?.on_delete !== "cascade");
+    assert(
+      broken.length === 0,
+      broken.length === 0
+        ? "Chuỗi xoá đề thông suốt trên DB thật: mọi bảng phái sinh đều cascade"
+        : `Xoá đề SẼ HỎNG (23503) ở: ${broken.map((k) => `${k} = ${live.get(k)?.on_delete ?? "không tồn tại"}`).join(", ")} — đúng bug 2026-08-04`
+    );
+  }
+
   console.log(
     failures === 0
-      ? "\n✅ Schema verify: DB khớp schema.sql §10 + §11 + §12."
+      ? "\n✅ Schema verify: DB khớp schema.sql §10 + §11 + §12 + khoá ngoại (§15/§16)."
       : `\n❌ Schema verify: ${failures} check FAIL — DB và schema.sql đang lệch nhau.`
   );
   process.exit(failures === 0 ? 0 : 1);

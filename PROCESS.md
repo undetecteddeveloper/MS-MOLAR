@@ -3592,3 +3592,125 @@ Chi tiết đáng ghi về cách phát hiện: lần bấm Delete đầu tiên t
 - **TD-011 (mới)**: `verify-schema.ts` không soi được `on delete` của khoá ngoại — nó cố ý chỉ-đọc, mà cách duy nhất quan sát cascade từ client là thật sự xoá. Bug này đi lọt qua tsc + test + `verify:schema`. Trả nợ cần đường chạy SQL đọc `information_schema.referential_constraints`.
 - Engineer CHƯA tự đăng nhập tài khoản chính để xác nhận `/admin` mở được (agent cố ý không dùng tài khoản thật).
 - Nợ bảo mật RLS column-level từ S#44 vẫn còn nguyên.
+
+---
+
+# [Tech debt] — Trả 5 mục trong sổ nợ, mở 1 mục mới (S#47, 2026-08-04, branch `main`)
+
+## Yêu cầu
+"Có một số nợ kỹ thuật trong `docs/TECH-DEBT.md`. Sửa chúng." Sổ lúc bắt đầu có
+7 mục đang mở: TD-011, TD-010, TD-009, TD-008, TD-007, TD-006, TD-005.
+
+## Đã trả (5) — mỗi mục kèm cách VERIFY, không chỉ cách sửa
+
+**TD-010 — lint không chặn được merge.** Sửa cả 2 lỗi bằng đổi cấu trúc, không
+dán `eslint-disable`:
+- `ExamTimer` → `useEffectEvent` (React 19.2 có sẵn) thay latest-ref ghi trong
+  thân render. Hai tính chất phải giữ: fire đúng 1 lần lúc chạm 0, và gọi bản
+  `onTimeUp` MỚI NHẤT (nó đóng gói answers hiện tại — gọi nhầm bản cũ = nộp bài
+  trống). Đổi identity callback mỗi render KHÔNG được reset đồng hồ.
+- `SuccessToast` → hiện/ẩn thành giá trị DẪN XUẤT lúc render; state chỉ còn lưu
+  "trigger nào đã hết hạn", và chỉ được set trong callback `setTimeout`.
+- Cảnh báo `<img>` cố ý của `AttemptPdfTemplate` tắt TẠI CHỖ kèm lý do
+  (html2canvas chụp trước khi `next/image` lazy kịp nạp → logo trắng trong PDF).
+- `npm run lint` nay là `eslint --max-warnings 0`; CI bỏ `continue-on-error`.
+- **Thêm 15 test hồi quy** — trước đó cả hai component không có test nào, dù một
+  cái nằm trên đường auto-submit khi hết giờ.
+
+**TD-011 — không cổng nào soi được `on delete`.** Đóng ở HAI tầng, cố ý:
+- *Tầng văn bản, không cần DB:* `lib/schema/parseForeignKeys.ts` + test đọc
+  schema.sql THẬT và FAIL nếu có khoá ngoại nào không viết `on delete`. Chạy
+  trong `npm test`/CI → nổ lúc mở PR, trước khi SQL kịp chạy ở đâu. Đặt dưới
+  `lib/` chứ không phải `supabase/` chính là để vào được vitest include.
+- *Tầng DB:* §16a mở RPC chỉ-đọc `public.schema_foreign_keys()` (SECURITY
+  INVOKER — pg_catalog vốn ai cũng đọc được, definer chỉ thêm bề mặt leo quyền
+  vô ích; EXECUTE khoá về `service_role`). `verify-schema.ts` mục 6 so HAI CHIỀU
+  với schema.sql + kiểm riêng chuỗi xoá đề trên DB thật.
+- Đối chiếu hai chiều là chỗ quan trọng: khoá ngoại parser bỏ sót sẽ hiện ra ở
+  chiều "DB có mà file không khai" → lỗ hổng của công cụ thành BÁO ĐỘNG, không
+  thành im lặng.
+- Quy ước mới: mọi `references` phải khai `on delete`, kể cả khi hành vi mong
+  muốn đúng bằng mặc định. §16b viết rõ 2 khoá ngoại duy nhất còn để mặc định.
+
+**TD-009 — cấu hình thiếu thì im lặng.** `instrumentation.ts` (chạy 1 lần lúc
+server khởi động) → `lib/env/checkEnv.ts`. Bắt cả 2 kiểu hỏng ngầm mà
+`.env.example` không bắt được: id không phải UUID trong `ADMIN_USER_IDS` (không
+bao giờ khớp, không phân biệt được với "chưa cấu hình"), và
+`NEXT_PUBLIC_SUPABASE_URL` sai định dạng (`next.config.ts` nuốt lỗi parse → CSP
+rụng origin Supabase → ảnh đề chết với thông báo không hề nhắc tới env). CỐ Ý
+không throw: sập cả site vì thiếu `GEMINI_API_KEY` là đổi hỏng hóc cục bộ lấy sự
+cố toàn site. Kiểm bằng `next start` thật với env cố tình sai — khối cảnh báo in
+đúng ngay dưới dòng "Ready".
+
+**TD-007 — 3 high trong bản lồng của next.** Bản nâng mà mục này chờ đã có:
+`next` 16.3.0 nằm NGOÀI dải advisory (`... - 16.3.0-preview.10`) và bỏ hẳn
+`next/node_modules/{sharp,postcss}`. `npm audit fix` (KHÔNG `--force`) → **0
+vulnerabilities**.
+- **Đánh giá cũ đã MỤC mà không ai biết:** advisory postcss nới lên `<=8.5.22`,
+  nên bản TOP-LEVEL (8.5.19) cũng đã dính — câu "chúng chỉ nằm ở bản lồng" đúng
+  lúc viết và sai 1 ngày sau. Thêm 2 gói mới vào danh sách: `undici` (qua jsdom,
+  chỉ dùng khi test) và `ip-address` (qua `@google/genai` → MCP SDK).
+  **Bài học: một đánh giá "chấp nhận được" có hạn sử dụng — phải SOI LẠI chứ
+  không đọc lại.**
+- Lần chạy đầu đứt mạng giữa chừng (ECONNRESET). Đã kiểm tra tree trước khi thử
+  lại: lockfile và node_modules KHÔNG đổi — npm rollback sạch.
+
+**TD-006 — CSP còn `'unsafe-inline'`.** `lib/security/csp.ts` là nguồn chân lý
+duy nhất, dùng chung `next.config.ts` và `proxy.ts`. Middleware sinh nonce
+128-bit mỗi request, đặt CSP có nonce lên **request** header (Next đọc chính
+header này để gắn `nonce=` vào script của nó) rồi đặt cùng chuỗi đó lên response.
+- `next.config.ts` giữ chính sách NỀN có `'unsafe-inline'` làm LƯỚI AN TOÀN, chỉ
+  còn hiệu lực ở path proxy.ts không chạy qua. Middleware không chạy → CSP yếu
+  hơn, chứ KHÔNG phải trang trắng.
+- Header của request phải DỰNG LẠI trong callback `setAll` chứ không chụp sẵn
+  một lần: `request.cookies.set()` mutate chính `request.headers`, chụp trước sẽ
+  đông cứng cookie CŨ và làm hỏng vòng refresh token.
+- KHÔNG dùng `'strict-dynamic'` (dù tài liệu Next nhắc): nó làm trình duyệt BỎ
+  QUA `'self'`, đổi lấy gần như không gì ở dự án không có script bên thứ ba.
+- Dev giữ `'unsafe-inline'`: Turbopack/HMR chèn script inline không qua đường
+  gắn nonce của Next.
+
+## Còn mở, và vì sao KHÔNG sửa trong phiên này
+- **TD-008 (rate limit trong RAM)** — trả nợ thật cần hạ tầng chưa có: rate limit
+  ở biên (Vercel Firewall/Cloudflare) hoặc bộ đếm Redis/Upstash. Cả hai cần
+  credential + quyết định chi phí, không phải việc sửa code.
+- **TD-005 (không có migration tool)** — cần Supabase CLI + DB password. Phiên
+  này đã phủ rộng thêm phần PHÁT HIỆN (khoá ngoại), phần QUẢN LÝ vẫn nguyên.
+
+## Mục mới mở
+- **TD-012** — `exams.author_id` và `exam_moderation_log.actor_id` là 2 khoá
+  ngoại duy nhất trỏ `auth.users` mà không cascade, nên xoá một tài khoản đã đăng
+  đề sẽ chết `23503`: **đúng hình dạng bug 2026-08-04 nhưng ở tầng tài khoản.**
+  Hiện chưa chạm tới được (không có đường xoá tài khoản trong app — đã grep).
+  Ghi lại vì ngày làm tính năng đó nó sẽ hỏng ngay, và cascade KHÔNG phải câu
+  trả lời (sẽ cuốn theo đề công khai + nhật ký kiểm toán); đáp án là `set null`.
+  Chính cổng dựng cho TD-011 làm hai khoá này lộ ra.
+
+## Verify
+`tsc --noEmit` sạch · `eslint --max-warnings 0` sạch (0 lỗi, 0 cảnh báo — trước
+là 2 lỗi + 1 cảnh báo) · **396/396 vitest pass** (trước 348; +48 test mới) ·
+`next build` qua trên next 16.3.0 · `check:bundle` PASS · `npm audit` **0
+vulnerabilities** (trước 5 high).
+
+CSP kiểm trên production build + trình duyệt thật: đúng MỘT header CSP (đè được
+nền), nonce khác nhau từng request, **17/17 thẻ script mang đúng nonce của
+header**, trang hydrate (điều hướng client-side chạy), **0 lỗi CSP trong
+console**, response 307 của route guard cũng mang CSP, `/robots.txt` giữ chính
+sách nền, `next dev` không hỏng.
+
+## CÒN NỢ / lưu ý cho phiên sau
+- **CHƯA COMMIT, CHƯA PUSH.** Toàn bộ nằm ở working tree trên `main`.
+- **[CHẶN] §16 CHƯA ÁP lên DB nào.** Agent không có quyền chạy SQL (Supabase MCP
+  trả `Unauthorized`). Cho tới khi paste `schema.sql` §16 vào SQL Editor,
+  `npm run verify:schema` sẽ FAIL ở mục 6 với `PGRST202` — đó là hành vi ĐÚNG,
+  không phải lỗi script. Tầng CI của TD-011 (parse file) đã chạy độc lập với
+  việc này.
+- **next 16.3.0 tự sinh `SOURCE/AGENTS.md` + `SOURCE/CLAUDE.md`** khi chạy
+  `next dev` — tính năng mới của bản này, KHÔNG phải do ai thêm. File tự ghi là
+  xoá thì `next dev` tạo lại. Hai lối: commit kèm (Next khuyến nghị), hoặc đặt
+  `agentRules: false` trong `next.config.ts`. Để nguyên chưa quyết vì
+  `SOURCE/CLAUDE.md` sẽ được Claude Code tự nạp — đó là thay đổi hành vi công cụ
+  của engineer, không phải việc agent tự chọn.
+- `eslint-config-next` vẫn pin `16.2.7` trong khi `next` đã 16.3.0. Lint chạy
+  sạch nên không đụng (mỗi lần cài lại là một lần đánh cược với mạng đang chập).
+- TD-008 và TD-005 còn nguyên — xem lý do ở trên.
