@@ -575,6 +575,49 @@ left join (
   group by exam_id
 ) agg on agg.exam_id = e.id;
 
+-- ----------------------------------------------------------------------------
+-- 9b. Skill Taxonomy (Engine 1 Adaptive AI & Feedback, PRD R1/R2, D1) — Math
+--     only. Nodes + prerequisite edges (DAG); reviewed by the engineer before
+--     ship (A2), not authored here. questions.skill_node_id is nullable —
+--     a question may legitimately have no skill (D2: NULL instead of a
+--     guess). Placed HERE (before §10, not appended at the end) because §10c
+--     below is edited in place to grant skill_node_id, and that edit needs
+--     the column to already exist earlier in the file's execution order.
+-- ----------------------------------------------------------------------------
+create table if not exists public.skill_nodes (
+  id         text primary key,           -- slug, vd 'luy-thua', 'logarit'
+  label_vi   text not null,               -- nhãn tiếng Việt hiển thị (AC-004)
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.skill_prerequisites (
+  skill_node_id        text not null references public.skill_nodes(id) on delete cascade,
+  prerequisite_node_id text not null references public.skill_nodes(id) on delete cascade,
+  primary key (skill_node_id, prerequisite_node_id)
+);
+alter table public.skill_prerequisites drop constraint if exists skill_prerequisites_no_self_check;
+alter table public.skill_prerequisites add constraint skill_prerequisites_no_self_check
+  check (skill_node_id <> prerequisite_node_id);
+
+alter table public.questions add column if not exists skill_node_id text
+  references public.skill_nodes(id) on delete set null;
+-- `set null`: xoá một skill node không được kéo xoá câu hỏi theo — câu hỏi vẫn
+-- hợp lệ, chỉ mất tag (giống questions.correct_answer nullable đã xử lý case
+-- "chưa đủ dữ liệu" bằng nullable thay vì xoá dòng).
+
+alter table public.skill_nodes enable row level security;
+drop policy if exists "skill_nodes_select_authenticated" on public.skill_nodes;
+create policy "skill_nodes_select_authenticated" on public.skill_nodes
+  for select to authenticated using (true);
+
+alter table public.skill_prerequisites enable row level security;
+drop policy if exists "skill_prerequisites_select_authenticated" on public.skill_prerequisites;
+create policy "skill_prerequisites_select_authenticated" on public.skill_prerequisites
+  for select to authenticated using (true);
+-- Không có policy ghi cho client — tiền lệ "Seeded content" (§5 comment cũ):
+-- taxonomy do kỹ sư duyệt rồi seed qua service_role (seedSkillTaxonomy.ts),
+-- không phải nội dung người dùng ghi qua app.
+
 -- ============================================================================
 -- ANSWER-KEY COLUMN LOCKDOWN (Security review 2026-08-03, Critical #1)
 --
@@ -753,7 +796,7 @@ grant execute on function public.claim_attempt_answer_key(uuid) to authenticated
 -- ----------------------------------------------------------------------------
 revoke select on public.questions from anon, authenticated;
 grant select (
-  id, content, choices, subject, grade, topic, question_type, part_number, image_url
+  id, content, choices, subject, grade, topic, question_type, part_number, image_url, skill_node_id
 ) on public.questions to anon, authenticated;
 
 -- ============================================================================
@@ -1213,6 +1256,139 @@ alter table public.exam_moderation_log
   add constraint exam_moderation_log_actor_id_fkey
   foreign key (actor_id) references auth.users (id) on delete set null;
 
+-- ============================================================================
+-- MASTERY WRITE (Engine 1 Adaptive AI, ADR-0011, PRD R3/AC-011)
+--
+-- Mirrors §11's SCORE WRITE LOCKDOWN shape exactly: client loses all write
+-- access, a privileged service_role-only INVOKER function derives user_id
+-- from the attempt row (never a parameter), requires status='submitted'.
+--
+-- DELIBERATELY a SEPARATE function from record_exam_result(), not an
+-- extension of it: PRD Reliability NFR requires a failed mastery update to
+-- NOT break exam submission. Extending record_exam_result() would make the
+-- two writes atomic (one statement, one implicit transaction) — a mastery-
+-- side failure would roll back the score insert too. See ADR-0011.
+-- ============================================================================
+
+create table if not exists public.user_skill_mastery (
+  user_id       uuid not null references auth.users(id) on delete cascade,
+  skill_node_id text not null references public.skill_nodes(id) on delete cascade,
+  correct_count int not null default 0,
+  total_count   int not null default 0,
+  last_wrong_at timestamptz,             -- null = chưa từng sai trên skill này
+  updated_at    timestamptz not null default now(),
+  primary key (user_id, skill_node_id)
+);
+
+alter table public.user_skill_mastery enable row level security;
+
+-- Không có insert/update policy cho authenticated: KHÔNG có trường hợp hợp lệ
+-- nào client tự ghi mastery — mọi ghi đi qua record_skill_mastery() dưới đây
+-- (service_role, bypass RLS). Revoke tường minh dù RLS không có policy nào
+-- cho các thao tác ghi (defense-in-depth, tiền lệ §11a).
+revoke insert, update, delete on public.user_skill_mastery from anon, authenticated;
+
+drop policy if exists "mastery_select_own" on public.user_skill_mastery;
+create policy "mastery_select_own" on public.user_skill_mastery
+  for select using (user_id = auth.uid());
+
+drop function if exists public.record_skill_mastery(uuid, jsonb);
+create function public.record_skill_mastery(
+  p_attempt_id   uuid,
+  p_per_question jsonb
+)
+returns void
+language plpgsql
+volatile
+set search_path = public, pg_temp
+as $$
+declare
+  v_user_id uuid;
+begin
+  -- Cùng cưỡng chế với record_exam_result(): user_id suy ra từ attempt, đòi
+  -- status='submitted' — người gọi không tự khai được user_id hay attempt
+  -- chưa nộp.
+  select a.user_id into v_user_id
+    from public.exam_attempts a
+   where a.id = p_attempt_id
+     and a.status = 'submitted';
+
+  if v_user_id is null then
+    raise exception 'record_skill_mastery: attempt % không tồn tại hoặc chưa submitted', p_attempt_id
+      using errcode = 'check_violation';
+  end if;
+
+  -- Gộp theo skill_node_id: câu scored=false hoặc skill_node_id null KHÔNG
+  -- đóng góp gì (AC-010/AC-029) — WHERE lọc cả hai điều kiện, join là INNER
+  -- nên câu không khớp questions (hiếm, xem Data Contracts) cũng tự loại.
+  -- scored thiếu (undefined ở TS, JSON.stringify bỏ key) → coalesce về true,
+  -- khớp đúng quy ước "undefined = true" của computeScore.ts.
+  insert into public.user_skill_mastery
+    (user_id, skill_node_id, correct_count, total_count, last_wrong_at, updated_at)
+  select
+    v_user_id,
+    q.skill_node_id,
+    count(*) filter (where (pq->>'isCorrect')::boolean),
+    count(*),
+    max(now()) filter (where not (pq->>'isCorrect')::boolean),
+    now()
+  from jsonb_array_elements(p_per_question) as pq
+  join public.questions q on q.id = pq->>'questionId'
+  where coalesce((pq->>'scored')::boolean, true)
+    and q.skill_node_id is not null
+  group by q.skill_node_id
+  on conflict (user_id, skill_node_id) do update
+  set correct_count = public.user_skill_mastery.correct_count + excluded.correct_count,
+      total_count   = public.user_skill_mastery.total_count + excluded.total_count,
+      last_wrong_at = coalesce(excluded.last_wrong_at, public.user_skill_mastery.last_wrong_at),
+      updated_at    = now();
+end;
+$$;
+
+-- Revoke ĐÍCH DANH — xem ghi chú §10b về default privileges của Supabase.
+revoke all on function public.record_skill_mastery(uuid, jsonb) from public, anon, authenticated;
+grant execute on function public.record_skill_mastery(uuid, jsonb) to service_role;
+
+-- ============================================================================
+-- TELEMETRY LOG (Engine 1 Adaptive AI, PRD R4/AC-012/AC-013)
+--
+-- Ghi lại lời gọi tutor/adaptive để quan sát được sau khi ship (AC-012), KHÔNG
+-- BAO GIỜ chứa answer-key material (AC-013 — schema không có cột nào để chứa
+-- correct_answer/sub_answers/essay_answer, đúng bằng thiết kế). Bảng vận hành,
+-- không phải dữ liệu người dùng tự xem — tiền lệ exam_moderation_log: RLS bật
+-- + không policy đọc nào cho authenticated/anon.
+-- ============================================================================
+create table if not exists public.telemetry_log (
+  id            uuid primary key default gen_random_uuid(),
+  -- `set null`: nhật ký vận hành không nên biến mất theo tài khoản (tiền lệ
+  -- §16b, TD-012) — mất DANH TÍNH chấp nhận được, mất DÒNG thì không.
+  user_id       uuid references auth.users(id) on delete set null,
+  event_type    text not null check (event_type in ('adaptive_route', 'tutor_invoke')),
+  question_id   text references public.questions(id) on delete set null,
+  skill_node_id text references public.skill_nodes(id) on delete set null,
+  success       boolean not null,
+  -- Mã có cấu trúc, KHÔNG BAO GIỜ free-text/exception message — chặn một
+  -- con đường vô tình nhét nội dung câu hỏi (UGC, attacker-influenced) vào
+  -- log qua err.message.
+  error_code    text check (
+    error_code is null or error_code in ('gemini_unavailable', 'rate_limited', 'server', 'not_eligible')
+  ),
+  created_at    timestamptz not null default now()
+);
+
+alter table public.telemetry_log enable row level security;
+
+-- Chỉ GHI được (lúc invoke), KHÔNG đọc được — quan sát vận hành (AC-012) đi
+-- qua service_role/SQL Editor, không qua app. Revoke tường minh SELECT/UPDATE/
+-- DELETE dù RLS không có policy nào cho các thao tác đó (defense-in-depth,
+-- tiền lệ §11a).
+revoke select, update, delete on public.telemetry_log from anon, authenticated;
+revoke insert on public.telemetry_log from anon;
+
+drop policy if exists "telemetry_insert_own" on public.telemetry_log;
+create policy "telemetry_insert_own" on public.telemetry_log
+  for insert to authenticated with check (user_id = auth.uid());
+
 -- ----------------------------------------------------------------------------
 -- 17. Phiên bản schema — DB tự khai nó đang chạy bản nào (2026-08-07).
 --
@@ -1252,7 +1428,7 @@ revoke all on public.schema_version from anon, authenticated;
 -- nó — xem lib/schema/schemaFingerprint.ts).
 -- @schema-fingerprint-begin
 insert into public.schema_version (id, fingerprint)
-values (1, 'bbe1ee9326c9')
+values (1, '2ce144118c30')
 on conflict (id) do update
   set fingerprint = excluded.fingerprint,
       applied_at  = now();
