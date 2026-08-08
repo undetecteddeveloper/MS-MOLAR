@@ -338,7 +338,7 @@ Three in-scope elements: `useTutorAction`'s returned state shape (crosses the ho
 #### Element 3: Does `ExplainStepAffordance` need an `idPrefix`-style disambiguation prop?
 
 **Step 1 — Fixed Requirements**
-- The sr-only reason span's `id` (target of `aria-describedby`) must be unique per rendered instance on the page.
+- The sr-only reason span's `id` (target of `aria-describedby`) must be unique per rendered instance on the page, across all N questions the page may render simultaneously (AC-025/AC-026 — `aria-describedby` pointing at a duplicate id is undefined behavior for assistive tech, so per-instance uniqueness is a correctness requirement, not a nicety).
 - `ResultDetailPage` can render 2+ `ExplainStepAffordance` instances simultaneously (any number of questions may independently satisfy `hasBeenWrongTwice`).
 
 **Steps 2–3 — Alternatives Compared**
@@ -346,14 +346,14 @@ Three in-scope elements: `useTutorAction`'s returned state shape (crosses the ho
 | Alternative | Reqs covered | New state (count) | New props (count) | Crosses boundary | Breaking/migration | Subjective cost |
 |---|---|---|---|---|---|---|
 | Derive the id from `questionId` alone (`` `tutor-${questionId}-reason` ``) (**selected**) | Uniqueness (questionId is already the `.map()` key, unique per list) | 0 | 0 (no new prop beyond the already-fixed `questionId`/`attemptId`) | No | No | Zero added surface — reuses a value the component already receives. |
-| Add an `idPrefix: string` prop, mirroring `ActionButton`'s | Uniqueness | 0 | 1 | Yes | No | `ActionButton` needed `idPrefix` because a single history row renders **two** `ActionButton` instances (Save + Share) sharing the same row-level id otherwise; `ExplainStepAffordance` mounts **once** per question, so `questionId` alone is already the disambiguator `idPrefix` would have provided. |
+| Add an `idPrefix: string` prop, mirroring `ActionButton`'s | Uniqueness | 0 | 1 | Yes | No | `ActionButton` needs `idPrefix` (per its own JSDoc, `SOURCE/components/history/ActionButton.tsx:46`) to keep the reason-span id unique **across N sibling `HistoryRow` instances** on `/history` — not to distinguish Save from Share within one row (its `reasonId` is `` `${idPrefix}-${action}-reason` ``, and `action` already disambiguates the two instances in a single row on its own). `ExplainStepAffordance` has the same underlying multiplicity concern — N sibling instances across N questions on one page — but `questionId` already serves the exact per-list-item-uniqueness role `idPrefix` serves for `ActionButton`, since it is already the `.map()` key and therefore already unique across the page. |
 
 **Step 4 — Selected Alternative and Rationale**
 - **Selected**: derive from `questionId` alone.
-- **Rationale**: smallest alternative considered; no further reduction available. `ActionButton`'s `idPrefix` solves a problem (two instances per list item) that does not exist here (one instance per list item).
+- **Rationale**: smallest alternative considered; no further reduction available. `ActionButton` needs `idPrefix` as an explicit prop because nothing else passed to it is already guaranteed page-unique; `ExplainStepAffordance` doesn't have that gap — `questionId` fills the identical role for free.
 
 **Step 5 — Rejected Alternatives Log**
-- `idPrefix` prop: rejected — solves a multiplicity problem this component doesn't have; would be dead-weight surface copied from a precedent without checking whether its reason for existing applies here.
+- `idPrefix` prop: rejected — solves the same multiplicity problem `questionId` already solves; would be dead-weight surface duplicating a value the component already receives, copied from a precedent without checking whether `ActionButton`'s specific gap (no other page-unique value available to it) applies here (it doesn't).
 
 ### Data Contracts (consumed — not redefined here)
 
