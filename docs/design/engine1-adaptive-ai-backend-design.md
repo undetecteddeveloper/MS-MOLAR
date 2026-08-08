@@ -167,7 +167,7 @@ Three concrete gaps, per the PRD: (1) `questions.topic` cannot carry a real skil
 
 #### Functional Requirements
 
-- R1-R8 as defined in the PRD (Math taxonomy, batch tagging, mastery write, telemetry, heuristic routing, Socratic tutor, "Explain this step" affordance backing data, defined cold-start/untagged behavior). R9/R10 (Should-Have) are out of this document's required scope per the Agreement Checklist.
+- R1-R8 as defined in the PRD (Math taxonomy, batch tagging, mastery write, telemetry, heuristic routing, Socratic tutor, "Explain this step" affordance backing data, defined cold-start/untagged behavior). R9 (Should-Have, `subject = 'Toán'` normalization) is out of this document's required scope. **R10's backend data provision (`getSkillRecommendation()`, the `SkillRecommendation` contract) IS in scope and required** — the already-approved UI Spec depends on it; only R10's UI placement/styling is out of scope (UI Spec D3's job, not this document's).
 
 #### Non-Functional Requirements
 
@@ -193,8 +193,8 @@ This document reuses the PRD's own AC IDs (AC-001 through AC-031) where the PRD'
 
 ### Telemetry (R4)
 
-- [ ] **AC-012** — **Given** a tutor invocation, **when** it completes or fails, **the system shall** record an event sufficient to answer "how many tutor calls happened, for whom, and how many failed" via a `telemetry_log` query.
-- [ ] **AC-013** — **Given** any `telemetry_log` row, **it shall** contain no answer-key material.
+- [ ] **AC-012** — **Given** a tutor invocation, **when** it completes or fails, **the system shall** record an event sufficient to answer "how many tutor calls happened, for whom, and how many failed" via a `telemetry_log` query — asserted by an integration test (`tutorActions.int.test.ts`) seeding success/failure calls and querying the count/outcome split; the routing half of R4 (`adaptive_route` events) is covered equivalently by `getSkillRecommendation.int.test.ts`.
+- [ ] **AC-013** — **Given** any `telemetry_log` row, **it shall** contain no answer-key material — asserted by a unit test on the telemetry-write payload builder (`lib/tutor/__tests__/telemetry.test.ts`), not by the schema's column-shape exclusion alone (the schema's absence of a capable column is the structural backstop; the unit test is the same "assert 0 occurrences on a fixture battery" mechanism AC-018 already uses for the prompt payload).
 
 ### Heuristic Routing (R5)
 
@@ -248,7 +248,9 @@ This document reuses the PRD's own AC IDs (AC-001 through AC-031) where the PRD'
 | New | `SOURCE/lib/tutor/__tests__/prompt.test.ts` | AC-018/019. |
 | New | `SOURCE/types/adaptive.ts` | `SkillRecommendation` type (UI Spec D6's exact contract). |
 | New | `SOURCE/app/(layer2)/tutorActions.ts` | `explainStep()` Server Action. |
-| New | `SOURCE/app/(layer2)/__tests__/tutorActions.int.test.ts` | AC-021/022/029, server-side re-verification. |
+| New | `SOURCE/app/(layer2)/__tests__/tutorActions.int.test.ts` | AC-021/022/029, server-side re-verification, **AC-012/013** (seeds ≥1 success + ≥1 failed `explainStep()` call, then asserts a `telemetry_log` query — filtered by `user_id`/`event_type='tutor_invoke'` — returns exactly the expected count/outcome split, proving the "how many calls, for whom, how many failed" question is answerable; separately asserts every inserted row's columns cannot structurally hold `correct_answer`/`sub_answers`/`essay_answer`, mirroring AC-018's fixture-based approach). |
+| New | `SOURCE/lib/tutor/__tests__/telemetry.test.ts` | **AC-013** (unit test on the telemetry-write payload builder itself — asserts, over a battery of fixture inputs including ones that historically would have leaked answer-key material through `buildTutorPrompt()`, that the constructed insert payload has 0 occurrences of any `correct_answer`/`sub_answers`/`essay_answer` value; complements the integration test above by testing the payload-construction step in isolation, matching AC-018's own "unit test on the builder, not just an integration check" precedent). |
+| New | `SOURCE/app/(layer3)/__tests__/getSkillRecommendation.int.test.ts` | AC-014-017/028/031, **AC-012** (asserts the new `adaptive_route` telemetry insert fires on invocation, mirroring `tutorActions.int.test.ts`'s query-based proof for the routing half of R4). |
 | New | `SOURCE/app/(layer2)/__tests__/recordSkillMastery.int.test.ts` | AC-009/010 against the real `submitExam` path. |
 | New | `SOURCE/supabase/seedSkillTaxonomy.ts` | Idempotent DAG seeding. |
 | New | `SOURCE/supabase/tagQuestionSkills.ts` | Batch skill tagger (dry-run default). |
@@ -328,7 +330,7 @@ No structured `Codebase Analysis.focusAreas` array was provided for this run; th
 | `FA-06` | `claim_attempt_answer_key` RPC's `RETURNS TABLE` lacks `skill_node_id` | transform | New outcome: deliberately NOT added — mastery derivation moved entirely into SQL (`record_skill_mastery`), so the TS layer never needs it. | `schema.sql:682-696`; this document's Minimal Surface Alternatives |
 | `FA-07` | `computeScore` output contract (`PerQuestionResult.scored`/`isCorrect`) is the exact input a mastery-update function must consume, filtering `scored !== false` and non-null `skill_node_id` | transform | New outcome: `record_skill_mastery()`'s `WHERE` clause implements exactly this filter in SQL over `p_per_question`. | `computeScore.ts:36-42`; this document's Data Contracts |
 | `FA-08` | `gemini.ts` reusable client/retry/deadline infra | transform | New outcome: `getGeminiClient`/`QUESTION_MODEL`/`ANSWER_MODEL`/`makeDeadlineSignal`/`sdkErrorDetail` reused verbatim; `logExtractorExit` NOT reused verbatim (hardcoded `"[ugc-extract]"` prefix would mislabel tutor logs) — a small analogous helper is added in `lib/tutor/` instead. | `gemini.ts:60-66` |
-| `rateLimit.ts` | `guard()`/`RATE_LIMITS` closed-object convention | transform | New outcome: `RATE_LIMITS` gains an `explainStep` key; `guard()` itself is called unmodified. | `rateLimit.ts:102-151` |
+| `FA-13` | `guard()`/`RATE_LIMITS` closed-object convention | transform | New outcome: `RATE_LIMITS` gains an `explainStep` key; `guard()` itself is called unmodified. | `rateLimit.ts:102-151` |
 | `FA-09` | Auth/error-shape convention split (throw-based vs. typed-result) | transform | New outcome: `explainStep()` adopts typed-result, stated as a deliberate choice (see Existing Code Investigation). | `actions.ts:54-165` vs. `:177-229` |
 | `FA-10` | Real corpus data (57 questions, 37 canonical Math + 10 `'Toán'`, grade/type distribution) | preserve | Informs the batch tagger's corpus query (includes `'Toán'` rows per R2) and the taxonomy's expected node-count range (15-25, A2); no schema decision changes because of it beyond what's already stated. | Task brief corpus measurement, 2026-08-08 |
 | `FA-11` | House style for `lib/<domain>/` pure-logic modules | preserve | `lib/adaptive/`, `lib/tutor/`, `lib/scoring/wrongTwice.ts` all follow it (single exported function, Vietnamese header, pure, co-located tests). | `computeScore.ts`, `aggregateAttempts.ts` |
@@ -808,7 +810,7 @@ sequenceDiagram
 
 #### `getSkillRecommendation()` (`SOURCE/app/(layer3)/queries.ts`)
 
-- **Responsibility**: fetch this user's DAG (nodes/edges, reference data) + mastery rows (RLS-scoped), call `recommendNextSkill()`, map to the UI Spec's `SkillRecommendation` contract.
+- **Responsibility**: fetch this user's DAG (nodes/edges, reference data) + mastery rows (RLS-scoped), call `recommendNextSkill()`, map to the UI Spec's `SkillRecommendation` contract, and attempt a best-effort `telemetry_log` insert (`event_type='adaptive_route'`) — the schema's §19 `event_type` CHECK constraint already names this value, and R4 ("Adaptive-routing and tutor events are recorded") covers routing invocations equally with tutor invocations, not tutor-only. Mirrors `explainStep()`'s telemetry-write shape: fire-and-forget, a write failure never blocks or alters the returned `SkillRecommendation` (same reasoning as `submitExam`'s `recordExamResult` failure handling — an observability write must not become a second point of failure for the user-facing read).
 - **Interface**: `getSkillRecommendation(): Promise<SkillRecommendation>`.
 - **Dependencies**: `createClient()`, `recommendNextSkill()`, `MASTERY_CLEARED_THRESHOLD`.
 
@@ -1089,6 +1091,22 @@ No feature flag, no dual-write/parallel-operation period (single dev DB during t
 - **Correctness definition**: (1) the schema DDL applies clean and stays classified/fingerprinted per TD-001/TD-005/TD-011's existing gates; (2) `recommendNextSkill()` produces DAG-valid, deterministic output on literal fixtures matching the engineer-confirmed algorithm semantics (Data Contracts pseudocode above); (3) `buildTutorPrompt()`'s output contains zero occurrences of literal answer-key fixture values across a battery of crafted inputs; (4) `user_skill_mastery` rows, after a real `submitExam()` call, arithmetically match the submitted attempt's per-question correctness for tagged/scored questions and are unaffected by untagged/unscored ones.
 - **Verification method**: Vitest unit tests with literal, independently-computed expected values (per testing-principles) for (2)/(3); a real-DB integration test for (4); `npm run verify:schema` + `parseForeignKeys.test.ts` + `schemaFingerprint.test.ts` for (1).
 - **Verification timing**: after each implementation-order step (see Technical Dependencies and Implementation Order) — this is a Hybrid-approach design, so each step's own tests must be green before the next step begins, not deferred to one final pass.
+- **Full PRD Success Criteria cross-reference** (the four points above are the highest-risk subset; every PRD-numbered item this document is responsible for is listed here so this section is a complete map, not a partial one):
+
+  | PRD Success Criteria | Proving mechanism | Where |
+  |---|---|---|
+  | #1 Schema applies clean | `npm run verify:schema` (7 checks) + `parseForeignKeys.test.ts` | Early Verification Point, above |
+  | #2 Schema fingerprint stays honest | `schemaFingerprint.test.ts` + §17 update procedure | Schema section, §17 |
+  | #3 Taxonomy is DAG-valid | `lib/adaptive/__tests__/skillTaxonomy.test.ts` (AC-001-003) | Test Boundaries |
+  | #4 Tag coverage and honesty | `tagQuestionSkills.ts`'s dry-run report + AC-005/007/008 (100% human review before `--apply`) | Main Components, Batch Skill-Tagging Script |
+  | #5 Batch is re-runnable | `tagQuestionSkills.ts`'s idempotent-by-construction design (plain column `UPDATE`, no separate tags table) — proven by actually running it twice, per the PRD's own "a script that claims idempotence and has never been re-run is a claim, not a property" standard | Main Components, Batch Skill-Tagging Script |
+  | #6 Routing is DAG-valid and deterministic | Correctness definition (2) above | This section |
+  | #7 Cold start is defined | `route.test.ts` (AC-028) | Test Boundaries |
+  | #8 Answer key never reaches the model | Correctness definition (3) above | This section |
+  | #12 Mastery reflects real submissions | Correctness definition (4) above | This section |
+  | #13 Telemetry never carries answer-key material | `lib/tutor/__tests__/telemetry.test.ts` (AC-013) | Test Boundaries |
+  | #14 Untagged questions still support the tutor | `tutorActions.int.test.ts` (AC-029) | Test Boundaries |
+  | #15 Tutor telemetry is queryable | `tutorActions.int.test.ts` + `getSkillRecommendation.int.test.ts` (AC-012) | Test Boundaries |
 
 ### Early Verification Point
 
