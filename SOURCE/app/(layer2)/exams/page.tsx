@@ -78,7 +78,10 @@ export default async function ExamsPage({ searchParams }: { searchParams: Search
         <h1 className="sr-only">{t("exams.title")}</h1>
         {/* MỘT block căn giữa: *Filter (trái, sticky, overlay) + lưới ExamCard
             tối đa 3 cột (phải, flex-1). mx-auto của <main> giữ block căn giữa. */}
-        <div className="relative flex items-start">
+        {/* `max-md:flex-col`: dưới 768px bộ lọc là một hàng NGANG phía trên lưới
+            thẻ, không phải một rail dọc bên cạnh — ở 360px không còn bề ngang
+            nào để chia cho hai cột. */}
+        <div className="relative flex items-start max-md:flex-col">
           <ExamFilters
             subjects={facets.subjects}
             grades={facets.grades}

@@ -43,7 +43,7 @@ export function EntryModeField({
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           disabled={disabled}
-          className="w-full appearance-none rounded-[4px] border border-border bg-transparent px-3 py-2.5 text-sm text-foreground outline-none transition-colors duration-200 focus:border-ring disabled:opacity-60"
+          className="min-h-11 w-full appearance-none rounded-[4px] border border-border bg-transparent px-3 py-2.5 text-sm text-foreground outline-none transition-colors duration-200 focus:border-ring disabled:opacity-60"
         >
           <option value="automatic">{t("upload.automatic")}</option>
           <option value="manual">{t("upload.manual")}</option>

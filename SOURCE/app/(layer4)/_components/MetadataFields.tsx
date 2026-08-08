@@ -48,7 +48,10 @@ const aiCls = "eyebrow mt-1 block text-muted-foreground";
 
 function fieldInputCls(hasError: boolean) {
   return [
-    "mt-1.5 w-full rounded-[4px] border bg-transparent px-3 py-2.5 text-sm text-foreground outline-none transition-colors duration-200 disabled:opacity-60",
+    // min-h-11: `px-3 py-2.5 text-sm` cho ra đúng 42px — hụt 2px so với sàn
+    // 44px của tài liệu Mobile-Layout-Research-MS §4.3. Ô nhập liệu là nơi sai
+    // số 2px đó đắt nhất: gõ hụt vào ô bên cạnh trong một form dài.
+    "mt-1.5 min-h-11 w-full rounded-[4px] border bg-transparent px-3 py-2.5 text-sm text-foreground outline-none transition-colors duration-200 disabled:opacity-60",
     hasError ? "border-brand" : "border-border focus:border-ring",
   ].join(" ");
 }
@@ -232,7 +235,7 @@ export function MetadataFields({
             onChange={(e) => onChange({ durationMinutes: e.target.value })}
             disabled={disabled}
             className={[
-              "w-28 rounded-[4px] border bg-transparent px-3 py-2.5 text-sm text-foreground outline-none transition-colors duration-200 disabled:opacity-60",
+              "min-h-11 w-28 rounded-[4px] border bg-transparent px-3 py-2.5 text-sm text-foreground outline-none transition-colors duration-200 disabled:opacity-60",
               fieldErrors?.durationMinutes ? "border-brand" : "border-border focus:border-ring",
             ].join(" ")}
             aria-invalid={!!fieldErrors?.durationMinutes}

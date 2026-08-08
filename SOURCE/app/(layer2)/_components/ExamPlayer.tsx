@@ -109,26 +109,39 @@ export function ExamPlayer({
         {/* Header — tên đề (trái) · đồng hồ + nút Nộp bài (phải). Không sticky:
             khu vực trả lời đã tự cuộn trong khung 238px (QuestionRenderer) nên
             trang hiếm khi cần cuộn dài. preload order 1 — fade sau navbar (S#21). */}
+        {/* Dưới 768px khối này DÍNH ĐỈNH (dưới navbar h-15) và nén lại: đồng hồ
+            đếm ngược là thông tin phải nhìn thấy LIÊN TỤC trong một bài thi có
+            giờ, nhưng trước thay đổi này nó cuộn mất ngay khi người dùng bắt
+            đầu đọc câu hỏi đầu tiên. Tiêu đề đề rút còn một dòng (`truncate`)
+            để dải sticky không ăn quá nhiều chiều cao — ở 360×800 mỗi 40px giữ
+            lại là một dòng câu hỏi đọc được thêm. */}
         <div
-          className="preload-fade flex flex-wrap items-end justify-between gap-4"
+          className="preload-fade flex flex-wrap items-end justify-between gap-4 max-md:bg-background/95 max-md:sticky max-md:top-15 max-md:z-20 max-md:-mx-4 max-md:items-center max-md:gap-2 max-md:px-4 max-md:py-2 max-md:backdrop-blur"
           style={{ "--preload-order": 1 } as React.CSSProperties}
         >
-          <div>
-            <h1 className="text-foreground font-serif text-2xl font-semibold sm:text-3xl">
+          <div className="min-w-0 max-md:flex-1">
+            <h1 className="text-foreground font-serif text-2xl font-semibold max-md:truncate max-md:text-base sm:text-3xl">
               {examTitle}
             </h1>
-            <div className="bg-ring mt-3 h-0.5 w-10" />
+            <div className="bg-ring mt-3 h-0.5 w-10 max-md:hidden" />
           </div>
-          <div className="flex items-center gap-4">
-            <div className="border-border min-w-[130px] rounded-md border px-4 py-2 text-center">
-              <span className="eyebrow block">{t("player.timeRemaining")}</span>
+          <div className="flex items-center gap-4 max-md:gap-2">
+            <div className="border-border min-w-[130px] rounded-md border px-4 py-2 text-center max-md:min-w-0 max-md:border-0 max-md:px-0 max-md:py-0">
+              {/* Nhãn "Thời gian còn lại" ẩn trên mobile — định dạng MM:SS
+                  trong một dải điều khiển đã tự nói nó là đồng hồ. */}
+              <span className="eyebrow block max-md:hidden">{t("player.timeRemaining")}</span>
               <ExamTimer durationMinutes={durationMinutes} onTimeUp={submit} />
             </div>
+            {/* Ẩn trên mobile: bản Nộp bài của mobile nằm trong dải dính ĐÁY
+                (Vùng Xanh của ngón cái, §4.2). Hai nút cùng chức năng trên một
+                màn hình sẽ khiến người dùng phải đoán chúng có khác nhau không.
+                ExamTimer thì KHÔNG nhân bản — nó mang `onTimeUp` tự nộp bài,
+                mount hai lần là hai bộ đếm cùng chạy. */}
             <button
               type="button"
               onClick={submit}
               disabled={submitting}
-              className="bg-brand text-brand-foreground rounded-full px-5 py-3 text-xs font-medium tracking-[0.04em] uppercase transition-opacity hover:opacity-90 disabled:opacity-50"
+              className="bg-brand text-brand-foreground rounded-full px-5 py-3 text-xs font-medium tracking-[0.04em] uppercase transition-opacity hover:opacity-90 disabled:opacity-50 max-md:hidden"
             >
               {submitting ? t("player.submitting") : t("player.submit")}
             </button>
@@ -169,20 +182,40 @@ export function ExamPlayer({
               onToggleFlag={() => toggleFlag(question.id)}
             />
 
-            <div className="border-border mt-4 flex items-center justify-between border-t pt-4">
+            {/* Điều hướng Trước/Tiếp.
+                Dưới 768px cụm này DÍNH ĐÁY (`sticky bottom-*`) ngay trên
+                BottomNav: đo trước thay đổi này, với đề chỉ 5 câu thì khối
+                điều hướng + bảng câu hỏi đã nằm ở y≈797 — đúng một viewport
+                bên dưới — nên mỗi lần chuyển câu là một lần cuộn xuống rồi
+                cuộn ngược lên. Đề 40 câu thì khoảng cách đó nhân lên.
+                bottom = chiều cao BottomNav + safe-area (§6.2). */}
+            <div className="border-border mt-4 flex items-center justify-between gap-3 border-t pt-4 max-md:bg-background/95 max-md:sticky max-md:bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom,0px))] max-md:z-20 max-md:-mx-4 max-md:px-4 max-md:pb-3 max-md:backdrop-blur">
               <button
                 type="button"
                 onClick={prev}
                 disabled={current === 0}
-                className="border-border text-foreground hover:border-ring disabled:hover:border-border rounded-md border px-4 py-2.5 text-xs font-medium tracking-[0.04em] uppercase transition-colors disabled:cursor-default disabled:opacity-40"
+                className="border-border text-foreground hover:border-ring disabled:hover:border-border min-h-11 rounded-md border px-4 py-2.5 text-xs font-medium tracking-[0.04em] uppercase transition-colors disabled:cursor-default disabled:opacity-40"
               >
                 ← {t("player.previous")}
+              </button>
+              {/* Nộp bài NHÂN BẢN ở đây CHỈ trên mobile: bản gốc nằm trong
+                  header trang, và header đó cuộn mất ngay khi người dùng bắt
+                  đầu đọc câu hỏi. Nút quan trọng nhất của màn hình không được
+                  đòi cuộn ngược lên mới bấm được (§4.2 Sticky CTA).
+                  `md:hidden` để desktop không có hai nút Nộp bài cùng lúc. */}
+              <button
+                type="button"
+                onClick={submit}
+                disabled={submitting}
+                className="bg-brand text-brand-foreground min-h-11 rounded-full px-4 py-2.5 text-xs font-medium tracking-[0.04em] uppercase transition-opacity hover:opacity-90 disabled:opacity-50 md:hidden"
+              >
+                {submitting ? t("player.submitting") : t("player.submit")}
               </button>
               <button
                 type="button"
                 onClick={next}
                 disabled={current === questions.length - 1}
-                className="border-border text-foreground hover:border-ring disabled:hover:border-border rounded-md border px-4 py-2.5 text-xs font-medium tracking-[0.04em] uppercase transition-colors disabled:cursor-default disabled:opacity-40"
+                className="border-border text-foreground hover:border-ring disabled:hover:border-border min-h-11 rounded-md border px-4 py-2.5 text-xs font-medium tracking-[0.04em] uppercase transition-colors disabled:cursor-default disabled:opacity-40"
               >
                 {t("common.next")}
               </button>

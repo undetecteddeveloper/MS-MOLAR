@@ -62,12 +62,15 @@ export function HeaderProfile({ displayName: initial }: { displayName: string })
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 rounded-md border border-[#EDE1C8]/12 px-2.5 py-1.5 transition-colors hover:border-[#EDE1C8]/30"
+        // min-h-11: sàn 44px cho vùng chạm (tài liệu §4.3) — trước đây trigger
+        // này chỉ cao 38px.
+        className="flex min-h-11 items-center gap-2 rounded-md border border-[#EDE1C8]/12 px-2.5 py-1.5 transition-colors hover:border-[#EDE1C8]/30"
       >
         <Image src={AVATAR} alt="" width={24} height={24} className="shrink-0 rounded-full" />
-        {/* Tên ẩn ở màn hẹp nhất — 4 tag + avatar không đủ chỗ 375px (tránh
-            h-scroll); avatar + chevron vẫn đủ nhận diện là ô tài khoản. */}
-        <span className="max-w-32 truncate font-sans text-sm text-[#EDE1C8] max-sm:hidden">
+        {/* Tên ẩn dưới 768px: ở đó header chỉ còn logo + ngôn ngữ + ô này, và
+            giữ tên lại sẽ ăn hết phần bề ngang vốn đã hẹp. Avatar + chevron vẫn
+            đủ nhận diện đây là ô tài khoản. */}
+        <span className="max-w-32 truncate font-sans text-sm text-[#EDE1C8] max-md:hidden">
           {displayName}
         </span>
         <ChevronDown open={open} />

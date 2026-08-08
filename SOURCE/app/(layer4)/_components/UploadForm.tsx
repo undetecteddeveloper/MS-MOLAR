@@ -225,12 +225,16 @@ export function UploadForm() {
 
       {pending && <ExtractionProgress metaStep={isAutomatic} />}
 
-      <div className="flex justify-start pt-2">
+      {/* Mobile canh GIỮA, desktop giữ canh trái. Trên một cột hẹp, nút hành
+          động chính nép mép trái đọc như còn thiếu thứ gì bên phải; canh giữa
+          làm nó thành điểm kết thúc rõ ràng của biểu mẫu. Desktop thì form
+          rộng hơn nhiều nên canh trái vẫn đúng nhịp đọc. */}
+      <div className="flex justify-start pt-2 max-md:justify-center">
         <button
           type="button"
           onClick={onSubmit}
           disabled={pending}
-          className="rounded-[4px] bg-brand px-7 py-2.5 text-xs font-medium uppercase tracking-[0.14em] text-brand-foreground transition-colors duration-200 hover:bg-[#8F2523] disabled:opacity-60"
+          className="min-h-11 rounded-[4px] bg-brand px-7 py-2.5 text-xs font-medium uppercase tracking-[0.14em] text-brand-foreground transition-colors duration-200 hover:bg-[#8F2523] disabled:opacity-60"
         >
           {pending ? t("common.processing") : t("upload.start")}
         </button>

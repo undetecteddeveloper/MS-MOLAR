@@ -53,6 +53,11 @@ export const en = {
   "nav.account": "Account",
   "nav.language": "Language",
   "nav.switchTo": "Switch to {language}",
+  // Nhãn cho <nav> của thanh điều hướng đáy (mobile). Trang có HAI landmark
+  // `navigation` cùng lúc (header + thanh đáy) nên mỗi cái phải có tên riêng,
+  // nếu không người dùng trình đọc màn hình chỉ nghe "navigation, navigation".
+  "nav.primary": "Primary",
+  "nav.secondary": "Account and language",
 
   // --- Trang chủ ----------------------------------------------------------
   "home.eyebrow": "Online exam practice platform",
@@ -69,6 +74,38 @@ export const en = {
   "home.instantGrading": "instant grading",
   "home.bodyPart3": " and weakness analysis so you study the right things and improve faster.",
   "home.getStarted": "Get started",
+
+  // --- Băng chuyền trang chủ (HomeCarousel) -------------------------------
+  // Ba mục cùng một chuỗi. Mục "Giới thiệu" dùng lại nguyên văn các khoá
+  // `home.eyebrow`/`home.headline`/`home.bodyPart*` ở trên — nó CHÍNH LÀ nhóm
+  // nội dung hero cũ, không viết lại.
+  "home.carouselLabel": "Platform highlights",
+  // `aria-roledescription` — thay chữ "group" mà trình đọc màn hình đọc mặc
+  // định bằng tên đúng của thành phần. DỊCH được, và phải dịch: nó được đọc to
+  // bằng ngôn ngữ của trang.
+  "home.carouselRole": "carousel",
+  "home.slideRole": "slide",
+  "home.slidePosition": "{current} of {total}",
+  // Nhãn cụm nút điều khiển (WCAG 2.2.2 cho tạm dừng/phát).
+  "home.carouselPause": "Pause automatic slideshow",
+  "home.carouselPlay": "Resume automatic slideshow",
+  "home.carouselPrev": "Previous highlight",
+  "home.carouselNext": "Next highlight",
+  // `tabAi`/`tabAdaptive` giữ tên khoá cũ dù dãy tab đã bỏ: chúng nay là dòng
+  // eyebrow của mục 2 và 3. Đổi tên khoá chỉ để đẹp sẽ chạm vào cả hai từ điển
+  // mà không đổi được gì người dùng thấy.
+  "home.tabAi": "AI-powered",
+  "home.tabAdaptive": "Adaptive learning",
+  // Tên hiển thị của website. Khớp `applicationName`/`title` trong
+  // app/layout.tsx — đổi tên thương hiệu thì sửa ĐÚNG khoá này (và metadata),
+  // đừng rải chuỗi vào từng component.
+  "home.siteName": "MS-MOLAR",
+  // Mỗi mục đúng MỘT dòng mô tả ngắn — giữ ngắn là có chủ đích, đây là thẻ
+  // giới thiệu chứ không phải trang tính năng.
+  "home.aiDescription":
+    "AI extracts every question from the PDFs you upload, and grades your answers the moment you submit.",
+  "home.adaptiveDescription":
+    "Each attempt reshapes what you practise next, so revision time lands where your score actually moves.",
 
   // --- Xác thực -----------------------------------------------------------
   "auth.email": "Email",
@@ -180,7 +217,9 @@ export const en = {
   "analytics.noDataHint": "Complete a submitted attempt in this range to see analytics.",
   "analytics.timeRangeFilter": "Time range filter",
   "analytics.barTitle": "Correct vs. Incorrect by Subject",
-  "analytics.barHint": "Hover a subject for details",
+  // Trung tính về thiết bị: chuột thì rê, cảm ứng thì chạm — một chuỗi đúng cho
+  // cả hai, thay vì "Hover…" vốn là hướng dẫn không làm theo được bằng ngón tay.
+  "analytics.barHint": "Select a subject for details",
   "analytics.barAlt": "Correct vs. incorrect answers by subject",
   "analytics.needsReview": "Needs review",
   "analytics.donutTitle": "Most Frequently Practiced Subject",

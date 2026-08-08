@@ -151,20 +151,37 @@ export function ExamFilters({
 
       {/* Cả block *Filter STICKY dưới navbar (h-15). shrink-0: tay nắm mảnh cạnh list.
           preload order 1 — fade sau navbar (S#21). pt-5 (S#22): edge trên của
-          tay nắm ngang hàng với ExamCard (cột card có py-5). */}
+          tay nắm ngang hàng với ExamCard (cột card có py-5).
+
+          Dưới 768px cả cụm này đổi hình: `max-md:static` bỏ sticky (một rail
+          dọc dính mép trái không có nghĩa gì khi bề ngang chỉ 360px) và tay nắm
+          trở thành một hàng NGANG đầy chiều rộng phía trên lưới thẻ. Trước thay
+          đổi này, cụm 3 ô lọc nhanh `absolute right-0` render ở left:-46px —
+          NGOÀI mép trái màn hình — và nhãn cụt còn "ất"; tức đường chính để tìm
+          một đề coi như không dùng được trên điện thoại. */}
+      {/* ⚠ `preload-fade` KHÔNG được đặt trên khối bọc này.
+          Animation đó kết thúc ở `transform: none` với `fill-mode: both`, và
+          trình duyệt giữ lại giá trị đó dưới dạng ma trận đơn vị — một phần tử
+          có `transform` (kể cả ma trận đơn vị) trở thành CONTAINING BLOCK cho
+          mọi con `position: fixed`. Đặt animation ở đây thì bottom sheet bên
+          dưới sẽ neo vào chính khối này thay vì vào viewport: đo được
+          `top: 64px` trong khi phần tử thật nằm ở y=125, và sheet không bao giờ
+          chạm đáy màn hình. Vì vậy fade chuyển xuống đúng phần tử NHÌN THẤY
+          (tay nắm) — nơi nó không nằm trên đường đi của sheet. */}
       <div
-        className="preload-fade sticky top-15 z-20 shrink-0 self-start pt-5"
-        style={{ "--preload-order": 1 } as React.CSSProperties}
+        className="sticky top-15 z-20 shrink-0 self-start pt-5 max-md:static max-md:w-full max-md:self-stretch max-md:px-4"
         data-pending={isPending ? "" : undefined}
       >
-        <div className="relative">
-          {/* Tay nắm (master toggle) — tam giác đen, nhãn dọc. Luôn render = mỏ neo sticky. */}
+        <div className="relative max-md:static">
+          {/* Tay nắm (master toggle). Desktop: tam giác + nhãn DỌC, cột mảnh.
+              Mobile: hàng ngang, nhãn nằm ngang, min-h-11 cho vùng chạm (§4.3). */}
           <button
             type="button"
             aria-label={t("common.filters")}
             aria-expanded={open}
             onClick={() => setOpen((v) => !v)}
-            className="border-border hover:bg-accent flex flex-col items-center gap-2 rounded-md border-r py-4 pr-2.5 pl-3 transition-colors duration-200"
+            style={{ "--preload-order": 1 } as React.CSSProperties}
+            className="preload-fade border-border hover:bg-accent flex flex-col items-center gap-2 rounded-md border-r py-4 pr-2.5 pl-3 transition-colors duration-200 max-md:min-h-11 max-md:w-full max-md:flex-row max-md:justify-center max-md:gap-3 max-md:border max-md:py-2.5 max-md:pr-3 max-md:pl-3"
           >
             <span className="relative">
               <Triangle open={open} />
@@ -175,7 +192,9 @@ export function ExamFilters({
                 />
               )}
             </span>
-            <span className="eyebrow" style={{ writingMode: "vertical-rl" }}>
+            {/* writingMode dọc CHỈ từ md trở lên — trên mobile nhãn phải nằm
+                ngang, chữ dọc trong một hàng ngang là không đọc được. */}
+            <span className="eyebrow max-md:[writing-mode:horizontal-tb] md:[writing-mode:vertical-rl]">
               {t("common.filters")}
             </span>
           </button>
@@ -184,7 +203,22 @@ export function ExamFilters({
               không đè lên filter button nữa), đè lên exam list (không đẩy bố cục). */}
           {open && (
             <div
-              className="border-border absolute top-0 left-full z-20 w-[84vw] max-w-xs border"
+              // Desktop: overlay absolute kề mép phải tay nắm (S#22).
+              // Mobile: BOTTOM SHEET — neo đáy màn hình (Vùng Xanh, §4.2), cao
+              // tối đa 70dvh và tự cuộn bên trong. `dvh` chứ không `vh`: thanh
+              // địa chỉ Safari/Chrome ẩn-hiện khi cuộn làm `vh` sai lệch và cắt
+              // mất phần dưới sheet (§3.2).
+              // bottom = chiều cao BottomNav + safe-area: sheet phải nằm TRÊN
+              // thanh điều hướng, không đè lên nó (§6.2 "Navigational
+              // Clearance").
+              // Mobile là mặc định (không tiền tố), desktop nằm sau `md:` —
+              // KHÔNG viết `absolute top-0 left-full` làm nền rồi ghi đè bằng
+              // `max-md:*`: hai khai báo cùng thuộc tính `top` sẽ tranh nhau
+              // theo thứ tự xuất hiện trong stylesheet chứ không theo ý người
+              // viết, và bản trước đúng như vậy — `top-0` thắng `max-md:top-auto`
+              // nên sheet dính đỉnh thay vì đáy. Tách hẳn hai nhánh thì không
+              // còn gì để tranh.
+              className="border-border bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom,0px))] fixed inset-x-0 z-30 max-h-[70dvh] w-full overflow-y-auto rounded-t-lg border border-x-0 border-b-0 md:absolute md:inset-x-auto md:top-0 md:bottom-auto md:left-full md:z-20 md:max-h-none md:w-[84vw] md:max-w-xs md:overflow-visible md:rounded-none md:border"
               style={{ backgroundColor: PANEL_BG }}
             >
               {/* Header bảng: toggle (nhãn, S#26 bỏ tam giác trong dropdown)
@@ -291,18 +325,43 @@ export function ExamFilters({
               mỗi ô canh đúng viền phải tay nắm: đặt absolute right-0 trong
               .relative (right-0 = mép phải handle = đường kẻ). w-max nới text
               sang TRÁI, checkbox luôn ghim mép phải nên cả 3 ô thẳng hàng. */}
-          <div className="absolute top-full right-0 mt-3 flex w-max flex-col gap-2">
+          {/* ⚠ `absolute right-0` đặt cụm này NGOÀI rail, trong phần lề trái
+              của container — nó chỉ nằm trong màn hình khi container còn ≥46px
+              lề, tức từ khoảng 1244px trở lên. Đo được: ở 360px, 768px và cả
+              1024px, cụm này render ở left:-46px — nằm ngoài mép trái màn hình,
+              nhãn cụt còn "ất". Đây là lỗi CÓ SẴN, không phải do đợt mobile
+              sinh ra, nhưng nó thuộc đúng dải mà đợt này chịu trách nhiệm.
+              Vì vậy `absolute` chỉ còn hiệu lực từ `xl` (1280px) — nấc đầu tiên
+              thật sự có đủ lề. Dưới ngưỡng đó cụm nằm TRONG dòng chảy: mobile
+              xếp ngang dưới nút lọc, tablet/desktop hẹp xếp dọc trong rail
+              (rail rộng thêm ~46px, lưới thẻ dịch phải tương ứng). */}
+          {/* Mobile dùng GRID 3 cột cố định, KHÔNG phải flex-wrap.
+              flex-wrap xếp chỗ theo BỀ RỘNG CHỮ, nên bố cục đổi theo ngôn ngữ:
+              tiếng Anh ("Newest/Oldest/Hardest" + "Descending") vừa một dòng,
+              còn tiếng Việt ("Mới nhất/Cũ nhất/Khó nhất" + "Giảm dần") dài hơn
+              nên nút đảo chiều bị đẩy xuống dòng riêng và nằm lệch trái — trông
+              như vỡ layout chứ không như một hàng thứ hai có chủ ý.
+              Lưới 3 cột thì vị trí do CẤU TRÚC quyết định, không do độ dài chữ:
+              hàng 1 luôn là 3 ô sắp xếp, hàng 2 luôn là nút đảo chiều canh phải
+              — giống nhau ở mọi ngôn ngữ, kể cả ngôn ngữ thêm vào sau này. */}
+          <div className="mt-3 flex w-max flex-col gap-2 max-md:mt-2 max-md:grid max-md:w-full max-md:grid-cols-3 max-md:items-center max-md:gap-x-3 xl:absolute xl:top-full xl:right-0">
             {QUICK.map((q) => {
               const checked = sort === q.value;
               return (
                 <label
                   key={q.value}
-                  className="text-foreground flex cursor-pointer items-center justify-between gap-2 text-sm whitespace-nowrap"
+                  // min-h-11 trên mobile: cả nhãn là vùng chạm, không chỉ ô
+                  // checkbox 16×16 (§4.3 — nới vùng nhận sự kiện bằng
+                  // padding/kích thước thay vì phóng to chính icon).
+                  // `min-w-0` + nhãn `truncate`: ô lưới không được phép nở ra
+                  // theo chữ dài, nếu không thì lưới 3 cột lại bị chính bề rộng
+                  // chữ đẩy vỡ — đúng thứ vừa đi sửa.
+                  className="text-foreground flex min-w-0 cursor-pointer items-center justify-between gap-1.5 text-sm whitespace-nowrap max-md:min-h-11 max-md:justify-start max-md:text-xs"
                 >
-                  {t(q.labelKey)}
+                  <span className="min-w-0 truncate">{t(q.labelKey)}</span>
                   <input
                     type="checkbox"
-                    className="accent-brand size-4"
+                    className="accent-brand size-4 shrink-0"
                     checked={checked}
                     onChange={() => setSort(q.value)}
                   />
@@ -319,7 +378,10 @@ export function ExamFilters({
               onClick={toggleDirection}
               disabled={!sort}
               aria-label={t("exams.toggleSortDirection")}
-              className="text-muted-foreground hover:text-brand border-border mt-1 flex items-center justify-end gap-1.5 border-t pt-2 text-xs whitespace-nowrap transition-colors disabled:pointer-events-none disabled:opacity-40"
+              // `col-span-3 justify-self-end` trên mobile: nút chiếm trọn hàng
+              // thứ hai của lưới và canh PHẢI — vị trí cố định, không phụ thuộc
+              // ba nhãn phía trên dài bao nhiêu.
+              className="text-muted-foreground hover:text-brand border-border mt-1 flex items-center justify-end gap-1.5 border-t pt-2 text-xs whitespace-nowrap transition-colors disabled:pointer-events-none disabled:opacity-40 max-md:col-span-3 max-md:mt-0 max-md:min-h-11 max-md:justify-self-end max-md:border-t-0 max-md:pt-0"
             >
               <span aria-hidden>{ascending ? "↑" : "↓"}</span>
               {ascending ? t("exams.ascending") : t("exams.descending")}

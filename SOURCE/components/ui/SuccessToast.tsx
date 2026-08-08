@@ -1,7 +1,9 @@
 "use client";
 
-// SuccessToast — bottom-center confirmation toast (Rating Page UX pass,
-// 2026-07-27). Replaces the old "Saved" button-label state: the submit
+// SuccessToast — confirmation toast (Rating Page UX pass, 2026-07-27).
+// Top-center dưới 768px, bottom-center từ 768px trở lên — lý do ở khối chú
+// thích ngay trên phần tử, đọc trước khi đổi vị trí. Replaces the old "Saved"
+// button-label state: the submit
 // button now only ever shows two states (Submit / Submitting), and this
 // toast is the sole success signal instead. Bounces up from the bottom edge
 // (slight overshoot easing) and auto-dismisses after `durationMs`. The owner
@@ -48,12 +50,22 @@ export function SuccessToast({ message, trigger, durationMs = 3000 }: SuccessToa
       <div role="status" aria-live="polite" className="sr-only">
         {visible ? message : ""}
       </div>
+      {/* Vị trí đổi theo bề rộng (tài liệu Mobile-Layout-Research-MS §6.2):
+          - <768px: TOP-CENTER. Không phải tuỳ chọn thẩm mỹ mà là hệ quả bắt
+            buộc của BottomNav — giữ `bottom-6` thì toast sẽ nằm ĐÚNG TRÊN thanh
+            điều hướng đáy, tức tự tạo ra đúng kiểu đè chéo mà §6.2 mô tả, và
+            che mất các ô điều hướng trong 3 giây. Đỉnh màn hình thuộc vùng nhìn
+            ngoại vi: thấy được trạng thái mà không chặn luồng ngón tay.
+          - ≥768px: giữ nguyên bottom-center như trước — không có thanh đáy để
+            đụng, và đổi chỗ vô cớ là thay đổi hành vi desktop đã quen thuộc.
+          Hướng trượt vào cũng lật theo: từ TRÊN xuống ở mobile, từ DƯỚI lên ở
+          desktop — vật thể phải bay vào từ phía mép nó neo. */}
       <div
         aria-hidden
-        className={`pointer-events-none fixed inset-x-0 bottom-6 z-[70] flex justify-center px-4 transition-all motion-reduce:transition-none ${
+        className={`pointer-events-none fixed inset-x-0 top-[calc(3.75rem+env(safe-area-inset-top,0px))] z-[70] flex justify-center px-4 transition-all motion-reduce:transition-none md:top-auto md:bottom-6 ${
           visible
             ? "translate-y-0 opacity-100 duration-300 [transition-timing-function:cubic-bezier(0.34,1.56,0.64,1)]"
-            : "translate-y-3 opacity-0 duration-200 ease-in"
+            : "-translate-y-3 opacity-0 duration-200 ease-in md:translate-y-3"
         }`}
       >
         <div className="border-border bg-foreground text-background flex items-center gap-2 rounded-md border px-4 py-2.5 text-sm font-medium">

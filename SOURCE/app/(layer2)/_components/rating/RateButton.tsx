@@ -38,8 +38,13 @@ interface RateButtonProps {
   eligibility: RateEligibility;
 }
 
+// `inline-flex min-h-11 items-center`: chữ 12px chỉ cao 16px, nên vùng chạm
+// trước 2026-08-07 đo được 63×16px — dưới hẳn ngưỡng 44–48px mà tài liệu
+// Mobile-Layout-Research-MS §4.3 đặt ra cho phần tử tương tác trên cảm ứng.
+// Nới bằng CHIỀU CAO TỐI THIỂU chứ không phải padding: padding sẽ đẩy nút ra
+// khỏi mép phải thẻ mà nó đang canh theo (`justify-end` ở ExamCard).
 const RATE_BUTTON_CLASS =
-  "relative z-10 text-xs font-medium uppercase tracking-[0.14em] transition-opacity";
+  "relative z-10 inline-flex min-h-11 items-center text-xs font-medium uppercase tracking-[0.14em] transition-opacity";
 
 export function RateButton({ examId, eligibility }: RateButtonProps) {
   const t = useT();

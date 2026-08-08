@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { HomeSidebar } from "@/app/(layer1)/_components/HomeSidebar";
 import { HomeStage, type AuthMode } from "@/app/(layer1)/_components/HomeStage";
+import { BottomNav } from "@/components/layout/BottomNav";
+import { SiteHeader } from "@/components/layout/SiteHeader";
 import { SkipLink } from "@/components/shared/SkipLink";
 import { getCurrentUserProfile } from "@/lib/auth/getCurrentUser";
 
@@ -28,21 +30,38 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ a
     // (overflow-y-auto) chỉ khi màn quá thấp, để không bị cắt nội dung.
     <div className="flex h-dvh flex-col overflow-hidden bg-[#1B1512] lg:flex-row">
       <SkipLink />
+
+      {/* Dưới 1024px: dùng CÙNG hệ điều hướng với phần còn lại của site
+          (SiteHeader mảnh + BottomNav) thay vì sidebar riêng của trang chủ.
+          Đo trước thay đổi này ở 360×800: sidebar xếp dọc thành một dải trên
+          cùng cao 296px — 37% chiều cao màn hình dành cho điều hướng, đẩy CTA
+          chính xuống y=827 nằm ngoài khung cuộn nội bộ cao 504px, tức người
+          dùng không thấy nút "Bắt đầu" mà cũng không có dấu hiệu nào bảo rằng
+          còn nội dung bên dưới.
+          Đây cũng là lần dọn một hệ điều hướng THỨ HAI: trước đây trang chủ và
+          các layer khác có hai bộ nav riêng phải "đồng bộ 100%" bằng tay. */}
+      <div className="lg:hidden">
+        <SiteHeader user={user} />
+      </div>
       <HomeSidebar user={user} authOpen={authMode !== null} />
 
       {/* preload order 1 — content area fade sau sidebar (S#21).
           id + tabIndex={-1} = đích nhảy của SkipLink (WCAG 2.4.1) — homepage
-          dùng thẳng <main> làm đích vì nó không có wrapper riêng như các layer. */}
+          dùng thẳng <main> làm đích vì nó không có wrapper riêng như các layer.
+          pb-bottom-nav: main là khung CUỘN ở đây (không phải body), nên đệm đáy
+          phải nằm trên chính nó — đặt ở tổ tiên sẽ không có tác dụng. */}
       <main
         id="main-content"
         tabIndex={-1}
-        className="preload-fade relative flex min-h-0 flex-1 flex-col overflow-y-auto bg-[#EDE1C8] px-6 py-8 sm:px-12 lg:px-16 lg:py-10"
+        className="preload-fade pb-bottom-nav relative flex min-h-0 flex-1 flex-col overflow-y-auto bg-[#EDE1C8] px-6 py-8 sm:px-12 lg:px-16 lg:py-10"
         style={{ "--preload-order": 1 } as React.CSSProperties}
       >
         <HeroLines />
         {/* HomeStage có my-auto → tự căn giữa dọc khi content thấp hơn khung. */}
         <HomeStage auth={authMode} />
       </main>
+
+      <BottomNav />
     </div>
   );
 }

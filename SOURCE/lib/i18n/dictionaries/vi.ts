@@ -53,6 +53,8 @@ export const vi: Dictionary = {
   "nav.account": "Tài khoản",
   "nav.language": "Ngôn ngữ",
   "nav.switchTo": "Chuyển sang {language}",
+  "nav.primary": "Chính",
+  "nav.secondary": "Tài khoản và ngôn ngữ",
 
   // --- Trang chủ ----------------------------------------------------------
   "home.eyebrow": "Nền tảng luyện đề trực tuyến",
@@ -64,6 +66,23 @@ export const vi: Dictionary = {
   "home.instantGrading": "chấm điểm tức thì",
   "home.bodyPart3": " và phân tích điểm yếu, để bạn học đúng trọng tâm và tiến bộ nhanh hơn.",
   "home.getStarted": "Bắt đầu",
+
+  // --- Băng chuyền trang chủ (HomeCarousel) -------------------------------
+  "home.carouselLabel": "Điểm nổi bật của nền tảng",
+  "home.carouselRole": "băng chuyền",
+  "home.slideRole": "mục",
+  "home.slidePosition": "{current} trên {total}",
+  "home.carouselPause": "Tạm dừng tự động chuyển mục",
+  "home.carouselPlay": "Tiếp tục tự động chuyển mục",
+  "home.carouselPrev": "Mục trước",
+  "home.carouselNext": "Mục sau",
+  "home.tabAi": "Có tích hợp AI",
+  "home.tabAdaptive": "Học tập thích ứng",
+  "home.siteName": "MS-MOLAR",
+  "home.aiDescription":
+    "AI bóc tách từng câu hỏi từ file đề bạn tải lên, và chấm bài ngay khi bạn nộp.",
+  "home.adaptiveDescription":
+    "Mỗi lần làm bài định lại nội dung luyện tiếp theo, để thời gian ôn rơi đúng chỗ giúp điểm số nhích lên.",
 
   // --- Xác thực -----------------------------------------------------------
   "auth.email": "Email",
@@ -175,7 +194,7 @@ export const vi: Dictionary = {
   "analytics.noDataHint": "Hoàn thành một lượt làm bài đã nộp trong khoảng này để xem thống kê.",
   "analytics.timeRangeFilter": "Lọc theo khoảng thời gian",
   "analytics.barTitle": "Đúng và sai theo môn",
-  "analytics.barHint": "Rê chuột lên một môn để xem chi tiết",
+  "analytics.barHint": "Chọn một môn để xem chi tiết",
   "analytics.barAlt": "Số câu đúng và sai theo từng môn",
   "analytics.needsReview": "Cần ôn lại",
   "analytics.donutTitle": "Môn luyện nhiều nhất",

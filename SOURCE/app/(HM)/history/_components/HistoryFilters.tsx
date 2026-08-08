@@ -84,7 +84,9 @@ export function HistoryFilters({ subjects, exams, selected }: HistoryFiltersProp
           aria-label={t("common.filters")}
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
-          className="border-border bg-card hover:border-brand/40 text-foreground flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition-colors"
+          // min-h-11: sàn 44px cho vùng chạm (tài liệu Mobile-Layout-Research-MS
+          // §4.3) — bản trước cao 38px.
+          className="border-border bg-card hover:border-brand/40 text-foreground flex min-h-11 items-center gap-2 rounded-xl border px-3 py-2 text-sm transition-colors"
         >
           <Triangle open={open} />
           {t("common.filters")}

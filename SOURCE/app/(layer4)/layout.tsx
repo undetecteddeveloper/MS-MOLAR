@@ -3,7 +3,8 @@
 // SiteHeader dùng chung với Layer 2/3 (xem comment trong SiteHeader.tsx).
 
 import { getCurrentUserProfile } from "@/lib/auth/getCurrentUser";
-import { SiteHeader } from "@/app/(layer2)/_components/SiteHeader";
+import { SiteHeader } from "@/components/layout/SiteHeader";
+import { BottomNav } from "@/components/layout/BottomNav";
 import { SkipLink } from "@/components/shared/SkipLink";
 
 export default async function Layer4Layout({ children }: { children: React.ReactNode }) {
@@ -15,9 +16,12 @@ export default async function Layer4Layout({ children }: { children: React.React
       <SiteHeader user={user} />
       {/* id + tabIndex={-1}: đích nhảy của SkipLink (WCAG 2.4.1). tabIndex âm
           cho phép nhận tiêu điểm bằng lập trình mà không chen vào thứ tự Tab. */}
-      <div id="main-content" tabIndex={-1}>
+      {/* pb-bottom-nav: chừa chỗ cho BottomNav (fixed) để dòng cuối của trang
+          không chui xuống dưới nó. Tự về 0 từ 768px vì thanh đáy không render. */}
+      <div id="main-content" tabIndex={-1} className="pb-bottom-nav">
         {children}
       </div>
+      <BottomNav />
     </div>
   );
 }

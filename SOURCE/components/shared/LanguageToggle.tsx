@@ -37,7 +37,11 @@ export function LanguageToggle({ className = "" }: { className?: string }) {
       aria-label={t("nav.switchTo", { language: LOCALE_LABEL[next] })}
       onClick={() => startTransition(() => setLocale(next))}
       className={[
-        "inline-flex min-h-6 shrink-0 items-center rounded-sm px-2 py-1 font-sans text-[10px] font-medium tracking-[0.12em] uppercase transition-colors",
+        // min-h-11 (44px) chứ không phải min-h-6 (24px) như trước: 24px là
+        // ngưỡng WCAG 2.5.8 cho con trỏ chuột, còn tài liệu
+        // Mobile-Layout-Research-MS §4.3 đặt sàn 44–48px cho ngón tay. Nút này
+        // sống trên navbar CẢM ỨNG ở mobile nên phải theo sàn cao hơn.
+        "inline-flex min-h-11 shrink-0 items-center rounded-sm px-2 py-1 font-sans text-[10px] font-medium tracking-[0.12em] uppercase transition-colors",
         "text-[#EDE1C8]/55 hover:text-[#EDE1C8] focus-visible:text-[#EDE1C8]",
         pending ? "pointer-events-none opacity-60" : "",
         className,

@@ -63,7 +63,17 @@ export async function HistoryList({
           )}
         </div>
       ) : (
-        <ul className="mt-6 flex max-h-[30rem] flex-col gap-3 overflow-y-auto pr-2">
+        // Trần chiều cao khác nhau theo bề rộng, CỐ Ý:
+        //  - Desktop (≥768px): giữ 30rem — khung có trần là quyết định thiết kế
+        //    sẵn có (D3), trang còn nội dung khác bên dưới.
+        //  - Mobile: 30rem cố định để lại một mảng trống lớn giữa dòng cuối và
+        //    thanh điều hướng đáy, trong khi danh sách BÊN TRONG vẫn đang cuộn
+        //    vì bị cắt — vừa xấu vừa lãng phí, ở đúng nơi màn hình chật nhất.
+        //    `100dvh - 15rem` trừ đi phần chiều cao đã bị chiếm: navbar 60px +
+        //    đệm trang + khối tiêu đề + đệm đáy cho BottomNav. `dvh` chứ không
+        //    `vh`: thanh địa chỉ trình duyệt ẩn/hiện khi cuộn làm `vh` sai số
+        //    (§3.2 tài liệu mobile).
+        <ul className="mt-6 flex max-h-[calc(100dvh-15rem)] flex-col gap-3 overflow-y-auto pr-2 md:max-h-[30rem]">
           {entries.map((entry) => (
             <HistoryRow key={entry.attemptId} entry={entry} />
           ))}

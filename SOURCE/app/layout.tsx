@@ -71,6 +71,13 @@ export const metadata: Metadata = {
 // Màu thanh địa chỉ trên mobile — đen sơn mài, khớp sidebar homepage.
 export const viewport: Viewport = {
   themeColor: "#1B1512",
+  // `viewport-fit=cover` — BẮT BUỘC để `env(safe-area-inset-*)` trả giá trị
+  // thật. Thiếu nó thì mọi safe-area inset luôn bằng 0 và thanh điều hướng đáy
+  // (BottomNav) sẽ nằm lọt dưới thanh Home ảo của iPhone: người dùng thấy nút
+  // nhưng bấm không trúng. Đây là kiểu hỏng IM LẶNG — không lỗi, không cảnh
+  // báo, chỉ là các ô cuối cùng không phản hồi trên đúng những thiết bị có
+  // notch/home indicator.
+  viewportFit: "cover",
 };
 
 export default async function RootLayout({

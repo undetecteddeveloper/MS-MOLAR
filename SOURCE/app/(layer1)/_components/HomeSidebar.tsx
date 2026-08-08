@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { LanguageToggle } from "@/components/shared/LanguageToggle";
 import { getTranslate } from "@/lib/i18n/server";
+import { GUEST_NAV_ITEMS, NAV_ITEMS } from "@/lib/nav/items";
 import type { MessageKey } from "@/lib/i18n/translate";
 import { SidebarProfile } from "./SidebarProfile";
 
@@ -16,20 +17,6 @@ import { SidebarProfile } from "./SidebarProfile";
 //  - AUTHED: tag "Account" ẩn đi, thay bằng Ô PROFILE riêng ở góc dưới-trái
 //    màn hình (SidebarProfile — dropup "Edit"/"Sign out" function thật).
 
-// Giữ KHOÁ i18n thay vì chuỗi sẵn — mảng ở cấp module không tra từ điển được.
-type NavItem = { key: MessageKey; href: string };
-
-const NAV: NavItem[] = [
-  { key: "nav.home", href: "/" },
-  { key: "nav.exams", href: "/exams" },
-  { key: "nav.analytics", href: "/me/dashboard" },
-  { key: "nav.history", href: "/history" },
-  // UGC v2.0 (Task 6.1): Import→Upload cho MỌI user; KHÔNG có mục admin.
-  { key: "nav.upload", href: "/upload" },
-];
-
-const GUEST_NAV: NavItem[] = [...NAV, { key: "nav.account", href: "/?auth=signin" }];
-
 export async function HomeSidebar({
   user,
   authOpen = false,
@@ -39,18 +26,19 @@ export async function HomeSidebar({
   authOpen?: boolean;
 }) {
   const t = await getTranslate();
-  const items = user ? NAV : GUEST_NAV;
+  const items = user ? NAV_ITEMS : GUEST_NAV_ITEMS;
   // Tag đang được chọn highlight đỏ son (server-side theo URL — trang chủ chỉ
   // có 2 trạng thái: hero = Home, form auth mở = Account). So bằng KHOÁ chứ
   // không bằng nhãn hiển thị — nhãn đổi theo ngôn ngữ, khoá thì không.
   const activeKey: MessageKey = authOpen ? "nav.account" : "nav.home";
 
   return (
-    // preload order 0 — sidebar là khối trên cùng (mobile) / đầu tiên của chuỗi fade (S#21).
-    <aside className="preload-fade flex shrink-0 flex-col bg-[#1B1512] lg:sticky lg:top-0 lg:h-dvh lg:w-80">
-      {/* Desktop: nav vertically centered (flex-1 + justify-center) inside the
-          full-height column. Mobile: sidebar is a top strip, rows stacked
-          (compact padding — trang không cuộn, S#17 vòng sửa 1). */}
+    // preload order 0 — sidebar là khối đầu tiên của chuỗi fade (S#21).
+    // `max-lg:hidden` (2026-08-07): sidebar này CHỈ còn tồn tại từ 1024px. Dưới
+    // ngưỡng đó, trang chủ dùng SiteHeader + BottomNav như mọi trang khác — xem
+    // ghi chú trong app/page.tsx về 296px chiều cao mà bản xếp-dọc từng chiếm.
+    <aside className="preload-fade hidden shrink-0 flex-col bg-[#1B1512] lg:sticky lg:top-0 lg:flex lg:h-dvh lg:w-80">
+      {/* Nav căn giữa dọc (flex-1 + justify-center) trong cột full-height. */}
       <nav className="flex flex-col px-8 py-4 lg:flex-1 lg:justify-center lg:px-10 lg:py-0">
         {items.map((item) => {
           const isActive = item.key === activeKey;
