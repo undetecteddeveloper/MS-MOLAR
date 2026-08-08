@@ -41,7 +41,7 @@ Notion database MS-MOLAR (row đã đóng) hoặc git log, không còn ở PROCE
 
 ### Pha 3 — Implementation
 
-1. **Code**: theo recipe của plugin `dev-workflows-fullstack` + cập nhật bảng trong Notion cho mỗi task (skills `recipe-plan` / `recipe-implement` / `recipe-fullstack-build` / `recipe-front-*` / `recipe-review`; agent chuyên biệt như `quality-fixer`, `code-reviewer` gọi qua Agent tool khi engineer yêu cầu).
+1. **Code**: nghiên cứu các thông tin liên quan đến mission hoặc task --> khởi động `dev-workflows-fullstack` với `/recipe-fullstack-implement` (hoặc skills `recipe-plan` / `recipe-implement` / `recipe-fullstack-build` / `recipe-front-*` / `recipe-review`; agent chuyên biệt như `quality-fixer`, `code-reviewer`. Chỉ inovke đối với mission - các task lớn) --> cập nhật bảng trong Notion cho mỗi task --> lặp lại các step này cho đến khi tới step "Cổng verify".
 2. **Cổng verify** — chạy đủ 4, trong `SOURCE/`, TRƯỚC khi commit:
    `npx tsc --noEmit` · `npx eslint --max-warnings 0` · `npx vitest run` · `npm run build`
    `next build` bắt lỗi ranh giới server/client mà `tsc` không thấy — đừng bỏ.
