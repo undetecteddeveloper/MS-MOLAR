@@ -18,6 +18,29 @@ còn nơi nào khác giữ lịch sử nợ ngoài chính file này.)*
 
 ## Đang mở
 
+### TD-016 — 10 câu hỏi mang `questions.subject = 'Toán'` thay vì canonical `'Math'`
+**Từ:** 2026-08-08 (phát hiện khi đếm dữ liệu thật cho Engine 1 — `requirement-analyzer`
+cần biết corpus môn Toán lớn cỡ nào, không phải đi tìm bug)
+**Loại:** dữ liệu bẩn, im lặng
+
+Đếm trực tiếp trên DB **dev** (`service_role`, không phải suy đoán từ code):
+57 câu hỏi tổng, `subject = 'Math'` có 37, và **10 câu mang `subject = 'Toán'`** —
+giá trị không nằm trong `SUBJECTS` (`lib/ugc/subjects.ts`). `normalizeSubject()`
+lẽ ra chặn được việc này ở đường UGC (map "Toán" → canonical `"Math"` qua bảng
+`ALIASES`), nhưng 10 câu này đã lọt — khả năng cao đến từ `seed.ts` hoặc một
+đường ghi tay không đi qua `normalizeSubject`, chưa xác minh đường nào.
+
+**Sẽ nổ thế nào:** mọi filter theo môn ("Toán") trên `/exams`, mọi thống kê
+theo `subject`, và giờ cả taxonomy kỹ năng Engine 1 (tagging chỉ nhắm
+`subject = 'Math'`) đều **âm thầm bỏ sót 10 câu này** — không lỗi, không log,
+chỉ thiếu. Không ai thấy vì kết quả vẫn "đúng dạng", chỉ thiếu vài dòng.
+
+**Cách trả:** một script one-off `update questions set subject = 'Math' where
+subject = 'Toán'` (paste tay qua Supabase SQL Editor như mọi DDL khác — xem
+TD-005), sau đó tìm đường ghi đã tạo ra 10 dòng này và bọc nó bằng
+`normalizeSubject`/`isSubject` để không tái diễn. Ngoài phạm vi Engine 1 Sprint 1
+— ghi lại để không quên, không phải để làm ngay trong nhánh này.
+
 ### TD-013 — Không có rate limit nào cho lưu lượng CHƯA đăng nhập
 **Từ:** 2026-08-07 (tách ra khi trả TD-008; trước đó nằm lẫn trong mục đó)
 **Loại:** phòng thủ còn thiếu hẳn một mảng, có vật cản cụ thể
