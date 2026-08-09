@@ -69,12 +69,16 @@ function Dropzone({ id, label, hint, file, onSelect, disabled, error }: Dropzone
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
         className={[
-          "mt-1.5 grid h-28 cursor-pointer place-items-center rounded-[4px] border border-dashed px-3 text-center transition-colors duration-200",
+          "mt-1.5 grid h-28 cursor-pointer place-items-center rounded-[4px] border border-dashed px-3 text-center transition-[border-color,background-color,transform] duration-200 active:scale-[0.99]",
           error
             ? "border-brand"
             : dragOver || file
               ? "border-ring"
               : "border-border hover:border-ring",
+          // Kéo file rê qua: phóng nhẹ + tô nền mờ để báo "thả vào đây" rõ hơn
+          // chỉ đổi màu viền — dragOver là trạng thái CHỦ ĐỘNG chờ hành động
+          // thả, nên phản hồi mạnh hơn hover thường.
+          dragOver ? "scale-[1.02] bg-ring/5" : "",
           disabled ? "pointer-events-none opacity-60" : "",
         ].join(" ")}
       >

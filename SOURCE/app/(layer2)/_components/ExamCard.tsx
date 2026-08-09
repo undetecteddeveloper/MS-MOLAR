@@ -32,7 +32,7 @@ export async function ExamCard({ exam, eligibility }: ExamCardProps) {
       {/* hover shadow (S#26): engineer yêu cầu đích danh — exception quy tắc
           "không đổ bóng" DESIGN.md cho riêng ExamCard; tông ấm đen sơn mài
           thay đen lạnh. */}
-      <div className="flex h-full flex-col gap-3 rounded-lg border border-[color:var(--block-border)] bg-[var(--block-bg)] p-5 transition-[border-color,box-shadow] duration-200 group-focus-within:border-[color:var(--block-hover)] group-hover:border-[color:var(--block-hover)] group-hover:shadow-[0_8px_24px_rgba(27,21,18,0.12)]">
+      <div className="flex h-full flex-col gap-3 rounded-lg border border-[color:var(--block-border)] bg-[var(--block-bg)] p-5 transition-[border-color,box-shadow,transform] duration-200 ease-out group-focus-within:border-[color:var(--block-hover)] group-hover:-translate-y-0.5 group-hover:border-[color:var(--block-hover)] group-hover:shadow-[0_8px_24px_rgba(27,21,18,0.12)]">
         <div className="flex items-baseline justify-between gap-3">
           <span className="eyebrow text-[var(--block-fg-muted)]">{exam.subject}</span>
           <span className="eyebrow text-[var(--block-fg-muted)] tabular-nums">

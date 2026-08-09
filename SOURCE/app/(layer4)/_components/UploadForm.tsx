@@ -225,16 +225,19 @@ export function UploadForm() {
 
       {pending && <ExtractionProgress metaStep={isAutomatic} />}
 
-      {/* Mobile canh GIỮA, desktop giữ canh trái. Trên một cột hẹp, nút hành
-          động chính nép mép trái đọc như còn thiếu thứ gì bên phải; canh giữa
-          làm nó thành điểm kết thúc rõ ràng của biểu mẫu. Desktop thì form
-          rộng hơn nhiều nên canh trái vẫn đúng nhịp đọc. */}
-      <div className="flex justify-start pt-2 max-md:justify-center">
+      {/* Canh GIỮA ở mọi bề rộng — trước đây desktop canh trái riêng (đọc
+          nhịp theo lề trái của form), nhưng vì 2 dropzone phía trên đứng
+          thành CẶP đối xứng (grid 2 cột đều nhau), một nút canh trái bên
+          dưới đọc như lệch tâm so với cặp đó chứ không phải "điểm kết thúc
+          rõ ràng" như dự tính — engineer xác nhận lệch (2026-08-09). Canh
+          giữa để nút luôn là điểm hội tụ của cả 2 khung phía trên, ở mọi
+          breakpoint. */}
+      <div className="flex justify-center pt-2">
         <button
           type="button"
           onClick={onSubmit}
           disabled={pending}
-          className="min-h-11 rounded-[4px] bg-brand px-7 py-2.5 text-xs font-medium uppercase tracking-[0.14em] text-brand-foreground transition-colors duration-200 hover:bg-[#8F2523] disabled:opacity-60"
+          className="min-h-11 rounded-[4px] bg-brand px-7 py-2.5 text-xs font-medium uppercase tracking-[0.14em] text-brand-foreground transition-[background-color,transform] duration-200 hover:bg-[#8F2523] active:scale-[0.97] disabled:pointer-events-none disabled:opacity-60"
         >
           {pending ? t("common.processing") : t("upload.start")}
         </button>

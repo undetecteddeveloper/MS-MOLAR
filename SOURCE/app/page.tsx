@@ -70,6 +70,16 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ a
 // template). Hairline phẳng (không gradient/bóng), màu đen sơn mài opacity
 // thấp — đúng tinh thần "flat + hairline" của DESIGN.md. vector-effect giữ nét
 // 1px dù SVG bị kéo giãn không đồng đều (preserveAspectRatio=none).
+//
+// Trôi chậm (2026-08-09, engineer yêu cầu làm "lưới không gian" sau tiêu đề
+// sống động hơn, cả desktop lẫn mobile): mỗi đường tự animate qua
+// `.hero-line-drift` (keyframes + reduced-motion guard ở globals.css) —
+// THUẦN CSS, không JS, nên chạy y hệt trên Server Component này không cần
+// "use client". Biên độ animate tính theo % toạ độ viewBox (0 0 100 100) nên
+// tự co giãn theo mọi kích cỡ màn hình, không cần giá trị riêng cho
+// desktop/mobile. `--hero-line-duration`/`--hero-line-delay` lệch dần theo
+// index (delay ÂM để mỗi đường vào ngay giữa chu kỳ thay vì cùng xuất phát
+// từ 0%) — 6 đường trôi lệch pha nhau, không đồng bộ như một khối cứng.
 function HeroLines() {
   const lines = [
     [0, 18, 100, 2],
@@ -97,6 +107,13 @@ function HeroLines() {
           strokeOpacity="0.08"
           strokeWidth="1"
           vectorEffect="non-scaling-stroke"
+          className="hero-line-drift"
+          style={
+            {
+              "--hero-line-duration": `${22 + i * 3}s`,
+              "--hero-line-delay": `${-i * 4}s`,
+            } as React.CSSProperties
+          }
         />
       ))}
     </svg>

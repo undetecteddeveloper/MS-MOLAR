@@ -379,3 +379,45 @@
     animation: none;
   }
 }
+
+/* ============================================================
+   HERO LINES DRIFT (2026-08-09) — hoa văn đường kẻ hình học sau
+   tiêu đề trang chủ (app/page.tsx HeroLines) trôi rất chậm, để
+   trông như đang "sống" trong không gian thay vì một hoạ tiết
+   tĩnh. ease-in-out vì đây là chuyển động TRÊN MÀN HÌNH (không
+   phải vào/ra), biên độ cực nhỏ (dưới 1% toạ độ viewBox) và chu
+   kỳ rất dài (22–37s, so le theo từng đường) để không lấn át tiêu
+   đề/form phía trước — mắt gần như không bắt được chuyển động
+   TỪNG KHOẢNH KHẮC, chỉ cảm nhận được nền "sống" khi nhìn tổng
+   thể một lúc, đúng tinh thần trang trí chứ không phải chỉ báo.
+   ============================================================ */
+@keyframes hero-line-drift {
+  0% {
+    transform: translate(0%, 0%) rotate(0deg);
+  }
+  25% {
+    transform: translate(0.6%, -0.5%) rotate(0.12deg);
+  }
+  50% {
+    transform: translate(-0.4%, 0.6%) rotate(-0.1deg);
+  }
+  75% {
+    transform: translate(0.5%, 0.35%) rotate(0.08deg);
+  }
+  100% {
+    transform: translate(0%, 0%) rotate(0deg);
+  }
+}
+
+.hero-line-drift {
+  animation: hero-line-drift var(--hero-line-duration, 26s) ease-in-out infinite;
+  animation-delay: var(--hero-line-delay, 0s);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-line-drift {
+    animation: none;
+  }
+}

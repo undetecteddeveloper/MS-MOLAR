@@ -9,8 +9,22 @@ import type { MessageKey } from "@/lib/i18n/translate";
 //  - Mở: bảng lọc ĐÈ LÊN exam list (overlay, không đẩy block sang bên) + rgba highlight.
 //  - Cả block *Filter là position: STICKY (top-14) → đi theo user khi cuộn trang,
 //    không trôi mất như phần tử thường.
-//  - Mỗi filter có toggle riêng; mở "bảng chọn" cũng là overlay (absolute) nên
-//    KHÔNG làm xê dịch bố cục các filter khác.
+//  - Mỗi filter có toggle riêng; mở "bảng chọn" là overlay (absolute) từ `md`
+//    trở lên nên KHÔNG làm xê dịch bố cục các filter khác — panel desktop là
+//    `overflow-visible`/`max-h-none` nên overlay không có nguy cơ bị cắt.
+//    DƯỚI `md` bảng chọn đổi sang IN-FLOW (đẩy các filter dưới nó xuống, xem
+//    FilterRow) — panel mobile là bottom sheet `max-h-[70dvh] overflow-y-auto`
+//    (một scroll container), và một overlay `absolute` lồng bên trong scroll
+//    container qua một ancestor `position:relative` trung gian là đúng tổ hợp
+//    nổi tiếng hay bị trình duyệt tính overflow/scroll không nhất quán (an
+//    toàn trên Chromium lúc đo đạc không có nghĩa an toàn trên mọi trình
+//    duyệt di động thật) — engineer bắt được hậu quả 2026-08-09: dropdown của
+//    filter Year (gần cuối danh sách, gần BottomNav `z-40` > panel `z-30`)
+//    hiện sát mép panel, phần cuối bị BottomNav đè lên. In-flow loại bỏ hẳn
+//    lớp rủi ro này (nội dung trong luồng bình thường luôn được scroll
+//    container tính đúng), đổi lại mobile giờ CÓ xê dịch bố cục khi mở — chấp
+//    nhận được vì bottom sheet vốn đã là danh sách cuộn dọc, "mở ra đẩy xuống"
+//    là hành vi quen thuộc của accordion trong sheet (iOS Settings...).
 // State lọc ở URL searchParams (UI-LAYER-MAP Mục 9) → Server Component re-query.
 // S#27: Subject/Grade/School/Year/Semester lọc thật từ DB. Rating System
 // (D002, frontend DD): Level giờ lọc thật (avg_overall bucket, DB-side);
@@ -19,7 +33,7 @@ import type { MessageKey } from "@/lib/i18n/translate";
 // tại design [Stop], thay thế thiết kế Hardest-độc-lập cũ ở S#28).
 
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 /** Rating System — khớp ExamSort (queries.ts) + ExamLevel lowercase slug (IP-6). */
 type ExamSort = "newest" | "oldest" | "hardest";
@@ -136,6 +150,64 @@ export function ExamFilters({
     selected.semester !== undefined ||
     selected.level !== undefined;
 
+  // Lọc nhanh (Newest/Oldest/Hardest) — render dùng CHUNG cho 2 chỗ: bên
+  // trong sheet mobile (variant "sheet") và rail desktop/tablet (variant
+  // "rail", giữ nguyên style cũ). Tách hàm để không lặp JSX ở hai nơi.
+  //
+  // ⚠ 2026-08-09 LÀM LẠI #3: bản trước dùng `grid grid-cols-3` cho "sheet" —
+  // engineer chụp ảnh báo lại vẫn vỡ (chữ nhảy dòng, gap giữa nhãn/checkbox
+  // trong mỗi cột quá lớn vì `justify-between` kéo hai đầu ra hết bề rộng CỘT
+  // thay vì bề rộng CHỮ). Chia 3 cột ngang là nguồn gốc bug cả 3 lần sửa gần
+  // đây (xem lịch sử comment cũ), nên bỏ hẳn hướng đó: sheet giờ xếp DỌC, mỗi
+  // mục CHIẾM TRỌN bề rộng sheet — giống hệt cấu trúc rail desktop đã chứng
+  // minh ổn định (rail cũng xếp dọc, chưa từng bị báo lỗi). Đối xứng vì mọi
+  // hàng cao/rộng bằng nhau; không thể nhảy dòng vì không còn cột hẹp nào ép
+  // chữ vào một khoảng trống cố định.
+  function quickSortLabels(variant: "sheet" | "rail") {
+    return QUICK.map((q) => {
+      const checked = sort === q.value;
+      return (
+        <label
+          key={q.value}
+          className={
+            variant === "sheet"
+              ? "text-foreground flex min-h-11 w-full cursor-pointer items-center justify-between gap-3 text-sm"
+              : "text-foreground flex min-w-0 cursor-pointer items-center justify-between gap-1.5 text-sm whitespace-nowrap"
+          }
+        >
+          <span className={variant === "rail" ? "min-w-0 truncate" : undefined}>
+            {t(q.labelKey)}
+          </span>
+          <input
+            type="checkbox"
+            className="accent-brand size-4 shrink-0 transition-transform duration-150 active:scale-90"
+            checked={checked}
+            onChange={() => setSort(q.value)}
+          />
+        </label>
+      );
+    });
+  }
+
+  function directionToggleButton(variant: "sheet" | "rail") {
+    return (
+      <button
+        type="button"
+        onClick={toggleDirection}
+        disabled={!sort}
+        aria-label={t("exams.toggleSortDirection")}
+        className={
+          variant === "sheet"
+            ? "text-muted-foreground hover:text-brand border-border mt-1 flex min-h-11 w-full items-center justify-end gap-1.5 border-t pt-2 text-xs whitespace-nowrap transition-colors disabled:pointer-events-none disabled:opacity-40"
+            : "text-muted-foreground hover:text-brand border-border mt-1 flex items-center justify-end gap-1.5 border-t pt-2 text-xs whitespace-nowrap transition-colors disabled:pointer-events-none disabled:opacity-40"
+        }
+      >
+        <span aria-hidden>{ascending ? "↑" : "↓"}</span>
+        {ascending ? t("exams.ascending") : t("exams.descending")}
+      </button>
+    );
+  }
+
   return (
     <>
       {/* Scrim rgba — dim exam list để *Filter nổi bật. Click để đóng. */}
@@ -144,7 +216,7 @@ export function ExamFilters({
           aria-hidden
           tabIndex={-1}
           onClick={() => setOpen(false)}
-          className="fixed inset-0 z-10 cursor-default"
+          className="animate-in fade-in fixed inset-0 z-10 cursor-default duration-200"
           style={{ backgroundColor: SCRIM_BG }}
         />
       )}
@@ -181,6 +253,14 @@ export function ExamFilters({
             aria-expanded={open}
             onClick={() => setOpen((v) => !v)}
             style={{ "--preload-order": 1 } as React.CSSProperties}
+            // ⚠ KHÔNG thêm `active:scale-*`/`transition-transform` ở nút này:
+            // nó mang class `preload-fade` — animation đó kết thúc bằng
+            // `transform: none` với `fill-mode: both`, và CSS Animation giữ
+            // quyền kiểm soát thuộc tính `transform` với độ ưu tiên CAO HƠN
+            // rule thường (kể cả `:active`) trong suốt vòng đời "both" (vô
+            // thời hạn) — một scale khai báo bình thường ở đây sẽ bị animation
+            // đè, lặng lẽ không có tác dụng. Phản hồi khi bấm dùng màu nền
+            // (hover:bg-accent, không đụng transform) thay vì scale.
             className="preload-fade border-border hover:bg-accent flex flex-col items-center gap-2 rounded-md border-r py-4 pr-2.5 pl-3 transition-colors duration-200 max-md:min-h-11 max-md:w-full max-md:flex-row max-md:justify-center max-md:gap-3 max-md:border max-md:py-2.5 max-md:pr-3 max-md:pl-3"
           >
             <span className="relative">
@@ -218,7 +298,7 @@ export function ExamFilters({
               // viết, và bản trước đúng như vậy — `top-0` thắng `max-md:top-auto`
               // nên sheet dính đỉnh thay vì đáy. Tách hẳn hai nhánh thì không
               // còn gì để tranh.
-              className="border-border bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom,0px))] fixed inset-x-0 z-30 max-h-[70dvh] w-full overflow-y-auto rounded-t-lg border border-x-0 border-b-0 md:absolute md:inset-x-auto md:top-0 md:bottom-auto md:left-full md:z-20 md:max-h-none md:w-[84vw] md:max-w-xs md:overflow-visible md:rounded-none md:border"
+              className="border-border animate-in fade-in slide-in-from-top-2 bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom,0px))] fixed inset-x-0 z-30 max-h-[70dvh] w-full overflow-y-auto rounded-t-lg border border-x-0 border-b-0 duration-200 ease-out md:absolute md:inset-x-auto md:top-0 md:bottom-auto md:left-full md:z-20 md:max-h-none md:w-[84vw] md:max-w-xs md:overflow-visible md:rounded-none md:border"
               style={{ backgroundColor: PANEL_BG }}
             >
               {/* Header bảng: toggle (nhãn, S#26 bỏ tam giác trong dropdown)
@@ -241,6 +321,21 @@ export function ExamFilters({
                 >
                   {t("common.clear")}
                 </button>
+              </div>
+
+              {/* Lọc nhanh GỘP vào panel trên mobile (yêu cầu engineer
+                  2026-08-09): trước đây render thành hàng riêng đầy chiều
+                  rộng ngay dưới nút *Filter (tách khỏi phần còn lại của bộ
+                  lọc) — nhìn tách rời, đọc như vỡ bố cục. Chuyển vào đây để
+                  nó là MỘT phần của cùng bảng lọc thay vì mảnh trôi nổi bên
+                  ngoài. Xếp DỌC (không phải grid-cols-3, xem comment ở
+                  quickSortLabels) — mỗi mục một hàng đầy đủ, đối xứng và
+                  không thể nhảy dòng. `md:hidden`: từ tablet trở lên
+                  quick-sort vẫn hiện thường trực trong rail cạnh danh sách
+                  đề (đủ chỗ), không cần lặp lại trong panel. */}
+              <div className="border-border flex flex-col gap-1 border-b px-4 py-3 md:hidden">
+                {quickSortLabels("sheet")}
+                {directionToggleButton("sheet")}
               </div>
 
               <FilterRow
@@ -324,7 +419,11 @@ export function ExamFilters({
               chọn 2 cái còn lại (dùng chung param, loại trừ nhau). Mép phải
               mỗi ô canh đúng viền phải tay nắm: đặt absolute right-0 trong
               .relative (right-0 = mép phải handle = đường kẻ). w-max nới text
-              sang TRÁI, checkbox luôn ghim mép phải nên cả 3 ô thẳng hàng. */}
+              sang TRÁI, checkbox luôn ghim mép phải nên cả 3 ô thẳng hàng.
+              CHỈ hiển thị từ `md` trở lên (`hidden md:flex`) — dưới `md`
+              phiên bản "sheet" bên trong panel FILTERS đảm nhiệm thay
+              (2026-08-09, xem comment ở khối panel phía trên), nên khối này
+              không còn cần tự lo bố cục mobile nữa. */}
           {/* ⚠ `absolute right-0` đặt cụm này NGOÀI rail, trong phần lề trái
               của container — nó chỉ nằm trong màn hình khi container còn ≥46px
               lề, tức từ khoảng 1244px trở lên. Đo được: ở 360px, 768px và cả
@@ -332,60 +431,12 @@ export function ExamFilters({
               nhãn cụt còn "ất". Đây là lỗi CÓ SẴN, không phải do đợt mobile
               sinh ra, nhưng nó thuộc đúng dải mà đợt này chịu trách nhiệm.
               Vì vậy `absolute` chỉ còn hiệu lực từ `xl` (1280px) — nấc đầu tiên
-              thật sự có đủ lề. Dưới ngưỡng đó cụm nằm TRONG dòng chảy: mobile
-              xếp ngang dưới nút lọc, tablet/desktop hẹp xếp dọc trong rail
-              (rail rộng thêm ~46px, lưới thẻ dịch phải tương ứng). */}
-          {/* Mobile dùng GRID 3 cột cố định, KHÔNG phải flex-wrap.
-              flex-wrap xếp chỗ theo BỀ RỘNG CHỮ, nên bố cục đổi theo ngôn ngữ:
-              tiếng Anh ("Newest/Oldest/Hardest" + "Descending") vừa một dòng,
-              còn tiếng Việt ("Mới nhất/Cũ nhất/Khó nhất" + "Giảm dần") dài hơn
-              nên nút đảo chiều bị đẩy xuống dòng riêng và nằm lệch trái — trông
-              như vỡ layout chứ không như một hàng thứ hai có chủ ý.
-              Lưới 3 cột thì vị trí do CẤU TRÚC quyết định, không do độ dài chữ:
-              hàng 1 luôn là 3 ô sắp xếp, hàng 2 luôn là nút đảo chiều canh phải
-              — giống nhau ở mọi ngôn ngữ, kể cả ngôn ngữ thêm vào sau này. */}
-          <div className="mt-3 flex w-max flex-col gap-2 max-md:mt-2 max-md:grid max-md:w-full max-md:grid-cols-3 max-md:items-center max-md:gap-x-3 xl:absolute xl:top-full xl:right-0">
-            {QUICK.map((q) => {
-              const checked = sort === q.value;
-              return (
-                <label
-                  key={q.value}
-                  // min-h-11 trên mobile: cả nhãn là vùng chạm, không chỉ ô
-                  // checkbox 16×16 (§4.3 — nới vùng nhận sự kiện bằng
-                  // padding/kích thước thay vì phóng to chính icon).
-                  // `min-w-0` + nhãn `truncate`: ô lưới không được phép nở ra
-                  // theo chữ dài, nếu không thì lưới 3 cột lại bị chính bề rộng
-                  // chữ đẩy vỡ — đúng thứ vừa đi sửa.
-                  className="text-foreground flex min-w-0 cursor-pointer items-center justify-between gap-1.5 text-sm whitespace-nowrap max-md:min-h-11 max-md:justify-start max-md:text-xs"
-                >
-                  <span className="min-w-0 truncate">{t(q.labelKey)}</span>
-                  <input
-                    type="checkbox"
-                    className="accent-brand size-4 shrink-0"
-                    checked={checked}
-                    onChange={() => setSort(q.value)}
-                  />
-                </label>
-              );
-            })}
-
-            {/* Direction toggle — đảo chiều trục ?sort= đang chọn (nhỏ-lớn/
-                ngược lại), thay vì cần thêm checkbox riêng cho từng chiều
-                (vd "Easiest" cho trục Hardest). Vô hiệu khi chưa chọn trục
-                nào — direction không có ý nghĩa nếu không có gì để đảo. */}
-            <button
-              type="button"
-              onClick={toggleDirection}
-              disabled={!sort}
-              aria-label={t("exams.toggleSortDirection")}
-              // `col-span-3 justify-self-end` trên mobile: nút chiếm trọn hàng
-              // thứ hai của lưới và canh PHẢI — vị trí cố định, không phụ thuộc
-              // ba nhãn phía trên dài bao nhiêu.
-              className="text-muted-foreground hover:text-brand border-border mt-1 flex items-center justify-end gap-1.5 border-t pt-2 text-xs whitespace-nowrap transition-colors disabled:pointer-events-none disabled:opacity-40 max-md:col-span-3 max-md:mt-0 max-md:min-h-11 max-md:justify-self-end max-md:border-t-0 max-md:pt-0"
-            >
-              <span aria-hidden>{ascending ? "↑" : "↓"}</span>
-              {ascending ? t("exams.ascending") : t("exams.descending")}
-            </button>
+              thật sự có đủ lề. Dưới ngưỡng đó (md–xl) cụm nằm TRONG dòng chảy,
+              xếp dọc trong rail (rail rộng thêm ~46px, lưới thẻ dịch phải
+              tương ứng). */}
+          <div className="mt-3 hidden w-max flex-col gap-2 md:flex xl:absolute xl:top-full xl:right-0">
+            {quickSortLabels("rail")}
+            {directionToggleButton("rail")}
           </div>
         </div>
       </div>
@@ -414,15 +465,35 @@ function FilterRow({
   last?: boolean;
 }) {
   const [rowOpen, setRowOpen] = useState(false);
+  const rowRef = useRef<HTMLDivElement>(null);
+
+  // Cuộn cả row vào vùng nhìn thấy của bottom sheet khi mở — dưới `md` bảng
+  // chọn giờ in-flow (xem comment đầu file) nên nếu row nằm gần đáy panel,
+  // nội dung mới lộ ra có thể vẫn khuất dưới mép cuộn hiện tại; không cuộn hộ
+  // thì đúng cái cảm giác "mở ra mà không thấy gì" engineer vừa báo. Chỉ chạy
+  // dưới `md` — desktop là overlay `absolute` trên panel `overflow-visible`,
+  // cuộn hộ ở đó chỉ gây giật trang vô cớ.
+  useEffect(() => {
+    if (!rowOpen) return;
+    // jsdom (RTL/vitest) không cài `matchMedia` — guard `typeof` để test
+    // component chạy được, không phải vì lo trình duyệt thật thiếu API này.
+    const isDesktop =
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(min-width: 768px)").matches;
+    if (!isDesktop) {
+      rowRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }, [rowOpen]);
 
   return (
-    <div className={`relative ${last ? "" : "border-border border-b"}`}>
+    <div ref={rowRef} className={`relative ${last ? "" : "border-border border-b"}`}>
       {/* S#26: bỏ tam giác trong dropdown (RowTriangle) — row chỉ còn nhãn. */}
       <button
         type="button"
         aria-expanded={rowOpen}
         onClick={() => setRowOpen((v) => !v)}
-        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+        className="hover:bg-accent/50 flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors duration-150"
       >
         <span className="flex flex-col gap-0.5">
           <span className="eyebrow">{label}</span>
@@ -432,10 +503,12 @@ function FilterRow({
         </span>
       </button>
 
-      {/* Bảng chọn của filter — OVERLAY absolute (đè row dưới, không xê dịch). */}
+      {/* Bảng chọn của filter — desktop (`md:`) là OVERLAY absolute (đè row
+          dưới, không xê dịch); mobile IN-FLOW (đẩy row dưới xuống) — lý do đầy
+          đủ ở comment đầu file (2026-08-09, bug dropdown Year bị BottomNav đè). */}
       {rowOpen && (
         <div
-          className="border-border absolute inset-x-0 top-full z-30 border-x border-b"
+          className="border-border animate-in fade-in slide-in-from-top-1 z-30 border-x border-b duration-150 ease-out md:absolute md:inset-x-0 md:top-full"
           style={{ backgroundColor: OPTIONS_BG }}
         >
           <ul className="py-1">
