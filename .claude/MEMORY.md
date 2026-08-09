@@ -10,7 +10,7 @@
   - `smithnguyen247+se2rater1@gmail.com` … `+se2rater10@gmail.com` — 10 tài khoản dùng để test rating threshold (N=3 raters)
   - ⚠️ KHÔNG đụng `smithnguyen247@gmail.com` và `nguyenphatbentre904@gmail.com` — đây là tài khoản thật của user (không có `+alias`)
 
-## 1b. Định hướng chụp screenshot bằng Playwright (tránh downscale)
+## 1b. Định hướng chụp screenshot bằng Playwright - NO NEEDED (using CLI version instead)
 
 Claude Code có giới hạn cứng của API Anthropic: ảnh bị downscale nếu cạnh dài nhất vượt 8000px (1 ảnh) hoặc 2000px (nhiều ảnh cùng lúc trong context) — không có setting nào tắt được. Khi cần chụp lại **toàn bộ layout của một trang** để xem/chỉnh sửa UI, đây là định hướng nên theo (không phải luật cứng, tuỳ ngữ cảnh mà linh hoạt):
 
@@ -26,12 +26,12 @@ Ba pha, chạy theo thứ tự. Pha 2 tồn tại để pha 1 của phiên SAU t
 
 1. **Tool**: xác nhận thứ sắp dùng còn sống, đừng giả định. 
    - `composio` MCP: Dùng Composio MCP (`COMPOSIO_SEARCH_TOOLS` → `COMPOSIO_MULTI_EXECUTE_TOOL`, toolkit `notion`, `supabase`, `vercel`, `google drive` đã connected). Composio CLI không được hỗ trợ trên Window. Bỏ qua thay vì cố cài.
-2. **Việc dang dở**: đọc Notion database **MS-MOLAR** (`3b378ba6-ae12-803c-8500-c572b6fc745f`) — lọc row khác trạng thái "Hoàn tất". Kèm `docs/TECH-DEBT.md` và `docs/plans/`.
+2. **Việc dang dở**: đọc Notion database **MS-MOLAR** (`3b378ba6-ae12-803c-8500-c572b6fc745f`) — lọc row khác trạng thái "Hoàn tất". Kèm `docs/TECH-DEBT.md` + `docs/plans/` + git commited list.
 3. Chỉ tiếp tục việc cũ khi engineer yêu cầu; mặc định hỏi trước khi tự nối tiếp.
 
 ### Pha 2 — Notion (ghi nhận)
 
-Tạo/cập nhật row trong database MS-MOLAR. Thuộc tính: `Tên nhiệm vụ`, `Trạng thái` (Chưa bắt đầu/Đang thực hiện/Hoàn tất), `Mô tả`, `Loại nhiệm vụ`, `Mức độ ưu tiên`, `Mức độ công sức`. Thân page ghi **số đo và lý do**, không chỉ liệt kê việc — phiên sau đọc lại cần hiểu *tại sao*, không chỉ *cái gì*.
+Tạo/cập nhật row trong database MS-MOLAR. Thuộc tính: `Tên nhiệm vụ`, `Trạng thái` (Chưa bắt đầu/Đang thực hiện/Hoàn tất), `Mô tả`, `Loại nhiệm vụ`, `Mức độ ưu tiên`, `Mức độ công sức`, `Hạn chót` (hỏi nếu chưa biết). Thân page ghi **số đo và lý do**, không chỉ liệt kê việc — phiên sau đọc lại cần hiểu *tại sao*, không chỉ *cái gì*.
 
 `PROCESS.md` — lịch sử chỉ-đọc từ 2026-08-06 — đã **xoá hẳn 2026-08-07**: mọi
 nợ kỹ thuật còn mở trong đó (rà toàn bộ ~3700 dòng, không chỉ phần cuối) đã
@@ -41,7 +41,7 @@ Notion database MS-MOLAR (row đã đóng) hoặc git log, không còn ở PROCE
 
 ### Pha 3 — Implementation
 
-1. **Code**: nghiên cứu các thông tin liên quan đến mission hoặc task --> khởi động `dev-workflows-fullstack` với `/recipe-fullstack-implement` (hoặc skills `recipe-plan` / `recipe-implement` / `recipe-fullstack-build` / `recipe-front-*` / `recipe-review`; agent chuyên biệt như `quality-fixer`, `code-reviewer`. Chỉ inovke đối với mission - các task lớn) --> cập nhật bảng trong Notion cho mỗi task --> lặp lại các step này cho đến khi tới step "Cổng verify".
+1. **Code**: nghiên cứu các thông tin liên quan đến mission hoặc task --> khởi động `dev-workflows-fullstack` với `/recipe-fullstack-implement` (hoặc skills `recipe-plan` / `recipe-implement` / `recipe-fullstack-build` / `recipe-front-*` / `recipe-review`; agent chuyên biệt như `quality-fixer`, `code-reviewer`. Chỉ inovke đối với mission - các task lớn).
 2. **Cổng verify** — chạy đủ 4, trong `SOURCE/`, TRƯỚC khi commit:
    `npx tsc --noEmit` · `npx eslint --max-warnings 0` · `npx vitest run` · `npm run build`
    `next build` bắt lỗi ranh giới server/client mà `tsc` không thấy — đừng bỏ.
