@@ -48,8 +48,9 @@ export function buildCsp({ nonce, isProd, supabaseOrigin }: CspOptions): string 
     // Tailwind + KaTeX sinh style inline; next/font nhúng @font-face inline.
     // CỐ Ý không gắn nonce: style-src có nonce sẽ chặn thuộc tính `style=` do
     // React đặt runtime (transition của SuccessToast, ExamTimer…), mà XSS qua
-    // CSS lại không phải rủi ro dự án này có — không có
-    // `dangerouslySetInnerHTML` nào trong repo và RichText đã sanitize.
+    // CSS lại không phải rủi ro dự án này có — RichText đã sanitize, và
+    // `dangerouslySetInnerHTML` duy nhất trong repo (khối JSON-LD ở
+    // `app/page.tsx`) chỉ nhận hằng số đã escape, không nhận dữ liệu người dùng.
     "style-src 'self' 'unsafe-inline'",
     // data: cho ảnh nhúng của html2canvas; blob: cho PDF (jspdf) tạo ở client.
     `img-src 'self' data: blob:${supabaseOrigin ? ` ${supabaseOrigin}` : ""}`,

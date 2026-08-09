@@ -44,6 +44,16 @@ export const metadata: Metadata = {
   // Site chỉ có duy nhất `/` là public; phần còn lại nằm sau đăng nhập nên
   // không có gì để index. Chi tiết per-path nằm ở app/robots.ts.
   alternates: { canonical: "/" },
+  // Verify quyền sở hữu site trong Google Search Console bằng thẻ meta.
+  //
+  // Đây là bước CHẶN của mọi việc SEO còn lại (SEO-TODO.md § "Việc cần làm"):
+  // chưa verify thì không submit được sitemap, không "Request Indexing" được,
+  // và phải ngồi chờ Google tình cờ bò vào. Bản thân token là thứ NGƯỜI phải
+  // lấy từ tài khoản Search Console, nên chỗ này chỉ dựng sẵn đường dẫn: đặt
+  // `GOOGLE_SITE_VERIFICATION` trên Vercel là thẻ tự xuất hiện, không phải sửa
+  // code + deploy lại. Không đặt → không render thẻ nào (Next bỏ qua undefined),
+  // không phải một thẻ rỗng làm Google báo verify hỏng.
+  verification: { google: process.env.GOOGLE_SITE_VERIFICATION },
   openGraph: {
     type: "website",
     siteName: "MS-MOLAR",

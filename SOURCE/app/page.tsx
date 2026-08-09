@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { HomeSidebar } from "@/app/(layer1)/_components/HomeSidebar";
 import { HomeStage, type AuthMode } from "@/app/(layer1)/_components/HomeStage";
@@ -5,6 +6,8 @@ import { BottomNav } from "@/components/layout/BottomNav";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { SkipLink } from "@/components/shared/SkipLink";
 import { getCurrentUserProfile } from "@/lib/auth/getCurrentUser";
+import { getLocale } from "@/lib/i18n/server";
+import { buildHomeJsonLd, serializeJsonLd } from "@/lib/seo/jsonLd";
 
 // Homepage (Layer 1 — Entry). Bố cục theo template Hyperspace (HTML5 UP):
 // sidebar nav dọc bên trái + content area bên phải. Theme "Mực & Sơn mài"
@@ -17,18 +20,40 @@ import { getCurrentUserProfile } from "@/lib/auth/getCurrentUser";
 export default async function Home({ searchParams }: { searchParams: Promise<{ auth?: string }> }) {
   // Fetch user cho ô account đáy sidebar (avatar + tên). Đọc cookie auth mỗi
   // request → `/` là dynamic (ƒ), đánh đổi hợp lý cho cá nhân hoá.
-  const [{ auth }, user] = await Promise.all([searchParams, getCurrentUserProfile()]);
+  const [{ auth }, user, locale, requestHeaders] = await Promise.all([
+    searchParams,
+    getCurrentUserProfile(),
+    getLocale(),
+    headers(),
+  ]);
 
   const authMode: AuthMode = auth === "signup" ? "signup" : auth === "signin" ? "signin" : null;
 
   // Đã đăng nhập mà mở form auth → vào thẳng /exams (parity với /login cũ).
   if (user && authMode) redirect("/exams");
 
+  // Nonce CSP của lượt request này, do proxy.ts sinh và middleware đặt lên
+  // header REQUEST (`x-nonce`). Bắt buộc phải gắn tay: Next chỉ tự gắn nonce
+  // vào script của CHÍNH nó, không đụng tới thẻ <script> ta tự viết — mà
+  // `script-src` ở production KHÔNG còn 'unsafe-inline' (lib/security/csp.ts),
+  // nên khối JSON-LD thiếu nonce sẽ bị trình duyệt chặn thẳng. Chặn không làm
+  // hỏng trang (nó không phải JS chạy được), nó chỉ âm thầm vô hiệu hoá đúng
+  // thứ vừa thêm — kiểu hỏng không ai thấy cho tới khi soi Search Console.
+  const nonce = requestHeaders.get("x-nonce") ?? undefined;
+
   return (
     // h-dvh + overflow-hidden: trang KHÔNG cuộn (S#17 vòng sửa 1) — toàn bộ
     // homepage nằm gọn trong viewport. Content area tự cuộn NỘI BỘ
     // (overflow-y-auto) chỉ khi màn quá thấp, để không bị cắt nội dung.
     <div className="flex h-dvh flex-col overflow-hidden bg-[#1B1512] lg:flex-row">
+      {/* Structured data — xem lib/seo/jsonLd.ts cho lý do và phạm vi. Nội dung
+          là hằng số do chính repo sinh (không có dữ liệu người dùng), và đã đi
+          qua serializeJsonLd() để không thể cắt được thẻ script. */}
+      <script
+        type="application/ld+json"
+        nonce={nonce}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(buildHomeJsonLd(locale)) }}
+      />
       <SkipLink />
 
       {/* Dưới 1024px: dùng CÙNG hệ điều hướng với phần còn lại của site
