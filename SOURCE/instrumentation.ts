@@ -6,14 +6,25 @@
 // vẫn sót những trang không đi qua chỗ đó. Đặt ở đây thì một lần khởi động sai
 // cấu hình = một khối log đọc được ở đầu Vercel Runtime Logs, ngay trên dòng
 // request đầu tiên.
-import { checkEnv, formatEnvReport } from "@/lib/env/checkEnv";
-import { checkSchemaVersion, formatSchemaVersionReport } from "@/lib/schema/checkSchemaVersion";
+// TD-017 — KHÔNG import tĩnh gì ở đầu file này.
+//
+// Next nạp `instrumentation.ts` cho MỌI runtime, kể cả Edge (proxy.ts). Import
+// tĩnh kéo cả cây phụ thuộc vào bundle Edge lúc BUILD, không cần biết
+// `register()` có chạy tới nhánh đó hay không — và
+// `checkSchemaVersion` → `schemaFingerprint` dùng `node:crypto`, thứ không tồn
+// tại trên Edge. Trước đây Turbopack chỉ WARN nên vẫn deploy được; một bản
+// runtime siết chặt hơn sẽ biến cảnh báo đó thành lỗi trên mọi request đi qua
+// proxy.ts (gần như toàn site).
+//
+// `await import(...)` bên TRONG nhánh runtime check giữ cây phụ thuộc lại ở
+// phía nodejs: Edge chỉ nạp đúng hàm rỗng bail-out ở dòng đầu.
 
 export async function register() {
   // Chỉ chạy ở runtime nodejs. Edge runtime nạp module này riêng một lần nữa
   // và không thấy các biến chỉ-có-ở-server, nên chạy ở đó chỉ sinh báo động giả.
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
 
+  const { checkEnv, formatEnvReport } = await import("@/lib/env/checkEnv");
   const envReport = formatEnvReport(checkEnv(process.env));
   if (envReport) console.warn(envReport);
 
@@ -28,6 +39,9 @@ export async function register() {
   // ở đây vì một cảnh báo vận hành không được phép làm chết tiến trình server
   // (cùng quyết định với TD-009).
   try {
+    const { checkSchemaVersion, formatSchemaVersionReport } = await import(
+      "@/lib/schema/checkSchemaVersion"
+    );
     const schemaReport = formatSchemaVersionReport(await checkSchemaVersion(process.env));
     if (schemaReport) console.warn(schemaReport);
   } catch (err) {
