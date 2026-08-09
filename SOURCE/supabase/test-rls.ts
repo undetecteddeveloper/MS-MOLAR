@@ -23,6 +23,11 @@
 //   (e) (mocked) chỉ chứng minh predicate còn được gắn vào query. Từ 2026-08-03
 //   case này chạy trên chính embedded join mà listMyHistory() phát sau khi gộp
 //   round-trip, kèm một positive control đi trước.
+// Phần 7 (Engine 1 Adaptive AI, backend Design Doc §Test Boundaries + ADR-0011,
+//   cases MM-a/MM-b/TL-a/TL-b) — required, blocking. Cách ly bảng
+//   user_skill_mastery, ranh giới EXECUTE của record_skill_mastery() (§18) và
+//   khoá đọc/ghi telemetry_log (§19). MM-b là hồi quy trực tiếp của "học sinh
+//   tự ghi mastery bịa", tức bản sao ADR-0010 cho điểm số áp sang mastery.
 //
 // 2 user test được tạo qua Admin API (service_role, email_confirm=true) để KHÔNG
 // gửi email xác nhận. Việc TEST RLS sau đó chỉ dùng ANON key + đăng nhập thật.
@@ -92,6 +97,14 @@ const UPDATED_RATING_SCORES = { score_part1: 9, score_part2: 3, score_part3: 8 }
 // cleanup idempotent như 2 fixture trên. A vừa là tác giả vừa là người làm bài
 // (published, có 1 submitted attempt + exam_results tương ứng).
 const HISTORY_EXAM_ID = "rls-history-h-a";
+
+// Fixture Engine 1 Adaptive AI (backend Design Doc §Test Boundaries, schema.sql
+// §18/§19, cases MM-a/MM-b/TL-a/TL-b) — id prefix riêng, setup/cleanup idempotent
+// như 3 fixture trên. Chủ sở hữu dữ liệu = User A; User B đóng vai "người khác"
+// đi đọc trộm. Phải TỰ tạo skill node fixture chứ không mượn taxonomy thật:
+// taxonomy do seedSkillTaxonomy.ts seed (Task 5, chưa chạy) nên không được phép
+// giả định nó đã tồn tại, và mượn node thật thì cleanup sẽ xoá nhầm nội dung.
+const MASTERY_SKILL_ID = "rls-skill-mastery";
 
 let failures = 0;
 function assert(cond: boolean, msg: string) {
@@ -333,6 +346,49 @@ async function setupHistoryFixtures(admin: SupabaseClient, authorId: string) {
     topic_breakdown: [],
   });
   if (result.error) throw result.error;
+}
+
+/** Xóa sạch fixture Engine 1 (chạy trước VÀ sau để idempotent).
+ *
+ *  THỨ TỰ QUAN TRỌNG: telemetry_log.skill_node_id là `on delete set null` (§19 —
+ *  nhật ký vận hành không được biến mất theo node), nên nếu xoá skill node
+ *  TRƯỚC thì dòng telemetry còn lại với skill_node_id = null, tức chính bộ lọc
+ *  dưới đây không còn tìm thấy nó ở lần chạy sau → rác tích luỹ vĩnh viễn.
+ *  user_skill_mastery thì `on delete cascade` nên xoá theo cách nào cũng sạch,
+ *  vẫn xoá tường minh để không phụ thuộc vào cascade khi đọc code. */
+async function cleanupEngine1Fixtures(admin: SupabaseClient) {
+  await admin.from("telemetry_log").delete().eq("skill_node_id", MASTERY_SKILL_ID);
+  await admin.from("user_skill_mastery").delete().eq("skill_node_id", MASTERY_SKILL_ID);
+  await admin.from("skill_nodes").delete().eq("id", MASTERY_SKILL_ID);
+}
+
+/** Tạo fixture Engine 1 qua service_role (bypass RLS): 1 skill node + 1 dòng
+ *  mastery của User A + 1 dòng telemetry của chính User A.
+ *
+ *  Dòng telemetry cố tình gắn user_id = A (chứ không để null): TL-a phải chứng
+ *  minh được "kể cả dòng CỦA CHÍNH MÌNH cũng không đọc được" — nếu fixture để
+ *  user_id null thì case xanh vì lý do sai (không có dòng nào thuộc về A). */
+async function setupEngine1Fixtures(admin: SupabaseClient, ownerId: string) {
+  const node = await admin
+    .from("skill_nodes")
+    .insert({ id: MASTERY_SKILL_ID, label_vi: "[RLS] Kỹ năng fixture" });
+  if (node.error) throw node.error;
+
+  const mastery = await admin.from("user_skill_mastery").insert({
+    user_id: ownerId,
+    skill_node_id: MASTERY_SKILL_ID,
+    correct_count: 3,
+    total_count: 5,
+  });
+  if (mastery.error) throw mastery.error;
+
+  const telemetry = await admin.from("telemetry_log").insert({
+    user_id: ownerId,
+    event_type: "adaptive_route",
+    skill_node_id: MASTERY_SKILL_ID,
+    success: true,
+  });
+  if (telemetry.error) throw telemetry.error;
 }
 
 async function main() {
@@ -1312,6 +1368,134 @@ async function main() {
 
   // Dọn dẹp fixture History.
   await cleanupHistoryFixtures(admin);
+
+  // ==========================================================================
+  // Phần 7 — Engine 1 Adaptive AI (Mastery + Telemetry), cases MM-a/MM-b/TL-a/
+  // TL-b — REQUIRED, BLOCKING. Backend Design Doc §Test Boundaries + schema.sql
+  // §18/§19 + ADR-0011.
+  //
+  // Vì sao phải chạy trên Postgres thật: cả 4 case đều là ranh giới QUYỀN, chỉ
+  // tồn tại trong DB — RLS policy `mastery_select_own`, EXECUTE grant của
+  // record_skill_mastery(), và các lệnh `revoke` tường minh trên telemetry_log.
+  // Không mock nào chứng minh được, và §18 chính là cơ chế ADR-0011 mirror lại
+  // ADR-0010 cho điểm số: một dòng mastery bịa được ghi/đọc chéo sẽ mở lại đúng
+  // lỗ hổng ADR-0010 đã đóng.
+  //
+  // MM-b bổ sung cho recordSkillMastery.int.test.ts Test 2 (backend-task-10) —
+  // file đó tự trích tên MM-a/MM-b trong header; hai chỗ chứng minh cùng ranh
+  // giới ở hai tầng khác nhau theo đúng thiết kế dual-coverage của Work Plan,
+  // KHÔNG phải trùng lặp thừa.
+  // ==========================================================================
+  console.log("\nEngine 1 MM/TL — setup fixture (service_role)…");
+  await cleanupEngine1Fixtures(admin);
+  await setupEngine1Fixtures(admin, userAId);
+
+  console.log("\nRLS checks (Engine 1 Phần 7):");
+
+  // MM-a (positive control). Chủ dòng PHẢI đọc được dòng của chính mình. Thiếu
+  // bước này, assertion "B thấy 0 row" bên dưới có thể xanh vì fixture hỏng /
+  // tên cột sai / RLS giấu sạch của mọi người, chứ không phải vì cách ly hoạt
+  // động (đúng bài học của H-a Phần 6).
+  const mmOwn = await userA
+    .from("user_skill_mastery")
+    .select("skill_node_id, correct_count, total_count")
+    .eq("skill_node_id", MASTERY_SKILL_ID);
+  assert(
+    !mmOwn.error &&
+      (mmOwn.data?.length ?? 0) === 1 &&
+      mmOwn.data?.[0]?.correct_count === 3 &&
+      mmOwn.data?.[0]?.total_count === 5,
+    "MM-a (positive control): chủ dòng đọc được đúng dòng mastery của mình (3/5)",
+  );
+
+  // MM-a. User B đọc user_skill_mastery lọc đúng skill node của A -> phải
+  //       KHÔNG thấy dòng nào. Chế độ hỏng chính: policy `mastery_select_own`
+  //       thiếu (hoặc sai toán tử) `user_id = auth.uid()`, khiến mọi user đọc
+  //       được counter của mọi người.
+  const mmOther = await userB
+    .from("user_skill_mastery")
+    .select("user_id, skill_node_id")
+    .eq("skill_node_id", MASTERY_SKILL_ID);
+  assert(
+    mmOther.error !== null || (mmOther.data?.length ?? 0) === 0,
+    "MM-a: user khác KHÔNG đọc được dòng user_skill_mastery của người ta",
+  );
+
+  // MM-b. JWT học sinh KHÔNG gọi thẳng record_skill_mastery() được (§18:
+  //       `revoke all on function ... from public, anon, authenticated`).
+  //
+  //       ⚠ KHÔNG được assert trần `error !== null` — đó là false green: nếu
+  //       quyền EXECUTE bị hở, lời gọi VẪN lỗi, nhưng là lỗi check_violation do
+  //       thân hàm ném ("attempt … không tồn tại hoặc chưa submitted") vì
+  //       attempt id bịa ở dưới. Phải phân biệt đúng lớp lỗi QUYỀN: 42501
+  //       (permission denied) hoặc PGRST202 (PostgREST không thấy hàm trong
+  //       schema cache vì role không có EXECUTE) — cả hai đều chứng minh không
+  //       gọi được; lỗi từ thân hàm thì ngược lại, chứng minh ĐÃ gọi được.
+  const mmRpc = await userA.rpc("record_skill_mastery", {
+    p_attempt_id: "00000000-0000-0000-0000-000000000000",
+    p_per_question: [],
+  });
+  assert(
+    mmRpc.error !== null &&
+      (mmRpc.error.code === "42501" ||
+        mmRpc.error.code === "PGRST202" ||
+        /permission denied|could not find the function/i.test(mmRpc.error.message)),
+    "MM-b: JWT học sinh gọi thẳng record_skill_mastery() bị chặn ở tầng quyền (không phải lỗi từ thân hàm)",
+  );
+
+  // TL-a (positive control). Dòng telemetry fixture của A có thật trong DB
+  //      (đọc bằng service_role) — để "user đọc ra 0 dòng" bên dưới có nghĩa.
+  const tlSeeded = await admin
+    .from("telemetry_log")
+    .select("id, user_id")
+    .eq("skill_node_id", MASTERY_SKILL_ID);
+  assert(
+    !tlSeeded.error &&
+      (tlSeeded.data?.length ?? 0) === 1 &&
+      tlSeeded.data?.[0]?.user_id === userAId,
+    "TL-a (positive control): dòng telemetry_log của User A tồn tại thật (service_role đọc được)",
+  );
+
+  // TL-a. Chính User A — CHỦ của dòng telemetry đó — vẫn KHÔNG đọc được.
+  //       telemetry_log là dữ liệu vận hành, không phải dữ liệu người dùng tự
+  //       xem (tiền lệ exam_moderation_log / M-d): RLS bật + KHÔNG policy select
+  //       nào + `revoke select ... from anon, authenticated`. Chế độ hỏng chính:
+  //       ai đó thêm một policy select "own-row" cho tiện debug.
+  const tlOwn = await userA
+    .from("telemetry_log")
+    .select("id")
+    .eq("skill_node_id", MASTERY_SKILL_ID);
+  assert(
+    tlOwn.error !== null || (tlOwn.data?.length ?? 0) === 0,
+    "TL-a: user đã đăng nhập KHÔNG đọc được telemetry_log, kể cả dòng của chính mình",
+  );
+
+  // TL-b. anon KHÔNG insert được vào telemetry_log (§19 `revoke insert ... from
+  //       anon`; policy insert chỉ dành cho authenticated với check user_id =
+  //       auth.uid()). Gắn skill_node_id fixture vào payload để nếu lệnh này
+  //       LỌT thì cleanup vẫn dọn được dòng rác đó.
+  const tlAnonInsert = await anonClient.from("telemetry_log").insert({
+    user_id: userAId,
+    event_type: "tutor_invoke",
+    skill_node_id: MASTERY_SKILL_ID,
+    success: false,
+    error_code: "server",
+  });
+  // Xác nhận bằng trạng thái DB thật chứ không chỉ bằng error trả về: một
+  // lệnh insert bị RLS chặn có thể trả "thành công rỗng" tuỳ cấu hình, nên
+  // đếm lại bằng service_role mới là bằng chứng chắc chắn không có dòng nào rơi vào.
+  const tlAfterAnon = await admin
+    .from("telemetry_log")
+    .select("id")
+    .eq("skill_node_id", MASTERY_SKILL_ID)
+    .eq("event_type", "tutor_invoke");
+  assert(
+    tlAnonInsert.error !== null && !tlAfterAnon.error && (tlAfterAnon.data?.length ?? 0) === 0,
+    "TL-b: anon KHÔNG insert được vào telemetry_log (lỗi trả về + DB thật không có dòng nào)",
+  );
+
+  // Dọn dẹp fixture Engine 1.
+  await cleanupEngine1Fixtures(admin);
 
   // Dọn dẹp fixture Rating.
   await cleanupRatingFixtures(admin);
