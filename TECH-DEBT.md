@@ -18,6 +18,27 @@ còn nơi nào khác giữ lịch sử nợ ngoài chính file này.)*
 
 ## Đang mở
 
+### TD-017 — `instrumentation.ts` import tĩnh `node:crypto` vào Edge bundle
+**Từ:** 2026-08-09 (phát hiện qua warning trong log build/deploy Vercel, không
+chặn build)
+**Loại:** vận hành, fragile-nhưng-chưa-hại
+
+**Hại ngay bây giờ:** Không. `register()` bail-out sớm khi không phải runtime
+`nodejs` (dòng đầu hàm) nên nhánh gọi `createHash()` không bao giờ chạy trên
+Edge; site vẫn trả 200 bình thường qua `proxy.ts` (đã verify sau deploy).
+
+**Bỏ qua thì hại hơn không:** Có, về sau. Đây là do `instrumentation.ts` dùng
+`import` TĨNH (không phải dynamic import trong nhánh runtime check) cho
+`checkSchemaVersion.ts` → `schemaFingerprint.ts` (`node:crypto`) — đúng
+anti-pattern mà docs Next.js cảnh báo. Nó "chạy được" bây giờ vì Turbopack
+mới chỉ WARN chứ chưa hard-fail; một bản Turbopack/Edge runtime siết chặt hơn
+có thể biến cảnh báo này thành lỗi thật trên **mọi** request đi qua
+`proxy.ts` (gần như toàn site, theo `matcher` của nó).
+
+**Cách trả:** đổi 2 import đó trong `instrumentation.ts` thành `await
+import(...)` bên TRONG nhánh `if (process.env.NEXT_RUNTIME === "nodejs")`
+thay vì import tĩnh ở đầu file.
+
 ### TD-016 — 10 câu hỏi mang `questions.subject = 'Toán'` thay vì canonical `'Math'`
 **Từ:** 2026-08-08 (phát hiện khi đếm dữ liệu thật cho Engine 1 — `requirement-analyzer`
 cần biết corpus môn Toán lớn cỡ nào, không phải đi tìm bug)
