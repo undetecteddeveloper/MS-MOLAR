@@ -80,8 +80,19 @@ export default async function ExamsPage({ searchParams }: { searchParams: Search
             tối đa 3 cột (phải, flex-1). mx-auto của <main> giữ block căn giữa. */}
         {/* `max-md:flex-col`: dưới 768px bộ lọc là một hàng NGANG phía trên lưới
             thẻ, không phải một rail dọc bên cạnh — ở 360px không còn bề ngang
-            nào để chia cho hai cột. */}
-        <div className="relative flex items-start max-md:flex-col">
+            nào để chia cho hai cột.
+            `max-md:items-stretch` (2026-08-09, lỗi thật phát hiện qua ảnh chụp
+            prod của engineer): `items-start` chỉ đúng Ý khi trục chính là NGANG
+            (desktop `flex-row` — không kéo cột *Filter/lưới đề cao bằng nhau).
+            `max-md:flex-col` đổi trục chính sang DỌC, và cùng lúc đó
+            `align-items` chuyển sang điều khiển chiều NGANG — `flex-start` khiến
+            khối bọc <ExamBrowser> (dưới) co theo bề rộng NỘI DUNG thay vì giãn
+            hết màn hình, hở khoảng trắng bên phải với đề tiêu đề/tên trường
+            ngắn (che khuất với đề dài vì nội dung tự nhiên đã đủ rộng). Khối
+            *Filter đã tự vá đúng lỗi này cho chính nó (`max-md:w-full
+            max-md:self-stretch`, ExamFilters.tsx) — vá ở đây thay vì lặp lại
+            per-child để không sót đứa con nào trong tương lai. */}
+        <div className="relative flex items-start max-md:flex-col max-md:items-stretch">
           <ExamFilters
             subjects={facets.subjects}
             grades={facets.grades}
