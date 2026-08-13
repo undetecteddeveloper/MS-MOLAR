@@ -28,6 +28,14 @@
 //   user_skill_mastery, ranh giới EXECUTE của record_skill_mastery() (§18) và
 //   khoá đọc/ghi telemetry_log (§19). MM-b là hồi quy trực tiếp của "học sinh
 //   tự ghi mastery bịa", tức bản sao ADR-0010 cho điểm số áp sang mastery.
+// Phần 8 (User Support System v1, backend Design Doc §Test Boundaries + ADR-0012,
+//   Work Plan Task 03, cases ST-a…ST-e) — required, blocking Early Verification
+//   Point, backend. Cách ly bảng support_tickets (`support_tickets_select_own`),
+//   khoá đọc/ghi tuyệt đối support_ticket_notes (`revoke all`, ZERO policy —
+//   idiom giống exam_moderation_log) và policy insert-own trên bucket
+//   support-screenshots (KHÔNG có select policy nào cho authenticated). ST-a..
+//   ST-d ported từ supabase/__tests__/support.rls.service.e2e.test.ts; ST-e là
+//   plan-added (đóng document review finding I001, AC-013).
 //
 // 2 user test được tạo qua Admin API (service_role, email_confirm=true) để KHÔNG
 // gửi email xác nhận. Việc TEST RLS sau đó chỉ dùng ANON key + đăng nhập thật.
@@ -105,6 +113,18 @@ const HISTORY_EXAM_ID = "rls-history-h-a";
 // taxonomy do seedSkillTaxonomy.ts seed (Task 5, chưa chạy) nên không được phép
 // giả định nó đã tồn tại, và mượn node thật thì cleanup sẽ xoá nhầm nội dung.
 const MASTERY_SKILL_ID = "rls-skill-mastery";
+
+// Fixture User Support System v1 (backend Design Doc §Test Boundaries, schema.sql
+// User Support System section, cases ST-a…ST-e) — setup/cleanup idempotent như 4
+// fixture trên. `support_tickets.id` là uuid (không có text PK cố định để đặt
+// prefix như các fixture khác) nên cleanup dọn theo user_id sở hữu (2 tài khoản
+// RLS test A/B dành riêng cho việc này, không có vé thật nào khác); note bị xoá
+// theo cascade khi vé bị xoá (schema.sql: `ticket_id ... on delete cascade`).
+const SUPPORT_TICKET_A_MESSAGE = "[rls-support] Vé của A — test cách ly (ST-a/ST-b/ST-c/ST-d)";
+const SUPPORT_TICKET_B_MESSAGE = "[rls-support] Vé của B — test cách ly (ST-a)";
+const SUPPORT_NOTE_TEXT = "[rls-support] Ghi chú nội bộ trên vé của A (ST-b/ST-c)";
+const SUPPORT_SCREENSHOTS_BUCKET = "support-screenshots";
+const SUPPORT_SCREENSHOT_FILENAME = "rls-support-screenshot.png";
 
 let failures = 0;
 function assert(cond: boolean, msg: string) {
@@ -389,6 +409,61 @@ async function setupEngine1Fixtures(admin: SupabaseClient, ownerId: string) {
     success: true,
   });
   if (telemetry.error) throw telemetry.error;
+}
+
+/** Xóa sạch fixture Support System (chạy trước VÀ sau để idempotent). Xóa vé
+ *  theo user_id sở hữu -> support_ticket_notes bị xóa theo cascade. */
+async function cleanupSupportFixtures(
+  admin: SupabaseClient,
+  authorAId: string,
+  authorBId: string,
+) {
+  await admin.from("support_tickets").delete().in("user_id", [authorAId, authorBId]);
+  await admin.storage
+    .from(SUPPORT_SCREENSHOTS_BUCKET)
+    .remove([`${authorAId}/${SUPPORT_SCREENSHOT_FILENAME}`]);
+}
+
+/** Tạo fixture Support System qua service_role (bypass RLS): 1 vé của A + 1 vé
+ *  của B + 1 ghi chú nội bộ trên vé của A + 1 object ảnh chụp màn hình dưới
+ *  đúng folder path của A trong bucket support-screenshots (schema.sql:
+ *  `(storage.foldername(name))[1] = auth.uid()::text`). */
+async function setupSupportFixtures(
+  admin: SupabaseClient,
+  authorAId: string,
+  authorBId: string,
+): Promise<{ ticketAId: string; ticketBId: string; screenshotPath: string }> {
+  const ticketA = await admin
+    .from("support_tickets")
+    .insert({ user_id: authorAId, intent: "bug", message: SUPPORT_TICKET_A_MESSAGE })
+    .select("id")
+    .single();
+  if (ticketA.error) throw ticketA.error;
+
+  const ticketB = await admin
+    .from("support_tickets")
+    .insert({ user_id: authorBId, intent: "bug", message: SUPPORT_TICKET_B_MESSAGE })
+    .select("id")
+    .single();
+  if (ticketB.error) throw ticketB.error;
+
+  const ticketAId = ticketA.data.id as string;
+  const ticketBId = ticketB.data.id as string;
+
+  const note = await admin
+    .from("support_ticket_notes")
+    .insert({ ticket_id: ticketAId, note_text: SUPPORT_NOTE_TEXT });
+  if (note.error) throw note.error;
+
+  // Nội dung file không quan trọng — chỉ test quyền đọc object (giống UGC fixture).
+  const pngBytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const screenshotPath = `${authorAId}/${SUPPORT_SCREENSHOT_FILENAME}`;
+  const upload = await admin.storage
+    .from(SUPPORT_SCREENSHOTS_BUCKET)
+    .upload(screenshotPath, pngBytes, { contentType: "image/png", upsert: true });
+  if (upload.error) throw upload.error;
+
+  return { ticketAId, ticketBId, screenshotPath };
 }
 
 async function main() {
@@ -1496,6 +1571,147 @@ async function main() {
 
   // Dọn dẹp fixture Engine 1.
   await cleanupEngine1Fixtures(admin);
+
+  // ==========================================================================
+  // Phần 8 — User Support System v1 (support_tickets + support_ticket_notes +
+  // support-screenshots), cases ST-a…ST-e — REQUIRED, BLOCKING (backend Design
+  // Doc §Test Boundaries — RLS suite ST-a…ST-d; ST-e plan-added, closes document
+  // review finding I001, AC-013). Work Plan Task 03 — this IS the Early
+  // Verification Point, backend: no code in lib/support/ may be built on top of
+  // this authorization layer before all five cases below are green.
+  //
+  // Vì sao phải chạy trên Postgres thật: cả 5 case đều là ranh giới QUYỀN, chỉ
+  // tồn tại trong DB — RLS policy `support_tickets_select_own`, `revoke all`
+  // tường minh trên support_ticket_notes (KHÔNG một policy nào), và Storage
+  // policy insert-own trên bucket `support-screenshots` (KHÔNG có select policy
+  // nào cho `authenticated`). Không mock nào chứng minh được (backend DD Mock
+  // Boundary Decisions, "Supabase DB + RLS (cả 2 bảng + storage policy) — No").
+  // ==========================================================================
+  console.log("\nSupport System — setup fixture (service_role)…");
+  await cleanupSupportFixtures(admin, userAId, userBId);
+  const supportFixture = await setupSupportFixtures(admin, userAId, userBId);
+
+  console.log("\nRLS checks (Support System ST-a…ST-e):");
+
+  // ST-a (AC-015, metric 2). A đọc được đúng vé của mình, KHÔNG đọc được vé của
+  // B; đối xứng ngược lại từ phía B. Chế độ hỏng chính: thiếu hoặc sai toán tử
+  // `user_id = auth.uid()` trên `support_tickets_select_own`.
+  const staAOwn = await userA
+    .from("support_tickets")
+    .select("id")
+    .eq("id", supportFixture.ticketAId);
+  const staACross = await userA
+    .from("support_tickets")
+    .select("id")
+    .eq("id", supportFixture.ticketBId);
+  assert(
+    !staAOwn.error &&
+      staAOwn.data?.length === 1 &&
+      !staACross.error &&
+      (staACross.data?.length ?? 0) === 0,
+    "ST-a: User A đọc được đúng vé của mình, KHÔNG đọc được vé của B",
+  );
+
+  const staBOwn = await userB
+    .from("support_tickets")
+    .select("id")
+    .eq("id", supportFixture.ticketBId);
+  const staBCross = await userB
+    .from("support_tickets")
+    .select("id")
+    .eq("id", supportFixture.ticketAId);
+  assert(
+    !staBOwn.error &&
+      staBOwn.data?.length === 1 &&
+      !staBCross.error &&
+      (staBCross.data?.length ?? 0) === 0,
+    "ST-a: đối xứng — User B đọc được đúng vé của mình, KHÔNG đọc được vé của A",
+  );
+
+  // ST-b (positive control, mirrors TL-a/S-a). Ghi chú nội bộ trên vé của A có
+  // thật trong DB (đọc bằng service_role) — để "0 dòng" ở ST-c có nghĩa là bị
+  // RLS chặn, không phải vì fixture rỗng.
+  const stb = await admin
+    .from("support_ticket_notes")
+    .select("id")
+    .eq("ticket_id", supportFixture.ticketAId);
+  assert(
+    !stb.error && (stb.data?.length ?? 0) >= 1,
+    "ST-b (positive control): ghi chú nội bộ trên vé của A tồn tại thật (service_role đọc được)",
+  );
+
+  // ST-c (AC-025, metric 3). Chính A — CHỦ của vé đó — vẫn KHÔNG đọc được ghi
+  // chú nội bộ. `support_ticket_notes` có `revoke all ... from anon,
+  // authenticated` + ZERO policy (idiom strict giống exam_moderation_log) —
+  // phải phân biệt đúng lớp lỗi QUYỀN (42501/permission denied) khi có lỗi,
+  // giống cách MM-b phân biệt lớp lỗi, chứ không chấp nhận lỗi bất kỳ làm bằng
+  // chứng; kết quả "0 dòng không lỗi" cũng thỏa AC-025 ("0 rows ... or access
+  // is denied").
+  const stc = await userA
+    .from("support_ticket_notes")
+    .select("id")
+    .eq("ticket_id", supportFixture.ticketAId);
+  assert(
+    (stc.error !== null &&
+      (stc.error.code === "42501" || /permission denied/i.test(stc.error.message))) ||
+      (stc.error === null && (stc.data?.length ?? 0) === 0),
+    `ST-c: Chính tác giả vé cũng KHÔNG đọc được ghi chú nội bộ (mong đợi 0 dòng hoặc lỗi 42501, nhận: ${stc.error?.code ?? `${stc.data?.length ?? 0} dòng`})`,
+  );
+
+  // ST-d (AC-048, metric 3). A INSERT thẳng vào support_ticket_notes cho vé của
+  // chính mình -> phải bị chặn ở tầng GRANT (42501, vì `revoke all` xóa quyền
+  // bảng trước khi RLS được xét, không chỉ dựa vào "không có policy insert") ->
+  // service_role đếm lại số dòng trước/sau xác nhận không có dòng nào lọt qua
+  // (per TL-b convention — RLS/grant-blocked write có thể trả "thành công
+  // rỗng" tùy cấu hình mà một check lỗi trần sẽ bỏ sót).
+  const stdBefore = await admin
+    .from("support_ticket_notes")
+    .select("id")
+    .eq("ticket_id", supportFixture.ticketAId);
+  const stdInsert = await userA.from("support_ticket_notes").insert({
+    ticket_id: supportFixture.ticketAId,
+    note_text: "[rls-support] học sinh cố tự ghi chú (ST-d, phải bị chặn)",
+  });
+  const stdAfter = await admin
+    .from("support_ticket_notes")
+    .select("id")
+    .eq("ticket_id", supportFixture.ticketAId);
+  assert(
+    stdInsert.error !== null &&
+      (stdInsert.error.code === "42501" ||
+        /permission denied/i.test(stdInsert.error.message)) &&
+      !stdBefore.error &&
+      !stdAfter.error &&
+      stdBefore.data?.length === stdAfter.data?.length,
+    `ST-d: A KHÔNG tự INSERT được vào support_ticket_notes (mong đợi 42501, nhận: ${stdInsert.error?.code ?? "KHÔNG CÓ LỖI"}; số dòng trước/sau: ${stdBefore.data?.length}/${stdAfter.data?.length})`,
+  );
+
+  console.log("\nStorage checks (Support System ST-e):");
+
+  // ST-e (AC-013, plan-added — đóng document review finding I001). Ảnh chụp
+  // màn hình của A được service_role xác nhận tồn tại thật (positive control,
+  // mirrors ST-b) -> User B (không phải tác giả, không phải admin) tải xuống
+  // cùng path -> phải bị chặn, phân biệt bằng lớp lỗi thật (error != null &&
+  // data == null) giống hệt idiom R-m/R-n cho bucket exam-images/exam-uploads
+  // (:715-737), KHÔNG chỉ `error !== null` trần.
+  const steSeed = await admin.storage
+    .from(SUPPORT_SCREENSHOTS_BUCKET)
+    .download(supportFixture.screenshotPath);
+  assert(
+    steSeed.error == null && steSeed.data != null,
+    "ST-e (positive control): service_role xác nhận ảnh chụp màn hình của A tồn tại thật trong bucket support-screenshots",
+  );
+
+  const steB = await userB.storage
+    .from(SUPPORT_SCREENSHOTS_BUCKET)
+    .download(supportFixture.screenshotPath);
+  assert(
+    steB.error != null && steB.data == null,
+    "ST-e: User B (không phải tác giả, không phải admin) KHÔNG tải được ảnh chụp màn hình của A (AC-013 — bucket không có select policy nào cho authenticated)",
+  );
+
+  // Dọn dẹp fixture Support System.
+  await cleanupSupportFixtures(admin, userAId, userBId);
 
   // Dọn dẹp fixture Rating.
   await cleanupRatingFixtures(admin);

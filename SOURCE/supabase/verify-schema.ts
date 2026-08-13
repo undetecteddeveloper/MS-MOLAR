@@ -335,6 +335,22 @@ async function main() {
         : `authenticated VẪN gọi được record_exam_result (chạy tới thân hàm, mã ${rer.error?.code ?? "không có lỗi"}) — thiếu \`revoke ... from anon, authenticated\` ở §11b`
   );
 
+  // change_support_ticket_status — cùng lớp EXECUTE-chỉ-service_role như
+  // record_exam_result ở trên (User Support System v1, Design Doc § Schema
+  // & DB Enforcement §4). id giả nên không đụng ticket của ai.
+  const csts = await probe.rpc("change_support_ticket_status", {
+    p_ticket_id: "00000000-0000-0000-0000-000000000000",
+    p_status: "in_progress",
+  });
+  assert(
+    csts.error?.code === "42501",
+    csts.error?.code === "42501"
+      ? "change_support_ticket_status KHÔNG gọi được bằng JWT học sinh (42501) — EXECUTE chỉ service_role"
+      : csts.error?.code === "PGRST202"
+        ? "change_support_ticket_status chưa tồn tại — apply schema.sql (Schema & DB Enforcement §4)"
+        : `authenticated VẪN gọi được change_support_ticket_status (chạy tới thân hàm, mã ${csts.error?.code ?? "không có lỗi"}) — thiếu \`revoke ... from anon, authenticated\``
+  );
+
   // §10 — hai hàm đáp án chỉ dành cho user đã đăng nhập. anon gọi được thì hiện
   // KHÔNG lộ gì (auth.uid() null → 0 dòng), nhưng đó là may chứ không phải thiết
   // kế: bề mặt tấn công thừa, và mọi thay đổi tương lai trong 2 hàm đó sẽ mặc
@@ -513,6 +529,7 @@ async function main() {
       "public.exam_reports(exam_id)",
       "public.exam_difficulty_ratings(exam_id)",
       "public.exam_moderation_log(exam_id)",
+      "public.support_ticket_notes(ticket_id)",
     ];
     const broken = deleteChain.filter((k) => live.get(k)?.on_delete !== "cascade");
     assert(

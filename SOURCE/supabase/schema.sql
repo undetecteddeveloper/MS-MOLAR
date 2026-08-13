@@ -1389,6 +1389,149 @@ drop policy if exists "telemetry_insert_own" on public.telemetry_log;
 create policy "telemetry_insert_own" on public.telemetry_log
   for insert to authenticated with check (user_id = auth.uid());
 
+-- ============================================================================
+-- User Support System v1 (PRD support-system-prd.md v1.2, ADR-0012, Design
+-- Doc support-system-backend-design.md) — support_tickets + support_ticket_notes
+-- + support-screenshots storage policies. Idempotent.
+-- ============================================================================
+create table if not exists public.support_tickets (
+  id                          uuid primary key default gen_random_uuid(),
+  user_id                     uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  intent                      text not null,
+  message                     text not null,
+  page_url                    text,          -- null cho phép (AC-010: khoảng trống metadata không chặn submit)
+  user_agent                  text,
+  screen_width                integer,
+  screen_height               integer,
+  screenshot_path             text,          -- 1 cột scalar = tối đa 1 ảnh cấu trúc (AC-011, metric 7)
+  status                      text not null default 'new',
+  notify_failed               boolean not null default false,           -- AC-032
+  first_status_transition_at  timestamptz,                              -- AC-016/AC-047, null khi còn 'new'
+  created_at                  timestamptz not null default now()
+);
+
+alter table public.support_tickets drop constraint if exists support_tickets_intent_check;
+alter table public.support_tickets add constraint support_tickets_intent_check
+  check (intent in ('bug', 'suggestion', 'question'));
+
+alter table public.support_tickets drop constraint if exists support_tickets_status_check;
+alter table public.support_tickets add constraint support_tickets_status_check
+  check (status in ('new', 'in_progress', 'resolved'));                 -- AC-029 (DB layer)
+
+alter table public.support_tickets drop constraint if exists support_tickets_message_not_empty_check;
+alter table public.support_tickets add constraint support_tickets_message_not_empty_check
+  check (length(btrim(message)) > 0);
+
+alter table public.support_tickets drop constraint if exists support_tickets_message_length_check;
+alter table public.support_tickets add constraint support_tickets_message_length_check
+  check (length(message) <= 1000);   -- LIMITS.MAX_SUPPORT_MESSAGE (SOURCE/lib/ugc/limits.ts) — TBD-07 resolved: 1000
+
+create index if not exists support_tickets_created_at_idx on public.support_tickets (created_at desc);
+
+alter table public.support_tickets enable row level security;
+
+drop policy if exists "support_tickets_insert_own" on public.support_tickets;
+create policy "support_tickets_insert_own" on public.support_tickets
+  for insert to authenticated with check (user_id = auth.uid());
+
+drop policy if exists "support_tickets_select_own" on public.support_tickets;
+create policy "support_tickets_select_own" on public.support_tickets
+  for select to authenticated using (user_id = auth.uid());            -- AC-015; không có UI đọc trong v1 (D3) nhưng RLS vẫn bật
+
+-- KHÔNG có policy update/delete cho `authenticated`: đổi status, ghi cờ
+-- notify_failed đều đi qua service role trong Server Action admin/hệ thống,
+-- không mở surface cho student tự sửa nội dung/status ticket của mình.
+
+-- ----------------------------------------------------------------------------
+-- change_support_ticket_status(p_ticket_id, p_status) — đường DUY NHẤT ghi
+-- first_status_transition_at, atomic CASE trong cùng câu UPDATE (AC-047).
+--
+-- CỐ Ý KHÔNG phải SECURITY DEFINER, cùng lý do với record_exam_result() (§11b):
+-- service_role đã bypass RLS và còn nguyên quyền UPDATE trên support_tickets,
+-- nên hàm chạy đúng dưới quyền người gọi (INVOKER, mặc định của Postgres khi
+-- không khai `security definer`). Giữ INVOKER để phòng thủ theo lớp: lỡ ai đó
+-- `grant execute ... to authenticated` thì học sinh/admin vẫn không đổi được
+-- status qua đường này, vì `support_tickets` không có policy update nào cho
+-- `authenticated` (xem trên) — phải hỏng cả hai chỗ mới khai thác được.
+--
+-- p_status validate lại NGAY TRONG hàm — lớp cưỡng chế thứ ba, độc lập với
+-- validate ở changeTicketStatusAction (defensive) và CHECK constraint ở trên
+-- (authoritative backstop, AC-029).
+-- ----------------------------------------------------------------------------
+drop function if exists public.change_support_ticket_status(uuid, text);
+create function public.change_support_ticket_status(
+  p_ticket_id uuid,
+  p_status    text
+)
+returns table (status text, first_status_transition_at timestamptz)
+language plpgsql
+volatile
+set search_path = public, pg_temp
+as $$
+begin
+  if p_status not in ('new', 'in_progress', 'resolved') then
+    raise exception 'change_support_ticket_status: status % không hợp lệ', p_status
+      using errcode = 'check_violation';
+  end if;
+
+  return query
+    update public.support_tickets t
+       set status = p_status,
+           first_status_transition_at = case
+             when t.status = 'new' and p_status <> 'new' then now()
+             else t.first_status_transition_at
+           end
+     where t.id = p_ticket_id
+    returning t.status, t.first_status_transition_at;
+end;
+$$;
+
+-- Revoke ĐÍCH DANH anon + authenticated (không chỉ PUBLIC), giống record_exam_result
+-- §11b — thiếu dòng này thì bất kỳ authenticated nào (không riêng admin, vì DB
+-- không có role admin — ADR-0001) gọi thẳng RPC này cũng đổi được status của
+-- ticket bất kỳ, bỏ qua hoàn toàn isAdminUserId() re-check ở tầng Server Action.
+revoke all on function public.change_support_ticket_status(uuid, text)
+  from public, anon, authenticated;
+grant execute on function public.change_support_ticket_status(uuid, text)
+  to service_role;
+
+-- Internal notes: KHÔNG BAO GIỜ là cột trên support_tickets (D4). Idiom
+-- "strict" giống exam_moderation_log/schema_version — KHÁC telemetry_log's
+-- narrow form (telemetry_log có insert path từ app, notes thì KHÔNG).
+create table if not exists public.support_ticket_notes (
+  id          uuid primary key default gen_random_uuid(),
+  ticket_id   uuid not null references public.support_tickets(id) on delete cascade,
+  admin_id    uuid references auth.users(id) on delete set null,       -- audit row sống sót nếu admin bị xoá (giống exam_moderation_log.actor_id)
+  note_text   text not null,
+  created_at  timestamptz not null default now()
+);
+
+alter table public.support_ticket_notes drop constraint if exists support_ticket_notes_text_not_empty_check;
+alter table public.support_ticket_notes add constraint support_ticket_notes_text_not_empty_check
+  check (length(btrim(note_text)) > 0);
+
+create index if not exists support_ticket_notes_ticket_idx on public.support_ticket_notes (ticket_id, created_at);
+
+alter table public.support_ticket_notes enable row level security;
+revoke all on public.support_ticket_notes from anon, authenticated;
+-- ZERO policy nào — service role (bypass RLS) là đường ghi/đọc duy nhất
+-- (AC-025, AC-026, AC-048). `authenticated` không có INSERT path — không
+-- policy nào cấp, và `revoke all` xoá cả grant tầng bảng.
+
+-- Bucket "support-screenshots" tạo ngoài SQL (setup-storage.ts BUCKETS array),
+-- private (public:false), kèm fileSizeLimit/allowedMimeTypes ở tầng Storage
+-- (backstop — enforcement chính vẫn ở Server Action, xem TBD-02 rationale).
+drop policy if exists "support_screenshots_insert_own" on storage.objects;
+create policy "support_screenshots_insert_own" on storage.objects
+  for insert to authenticated with check (
+    bucket_id = 'support-screenshots'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+-- KHÔNG select/update/delete policy cho `authenticated`: student không đọc
+-- lại ảnh mình gửi (D3 — không có "my tickets"); admin đọc qua signed URL do
+-- service role tạo (bypass RLS hoàn toàn — AC-013: không authenticated nào
+-- khác, kể cả không phải tác giả, có quyền đọc trực tiếp qua policy này).
+
 -- ----------------------------------------------------------------------------
 -- 17. Phiên bản schema — DB tự khai nó đang chạy bản nào (2026-08-07).
 --
@@ -1428,7 +1571,7 @@ revoke all on public.schema_version from anon, authenticated;
 -- nó — xem lib/schema/schemaFingerprint.ts).
 -- @schema-fingerprint-begin
 insert into public.schema_version (id, fingerprint)
-values (1, '2ce144118c30')
+values (1, 'f525e3095339')
 on conflict (id) do update
   set fingerprint = excluded.fingerprint,
       applied_at  = now();

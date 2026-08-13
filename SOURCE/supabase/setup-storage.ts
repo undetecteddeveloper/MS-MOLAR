@@ -22,7 +22,18 @@ function loadEnv(): Record<string, string> {
   return env;
 }
 
-const BUCKETS = ["exam-images", "exam-uploads"] as const;
+const BUCKETS = ["exam-images", "exam-uploads", "support-screenshots"] as const;
+
+// support-screenshots: private, giới hạn kích thước/MIME ở tầng Storage (backstop) —
+// xem node_modules/@supabase/storage-js/dist/index.d.mts:1809-1812 cho field names.
+const BUCKET_OPTIONS: Partial<
+  Record<(typeof BUCKETS)[number], { fileSizeLimit: string; allowedMimeTypes: string[] }>
+> = {
+  "support-screenshots": {
+    fileSizeLimit: "8MB", // LIMITS.MAX_SCREENSHOT_BYTES mirror
+    allowedMimeTypes: ["image/png", "image/jpeg", "image/webp"], // LIMITS.ALLOWED_SCREENSHOT_MIME mirror
+  },
+};
 
 async function main() {
   const env = loadEnv();
@@ -46,6 +57,7 @@ async function main() {
     }
     const { error } = await admin.storage.createBucket(bucket, {
       public: false,
+      ...BUCKET_OPTIONS[bucket],
     });
     if (error) throw error;
     console.log(`✓ Đã tạo bucket "${bucket}" (private).`);
