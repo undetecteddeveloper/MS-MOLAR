@@ -1,160 +1,308 @@
 // User Support System v1 — admin/tickets actions + service-role reads [integration]
-//   Test Skeleton
 // Design Doc: docs/design/support-system-backend-design.md (v1.2, Data Contracts
 //   §changeTicketStatusAction, §addTicketNoteAction, §listSupportTickets,
-//   §changeSupportTicketStatus, Schema & DB Enforcement §4 `change_support_ticket_status`,
-//   Verification Strategy item (5)/(6))
-// PRD: docs/prd/support-system-prd.md (v1.2, AC-021, AC-022 data-supply half, AC-024,
-//   AC-027, AC-029 defensive half, AC-030, AC-047, metric 11, metric 12)
-// Generated: 2026-08-13 | Budget Used (whole feature): integration 3/3, fixture-e2e
-//   3/3, service-integration-e2e 1/2 — this file is integration slot 3/3. See
-//   SOURCE/lib/support/__tests__/actions.int.test.ts (slot 1/3) and
-//   SOURCE/lib/mail/__tests__/sendSupportNotification.int.test.ts (slot 2/3). The
-//   UI-rendering half of AC-022 (notify_failed flag visible in the list without
-//   opening a ticket) is covered by
-//   SOURCE/tests/e2e/fixture/support-admin-triage.fixture.e2e.test.ts, not here — this
-//   file proves only that the flag is present in the data `listSupportTickets`
-//   returns, not how it renders.
+//   §changeSupportTicketStatus)
+// PRD: docs/prd/support-system-prd.md (v1.2, AC-021, AC-022 data half, AC-024,
+//   AC-027, AC-029 defensive half, AC-030, AC-047)
 //
-// Skeleton only — comments describing what the implementer must write. No imports, no
-// executable assertions yet. Mocked Supabase service-role client per backend DD Test
-// Boundaries ("Supabase client inside submitSupportTicket — Yes (mock)"; the same
-// mock-the-client-boundary principle extends to the admin service-role functions and
-// actions — the real RPC/RLS behavior of `change_support_ticket_status` and the
-// `authenticated`-cannot-call-it grant are proven by
-// SOURCE/supabase/__tests__/support.rls.service.e2e.test.ts, not by this file).
+// Group 1 mocks the underlying @supabase/supabase-js client (the boundary
+// serviceRoleClient() itself constructs) — this is the one place in the repo
+// that needs to observe service-role.ts's OWN call shape, not just mock the
+// whole module away. Groups 2-3 mock @/lib/supabase/service-role wholesale,
+// mirroring submitExam.int.test.ts's precedent for testing a caller of it.
 
-// =============================================================================
-// Group 1 — changeSupportTicketStatus: first-status-transition timestamp written
-//   exactly once, never overwritten (AC-047)
-// =============================================================================
-// AC: "Given a ticket whose status changes from `new` to any other value, when that
-//   transition is applied, then the ticket's first-status-transition timestamp is
-//   written with the time of that transition; and given any subsequent status change
-//   on the same ticket, when it is applied, then that timestamp is not overwritten..."
-//   (AC-047)
-// ROI: 56 (BV:8 x Freq:6 + Legal:0 + Defect:8)
-// Behavior: `changeSupportTicketStatus(ticketId, nextStatus)` is called twice in
-//   sequence against a mocked service-role client whose `.rpc("change_support_ticket_status", ...)`
-//   is stubbed to mirror the real function's CASE-expression semantics (first call:
-//   `status:'new'` row -> returns a fresh timestamp; second call on the same
-//   already-non-'new' row -> returns the same timestamp unchanged) -> assert the
-//   caller reads back exactly one non-null timestamp across both calls, and that both
-//   calls go through `.rpc()`, never `.from().update()` (the backend DD's own D002
-//   correction: no raw SQL/`.update()` path can express the conditional CASE write).
-// @category: core-functionality
-// @lane: integration
-// @dependency: SOURCE/lib/supabase/service-role.ts (changeSupportTicketStatus) +
-//   mocked Supabase service-role client
-// @complexity: medium
-// @real-dependency: none — this test proves the JS call shape (exactly one `.rpc()`
-//   call per invocation, correct function name and argument names) and the
-//   caller-side sequencing assumption; the function body's actual atomicity (no
-//   read-then-write race inside Postgres) is proven by the function being a single
-//   SQL statement (backend DD Schema & DB Enforcement §4), not by this mock, and the
-//   `authenticated`-cannot-call-it grant is proven by the RLS/EXECUTE-grant probe in
-//   the service-integration-e2e sibling skeleton.
-// Primary failure mode: the caller issues a `.from("support_tickets").update(...)` call
-//   instead of `.rpc("change_support_ticket_status", ...)` (reopening the D002 defect —
-//   no way to express the conditional CASE write through the query builder); OR the
-//   caller reads a stale/locally-cached timestamp instead of the function's own
-//   returned row, letting a second transition appear to "advance" a timestamp that
-//   should be frozen.
-// Proof obligation:
-//   (a) both the first and second call invoke exactly
-//       `.rpc("change_support_ticket_status", { p_ticket_id: ticketId, p_status: nextStatus })`
-//       — never `.from("support_tickets").update(...)` for this operation;
-//   (b) the first call's returned `firstStatusTransitionAt` is non-null and distinct
-//       from `null`; the second call's returned `firstStatusTransitionAt` equals the
-//       first call's value exactly (not merely non-null) — proving the caller
-//       forwards the function's own returned timestamp rather than re-deriving one.
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// =============================================================================
-// Group 2 — changeTicketStatusAction / addTicketNoteAction: independent admin
-//   re-authorization (AC-021/AC-024), no email on status change (AC-030)
-// =============================================================================
-// AC: "Given the calling user's id is not in ADMIN_USER_IDS, when any admin Server
-//   Action or the admin page is invoked, then it is rejected ... independently of any
-//   page-level guard." (AC-021, AC-024)
-// AC: "Given any status change by an admin, when it is applied, then no email is sent
-//   to the student." (AC-030)
-// AC: "Given an admin writes a note, when it persists, then it records the note text,
-//   the authoring admin's user id, the ticket it belongs to, and a timestamp."
-//   (AC-027)
-// ROI: 62 (BV:8 x Freq:5 + Legal:true(+10) + Defect:8) — Legal:true because this is
-//   the "Server Action is an independently callable endpoint" convention that the
-//   backend DD's own biggest_risks entry calls out (any authenticated student could
-//   invoke the action id directly if the re-check is skipped).
-// Behavior: `changeTicketStatusAction(ticketId, nextStatus)` and
-//   `addTicketNoteAction(ticketId, noteText)` are each called against a mocked
-//   Supabase client whose `auth.getUser()` resolves to a non-admin user id (one whose
-//   id is asserted NOT to be in a mocked `ADMIN_USER_IDS`), independent of any
-//   page-level guard state -> both actions resolve to a refusal and neither reaches
-//   its underlying service-role write; a second call with an admin id proceeds
-//   normally and (for the status action) triggers no mail-sending call of any kind.
-// @category: core-functionality
-// @lane: integration
-// @dependency: SOURCE/app/(admin)/admin/tickets/actions.ts (changeTicketStatusAction,
-//   addTicketNoteAction) + mocked Supabase client + mocked isAdminUserId +
-//   SOURCE/lib/supabase/service-role.ts (changeSupportTicketStatus, addSupportTicketNote,
-//   mocked)
-// @complexity: medium
-// Primary failure mode: either action trusts a caller-supplied flag or the page-level
-//   guard instead of independently re-deriving the user and re-checking
-//   `isAdminUserId()` inside the action body itself — mirrors the documented
-//   `moderateExamAction` convention this design explicitly follows (backend DD
-//   biggest_risks); OR a status-change call triggers any mail-related function call
-//   (AC-030 violated — no email is sent on any admin status change, ever, in v1).
-// Proof obligation:
-//   (a) a mocked non-admin session calling `changeTicketStatusAction` resolves to a
-//       refusal (a non-null `error`) and the mocked `changeSupportTicketStatus` is
-//       never invoked;
-//   (b) the same non-admin session calling `addTicketNoteAction` resolves to a
-//       refusal and the mocked `addSupportTicketNote` is never invoked;
-//   (c) a mocked admin session calling `addTicketNoteAction` with valid `noteText`
-//       invokes `addSupportTicketNote(ticketId, adminId, noteText)` with `adminId`
-//       taken from the session's own `auth.uid()` — never from a client-supplied
-//       argument — proving a note cannot be attributed to a different admin than the
-//       one who is actually authenticated (AC-027);
-//   (d) a mocked admin session successfully changing a ticket's status never invokes
-//       `sendSupportNotification` or any other mail-sending function in the same call
-//       (AC-030 — no student status-change email exists anywhere in v1).
+vi.mock("server-only", () => ({}));
 
-// =============================================================================
-// Group 3 — listSupportTickets: batched read includes notify_failed (AC-022, data
-//   half only — UI visibility is the fixture-e2e sibling skeleton's concern)
-// =============================================================================
-// AC: "...they see the ticket queue with, per ticket, the intent, the message, the
-//   technical metadata, the screenshot indicator, the current status, the creation
-//   time, and the notification-failure flag where set — the flag is visible in the
-//   list, without opening the ticket..." (AC-022, data-supply half — this backend
-//   Design Doc's own AC Responsibility table marks AC-022 "data supply" as
-//   backend-owned, distinct from the frontend-owned rendering half)
-// ROI: 46 (BV:6 x Freq:6 + Legal:0 + Defect:10)
-// Behavior: `listSupportTickets()` is called against a mocked service-role client
-//   returning two batched result sets (one `support_tickets` select, one
-//   `support_ticket_notes` select filtered by the first result's ids) -> assert
-//   exactly two round trips are made (no per-row query, no embedded join — mirrors
-//   `listReportedExams`), and that every returned ticket object carries a
-//   `notify_failed` boolean field sourced directly from the row, present even when
-//   `false`, not omitted.
-// @category: core-functionality
-// @lane: integration
-// @dependency: SOURCE/lib/supabase/service-role.ts (listSupportTickets) + mocked
-//   Supabase service-role client
-// @complexity: medium
-// Primary failure mode: `notify_failed` is dropped from the select's column list or
-//   from the returned object shape, making a silent mail outage invisible in the admin
-//   list exactly as PRD Risk "Notification silently off" warns against; OR the
-//   implementation issues a per-ticket round trip for notes instead of one batched
-//   `where ticket_id in [...]` select (N+1, violating the PRD's own Performance NFR).
-// Proof obligation:
-//   (a) exactly one call selects from `support_tickets` and exactly one call selects
-//       from `support_ticket_notes` — no third call, no per-ticket note fetch, for a
-//       mocked result set of 3+ tickets;
-//   (b) every object in the returned array has a `notify_failed` key with a boolean
-//       value, including for a mocked ticket row where `notify_failed` is `false`
-//       (proving the field is not conditionally omitted);
-//   (c) each ticket's `notes` array contains exactly the notes whose `ticket_id`
-//       matches that ticket's id from the mocked second result set, grouped in JS, not
-//       via a database-side join.
+afterEach(() => {
+  // Group 2/2b use vi.doMock per-test (their session/mock shape varies test
+  // to test); undo those registrations so Group 1/3's plain, unmocked
+  // imports of the real service-role.ts module aren't shadowed by a stale
+  // partial mock from an earlier test in this file.
+  vi.doUnmock("@/lib/supabase/server");
+  vi.doUnmock("@/lib/auth/admin");
+  vi.doUnmock("@/lib/supabase/service-role");
+  vi.doUnmock("@/lib/mail/sendSupportNotification");
+  vi.doUnmock("@/lib/i18n/server");
+  vi.doUnmock("next/cache");
+});
+
+const rpcMock = vi.fn();
+const fromMock = vi.fn();
+vi.mock("@supabase/supabase-js", () => ({
+  createClient: vi.fn(() => ({ rpc: rpcMock, from: fromMock, storage: { from: vi.fn() } })),
+}));
+
+beforeEach(() => {
+  process.env.NEXT_PUBLIC_SUPABASE_URL = "https://fixture.supabase.co";
+  process.env.SUPABASE_SERVICE_ROLE_KEY = "fixture-service-role-key";
+  rpcMock.mockReset();
+  fromMock.mockReset();
+});
+
+describe("Group 1 — changeSupportTicketStatus: first-status-transition timestamp write-once (AC-047)", () => {
+  it("both calls go through .rpc('change_support_ticket_status', ...), never .from().update(); second call's timestamp equals the first's", async () => {
+    const { changeSupportTicketStatus } = await import("@/lib/supabase/service-role");
+
+    // First call: row was 'new' -> function stamps a fresh timestamp.
+    rpcMock.mockResolvedValueOnce({
+      data: [{ status: "in_progress", first_status_transition_at: "2026-08-13T10:00:00.000Z" }],
+      error: null,
+    });
+    const first = await changeSupportTicketStatus("ticket-1", "in_progress");
+
+    // Second call: row already non-'new' -> function returns the SAME timestamp, unchanged.
+    rpcMock.mockResolvedValueOnce({
+      data: [{ status: "resolved", first_status_transition_at: "2026-08-13T10:00:00.000Z" }],
+      error: null,
+    });
+    const second = await changeSupportTicketStatus("ticket-1", "resolved");
+
+    expect(rpcMock).toHaveBeenCalledTimes(2);
+    expect(rpcMock).toHaveBeenNthCalledWith(1, "change_support_ticket_status", {
+      p_ticket_id: "ticket-1",
+      p_status: "in_progress",
+    });
+    expect(rpcMock).toHaveBeenNthCalledWith(2, "change_support_ticket_status", {
+      p_ticket_id: "ticket-1",
+      p_status: "resolved",
+    });
+    expect(fromMock).not.toHaveBeenCalled();
+
+    expect("firstStatusTransitionAt" in first && first.firstStatusTransitionAt).not.toBeNull();
+    expect("firstStatusTransitionAt" in first && first.firstStatusTransitionAt).toBe(
+      "2026-08-13T10:00:00.000Z"
+    );
+    expect("firstStatusTransitionAt" in second && second.firstStatusTransitionAt).toBe(
+      "firstStatusTransitionAt" in first ? first.firstStatusTransitionAt : undefined
+    );
+  });
+});
+
+describe("Group 2 — independent admin re-authorization (AC-021/AC-024), no email on status change (AC-030)", () => {
+  async function importAction() {
+    vi.resetModules();
+    // getTranslate() reads next/headers' cookies(), which throws outside a
+    // real request scope (no Next.js server runtime in vitest) — mocked
+    // uniformly here since every Group 2/2b test needs it regardless of its
+    // own session/service-role mock shape.
+    vi.doMock("@/lib/i18n/server", () => ({
+      getTranslate: vi.fn(async () => (key: string) => key),
+    }));
+    // revalidatePath() requires a real Next.js static-generation store on
+    // the success path — not present under vitest.
+    vi.doMock("next/cache", () => ({ revalidatePath: vi.fn() }));
+    return import("@/app/(admin)/admin/tickets/actions");
+  }
+
+  it("(a) non-admin session calling changeTicketStatusAction resolves to a refusal; changeSupportTicketStatus never invoked", async () => {
+    vi.doMock("@/lib/supabase/server", () => ({
+      createClient: vi.fn(async () => ({
+        auth: { getUser: vi.fn(async () => ({ data: { user: { id: "student-1" } } })) },
+      })),
+    }));
+    vi.doMock("@/lib/auth/admin", () => ({ isAdminUserId: vi.fn(() => false) }));
+    const changeSupportTicketStatusMock = vi.fn();
+    vi.doMock("@/lib/supabase/service-role", () => ({
+      changeSupportTicketStatus: changeSupportTicketStatusMock,
+      addSupportTicketNote: vi.fn(),
+    }));
+
+    const { changeTicketStatusAction } = await importAction();
+    const result = await changeTicketStatusAction("ticket-1", "resolved");
+
+    expect(result?.error).toBeTruthy();
+    expect(changeSupportTicketStatusMock).not.toHaveBeenCalled();
+  });
+
+  it("(b) non-admin session calling addTicketNoteAction resolves to a refusal; addSupportTicketNote never invoked", async () => {
+    vi.doMock("@/lib/supabase/server", () => ({
+      createClient: vi.fn(async () => ({
+        auth: { getUser: vi.fn(async () => ({ data: { user: { id: "student-1" } } })) },
+      })),
+    }));
+    vi.doMock("@/lib/auth/admin", () => ({ isAdminUserId: vi.fn(() => false) }));
+    const addSupportTicketNoteMock = vi.fn();
+    vi.doMock("@/lib/supabase/service-role", () => ({
+      changeSupportTicketStatus: vi.fn(),
+      addSupportTicketNote: addSupportTicketNoteMock,
+    }));
+
+    const { addTicketNoteAction } = await importAction();
+    const result = await addTicketNoteAction("ticket-1", "a note");
+
+    expect(result?.error).toBeTruthy();
+    expect(addSupportTicketNoteMock).not.toHaveBeenCalled();
+  });
+
+  it("(c) admin session calling addTicketNoteAction invokes addSupportTicketNote(ticketId, adminId, noteText) with adminId from auth.uid(), never client-supplied", async () => {
+    vi.doMock("@/lib/supabase/server", () => ({
+      createClient: vi.fn(async () => ({
+        auth: { getUser: vi.fn(async () => ({ data: { user: { id: "admin-1" } } })) },
+      })),
+    }));
+    vi.doMock("@/lib/auth/admin", () => ({ isAdminUserId: vi.fn((id: string) => id === "admin-1") }));
+    const addSupportTicketNoteMock = vi.fn(async () => ({ error: null }));
+    vi.doMock("@/lib/supabase/service-role", () => ({
+      changeSupportTicketStatus: vi.fn(),
+      addSupportTicketNote: addSupportTicketNoteMock,
+    }));
+
+    const { addTicketNoteAction } = await importAction();
+    await addTicketNoteAction("ticket-1", "a real note");
+
+    expect(addSupportTicketNoteMock).toHaveBeenCalledWith("ticket-1", "admin-1", "a real note");
+  });
+
+  it("(d) admin session successfully changing status never calls sendSupportNotification or any mail-sending function (AC-030)", async () => {
+    vi.doMock("@/lib/supabase/server", () => ({
+      createClient: vi.fn(async () => ({
+        auth: { getUser: vi.fn(async () => ({ data: { user: { id: "admin-1" } } })) },
+      })),
+    }));
+    vi.doMock("@/lib/auth/admin", () => ({ isAdminUserId: vi.fn((id: string) => id === "admin-1") }));
+    const changeSupportTicketStatusMock = vi.fn(async () => ({
+      status: "resolved",
+      firstStatusTransitionAt: "2026-08-13T10:00:00.000Z",
+    }));
+    vi.doMock("@/lib/supabase/service-role", () => ({
+      changeSupportTicketStatus: changeSupportTicketStatusMock,
+      addSupportTicketNote: vi.fn(),
+    }));
+    const sendSupportNotificationMock = vi.fn();
+    vi.doMock("@/lib/mail/sendSupportNotification", () => ({
+      sendSupportNotification: sendSupportNotificationMock,
+    }));
+
+    const { changeTicketStatusAction } = await importAction();
+    await changeTicketStatusAction("ticket-1", "resolved");
+
+    expect(changeSupportTicketStatusMock).toHaveBeenCalledTimes(1);
+    expect(sendSupportNotificationMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("Group 2b — changeTicketStatusAction rejects an out-of-range status before calling the service layer (AC-029 defensive half)", () => {
+  it("a nextStatus outside {new,in_progress,resolved} never reaches changeSupportTicketStatus", async () => {
+    vi.resetModules();
+    vi.doMock("@/lib/supabase/server", () => ({
+      createClient: vi.fn(async () => ({
+        auth: { getUser: vi.fn(async () => ({ data: { user: { id: "admin-1" } } })) },
+      })),
+    }));
+    vi.doMock("@/lib/auth/admin", () => ({ isAdminUserId: vi.fn((id: string) => id === "admin-1") }));
+    const changeSupportTicketStatusMock = vi.fn();
+    vi.doMock("@/lib/supabase/service-role", () => ({
+      changeSupportTicketStatus: changeSupportTicketStatusMock,
+      addSupportTicketNote: vi.fn(),
+    }));
+    vi.doMock("@/lib/i18n/server", () => ({
+      getTranslate: vi.fn(async () => (key: string) => key),
+    }));
+
+    const { changeTicketStatusAction } = await import("@/app/(admin)/admin/tickets/actions");
+    // @ts-expect-error deliberately out-of-range at the call boundary, mirroring a bypassed client
+    const result = await changeTicketStatusAction("ticket-1", "archived");
+
+    expect(result?.error).toBeTruthy();
+    expect(changeSupportTicketStatusMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("Group 3 — listSupportTickets: batched read includes notify_failed (AC-022, data half)", () => {
+  it("(a)-(b) exactly one support_tickets select + one support_ticket_notes select; notify_failed present as boolean even when false; (c) notes grouped by ticket_id in JS", async () => {
+    const { listSupportTickets } = await import("@/lib/supabase/service-role");
+
+    const ticketRows = [
+      {
+        id: "t1",
+        intent: "bug",
+        message: "m1",
+        page_url: null,
+        user_agent: null,
+        screen_width: null,
+        screen_height: null,
+        screenshot_path: null,
+        status: "new",
+        notify_failed: false,
+        created_at: "2026-08-13T10:00:00.000Z",
+        first_status_transition_at: null,
+      },
+      {
+        id: "t2",
+        intent: "question",
+        message: "m2",
+        page_url: null,
+        user_agent: null,
+        screen_width: null,
+        screen_height: null,
+        screenshot_path: null,
+        status: "in_progress",
+        notify_failed: true,
+        created_at: "2026-08-13T09:00:00.000Z",
+        first_status_transition_at: "2026-08-13T09:30:00.000Z",
+      },
+      {
+        id: "t3",
+        intent: "suggestion",
+        message: "m3",
+        page_url: null,
+        user_agent: null,
+        screen_width: null,
+        screen_height: null,
+        screenshot_path: null,
+        status: "resolved",
+        notify_failed: false,
+        created_at: "2026-08-13T08:00:00.000Z",
+        first_status_transition_at: "2026-08-13T08:30:00.000Z",
+      },
+    ];
+    const noteRows = [
+      { id: "n1", ticket_id: "t2", note_text: "note for t2", admin_id: "admin-1", created_at: "2026-08-13T09:35:00.000Z" },
+    ];
+
+    let callIndex = 0;
+    fromMock.mockImplementation((table: string) => {
+      callIndex += 1;
+      if (table === "support_tickets") {
+        return {
+          select: () => ({
+            order: async () => ({ data: ticketRows, error: null }),
+          }),
+        };
+      }
+      if (table === "support_ticket_notes") {
+        return {
+          select: () => ({
+            in: () => ({
+              order: async () => ({ data: noteRows, error: null }),
+            }),
+          }),
+        };
+      }
+      throw new Error(`unexpected table in test: ${table}`);
+    });
+
+    const result = await listSupportTickets();
+
+    const ticketsCalls = fromMock.mock.calls.filter(([t]) => t === "support_tickets").length;
+    const notesCalls = fromMock.mock.calls.filter(([t]) => t === "support_ticket_notes").length;
+    expect(ticketsCalls).toBe(1);
+    expect(notesCalls).toBe(1);
+    void callIndex;
+
+    expect(result).toHaveLength(3);
+    for (const ticket of result) {
+      expect(typeof ticket.notifyFailed).toBe("boolean");
+    }
+    expect(result.find((t) => t.id === "t1")?.notifyFailed).toBe(false);
+    expect(result.find((t) => t.id === "t2")?.notifyFailed).toBe(true);
+
+    expect(result.find((t) => t.id === "t2")?.notes).toEqual([
+      { id: "n1", noteText: "note for t2", adminId: "admin-1", createdAt: "2026-08-13T09:35:00.000Z" },
+    ]);
+    expect(result.find((t) => t.id === "t1")?.notes).toEqual([]);
+    expect(result.find((t) => t.id === "t3")?.notes).toEqual([]);
+  });
+});
