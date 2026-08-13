@@ -82,6 +82,33 @@ export function checkEnv(env: Readonly<Record<string, string | undefined>>): Env
     });
   }
 
+  // User Support System v1 (ADR-0012) — thiếu 1 trong 3 biến này thì
+  // sendSupportNotification tự degrade về { ok: false }, KHÔNG chặn ticket
+  // commit (D5/AC-031) — nên chỉ warn, không error, mirror GEMINI_API_KEY.
+  if (!get("SUPPORT_NOTIFY_EMAIL")) {
+    problems.push({
+      level: "warn",
+      name: "SUPPORT_NOTIFY_EMAIL",
+      impact: "không có hộp thư nhận ticket hỗ trợ — vé vẫn được ghi nhận nhưng không ai được báo qua email",
+    });
+  }
+
+  if (!get("SUPPORT_SMTP_USER")) {
+    problems.push({
+      level: "warn",
+      name: "SUPPORT_SMTP_USER",
+      impact: "sendSupportNotification không xác thực được với Gmail SMTP — mọi email báo ticket sẽ lỗi âm thầm",
+    });
+  }
+
+  if (!get("SUPPORT_SMTP_APP_PASSWORD")) {
+    problems.push({
+      level: "warn",
+      name: "SUPPORT_SMTP_APP_PASSWORD",
+      impact: "sendSupportNotification không xác thực được với Gmail SMTP — mọi email báo ticket sẽ lỗi âm thầm",
+    });
+  }
+
   const admins = get("ADMIN_USER_IDS");
   if (!admins) {
     problems.push({

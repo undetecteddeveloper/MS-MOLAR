@@ -20,6 +20,9 @@ function goodEnv(over: Env = {}): Env {
     SUPABASE_SERVICE_ROLE_KEY: "service-role-key",
     GEMINI_API_KEY: "gemini-key",
     ADMIN_USER_IDS: UUID_A,
+    SUPPORT_NOTIFY_EMAIL: "support@example.com",
+    SUPPORT_SMTP_USER: "support@example.com",
+    SUPPORT_SMTP_APP_PASSWORD: "app-password",
     ...over,
   };
 }
@@ -70,6 +73,20 @@ describe("checkEnv", () => {
   it("GEMINI_API_KEY thiếu là warn, KHÔNG phải error — phần còn lại của app vẫn chạy", () => {
     expect(levelOf(goodEnv({ GEMINI_API_KEY: "" }), "GEMINI_API_KEY")).toBe("warn");
   });
+
+  it.each([
+    ["SUPPORT_NOTIFY_EMAIL", "hộp thư"],
+    ["SUPPORT_SMTP_USER", "SMTP"],
+    ["SUPPORT_SMTP_APP_PASSWORD", "SMTP"],
+  ])(
+    "%s thiếu là warn, KHÔNG phải error — sendSupportNotification tự degrade, ticket vẫn commit (D5/AC-031)",
+    (name, mustMention) => {
+      const env = goodEnv({ [name]: "" });
+      const p = checkEnv(env).find((x) => x.name === name);
+      expect(p?.level).toBe("warn");
+      expect(p?.impact).toContain(mustMention);
+    }
+  );
 
   it("chuỗi toàn khoảng trắng bị coi là thiếu, không phải 'đã đặt'", () => {
     expect(levelOf(goodEnv({ SUPABASE_SERVICE_ROLE_KEY: "   " }), "SUPABASE_SERVICE_ROLE_KEY")).toBe(

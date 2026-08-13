@@ -104,6 +104,7 @@ export const RATE_LIMITS = {
   rateExam: { limit: 40, windowMs: 60 * 60 * 1000 },
   reportExam: { limit: 15, windowMs: 60 * 60 * 1000 },
   updateProfile: { limit: 20, windowMs: 60 * 60 * 1000 },
+  submitTicket: { limit: 15, windowMs: 60 * 60 * 1000 },
 } as const;
 
 /**

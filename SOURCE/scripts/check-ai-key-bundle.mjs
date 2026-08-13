@@ -68,6 +68,14 @@ const SECRETS = [
     // trong lib/supabase/service-role.ts, module không bao giờ được xuống client.
     markers: ["SUPABASE_SERVICE_ROLE_KEY", "record_exam_result"],
   },
+  {
+    label: "Support mail SMTP credential (ADR-0012)",
+    value: read("SUPPORT_SMTP_APP_PASSWORD"),
+    // "nodemailer" chỉ được import trong lib/mail/sendSupportNotification.ts
+    // (Node-only, không "use client") — lọt vào bundle là dấu hiệu module
+    // server-only bị import nhầm từ client.
+    markers: ["SUPPORT_SMTP_APP_PASSWORD", "SUPPORT_SMTP_USER", "nodemailer"],
+  },
 ];
 
 for (const s of SECRETS) {
