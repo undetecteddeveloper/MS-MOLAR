@@ -7,6 +7,7 @@ import { getCurrentUserProfile } from "@/lib/auth/getCurrentUser";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { SkipLink } from "@/components/shared/SkipLink";
+import { SupportWidget } from "@/components/support/SupportWidget";
 
 export default async function HMLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUserProfile();
@@ -23,6 +24,7 @@ export default async function HMLayout({ children }: { children: React.ReactNode
         {children}
       </div>
       <BottomNav />
+      <SupportWidget user={user} />
     </div>
   );
 }

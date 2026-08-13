@@ -454,4 +454,56 @@ export const vi: Dictionary = {
   "ugcError.fieldSemester": "học kỳ",
   "ugcError.fieldRequired": "một trường bắt buộc",
   "ugcError.fieldGeneric": "một trường",
+
+  // User Support System v1 — sendSupportNotification subject only (NOT the
+  // support.* widget block, that's a separate later addition). Deliberately
+  // NOT prefixed "support." to avoid colliding with that block's key set.
+  "mail.ticketIntent.bug": "báo lỗi",
+  "mail.ticketIntent.suggestion": "góp ý",
+  "mail.ticketIntent.question": "câu hỏi",
+
+  // User Support System v1 — support.* widget block (student-facing only;
+  // support.admin.* is a separate later addition, task-14's responsibility).
+  // common.cancel/common.retry/common.working are REUSED, not duplicated here.
+  "support.trigger.label": "Gửi phản hồi",
+  "support.dialog.title": "Gửi phản hồi",
+  "support.intent.groupLabel": "Loại phản hồi",
+  "support.intent.bug": "Báo lỗi",
+  "support.intent.suggestion": "Góp ý",
+  "support.intent.question": "Câu hỏi",
+  "support.validation.intentRequired": "Vui lòng chọn một loại phản hồi.",
+  "support.message.label": "Nội dung",
+  "support.message.placeholder": "Mô tả điều bạn muốn gửi…",
+  "support.message.count": "{count}/{max}",
+  "support.validation.messageRequired": "Vui lòng nhập nội dung.",
+  "support.screenshot.label": "Đính kèm ảnh chụp màn hình (tuỳ chọn)",
+  "support.screenshot.chooseFile": "Chọn ảnh",
+  "support.screenshot.remove": "Xoá ảnh",
+  "support.screenshot.uploading": "Đang tải ảnh lên…",
+  "support.screenshot.tooLarge": "Ảnh vượt quá {maxMb}MB. Chọn ảnh nhỏ hơn nhé.",
+  "support.screenshot.invalidType": "Chỉ nhận ảnh PNG, JPEG hoặc WebP.",
+  "support.screenshot.rejected": "Ảnh không hợp lệ — bạn thử ảnh khác hoặc gửi không kèm ảnh.",
+  "support.submit": "Gửi",
+  "support.submitting": "Đang gửi…",
+  "support.error.rateLimited": "Bạn gửi hơi nhanh — thử lại sau ít phút nhé.",
+  "support.error.network": "Chưa gửi được — có thể do mạng. Bạn thử lại nhé.",
+  "support.error.generic": "Chưa gửi được lúc này. Bạn thử lại nhé.",
+  "support.ack.title": "Đã gửi!",
+  "support.ack.message": "Cảm ơn bạn đã phản hồi. Chúng tôi sẽ xem sớm.",
+  "support.ack.reference": "Mã tham chiếu: {ref}",
+  "support.ack.close": "Đóng",
+
+  // Hộp thư admin (/admin/tickets) — task-13/14.
+  "support.admin.title": "Hộp thư hỗ trợ",
+  "support.admin.empty": "Chưa có phản hồi nào.",
+  "support.admin.notifyFailed": "Email báo chưa gửi được",
+  "support.admin.screenshotAlt": "Ảnh chụp màn hình học sinh gửi kèm",
+  "support.admin.notesEmpty": "Chưa có ghi chú nội bộ.",
+  "support.admin.notePlaceholder": "Ghi chú nội bộ (chỉ admin thấy)…",
+  "support.admin.noteSubmit": "Lưu ghi chú",
+  "support.admin.noteError": "Chưa lưu được ghi chú. Bạn thử lại nhé.",
+  "support.admin.statusError": "Chưa đổi được trạng thái. Bạn thử lại nhé.",
+  "support.admin.status.new": "Mới",
+  "support.admin.status.inProgress": "Đang xử lý",
+  "support.admin.status.resolved": "Đã xử lý",
 };

@@ -44,6 +44,13 @@ describe("từ điển", () => {
     expect(mismatched).toEqual([]);
   });
 
+  it("không khoá/giá trị nào chứa 'report-ms' — token là hằng số module-level, không đi qua i18n (D10/R16)", () => {
+    const containsToken = (dict: Record<string, string>) =>
+      Object.entries(dict).some(([k, v]) => k.includes("report-ms") || v.includes("report-ms"));
+    expect(containsToken(en)).toBe(false);
+    expect(containsToken(vi)).toBe(false);
+  });
+
   it("phần lớn chuỗi tiếng Việt thực sự KHÁC tiếng Anh", () => {
     // Một số khoá trùng nhau là hợp lệ và cố ý ("Email", "Google", "HK1"…),
     // nhưng nếu tỷ lệ trùng vọt lên thì gần như chắc chắn có mảng bị quên dịch.

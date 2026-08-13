@@ -482,6 +482,58 @@ export const en = {
   "ugcError.fieldSemester": "the semester",
   "ugcError.fieldRequired": "a required field",
   "ugcError.fieldGeneric": "a field",
+
+  // User Support System v1 — sendSupportNotification subject only (NOT the
+  // support.* widget block, that's a separate later addition). Deliberately
+  // NOT prefixed "support." to avoid colliding with that block's key set.
+  "mail.ticketIntent.bug": "bug report",
+  "mail.ticketIntent.suggestion": "suggestion",
+  "mail.ticketIntent.question": "question",
+
+  // User Support System v1 — support.* widget block (student-facing only;
+  // support.admin.* is a separate later addition, task-14's responsibility).
+  // common.cancel/common.retry/common.working are REUSED, not duplicated here.
+  "support.trigger.label": "Send feedback",
+  "support.dialog.title": "Send feedback",
+  "support.intent.groupLabel": "Feedback type",
+  "support.intent.bug": "Bug report",
+  "support.intent.suggestion": "Suggestion",
+  "support.intent.question": "Question",
+  "support.validation.intentRequired": "Please pick a feedback type.",
+  "support.message.label": "Message",
+  "support.message.placeholder": "Describe what you'd like to share…",
+  "support.message.count": "{count}/{max}",
+  "support.validation.messageRequired": "Please enter a message.",
+  "support.screenshot.label": "Attach a screenshot (optional)",
+  "support.screenshot.chooseFile": "Choose file",
+  "support.screenshot.remove": "Remove image",
+  "support.screenshot.uploading": "Uploading image…",
+  "support.screenshot.tooLarge": "That image is over {maxMb}MB. Try a smaller one.",
+  "support.screenshot.invalidType": "Only PNG, JPEG, or WebP images are accepted.",
+  "support.screenshot.rejected": "That image isn't valid — try another one or send without it.",
+  "support.submit": "Send",
+  "support.submitting": "Sending…",
+  "support.error.rateLimited": "You're sending a bit fast — try again in a few minutes.",
+  "support.error.network": "Couldn't send — might be a network issue. Please try again.",
+  "support.error.generic": "Couldn't send right now. Please try again.",
+  "support.ack.title": "Sent!",
+  "support.ack.message": "Thanks for the feedback. We'll take a look soon.",
+  "support.ack.reference": "Reference: {ref}",
+  "support.ack.close": "Close",
+
+  // Admin inbox (/admin/tickets) — task-13/14.
+  "support.admin.title": "Support inbox",
+  "support.admin.empty": "No feedback yet.",
+  "support.admin.notifyFailed": "Notification email failed",
+  "support.admin.screenshotAlt": "Screenshot attached by the student",
+  "support.admin.notesEmpty": "No internal notes yet.",
+  "support.admin.notePlaceholder": "Internal note (admins only)…",
+  "support.admin.noteSubmit": "Save note",
+  "support.admin.noteError": "Couldn't save the note. Please try again.",
+  "support.admin.statusError": "Couldn't update status. Please try again.",
+  "support.admin.status.new": "New",
+  "support.admin.status.inProgress": "In progress",
+  "support.admin.status.resolved": "Resolved",
 } as const;
 
 /** Tập khoá hợp lệ — mọi ngôn ngữ khác phải phủ đủ. */

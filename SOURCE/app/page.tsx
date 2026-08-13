@@ -5,6 +5,7 @@ import { HomeStage, type AuthMode } from "@/app/(layer1)/_components/HomeStage";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { SkipLink } from "@/components/shared/SkipLink";
+import { SupportWidget } from "@/components/support/SupportWidget";
 import { getCurrentUserProfile } from "@/lib/auth/getCurrentUser";
 import { getLocale } from "@/lib/i18n/server";
 import { buildHomeJsonLd, serializeJsonLd } from "@/lib/seo/jsonLd";
@@ -87,6 +88,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ a
       </main>
 
       <BottomNav />
+      <SupportWidget user={user} />
     </div>
   );
 }
