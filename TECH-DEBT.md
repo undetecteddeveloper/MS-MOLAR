@@ -18,28 +18,92 @@ còn nơi nào khác giữ lịch sử nợ ngoài chính file này.)*
 
 ## Đang mở
 
-### TD-016 — 10 câu hỏi mang `questions.subject = 'Toán'` thay vì canonical `'Math'`
+### TD-018 — 9 file test rỗng làm cổng `npm test` ĐỎ trên mọi push
+**Từ:** 2026-08-14 (phát hiện khi chạy full suite cho một việc khác, không phải
+đi tìm — đúng kiểu bug này ẩn được lâu)
+**Loại:** cổng kiểm tra hỏng, im lặng
+
+Commit `fdad2b8` ("sinh test skeleton — 9 file, chỉ comment, chưa implement")
+thêm 9 file `*.test.ts(x)` chỉ có comment, không có `describe`/`it` nào. Vitest
+tính mỗi file như vậy là **suite FAIL** (`No test suite found in file`), nên:
+
+```
+Test Files  9 failed | 56 passed (65)
+     Tests  558 passed (558)
+```
+
+558 assertion đều xanh; cổng vẫn exit 1. CI chạy `npm test` (= `vitest run`)
+và **không** có `continue-on-error` (`.github/workflows/ci.yml`), nghĩa là job
+test đang ĐỎ trên mọi push kể từ `fdad2b8`.
+
+**Sẽ nổ thế nào:** đây đúng hình dạng TD-010 — một cổng CHẶN merge mà đỏ sẵn sẽ
+dạy người ta bỏ qua nó. Khi cổng đã đỏ thường trực, một test THẬT vỡ không thay
+đổi gì trên màn hình: vẫn là "vitest đỏ như mọi hôm". Khoảng hở không nằm ở 9
+file rỗng, nó nằm ở việc mất khả năng phân biệt đỏ-thật với đỏ-nền.
+
+**Cách trả:** rẻ nhất là cho mỗi file một `describe.todo(...)`/`it.todo(...)` —
+vitest coi đó là suite hợp lệ và in ra dạng "todo", nên cổng xanh lại mà việc
+còn nợ vẫn hiện trong output (khác hẳn với xoá file hay thêm vào `exclude`, hai
+cách đó giấu luôn ý định). Implement thật 9 test đó là việc của nhánh Engine 1.
+
+### TD-016 — `subject` không canonical trong `questions` VÀ `exams`
 **Từ:** 2026-08-08 (phát hiện khi đếm dữ liệu thật cho Engine 1 — `requirement-analyzer`
 cần biết corpus môn Toán lớn cỡ nào, không phải đi tìm bug)
 **Loại:** dữ liệu bẩn, im lặng
+**Trạng thái:** **đường ghi ĐÃ BỊT + có cổng canh (2026-08-14)** — phần DỌN DỮ LIỆU còn chờ
 
-Đếm trực tiếp trên DB **dev** (`service_role`, không phải suy đoán từ code):
-57 câu hỏi tổng, `subject = 'Math'` có 37, và **10 câu mang `subject = 'Toán'`** —
-giá trị không nằm trong `SUBJECTS` (`lib/ugc/subjects.ts`). `normalizeSubject()`
-lẽ ra chặn được việc này ở đường UGC (map "Toán" → canonical `"Math"` qua bảng
-`ALIASES`), nhưng 10 câu này đã lọt — khả năng cao đến từ `seed.ts` hoặc một
-đường ghi tay không đi qua `normalizeSubject`, chưa xác minh đường nào.
+> **Cập nhật 2026-08-14 — bản mô tả cũ của mục này SAI ở hai chỗ, đã đo lại bằng
+> `service_role` trên dev, không suy từ code:**
+>
+> - **Không chỉ `questions`.** `exams.subject` cũng bẩn: 2 đề mang `'Toán'`
+>   (`Math 4 · Physics 1 · Chemistry 1 · "Toán" 2`). 10 câu hỏi bẩn chính là
+>   câu của đúng 2 đề đó — đường UGC cascade `subject`/`topic` từ đề xuống câu,
+>   nên đếm ở tầng `questions` là đang nhìn cái BÓNG chứ không phải cái gốc.
+> - **Không phải `seed.ts`.** Cả 2 đề là UGC người dùng thật upload
+>   (`ugc-f8ec9b8a…` 2026-07-20 00:06 UTC, `ugc-9c857be4…` 01:03 UTC), có
+>   `author_id`. `lib/ugc/subjects.ts` ra đời commit `971a4fe` lúc 2026-07-20
+>   **15:33 UTC** — tức 14 tiếng SAU. Đây là dữ liệu tồn dư của thời chưa có
+>   canonical hoá, không phải một đường ghi đang rò rỉ hàng ngày.
+>
+> **Đường ghi vẫn hở thật, nhưng ở chỗ khác với phỏng đoán cũ:**
+> `validateExamMeta` (`lib/ugc/validateInput.ts`) — đường **Manual** — chỉ kiểm
+> `subject` khác rỗng rồi ghi thẳng chuỗi thô. Mọi đường khác đã canonical hoá
+> từ trước (`parseTypedMeta` và `saveExam` dùng `isSubject`; đường Automatic
+> dùng `normalizeMeta` → `normalizeSubject`). S-01 render `<select>` từ
+> `SUBJECTS` nên UI không tạo được giá trị lạ — nhưng đây là **server action**,
+> và FormData thì không được tin. Đã vá: quy đổi bằng `normalizeSubject` TRƯỚC
+> rồi mới đòi canonical (alias "Toán"/"Vật lí"/… sửa được thì sửa, chỉ từ chối
+> cái không map nổi), kèm 4 test. Test cũ khẳng định `subject: "Toán"` đi qua
+> NGUYÊN VĂN — nó ghim đúng cái bug, nay đã sửa thành `"Math"`.
+>
+> **Cổng canh (mới):** `verify-schema.ts` mục 8 hỏi thẳng DB "có dòng nào ngoài
+> `SUBJECTS` không", cho cả `questions` lẫn `exams`, in ra id + giá trị + giá
+> trị canonical tương ứng. Khác 7 mục kia ở chỗ nó soi DỮ LIỆU chứ không phải
+> cấu trúc — đặt ở đây vì hình dạng hỏng giống hệt TD-001/TD-005: không mã lỗi,
+> không log, chỉ THIẾU. Bịt code không dọn được dữ liệu đã ghi, và không có gì
+> bảo đảm đường ghi thứ N+1 sau này cũng nhớ canonical hoá.
+>
+> **VÌ SAO CHƯA ĐÓNG:** dữ liệu vẫn bẩn. Bản vá nằm ở
+> `supabase/one-off/2026-08-14-td016-canonical-subject.sql` (idempotent, sửa cả
+> `subject` lẫn `topic`, và chỉ sửa `topic` khi nó đang phản chiếu `subject` —
+> nếu chỉ sửa `subject` thì 10 dòng thành `subject='Math'` + `topic='Toán'`,
+> đổi mảnh vỡ này lấy mảnh vỡ khác ở facet `topic`, nơi taxonomy Engine 1 đọc
+> vào). Phải paste tay qua Supabase SQL Editor cho **cả dev lẫn prod** — xem
+> TD-005. Chạy xong thì `npm run verify:schema` mục 8 phải xanh.
+>
+> **Chưa đo được prod.** Session 2026-08-14 không có quyền đọc DB prod, nên số
+> dòng bẩn ở prod là ẩn số — đừng giả định nó bằng 0 chỉ vì dev đã sạch.
 
-**Sẽ nổ thế nào:** mọi filter theo môn ("Toán") trên `/exams`, mọi thống kê
-theo `subject`, và giờ cả taxonomy kỹ năng Engine 1 (tagging chỉ nhắm
-`subject = 'Math'`) đều **âm thầm bỏ sót 10 câu này** — không lỗi, không log,
-chỉ thiếu. Không ai thấy vì kết quả vẫn "đúng dạng", chỉ thiếu vài dòng.
+`subject` là cột `text` tự do — không enum, không khoá ngoại — nên một giá trị
+ngoài `SUBJECTS` (`lib/ugc/subjects.ts`) ghi được bình thường.
 
-**Cách trả:** một script one-off `update questions set subject = 'Math' where
-subject = 'Toán'` (paste tay qua Supabase SQL Editor như mọi DDL khác — xem
-TD-005), sau đó tìm đường ghi đã tạo ra 10 dòng này và bọc nó bằng
-`normalizeSubject`/`isSubject` để không tái diễn. Ngoài phạm vi Engine 1 Sprint 1
-— ghi lại để không quên, không phải để làm ngay trong nhánh này.
+**Sẽ nổ thế nào:** mọi filter theo môn trên `/exams`, mọi thống kê theo
+`subject`, và cả taxonomy kỹ năng Engine 1 (tagging chỉ nhắm `subject = 'Math'`)
+đều **âm thầm bỏ sót** những dòng này — không lỗi, không log, chỉ thiếu. Không
+ai thấy vì kết quả vẫn "đúng dạng", chỉ thiếu vài dòng. Đã quan sát được một
+triệu chứng CỤ THỂ ở UI: mở `/me/exams/ugc-9c857be4…`, ô **Subject** hiện
+"Select a subject" — rỗng — vì `<select>` chỉ có option từ `SUBJECTS` và
+`'Toán'` không khớp cái nào.
 
 ### TD-013 — Không có rate limit nào cho lưu lượng CHƯA đăng nhập
 **Từ:** 2026-08-07 (tách ra khi trả TD-008; trước đó nằm lẫn trong mục đó)
@@ -65,28 +129,6 @@ Hobby, rồi site tắt. Mức độ hiện tại thấp vì site chưa có ai c
 **Cách trả:** nâng Pro rồi cấu hình Vercel Firewall rate limit (config, không
 phải code), hoặc đặt site sau Cloudflare free tier — cái sau không tốn tiền
 nhưng đổi DNS và thêm một tầng vào đường đi.
-
-### TD-014 — `ADMIN_USER_IDS` mất scope Preview trên Vercel
-**Từ:** 2026-08-04 (S#46), phát hiện lại và XÁC NHẬN CÒN SỐNG 2026-08-07
-**Loại:** vận hành, cấu hình
-
-`vercel env ls` (2026-08-07): `ADMIN_USER_IDS` chỉ còn scope **Production**.
-Nguyên nhân đã biết từ S#46: `vercel env rm` gỡ biến khỏi **mọi** scope chứ
-không chỉ scope được chỉ định — một lần `rm` rồi `add` lại vô tình làm mất
-Preview. Hệ quả: `/admin` trên **mọi** Preview deploy (mọi feature branch) luôn
-404 cho tất cả mọi người, kể cả tài khoản đúng quyền — không phân biệt được với
-đăng nhập nhầm tài khoản (đúng hình dạng lỗi mà TD-009 mô tả: fail-closed im
-lặng).
-
-**Vì sao chưa vá ngay:** không chặn được gì hôm nay — không ai đang cần test
-`/admin` trên Preview. Nhưng đây là bẫy cho người TIẾP THEO: họ sẽ thấy 404 và
-tưởng mình đăng nhập sai tài khoản, mất thời gian debug nhầm hướng trước khi
-nghĩ tới env scope.
-
-**Cách trả:** thêm lại `ADMIN_USER_IDS` cho scope Preview, dùng UUID của tài
-khoản admin trên project Supabase **dev** (Preview trỏ dev, không phải prod —
-xem TD-005/DEPLOYMENT.md). Sau đó test bằng cách mở một Preview deploy bất kỳ
-và xác nhận `/admin` vào được với tài khoản đó.
 
 ### TD-015 — `eslint-config-next` lệch phiên bản với `next`
 **Từ:** 2026-08-04 (ghi nhận lần đầu trong PROCESS.md, chưa từng vào sổ)
@@ -204,6 +246,33 @@ một lần chạy lại toàn file trên DB có dữ liệu đại diện, mớ
 ---
 
 ## Đã trả
+
+### ~~TD-014 — `ADMIN_USER_IDS` mất scope Preview trên Vercel~~
+`ADMIN_USER_IDS` chỉ còn scope **Production**. Nguyên nhân đã biết từ S#46:
+`vercel env rm` gỡ biến khỏi **mọi** scope chứ không chỉ scope được chỉ định —
+một lần `rm` rồi `add` lại vô tình làm mất Preview. Hệ quả: `/admin` trên **mọi**
+Preview deploy luôn 404 cho tất cả mọi người, kể cả tài khoản đúng quyền — không
+phân biệt được với đăng nhập nhầm tài khoản (đúng hình dạng TD-009: fail-closed
+im lặng). Từng xếp "chưa vá ngay" vì không chặn được gì hôm nay, nhưng nó là bẫy
+cho người TIẾP THEO: thấy 404 rồi đi debug nhầm hướng.
+
+**Đã trả 2026-08-14** — thêm entry mới `ADMIN_USER_IDS` scope **Preview**
+(type `sensitive`, id `bmhkQ05v9a6dKLYo`), giá trị là UUID admin trên Supabase
+**dev**, lấy từ `SOURCE/.env.local` (Preview trỏ dev). Làm qua Composio
+(`VERCEL_ADD_ENVIRONMENT_VARIABLE`), **`upsert: false`** — cố ý, để entry
+Production (`PuSygCGTweNdWPNo`) không bị đụng tới; đã đọc lại danh sách sau khi
+ghi và xác nhận `updatedAt` của nó không đổi. Đây chính là bài học của S#46:
+món nợ này SINH RA từ một thao tác env vô tình chạm nhiều scope hơn dự định,
+nên cách trả nó phải là thao tác chỉ-thêm, không phải `rm` rồi `add` lại.
+
+**Hai điều người sau cần biết:**
+- **Env chỉ có hiệu lực với deploy MỚI.** Preview deploy đang tồn tại vẫn 404
+  `/admin`; phải push/redeploy rồi mới kiểm được.
+- **Chưa xác minh end-to-end.** Giá trị dev là suy ra từ `.env.local` + ghi chú
+  TD-014, KHÔNG phải đọc được từ Vercel (biến `sensitive` không đọc lại được),
+  và `docs/DEPLOYMENT.md` mà mục này từng dẫn chiếu **nay không còn tồn tại**
+  trong repo. Nếu Preview hoá ra không trỏ dev thì `/admin` vẫn 404 — đúng như
+  hiện trạng, không hỏng thêm gì, vì biến này chỉ gác `/admin`.
 
 ### ~~TD-017 — `instrumentation.ts` import tĩnh `node:crypto` vào Edge bundle~~
 **Từ:** 2026-08-09 (phát hiện qua warning trong log build/deploy Vercel, không

@@ -23,12 +23,45 @@ describe("validateExamMeta", () => {
     expect(fieldErrors).toEqual({});
     expect(meta).toEqual({
       title: "Đề kiểm tra giữa kỳ Toán 10",
-      subject: "Toán",
+      // "Toán" → canonical "Math" (TD-016). Bản trước của test này khẳng định
+      // subject đi qua NGUYÊN VĂN — nó ghim đúng cái bug: chuỗi thô chảy thẳng
+      // vào exams.subject rồi cascade xuống questions.subject/topic.
+      subject: "Math",
       grade: 10,
       durationMinutes: 45,
       school: undefined,
       schoolYear: undefined,
       semester: undefined,
+    });
+  });
+
+  // TD-016 — đường Manual là SERVER ACTION, FormData không đáng tin dù S-01
+  // render <select> từ SUBJECTS.
+  describe("subject phải canonical (TD-016)", () => {
+    it("alias tiếng Việt được quy đổi, không bị từ chối", () => {
+      expect(validateExamMeta({ ...VALID_RAW, subject: "Vật lí" }).meta?.subject).toBe("Physics");
+      expect(validateExamMeta({ ...VALID_RAW, subject: "GDCD" }).meta?.subject).toBe(
+        "Civic Education"
+      );
+      expect(validateExamMeta({ ...VALID_RAW, subject: "Môn: Hóa học" }).meta?.subject).toBe(
+        "Chemistry"
+      );
+    });
+
+    it("giá trị canonical đi qua nguyên vẹn", () => {
+      expect(validateExamMeta({ ...VALID_RAW, subject: "Math" }).meta?.subject).toBe("Math");
+    });
+
+    it("giá trị không map được → fieldErrors, KHÔNG ghi ra meta", () => {
+      const { meta, fieldErrors } = validateExamMeta({ ...VALID_RAW, subject: "Thể dục" });
+      expect(fieldErrors.subject).toBeTruthy();
+      expect(meta).toBeNull();
+    });
+
+    it("subject trống vẫn là 'required', không phải 'not in list'", () => {
+      expect(validateExamMeta({ ...VALID_RAW, subject: "  " }).fieldErrors.subject).toBe(
+        "Subject is required."
+      );
     });
   });
 

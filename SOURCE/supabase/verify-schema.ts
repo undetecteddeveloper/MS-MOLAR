@@ -16,6 +16,7 @@
 //   5. Hai RPC phải tồn tại và authenticated phải gọi được.
 //   6. `on delete` của MỌI khoá ngoại  <- catalog thật, qua RPC §16a (TD-011)
 //   7. DB đang chạy BẢN NÀO của schema.sql <- vân tay §17 (TD-005)
+//   8. Mọi `subject` nằm trong SUBJECTS    <- dữ liệu, không phải cấu trúc (TD-016)
 //
 // (1)–(6) soi từng mảnh cụ thể, và chỉ bắt được đúng những thứ đã từng hỏng.
 // (7) soi phần còn lại: gộp toàn bộ file thành một vân tay, nên một bản vá nằm
@@ -42,6 +43,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { fkKey, resolveForeignKeys } from "../lib/schema/parseForeignKeys";
+import { SUBJECTS, normalizeSubject } from "../lib/ugc/subjects";
 import {
   SCHEMA_FINGERPRINT,
   computeSchemaFingerprint,
@@ -594,9 +596,43 @@ async function main() {
     );
   }
 
+  // ==========================================================================
+  // 8. subject phải nằm trong SUBJECTS (TD-016)
+  //
+  // Khác mọi check trên: đây là DỮ LIỆU, không phải cấu trúc. Nó ở đây vì hình
+  // dạng hỏng giống hệt TD-001/TD-005 — không mã lỗi, không log, chỉ THIẾU.
+  // `subject` là text tự do (không enum, không FK), nên một giá trị lạ vẫn ghi
+  // được và mọi filter/thống kê theo môn chỉ lặng lẽ bỏ sót nó.
+  //
+  // Đường ghi đã bịt ở validateExamMeta (2026-08-14), nhưng bịt code KHÔNG dọn
+  // dữ liệu đã nằm sẵn trong DB, và không có gì bảo đảm đường ghi thứ N+1 sau
+  // này cũng nhớ canonical hoá. Check này hỏi thẳng DB thay vì tin vào code.
+  // ==========================================================================
+  console.log("\nGiá trị subject (TD-016):");
+
+  for (const table of ["questions", "exams"] as const) {
+    const res = await admin.from(table).select("id, subject");
+    if (res.error) {
+      assert(false, `Không đọc được ${table}.subject: ${res.error.message}`);
+      continue;
+    }
+    const canonical = new Set<string>(SUBJECTS);
+    const bad = (res.data ?? []).filter((r) => !canonical.has(r.subject as string));
+    const shown = bad
+      .slice(0, 5)
+      .map((r) => `${r.id}=${JSON.stringify(r.subject)}→${normalizeSubject(r.subject as string) ?? "KHÔNG MAP ĐƯỢC"}`)
+      .join(", ");
+    assert(
+      bad.length === 0,
+      bad.length === 0
+        ? `${table}.subject: cả ${res.data?.length ?? 0} dòng đều canonical`
+        : `${table}.subject có ${bad.length} dòng NGOÀI SUBJECTS — mọi filter/thống kê theo môn đang bỏ sót chúng: ${shown}${bad.length > 5 ? ", …" : ""}. Vá: supabase/one-off/2026-08-14-td016-canonical-subject.sql`
+    );
+  }
+
   console.log(
     failures === 0
-      ? "\n✅ Schema verify: DB khớp schema.sql §10 + §11 + §12 + khoá ngoại (§15/§16) + phiên bản (§17)."
+      ? "\n✅ Schema verify: DB khớp schema.sql §10 + §11 + §12 + khoá ngoại (§15/§16) + phiên bản (§17) + subject canonical (TD-016)."
       : `\n❌ Schema verify: ${failures} check FAIL — DB và schema.sql đang lệch nhau.`
   );
   process.exit(failures === 0 ? 0 : 1);

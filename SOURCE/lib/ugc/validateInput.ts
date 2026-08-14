@@ -6,6 +6,7 @@
 
 import { makeUgcError } from "./errorCopy";
 import { LIMITS, type AllowedMime } from "./limits";
+import { normalizeSubject } from "./subjects";
 import type { ExamMeta, UgcError } from "./types";
 
 export type ExamMetaFieldErrors = Partial<
@@ -43,8 +44,25 @@ export function validateExamMeta(raw: RawExamMetaInput): {
   else if (title.length > LIMITS.MAX_TITLE)
     fieldErrors.title = `Title must be at most ${LIMITS.MAX_TITLE} characters.`;
 
-  const subject = raw.subject?.trim() ?? "";
-  if (subject.length === 0) fieldErrors.subject = "Subject is required.";
+  // TD-016: đường Manual TỪNG ghi thẳng chuỗi thô vào exams.subject, rồi
+  // cascade xuống questions.subject/topic — nguồn của 12 dòng mang "Toán" thay
+  // vì canonical "Math". S-01 render <select> từ SUBJECTS nên UI không tạo ra
+  // được giá trị lạ nữa, nhưng đây là SERVER ACTION: FormData đến từ client và
+  // không được tin. Mọi đường ghi subject khác (parseTypedMeta, saveExam,
+  // normalizeMeta) đã canonical hoá từ trước; đây là đường cuối còn hở.
+  //
+  // Quy đổi TRƯỚC rồi mới đòi canonical (không phải isSubject thẳng): alias
+  // "Toán"/"Vật lí"/… sửa được thì sửa, chỉ từ chối cái không map nổi — cùng
+  // hàm mà đường Automatic dùng, nên hai đường không thể lệch kết luận.
+  const subjectRaw = raw.subject?.trim() ?? "";
+  let subject = "";
+  if (subjectRaw.length === 0) {
+    fieldErrors.subject = "Subject is required.";
+  } else {
+    const canonical = normalizeSubject(subjectRaw);
+    if (canonical === null) fieldErrors.subject = "Pick a subject from the list.";
+    else subject = canonical;
+  }
 
   const grade = raw.grade ? parseIntStrict(raw.grade) : null;
   if (grade === null || grade < LIMITS.MIN_GRADE || grade > LIMITS.MAX_GRADE)
