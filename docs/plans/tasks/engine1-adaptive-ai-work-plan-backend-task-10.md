@@ -14,9 +14,9 @@ Add `recordSkillMastery()` export to `SOURCE/lib/supabase/service-role.ts` (mirr
 - Test 2 (AC-011, negative proof — a real non-service-role student JWT calling `.rpc("record_skill_mastery", ...)` directly must fail permission-denied)
 
 ## Target Files
-- [ ] `SOURCE/lib/supabase/service-role.ts` (additive — `recordSkillMastery()` export)
-- [ ] `SOURCE/app/(layer2)/actions.ts` (additive — new non-throwing step 7 in `submitExam()`)
-- [ ] `SOURCE/app/(layer2)/__tests__/recordSkillMastery.int.test.ts` (fill in the existing skeleton's 2 tests — requires real dev Supabase + `.env.local`)
+- [x] `SOURCE/lib/supabase/service-role.ts` (additive — `recordSkillMastery()` export)
+- [x] `SOURCE/app/(layer2)/actions.ts` (additive — new non-throwing step 7 in `submitExam()`)
+- [x] `SOURCE/app/(layer2)/__tests__/recordSkillMastery.int.test.ts` (fill in the existing skeleton's 2 tests — requires real dev Supabase + `.env.local`)
 
 ## Investigation Targets
 - `SOURCE/app/(layer2)/__tests__/recordSkillMastery.int.test.ts` (already generated — read in full: the LANE MAPPING NOTE explaining this is a real-DB test unlike its `.int.test.ts` siblings, the fixture id-prefix convention, both tests' exact annotations)
@@ -53,19 +53,19 @@ This task writes new persisted state (`user_skill_mastery`) from an existing, al
 ## Implementation Steps (TDD: Red-Green-Refactor)
 
 ### 1. Red Phase
-- [ ] Confirm backend-task-01's checkpoint is green on dev (this test file requires the real `record_skill_mastery()` function to exist).
-- [ ] Read all Investigation Targets, in particular `recordSkillMastery.int.test.ts`'s LANE MAPPING NOTE and both tests' full annotations.
-- [ ] Sweep the adjacent cases per Change Category above; record findings in Investigation Notes.
-- [ ] Convert the 2 skeleton tests into real tests against the real dev Supabase instance, following `test-rls.ts`'s fixture-prefix pattern for isolated setup/cleanup.
-- [ ] Run the tests and confirm both fail (no `recordSkillMastery()` TS export or step-7 wiring exists yet).
+- [x] Confirm backend-task-01's checkpoint is green on dev (this test file requires the real `record_skill_mastery()` function to exist).
+- [x] Read all Investigation Targets, in particular `recordSkillMastery.int.test.ts`'s LANE MAPPING NOTE and both tests' full annotations.
+- [x] Sweep the adjacent cases per Change Category above; record findings in Investigation Notes.
+- [x] Convert the 2 skeleton tests into real tests against the real dev Supabase instance, following `test-rls.ts`'s fixture-prefix pattern for isolated setup/cleanup.
+- [x] Run the tests and confirm both fail (no `recordSkillMastery()` TS export or step-7 wiring exists yet).
 
 ### 2. Green Phase
-- [ ] Implement `recordSkillMastery()` in `service-role.ts`, mirroring `recordExamResult()`'s never-throws/`{error}`-return shape, passing `p_per_question` unmodified.
-- [ ] Insert step 7 into `submitExam()`: call `recordSkillMastery()` in a `try/catch` immediately after the existing `recordExamResult()` error-handling block (after line ~162), before the final redirect (line ~164); on failure, `console.error` with context, do not re-throw.
-- [ ] Run `recordSkillMastery.int.test.ts` against real dev Postgres — confirm both tests pass.
+- [x] Implement `recordSkillMastery()` in `service-role.ts`, mirroring `recordExamResult()`'s never-throws/`{error}`-return shape, passing `p_per_question` unmodified.
+- [x] Insert step 7 into `submitExam()`: call `recordSkillMastery()` in a `try/catch` immediately after the existing `recordExamResult()` error-handling block (after line ~162), before the final redirect (line ~164); on failure, `console.error` with context, do not re-throw.
+- [x] Run `recordSkillMastery.int.test.ts` against real dev Postgres — confirm both tests pass.
 
 ### 3. Refactor Phase
-- [ ] Re-run `submitExam.int.test.ts` (the existing, unrelated test file for this same function) to confirm no regression to steps 1-6's pre-existing behavior.
+- [x] Re-run `submitExam.int.test.ts` (the existing, unrelated test file for this same function) to confirm no regression to steps 1-6's pre-existing behavior.
 
 ## Quality Assurance Mechanisms
 - ESLint / `tsc --noEmit` / `next build` — project-wide
@@ -116,12 +116,77 @@ This task writes new persisted state (`user_skill_mastery`) from an existing, al
 - **Mock boundary rationale**: N/A.
 - **Residual**: this is the plan's own accepted residual — not resolved further by this task, only confirmed to be implemented as designed (independent calls, no shared transaction, per the Binding Decisions table above).
 
+## Investigation Notes
+
+### Investigation Targets read (2026-08-14)
+
+- `SOURCE/app/(layer2)/__tests__/recordSkillMastery.int.test.ts` (skeleton, 137 lines, comments only — no code). LANE MAPPING NOTE: this `.int.test.ts` is the ONE file in the repo whose `.int.test.ts` suffix means *real dev Supabase*, not the mocked-`@/lib/supabase/server` convention its four siblings use. Fixture id-prefix convention borrowed from `test-rls.ts` (`rls-` → here `mastery-int-`). Test 1 obligations (a)-(d); Test 2 is a negative proof that must distinguish the PERMISSION error class from a function-body error.
+- `SOURCE/lib/supabase/service-role.ts` — `recordExamResult(attemptId, score)` (lines 57-70) is the exact shape to mirror: private `serviceRoleClient()`, single `.rpc()`, `return { error: error ? { code, message } : null }`, never throws on RPC failure (it *can* throw only if env is missing, inside `serviceRoleClient()`).
+- `SOURCE/app/(layer2)/actions.ts` — `submitExam()` control flow: (1) read attempt → (rate-limit `guard`) → idempotency short-circuit `redirect()` at 82-84 → (2) exam `question_ids` → (3) `claim_attempt_answer_key` RPC + empty-`qRows` short-circuit `redirect()` at 113-115 → row→`Question` mapping → (4) `attempt_answers` upsert → (5) `computeScore()` → (6) `recordExamResult()` (throws "Could not save your result" on error) → `redirect()` at 164. Step 7's only correct insertion point is between 162 and 164.
+- `SOURCE/supabase/test-rls.ts` — `ensureUser()` (Admin API create-or-update, `email_confirm: true`), `signInAs()` (anon key + real password sign-in), `cleanupX`/`setupX` pairs run before AND after for idempotency, and MM-b's error-class discrimination (`42501` / `PGRST202` / `/permission denied|could not find the function/i`) — reused verbatim as this file's Test 2 predicate so the two proofs stay recognisably the same boundary at two layers.
+- `SOURCE/supabase/schema.sql` §18 (lines 1259-1350) — `record_skill_mastery(p_attempt_id uuid, p_per_question jsonb)`: derives `v_user_id` from `exam_attempts` requiring `status='submitted'` (raises `check_violation` otherwise); `join public.questions q on q.id = pq->>'questionId'` (INNER, so an unknown question drops out); `where coalesce((pq->>'scored')::boolean, true) and q.skill_node_id is not null`; `count(*) filter (where isCorrect)` / `count(*)`; `on conflict (user_id, skill_node_id) do update set correct_count = existing + excluded, total_count = existing + excluded` (accumulate, never overwrite); `last_wrong_at = coalesce(excluded.last_wrong_at, existing)`. `revoke all ... from public, anon, authenticated` + `grant execute ... to service_role`.
+- `docs/design/engine1-adaptive-ai-backend-design.md` — contract fixed at line 778: `recordSkillMastery(attemptId: string, score: ScoreResult): Promise<{error: {code?: string; message: string} | null}>` (takes the whole `ScoreResult`, like `recordExamResult`; passes `score.perQuestion` through). Sequence diagram (735-760) puts the try/catch on the TS side, not a SQL transaction. Minimal Surface Element 3: `skill_node_id` never enters the TS layer — confirmed, the wrapper names no skill anywhere.
+- `docs/adr/ADR-0011-...` — read; Decision table + Implementation Guidance drive the Binding Decisions below.
+
+### Test environment check (Step 3 precondition) — PASSED
+
+Probed the dev instance over PostgREST before writing any test code (service_role key + anon key from `SOURCE/.env.local`):
+
+| Probe | Result |
+|---|---|
+| `select user_skill_mastery` as service_role | `200 []` — table exists, reachable |
+| `rpc record_skill_mastery` as service_role (bogus attempt id) | `400 23514 "record_skill_mastery: attempt … không tồn tại hoặc chưa submitted"` — function EXISTS and EXECUTED (error came from the body, i.e. Task 1's apply is live) |
+| `rpc record_skill_mastery` as anon | `401 42501 "permission denied for function record_skill_mastery"` — the §18 revoke is live on this DB |
+
+### Adjacent Case Sweep (Change Category: state-change, boundary-change)
+
+1. **Idempotency short-circuit (`actions.ts:82-84`)** — `redirect()` throws `NEXT_REDIRECT` before step 7's insertion point (line 162+). Step 7 is unreachable on the "đã nộp rồi" branch, so a re-submit cannot double-accumulate mastery *through submitExam*. Preserved by position, not by a flag. (Note this is also the exact reason ADR-0011's narrow window is not self-healing — same mechanism, accepted.)
+2. **Empty-`qRows` short-circuit (`actions.ts:113-115`)** — same: `redirect()` before step 7. A concurrently-submitted attempt never reaches the mastery write.
+3. **Steps 1-6 error paths** — all pre-existing paths either `throw` or `redirect` before line 162; step 7 is purely appended, adds no branch to them. `recordExamResult()`'s own failure still `throw`s (line 161) and therefore never reaches step 7 — mastery is only ever written *after* a durable score write, exactly ADR-0011's ordering.
+4. **`recordExamResult()` has exactly one caller** (`actions.ts:158`) — verified by repo grep; no other call site needs an analogous wrapper.
+5. **Sibling exports in `service-role.ts`** — `moderateExam`, `flagSupportTicketNotifyFailed`, `addSupportTicketNote`, `changeSupportTicketStatus` already return `{error}` rather than throwing (the same never-throw convention); `listReportedExams`/`listSupportTickets` deliberately `throw` because they are read paths on an admin screen where a silent empty list would be worse. No inconsistency introduced by adding one more `{error}`-returning write. No adjacent residual outside this task's Target Files.
+6. **Residual recorded for downstream review**: `submitExam.int.test.ts` (pre-existing, not a Target File) mocks `@/lib/supabase/service-role` with only `recordExamResult`. After step 7 lands, `recordSkillMastery` is `undefined` there, so step 7 throws a `TypeError` *inside its own try/catch* and is swallowed + logged. That is the designed behaviour (a failing mastery write must not affect submitExam), and it makes that file an incidental live proof of the non-throwing contract — but it does print one `console.error` line per happy-path case. Left as-is deliberately: modifying a pre-existing test file is outside this task's scope.
+
+### Binding Decision Check (pre-implementation, all rows evaluated against the planned approach)
+
+Planned approach — **dependency_direction**: `recordSkillMastery()` is a new, separate export in `service-role.ts` calling `.rpc("record_skill_mastery", …)`; `submitExam()` calls it in its own `try/catch` placed after the whole `recordExamResult()` if-error block (which still throws on failure) and before the final `redirect()`; no transaction spans the two RPCs (they are two independent PostgREST requests).
+Planned approach — **contract_schema**: the wrapper's RPC payload is exactly `{p_attempt_id, p_per_question}`; there is no user-id-shaped parameter anywhere in the TS layer, and the integration test asserts the rows landed under the *attempt's* owner (a user id the test never passes to the RPC).
+Planned approach — **data_flow**: step 7's `try/catch` logs via `console.error` on either an `{error}` return or a thrown exception, and never re-throws; the `redirect()` is outside the try block and always runs.
+
+| # | Compliance Check | Eval | Rationale |
+|---|---|---|---|
+| 1 | separate try/catch step AFTER `recordExamResult()`'s error handling, no shared transaction | `Y` | Two independent `.rpc()` calls over PostgREST; no `begin/commit` exists on either side; insertion point is after line 162. |
+| 2 | Test 1 proves `user_id` derivation end-to-end, no `p_user_id`-shaped parameter | `Y` | Payload is 2 keys only; the test reads back `where user_id = <student created via Admin API>` — a value never sent to the RPC, so a match can only come from the SQL's own `select a.user_id from exam_attempts`. |
+| 3 | step 7 swallows (logs, not re-throws) failures, submitExam's success/redirect unaffected | `Y` | `catch` logs only; `redirect()` sits outside the try; the RED-phase run (before implementation) and the `submitExam.int.test.ts` re-run (where the mocked module makes step 7 throw) both exercise this. |
+
+### Exit-gate re-evaluation (post-implementation)
+
+- Row 1 — `Y`. `SOURCE/app/(layer2)/actions.ts` step 7 is a standalone `try/catch` (comment from line 164, code at 179-186), after the `if (resErr) { … throw }` block; `redirect()` at line 188 is outside it.
+- Row 2 — `Y`. `recordSkillMastery()` sends exactly `{ p_attempt_id, p_per_question }` (no third key); Test 1 passes reading back by `user_id` derived server-side.
+- Row 3 — `Y`. Proven twice at runtime: (i) mutation M2 (wrapper made to reject) left Test 1's `submitExam` redirect assertion green while the mastery assertions went red; (ii) `submitExam.int.test.ts` still passes end-to-end although `recordSkillMastery` is `undefined` in its mock, i.e. step 7 throws and is swallowed.
+- Roundtrip check (Boundary Context) — `Y`. `p_per_question` is `score.perQuestion` by reference, no re-shaping; the real-Postgres read-back arithmetic (1/2 and 1/1) is only reachable if the SQL parse rule and the TS payload agree field-for-field.
+
+### Mutation evidence (non-vacuity)
+
+| # | Mutation | Target | Observed |
+|---|---|---|---|
+| M1 | `p_per_question: score.perQuestion` → `score.perQuestion.filter((r) => r.isCorrect)` | `service-role.ts` | Test 1 FAILS (`sn-fixture-a` total_count 1, expected 2) — the roundtrip/arithmetic assertion is load-bearing. Restored, green. |
+| M2 | step 7's call made to reject before reaching the wrapper (`await Promise.reject(new Error("MUTATION")).then(() => recordSkillMastery(…))`) | `actions.ts` | Test 1 FAILS on the mastery rows (`[]`, expected length 2) while the redirect + `exam_results` (correct 2 / total 4) assertions that run BEFORE it still PASS, and the run logs `[submitExam] recordSkillMastery Error: MUTATION` — proves non-vacuity of Test 1 AND that a thrown mastery failure is swallowed without affecting submission (Binding Decision 3). Restored, green. |
+| M3 | Test 2's caller client swapped from the student's JWT to the service-role key | test file | Test 2 FAILS (`error` is `null` — the privileged caller executes the function) — proves the negative assertion is not vacuously green. Restored, green. |
+
+Each mutation was applied alone and reverted immediately (never batched); after every restore the file was `diff`ed against the pristine backup taken before the first mutation (SHA-256-verified when taken) and the test re-run to green. Final state is byte-identical to those backups.
+
+### Deviations from the written Implementation Steps
+
+- Red Phase item "Run the tests and confirm **both** fail": only Test 1 failed in the RED run (`expected [] to have a length of 2`, i.e. exactly the missing step 7). Test 2 passed pre-implementation *by construction* — it is a negative proof about a Postgres EXECUTE grant that Task 1 already landed, and no TS code of this task can influence it. Its non-vacuity is therefore established by mutation M3 instead of by a RED run.
+- One incidental fix inside the new test file: `.env.local` values in this repo may be quote-wrapped (`KV_REST_API_URL="https://…"`, written that way because Next.js strips quotes when *it* loads the file). `test-rls.ts`'s loader does not strip them; carried over verbatim, the quoted Upstash URL made `guard()` throw inside `submitExam()` for a reason unrelated to this task. The test's own loader strips one layer of surrounding quotes. No production code reads `.env.local` this way, so nothing outside this file is affected.
+
 ## Completion Criteria
-- [ ] `recordSkillMastery()` exported from `service-role.ts`; step 7 wired into `submitExam()`
-- [ ] `recordSkillMastery.int.test.ts` Tests 1-2 pass against real dev Postgres
-- [ ] Each Binding Decision's Compliance Check evaluates to `Y`, evidence recorded in Investigation Notes
-- [ ] `submitExam.int.test.ts` (pre-existing) re-run with no regression
-- [ ] Each Proof Obligation is met
+- [x] `recordSkillMastery()` exported from `service-role.ts`; step 7 wired into `submitExam()`
+- [x] `recordSkillMastery.int.test.ts` Tests 1-2 pass against real dev Postgres
+- [x] Each Binding Decision's Compliance Check evaluates to `Y`, evidence recorded in Investigation Notes
+- [x] `submitExam.int.test.ts` (pre-existing) re-run with no regression
+- [x] Each Proof Obligation is met
 
 ## Notes
 - Impact scope: `SOURCE/lib/supabase/service-role.ts` (additive export), `SOURCE/app/(layer2)/actions.ts` (additive step 7 only, lines ~162-164 insertion point).

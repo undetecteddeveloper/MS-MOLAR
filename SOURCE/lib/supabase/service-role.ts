@@ -69,6 +69,35 @@ export async function recordExamResult(
   return { error: error ? { code: error.code, message: error.message } : null };
 }
 
+/**
+ * Cộng dồn mastery theo kỹ năng cho một attempt ĐÃ NỘP (ADR-0011, schema.sql §18).
+ *
+ * Anh em ruột của recordExamResult() ở trên, và CỐ Ý là một hàm RIÊNG chứ không
+ * phải một tham số thêm của nó: gộp hai việc vào một câu lệnh SQL sẽ khiến một
+ * lỗi bên mastery kéo rollback luôn dòng điểm — trong khi NFR nói rõ mastery
+ * hỏng KHÔNG được làm hỏng việc nộp bài. Hai lời gọi, hai đường xử lý lỗi.
+ *
+ * KHÔNG nhận userId (record_skill_mastery() suy ra từ attempt + đòi 'submitted',
+ * §18) và KHÔNG nhận skill_node_id: việc tra kỹ năng nằm trong SQL (join
+ * questions.skill_node_id), nên tầng TS không có, và không cần có, khái niệm
+ * "kỹ năng" nào ở đây.
+ *
+ * `score.perQuestion` truyền THẲNG, không nắn lại: §18 đọc từng phần tử bằng
+ * `pq->>'questionId'` / `(pq->>'isCorrect')::boolean` /
+ * `coalesce((pq->>'scored')::boolean, true)`. Đổi tên hay lọc bớt ở đây là cách
+ * chắc chắn nhất để hai bên cùng "trông có vẻ đúng" mà lệch nhau.
+ */
+export async function recordSkillMastery(
+  attemptId: string,
+  score: ScoreResult
+): Promise<{ error: { code?: string; message: string } | null }> {
+  const { error } = await serviceRoleClient().rpc("record_skill_mastery", {
+    p_attempt_id: attemptId,
+    p_per_question: score.perQuestion,
+  });
+  return { error: error ? { code: error.code, message: error.message } : null };
+}
+
 // ---------------------------------------------------------------------------
 // Takedown UGC (Security review Medium #7, schema.sql §14)
 //
