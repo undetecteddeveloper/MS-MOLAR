@@ -10,14 +10,6 @@
   - `smithnguyen247+se2rater1@gmail.com` … `+se2rater10@gmail.com` — 10 tài khoản dùng để test rating threshold (N=3 raters)
   - ⚠️ KHÔNG đụng `smithnguyen247@gmail.com` và `nguyenphatbentre904@gmail.com` — đây là tài khoản thật của user (không có `+alias`)
 
-## 1b. Định hướng chụp screenshot bằng Playwright - NO NEEDED (using CLI version instead)
-
-Claude Code có giới hạn cứng của API Anthropic: ảnh bị downscale nếu cạnh dài nhất vượt 8000px (1 ảnh) hoặc 2000px (nhiều ảnh cùng lúc trong context) — không có setting nào tắt được. Khi cần chụp lại **toàn bộ layout của một trang** để xem/chỉnh sửa UI, đây là định hướng nên theo (không phải luật cứng, tuỳ ngữ cảnh mà linh hoạt):
-
-- Đừng chụp `fullPage: true` nguyên trang dài — chụp **từng phần nhỏ** (theo section/viewport, hoặc element-scoped screenshot dùng `ref` từ `browser_snapshot`) rồi ghép lại trong đầu khi review.
-- Nếu một trang cần nhiều ảnh (nhiều section), có thể **tạo subfolder riêng cho nhóm screenshot của trang đó** (ví dụ `SCREENSHOT\temporary_screenshot\<ten-trang>\`) để dễ quản lý và dễ dọn dẹp sau khi dùng xong, thay vì đổ chung vào `temporary_screenshot`.
-- Việc chia nhỏ ảnh cũng giúp né giới hạn 2000px khi context đang tích luỹ nhiều ảnh cùng lúc.
-
 ## 2. Workflow tổng thể mỗi phiên
 
 Ba pha, chạy theo thứ tự. Pha 2 tồn tại để pha 1 của phiên SAU tìm lại được việc dang dở.
@@ -42,18 +34,19 @@ Notion database MS-MOLAR (row đã đóng) hoặc git log, không còn ở PROCE
 ### Pha 3 — Implementation
 
 1. **Code**: nghiên cứu các thông tin liên quan đến mission hoặc task --> khởi động `dev-workflows-fullstack` với `/recipe-fullstack-implement` (hoặc skills `recipe-plan` / `recipe-implement` / `recipe-fullstack-build` / `recipe-front-*` / `recipe-review`; agent chuyên biệt như `quality-fixer`, `code-reviewer`. Chỉ inovke đối với mission - các task lớn).
-2. **Cổng verify** — chạy đủ 4, trong `SOURCE/`, TRƯỚC khi commit:
+2. **UI audit**: Thực hiện workflow kiểm tra UI theo `E:\StemWeb_project\MS-MOLAR\.claude\skills\ui-audit\ui-interaction-audit.skill` - Lưu ý: sử dụng Playwright CLI (thay vì bản MCP server như trong skill)
+3. **Cổng verify** — chạy đủ 4, trong `SOURCE/`, TRƯỚC khi commit:
    `npx tsc --noEmit` · `npx eslint --max-warnings 0` · `npx vitest run` · `npm run build`
    `next build` bắt lỗi ranh giới server/client mà `tsc` không thấy — đừng bỏ.
-3. **Commit + push**: branch trước, không commit thẳng `main` trừ khi engineer bảo thế.
+4. **Commit + push**: branch trước, không commit thẳng `main` trừ khi engineer bảo thế.
    ⚠️ Cây làm việc thường có sẵn thay đổi CHƯA COMMIT của engineer. Trước mọi `git checkout -- <file>` / `git restore`, đối chiếu `git status` đầu phiên xem file đó đã bẩn từ trước chưa — revert nhầm là xoá việc của họ, không hoàn lại được.
-4. **Deploy**: **tự làm bằng `vercel` qua `composio MCP`** (đã cài + đăng nhập + link sẵn), chạy trong `SOURCE/`:
+5. **Deploy**: **tự làm bằng `vercel` qua `composio MCP`** (đã cài + đăng nhập + link sẵn), chạy trong `SOURCE/`:
    - Preview: `vercel` → trả link, gửi engineer duyệt.
    - Production: `vercel --prod`, hoặc promote bản preview đã duyệt.
    - Mặc định đi preview trước với thay đổi diện rộng (theme, i18n, auth); chỉ vào thẳng prod khi engineer bảo.
    - Push `main` cũng kích hoạt build prod tự động — coi chừng deploy hai lần.
    - Có skill `vercel:deploy` và `vercel:status`. Env/Supabase prod: `docs/DEPLOYMENT.md`.
-5. **Đóng vòng**: cập nhật lại row Notion (trạng thái + kết quả verify + link deploy + việc còn lại).
+6. **Đóng vòng**: cập nhật lại row Notion (trạng thái + kết quả verify + link deploy + việc còn lại).
 
 ## 3. Theme — "Mực & Sơn mài" (Ink & Lacquer)
 
