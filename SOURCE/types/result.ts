@@ -16,6 +16,12 @@ export interface PerQuestionResult {
    * truth → scored:false). essay LUÔN false ("stored, not auto-scored" —
    * không có ground truth để chấm). undefined (row cũ trước v2.1) = true. */
   scored?: boolean;
+  /** Câu này đã bị chấm SAI trên >= 2 lượt làm bài khác nhau của cùng user
+   * (Engine 1, UI Spec D1). KHÔNG lưu trong DB — computeScore() không bao giờ
+   * đặt trường này; getResult() tính lúc đọc qua computeWrongTwiceQuestionIds().
+   * undefined khi trường không có ý nghĩa (scored === false hoặc isCorrect) —
+   * chỉ dòng đang sai VÀ có chấm mới mang true/false. */
+  hasBeenWrongTwice?: boolean;
 }
 
 export interface TopicResult {

@@ -5,10 +5,11 @@ import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
 import { communityDifficultyFrom, RATING_MIN } from "@/lib/rating";
+import { computeWrongTwiceQuestionIds, type WrongTwiceAttempt } from "@/lib/scoring/wrongTwice";
 import { resolveSignedImageUrl } from "@/lib/ugc/imageUrl";
 import type { Exam } from "@/types/exam";
 import type { Choice, PublicQuestion } from "@/types/question";
-import type { ScoreResult } from "@/types/result";
+import type { PerQuestionResult, ScoreResult } from "@/types/result";
 
 // --- Mappers (snake_case DB → camelCase type) ----------------------------
 
@@ -308,6 +309,42 @@ export type ExamResult = {
   overtimeSeconds: number;
 };
 
+/** Lịch sử làm bài của CHÍNH user đang đăng nhập, rút gọn còn đúng phần
+ * computeWrongTwiceQuestionIds() cần (Engine 1, backend DD § Data Contracts).
+ *
+ * KHÔNG lọc user_id: policy `results_select_own` (schema.sql §RLS) đã giới hạn
+ * `user_id = auth.uid()`, và cột user_id không nằm trong projection này. Cũng
+ * không lọc trạng thái: exam_results chỉ có dòng cho attempt ĐÃ NỘP, vì
+ * record_exam_result() là đường ghi duy nhất và nó đòi status='submitted'.
+ *
+ * Dòng đang xem cũng nằm trong tập này — đúng theo contract ("across all
+ * attempts including the current one being viewed").
+ *
+ * SUY GIẢM MỀM khi query lỗi, KHÁC với vòng 1 của getResult(): đây là dữ liệu
+ * LÀM GIÀU cho một cờ hiển thị, không phải dữ liệu cốt lõi của trang. Trả []
+ * → mọi hasBeenWrongTwice thành undefined → affordance không hiện, đúng trạng
+ * thái fail-closed UI Spec §D1 đã định nghĩa ("Absent/false = affordance does
+ * not render", AC-024). Ném lỗi ở đây sẽ đánh sập cả màn Chi tiết vốn đã chạy
+ * tốt từ trước tính năng này — một lỗi nặng hơn hẳn lỗi nó báo. */
+async function fetchWrongTwiceAttempts(
+  supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<WrongTwiceAttempt[]> {
+  const { data, error } = await supabase.from("exam_results").select("attempt_id, per_question");
+  if (error) {
+    // Chỉ code + message: `details`/`hint` của PostgREST có thể chứa giá trị
+    // dòng dữ liệu, không được đưa vào log.
+    console.warn("[getResult] đọc lịch sử wrong-twice thất bại:", error.code, error.message);
+    return [];
+  }
+  const rows = (data ?? []) as unknown as {
+    attempt_id: string;
+    per_question: PerQuestionResult[] | null;
+  }[];
+  // per_question là jsonb → về lý thuyết có thể null với dòng hỏng; hàm thuần
+  // nhận kiểu mảng chặt nên chuẩn hoá ngay tại ranh giới dữ liệu này.
+  return rows.map((r) => ({ attemptId: r.attempt_id, perQuestion: r.per_question ?? [] }));
+}
+
 /**
  * Kết quả của một attempt đã nộp. null nếu attempt không tồn tại / chưa nộp /
  * không thuộc về user (RLS lọc) → caller redirect về trang đề (Q2=A).
@@ -329,14 +366,22 @@ export async function getResult(attemptId: string): Promise<ExamResult | null> {
   // của getExam() (RLS lọc, VÀ thêm filter published tường minh chồng lên).
   // Chỉ lấy id/title của đề vì đó là tất cả những gì hàm này dùng — cố ý KHÔNG
   // kéo cả EXAM_COLUMNS để không ngụ ý rằng có sẵn nguyên contract `Exam`.
-  const { data: joined, error: joinedErr } = await supabase
-    .from("exam_results")
-    .select(
-      "total_score, correct, total, per_question, topic_breakdown, overtime_seconds, exam_attempts!inner(started_at, submitted_at, exams_with_difficulty!inner(id, title))"
-    )
-    .eq("attempt_id", attemptId)
-    .eq("exam_attempts.exams_with_difficulty.status", "published")
-    .maybeSingle();
+  //
+  // Song song (KHÔNG nối đuôi) với vòng 1: lịch sử làm bài cho cờ
+  // hasBeenWrongTwice. Hai query không phụ thuộc nhau — cái sau chỉ cần user
+  // đang đăng nhập, không cần exam.id — nên gộp Promise.all giữ nguyên số RTT
+  // quan sát được của getResult() (Engine 1 backend DD § Integration Points).
+  const [{ data: joined, error: joinedErr }, wrongTwiceAttempts] = await Promise.all([
+    supabase
+      .from("exam_results")
+      .select(
+        "total_score, correct, total, per_question, topic_breakdown, overtime_seconds, exam_attempts!inner(started_at, submitted_at, exams_with_difficulty!inner(id, title))"
+      )
+      .eq("attempt_id", attemptId)
+      .eq("exam_attempts.exams_with_difficulty.status", "published")
+      .maybeSingle(),
+    fetchWrongTwiceAttempts(supabase),
+  ]);
   if (joinedErr) throw joinedErr;
   if (!joined) return null;
 
@@ -351,11 +396,22 @@ export async function getResult(attemptId: string): Promise<ExamResult | null> {
   const attempt = row.exam_attempts;
   const exam = attempt.exams_with_difficulty;
 
+  // Cờ chỉ có nghĩa với câu ĐANG sai VÀ có chấm — mọi dòng khác để undefined
+  // (backend DD § Data Contracts, Consumer-side gating: điều kiện nằm ở phía
+  // caller chứ không nằm trong computeWrongTwiceQuestionIds()). Mọi trường cũ
+  // của mỗi dòng giữ nguyên giá trị, chỉ thêm đúng một trường tuỳ chọn.
+  const wrongTwiceQuestionIds = computeWrongTwiceQuestionIds(wrongTwiceAttempts);
+  const perQuestion: PerQuestionResult[] = row.per_question.map((r) => ({
+    ...r,
+    hasBeenWrongTwice:
+      r.scored !== false && !r.isCorrect ? wrongTwiceQuestionIds.has(r.questionId) : undefined,
+  }));
+
   const result: ScoreResult = {
     totalScore: row.total_score,
     correct: row.correct,
     total: row.total,
-    perQuestion: row.per_question,
+    perQuestion,
     topicBreakdown: row.topic_breakdown,
   };
 
