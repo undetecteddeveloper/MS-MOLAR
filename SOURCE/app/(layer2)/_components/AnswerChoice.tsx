@@ -1,7 +1,10 @@
 // AnswerChoice — một lựa chọn đáp án trong Exam Player (Layer 2). GĐ 3 M3.1 Task 2.
 // Visual đồng bộ TEMPLATE/L2/ExamPage: hàng hairline bo góc 4px, radio native ẩn
-// (giữ a11y), text đầy đủ chiều rộng (không có badge chữ cái), viền brand 2px
-// khi chọn. Controlled qua props selected/onSelect.
+// (giữ a11y), viền brand 2px khi chọn. Controlled qua props selected/onSelect.
+// Badge chữ cái A–D đứng trước nội dung — cùng hình dạng với badge ở màn kết quả
+// (result/detail) để một lựa chọn trông giống nhau ở cả hai màn. KHÔNG aria-hidden:
+// chữ cái là cách người làm bài gọi tên đáp án ("chọn câu B"), nên nó phải nằm
+// trong tên khả truy cập của radio.
 
 import type { Choice, ChoiceId } from "@/types/question";
 import { RichText } from "@/components/shared/RichText";
@@ -37,6 +40,20 @@ export function AnswerChoice({
         onChange={() => onSelect(choice.id)}
         className="sr-only"
       />
+      <span
+        // size-6 (24px) chứ KHÔNG phải size-7: badge phải thấp hơn dòng text
+        // (text-base/leading-relaxed ≈ 26px) để không làm hàng cao thêm. Khu vực
+        // trả lời của QuestionRenderer cao CỐ ĐỊNH 238px — badge 28px đẩy đúng
+        // lựa chọn D ra ngoài vùng nhìn thấy.
+        className={`mr-3 flex size-6 shrink-0 items-center justify-center rounded-md border font-mono text-sm font-medium transition-colors ${
+          selected ? "border-brand bg-brand text-brand-foreground" : "border-border text-muted-foreground"
+        }`}
+      >
+        {choice.id}
+      </span>
+      {/* Dấu cách THẬT: tên khả truy cập nối các phần tử inline không tự chèn
+          khoảng trắng — thiếu nó screen reader đọc liền "Be^x + C". Flex bỏ qua
+          text node chỉ chứa khoảng trắng nên hình thức không đổi. */}{" "}
       <RichText
         text={choice.text}
         inline

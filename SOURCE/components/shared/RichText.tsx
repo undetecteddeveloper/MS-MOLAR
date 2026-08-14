@@ -140,6 +140,19 @@ const SANITIZE_SCHEMA: typeof defaultSchema = {
   },
 };
 
+// remark-math CHỈ hiểu $…$ / $$…$$. Nguồn đề (và Gemini, dù prompt yêu cầu $…$)
+// thường xuyên trả delimiter LaTeX chuẩn \(…\) và \[…\]. Markdown coi "\(" là
+// escape của "(" nên công thức bị hạ xuống văn bản thường, mất hẳn — không lỗi,
+// không cảnh báo. Quy đổi TRƯỚC khi vào markdown là chỗ duy nhất sửa được cả
+// nội dung ĐÃ lưu trong DB lẫn nội dung upload sau này.
+// Chỉ đổi khi có cặp đóng/mở khớp nhau; sanitize vẫn chạy cuối nên không nới
+// thêm quyền gì cho nội dung không tin cậy.
+export function normalizeMathDelimiters(text: string): string {
+  return text
+    .replace(/\\\[([\s\S]+?)\\\]/g, (_m, body: string) => `$$${body}$$`)
+    .replace(/\\\(([\s\S]+?)\\\)/g, (_m, body: string) => `$${body}$`);
+}
+
 const INLINE_COMPONENTS: Components = {
   // Gỡ <p> để text chảy inline trong nhãn lựa chọn (vẫn giữ math/format con).
   p: ({ children }) => <>{children}</>,
@@ -164,7 +177,7 @@ export function RichText({ text, className, inline = false }: RichTextProps) {
       ]}
       components={inline ? INLINE_COMPONENTS : undefined}
     >
-      {text}
+      {normalizeMathDelimiters(text)}
     </ReactMarkdown>
   );
 

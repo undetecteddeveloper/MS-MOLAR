@@ -1,6 +1,11 @@
 "use client";
 
 // QuestionEditor — sửa tại chỗ một câu (UI Spec §QuestionEditor / Task 6.4 + D1).
+// Chế độ XEM render qua <RichText> (markdown + LaTeX) — GIỐNG HỆT màn làm bài.
+// Trước đây màn này in thẳng chuỗi nguồn, nên đề có công thức hiện ra dưới dạng
+// "$\frac{1}{2}$" và tác giả không có cách nào biết đề sẽ hiển thị đúng hay
+// không cho tới khi đã publish. Chế độ SỬA vẫn là chuỗi NGUỒN (phải sửa được
+// LaTeX thì mới sửa được công thức) — đó là lý do hai chế độ khác nhau.
 // Chế độ xem: stem plain-text, QuestionFigure cho hình, lựa chọn A–D, đáp án
 // đúng chú thích "from your answer file"; essay → đáp án mẫu read-only +
 // "Essay — stored, not auto-scored yet". v2.1 (ADR-0005) thêm 2 variant:
@@ -15,6 +20,7 @@
 
 import { useState } from "react";
 import { QuestionFigure } from "@/components/shared/QuestionFigure";
+import { RichText } from "@/components/shared/RichText";
 import { useT } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n/translate";
 import { LIMITS } from "@/lib/ugc/limits";
@@ -80,7 +86,7 @@ export function QuestionEditor({
           placeholder={t("upload.questionText")}
         />
       ) : (
-        <p className="mt-3 whitespace-pre-wrap text-foreground">{q.stem}</p>
+        <RichText text={q.stem} className="mt-3 text-foreground" />
       )}
 
       {/* Hình */}
@@ -144,10 +150,10 @@ export function QuestionEditor({
                     className="flex-1 rounded-[4px] border border-border bg-card px-3 py-1.5 text-sm text-foreground outline-none focus:border-brand"
                     placeholder={t("upload.choicePlaceholder", { choice: cid })}
                   />
+                ) : choice ? (
+                  <RichText text={choice.text} inline className="flex-1 text-sm text-foreground" />
                 ) : (
-                  <span className="flex-1 text-sm text-foreground">
-                    {choice?.text ?? empty}
-                  </span>
+                  <span className="flex-1 text-sm text-foreground">{empty}</span>
                 )}
               </div>
             );
@@ -192,8 +198,10 @@ export function QuestionEditor({
                     className="flex-1 rounded-[4px] border border-border bg-card px-3 py-1.5 text-sm text-foreground outline-none focus:border-brand"
                     placeholder={t("upload.statementPlaceholder", { item: sid })}
                   />
+                ) : item ? (
+                  <RichText text={item.text} inline className="flex-1 text-sm text-foreground" />
                 ) : (
-                  <span className="flex-1 text-sm text-foreground">{item?.text ?? empty}</span>
+                  <span className="flex-1 text-sm text-foreground">{empty}</span>
                 )}
                 {/* Toggle Đ/S — đáp án của ý này (từ file đáp án, sửa được). */}
                 <div
@@ -244,9 +252,15 @@ export function QuestionEditor({
               className="mt-1 w-full rounded-[4px] border border-border bg-card px-3 py-1.5 text-sm text-foreground outline-none focus:border-brand"
               placeholder={t("upload.shortAnswerExample")}
             />
+          ) : q.essayAnswer ? (
+            <RichText
+              text={q.essayAnswer}
+              inline
+              className="mt-1 block rounded-[4px] border border-border bg-card px-3 py-1.5 text-sm text-foreground"
+            />
           ) : (
             <p className="mt-1 rounded-[4px] border border-border bg-card px-3 py-1.5 text-sm text-foreground">
-              {q.essayAnswer ?? empty}
+              {empty}
             </p>
           )}
           <p className="mt-1 text-xs italic text-muted-foreground">
@@ -267,9 +281,14 @@ export function QuestionEditor({
               rows={4}
               className="mt-1 w-full resize-y rounded-[4px] border border-border bg-card p-3 text-sm text-foreground outline-none focus:border-brand"
             />
+          ) : q.essayAnswer ? (
+            <RichText
+              text={q.essayAnswer}
+              className="mt-1 rounded-[4px] border border-border bg-card p-3 text-sm text-foreground"
+            />
           ) : (
-            <p className="mt-1 whitespace-pre-wrap rounded-[4px] border border-border bg-card p-3 text-sm text-foreground">
-              {q.essayAnswer ?? empty}
+            <p className="mt-1 rounded-[4px] border border-border bg-card p-3 text-sm text-foreground">
+              {empty}
             </p>
           )}
           <p className="mt-1 text-xs italic text-muted-foreground">{t("upload.essayStored")}</p>
