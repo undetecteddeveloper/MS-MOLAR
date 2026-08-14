@@ -46,65 +46,6 @@ vitest coi đó là suite hợp lệ và in ra dạng "todo", nên cổng xanh l
 còn nợ vẫn hiện trong output (khác hẳn với xoá file hay thêm vào `exclude`, hai
 cách đó giấu luôn ý định). Implement thật 9 test đó là việc của nhánh Engine 1.
 
-### TD-016 — `subject` không canonical trong `questions` VÀ `exams`
-**Từ:** 2026-08-08 (phát hiện khi đếm dữ liệu thật cho Engine 1 — `requirement-analyzer`
-cần biết corpus môn Toán lớn cỡ nào, không phải đi tìm bug)
-**Loại:** dữ liệu bẩn, im lặng
-**Trạng thái:** **đường ghi ĐÃ BỊT + có cổng canh (2026-08-14)** — phần DỌN DỮ LIỆU còn chờ
-
-> **Cập nhật 2026-08-14 — bản mô tả cũ của mục này SAI ở hai chỗ, đã đo lại bằng
-> `service_role` trên dev, không suy từ code:**
->
-> - **Không chỉ `questions`.** `exams.subject` cũng bẩn: 2 đề mang `'Toán'`
->   (`Math 4 · Physics 1 · Chemistry 1 · "Toán" 2`). 10 câu hỏi bẩn chính là
->   câu của đúng 2 đề đó — đường UGC cascade `subject`/`topic` từ đề xuống câu,
->   nên đếm ở tầng `questions` là đang nhìn cái BÓNG chứ không phải cái gốc.
-> - **Không phải `seed.ts`.** Cả 2 đề là UGC người dùng thật upload
->   (`ugc-f8ec9b8a…` 2026-07-20 00:06 UTC, `ugc-9c857be4…` 01:03 UTC), có
->   `author_id`. `lib/ugc/subjects.ts` ra đời commit `971a4fe` lúc 2026-07-20
->   **15:33 UTC** — tức 14 tiếng SAU. Đây là dữ liệu tồn dư của thời chưa có
->   canonical hoá, không phải một đường ghi đang rò rỉ hàng ngày.
->
-> **Đường ghi vẫn hở thật, nhưng ở chỗ khác với phỏng đoán cũ:**
-> `validateExamMeta` (`lib/ugc/validateInput.ts`) — đường **Manual** — chỉ kiểm
-> `subject` khác rỗng rồi ghi thẳng chuỗi thô. Mọi đường khác đã canonical hoá
-> từ trước (`parseTypedMeta` và `saveExam` dùng `isSubject`; đường Automatic
-> dùng `normalizeMeta` → `normalizeSubject`). S-01 render `<select>` từ
-> `SUBJECTS` nên UI không tạo được giá trị lạ — nhưng đây là **server action**,
-> và FormData thì không được tin. Đã vá: quy đổi bằng `normalizeSubject` TRƯỚC
-> rồi mới đòi canonical (alias "Toán"/"Vật lí"/… sửa được thì sửa, chỉ từ chối
-> cái không map nổi), kèm 4 test. Test cũ khẳng định `subject: "Toán"` đi qua
-> NGUYÊN VĂN — nó ghim đúng cái bug, nay đã sửa thành `"Math"`.
->
-> **Cổng canh (mới):** `verify-schema.ts` mục 8 hỏi thẳng DB "có dòng nào ngoài
-> `SUBJECTS` không", cho cả `questions` lẫn `exams`, in ra id + giá trị + giá
-> trị canonical tương ứng. Khác 7 mục kia ở chỗ nó soi DỮ LIỆU chứ không phải
-> cấu trúc — đặt ở đây vì hình dạng hỏng giống hệt TD-001/TD-005: không mã lỗi,
-> không log, chỉ THIẾU. Bịt code không dọn được dữ liệu đã ghi, và không có gì
-> bảo đảm đường ghi thứ N+1 sau này cũng nhớ canonical hoá.
->
-> **VÌ SAO CHƯA ĐÓNG:** dữ liệu vẫn bẩn. Bản vá nằm ở
-> `supabase/one-off/2026-08-14-td016-canonical-subject.sql` (idempotent, sửa cả
-> `subject` lẫn `topic`, và chỉ sửa `topic` khi nó đang phản chiếu `subject` —
-> nếu chỉ sửa `subject` thì 10 dòng thành `subject='Math'` + `topic='Toán'`,
-> đổi mảnh vỡ này lấy mảnh vỡ khác ở facet `topic`, nơi taxonomy Engine 1 đọc
-> vào). Phải paste tay qua Supabase SQL Editor cho **cả dev lẫn prod** — xem
-> TD-005. Chạy xong thì `npm run verify:schema` mục 8 phải xanh.
->
-> **Chưa đo được prod.** Session 2026-08-14 không có quyền đọc DB prod, nên số
-> dòng bẩn ở prod là ẩn số — đừng giả định nó bằng 0 chỉ vì dev đã sạch.
-
-`subject` là cột `text` tự do — không enum, không khoá ngoại — nên một giá trị
-ngoài `SUBJECTS` (`lib/ugc/subjects.ts`) ghi được bình thường.
-
-**Sẽ nổ thế nào:** mọi filter theo môn trên `/exams`, mọi thống kê theo
-`subject`, và cả taxonomy kỹ năng Engine 1 (tagging chỉ nhắm `subject = 'Math'`)
-đều **âm thầm bỏ sót** những dòng này — không lỗi, không log, chỉ thiếu. Không
-ai thấy vì kết quả vẫn "đúng dạng", chỉ thiếu vài dòng. Đã quan sát được một
-triệu chứng CỤ THỂ ở UI: mở `/me/exams/ugc-9c857be4…`, ô **Subject** hiện
-"Select a subject" — rỗng — vì `<select>` chỉ có option từ `SUBJECTS` và
-`'Toán'` không khớp cái nào.
-
 ### TD-013 — Không có rate limit nào cho lưu lượng CHƯA đăng nhập
 **Từ:** 2026-08-07 (tách ra khi trả TD-008; trước đó nằm lẫn trong mục đó)
 **Loại:** phòng thủ còn thiếu hẳn một mảng, có vật cản cụ thể
@@ -246,6 +187,47 @@ một lần chạy lại toàn file trên DB có dữ liệu đại diện, mớ
 ---
 
 ## Đã trả
+
+### ~~TD-016 — `subject` không canonical trong `questions` VÀ `exams`~~
+Bản mô tả ban đầu (2026-08-08) SAI ở hai chỗ, phát hiện khi đo lại bằng
+`service_role` trên dev thay vì suy từ code:
+  - **Không chỉ `questions`.** `exams.subject` cũng bẩn (2 đề mang `'Toán'`).
+    10 câu hỏi bẩn chính là câu của đúng 2 đề đó — UGC cascade `subject`/`topic`
+    từ đề xuống câu, nên đếm ở tầng `questions` là nhìn cái BÓNG, không phải
+    cái gốc.
+  - **Không phải `seed.ts`.** Cả 2 đề là UGC người dùng thật upload
+    (`ugc-f8ec9b8a…`, `ugc-9c857be4…`, 2026-07-20 00:06/01:03 UTC), có
+    `author_id`. `lib/ugc/subjects.ts` ra đời commit `971a4fe` lúc 15:33 UTC
+    CÙNG NGÀY — tức 14 tiếng SAU. Dữ liệu tồn dư của thời chưa có canonical
+    hoá, không phải một đường ghi rò rỉ hàng ngày.
+
+**Đường ghi đã bịt 2026-08-14** — `validateExamMeta` (`lib/ugc/validateInput.ts`,
+đường **Manual**) trước đây chỉ kiểm `subject` khác rỗng rồi ghi thẳng chuỗi
+thô. Mọi đường khác đã canonical hoá từ trước (`parseTypedMeta`/`saveExam` dùng
+`isSubject`; đường Automatic dùng `normalizeMeta` → `normalizeSubject`). S-01
+render `<select>` từ `SUBJECTS` nên UI không tạo được giá trị lạ — nhưng đây là
+**server action**, FormData không được tin. Vá bằng `normalizeSubject` TRƯỚC
+rồi mới đòi canonical (alias sửa được thì sửa, chỉ từ chối cái không map nổi —
+cùng hàm đường Automatic dùng, hai đường không thể lệch kết luận), kèm 4 test.
+
+**Cổng canh (mới, sống lâu dài):** `verify-schema.ts` mục 8 hỏi thẳng DB "có
+dòng nào ngoài `SUBJECTS` không", cho cả `questions` lẫn `exams`. Khác 7 mục
+kia ở chỗ soi DỮ LIỆU chứ không phải cấu trúc — hình dạng hỏng giống hệt
+TD-001/TD-005: không mã lỗi, không log, chỉ THIẾU.
+
+**Dữ liệu đã dọn 2026-08-14** — `supabase/one-off/2026-08-14-td016-canonical-subject.sql`
+(idempotent, sửa cả `subject` lẫn `topic`, chỉ sửa `topic` khi nó đang phản
+chiếu `subject` — tránh đổi mảnh vỡ này lấy mảnh vỡ khác ở facet `topic`, nơi
+taxonomy Engine 1 đọc vào). Áp qua Composio (`SUPABASE_BETA_RUN_SQL_QUERY`),
+không phải paste tay:
+  - **dev**: 10 câu + 2 đề → canonical. Đo trước/sau: `questions.subject=Math`
+    37→47, `exams.subject=Math` 4→6, cả 10 câu có `topic` khớp `subject` sau vá.
+    `npm run verify:schema` mục 8 xanh (57/57 câu, 8/8 đề canonical).
+  - **prod**: đo trước khi vá — **0 dòng bẩn sẵn** (28 câu/3 đề, toàn bộ
+    `Math`). Hai đề bẩn chỉ tồn tại trên dev (tài khoản test upload lúc dev
+    testing), chưa từng chạm prod. Không cần chạy UPDATE nào ở đây — xác nhận
+    bằng đếm subject trên toàn bảng, không chỉ bằng truy vấn "có dòng bẩn
+    không" (loại trừ khả năng bảng rỗng làm truy vấn dương tính giả).
 
 ### ~~TD-014 — `ADMIN_USER_IDS` mất scope Preview trên Vercel~~
 `ADMIN_USER_IDS` chỉ còn scope **Production**. Nguyên nhân đã biết từ S#46:
