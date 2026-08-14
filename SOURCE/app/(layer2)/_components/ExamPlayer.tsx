@@ -20,6 +20,7 @@ import { useLeaveGuard } from "@/hooks/useLeaveGuard";
 import { useSwipe } from "@/hooks/useSwipe";
 import type { PublicQuestion } from "@/types/question";
 import { PageContainer } from "@/components/layout/PageContainer";
+import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 
 interface ExamPlayerProps {
   attemptId: string;
@@ -120,6 +121,20 @@ export function ExamPlayer({
           style={{ "--preload-order": 1 } as React.CSSProperties}
         >
           <div className="min-w-0 max-md:flex-1">
+            {/* Về danh sách đề — TÁI DÙNG <Breadcrumbs> (đã có sẵn ở
+                exams/[id]/page.tsx), không dựng link riêng: đây đúng là lý do
+                Breadcrumbs ra đời — "← Back" chỉ nói ĐI ĐÂU chứ không nói ĐANG
+                Ở ĐÂU. `<Link>` bên trong nó vẫn là thẻ <a> thật nên interceptor
+                của useLeaveGuard bắt được y hệt navbar/BottomNav — hiện modal
+                xác nhận thay vì rời thẳng và mất bài đang làm dở.
+                Ẩn trên mobile: dải sticky đã tính chi phí từng 40px chiều cao
+                (xem comment khối cha), và BottomNav đã có sẵn ô "Đề thi" luôn
+                hiện — thêm breadcrumb ở đây là hai lối cùng chức năng chồng
+                lên nhau trên một màn hình hẹp. */}
+            <Breadcrumbs
+              items={[{ label: t("nav.exams"), href: "/exams" }, { label: examTitle }]}
+              className="mb-1.5 text-xs max-md:hidden"
+            />
             <h1 className="text-foreground font-serif text-2xl font-semibold max-md:truncate max-md:text-base sm:text-3xl">
               {examTitle}
             </h1>
