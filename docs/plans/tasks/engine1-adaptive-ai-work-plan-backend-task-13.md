@@ -18,9 +18,9 @@ Convert `tutorActions.int.test.ts`'s 4 already-generated tests into real vitest 
 - Test 4 (AC-022, rate-limit rejects before any Gemini call)
 
 ## Target Files
-- [ ] `SOURCE/app/(layer2)/tutorActions.ts` (new — `explainStep()`)
-- [ ] `SOURCE/lib/security/rateLimit.ts` (additive — `RATE_LIMITS.explainStep`)
-- [ ] `SOURCE/app/(layer2)/__tests__/tutorActions.int.test.ts` (fill in the existing skeleton's 4 tests)
+- [x] `SOURCE/app/(layer2)/tutorActions.ts` (new — `explainStep()`)
+- [x] `SOURCE/lib/security/rateLimit.ts` (additive — `RATE_LIMITS.explainStep`)
+- [x] `SOURCE/app/(layer2)/__tests__/tutorActions.int.test.ts` (fill in the existing skeleton's 4 tests)
 
 ## Investigation Targets
 - `SOURCE/app/(layer2)/__tests__/tutorActions.int.test.ts` (already generated — read in full: the BUDGET NOTE and IMPORTANT terminology note distinguishing this mocked-boundary file from `recordSkillMastery.int.test.ts`'s real-DB lane, all 4 tests' exact annotations)
@@ -41,18 +41,18 @@ Convert `tutorActions.int.test.ts`'s 4 already-generated tests into real vitest 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 
 ### 1. Red Phase
-- [ ] Read all Investigation Targets, in particular the skeleton's terminology note (this file mocks Supabase + `generateHint()`, unlike backend-task-10's real-DB file) and all 4 tests' annotations.
-- [ ] Convert the 4 skeleton tests into real vitest tests against a mocked Supabase client and mocked `generateHint()`.
-- [ ] Run the tests and confirm all 4 fail (no `explainStep()` implementation exists yet).
+- [x] Read all Investigation Targets, in particular the skeleton's terminology note (this file mocks Supabase + `generateHint()`, unlike backend-task-10's real-DB file) and all 4 tests' annotations.
+- [x] Convert the 4 skeleton tests into real vitest tests against a mocked Supabase client and mocked `generateHint()`.
+- [x] Run the tests and confirm all 4 fail (no `explainStep()` implementation exists yet).
 
 ### 2. Green Phase
-- [ ] Add `RATE_LIMITS.explainStep` to `rateLimit.ts`, matching the existing member shape (`{limit, windowMs}`).
-- [ ] Implement `explainStep(attemptId: string, questionId: string)`: inherited-session auth → RLS-scoped ownership check on the attempt → `guard("explainStep", userId)` (must run before any Gemini-facing call) → server-side re-verification via `computeWrongTwiceQuestionIds()` against the questionId (must run before `generateHint()`, independent of any client-supplied eligibility claim) → safe-column question fetch (plain authenticated client only) → `buildTutorPrompt()` + `generateHint()` → best-effort telemetry write (`event_type='tutor_invoke'`, via backend-task-12's shared payload builder).
-- [ ] Set/confirm `export const maxDuration` on this route segment, checked against `TUTOR_CALL_DEADLINE_MS`.
-- [ ] Run `npx vitest run app/\(layer2\)/__tests__/tutorActions.int.test.ts` — confirm all 4 pass.
+- [x] Add `RATE_LIMITS.explainStep` to `rateLimit.ts`, matching the existing member shape (`{limit, windowMs}`).
+- [x] Implement `explainStep(attemptId: string, questionId: string)`: inherited-session auth → RLS-scoped ownership check on the attempt → `guard("explainStep", userId)` (must run before any Gemini-facing call) → server-side re-verification via `computeWrongTwiceQuestionIds()` against the questionId (must run before `generateHint()`, independent of any client-supplied eligibility claim) → safe-column question fetch (plain authenticated client only) → `buildTutorPrompt()` + `generateHint()` → best-effort telemetry write (`event_type='tutor_invoke'`, via backend-task-12's shared payload builder).
+- [x] Set/confirm `export const maxDuration` on this route segment, checked against `TUTOR_CALL_DEADLINE_MS`.
+- [x] Run `npx vitest run app/\(layer2\)/__tests__/tutorActions.int.test.ts` — confirm all 4 pass.
 
 ### 3. Refactor Phase
-- [ ] Confirm the exact call order (`guard()` before `computeWrongTwiceQuestionIds()` before `generateHint()`, or whichever order the tests actually require — re-verify Test 1's "0 calls to `generateHint()`" and Test 4's "0 calls to `generateHint()`, rejects before Gemini" both hold simultaneously).
+- [x] Confirm the exact call order (`guard()` before `computeWrongTwiceQuestionIds()` before `generateHint()`, or whichever order the tests actually require — re-verify Test 1's "0 calls to `generateHint()`" and Test 4's "0 calls to `generateHint()`, rejects before Gemini" both hold simultaneously).
 
 ## Quality Assurance Mechanisms
 - ESLint / `tsc --noEmit` / `next build` — project-wide
@@ -99,9 +99,35 @@ Convert `tutorActions.int.test.ts`'s 4 already-generated tests into real vitest 
 - **Residual**: the `maxDuration` setting's actual effectiveness against Vercel's real Hobby-plan limits is not provable until Phase 5's real deployment/manual pass — this task only ensures the setting is explicitly present and reasoned about, not silently left to platform defaults.
 
 ## Completion Criteria
-- [ ] `explainStep()` implemented; `RATE_LIMITS.explainStep` added; `maxDuration` set/confirmed against `TUTOR_CALL_DEADLINE_MS`
-- [ ] All 4 `tutorActions.int.test.ts` tests pass
-- [ ] Each Proof Obligation is met
+- [x] `explainStep()` implemented; `RATE_LIMITS.explainStep` added; `maxDuration` set/confirmed against `TUTOR_CALL_DEADLINE_MS`
+- [x] All 4 `tutorActions.int.test.ts` tests pass
+- [x] Each Proof Obligation is met
+
+## Investigation Notes (recorded during execution)
+
+**Interfaces read (exact signatures the implementation binds to)**
+- `computeWrongTwiceQuestionIds(attempts: WrongTwiceAttempt[]): Set<string>` where `WrongTwiceAttempt = {attemptId, perQuestion: PerQuestionResult[]}` (`lib/scoring/wrongTwice.ts`) — pure, never throws, counts a questionId wrong on ≥2 *distinct* attemptIds, skips `scored === false`. Reused verbatim by `explainStep()`; no re-derivation.
+- `generateHint(input: TutorPromptInput): Promise<string>` + `class TutorCallError { code: "gemini_unavailable" | "server" }` (`lib/tutor/callTutor.ts`). `generateHint()` calls `buildTutorPrompt()` itself (line 99) → `explainStep()` builds only the `TutorPromptInput` and must NOT call `buildTutorPrompt()` a second time.
+- `buildTelemetryPayload(event: TelemetryEvent): TelemetryLogInsert` (`lib/tutor/telemetry.ts`) — the only permitted way to shape the `telemetry_log` insert.
+- `guard(action: keyof typeof RATE_LIMITS, userId: string): Promise<RateLimitResult>` (`lib/security/rateLimit.ts:132`); `RATE_LIMITS` is a closed `as const` object of `{limit, windowMs}` — `explainStep` added as a 6th member (the closed type is itself the tsc-level proof the member exists).
+- `submitExam()`'s pattern (`app/(layer2)/actions.ts:74`): the rate-limit key comes from the RLS-filtered attempt row already read, not a second `auth.getUser()` round trip. Mirrored here.
+- `rateExam()` (`actions.ts:177-229`): typed-result convention (`return {error: "..."}`, never throw/redirect, never leak `error.details`/`hint` into logs). Mirrored here.
+
+**Control/data flow chosen (side effects marked)**
+`createClient()` → read `exam_attempts(user_id)` RLS-scoped [I/O] → `guard("explainStep", userId)` [I/O, Redis] → read `exam_results(attempt_id, per_question)` unscoped-but-RLS-filtered [I/O] → `computeWrongTwiceQuestionIds()` [pure] → read `questions(content, question_type, choices)` safe columns only [I/O] → `generateHint()` [I/O, Gemini] → `telemetry_log` insert [I/O, best-effort, never alters the return value].
+
+**Declared deviations and their accepted trade-offs**
+
+1. *Gate order vs. the DD's numbered Validation list* (which places `guard()` third, after re-verification): the task file's Green Phase orders `guard()` *before* re-verification, and that is what is implemented. Both orders satisfy every DD invariant (`guard()` before any Gemini-facing call; re-verification before `generateHint()`); guard-first is the stricter cost guard — a rate-limited caller costs one attempt read instead of a full cross-attempt history scan.
+   - **Accepted cost of guard-first**: the quota is consumed by *every* invocation, including ones later rejected for non-Gemini reasons. Concretely, during a transient `exam_results` outage a user retrying the affordance burns all 20 hourly attempts on calls that never reach Gemini, and stays locked out for the remainder of the window after the DB recovers. Judged acceptable for a Sprint-1 affordance: the alternative (charge quota only for calls that reach the model) means doing the full history scan before the cost guard, which is exactly the loop an automated caller would exploit. Revisit if support reports "tutor says try again later" after an incident.
+2. *Telemetry is skipped on the two no-userId early exits* (attempt row missing/not owned, and attempt read failed) — a deliberate narrowing of the DD invariant "Every invocation (success or failure) attempts a best-effort `telemetry_log` insert". Reason: §19's `telemetry_insert_own` is `with check (user_id = auth.uid())`, so a NULL-`user_id` row is rejected outright for the `authenticated` role — the insert would not produce an unattributed row, it would produce no row plus a warning. Neither path is a tutor invocation in the AC-012 sense ("how many tutor calls happened, for whom"). Every path that *does* have a userId — including `rate_limited` and `not_eligible` — writes its row, which is why §19's `error_code` CHECK enumerates those two codes at all.
+
+**Carried-forward items resolved**
+1. *`TelemetryEvent.userId` null vs. §19 `with check (user_id = auth.uid())`*: `explainStep()` never passes `null`. The userId is read from the RLS-filtered `exam_attempts` row, so it is by construction `auth.uid()`, and the insert always satisfies the policy. The only path with no userId (attempt missing/not owned, or the attempt read itself failing) writes no telemetry at all — an insert there would be rejected by the policy and the row lost anyway, and that path is not a tutor invocation. Recorded in the code comment at the telemetry helper.
+2. *Re-verification history read must not degrade to empty*: `getResult()`'s private `fetchWrongTwiceAttempts()` (`queries.ts:329`) returns `[]` on error deliberately (display enrichment). `explainStep()` deliberately does NOT reuse it (it is also not exported): here the same read is a security boundary, so a failed read returns the typed `"server"` error instead of an empty history that would be indistinguishable from `"not_eligible"`. Only the *aggregation* is shared (`computeWrongTwiceQuestionIds`), which is what the overview's single-source-of-truth rule covers.
+3. *`TUTOR_CALL_DEADLINE_MS` (30s) vs. platform function duration* — **resolved by confirmed platform default, not by an export.** Two facts, both verified during this task: (a) Next.js 16.3.0's bundled docs (`node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/02-route-segment-config/maxDuration.md`) state `maxDuration` is a route-segment export (`layout.tsx | page.tsx | route.ts`) and that for Server Actions it must be set *at the page level* — a `"use server"` module is not a route segment and may only export async functions, so no export in `tutorActions.ts` could ever take effect. The page in question (`.../result/detail/page.tsx`) is frontend-task-01's file and outside this task's Target Files, so it was not edited. (b) Vercel's own duration documentation (`https://vercel.com/docs/functions/configuring-functions/duration`, fetched 2026-08-14, page last updated 2026-07-01) states that with fluid compute (**enabled by default**) the **default** duration is **300s on Hobby, Pro and Enterprise alike** (Hobby max also 300s). 30s therefore sits inside the platform default with a 10× margin, and `SOURCE/vercel.json` contains no `functions.maxDuration` override that could lower it. Residual (matching this task's own Proof Obligation): the dashboard-level "Default Max Duration" project setting is not readable from the repository — if it is ever lowered below 30s, or fluid compute is disabled, the page segment must export `maxDuration >= 30`. Recorded verbatim in `tutorActions.ts`'s header comment so the next maintainer of that page sees it.
+
+**Mutation (non-vacuity) evidence** — see the task report; every test was proven to fail against a deliberately broken, compile-clean implementation before being accepted. Twelve mutations in total: six from the first round (drop the wrong-twice recomputation; skip telemetry on the failure path; require a non-null `skill_node_id`; miscode `rate_limited` as `server`; degrade the history read to `[]`; move `guard()` after `generateHint()`), and six added after the integration-test review found the answer-key containment claim was proven only on the telemetry path (`studentAnswer` sourced from `PerQuestionResult.correct`; the answer key appended to `questionContent`; the question select widened to `"*"`; the per-attempt half of the eligibility gate deleted; the attempt read's `.eq("id", attemptId)` dropped; the question read filtered by `attemptId` instead of `questionId`).
 
 ## Notes
 - Impact scope: `SOURCE/app/(layer2)/tutorActions.ts` (new), `SOURCE/lib/security/rateLimit.ts` (additive member only).

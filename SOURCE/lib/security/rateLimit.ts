@@ -105,6 +105,12 @@ export const RATE_LIMITS = {
   reportExam: { limit: 15, windowMs: 60 * 60 * 1000 },
   updateProfile: { limit: 20, windowMs: 60 * 60 * 1000 },
   submitTicket: { limit: 15, windowMs: 60 * 60 * 1000 },
+  // Gia sư Socratic (Engine 1, AC-022). CHẶT hơn các mục trên vì đây là mục duy
+  // nhất tốn tiền/quota bên thứ ba mỗi lần gọi (một lượt gọi Gemini), không chỉ
+  // tốn một dòng DB. 20 lượt/giờ vẫn cao hơn nhiều lần mức dùng thật: gợi ý chỉ
+  // mở ra ở những câu đã sai hai lượt khác nhau, một học sinh hiếm khi có tới 20
+  // câu như thế trong một giờ.
+  explainStep: { limit: 20, windowMs: 60 * 60 * 1000 },
 } as const;
 
 /**
