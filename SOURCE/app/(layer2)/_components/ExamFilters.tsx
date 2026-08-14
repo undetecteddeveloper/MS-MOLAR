@@ -103,6 +103,22 @@ export function ExamFilters({
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [open, setOpen] = useState(false); // master *Filter open/close
+  // Row nào (subject/grade/school/...) đang mở dropdown — CHỈ MỘT row tại một
+  // thời điểm. Trước đây mỗi FilterRow tự giữ state riêng (`rowOpen` cục bộ)
+  // nên mở School rồi mở tiếp Semester không đóng School lại: hai overlay
+  // `absolute` cùng z-30 chồng lên nhau, danh sách option của cả hai row lẫn
+  // vào nhau trên desktop (engineer chụp ảnh báo lại 2026-08-14).
+  const [openFilterKey, setOpenFilterKey] = useState<string | null>(null);
+
+  function toggleFilterPanel() {
+    setOpen((v) => !v);
+    setOpenFilterKey(null);
+  }
+
+  function closeFilterPanel() {
+    setOpen(false);
+    setOpenFilterKey(null);
+  }
 
   function setParam(key: string, value: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -215,7 +231,7 @@ export function ExamFilters({
         <button
           aria-hidden
           tabIndex={-1}
-          onClick={() => setOpen(false)}
+          onClick={closeFilterPanel}
           className="animate-in fade-in fixed inset-0 z-10 cursor-default duration-200"
           style={{ backgroundColor: SCRIM_BG }}
         />
@@ -251,7 +267,7 @@ export function ExamFilters({
             type="button"
             aria-label={t("common.filters")}
             aria-expanded={open}
-            onClick={() => setOpen((v) => !v)}
+            onClick={toggleFilterPanel}
             style={{ "--preload-order": 1 } as React.CSSProperties}
             // ⚠ KHÔNG thêm `active:scale-*`/`transition-transform` ở nút này:
             // nó mang class `preload-fade` — animation đó kết thúc bằng
@@ -308,7 +324,7 @@ export function ExamFilters({
                 <button
                   type="button"
                   aria-expanded
-                  onClick={() => setOpen(false)}
+                  onClick={closeFilterPanel}
                   className="flex items-center gap-3"
                 >
                   <span className="eyebrow">Filters{hasFilters ? " · active" : ""}</span>
@@ -339,6 +355,7 @@ export function ExamFilters({
               </div>
 
               <FilterRow
+                filterKey="subject"
                 label={t("common.subject")}
                 selectedLabel={selected.subject}
                 currentValue={selected.subject ?? ""}
@@ -347,8 +364,11 @@ export function ExamFilters({
                   ...subjects.map((s) => ({ value: s, label: s })),
                 ]}
                 onSelect={(v) => setParam("subject", v)}
+                open={openFilterKey === "subject"}
+                onOpenChange={(v) => setOpenFilterKey(v ? "subject" : null)}
               />
               <FilterRow
+                filterKey="grade"
                 label={t("common.grade")}
                 selectedLabel={
                   selected.grade !== undefined
@@ -364,8 +384,11 @@ export function ExamFilters({
                   })),
                 ]}
                 onSelect={(v) => setParam("grade", v)}
+                open={openFilterKey === "grade"}
+                onOpenChange={(v) => setOpenFilterKey(v ? "grade" : null)}
               />
               <FilterRow
+                filterKey="school"
                 label={t("common.school")}
                 selectedLabel={selected.school}
                 currentValue={selected.school ?? ""}
@@ -374,8 +397,11 @@ export function ExamFilters({
                   ...schools.map((s) => ({ value: s, label: s })),
                 ]}
                 onSelect={(v) => setParam("school", v)}
+                open={openFilterKey === "school"}
+                onOpenChange={(v) => setOpenFilterKey(v ? "school" : null)}
               />
               <FilterRow
+                filterKey="year"
                 label={t("common.year")}
                 selectedLabel={selected.year !== undefined ? String(selected.year) : undefined}
                 currentValue={selected.year !== undefined ? String(selected.year) : ""}
@@ -384,8 +410,11 @@ export function ExamFilters({
                   ...years.map((y) => ({ value: String(y), label: String(y) })),
                 ]}
                 onSelect={(v) => setParam("year", v)}
+                open={openFilterKey === "year"}
+                onOpenChange={(v) => setOpenFilterKey(v ? "year" : null)}
               />
               <FilterRow
+                filterKey="semester"
                 label={t("common.semester")}
                 selectedLabel={selected.semester}
                 currentValue={selected.semester ?? ""}
@@ -394,10 +423,13 @@ export function ExamFilters({
                   ...semesters.map((s) => ({ value: s, label: s })),
                 ]}
                 onSelect={(v) => setParam("semester", v)}
+                open={openFilterKey === "semester"}
+                onOpenChange={(v) => setOpenFilterKey(v ? "semester" : null)}
               />
               {/* Level — bucket độ khó cộng đồng (Rating System, D002 sibling
                   change: real FilterRow thay panel "Coming soon"). */}
               <FilterRow
+                filterKey="level"
                 label={t("exams.level")}
                 selectedLabel={
                   selected.level !== undefined
@@ -410,6 +442,8 @@ export function ExamFilters({
                 currentValue={selected.level ?? ""}
                 options={LEVEL_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
                 onSelect={(v) => setParam("level", v)}
+                open={openFilterKey === "level"}
+                onOpenChange={(v) => setOpenFilterKey(v ? "level" : null)}
                 last
               />
             </div>
@@ -450,21 +484,26 @@ interface Option {
 }
 
 function FilterRow({
+  filterKey,
   label,
   selectedLabel,
   currentValue,
   options,
   onSelect,
+  open: rowOpen,
+  onOpenChange,
   last = false,
 }: {
+  filterKey: string;
   label: string;
   selectedLabel?: string;
   currentValue?: string;
   options: Option[];
   onSelect: (value: string) => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   last?: boolean;
 }) {
-  const [rowOpen, setRowOpen] = useState(false);
   const rowRef = useRef<HTMLDivElement>(null);
 
   // Cuộn cả row vào vùng nhìn thấy của bottom sheet khi mở — dưới `md` bảng
@@ -487,12 +526,16 @@ function FilterRow({
   }, [rowOpen]);
 
   return (
-    <div ref={rowRef} className={`relative ${last ? "" : "border-border border-b"}`}>
+    <div
+      ref={rowRef}
+      data-filter-key={filterKey}
+      className={`relative ${last ? "" : "border-border border-b"}`}
+    >
       {/* S#26: bỏ tam giác trong dropdown (RowTriangle) — row chỉ còn nhãn. */}
       <button
         type="button"
         aria-expanded={rowOpen}
-        onClick={() => setRowOpen((v) => !v)}
+        onClick={() => onOpenChange(!rowOpen)}
         className="hover:bg-accent/50 flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors duration-150"
       >
         <span className="flex flex-col gap-0.5">
@@ -505,7 +548,10 @@ function FilterRow({
 
       {/* Bảng chọn của filter — desktop (`md:`) là OVERLAY absolute (đè row
           dưới, không xê dịch); mobile IN-FLOW (đẩy row dưới xuống) — lý do đầy
-          đủ ở comment đầu file (2026-08-09, bug dropdown Year bị BottomNav đè). */}
+          đủ ở comment đầu file (2026-08-09, bug dropdown Year bị BottomNav đè).
+          `open` được điều khiển từ ExamFilters (CHỈ một row mở tại một thời
+          điểm) — trước đây mỗi row tự giữ state riêng nên mở 2 row cùng lúc
+          làm 2 overlay `absolute` này chồng/lẫn vào nhau trên desktop. */}
       {rowOpen && (
         <div
           className="border-border animate-in fade-in slide-in-from-top-1 z-30 border-x border-b duration-150 ease-out md:absolute md:inset-x-0 md:top-full"
@@ -520,7 +566,7 @@ function FilterRow({
                     type="button"
                     onClick={() => {
                       onSelect(opt.value);
-                      setRowOpen(false);
+                      onOpenChange(false);
                     }}
                     aria-pressed={active}
                     className={`flex w-full items-center gap-2 px-4 py-2 text-left font-serif text-base transition-colors ${
