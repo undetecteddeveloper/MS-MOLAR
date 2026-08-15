@@ -14,6 +14,7 @@
 // chặn nháy đúp thật sự là busyRef đồng bộ trong hook.
 
 import { Lightbulb, Loader2 } from "lucide-react";
+import { useEffect, useRef } from "react";
 import { BentoCell } from "@/components/layout/BentoGrid";
 import { RichText } from "@/components/shared/RichText";
 import { Button } from "@/components/ui/button";
@@ -35,15 +36,40 @@ export function ExplainStepAffordance({ questionId, attemptId }: ExplainStepAffo
   // một trang — không cần thêm prop idPrefix (Minimal Surface Element 3).
   const reasonId = `tutor-${questionId}-reason`;
 
+  // Bắt lại focus khi bảng gợi ý THAY THẾ nút (Phase 5 Task 19, đo trên trình
+  // duyệt thật): D5 buộc nút biến mất hẳn, mà nút đó chính là phần tử đang giữ
+  // focus của người dùng bàn phím vừa bấm Enter/Space. Trình duyệt trả focus về
+  // <body>, nên Tab kế tiếp nhảy ngược lên đầu tài liệu và người dùng bàn phím
+  // không bao giờ tới được nội dung họ vừa yêu cầu. tabIndex={-1} cho bảng nhận
+  // được focus theo lệnh mà KHÔNG chen vào thứ tự Tab.
+  //
+  // Ref chứ KHÔNG phải document.getElementById(): id chỉ duy nhất trong một
+  // trang thật, còn trong jsdom nhiều lần render cùng questionId sống chung một
+  // document, và getElementById sẽ trả về panel của lần render TRƯỚC.
+  //
+  // Ref nằm trên một <div> bọc ngoài chứ không trên chính <BentoCell>: BentoCell
+  // là component đa hình (`as` = div|li|section), nên khai một prop `ref` ở đó
+  // buộc TS giao props của cả ba thẻ và không kiểu ref nào thoả được. Đổi API
+  // một component dùng chung để lấy một lời gọi .focus() cục bộ là cái giá sai;
+  // <div> bọc ngoài không đổi bố cục vì <li> cha đã là flex-col (item vẫn dàn
+  // hết chiều ngang).
+  const hintRef = useRef<HTMLDivElement>(null);
+  const showHint = phase === "hint-shown" && hint !== null;
+  useEffect(() => {
+    if (showHint) hintRef.current?.focus();
+  }, [showHint]);
+
   // D5: gợi ý hiện ra là trạng thái CUỐI của lượt render này — nút bị THAY THẾ
   // hẳn (không phải ẩn đi hay khoá lại), nên không còn nút nào để gọi gia sư
   // lần nữa cho câu này.
-  if (phase === "hint-shown" && hint !== null) {
+  if (showHint) {
     return (
-      <BentoCell span="full">
-        <span className="eyebrow">{t("tutor.hintEyebrow")}</span>
-        <RichText text={hint} className="text-foreground mt-2 text-base leading-relaxed" />
-      </BentoCell>
+      <div ref={hintRef} tabIndex={-1} className="focus-visible:outline-ring rounded-[var(--radius-card)] focus-visible:outline-2 focus-visible:outline-offset-2">
+        <BentoCell span="full">
+          <span className="eyebrow">{t("tutor.hintEyebrow")}</span>
+          <RichText text={hint} className="text-foreground mt-2 text-base leading-relaxed" />
+        </BentoCell>
+      </div>
     );
   }
 

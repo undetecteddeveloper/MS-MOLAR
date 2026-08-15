@@ -233,6 +233,18 @@ describe("ExplainStepAffordance", () => {
     expect(within(container).queryByRole("button", { name: RETRY_LABEL })).toBeNull();
     expect(container.querySelectorAll("button").length).toBe(0);
     expect(container.textContent).toContain("Hint"); // tutor.hintEyebrow
+
+    // Hồi quy Phase 5 Task 19 (đo bằng bàn phím trên trình duyệt thật, không
+    // phải suy diễn): D5 xoá hẳn cái nút vừa GIỮ FOCUS của người dùng bàn phím,
+    // và trình duyệt đáp lại bằng cách trả focus về <body> — Tab kế tiếp nhảy
+    // ngược lên đầu tài liệu, người dùng bàn phím không bao giờ tới được gợi ý
+    // họ vừa xin. Bảng gợi ý phải tự nhận lấy focus, và phải bằng tabIndex={-1}
+    // (nhận theo lệnh) chứ không phải 0 — nó là nội dung tĩnh, không được chen
+    // thêm một chặng vào thứ tự Tab của trang.
+    const panel = container.querySelector<HTMLElement>('[tabindex="-1"]');
+    expect(panel).not.toBeNull();
+    expect(document.activeElement).toBe(panel);
+    expect(panel!.textContent).toContain("định luật bảo toàn");
   });
 
   // ===========================================================================
