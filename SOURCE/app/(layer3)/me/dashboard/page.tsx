@@ -8,8 +8,9 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { getTranslate } from "@/lib/i18n/server";
-import { getAnalyticsByRange } from "@/app/(layer3)/queries";
+import { getAnalyticsByRange, getSkillRecommendation } from "@/app/(layer3)/queries";
 import { AnalyticsDashboard } from "@/app/(layer3)/_components/AnalyticsDashboard";
+import { SkillRecommendationCard } from "@/app/(layer3)/_components/SkillRecommendationCard";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { PageHeader } from "@/components/layout/PageHeader";
 
@@ -18,7 +19,16 @@ export default async function DashboardPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/?auth=signin");
 
-  const dataByRange = await getAnalyticsByRange();
+  // Song song chứ không nối tiếp: hai lệnh đọc độc lập nhau, để nối tiếp thì
+  // gợi ý kỹ năng phải xếp hàng sau toàn bộ dữ liệu biểu đồ và làm trang chậm
+  // đi đúng bằng thời gian của lệnh đọc kia (frontend DD § Constraints).
+  // Ngữ nghĩa lỗi giữ nguyên như trước: một lệnh đọc hỏng thì cả trang đi vào
+  // xử lý lỗi cấp trang — đúng thứ `await getAnalyticsByRange()` trần vẫn làm,
+  // và đúng điều UI Spec đã chốt cho thẻ gợi ý (không có UI lỗi riêng cho nó).
+  const [dataByRange, recommendation] = await Promise.all([
+    getAnalyticsByRange(),
+    getSkillRecommendation(),
+  ]);
 
   return (
     // `full` (72rem) thay max-w-4xl cũ: đây là trang lưới dữ liệu — biểu đồ có
@@ -30,6 +40,10 @@ export default async function DashboardPage() {
         title={t("analytics.title")}
         description={t("analytics.subtitle")}
       />
+
+      <div className="mt-6">
+        <SkillRecommendationCard recommendation={recommendation} />
+      </div>
 
       <div className="mt-6">
         <AnalyticsDashboard dataByRange={dataByRange} />

@@ -230,6 +230,19 @@ export const en = {
   "analytics.rangeMonth": "Month",
   "analytics.rangeAll": "All time",
   "analytics.donutSubtitle": "% share of practice sessions by subject, this {range}",
+  // SkillRecommendationCard (Engine 1). Nối vào ngay khối `analytics.*` này chứ
+  // không thêm khối mới ở cuối file: thẻ gợi ý sống trên chính route
+  // /me/dashboard vốn đã sở hữu namespace này, tách ra là làm phân mảnh nó.
+  // Nhãn kỹ năng (skillLabel) KHÔNG có ở đây — đó là nội dung chương trình học
+  // do backend trả về, không phải chữ giao diện.
+  "analytics.recommendTitle": "What to practise next",
+  "analytics.recommendColdStart":
+    "Not enough data yet — practise a Math exam to get your first recommendation.",
+  "analytics.recommendWhy": "Why this skill?",
+  "analytics.recommendReasonPrerequisiteGate":
+    "A skill you haven't mastered yet comes before this one.",
+  "analytics.recommendReasonLowestMastery": "This is the skill you're weakest at right now.",
+  "analytics.recommendReasonRecentlyWrong": "You got this one wrong recently.",
 
   // --- Tải đề lên (UGC) ---------------------------------------------------
   "upload.title": "Import Exam Document",

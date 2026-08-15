@@ -19,11 +19,11 @@ Add the parallel `getSkillRecommendation()` fetch to `DashboardPage`'s existing 
 - Test 3 (AC-028, cold-start renders without throwing, honest copy, populated-only elements absent)
 
 ## Target Files
-- [ ] `SOURCE/lib/i18n/dictionaries/en.ts` (additive — extend existing `analytics.*` block with `recommend*` keys)
-- [ ] `SOURCE/lib/i18n/dictionaries/vi.ts` (additive — same)
-- [ ] `SOURCE/app/(layer3)/_components/SkillRecommendationCard.tsx` (new)
-- [ ] `SOURCE/app/(layer3)/me/dashboard/page.tsx` (additive — parallel fetch + mount)
-- [ ] `SOURCE/app/(layer3)/_components/SkillRecommendationCard.test.tsx` (fill in the existing skeleton's 3 tests, or record the fallback decision)
+- [x] `SOURCE/lib/i18n/dictionaries/en.ts` (additive — extend existing `analytics.*` block with `recommend*` keys)
+- [x] `SOURCE/lib/i18n/dictionaries/vi.ts` (additive — same)
+- [x] `SOURCE/app/(layer3)/_components/SkillRecommendationCard.tsx` (new)
+- [x] `SOURCE/app/(layer3)/me/dashboard/page.tsx` (additive — parallel fetch + mount)
+- [x] `SOURCE/app/(layer3)/_components/SkillRecommendationCard.test.tsx` (fill in the existing skeleton's 3 tests, or record the fallback decision)
 
 ## Investigation Targets
 - `SOURCE/app/(layer3)/_components/SkillRecommendationCard.test.tsx` (already generated — read in full: the IMPLEMENTER NOTE on the unprecedented async-Server-Component render technique and its explicit fallback instruction, the Mock Boundary Decisions note on `getTranslate()`, all 3 tests' exact annotations)
@@ -48,22 +48,22 @@ This task extends `DashboardPage`'s existing render tree (an already-shipped pag
 ## Implementation Steps (TDD: Red-Green-Refactor)
 
 ### 1. Red Phase
-- [ ] Read all Investigation Targets, in particular the skeleton's fallback instruction and all 3 tests' annotations.
-- [ ] Sweep the `AnalyticsDashboard`-untouched and `Promise.all`-error-handling adjacent cases per Change Category above; record findings in Investigation Notes.
-- [ ] Add `// @vitest-environment jsdom` as the real test file's first line.
-- [ ] Attempt the `render(await SkillRecommendationCard({ recommendation }))` technique on a minimal throwaway case first, to determine early whether the fallback is needed — record the outcome in Investigation Notes before writing the full 3-test suite.
-- [ ] If the technique works: convert the 3 skeleton tests into real vitest(jsdom) tests. If it does not: document the fallback decision explicitly and plan for manual/Playwright-only verification (Phase 5 Task 18) instead — do not silently skip.
-- [ ] Run the tests (if written) and confirm they fail (no implementation exists yet).
+- [x] Read all Investigation Targets, in particular the skeleton's fallback instruction and all 3 tests' annotations.
+- [x] Sweep the `AnalyticsDashboard`-untouched and `Promise.all`-error-handling adjacent cases per Change Category above; record findings in Investigation Notes.
+- [x] Add `// @vitest-environment jsdom` as the real test file's first line.
+- [x] Attempt the `render(await SkillRecommendationCard({ recommendation }))` technique on a minimal throwaway case first, to determine early whether the fallback is needed — record the outcome in Investigation Notes before writing the full 3-test suite.
+- [x] If the technique works: convert the 3 skeleton tests into real vitest(jsdom) tests. If it does not: document the fallback decision explicitly and plan for manual/Playwright-only verification (Phase 5 Task 18) instead — do not silently skip.
+- [x] Run the tests (if written) and confirm they fail (no implementation exists yet).
 
 ### 2. Green Phase
-- [ ] Extend `en.ts`/`vi.ts`'s existing `analytics.*` block in place with `recommend*` keys (including `recommendColdStart` and the 3 `REASON_KEY`-mapped reason strings).
-- [ ] Implement `SkillRecommendationCard.tsx`: Server Component, no `"use client"`; populated state renders `skillLabel` verbatim + closed-by-default `<details>`/`<summary>` via `REASON_KEY`; cold-start state (`recommendation === null`) renders `analytics.recommendColdStart`, never throws, never blank.
-- [ ] Add the parallel `getSkillRecommendation()` fetch to `DashboardPage`'s `Promise.all`; mount `SkillRecommendationCard` between `PageHeader` and `AnalyticsDashboard`; confirm `AnalyticsDashboard`'s own props/children are unchanged.
-- [ ] Run `npx vitest run components/tutor app/\(layer3\)/_components` (project-wide staged gate for this phase) — confirm this task's tests pass (if the technique was viable).
+- [x] Extend `en.ts`/`vi.ts`'s existing `analytics.*` block in place with `recommend*` keys (including `recommendColdStart` and the 3 `REASON_KEY`-mapped reason strings).
+- [x] Implement `SkillRecommendationCard.tsx`: Server Component, no `"use client"`; populated state renders `skillLabel` verbatim + closed-by-default `<details>`/`<summary>` via `REASON_KEY`; cold-start state (`recommendation === null`) renders `analytics.recommendColdStart`, never throws, never blank.
+- [x] Add the parallel `getSkillRecommendation()` fetch to `DashboardPage`'s `Promise.all`; mount `SkillRecommendationCard` between `PageHeader` and `AnalyticsDashboard`; confirm `AnalyticsDashboard`'s own props/children are unchanged.
+- [x] Run `npx vitest run components/tutor app/\(layer3\)/_components` (project-wide staged gate for this phase) — confirm this task's tests pass (if the technique was viable).
 
 ### 3. Refactor Phase
-- [ ] Confirm the Reference Contract's Compliance Check evaluates to `Y`; record evidence.
-- [ ] Confirm `AnalyticsDashboard`'s render is byte-identical to before this change for a fixture dashboard load.
+- [x] Confirm the Reference Contract's Compliance Check evaluates to `Y`; record evidence.
+- [x] Confirm `AnalyticsDashboard`'s render is byte-identical to before this change for a fixture dashboard load.
 
 ## Quality Assurance Mechanisms
 - ESLint / `tsc --noEmit` / `next build` — project-wide
@@ -98,11 +98,82 @@ This task extends `DashboardPage`'s existing render tree (an already-shipped pag
 - **Residual**: none.
 
 ## Completion Criteria
-- [ ] `analytics.recommend*` i18n keys added in place; `SkillRecommendationCard.tsx` implemented; mounted on `DashboardPage` between `PageHeader`/`AnalyticsDashboard`
-- [ ] All 3 tests pass, OR the fallback decision is explicitly documented in Investigation Notes and Phase 5 Task 18 is confirmed as this component's verification path
-- [ ] Reference Contract's Compliance Check evaluates to `Y`, evidence recorded
-- [ ] `AnalyticsDashboard` confirmed byte-identical/unchanged
-- [ ] Each Proof Obligation is met (directly, or transferred to Phase 5 Task 18 if the fallback was taken)
+- [x] `analytics.recommend*` i18n keys added in place; `SkillRecommendationCard.tsx` implemented; mounted on `DashboardPage` between `PageHeader`/`AnalyticsDashboard`
+- [x] All 3 tests pass, OR the fallback decision is explicitly documented in Investigation Notes and Phase 5 Task 18 is confirmed as this component's verification path
+- [x] Reference Contract's Compliance Check evaluates to `Y`, evidence recorded
+- [x] `AnalyticsDashboard` confirmed byte-identical/unchanged
+- [x] Each Proof Obligation is met (directly, or transferred to Phase 5 Task 18 if the fallback was taken)
+
+## Investigation Notes
+
+**Render technique outcome — the fallback was NOT needed.** A throwaway probe
+(`SkillRecommendationCard.probe.test.tsx`, created, run, then deleted) rendered a
+minimal async component that awaits the real `getTranslate()` via
+`render(await Probe())` under React 19.2.4 / RTL 16.3.2 / vitest 4.1.10 / jsdom
+29.1.1 — passed on the first attempt (1 test, 1.61s). The only two things
+`getTranslate()` needs from the Next server runtime are stubbed in the real test
+file, both with existing repo precedent and both explicitly sanctioned by the
+skeleton's Mock Boundary note:
+- `vi.mock("server-only", () => ({}))` — precedent `app/(layer3)/__tests__/getSkillRecommendation.int.test.ts:27`
+- `vi.mock("next/headers", ...)` returning a `cookies()` whose `get()` yields
+  `undefined` — precedent `app/(admin)/admin/tickets/__tests__/actions.int.test.ts:86`
+
+`getTranslate()` itself stays REAL (not stubbed to an identity function), so the
+3 tests assert against the real dictionary; the absent cookie resolves to
+`DEFAULT_LOCALE` = `en`, which is why the expected copy is English. All 3 tests
+pass. Phase 5 Task 18's manual/Playwright pass therefore remains an addition, not
+this component's sole verification path.
+
+**Reference Contract (`REASON_KEY`) — Compliance Check = `Y`.**
+`SkillRecommendationCard.tsx:19-23` declares
+`Record<ReasonCode, MessageKey>` with exactly
+`"prerequisite-gate" → "analytics.recommendReasonPrerequisiteGate"`,
+`"lowest-mastery" → "analytics.recommendReasonLowestMastery"`,
+`"recently-wrong" → "analytics.recommendReasonRecentlyWrong"` — byte-identical to
+the frontend DD § Design block. Evidence beyond inspection: (a) `ReasonCode` is
+derived as `Exclude<SkillRecommendation, null>["reasonCode"]`, so `Record<...>`
+makes a *missing* member a compile error (`tsc --noEmit` clean); (b) a mutation
+run mapping `"recently-wrong"` to the `lowest-mastery` key made Test 2 fail
+(`expected 'This is the skill you're weakest at …' to be 'You got this one wrong
+recently.'`), proving the *duplicate*-mapping half of the check is actually
+exercised and not an always-passing assertion. Mutation reverted; suite green.
+
+**Adjacent-case sweep 1 — `AnalyticsDashboard` untouched: confirmed.**
+`git status`/`git diff --stat` show no entry for `AnalyticsDashboard.tsx`,
+`BarChartCard.tsx`, or `DonutChartCard.tsx`. Its mount site is unchanged
+(`<AnalyticsDashboard dataByRange={dataByRange} />`, same single prop, same
+`<div className="mt-6">` wrapper); the new card is a *sibling* `<div>` inserted
+before it, not a wrapper around it, so its own render tree is byte-identical.
+
+**Adjacent-case sweep 2 — `Promise.all` error semantics (with a task-file
+discrepancy).** The task file and the frontend DD both describe an *existing*
+`Promise.all` in `DashboardPage` ("line ~242"); there is none. The real file was
+39 lines with a single bare `const dataByRange = await getAnalyticsByRange();`.
+`Promise.all` is therefore *introduced* by this task (which is what the DD's
+Constraints section actually asks for: the recommendation read must not serialize
+behind the analytics read). Finding on semantics: the change is neutral for the
+pre-existing member and fail-fast for the new one, deliberately —
+- Before: `getAnalyticsByRange()` rejecting propagated out of the async page
+  component to page-level error handling.
+- After: `Promise.all` still rejects on the first rejection, so
+  `getAnalyticsByRange()` behaves exactly as before, and a rejecting
+  `getSkillRecommendation()` now also breaks the whole dashboard render.
+- That blast radius is the *specified* behavior, not an accident: UI Spec
+  § Component: DashboardPage state × display matrix ("a fetch failure here
+  follows the same (unchanged) top-level error handling as the existing
+  `getAnalyticsByRange()` call; no new per-component error UI is introduced") and
+  its AC-031 mount row ("Falls back to the page's existing top-level error
+  handling if the fetch throws (unchanged)"). Note `getSkillRecommendation()`
+  does throw on a Supabase read error (`queries.ts:112-114`), while its
+  cold-start path returns `null` rather than throwing — so the highest-frequency
+  "no data" case never reaches this error path at all.
+- No `.catch(() => null)` swallow was added: inventing per-component error
+  recovery here would change the existing page's error strategy, which this task
+  is not authorized to do. Recorded for review rather than silently altered.
+
+**Auth-guard ordering preserved**: the `getCurrentUser()` guard + `redirect()`
+still run strictly before both data reads (the page's own header comment makes
+this a hard rule), so the new fetch never fires for an unauthenticated visitor.
 
 ## Notes
 - Impact scope: `SOURCE/app/(layer3)/_components/SkillRecommendationCard.tsx` (new), `SOURCE/app/(layer3)/me/dashboard/page.tsx` (additive fetch + mount only), `SOURCE/lib/i18n/dictionaries/{en,vi}.ts` (additive, in-place `analytics.*` extension).

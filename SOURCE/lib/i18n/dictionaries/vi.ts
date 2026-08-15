@@ -205,6 +205,15 @@ export const vi: Dictionary = {
   "analytics.rangeMonth": "Tháng",
   "analytics.rangeAll": "Toàn thời gian",
   "analytics.donutSubtitle": "% tỷ lệ lượt luyện tập theo môn, trong {range} này",
+  // SkillRecommendationCard (Engine 1) — đặt cùng vị trí tương đối với en.ts.
+  "analytics.recommendTitle": "Nên luyện gì tiếp theo",
+  "analytics.recommendColdStart":
+    "Chưa đủ dữ liệu — bạn luyện một đề Toán để nhận gợi ý đầu tiên nhé.",
+  "analytics.recommendWhy": "Vì sao là kỹ năng này?",
+  "analytics.recommendReasonPrerequisiteGate":
+    "Có một kỹ năng nền bạn chưa nắm vững đứng trước kỹ năng này.",
+  "analytics.recommendReasonLowestMastery": "Đây là kỹ năng bạn đang yếu nhất lúc này.",
+  "analytics.recommendReasonRecentlyWrong": "Bạn vừa làm sai kỹ năng này gần đây.",
 
   // --- Tải đề lên (UGC) ---------------------------------------------------
   "upload.title": "Tải đề lên",
