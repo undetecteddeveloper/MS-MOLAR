@@ -4,11 +4,13 @@ Covers Work Plan Phase 3 (Tasks 9-13 / `engine1-adaptive-ai-work-plan-backend-ta
 
 ## All-Task Completion Checklist
 
-- [ ] backend-task-09 (T9 — `wrongTwice.ts` + `getResult()`) complete: `wrongTwice.test.ts` 3/3 green; Output Comparison confirms no regression.
-- [ ] backend-task-10 (T10 — mastery-write TS wiring) complete: `recordSkillMastery.int.test.ts` 2/2 green against **real dev Postgres**; requires backend-task-01's checkpoint already passed.
-- [ ] backend-task-11 (T11 — `prompt.ts`) complete: `prompt.test.ts` 3/3 green, incl. the 0-occurrence sentinel battery.
-- [ ] backend-task-12 (T12 — `callTutor.ts` + telemetry) complete: `telemetry.test.ts` 1/1 green.
-- [ ] backend-task-13 (T13 — `explainStep()`) complete: `tutorActions.int.test.ts` 4/4 green.
+- [x] backend-task-09 (T9 — `wrongTwice.ts` + `getResult()`) complete: `wrongTwice.test.ts` 3/3 green; Output Comparison confirms no regression.
+- [x] backend-task-10 (T10 — mastery-write TS wiring) complete: `recordSkillMastery.int.test.ts` 2/2 green against **real dev Postgres**; requires backend-task-01's checkpoint already passed.
+- [x] backend-task-11 (T11 — `prompt.ts`) complete: `prompt.test.ts` 3/3 green, incl. the 0-occurrence sentinel battery.
+- [x] backend-task-12 (T12 — `callTutor.ts` + telemetry) complete: `telemetry.test.ts` 1/1 green; `callTutor.test.ts` (12 cases, added 2026-08-14 post-check — backend DD Test Boundaries named this file but it had never been written) covers `classifyCallError()`/`generateHint()`'s finishReason/emptyText/retryable-status/AbortError/server branches directly, previously 0 coverage (every other call site mocks the module away).
+- [x] backend-task-13 (T13 — `explainStep()`) complete: `tutorActions.int.test.ts` 4/4 green.
+
+Verified 2026-08-14 via `dev-workflows-fullstack:code-verifier` + `:security-reviewer` post-check (engineer-requested, optional hậu kiểm): all 5 tasks' tests actually re-run against real dev Postgres where applicable (not assumed from this file's stale un-ticked state — this checklist was authored once in commit `0459f64` and never re-ticked after Tasks 9-13 landed in `585031a`..`6d5d80d`), trust boundary (ADR-0011) and answer-key containment confirmed closed at the DB-grant level, not just app-discipline level. See conversation/Notion log for full findings; only actionable gap found was the missing `callTutor.test.ts` coverage, now closed.
 
 ## Test Skeleton Paths for Verification
 
@@ -20,11 +22,11 @@ Covers Work Plan Phase 3 (Tasks 9-13 / `engine1-adaptive-ai-work-plan-backend-ta
 
 ## Phase Completion Criteria (verbatim from Work Plan)
 
-- [ ] `hasBeenWrongTwice` computed correctly and wired into `getResult()`'s existing output shape (byte-identical for all pre-existing fields)
-- [ ] Mastery-write integration verified end-to-end against real dev Postgres (Task 10's 2 tests green); a forged student-JWT call to `record_skill_mastery()` is denied
-- [ ] Answer-key containment proven with 0 occurrences across both the prompt-builder and telemetry-payload fixture batteries
-- [ ] `explainStep()`'s server-side re-verification is proven to be the actual eligibility gate, independent of client-supplied state
-- [ ] Rate limiting proven to block before any Gemini call fires
+- [x] `hasBeenWrongTwice` computed correctly and wired into `getResult()`'s existing output shape (byte-identical for all pre-existing fields)
+- [x] Mastery-write integration verified end-to-end against real dev Postgres (Task 10's 2 tests green); a forged student-JWT call to `record_skill_mastery()` is denied
+- [x] Answer-key containment proven with 0 occurrences across both the prompt-builder and telemetry-payload fixture batteries
+- [x] `explainStep()`'s server-side re-verification is proven to be the actual eligibility gate, independent of client-supplied state
+- [x] Rate limiting proven to block before any Gemini call fires
 
 ## Verification Commands
 
