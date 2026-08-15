@@ -22,10 +22,23 @@ export const MASTERY_CLEARED_THRESHOLD = 0.7;
  * (PRD U3/D2/AC-005). Dưới ngưỡng thì để NULL, không đoán bừa — cùng quy ước
  * với `normalizeSubject()` (lib/ugc/subjects.ts) trả null thay vì đoán.
  *
- * 0.75 cao hơn `MASTERY_CLEARED_THRESHOLD` có chủ ý: một tag sai KHÔNG hiện ra
- * như lỗi (PRD R-a — học sinh chỉ đơn giản bị đẩy đi luyện sai thứ, và mô hình
- * mastery học theo cái sai đó), nên thà bỏ trống còn hơn ghi nhầm. Coverage
- * dưới 70% corpus vì ngưỡng này là tín hiệu DỪNG-XEM-LẠI, không tự động là lỗi
- * (PRD Success Criteria #4).
+ * Cao hơn `MASTERY_CLEARED_THRESHOLD` có chủ ý: một tag sai KHÔNG hiện ra như
+ * lỗi (PRD R-a — học sinh chỉ đơn giản bị đẩy đi luyện sai thứ, và mô hình
+ * mastery học theo cái sai đó), nên thà bỏ trống còn hơn ghi nhầm.
+ *
+ * 0.90, KHÔNG phải 0.75 như PRD ghi ban đầu. Đây chính là lần chỉnh mà U3 dự
+ * liệu sẵn ("shipped as placeholder, retune when real data exists"), và dữ
+ * liệu thật đã có: dry-run trên toàn corpus 47 câu Toán (2026-08-15) cho thấy
+ * ranh giới đúng/sai nằm gọn ở mốc 0.90 —
+ *   - 36 câu confidence >= 0.90: engineer rà tay, 100% đúng.
+ *   - 5 câu confidence == 0.85: cả 5 đều sai hoặc lệch — "tập xác định của
+ *     hàm số" bị xếp vào mệnh-đề-tập-hợp; hàm BẬC NHẤT y = 2x-1 bị xếp vào
+ *     hàm-số-bậc-hai (taxonomy không có node cho hàm bậc nhất, đúng ra phải
+ *     NULL); và 3 câu "đạo hàm tại một điểm" — kiến thức lớp 11, DAG cố ý
+ *     không phủ lớp 11. Chính câu lớp 11 đó ở một lần chạy khác bị model xếp
+ *     "no-matching-node", tức bản thân model cũng không chắc.
+ * 0.85 là mức model dùng khi "gần đúng nhưng không hẳn" — đúng nhóm mà D2 bảo
+ * để NULL. Coverage tụt 87.2% → 76.6%, vẫn trên mốc dừng-xem-lại 70% của PRD
+ * Success Criteria #4.
  */
-export const SKILL_TAG_CONFIDENCE_THRESHOLD = 0.75;
+export const SKILL_TAG_CONFIDENCE_THRESHOLD = 0.9;
