@@ -194,3 +194,26 @@
 //   ResultDetailPage's own responsibility and is out of RTL scope per IP-1,
 //   verified instead by the manual Playwright pass (frontend DD Integration
 //   Verification Points).
+
+// TD-018: component under test (ExplainStepAffordance.tsx + useTutorAction.ts)
+// does not exist yet — .todo keeps this suite valid (vitest gate green) while
+// keeping the 5 planned tests above visible in `vitest run` output as owed.
+import { describe, it } from "vitest";
+
+describe("ExplainStepAffordance", () => {
+  it.todo(
+    "AC-025: busyRef synchronous double-activation guard — a second activation while busy is a no-op (at most 1 explainStep() call)",
+  );
+  it.todo(
+    "argument-order proof: explainStep called with (attemptId, questionId), never the swapped declaration order",
+  );
+  it.todo(
+    "AC-018/019/020 UI half + D5: hint-shown state renders the hint via RichText and removes the re-invoke control",
+  );
+  it.todo(
+    "AC-021: failure path re-labels to retry, mounts a role=alert error paragraph, stays interactive",
+  );
+  it.todo(
+    "AC-023/024/029: mount condition gated solely by hasBeenWrongTwice, never by skill_node_id presence",
+  );
+});

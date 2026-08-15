@@ -125,3 +125,20 @@
 //   populated-state-only elements (skillLabel text, <details>/<summary>
 //   disclosure) are ABSENT in this render — proving the cold-start branch is a
 //   genuinely different, honest render, not a partially-populated fallback.
+
+// TD-018: component under test (SkillRecommendationCard.tsx) does not exist
+// yet — .todo keeps this suite valid (vitest gate green) while keeping the 3
+// planned tests above visible in `vitest run` output as owed.
+import { describe, it } from "vitest";
+
+describe("SkillRecommendationCard", () => {
+  it.todo(
+    "AC-031: populated state renders eyebrow, plain-text skillLabel (verbatim), closed-by-default <details>",
+  );
+  it.todo(
+    "AC-031: reasonCode-to-copy mapping — 3 reasonCode values resolve to 3 distinct localized texts",
+  );
+  it.todo(
+    "AC-028: cold start renders an honest 'not enough data yet' message — never throws, never blank",
+  );
+});

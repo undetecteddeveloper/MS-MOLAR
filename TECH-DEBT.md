@@ -18,34 +18,6 @@ còn nơi nào khác giữ lịch sử nợ ngoài chính file này.)*
 
 ## Đang mở
 
-### TD-018 — 9 file test rỗng làm cổng `npm test` ĐỎ trên mọi push
-**Từ:** 2026-08-14 (phát hiện khi chạy full suite cho một việc khác, không phải
-đi tìm — đúng kiểu bug này ẩn được lâu)
-**Loại:** cổng kiểm tra hỏng, im lặng
-
-Commit `fdad2b8` ("sinh test skeleton — 9 file, chỉ comment, chưa implement")
-thêm 9 file `*.test.ts(x)` chỉ có comment, không có `describe`/`it` nào. Vitest
-tính mỗi file như vậy là **suite FAIL** (`No test suite found in file`), nên:
-
-```
-Test Files  9 failed | 56 passed (65)
-     Tests  558 passed (558)
-```
-
-558 assertion đều xanh; cổng vẫn exit 1. CI chạy `npm test` (= `vitest run`)
-và **không** có `continue-on-error` (`.github/workflows/ci.yml`), nghĩa là job
-test đang ĐỎ trên mọi push kể từ `fdad2b8`.
-
-**Sẽ nổ thế nào:** đây đúng hình dạng TD-010 — một cổng CHẶN merge mà đỏ sẵn sẽ
-dạy người ta bỏ qua nó. Khi cổng đã đỏ thường trực, một test THẬT vỡ không thay
-đổi gì trên màn hình: vẫn là "vitest đỏ như mọi hôm". Khoảng hở không nằm ở 9
-file rỗng, nó nằm ở việc mất khả năng phân biệt đỏ-thật với đỏ-nền.
-
-**Cách trả:** rẻ nhất là cho mỗi file một `describe.todo(...)`/`it.todo(...)` —
-vitest coi đó là suite hợp lệ và in ra dạng "todo", nên cổng xanh lại mà việc
-còn nợ vẫn hiện trong output (khác hẳn với xoá file hay thêm vào `exclude`, hai
-cách đó giấu luôn ý định). Implement thật 9 test đó là việc của nhánh Engine 1.
-
 ### TD-013 — Không có rate limit nào cho lưu lượng CHƯA đăng nhập
 **Từ:** 2026-08-07 (tách ra khi trả TD-008; trước đó nằm lẫn trong mục đó)
 **Loại:** phòng thủ còn thiếu hẳn một mảng, có vật cản cụ thể
@@ -187,6 +159,36 @@ một lần chạy lại toàn file trên DB có dữ liệu đại diện, mớ
 ---
 
 ## Đã trả
+
+### ~~TD-018 — 9 file test rỗng làm cổng `npm test` ĐỎ trên mọi push~~
+**Từ:** 2026-08-14 (phát hiện khi chạy full suite cho một việc khác)
+
+Commit `fdad2b8` thêm 9 file `*.test.ts(x)` chỉ có comment, không
+`describe`/`it` nào → Vitest tính mỗi file là suite FAIL (`No test suite found
+in file`), cổng `npm test` đỏ trên mọi push dù 558 assertion đều xanh.
+
+**Đã trả 2026-08-15** — đo lại trước khi sửa: 7/9 file đã được implement thật ở
+các commit sau đó (`795ab38`, `1c2c02d`, `7352960`...), chỉ còn đúng 2 file rỗng
+— `components/tutor/ExplainStepAffordance.test.tsx` và
+`app/(layer3)/_components/SkillRecommendationCard.test.tsx`. Cả hai đổi sang
+`it.todo(...)` (một dòng mỗi test case đã đặc tả sẵn trong skeleton — 5 test cho
+ExplainStepAffordance, 3 cho SkillRecommendationCard), giữ nguyên toàn bộ
+comment ROI/proof-obligation phía trên làm tài liệu cho lần implement thật.
+
+**Không implement thật 2 file này** — component chúng test
+(`ExplainStepAffordance.tsx`, `useTutorAction.ts`, `SkillRecommendationCard.tsx`)
+CHƯA TỒN TẠI trong repo (`ls` xác nhận, không phải suy đoán); test thật cho
+component chưa build là không thể viết, đúng lý do TD-018 tách "trả cổng" ra
+khỏi "implement thật" ngay từ đầu.
+
+**Verify:** `npx vitest run` → `Test Files 67 passed | 2 skipped (69)`,
+`Tests 649 passed | 8 todo (657)`, exit 0. `tsc --noEmit` và `npm run lint`
+(`--max-warnings 0`) cũng xanh trên 2 file đã sửa.
+
+**Còn nợ:** implement thật 8 test case (`it.todo` → nội dung) khi
+ExplainStepAffordance/SkillRecommendationCard được build — việc của nhánh
+Engine 1, chưa mở lại thành mục riêng vì đã có sẵn đặc tả đầy đủ ngay trong
+file.
 
 ### ~~TD-016 — `subject` không canonical trong `questions` VÀ `exams`~~
 Bản mô tả ban đầu (2026-08-08) SAI ở hai chỗ, phát hiện khi đo lại bằng
