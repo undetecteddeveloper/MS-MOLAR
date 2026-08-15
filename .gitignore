@@ -34,3 +34,6 @@ SCREENSHOT/temporary_screenshot/
 /test_data/
 .vercel
 .env*
+
+# Report của batch gắn thẻ kỹ năng (Engine 1) — dữ liệu chạy, không phải source
+SOURCE/supabase/skill-tagging-report-*.json
