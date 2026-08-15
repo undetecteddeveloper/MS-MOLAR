@@ -23,12 +23,12 @@ Convert `ExplainStepAffordance.test.tsx`'s 5 already-generated tests into real v
 - Test 5 (AC-023/024/029, component functions with only its documented `{questionId, attemptId}` props, no skill-tag-shaped prop consulted)
 
 ## Target Files
-- [ ] `SOURCE/lib/i18n/dictionaries/en.ts` (additive — `tutor.*` tail block)
-- [ ] `SOURCE/lib/i18n/dictionaries/vi.ts` (additive — `tutor.*` tail block)
-- [ ] `SOURCE/components/tutor/useTutorAction.ts` (new)
-- [ ] `SOURCE/components/tutor/ExplainStepAffordance.tsx` (new)
-- [ ] `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` (additive — conditional mount in mcq + short_answer branches)
-- [ ] `SOURCE/components/tutor/ExplainStepAffordance.test.tsx` (fill in the existing skeleton's 5 tests)
+- [x] `SOURCE/lib/i18n/dictionaries/en.ts` (additive — `tutor.*` tail block)
+- [x] `SOURCE/lib/i18n/dictionaries/vi.ts` (additive — `tutor.*` tail block)
+- [x] `SOURCE/components/tutor/useTutorAction.ts` (new)
+- [x] `SOURCE/components/tutor/ExplainStepAffordance.tsx` (new)
+- [x] `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` (additive — conditional mount in mcq + short_answer branches)
+- [x] `SOURCE/components/tutor/ExplainStepAffordance.test.tsx` (fill in the existing skeleton's 5 tests)
 
 ## Investigation Targets
 - `SOURCE/components/tutor/ExplainStepAffordance.test.tsx` (already generated — read in full: the IMPLEMENTER NOTE on `// @vitest-environment jsdom`, the full Mock Boundary Decisions note including the `within`-not-`screen` convention and no-jest-dom-matchers convention, all 5 tests' exact annotations)
@@ -70,22 +70,76 @@ This task extends `ResultDetailPage`'s existing render tree (an already-shipped 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 
 ### 1. Red Phase
-- [ ] Read all Investigation Targets, in particular the skeleton's full 5-test annotation set and the exact `ResultDetailPage` mount points.
-- [ ] Sweep the not-scored-branch adjacent case per Change Category above; record findings in Investigation Notes.
-- [ ] Add `// @vitest-environment jsdom` as the real test file's first line.
-- [ ] Convert the 5 skeleton tests into real vitest(jsdom) tests, using `within` scoping (never global `screen`) and raw DOM property/attribute checks (no jest-dom matchers), per the Mock Boundary Decisions convention.
-- [ ] Run the tests and confirm all 5 fail (no implementation exists yet).
+- [x] Read all Investigation Targets, in particular the skeleton's full 5-test annotation set and the exact `ResultDetailPage` mount points.
+- [x] Sweep the not-scored-branch adjacent case per Change Category above; record findings in Investigation Notes.
+- [x] Add `// @vitest-environment jsdom` as the real test file's first line.
+- [x] Convert the 5 skeleton tests into real vitest(jsdom) tests, using `within` scoping (never global `screen`) and raw DOM property/attribute checks (no jest-dom matchers), per the Mock Boundary Decisions convention.
+- [x] Run the tests and confirm all 5 fail (no implementation exists yet).
 
 ### 2. Green Phase
-- [ ] Add `tutor.*` i18n keys to `en.ts`/`vi.ts` (appended tail block).
-- [ ] Implement `useTutorAction.ts`: 4-phase state machine (idle/busy/hint-shown/error), synchronous `busyRef` check before any state update, calls `explainStep(attemptId, questionId)` in that exact order.
-- [ ] Implement `ExplainStepAffordance.tsx`: idle/busy/hint-shown/error render; `aria-disabled`/`aria-busy`/`aria-describedby`, never native `disabled`; hint renders only via `RichText`; error state mounts a `role="alert"` paragraph with the generic `tutor.error` copy and a retry-relabeled, still-focusable button.
-- [ ] Mount `ExplainStepAffordance` conditionally (`r.hasBeenWrongTwice &&`) in both the mcq and short_answer branches of `ResultDetailPage`; leave the not-scored branch untouched.
-- [ ] Run `npx vitest run components/tutor/ExplainStepAffordance.test.tsx` — confirm all 5 pass.
+- [x] Add `tutor.*` i18n keys to `en.ts`/`vi.ts` (appended tail block).
+- [x] Implement `useTutorAction.ts`: 4-phase state machine (idle/busy/hint-shown/error), synchronous `busyRef` check before any state update, calls `explainStep(attemptId, questionId)` in that exact order.
+- [x] Implement `ExplainStepAffordance.tsx`: idle/busy/hint-shown/error render; `aria-disabled`/`aria-busy`/`aria-describedby`, never native `disabled`; hint renders only via `RichText`; error state mounts a `role="alert"` paragraph with the generic `tutor.error` copy and a retry-relabeled, still-focusable button.
+- [x] Mount `ExplainStepAffordance` conditionally (`r.hasBeenWrongTwice &&`) in both the mcq and short_answer branches of `ResultDetailPage`; leave the not-scored branch untouched.
+- [x] Run `npx vitest run components/tutor/ExplainStepAffordance.test.tsx` — confirm all 5 pass.
 
 ### 3. Refactor Phase
-- [ ] Confirm every Binding Decision and Reference Contract Compliance Check evaluates to `Y`; record evidence in Investigation Notes.
-- [ ] Confirm the not-scored branch and every other pre-existing `ResultDetailPage` render path is byte-identical to before this change.
+- [x] Confirm every Binding Decision and Reference Contract Compliance Check evaluates to `Y`; record evidence in Investigation Notes.
+- [x] Confirm the not-scored branch and every other pre-existing `ResultDetailPage` render path is byte-identical to before this change.
+
+## Investigation Notes
+
+### Investigation Targets read
+
+- **`ExplainStepAffordance.test.tsx` (skeleton)** — authoritative. Adopted verbatim: `// @vitest-environment jsdom` first line; `explainStep` is the only mock (I/O boundary); `RichText`/`BentoCell`/`Button`/`useT()` all real; no `I18nProvider` wrapper (`useT()` falls back to `DEFAULT_LOCALE`, confirmed `"en"` at `lib/i18n/locales.ts:10`, so assertions use English copy); no jest-dom matchers (raw DOM property/attribute reads); every query scoped through `within(container)`, never global `screen`; no `cleanup()` (matching the sibling convention).
+- **Frontend DD § State Machine Detail / § Accessibility Implementation / § Error Handling / § Logging and Monitoring / § i18n / § Minimal Surface Elements 1–3** — the DD carries a near-complete reference implementation for both new files; implemented as written (4-phase machine, `busyRef` before any state update, `try/catch/finally` always releasing the ref, `console.error` twice with `{attemptId, questionId, errorCode|err}` only — never the hint or question content).
+- **UI Spec § D1 / § D5 / both state × display matrices** — D5's "no control to re-invoke" is implemented as a full early `return` of the `BentoCell` hint panel, so the button subtree is not rendered at all in `hint-shown`.
+- **`SOURCE/app/(layer2)/tutorActions.ts` (real source, not assumption)** — signature verified at line 156: `export async function explainStep(attemptId: string, questionId: string): Promise<ExplainStepResult>`; result type at line 53: `{ hint: string } | { error: ExplainStepError }` with `ExplainStepError = "not_eligible" | "rate_limited" | "gemini_unavailable" | "server"` (line 51). **No discrepancy** against the skeleton test's assumed `"hint" in result` discriminant or the backend DD — no escalation triggered. The test file imports the real `ExplainStepResult` type (while mocking the module's runtime), so a future change to that union breaks this test at compile time.
+- **`ResultDetailPage`** — not-scored branch returns early at its own `if (notScored) { ... return (...) }` (page.tsx:74–128); the scored `<li>` follows, with the `isShortAnswer ? … : …` ternary as the only sub-branch split. Exactly 2 mount points, one at the end of each ternary arm.
+- **Client-component-plus-hook precedent — FOUND**: `SOURCE/components/history/ActionButton.tsx` + `SOURCE/components/history/usePdfAction.ts` (plus `ActionButton.test.tsx` as the test precedent). Mirrored: hook owns `phase` + `busyRef` + `run()` and returns them; component owns render only; `aria-disabled` as the **string** `"true"`/`"false"`; `aria-busy` boolean; `aria-describedby` → an sr-only reason span with **no** `aria-live` (text mutation is the announcement mechanism); native `disabled` never used. Deviations from that precedent, each spec-mandated: no `idPrefix` prop (Minimal Surface Element 3), no `Tooltip` (visible label always present), error paragraph in-flow rather than absolutely positioned (UI Spec: this component has vertical room in the `<li>` flow).
+
+### Adjacent Case Sweep (Change Category: `boundary-change`)
+
+Whitespace-insensitive diff of `page.tsx` (`git diff -w`) contains exactly: the new import, the mount-rationale comment, two `<>…</>` wrappers, two `{r.hasBeenWrongTwice === true && <ExplainStepAffordance … />}` blocks, and one prettier line-wrap of the pre-existing `isSelectedWrong` assignment (caused purely by the deeper indentation, no semantic change). **The not-scored branch is byte-identical** — zero diff hunks touch lines 74–128. Fragments emit no DOM, and both new blocks render `false`/nothing unless the flag is strictly `true`, so every pre-existing render path (not-scored questions, and every scored question where `hasBeenWrongTwice` is `false`/`undefined`) produces identical DOM to before. No residual adjacent case found outside the Target Files.
+
+### Binding Decisions — Compliance Check evaluation (post-implementation)
+
+Planned approach (contract_schema axis): implement the hook/component exactly as the frontend DD's reference implementation specifies, adding no field, prop, or error-copy variant beyond it.
+
+| Source (Axis) | Evaluation | Evidence |
+|---|---|---|
+| Minimal Surface Element 1 — `{phase, hint, run}` | **Y** | `useTutorAction.ts` declares `UseTutorActionResult { phase; hint; run }` and its single `return { phase, hint, run };` — no fourth field; `tsc --noEmit` clean against the explicit return type annotation. |
+| Minimal Surface Element 2 — one generic `tutor.error` | **Y** | The error render is a single `<p role="alert">{t("tutor.error")}</p>`; `result.error` reaches only `console.error`, never the UI. Test 4 asserts the identical string `"Couldn't load a hint. Try again."` for both a typed `{error: "gemini_unavailable"}` and a rejected promise — no code path can surface `not_eligible`'s existence. Only 4 `tutor.*` keys exist in both dictionaries; no per-code key. |
+| Minimal Surface Element 3 — no `idPrefix`-shaped prop | **Y** | `ExplainStepAffordanceProps` has exactly `{questionId, attemptId}`. DOM-id uniqueness comes from `` const reasonId = `tutor-${questionId}-reason` `` — `questionId` alone, which is already the `.map()` key on the page. Test 5 renders with only those two props and the component is fully activatable. |
+
+### Reference Contracts — Compliance Check evaluation (post-implementation)
+
+| Source | Evaluation | Evidence |
+|---|---|---|
+| UI Spec § D5 — hint-shown removes every re-invoke control | **Y** | `phase === "hint-shown" && hint !== null` returns the `BentoCell` panel early, so the button subtree never renders. Test 3 asserts `within(container).queryByRole("button")` is `null`, both named queries are `null`, and `container.querySelectorAll("button").length === 0`. |
+| UI Spec § D1 — mount only when strictly `true` (fail-closed) | **Y** | Both mount points read `{r.hasBeenWrongTwice === true && (…)}` — an explicit identity check, matching AC-023's own wording (`When r.hasBeenWrongTwice === true`); `false`, `undefined`, and an absent field all fail it. The not-scored branch has no mount at all. |
+
+### Boundary roundtrip (Connection Map — Expected Signal)
+
+Test 2 is the roundtrip guard: the producer (`useTutorAction`) emits `(attemptId, questionId)` and the consumer (`explainStep`'s real signature) expects that same order. Asserted twice — `toHaveBeenCalledWith(ATTEMPT_ID, QUESTION_ID)` and `mock.calls[0]` deep-equal — with two non-interchangeable fixtures (`"attempt-fixture-111"` / `"question-fixture-222"`).
+
+### Mutation checks (proof that the tests are not vacuous)
+
+Each primary failure mode named in the Proof Obligations was injected into the implementation, the suite re-run, and the implementation restored:
+
+| Injected defect | Result |
+|---|---|
+| `if (phase === "busy") return;` replacing the `busyRef` check | Test 1 **fails** (2 calls recorded). Note: this required firing both activations inside **one** `act()` body — `fireEvent.click` wraps each call in its own `act()`, which flushes the state update in between and lets a state-based guard falsely pass. The final Test 1 uses `act(() => { button.click(); button.click(); })` for this reason. |
+| `explainStep(questionId, attemptId)` (swapped) | Tests 2 and 5 **fail**. |
+| `<p>{hint}</p>` replacing `<RichText text={hint} />` | Test 3 **fails** (literal `**` present, no `<strong>`). |
+| `disabled={phase === "error"}` on the button | Test 4 **fails** (native `disabled` present, button unfocusable). |
+
+### Verification
+
+- `npx vitest run components/tutor/ExplainStepAffordance.test.tsx` → `Test Files 1 passed (1) / Tests 5 passed (5)`.
+- Full suite `npx vitest run` → `Test Files 68 passed | 1 skipped (69) / Tests 654 passed | 3 todo (657)` — no regression (the 3 remaining `todo`s belong to other files, not this one).
+- `npx tsc --noEmit` → clean, project-wide (this is also what enforces `vi.ts`'s key-set completeness for the 4 new keys).
+- `npx eslint --max-warnings 0` on all touched paths → clean, including the bundled `jsx-a11y` rules over the new ARIA usage.
 
 ## Quality Assurance Mechanisms
 - ESLint / `tsc --noEmit` / `next build` — project-wide
@@ -132,11 +186,11 @@ This task extends `ResultDetailPage`'s existing render tree (an already-shipped 
 - **Residual**: the mount/no-mount DECISION itself (AC-023/024, `ResultDetailPage`'s own gating) is out of this component's RTL scope, per the skeleton's own note — verified instead by the manual Playwright pass (Phase 5 Task 18) and this task's Reference Contract row (UI Spec § D1) above.
 
 ## Completion Criteria
-- [ ] `tutor.*` i18n keys added; `useTutorAction.ts`/`ExplainStepAffordance.tsx` implemented; mounted in both mcq/short_answer branches of `ResultDetailPage`
-- [ ] All 5 `ExplainStepAffordance.test.tsx` tests pass
-- [ ] Each Binding Decision and Reference Contract Compliance Check evaluates to `Y`, evidence recorded in Investigation Notes
-- [ ] Not-scored branch and all other pre-existing `ResultDetailPage` renders confirmed byte-identical
-- [ ] Each Proof Obligation is met
+- [x] `tutor.*` i18n keys added; `useTutorAction.ts`/`ExplainStepAffordance.tsx` implemented; mounted in both mcq/short_answer branches of `ResultDetailPage`
+- [x] All 5 `ExplainStepAffordance.test.tsx` tests pass
+- [x] Each Binding Decision and Reference Contract Compliance Check evaluates to `Y`, evidence recorded in Investigation Notes
+- [x] Not-scored branch and all other pre-existing `ResultDetailPage` renders confirmed byte-identical
+- [x] Each Proof Obligation is met (each one's primary failure mode injected and confirmed to fail the owning test — see Investigation Notes § Mutation checks)
 
 ## Notes
 - Impact scope: `SOURCE/components/tutor/**` (new), `SOURCE/lib/i18n/dictionaries/{en,vi}.ts` (additive tail block), `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` (additive mount only).

@@ -14,6 +14,7 @@ import { decodeTfAnswer, formatSubAnswers } from "@/lib/ugc/tfCodec";
 import { RichText } from "@/components/shared/RichText";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
+import { ExplainStepAffordance } from "@/components/tutor/ExplainStepAffordance";
 
 export default async function ResultDetailPage({
   params,
@@ -153,64 +154,82 @@ export default async function ResultDetailPage({
                   />
                 )}
 
+                {/* Engine 1 (AC-023/024): gia sư "Giải thích bước này" mount ở
+                    CUỐI cả hai nhánh CÓ CHẤM (short_answer và mcq), ngay trước
+                    khi đóng <li>, và CHỈ khi cờ đúng bằng true — vắng mặt/false/
+                    undefined đều không mount (fail-closed, UI Spec D1). Nhánh
+                    KHÔNG chấm ở trên không có mount này: câu không chấm không thể
+                    mang một `hasBeenWrongTwice` có nghĩa. Cờ này chỉ là tiện ích
+                    hiển thị — explainStep() tự tái kiểm tra điều kiện phía server. */}
                 {isShortAnswer ? (
-                  <div className="flex flex-col gap-1 text-sm">
-                    <p className="text-muted-foreground">
-                      {t("result.yourAnswerLabel")}{" "}
-                      <span className={status.cls}>{r.selected || t("result.skipped")}</span>
-                    </p>
-                    <p className="text-muted-foreground">
-                      {t("result.correctAnswerLabel")}{" "}
-                      <span className="text-[#4F7942]">{q?.essayAnswer || "—"}</span>
-                    </p>
-                  </div>
+                  <>
+                    <div className="flex flex-col gap-1 text-sm">
+                      <p className="text-muted-foreground">
+                        {t("result.yourAnswerLabel")}{" "}
+                        <span className={status.cls}>{r.selected || t("result.skipped")}</span>
+                      </p>
+                      <p className="text-muted-foreground">
+                        {t("result.correctAnswerLabel")}{" "}
+                        <span className="text-[#4F7942]">{q?.essayAnswer || "—"}</span>
+                      </p>
+                    </div>
+                    {r.hasBeenWrongTwice === true && (
+                      <ExplainStepAffordance questionId={r.questionId} attemptId={attemptId} />
+                    )}
+                  </>
                 ) : (
-                  <ul className="flex flex-col gap-2">
-                    {q?.choices.map((choice) => {
-                      const isCorrect = choice.id === r.correct;
-                      const isSelectedWrong = choice.id === r.selected && r.selected !== r.correct;
+                  <>
+                    <ul className="flex flex-col gap-2">
+                      {q?.choices.map((choice) => {
+                        const isCorrect = choice.id === r.correct;
+                        const isSelectedWrong =
+                          choice.id === r.selected && r.selected !== r.correct;
 
-                      const rowCls = isCorrect
-                        ? "border-[#4F7942] bg-[#4F7942]/10"
-                        : isSelectedWrong
-                          ? "border-destructive bg-destructive/8"
-                          : "border-border bg-card";
-                      const badgeCls = isCorrect
-                        ? "border-[#4F7942] bg-[#4F7942] text-[#EDE1C8]"
-                        : isSelectedWrong
-                          ? "border-destructive bg-destructive text-brand-foreground"
-                          : "border-border text-muted-foreground";
+                        const rowCls = isCorrect
+                          ? "border-[#4F7942] bg-[#4F7942]/10"
+                          : isSelectedWrong
+                            ? "border-destructive bg-destructive/8"
+                            : "border-border bg-card";
+                        const badgeCls = isCorrect
+                          ? "border-[#4F7942] bg-[#4F7942] text-[#EDE1C8]"
+                          : isSelectedWrong
+                            ? "border-destructive bg-destructive text-brand-foreground"
+                            : "border-border text-muted-foreground";
 
-                      return (
-                        <li
-                          key={choice.id}
-                          className={`flex items-start gap-3 rounded-lg border p-3 ${rowCls}`}
-                        >
-                          <span
-                            aria-hidden
-                            className={`flex size-7 shrink-0 items-center justify-center rounded-md border font-mono text-sm font-medium ${badgeCls}`}
+                        return (
+                          <li
+                            key={choice.id}
+                            className={`flex items-start gap-3 rounded-lg border p-3 ${rowCls}`}
                           >
-                            {choice.id}
-                          </span>
-                          <RichText
-                            text={choice.text}
-                            inline
-                            className="text-card-foreground pt-0.5 text-base leading-relaxed"
-                          />
-                          {isCorrect && (
-                            <span className="ml-auto shrink-0 self-center font-mono text-[0.65rem] tracking-wide text-[#4F7942] uppercase">
-                              {t("result.correctAnswer")}
+                            <span
+                              aria-hidden
+                              className={`flex size-7 shrink-0 items-center justify-center rounded-md border font-mono text-sm font-medium ${badgeCls}`}
+                            >
+                              {choice.id}
                             </span>
-                          )}
-                          {isSelectedWrong && (
-                            <span className="text-destructive ml-auto shrink-0 self-center font-mono text-[0.65rem] tracking-wide uppercase">
-                              {t("result.yourChoice")}
-                            </span>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
+                            <RichText
+                              text={choice.text}
+                              inline
+                              className="text-card-foreground pt-0.5 text-base leading-relaxed"
+                            />
+                            {isCorrect && (
+                              <span className="ml-auto shrink-0 self-center font-mono text-[0.65rem] tracking-wide text-[#4F7942] uppercase">
+                                {t("result.correctAnswer")}
+                              </span>
+                            )}
+                            {isSelectedWrong && (
+                              <span className="text-destructive ml-auto shrink-0 self-center font-mono text-[0.65rem] tracking-wide uppercase">
+                                {t("result.yourChoice")}
+                              </span>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    {r.hasBeenWrongTwice === true && (
+                      <ExplainStepAffordance questionId={r.questionId} attemptId={attemptId} />
+                    )}
+                  </>
                 )}
               </li>
             );

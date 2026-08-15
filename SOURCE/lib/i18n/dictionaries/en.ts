@@ -469,7 +469,8 @@ export const en = {
   "ugcError.shortAnswerTooLong": "{q} — the expected answer is too long (max {max} characters).",
   "ugcError.metaIncomplete": "Exam details — {field} is missing. Add it above before publishing.",
   "ugcError.metaInvalid": "Exam details — {field} is out of range. Correct it above.",
-  "ugcError.metaInvalidRange": "Exam details — {field} is out of range ({range}). Correct it above.",
+  "ugcError.metaInvalidRange":
+    "Exam details — {field} is out of range ({range}). Correct it above.",
   "ugcError.metaExtractionFailed":
     "Exam details — we couldn't read the exam details from your file. Fill them in above.",
   "ugcError.durationRange": "{min}–{max} minutes",
@@ -534,6 +535,17 @@ export const en = {
   "support.admin.status.new": "New",
   "support.admin.status.inProgress": "In progress",
   "support.admin.status.resolved": "Resolved",
+
+  // --- Gia sư AI (Explain this step) — Engine 1 Adaptive AI ---
+  // ExplainStepAffordance. `common.retry` được TÁI DÙNG cho nhãn thử lại ở
+  // trạng thái lỗi (tiền lệ LABEL_KEY của ActionButton) nên không thêm khoá mới.
+  // `tutor.error` là MỘT câu chung cho cả bốn mã lỗi của explainStep(): tách
+  // riêng từng mã sẽ để lộ có một vòng tái kiểm tra điều kiện phía server
+  // (not_eligible) cho phía client dò được.
+  "tutor.explainThisStep": "Explain this step",
+  "tutor.busy": "Getting a hint…",
+  "tutor.error": "Couldn't load a hint. Try again.",
+  "tutor.hintEyebrow": "Hint",
 } as const;
 
 /** Tập khoá hợp lệ — mọi ngôn ngữ khác phải phủ đủ. */

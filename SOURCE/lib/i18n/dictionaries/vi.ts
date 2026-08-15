@@ -318,7 +318,8 @@ export const vi: Dictionary = {
     "Bốn ý nhỏ mỗi câu, đánh dấu đúng hoặc sai cho từng ý. Sai một ý là mất điểm cả câu — không đoán mò bằng loại trừ được.",
   "rating.saEyebrow": "PHẦN III · TRẢ LỜI NGẮN",
   "rating.saName": "Trả lời ngắn",
-  "rating.saDescription": "Không có lựa chọn sẵn — tự giải và nhập một đáp số duy nhất. Không có chỗ cho đoán mò.",
+  "rating.saDescription":
+    "Không có lựa chọn sẵn — tự giải và nhập một đáp số duy nhất. Không có chỗ cho đoán mò.",
   "rating.errIneligible": "Bạn cần làm xong đề này trước khi chấm độ khó.",
   "rating.errInvalid": "Bạn chấm đủ cả ba phần, mỗi phần từ 1 đến 10 nhé.",
   "rating.errRateLimited": "Bạn đang chấm quá nhanh. Đợi một chút rồi thử lại nhé.",
@@ -370,10 +371,8 @@ export const vi: Dictionary = {
   "upload.filledAutomatically": "— hệ thống tự điền",
   "upload.automaticNote":
     "AI sẽ quét file bạn tải lên và tự trích xuất đề — bạn vẫn sửa được mọi trường.",
-  "upload.manualNote":
-    "Bạn tự nhập toàn bộ thông tin đề; AI vẫn trích xuất câu hỏi và đáp án.",
-  "upload.extractingWithMeta":
-    "Đang đọc thông tin đề, câu hỏi và đáp án… việc này mất một lát.",
+  "upload.manualNote": "Bạn tự nhập toàn bộ thông tin đề; AI vẫn trích xuất câu hỏi và đáp án.",
+  "upload.extractingWithMeta": "Đang đọc thông tin đề, câu hỏi và đáp án… việc này mất một lát.",
   "upload.extractingFiles": "Đang đọc file và dựng đề… việc này mất một lát.",
   "upload.reviewBeforePublish": "Bạn sẽ được rà soát lại toàn bộ trước khi đăng.",
   "upload.errTitleRequired": "Bạn nhập tiêu đề đề thi nhé.",
@@ -426,8 +425,7 @@ export const vi: Dictionary = {
     "File đáp án có {answers} đáp án nhưng file đề có {questions} câu hỏi ({unmatched} câu không khớp).",
   "ugcError.answerMissing":
     "{q} — không tìm thấy đáp án trong file đáp án. Bạn thêm vào file hoặc đặt trực tiếp bên dưới.",
-  "ugcError.imageCropFailed":
-    "{q} — không cắt được hình. Bạn tải lại file hoặc gỡ hình đi nhé.",
+  "ugcError.imageCropFailed": "{q} — không cắt được hình. Bạn tải lại file hoặc gỡ hình đi nhé.",
   "ugcError.extractionFailed": "Chưa đọc được file của bạn lúc này. Bạn thử lại nhé.",
   "ugcError.fileTooLarge": "File này quá nặng (tối đa {mb} MB).",
   "ugcError.tooManyPages": "File này quá nhiều trang (tối đa {max}).",
@@ -437,8 +435,7 @@ export const vi: Dictionary = {
   "ugcError.wrongSubItemCount":
     "{q} — đọc được {count} ý; câu Đúng/Sai cần {min}–{max} ý (a–d). Bạn sửa bên dưới hoặc tải lại file.",
   "ugcError.shortAnswerTooLong": "{q} — đáp án mong đợi quá dài (tối đa {max} ký tự).",
-  "ugcError.metaIncomplete":
-    "Thông tin đề — thiếu {field}. Bạn bổ sung ở trên trước khi đăng nhé.",
+  "ugcError.metaIncomplete": "Thông tin đề — thiếu {field}. Bạn bổ sung ở trên trước khi đăng nhé.",
   "ugcError.metaInvalid": "Thông tin đề — {field} nằm ngoài khoảng cho phép. Bạn sửa lại ở trên.",
   "ugcError.metaInvalidRange":
     "Thông tin đề — {field} nằm ngoài khoảng cho phép ({range}). Bạn sửa lại ở trên.",
@@ -506,4 +503,12 @@ export const vi: Dictionary = {
   "support.admin.status.new": "Mới",
   "support.admin.status.inProgress": "Đang xử lý",
   "support.admin.status.resolved": "Đã xử lý",
+
+  // --- Gia sư AI (Giải thích bước này) — Engine 1 Adaptive AI ---
+  // Đặt cùng vị trí tương đối với en.ts để hai file dễ so nhau; `Dictionary`
+  // chỉ ràng buộc ĐỦ KHOÁ chứ không ràng buộc thứ tự.
+  "tutor.explainThisStep": "Giải thích bước này",
+  "tutor.busy": "Đang lấy gợi ý…",
+  "tutor.error": "Chưa lấy được gợi ý. Bạn thử lại nhé.",
+  "tutor.hintEyebrow": "Gợi ý",
 };
