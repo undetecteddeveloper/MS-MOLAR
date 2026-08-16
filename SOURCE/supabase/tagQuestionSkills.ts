@@ -23,6 +23,10 @@ import { resolve } from "node:path";
 import { createClient } from "@supabase/supabase-js";
 
 import { SKILL_TAG_CONFIDENCE_THRESHOLD } from "../lib/adaptive/constants";
+// Nhập thẳng từ lib/ai/models chứ KHÔNG qua lib/ugc/gemini.ts: file đó
+// `import "server-only"`, ném khi chạy dưới tsx (xem ghi chú cùng lý do ở
+// lib/tutor/__tests__/toneEval.manual.test.ts:9-11).
+import { ANSWER_MODEL } from "../lib/ai/models";
 import { SKILL_NODES } from "../lib/adaptive/skillTaxonomy";
 import { decideSkillTag, type SkillClassification } from "../lib/adaptive/tagDecision";
 
@@ -230,9 +234,9 @@ async function main() {
     apiKey: geminiKey,
     httpOptions: { retryOptions: { attempts: 3 } },
   });
-  // ANSWER_MODEL (gemini-3.1-flash-lite) — phân loại hàng loạt, cùng hạng
-  // chi phí/độ khó với việc "đọc file đáp án" mà model này đã được ghim cho.
-  const model = "gemini-3.1-flash-lite";
+  // Phân loại hàng loạt — cùng hạng chi phí/độ khó với việc "đọc file đáp án"
+  // mà ANSWER_MODEL đã được ghim cho, nên dùng chung hằng số thay vì chép chuỗi.
+  const model = ANSWER_MODEL;
 
   const report: ReportEntry[] = [];
 
