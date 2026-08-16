@@ -4,36 +4,221 @@ Covers Work Plan Final Phase (Tasks 22-27). Task 22 has its own file (`engine1-a
 
 ## All-Item Completion Checklist (carried forward from the Work Plan, verbatim scope)
 
-- [ ] **Task 22 — Full regression + prod schema apply**: see `engine1-adaptive-ai-work-plan-backend-task-14.md` (⚠ BLOCKING).
-- [ ] **Task 23 — Security review**: walk ADR-0011's mechanism end to end (INVOKER, `service_role`-only, revoke-by-name on `record_skill_mastery()`); re-confirm D3/AC-018/019 answer-key containment across both the prompt (backend-task-11) and telemetry (backend-task-12) paths; confirm D4 (hint renders only via `RichText`, no competing path — frontend-task-01); confirm `explainStep()` (backend-task-13) has 0 unauthenticated code paths and every invocation passes through `guard()` (AC-022, PRD Success Criteria #11).
-- [ ] **Task 24 — Coverage check**: 70%+ on `lib/adaptive/**` (backend-task-04/07), `lib/tutor/**` (backend-task-11/12), `lib/scoring/wrongTwice.ts` (backend-task-09), `components/tutor/**` (frontend-task-01), `app/(layer3)/_components/SkillRecommendationCard.tsx` (frontend-task-02).
-- [ ] **Task 25 — Risk closure walk**: confirm each backend DD Risk (mastery-write forgery, answer-key-in-prompt, §10c parser trap, §17 fingerprint, mastery/score-divergence narrow window, Vercel deadline, threshold placeholders, dry-run/apply drift), each frontend DD Risk (argument-order swap, TBD-01 repeated-cost-on-reload, async-SC test technique, multi-instance id uniqueness, RichText malformed-input degrade), and each PRD Risk (R-a through R-h) has either a passing, evidenced mitigation or an explicitly accepted residual — none silently dropped between design and ship. (This plan's own per-task Proof Obligations and Change Category sweeps are the primary evidence trail for this walk — cross-reference each risk against the task file that names it.)
-- [ ] **Task 26 — Design Doc / PRD acceptance criteria final walk**: verify every AC this feature owns (the backend-owned and frontend-owned subsets of AC-001 through AC-031) against the shipped implementation; record disposition per AC. (Cross-reference this plan's own Design-to-Plan Traceability table, reproduced per-task across `engine1-adaptive-ai-work-plan-backend-task-01.md` through `-frontend-task-02.md`'s Investigation Targets/Reference Contracts/Proof Obligations sections.)
-- [ ] **Task 27 — Document updates**: update the Update History of both Design Docs, the ADR, and the UI Spec if any discrepancy was found during implementation. Record U3/U5's actual shipped values (0.75/0.7, or their retuned values if backend-task-04/Phase 5 evidence justified a change) and R9's accepted-gap disposition (tracked separately as TD-016, not a Sprint 1 blocker).
+- [ ] **Task 22 — Full regression + prod schema apply**: see `engine1-adaptive-ai-work-plan-backend-task-14.md` (⚠ BLOCKING). **Dev-side regression: DONE and green** (see Task 22 section below). **Prod side: NOT DONE, and its scope grew** — see Finding P-1.
+- [x] **Task 23 — Security review**: walk ADR-0011's mechanism end to end (INVOKER, `service_role`-only, revoke-by-name on `record_skill_mastery()`); re-confirm D3/AC-018/019 answer-key containment across both the prompt (backend-task-11) and telemetry (backend-task-12) paths; confirm D4 (hint renders only via `RichText`, no competing path — frontend-task-01); confirm `explainStep()` (backend-task-13) has 0 unauthenticated code paths and every invocation passes through `guard()` (AC-022, PRD Success Criteria #11).
+- [x] **Task 24 — Coverage check**: 70%+ on `lib/adaptive/**`, `lib/tutor/**`, `lib/scoring/wrongTwice.ts`, `components/tutor/**`, `app/(layer3)/_components/SkillRecommendationCard.tsx`.
+- [x] **Task 25 — Risk closure walk**: every backend DD, frontend DD and PRD risk has a passing evidenced mitigation or an explicitly accepted residual.
+- [x] **Task 26 — Design Doc / PRD acceptance criteria final walk**: AC-001 through AC-031, disposition recorded per AC.
+- [x] **Task 27 — Document updates**: Update History appended to both Design Docs, the ADR, and the UI Spec; U3/U5 shipped values recorded; R9 disposition recorded.
+
+---
+
+## Task 22 — Regression (dev side)
+
+Run 2026-08-16 from `SOURCE/`:
+
+| Gate | Result |
+|---|---|
+| `npx vitest run` | **69 passed / 1 skipped** files; **657 passed / 10 skipped** tests. The skip is the tone-eval harness, correctly gated off without `TUTOR_TONE_EVAL=1`. |
+| `npx tsc --noEmit` | clean |
+| `npx eslint --max-warnings 0 .` | clean |
+| `npm run build` | success |
+
+`npm run verify:schema` and `test-rls.ts` were last run green at their own phase gates (Phase 1 Tasks 1-2) and the schema has not changed since. The **prod** half of Task 22 remains open — see Finding P-1.
+
+## Task 23 — Security review ✅
+
+### ADR-0011's mechanism, walked end to end in the shipped `schema.sql` §18
+
+| Decision | Shipped state | Evidence |
+|---|---|---|
+| `INVOKER`, not `SECURITY DEFINER` | `create function public.record_skill_mastery(...) language plpgsql volatile set search_path = public, pg_temp` — **no `security definer` clause**, so Postgres defaults to INVOKER | schema.sql:1296-1304 |
+| `service_role`-only | `revoke all on function public.record_skill_mastery(uuid, jsonb) from public, anon, authenticated;` then `grant execute ... to service_role;` — revoked **by name**, which is what actually undoes Supabase's default grants | schema.sql:1349-1350 |
+| Identity derived, never a parameter | The signature takes only `(p_attempt_id, p_per_question)`. `v_user_id` is selected from `exam_attempts` and the function raises `check_violation` if it is null | schema.sql:1305-1319 |
+| Requires a submitted attempt | The same select carries `and a.status = 'submitted'` | schema.sql:1313-1314 |
+| Table-level lockdown | `revoke insert, update, delete on public.user_skill_mastery from anon, authenticated;` + only a `mastery_select_own` read policy | schema.sql:1289-1293 |
+
+**Proven, not merely inspected:** `recordSkillMastery.int.test.ts` Test 2 drives a real student JWT at `.rpc("record_skill_mastery", ...)` and asserts permission-denied; `test-rls.ts` Phần 7 `MM-a`/`MM-b` cover cross-user SELECT and the forged RPC at the DB level.
+
+### Answer-key containment (D3 / AC-018 / AC-019)
+
+Three independent layers, each of which would have to fail:
+
+1. **Type layer.** `TutorPromptInput` has exactly five fields — `questionContent`, `questionType`, `choices?`, `subItems?`, `studentAnswer`. There is no field that can *hold* `correct_answer` / `sub_answers` / `essay_answer`, and `questionType` excludes `"essay"` at compile time (`prompt.test.ts` Test 3 asserts this with `@ts-expect-error`).
+2. **Query layer.** `explainStep()` selects `TUTOR_QUESTION_COLUMNS = "content, question_type, choices"` through the ordinary cookie-bound client — never `claim_attempt_answer_key()` or `exam_answer_key()`.
+3. **Database layer — the one that holds even if 1 and 2 are edited wrong.** `schema.sql` §10c does `revoke select on public.questions from anon, authenticated` and re-grants exactly ten columns: `id, content, choices, subject, grade, topic, question_type, part_number, image_url, skill_node_id`. `correct_answer`, `sub_answers` and `essay_answer` are **not** in that list, and `explainStep()` runs as `authenticated`. Adding an answer-key column to the select string would produce a Postgres permission error, not a leak.
+
+Telemetry path: `telemetry_log` has **no column** that could carry answer-key material, and `error_code` is constrained by a DB `CHECK` to the four literals `gemini_unavailable | rate_limited | server | not_eligible`. Confirmed on live data during Phase 5 — a real Gemini 429 produced a row with `error_code = 'server'`, not the raw `"Retryable HTTP Error: Too Many Requests"` string.
+
+### D4 — hint renders only via `RichText` ✅
+
+`ExplainStepAffordance.tsx`'s hint branch renders `<RichText text={hint} />` and nothing else; there is no `dangerouslySetInnerHTML`, no second render path, no plain-text fallback. Verified in a real browser during Phase 5: the hint's LaTeX arrives as real `<math>` elements, which only the sanitized pipeline produces. `ExplainStepAffordance.test.tsx` Test 3 discriminates the two paths using markdown emphasis (RichText yields `<strong>`; a plain-text path would leave literal `**`).
+
+### AC-022 — 0 unauthenticated paths, `guard()` on every invocation ✅
+
+`explainStep()`'s first act is an RLS-scoped read of `exam_attempts` through the cookie-bound client. With no session, `auth.uid()` is null, `attempts_select_own` matches nothing, and the function returns `not_eligible` — **before** `guard()`, before the history read, before Gemini. The auth gate is RLS itself rather than an explicit `getUser()` call, which is fail-closed: there is no branch that reaches `generateHint()` without a `userId` that came out of a row RLS already proved belongs to the caller.
+
+`guard("explainStep", userId)` sits at step 2, ahead of the eligibility recompute, the question fetch and the Gemini call — so a rate-limited caller costs one cheap DB read and nothing else. `tutorActions.int.test.ts` Test 4 asserts zero `generateHint()` calls on the rate-limited path.
+
+⚠️ **One security-adjacent finding, carried to Finding Q-1**: `RATE_LIMITS.explainStep` is `20/hour per user`, but the Gemini key's ceiling is **20 requests per day for the entire project**. The per-user guard is correctly placed and correctly implemented; it just guards the wrong axis for this particular cost surface. PRD Risk R-c anticipated the *unauthenticated* hole (TD-013) but not this one.
+
+## Task 24 — Coverage ✅
+
+`npx vitest run --coverage` (v8 provider, installed with `--no-save` so the engineer's in-flight `package.json` diff was not disturbed):
+
+| Target path | % Stmts | % Branch | % Funcs | % Lines |
+|---|---|---|---|---|
+| `lib/adaptive/constants.ts` | 100 | 100 | 100 | 100 |
+| `lib/adaptive/route.ts` | 91.80 | 71.79 | 100 | 97.82 |
+| `lib/adaptive/skillTaxonomy.ts` | 96.96 | 83.33 | 100 | 100 |
+| `lib/adaptive/tagDecision.ts` | 100 | 100 | 100 | 100 |
+| `lib/scoring/wrongTwice.ts` | 100 | 100 | 100 | 100 |
+| `lib/tutor/callTutor.ts` | 96.96 | 100 | 100 | 96.77 |
+| `lib/tutor/constants.ts` | 100 | 100 | 100 | 100 |
+| `lib/tutor/prompt.ts` | 100 | 100 | 100 | 100 |
+| `lib/tutor/telemetry.ts` | 100 | 100 | 100 | 100 |
+| `components/tutor/ExplainStepAffordance.tsx` | 100 | 100 | 100 | 100 |
+| `components/tutor/useTutorAction.ts` | 100 | 100 | 100 | 100 |
+| `app/(layer3)/_components/SkillRecommendationCard.tsx` | 100 | 100 | 100 | 100 |
+
+**Total across the required scope: 96.65% statements / 88.80% branches / 100% functions / 98.84% lines.** Every path clears the 70% bar; the lowest single file is `route.ts` at 91.80% statements (uncovered: line 103, the `a.id === b.id` leg of the third sort key — unreachable in practice because node ids are unique).
+
+`@vitest/coverage-v8` is **not** a saved dependency. Re-running this check needs `npm i --no-save @vitest/coverage-v8@4.1.10` first; adding it permanently is a separate call, deliberately not made here.
+
+## Task 25 — Risk closure walk ✅
+
+### Backend Design Doc risks
+
+| Risk | Disposition | Evidence |
+|---|---|---|
+| Mastery-write forgery re-opens §11 | **Closed** | Task 23 above; `recordSkillMastery.int.test.ts` Test 2; `test-rls.ts` `MM-b` |
+| Answer-key reaches prompt or telemetry | **Closed** — three independent layers | Task 23; `prompt.test.ts` 3 tests, `telemetry.test.ts` 1 test; live 429 wrote `error_code='server'` |
+| §10c grant appended instead of edited in place | **Closed** | Single `grant select (...)` statement at schema.sql:798-800 with 10 columns; `verify:schema` check #1 green |
+| §17 fingerprint not updated with the DDL | **Closed** on dev | `schemaFingerprint.test.ts` + `parseForeignKeys.test.ts` green in the full suite |
+| Mastery/score divergence narrow window | **Accepted residual, unchanged** | ADR-0011 states it; `submitExam()` step 7 comment states it; retry does not self-heal, by design |
+| Vercel deadline vs `TUTOR_CALL_DEADLINE_MS` | **Residual, downgraded from "closed on paper"** | Task 13 reasoned a 10× margin from Vercel's 300s fluid-compute default. Measured latency in Phase 5 was 7.3s / 7.3s / 22.0s / 23.0s against a 30s deadline — the *application* margin is 7s. The platform margin is still fine; the risk that actually matters is a slow Gemini call tripping the abort, not Vercel cutting first. |
+| Threshold placeholders (U3/U5) | **Closed for U3, still placeholder for U5** | U3 retuned to 0.90 on real dry-run evidence; U5 remains 0.7 with no usage data yet to retune against — the PRD's own expectation |
+| Dry-run / apply drift in the tagger | **Closed** | Ran dry-run → human review → `--apply` → `--apply` again; 0 duplicates (AC-006) |
+
+### Frontend Design Doc risks
+
+| Risk | Disposition | Evidence |
+|---|---|---|
+| `explainStep()` argument-order swap | **Closed** | Unit assertion with two distinguishable fixtures, plus the real dev-server log line `explainStep("c5a6ea39-…", "q-t10-3")` |
+| TBD-01 repeated cost on reload | **Accepted residual** — and now materially worse than assessed, see Finding Q-1: a reload re-spends from a 20/day project budget, not just a per-user allowance |
+| Async-Server-Component test technique unprecedented | **Closed** | Technique worked; the documented manual-only fallback was not needed; `SkillRecommendationCard.test.tsx` 3/3 green and the file is at 100% coverage |
+| Multi-instance id uniqueness (no `idPrefix`) | **Closed** | Real page rendered three affordance instances with distinct `aria-describedby` targets and no duplicate-id collision |
+| `RichText` malformed-input degrade | **Closed** | Existing `RichText.xss.test.tsx` covers the pipeline; live hints with LaTeX rendered correctly |
+
+### PRD risks
+
+| Risk | Disposition |
+|---|---|
+| R-a — mis-tagged skills produce confidently wrong recommendations | **Closed, and strengthened beyond design.** The 0.75 → 0.90 retune came from exactly the failure mode R-a describes: at 0.85 the model mapped "tập xác định" to mệnh-đề-tập-hợp and a *linear* function to hàm-số-bậc-hai. 100% of written tags human-reviewed (AC-008) |
+| R-b — tone evaluation not repeatable | **Closed as a mechanism, open as a result.** `toneEval.manual.test.ts` fixes the 10 cases and writes a report file, so the pass is repeatable by construction. Only 3/10 cases have recorded verdicts — quota-blocked, see Phase 5 Task 21 |
+| R-c — tutor is a cost surface with a known rate-limit hole | **Was accepted (TD-013, unauthenticated traffic). Now reopened on a second axis** — see Finding Q-1. The authenticated guard works; the project-wide daily budget is unguarded |
+| R-d — mastery write re-opens §11 | **Closed** — ADR-0011, verified in Task 23 |
+| R-e/R-f — heuristic, not IRT; tiny corpus | **Accepted as designed** — routing is explicitly heuristic; U5 stays a placeholder until real usage data exists |
+| R-g/R-h | **Accepted residuals**, unchanged from design |
+
+## Task 26 — Acceptance criteria walk ✅
+
+| AC | Disposition | Evidence |
+|---|---|---|
+| AC-001 cycles | ✅ | `validateDag()` + `skillTaxonomy.test.ts` |
+| AC-002 dangling prerequisites | ✅ | same |
+| AC-003 node count 15-25 | ✅ | **20** nodes / 15 edges in dev DB |
+| AC-004 Vietnamese labels | ✅ | Rendered verbatim in the live dashboard ("Hàm số bậc hai", …) |
+| AC-005 no below-threshold writes | ✅ | Tagging report: every sub-0.90 row is `decision: "left-null"`, `wrote: false` |
+| AC-006 re-runnable | ✅ | `--apply` run twice, 0 duplicates |
+| AC-007 exactly two states | ✅ | Every report row is `tagged` or `left-null` **with a `reason`** (`below-threshold` / `no-matching-node` / `already-tagged`) |
+| AC-008 100% human-reviewed | ✅ | 36 tags reviewed; the review is what produced the 0.90 retune |
+| AC-009 mastery matches correctness | ✅ | `recordSkillMastery.int.test.ts` Test 1 on real Postgres |
+| AC-010 untagged contributes nothing | ✅ | same test; SQL `where q.skill_node_id is not null` |
+| AC-011 trust boundary | ✅ | Task 23 |
+| AC-012 telemetry answers "how many, for whom, how many failed" | ✅ | Live: 6 × `adaptive_route` + 5 × `tutor_invoke` (4 ok / 1 failed), queried directly |
+| AC-013 no answer-key in telemetry | ✅ | Schema has no such column; `error_code` CHECK-constrained; live failure stored `'server'` |
+| AC-014 DAG-valid recommendation | ✅ | `route.test.ts`; live prereq-gate account returned the prerequisite |
+| AC-015 recency preferred | ✅ | `route.test.ts`; live `recently-wrong` account |
+| AC-016 deterministic | ✅ | `route.test.ts` incl. no-mutation assertion; pure function, no `Date.now()` |
+| AC-017 returns prerequisite, not blocked node | ✅ | Live: `nguyen-ham` wrong → recommended **Hàm số bậc hai** |
+| AC-018 0 answer-key occurrences in prompt | ✅ | `prompt.test.ts` Test 1 sentinel battery |
+| AC-019 reads only §10c safe columns | ✅ | `TUTOR_QUESTION_COLUMNS` ⊂ granted columns; DB enforces |
+| AC-020 Vietnamese + Socratic + no final answer | ⚠️ **3/10** | 3 real hints judged; 7 quota-blocked (Phase 5 Task 21) |
+| AC-021 actionable retry, page keeps working | ✅ | Real 429 → "Retry" + `role="alert"`, rest of page interactive |
+| AC-022 Server Action, guarded, 0 unauthenticated paths | ✅ | Task 23 |
+| AC-023 affordance present on wrong-twice | ✅ | Live: Q1, Q2 |
+| AC-024 absent otherwise | ✅ | Live: Q3 (answered correctly) has none |
+| AC-025 busy state, no double-trigger, announced | ✅ | 2 synchronous clicks → 1 call + 1 telemetry row; `aria-busy` + sr-only "Getting a hint…" |
+| AC-026 keyboard reachable, visible focus, not colour-only | ✅ **after the Phase 5 focus fix** | Tab/Enter/Space verified; 3px ring; four states differ by icon/label, not colour |
+| AC-027 chrome from i18n dictionaries | ✅ | EN locale rendered EN chrome; hint stayed Vietnamese as specified |
+| AC-028 cold start defined | ✅ | Live cold account: honest message, no `<details>`, no crash |
+| AC-029 untagged question still supports tutor | ✅ | `tutorActions.int.test.ts` Test 3; `skill_node_id` never read by the tutor |
+| AC-030 `subject='Toán'` normalised | — **out of scope** | R9, tracked as TD-016 (already closed separately 2026-08-14) |
+| AC-031 recommendation shown with Vietnamese label | ✅ | Live, all 3 reasonCodes, labels verbatim |
+
+**29 of 31 satisfied. AC-020 partial (quota). AC-030 out of Sprint 1 scope by design.**
+
+## Task 27 — Document updates ✅
+
+Update History rows appended to:
+
+- `docs/design/engine1-adaptive-ai-backend-design.md` → **v1.1**: U3 shipped at **0.90** (not the 0.75 placeholder) with the dry-run evidence that justified it; U5 shipped at **0.7** as designed; the Gemini 20/day ceiling recorded as a correction to the "Gemini failures are transient" Assumed Behavior; measured tutor latency vs the 30s deadline.
+- `docs/design/engine1-adaptive-ai-frontend-design.md` → **v1.1**: the focus-loss gap in its own Accessibility Implementation scope, the shipped fix, and why the wrapper is a `<div>` rather than a `ref` on `BentoCell`; confirmation that the argument-order risk and `busyRef` guard held, and that the async-SC test fallback was not needed.
+- `docs/adr/ADR-0011-mastery-write-trust-boundary.md` → new Update History section: decision unchanged, mechanism verified clause by clause against shipped SQL, residual re-affirmed.
+- `docs/ui-spec/engine1-adaptive-ai-ui-spec.md` → **v1.1**: TBD-06 resolved (manual pass, no new dependency) with the measured contrast range; D5 amended in practice by the focus fix; TBD-01/TBD-05 remain open and non-blocking as specified.
+
+**R9 disposition**: out of this plan's scope by explicit design; tracked as TD-016, which was itself closed separately on 2026-08-14 (`88d326b`).
+
+---
+
+## Findings that block "shippable"
+
+### P-1 — Prod has the Engine 1 tables but none of the Engine 1 content 🔴
+
+`pebjdlbgbmizgfpuptjl` (MS-MOLAR-prod): `skill_nodes = 0`, `skill_prerequisites = 0`, tagged questions `= 0`, against 28 Math questions and 7 users. The 2026-08-15 migration created the tables; nobody ran the seed or the tagger.
+
+Shipping as-is: the recommendation card shows cold-start to every user permanently, and `record_skill_mastery()` can never write a row because every `questions.skill_node_id` is NULL. This is TD-005's shape at the **data** layer, where a matching `schema_version` fingerprint gives no warning at all.
+
+Task 22's prod step is therefore three actions, not one: apply DDL → `seedSkillTaxonomy.ts` → `tagQuestionSkills.ts` (dry-run → human review → `--apply`) → re-count with a real query.
+
+### Q-1 — The tutor's Gemini key allows 20 requests per day, project-wide 🔴
+
+`GenerateRequestsPerDayPerProjectPerModel-FreeTier`, `quotaValue = 20`, model `gemini-3.5-flash`, shared with UGC extraction, resetting at midnight Pacific. `RATE_LIMITS.explainStep` is 20/hour *per user*, so one student can drain the whole project's day in an hour; afterwards every student who clicks "Explain this step" gets the generic error state and `telemetry_log` fills with `error_code='server'` rows that read like an outage rather than a budget.
+
+Nothing in the PRD, either Design Doc, or `rateLimit.ts` accounts for this. **Owner has been notified and is treating it as a separate upcoming feature** — recorded here as an open, unresolved item, deliberately not mitigated in code during this phase.
+
+### Q-2 — AC-020 is 3/10 judged
+
+Quota-blocked, not failing. Harness is committed and repeatable; needs one run on a day whose 20-request budget is reserved for it.
 
 ## Phase Completion Criteria (verbatim from Work Plan)
 
-- [ ] Security review: complete (Task 23)
-- [ ] Quality checks (types, lint, format): zero errors
-- [ ] Execute all tests (unit, integration, service-integration-e2e): all green; manual/Playwright passes recorded (Phase 5)
-- [ ] Coverage 70%+: confirmed (Task 24)
-- [ ] Document updates: complete (Task 27)
+- [x] Security review: complete (Task 23)
+- [x] Quality checks (types, lint, format): zero errors
+- [x] Execute all tests (unit, integration, service-integration-e2e): all green; manual/Playwright passes recorded (Phase 5)
+- [x] Coverage 70%+: confirmed (Task 24) — 96.65% statements across the required scope
+- [x] Document updates: complete (Task 27)
 
 ## Overall Work Plan Completion Criteria (verbatim)
 
-- [ ] All phases completed
-- [ ] All integration/service-integration-e2e tests passing
-- [ ] Both Design Docs' acceptance criteria satisfied
-- [ ] Staged quality checks completed (zero errors)
-- [ ] All tests pass
-- [ ] Manual Playwright/keyboard/axe-equivalent/10-case tone-eval passes recorded (Phase 5)
-- [ ] Both dev and prod schema applies verified via `verify:schema`, fingerprints matching git
+- [ ] All phases completed — Phase 5 Task 21 outstanding (Q-2)
+- [x] All integration/service-integration-e2e tests passing
+- [ ] Both Design Docs' acceptance criteria satisfied — 29/31; AC-020 partial (Q-2), AC-030 out of scope by design
+- [x] Staged quality checks completed (zero errors)
+- [x] All tests pass
+- [ ] Manual Playwright/keyboard/axe-equivalent/10-case tone-eval passes recorded (Phase 5) — all recorded except the tone eval (Q-2)
+- [ ] Both dev and prod schema applies verified via `verify:schema`, fingerprints matching git — **dev yes, prod outstanding (P-1)**
 - [ ] User review approval obtained
 
 ## Verification Commands
 
 ```
-cd SOURCE && npx vitest run --coverage
+cd SOURCE && npm i --no-save @vitest/coverage-v8@4.1.10   # coverage is not a saved dep
+cd SOURCE && npx vitest run --coverage --coverage.provider=v8 --coverage.all \
+  --coverage.include='lib/adaptive/**' --coverage.include='lib/tutor/**' \
+  --coverage.include='lib/scoring/wrongTwice.ts' --coverage.include='components/tutor/**' \
+  --coverage.include='app/**/_components/SkillRecommendationCard.tsx'
 cd SOURCE && npx eslint --max-warnings 0 .
 cd SOURCE && npx tsc --noEmit
 cd SOURCE && npm run build
@@ -41,4 +226,4 @@ cd SOURCE && npm run build
 
 ## This Is the Final Gate
 
-No further phase follows. Once this checklist and both `⚠` manual checkpoints (backend-task-01 dev apply, backend-task-14 prod apply) are confirmed, the work plan itself is complete pending user review approval.
+No further phase follows. Three items stand between here and "shippable": **P-1** (prod content, blocking), **Q-2** (AC-020's remaining 7 cases, quota-gated), and **Q-1** (the daily-quota ceiling, owner-deferred to a separate feature). Everything else in this work plan is complete and evidenced.

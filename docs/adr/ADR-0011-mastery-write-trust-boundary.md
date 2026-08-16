@@ -87,3 +87,9 @@ Where this ADR's problem shape **differs** from ADR-0010's: the PRD's own Reliab
 - `docs/prd/engine1-adaptive-ai-prd.md` — R3, AC-011, Security NFR, Risk R-d, Undetermined Item U2.
 - `docs/design/engine1-adaptive-ai-backend-design.md` — full DDL, integration point in `submitExam()`, and the Minimal Surface Alternatives analysis for keeping `skill_node_id` out of the TS layer.
 - `SOURCE/supabase/schema.sql` §11 (`SCORE WRITE LOCKDOWN`) — the block this ADR's §18 sits beside.
+
+## Update History
+
+| Date | Version | Changes | Author |
+|------|---------|---------|--------|
+| 2026-08-16 | — | Decision **unchanged and verified end to end** (Final Phase Task 23). Confirmed in the shipped `schema.sql` §18: `record_skill_mastery()` declares no `security definer` and is therefore `INVOKER` as decided; `revoke all on function ... from public, anon, authenticated` is present by name, with `grant execute` to `service_role` alone; `v_user_id` is derived from the `exam_attempts` row and the function raises `check_violation` unless `status = 'submitted'`, so no caller can assert an identity or write against an unsubmitted attempt; `user_skill_mastery` additionally revokes `insert, update, delete` from `anon, authenticated` and exposes only a `mastery_select_own` read policy. Proven, not merely inspected: `recordSkillMastery.int.test.ts` Test 2 (a real student JWT calling `.rpc("record_skill_mastery", ...)` is denied) and `test-rls.ts` Phần 7 case `MM-b`. The accepted residual also held as written — the narrow window where a crash between `recordExamResult()` and `recordSkillMastery()` leaves a scored attempt with no mastery row is still not self-healing on retry, and is still the right trade against rolling back a score. | Final Phase Task 27 (Claude) |

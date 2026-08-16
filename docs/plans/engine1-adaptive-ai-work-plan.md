@@ -409,16 +409,16 @@ flowchart TD
 #### Tasks
 
 - [ ] **Task 22 — Full regression + prod schema apply**: Re-run `npm run verify:schema` (dev), `npx tsx supabase/test-rls.ts` (full suite incl. Phần 7), `npx vitest run` (all unit + integration), `tsc --noEmit`, `eslint --max-warnings 0`, `next build`. ⚠ **NỘI DUNG, KHÔNG CHỈ SCHEMA** (phát hiện ở Phase 5, 2026-08-16): bản migrate schema lên prod ngày 2026-08-15 đã tạo đủ bảng Engine 1 nhưng `skill_nodes`=0, `skill_prerequisites`=0, 0 câu hỏi gắn thẻ trên prod — tức trên prod thẻ gợi ý sẽ mãi hiện cold-start và `record_skill_mastery()` không bao giờ ghi nổi một dòng (mọi `questions.skill_node_id` đều NULL). Bước prod vì thế gồm BA việc, không phải một: apply DDL → chạy `seedSkillTaxonomy.ts` → chạy `tagQuestionSkills.ts` (dry-run, người duyệt, rồi `--apply`) trên prod, rồi hậu kiểm bằng truy vấn đếm thật. ⚠ **MANUAL CHECKPOINT (A3, human-in-the-loop)**: once all dev-side work is verified, the engineer manually applies the identical, already-verified DDL to the **prod** Supabase project and runs `npm run verify:schema` against prod, confirming the §17 fingerprint there matches the fingerprint committed to git (A3 explicitly permits interim dev/prod drift during the sprint — this step is what closes that drift, not silently).
-- [ ] **Task 23 — Security review**: Walk ADR-0011's mechanism end to end (INVOKER, `service_role`-only, revoke-by-name on `record_skill_mastery()`); re-confirm D3/AC-018/019 answer-key containment across both the prompt and telemetry paths; confirm D4 (hint renders only via `RichText`, no competing path); confirm `explainStep()` has 0 unauthenticated code paths and every invocation passes through `guard()` (AC-022, PRD Success Criteria #11).
-- [ ] **Task 24 — Coverage check**: 70%+ on `lib/adaptive/**`, `lib/tutor/**`, `lib/scoring/wrongTwice.ts`, `components/tutor/**`, `app/(layer3)/_components/SkillRecommendationCard.tsx`.
-- [ ] **Task 25 — Risk closure walk**: Confirm each backend DD Risk (mastery-write forgery, answer-key-in-prompt, §10c parser trap, §17 fingerprint, mastery/score-divergence narrow window, Vercel deadline, threshold placeholders, dry-run/apply drift), each frontend DD Risk (argument-order swap, TBD-01 repeated-cost-on-reload, async-SC test technique, multi-instance id uniqueness, RichText malformed-input degrade), and each PRD Risk (R-a through R-h) has either a passing, evidenced mitigation or an explicitly accepted residual — none silently dropped between design and ship.
-- [ ] **Task 26 — Design Doc / PRD acceptance criteria final walk**: Verify every AC this feature owns (the backend-owned and frontend-owned subsets of AC-001 through AC-031) against the shipped implementation; record disposition per AC.
-- [ ] **Task 27 — Document updates**: Update the Update History of both Design Docs, the ADR, and the UI Spec if any discrepancy was found during implementation. Record U3/U5's actual shipped values (0.75/0.7, or their retuned values if Phase 1/5 evidence justified a change) and R9's accepted-gap disposition (tracked separately as TD-016, not a Sprint 1 blocker).
-- [ ] Security review: complete (Task 23)
-- [ ] Quality checks (types, lint, format): zero errors
-- [ ] Execute all tests (unit, integration, service-integration-e2e): all green; manual/Playwright passes recorded (Phase 5)
-- [ ] Coverage 70%+: confirmed (Task 24)
-- [ ] Document updates: complete (Task 27)
+- [x] **Task 23 — Security review** (PASS — INVOKER + revoke-đích-danh + user_id suy từ attempt xác nhận trên SQL đã ship; chặn lộ đáp án có BA lớp độc lập, lớp DB là lớp giữ được kể cả khi hai lớp trên bị sửa sai; explainStep() fail-closed bằng chính RLS, guard() đứng trước mọi lời gọi Gemini): Walk ADR-0011's mechanism end to end (INVOKER, `service_role`-only, revoke-by-name on `record_skill_mastery()`); re-confirm D3/AC-018/019 answer-key containment across both the prompt and telemetry paths; confirm D4 (hint renders only via `RichText`, no competing path); confirm `explainStep()` has 0 unauthenticated code paths and every invocation passes through `guard()` (AC-022, PRD Success Criteria #11).
+- [x] **Task 24 — Coverage check** (96.65% stmts / 88.80% branch / 100% funcs trên toàn phạm vi yêu cầu; thấp nhất là route.ts 91.80%): 70%+ on `lib/adaptive/**`, `lib/tutor/**`, `lib/scoring/wrongTwice.ts`, `components/tutor/**`, `app/(layer3)/_components/SkillRecommendationCard.tsx`.
+- [x] **Task 25 — Risk closure walk** (mọi rủi ro của 2 DD + PRD đều có bằng chứng đóng hoặc residual ghi rõ; HAI mục bị hạ cấp khỏi 'đã đóng': deadline Vercel — biên thật 7s chứ không 10×, và R-c — mở lại trên trục thứ hai là hạn ngạch 20/ngày toàn dự án): Confirm each backend DD Risk (mastery-write forgery, answer-key-in-prompt, §10c parser trap, §17 fingerprint, mastery/score-divergence narrow window, Vercel deadline, threshold placeholders, dry-run/apply drift), each frontend DD Risk (argument-order swap, TBD-01 repeated-cost-on-reload, async-SC test technique, multi-instance id uniqueness, RichText malformed-input degrade), and each PRD Risk (R-a through R-h) has either a passing, evidenced mitigation or an explicitly accepted residual — none silently dropped between design and ship.
+- [x] **Task 26 — AC final walk** (29/31 đạt; AC-020 mới 3/10 ca vì hạn ngạch Gemini; AC-030 ngoài phạm vi Sprint 1 theo thiết kế): Verify every AC this feature owns (the backend-owned and frontend-owned subsets of AC-001 through AC-031) against the shipped implementation; record disposition per AC.
+- [x] **Task 27 — Document updates** (đã ghi Update History cho 2 Design Doc + ADR-0011 + UI Spec; U3 ship ở **0.90** chứ không phải 0.75 — có bằng chứng dry-run; U5 giữ 0.7): Update the Update History of both Design Docs, the ADR, and the UI Spec if any discrepancy was found during implementation. Record U3/U5's actual shipped values (0.75/0.7, or their retuned values if Phase 1/5 evidence justified a change) and R9's accepted-gap disposition (tracked separately as TD-016, not a Sprint 1 blocker).
+- [x] Security review: complete (Task 23)
+- [x] Quality checks (types, lint, format): zero errors
+- [x] Execute all tests (unit, integration, service-integration-e2e): all green; manual/Playwright passes recorded (Phase 5)
+- [x] Coverage 70%+: confirmed (Task 24) — 96.65% stmts
+- [x] Document updates: complete (Task 27)
 
 ### Quality Assurance
 
@@ -467,9 +467,9 @@ flowchart TD
 - Notes: Chạy bằng Playwright CLI (`SOURCE/scripts/pw/cli.mjs`) thay MCP server — cùng Chromium, là bản thay thế đã dùng quen của repo này. Ba phát hiện chuyển tiếp sang Final Phase: (1) độ trễ gia sư trôi 7s→23s trong cùng một phiên, biên còn 7s so với `TUTOR_CALL_DEADLINE_MS`=30s; (2) hạn ngạch ngày của Gemini free tier cạn sau ~36 lời gọi; (3) **prod có bảng Engine 1 nhưng KHÔNG có nội dung** — `skill_nodes`=0, `skill_prerequisites`=0, 0 câu hỏi gắn thẻ, nên trên prod thẻ gợi ý sẽ mãi mãi hiện cold-start và không dòng mastery nào ghi được. Task 22 phải apply cả DDL LẪN nội dung. Chi tiết đầy đủ: `docs/plans/tasks/engine1-adaptive-ai-work-plan-phase5-completion.md`.
 
 ### Final Phase (Quality Assurance & Hardening)
-- Start:
-- Complete:
-- Notes:
+- Start: 2026-08-16
+- Complete: Task 23-27 xong; Task 22 mới xong nửa dev.
+- Notes: Còn ĐÚNG BA việc trước khi gọi là ship được — (P-1) prod có bảng nhưng chưa có nội dung Engine 1, phải seed taxonomy + gắn thẻ chứ không chỉ apply DDL; (Q-2) AC-020 mới chấm 3/10 ca, chờ hạn ngạch Gemini; (Q-1) trần 20 request/NGÀY toàn dự án của key Gemini — chủ dự án đã biết và tách thành tính năng riêng, cố ý KHÔNG vá trong pha này. Chi tiết: `docs/plans/tasks/engine1-adaptive-ai-work-plan-phase6-completion.md`.
 
 ## Notes
 
