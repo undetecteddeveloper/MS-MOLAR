@@ -60,7 +60,9 @@ Telemetry path: `telemetry_log` has **no column** that could carry answer-key ma
 
 `guard("explainStep", userId)` sits at step 2, ahead of the eligibility recompute, the question fetch and the Gemini call — so a rate-limited caller costs one cheap DB read and nothing else. `tutorActions.int.test.ts` Test 4 asserts zero `generateHint()` calls on the rate-limited path.
 
-⚠️ **One security-adjacent finding, carried to Finding Q-1**: `RATE_LIMITS.explainStep` is `20/hour per user`, but the Gemini key's ceiling is **20 requests per day for the entire project**. The per-user guard is correctly placed and correctly implemented; it just guards the wrong axis for this particular cost surface. PRD Risk R-c anticipated the *unauthenticated* hole (TD-013) but not this one.
+⚠️ **One security-adjacent finding, carried to Finding Q-1**: at the time of this review `RATE_LIMITS.explainStep` was `20/hour per user`, while the Gemini key's ceiling is **20 requests per day for the entire project**. The per-user guard was correctly placed and correctly implemented; it just guarded the wrong axis — and, more precisely, the wrong *unit* — for this particular cost surface. PRD Risk R-c anticipated the *unauthenticated* hole (TD-013) but not this one.
+
+**Superseded 2026-08-16 by `e8d91a4`** — see the updated Finding Q-1 below. `RATE_LIMITS.explainStep` now reads `{ limit: 3, windowMs: 24 * 60 * 60 * 1000 }`. The unit, not the number, was the substantive fix: an hour-long window can never bound a per-day quota (3/hour is still 72/day for one person), so lowering `limit` while keeping the hourly window would only have slowed the drain. The per-user axis is closed; the project-wide axis is not.
 
 ## Task 24 — Coverage ✅
 
@@ -105,7 +107,7 @@ Telemetry path: `telemetry_log` has **no column** that could carry answer-key ma
 | Risk | Disposition | Evidence |
 |---|---|---|
 | `explainStep()` argument-order swap | **Closed** | Unit assertion with two distinguishable fixtures, plus the real dev-server log line `explainStep("c5a6ea39-…", "q-t10-3")` |
-| TBD-01 repeated cost on reload | **Accepted residual** — and now materially worse than assessed, see Finding Q-1: a reload re-spends from a 20/day project budget, not just a per-user allowance |
+| TBD-01 repeated cost on reload | **Accepted residual, since bounded** — a reload re-spends from a 20/day *project* budget, not just a per-user allowance. `e8d91a4` caps any one user at 3/day, so a reload loop now costs that user their own day's allowance rather than the whole project's; see Finding Q-1 |
 | Async-Server-Component test technique unprecedented | **Closed** | Technique worked; the documented manual-only fallback was not needed; `SkillRecommendationCard.test.tsx` 3/3 green and the file is at 100% coverage |
 | Multi-instance id uniqueness (no `idPrefix`) | **Closed** | Real page rendered three affordance instances with distinct `aria-describedby` targets and no duplicate-id collision |
 | `RichText` malformed-input degrade | **Closed** | Existing `RichText.xss.test.tsx` covers the pipeline; live hints with LaTeX rendered correctly |
@@ -116,7 +118,7 @@ Telemetry path: `telemetry_log` has **no column** that could carry answer-key ma
 |---|---|
 | R-a — mis-tagged skills produce confidently wrong recommendations | **Closed, and strengthened beyond design.** The 0.75 → 0.90 retune came from exactly the failure mode R-a describes: at 0.85 the model mapped "tập xác định" to mệnh-đề-tập-hợp and a *linear* function to hàm-số-bậc-hai. 100% of written tags human-reviewed (AC-008) |
 | R-b — tone evaluation not repeatable | **Closed as a mechanism, open as a result.** `toneEval.manual.test.ts` fixes the 10 cases and writes a report file, so the pass is repeatable by construction. Only 3/10 cases have recorded verdicts — quota-blocked, see Phase 5 Task 21 |
-| R-c — tutor is a cost surface with a known rate-limit hole | **Was accepted (TD-013, unauthenticated traffic). Now reopened on a second axis** — see Finding Q-1. The authenticated guard works; the project-wide daily budget is unguarded |
+| R-c — tutor is a cost surface with a known rate-limit hole | **Accepted on axis 1 (TD-013, unauthenticated traffic). Reopened on a second axis, then partly closed** — `e8d91a4` moved the per-user guard onto the provider's own day unit (3/day), so no single account can drain the project. What remains open is the aggregate: 7 distinct users × 3 exceeds 20. See Finding Q-1 |
 | R-d — mastery write re-opens §11 | **Closed** — ADR-0011, verified in Task 23 |
 | R-e/R-f — heuristic, not IRT; tiny corpus | **Accepted as designed** — routing is explicitly heuristic; U5 stays a placeholder until real usage data exists |
 | R-g/R-h | **Accepted residuals**, unchanged from design |
@@ -203,11 +205,19 @@ This matters beyond labelling. `pp-toa-do-khong-gian` has `mat-non-mat-tru-mat-c
 
 **Prod `verify:schema` after the content work: 8/8 sections green**, fingerprint `f525e3095339` matching `SCHEMA_FINGERPRINT` in git — the A3 checkpoint of backend-task-14, now satisfied on both environments.
 
-### Q-1 — The tutor's Gemini key allows 20 requests per day, project-wide 🔴
+### Q-1 — The tutor's Gemini key allows 20 requests per day, project-wide 🟠 (narrowed 2026-08-16, not closed)
 
-`GenerateRequestsPerDayPerProjectPerModel-FreeTier`, `quotaValue = 20`, model `gemini-3.5-flash`, shared with UGC extraction, resetting at midnight Pacific. `RATE_LIMITS.explainStep` is 20/hour *per user*, so one student can drain the whole project's day in an hour; afterwards every student who clicks "Explain this step" gets the generic error state and `telemetry_log` fills with `error_code='server'` rows that read like an outage rather than a budget.
+`GenerateRequestsPerDayPerProjectPerModel-FreeTier`, `quotaValue = 20`, model `gemini-3.5-flash`, shared with UGC extraction, resetting at midnight Pacific. As originally found, `RATE_LIMITS.explainStep` was 20/hour *per user*, so one student could drain the whole project's day in an hour; afterwards every student who clicks "Explain this step" gets the generic error state and `telemetry_log` fills with `error_code='server'` rows that read like an outage rather than a budget.
 
-Nothing in the PRD, either Design Doc, or `rateLimit.ts` accounts for this. **Owner has been notified and is treating it as a separate upcoming feature** — recorded here as an open, unresolved item, deliberately not mitigated in code during this phase.
+**Partly mitigated by `e8d91a4` (2026-08-16), after this phase's review was written.** `RATE_LIMITS.explainStep` is now `{ limit: 3, windowMs: 24h }`.
+
+The substantive change is the **unit, not the number** — and this is the part worth carrying forward. A window measured in hours cannot bound a quota measured in days: at 3/hour one account still reaches 72/day, so lowering `limit` while keeping the hourly window only slows the drain instead of capping it. Only once the window is exactly 24h does `limit` read as "each person's share of the day's quota." `rateLimit.test.ts` now pins this structurally: actions are sorted into `DB_COST_ACTIONS` (our own DB cost, cap generous) and `SUPPLIER_CAPPED_ACTIONS` (third-party quota, `windowMs` asserted `=== 24h` and `limit <= 20`), with a third test asserting the two lists partition `RATE_LIMITS` exactly — so a new action added without being classified turns the suite red rather than slipping through unguarded.
+
+**What is closed**: the single-account drain. No one user can spend more than 3 of the project's 20.
+
+**What remains open**: the **aggregate**. The guard is per user; nothing counts the project's total. Seven distinct users at 3 each exceed 20, and UGC extraction spends from the same bucket. There is still no project-wide counter, and a genuinely exhausted budget still surfaces to students as `error_code='server'` — indistinguishable from an outage.
+
+**Owner decision, unchanged**: the aggregate axis is deferred to the Subscription feature, where the ceiling becomes a per-plan entitlement read from the user's plan rather than one constant shared by everyone — `rateLimit.ts` says so at the `explainStep` definition, which calls 3 an explicit interim cap. Recorded here as an open item, deliberately not further mitigated inside Engine 1.
 
 ### Q-2 — AC-020 is 3/10 judged
 
@@ -250,6 +260,6 @@ cd SOURCE && npm run build
 No further phase follows. **P-1 is closed (2026-08-16)** — prod now carries the taxonomy and 92.9% tag coverage, verified by query, and `verify:schema` is green on both environments. Two items remain, neither blocking a ship:
 
 - **Q-2** — AC-020 is 3/10 judged. Quota-gated, not failing; the harness is committed and needs one run on a day whose `gemini-3.5-flash` budget is reserved for it.
-- **Q-1** — the 20-requests/day ceiling on the tutor model, owner-deferred to a separate feature by explicit decision.
+- **Q-1** — the 20-requests/day ceiling on the tutor model. **Narrowed, not closed**, by `e8d91a4`: the per-user guard now runs on the provider's day unit (3/day), so no one account can drain the project. The aggregate axis stays open and owner-deferred to the Subscription feature by explicit decision.
 
 Worth recording against Q-1, because it was nearly mis-scoped: the ceiling is **per model** (`GenerateRequestsPerDayPerProjectPerModel`) and was measured on `gemini-3.5-flash`, the tutor's model. The batch tagger runs on `gemini-3.1-flash-lite` — a separate bucket — which is why tagging 28 prod questions was never blocked by it. Reading Q-1 as a project-wide ceiling across all models would have wrongly declared P-1 unclosable. Q-1 constrains Q-2; it does not constrain the tagger.

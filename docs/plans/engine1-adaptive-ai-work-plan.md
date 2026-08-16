@@ -299,22 +299,22 @@ flowchart TD
   - Proof obligations: backend DD's Early Verification Point (success/failure criteria as stated in Verification Strategy above); ADR-0011's Decision Details table (INVOKER/revoke-by-name/derived-identity).
 - [x] **Task 2 — RLS regression cases (`test-rls.ts` Phần 7)** (shipped in `a948efa`): Append a new phased comment block (`Phần 7 — Engine 1 Adaptive AI (Mastery + Telemetry)`) following the file's existing fixture-ID-prefix convention. Cases: `MM-a` (a second user cannot SELECT another user's `user_skill_mastery` row), `MM-b` (a student's own JWT cannot invoke `record_skill_mastery()` via `.rpc(...)` — must fail permission-denied, complementing `recordSkillMastery.int.test.ts`'s Test 2 which is name-referenced directly by that skeleton's own header), `TL-a` (an authenticated user cannot SELECT any `telemetry_log` row, including their own), `TL-b` (`anon` cannot INSERT into `telemetry_log`). Run `cd SOURCE && npx tsx supabase/test-rls.ts` — full suite (all prior Phần blocks + new Phần 7) green.
   - Proof obligations: backend DD Test Boundaries / Integration Verification Points ("new `test-rls.ts` cases... for `user_skill_mastery`... and `telemetry_log`").
-- [ ] **Task 3 — Math skill DAG content draft + engineer review (A2)**: Draft ~15-25 skill nodes + prerequisite edges covering grades 10 and 12 (the corpus's actual grade distribution) from the Vietnamese MOET curriculum outline. ⚠ **Content review checkpoint**: the engineer must review and approve the draft DAG before it is seeded (A2 — "review by the engineer is a required step, not a nicety"). This is a content-authoring/review deliverable, not a code-review step.
+- [x] **Task 3 — Math skill DAG content draft + engineer review (A2)** (shipped; DAG duyệt xong, 20 node / 15 cạnh, nhãn tiếng Việt, lớp 10 và 12): Draft ~15-25 skill nodes + prerequisite edges covering grades 10 and 12 (the corpus's actual grade distribution) from the Vietnamese MOET curriculum outline. ⚠ **Content review checkpoint**: the engineer must review and approve the draft DAG before it is seeded (A2 — "review by the engineer is a required step, not a nicety"). This is a content-authoring/review deliverable, not a code-review step.
   - Proof obligations: PRD AC-003 (node count in the 15-25 range) and AC-004 (Vietnamese labels) as reviewed content, not as code.
-- [ ] **Task 4 — `lib/adaptive/skillTaxonomy.ts` + `constants.ts`**: Implement the reviewed DAG (Task 3's content) as typed data + `validateDag()` (0 cycles, 0 dangling prerequisites). Author `SOURCE/lib/adaptive/__tests__/skillTaxonomy.test.ts` directly from AC-001/002/003/004 (no skeleton was generated for this file — write it against the stated Acceptance Criteria, same rigor as the skeleton-driven files). Also author `lib/adaptive/constants.ts`: `MASTERY_CLEARED_THRESHOLD = 0.7` (U5), `SKILL_TAG_CONFIDENCE_THRESHOLD = 0.75` (U3), both as named constants per the PRD's own instruction (not scattered literals).
+- [x] **Task 4 — `lib/adaptive/skillTaxonomy.ts` + `constants.ts`** (shipped trong `1599a27`; 20 node / 15 cạnh, test 15/15. Đặt ở `lib/adaptive/` chứ không `supabase/` vì `vitest.config.ts` không thu `supabase/**` — nhờ vậy dữ liệu ship và dữ liệu được test là CÙNG một file): Implement the reviewed DAG (Task 3's content) as typed data + `validateDag()` (0 cycles, 0 dangling prerequisites). Author `SOURCE/lib/adaptive/__tests__/skillTaxonomy.test.ts` directly from AC-001/002/003/004 (no skeleton was generated for this file — write it against the stated Acceptance Criteria, same rigor as the skeleton-driven files). Also author `lib/adaptive/constants.ts`: `MASTERY_CLEARED_THRESHOLD = 0.7` (U5), `SKILL_TAG_CONFIDENCE_THRESHOLD = 0.75` (U3), both as named constants per the PRD's own instruction (not scattered literals).
   - Proof obligations: AC-001 (0 cycles), AC-002 (0 dangling prerequisites), AC-003 (node count 15-25), AC-004 (Vietnamese labels).
-- [ ] **Task 5 — `SOURCE/supabase/seedSkillTaxonomy.ts`**: Idempotent upsert of the reviewed DAG (Task 3/4's content) via a service-role client, mirroring `seed.ts`'s env-loading/client pattern. Run against dev; confirm re-running produces 0 duplicate rows.
+- [x] **Task 5 — `SOURCE/supabase/seedSkillTaxonomy.ts`** (shipped trong `944ff23`; seed dev lần 1 → 20 node/15 cạnh, lần 2 → vẫn 20/15, 0 dòng trùng. Về sau chạy lại trên prod ở Task 22, cũng 2 lần, cũng 0 trùng): Idempotent upsert of the reviewed DAG (Task 3/4's content) via a service-role client, mirroring `seed.ts`'s env-loading/client pattern. Run against dev; confirm re-running produces 0 duplicate rows.
   - Proof obligations: PRD Success Criteria #3 (taxonomy DAG-valid, node count in range) as observed in the live dev DB after seeding.
-- [ ] **Task 6 — `SOURCE/supabase/tagQuestionSkills.ts`**: Batch skill-tagging script, dry-run by default, `--apply` flag. Corpus query `subject in ('Math', 'Toán')` (R2 — must include the 10 non-canonical `'Toán'` rows). Confidence gate at `SKILL_TAG_CONFIDENCE_THRESHOLD` — below-threshold classifications are recorded as `"left-null"` in the JSON report, never written. Run: (1) dry-run, produce the report; (2) engineer reviews 100% of proposed `"tagged"` decisions (AC-008); (3) `--apply`; (4) re-run `--apply` a second time against the unchanged corpus to prove re-runnability (AC-006, PRD Success Criteria #5 — "a script that claims idempotence and has never been re-run is a claim, not a property"); (5) verify tag coverage ≥ 70% of the ~47-question corpus (PRD Success Criteria #4) — below 70% is a stop-and-review signal, not an automatic failure.
+- [x] **Task 6 — `SOURCE/supabase/tagQuestionSkills.ts`** (shipped trong `4e2fe8b` + `6027356`; dev: 47 câu Toán · 35 có thẻ · 12 NULL = 74.5%, qua mốc 70%, 0 thẻ trỏ node không tồn tại. ⚠ Ngưỡng U3 retune **0.75 → 0.90** trên bằng chứng dry-run thật: 36 câu conf ≥0.90 rà tay đúng 100%, cả 5 câu conf =0.85 đều sai. Tách `no-matching-node` khỏi `classification-error` vì hai thứ dẫn tới hành động ngược nhau, mà report chính là vật liệu engineer duyệt theo AC-008): Batch skill-tagging script, dry-run by default, `--apply` flag. Corpus query `subject in ('Math', 'Toán')` (R2 — must include the 10 non-canonical `'Toán'` rows). Confidence gate at `SKILL_TAG_CONFIDENCE_THRESHOLD` — below-threshold classifications are recorded as `"left-null"` in the JSON report, never written. Run: (1) dry-run, produce the report; (2) engineer reviews 100% of proposed `"tagged"` decisions (AC-008); (3) `--apply`; (4) re-run `--apply` a second time against the unchanged corpus to prove re-runnability (AC-006, PRD Success Criteria #5 — "a script that claims idempotence and has never been re-run is a claim, not a property"); (5) verify tag coverage ≥ 70% of the ~47-question corpus (PRD Success Criteria #4) — below 70% is a stop-and-review signal, not an automatic failure.
   - Proof obligations: AC-005 (0 below-threshold writes), AC-006 (re-runnable, 0 duplicates), AC-007 (every considered row in exactly one of two states), AC-008 (100% human review before ship).
-- [ ] Quality check (staged): lint, typecheck, `npx vitest run lib/adaptive/__tests__/skillTaxonomy.test.ts` — zero errors.
+- [x] Quality check (staged): lint, typecheck, `npx vitest run lib/adaptive/__tests__/skillTaxonomy.test.ts` — zero errors.
 
 #### Phase Completion Criteria
 
-- [ ] `npm run verify:schema` passes all 7 checks against the dev DB; `parseForeignKeys.test.ts`/`schemaFingerprint.test.ts` green
-- [ ] `test-rls.ts` full suite (incl. new Phần 7 `MM-a`/`MM-b`/`TL-a`/`TL-b`) green
-- [ ] Reviewed DAG seeded on dev, `validateDag()`-proven, node count in the 15-25 range
-- [ ] Batch tagger run twice against the real corpus with 0 errors/duplicates; ≥70% coverage or an explicit, recorded stop-and-review decision; 100% of assigned tags human-reviewed
+- [x] `npm run verify:schema` passes all 7 checks against the dev DB; `parseForeignKeys.test.ts`/`schemaFingerprint.test.ts` green — fingerprint `f525e3095339`
+- [x] `test-rls.ts` full suite (incl. new Phần 7 `MM-a`/`MM-b`/`TL-a`/`TL-b`) green — `npx tsx supabase/test-rls.ts` exit 0
+- [x] Reviewed DAG seeded on dev, `validateDag()`-proven, node count in the 15-25 range — **20 node / 15 cạnh**
+- [x] Batch tagger run twice against the real corpus with 0 errors/duplicates; ≥70% coverage or an explicit, recorded stop-and-review decision; 100% of assigned tags human-reviewed — dev 74.5%, `--apply` chạy 3 lần (34 dòng ghi → 1 → 0). ⚠ Vòng duyệt AC-008 lần này **để lọt 2 thẻ sai** (`p2q3`, `p3q4`), chỉ lộ ra khi corpus được duyệt lần thứ hai ở Task 22 — đã sửa trên cả dev lẫn prod, xem `phase6-completion.md`
 
 ### Phase 2: Adaptive Routing (Estimated commits: 2)
 
@@ -323,16 +323,16 @@ flowchart TD
 
 #### Tasks
 
-- [ ] **Task 7 — `lib/adaptive/route.ts` (`recommendNextSkill()`)**: Implement per the backend DD's Data Contracts algorithm (10-step pseudocode: cold-start check, ratio computation with untouched-node-defaults-to-0, `isCleared()`, the 3-key `sortKey`, the prerequisite-substitution walk with a defensive visited-set, `reasonCode` derivation). Convert `route.test.ts`'s 4 tests into real vitest tests in the same commit (Red→Green): Test 1 (AC-014/017, prerequisite-gate substitution), Test 2 (AC-015/016, recency tie-break + determinism, incl. no-mutation assertion), Test 3 (AC-028, strict-null cold start on a non-trivial DAG), Test 4 (node-absent-from-mastery defaults to ratio 0, no crash).
+- [x] **Task 7 — `lib/adaptive/route.ts` (`recommendNextSkill()`)** (shipped trong `1c2c02d`; test 9/9): Implement per the backend DD's Data Contracts algorithm (10-step pseudocode: cold-start check, ratio computation with untouched-node-defaults-to-0, `isCleared()`, the 3-key `sortKey`, the prerequisite-substitution walk with a defensive visited-set, `reasonCode` derivation). Convert `route.test.ts`'s 4 tests into real vitest tests in the same commit (Red→Green): Test 1 (AC-014/017, prerequisite-gate substitution), Test 2 (AC-015/016, recency tie-break + determinism, incl. no-mutation assertion), Test 3 (AC-028, strict-null cold start on a non-trivial DAG), Test 4 (node-absent-from-mastery defaults to ratio 0, no crash).
   - Proof obligations: `route.test.ts` Tests 1-4 proof obligations verbatim (as read from the skeleton file).
-- [ ] **Task 8 — `getSkillRecommendation()` + `types/adaptive.ts`**: Implement `SkillRecommendation` type (`{skillLabel, reasonCode} | null`) and `getSkillRecommendation()` (`SOURCE/app/(layer3)/queries.ts`) — fetches nodes/edges + this user's mastery rows (RLS-scoped), calls `recommendNextSkill()`, maps `{nodeId, labelVi, reasonCode}` → `{skillLabel: labelVi, reasonCode}` **dropping `nodeId` entirely**, attempts a best-effort `telemetry_log` insert (`event_type='adaptive_route'`) whose failure never alters the returned value. Convert `getSkillRecommendation.int.test.ts`'s 3 tests into real vitest tests against a mocked Supabase client boundary (matching `getResult.int.test.ts`/`rating.int.test.ts`'s sanctioned mock precedent): Test 1 (AC-012, telemetry insert fires), Test 2 (AC-028, cold-start strict-`null` + fire-and-forget telemetry-failure isolation), Test 3 (AC-014-017/031, mapping fidelity — exact `toEqual`, `nodeId` provably absent via `not.toHaveProperty`).
+- [x] **Task 8 — `getSkillRecommendation()` + `types/adaptive.ts`** (shipped trong `795ab38`; test 10/10, đóng Phase 2): Implement `SkillRecommendation` type (`{skillLabel, reasonCode} | null`) and `getSkillRecommendation()` (`SOURCE/app/(layer3)/queries.ts`) — fetches nodes/edges + this user's mastery rows (RLS-scoped), calls `recommendNextSkill()`, maps `{nodeId, labelVi, reasonCode}` → `{skillLabel: labelVi, reasonCode}` **dropping `nodeId` entirely**, attempts a best-effort `telemetry_log` insert (`event_type='adaptive_route'`) whose failure never alters the returned value. Convert `getSkillRecommendation.int.test.ts`'s 3 tests into real vitest tests against a mocked Supabase client boundary (matching `getResult.int.test.ts`/`rating.int.test.ts`'s sanctioned mock precedent): Test 1 (AC-012, telemetry insert fires), Test 2 (AC-028, cold-start strict-`null` + fire-and-forget telemetry-failure isolation), Test 3 (AC-014-017/031, mapping fidelity — exact `toEqual`, `nodeId` provably absent via `not.toHaveProperty`).
   - Proof obligations: `getSkillRecommendation.int.test.ts` Tests 1-3 proof obligations verbatim.
-- [ ] Quality check (staged): lint, typecheck, `npx vitest run lib/adaptive app/\(layer3\)/__tests__/getSkillRecommendation.int.test.ts` — zero errors.
+- [x] Quality check (staged): lint, typecheck, `npx vitest run lib/adaptive app/\(layer3\)/__tests__/getSkillRecommendation.int.test.ts` — zero errors.
 
 #### Phase Completion Criteria
 
-- [ ] `recommendNextSkill()` is DAG-valid and deterministic on all 4 unit test fixtures
-- [ ] `getSkillRecommendation()`'s contract matches the backend DD exactly (`nodeId` dropped, `null` on cold start, telemetry fire-and-forget)
+- [x] `recommendNextSkill()` is DAG-valid and deterministic on all 4 unit test fixtures — kèm assertion không-đột-biến; hàm thuần, không gọi `Date.now()`
+- [x] `getSkillRecommendation()`'s contract matches the backend DD exactly (`nodeId` dropped, `null` on cold start, telemetry fire-and-forget) — `nodeId` chứng minh vắng mặt bằng `not.toHaveProperty`; xác nhận lại trên prod ở Phase 5 (cold-start + cả 3 reasonCode)
 
 ### Phase 3: Mastery Write Integration & Socratic Tutor (Estimated commits: 4)
 
@@ -351,15 +351,15 @@ flowchart TD
   - Proof obligations: `telemetry.test.ts` Test 1 proof obligation verbatim; AC-013.
 - [x] **Task 13 — `explainStep()` Server Action**: Implement `SOURCE/app/(layer2)/tutorActions.ts` — auth (inherited session), ownership check (RLS-scoped attempt read), server-side re-verification of wrong-twice eligibility via `computeWrongTwiceQuestionIds()` (Task 9 — the actual security gate, independent of client state), `guard("explainStep", userId)` rate limiting (add `RATE_LIMITS.explainStep` to `SOURCE/lib/security/rateLimit.ts`), safe-column question fetch (the plain authenticated client, never `claim_attempt_answer_key`/`exam_answer_key`), `buildTutorPrompt()` + `generateHint()` call, best-effort telemetry write (`event_type='tutor_invoke'`). Confirm or explicitly set `export const maxDuration` on this Server Action's route segment against `TUTOR_CALL_DEADLINE_MS` (resolves the flagged, unverified Vercel Hobby-plan Assumed Behavior). Convert `tutorActions.int.test.ts`'s 4 tests into real vitest tests against a mocked Supabase client + mocked `generateHint()`: Test 1 (AC-021, server-side re-verification is the real gate — 0 calls to `generateHint()` for an ineligible `questionId`), Test 2 (AC-012/013, telemetry fires with the right queryable shape on both success and failure), Test 3 (AC-029, untagged question still functions), Test 4 (AC-022, rate-limit rejects before any Gemini call).
   - Proof obligations: `tutorActions.int.test.ts` Tests 1-4 proof obligations verbatim.
-- [ ] Quality check (staged): lint, typecheck, `npx vitest run lib/scoring lib/tutor app/\(layer2\)/__tests__` — zero errors (excluding `recordSkillMastery.int.test.ts`, which requires the live dev DB and is run explicitly as part of Task 10, not the generic staged gate).
+- [x] Quality check (staged): lint, typecheck, `npx vitest run lib/scoring lib/tutor app/\(layer2\)/__tests__` — zero errors (excluding `recordSkillMastery.int.test.ts`, which requires the live dev DB and is run explicitly as part of Task 10, not the generic staged gate).
 
 #### Phase Completion Criteria
 
-- [ ] `hasBeenWrongTwice` computed correctly and wired into `getResult()`'s existing output shape (byte-identical for all pre-existing fields)
+- [x] `hasBeenWrongTwice` computed correctly and wired into `getResult()`'s existing output shape (byte-identical for all pre-existing fields) — ⚠ lỗ hổng "test xanh giả" của Task 9 (builder Supabase giả không thenable, read lịch sử luôn suy biến thành `[]` mà 11/11 test vẫn xanh) đã phát hiện bằng đột biến và vá; xem Notion row Engine 1
 - [x] Mastery-write integration verified end-to-end against real dev Postgres (Task 10's 2 tests green); a forged student-JWT call to `record_skill_mastery()` is denied
-- [ ] Answer-key containment proven with 0 occurrences across both the prompt-builder and telemetry-payload fixture batteries
-- [ ] `explainStep()`'s server-side re-verification is proven to be the actual eligibility gate, independent of client-supplied state
-- [ ] Rate limiting proven to block before any Gemini call fires
+- [x] Answer-key containment proven with 0 occurrences across both the prompt-builder and telemetry-payload fixture batteries — battery sentinel có ĐỐI CHỨNG NGƯỢC (khẳng định context vẫn mang nội dung thật) để assertion không xanh rỗng; Task 23 xác nhận thêm lớp DB §10c giữ được kể cả khi hai lớp trên bị sửa sai
+- [x] `explainStep()`'s server-side re-verification is proven to be the actual eligibility gate, independent of client-supplied state — 0 lời gọi `generateHint()` với `questionId` không đủ điều kiện
+- [x] Rate limiting proven to block before any Gemini call fires — `tutorActions.int.test.ts` Test 4. ⚠ `guard()` đặt TRƯỚC khâu xác minh (lệch vị trí 3 của Design Doc, có chủ đích): `fetchOwnAttemptHistory()` quét `exam_results` không giới hạn, theo thứ tự DD thì người đã đăng nhập ép được quét vô hạn trước khi bị chặn. Đánh đổi đã ghi: lần từ chối không chạm Gemini vẫn tiêu quota
 
 ### Phase 4: Frontend Integration (Estimated commits: 2)
 
@@ -378,7 +378,7 @@ flowchart TD
 
 - [x] Both slices compile against the real backend contracts landed in Phases 2-3 (no stub types remaining)
 - [x] All 8 frontend component tests green
-- [ ] `ResultDetailPage`/`DashboardPage`'s pre-existing all-server-rendering behavior is unregressed for every question/user not satisfying the new gating conditions
+- [x] `ResultDetailPage`/`DashboardPage`'s pre-existing all-server-rendering behavior is unregressed for every question/user not satisfying the new gating conditions — xác nhận trên trình duyệt thật ở Phase 5 Task 17-18 (câu trả lời ĐÚNG không hiện affordance; tài khoản cold-start ra thông điệp trung thực, không `<details>`, không sập)
 
 ### Phase 5: Real-Content End-to-End Verification & Tone Tuning (Estimated commits: 1)
 
@@ -408,7 +408,7 @@ flowchart TD
 
 #### Tasks
 
-- [ ] **Task 22 — Full regression + prod schema apply**: Re-run `npm run verify:schema` (dev), `npx tsx supabase/test-rls.ts` (full suite incl. Phần 7), `npx vitest run` (all unit + integration), `tsc --noEmit`, `eslint --max-warnings 0`, `next build`. ⚠ **NỘI DUNG, KHÔNG CHỈ SCHEMA** (phát hiện ở Phase 5, 2026-08-16): bản migrate schema lên prod ngày 2026-08-15 đã tạo đủ bảng Engine 1 nhưng `skill_nodes`=0, `skill_prerequisites`=0, 0 câu hỏi gắn thẻ trên prod — tức trên prod thẻ gợi ý sẽ mãi hiện cold-start và `record_skill_mastery()` không bao giờ ghi nổi một dòng (mọi `questions.skill_node_id` đều NULL). Bước prod vì thế gồm BA việc, không phải một: apply DDL → chạy `seedSkillTaxonomy.ts` → chạy `tagQuestionSkills.ts` (dry-run, người duyệt, rồi `--apply`) trên prod, rồi hậu kiểm bằng truy vấn đếm thật. ⚠ **MANUAL CHECKPOINT (A3, human-in-the-loop)**: once all dev-side work is verified, the engineer manually applies the identical, already-verified DDL to the **prod** Supabase project and runs `npm run verify:schema` against prod, confirming the §17 fingerprint there matches the fingerprint committed to git (A3 explicitly permits interim dev/prod drift during the sprint — this step is what closes that drift, not silently).
+- [x] **Task 22 — Full regression + prod schema apply** (ĐÓNG 2026-08-16, commit `9ed0da0`. Hoá ra là HAI việc chứ không phải ba: vân tay prod ĐÃ là `f525e3095339` khớp git từ bản migrate 2026-08-15T08:57:15Z, nên bước DDL là no-op — khoảng trống thuần tuý ở tầng DỮ LIỆU. Prod sau khi seed + gắn thẻ: `skill_nodes` 0→20, `skill_prerequisites` 0→15, câu Toán có thẻ 0/28→26/28 = 92.9%, 0 thẻ trỏ node không tồn tại; `verify:schema` xanh 8/8 mục. ⚠ Bẫy quy trình mới: dry-run và `--apply` KHÔNG cho cùng tập đề xuất vì 429 rơi vào các câu khác nhau giữa hai lần chạy, nên `--apply` ghi 2 thẻ dry-run chưa từng đề xuất — AC-008 phải duyệt theo report của lần APPLY): Re-run `npm run verify:schema` (dev), `npx tsx supabase/test-rls.ts` (full suite incl. Phần 7), `npx vitest run` (all unit + integration), `tsc --noEmit`, `eslint --max-warnings 0`, `next build`. ⚠ **NỘI DUNG, KHÔNG CHỈ SCHEMA** (phát hiện ở Phase 5, 2026-08-16): bản migrate schema lên prod ngày 2026-08-15 đã tạo đủ bảng Engine 1 nhưng `skill_nodes`=0, `skill_prerequisites`=0, 0 câu hỏi gắn thẻ trên prod — tức trên prod thẻ gợi ý sẽ mãi hiện cold-start và `record_skill_mastery()` không bao giờ ghi nổi một dòng (mọi `questions.skill_node_id` đều NULL). Bước prod vì thế gồm BA việc, không phải một: apply DDL → chạy `seedSkillTaxonomy.ts` → chạy `tagQuestionSkills.ts` (dry-run, người duyệt, rồi `--apply`) trên prod, rồi hậu kiểm bằng truy vấn đếm thật. ⚠ **MANUAL CHECKPOINT (A3, human-in-the-loop)**: once all dev-side work is verified, the engineer manually applies the identical, already-verified DDL to the **prod** Supabase project and runs `npm run verify:schema` against prod, confirming the §17 fingerprint there matches the fingerprint committed to git (A3 explicitly permits interim dev/prod drift during the sprint — this step is what closes that drift, not silently).
 - [x] **Task 23 — Security review** (PASS — INVOKER + revoke-đích-danh + user_id suy từ attempt xác nhận trên SQL đã ship; chặn lộ đáp án có BA lớp độc lập, lớp DB là lớp giữ được kể cả khi hai lớp trên bị sửa sai; explainStep() fail-closed bằng chính RLS, guard() đứng trước mọi lời gọi Gemini): Walk ADR-0011's mechanism end to end (INVOKER, `service_role`-only, revoke-by-name on `record_skill_mastery()`); re-confirm D3/AC-018/019 answer-key containment across both the prompt and telemetry paths; confirm D4 (hint renders only via `RichText`, no competing path); confirm `explainStep()` has 0 unauthenticated code paths and every invocation passes through `guard()` (AC-022, PRD Success Criteria #11).
 - [x] **Task 24 — Coverage check** (96.65% stmts / 88.80% branch / 100% funcs trên toàn phạm vi yêu cầu; thấp nhất là route.ts 91.80%): 70%+ on `lib/adaptive/**`, `lib/tutor/**`, `lib/scoring/wrongTwice.ts`, `components/tutor/**`, `app/(layer3)/_components/SkillRecommendationCard.tsx`.
 - [x] **Task 25 — Risk closure walk** (mọi rủi ro của 2 DD + PRD đều có bằng chứng đóng hoặc residual ghi rõ; HAI mục bị hạ cấp khỏi 'đã đóng': deadline Vercel — biên thật 7s chứ không 10×, và R-c — mở lại trên trục thứ hai là hạn ngạch 20/ngày toàn dự án): Confirm each backend DD Risk (mastery-write forgery, answer-key-in-prompt, §10c parser trap, §17 fingerprint, mastery/score-divergence narrow window, Vercel deadline, threshold placeholders, dry-run/apply drift), each frontend DD Risk (argument-order swap, TBD-01 repeated-cost-on-reload, async-SC test technique, multi-instance id uniqueness, RichText malformed-input degrade), and each PRD Risk (R-a through R-h) has either a passing, evidenced mitigation or an explicitly accepted residual — none silently dropped between design and ship.
@@ -422,44 +422,48 @@ flowchart TD
 
 ### Quality Assurance
 
-- [ ] Quality check (staged)
-- [ ] All tests pass
-- [ ] Static check pass
-- [ ] Lint check pass
-- [ ] Build success
+Đo lại 2026-08-16 khi đóng sổ (cây làm việc có sẵn thay đổi CHƯA COMMIT của engineer cho feature Subscription — `@vercel/analytics`, `layout.tsx`, `SiteHeader.tsx`; không đụng tới):
+
+- [x] Quality check (staged)
+- [x] All tests pass — `npx vitest run` **702 pass / 10 skip** (73 file pass, 1 skip = harness tone eval, tắt mặc định đúng thiết kế)
+- [x] Static check pass — `npx tsc --noEmit` sạch
+- [x] Lint check pass — `npx eslint . --max-warnings 0` sạch
+- [x] Build success — `npm run build` thành công
 
 ## Completion Criteria
 
-- [ ] All phases completed
-- [ ] All integration/service-integration-e2e tests passing
-- [ ] Both Design Docs' acceptance criteria satisfied
-- [ ] Staged quality checks completed (zero errors)
-- [ ] All tests pass
-- [ ] Manual Playwright/keyboard/axe-equivalent/10-case tone-eval passes recorded (Phase 5)
-- [ ] Both dev and prod schema applies verified via `verify:schema`, fingerprints matching git
-- [ ] User review approval obtained
+- [ ] All phases completed — **còn ĐÚNG một mục**: Phase 5 Task 21 (Q-2), chặn bởi hạn ngạch Gemini, không phải do trượt
+- [x] All integration/service-integration-e2e tests passing
+- [ ] Both Design Docs' acceptance criteria satisfied — **29/31**; AC-020 mới 3/10 ca (Q-2), AC-030 ngoài phạm vi Sprint 1 theo đúng thiết kế
+- [x] Staged quality checks completed (zero errors)
+- [x] All tests pass
+- [ ] Manual Playwright/keyboard/axe-equivalent/10-case tone-eval passes recorded (Phase 5) — đã ghi đủ TRỪ tone eval (Q-2)
+- [x] Both dev and prod schema applies verified via `verify:schema`, fingerprints matching git — cả hai xanh ở `f525e3095339`, prod xác minh lại 2026-08-16 (8/8 mục)
+- [ ] User review approval obtained — **đang chờ**: đây là mục cuối cùng không bị chặn bởi quota
 
 ## Progress Tracking
 
+> Bốn mục dưới đây điền ngược lại 2026-08-16 khi đóng sổ — công việc đã ship và có bằng chứng ở Notion + git, chỉ riêng bảng theo dõi này bị bỏ trống. Ngày lấy từ ngày commit thật.
+
 ### Phase 1
-- Start:
-- Complete:
-- Notes:
+- Start: 2026-08-08 (`d93bb1d`)
+- Complete: 2026-08-15 (`6027356`)
+- Notes: **KHÔNG chạy liền một mạch, và đó là điều đáng nhớ nhất của pha này.** Task 1-2 xong 08-08/08-09 (`d93bb1d`, `a948efa`), rồi Task 4-6 mãi 08-15 mới làm (`1599a27`, `944ff23`, `4e2fe8b`+`6027356`) — ở giữa là Phase 3. Không phải bỏ sót: sơ đồ phụ thuộc của chính work plan này không có cạnh nào từ T7/T8 vào T9-T13, nên Phase 3 chạy trước được. Số đo cuối trên dev: 20 node / 15 cạnh, 47 câu Toán · 35 có thẻ = 74.5% (mốc PRD là 70%). Quyết định đáng nhớ: ngưỡng U3 **0.75 → 0.90** — đúng lần retune mà PRD dự liệu sẵn, và có dữ liệu thật để chỉnh (36 câu ≥0.90 rà tay đúng 100%; cả 5 câu ở 0.85 đều sai). Coverage tụt còn 68.1% ở lần chạy đầu với ngưỡng mới KHÔNG phải lỗi ngưỡng mà là 3 câu rớt 429 của Gemini free tier — script vốn tự hội tụ khi chạy lại, nên không thêm cơ chế gì để chữa.
 
 ### Phase 2
-- Start:
-- Complete:
-- Notes:
+- Start: 2026-08-15 (`1c2c02d`)
+- Complete: 2026-08-15 (`795ab38`)
+- Notes: Gọn nhất sprint — 2 task, 2 commit, cùng ngày, test 9/9 rồi 10/10. Lý do gọn: `recommendNextSkill()` được chứng minh trên fixture DAG literal độc lập chứ không chờ nội dung taxonomy thật, đúng như phần Risks đã thiết kế để tách phụ thuộc. Đây là chỗ countermeasure của work plan trả cổ tức.
 
 ### Phase 3
-- Start:
-- Complete:
-- Notes:
+- Start: 2026-08-14 (`585031a`)
+- Complete: 2026-08-14
+- Notes: Xong 5/5 trong một phiên, TRƯỚC Phase 1 Task 4-8 (xem ghi chú Phase 1). Bài học lớn nhất của cả sprint nằm ở đây: **3 lỗ hổng nặng đều là test xanh giả**, không cái nào là code sai — cả ba lọt vì test canh SỰ TỒN TẠI của lời gọi thay vì canh NỘI DUNG đi qua nó. (1) Builder Supabase giả không thenable → read lịch sử luôn suy biến thành `[]`, tính năng chết hẳn mà 11/11 test vẫn xanh. (2) Test chỉ đếm số lần `generateHint` được gọi, không soi đối số — nhét `studentAnswer: currentRow.correct` là rò đáp án sang Gemini mà 5/5 test vẫn xanh, tức thủng đúng PRD Success Criteria #8, cổng quan trọng nhất sprint. (3) Mock Supabase vứt bỏ tham số `eq()` nên lọc theo `attemptId` thay vì `questionId` (gia sư giải thích nhầm câu) vẫn qua toàn bộ suite. Cả ba phát hiện bằng ĐỘT BIẾN, không phải bằng đọc code. Sự cố vận hành phải nhớ: quality-fixer bị cắt giữa đợt mutation test và **để lại đột biến rò đáp án trong mã nguồn**; file chưa từng commit nên `git checkout` không cứu được, phải gỡ tay.
 
 ### Phase 4
-- Start:
-- Complete:
-- Notes:
+- Start: 2026-08-15 (`ae7e3c5`)
+- Complete: 2026-08-15 (`4622396`)
+- Notes: 2 slice, 2 commit, 8 test mới (5 + 3), suite lên 657 pass / 69 file. Kỹ thuật test Server Component bất đồng bộ `render(await Component(props))` CHƯA có tiền lệ trong repo — thử trên ca tối giản trước, chạy được trên React 19 / RTL 16 / vitest 4 / jsdom, nên KHÔNG phải dùng đường lùi manual-Playwright mà task file đã cho phép sẵn. Lặp lại đúng bài học Phase 3 ở tầng UI: Test 1 (chống double-click) lúc đầu viết bằng `fireEvent.click` và VẪN XANH dù chốt chặn cố tình bị làm hỏng, vì `fireEvent` bọc mỗi lần gọi trong `act()` riêng nên đúng cuộc đua nó sinh ra để bắt thì không bao giờ xảy ra — phải `act(() => { button.click(); button.click(); })` mới bắt được. Rủi ro số 1 của sprint (hoán vị `explainStep(attemptId, questionId)` compile im lặng vì cả hai đều là string) KHÔNG nổ: ghim bằng 2 fixture không thể hoán đổi. Chi tiết + sai lệch tài liệu `Promise.all` đã đóng: `docs/plans/tasks/engine1-adaptive-ai-work-plan-phase4-completion.md`.
 
 ### Phase 5
 - Start: 2026-08-15
@@ -468,8 +472,8 @@ flowchart TD
 
 ### Final Phase (Quality Assurance & Hardening)
 - Start: 2026-08-16
-- Complete: Task 23-27 xong; Task 22 mới xong nửa dev.
-- Notes: Còn ĐÚNG BA việc trước khi gọi là ship được — (P-1) prod có bảng nhưng chưa có nội dung Engine 1, phải seed taxonomy + gắn thẻ chứ không chỉ apply DDL; (Q-2) AC-020 mới chấm 3/10 ca, chờ hạn ngạch Gemini; (Q-1) trần 20 request/NGÀY toàn dự án của key Gemini — chủ dự án đã biết và tách thành tính năng riêng, cố ý KHÔNG vá trong pha này. Chi tiết: `docs/plans/tasks/engine1-adaptive-ai-work-plan-phase6-completion.md`.
+- Complete: 2026-08-16 — Task 22-27 xong hết. Còn lại đúng một mục bị chặn bởi quota (Q-2) và một mục chờ engineer duyệt.
+- Notes: Ba việc của bản ghi trước nay còn một. **(P-1) ĐÓNG** 2026-08-16 (`9ed0da0`): prod 20 node / 15 cạnh / 26-trên-28 câu có thẻ = 92.9%, `verify:schema` xanh 8/8, vân tay khớp git trên CẢ HAI môi trường. Hoá ra là hai việc chứ không phải ba — DDL đã có sẵn từ bản migrate 08-15, khoảng trống thuần tuý ở tầng DỮ LIỆU; "prod thiếu Engine 1" ĐÚNG ở tầng dữ liệu và SAI ở tầng schema, và chỉ một truy vấn thật mới tách được hai cái đó ra vì vân tay khớp không cảnh báo gì cả. Kèm theo: tìm ra **một thẻ sai thật** (`p2q3`, `p3q4` — mặt cầu cho bằng phương trình Oxyz bị xếp vào khối tròn xoay) mà vòng duyệt AC-008 lần trước đã để lọt, và **dev cũng sai đúng 2 câu đó** — nó chỉ lộ ra vì corpus được duyệt LẦN THỨ HAI; đã sửa cả hai môi trường. **(Q-1) THU HẸP, chưa đóng** (`e8d91a4`): trần `explainStep` về đúng đơn vị NGÀY của nhà cung cấp — 3 lượt/24h, nên không ai một mình vét cạn được project; trục TỔNG (7 người × 3 > 20) vẫn mở, chủ dự án tách sang feature Subscription. **(Q-2) CÒN CHẶN**: AC-020 mới 3/10 ca. Chi tiết: `docs/plans/tasks/engine1-adaptive-ai-work-plan-phase6-completion.md`.
 
 ## Notes
 
