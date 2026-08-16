@@ -73,11 +73,49 @@ describe("guard", () => {
     expect((await guard("submitExam", "u1")).ok).toBe(true);
   });
 
-  it("every configured limit is generous enough not to hit a real user", () => {
-    // Guard chống vòng lặp tự động, không phải chống người dùng thật.
-    for (const cfg of Object.values(RATE_LIMITS)) {
-      expect(cfg.limit).toBeGreaterThanOrEqual(15);
-      expect(cfg.windowMs).toBeGreaterThanOrEqual(60_000);
+  // HAI NHÓM TRẦN, vì có hai thứ KHÁC NHAU đang chặn chúng — không thể kiểm
+  // bằng một bất biến chung:
+  //   - Nhóm tốn DB của CHÍNH ta: thứ giới hạn chúng là chi phí của ta, mà ta
+  //     tự nới được. Nên trần đặt rộng rãi và bất biến cần ghim là "đủ rộng để
+  //     không làm phiền người dùng thật" — guard chống vòng lặp tự động thôi.
+  //   - Nhóm tiêu hạn ngạch BÊN THỨ BA: thứ giới hạn chúng là hạn ngạch của nhà
+  //     cung cấp, ta KHÔNG nới được. Trần vì thế phải chặt, và bất biến cần ghim
+  //     ngược lại: nằm dưới trần nhà cung cấp, và cửa sổ trùng ĐƠN VỊ của hạn
+  //     ngạch đó. Ghim cả windowMs vì hạ `limit` mà giữ cửa sổ theo giờ thì trần
+  //     ngày không còn được đặt (xem lý lẽ đầy đủ ở RATE_LIMITS.explainStep).
+  // Hai danh sách dưới đây liệt kê tường minh, không suy ra từ nhau: thêm action
+  // mới vào RATE_LIMITS mà quên xếp nhóm sẽ làm case "phân loại" đỏ, thay vì
+  // lọt qua cả hai nhánh mà không ai quyết định nó thuộc nhóm nào.
+  const DB_COST_ACTIONS: readonly (keyof typeof RATE_LIMITS)[] = [
+    "submitExam",
+    "rateExam",
+    "reportExam",
+    "updateProfile",
+    "submitTicket",
+  ];
+  const SUPPLIER_CAPPED_ACTIONS: readonly (keyof typeof RATE_LIMITS)[] = ["explainStep"];
+
+  /** Trần free tier của Gemini: 20 request/NGÀY cho CẢ project (rateLimit.ts). */
+  const SUPPLIER_DAILY_QUOTA = 20;
+  const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+  it("classifies every configured action into exactly one category", () => {
+    // Xếp trùng hai nhóm cũng đỏ ở đây: mảng gộp sẽ dài hơn danh sách khoá.
+    const classified = [...DB_COST_ACTIONS, ...SUPPLIER_CAPPED_ACTIONS].sort();
+    expect(classified).toEqual(Object.keys(RATE_LIMITS).sort());
+  });
+
+  it("keeps every DB-cost limit generous enough not to hit a real user", () => {
+    for (const action of DB_COST_ACTIONS) {
+      expect(RATE_LIMITS[action].limit).toBeGreaterThanOrEqual(15);
+      expect(RATE_LIMITS[action].windowMs).toBeGreaterThanOrEqual(60_000);
+    }
+  });
+
+  it("keeps every supplier-capped limit under the supplier quota, on its day unit", () => {
+    for (const action of SUPPLIER_CAPPED_ACTIONS) {
+      expect(RATE_LIMITS[action].windowMs).toBe(ONE_DAY_MS);
+      expect(RATE_LIMITS[action].limit).toBeLessThanOrEqual(SUPPLIER_DAILY_QUOTA);
     }
   });
 });

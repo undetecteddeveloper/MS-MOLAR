@@ -80,8 +80,13 @@ export function checkRateLimit(key: string, limit: number, windowMs: number): Ra
 function pruneOldest() {
   const now = Date.now();
   for (const [k, times] of hits) {
-    // Cửa sổ dài nhất đang dùng là 1 giờ; quá 1 giờ chắc chắn hết hiệu lực.
-    if (times.length === 0 || times[times.length - 1] < now - 3_600_000) hits.delete(k);
+    // Chỉ xoá khoá mà lần gọi mới nhất đã cũ hơn CỬA SỔ DÀI NHẤT đang cấu hình —
+    // quá mốc đó thì mọi bộ đếm chắc chắn đã hết hiệu lực. Mốc này SUY RA từ
+    // RATE_LIMITS chứ không viết lại thành số: mốc cứng 1 giờ từng đúng khi mọi
+    // cửa sổ đều tính theo giờ, và đã âm thầm sai ngay khi explainStep dùng cửa
+    // sổ 24 giờ — lúc đó prune vứt mất bộ đếm CÒN HIỆU LỰC, làm thủng lớp chặn
+    // sớm. Suy ra từ cấu hình thì thêm hay nới cửa sổ nào cũng không lặp lại lỗi.
+    if (times.length === 0 || times[times.length - 1] < now - LONGEST_WINDOW_MS) hits.delete(k);
   }
   if (hits.size <= MAX_TRACKED_KEYS) return;
 
@@ -105,13 +110,35 @@ export const RATE_LIMITS = {
   reportExam: { limit: 15, windowMs: 60 * 60 * 1000 },
   updateProfile: { limit: 20, windowMs: 60 * 60 * 1000 },
   submitTicket: { limit: 15, windowMs: 60 * 60 * 1000 },
-  // Gia sư Socratic (Engine 1, AC-022). CHẶT hơn các mục trên vì đây là mục duy
-  // nhất tốn tiền/quota bên thứ ba mỗi lần gọi (một lượt gọi Gemini), không chỉ
-  // tốn một dòng DB. 20 lượt/giờ vẫn cao hơn nhiều lần mức dùng thật: gợi ý chỉ
-  // mở ra ở những câu đã sai hai lượt khác nhau, một học sinh hiếm khi có tới 20
-  // câu như thế trong một giờ.
-  explainStep: { limit: 20, windowMs: 60 * 60 * 1000 },
+  // Gia sư Socratic (Engine 1, AC-022). NGOẠI LỆ của cả khối trên, và chặt vì
+  // một lý do khác hẳn: các mục trên chỉ tốn một dòng DB của CHÍNH ta, còn mục
+  // này tiêu vào hạn ngạch của bên thứ ba mà ta không tự nới được. Key Gemini
+  // đang dùng nằm ở free tier: quotaId
+  // `GenerateRequestsPerDayPerProjectPerModel-FreeTier` — 20 request/NGÀY cho
+  // CẢ PROJECT, không phải 20 cho mỗi người (đọc thẳng từ thân phản hồi 429; xem
+  // docs/plans/tasks/engine1-adaptive-ai-work-plan-phase6-completion.md mục Q-1).
+  // Cùng key đó còn phục vụ trích xuất PDF ở lib/ugc/gemini.ts, nên gia sư thậm
+  // chí không được trọn 20.
+  //
+  // ĐƠN VỊ CỬA SỔ CỐ Ý TRÙNG ĐƠN VỊ CỦA NHÀ CUNG CẤP. Một cửa sổ tính theo GIỜ
+  // không bao giờ đặt được trần cho một hạn ngạch tính theo NGÀY: 3 lượt/giờ
+  // vẫn là 72 lượt/ngày cho một người — hạ `limit` mà giữ cửa sổ 1 giờ chỉ làm
+  // chậm tốc độ vét cạn chứ không chặn được nó. Chỉ khi cửa sổ dài đúng 24 giờ
+  // thì `limit` mới đọc được thành "mỗi người được bao nhiêu phần của hạn ngạch
+  // ngày".
+  //
+  // 3 = phần chia cho mỗi người từ 20 lượt/ngày đang phải chia sẻ với trích xuất
+  // UGC: đủ để nhiều người dùng KHÁC NHAU mỗi người vẫn nhận được số gợi ý có
+  // nghĩa trong ngày, mà không một ai vét sạch ngân sách của cả project.
+  //
+  // Đây là TRẦN TẠM, không phải con số cuối. Nó sẽ được thay bằng hạn ngạch theo
+  // gói khi tính năng thuê bao lên: khi đó trần đọc từ gói của người dùng chứ
+  // không còn là một hằng số chung cho mọi người.
+  explainStep: { limit: 3, windowMs: 24 * 60 * 60 * 1000 },
 } as const;
+
+/** Cửa sổ dài nhất đang cấu hình — mốc "chắc chắn hết hiệu lực" của `pruneOldest`. */
+const LONGEST_WINDOW_MS = Math.max(...Object.values(RATE_LIMITS).map((c) => c.windowMs));
 
 /**
  * Tiện ích gộp: `await guard("reportExam", userId)`.
