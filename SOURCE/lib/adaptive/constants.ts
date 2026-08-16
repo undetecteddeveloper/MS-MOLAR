@@ -42,3 +42,52 @@ export const MASTERY_CLEARED_THRESHOLD = 0.7;
  * Success Criteria #4.
  */
 export const SKILL_TAG_CONFIDENCE_THRESHOLD = 0.9;
+
+// --- Xếp hạng đề ở Layer 2 (PRD exam-recommendation v1.2, R11/AC-036) --------
+//
+// Hai trọng số dưới đây là TOÀN BỘ số học có thể chỉnh của thuật toán xếp hạng.
+// Chúng ở đây chứ không rải trong `rankExams.ts` vì lý do file này đã nói ở
+// đầu: chỉnh sau phải là diff một dòng. Với tính năng này lý do còn mạnh hơn —
+// bản v1 KHÔNG có nhãn, KHÔNG có click-through và KHÔNG có telemetry (PRD
+// "Release partition"), nên comment ở đây là lời giải thích duy nhất đọc được
+// bằng mắt người về việc vì sao danh sách đề lại xếp như thế, ở bất cứ đâu
+// trong hệ thống đang chạy.
+
+/**
+ * Trọng số của tín hiệu KHỚP LỚP — tỉ trọng lượt làm bài đã nộp của học sinh
+ * rơi vào lớp của đề đang xét (∈ [0, 1]).
+ *
+ * Đây là tín hiệu cá nhân hoá DUY NHẤT còn sống ở v1, nên nó là mốc 1.0 mà
+ * trọng số kia được đọc theo tỉ lệ với. Số đo prod 2026-08-16 cho thấy lớp
+ * THỰC SỰ phân biệt được kho đề hiện tại (2 đề lớp 12, 1 đề lớp 9) — đó chính
+ * là lý do lớp qua được đợt cắt phạm vi còn "sở thích môn" thì không (cả 3 đề
+ * đều là Toán, tín hiệu đó là hằng số).
+ *
+ * Điểm yếu đã biết, ghi ra thay vì giấu: tín hiệu này VÒNG TRÒN (PRD R-g) —
+ * nó suy ra từ chính những đề học sinh đã chọn, nên nó củng cố lựa chọn cũ chứ
+ * không mở rộng. Và nó không phạt cỡ mẫu: học sinh mới làm ĐÚNG MỘT đề cũng
+ * cho tỉ trọng 1.0 y như học sinh đã làm hai mươi đề. Chấp nhận ở v1 vì cách
+ * chữa thật là một cột `grade` có thật trên hồ sơ (PRD U7), không phải một
+ * hằng số khác.
+ */
+export const EXAM_RANK_GRADE_MATCH_WEIGHT = 1;
+
+/**
+ * Trọng số của tín hiệu MỚI-CŨ — `created_at` chuẩn hoá min-max trong chính
+ * tập ứng viên (∈ [0, 1]), 1 = mới nhất.
+ *
+ * 0.25 chọn theo một tính chất cụ thể chứ không phải cảm giác: vì cả hai tín
+ * hiệu đều nằm trong [0, 1], mới-cũ chỉ có thể đảo chỗ hai đề khi tỉ trọng lớp
+ * của chúng chênh nhau DƯỚI 0.25. Hệ quả là hai câu có thể kiểm chứng được:
+ *   - một đề mới tinh SAI lớp không bao giờ vượt một đề cũ ĐÚNG lớp (chênh
+ *     lệch tỉ trọng khi đó là 1.0 hoặc gần thế, vượt xa 0.25);
+ *   - khi học sinh chia thời gian gần đều cho hai lớp (chênh < 0.25) thì "mới
+ *     hơn" được quyền quyết định — đúng ý, vì lúc đó lớp không còn nói lên
+ *     điều gì.
+ * Đây là dạng "nhỏ hơn nhưng không phải bằng 0" mà PRD mô tả cho S6.
+ *
+ * Với kho đề hiện tại (3 đề) mới-cũ gần như quyết định toàn bộ thứ tự cho học
+ * sinh cold-start — nửa số người dùng prod. Đó là trạng thái đã được thiết kế,
+ * không phải sự cố: PRD AC-022 quy định cold-start xếp theo mới-cũ rồi tới id.
+ */
+export const EXAM_RANK_RECENCY_WEIGHT = 0.25;

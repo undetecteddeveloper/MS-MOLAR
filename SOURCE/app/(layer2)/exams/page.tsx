@@ -9,9 +9,8 @@
 // Visual language "tờ giấy trắng / focused". Bộ lọc qua URL searchParams → re-query.
 
 import {
-  listExams,
+  listExamsRanked,
   listExamFacets,
-  listMySubmittedExamIds,
   type ExamSort,
   type ExamLevel,
   type SortDirection,
@@ -54,12 +53,19 @@ export default async function ExamsPage({ searchParams }: { searchParams: Search
   const dir: SortDirection | undefined = sp.dir === "asc" || sp.dir === "desc" ? sp.dir : undefined;
 
   const t = await getTranslate();
-  const [exams, facets, submittedExamIds, user] = await Promise.all([
-    listExams({ subject, grade, school, schoolYear: year, semester, sort, level, dir }),
+  // ADR-0015 Decision 1b: `listExamsRanked` thay CẢ `listExams` lẫn
+  // `listMySubmittedExamIds` ở trang này. Nó tự sở hữu lượt đọc `exam_attempts`
+  // và trả về luôn tập id đã nộp, nên băng xếp hạng "đã làm" và huy hiệu "đã
+  // làm" trên thẻ đề dùng CHUNG một giá trị, không thể lệch nhau — và không có
+  // lượt đọc `exam_attempts` nào bị lặp lại mỗi lần bấm bộ lọc.
+  // `listMySubmittedExamIds()` KHÔNG bị sửa: nó còn một chỗ dùng khác
+  // (exams/[id]/rate/page.tsx).
+  const [ranked, facets, user] = await Promise.all([
+    listExamsRanked({ subject, grade, school, schoolYear: year, semester, sort, level, dir }),
     listExamFacets(),
-    listMySubmittedExamIds(),
     getCurrentUser(),
   ]);
+  const { exams, submittedExamIds } = ranked;
 
   return (
     // Theme root "Mực & Sơn mài" (S#17) — scope .theme-ebp đã xóa, block/nav
