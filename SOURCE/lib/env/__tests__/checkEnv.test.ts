@@ -23,6 +23,11 @@ function goodEnv(over: Env = {}): Env {
     SUPPORT_NOTIFY_EMAIL: "support@example.com",
     SUPPORT_SMTP_USER: "support@example.com",
     SUPPORT_SMTP_APP_PASSWORD: "app-password",
+    // Cổng phát hành Premium (PRD R14). Để BẬT trong bộ "hợp lệ tối thiểu" vì
+    // chưa đặt là một trạng thái checkEnv cố ý NÓI RA — cùng lối ADMIN_USER_IDS
+    // để trống cũng warn. Bộ này định nghĩa "không còn gì để báo", nên mọi biến
+    // có nhánh warn khi vắng đều phải có mặt ở đây.
+    GEMINI_PAID_TIER_ENABLED: "1",
     ...over,
   };
 }
@@ -102,6 +107,24 @@ describe("checkEnv", () => {
       expect(p?.level, `"${bad}" phải bị bắt`).toBe("error");
       expect(p?.impact).toContain("CSP");
     }
+  });
+
+  it("GEMINI_PAID_TIER_ENABLED chưa đặt là hợp lệ nhưng phải NÓI — Premium không bán được", () => {
+    // AC-054: quên đặt biến thì hậu quả là KHÔNG BÁN ĐƯỢC, không phải BÁN
+    // NHẦM. Vẫn phải kêu, vì hình dạng hỏng thật là "đặt ở local, hụt ở
+    // production" — nút chết mà không ai hiểu vì sao.
+    const env = goodEnv({ GEMINI_PAID_TIER_ENABLED: undefined });
+    expect(levelOf(env, "GEMINI_PAID_TIER_ENABLED")).toBe("warn");
+  });
+
+  it("GEMINI_PAID_TIER_ENABLED đặt giá trị TRÔNG NHƯ bật vẫn bị bắt", () => {
+    // "yes" bị đọc là TẮT, và triệu chứng giống hệt ca chưa-đặt-biến — đúng
+    // kiểu hỏng âm thầm mà TD-009 sinh ra checkEnv để chặn.
+    const env = goodEnv({ GEMINI_PAID_TIER_ENABLED: "yes" });
+    expect(levelOf(env, "GEMINI_PAID_TIER_ENABLED")).toBe("warn");
+    expect(checkEnv(env).find((p) => p.name === "GEMINI_PAID_TIER_ENABLED")?.impact).toContain(
+      "không phải giá trị bật"
+    );
   });
 
   it("NEXT_PUBLIC_SITE_URL bỏ trống là hợp lệ (siteUrl.ts tự suy ra)", () => {

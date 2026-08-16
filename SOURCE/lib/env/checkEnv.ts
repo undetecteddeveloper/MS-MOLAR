@@ -134,6 +134,28 @@ export function checkEnv(env: Readonly<Record<string, string | undefined>>): Env
     }
   }
 
+  // Cổng phát hành Premium (PRD R14). Mặc định TẮT là cố ý, nên "chưa đặt"
+  // KHÔNG phải lỗi cấu hình — nhưng nó vẫn phải được NÓI RA lúc khởi động, vì
+  // hình dạng hỏng mà AC-054 lo là "đặt ở môi trường này, hụt ở môi trường
+  // kia": trên máy thì bán được, lên production thì nút chết mà không ai hiểu
+  // vì sao. Đúng loại hỏng im lặng mà checkEnv sinh ra để bắt (TD-009).
+  const paidTier = (get("GEMINI_PAID_TIER_ENABLED") ?? "").trim().toLowerCase();
+  if (!paidTier) {
+    problems.push({
+      level: "warn",
+      name: "GEMINI_PAID_TIER_ENABLED",
+      impact: "Premium CHƯA mở bán — nút mua ở /pricing không khả dụng (fail-closed, cố ý)",
+    });
+  } else if (paidTier !== "1" && paidTier !== "true") {
+    // Một giá trị như "yes"/"on"/"enabled" bị đọc là TẮT mà không báo ở đâu cả,
+    // và triệu chứng ("nút mua chết") giống hệt ca chưa-đặt-biến.
+    problems.push({
+      level: "warn",
+      name: "GEMINI_PAID_TIER_ENABLED",
+      impact: `"${paidTier}" không phải giá trị bật — chỉ "1" hoặc "true" mới bật; hiện Premium vẫn KHÔNG bán được`,
+    });
+  }
+
   const siteUrl = get("NEXT_PUBLIC_SITE_URL");
   if (siteUrl && !isParseableHttpUrl(siteUrl)) {
     problems.push({

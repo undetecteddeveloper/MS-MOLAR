@@ -1,6 +1,6 @@
 # External Resources
 
-Last updated: 2026-08-08 (diff-only refresh — see `docs/plans/` git history for the 2026-08-06 baseline; DDL/RLS/auth facts below unchanged since then)
+Last updated: 2026-08-16 (diff-only refresh — added **Payment Gateway (payOS)**, the project's first payment external resource, for the Subscription feature; everything else unchanged since the 2026-08-08 refresh, which itself diffed the 2026-08-06 baseline in `docs/plans/` git history)
 
 This file records the external resources available to this project and how to access them. AI agents and contributors consult this file when work depends on resources outside the repository. Feature-specific identifiers belong in the consuming UI Spec or Design Doc, not here — this file holds environment-stable facts only.
 
@@ -56,6 +56,15 @@ This file records the external resources available to this project and how to ac
 - Location: `SOURCE/lib/security/rateLimitStore.ts` (Redis-backed authoritative counter) + `SOURCE/lib/security/rateLimit.ts` (in-process RAM fallback if Redis is unreachable — fails closed, never opens the gate)
 - Access method: `@upstash/redis` client reading `KV_REST_API_URL` / `KV_REST_API_TOKEN` from env
 - Known gap: keyed on `user.id` only — unauthenticated traffic is uncounted (TD-013, open; blocked on a Vercel Pro plan decision for edge-level protection)
+
+### Payment Gateway (payOS)
+- Status: **decided, NOT yet provisioned** — the merchant account exists but **eKYC is not activated**, so no credential can be issued yet. This is the stated reason the Subscription feature is being built **UI-first with the backend deferred**. Recorded here as a *pending* resource on purpose: a downstream agent must not read its absence as "no payment provider chosen".
+- Service: **payOS** (A2A / VietQR, by Casso). Selected in `docs/adr/ADR-0013-payment-provider-and-prepaid-period-model.md`; product rationale in `docs/prd/subscription-prd.md` D3. Individual merchant registration via CCCD; no per-transaction fee for individuals/HKD from 2026-01-23.
+- Access method (once provisioned): HTTPS to the single documented base URL `https://api-merchant.payos.vn`. `POST /v2/payment-requests` creates an order (`orderCode`, `amount`, `description`, `returnUrl`, `cancelUrl`, `signature`, optional `expiredAt`); `GET /v2/payment-requests/{id}` queries status by `orderCode` (`PENDING` / `SUCCEEDED` / `CANCELLED`) — this is what makes active reconciliation a supported query rather than a workaround. Webhooks are signed HMAC-SHA256 over the alphabetically key-sorted `key=value&…` serialisation, keyed by a rotatable per-integration **checksum key**.
+- Credentials: **none present in any environment yet.** When issued they follow the existing Secret Store mechanism (Vercel env vars, per-environment scope; `SOURCE/.env.local` locally) — client id / api key / checksum key, server-only, never `NEXT_PUBLIC_*`. Register them in `SOURCE/lib/env/checkEnv.ts` in the same change that first reads them.
+- **No sandbox is documented** (`payos.vn/docs/api` lists only the production host, verified 2026-08-16). PRD **U1** is open and owned by the engineer; its stated default if unanswered is "no sandbox", meaning end-to-end verification costs a small real-money transaction on production, pre-approved. Do not assume a test environment exists.
+- Environment caveat that bites here specifically: `webhooks.confirm(url)` needs a **stable public URL**, and Vercel Preview deploys get a new URL every build (see Deployment Trigger below). The webhook can therefore only be registered against the **production domain**; Preview deploys will never receive one, and any end-to-end test on Preview must go through the active-reconciliation path instead.
+- Deferred decision: webhook trust boundary, signature-verification placement, replay defence, and the `PUBLIC_PATHS` change — **ADR-0014, not yet written**, belongs with the backend Design Doc.
 
 ### Background Job Infrastructure
 - Status: not applicable — no queue/worker/cron in this project. Batch scripts (e.g. seeding, skill tagging) are manually-triggered one-off runs via `npx tsx`, not scheduled or queued jobs.

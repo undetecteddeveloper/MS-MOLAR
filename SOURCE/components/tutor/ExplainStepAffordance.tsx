@@ -14,10 +14,13 @@
 // chặn nháy đúp thật sự là busyRef đồng bộ trong hook.
 
 import { Lightbulb, Loader2 } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { BentoCell } from "@/components/layout/BentoGrid";
 import { RichText } from "@/components/shared/RichText";
 import { Button } from "@/components/ui/button";
+import { useEntitlement } from "@/lib/billing/entitlement";
+import { isQuotaExhausted } from "@/lib/billing/types";
 import { useT } from "@/lib/i18n/client";
 import { useTutorAction } from "./useTutorAction";
 
@@ -32,6 +35,7 @@ export interface ExplainStepAffordanceProps {
 export function ExplainStepAffordance({ questionId, attemptId }: ExplainStepAffordanceProps) {
   const t = useT();
   const { phase, hint, run } = useTutorAction(attemptId, questionId);
+  const { tutor } = useEntitlement();
   // questionId đã là key của chính danh sách câu hỏi nên tự nó duy nhất trong
   // một trang — không cần thêm prop idPrefix (Minimal Surface Element 3).
   const reasonId = `tutor-${questionId}-reason`;
@@ -69,6 +73,43 @@ export function ExplainStepAffordance({ questionId, attemptId }: ExplainStepAffo
           <span className="eyebrow">{t("tutor.hintEyebrow")}</span>
           <RichText text={hint} className="text-foreground mt-2 text-base leading-relaxed" />
         </BentoCell>
+      </div>
+    );
+  }
+
+  // Hết hạn mức kỳ → KHÔNG render nút, và cũng không gọi Server Action lần nào
+  // (AC-014/AC-015: "0 request nào được gửi tới Gemini" trong ca bị chặn).
+  //
+  // Trạng thái này được suy ra TRƯỚC khi bấm, từ quyền lợi — chứ không phải từ
+  // một mã lỗi trả về SAU khi bấm. Đó là chủ đích (UI Spec UI-D3): việc gộp bốn
+  // mã lỗi ở dưới là một quyết định CHỐNG LỘ THÔNG TIN có ghi lý do, và tách nó
+  // ra sẽ mở lại đúng thứ nó tồn tại để che (not_eligible). Nói trước thì thông
+  // điệp sau-thất-bại không cần mang nghĩa "hết lượt" nữa, nên AC-041 đạt được
+  // mà không phải đụng vào bề mặt lộ thông tin.
+  //
+  // Đặt SAU nhánh showHint: một gợi ý đã giao rồi thì không được rút lại. Nhánh
+  // này chỉ có nghĩa khi còn một cái nút để bấm.
+  //
+  // `isQuotaExhausted` trả false khi hạn mức là `unknown` (fail-OPEN, UI-D2) —
+  // tức trong suốt pha UI, khi chưa có bộ đếm nào tồn tại, nhánh này KHÔNG BAO
+  // GIỜ chạy trên production. Cố ý: quy `unknown` về 0 sẽ tắt gia sư cho toàn
+  // bộ người dùng.
+  if (isQuotaExhausted(tutor)) {
+    return (
+      // Không dùng role="alert": đây là trạng thái lúc MOUNT, không phải thứ
+      // xuất hiện giữa chừng (không có đường nào đi từ nút sang đây — nút không
+      // tồn tại khi đã hết lượt). role="alert" ở đây sẽ ngắt lời trình đọc màn
+      // hình ngay khi tải trang mà chẳng báo được thay đổi nào.
+      <div className="border-border rounded-lg border border-dashed px-4 py-3">
+        <p className="text-foreground text-sm leading-relaxed">
+          {t("billing.quota.tutorExhausted")}
+        </p>
+        <Link
+          href="/pricing"
+          className="text-brand mt-2 inline-flex min-h-11 items-center text-sm underline-offset-4 hover:underline"
+        >
+          {t("billing.quota.upgradeLink")}
+        </Link>
       </div>
     );
   }

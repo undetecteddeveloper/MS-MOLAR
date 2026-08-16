@@ -559,6 +559,56 @@ export const en = {
   "tutor.busy": "Getting a hint…",
   "tutor.error": "Couldn't load a hint. Try again.",
   "tutor.hintEyebrow": "Hint",
+
+  // --- Subscription / Premium prepaid period (payOS) — UI Spec S-01..S-04 ----
+  // Giá viết THÀNH CHỮ ở đây chứ không nội suy số (UI-D4): repo không có bộ
+  // định dạng số nào (0 lần Intl.NumberFormat), và đường thay tham số của i18n
+  // là String() thô nên `{price}` với 39000 sẽ ra "39000". Hai ngôn ngữ viết
+  // khác nhau ("39.000 VNĐ" / "39,000 VND") vừa đúng quy ước từng nơi, vừa
+  // tránh tính vào ngưỡng <10% khoá trùng byte của i18n.test.ts:54-59.
+  //
+  // KHÔNG chuỗi nào ở đây được nói "tự động gia hạn": cổng A2A/VietQR không có
+  // auto-renew, đây là KỲ TRẢ TRƯỚC (ADR-0013). Nói sai chỗ này là hứa một thứ
+  // sản phẩm không làm được.
+  "billing.pricing.eyebrow": "Plans",
+  "billing.pricing.title": "Choose your plan",
+  "billing.pricing.description":
+    "Taking exams, submitting, results, history and Layer 3 analytics stay free for every account. A plan only changes how much AI tutoring and exam uploading you get.",
+  "billing.plan.free.name": "Free",
+  "billing.plan.free.price": "0 VND",
+  "billing.plan.free.period": "always",
+  "billing.plan.free.line1": "5 tutor hints per 30 days",
+  "billing.plan.free.line2": "3 exam uploads per 30 days",
+  "billing.plan.free.line3": "The full core loop, unlimited",
+  "billing.plan.free.line4": "Layer 3 analytics included",
+  "billing.plan.premium.name": "Premium",
+  "billing.plan.premium.price": "39,000 VND",
+  "billing.plan.premium.period": "per 30 days, paid up front",
+  "billing.plan.premium.line1": "500 tutor hints per 30 days",
+  "billing.plan.premium.line2": "15 exam uploads per 30 days",
+  "billing.plan.premium.line3": "A reserved share of the daily AI budget",
+  "billing.plan.premium.line4": "Buy early and your remaining days carry over",
+  "billing.plan.current": "Your current plan",
+  "billing.cta.buy": "Get Premium",
+  "billing.cta.unavailableReason":
+    "Premium isn't on sale yet — we don't sell an allowance we can't deliver. Check back soon.",
+  "billing.noAutoRenew":
+    "This plan does not renew itself. When the 30 days are up, nothing is charged and nothing is stored — you buy again by hand whenever you want to.",
+  "billing.legal.terms": "Terms of Service",
+  "billing.legal.refund": "Refund Policy",
+  "billing.legal.linkIntro": "Before you buy, please read:",
+  "billing.terms.title": "Terms of Service",
+  "billing.terms.eyebrow": "Legal",
+  "billing.terms.pending":
+    "This document is being finalised and is not ready yet. Nothing is on sale until it is.",
+  "billing.refund.title": "Refund Policy",
+  "billing.refund.eyebrow": "Legal",
+  "billing.refund.pending":
+    "This document is being finalised and is not ready yet. Nothing is on sale until it is.",
+  "billing.quota.tutorExhausted": "You've used all your tutor hints for this period.",
+  "billing.quota.resetsAt": "Resets on {date}.",
+  "billing.quota.remaining": "{used}/{limit} tutor hints used this period.",
+  "billing.quota.upgradeLink": "See plans",
 } as const;
 
 /** Tập khoá hợp lệ — mọi ngôn ngữ khác phải phủ đủ. */

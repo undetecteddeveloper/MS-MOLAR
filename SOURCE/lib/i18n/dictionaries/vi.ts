@@ -520,4 +520,48 @@ export const vi: Dictionary = {
   "tutor.busy": "Đang lấy gợi ý…",
   "tutor.error": "Chưa lấy được gợi ý. Bạn thử lại nhé.",
   "tutor.hintEyebrow": "Gợi ý",
+
+  // --- Gói Premium kỳ trả trước (payOS) — UI Spec S-01..S-04 ----------------
+  // Ngữ điệu theo đúng bộ chuỗi sẵn có: xưng "bạn", câu ngắn, em-dash để ngắt
+  // hai vế, kết bằng "nhé" khi nhờ người dùng làm gì, không dấu chấm than.
+  // Tuyệt đối không nói "tự động gia hạn" — xem chú thích ở en.ts.
+  "billing.pricing.eyebrow": "Gói",
+  "billing.pricing.title": "Chọn gói của bạn",
+  "billing.pricing.description":
+    "Làm đề, nộp bài, xem kết quả, lịch sử và phân tích Layer 3 vẫn miễn phí cho mọi tài khoản. Gói chỉ đổi số lượt gia sư AI và số lượt tải đề lên.",
+  "billing.plan.free.name": "Miễn phí",
+  "billing.plan.free.price": "0 đồng",
+  "billing.plan.free.period": "mãi mãi",
+  "billing.plan.free.line1": "5 lượt gia sư mỗi 30 ngày",
+  "billing.plan.free.line2": "3 lượt tải đề mỗi 30 ngày",
+  "billing.plan.free.line3": "Toàn bộ vòng lặp cốt lõi, không giới hạn",
+  "billing.plan.free.line4": "Có sẵn phân tích Layer 3",
+  "billing.plan.premium.name": "Premium",
+  "billing.plan.premium.price": "39.000 VNĐ",
+  "billing.plan.premium.period": "cho mỗi kỳ 30 ngày, trả trước",
+  "billing.plan.premium.line1": "500 lượt gia sư mỗi 30 ngày",
+  "billing.plan.premium.line2": "15 lượt tải đề mỗi 30 ngày",
+  "billing.plan.premium.line3": "Một suất được bảo lưu trong ngân sách AI mỗi ngày",
+  "billing.plan.premium.line4": "Mua sớm thì số ngày còn lại được cộng dồn",
+  "billing.plan.current": "Gói bạn đang dùng",
+  "billing.cta.buy": "Mua Premium",
+  "billing.cta.unavailableReason":
+    "Premium chưa mở bán — chúng tôi không bán một hạn mức chưa giao được. Bạn quay lại sau nhé.",
+  "billing.noAutoRenew":
+    "Gói này không tự động gia hạn. Hết 30 ngày là dừng, không trừ tiền, không lưu thẻ — muốn dùng tiếp thì bạn tự mua lại.",
+  "billing.legal.terms": "Điều khoản dịch vụ",
+  "billing.legal.refund": "Chính sách hoàn tiền",
+  "billing.legal.linkIntro": "Trước khi mua, bạn đọc giúp:",
+  "billing.terms.title": "Điều khoản dịch vụ",
+  "billing.terms.eyebrow": "Pháp lý",
+  "billing.terms.pending":
+    "Nội dung đang được hoàn thiện, chưa sẵn sàng. Chưa có gì được bán ra cho tới khi xong.",
+  "billing.refund.title": "Chính sách hoàn tiền",
+  "billing.refund.eyebrow": "Pháp lý",
+  "billing.refund.pending":
+    "Nội dung đang được hoàn thiện, chưa sẵn sàng. Chưa có gì được bán ra cho tới khi xong.",
+  "billing.quota.tutorExhausted": "Bạn đã dùng hết lượt gia sư của kỳ này.",
+  "billing.quota.resetsAt": "Đặt lại vào {date}.",
+  "billing.quota.remaining": "Đã dùng {used}/{limit} lượt gia sư trong kỳ này.",
+  "billing.quota.upgradeLink": "Xem các gói",
 };

@@ -9,8 +9,32 @@ import { SESSION_COOKIE_OPTIONS } from "./cookieOptions";
 /** Các path không yêu cầu đăng nhập. `/auth/callback` (S#23): điểm về của
  * OAuth + email link — request tới đây CHƯA có cookie session, không whitelist
  * thì bị chặn trước khi route handler kịp đổi code lấy session.
- * (`/reset-password` KHÔNG public — cần recovery session từ email link.) */
-const PUBLIC_PATHS = ["/", "/login", "/auth/callback"];
+ * (`/reset-password` KHÔNG public — cần recovery session từ email link.)
+ *
+ * Cách khớp (xem `isPublic` bên dưới) là BẰNG hoặc tiền tố THEO ĐOẠN, không
+ * phải tiền tố chuỗi thô: "/terms" phủ cả "/terms/abc" nhưng KHÔNG phủ
+ * "/terms-of-service". Mỗi mục thêm vào đây phải nêu lý do ngay tại chỗ
+ * (subscription PRD AC-032).
+ *
+ * Ba mục cuối là của tính năng Subscription. Hai mục dưới đây là đường ĐỌC
+ * tĩnh; mục thứ ba — webhook payOS, đường GHI chưa-đăng-nhập ĐẦU TIÊN của dự
+ * án — thuộc pha backend và ADR-0014, CHƯA thêm. Khi nó được thêm thì danh sách
+ * này có đúng 6 mục, trong đó đúng 1 mục cho phép ghi. */
+// Export để AC-032/AC-038 kiểm được bằng test thay vì bằng mắt: danh sách này
+// là một ràng buộc bảo mật có số đếm ("đúng 6 mục, đúng 1 mục cho phép ghi"),
+// và ràng buộc có số đếm mà không có cổng tự động thì chỉ là một điều phải nhớ.
+export const PUBLIC_PATHS = [
+  "/",
+  "/login",
+  "/auth/callback",
+  // Bán hàng cho học sinh THCS/THPT thì điều khoản phải đọc được TRƯỚC khi có
+  // tài khoản, nếu không thì "đồng ý điều khoản" là đồng ý với một trang bị
+  // chặn (PRD R11/AC-038).
+  "/terms",
+  // Cùng lý do. AC-040 buộc trang này nói rõ gói KHÔNG tự động gia hạn — kỳ
+  // vọng dễ hiểu sai nhất của mô hình trả trước.
+  "/refund-policy",
+];
 
 /** CSP của lượt request này, do proxy.ts sinh (TD-006). */
 export interface CspContext {

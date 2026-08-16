@@ -6,7 +6,14 @@ import { SITE_URL } from "@/lib/siteUrl";
 // `/auth/callback`). Không hỏng gì, nhưng phí crawl budget và có nguy cơ lộ
 // URL nội bộ trong báo cáo Search Console.
 //
-// Chỉ `/` là trang thật sự công khai và đáng index, nên allowlist đúng nó.
+// Ba trang công khai và đáng index: `/`, `/terms`, `/refund-policy` (hai trang
+// sau do tính năng Subscription thêm — PRD R11/AC-038). Chúng không cần khai
+// `allow` riêng vì đã nằm dưới `allow: "/"`; chúng chỉ cần KHÔNG bị dính một
+// luật disallow nào. Mọi route còn lại nằm sau đăng nhập.
+//
+// Danh sách disallow phải bám theo PUBLIC_PATHS (lib/supabase/middleware.ts):
+// route nào KHÔNG công khai mà thiếu ở đây thì crawler vẫn bò vào rồi ăn
+// redirect `/?auth=signin` — chính lãng phí mà file này sinh ra để chặn.
 
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -22,6 +29,8 @@ export default function robots(): MetadataRoute.Robots {
         "/login",
         "/reset-password",
         "/auth/",
+        // Cần đăng nhập (Subscription S-01): không nằm trong PUBLIC_PATHS.
+        "/pricing",
       ],
     },
     sitemap: `${SITE_URL}/sitemap.xml`,

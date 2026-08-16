@@ -41,8 +41,13 @@ export const metadata: Metadata = {
   },
   description: DESCRIPTION,
   applicationName: "MS-MOLAR",
-  // Site chỉ có duy nhất `/` là public; phần còn lại nằm sau đăng nhập nên
-  // không có gì để index. Chi tiết per-path nằm ở app/robots.ts.
+  // Ba trang public: `/`, `/terms`, `/refund-policy` (hai trang sau do tính
+  // năng Subscription thêm — PRD R11). Phần còn lại nằm sau đăng nhập nên không
+  // có gì để index. Chi tiết per-path ở app/robots.ts và app/sitemap.ts.
+  //
+  // `canonical: "/"` ở ĐÂY là canonical MẶC ĐỊNH của root layout, không phải
+  // lời khẳng định rằng chỉ có một trang public. Trang nào cần canonical riêng
+  // thì tự khai `alternates` trong `export const metadata` của chính nó.
   alternates: { canonical: "/" },
   // Verify quyền sở hữu site trong Google Search Console bằng thẻ meta.
   //
