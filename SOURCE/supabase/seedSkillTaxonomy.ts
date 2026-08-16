@@ -4,7 +4,8 @@
 //
 // Cách chạy (sau khi đã apply §9b của schema.sql trong Supabase SQL Editor):
 //   cd SOURCE
-//   npx tsx supabase/seedSkillTaxonomy.ts
+//   npx tsx supabase/seedSkillTaxonomy.ts                                  # dev
+//   SCHEMA_ENV_FILE=.env.local.prod-backup npx tsx supabase/seedSkillTaxonomy.ts   # prod
 //
 // Idempotent (upsert theo khoá chính) — chạy lại không sinh dòng trùng. Mượn
 // nguyên pattern nạp env + tạo client của supabase/seed.ts.
@@ -22,8 +23,19 @@ import {
 } from "../lib/adaptive/skillTaxonomy";
 
 // --- Nạp env từ .env.local (tsx không tự load như Next.js) ----------------
+/** File env đang dùng — đọc một lần để log ra đúng cái đã thật sự nạp. */
+const ENV_FILE = process.env.SCHEMA_ENV_FILE?.trim() || ".env.local";
+
+/**
+ * Đọc env từ `.env.local`, hoặc từ file khác nếu đặt `SCHEMA_ENV_FILE` — cùng
+ * convention với `verify-schema.ts`, và vì đúng lý do đã ghi ở đó: dự án có 2
+ * Supabase project (dev + prod), mà seed prod bằng cách đổi tên `.env.local`
+ * qua lại là thao tác vừa dễ quên bước đổi ngược, vừa để lại cây làm việc trỏ
+ * nhầm DB nếu lệnh giữa chừng hỏng. Script này ghi thật vào DB nên hậu quả của
+ * việc trỏ nhầm nặng hơn `verify-schema.ts` (chỉ đọc), không nhẹ hơn.
+ */
 function loadEnv(): Record<string, string> {
-  const raw = readFileSync(resolve(__dirname, "../.env.local"), "utf8");
+  const raw = readFileSync(resolve(__dirname, "..", ENV_FILE), "utf8");
   const env: Record<string, string> = {};
   for (const line of raw.split("\n")) {
     const trimmed = line.trim();
@@ -60,6 +72,11 @@ async function main() {
   const supabase = createClient(url, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+
+  // In ra ĐÍCH trước khi ghi: một dòng seed nhầm môi trường không báo lỗi gì cả
+  // (upsert vào DB nào cũng "thành công"), nên thứ duy nhất phân biệt được hai
+  // lần chạy là dòng log này.
+  console.log(`Env: ${ENV_FILE} → ${new URL(url).host}`);
 
   const nodeRows = SKILL_NODES.map((n) => ({ id: n.id, label_vi: n.labelVi }));
   const edgeRows = SKILL_PREREQUISITES.map((e) => ({

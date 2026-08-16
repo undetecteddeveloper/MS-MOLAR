@@ -4,7 +4,7 @@ Covers Work Plan Final Phase (Tasks 22-27). Task 22 has its own file (`engine1-a
 
 ## All-Item Completion Checklist (carried forward from the Work Plan, verbatim scope)
 
-- [ ] **Task 22 — Full regression + prod schema apply**: see `engine1-adaptive-ai-work-plan-backend-task-14.md` (⚠ BLOCKING). **Dev-side regression: DONE and green** (see Task 22 section below). **Prod side: NOT DONE, and its scope grew** — see Finding P-1.
+- [x] **Task 22 — Full regression + prod schema apply**: see `engine1-adaptive-ai-work-plan-backend-task-14.md` (⚠ BLOCKING). **Dev-side regression: DONE and green** (see Task 22 section below). **Prod side: DONE 2026-08-16** — P-1 closed, see the Finding P-1 section (now resolved).
 - [x] **Task 23 — Security review**: walk ADR-0011's mechanism end to end (INVOKER, `service_role`-only, revoke-by-name on `record_skill_mastery()`); re-confirm D3/AC-018/019 answer-key containment across both the prompt (backend-task-11) and telemetry (backend-task-12) paths; confirm D4 (hint renders only via `RichText`, no competing path — frontend-task-01); confirm `explainStep()` (backend-task-13) has 0 unauthenticated code paths and every invocation passes through `guard()` (AC-022, PRD Success Criteria #11).
 - [x] **Task 24 — Coverage check**: 70%+ on `lib/adaptive/**`, `lib/tutor/**`, `lib/scoring/wrongTwice.ts`, `components/tutor/**`, `app/(layer3)/_components/SkillRecommendationCard.tsx`.
 - [x] **Task 25 — Risk closure walk**: every backend DD, frontend DD and PRD risk has a passing evidenced mitigation or an explicitly accepted residual.
@@ -174,13 +174,34 @@ Update History rows appended to:
 
 ## Findings that block "shippable"
 
-### P-1 — Prod has the Engine 1 tables but none of the Engine 1 content 🔴
+### ~~P-1 — Prod has the Engine 1 tables but none of the Engine 1 content~~ ✅ CLOSED 2026-08-16
 
 `pebjdlbgbmizgfpuptjl` (MS-MOLAR-prod): `skill_nodes = 0`, `skill_prerequisites = 0`, tagged questions `= 0`, against 28 Math questions and 7 users. The 2026-08-15 migration created the tables; nobody ran the seed or the tagger.
 
 Shipping as-is: the recommendation card shows cold-start to every user permanently, and `record_skill_mastery()` can never write a row because every `questions.skill_node_id` is NULL. This is TD-005's shape at the **data** layer, where a matching `schema_version` fingerprint gives no warning at all.
 
 Task 22's prod step is therefore three actions, not one: apply DDL → `seedSkillTaxonomy.ts` → `tagQuestionSkills.ts` (dry-run → human review → `--apply`) → re-count with a real query.
+
+**Closed 2026-08-16. It was two actions, not three — the DDL was already there.** Prod's `schema_version` already read `f525e3095339`, matching git, applied `2026-08-15T08:57:15Z` by that migration. The gap was purely content. What the fold above got wrong is worth keeping: *"prod is missing Engine 1"* was true at the data layer and false at the schema layer, and only a real query separates the two.
+
+| Prod, measured by query | before | after |
+|---|---|---|
+| `skill_nodes` / `skill_prerequisites` | 0 / 0 | **20 / 15** |
+| Math questions tagged | 0 / 28 | **26 / 28 (92.9%)** |
+| tags pointing at a non-existent node | — | **0** |
+| distinct nodes in use | 0 | 8 |
+
+- **Seed** run twice against prod (`SCHEMA_ENV_FILE=.env.local.prod-backup`): 20/15 both times, 0 duplicate rows — the same idempotence proof backend-task-05 required on dev.
+- **Tagger**: dry-run → 24 tagged / 4 left-null (85.7%) → human review → `--apply` wrote 25 rows. The two runs disagree because Gemini free-tier 429s move between runs: `p2q1`/`p2q2` failed in the dry-run and succeeded in the apply, `p2q3` did the reverse. Consequence worth naming — **`--apply` wrote two tags the dry-run never proposed, so AC-008's "100% reviewed" had to be re-satisfied against the apply run's report, not the dry-run's.** Both were reviewed (`nguyen-ham` conf 1.00, `pp-toa-do-khong-gian` conf 1.00) and both are correct.
+- **The 2 questions still NULL are correctly NULL**: `$2 + 2$ bằng bao nhiêu?` and a rectangle-area question — genuinely outside a THPT taxonomy, both `no-matching-node`, not errors.
+
+**One real mis-tag found by the review, fixed on both DBs.** `p2q3` and `p3q4` — both give a sphere *by its equation in Oxyz* (`p3q4` requires completing the square to get centre/radius) — were classified `mat-non-mat-tru-mat-cau`. That node is "Mặt nón, mặt trụ, mặt cầu" (surface area / volume of round solids); reading a sphere equation in coordinates is `pp-toa-do-khong-gian` under the 2018 programme. The model contradicted itself: the near-identical `p1q5` it tagged `pp-toa-do-khong-gian`.
+
+This matters beyond labelling. `pp-toa-do-khong-gian` has `mat-non-mat-tru-mat-cau` as its **prerequisite**, so the mis-tag pushes a student who missed a coordinate question toward revising cones and cylinders — the exact "confidently wrong recommendation" of PRD risk R-a.
+
+**Dev had the same two rows wrong**, tagged in the earlier pass that AC-008 recorded as 100% reviewed. So this is not a prod-only slip: it is a miss in the original review that only resurfaced because the corpus was reviewed a second time. Both environments corrected (4 rows, `mat-non-mat-tru-mat-cau` now used by 0 questions in either DB); dev's tagged count is unchanged at 35.
+
+**Prod `verify:schema` after the content work: 8/8 sections green**, fingerprint `f525e3095339` matching `SCHEMA_FINGERPRINT` in git — the A3 checkpoint of backend-task-14, now satisfied on both environments.
 
 ### Q-1 — The tutor's Gemini key allows 20 requests per day, project-wide 🔴
 
@@ -208,7 +229,7 @@ Quota-blocked, not failing. Harness is committed and repeatable; needs one run o
 - [x] Staged quality checks completed (zero errors)
 - [x] All tests pass
 - [ ] Manual Playwright/keyboard/axe-equivalent/10-case tone-eval passes recorded (Phase 5) — all recorded except the tone eval (Q-2)
-- [ ] Both dev and prod schema applies verified via `verify:schema`, fingerprints matching git — **dev yes, prod outstanding (P-1)**
+- [x] Both dev and prod schema applies verified via `verify:schema`, fingerprints matching git — **both green at `f525e3095339`** (prod re-verified 2026-08-16, 8/8 sections)
 - [ ] User review approval obtained
 
 ## Verification Commands
@@ -226,4 +247,9 @@ cd SOURCE && npm run build
 
 ## This Is the Final Gate
 
-No further phase follows. Three items stand between here and "shippable": **P-1** (prod content, blocking), **Q-2** (AC-020's remaining 7 cases, quota-gated), and **Q-1** (the daily-quota ceiling, owner-deferred to a separate feature). Everything else in this work plan is complete and evidenced.
+No further phase follows. **P-1 is closed (2026-08-16)** — prod now carries the taxonomy and 92.9% tag coverage, verified by query, and `verify:schema` is green on both environments. Two items remain, neither blocking a ship:
+
+- **Q-2** — AC-020 is 3/10 judged. Quota-gated, not failing; the harness is committed and needs one run on a day whose `gemini-3.5-flash` budget is reserved for it.
+- **Q-1** — the 20-requests/day ceiling on the tutor model, owner-deferred to a separate feature by explicit decision.
+
+Worth recording against Q-1, because it was nearly mis-scoped: the ceiling is **per model** (`GenerateRequestsPerDayPerProjectPerModel`) and was measured on `gemini-3.5-flash`, the tutor's model. The batch tagger runs on `gemini-3.1-flash-lite` — a separate bucket — which is why tagging 28 prod questions was never blocked by it. Reading Q-1 as a project-wide ceiling across all models would have wrongly declared P-1 unclosable. Q-1 constrains Q-2; it does not constrain the tagger.

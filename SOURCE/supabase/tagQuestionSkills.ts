@@ -5,6 +5,9 @@
 //   npx tsx supabase/tagQuestionSkills.ts            # DRY-RUN (mặc định, không ghi)
 //   npx tsx supabase/tagQuestionSkills.ts --apply    # ghi thật
 //
+// Chạy trên prod (đặt SCHEMA_ENV_FILE, cùng convention verify-schema.ts):
+//   SCHEMA_ENV_FILE=.env.local.prod-backup npx tsx supabase/tagQuestionSkills.ts
+//
 // DRY-RUN LÀ MẶC ĐỊNH có chủ ý: AC-008 đòi engineer đọc 100% các đề xuất
 // "tagged" TRƯỚC khi có bất cứ dòng nào được ghi. Report JSON ghi ra
 // supabase/skill-tagging-report-<ISO>.json (đã gitignore) chính là vật liệu
@@ -24,8 +27,18 @@ import { SKILL_NODES } from "../lib/adaptive/skillTaxonomy";
 import { decideSkillTag, type SkillClassification } from "../lib/adaptive/tagDecision";
 
 // --- Nạp env từ .env.local (tsx không tự load như Next.js) ----------------
+/** File env đang dùng — đọc một lần để log ra đúng cái đã thật sự nạp. */
+const ENV_FILE = process.env.SCHEMA_ENV_FILE?.trim() || ".env.local";
+
+/**
+ * Đọc env từ `.env.local`, hoặc từ file khác nếu đặt `SCHEMA_ENV_FILE` — cùng
+ * convention với `verify-schema.ts` và `seedSkillTaxonomy.ts`. Ở script NÀY nó
+ * còn quan trọng hơn: `--apply` ghi vào `questions` của DB đích, và report JSON
+ * là vật liệu engineer duyệt theo AC-008 — một report không nói nó đọc corpus
+ * của môi trường nào thì không duyệt được.
+ */
 function loadEnv(): Record<string, string> {
-  const raw = readFileSync(resolve(__dirname, "../.env.local"), "utf8");
+  const raw = readFileSync(resolve(__dirname, "..", ENV_FILE), "utf8");
   const env: Record<string, string> = {};
   for (const line of raw.split("\n")) {
     const trimmed = line.trim();
@@ -177,6 +190,9 @@ async function main() {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
+  /** Ref của project đích, suy từ host — đi vào cả log lẫn tên file report. */
+  const projectRef = new URL(url).host.split(".")[0];
+
   // Đọc thẳng skill_nodes từ DB chứ không dùng SKILL_NODES: khoá ngoại của
   // questions.skill_node_id trỏ vào DB, nên tập id hợp lệ phải lấy từ DB. Nếu
   // ai đó quên chạy seedSkillTaxonomy.ts thì phải fail ở đây, không phải fail
@@ -204,6 +220,7 @@ async function main() {
 
   console.log(
     `Chế độ: ${apply ? "--APPLY (ghi thật)" : "DRY-RUN (không ghi)"} · ` +
+      `env ${ENV_FILE} → ${projectRef} · ` +
       `corpus ${corpus.length} câu · ngưỡng ${SKILL_TAG_CONFIDENCE_THRESHOLD} · ` +
       `${knownNodeIds.size} node`,
   );
@@ -267,9 +284,12 @@ async function main() {
     );
   }
 
+  // Ref nằm trong TÊN file: hai môi trường sinh report cùng hình dạng, và
+  // engineer duyệt 100% dòng "tagged" theo AC-008 dựa trên chính file này —
+  // duyệt nhầm report của môi trường kia là lỗi không có gì bắt được.
   const reportPath = resolve(
     __dirname,
-    `skill-tagging-report-${new Date().toISOString().replace(/[:.]/g, "-")}.json`,
+    `skill-tagging-report-${projectRef}-${new Date().toISOString().replace(/[:.]/g, "-")}.json`,
   );
   writeFileSync(reportPath, JSON.stringify(report, null, 2), "utf8");
 
