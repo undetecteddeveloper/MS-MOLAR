@@ -247,10 +247,14 @@ type AttemptRow = {
   id: string;
   exam_id: string;
   submitted_at: string | null;
-  // PostgREST trả embed to-one dưới dạng OBJECT, nhưng điều đó CHƯA được kiểm
-  // chứng trên deployment này (analytics-layer3 để ngỏ đúng câu hỏi đó). Khai
-  // cả hai hình dạng và chuẩn hoá ở `gradeOf` — rẻ hơn nhiều so với việc phát
-  // hiện ra mình đoán sai lúc chạy thật.
+  // ĐÃ ĐO 2026-08-16 (câu hỏi analytics-layer3 để ngỏ, nay đóng lại): PostgREST
+  // trả embed to-one này dưới dạng OBJECT — `{"exams":{"grade":10}}` — kiểm
+  // bằng chính @supabase/supabase-js trên dev (hynwleaxtbtjzkvpjsug, 40 dòng
+  // qua đường anon key + JWT thật, RLS bật). Trên prod (pebjdlbgbmizgfpuptjl)
+  // xác nhận gián tiếp mà chắc chắn: `exam_attempts_exam_id_fkey` là khoá ngoại
+  // MỘT cột `exam_id -> exams`, và chính chiều many-to-one đó là thứ PostgREST
+  // dùng để quyết to-one. Vẫn khai CẢ HAI hình dạng: chi phí bằng 0, còn thứ
+  // được bảo vệ là một giả định về thư viện bên thứ ba có thể đổi khi nâng cấp.
   exams: { grade: number } | { grade: number }[] | null;
 };
 

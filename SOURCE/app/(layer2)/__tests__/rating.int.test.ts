@@ -635,7 +635,11 @@ describe("listExamsRanked — thứ tự mặc định của /exams và ngân s�
     expect(exams.map((e) => e.id).sort()).toEqual(["a", "b", "c"]);
   });
 
-  it("embed to-one trả về MẢNG vẫn đọc được lớp — hình dạng này chưa được kiểm chứng trên deployment", async () => {
+  // Hình dạng THẬT đã đo 2026-08-16 là OBJECT (xem chú thích ở AttemptRow trong
+  // queries.ts). Case này giữ lại cho nhánh MẢNG vì nó bảo vệ một giả định về
+  // thư viện bên thứ ba, thứ có thể đổi khi nâng cấp @supabase/supabase-js —
+  // không phải vì hình dạng còn là ẩn số.
+  it("embed to-one trả về MẢNG vẫn đọc được lớp (phòng khi PostgREST/SDK đổi hành vi)", async () => {
     mockTables({
       exams_with_difficulty: [
         examRow("g9", 9, "2026-06-01T00:00:00.000Z"),
