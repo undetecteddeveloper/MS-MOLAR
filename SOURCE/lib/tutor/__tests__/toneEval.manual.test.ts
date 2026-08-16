@@ -21,6 +21,16 @@
 // Một ca trượt là tín hiệu DỪNG-VÀ-CHỈNH: sửa chỉ dẫn trong buildTutorPrompt()
 // rồi chạy lại CẢ 10 ca, không chỉ ca trượt.
 //
+// ⚠ HẠN NGẠCH — ĐỌC TRƯỚC KHI CHẠY (đo 2026-08-16, đọc thẳng thân lỗi 429):
+//   quotaId `GenerateRequestsPerDayPerProjectPerModel-FreeTier`, quotaValue
+//   **20 request/NGÀY** cho `gemini-3.5-flash`, reset lúc nửa đêm giờ Thái Bình
+//   Dương. Một lượt 10 ca tiêu ít nhất một NỬA hạn mức ngày, và tiêu hơn nữa
+//   nếu generateHint() phải retry. Hệ quả: đừng chạy file này "để thử" — canh
+//   chạy đúng một lượt trọn vẹn, và đừng dùng chung ngày với việc trích UGC
+//   (cùng key, cùng model). Con số 20/ngày này còn là trần của CHÍNH TÍNH NĂNG
+//   gia sư trên production, không riêng gì bộ đánh giá — đã ghi vào
+//   engine1-adaptive-ai-work-plan-phase5-completion.md để Task 24 xử lý.
+//
 // Assertion trong file này CỐ Ý chỉ chặn phần máy đọc được (có trả về chuỗi,
 // có dấu tiếng Việt, có ít nhất một dấu hỏi) — ba tiêu chí trên vẫn cần mắt
 // người. Assertion máy đỏ = hỏng ở tầng thấp hơn tiêu chí giọng văn.
@@ -222,11 +232,24 @@ afterAll(() => {
   writeFileSync(REPORT_PATH, report.join("\n"), "utf8");
 });
 
+/** Giãn cách giữa hai ca — mặc định 0.
+ *
+ *  Giãn cách KHÔNG cứu được hạn ngạch: ràng buộc thật là
+ *  `GenerateRequestsPerDayPerProjectPerModel-FreeTier`, **20 request/NGÀY** cho
+ *  `gemini-3.5-flash` (đọc thẳng từ thân 429 ngày 2026-08-16 — xem chú thích
+ *  "HẠN NGẠCH" ở đầu file). Một lượt 10 ca ăn ít nhất 10/20, và ăn nhiều hơn
+ *  nếu generateHint() phải retry. Biến này để dành cho tài khoản trả phí, nơi
+ *  trần là theo PHÚT và giãn cách mới có tác dụng. */
+const PACING_MS = Number(process.env.TUTOR_TONE_EVAL_PACING_MS ?? 0);
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 describe.skipIf(!ENABLED)("PRD Success Criteria #9 — 10 ca đánh giá giọng Socratic", () => {
-  for (const c of CASES) {
+  CASES.forEach((c, index) => {
     it(
       c.label,
       async () => {
+        if (index > 0) await sleep(PACING_MS);
         const hint = await generateHint(c.input);
 
         report.push(
@@ -248,7 +271,8 @@ describe.skipIf(!ENABLED)("PRD Success Criteria #9 — 10 ca đánh giá giọng
         // Có ít nhất một câu hỏi — điều kiện CẦN (không đủ) của lối Socratic.
         expect(hint).toContain("?");
       },
-      60_000
+      // PACING_MS + 30s deadline của generateHint + biên cho retry nội bộ.
+      PACING_MS + 90_000
     );
-  }
+  });
 });
