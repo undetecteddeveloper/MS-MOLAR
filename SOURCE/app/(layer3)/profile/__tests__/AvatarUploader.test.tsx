@@ -8,6 +8,7 @@
 // này dùng ĐÚNG hằng số mà Server Action dùng, chứ không chép riêng một bản
 // giới hạn 2MB.
 
+import { useRef, useState } from "react";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -42,9 +43,41 @@ function fakeFile(name: string, type: string, size: number): File {
   return file;
 }
 
+/** Dựng lại đúng phần sở hữu mà ProfileCard đảm nhiệm: nút mở nằm NGOÀI khối
+ *  sửa và ở LẠI trong cây khi khối mở, còn khối sửa thì được gắn/gỡ. Không có
+ *  cái khung này thì không test được việc trả focus — nút mở không tồn tại. */
+function Harness({
+  onSuccess,
+  onStatus,
+}: {
+  onSuccess: () => void;
+  onStatus: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  return (
+    <>
+      <button ref={triggerRef} type="button" onClick={() => setOpen(true)}>
+        Change picture
+      </button>
+      {open && (
+        <AvatarUploader
+          id="profile-avatar-panel"
+          onClose={() => {
+            setOpen(false);
+            triggerRef.current?.focus();
+          }}
+          onSuccess={onSuccess}
+          onStatus={onStatus}
+        />
+      )}
+    </>
+  );
+}
+
 function renderUploader() {
   const props = { onSuccess: vi.fn(), onStatus: vi.fn() };
-  render(<AvatarUploader {...props} />);
+  render(<Harness {...props} />);
   return props;
 }
 
@@ -192,7 +225,7 @@ describe("chọn xong — xem trước rồi mới Lưu (UI-D11)", () => {
   });
 
   it("thu hồi object URL khi tháo — không rò blob", () => {
-    const { unmount } = render(<AvatarUploader onSuccess={vi.fn()} onStatus={vi.fn()} />);
+    const { unmount } = render(<Harness onSuccess={vi.fn()} onStatus={vi.fn()} />);
     act(() => {
       screen.getByRole("button", { name: "Change picture" }).click();
     });

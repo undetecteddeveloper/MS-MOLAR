@@ -36,12 +36,15 @@ describe("khối danh tính", () => {
   it("hiện tên và email; tên KHÔNG BAO GIỜ là heading (nó là dữ liệu, không phải cấu trúc)", () => {
     render(<ProfileCard user={USER} />);
 
-    // Tên xuất hiện hai lần theo đúng đặc tả: một lần trong khối danh tính, một
-    // lần làm giá trị của hàng "Display name". Không lần nào được là h1/h2/h3 —
-    // globals.css tự gán serif cho ba thẻ đó, và serif ở đây sẽ nói dối rằng
-    // tên người dùng là một cấp mục lục của trang.
+    // Tên xuất hiện ĐÚNG MỘT lần (2026-08-17). Trước đây là hai: một trong khối
+    // danh tính, một làm giá trị của hàng "Display name" — nhưng hàng đó chỉ
+    // hiển thị lại đúng cái tên nằm ngay phía trên nó, và cái nhãn ấy tồn tại
+    // chỉ để làm chỗ treo một cái nút. Nút đó nay là bút chì đứng cạnh chính
+    // cái tên, nên hàng thừa đã bị bỏ.
+    // Không được là h1/h2/h3 — globals.css tự gán serif cho ba thẻ đó, và serif
+    // ở đây sẽ nói dối rằng tên người dùng là một cấp mục lục của trang.
     const occurrences = screen.getAllByText("an.nguyen");
-    expect(occurrences).toHaveLength(2);
+    expect(occurrences).toHaveLength(1);
     for (const node of occurrences) expect(node.tagName).not.toMatch(/^H[1-6]$/);
 
     expect(screen.getByText("an.nguyen@example.com")).toBeDefined();

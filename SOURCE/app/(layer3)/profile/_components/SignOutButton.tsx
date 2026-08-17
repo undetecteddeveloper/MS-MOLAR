@@ -14,11 +14,12 @@ import { useRef } from "react";
 import { useFormStatus } from "react-dom";
 import { signOut } from "@/app/(layer1)/actions";
 import { useT } from "@/lib/i18n/client";
+import { cn } from "@/lib/utils";
 import { outlineButtonCls } from "./styles";
 
 export function SignOutButton() {
   return (
-    <form action={signOut} className="flex">
+    <form action={signOut} className="flex w-full justify-center">
       <SubmitButton />
     </form>
   );
@@ -44,9 +45,18 @@ function SubmitButton() {
         }
         submittedRef.current = true;
       }}
-      // Đỏ son cho chữ: đây là hành động rời đi, không phải một hành động sửa
-      // ngang hàng ba nút trên. Full-width dưới 768px để ngón cái với tới dễ.
-      className={`${outlineButtonCls} text-brand w-full md:ml-auto md:w-auto`}
+      // Đỏ son cho CHỮ, không phải cho nền: quy tắc cứng của theme là đỏ son
+      // không phủ khối lớn (.claude/MEMORY.md §3) — một nút nền đỏ ở đây vừa
+      // phạm luật đó vừa hét to hơn mức cần thiết cho việc đăng xuất.
+      // Căn giữa (form bọc `justify-center`), không còn `md:ml-auto`: đăng xuất
+      // không thuộc cột hành động căn phải của các hàng phía trên.
+      //
+      // ⚠ PHẢI đi qua cn(): `outlineButtonCls` đã mang sẵn `text-foreground`, và
+      // nối chuỗi trần thì Tailwind xử va chạm theo THỨ TỰ TRONG STYLESHEET chứ
+      // không theo thứ tự trong thuộc tính class — `text-brand` viết sau vẫn
+      // thua. cn() (tailwind-merge) bỏ hẳn lớp bị ghi đè, nên cái sau thắng
+      // thật. Bản trước dùng nối chuỗi và nút hiện ra màu đen.
+      className={cn(outlineButtonCls, "text-brand w-full md:w-auto")}
     >
       {pending ? t("common.working") : t("common.signOut")}
     </button>

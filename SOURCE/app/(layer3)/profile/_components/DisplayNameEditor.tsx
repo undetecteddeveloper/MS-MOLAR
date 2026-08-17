@@ -12,13 +12,12 @@
 // đó được dịch ở client qua resolveDisplayNameError (UI-D9), và một cổng build
 // canh cho bản đồ ấy không trôi (xem __tests__/errorMessages.test.ts).
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { updateProfile, type AuthState } from "@/app/(layer1)/actions";
 import { useT } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n/translate";
 import { DISPLAY_NAME_MAX, filterDisplayNameInput } from "@/lib/profile/displayName";
-import { ProfileRow } from "./ProfileRow";
 import { resolveDisplayNameError, type ProfileMessage } from "./errorMessages";
 import {
   actionRowCls,
@@ -33,31 +32,32 @@ const HINT_ID = "profile-display-name-hint";
 const ERROR_ID = "profile-display-name-error";
 
 interface DisplayNameEditorProps {
+  /** Đích của `aria-controls` trên nút bút chì, nút đó nằm ở ProfileCard. */
+  id: string;
+  onClose: () => void;
   displayName: string;
   onSuccess: (key: MessageKey) => void;
   onStatus: (message: ProfileMessage | null) => void;
 }
 
-export function DisplayNameEditor({ displayName, onSuccess, onStatus }: DisplayNameEditorProps) {
+/** Khối sửa tên. Trạng thái mở/đóng và việc trả focus thuộc về ProfileCard —
+ *  bút chì nằm cạnh cái tên trong cụm danh tính, tách khỏi khối này trong cây.
+ *
+ *  ProfileCard GẮN/GỠ component này thay vì truyền `open` xuống: nhờ vậy
+ *  `useState(displayName)` tự khởi tạo đúng ở mỗi lần mở, không cần một effect
+ *  đồng bộ lại bản nháp — mà một effect như thế sẽ setState trong thân effect
+ *  và bị `react-hooks/set-state-in-effect` chặn ở cổng lint. */
+export function DisplayNameEditor({
+  id,
+  onClose,
+  displayName,
+  onSuccess,
+  onStatus,
+}: DisplayNameEditorProps) {
   const t = useT();
   const router = useRouter();
-  const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(displayName);
   const submittingRef = useRef(false);
-  const changeButtonRef = useRef<HTMLButtonElement>(null);
-  const returnFocusRef = useRef(false);
-
-  // Trả focus về nút "Đổi tên" phải đợi nút đó MỌC LẠI: trong lúc sửa, nút
-  // không được render, nên `changeButtonRef.current` là null và một lệnh
-  // focus() gọi ngay trong hàm huỷ sẽ rơi vào khoảng không — focus tụt xuống
-  // <body> và người dùng bàn phím mất chỗ đứng giữa trang.
-  // Effect này KHÔNG gọi setState, nên nó không phạm react-hooks/set-state-in-effect.
-  useEffect(() => {
-    if (!editing && returnFocusRef.current) {
-      returnFocusRef.current = false;
-      changeButtonRef.current?.focus();
-    }
-  }, [editing]);
 
   // Kết cục được xử lý NGAY TRONG action, không qua useEffect nghe lằn ranh
   // pending true→false (khuôn cũ ở HeaderProfile.tsx:33-41). Hai lý do:
@@ -74,10 +74,9 @@ export function DisplayNameEditor({ displayName, onSuccess, onStatus }: DisplayN
       try {
         const result = await updateProfile(prev, formData);
         if (!result?.error) {
-          // Nút Lưu vừa biến mất cùng trình sửa — không trả focus thì nó rơi
-          // xuống <body>.
-          returnFocusRef.current = true;
-          setEditing(false);
+          // Nút Lưu biến mất cùng khối này — ProfileCard trả focus về bút chì,
+          // thứ vẫn còn trong cây.
+          onClose();
           onSuccess("profile.name.saved");
           // Đẩy tên mới ra thẻ /profile, SiteHeader và HomeSidebar mà không bắt
           // người dùng tự tải lại trang (AC-047).
@@ -92,15 +91,9 @@ export function DisplayNameEditor({ displayName, onSuccess, onStatus }: DisplayN
     null
   );
 
-  function startEditing() {
-    setDraft(displayName);
-    setEditing(true);
-  }
-
   function cancel() {
-    returnFocusRef.current = true;
-    setEditing(false);
-    setDraft(displayName);
+    onStatus(null);
+    onClose();
   }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -113,36 +106,15 @@ export function DisplayNameEditor({ displayName, onSuccess, onStatus }: DisplayN
     submittingRef.current = true;
   }
 
-  const label = t("common.displayName");
-
-  if (!editing) {
-    return (
-      <ProfileRow
-        label={label}
-        action={
-          <button
-            ref={changeButtonRef}
-            type="button"
-            onClick={startEditing}
-            className={outlineButtonCls}
-          >
-            {t("profile.name.change")}
-          </button>
-        }
-      >
-        {displayName}
-      </ProfileRow>
-    );
-  }
-
   const error = state?.error ? resolveDisplayNameError(state.error) : null;
   const saveBlocked = pending || draft.trim().length === 0;
 
   return (
-    <ProfileRow
-      label={label}
-      labelFor={INPUT_ID}
-      expanded={
+    <div id={id} className="border-border mt-4 border-t pt-4">
+      <label htmlFor={INPUT_ID} className="eyebrow block">
+        {t("common.displayName")}
+      </label>
+      <div className="mt-2">
         <form action={formAction} onSubmit={handleSubmit}>
           <input
             id={INPUT_ID}
@@ -177,7 +149,7 @@ export function DisplayNameEditor({ displayName, onSuccess, onStatus }: DisplayN
             </button>
           </div>
         </form>
-      }
-    />
+      </div>
+    </div>
   );
 }

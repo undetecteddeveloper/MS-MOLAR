@@ -4,6 +4,7 @@
 // tiếng Anh của nó sang khoá i18n (UI-D9), lọc lúc gõ bằng chính hàm dùng chung
 // (AC-043..AC-045 vẫn do server cưỡng chế), và chặn gửi trùng (AC-069).
 
+import { useRef, useState } from "react";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -23,9 +24,48 @@ beforeEach(() => {
 
 afterEach(cleanup);
 
+/** Dựng lại phần sở hữu của ProfileCard: cái tên và nút bút chì nằm trong cụm
+ *  danh tính, NGOÀI khối sửa; khối sửa được gắn/gỡ. Bút chì ở lại trong cây khi
+ *  khối mở, nên việc trả focus mới kiểm được. */
+function Harness({
+  displayName,
+  onSuccess,
+  onStatus,
+}: {
+  displayName: string;
+  onSuccess: () => void;
+  onStatus: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  return (
+    <>
+      <p>{displayName}</p>
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-label="Change name"
+        onClick={() => setOpen(true)}
+      />
+      {open && (
+        <DisplayNameEditor
+          id="profile-name-panel"
+          onClose={() => {
+            setOpen(false);
+            triggerRef.current?.focus();
+          }}
+          displayName={displayName}
+          onSuccess={onSuccess}
+          onStatus={onStatus}
+        />
+      )}
+    </>
+  );
+}
+
 function renderEditor(displayName = "an.nguyen") {
   const props = { displayName, onSuccess: vi.fn(), onStatus: vi.fn() };
-  render(<DisplayNameEditor {...props} />);
+  render(<Harness {...props} />);
   return props;
 }
 

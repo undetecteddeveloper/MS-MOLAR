@@ -28,7 +28,6 @@ import { useT } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n/translate";
 import { AVATAR_LIMITS } from "@/lib/profile/limits";
 import { checkAvatarFile } from "@/lib/profile/validateAvatar";
-import { ProfileRow } from "./ProfileRow";
 import { profileMessage, resolveActionError, type ProfileMessage } from "./errorMessages";
 import { actionRowCls, fieldErrorCls, fieldHintCls, outlineButtonCls } from "./styles";
 
@@ -40,32 +39,26 @@ const HINT_ID = "profile-avatar-hint";
 const ERROR_ID = "profile-avatar-error";
 
 interface AvatarUploaderProps {
+  /** Đích của `aria-controls` trên nút mở, nút đó nằm ở ProfileCard. */
+  id: string;
+  onClose: () => void;
   onSuccess: (key: MessageKey) => void;
   onStatus: (message: ProfileMessage | null) => void;
 }
 
-export function AvatarUploader({ onSuccess, onStatus }: AvatarUploaderProps) {
+/** Khối sửa ảnh. Trạng thái mở/đóng và việc trả focus thuộc về ProfileCard —
+ *  nút mở nằm trong cụm danh tính đầu thẻ, tách khỏi khối này trong cây DOM.
+ *  ProfileCard GẮN/GỠ component này thay vì truyền `open`, nên tệp đã chọn và
+ *  lỗi cũ không sống sót qua một lần đóng. */
+export function AvatarUploader({ id, onClose, onSuccess, onStatus }: AvatarUploaderProps) {
   const t = useT();
   const router = useRouter();
-  const [expanded, setExpanded] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<ProfileMessage | null>(null);
   const [uploading, setUploading] = useState(false);
 
-  const changeButtonRef = useRef<HTMLButtonElement>(null);
   const uploadingRef = useRef(false);
   const attemptIdRef = useRef(0);
-  const returnFocusRef = useRef(false);
-
-  // Trả focus về nút "Đổi ảnh" phải đợi nút đó MỌC LẠI: khi hàng đang mở, nút
-  // không được render, nên `changeButtonRef.current` là null và một lệnh focus()
-  // gọi ngay trong hàm thu gọn sẽ rơi vào khoảng không.
-  useEffect(() => {
-    if (!expanded && returnFocusRef.current) {
-      returnFocusRef.current = false;
-      changeButtonRef.current?.focus();
-    }
-  }, [expanded]);
 
   // Tạo URL ĐỒNG BỘ trong render, không setState trong effect: effect bên dưới
   // chỉ còn việc dọn dẹp, nên không có lượt render thừa nào ở trạng thái "chưa
@@ -99,11 +92,10 @@ export function AvatarUploader({ onSuccess, onStatus }: AvatarUploaderProps) {
   }
 
   function collapse() {
-    returnFocusRef.current = true;
-    setExpanded(false);
     setFile(null);
     setError(null);
     onStatus(null);
+    onClose();
   }
 
   async function handleSave() {
@@ -134,11 +126,10 @@ export function AvatarUploader({ onSuccess, onStatus }: AvatarUploaderProps) {
         return;
       }
       if (outcome === null) {
-        // Nút Lưu vừa biến mất cùng khối mở rộng — không trả focus thì nó rơi
-        // xuống <body>.
-        returnFocusRef.current = true;
-        setExpanded(false);
+        // Nút Lưu biến mất cùng khối này — ProfileCard trả focus về nút mở, thứ
+        // vẫn còn trong cây.
         setFile(null);
+        onClose();
         onSuccess("profile.avatar.saved");
         // Ảnh mới xuất hiện ở /profile VÀ trên SiteHeader mà không cần tải lại
         // trang (AC-071) — mọi chỗ hiển thị đều đọc từ hàng profile ở server.
@@ -159,31 +150,10 @@ export function AvatarUploader({ onSuccess, onStatus }: AvatarUploaderProps) {
   const hint = profileMessage("profile.avatar.hint");
   const hintText = t(hint.key, hint.values);
 
-  if (!expanded) {
-    return (
-      <ProfileRow
-        label={t("profile.avatar.label")}
-        action={
-          <button
-            ref={changeButtonRef}
-            type="button"
-            onClick={() => setExpanded(true)}
-            className={outlineButtonCls}
-          >
-            {t("profile.avatar.change")}
-          </button>
-        }
-      >
-        <span className="text-muted-foreground">{hintText}</span>
-      </ProfileRow>
-    );
-  }
-
   return (
-    <ProfileRow
-      label={t("profile.avatar.label")}
-      expanded={
-        <div>
+    <div id={id} className="border-border mt-4 border-t pt-4">
+      <p className="eyebrow block">{t("profile.avatar.label")}</p>
+      <div className="mt-2">
           <input
             id={INPUT_ID}
             type="file"
@@ -243,8 +213,7 @@ export function AvatarUploader({ onSuccess, onStatus }: AvatarUploaderProps) {
               </button>
             )}
           </div>
-        </div>
-      }
-    />
+      </div>
+    </div>
   );
 }

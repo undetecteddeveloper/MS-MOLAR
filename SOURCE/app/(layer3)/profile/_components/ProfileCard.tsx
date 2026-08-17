@@ -6,6 +6,7 @@
 // Component) truyền xuống, khuôn của SupportWidget.tsx:3-6.
 
 import { useRef, useState } from "react";
+import { Pencil } from "lucide-react";
 import type { CurrentUserProfile } from "@/lib/auth/getCurrentUser";
 import { useT } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n/translate";
@@ -17,6 +18,12 @@ import { DisplayNameEditor } from "./DisplayNameEditor";
 import { PasswordRow } from "./PasswordRow";
 import { SignOutButton } from "./SignOutButton";
 import type { ProfileMessage } from "./errorMessages";
+import { outlineButtonCls } from "./styles";
+
+/** Nút mở và khối sửa nằm ở hai chỗ khác nhau trong cây, nên `aria-controls`
+ *  là thứ duy nhất nối chúng lại cho trình đọc màn hình. */
+const AVATAR_PANEL_ID = "profile-avatar-panel";
+const NAME_PANEL_ID = "profile-name-panel";
 
 interface ProfileCardProps {
   user: CurrentUserProfile;
@@ -31,6 +38,28 @@ export function ProfileCard({ user }: ProfileCardProps) {
   const [toast, setToast] = useState<{ key: MessageKey | null; n: number }>({ key: null, n: 0 });
   const [status, setStatus] = useState<ProfileMessage | null>(null);
   const passwordTriggerRef = useRef<HTMLButtonElement>(null);
+  // Trình đổi ảnh do thẻ này sở hữu, không do AvatarUploader tự giữ: nút mở nằm
+  // trong cụm danh tính ở đầu thẻ còn khối sửa nằm bên dưới nó, hai chỗ khác
+  // nhau trong cây DOM. Một component không thể render hai mảnh vào hai nơi mà
+  // không có ai đứng trên cả hai.
+  const [avatarOpen, setAvatarOpen] = useState(false);
+  const avatarTriggerRef = useRef<HTMLButtonElement>(null);
+  // Cùng lý do với avatar: bút chì nằm trong cụm danh tính, khối sửa nằm dưới.
+  const [nameOpen, setNameOpen] = useState(false);
+  const nameTriggerRef = useRef<HTMLButtonElement>(null);
+
+  function closeName() {
+    setNameOpen(false);
+    nameTriggerRef.current?.focus();
+  }
+
+  // Nút "Đổi ảnh" ở LẠI trong cây khi khối sửa mở (chỉ đổi nhãn), nên trả focus
+  // là một lệnh gọi thẳng — không cần ref "chờ nút mọc lại" + effect như bản
+  // trước, khi nút bị gỡ khỏi cây lúc đang sửa và focus() rơi vào khoảng không.
+  function closeAvatar() {
+    setAvatarOpen(false);
+    avatarTriggerRef.current?.focus();
+  }
 
   function reportSuccess(key: MessageKey) {
     setToast((prev) => ({ key, n: prev.n + 1 }));
@@ -51,29 +80,87 @@ export function ProfileCard({ user }: ProfileCardProps) {
       <div className="flex flex-col items-center gap-4 text-center md:flex-row md:text-left">
         <Avatar src={user.avatarUrl} name={user.displayName} size={96} />
         <div className="min-w-0">
-          {/* <p>, KHÔNG phải heading: đây là DỮ LIỆU, không phải cấu trúc tài
-              liệu — nên nó cũng không được nhận serif (globals.css tự gán serif
-              cho h1/h2/h3). */}
-          <p className="text-foreground text-xl font-medium">{user.displayName}</p>
+          {/* Bút chì ĐỨNG CẠNH cái tên nó sửa. Hàng "DISPLAY NAME" riêng đã bị
+              bỏ: nó hiển thị lại đúng cái tên đang nằm ngay phía trên nó, nên
+              cái nhãn ấy chỉ tồn tại để làm chỗ treo một cái nút.
+              `justify-center md:justify-start` bám theo `text-center
+              md:text-left` của cụm cha — dưới 768px cụm xếp dọc và căn giữa. */}
+          <div className="flex items-center justify-center gap-1 md:justify-start">
+            {/* <p>, KHÔNG phải heading: đây là DỮ LIỆU, không phải cấu trúc tài
+                liệu — nên nó cũng không được nhận serif (globals.css tự gán
+                serif cho h1/h2/h3). */}
+            <p className="text-foreground truncate text-xl font-medium">{user.displayName}</p>
+            {/* `size-11` = sàn chạm 44px (Mobile-Layout-Research-MS §4.3) —
+                biểu tượng nhỏ nhưng vùng bấm thì không. `-my-2` nuốt phần cao
+                thừa để cụm danh tính không cao thêm vì một cái nút.
+                aria-label bắt buộc: nút chỉ có biểu tượng không có chữ nào cho
+                trình đọc màn hình, và <svg> bên trong là aria-hidden. */}
+            <button
+              ref={nameTriggerRef}
+              type="button"
+              aria-label={t("profile.name.change")}
+              aria-expanded={nameOpen}
+              aria-controls={NAME_PANEL_ID}
+              onClick={() => (nameOpen ? closeName() : setNameOpen(true))}
+              className="text-muted-foreground hover:text-brand hover:bg-accent focus-visible:border-ring focus-visible:ring-ring/50 -my-2 inline-flex size-11 shrink-0 items-center justify-center rounded-[4px] border border-transparent transition-colors outline-none focus-visible:ring-3"
+            >
+              <Pencil aria-hidden className="size-4" />
+            </button>
+          </div>
           <p className="text-muted-foreground truncate text-sm">
             <span className="sr-only">{t("profile.email.label")}: </span>
             {user.email}
           </p>
           <p className="text-muted-foreground text-xs">{t("profile.email.readOnly")}</p>
         </div>
+        {/* Nút đổi ảnh đứng cạnh thứ nó sửa. `md:ml-auto` đẩy nó về mép phải
+            trên desktop; dưới 768px cụm xếp dọc và căn giữa nên nút tự nằm dưới
+            avatar, vẫn ngay cạnh đối tượng của nó. */}
+        <div className="md:ml-auto md:shrink-0">
+          <button
+            ref={avatarTriggerRef}
+            type="button"
+            aria-expanded={avatarOpen}
+            aria-controls={AVATAR_PANEL_ID}
+            onClick={() => (avatarOpen ? closeAvatar() : setAvatarOpen(true))}
+            className={outlineButtonCls}
+          >
+            {t("profile.avatar.change")}
+          </button>
+        </div>
       </div>
 
-      <div className="divide-border border-border mt-6 divide-y border-t">
+      {/* GẮN/GỠ chứ không truyền `open` xuống: state bên trong (bản nháp tên,
+          tệp đã chọn, lỗi) tự khởi tạo lại mỗi lần mở, nên không cần effect nào
+          đồng bộ chúng — và một effect như vậy sẽ setState trong thân effect,
+          thứ `react-hooks/set-state-in-effect` chặn ở cổng lint. */}
+      {nameOpen && (
         <DisplayNameEditor
+          id={NAME_PANEL_ID}
+          onClose={closeName}
           displayName={user.displayName}
           onSuccess={reportSuccess}
           onStatus={setStatus}
         />
+      )}
+
+      {avatarOpen && (
+        <AvatarUploader
+          id={AVATAR_PANEL_ID}
+          onClose={closeAvatar}
+          onSuccess={reportSuccess}
+          onStatus={setStatus}
+        />
+      )}
+
+      <div className="divide-border border-border mt-6 divide-y border-t">
         <PasswordRow onOpen={() => setDialogOpen(true)} triggerRef={passwordTriggerRef} />
-        <AvatarUploader onSuccess={reportSuccess} onStatus={setStatus} />
       </div>
 
-      <div className="border-border mt-6 flex border-t pt-6">
+      {/* Căn GIỮA: đăng xuất không cùng họ với ba hành động sửa ở trên (chúng
+          căn phải theo hàng của mình), nó rời khỏi trang. Đứng giữa dưới một
+          hairline là cách nói điều đó bằng bố cục. */}
+      <div className="border-border mt-6 flex justify-center border-t pt-6">
         <SignOutButton />
       </div>
 
