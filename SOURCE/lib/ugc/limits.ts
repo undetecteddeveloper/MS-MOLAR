@@ -9,6 +9,12 @@ export const LIMITS = {
   MIN_SUB_ITEMS: 2,
   MAX_SUB_ITEMS: 4,
   MAX_SHORT_ANSWER: 100,
+  // Trần cho BÀI LÀM của người thi (attempt_answers.answer), KHÁC với
+  // MAX_ESSAY_ANSWER ở dưới — cái đó là đáp án mẫu của tác giả đề, lưu ở
+  // questions.essay_answer. Giá trị này PHẢI khớp CHECK trong
+  // supabase/schema.sql: `length(answer) <= 500`. Lệch xuống thì cắt oan bài
+  // làm; lệch lên thì Postgres từ chối nguyên lượt nộp bài lúc submit.
+  MAX_ATTEMPT_ANSWER: 500,
   MAX_TITLE: 200,
   MAX_STEM: 2000,
   MAX_CHOICE: 500,

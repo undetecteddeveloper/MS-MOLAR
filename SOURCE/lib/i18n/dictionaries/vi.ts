@@ -127,7 +127,9 @@ export const vi: Dictionary = {
   "player.yourAnswer": "Câu trả lời của bạn",
   "player.tfNotScored": "Đúng/Sai — đã lưu, chưa chấm tự động.",
   "player.shortAnswerScored": "Trả lời ngắn — chấm tự động sau khi bạn nộp bài.",
-  "player.essayNotScored": "Câu tự luận — làm ra giấy. Bài lưu lại, chưa chấm tự động.",
+  "player.essayNotScored": "Tự luận — bài làm được lưu cùng lượt thi, chưa chấm tự động.",
+  "player.essayPlaceholder": "Trình bày bài làm của bạn ở đây…",
+  "player.charsLeft": "Còn {remaining} ký tự",
   "player.leaveTitle": "Rời khỏi đề này?",
   "player.leaveBody":
     "Bài của bạn chưa được nộp. Nếu rời khỏi bây giờ, toàn bộ tiến trình của lượt làm bài này sẽ mất.",

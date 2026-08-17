@@ -150,7 +150,9 @@ export const en = {
   "player.yourAnswer": "Your answer",
   "player.tfNotScored": "True/False — stored, not auto-scored yet.",
   "player.shortAnswerScored": "Short answer — auto-scored after you submit.",
-  "player.essayNotScored": "Essay question — answer on paper. Stored, not auto-scored yet.",
+  "player.essayNotScored": "Essay — your working is saved with the attempt, not auto-scored yet.",
+  "player.essayPlaceholder": "Write your working here…",
+  "player.charsLeft": "{remaining} characters left",
   "player.leaveTitle": "Leave this exam?",
   "player.leaveBody":
     "Your answers haven't been submitted yet. If you leave now, the progress of this attempt will be lost.",

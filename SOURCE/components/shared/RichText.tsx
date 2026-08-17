@@ -171,6 +171,40 @@ export function normalizeMathDelimiters(text: string): string {
     .replace(/\\\(([\s\S]+?)\\\)/g, (_m, body: string) => `$${body}$`);
 }
 
+// Ở ngữ cảnh INLINE (nhãn lựa chọn A–D, ý a–d của câu Đúng/Sai) không tồn tại
+// khái niệm "khối": chuỗi là một nhãn, không phải một tài liệu. Nhưng parser
+// markdown vẫn chạy đủ ngữ pháp khối, nên một nhãn hợp lệ mà TÌNH CỜ trùng
+// marker khối sẽ bị nuốt sạch chữ.
+//
+// Bug prod 2026-08-17: đề Sinh học 12 có câu cả 4 lựa chọn là "1." "2." "3."
+// "4."; đề Vật lí 11 câu 21 có B = "1.". Markdown đọc "1." là marker danh sách
+// đánh số → <ol><li></li></ol> RỖNG. Trên màn làm bài lựa chọn hiện ra trống
+// trơn, trong khi DB lưu đúng và validate EMPTY_CHOICE vẫn pass (chuỗi có ký
+// tự) — không lỗi, không cảnh báo, chỉ mất chữ.
+//
+// Escape bằng backslash (cú pháp escape chuẩn của markdown) thay vì đổi parser:
+// giữ nguyên mọi định dạng INLINE hợp lệ (đậm/nghiêng/`code`/math) mà chỉ vô
+// hiệu hoá đúng phần ngữ pháp khối. Chế độ block (thân câu hỏi) KHÔNG áp dụng —
+// ở đó danh sách đánh số là nội dung thật của đề.
+export function escapeBlockMarkers(text: string): string {
+  return text
+    .split("\n")
+    .map((line) =>
+      line
+        // Danh sách đánh số: "1." / "10)" — cả khi đứng một mình (nhãn lựa chọn).
+        .replace(/^(\s*)(\d{1,9})([.)])(?=\s|$)/, "$1$2\\$3")
+        // Gạch đầu dòng: "- 5", "* x", "+ 2".
+        .replace(/^(\s*)([-*+])(?=\s|$)/, "$1\\$2")
+        // Đường kẻ ngang: "---", "***", "___".
+        .replace(/^(\s*)([-*_])([-*_]{2,})\s*$/, "$1\\$2$3")
+        // Heading ATX: "# 3".
+        .replace(/^(\s*)(#{1,6})(?=\s|$)/, "$1\\$2")
+        // Blockquote: "> 7".
+        .replace(/^(\s*)>/, "$1\\>")
+    )
+    .join("\n");
+}
+
 const INLINE_COMPONENTS: Components = {
   // Gỡ <p> để text chảy inline trong nhãn lựa chọn (vẫn giữ math/format con).
   p: ({ children }) => <>{children}</>,
@@ -195,7 +229,7 @@ export function RichText({ text, className, inline = false }: RichTextProps) {
       ]}
       components={inline ? INLINE_COMPONENTS : undefined}
     >
-      {normalizeMathDelimiters(text)}
+      {inline ? escapeBlockMarkers(normalizeMathDelimiters(text)) : normalizeMathDelimiters(text)}
     </ReactMarkdown>
   );
 

@@ -116,11 +116,20 @@ export function ExamPlayer({
             đầu đọc câu hỏi đầu tiên. Tiêu đề đề rút còn một dòng (`truncate`)
             để dải sticky không ăn quá nhiều chiều cao — ở 360×800 mỗi 40px giữ
             lại là một dòng câu hỏi đọc được thêm. */}
+        {/* KHÔNG `flex-wrap`: tên đề do người dùng đặt nên độ dài không có
+            trần thực tế (MAX_TITLE = 200). Với `flex-wrap` + tiêu đề chỉ
+            truncate ở mobile, một tên đề dài đẩy cụm đồng hồ + Nộp bài xuống
+            DÒNG RIÊNG trên desktop (bug prod 2026-08-17: "Đề kiểm tra giữa kì
+            2 Sinh học 12 — THPT Gia Định, TP HCM (mã 421)"). Đồng hồ đếm ngược
+            và nút Nộp bài là hai thứ phải ở CHỖ CỐ ĐỊNH suốt bài thi, không
+            được nhảy vị trí theo dữ liệu. Nay: cụm phải `shrink-0` giữ nguyên
+            chỗ, phần chữ bên trái co lại và cắt bằng dấu ba chấm ở MỌI bề
+            rộng — `title` giữ lại tên đầy đủ khi rê chuột. */}
         <div
-          className="preload-fade flex flex-wrap items-end justify-between gap-4 max-md:bg-background/95 max-md:sticky max-md:top-15 max-md:z-20 max-md:-mx-4 max-md:items-center max-md:gap-2 max-md:px-4 max-md:py-2 max-md:backdrop-blur"
+          className="preload-fade flex items-end justify-between gap-4 max-md:bg-background/95 max-md:sticky max-md:top-15 max-md:z-20 max-md:-mx-4 max-md:items-center max-md:gap-2 max-md:px-4 max-md:py-2 max-md:backdrop-blur"
           style={{ "--preload-order": 1 } as React.CSSProperties}
         >
-          <div className="min-w-0 max-md:flex-1">
+          <div className="min-w-0 flex-1">
             {/* Về danh sách đề — TÁI DÙNG <Breadcrumbs> (đã có sẵn ở
                 exams/[id]/page.tsx), không dựng link riêng: đây đúng là lý do
                 Breadcrumbs ra đời — "← Back" chỉ nói ĐI ĐÂU chứ không nói ĐANG
@@ -135,12 +144,15 @@ export function ExamPlayer({
               items={[{ label: t("nav.exams"), href: "/exams" }, { label: examTitle }]}
               className="mb-1.5 text-xs max-md:hidden"
             />
-            <h1 className="text-foreground font-serif text-2xl font-semibold max-md:truncate max-md:text-base sm:text-3xl">
+            <h1
+              title={examTitle}
+              className="text-foreground truncate font-serif text-2xl font-semibold max-md:text-base sm:text-3xl"
+            >
               {examTitle}
             </h1>
             <div className="bg-ring mt-3 h-0.5 w-10 max-md:hidden" />
           </div>
-          <div className="flex items-center gap-4 max-md:gap-2">
+          <div className="flex shrink-0 items-center gap-4 max-md:gap-2">
             <div className="border-border min-w-[130px] rounded-md border px-4 py-2 text-center max-md:min-w-0 max-md:border-0 max-md:px-0 max-md:py-0">
               {/* Nhãn "Thời gian còn lại" ẩn trên mobile — định dạng MM:SS
                   trong một dải điều khiển đã tự nói nó là đồng hồ. */}

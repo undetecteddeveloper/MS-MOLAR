@@ -94,12 +94,38 @@ describe("QuestionRenderer — footnote copy (AC-008/AC-009)", () => {
     expect(within(container).queryByText(/not auto-scored yet/i)).toBeNull();
   });
 
-  it("essay: footnote stays byte-identical to the pre-change string (AC-009 guard)", () => {
+  // Chuỗi cũ ("Essay question — answer on paper.") CỐ Ý bị thay, không phải
+  // copy trôi: bug prod 2026-08-17 — nhánh essay trước đây CHỈ render dòng chữ
+  // đó, không có ô nhập nào, nên với đề toàn tự luận (Toán 8) màn làm bài
+  // không có chỗ trả lời. Nay có <textarea>, nên câu "làm ra giấy" đã thành
+  // mô tả SAI về màn hình. Guard vẫn còn nguyên tinh thần AC-009: khoá chuỗi
+  // hiện hành + khoá luôn ô nhập vừa thêm để lần sau mất field thì test đỏ.
+  it("essay: renders an answer textarea and the current footnote copy (AC-009 guard, updated)", () => {
     const { container } = renderQuestion(ESSAY_QUESTION);
 
     expect(
-      within(container).getByText("Essay question — answer on paper. Stored, not auto-scored yet.")
+      within(container).getByText("Essay — your working is saved with the attempt, not auto-scored yet.")
     ).toBeTruthy();
+
+    // Ô nhập phải TỒN TẠI (đây là thứ bug prod làm mất) và bị chặn đúng ở trần
+    // của DB — attempt_answers.answer CHECK length <= 500.
+    const textarea = container.querySelector("textarea");
+    expect(textarea).not.toBeNull();
+    expect(textarea?.maxLength).toBe(500);
+    // Nhãn phải trỏ đúng ô nhập (a11y) — id do questionType + question.id sinh ra.
+    expect(textarea?.id).toBe(`essay-${ESSAY_QUESTION.id}`);
+    expect(container.querySelector(`label[for="essay-${ESSAY_QUESTION.id}"]`)).not.toBeNull();
+  });
+
+  it("essay: typing forwards the text to onSelectAnswer (bug prod 2026-08-17)", () => {
+    const onSelectAnswer = vi.fn();
+    const { container } = renderQuestion(ESSAY_QUESTION, onSelectAnswer);
+
+    const textarea = container.querySelector("textarea");
+    expect(textarea).not.toBeNull();
+    fireEvent.change(textarea as HTMLTextAreaElement, { target: { value: "2x(x-3)" } });
+
+    expect(onSelectAnswer).toHaveBeenCalledWith("2x(x-3)");
   });
 
   it("true_false: footnote stays byte-identical to the pre-change string (AC-009 guard)", () => {
