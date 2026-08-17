@@ -57,11 +57,20 @@ export function SiteHeader({ user = null }: { user?: MenuUser | null }) {
           aria-label={t("nav.home")}
           className="-ml-1 flex min-h-11 shrink-0 items-center px-1"
         >
+          {/* `priority` (perf audit 2026-08-15): dưới 1024px header này là khối
+              đầu tiên có ảnh, nên Lighthouse chấm CHÍNH logo 42×38 này là phần
+              tử LCP. Mặc định next/image phát `loading="lazy"` + không có
+              `fetchpriority`, khiến trình duyệt xếp nó sau 12 file font và toàn
+              bộ chunk JS → LCP 4.6s (Poor) trong khi FCP chỉ 0.9s. `priority`
+              đổi thành eager + fetchpriority=high + <link rel=preload>.
+              ⚠ KHÔNG rải `priority` sang các <Image> khác: nó chỉ có nghĩa khi
+              số ảnh được ưu tiên đủ nhỏ để thật sự giành được băng thông. */}
           <Image
             src="/images/brand_logo.png"
             alt="Trạng Nguyên"
             width={42}
             height={38}
+            priority
             className="h-[38px] w-auto"
           />
         </Link>
