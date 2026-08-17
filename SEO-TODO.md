@@ -54,23 +54,32 @@ khác hẳn, gác riêng).
 
 ## Việc cần làm khi quay lại (ưu tiên theo thứ tự)
 
-1. **Verify site trong Google Search Console** (cần tài khoản Google Search
-   Console của chủ site — bước NGƯỜI làm, không phải code) → thêm domain
-   `ms-molar.vercel.app` (hoặc domain mới nếu đã mua, xem bước 3), verify bằng
-   DNS TXT hoặc thẻ meta (`GOOGLE_SITE_VERIFICATION`, xem mục trên).
-2. **Submit `sitemap.xml` + "Request Indexing" thủ công** cho `/` trong Search
-   Console (URL Inspection → Request Indexing) — đẩy nhanh lần crawl đầu tiên
-   thay vì chờ Google tự tìm ra.
+1. ~~**Verify site trong Google Search Console**~~ — **XONG 2026-08-17.**
+   Verify bằng thẻ meta (URL prefix `https://ms-molar.vercel.app/`, không phải
+   "Miền" — subdomain `.vercel.app` không có DNS mà mình kiểm soát để làm TXT
+   record). Token dán vào Vercel env `GOOGLE_SITE_VERIFICATION` (scope
+   **Production**, type `plain` — giá trị này vốn nằm trong HTML công khai,
+   không phải secret) qua Composio, kèm redeploy để nạp biến, rồi xác nhận thẻ
+   `<meta name="google-site-verification">` sống thật trên
+   `https://ms-molar.vercel.app/` trước khi bấm nút "Xác minh" trong Search
+   Console — tránh xác minh nhầm lúc thẻ chưa lên production.
+2. ~~**Submit `sitemap.xml` + "Request Indexing"**~~ — **XONG 2026-08-17.**
+   Submit lần đầu báo "Không thể tìm nạp" — kiểm bằng `curl -A Googlebot` xác
+   nhận `sitemap.xml` trả `200 OK` + `Content-Type: application/xml`, không bị
+   chặn gì; hoá ra chỉ là độ trễ tự nhiên trước khi Google chạy lượt tìm nạp
+   đầu (`Lần đọc cuối cùng` khi đó vẫn trống). Refresh sau ít lâu → thành công.
+   Request Indexing cho `/` đã bấm qua URL Inspection.
 3. **(Nên làm) Mua domain riêng** (vd `ms-molar.vn`/`.com`), gắn vào Vercel
    (`vercel domains add`), đặt `NEXT_PUBLIC_SITE_URL` — tăng độ tin cậy so với
    subdomain `.vercel.app`, và tên thương hiệu khớp domain giúp tìm-tên dễ ra
-   kết quả đúng hơn.
+   kết quả đúng hơn. Domain xong thì đổi property Search Console sang loại
+   "Miền" để phủ luôn mọi biến thể http/https/www.
 4. ~~Thêm JSON-LD structured data~~ — **XONG 2026-08-09**, xem mục "Đã làm
    trong code" ở trên. Kiểm tra lại sau khi có domain thật bằng Rich Results
    Test / Search Console → Enhancements.
-5. Theo dõi **Search Console → Coverage/Pages** tới khi `/` hiện trạng thái
-   "Indexed" (thường vài ngày–2 tuần sau bước 1–2, không có gì để AI tự verify
-   được — phụ thuộc lịch crawl của Google).
+5. **Còn mở.** Theo dõi **Search Console → Coverage/Pages** tới khi `/` hiện
+   trạng thái "Indexed" (thường vài ngày–2 tuần sau bước 1–2, không có gì để
+   AI tự verify được — phụ thuộc lịch crawl của Google).
 
 ## Gác lại — KHÔNG làm bây giờ: lên top từ khóa chung
 

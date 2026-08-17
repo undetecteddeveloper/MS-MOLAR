@@ -103,7 +103,7 @@ ARIA semantics walk: `aria-disabled`/`aria-busy`/`aria-describedby` present and 
 
 **TBD-06 resolved**: no `axe-core`/`jest-axe` dependency added; the metric is this manual pass, following `rating-system-work-plan.md` Task 9's accepted precedent.
 
-### Task 21 — 10-case Socratic-tone evaluation ⚠️ **BLOCKED — Gemini daily quota exhausted**
+### Task 21 — 10-case Socratic-tone evaluation ⚠️ **8/10 judged — 2 cases still quota-blocked**
 
 Harness built and committed: **`SOURCE/lib/tutor/__tests__/toneEval.manual.test.ts`** — 10 fixed cases (5 mcq, 3 true_false, 2 short_answer) whose question text is copied verbatim from the real dev Math corpus, each with a plausible (not random) wrong student answer.
 
@@ -118,22 +118,24 @@ Off by default; run with `TUTOR_TONE_EVAL=1 npx vitest run lib/tutor/__tests__/t
 - **2026-08-16, quota diagnosed properly** by reading the raw 429 body instead of the SDK's collapsed message: `quotaId = GenerateRequestsPerDayPerProjectPerModel-FreeTier`, `quotaValue = **20**`, model `gemini-3.5-flash`, resetting at midnight Pacific. A first re-run that morning got 3 more cases through before exhausting the day again. **A 10-case run costs at least half the entire daily allowance**, more when `generateHint()` retries internally — so the eval cannot be run casually, and must not share a day with UGC extraction (same key, same model).
 - **3 hints were read in full** during Task 17's browser pass (2 for the parabola-vertex mcq, 1 for the number-of-extrema mcq). All three: Vietnamese ✔, Socratic — led entirely with guiding questions ✔, stated the final answer ✘ (none did; one closed with *"Em hãy thử tính lại hoành độ đỉnh… xem ra kết quả bằng bao nhiêu nhé!"*).
 
-**Remaining work (one command, once quota resets — next reset is midnight Pacific; budget the whole day's 20 requests for it):** run the harness, read `engine1-adaptive-ai-tone-eval-report.md`, and fill the verdict table below. Passing bar unchanged: 10/10 Vietnamese, 10/10 Socratic form, 0/10 state the final answer. A failing case is a stop-and-tune signal — tune `buildTutorPrompt()`'s instruction text (backend-task-11) and re-run **all 10**, not just the failing case.
+**2026-08-17 run** (`TUTOR_TONE_EVAL=1 npx vitest run lib/tutor/__tests__/toneEval.manual.test.ts`, started 21:44 local / 14:44 UTC — well past the midnight-Pacific reset, so the day's 20-request budget was fresh going in): **7/10 cases returned a hint** and were judged from `engine1-adaptive-ai-tone-eval-report.md`'s captured text. The other 3 failed mid-run — case 03 at 30.0s (`Service Unavailable`, `classifiedAs: server`), cases 06 and 07 at 14.7s/3.4s (`Too Many Requests`) — i.e. the run itself exhausted the remaining daily quota partway through, the same failure shape as the 2026-08-16 runs. Case 03 already had a verdict from the Task 17 browser pass, so only **06 and 07 remain ungraded**.
+
+**Remaining work (one command, once quota resets):** run the harness again, read `engine1-adaptive-ai-tone-eval-report.md`, and fill rows 06/07 below. Passing bar unchanged: 10/10 Vietnamese, 10/10 Socratic form, 0/10 state the final answer — nothing so far has failed the bar, so no prompt retune has been triggered.
 
 | # | Case | Type | Vietnamese | Socratic | States final answer |
 |---|---|---|---|---|---|
-| 01 | tập xác định | mcq | | | |
-| 02 | phương trình bậc nhất | mcq | | | |
+| 01 | tập xác định | mcq | Y | Y | N |
+| 02 | phương trình bậc nhất | mcq | Y | Y | N |
 | 03 | đỉnh parabol | mcq | Y | Y | N |
 | 04 | số điểm cực trị | mcq | Y | Y | N |
-| 05 | tập nghiệm bậc hai | mcq | | | |
+| 05 | tập nghiệm bậc hai | mcq | Y | Y | N |
 | 06 | khảo sát parabol | true_false | | | |
 | 07 | nguyên hàm | true_false | | | |
-| 08 | tính đơn điệu | true_false | | | |
-| 09 | đạo hàm tại một điểm | short_answer | | | |
-| 10 | diện tích hình chữ nhật | short_answer | | | |
+| 08 | tính đơn điệu | true_false | Y | Y | N |
+| 09 | đạo hàm tại một điểm | short_answer | Y | Y | N |
+| 10 | diện tích hình chữ nhật | short_answer | Y | Y | N |
 
-*(Rows 03/04 filled from the Task 17 browser pass — the same code path, judged by eye on real output.)*
+*(Row 03 filled from the Task 17 browser pass — the same code path, judged by eye on real output. Rows 01/02/04/05/08/09/10 filled 2026-08-17 from the harness's captured report text.)*
 
 ### Quality check (staged) ✅ ALL GREEN
 

@@ -117,7 +117,7 @@ Telemetry path: `telemetry_log` has **no column** that could carry answer-key ma
 | Risk | Disposition |
 |---|---|
 | R-a — mis-tagged skills produce confidently wrong recommendations | **Closed, and strengthened beyond design.** The 0.75 → 0.90 retune came from exactly the failure mode R-a describes: at 0.85 the model mapped "tập xác định" to mệnh-đề-tập-hợp and a *linear* function to hàm-số-bậc-hai. 100% of written tags human-reviewed (AC-008) |
-| R-b — tone evaluation not repeatable | **Closed as a mechanism, open as a result.** `toneEval.manual.test.ts` fixes the 10 cases and writes a report file, so the pass is repeatable by construction. Only 3/10 cases have recorded verdicts — quota-blocked, see Phase 5 Task 21 |
+| R-b — tone evaluation not repeatable | **Closed as a mechanism, still open on 2 cases.** `toneEval.manual.test.ts` fixes the 10 cases and writes a report file, so the pass is repeatable by construction. 8/10 cases have recorded verdicts (2026-08-17 run); cases 06/07 quota-blocked mid-run, see Phase 5 Task 21 |
 | R-c — tutor is a cost surface with a known rate-limit hole | **Accepted on axis 1 (TD-013, unauthenticated traffic). Reopened on a second axis, then partly closed** — `e8d91a4` moved the per-user guard onto the provider's own day unit (3/day), so no single account can drain the project. What remains open is the aggregate: 7 distinct users × 3 exceeds 20. See Finding Q-1 |
 | R-d — mastery write re-opens §11 | **Closed** — ADR-0011, verified in Task 23 |
 | R-e/R-f — heuristic, not IRT; tiny corpus | **Accepted as designed** — routing is explicitly heuristic; U5 stays a placeholder until real usage data exists |
@@ -146,7 +146,7 @@ Telemetry path: `telemetry_log` has **no column** that could carry answer-key ma
 | AC-017 returns prerequisite, not blocked node | ✅ | Live: `nguyen-ham` wrong → recommended **Hàm số bậc hai** |
 | AC-018 0 answer-key occurrences in prompt | ✅ | `prompt.test.ts` Test 1 sentinel battery |
 | AC-019 reads only §10c safe columns | ✅ | `TUTOR_QUESTION_COLUMNS` ⊂ granted columns; DB enforces |
-| AC-020 Vietnamese + Socratic + no final answer | ⚠️ **3/10** | 3 real hints judged; 7 quota-blocked (Phase 5 Task 21) |
+| AC-020 Vietnamese + Socratic + no final answer | ⚠️ **8/10** | 8 real hints judged, 10/10 on the bar so far (Vietnamese/Socratic/no answer); cases 06/07 still quota-blocked (Phase 5 Task 21) |
 | AC-021 actionable retry, page keeps working | ✅ | Real 429 → "Retry" + `role="alert"`, rest of page interactive |
 | AC-022 Server Action, guarded, 0 unauthenticated paths | ✅ | Task 23 |
 | AC-023 affordance present on wrong-twice | ✅ | Live: Q1, Q2 |
@@ -159,7 +159,7 @@ Telemetry path: `telemetry_log` has **no column** that could carry answer-key ma
 | AC-030 `subject='Toán'` normalised | — **out of scope** | R9, tracked as TD-016 (already closed separately 2026-08-14) |
 | AC-031 recommendation shown with Vietnamese label | ✅ | Live, all 3 reasonCodes, labels verbatim |
 
-**29 of 31 satisfied. AC-020 partial (quota). AC-030 out of Sprint 1 scope by design.**
+**29 of 31 satisfied. AC-020 partial — 8/10 judged, 2 still quota-blocked. AC-030 out of Sprint 1 scope by design.**
 
 ## Task 27 — Document updates ✅
 
@@ -219,9 +219,9 @@ The substantive change is the **unit, not the number** — and this is the part 
 
 **Owner decision, unchanged**: the aggregate axis is deferred to the Subscription feature, where the ceiling becomes a per-plan entitlement read from the user's plan rather than one constant shared by everyone — `rateLimit.ts` says so at the `explainStep` definition, which calls 3 an explicit interim cap. Recorded here as an open item, deliberately not further mitigated inside Engine 1.
 
-### Q-2 — AC-020 is 3/10 judged
+### Q-2 — AC-020 is 8/10 judged
 
-Quota-blocked, not failing. Harness is committed and repeatable; needs one run on a day whose 20-request budget is reserved for it.
+Quota-blocked, not failing. **2026-08-17 run** got 7 new cases through before hitting quota again mid-run (case 03 `Service Unavailable`, cases 06/07 `Too Many Requests`) — combined with case 03's earlier Task 17 verdict, **8/10 rows are now filled, all 8 clean on the bar** (10/10 Vietnamese, 10/10 Socratic, 0/10 state the answer). Only **06** (khảo sát parabol, true_false) and **07** (nguyên hàm, true_false) remain — one more run, on a day whose budget is reserved and not shared with UGC upload traffic, closes this.
 
 ## Phase Completion Criteria (verbatim from Work Plan)
 
@@ -259,7 +259,7 @@ cd SOURCE && npm run build
 
 No further phase follows. **P-1 is closed (2026-08-16)** — prod now carries the taxonomy and 92.9% tag coverage, verified by query, and `verify:schema` is green on both environments. Two items remain, neither blocking a ship:
 
-- **Q-2** — AC-020 is 3/10 judged. Quota-gated, not failing; the harness is committed and needs one run on a day whose `gemini-3.5-flash` budget is reserved for it.
+- **Q-2** — AC-020 is 8/10 judged (updated 2026-08-17). Quota-gated, not failing; cases 06/07 need one more run on a day whose `gemini-3.5-flash` budget is reserved for it and not shared with UGC upload traffic.
 - **Q-1** — the 20-requests/day ceiling on the tutor model. **Narrowed, not closed**, by `e8d91a4`: the per-user guard now runs on the provider's day unit (3/day), so no one account can drain the project. The aggregate axis stays open and owner-deferred to the Subscription feature by explicit decision.
 
 Worth recording against Q-1, because it was nearly mis-scoped: the ceiling is **per model** (`GenerateRequestsPerDayPerProjectPerModel`) and was measured on `gemini-3.5-flash`, the tutor's model. The batch tagger runs on `gemini-3.1-flash-lite` — a separate bucket — which is why tagging 28 prod questions was never blocked by it. Reading Q-1 as a project-wide ceiling across all models would have wrongly declared P-1 unclosable. Q-1 constrains Q-2; it does not constrain the tagger.
