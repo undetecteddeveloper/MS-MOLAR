@@ -175,8 +175,37 @@ export function ExamPlayer({
             onTouchStart={swipe.onTouchStart}
             onTouchEnd={swipe.onTouchEnd}
           >
+            {/* Nhãn PHẦN — KHÔNG dùng `.eyebrow` nữa. `.eyebrow` là style NHÃN
+                NGẮN (uppercase + tracking 0.08em + 12px + muted): đúng cho "Thời
+                gian còn lại", sai cho thứ đang đổ vào đây. Nội dung thật trong
+                DB là cả một đoạn ba câu — vd "PHẦN I. (3.0 điểm) Câu trắc
+                nghiệm nhiều phương án lựa chọn. Thí sinh trả lời từ câu 1 đến
+                câu 12. Mỗi câu hỏi thí sinh chỉ chọn một phương án." — và
+                `uppercase` của CSS ép TOÀN BỘ đoạn đó thành chữ hoa (bản thân
+                chuỗi trong DB vốn là chữ thường, chỉ "PHẦN I." mới viết hoa).
+                Chữ hoa toàn bộ xoá hình dạng từ (word shape) nên mắt phải đọc
+                từng chữ cái; cộng thêm 12px + giãn chữ + màu mờ thì đây là khối
+                khó đọc nhất màn hình, trong khi nó lại là HƯỚNG DẪN LÀM BÀI bắt
+                buộc phải đọc ("chỉ chọn một phương án").
+                Nay: giữ nguyên chữ như tác giả đề đã viết, 14px, giãn dòng
+                thoáng, tương phản đầy đủ, và bọc trong khối nền + kẻ dọc — thứ
+                bậc do KÍCH CỠ và cái khối đảm nhiệm, không phải do làm mờ chữ.
+                Khối nền + hairline là cách phân lớp của theme (không đổ bóng). */}
             {currentPartTitle && (
-              <p className="eyebrow mb-3" aria-live="polite">
+              <p
+                /* Đệm dọc bó sát hơn ở mobile. Đo ở 390px với nhãn phần dài
+                   nhất (đoạn 3 câu): 127px kể cả lề dưới, so với ~87px của bản
+                   `.eyebrow` cũ. Bó đệm + lề chỉ lấy lại 8px (còn 119px) — chỗ
+                   tốn nằm ở LINE-HEIGHT của 4 dòng chữ thường, không nằm ở
+                   đệm, nên không bó thêm được nữa mà không phá lại chính phần
+                   dễ đọc vừa giành được.
+                   Vẫn đắt hơn bản cũ ~32px, xấp xỉ một dòng câu hỏi trên màn
+                   hẹp (xem ghi chú chi phí chiều cao ở khối header). Chấp nhận:
+                   đây là HƯỚNG DẪN LÀM BÀI bắt buộc đọc, và bản cũ tuy ngắn
+                   hơn nhưng gần như không ai đọc nổi. */
+                className="border-ring bg-muted text-foreground mb-3 border-l-2 py-2 pr-3 pl-3 text-sm leading-relaxed text-pretty sm:mb-4 sm:py-2.5 sm:pl-3.5"
+                aria-live="polite"
+              >
                 {currentPartTitle}
               </p>
             )}

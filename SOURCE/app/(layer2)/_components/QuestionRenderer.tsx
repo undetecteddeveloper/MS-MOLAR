@@ -50,7 +50,24 @@ export function QuestionRenderer({
         <FlagButton flagged={flagged} onToggle={onToggleFlag} />
       </div>
 
-      <RichText text={question.content} className="text-foreground text-lg leading-relaxed" />
+      {/* Nội dung câu hỏi — `font-serif` + một nấc cỡ chữ so với trước.
+          Serif KHÔNG phải trang trí: DESIGN.md xếp serif cho "tiêu đề & nội
+          dung đọc", và màn xem lại bài (result/detail) VỐN ĐÃ render thân câu
+          hỏi bằng `font-serif text-lg` — player mới là chỗ lệch chuẩn. Cho hai
+          màn cùng một khuôn mặt chữ nghĩa là cùng một câu hỏi trông giống nhau
+          dù đang làm bài hay đang dò lại.
+          Nó cũng tách thân câu hỏi khỏi phần CÒN LẠI của màn hình, vốn sans
+          hết: nhãn "Câu N", nút, và quan trọng nhất là các LỰA CHỌN
+          (AnswerChoice, sans 16px). Trước thay đổi này câu hỏi 18px và lựa chọn
+          16px cùng font cùng màu — cách nhau đúng 2px, nên mắt không có mỏ neo
+          để biết đọc cái nào trước. Nay khác cả font lẫn cỡ (20px so với 16px).
+          Giữ 18px ở mobile: màn hẹp thì mỗi nấc cỡ chữ ăn thêm một dòng, và
+          khu vực trả lời bên dưới cao CỐ ĐỊNH 238px nên phần đọc được của câu
+          hỏi là thứ bị ép trước tiên. */}
+      <RichText
+        text={question.content}
+        className="text-foreground font-serif text-lg leading-[1.75] text-pretty sm:text-xl"
+      />
 
       {/* Hình thân câu (UGC v2.0, Task 5.2) — chỉ render nếu có + origin hợp lệ. */}
       {question.imageUrl && (
