@@ -426,6 +426,19 @@
    ROUTE LOADING OVERLAY — lớp phủ "Loading" trong lúc chuyển
    trang (components/layout/RouteLoadingOverlay.tsx).
 
+   ⚠ 2026-08-17 — khối này từng LÊN PROD MÀ THIẾU HẲN: hai lượt
+   deploy liên tiếp (commit 8be5340, build cache Vercel) trả về
+   `.route-loading` — 0 kết quả trong CSS đã build, trong khi build
+   `next build` cục bộ TRÊN ĐÚNG COMMIT ĐÓ lại có đủ. Hệ quả: overlay
+   luôn hiện toàn phần (`opacity:1;visibility:visible` mặc định, vì
+   không còn rule nào ẩn nó) trên MỌI lượt tải trang, bất kể
+   `data-pending` — đúng hình dạng "kẹt ngay từ đầu, bấm gì cũng
+   vậy" mà engineer báo lại. Sửa bằng cách buộc nội dung file này
+   đổi thật (không chỉ deploy lại) để build không tái dùng artifact
+   CSS cũ. Nếu sau này còn tái diễn: nghi Turbopack persistent cache
+   trên Vercel không phát hiện đúng thay đổi CSS thuần (không qua
+   class Tailwind) nằm cuối file.
+
    Phần tử LUÔN nằm trong DOM và chỉ đổi `visibility` — lý do ở
    trong header component đó (ảnh logo phải tải xong TRƯỚC, chỉ
    báo tải mà phải chờ tải thì vô nghĩa).
