@@ -125,6 +125,7 @@ export const vi: Dictionary = {
   "player.submitting": "Đang nộp…",
   "player.chooseAnswer": "Chọn một đáp án",
   "player.yourAnswer": "Câu trả lời của bạn",
+  "player.answeredCount": "Đã làm {done}/{total}",
   "player.tfNotScored": "Đúng/Sai — đã lưu, chưa chấm tự động.",
   "player.shortAnswerScored": "Trả lời ngắn — chấm tự động sau khi bạn nộp bài.",
   "player.essayNotScored": "Tự luận — bài làm được lưu cùng lượt thi, chưa chấm tự động.",

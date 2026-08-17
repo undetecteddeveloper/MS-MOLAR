@@ -148,6 +148,7 @@ export const en = {
   "player.submitting": "Submitting…",
   "player.chooseAnswer": "Choose an answer",
   "player.yourAnswer": "Your answer",
+  "player.answeredCount": "{done}/{total} done",
   "player.tfNotScored": "True/False — stored, not auto-scored yet.",
   "player.shortAnswerScored": "Short answer — auto-scored after you submit.",
   "player.essayNotScored": "Essay — your working is saved with the attempt, not auto-scored yet.",

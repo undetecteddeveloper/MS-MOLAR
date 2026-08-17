@@ -278,7 +278,11 @@ export function ExamPlayer({
             </div>
           </div>
 
-          <div className="w-full basis-[260px] sm:w-auto sm:min-w-[240px]">
+          {/* Mobile: bó về đúng bề rộng của sidebar desktop rồi canh GIỮA.
+              Trước đây `w-full` kéo lưới giãn hết bề ngang màn hình nên các ô
+              số phình to bất thường và cả khối lệch hẳn về mép trái so với
+              card câu hỏi phía trên. ≥sm trả lại hành vi sidebar cũ. */}
+          <div className="mx-auto w-full max-w-[260px] basis-[260px] sm:mx-0 sm:w-auto sm:max-w-none sm:min-w-[240px]">
             <QuestionPagination
               current={current}
               total={questions.length}
