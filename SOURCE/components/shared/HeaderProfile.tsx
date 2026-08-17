@@ -7,18 +7,26 @@
 // ô sidebar nằm đáy) và trigger nén gọn cho khớp navbar h-14.
 // Panel nền ngà trên navbar đen sơn mài (phân lớp bằng màu + hairline —
 // DESIGN.md, không shadow). Nhãn tiếng Anh đồng bộ homepage.
-import Image from "next/image";
 import Link from "next/link";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut, updateProfile, type AuthState } from "@/app/(layer1)/actions";
 import { useT } from "@/lib/i18n/client";
+import { Avatar } from "@/components/shared/Avatar";
+import { filterDisplayNameInput, DISPLAY_NAME_MAX } from "@/lib/profile/displayName";
 
-export type MenuUser = { displayName: string };
+// ⚠ SidebarProfile.tsx là BẢN SINH ĐÔI gần như từng chữ của file này. Mọi thay
+// đổi ở đây phải làm ở CẢ HAI, nếu không hai ô tài khoản của cùng một sản phẩm
+// sẽ trôi ra khác nhau — đúng thứ AC-040 cấm.
+export type MenuUser = { displayName: string; avatarUrl: string | null };
 
-const AVATAR = "/images/user-avatar-placeholder.png";
-
-export function HeaderProfile({ displayName: initial }: { displayName: string }) {
+export function HeaderProfile({
+  displayName: initial,
+  avatarUrl,
+}: {
+  displayName: string;
+  avatarUrl: string | null;
+}) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -66,7 +74,10 @@ export function HeaderProfile({ displayName: initial }: { displayName: string })
         // này chỉ cao 38px.
         className="flex min-h-11 items-center gap-2 rounded-md border border-[#EDE1C8]/12 px-2.5 py-1.5 transition-colors hover:border-[#EDE1C8]/30"
       >
-        <Image src={AVATAR} alt="" width={24} height={24} className="shrink-0 rounded-full" />
+        {/* Avatar thay cho <Image> + ảnh placeholder cục bộ. next/image chỉ chạy
+            được với ảnh cục bộ ở đây: next.config.ts không khai remotePatterns
+            nào, nên một URL Supabase đưa vào <Image> là lỗi LÚC CHẠY. */}
+        <Avatar src={avatarUrl} name={displayName} size={24} />
         {/* Tên ẩn dưới 768px: ở đó header chỉ còn logo + ngôn ngữ + ô này, và
             giữ tên lại sẽ ăn hết phần bề ngang vốn đã hẹp. Avatar + chevron vẫn
             đủ nhận diện đây là ô tài khoản. */}
@@ -84,6 +95,17 @@ export function HeaderProfile({ displayName: initial }: { displayName: string })
         >
           {!editing ? (
             <>
+              {/* Trang tài khoản đầy đủ — mục ĐẦU TIÊN của menu. Không thêm ô
+                  nào vào BottomNav và không thêm tag nào vào header, nên nó
+                  không đụng tới hai bề mặt điều hướng đã chật. */}
+              <Link
+                role="menuitem"
+                href="/profile"
+                onClick={close}
+                className="block w-full rounded-[4px] px-3 py-2 text-center font-sans text-sm text-[#1B1512] transition-colors hover:bg-[#E3D5B6]"
+              >
+                {t("common.profile")}
+              </Link>
               <button
                 type="button"
                 onClick={() => {
@@ -121,12 +143,12 @@ export function HeaderProfile({ displayName: initial }: { displayName: string })
                 id="header-profile-display-name"
                 name="displayName"
                 value={draft}
-                onChange={(e) => {
-                  // Ràng buộc: ≤12 ký tự, chỉ chữ cái (kể cả có dấu) + dấu chấm.
-                  const filtered = e.target.value.replace(/[^\p{L}.]/gu, "").slice(0, 12);
-                  setDraft(filtered);
-                }}
-                maxLength={12}
+                // Ràng buộc (≤12 ký tự, chỉ chữ cái kể cả có dấu + dấu chấm)
+                // nay ở lib/profile/displayName.ts, dùng chung với
+                // SidebarProfile và /profile. Trước đây nó là ba bản sao của
+                // cùng một regex, và updateProfile là bản thứ tư.
+                onChange={(e) => setDraft(filterDisplayNameInput(e.target.value))}
+                maxLength={DISPLAY_NAME_MAX}
                 autoFocus
                 className="w-full rounded-[4px] border border-[color:var(--input)] bg-transparent px-3 py-2 text-center font-sans text-sm text-[#1B1512] outline-none focus:border-[color:var(--ring)]"
               />

@@ -131,7 +131,7 @@ export function SiteHeader({ user = null }: { user?: MenuUser | null }) {
 
           <LanguageToggle />
 
-          {user && <HeaderProfile displayName={user.displayName} />}
+          {user && <HeaderProfile displayName={user.displayName} avatarUrl={user.avatarUrl} />}
         </nav>
       </div>
     </header>

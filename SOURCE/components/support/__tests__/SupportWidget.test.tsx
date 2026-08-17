@@ -23,7 +23,14 @@ vi.mock("next/navigation", () => ({
 // the action is mocked away rather than pulled in unmocked.
 vi.mock("@/lib/support/actions", () => ({ submitSupportTicket: vi.fn() }));
 
-const FIXTURE_USER = { id: "u1", email: "a@example.com", displayName: "AnhPhat" };
+// avatarUrl: CurrentUserProfile gained it with /profile (ADR-0016). SupportWidget
+// never reads it; it is here only because the fixture must satisfy the type.
+const FIXTURE_USER = {
+  id: "u1",
+  email: "a@example.com",
+  displayName: "AnhPhat",
+  avatarUrl: null,
+};
 const ATTEMPT_PATHNAME = "/exams/abc/attempt/xyz";
 const NORMAL_PATHNAME = "/exams";
 

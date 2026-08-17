@@ -20,6 +20,14 @@ create table if not exists public.user_profiles (
   created_at   timestamptz not null default now()
 );
 
+-- Ảnh đại diện (ADR-0016). Cột này giữ ĐƯỜNG DẪN OBJECT trong bucket `avatars`
+-- (`{auth.uid()}/{uuid}.{ext}`), KHÔNG phải URL tải được: bucket private nên mọi
+-- lượt đọc phải ký lại lúc render (lib/auth/getCurrentUser.ts). Ai lưu URL vào
+-- đây thì sau 1 giờ nó chết mà không có gì báo.
+-- Nullable + additive: handle_new_user() bên dưới insert danh sách cột CỐ ĐỊNH
+-- nên trigger không bị ảnh hưởng.
+alter table public.user_profiles add column if not exists avatar_url text;
+
 -- Tự tạo user_profiles khi có user mới trong auth.users (chuẩn Supabase).
 -- SECURITY DEFINER để bypass RLS lúc insert tự động.
 -- S#24: OAuth (Google/Facebook) không set 'display_name' trong
@@ -1533,6 +1541,59 @@ create policy "support_screenshots_insert_own" on storage.objects
 -- khác, kể cả không phải tác giả, có quyền đọc trực tiếp qua policy này).
 
 -- ----------------------------------------------------------------------------
+-- Storage policies — bucket "avatars" (ADR-0016, PRD AC-031/AC-032/AC-033)
+--     Bucket tạo ngoài SQL (setup-storage.ts BUCKETS), private (public:false),
+--     kèm fileSizeLimit/allowedMimeTypes ở tầng Storage (backstop — enforcement
+--     chính vẫn ở Server Action changeAvatar).
+--     Path convention: {auth.uid()}/{uuid}.{ext} → mọi policy dưới đây dùng
+--     CHUNG một vị từ sở hữu, chép từ "support_screenshots_insert_own" §16:
+--       bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text
+--
+--     ⚠ CÓ select ở đây, trong khi support-screenshots CỐ Ý KHÔNG có. Khác biệt
+--     nằm ở đường đọc, không phải ở mức nhạy cảm: ảnh support do service role
+--     ký hộ cho admin, còn ảnh đại diện thì CHÍNH CHỦ đọc lại object của mình
+--     bằng client PHIÊN CỦA MÌNH để ký signed URL (getCurrentUserProfile →
+--     storage.createSignedUrl). Thiếu policy select thì createSignedUrl trả lỗi
+--     và mọi avatar âm thầm tụt về initials — trông như "user chưa có ảnh" chứ
+--     không như một bug (PRD R-f).
+--
+--     Nếu SQL Editor báo "must be owner of table objects", tạo qua Dashboard →
+--     Storage → Policies (nội dung y hệt), giống §8.
+-- ----------------------------------------------------------------------------
+drop policy if exists "avatars_select_own" on storage.objects;
+create policy "avatars_select_own" on storage.objects
+  for select to authenticated using (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+drop policy if exists "avatars_insert_own" on storage.objects;
+create policy "avatars_insert_own" on storage.objects
+  for insert to authenticated with check (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+drop policy if exists "avatars_update_own" on storage.objects;
+create policy "avatars_update_own" on storage.objects
+  for update to authenticated using (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  ) with check (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+-- delete: đổi ảnh là upload key MỚI rồi xoá key cũ (best-effort, changeAvatar
+-- bước 7). Không có policy này thì object cũ ở lại vĩnh viễn.
+drop policy if exists "avatars_delete_own" on storage.objects;
+create policy "avatars_delete_own" on storage.objects
+  for delete to authenticated using (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+-- ----------------------------------------------------------------------------
 -- 17. Phiên bản schema — DB tự khai nó đang chạy bản nào (2026-08-07).
 --
 --     Vì sao có phần này (TECH-DEBT TD-005): file này được paste TAY vào SQL
@@ -1571,7 +1632,7 @@ revoke all on public.schema_version from anon, authenticated;
 -- nó — xem lib/schema/schemaFingerprint.ts).
 -- @schema-fingerprint-begin
 insert into public.schema_version (id, fingerprint)
-values (1, 'f525e3095339')
+values (1, 'd714c313fe1d')
 on conflict (id) do update
   set fingerprint = excluded.fingerprint,
       applied_at  = now();

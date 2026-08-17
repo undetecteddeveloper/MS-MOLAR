@@ -23,6 +23,7 @@ export const vi: Dictionary = {
   "common.back": "Quay lại",
   "common.signOut": "Đăng xuất",
   "common.myExams": "Đề của tôi",
+  "common.profile": "Hồ sơ",
   "common.displayName": "Tên hiển thị",
   "common.displayNameHint": "Tối đa 12 ký tự, chỉ chữ cái và dấu chấm.",
   "common.browseExams": "Xem danh sách đề",
@@ -567,4 +568,65 @@ export const vi: Dictionary = {
   "billing.quota.resetsAt": "Đặt lại vào {date}.",
   "billing.quota.remaining": "Đã dùng {used}/{limit} lượt gia sư trong kỳ này.",
   "billing.quota.upgradeLink": "Xem các gói",
+
+  // /profile — xem chú thích tương ứng trong en.ts.
+  "profile.error.sessionExpired": "Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.",
+  "profile.error.rateLimited": "Thao tác quá nhiều lần. Thử lại sau {seconds} giây.",
+  "profile.error.generic": "Có lỗi xảy ra. Hãy thử lại.",
+  "profile.avatar.invalidType": "Chỉ nhận ảnh JPG, PNG và WebP.",
+  "profile.avatar.tooLarge": "Ảnh này nặng hơn {maxMb}MB. Hãy chọn ảnh nhẹ hơn.",
+  "profile.avatar.uploadFailed": "Chưa lưu được ảnh. Hãy thử lại.",
+  "profile.password.errorCurrentRequired": "Hãy nhập mật khẩu hiện tại.",
+  "profile.password.errorCurrentWrong": "Mật khẩu hiện tại không đúng.",
+  "profile.password.errorMismatch": "Hai ô mật khẩu mới không khớp nhau.",
+  "profile.password.errorSameAsCurrent": "Mật khẩu mới phải khác mật khẩu hiện tại.",
+
+  // --- /profile — giao diện; xem chú thích tương ứng trong en.ts -----------
+  "profile.eyebrow": "Tài khoản",
+  "profile.title": "Hồ sơ của bạn",
+  "profile.description": "Tài khoản này gồm những gì, và những phần bạn đổi được.",
+  "profile.email.label": "Email đăng ký",
+  "profile.email.readOnly": "Không thể thay đổi",
+  "profile.name.change": "Đổi tên",
+  "profile.name.saved": "Đã cập nhật tên hiển thị.",
+  "profile.name.errorEmpty": "Hãy nhập tên hiển thị.",
+  "profile.name.errorTooLong": "Tên hiển thị tối đa {max} ký tự.",
+  "profile.name.errorCharset": "Tên hiển thị chỉ được gồm chữ cái và dấu chấm.",
+  "profile.password.label": "Mật khẩu",
+  "profile.password.masked": "Mật khẩu của bạn không hiển thị ở đây.",
+  "profile.password.noReveal":
+    "Mật khẩu được lưu ở dạng băm, nên không ai — kể cả chúng tôi — hiển thị lại được.",
+  "profile.password.change": "Đổi mật khẩu",
+  "profile.password.current": "Mật khẩu hiện tại",
+  "profile.password.new": "Mật khẩu mới",
+  "profile.password.confirm": "Nhập lại mật khẩu mới",
+  "profile.password.hint": "Tối thiểu {min} ký tự.",
+  "profile.password.submit": "Cập nhật mật khẩu",
+  "profile.password.changed":
+    "Đã đổi mật khẩu. Các thiết bị khác sẽ phải đăng nhập lại.",
+  "profile.password.errorTooShort": "Hãy dùng ít nhất {min} ký tự.",
+  "profile.password.errorTooLong":
+    "Mật khẩu quá dài (tối đa {maxBytes} byte — chữ có dấu tính hơn một byte).",
+  "profile.password.errorOnlySpaces": "Mật khẩu không thể chỉ gồm dấu cách.",
+  "profile.password.errorTooCommon":
+    "Mật khẩu này quá phổ biến. Hãy chọn mật khẩu khác.",
+  "profile.avatar.label": "Ảnh đại diện",
+  "profile.avatar.change": "Đổi ảnh",
+  "profile.avatar.chooseFile": "Chọn ảnh",
+  "profile.avatar.hint": "JPG, PNG hoặc WebP, tối đa {maxMb}MB.",
+  "profile.avatar.selected": "Đã chọn: {name}",
+  "profile.avatar.uploading": "Đang tải ảnh lên…",
+  "profile.avatar.saved": "Đã cập nhật ảnh đại diện.",
+  "profile.error.network": "Mất kết nối trước khi xong. Hãy thử lại.",
+
+  // /about — xem chú thích tương ứng trong en.ts.
+  "about.eyebrow": "Giới thiệu",
+  "about.title": "Về chúng tôi",
+  "about.intro":
+    "MS-MOLAR là nền tảng luyện đề thi dành cho học sinh THCS và THPT. Bạn có thể liên hệ trực tiếp với chúng tôi theo thông tin dưới đây.",
+  "about.owner": "Chủ sở hữu website",
+  "about.email": "Email liên hệ",
+  "about.phone": "Số điện thoại liên hệ",
+  "about.placeholderNotice":
+    "Thông tin liên hệ ở trên là dữ liệu tạm, sẽ được thay bằng thông tin thật trước khi ra mắt.",
 };

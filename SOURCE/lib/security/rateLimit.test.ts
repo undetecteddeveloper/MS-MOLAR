@@ -73,7 +73,7 @@ describe("guard", () => {
     expect((await guard("submitExam", "u1")).ok).toBe(true);
   });
 
-  // HAI NHÓM TRẦN, vì có hai thứ KHÁC NHAU đang chặn chúng — không thể kiểm
+  // BA NHÓM TRẦN, vì có ba thứ KHÁC NHAU đang chặn chúng — không thể kiểm
   // bằng một bất biến chung:
   //   - Nhóm tốn DB của CHÍNH ta: thứ giới hạn chúng là chi phí của ta, mà ta
   //     tự nới được. Nên trần đặt rộng rãi và bất biến cần ghim là "đủ rộng để
@@ -83,6 +83,10 @@ describe("guard", () => {
   //     ngược lại: nằm dưới trần nhà cung cấp, và cửa sổ trùng ĐƠN VỊ của hạn
   //     ngạch đó. Ghim cả windowMs vì hạ `limit` mà giữ cửa sổ theo giờ thì trần
   //     ngày không còn được đặt (xem lý lẽ đầy đủ ở RATE_LIMITS.explainStep).
+  //   - Nhóm chặn LẠM DỤNG (2026-08-17, /profile): thứ giới hạn chúng không phải
+  //     chi phí của ai cả — changePassword gần như miễn phí — mà là việc gọi dồn
+  //     TỰ NÓ đã là tấn công. Bất biến vì thế NGƯỢC HẲN nhóm đầu: trần phải CHẶT,
+  //     và "chặt" ở đây có nghĩa chính xác là chặt hơn mọi trần của nhóm tốn-DB.
   // Hai danh sách dưới đây liệt kê tường minh, không suy ra từ nhau: thêm action
   // mới vào RATE_LIMITS mà quên xếp nhóm sẽ làm case "phân loại" đỏ, thay vì
   // lọt qua cả hai nhánh mà không ai quyết định nó thuộc nhóm nào.
@@ -104,6 +108,17 @@ describe("guard", () => {
     "explainStep",
     "uploadExam",
   ] as const satisfies readonly (keyof typeof RATE_LIMITS)[];
+  // Hai action của /profile. `changePassword` NHẬN VÀO một credential (phải kiểm
+  // mật khẩu hiện tại), nên mỗi lần gọi trả lời "chuỗi này có đúng không" — trần
+  // ở đây đo TỐC ĐỘ DÒ chứ không đo chi phí. `uploadAvatar` cùng nhóm vì lý do
+  // gần: nó ghi object vào Storage của ta, nhưng 10/giờ được chọn theo mức lạm
+  // dụng chấp nhận được chứ không theo "rộng rãi để không phiền người dùng" —
+  // xếp nó vào nhóm tốn-DB sẽ đòi limit >= 15, tức nới trần để chiều một bất biến
+  // vốn không nói về nó.
+  const ABUSE_CAPPED_ACTIONS: readonly (keyof typeof RATE_LIMITS)[] = [
+    "changePassword",
+    "uploadAvatar",
+  ];
 
   /** Trần free tier của Gemini: 20 request/NGÀY cho CẢ project (rateLimit.ts). */
   const SUPPLIER_DAILY_QUOTA = 20;
@@ -111,7 +126,11 @@ describe("guard", () => {
 
   it("classifies every configured action into exactly one category", () => {
     // Xếp trùng hai nhóm cũng đỏ ở đây: mảng gộp sẽ dài hơn danh sách khoá.
-    const classified = [...DB_COST_ACTIONS, ...SUPPLIER_CAPPED_ACTIONS].sort();
+    const classified = [
+      ...DB_COST_ACTIONS,
+      ...SUPPLIER_CAPPED_ACTIONS,
+      ...ABUSE_CAPPED_ACTIONS,
+    ].sort();
     expect(classified).toEqual(Object.keys(RATE_LIMITS).sort());
   });
 
@@ -120,6 +139,28 @@ describe("guard", () => {
       expect(RATE_LIMITS[action].limit).toBeGreaterThanOrEqual(15);
       expect(RATE_LIMITS[action].windowMs).toBeGreaterThanOrEqual(60_000);
     }
+  });
+
+  it("keeps every abuse-capped limit tighter than every cost-capped one", () => {
+    for (const abuseAction of ABUSE_CAPPED_ACTIONS) {
+      for (const dbAction of DB_COST_ACTIONS) {
+        expect(RATE_LIMITS[abuseAction].limit).toBeLessThan(RATE_LIMITS[dbAction].limit);
+      }
+    }
+  });
+
+  it("keeps abuse-capped windows hourly — the constrained resource is our own endpoint", () => {
+    // KHÔNG phải cửa sổ ngày như nhóm nhà cung cấp: ở đây không có hạn ngạch nào
+    // tính theo ngày để khớp đơn vị, và kéo cửa sổ dài ra chỉ khoá người dùng
+    // thật ra ngoài lâu hơn (xem RATE_LIMITS.changePassword).
+    for (const action of ABUSE_CAPPED_ACTIONS) {
+      expect(RATE_LIMITS[action].windowMs).toBe(60 * 60 * 1000);
+    }
+  });
+
+  it("keeps the credential-accepting ceiling low enough to be useless as a guessing loop", () => {
+    // 5/giờ: rộng rãi cho người gõ nhầm, vô dụng cho một vòng lặp dò mật khẩu.
+    expect(RATE_LIMITS.changePassword.limit).toBeLessThanOrEqual(5);
   });
 
   it("keeps every supplier-capped limit under the supplier quota, on its day unit", () => {

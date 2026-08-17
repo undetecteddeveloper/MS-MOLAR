@@ -21,7 +21,10 @@ export async function HomeSidebar({
   user,
   authOpen = false,
 }: {
-  user: { displayName: string } | null;
+  // Nới thêm `avatarUrl` cho ô profile đáy sidebar. Không nới thì
+  // getCurrentUserProfile() vẫn ký URL trên mọi lượt render trang chủ mà không
+  // ai tiêu thụ kết quả đó.
+  user: { displayName: string; avatarUrl: string | null } | null;
   /** Form auth đang mở trong content area (?auth=) → tag "Account" là tag active. */
   authOpen?: boolean;
 }) {
@@ -75,7 +78,7 @@ export async function HomeSidebar({
       {/* Ô profile — góc dưới-trái màn hình, CHỈ khi đã đăng nhập. */}
       {user && (
         <div className="px-8 pb-4 lg:px-10 lg:pb-8">
-          <SidebarProfile displayName={user.displayName} />
+          <SidebarProfile displayName={user.displayName} avatarUrl={user.avatarUrl} />
         </div>
       )}
     </aside>

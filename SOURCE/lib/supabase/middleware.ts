@@ -16,13 +16,29 @@ import { SESSION_COOKIE_OPTIONS } from "./cookieOptions";
  * "/terms-of-service". Mỗi mục thêm vào đây phải nêu lý do ngay tại chỗ
  * (subscription PRD AC-032).
  *
- * Ba mục cuối là của tính năng Subscription. Hai mục dưới đây là đường ĐỌC
- * tĩnh; mục thứ ba — webhook payOS, đường GHI chưa-đăng-nhập ĐẦU TIÊN của dự
- * án — thuộc pha backend và ADR-0014, CHƯA thêm. Khi nó được thêm thì danh sách
- * này có đúng 6 mục, trong đó đúng 1 mục cho phép ghi. */
-// Export để AC-032/AC-038 kiểm được bằng test thay vì bằng mắt: danh sách này
-// là một ràng buộc bảo mật có số đếm ("đúng 6 mục, đúng 1 mục cho phép ghi"),
-// và ràng buộc có số đếm mà không có cổng tự động thì chỉ là một điều phải nhớ.
+ * Ba mục của tính năng Subscription: hai đường ĐỌC tĩnh (/terms,
+ * /refund-policy) và một đường GHI — webhook payOS, đường GHI chưa-đăng-nhập
+ * ĐẦU TIÊN của dự án — thuộc pha backend và ADR-0014, CHƯA thêm.
+ *
+ * ⚠ RÀNG BUỘC ĐƯỢC ĐẾM LÀ SỐ MỤC CHO PHÉP GHI, KHÔNG PHẢI TỔNG SỐ MỤC
+ * (ADR-0017, sửa cách phát biểu của subscription PRD AC-032).
+ *
+ * Cách phát biểu cũ — "đúng 6 mục, đúng 1 mục cho phép ghi" — gộp hai rủi ro
+ * khác hẳn nhau vào một con số. Nó được viết khi mọi mục đều là đường đọc và
+ * webhook là bổ sung duy nhất người ta lường trước. Hệ quả: một trang tĩnh
+ * chỉ-đọc như /about làm tổng số chạm 6 TRƯỚC khi webhook về, và lời khẳng
+ * định "6 mục, 1 mục ghi" khi đó được thoả mãn bởi đúng sáu mục SAI.
+ *
+ * Thứ thật sự cần canh là: KHÔNG có đường GHI nào chưa-đăng-nhập lọt vào đây
+ * mà không phải một quyết định có chủ đích. Hôm nay con số đó là 0. Webhook
+ * payOS sẽ là mục ghi đầu tiên và, tại thời điểm đó, là mục ghi duy nhất.
+ * Tổng số mục vẫn được ghim bằng phép so khớp mảng nguyên văn trong test,
+ * nhưng nó chỉ còn là mô tả — không còn là chỗ dựa của lời khẳng định bảo mật.
+ *
+ * Đổi lại: thêm một trang công khai chỉ-đọc trở thành thay đổi một dòng bình
+ * thường, còn thêm một đường GHI thì vẫn phải dừng người review lại — đúng
+ * việc mà cái cổng này sinh ra để làm. */
+// Export để test kiểm được bằng máy thay vì bằng mắt.
 export const PUBLIC_PATHS = [
   "/",
   "/login",
@@ -34,6 +50,14 @@ export const PUBLIC_PATHS = [
   // Cùng lý do. AC-040 buộc trang này nói rõ gói KHÔNG tự động gia hạn — kỳ
   // vọng dễ hiểu sai nhất của mô hình trả trước.
   "/refund-policy",
+  // Trang giới thiệu + liên hệ (ADR-0017). Toàn bộ đối tượng của nó là người
+  // CHƯA có tài khoản: phụ huynh muốn biết ai vận hành site, học sinh cần số
+  // điện thoại vì không đăng nhập được. Đặt nó sau đăng nhập là cấu hình duy
+  // nhất khiến nó vô dụng với đúng những người nó phục vụ.
+  // Đây là đường ĐỌC: không fetch dữ liệu, không Server Action, không form nào
+  // gửi đi. Nếu về sau nó cần một form, đó là một quyết định MỚI theo ràng buộc
+  // đã phát biểu lại ở trên, không phải phần mở rộng lặng lẽ của mục này.
+  "/about",
 ];
 
 /** CSP của lượt request này, do proxy.ts sinh (TD-006). */

@@ -23,6 +23,7 @@ export const en = {
   "common.back": "Back",
   "common.signOut": "Sign out",
   "common.myExams": "My exams",
+  "common.profile": "Profile",
   "common.displayName": "Display name",
   "common.displayNameHint": "Max 12 characters, letters and dots only.",
   "common.browseExams": "Browse exams",
@@ -612,6 +613,89 @@ export const en = {
   "billing.quota.resetsAt": "Resets on {date}.",
   "billing.quota.remaining": "{used}/{limit} tutor hints used this period.",
   "billing.quota.upgradeLink": "See plans",
+
+  // /profile — thông báo lỗi của changeAvatar / changePassword.
+  //
+  // Server Action trả về KHOÁ, không trả câu chữ của Supabase: thông điệp của
+  // nhà cung cấp trên đường mật khẩu là một oracle (updateUser trả nguyên văn
+  // "New password should be different from the old password"). Đây là chỗ khác
+  // biệt có chủ đích so với sáu chỗ còn lại trong app/(layer1)/actions.ts, nơi
+  // error.message vẫn được trả thẳng.
+  //
+  // NGOẠI LỆ: bốn câu của validatePassword vẫn về nguyên văn tiếng Anh và được
+  // ánh xạ ở phía client (UI-D10) — đưa chúng vào đây là tạo bản sao thứ hai
+  // của chính sách mật khẩu.
+  "profile.error.sessionExpired": "Your session has expired. Sign in again.",
+  "profile.error.rateLimited": "Too many attempts. Try again in {seconds} seconds.",
+  "profile.error.generic": "Something went wrong. Try again.",
+  "profile.avatar.invalidType": "Only JPG, PNG and WebP images are accepted.",
+  "profile.avatar.tooLarge": "That image is over {maxMb}MB. Choose a smaller one.",
+  "profile.avatar.uploadFailed": "The picture was not saved. Try again.",
+  "profile.password.errorCurrentRequired": "Enter your current password.",
+  "profile.password.errorCurrentWrong": "That is not your current password.",
+  "profile.password.errorMismatch": "The two new passwords do not match.",
+  // So sánh hai chuỗi ta đã cầm trong tay, TRƯỚC mọi lượt mạng — không phải đọc
+  // câu trả lời của Supabase rồi đoán ngược ra.
+  "profile.password.errorSameAsCurrent":
+    "The new password must be different from your current one.",
+
+  // --- /profile — giao diện (UI Spec profile-and-about-ui-spec.md §i18n) ----
+  //
+  // Bốn khoá `profile.password.errorTooShort|TooLong|OnlySpaces|TooCommon` là
+  // bản dịch của bốn câu validatePassword trả về NGUYÊN VĂN tiếng Anh (UI-D10).
+  // Chúng được nối với nhau bằng đối chiếu literal ở
+  // app/(layer3)/profile/_components/errorMessages.ts, và một test canh literal
+  // đó khớp đúng đầu ra thật của lib/auth/passwordPolicy.ts — sửa câu chữ bên
+  // đó mà quên bên này thì FAIL BUILD, không phải âm thầm rơi về câu chung.
+  "profile.eyebrow": "Account",
+  "profile.title": "Your profile",
+  "profile.description": "What this account is, and the parts of it you can change.",
+  "profile.email.label": "Registered email",
+  "profile.email.readOnly": "Cannot be changed",
+  "profile.name.change": "Change name",
+  "profile.name.saved": "Display name updated.",
+  "profile.name.errorEmpty": "Enter a display name.",
+  "profile.name.errorTooLong": "Display name must be {max} characters or fewer.",
+  "profile.name.errorCharset": "Display name may only contain letters and dots.",
+  "profile.password.label": "Password",
+  "profile.password.masked": "Your password is not shown here.",
+  "profile.password.noReveal":
+    "Passwords are stored hashed, so nobody — us included — can show yours again.",
+  "profile.password.change": "Change password",
+  "profile.password.current": "Current password",
+  "profile.password.new": "New password",
+  "profile.password.confirm": "Confirm new password",
+  "profile.password.hint": "At least {min} characters.",
+  "profile.password.submit": "Update password",
+  "profile.password.changed":
+    "Password changed. Other devices will need to sign in again.",
+  "profile.password.errorTooShort": "Use at least {min} characters.",
+  "profile.password.errorTooLong":
+    "That password is too long (max {maxBytes} bytes — accented letters count as more than one).",
+  "profile.password.errorOnlySpaces": "A password cannot be only spaces.",
+  "profile.password.errorTooCommon":
+    "That password is too common. Choose a different one.",
+  "profile.avatar.label": "Profile picture",
+  "profile.avatar.change": "Change picture",
+  "profile.avatar.chooseFile": "Choose an image",
+  "profile.avatar.hint": "JPG, PNG or WebP, up to {maxMb}MB.",
+  "profile.avatar.selected": "Selected: {name}",
+  "profile.avatar.uploading": "Uploading…",
+  "profile.avatar.saved": "Profile picture updated.",
+  "profile.error.network": "The connection dropped before that finished. Try again.",
+
+  // /about — trang giới thiệu + liên hệ (PRD R10, ADR-0017). Chỉ NHÃN nằm ở
+  // đây; tên/email/số điện thoại là giá trị giống nhau ở cả hai ngôn ngữ nên
+  // được giữ trong chính page.tsx (xem comment ở đó).
+  "about.eyebrow": "About",
+  "about.title": "About Us",
+  "about.intro":
+    "MS-MOLAR is an exam-practice platform for Vietnamese secondary and high-school students. You can reach us directly using the details below.",
+  "about.owner": "Site owner",
+  "about.email": "Contact email",
+  "about.phone": "Contact phone",
+  "about.placeholderNotice":
+    "These contact details are placeholders. They will be replaced with real information before launch.",
 } as const;
 
 /** Tập khoá hợp lệ — mọi ngôn ngữ khác phải phủ đủ. */

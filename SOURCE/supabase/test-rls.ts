@@ -1710,6 +1710,101 @@ async function main() {
     "ST-e: User B (không phải tác giả, không phải admin) KHÔNG tải được ảnh chụp màn hình của A (AC-013 — bucket không có select policy nào cho authenticated)",
   );
 
+  // -------------------------------------------------------------------------
+  // Storage checks — bucket `avatars` (profile-and-about-prd.md AC-031/AC-032,
+  // ADR-0016), cases AV-a…AV-d. REQUIRED, BLOCKING.
+  //
+  // VÌ SAO PHẢI Ở ĐÂY chứ không phải trong vitest: các test integration của
+  // tính năng này mock TOÀN BỘ Supabase client, nên chúng chứng minh được thứ
+  // tự lệnh gọi chứ không chứng minh được một policy nào cả. Bốn policy
+  // `avatars_*_own` chỉ tồn tại trong schema.sql, và schema.sql tới được
+  // database bằng TAY (TD-005).
+  //
+  // VÌ SAO `npm run verify:schema` KHÔNG thay được: nó so
+  // `public.schema_version.fingerprint` với file, mà dòng fingerprint đó do
+  // chính file tự insert ở câu lệnh cuối. Nó chứng minh "lần paste gần nhất
+  // chạy hết", KHÔNG chứng minh "vị từ của policy khớp với file".
+  //
+  // Kịch bản hỏng mà khối này canh, và chính schema.sql:1560-1561 mời gọi nó:
+  // khi SQL Editor báo "must be owner of table objects", người vận hành được
+  // hướng dẫn tạo lại policy bằng Dashboard. Gõ tay `bucket_id = 'avatars'` mà
+  // quên vế `(storage.foldername(name))[1] = auth.uid()::text` cho ra một
+  // verify:schema XANH và một bucket nơi bất kỳ học sinh nào cũng đọc được ảnh
+  // của học sinh khác. Chủ thể của những tấm ảnh đó là trẻ vị thành niên —
+  // đúng thứ ADR-0016 chọn bucket private để chặn.
+  // -------------------------------------------------------------------------
+  console.log("\nStorage checks (avatars AV-a…AV-d):");
+
+  const AVATARS_BUCKET = "avatars";
+  const avatarBytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const avatarAPath = `${userAId}/rls-avatar-a.png`;
+  const avatarBPath = `${userBId}/rls-avatar-b.png`;
+  // Đường A cố tình ghi vào folder của B — tên file riêng để nếu nó LỌT thì
+  // dọn dẹp bên dưới vẫn xoá được, không để rác lại trong folder của B.
+  const avatarCrossPath = `${userBId}/rls-avatar-cross-written-by-a.png`;
+
+  // Nền: B có sẵn một ảnh thật (qua service_role, bypass RLS) để AV-c/AV-d có
+  // thứ để mà thử đọc. Không có bước này thì "A không đọc được gì" là một khẳng
+  // định rỗng — không đọc được vì bị chặn, hay vì chẳng có gì ở đó?
+  const avSeed = await admin.storage
+    .from(AVATARS_BUCKET)
+    .upload(avatarBPath, avatarBytes, { contentType: "image/png", upsert: true });
+  assert(
+    avSeed.error == null,
+    "AV (positive control): service_role tạo được ảnh đại diện của B trong bucket avatars",
+  );
+
+  // AV-a. A ghi được vào ĐÚNG folder của mình — chứng minh policy insert không
+  // chặn nhầm chính chủ (một policy `false` cũng làm AV-b xanh).
+  const avA = await userA.storage
+    .from(AVATARS_BUCKET)
+    .upload(avatarAPath, avatarBytes, { contentType: "image/png", upsert: true });
+  assert(
+    avA.error == null,
+    "AV-a: User A upload được vào folder của chính mình (avatars_insert_own cho phép đúng chủ)",
+  );
+
+  // AV-b. A ghi vào folder của B — phải bị chặn.
+  const avB = await userA.storage
+    .from(AVATARS_BUCKET)
+    .upload(avatarCrossPath, avatarBytes, { contentType: "image/png", upsert: true });
+  assert(
+    avB.error != null,
+    "AV-b: User A KHÔNG upload được vào folder của B (AC-031/AC-032)",
+  );
+
+  // AV-b'. Xác nhận bằng phía service_role rằng thật sự không có object nào
+  // được tạo — `error != null` một mình vẫn có thể là lỗi mạng, không phải RLS.
+  const avBCheck = await admin.storage.from(AVATARS_BUCKET).list(userBId);
+  const avBNames = (avBCheck.data ?? []).map((o) => o.name);
+  assert(
+    avBCheck.error == null && !avBNames.includes("rls-avatar-cross-written-by-a.png"),
+    "AV-b (hậu kiểm): service_role xác nhận folder của B KHÔNG có object nào do A ghi vào",
+  );
+
+  // AV-c. A không ký được URL cho ảnh của B. Đây là đường đọc thật của tính
+  // năng (getCurrentUser.ts gọi createSignedUrl), nên nó mới là thứ đáng kiểm,
+  // không phải download() trần.
+  const avC = await userA.storage.from(AVATARS_BUCKET).createSignedUrl(avatarBPath, 60);
+  assert(
+    avC.error != null && avC.data == null,
+    "AV-c: User A KHÔNG ký được signed URL cho ảnh của B (avatars_select_own)",
+  );
+
+  // AV-d. A liệt kê folder của B — phải rỗng. Chặn được download mà vẫn liệt kê
+  // được tên file thì vẫn là rò: tên file cho biết người đó CÓ ảnh.
+  const avD = await userA.storage.from(AVATARS_BUCKET).list(userBId);
+  assert(
+    (avD.data ?? []).length === 0,
+    "AV-d: User A liệt kê folder của B ra 0 object (không rò cả sự tồn tại)",
+  );
+
+  // Dọn dẹp fixture avatars — service_role, xoá cả đường cross phòng khi AV-b
+  // lọt (nếu nó lọt thì test đã FAIL, nhưng đừng để lại rác trên môi trường).
+  await admin.storage
+    .from(AVATARS_BUCKET)
+    .remove([avatarAPath, avatarBPath, avatarCrossPath]);
+
   // Dọn dẹp fixture Support System.
   await cleanupSupportFixtures(admin, userAId, userBId);
 

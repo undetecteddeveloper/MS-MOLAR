@@ -157,6 +157,28 @@ export const RATE_LIMITS = {
   // đó là một ngân sách mức PROJECT (đếm chung mọi user, mọi đường gọi Gemini) —
   // chưa có, còn nợ, xem TD-019.
   uploadExam: { limit: 5, windowMs: 24 * 60 * 60 * 1000 },
+  // Đổi mật khẩu (/profile — PRD profile-and-about AC-023). CHẶT HƠN HẲN mọi
+  // mục trên, và vì một lý do KHÁC CẢ HAI HỌ TRÊN. Khối đầu tốn một dòng DB của
+  // CHÍNH ta; explainStep/uploadExam tiêu vào hạn ngạch của bên thứ ba. Mục này
+  // không tốn gì cả — nó NHẬN VÀO MỘT THÔNG TIN XÁC THỰC: để đổi mật khẩu, ta
+  // phải kiểm mật khẩu HIỆN TẠI, nên mỗi lần gọi trả lời đúng câu hỏi "chuỗi này
+  // có phải mật khẩu của tài khoản đó không". Nói cách khác action này đồng thời
+  // là một oracle dò mật khẩu, và trần ở đây không đo chi phí — nó đo TỐC ĐỘ DÒ.
+  //
+  // Vì sao 5: một người dùng thật đổi mật khẩu gần như không bao giờ. 5 lần/giờ
+  // rộng rãi cho người gõ nhầm vài lần, và chật tới mức vô dụng cho một vòng lặp.
+  //
+  // CỬA SỔ VẪN THEO GIỜ, không theo ngày như explainStep/uploadExam: tài nguyên
+  // bị ràng buộc ở đây là endpoint auth của CHÍNH ta, không phải một hạn ngạch
+  // tính theo NGÀY của nhà cung cấp. Luật khớp đơn vị trong comment explainStep
+  // chỉ bắt buộc cửa sổ 24 giờ khi hạn ngạch bên kia tính theo ngày; ở đây kéo
+  // dài cửa sổ chỉ làm phiền người quên mật khẩu chứ không chặn thêm được ai.
+  changePassword: { limit: 5, windowMs: 60 * 60 * 1000 },
+  // Upload ảnh đại diện (/profile — AC-037). CÙNG HỌ với khối đầu: mỗi lần gọi
+  // tốn một object trong Storage của ta, không phải hạn ngạch của ai khác và
+  // không phải một câu trả lời về credential. 10/giờ đủ cho người thử vài tấm
+  // rồi đổi ý, và vẫn chặn vòng lặp bơm file.
+  uploadAvatar: { limit: 10, windowMs: 60 * 60 * 1000 },
 } as const;
 
 /** Cửa sổ dài nhất đang cấu hình — mốc "chắc chắn hết hiệu lực" của `pruneOldest`. */

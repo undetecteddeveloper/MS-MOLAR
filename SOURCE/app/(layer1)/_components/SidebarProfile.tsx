@@ -9,16 +9,24 @@
 //  - "Sign out": signOut Server Action → về /?auth=signin.
 // Panel dropup nền ngà trên sidebar đen sơn mài (phân lớp bằng màu nền +
 // hairline — DESIGN.md, không shadow). Nhãn tiếng Anh đồng bộ homepage.
-import Image from "next/image";
 import Link from "next/link";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut, updateProfile, type AuthState } from "@/app/(layer1)/actions";
 import { useT } from "@/lib/i18n/client";
+import { Avatar } from "@/components/shared/Avatar";
+import { filterDisplayNameInput, DISPLAY_NAME_MAX } from "@/lib/profile/displayName";
 
-const AVATAR = "/images/user-avatar-placeholder.png";
-
-export function SidebarProfile({ displayName: initial }: { displayName: string }) {
+// ⚠ components/shared/HeaderProfile.tsx là BẢN SINH ĐÔI gần như từng chữ của
+// file này. Mọi thay đổi ở đây phải làm ở CẢ HAI, nếu không hai ô tài khoản của
+// cùng một sản phẩm sẽ trôi ra khác nhau — đúng thứ AC-040 cấm.
+export function SidebarProfile({
+  displayName: initial,
+  avatarUrl,
+}: {
+  displayName: string;
+  avatarUrl: string | null;
+}) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -64,7 +72,10 @@ export function SidebarProfile({ displayName: initial }: { displayName: string }
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center gap-3 rounded-md border border-[#EDE1C8]/12 px-3 py-2.5 transition-colors hover:border-[#EDE1C8]/30"
       >
-        <Image src={AVATAR} alt="" width={32} height={32} className="shrink-0 rounded-full" />
+        {/* Avatar thay cho <Image> + ảnh placeholder cục bộ. next/image chỉ chạy
+            được với ảnh cục bộ ở đây: next.config.ts không khai remotePatterns
+            nào, nên một URL Supabase đưa vào <Image> là lỗi LÚC CHẠY. */}
+        <Avatar src={avatarUrl} name={displayName} size={32} />
         <span className="min-w-0 flex-1 truncate text-left font-sans text-sm text-[#EDE1C8]">
           {displayName}
         </span>
@@ -79,6 +90,17 @@ export function SidebarProfile({ displayName: initial }: { displayName: string }
         >
           {!editing ? (
             <>
+              {/* Trang tài khoản đầy đủ — mục ĐẦU TIÊN của menu. Không thêm ô
+                  nào vào BottomNav và không thêm tag nào vào header, nên nó
+                  không đụng tới hai bề mặt điều hướng đã chật. */}
+              <Link
+                role="menuitem"
+                href="/profile"
+                onClick={close}
+                className="block w-full rounded-[4px] px-3 py-2 text-center font-sans text-sm text-[#1B1512] transition-colors hover:bg-[#E3D5B6]"
+              >
+                {t("common.profile")}
+              </Link>
               <button
                 type="button"
                 onClick={() => {
@@ -116,12 +138,12 @@ export function SidebarProfile({ displayName: initial }: { displayName: string }
                 id="sidebar-profile-display-name"
                 name="displayName"
                 value={draft}
-                onChange={(e) => {
-                  // Ràng buộc: ≤12 ký tự, chỉ chữ cái (kể cả có dấu) + dấu chấm.
-                  const filtered = e.target.value.replace(/[^\p{L}.]/gu, "").slice(0, 12);
-                  setDraft(filtered);
-                }}
-                maxLength={12}
+                // Ràng buộc (≤12 ký tự, chỉ chữ cái kể cả có dấu + dấu chấm)
+                // nay ở lib/profile/displayName.ts, dùng chung với
+                // HeaderProfile và /profile. Trước đây nó là ba bản sao của
+                // cùng một regex, và updateProfile là bản thứ tư.
+                onChange={(e) => setDraft(filterDisplayNameInput(e.target.value))}
+                maxLength={DISPLAY_NAME_MAX}
                 autoFocus
                 className="w-full rounded-[4px] border border-[color:var(--input)] bg-transparent px-3 py-2 text-center font-sans text-sm text-[#1B1512] outline-none focus:border-[color:var(--ring)]"
               />
