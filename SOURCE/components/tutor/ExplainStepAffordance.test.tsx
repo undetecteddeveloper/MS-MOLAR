@@ -220,6 +220,14 @@ describe("ExplainStepAffordance", () => {
 
     await waitFor(() => expect(within(container).queryByRole("button")).toBeNull());
 
+    // RichText nạp ĐỘNG từ TD-021 (chunk markdown+KaTeX 122.5 KB gzip không được
+    // nằm trong bundle đầu của trang này). Nút biến mất NGAY khi hint về, nhưng
+    // nội dung hint chỉ render sau khi chunk resolve — hai mốc khác nhau, nên
+    // phải đợi riêng. Chờ đúng <strong> chứ không chờ chuỗi: nó vừa là bằng chứng
+    // chunk đã về, vừa là chính thứ nghĩa vụ chứng minh của case này cần (đường
+    // render đi qua markdown, không phải plain-text).
+    await waitFor(() => expect(container.querySelector("strong")).not.toBeNull());
+
     expect(container.textContent).toContain("Xem lại");
     expect(container.textContent).toContain("định luật bảo toàn");
     expect(container.textContent).toContain("rồi thử lại nhé.");

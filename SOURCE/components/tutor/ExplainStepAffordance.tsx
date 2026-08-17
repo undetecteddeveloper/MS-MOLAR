@@ -14,15 +14,29 @@
 // chặn nháy đúp thật sự là busyRef đồng bộ trong hook.
 
 import { Lightbulb, Loader2 } from "lucide-react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { BentoCell } from "@/components/layout/BentoGrid";
-import { RichText } from "@/components/shared/RichText";
 import { Button } from "@/components/ui/button";
 import { useEntitlement } from "@/lib/billing/entitlement";
 import { isQuotaExhausted } from "@/lib/billing/types";
 import { useT } from "@/lib/i18n/client";
 import { useTutorAction } from "./useTutorAction";
+
+// RichText nạp ĐỘNG, không import tĩnh (TD-021). Lý do nằm ở xác suất: component
+// này chỉ mount khi học sinh đã sai câu đó HAI lần, và ngay cả lúc đó bảng gợi ý
+// vẫn chỉ render sau khi họ CHỦ ĐỘNG bấm nút. Import tĩnh thì cây markdown+KaTeX
+// (122.5 KB gzip — chunk client lớn nhất dự án) nằm trong bundle đầu của trang
+// Chi tiết kết quả cho MỌI người xem, kể cả người làm đúng hết và không bao giờ
+// thấy cái nút này.
+//
+// `ssr: false` là ĐÚNG chứ không phải để né lỗi: `hint` chỉ tồn tại sau một lời
+// gọi Server Action từ tương tác người dùng, nên ở lượt render server nó luôn
+// rỗng — không có gì để render trước, và cũng không có gì bị mất khi bỏ SSR.
+const RichText = dynamic(() => import("@/components/shared/RichText").then((m) => m.RichText), {
+  ssr: false,
+});
 
 /** Cố ý chỉ hai trường: kiểu props này KHÔNG mang nổi đáp án
  *  (correct_answer/sub_answers/essay_answer) lẫn nhãn kỹ năng — phòng thủ theo

@@ -93,7 +93,17 @@ describe("guard", () => {
     "updateProfile",
     "submitTicket",
   ];
-  const SUPPLIER_CAPPED_ACTIONS: readonly (keyof typeof RATE_LIMITS)[] = ["explainStep"];
+  // `uploadExam` thuộc nhóm này chứ KHÔNG phải nhóm tốn-DB, dù nó cũng ghi DB và
+  // cũng nhận file: thứ giới hạn nó là hạn ngạch Gemini, y như explainStep, và
+  // hai cái ăn CHUNG một hạn ngạch (TD-019). Xếp nhầm nó sang nhóm tốn-DB sẽ đòi
+  // `limit >= 15` — tức là hợp thức hoá đúng cái lỗ vừa vá.
+  // `as const satisfies` chứ không phải chú thích kiểu rộng: giữ được kiểu literal
+  // của từng phần tử (để bảng GEMINI_REQUESTS_PER_CALL bên dưới ép đúng HAI khoá
+  // này), đồng thời vẫn bắt lỗi ngay nếu ai gõ sai tên một action.
+  const SUPPLIER_CAPPED_ACTIONS = [
+    "explainStep",
+    "uploadExam",
+  ] as const satisfies readonly (keyof typeof RATE_LIMITS)[];
 
   /** Trần free tier của Gemini: 20 request/NGÀY cho CẢ project (rateLimit.ts). */
   const SUPPLIER_DAILY_QUOTA = 20;
@@ -117,5 +127,26 @@ describe("guard", () => {
       expect(RATE_LIMITS[action].windowMs).toBe(ONE_DAY_MS);
       expect(RATE_LIMITS[action].limit).toBeLessThanOrEqual(SUPPLIER_DAILY_QUOTA);
     }
+  });
+
+  // Bất biến THẬT của TD-019, và là cái mà hai case trên KHÔNG bắt được: kiểm
+  // từng trần một thì 3 và 5 đều "dưới 20", trong khi cộng lại thì một tài khoản
+  // vẫn vét được sạch hạn ngạch của cả project. Trần phải đọc theo SỐ REQUEST
+  // GEMINI, không phải số lần bấm nút — explainStep 1 request/lần, uploadExam
+  // 2–3 (extractQuestions + extractAnswers + extractMeta ở chế độ Automatic).
+  //
+  // Ghim số nhân tại chỗ: ngày nào pipeline thêm một lời gọi AI thứ tư thì sửa
+  // hằng số này, và case sẽ nói ngay trần nào phải hạ theo.
+  const GEMINI_REQUESTS_PER_CALL: Record<(typeof SUPPLIER_CAPPED_ACTIONS)[number], number> = {
+    explainStep: 1,
+    uploadExam: 3,
+  };
+
+  it("keeps ONE account's whole daily Gemini budget under the project quota", () => {
+    const worstCasePerUser = SUPPLIER_CAPPED_ACTIONS.reduce(
+      (sum, action) => sum + RATE_LIMITS[action].limit * GEMINI_REQUESTS_PER_CALL[action],
+      0
+    );
+    expect(worstCasePerUser).toBeLessThanOrEqual(SUPPLIER_DAILY_QUOTA);
   });
 });

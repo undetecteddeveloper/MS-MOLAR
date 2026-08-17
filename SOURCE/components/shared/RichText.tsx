@@ -1,6 +1,24 @@
-"use client";
-
 // RichText — render nội dung markdown + LaTeX (GĐ 3 M3.1 Task 5).
+//
+// ⚠ CỐ Ý KHÔNG CÓ `"use client"` (TD-021, 2026-08-17) ⚠
+//
+// Component này thuần render: không hook, không state, không handler, không API
+// trình duyệt. Bỏ directive đi biến nó thành component DÙNG CHUNG — server
+// component render nó ở SERVER (chỉ ra HTML), client component import nó thì nó
+// đi vào bundle như trước. Đó không phải tinh chỉnh nhỏ: cây phụ thuộc của file
+// này (react-markdown + remark-gfm + remark-math + rehype-katex +
+// rehype-sanitize + katex) là 122.5 KB gzip — CHUNK CLIENT LỚN NHẤT của dự án,
+// đo bằng bản build thật, lớn hơn toàn bộ phần JS còn lại của phần lớn route.
+//
+// Vì thế: THÊM `"use client"` VÀO ĐÂY LÀ ĐẨY 122.5 KB GZIP SANG TRÌNH DUYỆT cho
+// MỌI route render nội dung câu hỏi, kể cả route thuần đọc. Cần state/hook thì
+// bọc một component client MỎNG ở ngoài rồi truyền chuỗi vào, đừng đổi file này.
+//
+// Đã ĐO cả 4 tổ hợp trên bản build thật, vì một mình directive này KHÔNG đủ:
+// route /result/detail chỉ tụt 181.8K → 60.7K gzip khi file này bỏ "use client"
+// VÀ ExplainStepAffordance nạp động; bỏ directive mà vẫn còn một import tĩnh từ
+// component client thì route đứng nguyên 181.8K.
+//
 // Dùng cho nội dung câu hỏi và lựa chọn đáp án (Layer 2), tái dùng được cho layer khác.
 //
 // HARDENED cho nội dung KHÔNG TIN CẬY (UGC v2.0, ADR-0002 / Task 3.1 — Gate B):

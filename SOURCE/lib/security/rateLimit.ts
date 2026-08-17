@@ -135,6 +135,28 @@ export const RATE_LIMITS = {
   // gói khi tính năng thuê bao lên: khi đó trần đọc từ gói của người dùng chứ
   // không còn là một hằng số chung cho mọi người.
   explainStep: { limit: 3, windowMs: 24 * 60 * 60 * 1000 },
+  // Trích xuất đề bằng AI (Layer 4, extractAndAssemble). CÙNG HỌ với explainStep
+  // ở trên — cùng lý do, cùng đơn vị cửa sổ, và CÙNG MỘT HẠN NGẠCH THẬT: comment
+  // của explainStep đã ghi rõ "cùng key đó còn phục vụ trích xuất PDF ở
+  // lib/ugc/gemini.ts", nhưng đường trích xuất đó lại là đường DUY NHẤT tiêu vào
+  // hạn ngạch mà không có guard nào (TD-019). Trần cho gia sư vì thế từng là một
+  // trần trên giấy: một tài khoản lặp upload vét sạch 20 lượt/ngày của CẢ project
+  // rồi gia sư của mọi người cùng chết, dù không ai vượt 3 lượt của mình.
+  //
+  // MỘT lần gọi = 2 request Gemini (extractQuestions + extractAnswers), hoặc 3 ở
+  // chế độ Automatic (thêm extractMeta) — xem khối Promise.all ở stage 5. Nên
+  // trần 5 ≈ 10–15 request/ngày cho mỗi tài khoản.
+  //
+  // Vì sao 5 chứ không nhỏ hơn: đăng đề là việc TẠO GIÁ TRỊ chính của Layer 4,
+  // không phải một thao tác phụ — siết xuống 1–2 là chặn người dùng thật để
+  // phòng một kẻ tấn công chưa xuất hiện. Vì sao không lớn hơn: quá 5 thì con số
+  // thôi không còn nói được gì về hạn ngạch 20 nữa.
+  //
+  // ⚠ Trần này giới hạn MỘT TÀI KHOẢN, không bảo vệ được hạn ngạch của project:
+  // 2 tài khoản dùng hết phần mình đã chạm trần 20 lượt/ngày. Chặn thật cho vế
+  // đó là một ngân sách mức PROJECT (đếm chung mọi user, mọi đường gọi Gemini) —
+  // chưa có, còn nợ, xem TD-019.
+  uploadExam: { limit: 5, windowMs: 24 * 60 * 60 * 1000 },
 } as const;
 
 /** Cửa sổ dài nhất đang cấu hình — mốc "chắc chắn hết hiệu lực" của `pruneOldest`. */

@@ -166,6 +166,26 @@ function parseTypedMeta(formData: FormData): TypedMeta {
  */
 export async function extractAndAssemble(formData: FormData): Promise<UgcActionFailure> {
   const { supabase, user } = await requireUser();
+
+  // Rate limit TRƯỚC mọi việc khác (TD-019) — đây là action đắt nhất của dự án:
+  // 2 file × 15MB, một lượt đọc PDF bằng mupdf/WASM, rồi 2–3 request Gemini tiêu
+  // vào hạn ngạch 20 lượt/NGÀY dùng chung cho CẢ project. Trước bản vá này nó là
+  // đường DUY NHẤT chạm Gemini mà không có guard nào, nên trần 3 lượt/ngày của
+  // gia sư (explainStep) chỉ là trần trên giấy: vét hạn ngạch ở đây thì gia sư
+  // của mọi người cùng chết.
+  //
+  // Đặt TRƯỚC requireUser thì không được — cần user.id làm khoá. Đặt sau bước
+  // validate file thì mất nửa tác dụng: chính việc đọc/parse file mới là phần
+  // tốn CPU, và một vòng lặp gửi rác vẫn bắt server làm hết việc đó rồi mới bị
+  // từ chối. Ngay sau requireUser là điểm SỚM NHẤT còn có khoá để đếm.
+  const rl = await guard("uploadExam", user.id);
+  if (!rl.ok) {
+    return failure(
+      "server",
+      `You have uploaded too many exams today. Try again in ${Math.ceil(rl.retryAfterSeconds / 3600)} hour(s).`
+    );
+  }
+
   const log = createPipelineLogger();
   const isRerun = !!(formData.get("examId") as string | null)?.trim();
   // Thiếu entryMode (client cũ) → manual: giữ nguyên hành vi v2.1.

@@ -18,6 +18,65 @@ còn nơi nào khác giữ lịch sử nợ ngoài chính file này.)*
 
 ## Đang mở
 
+### TD-022 — Không có ngân sách Gemini ở mức PROJECT, chỉ có trần theo từng user
+**Từ:** 2026-08-17 (tách ra khi trả TD-019 — phần TD-019 không trả được)
+**Loại:** phòng thủ đúng tầng nhưng thiếu một tầng, chặn bởi thiết kế
+
+TD-019 đã bịt đường vét hạn ngạch KHÔNG GIỚI HẠN. Phần còn lại KHÔNG cùng một
+bài toán: mọi trần hiện có đều khoá theo `user.id`, nên chúng bó được MỘT tài
+khoản chứ không bó được TỔNG. Số đo cụ thể: sau TD-019, một tài khoản tiêu tối
+đa 18 request Gemini/ngày (explainStep 3×1 + uploadExam 5×3) trên hạn ngạch
+**20 request/ngày cho CẢ project** (`GenerateRequestsPerDayPerProjectPerModel-FreeTier`,
+đọc từ thân phản hồi 429). Nghĩa là **2 tài khoản dùng hết phần mình là hết sạch
+hạn ngạch của mọi người** — hoàn toàn hợp lệ, không ai vượt trần nào.
+
+**Sẽ nổ thế nào:** không phải lỗi sai kết quả mà là tính năng tắt lịm giữa ngày.
+Người thứ ba bấm "Giải thích bước này" nhận lỗi 429 dù chưa dùng lượt nào của
+mình; tác giả thứ ba upload đề thì pipeline chết ở stage 5. Không mã lỗi nào chỉ
+về đúng nguyên nhân ("người khác đã dùng hết"), nên người sau sẽ đi debug nhầm
+hướng — đúng hình dạng TD-009: fail-closed im lặng.
+
+**Vì sao chưa trả ngay:** trần theo user đếm được bằng một khoá có sẵn; ngân sách
+project cần một bộ đếm CHUNG không theo user (khoá kiểu `gemini:project:<ngày>`)
+và, quan trọng hơn, cần một QUYẾT ĐỊNH sản phẩm cho lúc cạn ngân sách — xếp hàng,
+từ chối, hay hạ cấp sang đường không-AI. Chọn bừa một trong ba rồi viết code là
+cách chắc chắn phải viết lại. Bộ đếm chung đã có sẵn hạ tầng (`rateLimitStore.ts`,
+Upstash cùng region), nên phần thiếu là thiết kế chứ không phải công cụ.
+
+**Cách trả:** hoặc nâng hạn ngạch Gemini lên gói trả phí (làm số 20 hết là ràng
+buộc chính), hoặc thêm bộ đếm mức project + đường hạ cấp. Ghi chú sẵn trong
+`RATE_LIMITS.explainStep`: các trần này rồi sẽ đọc từ gói thuê bao của người dùng
+chứ không còn là hằng số chung — khi đó TD-022 nên được trả CÙNG lúc, không phải
+trước đó.
+
+### TD-023 — Hai route vẫn vượt ngân sách JS, và lý do là bản chất chứ không phải sơ suất
+**Từ:** 2026-08-17 (đo khi trả TD-021)
+**Loại:** hiệu năng, đã đo, chưa có cách sửa rẻ
+
+Sau TD-021, còn đúng hai route vượt ngưỡng ~170 KB gzip (First Load JS, ngân sách
+JS di động tiêu chuẩn) — đo trên bản `next build` thật:
+- `/me/exams/[id]` — **188.4 KB gzip** (620.0 KB raw), màn sửa đề của tác giả.
+- `/exams/[id]/attempt/[attemptId]` — **185.6 KB gzip** (606.2 KB raw), màn LÀM BÀI.
+
+Cả hai vượt vì cùng một chunk markdown+KaTeX 122.5 KB gzip mà TD-021 đã gỡ được
+khỏi route Chi tiết kết quả. Ở đây KHÔNG gỡ được bằng cùng cách: `ExamPlayer` và
+`QuestionEditor` là component client thật (state làm bài, ô nhập, timer), nên nội
+dung câu hỏi buộc phải render được ở client. Nạp động cũng không cứu: khác với
+bảng gợi ý của gia sư (chỉ hiện sau khi người dùng CHỦ ĐỘNG bấm), nội dung câu
+hỏi là thứ phải có NGAY — nạp động chỉ đổi "tải chậm" thành "trang trống rồi mới
+có chữ".
+
+**Sẽ nổ thế nào:** không nổ, nó chỉ chậm — và chậm đúng ở màn quan trọng nhất,
+với đúng nhóm người dùng yếu thế nhất (học sinh dùng 3G/máy tầm thấp). ~200ms
+parse/compile thêm trên máy tầm trung, trước khi bài thi tương tác được.
+
+**Cách trả (chưa làm, cần đo trước khi tin):** tách phần hiển thị câu hỏi thành
+server component rồi truyền xuống client component qua `children` — RSC cho phép
+đúng việc này, và TD-021 đã dọn sẵn nửa đường (RichText nay render được ở server).
+Việc còn lại là dựng lại ranh giới của ExamPlayer/QuestionEditor sao cho state làm
+bài không cần sở hữu cây nội dung. Đây là đổi kiến trúc component, không phải một
+dòng config — đừng làm chung với một việc khác.
+
 ### TD-013 — Không có rate limit nào cho lưu lượng CHƯA đăng nhập
 **Từ:** 2026-08-07 (tách ra khi trả TD-008; trước đó nằm lẫn trong mục đó)
 **Loại:** phòng thủ còn thiếu hẳn một mảng, có vật cản cụ thể
@@ -42,30 +101,6 @@ Hobby, rồi site tắt. Mức độ hiện tại thấp vì site chưa có ai c
 **Cách trả:** nâng Pro rồi cấu hình Vercel Firewall rate limit (config, không
 phải code), hoặc đặt site sau Cloudflare free tier — cái sau không tốn tiền
 nhưng đổi DNS và thêm một tầng vào đường đi.
-
-### TD-015 — `eslint-config-next` lệch phiên bản với `next`
-**Từ:** 2026-08-04 (ghi nhận lần đầu trong PROCESS.md, chưa từng vào sổ)
-**Loại:** phụ thuộc, im lặng
-
-`package.json` ghim `eslint-config-next@16.2.7` trong khi `next` đã lên
-`16.3.0` (xác nhận qua `package-lock.json`, và `eslint-config-next@16.3.0` đã
-có sẵn trên npm — không phải chờ bản phát hành). Không ai cố ý để lệch: TD-007
-(2026-08-04) nâng `next` bằng `npm audit fix`, việc đó không đụng
-`eslint-config-next` vì nó không nằm trong đường phụ thuộc bị advisory.
-
-**Vì sao chưa nổ:** `npm run lint` (`--max-warnings 0`, chặn CI từ khi TD-010
-đóng) vẫn chạy sạch — bản 16.2.7 chưa flag sai hay bỏ sót gì quan sát được.
-
-**Vì sao vẫn ghi lại:** một bộ rule ESLint đặc thù Next.js đi sau chính bản
-Next đang chạy có thể bỏ sót cảnh báo cho pattern MỚI của 16.3.0, hoặc lỗi thời
-với pattern đã đổi — và vì lint là cổng CHẶN merge (TD-010), một khoảng hở ở
-đây là khoảng hở im lặng trên chính cổng được kỳ vọng bắt lỗi. Độ trễ càng lâu,
-khoảng cách phiên bản càng doãng.
-
-**Cách trả:** `npm install -D eslint-config-next@16.3.0` rồi chạy đủ 4 cổng
-verify. Rủi ro thấp (chỉ nâng đúng 1 minor version, khớp `next` đang chạy) —
-việc trì hoãn trước đó (ghi trong PROCESS.md) là do mạng không ổn định lúc đó,
-không phải rủi ro kỹ thuật.
 
 ### TD-005 — `schema.sql` áp bằng tay, không có migration tool
 **Từ:** trước 2026-08-03 (nợ cũ, ghi lại cho rõ)
@@ -159,6 +194,139 @@ một lần chạy lại toàn file trên DB có dữ liệu đại diện, mớ
 ---
 
 ## Đã trả
+
+### ~~TD-019 — `extractAndAssemble` không có rate limit, vét sạch hạn ngạch AI dùng chung~~
+**Từ:** 2026-08-17 (rà bảo mật toàn repo; Semgrep 117 rule/769 file ra 0 finding,
+mục này đến từ vòng thủ công OWASP A07/A08, không phải từ scanner)
+
+`extractAndAssemble` — action ĐẮT NHẤT dự án — là Server Action DUY NHẤT chạm
+Gemini mà không có `guard()` nào. Mỗi lần gọi: 2 file × 15MB, một lượt đọc PDF
+bằng mupdf/WASM, rồi **2 request Gemini (Manual) hoặc 3 (Automatic)** chạy song
+song ở stage 5. Hạn ngạch thật: **20 request/NGÀY cho CẢ project** (free tier).
+
+**Vì sao nó tệ hơn "một action thiếu guard":** nó làm HỎNG một guard khác đã
+viết đúng. `RATE_LIMITS.explainStep` được thiết kế rất kỹ (3 lượt/NGÀY, cửa sổ cố
+ý trùng đơn vị ngày của nhà cung cấp, kèm cả một đoạn giải thích vì sao cửa sổ
+theo giờ không đặt được trần cho hạn ngạch theo ngày) — và chính comment đó đã
+ghi "cùng key đó còn phục vụ trích xuất PDF ở `lib/ugc/gemini.ts`". Nhưng đường
+trích xuất ấy không bị đếm. Kết quả: **7 lần upload của MỘT tài khoản đã đăng
+nhập là hết sạch 20 lượt/ngày**, rồi gia sư của toàn bộ người dùng chết — trong
+khi không ai vượt trần 3 lượt của mình. Một trần trên giấy.
+
+**Đã trả 2026-08-17** — `RATE_LIMITS.uploadExam = { limit: 5, windowMs: 24h }`,
+`guard("uploadExam", user.id)` đặt NGAY sau `requireUser()`. Ba chi tiết cố ý:
+- **Vị trí là điểm sớm nhất còn có khoá để đếm.** Trước `requireUser()` thì chưa
+  có `user.id`; sau bước validate file thì đã trả giá phần đắt nhất (đọc/parse
+  file) rồi mới từ chối — một vòng lặp gửi rác vẫn bắt server làm hết việc.
+- **Xếp vào nhóm "supplier-capped", không phải nhóm "tốn DB của chính ta".** Test
+  phân loại sẵn có đòi nhóm tốn-DB phải `limit >= 15`; xếp nhầm là hợp thức hoá
+  đúng cái lỗ vừa vá.
+- **5 chứ không nhỏ hơn:** đăng đề là việc TẠO GIÁ TRỊ chính của Layer 4, siết
+  xuống 1–2 là chặn người dùng thật để phòng kẻ tấn công chưa xuất hiện.
+
+**Cổng canh mới, và nó bắt thứ mà từng trần riêng lẻ KHÔNG bắt được:** kiểm từng
+cái thì 3 và 5 đều "dưới 20", trong khi cộng lại một tài khoản vẫn vét sạch. Test
+mới quy đổi sang SỐ REQUEST GEMINI (explainStep ×1, uploadExam ×3) và ghim tổng
+worst-case của một tài khoản ≤ 20 — hiện là **18**. Thêm lời gọi AI thứ tư vào
+pipeline sẽ làm case này đỏ kèm chỉ dẫn trần nào phải hạ.
+
+**Verify:** `npx vitest run lib/security/rateLimit.test.ts` → 10 passed. Đủ 5 cổng
+sau khi sửa: `tsc --noEmit` sạch · `eslint --max-warnings 0` sạch · `vitest run`
+**728 passed / 10 skipped** · `next build` không warning · `check:bundle` PASS.
+
+**Phần KHÔNG trả được, đã tách thành TD-022:** trần khoá theo `user.id` nên bó
+được một tài khoản chứ không bó được TỔNG — 2 tài khoản dùng hết phần mình vẫn
+hết hạn ngạch project.
+
+### ~~TD-021 — Chunk markdown+KaTeX 122.5 KB gzip nằm trong bundle đầu của trang chỉ-đọc~~
+**Từ:** 2026-08-17 (rà hiệu năng; Next 16 + Turbopack KHÔNG còn in bảng
+`Size`/`First Load JS` sau build, nên số đo lấy bằng cách đọc
+`page_client-reference-manifest.js` của từng route rồi gzip từng chunk thật)
+
+Ba route vượt ngân sách ~170 KB gzip, và cả ba vượt vì CÙNG một chunk:
+`react-markdown + remark-gfm + remark-math + rehype-katex + rehype-sanitize +
+katex` = **122.5 KB gzip / 415.9 KB raw** — chunk client lớn nhất dự án, lớn hơn
+toàn bộ phần JS còn lại của phần lớn route. Đo bằng cách diff tập chunk giữa hai
+route anh em: `/…/result/detail` (181.8 K) trừ `/…/result` (94.4 K) ra đúng chunk
+đó.
+
+Chỗ sai thật nằm ở `/…/result/detail`: đây là trang **chỉ đọc**, nhưng nó trả
+122.5 KB cho MỌI người xem — kể cả người làm đúng hết. Lý do: `RichText` mang
+`"use client"` (dù không có hook/state/handler nào), nên 4 chỗ page.tsx render nó
+ở vị trí server vẫn tạo ranh giới client; và `ExplainStepAffordance` (client)
+import tĩnh nó, dù bảng gợi ý chỉ hiện khi học sinh đã sai câu đó HAI lần VÀ chủ
+động bấm nút.
+
+**Đã trả 2026-08-17** — hai thay đổi, và **cả hai đều bắt buộc**. Đây là chỗ dễ
+làm nửa vời nhất nên số đo cả 4 tổ hợp ghi lại ở đây:
+
+| `RichText` | import trong tutor | `/…/result/detail` |
+|---|---|---|
+| client | tĩnh | 181.8 K gzip (bản gốc) |
+| **server** | tĩnh | 181.8 K — bỏ directive MỘT MÌNH không đổi gì |
+| client | động | 183.2 K — nạp động MỘT MÌNH còn tệ hơn (thêm wrapper) |
+| **server** | **động** | **60.7 K** |
+
+→ **−121.1 KB gzip (−66%)**, route tụt từ trên ngưỡng xuống dưới hẳn. Bài học
+đáng giữ: hai thay đổi mà mỗi cái đo riêng đều ra **0**, gộp lại ra 66% — nếu chỉ
+làm một cái rồi đo, kết luận đúng sẽ là "cách này vô dụng".
+
+`ssr: false` ở chỗ nạp động là ĐÚNG chứ không phải để né lỗi: `hint` chỉ tồn tại
+sau một lời gọi Server Action từ tương tác người dùng, nên lượt render server nó
+luôn rỗng.
+
+**Cổng canh:** cảnh báo đặt ngay đầu `RichText.tsx` — thêm lại `"use client"` vào
+file đó là đẩy 122.5 KB sang trình duyệt cho mọi route render nội dung câu hỏi;
+cần state thì bọc một client component MỎNG ở ngoài. Test
+`ExplainStepAffordance.test.tsx` nay chờ đúng thẻ `<strong>` xuất hiện — vừa là
+bằng chứng chunk đã resolve, vừa đúng nghĩa vụ chứng minh sẵn có của case đó
+(đường render đi qua markdown, không phải plain-text).
+
+**Verify:** `vitest run components/tutor components/shared` → 61 passed (gồm
+nguyên bộ XSS fixtures của RichText). Đủ 5 cổng như TD-019.
+
+**Phần KHÔNG trả được, đã tách thành TD-023:** `/me/exams/[id]` (188.4 K) và
+`/exams/[id]/attempt/[attemptId]` (185.6 K) vẫn vượt ngưỡng — ở đó nội dung câu
+hỏi nằm trong cây client thật và phải có NGAY, nên không dùng lại được cách này.
+
+### ~~TD-020 — 2 CVE trong phụ thuộc production~~
+**Từ:** 2026-08-17 (`npm audit --omit=dev`)
+
+- `nanoid <3.3.18` (**high**, GHSA-2v37-7h3g-55p8) qua `next@16.3.0 → postcss`.
+- `dompurify <=3.4.12` (**moderate**, GHSA-55q2-fjhq-7xh7 — XSS: IN_PLACE hook
+  removal để lại subtree tách rời vẫn thực thi được) qua `jspdf@4.2.1`.
+
+**Đã trả 2026-08-17** — `npm audit fix` (KHÔNG `--force`; cảnh báo cũ ở TD-007
+vẫn nguyên giá trị: `--force` từng đề xuất hạ `next` xuống 9.3.3). Chỉ
+`package-lock.json` đổi, không chạm `package.json`: dompurify 3.4.12→3.4.13,
+nanoid 3.3.17→3.3.18. `npm audit --omit=dev` sau khi vá → **0 vulnerabilities**
+(cả `npm audit` đầy đủ cũng 0).
+
+Ghi lại vì hai đường tiếp cận đều dễ kết luận nhầm theo hướng ngược nhau:
+`--omit=dev` vẫn báo `nanoid` dù `@tailwindcss/postcss` là devDependency — nó
+đến qua `next` (đường prod thật), nên "chỉ là dev dependency" là sai. Ngược lại
+`npm audit fix --omit=dev` chạy thử thì đòi gỡ 332 gói (nó dọn luôn devDeps khỏi
+`node_modules`) — chạy bản đó để "cho an toàn" mới là thứ làm hỏng cây làm việc.
+
+### ~~TD-015 — `eslint-config-next` lệch phiên bản với `next`~~
+**Từ:** 2026-08-04 (ghi nhận lần đầu trong PROCESS.md, chưa từng vào sổ)
+
+`package.json` ghim `eslint-config-next@16.2.7` trong khi `next` đã lên `16.3.0`.
+Không ai cố ý để lệch: TD-007 nâng `next` bằng `npm audit fix`, việc đó không
+đụng `eslint-config-next` vì nó không nằm trong đường phụ thuộc bị advisory. Lint
+là cổng CHẶN merge (TD-010), nên một bộ rule đặc thù Next.js đi sau chính bản
+Next đang chạy là khoảng hở im lặng trên chính cổng được kỳ vọng bắt lỗi.
+
+**Đã trả 2026-08-17** — `eslint-config-next` 16.2.7 → **16.3.0**, khớp `next`
+đang chạy. `npm run lint` (`--max-warnings 0`) vẫn sạch sau khi nâng, tức bản
+mới không flag thêm gì trong source hiện tại.
+
+**Một chi tiết phải giữ lại, vì nó suýt trôi qua:** `npm install -D
+eslint-config-next@16.3.0` ghi vào `package.json` thành `^16.3.0` — đổi luôn
+CHÍNH SÁCH ghim của dep này (trước đó là bản duy nhất trong repo ghim CHÍNH XÁC,
+không caret, và đó là chủ đích: nó phải đi lockstep với `next`). Đã sửa lại thành
+`16.3.0` đúng nghĩa rồi `npm install` cho khớp lockfile. Nâng phiên bản mà vô
+tình nới quy ước ghim là đúng cách để món nợ này quay lại theo hướng ngược.
 
 ### ~~TD-018 — 9 file test rỗng làm cổng `npm test` ĐỎ trên mọi push~~
 **Từ:** 2026-08-14 (phát hiện khi chạy full suite cho một việc khác)
