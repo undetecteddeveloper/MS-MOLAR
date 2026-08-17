@@ -13,15 +13,23 @@ import { createClient } from "@supabase/supabase-js";
 // giải ở đó.
 import { AVATAR_LIMITS } from "../lib/profile/limits";
 
+// Đọc env từ `.env.local`, hoặc từ file khác nếu đặt `SCHEMA_ENV_FILE` — cùng
+// override đã có ở verify-schema.ts (TD-005), để chạy được cho prod mà không
+// phải swap `.env.local` bằng tay:
+//   SCHEMA_ENV_FILE=.env.local.prod-backup npx tsx supabase/setup-storage.ts
 function loadEnv(): Record<string, string> {
-  const raw = readFileSync(resolve(__dirname, "../.env.local"), "utf8");
+  const file = process.env.SCHEMA_ENV_FILE?.trim() || ".env.local";
+  const raw = readFileSync(resolve(__dirname, "..", file), "utf8");
   const env: Record<string, string> = {};
   for (const line of raw.split("\n")) {
     const t = line.trim();
     if (!t || t.startsWith("#")) continue;
     const eq = t.indexOf("=");
     if (eq === -1) continue;
-    env[t.slice(0, eq).trim()] = t.slice(eq + 1).trim();
+    env[t.slice(0, eq).trim()] = t
+      .slice(eq + 1)
+      .trim()
+      .replace(/^(["'])(.*)\1$/, "$2");
   }
   return env;
 }

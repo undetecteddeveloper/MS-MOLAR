@@ -49,21 +49,35 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+// Đọc env từ `.env.local`, hoặc từ file khác nếu đặt `SCHEMA_ENV_FILE` — cùng
+// override đã có ở verify-schema.ts (TD-005), để chạy được cho prod mà không
+// phải swap `.env.local` bằng tay:
+//   SCHEMA_ENV_FILE=.env.local.prod-backup npx tsx supabase/test-rls.ts
 function loadEnv(): Record<string, string> {
-  const raw = readFileSync(resolve(__dirname, "../.env.local"), "utf8");
+  const file = process.env.SCHEMA_ENV_FILE?.trim() || ".env.local";
+  const raw = readFileSync(resolve(__dirname, "..", file), "utf8");
   const env: Record<string, string> = {};
   for (const line of raw.split("\n")) {
     const t = line.trim();
     if (!t || t.startsWith("#")) continue;
     const eq = t.indexOf("=");
     if (eq === -1) continue;
-    env[t.slice(0, eq).trim()] = t.slice(eq + 1).trim();
+    env[t.slice(0, eq).trim()] = t
+      .slice(eq + 1)
+      .trim()
+      .replace(/^(["'])(.*)\1$/, "$2");
   }
   return env;
 }
 
 const PASSWORD = "rls-test-password-123";
-const EXAM_ID = "exam-toan-10";
+// Fixture riêng của Phần 1, KHÔNG còn phụ thuộc `supabase/seed.ts` (đề demo
+// "exam-toan-10" của seed đó chỉ từng chạy trên dev — prod chỉ có UGC thật,
+// không có demo content). Phụ thuộc cũ làm Phần 1 chết ngay ở INSERT đầu
+// tiên với 23503 khi chạy trên môi trường chưa seed (phát hiện 2026-08-17
+// khi chạy trên prod). Cùng khuôn tự cấp-phát/dọn dẹp fixture như mọi phần
+// khác trong file (setup*Fixtures/cleanup*Fixtures bên dưới).
+const EXAM_ID = "rls-legacy-attempt";
 const EMAIL_A = "smithnguyen247+rlstesta@gmail.com";
 const EMAIL_B = "smithnguyen247+rlstestb@gmail.com";
 
@@ -491,6 +505,21 @@ async function main() {
   // Phần 1 — attempts (GĐ 2 M2.7, giữ nguyên)
   // ==========================================================================
 
+  // Idempotent cleanup-trước rồi tạo fixture riêng (service_role) — xem ghi
+  // chú ở khai báo EXAM_ID.
+  await admin.from("exam_attempts").delete().eq("exam_id", EXAM_ID);
+  await admin.from("exams").delete().eq("id", EXAM_ID);
+  const legacyExam = await admin.from("exams").insert({
+    id: EXAM_ID,
+    title: "[RLS] Legacy attempt isolation fixture",
+    question_ids: [],
+    duration_minutes: 15,
+    subject: "Toán",
+    grade: 10,
+    status: "published",
+  });
+  if (legacyExam.error) throw legacyExam.error;
+
   // --- User A tạo một attempt -------------------------------------------
   const created = await userA
     .from("exam_attempts")
@@ -555,8 +584,9 @@ async function main() {
     "User đã auth đọc được questions",
   );
 
-  // Dọn dẹp: A xóa attempt test.
+  // Dọn dẹp: A xóa attempt test, service_role dọn nốt fixture đề.
   await userA.from("exam_attempts").delete().eq("id", attemptId);
+  await admin.from("exams").delete().eq("id", EXAM_ID);
 
   // ==========================================================================
   // Phần 2 — UGC v2.0 Gate A: R-a…R-o (Task 1.2)
