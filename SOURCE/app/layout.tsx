@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist_Mono, Source_Serif_4, Be_Vietnam_Pro } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import { I18nProvider } from "@/lib/i18n/client";
 import { getLocale } from "@/lib/i18n/server";
 import { SITE_URL } from "@/lib/siteUrl";
@@ -114,6 +115,7 @@ export default async function RootLayout({
     >
       <body className="flex min-h-full flex-col">
         <I18nProvider locale={locale}>{children}</I18nProvider>
+        <Analytics />
       </body>
     </html>
   );
