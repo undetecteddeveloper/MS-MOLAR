@@ -44,6 +44,7 @@ export const vi: Dictionary = {
   "common.sending": "Đang gửi…",
   "common.done": "Xong",
   "common.restore": "Khôi phục",
+  "common.loading": "Đang tải",
 
   // --- Điều hướng ---------------------------------------------------------
   "nav.home": "Trang chủ",
@@ -67,6 +68,7 @@ export const vi: Dictionary = {
   "home.instantGrading": "chấm điểm tức thì",
   "home.bodyPart3": " và phân tích điểm yếu, để bạn học đúng trọng tâm và tiến bộ nhanh hơn.",
   "home.getStarted": "Bắt đầu",
+  "home.aboutPrompt": "Bạn muốn tìm thông tin của chúng tôi? Nhấn vào đây",
 
   // --- Băng chuyền trang chủ (HomeCarousel) -------------------------------
   "home.carouselLabel": "Điểm nổi bật của nền tảng",

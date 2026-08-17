@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { AboutPrompt } from "@/app/(layer1)/_components/AboutPrompt";
 import { HomeSidebar } from "@/app/(layer1)/_components/HomeSidebar";
 import { HomeStage, type AuthMode } from "@/app/(layer1)/_components/HomeStage";
 import { BottomNav } from "@/components/layout/BottomNav";
@@ -85,6 +86,26 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ a
         <HeroLines />
         {/* HomeStage có my-auto → tự căn giữa dọc khi content thấp hơn khung. */}
         <HomeStage auth={authMode} />
+
+        {/* Lối vào /about — mép TRÁI-DƯỚI của content area, ở mọi bề rộng
+            (engineer chốt 2026-08-17). Đặt trong <main> chứ không phải trong
+            sidebar: sidebar là cột điều hướng và nó biến mất hẳn dưới 1024px,
+            nên một liên kết sống ở đó sẽ không tồn tại với người dùng di động —
+            đúng nhóm đông nhất của dự án.
+            `relative z-10`: HeroLines là SVG absolute nên nếu không nâng khối
+            này lên cùng tầng với HomeStage thì nó nằm dưới hoa văn.
+            KHÔNG có `mt-*`: `my-auto` của HomeStage đã ăn hết khoảng trống dọc
+            và tự đẩy khối này xuống đáy khung cuộn.
+            `md:pb-8 lg:pb-10` bù lại đúng phần `py-*` của <main> mà quy tắc
+            `.pb-bottom-nav` ép về 0 từ 768px (globals.css) — quy tắc đó viết
+            cho khoảng hở dưới thanh điều hướng đáy, và ở dải không có thanh đó
+            nó ghi đè luôn cả padding đáy thường. Trước khối này chưa ai thấy:
+            HomeStage `my-auto` không bao giờ chạm tới đáy. Đo được 2026-08-17:
+            thiếu hai class này thì liên kết dính sát mép dưới màn hình (bottom
+            = 900/900). */}
+        <div className="relative z-10 md:pb-8 lg:pb-10">
+          <AboutPrompt />
+        </div>
       </main>
 
       <BottomNav />

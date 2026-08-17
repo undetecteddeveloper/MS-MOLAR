@@ -44,6 +44,10 @@ export const en = {
   "common.sending": "Sending…",
   "common.done": "Done",
   "common.restore": "Restore",
+  // Lớp phủ chuyển trang (components/layout/RouteLoadingOverlay.tsx). Ngắn và
+  // không có dấu ba chấm như "common.saving"/"common.processing": ba chuỗi kia
+  // là nhãn NÚT đang bận, còn chuỗi này đứng một mình giữa màn hình.
+  "common.loading": "Loading",
 
   // --- Điều hướng ---------------------------------------------------------
   "nav.home": "Home",
@@ -75,6 +79,10 @@ export const en = {
   "home.instantGrading": "instant grading",
   "home.bodyPart3": " and weakness analysis so you study the right things and improve faster.",
   "home.getStarted": "Get started",
+  // Lối vào /about ở góc dưới-trái trang chủ (AboutPrompt.tsx). Câu hỏi + lời
+  // mời chứ không phải nhãn "About": /about là trang giới thiệu + liên hệ, và
+  // một nhãn trơ trọi ở chân trang thì không nói được nó chứa gì.
+  "home.aboutPrompt": "Looking for information about us? Tap here",
 
   // --- Băng chuyền trang chủ (HomeCarousel) -------------------------------
   // Ba mục cùng một chuỗi. Mục "Giới thiệu" dùng lại nguyên văn các khoá

@@ -1,6 +1,8 @@
+import { Suspense } from "react";
 import type { Metadata, Viewport } from "next";
 import { Geist_Mono, Source_Serif_4, Be_Vietnam_Pro } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
+import { RouteLoadingOverlay } from "@/components/layout/RouteLoadingOverlay";
 import { I18nProvider } from "@/lib/i18n/client";
 import { getLocale } from "@/lib/i18n/server";
 import { SITE_URL } from "@/lib/siteUrl";
@@ -114,7 +116,23 @@ export default async function RootLayout({
       className={`${geistMono.variable} ${sourceSerif.variable} ${beVietnamPro.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">
-        <I18nProvider locale={locale}>{children}</I18nProvider>
+        {/* Lớp phủ "Loading" lúc chuyển trang phải nằm TRONG I18nProvider (nó
+            đọc `useT`) và ở root layout — layout của từng route group sẽ
+            remount theo route, tức là chính lúc cần nó nhất thì nó biến mất.
+
+            <Suspense> là bắt buộc vì component đọc `useSearchParams()`: trên
+            một route được prerender tĩnh, Next bắt cả cây phải rơi về render
+            phía client nếu không có ranh giới này — và đặt ở root layout thì
+            "cả cây" nghĩa là toàn bộ trang. Hiện KHÔNG route nào của dự án là
+            tĩnh (`next build` in ƒ cho tất cả), nên ranh giới này chưa đổi gì
+            hôm nay; nó ở đây để cái ngày ai đó làm một trang tĩnh không kéo
+            theo một cú hồi quy hiệu năng không ai nối được về nguyên nhân. */}
+        <I18nProvider locale={locale}>
+          {children}
+          <Suspense fallback={null}>
+            <RouteLoadingOverlay />
+          </Suspense>
+        </I18nProvider>
         <Analytics />
       </body>
     </html>

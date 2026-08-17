@@ -421,3 +421,65 @@
     animation: none;
   }
 }
+
+/* ============================================================
+   ROUTE LOADING OVERLAY — lớp phủ "Loading" trong lúc chuyển
+   trang (components/layout/RouteLoadingOverlay.tsx).
+
+   Phần tử LUÔN nằm trong DOM và chỉ đổi `visibility` — lý do ở
+   trong header component đó (ảnh logo phải tải xong TRƯỚC, chỉ
+   báo tải mà phải chờ tải thì vô nghĩa).
+
+   Trễ 180ms trước khi fade vào, theo đúng khuyến nghị của tài
+   liệu useLinkStatus: điều hướng đã prefetch xong thường về đích
+   trong vài chục ms, hiện lớp phủ ngay lập tức sẽ thành một cú
+   nháy trắng trên MỌI cú bấm — tệ hơn hẳn việc không có gì.
+   `visibility` (không phải `display`) để trạng thái ẩn vẫn có hộp
+   bố cục, nhờ đó ảnh logo được trình duyệt tải như ảnh trong
+   khung nhìn.
+   ============================================================ */
+@keyframes route-loading-appear {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes route-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Bản thay thế cho người tắt hiệu ứng: nhịp mờ/tỏ tại chỗ. KHÔNG dùng
+   `animation: none` như .preload-fade — chuỗi fade lúc vào trang chỉ là trang
+   trí (bỏ đi thì nội dung hiện ngay, không mất thông tin gì), còn ở đây chuyển
+   động CHÍNH LÀ thông tin: bỏ hết thì lớp phủ đứng im, không phân biệt được
+   với một trang đã treo. */
+@keyframes route-loading-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.route-loading {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.route-loading[data-pending="true"] {
+  visibility: visible;
+  animation: route-loading-appear 200ms ease-out 180ms forwards;
+}
+
+/* Animation gắn theo trạng thái chứ không gắn cố định vào phần tử: một vòng
+   xoay chạy vĩnh viễn sau lớp phủ đang ẩn là CPU đốt không công trên đúng
+   nhóm máy Android tầm trung mà dự án nhắm tới. */
+.route-loading[data-pending="true"] .route-loading-mark {
+  animation: route-loading-spin 1200ms linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-loading[data-pending="true"] .route-loading-mark {
+    animation: route-loading-pulse 1600ms ease-in-out infinite;
+  }
+}
