@@ -25,11 +25,7 @@ Ba pha, chạy theo thứ tự. Pha 2 tồn tại để pha 1 của phiên SAU t
 
 Tạo/cập nhật row trong database MS-MOLAR. Thuộc tính: `Tên nhiệm vụ`, `Trạng thái` (Chưa bắt đầu/Đang thực hiện/Hoàn tất), `Mô tả`, `Loại nhiệm vụ`, `Mức độ ưu tiên`, `Mức độ công sức`, `Hạn chót` (hỏi nếu chưa biết). Thân page ghi **số đo và lý do**, không chỉ liệt kê việc — phiên sau đọc lại cần hiểu *tại sao*, không chỉ *cái gì*.
 
-`PROCESS.md` — lịch sử chỉ-đọc từ 2026-08-06 — đã **xoá hẳn 2026-08-07**: mọi
-nợ kỹ thuật còn mở trong đó (rà toàn bộ ~3700 dòng, không chỉ phần cuối) đã
-chuyển vào `TECH-DEBT.md`; các mục còn lại đều đã được phiên sau giải quyết
-(xác minh từng mục bằng code/DB thật, không chép mù). Quyết định cũ giờ tra ở
-Notion database MS-MOLAR (row đã đóng) hoặc git log, không còn ở PROCESS.md.
+Mọi nợ kỹ thuật còn mở trong đó đã chuyển vào `TECH-DEBT.md`; các mục còn lại đều đã được phiên sau giải quyết. Quyết định cũ giờ tra ở Notion database MS-MOLAR (row đã đóng) hoặc git log.
 
 ### Pha 3 — Implementation
 
@@ -47,6 +43,35 @@ Notion database MS-MOLAR (row đã đóng) hoặc git log, không còn ở PROCE
    - Push `main` cũng kích hoạt build prod tự động — coi chừng deploy hai lần.
    - Có skill `vercel:deploy` và `vercel:status`. Env/Supabase prod: `docs/DEPLOYMENT.md`.
 6. **Đóng vòng**: cập nhật lại row Notion (trạng thái + kết quả verify + link deploy + việc còn lại).
+
+### Pha 3.5 — Kiểm DB prod TRƯỚC khi launch (TD-005, đã nổ 4 lần)
+
+Deploy Vercel **không đụng gì tới database**. "Code đã live trên prod" và "DB
+prod có đủ bảng/cột cho code đó chạy" là hai trạng thái ĐỘC LẬP — CI (`tsc`,
+`vitest`, `next build`) chỉ so khớp fingerprint **cục bộ trong repo**, không
+hỏi database thật. Từng nổ 4 lần (TD-005, gần nhất 2026-08-15: prod thiếu
+nguyên schema Support System + Engine 1 — 6 bảng — vì bước "apply schema.sql
+lên prod trước launch" chỉ tồn tại dưới dạng câu ghi chú trong work plan,
+không phải checklist item có ai tick).
+
+**Bắt buộc TRƯỚC khi coi một feature có bảng/cột mới là "xong" trên production**
+(không phải chỉ khi deploy code — ngay cả khi chỉ nghi ngờ, hoặc trước khi
+đóng row Notion sang "Hoàn tất"):
+
+1. So fingerprint: `select fingerprint from public.schema_version` trên prod
+   (qua Composio `SUPABASE_RUN_READ_ONLY_QUERY`, ref lấy từ
+   `SUPABASE_LIST_ALL_PROJECTS`) đối chiếu với literal ở cuối
+   `SOURCE/supabase/schema.sql` (khối `insert into public.schema_version`).
+   Lệch = prod đang tụt lại, bất kể code đã deploy hay chưa.
+2. Nếu lệch: xác nhận với engineer trước khi apply DDL lên prod (dữ liệu thật,
+   không tự quyết một mình) — kiểm trước `drop table`/`truncate`/`delete`/
+   `update` nào chạm dữ liệu hiện có, apply qua `SUPABASE_APPLY_A_MIGRATION`
+   (file lớn thì tách theo ranh giới câu lệnh, tôn trọng khối `$$...$$`), rồi
+   hậu kiểm bằng truy vấn thật (đếm bảng, thử insert/select qua phiên user
+   thật) — đừng tin mỗi thông báo "success".
+3. Không đợi "trước khi launch" như một lời hứa mơ hồ — kiểm ngay khi
+   `schema.sql` đổi trong cùng phiên đó, cho MỌI project Supabase đang connect
+   (dev lẫn prod), không chỉ project đang test.
 
 ## 3. Theme — "Mực & Sơn mài" (Ink & Lacquer)
 
