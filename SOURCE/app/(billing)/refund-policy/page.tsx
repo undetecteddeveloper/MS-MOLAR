@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 export default async function RefundPolicyPage() {
   const t = await getTranslate();
   return (
-    <LegalDocument eyebrow={t("billing.refund.eyebrow")} title={t("billing.refund.title")}>
+    <LegalDocument title={t("billing.refund.title")}>
       <p>{t("billing.noAutoRenew")}</p>
       {/* Điều kiện và thời hạn hoàn tiền, cách xử lý khi người mua là trẻ vị
           thành niên, pháp nhân/cá nhân đứng tên bán — tất cả chờ PRD U3. */}

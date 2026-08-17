@@ -59,6 +59,7 @@ function parseArgs(argv) {
     press: ["key"],
     wait: ["selector"],
     screenshot: ["path"],
+    storageState: ["path"],
     snapshot: ["selector"],
     text: ["selector"],
     html: ["selector"],
@@ -91,6 +92,7 @@ Commands:
   press <key> [--selector=sel]    e.g. press Enter
   wait <selector> [--timeout=ms]
   screenshot [path] [--selector=sel] [--fullPage]
+  storageState [path]             save cookies/localStorage (Playwright storageState JSON)
   snapshot [selector]             compact accessibility tree (aria snapshot)
   text [selector]                 innerText
   html [selector]                 outerHTML / full page HTML

@@ -133,6 +133,11 @@ const handlers = {
     await page.setViewportSize({ width: Number(width), height: Number(height) });
     return { ok: true };
   },
+  async storageState({ path: outPath }) {
+    const resolved = path.resolve(outPath || "storageState.json");
+    await context.storageState({ path: resolved });
+    return { path: resolved };
+  },
   async close() {
     setTimeout(async () => {
       await browser.close().catch(() => {});

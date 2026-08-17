@@ -3,17 +3,17 @@
 // for a guest — backend Design Doc history-backend-design.md v1.2, § Auth
 // Guard and Layout).
 //
-// Front-adjust: this page owns a single-column <main>; HistoryFilters is
-// passed into HistoryList's `filters` slot, which renders it beside the
-// "History" heading (engineer feedback: the filter trigger belongs in the
-// page header, balanced against the title — not a separate left-rail column
-// like ExamFilters/ExamBrowser on /exams). Filter state lives in the URL
+// Front-adjust (2026-08-17): bố cục nay khớp ExamFilters/ExamBrowser trên
+// /exams — HistoryFilters là một rail sticky bên trái nội dung (KHÔNG còn
+// nằm trong header cạnh tiêu đề, và tiêu đề trang cũng bỏ khỏi UI nhìn thấy
+// được — điều hướng đã tô sáng mục History). Filter state lives in the URL
 // (same convention as ExamFilters) and is applied via filterHistoryEntries()
 // against the single listMyHistory() fetch — no extra round trip per filter
 // change.
 
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
+import { getTranslate } from "@/lib/i18n/server";
 import { listMyHistory } from "@/app/(HM)/queries";
 import { filterHistoryEntries, type HistoryEntryFilters } from "@/lib/history/filterEntries";
 import { HistoryFilters } from "./_components/HistoryFilters";
@@ -47,6 +47,7 @@ export default async function HistoryPage({ searchParams }: { searchParams: Sear
   const user = await getCurrentUser();
   if (!user) redirect("/?auth=signin");
 
+  const t = await getTranslate();
   const sp = await searchParams;
   const entries = await listMyHistory();
 
@@ -68,16 +69,28 @@ export default async function HistoryPage({ searchParams }: { searchParams: Sear
 
   return (
     <div className="bg-background">
-      {/* `small` là bề rộng THẬT của trang này: khung ngoài trước đây khai
-          max-w-6xl nhưng HistoryList bên trong lại tự ghim max-w-2xl, nên con
-          số 6xl chưa bao giờ có tác dụng. Khai đúng nấc thay vì để hai lớp
-          container mâu thuẫn nhau. */}
-      <PageContainer as="main" size="small" padding="compact">
-        <HistoryList
-          entries={filteredEntries}
-          isFiltered={entries.length > 0 && filteredEntries.length !== entries.length}
-          filters={<HistoryFilters subjects={subjects} exams={exams} selected={selected} />}
-        />
+      {/* `small` là bề rộng THẬT của trang này (danh sách hàng, không phải
+          lưới thẻ như /exams) — `padding="none"`: rail lọc phải dính mép
+          trái để sticky đúng chỗ, cột nội dung tự có padding riêng, cùng lối
+          thoát PageContainer chừa sẵn mà exams/page.tsx đang dùng. */}
+      <PageContainer as="main" size="small" padding="none">
+        {/* Trang này CỐ Ý không có tiêu đề nhìn thấy được (điều hướng đã tô
+            sáng mục History) — sr-only giữ mốc cho trình đọc màn hình, cùng
+            quy ước exams/page.tsx. */}
+        <h1 className="sr-only">{t("history.title")}</h1>
+        <div className="relative flex items-start max-md:flex-col max-md:items-stretch">
+          <HistoryFilters subjects={subjects} exams={exams} selected={selected} />
+
+          <div
+            className="preload-fade min-w-0 flex-1 px-4 py-5"
+            style={{ "--preload-order": 2 } as React.CSSProperties}
+          >
+            <HistoryList
+              entries={filteredEntries}
+              isFiltered={entries.length > 0 && filteredEntries.length !== entries.length}
+            />
+          </div>
+        </div>
       </PageContainer>
     </div>
   );

@@ -16,7 +16,6 @@ import { getTranslate } from "@/lib/i18n/server";
 import { listReportedExams } from "@/lib/supabase/service-role";
 import { ModerationRow } from "./ModerationRow";
 import { PageContainer } from "@/components/layout/PageContainer";
-import { PageHeader } from "@/components/layout/PageHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -32,10 +31,7 @@ export default async function AdminPage() {
   return (
     <div className="bg-background min-h-dvh">
       <PageContainer as="main" size="default" className="flex flex-col gap-6">
-        <PageHeader
-          title={t("admin.title")}
-          description={t("admin.intro", { email: user.email ?? "" })}
-        />
+        <h1 className="sr-only">{t("admin.title")}</h1>
 
         {!hasAdminsConfigured() && (
           <p className="border-border rounded-lg border border-dashed px-4 py-3 text-sm">

@@ -125,11 +125,10 @@ export function UploadForm() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-3xl text-foreground">{t("upload.title")}</h1>
-        <div className="mt-2 h-px w-12 bg-ring" />
-        <p className="mt-4 text-sm leading-relaxed text-muted-foreground">{t("upload.intro")}</p>
-      </div>
+      {/* Tiêu đề trang bỏ khỏi UI nhìn thấy được — điều hướng đã đủ ngữ cảnh
+          (mục Upload trên navbar tô sáng); h1 sr-only giữ mốc cho trình đọc
+          màn hình (cùng quy ước /exams). */}
+      <h1 className="sr-only">{t("upload.title")}</h1>
 
       <ImportInstructions />
 

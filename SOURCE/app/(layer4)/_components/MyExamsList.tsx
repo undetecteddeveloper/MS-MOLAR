@@ -53,18 +53,16 @@ export function MyExamsList({
         </div>
       )}
 
-      <div>
-        <h1 className="text-2xl text-foreground">{t("common.myExams")}</h1>
-        <div className="mt-3 h-0.5 w-10 bg-[#B8863B]" aria-hidden />
-        <div className="mt-3 flex items-center justify-between gap-4">
-          <p className="text-sm text-muted-foreground">{t("upload.myExamsHint")}</p>
-          <Link
-            href="/upload"
-            className="shrink-0 rounded-[4px] bg-brand px-4 py-2 text-xs font-medium uppercase tracking-[0.14em] text-brand-foreground transition-opacity hover:opacity-90"
-          >
-            {t("upload.uploadAnExam")}
-          </Link>
-        </div>
+      {/* Tiêu đề trang bỏ khỏi UI nhìn thấy được — điều hướng đã đủ ngữ cảnh;
+          h1 sr-only giữ mốc cho trình đọc màn hình (cùng quy ước /exams). */}
+      <h1 className="sr-only">{t("common.myExams")}</h1>
+      <div className="flex justify-end">
+        <Link
+          href="/upload"
+          className="shrink-0 rounded-[4px] bg-brand px-4 py-2 text-xs font-medium uppercase tracking-[0.14em] text-brand-foreground transition-opacity hover:opacity-90"
+        >
+          {t("upload.uploadAnExam")}
+        </Link>
       </div>
 
       {exams.length === 0 ? (

@@ -15,7 +15,6 @@ import { redirect } from "next/navigation";
 import { getCurrentUserProfile } from "@/lib/auth/getCurrentUser";
 import { getTranslate } from "@/lib/i18n/server";
 import { PageContainer } from "@/components/layout/PageContainer";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { ProfileCard } from "./_components/ProfileCard";
 
 // KHÔNG khai `alternates.canonical` — khác /terms và /about một cách có chủ ý.
@@ -40,12 +39,11 @@ export default async function ProfilePage() {
 
   return (
     <PageContainer as="main" size="small">
-      <PageHeader
-        eyebrow={t("profile.eyebrow")}
-        title={t("profile.title")}
-        description={t("profile.description")}
-      />
-      <div className="mt-6">
+      {/* Tiêu đề trang bỏ khỏi UI nhìn thấy được (điều hướng đã tô sáng mục
+          Account/Profile), h1 sr-only giữ lại mốc cho trình đọc màn hình —
+          cùng quy ước với /exams (trang đầu tiên áp dụng, xem exams/page.tsx). */}
+      <h1 className="sr-only">{t("profile.title")}</h1>
+      <div className="preload-fade mt-6" style={{ "--preload-order": 1 } as React.CSSProperties}>
         <ProfileCard user={user} />
       </div>
     </PageContainer>

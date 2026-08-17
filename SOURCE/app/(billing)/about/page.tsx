@@ -31,39 +31,31 @@ export const metadata: Metadata = {
 };
 
 // ---------------------------------------------------------------------------
-// TODO: replace with real contact info
-//
-// Ba giá trị dưới đây là GIẢ ĐỊNH, engineer thay bằng thông tin thật.
+// Thông tin liên hệ THẬT (engineer cung cấp 2026-08-17).
 //
 // Cố ý KHÔNG đưa vào từ điển i18n: tên riêng, email và số điện thoại giống hệt
 // nhau ở cả hai ngôn ngữ, mà lib/i18n/__tests__/i18n.test.ts bắt buộc dưới 10%
 // số chuỗi trùng khớp từng byte giữa en và vi — nhét chúng vào từ điển là tự
 // đẩy tỉ lệ đó lên vì một lý do không có thật. Nhãn thì dịch, GIÁ TRỊ thì không.
-// Đặt tập trung ở đây để thay thông tin thật là sửa đúng một chỗ.
 // ---------------------------------------------------------------------------
 const CONTACT = {
-  ownerName: "Nguyễn Văn A", // TODO: replace with real contact info
-  email: "lienhe@example.com", // TODO: replace with real contact info
-  phone: "+84 000 000 000", // TODO: replace with real contact info
+  ownerName: "Nguyễn Anh Phát",
+  email: "smithnguyen247@gmail.com",
+  phone: "0912037624",
 } as const;
 
 /** Còn đang là dữ liệu giả hay không.
  *
  *  UI Spec UI-D13 hoãn AC-070 (email/điện thoại thành liên kết bấm được) cho
- *  tới khi có thông tin THẬT, và lý do là cụ thể chứ không phải thận trọng
- *  chung chung: một số điện thoại bịa mà BẤM ĐƯỢC thì mời người ta gọi đi đâu
- *  đó. Dòng chữ "đây là dữ liệu tạm" ở cuối trang không ngăn được ngón tay.
- *
- *  Nên chỗ nối vẫn viết sẵn ở ContactRow (href), chỉ là không truyền vào khi cờ
- *  này còn bật. Thay thông tin thật = sửa CONTACT ở trên rồi đặt cờ này thành
- *  false; không phải viết lại markup. */
-const CONTACT_IS_PLACEHOLDER = true; // TODO: set to false with the real contact info above
+ *  tới khi có thông tin THẬT — nay đã có, nên cờ tắt và ContactRow tự nối
+ *  `mailto:`/`tel:` (href viết sẵn, chỉ chờ cờ này). */
+const CONTACT_IS_PLACEHOLDER = false;
 
 export default async function AboutPage() {
   const t = await getTranslate();
 
   return (
-    <LegalDocument eyebrow={t("about.eyebrow")} title={t("about.title")}>
+    <LegalDocument title={t("about.title")}>
       <p>{t("about.intro")}</p>
 
       {/* <dl> chứ không phải bảng: đây là các cặp nhãn–giá trị, không phải dữ
@@ -89,15 +81,18 @@ export default async function AboutPage() {
         />
       </dl>
 
-      {/* Nhắc rõ đây là dữ liệu tạm, hiển thị ngay trên trang chứ không chỉ nằm
-          trong comment: một trang liên hệ với số điện thoại giả mà trông như
-          thật thì tệ hơn một trang nói thẳng là chưa có. */}
-      <p
-        role="status"
-        className="border-border text-muted-foreground rounded-lg border border-dashed px-4 py-3"
-      >
-        {t("about.placeholderNotice")}
-      </p>
+      {/* Chỉ hiện khi CONTACT còn là dữ liệu giả (xem CONTACT_IS_PLACEHOLDER ở
+          trên) — một trang liên hệ với số điện thoại giả mà trông như thật
+          thì tệ hơn một trang nói thẳng là chưa có; nhưng với dữ liệu THẬT thì
+          câu này tự nó sai. */}
+      {CONTACT_IS_PLACEHOLDER && (
+        <p
+          role="status"
+          className="border-border text-muted-foreground rounded-lg border border-dashed px-4 py-3"
+        >
+          {t("about.placeholderNotice")}
+        </p>
+      )}
     </LegalDocument>
   );
 }

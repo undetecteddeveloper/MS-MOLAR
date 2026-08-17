@@ -11,7 +11,6 @@
 
 import type { Metadata } from "next";
 import { PageContainer } from "@/components/layout/PageContainer";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { LegalLinks } from "@/components/billing/LegalLinks";
 import { isPaidTierEnabled } from "@/lib/billing/paidTier";
 import { getTranslate } from "@/lib/i18n/server";
@@ -32,11 +31,7 @@ export default async function PricingPage() {
   return (
     <div className="bg-background min-h-dvh">
       <PageContainer as="main" size="default" className="flex flex-col gap-6">
-        <PageHeader
-          eyebrow={t("billing.pricing.eyebrow")}
-          title={t("billing.pricing.title")}
-          description={t("billing.pricing.description")}
-        />
+        <h1 className="sr-only">{t("billing.pricing.title")}</h1>
 
         <PlanComparison />
 

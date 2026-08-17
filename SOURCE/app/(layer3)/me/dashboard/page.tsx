@@ -12,7 +12,6 @@ import { getAnalyticsByRange, getSkillRecommendation } from "@/app/(layer3)/quer
 import { AnalyticsDashboard } from "@/app/(layer3)/_components/AnalyticsDashboard";
 import { SkillRecommendationCard } from "@/app/(layer3)/_components/SkillRecommendationCard";
 import { PageContainer } from "@/components/layout/PageContainer";
-import { PageHeader } from "@/components/layout/PageHeader";
 
 export default async function DashboardPage() {
   const t = await getTranslate();
@@ -35,11 +34,7 @@ export default async function DashboardPage() {
     // càng nhiều bề ngang thì các cột càng đọc được, và mép nội dung thẳng hàng
     // mép navbar (cùng 72rem).
     <PageContainer as="main" size="full">
-      <PageHeader
-        breadcrumbs={[{ label: t("nav.home"), href: "/" }, { label: t("nav.analytics") }]}
-        title={t("analytics.title")}
-        description={t("analytics.subtitle")}
-      />
+      <h1 className="sr-only">{t("analytics.title")}</h1>
 
       <div className="mt-6">
         <SkillRecommendationCard recommendation={recommendation} />

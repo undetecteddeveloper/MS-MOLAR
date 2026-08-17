@@ -10,7 +10,6 @@ import { isAdminUserId } from "@/lib/auth/admin";
 import { getTranslate } from "@/lib/i18n/server";
 import { listSupportTickets } from "@/lib/supabase/service-role";
 import { PageContainer } from "@/components/layout/PageContainer";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { TicketQueueList } from "./TicketQueueList";
 
 export const dynamic = "force-dynamic";
@@ -25,7 +24,7 @@ export default async function AdminTicketsPage() {
   return (
     <div className="bg-background min-h-dvh">
       <PageContainer as="main" size="default" className="flex flex-col gap-6">
-        <PageHeader title={t("support.admin.title")} />
+        <h1 className="sr-only">{t("support.admin.title")}</h1>
         <TicketQueueList tickets={tickets} />
       </PageContainer>
     </div>

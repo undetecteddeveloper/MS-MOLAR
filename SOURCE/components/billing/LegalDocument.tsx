@@ -15,22 +15,22 @@
 // tích markdown vào một trang tĩnh.
 
 import { PageContainer } from "@/components/layout/PageContainer";
-import { PageHeader } from "@/components/layout/PageHeader";
 
 export function LegalDocument({
-  eyebrow,
   title,
   children,
 }: {
-  eyebrow: string;
   title: string;
   children: React.ReactNode;
 }) {
   return (
     <div className="bg-background min-h-dvh">
       <PageContainer as="main" size="small" className="flex flex-col gap-6">
-        {/* PageHeader sở hữu <h1> — không tự dựng thẻ h1 thứ hai ở đây. */}
-        <PageHeader eyebrow={eyebrow} title={title} />
+        {/* Tiêu đề trang bỏ khỏi UI nhìn thấy được (điều hướng đã đủ ngữ
+            cảnh, và ba trang dùng khung này đều tới từ liên kết CÓ NHÃN —
+            footer/legal link — chứ không phải điều hướng mù); h1 sr-only
+            giữ mốc cho trình đọc màn hình, cùng quy ước với /exams. */}
+        <h1 className="sr-only">{title}</h1>
         {/* Nhịp chữ theo mẫu lặp nhiều nhất trong repo (`text-sm
             leading-relaxed`), không phải một thang mới. h2/h3 tự nhận
             font-serif từ globals.css:263-269. */}

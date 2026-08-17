@@ -22,8 +22,15 @@ export function ProfileRow({ label, labelFor, children, action, expanded }: Prof
     <div className="py-4">
       {/* flex-wrap + ml-auto: dưới 768px nhãn/giá trị chiếm dòng một và nút rơi
           xuống dòng hai NHƯNG VẪN căn phải. min-w-0 để một email dài bị cắt
-          bên trong hàng thay vì nong hàng ra và sinh cuộn ngang ở 320px. */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+          bên trong hàng thay vì nong hàng ra và sinh cuộn ngang ở 320px.
+          items-end (không phải items-center): cột nhãn/giá trị cao hơn nút
+          hành động (nhãn + giá trị + hint 3 dòng > 1 nút), nên items-center
+          để lại khoảng trắng dưới nút lớn hơn khoảng trắng trên nhãn — lệch
+          đối xứng với py-4 của hàng (engineer 2026-08-17, PasswordRow: đáy
+          nút "Change password" cách đường kẻ dưới xa hơn đỉnh nhãn "Password"
+          cách đường kẻ trên). items-end ghim đáy nút trùng đáy cột nhãn/giá
+          trị, khớp lại py-4 hai bên. */}
+      <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
         <div className="min-w-0">
           {labelFor ? (
             <label htmlFor={labelFor} className={labelCls}>

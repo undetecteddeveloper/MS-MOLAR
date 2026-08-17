@@ -102,7 +102,7 @@ export function ProfileCard({ user }: ProfileCardProps) {
               aria-expanded={nameOpen}
               aria-controls={NAME_PANEL_ID}
               onClick={() => (nameOpen ? closeName() : setNameOpen(true))}
-              className="text-muted-foreground hover:text-brand hover:bg-accent focus-visible:border-ring focus-visible:ring-ring/50 -my-2 inline-flex size-11 shrink-0 items-center justify-center rounded-[4px] border border-transparent transition-colors outline-none focus-visible:ring-3"
+              className="text-muted-foreground hover:text-brand focus-visible:border-ring focus-visible:ring-ring/50 -my-2 inline-flex size-11 shrink-0 items-center justify-center rounded-[4px] border border-transparent transition-colors outline-none focus-visible:ring-3"
             >
               <Pencil aria-hidden className="size-4" />
             </button>
@@ -153,14 +153,24 @@ export function ProfileCard({ user }: ProfileCardProps) {
         />
       )}
 
-      <div className="divide-border border-border mt-6 divide-y border-t">
+      {/* border-t VÀ border-b trên CHÍNH khối này (không phải border-t rời ở
+          khối Sign out bên dưới): khối Sign out trước đây tự mang border-t +
+          pt-6, nghĩa là khoảng cách "nút Change password → đường kẻ dưới" =
+          py-4 (16px, bên trong PasswordRow) + mt-6 (24px, margin của khối
+          Sign out) = 40px, trong khi "đường kẻ trên → nhãn Password" chỉ có
+          py-4 = 16px — lệch hẳn (engineer 2026-08-17, đo bằng bounding rect:
+          17px trên vs 40px dưới). Gộp cả hai đường kẻ vào khối này thì hai
+          khoảng cách cùng chỉ còn đúng py-4 (16px) hai bên. */}
+      <div className="border-border mt-6 border-t border-b">
         <PasswordRow onOpen={() => setDialogOpen(true)} triggerRef={passwordTriggerRef} />
       </div>
 
       {/* Căn GIỮA: đăng xuất không cùng họ với ba hành động sửa ở trên (chúng
           căn phải theo hàng của mình), nó rời khỏi trang. Đứng giữa dưới một
-          hairline là cách nói điều đó bằng bố cục. */}
-      <div className="border-border mt-6 flex justify-center border-t pt-6">
+          hairline là cách nói điều đó bằng bố cục. mt-6 giữ nguyên khoảng
+          cách 24px cũ tới đường kẻ (trước đây là pt-6 bên trong khối có
+          border riêng — nay đường kẻ thuộc khối phía trên). */}
+      <div className="mt-6 flex justify-center">
         <SignOutButton />
       </div>
 

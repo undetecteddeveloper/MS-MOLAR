@@ -26,7 +26,7 @@ export const metadata: Metadata = {
 export default async function TermsPage() {
   const t = await getTranslate();
   return (
-    <LegalDocument eyebrow={t("billing.terms.eyebrow")} title={t("billing.terms.title")}>
+    <LegalDocument title={t("billing.terms.title")}>
       {/* Nội dung thật chờ PRD U3 — chủ sở hữu là engineer, không phải agent. */}
       <LegalContentPending message={t("billing.terms.pending")} />
     </LegalDocument>
