@@ -240,6 +240,9 @@ function mockGetResultChain(attemptRow: {
           eqCalls.push(args);
           return builder;
         },
+        // Lệnh đọc lịch sử wrong-twice đi qua `readBounded` (P3), nó áp biên bằng
+        // .limit() trước khi await builder.
+        limit: () => builder,
         maybeSingle: async () => ({
           data: {
             ...RESULT_ROW,
@@ -326,6 +329,7 @@ describe("getResult() — additive select extension, byte-identical pre-existing
       const builder: Record<string, unknown> = {
         select: () => builder,
         eq: () => builder,
+        limit: () => builder,
         // The joined read completes through maybeSingle()...
         maybeSingle: async () => {
           await joinGate;
@@ -451,6 +455,7 @@ describe("getResult() — additive select extension, byte-identical pre-existing
           if (isHistoryRead) historyEqCalls.push(args);
           return builder;
         },
+        limit: () => builder,
         maybeSingle: async () => ({
           data: {
             ...RESULT_ROW,
@@ -526,6 +531,7 @@ describe("getResult() — additive select extension, byte-identical pre-existing
       const builder: Record<string, unknown> = {
         select: () => builder,
         eq: () => builder,
+        limit: () => builder,
         // The joined read still succeeds: the page's core data is fine, which is
         // exactly the situation in which rejecting would be the wrong behaviour.
         maybeSingle: async () => ({

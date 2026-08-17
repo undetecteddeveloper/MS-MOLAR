@@ -18,6 +18,96 @@ còn nơi nào khác giữ lịch sử nợ ngoài chính file này.)*
 
 ## Đang mở
 
+### TD-026 — Không có phân trang thật; mọi danh sách vẫn đọc một lượt tới trần
+**Từ:** 2026-08-17 (tách ra khi làm P3 — phần PHÁT HIỆN đã xong, phần PHÂN TRANG chưa)
+**Loại:** hiệu năng + đúng đắn dữ liệu, chặn bởi một quyết định thiết kế chưa có
+
+12 lệnh đọc danh sách trong 4 file `queries.ts` không có `.limit()`/`.range()`
+nào (audit 2026-08-15 đếm 17 lời gọi `.from()`; 12 trong số đó là đọc DANH SÁCH
+thật, phần còn lại bị chặn sẵn bởi `maybeSingle()`/`.in(question_ids)`/`count
+head`). Đánh giá lúc đó là "để yên": đo được `listExams` 150ms, chi phí để yên
+nhỏ hơn chi phí sửa. Đánh giá đó ĐÚNG về độ trễ và bỏ sót kiểu hỏng thật —
+`max_rows` của PostgREST cắt danh sách ở đúng trần, status 200, không error,
+không cảnh báo.
+
+**Đã trả PHẦN PHÁT HIỆN (2026-08-17)** — `lib/supabase/boundedRead.ts`:
+- `POSTGREST_MAX_ROWS = 1000`, **đo qua Management API trên CẢ HAI project**
+  (prod `pebjdlbgbmizgfpuptjl`, dev `hynwleaxtbtjzkvpjsug` — cùng giá trị). Hỏi
+  cả hai chứ không một, đúng bài học TD-005.
+- `LIST_ROW_CEILING = 500` + **dòng mồi**: mỗi lệnh đọc xin `501` dòng, dòng thứ
+  501 không bao giờ đi vào kết quả — sự tồn tại của nó là bằng chứng duy nhất
+  rằng dữ liệu đã vượt trần khai. Nhận đủ mồi → `console.error` kèm tên query.
+- Vì sao dòng mồi chứ không so `rows.length === max_rows`: cách sau không phân
+  biệt được "đúng 1000 dòng thật" với "bị cắt ở 1000", và nó phụ thuộc vào việc
+  hằng số trong repo còn khớp cấu hình PostgREST — thứ đổi được từ dashboard
+  Supabase mà không ai phải sửa một dòng code nào.
+- Fail-OPEN (trả 500 dòng đầu, không throw) — cùng lập luận TD-009: một danh
+  sách thiếu dòng mà làm sập cả trang là đổi hỏng hóc cục bộ lấy sự cố toàn site.
+
+Số đo prod lúc trả: 6 đề published · 8 đề tổng · 154 câu hỏi · 53 lượt làm bài ·
+3 dòng kết quả · 20 skill node / 15 cạnh. Tức dư địa ~3 bậc độ lớn, và **đó là
+lý do món nợ này nguy hiểm chứ không phải lý do bỏ qua nó**: nó chỉ nổ khi site
+bắt đầu có người dùng, tức đúng lúc tệ nhất, và nổ trong im lặng.
+
+**VÌ SAO MỤC NÀY CHƯA XOÁ:** cái vừa dựng là cơ chế PHÁT HIỆN, không phải phân
+trang. Không có `?page`, không có cursor, không có UI. Nó trả lời đúng một câu —
+"danh sách này có đang bị cắt cụt không?" — và im lặng về câu còn lại: "làm sao
+người dùng xem được phần còn lại".
+
+**Vì sao chưa trả ngay:** phân trang cho `/exams` VA CHẠM với ADR-0015. Xếp hạng
+cá nhân hoá cần TOÀN BỘ tập ứng viên để rank (`rankExamIds` nhận `candidates`
+rồi mới sinh thứ tự), nên phân trang DB-side sẽ phá chính thứ tự mà ADR-0015
+dựng ra. Ba đường đi, mỗi đường đổi một cam kết khác nhau: rank-rồi-cắt (giữ
+thứ tự, không giảm tải DB), cắt-rồi-rank (giảm tải, thứ tự sai theo trang), hay
+chuyển hẳn ranking xuống SQL (đúng cả hai, viết lại nhiều nhất). Chọn bừa một
+trong ba rồi viết code là cách chắc chắn phải viết lại — cùng hình dạng với lý
+do TD-022 chưa trả.
+
+**Sẽ nổ thế nào nếu quên:** khi một danh sách vượt 500 dòng, `console.error` nổ
+trong log Vercel và KHÔNG có gì khác xảy ra — người dùng vẫn thấy một danh sách
+trông hoàn chỉnh, thiếu phần cuối. Cổng này chỉ có giá trị KHI CÓ NGƯỜI ĐỌC LOG;
+nó biến một sự cố vô hình thành một sự cố nhìn thấy được, nó không tự sửa gì cả.
+
+**Cách trả:** quyết định một trong ba đường trên cho `/exams` trước (đó là danh
+sách duy nhất lớn theo nội dung TOÀN CỤC, nên nó chạm trần trước tiên), rồi mới
+tới các danh sách theo-user (`listMyHistory`, `listMyExams`) — chúng lớn chậm
+hơn hẳn và không vướng ranking.
+
+### TD-025 — Không có cổng nào xác nhận CSS/JS đã DEPLOY THẬT khớp với build cục bộ
+**Từ:** 2026-08-17 (tách ra khi trả TD-024 — bản thân sự cố đã sửa, nhưng lỗ hổng quy trình để nó lọt qua vẫn còn nguyên)
+**Loại:** khoảng trống quy trình verify, đã có bằng chứng nổ thật một lần
+
+TD-024 là một khối CSS thuần (không qua class Tailwind) thêm vào cuối
+`globals.css`, biến mất hoàn toàn khỏi bundle CSS mà Vercel build ra — trong
+khi `next build` chạy trên đúng commit đó ở máy local lại cho kết quả đúng.
+Cả **5 cổng verify chuẩn của dự án** (`tsc --noEmit`, `eslint --max-warnings
+0`, `vitest run`, `next build`, `check:bundle`) đều XANH trước khi ship, vì
+không cổng nào trong số đó hỏi câu "asset đã lên Vercel thật có khớp asset
+build local không" — tất cả chỉ kiểm cục bộ. Đây là hình dạng TD-005 (schema
+DB lệch giữa local/deploy) lặp lại ở một TẦNG KHÁC: build artifact tĩnh
+(CSS/JS) thay vì database.
+
+**Sẽ nổ thế nào:** một CSS/JS thay đổi khác (không nhất thiết dạng CSS thuần
+cuối file — chưa xác định được chính xác điều kiện kích hoạt bug build cache
+này) lên production mà không ai biết, cho tới khi người dùng thật báo lại một
+hiện tượng nhìn như bug UI (English: visual bug) — đúng như TD-024 đã xảy ra:
+5 cổng xanh, `next build` local sạch, nhưng người dùng thấy trang hỏng. Không
+có log, không có cảnh báo nào tự nổi lên — chỉ phát hiện được bằng cách chủ
+động tải trang production thật rồi so `getComputedStyle`/nội dung file CSS đã
+deploy với source.
+
+**Vì sao chưa trả ngay:** nguyên nhân gốc (vì sao Vercel build cache không phát
+hiện đúng thay đổi CSS thuần nằm cuối file) chưa xác định được — TD-024 sửa
+bằng cách buộc nội dung file đổi thật để né cache, không phải bằng cách hiểu
+đúng cơ chế cache của Turbopack trên Vercel. Không có API nào (kể cả qua
+Composio) lộ tham số "bỏ qua build cache" cho lượt deploy, nên không kiểm
+chứng được giả thuyết bằng cách tắt cache rồi build lại.
+
+**Cách trả (chưa làm):** thêm một bước `curl` kiểm CSS/JS đã deploy thật
+(so nội dung hoặc chỉ tra `grep` một class/rule mới thêm) vào quy trình sau
+mỗi lần ship UI có đụng `globals.css` hoặc thêm asset tĩnh mới — làm thủ công
+trước, rồi cân nhắc script hoá nếu tái diễn đủ nhiều lần để đáng công.
+
 ### TD-022 — Không có ngân sách Gemini ở mức PROJECT, chỉ có trần theo từng user
 **Từ:** 2026-08-17 (tách ra khi trả TD-019 — phần TD-019 không trả được)
 **Loại:** phòng thủ đúng tầng nhưng thiếu một tầng, chặn bởi thiết kế
@@ -194,6 +284,49 @@ một lần chạy lại toàn file trên DB có dữ liệu đại diện, mớ
 ---
 
 ## Đã trả
+
+### ~~TD-024 — Overlay "Loading" hiện toàn phần trên MỌI tải trang production, không do bấm gì~~
+**Từ:** 2026-08-17 (engineer báo lại kèm ảnh chụp — overlay "LOADING" phủ kín
+trang chủ prod ngay từ lần tải đầu, tương tác các thành phần khác vẫn bình
+thường)
+
+`RouteLoadingOverlay` (lớp phủ chuyển trang, thêm cùng ngày) hiện đè kín mọi
+trang trên `ms-molar.vercel.app`, không tắt được, không do một cú bấm cụ thể
+nào kích hoạt — chỉ cần tải trang là thấy. Ba đường tắt đã viết sẵn trong
+component (URL mới commit, popstate/pageshow, hẹn giờ 12s) đều không cứu được
+vì bug không nằm ở state JS.
+
+**Nguyên nhân xác định bằng đo, không suy luận:** `getComputedStyle` trên
+production trả `opacity: 1; visibility: visible` NGAY CẢ KHI `data-pending`
+đọc đúng là `"false"` — tức JS toggle đúng, chỉ CSS quyết định ẩn/hiện là
+thiếu. Kiểm CSS bundle đã deploy (`grep route-loading` trên file `.css` tải
+từ `https://ms-molar.vercel.app/_next/static/...`) ra **0 kết quả** — toàn bộ
+khối `.route-loading { opacity:0; visibility:hidden }` vắng mặt. Đối chiếu:
+git blob của ĐÚNG commit đã deploy (`8be5340`) có đủ 10 dòng khớp
+`route-loading`; `next build` chạy cục bộ trên cùng commit đó cũng cho ra CSS
+đúng. Vậy lệch pha xảy ra trong chính bước build của Vercel, không phải do
+quên commit hay do trình duyệt người dùng cache cũ (kiểm bằng Playwright phiên
+mới tinh, không cookie/cache cũ, vẫn ra kết quả giống hệt).
+
+**Đã trả 2026-08-17** — không tìm được tham số "bỏ qua build cache" nào cho
+API tạo deployment (kể cả qua Composio), nên sửa bằng cách đổi NỘI DUNG THẬT
+của `globals.css` (thêm đoạn cảnh báo sự cố này ngay tại chỗ) để bước build kế
+tiếp không còn artifact cũ nào để tái dùng, rồi deploy lại
+(`9dabe1a2cd15fc32256a89f73482e5bd00839975`).
+
+**Verify (đo lại trên chính production sau khi sửa):**
+- Tên file CSS đổi hash thật (`2hthv7rrgemj1.css` → `25_fg3gc056lk.css`) —
+  xác nhận đây là artifact MỚI, không phải cache được phục vụ lại.
+- `getComputedStyle` trên tải trang mới: `opacity: 0; visibility: hidden` khi
+  `data-pending="false"` — đúng thiết kế.
+- Điều hướng thật qua click: `data-pending` chuyển `true → false` trong ~1
+  giây, không kẹt.
+
+**Bài học giữ lại:** 5 cổng verify chuẩn của dự án (tsc/eslint/vitest/build/
+check:bundle) ĐỀU XANH trước khi ship — không cổng nào phát hiện được sự cố
+này vì tất cả chỉ kiểm cục bộ, không cổng nào hỏi "CSS/JS đã lên Vercel thật
+có khớp bản build không". Phần lỗ hổng quy trình này CHƯA trả, tách thành
+[[TD-025]].
 
 ### ~~TD-019 — `extractAndAssemble` không có rate limit, vét sạch hạn ngạch AI dùng chung~~
 **Từ:** 2026-08-17 (rà bảo mật toàn repo; Semgrep 117 rule/769 file ra 0 finding,

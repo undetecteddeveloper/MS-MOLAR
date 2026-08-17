@@ -9,6 +9,7 @@ import {
 } from "@/lib/adaptive/constants";
 import { rankExamIds } from "@/lib/adaptive/rankExams";
 import { createClient } from "@/lib/supabase/server";
+import { readBounded } from "@/lib/supabase/boundedRead";
 import { communityDifficultyFrom, RATING_MIN } from "@/lib/rating";
 import { computeWrongTwiceQuestionIds, type WrongTwiceAttempt } from "@/lib/scoring/wrongTwice";
 import { resolveSignedImageUrl } from "@/lib/ugc/imageUrl";
@@ -157,9 +158,11 @@ async function fetchExamRows(filters?: ExamFilters): Promise<ExamRow[]> {
   } else {
     query = query.order("id");
   }
-  const { data, error } = await query;
-  if (error) throw error;
-  return data as unknown as ExamRow[];
+  // Biên tường minh (P3): đây là lệnh đọc DUY NHẤT chạy trên nội dung TOÀN CỤC
+  // — nó lớn theo số đề published của cả site, không theo hoạt động của một
+  // người. Nên nó là lệnh đọc sẽ chạm trần PostgREST TRƯỚC TIÊN, và hậu quả của
+  // việc chạm trần ở đây là đề biến mất khỏi catalog mà không ai được báo.
+  return (await readBounded("listExams", query)) as ExamRow[];
 }
 
 /**
@@ -185,11 +188,14 @@ export async function listExamFacets(): Promise<{
   semesters: string[];
 }> {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("exams")
-    .select("subject, grade, school, school_year, semester");
-  if (error) throw error;
-  const rows = data as unknown as {
+  // Cùng nhóm rủi ro với `fetchExamRows`: lớn theo số đề của CẢ SITE. Chạm trần
+  // ở đây hỏng theo kiểu khó truy hơn — không phải đề biến mất, mà là một giá
+  // trị biến mất khỏi BỘ LỌC, nên người dùng không lọc được tới nhóm đề đó nữa
+  // dù bản thân các đề vẫn nằm trong catalog.
+  const rows = (await readBounded(
+    "listExamFacets",
+    supabase.from("exams").select("subject, grade, school, school_year, semester")
+  )) as {
     subject: string;
     grade: number;
     school: string | null;
@@ -232,12 +238,11 @@ export async function getExam(id: string): Promise<Exam | null> {
  */
 export async function listMySubmittedExamIds(): Promise<Set<string>> {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("exam_attempts")
-    .select("exam_id")
-    .eq("status", "submitted");
-  if (error) throw error;
-  return new Set((data as unknown as { exam_id: string }[]).map((row) => row.exam_id));
+  const rows = (await readBounded(
+    "listMySubmittedExamIds",
+    supabase.from("exam_attempts").select("exam_id").eq("status", "submitted")
+  )) as { exam_id: string }[];
+  return new Set(rows.map((row) => row.exam_id));
 }
 
 // --- Xếp hạng cá nhân hoá cho /exams (ADR-0015) -----------------------------
@@ -298,21 +303,23 @@ export interface RankedExamList {
 export async function listExamsRanked(filters?: ExamFilters): Promise<RankedExamList> {
   const supabase = await createClient();
 
+  // Hai lệnh đọc dưới đây lớn theo hoạt động của MỘT người (RLS khoá về
+  // auth.uid()), nên chậm chạm trần hơn hẳn catalog. Vẫn đặt biên: chạm trần ở
+  // đây làm tín hiệu xếp hạng bị tính trên dữ liệu thiếu, và thứ tự sai thì
+  // không có cách nào nhìn ra bằng mắt — nó chỉ là một thứ tự khác.
   const [rows, attemptRows, resultRows] = await Promise.all([
     fetchExamRows(filters),
-    (async () => {
-      const { data, error } = await supabase
+    readBounded(
+      "listExamsRanked.attempts",
+      supabase
         .from("exam_attempts")
         .select("id, exam_id, submitted_at, exams!inner(grade)")
-        .eq("status", "submitted");
-      if (error) throw error;
-      return data as unknown as AttemptRow[];
-    })(),
-    (async () => {
-      const { data, error } = await supabase.from("exam_results").select("attempt_id, total_score");
-      if (error) throw error;
-      return data as unknown as { attempt_id: string; total_score: number | string }[];
-    })(),
+        .eq("status", "submitted")
+    ) as Promise<AttemptRow[]>,
+    readBounded(
+      "listExamsRanked.results",
+      supabase.from("exam_results").select("attempt_id, total_score")
+    ) as Promise<{ attempt_id: string; total_score: number | string }[]>,
   ]);
 
   const submittedExamIds = new Set(attemptRows.map((row) => row.exam_id));
@@ -492,17 +499,23 @@ export type ExamResult = {
 async function fetchWrongTwiceAttempts(
   supabase: Awaited<ReturnType<typeof createClient>>
 ): Promise<WrongTwiceAttempt[]> {
-  const { data, error } = await supabase.from("exam_results").select("attempt_id, per_question");
-  if (error) {
+  // `readBounded` NÉM lỗi hạ tầng thay vì trả `error`, nên đường suy giảm mềm
+  // của hàm này chuyển sang try/catch. Rộng hơn bản cũ chứ không hẹp hơn: nó bắt
+  // cả exception, thứ mà nhánh `if (error)` cũ để lọt lên trên và đánh sập đúng
+  // màn Chi tiết mà cả đoạn docblock trên cam kết không làm sập.
+  let rows: { attempt_id: string; per_question: PerQuestionResult[] | null }[];
+  try {
+    rows = (await readBounded(
+      "getResult.wrongTwiceHistory",
+      supabase.from("exam_results").select("attempt_id, per_question")
+    )) as { attempt_id: string; per_question: PerQuestionResult[] | null }[];
+  } catch (err) {
     // Chỉ code + message: `details`/`hint` của PostgREST có thể chứa giá trị
     // dòng dữ liệu, không được đưa vào log.
-    console.warn("[getResult] đọc lịch sử wrong-twice thất bại:", error.code, error.message);
+    const e = err as { code?: string; message?: string };
+    console.warn("[getResult] đọc lịch sử wrong-twice thất bại:", e.code, e.message);
     return [];
   }
-  const rows = (data ?? []) as unknown as {
-    attempt_id: string;
-    per_question: PerQuestionResult[] | null;
-  }[];
   // per_question là jsonb → về lý thuyết có thể null với dòng hỏng; hàm thuần
   // nhận kiểu mảng chặt nên chuẩn hoá ngay tại ranh giới dữ liệu này.
   return rows.map((r) => ({ attemptId: r.attempt_id, perQuestion: r.per_question ?? [] }));

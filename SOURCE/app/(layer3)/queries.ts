@@ -5,6 +5,7 @@
 // (results_select_own/attempts_select_own, supabase/schema.sql).
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { readBounded } from "@/lib/supabase/boundedRead";
 import { aggregateAttemptsByRange, type AttemptRow } from "@/lib/analytics/aggregateAttempts";
 import { MASTERY_CLEARED_THRESHOLD } from "@/lib/adaptive/constants";
 import { recommendNextSkill } from "@/lib/adaptive/route";
@@ -28,13 +29,18 @@ type EmbeddedRow = {
 export async function getAnalyticsByRange(): Promise<Record<TimeRange, SubjectStats[]>> {
   const supabase = await createClient();
 
-  const { data, error } = await supabase
-    .from("exam_results")
-    .select("correct, total, exam_attempts!inner(submitted_at, status, exams!inner(subject))")
-    .eq("exam_attempts.status", "submitted");
-  if (error) throw error;
+  // Biên tường minh (P3). Chạm trần ở đây hỏng theo kiểu riêng, tệ hơn một danh
+  // sách thiếu dòng: đầu ra của hàm này là SỐ LIỆU TỔNG HỢP, nên dữ liệu thiếu
+  // không hiện ra thành chỗ trống mà thành một con số SAI nhìn hoàn toàn hợp lý.
+  const embedded = (await readBounded(
+    "getAnalyticsByRange",
+    supabase
+      .from("exam_results")
+      .select("correct, total, exam_attempts!inner(submitted_at, status, exams!inner(subject))")
+      .eq("exam_attempts.status", "submitted")
+  )) as EmbeddedRow[];
 
-  const rows: AttemptRow[] = (data as unknown as EmbeddedRow[]).map((row) => ({
+  const rows: AttemptRow[] = embedded.map((row) => ({
     correct: row.correct,
     total: row.total,
     submittedAt: row.exam_attempts.submitted_at,
@@ -100,29 +106,46 @@ async function recordRouteTelemetry(
 export async function getSkillRecommendation(): Promise<SkillRecommendation> {
   const supabase = await createClient();
 
-  const [{ data: userData }, nodesRes, edgesRes, masteryRes] = await Promise.all([
+  // Biên tường minh (P3). `skill_nodes`/`skill_prerequisites` là dữ liệu THAM
+  // CHIẾU (taxonomy — 20 node/15 cạnh lúc đo 2026-08-17), nên chúng lớn theo tốc
+  // độ người ta mở rộng taxonomy chứ không theo lưu lượng. Vẫn đặt biên, vì cắt
+  // cụt một DAG thì tệ hơn cắt cụt một danh sách: mất một CẠNH tiên quyết làm
+  // `recommendNextSkill` gợi ý một kỹ năng mà học sinh chưa đủ nền để học, và
+  // không có gì trong đầu ra nói rằng nó đã tính trên đồ thị thiếu.
+  //
+  // `readBounded` NÉM lỗi hạ tầng nên ba nhánh `if (...Res.error) throw` cũ
+  // không còn cần thiết — Promise.all lan exception ra ngoài y như cũ; thứ đổi
+  // là error nào tới trước thì ném cái đó, thay vì luôn ưu tiên nodes → edges →
+  // mastery. Không call site nào phân biệt được ba error đó nên thứ tự không phải
+  // hành vi ai dựa vào.
+  const [{ data: userData }, nodes, edges, mastery] = await Promise.all([
     supabase.auth.getUser(),
-    supabase.from("skill_nodes").select("id, label_vi"),
-    supabase.from("skill_prerequisites").select("skill_node_id, prerequisite_node_id"),
-    supabase
-      .from("user_skill_mastery")
-      .select("skill_node_id, correct_count, total_count, last_wrong_at"),
+    readBounded(
+      "getSkillRecommendation.nodes",
+      supabase.from("skill_nodes").select("id, label_vi")
+    ) as Promise<SkillNodeRow[]>,
+    readBounded(
+      "getSkillRecommendation.edges",
+      supabase.from("skill_prerequisites").select("skill_node_id, prerequisite_node_id")
+    ) as Promise<SkillEdgeRow[]>,
+    readBounded(
+      "getSkillRecommendation.mastery",
+      supabase
+        .from("user_skill_mastery")
+        .select("skill_node_id, correct_count, total_count, last_wrong_at")
+    ) as Promise<MasteryRow[]>,
   ]);
 
-  if (nodesRes.error) throw nodesRes.error;
-  if (edgesRes.error) throw edgesRes.error;
-  if (masteryRes.error) throw masteryRes.error;
-
   const recommendation = recommendNextSkill({
-    nodes: ((nodesRes.data ?? []) as SkillNodeRow[]).map((n) => ({
+    nodes: nodes.map((n) => ({
       id: n.id,
       labelVi: n.label_vi,
     })),
-    edges: ((edgesRes.data ?? []) as SkillEdgeRow[]).map((e) => ({
+    edges: edges.map((e) => ({
       skillNodeId: e.skill_node_id,
       prerequisiteNodeId: e.prerequisite_node_id,
     })),
-    mastery: ((masteryRes.data ?? []) as MasteryRow[]).map((m) => ({
+    mastery: mastery.map((m) => ({
       skillNodeId: m.skill_node_id,
       correctCount: m.correct_count,
       totalCount: m.total_count,

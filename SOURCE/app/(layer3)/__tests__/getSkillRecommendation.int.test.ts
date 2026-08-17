@@ -77,6 +77,10 @@ function mockChain(scenario: Scenario = {}) {
         insertPayloads.push(payload);
         return builder;
       },
+      // Ba lệnh đọc đi qua `readBounded` (P3) nên builder thật LUÔN nhận
+      // `.limit()` trước khi được await. Fake thiếu method này không phải "fake
+      // gọn hơn" mà là fake SAI hình dạng builder nó đóng thế.
+      limit: () => builder,
       then: (onFulfilled: (value: unknown) => unknown) => {
         const data =
           table === "skill_nodes"

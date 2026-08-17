@@ -4,6 +4,7 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
+import { readBounded } from "@/lib/supabase/boundedRead";
 import { assembledFromRows } from "@/lib/ugc/fromRows";
 import { resolveSignedImageUrl } from "@/lib/ugc/imageUrl";
 import type { AssembledExam } from "@/lib/ugc/types";
@@ -34,27 +35,29 @@ export async function listMyExams(): Promise<MyExamListItem[]> {
   } = await supabase.auth.getUser();
   if (!user) return [];
 
-  const { data, error } = await supabase
-    .from("exams")
-    .select(
-      "id, title, subject, grade, question_ids, status, created_at, reviewed_at"
-    )
-    .eq("author_id", user.id)
-    .order("created_at", { ascending: false });
-  if (error) throw error;
+  // Biên tường minh (P3): lớn theo số đề MỘT tác giả đã đăng. Có `.order(created_at
+  // desc)` DB-side nên phần bị cắt khi chạm trần là phần CŨ NHẤT — mất đề cũ khỏi
+  // màn quản lý của chính tác giả, trong im lặng, và tác giả là người duy nhất
+  // biết đề đó từng tồn tại.
+  const rows = (await readBounded(
+    "listMyExams",
+    supabase
+      .from("exams")
+      .select("id, title, subject, grade, question_ids, status, created_at, reviewed_at")
+      .eq("author_id", user.id)
+      .order("created_at", { ascending: false })
+  )) as Array<{
+    id: string;
+    title: string;
+    subject: string;
+    grade: number;
+    question_ids: string[];
+    status: string;
+    created_at: string;
+    reviewed_at: string | null;
+  }>;
 
-  return (
-    data as Array<{
-      id: string;
-      title: string;
-      subject: string;
-      grade: number;
-      question_ids: string[];
-      status: string;
-      created_at: string;
-      reviewed_at: string | null;
-    }>
-  ).map((r) => ({
+  return rows.map((r) => ({
     id: r.id,
     title: r.title,
     subject: r.subject,

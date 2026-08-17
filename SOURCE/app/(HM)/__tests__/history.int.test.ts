@@ -169,7 +169,9 @@ function createQueryBuilder(result: BuilderResult) {
       calls.push({ method, args });
       return builder;
     };
-  for (const method of ["select", "eq", "in", "order"]) {
+  // "limit": listMyHistory đọc qua `readBounded` (P3), nó áp biên bằng .limit()
+  // trước khi await builder.
+  for (const method of ["select", "eq", "in", "order", "limit"]) {
     builder[method] = chain(method);
   }
   builder.then = (onFulfilled: (value: BuilderResult) => unknown) =>

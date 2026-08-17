@@ -45,7 +45,9 @@ function createQueryBuilder(result: { data: unknown[]; error: null }) {
       calls.push({ method, args });
       return builder;
     };
-  for (const method of ["select", "eq", "gte", "lt", "order"]) {
+  // "limit": các lệnh đọc danh sách đi qua `readBounded` (P3), nó áp biên bằng
+  // .limit() trước khi await builder.
+  for (const method of ["select", "eq", "gte", "lt", "order", "limit"]) {
     builder[method] = chain(method);
   }
   builder.then = (onFulfilled: (value: typeof result) => unknown) =>
@@ -684,7 +686,7 @@ describe("listExamsRanked — thứ tự mặc định của /exams và ngân s�
     fromMock.mockImplementation((table: string) => {
       issued.push(table);
       const builder: Record<string, unknown> = {};
-      for (const method of ["select", "eq", "gte", "lt", "order"]) {
+      for (const method of ["select", "eq", "gte", "lt", "order", "limit"]) {
         builder[method] = () => builder;
       }
       builder.then = (onFulfilled: (value: { data: unknown[]; error: null }) => unknown) =>
