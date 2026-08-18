@@ -28,8 +28,8 @@ Then recompute §17 literal **and** `SOURCE/lib/schema/schemaFingerprint.ts` `SC
 The durable AI usage-log sink is **not** in this apply: no Design Doc schema section designs it, and choosing between a dedicated table and extending `telemetry_log` — or choosing its columns — is a schema design decision this plan does not make (BU-6 / plan Task 0.9). It also has no RLS denial case in plan Task 1.5, no allowlist coverage in plan Task 1.2 and no stated grants or FK target. When the DD revision lands, it ships as its **own** DDL block with its own traceability row, its own denial block and its own hand-apply — **not smuggled into this one**.
 
 ## Target Files
-- [ ] `SOURCE/supabase/schema.sql` (four new/edited DDL blocks + the §17 fingerprint literal)
-- [ ] `SOURCE/lib/schema/schemaFingerprint.ts` (`SCHEMA_FINGERPRINT` recomputed in the same commit)
+- [x] `SOURCE/supabase/schema.sql` (four new/edited DDL blocks + the §17 fingerprint literal)
+- [x] `SOURCE/lib/schema/schemaFingerprint.ts` (`SCHEMA_FINGERPRINT` recomputed in the same commit)
 
 ## Investigation Targets
 - `SOURCE/supabase/schema.sql` (`:1268` the unnumbered mastery-block header precedent; `:1381-1382` the inline `error_code in ( … )` list; `:1597` the `-- 17. Phiên bản schema` fingerprint insert; `:990` the one `create or replace` exception)
@@ -71,15 +71,15 @@ The durable AI usage-log sink is **not** in this apply: no Design Doc schema sec
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
-- [ ] Read all Investigation Targets and record key observations (header style at `:1268`, the exact insertion point before `:1597`, both `error_code in ( … )` sites)
-- [ ] **Boundary sweep (Change Category `boundary-change`)**: enumerate every place the telemetry literal list exists — `schema.sql` inline at `:1381-1382`, the drop/add pair this task adds, `telemetry.ts:35`, `telemetry.test.ts:49`, `telemetry.test.ts:261` — and record which task owns each (this task owns the two SQL sites; plan Task 5.5 owns the code sites). Fold the SQL-side sites into this commit; do **not** edit `telemetry.ts` here
-- [ ] Write/extend the failing text-side assertions first where they belong to gate A (plan Task 1.2 owns the two **new** ones; confirm the existing `parseForeignKeys` and `schemaFingerprint` cases go red against the un-fingerprinted DDL)
+- [x] Read all Investigation Targets and record key observations (header style at `:1268`, the exact insertion point before `:1597`, both `error_code in ( … )` sites)
+- [x] **Boundary sweep (Change Category `boundary-change`)**: enumerate every place the telemetry literal list exists — `schema.sql` inline at `:1381-1382`, the drop/add pair this task adds, `telemetry.ts:35`, `telemetry.test.ts:49`, `telemetry.test.ts:261` — and record which task owns each (this task owns the two SQL sites; plan Task 5.5 owns the code sites). Fold the SQL-side sites into this commit; do **not** edit `telemetry.ts` here
+- [x] Write/extend the failing text-side assertions first where they belong to gate A (plan Task 1.2 owns the two **new** ones; confirm the existing `parseForeignKeys` and `schemaFingerprint` cases go red against the un-fingerprinted DDL)
 ### 2. Green Phase
-- [ ] Write the four blocks; recompute §17 and `SCHEMA_FINGERPRINT` in the same commit
-- [ ] Run `npm test` and confirm the schema text-side cases pass
+- [x] Write the four blocks; recompute §17 and `SCHEMA_FINGERPRINT` in the same commit
+- [x] Run `npm test` and confirm the schema text-side cases pass
 ### 3. Refactor Phase
-- [ ] Re-count the new-object blocks (must be **four**) and re-check each against its traceability row
-- [ ] Reconcile `SOURCE/tests/e2e/service/subscriptionServiceFixtures.ts` against the shipped DDL: `FIXTURE_PERIOD_DAYS` versus `record_payment_settlement(p_period_days …)`'s default, and the **eleven** `payment_orders` plus **four** `subscriptions` column-name literals (`PaymentOrderRow` / `SubscriptionRow`, and the insert/upsert key sets) versus the column sets written here — these cross PostgREST as strings, so no compile-time link is possible and this checklist line is the only reconciliation there is
+- [x] Re-count the new-object blocks (must be **four**) and re-check each against its traceability row
+- [x] Reconcile `SOURCE/tests/e2e/service/subscriptionServiceFixtures.ts` against the shipped DDL: `FIXTURE_PERIOD_DAYS` versus `record_payment_settlement(p_period_days …)`'s default, and the **eleven** `payment_orders` plus **four** `subscriptions` column-name literals (`PaymentOrderRow` / `SubscriptionRow`, and the insert/upsert key sets) versus the column sets written here — these cross PostgREST as strings, so no compile-time link is possible and this checklist line is the only reconciliation there is
 
 ## Quality Assurance Mechanisms
 - `parseForeignKeys.test.ts` (text-side, `readFileSync`, no DB) — Enforces: TD-011, every FK declares `on delete` — Config: `SOURCE/lib/schema/__tests__/parseForeignKeys.test.ts`
@@ -110,13 +110,13 @@ Additional obligations carried verbatim from the plan:
 - the file new-object count is **four blocks**, matching the header and the traceability rows.
 
 ## Completion Criteria
-- [ ] All added tests pass; `npm test` green (gate A)
-- [ ] `schema.sql` gained **exactly four** new/edited DDL blocks, each with a Design Doc **schema** section behind it
-- [ ] §17 literal and `SOURCE/lib/schema/schemaFingerprint.ts` recomputed **in this same commit**
-- [ ] Every Binding Decisions Compliance Check evaluates to `Y`, with evidence (file:line) recorded in Investigation Notes
-- [ ] Every Reference Contracts Compliance Check evaluates to `Y`, with evidence recorded in Investigation Notes
-- [ ] No sink DDL shipped (BU-6 open) — **no fifth block**
-- [ ] **No production deploy of this branch has occurred** (see the plan Deployment Sequencing table)
+- [x] All added tests pass; `npm test` green (gate A)
+- [x] `schema.sql` gained **exactly four** new/edited DDL blocks, each with a Design Doc **schema** section behind it
+- [x] §17 literal and `SOURCE/lib/schema/schemaFingerprint.ts` recomputed **in this same commit**
+- [x] Every Binding Decisions Compliance Check evaluates to `Y`, with evidence (file:line) recorded in Investigation Notes
+- [x] Every Reference Contracts Compliance Check evaluates to `Y`, with evidence recorded in Investigation Notes
+- [x] No sink DDL shipped (BU-6 open) — **no fifth block**
+- [x] **No production deploy of this branch has occurred** (see the plan Deployment Sequencing table)
 
 ## Notes
 - Impact scope: `SOURCE/supabase/schema.sql`, `SOURCE/lib/schema/schemaFingerprint.ts`; downstream, plan Tasks 1.2, 1.3, 1.5, 5.5, 5.8.
@@ -124,4 +124,91 @@ Additional obligations carried verbatim from the plan:
 - The fingerprint insert must remain the **last** statement in `schema.sql`.
 
 ## Investigation Notes
-(Record the boundary-sweep enumeration, the block count, and each Compliance Check result with file:line evidence here.)
+
+### Insertion point and header style (Investigation Targets)
+
+- Header precedent confirmed at `schema.sql:1267-1279` — the mastery block uses an unnumbered named header under a `-- ===` rule. The four new blocks follow it: `:1604`, `:1670`, `:1703`, `:1794`. No §18, no §19 introduced.
+- Insertion point: the four blocks sit at `:1603-1821`, immediately **before** the §17 rule line. `-- 17. Phiên bản schema` now at `:1824`; the `insert into public.schema_version` at `:1861-1865` is still the **last statement** in the file (verified by `tail`).
+- `create or replace` exception re-read at `:981-989` (rationale) / `:990` (statement): it is **dependency-scoped** — the view `exams_with_difficulty` depends on `exam_rating_aggregate()`, so `drop function` dies with 2BP01 on a second run. `record_payment_settlement()` has no dependents, so drop-then-create applies (`:1734-1735`), matching `record_exam_result` (`:887-888`) and `record_skill_mastery` (`:1303-1304`).
+- `INVOKER` is Postgres' default when `security definer` is not declared; the file states this explicitly at `:875` and `:1459-1460` and both privileged-write precedents rely on it rather than writing `security invoker`. The new function follows: no `security definer` anywhere in `:1703-1793` (grep confirmed), and the header comment records why.
+- `schemaFingerprint.ts` computes a sha256 over `normalizeSql(sql)` with the `@schema-fingerprint` block excised, truncated to 12 hex chars; comments and whitespace are normalised away, so only executable SQL moves it.
+
+### Boundary sweep — the telemetry literal list (Change Category `boundary-change`)
+
+Repo-wide grep for `gemini_unavailable` over `*.ts`/`*.tsx`/`*.sql`. Every site of the **constraint list**, and its owner:
+
+| # | Site | Owner | Action here |
+|---|---|---|---|
+| 1 | `SOURCE/supabase/schema.sql:1382-1389` — inline CHECK inside `create table telemetry_log` | **this task** | edited 4 → 6 literals |
+| 2 | `SOURCE/supabase/schema.sql:1810-1821` — the `drop constraint` / `add constraint` pair | **this task** | added (new) |
+| 3 | `SOURCE/lib/tutor/telemetry.ts:35` — `TELEMETRY_ERROR_CODES` | plan Task 5.5 | **not edited** |
+| 4 | `SOURCE/lib/tutor/__tests__/telemetry.test.ts:49` — hand-transcribed `SCHEMA_ERROR_CODES` | plan Task 5.5 | **not edited** |
+| 5 | `SOURCE/lib/tutor/__tests__/telemetry.test.ts:261` — the two-layer equality guard | plan Task 5.5 | **not edited; passes unmodified** |
+
+Same-boundary sites that are *not* the constraint list, recorded so they are not mistaken for drift:
+- `SOURCE/app/(layer2)/tutorActions.ts:51` — `ExplainStepError`, the **client-visible** union (UI-D3 collapse constraint, plan Task 5.3). Deliberately does not widen with the CHECK.
+- `SOURCE/lib/tutor/callTutor.ts:51` — `Extract<TelemetryErrorCode, …>`, **derived**, so it carries no transcription.
+- `SOURCE/lib/tutor/telemetry.ts:33`/`:39` and `telemetry.test.ts:188` — phantom "§19" labels and a "4 named literals" comment; cleanup owned by plan Task 5.5.
+- `SOURCE/lib/supabase/service-role.ts:73` — the stale "§18" label; owned by plan Task 3.2/3.4 (traceability row I6). Out of scope here.
+
+**Why `telemetry.test.ts:261` still passes with the SQL at six and the code at four**: `:49` is a *hand copy*, deliberately not a parse of `schema.sql` (stated at `:47-48`). Both sides of the `:261` equality are code-side, so widening SQL alone cannot move it. That is exactly the drift plan Task 1.2's new "every `error_code in ( … )` occurrence" parse case exists to close. Confirmed by running the file: 4 files / 40 tests pass, `telemetry.test.ts` unmodified.
+
+### Red-phase observation (gates actually seen failing)
+
+- `schemaFingerprint.test.ts` → **RED** against the un-fingerprinted DDL: `expected '021dd1387945' to be 'd714c313fe1d'` at `schemaFingerprint.test.ts:105`.
+- `parseForeignKeys.test.ts` stayed green on the correct DDL (both new FKs declare `on delete`), so a green run proves nothing on its own. Discrimination was therefore **observed directly** with two transient probes on the real file, each reverted immediately:
+  - dropping `on delete set null` from `payment_orders.user_id` → RED, reported `"public.payment_orders(user_id) -> auth.users"`;
+  - dropping `on delete cascade` from `subscriptions.user_id` → RED, reported `"public.subscriptions(user_id) -> auth.users"`.
+  The gate sees both new foreign keys; it is not passing by not looking.
+
+### Block count and structural obligations
+
+- **Exactly four** new/edited blocks — `grep -c "^-- SUBSCRIPTION — "` = **4** (`:1604`, `:1670`, `:1703`, `:1794`). No fifth block; **no `ai_usage_log`, no usage columns on `telemetry_log`** (BU-6 stays open and undesigned).
+- Each block maps to a traceability row in `docs/plans/subscription-work-plan.md`: `:106`+`:107` (payment_orders + MSA-2 columns), `:108` (subscriptions / MSA-1), `:109` (record_payment_settlement), `:110` (RLS), `:111` (Schema (R13) telemetry alter), `:112` (fingerprint).
+- `payment_orders` column set parsed out of the block = **exactly eleven**, in DD order: `order_code, user_id, amount, status, created_at, pending_until, settled_at, qr_payload, account_number, account_name, memo`. No twelfth.
+- `subscriptions` = **four**: `user_id, expires_at, period_anchor_at, updated_at`. Grep for `boolean|is_premium|is_active|plan_active|status` inside the block matches only a *comment* saying those must not exist — no such column in either new table (AC-004, structural).
+- Fingerprint recomputed once for the whole change: `schema.sql:1862` `values (1, '021dd1387945')` and `SOURCE/lib/schema/schemaFingerprint.ts:41` `SCHEMA_FINGERPRINT = "021dd1387945"`. Repo-wide grep for the old `d714c313fe1d` returns **no** remaining occurrence.
+
+### Binding Decisions — Compliance Check results
+
+| Source | Axis | Result | Evidence |
+|---|---|---|---|
+| ADR-0013 (§ Decision) | persistence | **Y** | `schema.sql:1683` declares `expires_at timestamptz not null`; the block `:1677-1691` contains only `user_id`, `expires_at`, `period_anchor_at`, `updated_at`. Grep over the block for `boolean`/`is_premium`/`is_active`/`plan_active`/`status` matches no column declaration — only the comment at `:1681-1682`. No provider lifecycle column exists |
+| ADR-0013 (§ Implementation Guidance) | persistence | **Y** | Same block scan plus `payment_orders` `:1610-1648`: the only `status` in the change is `payment_orders.status` (`:1623-1624`), an **order** state that ADR-0013's rule does not govern (its subject is the entitlement timestamp). `subscriptions` has no `status`. `period_anchor_at` (`:1689`) is not a restatement — MSA-1's argument recorded in the column comment `:1684-1688`: after an early purchase `expires_at − 30d` is the OLD expiry, a different value |
+| ADR-0013 (§ Implementation Guidance) | data_flow | **Y** | The extension is written exactly **once** in the repository: `schema.sql:1773-1774` `greatest(public.subscriptions.expires_at, now()) + make_interval(days => p_period_days)`, inside `record_payment_settlement`. Grep for `make_interval` in `schema.sql` returns only `:1771` (the insert arm) and `:1774` (the conflict arm) of that one function |
+| ADR-0014 (§ Decision 3) | persistence | **Y** | `:1735-1743` declares the function with no `security definer` (INVOKER by Postgres default, the file's stated convention at `:875`, `:1459-1460`); `:1788-1789` `revoke all on function … from public, anon, authenticated`; `:1790-1791` `grant execute … to service_role`. Parameters are `p_order_code bigint` and `p_period_days integer` only — **no user identifier**; the beneficiary comes from `returning user_id into v_user_id` at `:1754` |
+| ADR-0014 (§ Decision 4) | persistence | **Y** | `and status = 'pending'` sits **inside** the UPDATE's WHERE at `:1753`, above `returning` at `:1754`. No nonce table, no timestamp window and no clock-based defence is added anywhere in `:1603-1821` |
+| ADR-0014 (§ Implementation Guidance) | persistence | **Y** | `:1788-1789` names all three roles explicitly on `record_payment_settlement(bigint, integer)` |
+
+**Recorded deviation carried through as designed** (backend DD `:527-531`): the body uses **two** statements (`:1750-1754` UPDATE, `:1770-1779` INSERT … ON CONFLICT). Carried as a *deviation*, not compliance — the header comment at `:1724-1733` states the transaction + row-lock argument and names plan Task 6.1's concurrent real-Postgres case as what proves it. The single-statement CTE fallback and why it was rejected (the null-beneficiary `raise exception` at `:1764-1765` has no CTE equivalent) is recorded in the same comment.
+
+### Reference Contracts — Compliance Check results
+
+| Source | Result | Evidence |
+|---|---|---|
+| DD § Schema, `payment_orders` — eleven columns | **Y** | Column declarations parsed out of `:1610-1648` = 11, in the declared order. Any twelfth would appear in that parse |
+| DD § Schema, `payment_orders` — `status` CHECK, four literals | **Y** | `:1623-1624` `status text not null default 'pending' check (status in ('pending', 'paid', 'expired', 'cancelled'))`. Exactly four; **no `'refunded'`** |
+| DD § Schema, telemetry alter — six literals | **Y** | Both occurrences carry the same six: `:1383` + `:1388` (inline, within the CHECK at `:1382-1389`) and `:1814` + `:1818-1819` (drop/add pair, within `:1813-1820`). `grep -n "error_code in ("` returns exactly these two sites |
+| DD § Schema, `record_payment_settlement` — one statement | **Y** | `:1772-1778`: `expires_at = greatest(…) + make_interval(…)`, `period_anchor_at = now()`, `updated_at = now()` are three SET clauses of the **same** `on conflict … do update` statement |
+
+### Refactor — fixture reconciliation (`SOURCE/tests/e2e/service/subscriptionServiceFixtures.ts`)
+
+These names cross PostgREST as strings, so `tsc` cannot see drift; reconciled by hand against the shipped DDL. **Result: no drift, no edit required.**
+
+| Fixture element | Shipped DDL | Verdict |
+|---|---|---|
+| `FIXTURE_PERIOD_DAYS = 30` (`:182`) | `p_period_days integer default 30` (`schema.sql:1737`) | agree |
+| `PaymentOrderRow` (`:216-228`), 11 fields | the 11 columns at `:1610-1648`, same names, same order | agree |
+| `SubscriptionRow` (`:230-235`), 4 fields | `user_id, expires_at, period_anchor_at, updated_at` | agree |
+| `payment_orders` insert keys (`:723-733`): 9 keys | omits only `created_at` (`not null default now()`, `:1625`) and `settled_at` (nullable, `:1631`); supplies every other `not null` column | legal |
+| `subscriptions` upsert keys (`:742-749`): `user_id, expires_at, period_anchor_at`, `onConflict: "user_id"` | omits only `updated_at` (`not null default now()`, `:1690`); `onConflict` matches the PK at `:1680` | legal |
+| `status` overrides comment "one of the four CHECK literals" (`:255`) | the four at `:1624` | agree |
+| `FIXTURE_ORDER_CODE_BASE = 8_000_000_000_000` (`:192`) | `order_code bigint primary key` (`:1613`) | agree — the value exceeds int4, so `bigint` is load-bearing here |
+| `FIXTURE_AMOUNT_VND = 39_000` (`:177`) | `amount integer not null check (amount > 0)` (`:1618`) | agree |
+
+### Verification run (gate A only — no database touched)
+
+- `npx vitest run lib/schema/__tests__/ lib/tutor/__tests__/telemetry.test.ts` → 4 files / **40 passed**, including `telemetry.test.ts:261` **unmodified**.
+- `npm test` → 87 passed / 1 failed / 1 skipped file; **913 passed / 10 skipped**. The single failure is the documented flake `components/tutor/ExplainStepAffordance.test.tsx` (5000ms timeout under parallel load); re-run alone it is **5/5 passed in 2.62s**, restoring the 914/10 baseline.
+- `npx tsc --noEmit` → 0 errors. `npm run lint` (`eslint --max-warnings 0`) → clean.
+- `npm run verify:schema` **deliberately not run** — that is gate B and belongs to plan Task 1.3 (manual, engineer-owned apply). No database was touched and no deploy of this branch occurred.

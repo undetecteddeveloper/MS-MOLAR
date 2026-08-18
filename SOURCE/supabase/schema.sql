@@ -1379,7 +1379,14 @@ create table if not exists public.telemetry_log (
   -- con đường vô tình nhét nội dung câu hỏi (UGC, attacker-influenced) vào
   -- log qua err.message.
   error_code    text check (
-    error_code is null or error_code in ('gemini_unavailable', 'rate_limited', 'server', 'not_eligible')
+    error_code is null or error_code in (
+      'gemini_unavailable', 'rate_limited', 'server', 'not_eligible',
+      -- Mới ở R13/AC-045 — xem khối SUBSCRIPTION telemetry_log ở cuối file:
+      -- sửa TẠI CHỖ ở đây là để một lần provision MỚI đúng; cặp drop/add
+      -- dưới đó là để dev/prod (đã tồn tại, nên `create table if not
+      -- exists` là no-op) cũng đúng. Thiếu một trong hai = hình dạng TD-005.
+      'user_quota_exhausted', 'project_budget_exhausted'
+    )
   ),
   created_at    timestamptz not null default now()
 );
@@ -1593,6 +1600,226 @@ create policy "avatars_delete_own" on storage.objects
     and (storage.foldername(name))[1] = auth.uid()::text
   );
 
+-- ============================================================================
+-- SUBSCRIPTION — payment_orders (PRD R8, ADR-0013/ADR-0014)
+--
+-- Chứng từ tiền, KHÔNG phải trạng thái phái sinh: nó sống lâu hơn tài khoản
+-- (`on delete set null`, PRD R-g) để một khiếu nại vẫn đối soát được. Client
+-- chỉ ĐỌC đơn của chính mình; mọi lệnh ghi đi qua service_role.
+-- ============================================================================
+create table if not exists public.payment_orders (
+  -- payOS đòi orderCode là SỐ NGUYÊN; bigint là kiểu vừa khít, và đây cũng là
+  -- khoá của nhà cung cấp cho cả webhook lẫn GET /v2/payment-requests/{id}.
+  order_code    bigint primary key,
+  -- CHO PHÉP NULL kèm `on delete set null`, cố ý (PRD R-g): chứng từ tiền phải
+  -- sống lâu hơn tài khoản. Cái giá là settlement một đơn mồ côi sẽ không tìm
+  -- ra người thụ hưởng và từ chối — đúng kết cục fail-closed mong muốn.
+  user_id       uuid references auth.users(id) on delete set null,
+  amount        integer not null check (amount > 0),
+  -- KHÔNG có trạng thái 'refunded': hoàn tiền là một thao tác ngân hàng cộng
+  -- một câu SQL sửa tay (D10). Bịa ra một status mà code không bao giờ đặt là
+  -- tạo một trạng thái chỉ tới được bằng một nhánh code không tồn tại (đúng
+  -- cảnh báo của ADR-0013).
+  status        text not null default 'pending'
+                check (status in ('pending', 'paid', 'expired', 'cancelled')),
+  created_at    timestamptz not null default now(),
+  -- Soi gương `expiredAt` của chính payOS trên payment request. MỘT hằng số
+  -- dùng chung nuôi cả hai (ADR-0013 Implementation Guidance) — hai đồng hồ
+  -- lệch nhau đẻ ra một QR mà bên này tưởng còn sống, bên kia tưởng đã chết.
+  -- Hằng đó là `ORDER_PENDING_WINDOW_MS` (lib/billing/pricing.ts).
+  pending_until timestamptz not null,
+  settled_at    timestamptz,
+
+  -- Bốn cột chuyển khoản (UI Spec C-13, FE-B-01) ----------------------------
+  -- Bốn trường còn lại của CheckoutOrder (UI Spec C-13). Chúng được LƯU chứ
+  -- không suy ra, vì đúng một lý do: phải đọc được trên một lần vào nguội
+  -- /pricing/checkout?order=… mà trong phiên KHÔNG có lượt gọi createOrder()
+  -- nào — link "tiếp tục thanh toán" (AC-027), một lần F5, một bookmark.
+  -- Ghi MỘT LẦN, từ phản hồi create-request của payOS, trong chính câu insert
+  -- tạo dòng; không bao giờ tính lại lúc đọc (frontend Risk R-11). Số tài
+  -- khoản hay memo đổi dưới chân một đơn đang bay là cùng loại lỗi mà
+  -- settleOrder() bước 3 từ chối trên số tiền.
+  -- NOT NULL cưỡng chế được vì lượt gọi nhà cung cấp đi TRƯỚC insert: payOS
+  -- không trả lời thì không dòng nào được ghi.
+  qr_payload     text not null,   -- payOS `qrCode`: một PAYLOAD VietQR/EMVCo, KHÔNG phải URL (UI-D14)
+  account_number text not null,   -- AC-028 — tài khoản NHẬN của mình, không bao giờ của người trả
+  account_name   text not null,   -- AC-028 — chủ tài khoản nhận
+  memo           text not null    -- AC-028 — payOS `description`; chuỗi nhà cung cấp đối soát theo
+);
+
+create index if not exists payment_orders_user_created_idx
+  on public.payment_orders (user_id, created_at desc);
+
+alter table public.payment_orders enable row level security;
+
+-- Client chỉ ĐỌC được đơn của chính mình và KHÔNG ghi được gì. Hai nơi đọc là
+-- S-05 ("đơn của tôi", R10) và S-06 (màn thanh toán). Đúng một policy này là
+-- TOÀN BỘ đường đọc của cả hai: với bốn cột chuyển khoản ở trên, một select
+-- theo chủ sở hữu trả đủ tám trường CheckoutOrder, nên S-06 không cần action
+-- thứ hai và không cần gọi nhà cung cấp để render (FE-B-01). Revoke tường minh
+-- dù RLS không có policy nào cho các thao tác ghi (defense-in-depth, tiền lệ
+-- §11a).
+revoke insert, update, delete on public.payment_orders from anon, authenticated;
+revoke select on public.payment_orders from anon;
+
+drop policy if exists "orders_select_own" on public.payment_orders;
+create policy "orders_select_own" on public.payment_orders
+  for select to authenticated using (user_id = auth.uid());
+
+-- ============================================================================
+-- SUBSCRIPTION — subscriptions (entitlement; PRD R2/R3/R4, ADR-0013)
+--
+-- Kỳ trả trước, KHÔNG phải subscription do nhà cung cấp đẩy: entitlement được
+-- SUY RA lúc đọc bằng cách so `expires_at` (cộng 3 ngày ân hạn, PRD D8/R4) với
+-- now(). Không boolean, không status enum, không sự kiện vòng đời từ provider,
+-- và do đó không job định kỳ nào trong repo này.
+-- ============================================================================
+create table if not exists public.subscriptions (
+  -- `cascade`, khác payment_orders: dòng này không phải chứng từ tiền, nó là
+  -- trạng thái phái sinh. Tài khoản đi thì nó đi theo.
+  user_id          uuid primary key references auth.users(id) on delete cascade,
+  -- MỘT giá trị vòng đời duy nhất. Không boolean, không status enum (PRD
+  -- R2/AC-004; metric #4 đếm đúng loại cột này và kỳ vọng bằng 0).
+  expires_at       timestamptz not null,
+  -- KHÔNG phải bản chép lại của expires_at (backend DD, MSA-1): sau một lần mua
+  -- sớm, `expires_at − 30d` chính là hạn CŨ — nó trả lời một câu hỏi khác. Đây
+  -- là mốc bắt đầu kỳ HẠN MỨC 30 ngày hiện tại (A4), đặt trong CÙNG câu lệnh
+  -- gia hạn expires_at — chính điều đó làm ca mua sớm của AC-016 được thêm
+  -- NGÀY mà không được thêm một suất hạn mức thứ hai.
+  period_anchor_at timestamptz not null,
+  updated_at       timestamptz not null default now()
+);
+
+alter table public.subscriptions enable row level security;
+
+revoke insert, update, delete on public.subscriptions from anon, authenticated;
+revoke select on public.subscriptions from anon;
+
+drop policy if exists "subscriptions_select_own" on public.subscriptions;
+create policy "subscriptions_select_own" on public.subscriptions
+  for select to authenticated using (user_id = auth.uid());
+
+-- ============================================================================
+-- SUBSCRIPTION — record_payment_settlement() (ADR-0014, PRD AC-009/031/033)
+--
+-- Đường DUY NHẤT gia hạn được entitlement. Anh em với record_exam_result()
+-- (§11b) và record_skill_mastery() (khối MASTERY WRITE), và theo cả hai từng
+-- mệnh đề: INVOKER (mặc định của Postgres khi không khai `security definer` —
+-- service_role vốn đã bypass RLS), danh tính SUY RA từ dòng đơn hàng, revoke
+-- ĐÍCH DANH khỏi public/anon/authenticated, và DROP-THEN-CREATE như cả hai.
+--
+-- KHÔNG dùng `create or replace`: ngoại lệ duy nhất trong file này
+-- (exam_rating_aggregate, §12a) tồn tại vì có view phụ thuộc vào hàm đó; hàm
+-- này KHÔNG có đối tượng nào phụ thuộc, nên tiền đề của ngoại lệ vắng mặt. Khác
+-- biệt không phải thẩm mỹ: `create or replace` giữ im lặng một chữ ký cũ nếu
+-- sau này danh sách tham số đổi — trên đường tiền, đó là hai hàm settlement
+-- gọi được trong khi tài liệu mô tả một.
+--
+-- Idempotency là mệnh đề `status = 'pending'` NẰM TRONG UPDATE ... RETURNING,
+-- không phải một phép kiểm riêng: hai lượt settlement đồng thời (webhook và nút
+-- "kiểm tra lại" bấm cùng lúc) tranh cùng một dòng, một bên thắng, UPDATE của
+-- bên kia không khớp dòng nào và hàm no-op. Đó là AC-031, và nó không cần bảng
+-- nonce, không cần đồng hồ (ADR-0014 Decision 4).
+--
+-- SAI LỆCH ĐƯỢC GHI NHẬN so với ADR-0014 Implementation Guidance ("Two
+-- statements is a window"): thân hàm này dùng HAI câu lệnh. Thứ làm nó an toàn
+-- không phải câu chữ mà là ngữ nghĩa giao dịch — thân plpgsql chạy trong một
+-- giao dịch ngầm duy nhất, và câu lệnh đầu khoá dòng đơn hàng dưới vị từ
+-- `status = 'pending'`, nên một settlement đồng thời của cùng order_code sẽ
+-- chặn rồi khớp 0 dòng. Dạng một-câu-lệnh (CTE ghi dữ liệu) bị loại vì nhánh
+-- `raise exception` không-người-thụ-hưởng bên dưới không có tương đương trong
+-- CTE. Đây là SAI LỆCH, không phải tuân thủ; ca đồng thời trên Postgres thật là
+-- thứ CHỨNG MINH nó, thay vì giả định.
+-- ============================================================================
+drop function if exists public.record_payment_settlement(bigint, integer);
+create function public.record_payment_settlement(
+  p_order_code bigint,
+  p_period_days integer default 30
+)
+returns timestamptz
+language plpgsql
+volatile
+set search_path = public, pg_temp
+as $$
+declare
+  v_user_id uuid;
+  v_new_expires timestamptz;
+begin
+  -- Một câu lệnh giành lấy đơn. Nếu nó không còn 'pending' (đã paid, expired,
+  -- cancelled, hoặc không tồn tại) thì không khớp gì và ta trả null.
+  update public.payment_orders
+     set status = 'paid', settled_at = now()
+   where order_code = p_order_code
+     and status = 'pending'
+  returning user_id into v_user_id;
+
+  if not found then
+    return null;                 -- phát lại hoặc đơn lạ: no-op, không phải lỗi
+  end if;
+
+  if v_user_id is null then
+    -- Đơn sống sót qua một tài khoản đã xoá (on delete set null). Fail closed
+    -- và để lại dấu vết ồn ào: dòng giờ là 'paid' mà không có người thụ hưởng —
+    -- đúng trạng thái cần một con người đối soát bằng tay (D10).
+    raise exception 'settlement for order % has no beneficiary', p_order_code
+      using errcode = 'check_violation';
+  end if;
+
+  -- GIA HẠN, không bao giờ ghi đè (PRD R3, ADR-0013). max(hiện có, now()) là
+  -- thứ làm việc mua sớm THÊM ngày thay vì tịch thu ngày.
+  insert into public.subscriptions (user_id, expires_at, period_anchor_at, updated_at)
+  values (v_user_id, now() + make_interval(days => p_period_days), now(), now())
+  on conflict (user_id) do update
+    set expires_at = greatest(public.subscriptions.expires_at, now())
+                     + make_interval(days => p_period_days),
+        -- CÙNG câu lệnh với phép gia hạn ở trên: ca mua sớm của AC-016 được
+        -- thêm NGÀY và đúng một kỳ hạn mức, không bao giờ hai.
+        period_anchor_at = now(),
+        updated_at = now()
+  returning expires_at into v_new_expires;
+
+  return v_new_expires;
+end;
+$$;
+
+-- Supabase mặc định cấp EXECUTE cho public trên hàm mới. Revoke ĐÍCH DANH là
+-- thứ duy nhất gỡ được nó (ADR-0011/ADR-0014 Implementation Guidance — nhắc
+-- lại vì quên nó thì im lặng; xem thêm ghi chú §10b).
+revoke all on function public.record_payment_settlement(bigint, integer)
+  from public, anon, authenticated;
+grant execute on function public.record_payment_settlement(bigint, integer)
+  to service_role;
+
+-- ============================================================================
+-- SUBSCRIPTION — telemetry_log.error_code mở rộng TẠI CHỖ (PRD R13,
+-- AC-045/046/047)
+--
+-- CHECK hiện có được khai INLINE trong khối TELEMETRY LOG ở trên. Hai chỗ sửa,
+-- và BẮT BUỘC cả hai — không chỗ nào một mình là đúng:
+--   (1) danh sách inline sửa thành sáu literal, để một lần provision MỚI là
+--       đúng;
+--   (2) cặp drop/add dưới đây, để một DB ĐÃ provision là đúng — `create table
+--       if not exists` là no-op trên dev và prod, cả hai đều đã tồn tại, nên
+--       chỉ sửa inline sẽ đúng hình dạng TD-005: đúng trong git, vắng mặt ở
+--       mọi database.
+-- Constraint được THAY dưới CHÍNH TÊN của nó, không bao giờ dựng song song một
+-- cái thứ hai — bài học §10c ("Bắt buộc theo thứ tự này"), thứ AC-045 gọi tên
+-- trực tiếp.
+-- ============================================================================
+alter table public.telemetry_log
+  drop constraint if exists telemetry_log_error_code_check;
+alter table public.telemetry_log
+  add constraint telemetry_log_error_code_check check (
+    error_code is null or error_code in (
+      'gemini_unavailable', 'rate_limited', 'server', 'not_eligible',
+      -- Mới trong tính năng này. Tên chọn ĐÚNG BẰNG chuỗi lý do từ chối của
+      -- consumeQuota(), để giá trị trong log và nhánh sinh ra nó không thể bị
+      -- ánh xạ nhầm.
+      'user_quota_exhausted',      -- AC-014/AC-015/AC-018/AC-053: hạn mức gói của CHÍNH người dùng
+      'project_budget_exhausted'   -- AC-022/AC-023: ngân sách ngày toàn dự án của R7
+    )
+  );
+
 -- ----------------------------------------------------------------------------
 -- 17. Phiên bản schema — DB tự khai nó đang chạy bản nào (2026-08-07).
 --
@@ -1632,7 +1859,7 @@ revoke all on public.schema_version from anon, authenticated;
 -- nó — xem lib/schema/schemaFingerprint.ts).
 -- @schema-fingerprint-begin
 insert into public.schema_version (id, fingerprint)
-values (1, 'd714c313fe1d')
+values (1, '021dd1387945')
 on conflict (id) do update
   set fingerprint = excluded.fingerprint,
       applied_at  = now();
