@@ -9,7 +9,7 @@ Layer mix: documents + build configuration only. **No product code.**
 |---|---|---|---|
 | 0.1 `vitest.integration.config.ts` + `test:integration` | `subscription-work-plan-backend-task-01.md` | backend | [ ] |
 | 0.2 `vitest.localdb.config.ts` + `test:localdb` | `subscription-work-plan-backend-task-02.md` | backend | [ ] |
-| 0.3 CL-02 UI Spec / frontend DD amendment (**must precede plan Task 2.4**) | `subscription-work-plan-backend-task-03.md` | backend | [ ] |
+| 0.3 CL-02 UI Spec / frontend DD amendment (**must precede plan Task 2.4**) | `subscription-work-plan-backend-task-03.md` | backend | [x] |
 | 0.4 ST-01 — unblock slice S2 | `subscription-work-plan-backend-task-04.md` | backend | [ ] |
 | 0.5 Documentation hygiene batch A (CL-03, CL-04, ST-02, ST-03) | `subscription-work-plan-backend-task-05.md` | backend | [ ] |
 | 0.6 Documentation hygiene batch B (ST-04, ST-05, CL-05, CL-06, LO-01, LO-02) | `subscription-work-plan-backend-task-06.md` | backend | [ ] |
@@ -27,7 +27,7 @@ Layer mix: documents + build configuration only. **No product code.**
 
 - [ ] `npm test` collects the same files as before Phase 0 and is green
 - [ ] `npm run test:integration` and `npm run test:localdb` both resolve their configs and run (0 tests, skeletons still comments-only)
-- [ ] UI Spec UI-D17 / C-06 delta amended; frontend `ui:06` corrected; X-13 recorded
+- [x] UI Spec UI-D17 / C-06 delta amended; frontend `ui:06` corrected; X-13 recorded
 - [ ] FE-B-01 / FE-B-02 reconciled as closed in the frontend DD; S2 no longer documented as un-startable
 - [ ] AC-050 **deferral** (UI Spec `:404`, S-07, P2; PRD R15 Should Have) recorded alongside its owner; no task claims to implement it
 - [ ] BU-6 raised: the `:79`/`:145` contradiction has an escalation row and a requested DD revision; **no task instructs an implementer to choose a schema alternative**
