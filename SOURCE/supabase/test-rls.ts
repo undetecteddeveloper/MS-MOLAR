@@ -36,6 +36,15 @@
 //   support-screenshots (KHÔNG có select policy nào cho authenticated). ST-a..
 //   ST-d ported từ supabase/__tests__/support.rls.service.e2e.test.ts; ST-e là
 //   plan-added (đóng document review finding I001, AC-013).
+// Phần 9 (Subscription, backend Design Doc §Security Considerations + ADR-0014,
+//   Work Plan Task 1.5, cases PO-a…PO-f / SB-a…SB-g / PS-a/PS-b) — required,
+//   blocking. Một nhóm từ chối cho MỖI đối tượng mà khối SUBSCRIPTION của
+//   schema.sql tạo ra, không ít hơn: bảng `payment_orders`, bảng `subscriptions`
+//   và hàm `record_payment_settlement()`. Đây là đường tiền: một JWT học sinh
+//   ghi được vào một trong hai bảng, hay gọi được hàm thanh toán, là tự cấp
+//   entitlement không trả tiền (AC-033).
+//   SỐ NHÓM PHẢI BẰNG số đối tượng DDL: thêm một bảng cho khối này thì nhóm
+//   từ chối của nó đi CÙNG thay đổi đó, không bao giờ đi sau.
 //
 // 2 user test được tạo qua Admin API (service_role, email_confirm=true) để KHÔNG
 // gửi email xác nhận. Việc TEST RLS sau đó chỉ dùng ANON key + đăng nhập thật.
@@ -139,6 +148,27 @@ const SUPPORT_TICKET_B_MESSAGE = "[rls-support] Vé của B — test cách ly (S
 const SUPPORT_NOTE_TEXT = "[rls-support] Ghi chú nội bộ trên vé của A (ST-b/ST-c)";
 const SUPPORT_SCREENSHOTS_BUCKET = "support-screenshots";
 const SUPPORT_SCREENSHOT_FILENAME = "rls-support-screenshot.png";
+
+// Fixture Subscription (backend Design Doc §Security Considerations, khối
+// SUBSCRIPTION của schema.sql, ADR-0014; cases PO-a…PO-f / SB-a…SB-g /
+// PS-a/PS-b) — setup/cleanup idempotent như 5 fixture trên.
+//
+// Mã đơn cố ý nằm ở dải 9_9xx tỷ: to hơn mọi orderCode thật payOS từng sinh
+// trong dự án này, nên không có cơ hội đụng một chứng từ tiền thật, và vẫn nằm
+// dưới Number.MAX_SAFE_INTEGER (bigint đi qua JSON).
+const SUB_ORDER_A = 9_900_000_000_001; // đơn của User A — chủ sở hữu (PO-a/PO-d/PO-e/PS-b)
+const SUB_ORDER_B = 9_900_000_000_002; // đơn của User B — đối tượng đọc chéo (PO-b)
+const SUB_ORDER_FORGED = 9_900_000_000_003; // đơn A tự ý insert (PO-c) — không bao giờ được tồn tại
+const SUB_ORDER_CODES = [SUB_ORDER_A, SUB_ORDER_B, SUB_ORDER_FORGED];
+
+// Hai giá trị mốc dưới đây KHÔNG chỉ để cho đẹp: chúng là vị từ hậu kiểm dọn
+// dẹp, và cố ý KHÁC vị từ mà cleanup dùng để xoá (order_code / user_id). Dọn
+// bằng một vị từ rồi xác nhận bằng chính vị từ đó thì một lệnh delete khớp 0
+// dòng vẫn cho ra "đã sạch".
+const SUB_ORDER_MEMO = "[rls-sub] fixture memo — khong phai don that";
+const SUB_ANCHOR_SENTINEL = "2099-01-02T03:04:05.000Z";
+const SUB_EXPIRES_SENTINEL = "2099-02-03T04:05:06.000Z";
+const SUB_PENDING_UNTIL_SENTINEL = "2099-03-04T05:06:07.000Z";
 
 let failures = 0;
 function assert(cond: boolean, msg: string) {
@@ -478,6 +508,99 @@ async function setupSupportFixtures(
   if (upload.error) throw upload.error;
 
   return { ticketAId, ticketBId, screenshotPath };
+}
+
+/** Lỗi trả về có thuộc hạng QUYỀN hay không.
+ *
+ *  ĐÂY LÀ CHỖ CẢ PHẦN 9 SỐNG HOẶC CHẾT. Một case "insert bị chặn" mà chỉ kiểm
+ *  `error !== null` sẽ XANH khi payload thiếu một cột NOT NULL (23502), sai FK
+ *  (23503), trùng khoá (23505) hay sai kiểu (22P02) — tức xanh trong khi không
+ *  chứng minh được một chữ nào về quyền. Chỉ 42501 (permission denied cho bảng,
+ *  do `revoke`) và thông báo vi phạm row-level security (do KHÔNG có policy
+ *  ghi) mới là "bị TỪ CHỐI CẤP QUYỀN"; mọi mã ràng buộc đều bị loại. */
+function isAuthorizationDenial(
+  error: { code?: string; message?: string } | null,
+): boolean {
+  if (!error) return false;
+  return (
+    error.code === "42501" ||
+    /permission denied|violates row-level security policy/i.test(error.message ?? "")
+  );
+}
+
+/** Một dòng `payment_orders` ĐẦY ĐỦ và hợp lệ về MỌI ràng buộc của bảng: đủ 8
+ *  cột NOT NULL, `amount > 0`, `status` nằm trong CHECK, `user_id` là FK có
+ *  thật, `order_code` chưa tồn tại.
+ *
+ *  MỘT builder dùng cho CẢ HAI phía là chủ ý: service_role tạo fixture bằng nó
+ *  (và thành công), rồi JWT học sinh gửi ĐÚNG hình dạng đó và phải nhận 42501.
+ *  Nhờ vậy "bị từ chối vì QUYỀN" tách bạch được với "bị từ chối vì DỮ LIỆU" —
+ *  nếu payload có gì sai thì bước fixture đã ném trước khi tới assertion. */
+function buildFixtureOrderRow(orderCode: number, userId: string) {
+  return {
+    order_code: orderCode,
+    user_id: userId,
+    amount: 199_000,
+    status: "pending",
+    pending_until: SUB_PENDING_UNTIL_SENTINEL,
+    // payOS `qrCode` là PAYLOAD VietQR/EMVCo, không phải URL (UI-D14) — chuỗi
+    // dưới đây chỉ cần đúng KIỂU, nội dung không được quét bởi ai.
+    qr_payload: "[rls-sub] 00020101021138540010A00000072701",
+    account_number: "0000000000",
+    account_name: "[RLS-SUB] TAI KHOAN FIXTURE",
+    memo: SUB_ORDER_MEMO,
+  };
+}
+
+/** Một dòng `subscriptions` đầy đủ (3 cột NOT NULL không có default). Cùng vai
+ *  trò builder-dùng-chung như buildFixtureOrderRow ở trên. */
+function buildFixtureSubscriptionRow(userId: string) {
+  return {
+    user_id: userId,
+    expires_at: SUB_EXPIRES_SENTINEL,
+    period_anchor_at: SUB_ANCHOR_SENTINEL,
+  };
+}
+
+/** Xóa sạch fixture Subscription (chạy trước VÀ sau để idempotent).
+ *
+ *  Xoá đơn theo `order_code` và entitlement theo `user_id` — vị từ user_id cố
+ *  ý RỘNG hơn fixture, để một dòng subscriptions do lỗi quyền (hoặc do hàm
+ *  settlement lỡ chạy) sinh ra cho A/B cũng bị cuốn đi, không chỉ dòng mang
+ *  giá trị mốc. Hậu kiểm ở cuối Phần 9 dùng vị từ khác hẳn. */
+async function cleanupSubscriptionFixtures(
+  admin: SupabaseClient,
+  authorAId: string,
+  authorBId: string,
+) {
+  await admin.from("payment_orders").delete().in("order_code", SUB_ORDER_CODES);
+  await admin.from("subscriptions").delete().in("user_id", [authorAId, authorBId]);
+}
+
+/** Tạo fixture Subscription qua service_role (bypass RLS): 1 đơn 'pending' của
+ *  A + 1 đơn của B + 1 dòng subscriptions của B.
+ *
+ *  A CỐ Ý chưa có dòng subscriptions ở bước này: `subscriptions.user_id` là
+ *  PRIMARY KEY, nên nếu A đã có dòng thì lệnh insert bị từ chối ở SB-c sẽ trùng
+ *  khoá (23505) và case xanh vì lý do sai. Dòng của A được tạo SAU SB-c, ngay
+ *  trước SB-d/SB-e. */
+async function setupSubscriptionFixtures(
+  admin: SupabaseClient,
+  authorAId: string,
+  authorBId: string,
+) {
+  const orders = await admin
+    .from("payment_orders")
+    .insert([
+      buildFixtureOrderRow(SUB_ORDER_A, authorAId),
+      buildFixtureOrderRow(SUB_ORDER_B, authorBId),
+    ]);
+  if (orders.error) throw orders.error;
+
+  const subB = await admin
+    .from("subscriptions")
+    .insert(buildFixtureSubscriptionRow(authorBId));
+  if (subB.error) throw subB.error;
 }
 
 async function main() {
@@ -1837,6 +1960,437 @@ async function main() {
 
   // Dọn dẹp fixture Support System.
   await cleanupSupportFixtures(admin, userAId, userBId);
+
+  // ==========================================================================
+  // Phần 9 — Subscription (payment_orders + subscriptions +
+  // record_payment_settlement), cases PO-a…PO-f / SB-a…SB-g / PS-a/PS-b —
+  // REQUIRED, BLOCKING. Backend Design Doc §Security Considerations + ADR-0014
+  // §Implementation Guidance + khối SUBSCRIPTION của schema.sql.
+  //
+  // Vì sao phải chạy trên Postgres thật: cả ba nhóm đều là ranh giới QUYỀN chỉ
+  // tồn tại trong DB — hai policy `*_select_own`, các lệnh `revoke insert,
+  // update, delete` tường minh trên hai bảng, và `revoke all on function …
+  // from public, anon, authenticated` trên hàm settlement. Một Supabase client
+  // giả lập sẽ chứng minh cái giả lập, không chứng minh policy nào.
+  //
+  // MỘT NHÓM CHO MỖI ĐỐI TƯỢNG DDL, và số nhóm phải BẰNG số đối tượng:
+  //   PO-* → public.payment_orders
+  //   SB-* → public.subscriptions
+  //   PS-* → public.record_payment_settlement(bigint, integer)
+  //
+  // ⚠ CÁCH KHỐI NÀY TRÁNH "XANH VÌ LÝ DO SAI" — đọc trước khi sửa bất cứ case
+  // nào. Một lệnh ghi bị từ chối vì thiếu cột NOT NULL (23502), sai FK (23503),
+  // trùng khoá (23505) hay sai kiểu (22P02) cũng "thất bại", và một assertion
+  // `error !== null` sẽ xanh trong khi `revoke` đã bị gỡ mất. Ba lớp phòng vệ:
+  //   1. isAuthorizationDenial() chỉ chấp nhận 42501 / vi phạm row-level
+  //      security — mọi mã ràng buộc đều trượt.
+  //   2. Payload bị từ chối do CÙNG builder sinh ra với payload mà service_role
+  //      chèn thành công trong chính lần chạy này (positive control ngay sau
+  //      mỗi case insert) — nên "dữ liệu sai" là giả thuyết bị loại bằng bằng
+  //      chứng, không bằng lời hứa. Với PS-b, thứ tương đương là một lời gọi
+  //      RPC no-op bằng service_role dùng ĐÚNG tên hàm và ĐÚNG bộ tham số,
+  //      loại bỏ giả thuyết "hàm không giải được" (PostgREST trả PGRST202 cho
+  //      cả sai tên lẫn thiếu EXECUTE).
+  //   3. Mọi case đều kèm hậu kiểm trạng thái DB bằng service_role: dòng còn
+  //      nguyên từng byte, hoặc không có dòng mới nào. Một lệnh ghi bị RLS chặn
+  //      có thể trả "thành công rỗng" tuỳ cấu hình, nên error trả về một mình
+  //      chưa bao giờ đủ (tiền lệ TL-b/ST-d).
+  // ==========================================================================
+  console.log("\nSubscription — setup fixture (service_role)…");
+  await cleanupSubscriptionFixtures(admin, userAId, userBId);
+  await setupSubscriptionFixtures(admin, userAId, userBId);
+
+  console.log("\nRLS checks (Subscription Phần 9 — payment_orders PO-a…PO-f):");
+
+  // PO-a (positive control). Chủ đơn PHẢI đọc được đơn của chính mình. Thiếu
+  // bước này, "A không thấy gì" ở PO-b có thể xanh vì fixture hỏng hoặc vì
+  // policy giấu sạch của mọi người (đúng bài học H-a/MM-a).
+  const poOwn = await userA
+    .from("payment_orders")
+    .select("order_code, user_id, amount, status, memo")
+    .eq("order_code", SUB_ORDER_A);
+  assert(
+    !poOwn.error &&
+      poOwn.data?.length === 1 &&
+      poOwn.data?.[0]?.user_id === userAId &&
+      poOwn.data?.[0]?.status === "pending" &&
+      poOwn.data?.[0]?.memo === SUB_ORDER_MEMO,
+    "PO-a (positive control): A đọc được đúng đơn 'pending' của chính mình (orders_select_own cho phép đúng chủ)",
+  );
+
+  // PO-b (positive control). Đơn của B tồn tại THẬT — để "A đọc ra 0 dòng" bên
+  // dưới nghĩa là bị policy chặn, không phải vì chẳng có gì ở đó.
+  const poBSeeded = await admin
+    .from("payment_orders")
+    .select("order_code, user_id")
+    .eq("order_code", SUB_ORDER_B);
+  assert(
+    !poBSeeded.error &&
+      poBSeeded.data?.length === 1 &&
+      poBSeeded.data?.[0]?.user_id === userBId,
+    "PO-b (positive control): đơn của User B tồn tại thật trong payment_orders (service_role đọc được)",
+  );
+
+  // PO-b. A đọc đơn của B -> 0 dòng. Chế độ hỏng chính: `orders_select_own`
+  //       thiếu hoặc sai vế `user_id = auth.uid()`, khiến mọi người đọc được
+  //       chứng từ tiền của mọi người.
+  const poCross = await userA
+    .from("payment_orders")
+    .select("order_code, user_id")
+    .eq("order_code", SUB_ORDER_B);
+  assert(
+    !poCross.error && (poCross.data?.length ?? 0) === 0,
+    `PO-b: User A KHÔNG đọc được đơn của User B (nhận: ${poCross.error?.code ?? String(poCross.data?.length ?? 0) + " dòng"})`,
+  );
+
+  // PO-c. A tự INSERT một đơn cho CHÍNH MÌNH -> phải bị chặn ở tầng GRANT
+  //       (`revoke insert … from authenticated`). Payload đầy đủ và hợp lệ,
+  //       user_id đúng là A: nếu quyền hở, lệnh này SẼ thành công, và đó chính
+  //       là "tự cấp một chứng từ tiền" mà AC-033 cấm.
+  const poForgedRow = buildFixtureOrderRow(SUB_ORDER_FORGED, userAId);
+  const poInsert = await userA.from("payment_orders").insert(poForgedRow);
+  const poAfterInsert = await admin
+    .from("payment_orders")
+    .select("order_code")
+    .eq("order_code", SUB_ORDER_FORGED);
+  assert(
+    isAuthorizationDenial(poInsert.error) &&
+      !poAfterInsert.error &&
+      (poAfterInsert.data?.length ?? 0) === 0,
+    `PO-c: A KHÔNG tự INSERT được vào payment_orders (mong đợi 42501, nhận: ${poInsert.error?.code ?? "KHÔNG CÓ LỖI"}; số dòng lọt vào: ${poAfterInsert.data?.length ?? "?"})`,
+  );
+
+  // PO-c (positive control) — mấu chốt của cả khối. CHÍNH payload vừa bị từ
+  // chối, do service_role gửi, được NHẬN. Nếu PO-c xanh vì payload sai (thiếu
+  // cột NOT NULL, sai FK, sai kiểu) thì bước này FAIL. Xoá ngay sau đó để
+  // cleanup cuối khối không phải là nơi duy nhất chịu trách nhiệm.
+  const poForgedByAdmin = await admin.from("payment_orders").insert(poForgedRow);
+  assert(
+    !poForgedByAdmin.error,
+    `PO-c (positive control): service_role chèn được ĐÚNG payload mà A vừa bị từ chối — lời từ chối ở PO-c là do QUYỀN, không phải do dữ liệu (nhận: ${poForgedByAdmin.error?.code ?? "OK"})`,
+  );
+  await admin.from("payment_orders").delete().eq("order_code", SUB_ORDER_FORGED);
+
+  // PO-d. A UPDATE đơn của CHÍNH MÌNH (đơn nó ĐỌC được, nên RLS không phải thứ
+  //       che mắt) sang 'paid' -> phải bị chặn. Đây là case đắt nhất của nhóm:
+  //       nếu `revoke update` biến mất mà chỉ còn "không có policy update", lệnh
+  //       này KHÔNG lỗi — nó lặng lẽ khớp 0 dòng và trả về thành công. Vì thế
+  //       assertion đòi CẢ mã lỗi quyền LẪN dòng còn nguyên từng byte.
+  const poBefore = await admin
+    .from("payment_orders")
+    .select("*")
+    .eq("order_code", SUB_ORDER_A)
+    .single();
+  const poUpdate = await userA
+    .from("payment_orders")
+    .update({ status: "paid", settled_at: new Date().toISOString() })
+    .eq("order_code", SUB_ORDER_A);
+  const poAfterUpdate = await admin
+    .from("payment_orders")
+    .select("*")
+    .eq("order_code", SUB_ORDER_A)
+    .single();
+  const poUpdateKeptRow =
+    JSON.stringify(poAfterUpdate.data) === JSON.stringify(poBefore.data);
+  assert(
+    isAuthorizationDenial(poUpdate.error) &&
+      !poBefore.error &&
+      !poAfterUpdate.error &&
+      poUpdateKeptRow,
+    `PO-d: A KHÔNG UPDATE được đơn của chính mình sang 'paid' (mong đợi 42501, nhận: ${poUpdate.error?.code ?? "KHÔNG CÓ LỖI"}; dòng sau còn nguyên: ${poUpdateKeptRow})`,
+  );
+
+  // PO-e. A DELETE đơn của chính mình -> phải bị chặn, và dòng còn nguyên.
+  //       Cùng lý do như PO-d: một delete bị RLS lọc cũng "thành công, 0 dòng".
+  const poDelete = await userA
+    .from("payment_orders")
+    .delete()
+    .eq("order_code", SUB_ORDER_A);
+  const poAfterDelete = await admin
+    .from("payment_orders")
+    .select("*")
+    .eq("order_code", SUB_ORDER_A)
+    .single();
+  const poDeleteKeptRow =
+    JSON.stringify(poAfterDelete.data) === JSON.stringify(poBefore.data);
+  assert(
+    isAuthorizationDenial(poDelete.error) && !poAfterDelete.error && poDeleteKeptRow,
+    `PO-e: A KHÔNG DELETE được đơn của chính mình (mong đợi 42501, nhận: ${poDelete.error?.code ?? "KHÔNG CÓ LỖI"}; dòng sau còn nguyên: ${poDeleteKeptRow})`,
+  );
+
+  // PO-f. Khách VÃNG LAI (anon) KHÔNG đọc được payment_orders. `revoke select
+  //       … from anon` là một bảo đảm DDL riêng, không suy ra được từ các case
+  //       JWT học sinh ở trên: policy `orders_select_own` chỉ khai `to
+  //       authenticated`, nên nếu revoke biến mất thì anon rơi vào "RLS bật,
+  //       không policy nào khớp" và nhận 0 DÒNG chứ không nhận lỗi — im lặng
+  //       giống hệt lúc đang an toàn. Vì thế assertion đòi ĐÚNG lớp lỗi quyền
+  //       (tiền lệ TL-b), không chấp nhận "0 dòng".
+  const poAnon = await anonClient
+    .from("payment_orders")
+    .select("order_code, user_id, amount");
+  assert(
+    isAuthorizationDenial(poAnon.error) && (poAnon.data?.length ?? 0) === 0,
+    `PO-f: anon KHÔNG đọc được payment_orders (mong đợi 42501, nhận: ${poAnon.error?.code ?? String(poAnon.data?.length ?? 0) + " dòng"})`,
+  );
+
+  console.log("\nRLS checks (Subscription Phần 9 — subscriptions SB-a…SB-g):");
+
+  // SB-a (positive control). B đọc được entitlement của chính mình.
+  const sbOwnB = await userB
+    .from("subscriptions")
+    .select("user_id, expires_at")
+    .eq("user_id", userBId);
+  assert(
+    !sbOwnB.error && sbOwnB.data?.length === 1 && sbOwnB.data?.[0]?.user_id === userBId,
+    "SB-a (positive control): B đọc được dòng subscriptions của chính mình (subscriptions_select_own cho phép đúng chủ)",
+  );
+
+  // SB-b. A đọc entitlement của B -> 0 dòng. Rò ở đây là rò "ai đã trả tiền".
+  const sbCross = await userA
+    .from("subscriptions")
+    .select("user_id, expires_at")
+    .eq("user_id", userBId);
+  assert(
+    !sbCross.error && (sbCross.data?.length ?? 0) === 0,
+    `SB-b: User A KHÔNG đọc được dòng subscriptions của User B (nhận: ${sbCross.error?.code ?? String(sbCross.data?.length ?? 0) + " dòng"})`,
+  );
+
+  // SB-c. A tự INSERT entitlement cho CHÍNH MÌNH -> phải bị chặn. Đây là kịch
+  //       bản "tự cấp gói trả phí" trần trụi nhất. A CHƯA có dòng nào ở thời
+  //       điểm này (xem setupSubscriptionFixtures), nên payload không thể trùng
+  //       khoá chính — nếu nó trùng, case sẽ xanh vì 23505 chứ không vì quyền.
+  const sbForgedRow = buildFixtureSubscriptionRow(userAId);
+  const sbInsert = await userA.from("subscriptions").insert(sbForgedRow);
+  const sbAfterInsert = await admin
+    .from("subscriptions")
+    .select("user_id")
+    .eq("user_id", userAId);
+  assert(
+    isAuthorizationDenial(sbInsert.error) &&
+      !sbAfterInsert.error &&
+      (sbAfterInsert.data?.length ?? 0) === 0,
+    `SB-c: A KHÔNG tự INSERT được entitlement cho chính mình (mong đợi 42501, nhận: ${sbInsert.error?.code ?? "KHÔNG CÓ LỖI"}; số dòng lọt vào: ${sbAfterInsert.data?.length ?? "?"})`,
+  );
+
+  // SB-c (positive control). CHÍNH payload vừa bị từ chối, do service_role gửi,
+  // được nhận — và dòng đó là fixture cho SB-d/SB-e ngay bên dưới.
+  const sbOwnSeed = await admin.from("subscriptions").insert(sbForgedRow);
+  assert(
+    !sbOwnSeed.error,
+    `SB-c (positive control): service_role chèn được ĐÚNG payload mà A vừa bị từ chối — lời từ chối ở SB-c là do QUYỀN, không phải do dữ liệu (nhận: ${sbOwnSeed.error?.code ?? "OK"})`,
+  );
+
+  // SB-d. A UPDATE entitlement của CHÍNH MÌNH (dòng nó ĐỌC được) để tự kéo dài
+  //       hạn -> phải bị chặn, và dòng còn nguyên từng byte.
+  const sbBefore = await admin
+    .from("subscriptions")
+    .select("*")
+    .eq("user_id", userAId)
+    .single();
+  const sbUpdate = await userA
+    .from("subscriptions")
+    .update({ expires_at: "2999-12-31T23:59:59.000Z" })
+    .eq("user_id", userAId);
+  const sbAfterUpdate = await admin
+    .from("subscriptions")
+    .select("*")
+    .eq("user_id", userAId)
+    .single();
+  const sbUpdateKeptRow =
+    JSON.stringify(sbAfterUpdate.data) === JSON.stringify(sbBefore.data);
+  assert(
+    isAuthorizationDenial(sbUpdate.error) &&
+      !sbBefore.error &&
+      !sbAfterUpdate.error &&
+      sbUpdateKeptRow,
+    `SB-d: A KHÔNG tự kéo dài được expires_at của chính mình (mong đợi 42501, nhận: ${sbUpdate.error?.code ?? "KHÔNG CÓ LỖI"}; dòng sau còn nguyên: ${sbUpdateKeptRow})`,
+  );
+
+  // SB-e. A DELETE dòng subscriptions của chính mình -> phải bị chặn. Xoá được
+  //       cũng là một lệnh ghi: nó dọn đường cho một lần insert "sạch" sau này.
+  const sbDelete = await userA
+    .from("subscriptions")
+    .delete()
+    .eq("user_id", userAId);
+  const sbAfterDelete = await admin
+    .from("subscriptions")
+    .select("*")
+    .eq("user_id", userAId)
+    .single();
+  const sbDeleteKeptRow =
+    JSON.stringify(sbAfterDelete.data) === JSON.stringify(sbBefore.data);
+  assert(
+    isAuthorizationDenial(sbDelete.error) && !sbAfterDelete.error && sbDeleteKeptRow,
+    `SB-e: A KHÔNG DELETE được dòng subscriptions của chính mình (mong đợi 42501, nhận: ${sbDelete.error?.code ?? "KHÔNG CÓ LỖI"}; dòng sau còn nguyên: ${sbDeleteKeptRow})`,
+  );
+
+  // SB-f (positive control). Đối xứng với PO-a: chủ dòng PHẢI đọc được
+  //       entitlement của CHÍNH MÌNH. SB-a mới chỉ chứng minh điều đó cho B —
+  //       người có dòng ngay từ fixture — nên nếu `subscriptions_select_own`
+  //       hỏng theo hướng "giấu sạch của mọi người", SB-b/SB-d/SB-e của A vẫn
+  //       xanh y nguyên. Case này phải đứng SAU SB-c positive control (nơi A
+  //       mới có dòng) và sau SB-e (nơi dòng đó vừa được chứng minh còn nguyên).
+  //       So mốc `period_anchor_at` bằng cách PARSE chứ không so chuỗi trần:
+  //       Postgres trả timestamptz dưới dạng `…+00:00`, không phải `…Z` như
+  //       hằng sentinel viết trong file này. Vẫn giữ phép so mốc (nó là thứ
+  //       chứng minh A đọc đúng DÒNG FIXTURE chứ không phải một dòng lạc nào
+  //       đó), chỉ bỏ giả định về CÁCH biểu diễn.
+  const sbOwnA = await userA
+    .from("subscriptions")
+    .select("user_id, expires_at, period_anchor_at")
+    .eq("user_id", userAId);
+  const sbOwnAAnchor = sbOwnA.data?.[0]?.period_anchor_at;
+  assert(
+    !sbOwnA.error &&
+      sbOwnA.data?.length === 1 &&
+      sbOwnA.data?.[0]?.user_id === userAId &&
+      typeof sbOwnAAnchor === "string" &&
+      new Date(sbOwnAAnchor).toISOString() === SUB_ANCHOR_SENTINEL,
+    `SB-f (positive control): A đọc được dòng subscriptions của CHÍNH MÌNH — "A không thấy gì" ở SB-b là do policy, không phải do policy giấu sạch (nhận: ${sbOwnA.error?.code ?? String(sbOwnA.data?.length ?? 0) + " dòng, mốc " + String(sbOwnAAnchor)})`,
+  );
+
+  // SB-g. anon KHÔNG đọc được subscriptions. Cùng lý do như PO-f: `revoke
+  //       select … from anon` là bảo đảm DDL riêng, và nếu nó biến mất thì thất
+  //       bại là IM LẶNG (0 dòng) chứ không phải ồn ào. Rò ở đây là rò danh
+  //       sách "ai đang trả tiền" cho một khách chưa đăng nhập.
+  const sbAnon = await anonClient.from("subscriptions").select("user_id, expires_at");
+  assert(
+    isAuthorizationDenial(sbAnon.error) && (sbAnon.data?.length ?? 0) === 0,
+    `SB-g: anon KHÔNG đọc được subscriptions (mong đợi 42501, nhận: ${sbAnon.error?.code ?? String(sbAnon.data?.length ?? 0) + " dòng"})`,
+  );
+
+  console.log(
+    "\nRLS checks (Subscription Phần 9 — record_payment_settlement PS-a/PS-b):",
+  );
+
+  // PS-a (positive control) — điều kiện làm PS-b có nghĩa. Trước lời gọi: đơn
+  // của A CÒN 'pending', chưa settled, và A ĐÃ có một dòng subscriptions. Nghĩa
+  // là một lời gọi ĐƯỢC PHÉP với đúng tham số đó sẽ đổi CẢ HAI dòng (status →
+  // 'paid', expires_at → +30 ngày). Không có bước này, "không có gì đổi" ở PS-b
+  // là một khẳng định rỗng.
+  const psOrderBefore = await admin
+    .from("payment_orders")
+    .select("*")
+    .eq("order_code", SUB_ORDER_A)
+    .single();
+  const psSubBefore = await admin
+    .from("subscriptions")
+    .select("*")
+    .eq("user_id", userAId)
+    .single();
+  assert(
+    !psOrderBefore.error &&
+      psOrderBefore.data?.status === "pending" &&
+      psOrderBefore.data?.settled_at === null &&
+      psOrderBefore.data?.user_id === userAId &&
+      !psSubBefore.error &&
+      psSubBefore.data?.expires_at != null,
+    `PS-a (positive control): trước lời gọi, đơn của A còn 'pending' + chưa settled và A đã có dòng subscriptions — một lời gọi ĐƯỢC PHÉP sẽ đổi cả hai (status nhận được: ${psOrderBefore.data?.status ?? psOrderBefore.error?.code})`,
+  );
+
+  // PS-b (positive control) — thứ làm MÃ LỖI của PS-b có nghĩa, và là lớp
+  // phòng vệ mà PS-b một mình KHÔNG có (PO-c ở trên có, SB-c ở trên có).
+  // PostgREST trả PGRST202 cho BẤT KỲ tham chiếu hàm nào nó không giải được:
+  // sai tên hàm, sai tên tham số, chữ ký đã đổi — chứ không riêng "role thiếu
+  // EXECUTE". Thiếu bước này, một lần đổi tên hàm sau này vẫn để PS-b XANH:
+  // lời gọi nhận PGRST202, và `psStateUntouched` xanh theo một cách RỖNG vì
+  // thân hàm không chạy ở CẢ HAI phía. Case sẽ báo "đã chặn được" mà không
+  // chứng minh nổi một chữ nào về quyền.
+  //
+  // Lời gọi này KHÔNG chạm vào trạng thái nào: SUB_ORDER_FORGED vừa bị xoá ở
+  // PO-c, nên `update … where order_code = … and status = 'pending'` khớp 0
+  // dòng, hàm rơi vào nhánh `if not found then return null` và dừng TRƯỚC cả
+  // lệnh insert vào subscriptions. `data === null` chính là bằng chứng nhánh đó
+  // đã chạy: vừa xác nhận hàm gọi được, vừa xác nhận nó không ghi gì.
+  const psCallable = await admin.rpc("record_payment_settlement", {
+    p_order_code: SUB_ORDER_FORGED,
+    p_period_days: 30,
+  });
+  assert(
+    !psCallable.error && psCallable.data === null,
+    `PS-b (positive control): service_role GỌI ĐƯỢC record_payment_settlement bằng ĐÚNG tên + ĐÚNG bộ tham số mà PS-b dùng, và lời gọi là no-op (mong đợi data=null, nhận: ${psCallable.error?.code ?? JSON.stringify(psCallable.data)})`,
+  );
+
+  // PS-b (AC-033; ADR-0014 §Implementation Guidance — `revoke all on function …
+  //       from public, anon, authenticated` ĐÍCH DANH). JWT học sinh gọi thẳng
+  //       record_payment_settlement().
+  //
+  //       Tham số cố ý ĐÚNG KIỂU và ĐÚNG NGHIỆP VỤ: p_order_code là bigint của
+  //       một đơn CÓ THẬT, thuộc chính A, vẫn 'pending' — tức đơn mà một lời
+  //       gọi hợp lệ settle được. Nhờ thế mọi giả thuyết "thất bại vì tham số"
+  //       bị loại, và mệnh đề `status = 'pending'` trong thân hàm KHÔNG thể là
+  //       nguyên nhân của lời từ chối.
+  //
+  //       ⚠ KHÔNG assert trần `error !== null` (bài học MM-b): nếu EXECUTE bị
+  //       hở, lời gọi vẫn có thể lỗi từ THÂN hàm (check_violation "no
+  //       beneficiary") — mà lỗi từ thân hàm chứng minh điều NGƯỢC LẠI, rằng
+  //       hàm đã gọi được. Chỉ hai lớp lỗi được chấp nhận: 42501 (permission
+  //       denied for function) và PGRST202 (PostgREST không thấy hàm trong
+  //       schema cache của role đang gọi).
+  //
+  //       PGRST202 tự nó KHÔNG nói gì về quyền: PostgREST trả đúng mã đó cho
+  //       mọi tham chiếu hàm không giải được, kể cả sai tên hay sai tên tham
+  //       số. Nó chỉ mang nghĩa "role không có EXECUTE" NHỜ positive control
+  //       ngay trên — service_role vừa giải được CHÍNH tên và CHÍNH bộ tham số
+  //       này, nên khả năng "hàm không tồn tại như đang gọi" đã bị loại bằng
+  //       bằng chứng, và cái còn lại chỉ có thể là schema cache theo role.
+  //
+  //       Và mã lỗi một mình vẫn chưa đủ: hai ảnh chụp bằng service_role phải
+  //       khớp từng byte, chứng minh thân hàm KHÔNG chạy — không dòng đơn nào
+  //       chuyển 'paid', không ngày hết hạn nào được cộng thêm.
+  const psRpc = await userA.rpc("record_payment_settlement", {
+    p_order_code: SUB_ORDER_A,
+    p_period_days: 30,
+  });
+  const psOrderAfter = await admin
+    .from("payment_orders")
+    .select("*")
+    .eq("order_code", SUB_ORDER_A)
+    .single();
+  const psSubAfter = await admin
+    .from("subscriptions")
+    .select("*")
+    .eq("user_id", userAId)
+    .single();
+  const psDeniedByPermission =
+    psRpc.error !== null &&
+    (psRpc.error.code === "42501" ||
+      psRpc.error.code === "PGRST202" ||
+      /permission denied|could not find the function/i.test(psRpc.error.message));
+  const psStateUntouched =
+    !psOrderAfter.error &&
+    !psSubAfter.error &&
+    JSON.stringify(psOrderAfter.data) === JSON.stringify(psOrderBefore.data) &&
+    JSON.stringify(psSubAfter.data) === JSON.stringify(psSubBefore.data);
+  assert(
+    psDeniedByPermission && psStateUntouched,
+    `PS-b: JWT học sinh gọi thẳng record_payment_settlement() bị chặn ở tầng QUYỀN và thân hàm KHÔNG chạy (mong đợi 42501/PGRST202, nhận: ${psRpc.error?.code ?? "KHÔNG CÓ LỖI"}; đơn + entitlement còn nguyên: ${psStateUntouched})`,
+  );
+
+  // Dọn dẹp fixture Subscription.
+  await cleanupSubscriptionFixtures(admin, userAId, userBId);
+
+  // Hậu kiểm dọn dẹp — CỐ Ý bằng vị từ KHÁC vị từ đã dùng để xoá (xoá theo
+  // order_code / user_id, xác nhận theo memo / period_anchor_at). Dọn bằng một
+  // vị từ rồi hỏi lại bằng chính vị từ đó thì một lệnh delete khớp 0 dòng cũng
+  // cho ra "đã sạch" — đúng lỗi đã bắt được ở Task 0.8. Hai giá trị mốc dưới
+  // đây do builder gắn vào MỌI dòng fixture, kể cả dòng của A được tạo giữa
+  // khối, nên không dòng nào lọt lưới.
+  const subResidueOrders = await admin
+    .from("payment_orders")
+    .select("order_code, user_id")
+    .eq("memo", SUB_ORDER_MEMO);
+  const subResidueSubs = await admin
+    .from("subscriptions")
+    .select("user_id")
+    .eq("period_anchor_at", SUB_ANCHOR_SENTINEL);
+  assert(
+    !subResidueOrders.error &&
+      (subResidueOrders.data?.length ?? 0) === 0 &&
+      !subResidueSubs.error &&
+      (subResidueSubs.data?.length ?? 0) === 0,
+    `Phần 9 (hậu kiểm dọn dẹp): không còn dòng fixture nào trong payment_orders/subscriptions (còn lại: ${subResidueOrders.data?.length ?? "?"} đơn / ${subResidueSubs.data?.length ?? "?"} entitlement)`,
+  );
 
   // Dọn dẹp fixture Rating.
   await cleanupRatingFixtures(admin);
