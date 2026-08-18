@@ -236,3 +236,154 @@ describe("schema.sql", () => {
     expect(fkKey("public.exam_attempts", ["exam_id"])).toBe("public.exam_attempts(exam_id)");
   });
 });
+
+// ---------------------------------------------------------------------------
+// payment_orders — ALLOWLIST cột. Nửa CẤU TRÚC của P-1 (backend DD § Sensitivity).
+//
+// P-1: KHÔNG trường nào của `transactions[]` (payOS) được lưu xuống cột nào.
+// Dạng kiểm DUY NHẤT bắt được một cột mà chính người viết assert chưa từng nghĩ
+// tới là ALLOWLIST: liệt kê đúng mười một cột đã thiết kế và ĐỎ với cột thứ mười
+// hai, bất kể nó tên gì. Blocklist theo tên trường payOS thì mù đúng những
+// trường mà bản v1.3 của DD đã bỏ sót (`counterAccountBankName`,
+// `virtualAccountName`) — tức mù đúng chỗ nguy hiểm.
+//
+// Đây là cổng VĂN BẢN (gate A): nó chứng minh file trong git đúng hình dạng,
+// KHÔNG chứng minh gì về database nào. Nội dung ở DB là việc của gate B.
+// ---------------------------------------------------------------------------
+
+/**
+ * Mười một cột backend DD (§ Schema, `payment_orders`) khai, đúng thứ tự file.
+ *
+ * Chép tay CỐ Ý — cùng lý do `telemetry.test.ts:49` chép tay CHECK constraint:
+ * sinh danh sách này từ chính schema.sql (hay import từ `lib/billing/types.ts`)
+ * biến allowlist thành phép so một nguồn với chính nó, và một cột thêm vào sẽ
+ * đi qua mà không ai thấy.
+ */
+const PAYMENT_ORDERS_COLUMNS = [
+  "order_code",
+  "user_id",
+  "amount",
+  "status",
+  "created_at",
+  "pending_until",
+  "settled_at",
+  "qr_payload",
+  "account_number",
+  "account_name",
+  "memo",
+];
+
+/** Mở đầu `create table … public.payment_orders (` — dùng để định vị thân bảng. */
+const PAYMENT_ORDERS_HEAD_RE =
+  /create\s+table\s+(?:if\s+not\s+exists\s+)?public\.payment_orders\s*\(/i;
+
+/** Mục ở MỨC BẢNG trong thân `create table` — không phải khai báo cột. */
+const TABLE_LEVEL_ITEM_RE =
+  /^(constraint|primary\s+key|foreign\s+key|unique|check|exclude|like)\b/i;
+
+/**
+ * Tên các cột khai trong khối `create table` mà `head` định vị, theo thứ tự
+ * xuất hiện.
+ *
+ * Bản sao CỤC BỘ của cách tách mà `parseForeignKeys.ts` dùng: hai helper ở đó
+ * (`balancedBody`, `splitTopLevel`) không export, và file ấy nằm ngoài phạm vi
+ * thay đổi này nên không được sửa chỉ để export. Là helper test, ngắn, không
+ * dùng lại ở đâu khác.
+ */
+function parseColumnNames(sql: string, head: RegExp): string[] {
+  const source = stripSqlLineComments(sql);
+  const m = head.exec(source);
+  if (!m) return [];
+  const body = balancedBody(source, m.index + m[0].length - 1);
+  if (body === null) return [];
+  return splitTopLevel(body)
+    .filter((item) => !TABLE_LEVEL_ITEM_RE.test(item))
+    .map((item) => /^"?(\w+)"?/.exec(item)?.[1] ?? "")
+    .filter(Boolean)
+    .map((name) => name.toLowerCase());
+}
+
+/** Nội dung trong cặp ngoặc mở tại `open`, cân bằng độ sâu. */
+function balancedBody(s: string, open: number): string | null {
+  let depth = 0;
+  for (let i = open; i < s.length; i++) {
+    if (s[i] === "(") depth++;
+    else if (s[i] === ")") {
+      depth--;
+      if (depth === 0) return s.slice(open + 1, i);
+    }
+  }
+  return null;
+}
+
+/** Tách theo dấu phẩy ở ĐỘ SÂU 0 — `check (status in ('a','b'))` không bị cắt đôi. */
+function splitTopLevel(body: string): string[] {
+  const out: string[] = [];
+  let depth = 0;
+  let cur = "";
+  for (const ch of body) {
+    if (ch === "(") depth++;
+    else if (ch === ")") depth--;
+    if (ch === "," && depth === 0) {
+      out.push(cur);
+      cur = "";
+    } else cur += ch;
+  }
+  out.push(cur);
+  return out.map((s) => s.trim()).filter(Boolean);
+}
+
+/**
+ * Bỏ comment `--` cuối dòng, KHÔNG bỏ `--` nằm trong chuỗi (đếm nháy đơn).
+ *
+ * Bắt buộc phải chạy TRƯỚC khi đếm ngoặc/phẩy: khối payment_orders có comment
+ * mang cả dấu phẩy lẫn ngoặc lẻ, đọc nguyên văn sẽ cắt nhầm danh sách cột.
+ */
+function stripSqlLineComments(sql: string): string {
+  return sql
+    .split("\n")
+    .map((line) => {
+      let quotes = 0;
+      for (let i = 0; i < line.length; i++) {
+        if (line[i] === "'") quotes++;
+        else if (line[i] === "-" && line[i + 1] === "-" && quotes % 2 === 0) {
+          return line.slice(0, i);
+        }
+      }
+      return line;
+    })
+    .join("\n");
+}
+
+describe("schema.sql — payment_orders (allowlist cột, P-1)", () => {
+  it("tập cột đúng bằng MƯỜI MỘT cột đã thiết kế, đúng thứ tự", () => {
+    expect(
+      parseColumnNames(schemaSql, PAYMENT_ORDERS_HEAD_RE),
+      `Tập cột của public.payment_orders lệch khỏi thiết kế.\n` +
+        `Đây là ALLOWLIST, không phải blocklist: một cột THÊM cũng đỏ, và đó là\n` +
+        `chủ đích — P-1 (backend DD § Sensitivity) cấm lưu BẤT KỲ trường nào của\n` +
+        `payOS \`transactions[]\`, kể cả trường mà người viết assert này chưa từng\n` +
+        `nghe tên. Thêm cột thật sự cần thiết thì sửa danh sách ở đây TRONG CÙNG\n` +
+        `commit, sau khi đã rà lại P-1.\nThực tế đọc được:`
+    ).toEqual(PAYMENT_ORDERS_COLUMNS);
+  });
+
+  it("một cột thứ MƯỜI HAI làm ca trên đỏ — dù nó tên gì", () => {
+    // Ca này là BẰNG CHỨNG ĐỎ của ca trên, chạy mọi lần: một allowlist không
+    // đỏ nổi với cột lạ thì nó không chứng minh gì cả. Bản vá chỉ nằm trong bộ
+    // nhớ — không có mutant nào chạm tới file trên đĩa.
+    const perturbed = schemaSql.replace(
+      "  settled_at    timestamptz,",
+      "  settled_at    timestamptz,\n  counter_account_name text,"
+    );
+    expect(
+      perturbed,
+      "Mẫu chèn không còn khớp schema.sql → perturbation thành no-op, và ca này chứng minh SỐ KHÔNG."
+    ).not.toBe(schemaSql);
+
+    const columns = parseColumnNames(perturbed, PAYMENT_ORDERS_HEAD_RE);
+    expect(columns).toHaveLength(PAYMENT_ORDERS_COLUMNS.length + 1);
+    expect(columns).toContain("counter_account_name");
+    expect(columns).not.toEqual(PAYMENT_ORDERS_COLUMNS);
+  });
+});
