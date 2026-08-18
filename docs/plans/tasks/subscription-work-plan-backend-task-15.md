@@ -69,6 +69,7 @@ Hand-rolled, **no SDK** (three endpoints and one HMAC on the money path; ADR-001
 - [ ] Implement the three functions; run only the added tests
 ### 3. Refactor Phase
 - [ ] Grep outside `SOURCE/lib/billing/payos/**` for payOS vocabulary and confirm zero hits
+- [ ] After exporting the real `getPaymentStatus()`, replace the transcribed `FixturePaymentStatusResult` declaration in `SOURCE/tests/e2e/service/subscriptionServiceFixtures.ts` with a compile-time link to its return type (e.g. `type FixturePaymentStatusResult = Awaited<ReturnType<typeof getPaymentStatus>>;`) — until that link exists, service-lane fixture drift against the adapter's return shape is silent, and the two-property shape (P-1) is the exact thing that drifts
 
 ## Quality Assurance Mechanisms
 - `npm test` -> `vitest run` — Enforces: the adapter-boundary unit tests — Config: `SOURCE/package.json:10`

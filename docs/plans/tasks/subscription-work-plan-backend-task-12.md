@@ -73,6 +73,7 @@ Metadata:
 - [ ] Run only the added tests and confirm they pass
 ### 3. Refactor Phase
 - [ ] Confirm the free-user formula exists in exactly one place and no caller copies it
+- [ ] After exporting `PREMIUM_PRICE_VND` and `ORDER_PENDING_WINDOW_MS`, reconcile the two transcriptions in `SOURCE/tests/e2e/service/subscriptionServiceFixtures.ts` — assert `FIXTURE_AMOUNT_VND === PREMIUM_PRICE_VND` and its local 30-minute window against `ORDER_PENDING_WINDOW_MS` (or import the real constants and delete both transcriptions) — until then, a price or window change leaves the service-lane fixture silently seeding the old value
 
 ## Quality Assurance Mechanisms
 - `npm test` -> `vitest run` — Enforces: every unit and text-side gate in the Test Boundaries tables — Config: `SOURCE/package.json:10`, `SOURCE/vitest.config.ts`

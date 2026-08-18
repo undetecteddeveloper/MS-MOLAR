@@ -52,6 +52,23 @@
 //   teardown. Each case creates its own users and orders and deletes them in
 //   teardown, so each passes when run twice in a row and when run in isolation.
 //
+//   BUILT, and it lives in `./subscriptionServiceFixtures.ts` (plan Task 0.8 /
+//   backend-task-07). SVC-1 and SVC-2 take their accounts, sessions, seeding,
+//   read-back, teardown and the COUNTED payOS stub from
+//   `createSubscriptionServiceFixture({ caseTag, orderCodeBlock, sessionHolder })`
+//   — one instance per case, and the two cases MUST pass different
+//   `orderCodeBlock` values, which is what makes one case's teardown unable to
+//   reach the other's rows. Read that file's header before writing either case:
+//   it states what the "sub-svc-" prefix can and cannot scope (neither
+//   `payment_orders.order_code` nor `subscriptions.user_id` can carry it), why
+//   the fixture accounts are DELETED rather than reused, and which of its
+//   constants are transcriptions whose drift nothing detects yet.
+//
+//   The `sessionHolder` is created HERE, not there: `vi.mock` is hoisted above
+//   imports, so the holder its factory reads has to come from `vi.hoisted` in
+//   this file — the same shape `recordSkillMastery.int.test.ts` uses, extended
+//   to two sessions by `fixture.useSession("A" | "B")`.
+//
 // HARD SCOPE LIMIT. No case in this file performs real payOS money movement or
 //   opens a live payOS connection. payOS is verified at the ADAPTER boundary:
 //   `getPaymentStatus()` / `createPaymentRequest()` are stubbed and

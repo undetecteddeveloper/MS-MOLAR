@@ -79,6 +79,7 @@ The durable AI usage-log sink is **not** in this apply: no Design Doc schema sec
 - [ ] Run `npm test` and confirm the schema text-side cases pass
 ### 3. Refactor Phase
 - [ ] Re-count the new-object blocks (must be **four**) and re-check each against its traceability row
+- [ ] Reconcile `SOURCE/tests/e2e/service/subscriptionServiceFixtures.ts` against the shipped DDL: `FIXTURE_PERIOD_DAYS` versus `record_payment_settlement(p_period_days …)`'s default, and the **eleven** `payment_orders` plus **four** `subscriptions` column-name literals (`PaymentOrderRow` / `SubscriptionRow`, and the insert/upsert key sets) versus the column sets written here — these cross PostgREST as strings, so no compile-time link is possible and this checklist line is the only reconciliation there is
 
 ## Quality Assurance Mechanisms
 - `parseForeignKeys.test.ts` (text-side, `readFileSync`, no DB) — Enforces: TD-011, every FK declares `on delete` — Config: `SOURCE/lib/schema/__tests__/parseForeignKeys.test.ts`
