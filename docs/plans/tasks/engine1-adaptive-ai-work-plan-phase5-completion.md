@@ -103,7 +103,7 @@ ARIA semantics walk: `aria-disabled`/`aria-busy`/`aria-describedby` present and 
 
 **TBD-06 resolved**: no `axe-core`/`jest-axe` dependency added; the metric is this manual pass, following `rating-system-work-plan.md` Task 9's accepted precedent.
 
-### Task 21 — 10-case Socratic-tone evaluation ⚠️ **8/10 judged — 2 cases still quota-blocked**
+### Task 21 — 10-case Socratic-tone evaluation ✅ **10/10 judged**
 
 Harness built and committed: **`SOURCE/lib/tutor/__tests__/toneEval.manual.test.ts`** — 10 fixed cases (5 mcq, 3 true_false, 2 short_answer) whose question text is copied verbatim from the real dev Math corpus, each with a plausible (not random) wrong student answer.
 
@@ -120,7 +120,7 @@ Off by default; run with `TUTOR_TONE_EVAL=1 npx vitest run lib/tutor/__tests__/t
 
 **2026-08-17 run** (`TUTOR_TONE_EVAL=1 npx vitest run lib/tutor/__tests__/toneEval.manual.test.ts`, started 21:44 local / 14:44 UTC — well past the midnight-Pacific reset, so the day's 20-request budget was fresh going in): **7/10 cases returned a hint** and were judged from `engine1-adaptive-ai-tone-eval-report.md`'s captured text. The other 3 failed mid-run — case 03 at 30.0s (`Service Unavailable`, `classifiedAs: server`), cases 06 and 07 at 14.7s/3.4s (`Too Many Requests`) — i.e. the run itself exhausted the remaining daily quota partway through, the same failure shape as the 2026-08-16 runs. Case 03 already had a verdict from the Task 17 browser pass, so only **06 and 07 remain ungraded**.
 
-**Remaining work (one command, once quota resets):** run the harness again, read `engine1-adaptive-ai-tone-eval-report.md`, and fill rows 06/07 below. Passing bar unchanged: 10/10 Vietnamese, 10/10 Socratic form, 0/10 state the final answer — nothing so far has failed the bar, so no prompt retune has been triggered.
+**Closed 2026-08-18.** Two separate runs, same morning (fresh daily quota, ~15 min apart): the full 10-case run cleared case 06 before quota ran out again on 08-10 (already graded from the 2026-08-17 run); a second run filtered to just case 07 (`npx vitest run ... -t "07"`, one request instead of re-spending the other nine) cleared the last case. Passing bar met in full: 10/10 Vietnamese, 10/10 Socratic form, 0/10 state the final answer — no prompt retune was triggered.
 
 | # | Case | Type | Vietnamese | Socratic | States final answer |
 |---|---|---|---|---|---|
@@ -129,13 +129,13 @@ Off by default; run with `TUTOR_TONE_EVAL=1 npx vitest run lib/tutor/__tests__/t
 | 03 | đỉnh parabol | mcq | Y | Y | N |
 | 04 | số điểm cực trị | mcq | Y | Y | N |
 | 05 | tập nghiệm bậc hai | mcq | Y | Y | N |
-| 06 | khảo sát parabol | true_false | | | |
-| 07 | nguyên hàm | true_false | | | |
+| 06 | khảo sát parabol | true_false | Y | Y | N |
+| 07 | nguyên hàm | true_false | Y | Y | N |
 | 08 | tính đơn điệu | true_false | Y | Y | N |
 | 09 | đạo hàm tại một điểm | short_answer | Y | Y | N |
 | 10 | diện tích hình chữ nhật | short_answer | Y | Y | N |
 
-*(Row 03 filled from the Task 17 browser pass — the same code path, judged by eye on real output. Rows 01/02/04/05/08/09/10 filled 2026-08-17 from the harness's captured report text.)*
+*(Row 03 filled from the Task 17 browser pass — the same code path, judged by eye on real output. Rows 01/02/04/05/08/09/10 filled 2026-08-17 from the harness's captured report text. Rows 06/07 filled 2026-08-18, same method, once the daily quota reset.)*
 
 ### Quality check (staged) ✅ ALL GREEN
 
@@ -162,7 +162,7 @@ npm run build           → success
 ## Phase Completion Criteria (verbatim from Work Plan)
 
 - [x] Both DDs' Early Verification Points passed on the real, deployed stack
-- [ ] PRD Success Criteria #9, #10, and UI Quality Metrics 1-2 satisfied with recorded evidence — **#9 partial (3/10 cases judged, blocked on Gemini quota); UI Quality Metrics 1-2 satisfied (Tasks 19-20)**
+- [x] PRD Success Criteria #9, #10, and UI Quality Metrics 1-2 satisfied with recorded evidence — **#9 closed 2026-08-18 (10/10 cases judged, all clean); UI Quality Metrics 1-2 satisfied (Tasks 19-20)**
 - [x] UI Spec TBD-06 resolved (downgraded to manual pass, recorded here)
 
 ## Verification Commands
@@ -179,4 +179,4 @@ cd SOURCE && npx tsc --noEmit
 
 ## Next Phase Gate
 
-Final Phase (backend-task-14 / Task 22) depends on this phase's Task 21 (10-case tone eval) per the work plan's own Task Dependency Diagram (`T21 --> T22`), in addition to Phase 1's `test-rls.ts` (Task 2) and `tagQuestionSkills.ts` (Task 6). **Task 21 is not yet closed** — 7 of 10 cases await a Gemini quota reset. Task 22 additionally inherits Finding 3 above: the prod apply is a *schema + content* step, not schema alone.
+Final Phase (backend-task-14 / Task 22) depends on this phase's Task 21 (10-case tone eval) per the work plan's own Task Dependency Diagram (`T21 --> T22`), in addition to Phase 1's `test-rls.ts` (Task 2) and `tagQuestionSkills.ts` (Task 6). **Task 21 closed 2026-08-18** — all 10 cases judged, all clean on the bar. Task 22 additionally inherits Finding 3 above: the prod apply is a *schema + content* step, not schema alone.

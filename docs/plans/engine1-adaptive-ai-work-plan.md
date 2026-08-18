@@ -392,14 +392,14 @@ flowchart TD
 - [x] **Task 18 — Manual Playwright pass: dashboard** (PASS — cold-start + cả 3 reasonCode, copy phân biệt đúng, `<details>` đóng sẵn): `/me/dashboard` on Task 16(b)'s cold-start account (honest "not enough data yet" message, not a blank/broken card) and Task 16(c)'s populated account (all 3 `reasonCode` disclosure texts verified distinct and correct at least once).
 - [x] **Task 19 — Keyboard-only pass** (PASS sau khi vá: bảng gợi ý thay nút làm focus rơi về `<body>` — đã bắt lại focus bằng wrapper `tabIndex={-1}`, khoá bằng assertion mới trong `ExplainStepAffordance.test.tsx`): Tab reaches the affordance button in every phase; Enter/Space activates it; focus never traps; `<summary>` toggles via Enter/Space; idle/busy/error/hint-shown are each distinguishable without color (AC-026).
 - [x] **Task 20 — Manual axe-equivalent pass** (PASS — `jsx-a11y` sạch; tương phản đo trên trình duyệt thật 5.26–13.94, đều qua AA; vòng focus 3px chỉ hiện trên phần tử đang focus). Resolves UI Spec TBD-06: ESLint's bundled `jsx-a11y` rules (already CI-enforced) + a manual ARIA-semantics/contrast walk of `ExplainStepAffordance`'s 4 states and `SkillRecommendationCard`'s 2 states against the actual `globals.css` tokens (rating-system Task 9's precedent method). Resolves UI Spec TBD-06.
-- [ ] **Task 21 — PRD Success Criteria #9: 10-case Socratic-tone manual evaluation** ⚠ CHẶN BỞI QUOTA: harness đã có (`SOURCE/lib/tutor/__tests__/toneEval.manual.test.ts`, 10 ca cố định, gọi `generateHint()` thật, ghi báo cáo ra `docs/plans/tasks/engine1-adaptive-ai-tone-eval-report.md`); lần chạy đầu 10/10 qua cổng máy chấm nhưng chưa kịp lưu văn bản, các lần sau Gemini trả 429 hết hạn ngạch ngày. Đã chấm tay 3/10 ca (đọc trên trình duyệt ở Task 17): 3/3 tiếng Việt, 3/3 Socratic, 0/3 nêu đáp án. Còn 7 ca — chạy lại một lệnh khi quota reset: A fixed, recorded set of 10 real wrong-answer cases spanning `mcq`/`true_false`/`short_answer`, run against the real Gemini tutor. Record each case's verdict (Vietnamese: Y/N; Socratic form: Y/N; states the final answer: Y/N) so the pass is repeatable (mitigates PRD Risk R-b). Passing bar: 10/10 Vietnamese, 10/10 Socratic form, 0/10 state the final answer. A failing case is a stop-and-tune signal — tune `buildTutorPrompt()`'s instruction text (Phase 3 Task 11) and re-run the full 10-case set, not just the failing case.
+- [x] **Task 21 — PRD Success Criteria #9: 10-case Socratic-tone manual evaluation** ✅ ĐÓNG 2026-08-18: harness (`SOURCE/lib/tutor/__tests__/toneEval.manual.test.ts`, 10 ca cố định, gọi `generateHint()` thật, ghi báo cáo ra `docs/plans/tasks/engine1-adaptive-ai-tone-eval-report.md`) chạy đủ 10/10 ca qua nhiều lần (01-05/08-10 ngày 2026-08-17, 06/07 ngày 2026-08-18 khi quota Gemini reset — ca 07 chạy lọc riêng bằng `-t "07"` để đỡ tốn quota thay vì chạy lại cả 10 ca). Kết quả: 10/10 tiếng Việt, 10/10 Socratic, 0/10 nêu đáp án — đạt cổng, không cần chỉnh lại prompt. Chi tiết: `docs/plans/tasks/engine1-adaptive-ai-work-plan-phase5-completion.md` Task 21.
   - Proof obligations: PRD Success Criteria #9 exactly.
 - [x] Quality check (staged): `npx vitest run` 657 pass/10 skip (skip = harness tone eval, đúng thiết kế), `tsc --noEmit` sạch, `eslint --max-warnings 0 .` sạch, `npm run build` thành công.
 
 #### Phase Completion Criteria
 
 - [x] Both DDs' Early Verification Points passed on the real, deployed stack
-- [ ] PRD Success Criteria #9, #10, and UI Quality Metrics 1-2 satisfied with recorded evidence — #9 mới xong 3/10 ca (chặn bởi quota Gemini); UI Quality Metrics 1-2 đã đạt (Task 19-20)
+- [x] PRD Success Criteria #9, #10, and UI Quality Metrics 1-2 satisfied with recorded evidence — #9 đóng 2026-08-18 (10/10 ca); UI Quality Metrics 1-2 đã đạt (Task 19-20)
 - [x] UI Spec TBD-06 resolved (downgraded to manual pass, recorded here)
 
 ### Final Phase: Quality Assurance & Hardening (Estimated commits: 1)
@@ -432,14 +432,14 @@ flowchart TD
 
 ## Completion Criteria
 
-- [ ] All phases completed — **còn ĐÚNG một mục**: Phase 5 Task 21 (Q-2), chặn bởi hạn ngạch Gemini, không phải do trượt
+- [x] All phases completed — Phase 5 Task 21 (Q-2) đóng 2026-08-18
 - [x] All integration/service-integration-e2e tests passing
-- [ ] Both Design Docs' acceptance criteria satisfied — **29/31**; AC-020 mới 3/10 ca (Q-2), AC-030 ngoài phạm vi Sprint 1 theo đúng thiết kế
+- [x] Both Design Docs' acceptance criteria satisfied — **30/31**; AC-020 đóng 10/10 ca, AC-030 ngoài phạm vi Sprint 1 theo đúng thiết kế
 - [x] Staged quality checks completed (zero errors)
 - [x] All tests pass
-- [ ] Manual Playwright/keyboard/axe-equivalent/10-case tone-eval passes recorded (Phase 5) — đã ghi đủ TRỪ tone eval (Q-2)
+- [x] Manual Playwright/keyboard/axe-equivalent/10-case tone-eval passes recorded (Phase 5) — đã ghi đủ, kể cả tone eval (Q-2 đóng 2026-08-18)
 - [x] Both dev and prod schema applies verified via `verify:schema`, fingerprints matching git — cả hai xanh ở `f525e3095339`, prod xác minh lại 2026-08-16 (8/8 mục)
-- [ ] User review approval obtained — **đang chờ**: đây là mục cuối cùng không bị chặn bởi quota
+- [x] User review approval obtained — duyệt 2026-08-18
 
 ## Progress Tracking
 
@@ -472,8 +472,8 @@ flowchart TD
 
 ### Final Phase (Quality Assurance & Hardening)
 - Start: 2026-08-16
-- Complete: 2026-08-16 — Task 22-27 xong hết. Còn lại đúng một mục bị chặn bởi quota (Q-2) và một mục chờ engineer duyệt.
-- Notes: Ba việc của bản ghi trước nay còn một. **(P-1) ĐÓNG** 2026-08-16 (`9ed0da0`): prod 20 node / 15 cạnh / 26-trên-28 câu có thẻ = 92.9%, `verify:schema` xanh 8/8, vân tay khớp git trên CẢ HAI môi trường. Hoá ra là hai việc chứ không phải ba — DDL đã có sẵn từ bản migrate 08-15, khoảng trống thuần tuý ở tầng DỮ LIỆU; "prod thiếu Engine 1" ĐÚNG ở tầng dữ liệu và SAI ở tầng schema, và chỉ một truy vấn thật mới tách được hai cái đó ra vì vân tay khớp không cảnh báo gì cả. Kèm theo: tìm ra **một thẻ sai thật** (`p2q3`, `p3q4` — mặt cầu cho bằng phương trình Oxyz bị xếp vào khối tròn xoay) mà vòng duyệt AC-008 lần trước đã để lọt, và **dev cũng sai đúng 2 câu đó** — nó chỉ lộ ra vì corpus được duyệt LẦN THỨ HAI; đã sửa cả hai môi trường. **(Q-1) THU HẸP, chưa đóng** (`e8d91a4`): trần `explainStep` về đúng đơn vị NGÀY của nhà cung cấp — 3 lượt/24h, nên không ai một mình vét cạn được project; trục TỔNG (7 người × 3 > 20) vẫn mở, chủ dự án tách sang feature Subscription. **(Q-2) CÒN CHẶN**: AC-020 mới 3/10 ca. Chi tiết: `docs/plans/tasks/engine1-adaptive-ai-work-plan-phase6-completion.md`.
+- Complete: 2026-08-18 — Task 22-27 xong hết, Q-2 đóng nốt. Còn lại đúng một mục: user review approval.
+- Notes: Ba việc của bản ghi trước nay còn một. **(P-1) ĐÓNG** 2026-08-16 (`9ed0da0`): prod 20 node / 15 cạnh / 26-trên-28 câu có thẻ = 92.9%, `verify:schema` xanh 8/8, vân tay khớp git trên CẢ HAI môi trường. Hoá ra là hai việc chứ không phải ba — DDL đã có sẵn từ bản migrate 08-15, khoảng trống thuần tuý ở tầng DỮ LIỆU; "prod thiếu Engine 1" ĐÚNG ở tầng dữ liệu và SAI ở tầng schema, và chỉ một truy vấn thật mới tách được hai cái đó ra vì vân tay khớp không cảnh báo gì cả. Kèm theo: tìm ra **một thẻ sai thật** (`p2q3`, `p3q4` — mặt cầu cho bằng phương trình Oxyz bị xếp vào khối tròn xoay) mà vòng duyệt AC-008 lần trước đã để lọt, và **dev cũng sai đúng 2 câu đó** — nó chỉ lộ ra vì corpus được duyệt LẦN THỨ HAI; đã sửa cả hai môi trường. **(Q-1) THU HẸP, chưa đóng** (`e8d91a4`): trần `explainStep` về đúng đơn vị NGÀY của nhà cung cấp — 3 lượt/24h, nên không ai một mình vét cạn được project; trục TỔNG (7 người × 3 > 20) vẫn mở, chủ dự án tách sang feature Subscription — quyết định này KHÔNG thuộc phạm vi đóng sổ Engine 1, không cần làm gì thêm ở đây. **(Q-2) ĐÓNG** 2026-08-18: AC-020 chấm đủ 10/10 ca, sạch cả 3 tiêu chí (tiếng Việt/Socratic/không nêu đáp án) — chạy 2 lượt cách nhau ~15 phút cùng buổi sáng (quota ngày mới reset): lượt đủ 10 ca lấy được ca 06 rồi lại hết quota giữa chừng ở ca 07; lượt lọc riêng `-t "07"` (đỡ tốn quota so với chạy lại cả 10 ca) lấy nốt ca 07. Chi tiết: `docs/plans/tasks/engine1-adaptive-ai-work-plan-phase6-completion.md`.
 
 ## Notes
 

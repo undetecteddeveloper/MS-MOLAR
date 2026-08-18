@@ -3,6 +3,14 @@
 Generation Date: 2026-08-08
 Target Plan Document: `docs/plans/engine1-adaptive-ai-work-plan.md`
 
+> **⚠ Per-task files removed 2026-08-18, after the feature closed.** The 16 executor-instruction files (`…-backend-task-01…14.md`, `…-frontend-task-01…02.md`) were deleted to keep the workspace navigable; references to them in this file and in the `*-phaseN-completion.md` files are therefore **dangling by intent, not by accident**.
+>
+> They are fully recoverable from git — the last commit containing them is **`aabc3de`**:
+> ```
+> git show aabc3de:docs/plans/tasks/engine1-adaptive-ai-work-plan-backend-task-14.md
+> ```
+> Kept instead: every `*-phaseN-completion.md` (outcomes, measurements, findings P-1/Q-1/Q-2) and this overview. That split is deliberate — the task files were scaffolding for doing the work; the completion files are the record of what the work found, and other documents cite them.
+
 ## Project Overview
 
 ### Purpose and Goals

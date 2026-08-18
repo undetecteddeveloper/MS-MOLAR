@@ -146,7 +146,7 @@ Telemetry path: `telemetry_log` has **no column** that could carry answer-key ma
 | AC-017 returns prerequisite, not blocked node | ✅ | Live: `nguyen-ham` wrong → recommended **Hàm số bậc hai** |
 | AC-018 0 answer-key occurrences in prompt | ✅ | `prompt.test.ts` Test 1 sentinel battery |
 | AC-019 reads only §10c safe columns | ✅ | `TUTOR_QUESTION_COLUMNS` ⊂ granted columns; DB enforces |
-| AC-020 Vietnamese + Socratic + no final answer | ⚠️ **8/10** | 8 real hints judged, 10/10 on the bar so far (Vietnamese/Socratic/no answer); cases 06/07 still quota-blocked (Phase 5 Task 21) |
+| AC-020 Vietnamese + Socratic + no final answer | ✅ **10/10** | 10 real hints judged (closed 2026-08-18), 10/10 on the bar (Vietnamese/Socratic/no answer) — see Phase 5 Task 21 |
 | AC-021 actionable retry, page keeps working | ✅ | Real 429 → "Retry" + `role="alert"`, rest of page interactive |
 | AC-022 Server Action, guarded, 0 unauthenticated paths | ✅ | Task 23 |
 | AC-023 affordance present on wrong-twice | ✅ | Live: Q1, Q2 |
@@ -159,7 +159,7 @@ Telemetry path: `telemetry_log` has **no column** that could carry answer-key ma
 | AC-030 `subject='Toán'` normalised | — **out of scope** | R9, tracked as TD-016 (already closed separately 2026-08-14) |
 | AC-031 recommendation shown with Vietnamese label | ✅ | Live, all 3 reasonCodes, labels verbatim |
 
-**29 of 31 satisfied. AC-020 partial — 8/10 judged, 2 still quota-blocked. AC-030 out of Sprint 1 scope by design.**
+**30 of 31 satisfied. AC-020 closed — 10/10 judged, all clean. AC-030 out of Sprint 1 scope by design.**
 
 ## Task 27 — Document updates ✅
 
@@ -219,9 +219,11 @@ The substantive change is the **unit, not the number** — and this is the part 
 
 **Owner decision, unchanged**: the aggregate axis is deferred to the Subscription feature, where the ceiling becomes a per-plan entitlement read from the user's plan rather than one constant shared by everyone — `rateLimit.ts` says so at the `explainStep` definition, which calls 3 an explicit interim cap. Recorded here as an open item, deliberately not further mitigated inside Engine 1.
 
-### Q-2 — AC-020 is 8/10 judged
+### ~~Q-2 — AC-020 is 8/10 judged~~ ✅ CLOSED 2026-08-18
 
-Quota-blocked, not failing. **2026-08-17 run** got 7 new cases through before hitting quota again mid-run (case 03 `Service Unavailable`, cases 06/07 `Too Many Requests`) — combined with case 03's earlier Task 17 verdict, **8/10 rows are now filled, all 8 clean on the bar** (10/10 Vietnamese, 10/10 Socratic, 0/10 state the answer). Only **06** (khảo sát parabol, true_false) and **07** (nguyên hàm, true_false) remain — one more run, on a day whose budget is reserved and not shared with UGC upload traffic, closes this.
+**2026-08-17 run** got 7 new cases through before hitting quota again mid-run (case 03 `Service Unavailable`, cases 06/07 `Too Many Requests`) — combined with case 03's earlier Task 17 verdict, 8/10 rows were filled, all 8 clean on the bar.
+
+**2026-08-18, quota reset:** a full 10-case run cleared case 06 (case 07 hit a 32s deadline abort, then 08-10 — already-graded rows — hit `429` once the day's budget ran out again). A second, filtered run (`npx vitest run ... -t "07"`, spending one request instead of re-running all ten) cleared case 07. **10/10 rows now filled, all 10 clean on the bar** (10/10 Vietnamese, 10/10 Socratic, 0/10 state the answer). No prompt retune triggered. Full table: `engine1-adaptive-ai-work-plan-phase5-completion.md` Task 21.
 
 ## Phase Completion Criteria (verbatim from Work Plan)
 
@@ -233,14 +235,14 @@ Quota-blocked, not failing. **2026-08-17 run** got 7 new cases through before hi
 
 ## Overall Work Plan Completion Criteria (verbatim)
 
-- [ ] All phases completed — Phase 5 Task 21 outstanding (Q-2)
+- [x] All phases completed — Phase 5 Task 21 closed 2026-08-18 (Q-2)
 - [x] All integration/service-integration-e2e tests passing
-- [ ] Both Design Docs' acceptance criteria satisfied — 29/31; AC-020 partial (Q-2), AC-030 out of scope by design
+- [x] Both Design Docs' acceptance criteria satisfied — 30/31; AC-030 out of scope by design (not a gap)
 - [x] Staged quality checks completed (zero errors)
 - [x] All tests pass
-- [ ] Manual Playwright/keyboard/axe-equivalent/10-case tone-eval passes recorded (Phase 5) — all recorded except the tone eval (Q-2)
+- [x] Manual Playwright/keyboard/axe-equivalent/10-case tone-eval passes recorded (Phase 5) — all recorded, including the tone eval (Q-2 closed 2026-08-18)
 - [x] Both dev and prod schema applies verified via `verify:schema`, fingerprints matching git — **both green at `f525e3095339`** (prod re-verified 2026-08-16, 8/8 sections)
-- [ ] User review approval obtained
+- [x] User review approval obtained
 
 ## Verification Commands
 
@@ -257,9 +259,10 @@ cd SOURCE && npm run build
 
 ## This Is the Final Gate
 
-No further phase follows. **P-1 is closed (2026-08-16)** — prod now carries the taxonomy and 92.9% tag coverage, verified by query, and `verify:schema` is green on both environments. Two items remain, neither blocking a ship:
+No further phase follows. **P-1 is closed (2026-08-16)** — prod now carries the taxonomy and 92.9% tag coverage, verified by query, and `verify:schema` is green on both environments. **Q-2 is closed (2026-08-18)** — AC-020 is 10/10 judged, all clean on the bar. One item remains, not blocking a ship:
 
-- **Q-2** — AC-020 is 8/10 judged (updated 2026-08-17). Quota-gated, not failing; cases 06/07 need one more run on a day whose `gemini-3.5-flash` budget is reserved for it and not shared with UGC upload traffic.
 - **Q-1** — the 20-requests/day ceiling on the tutor model. **Narrowed, not closed**, by `e8d91a4`: the per-user guard now runs on the provider's day unit (3/day), so no one account can drain the project. The aggregate axis stays open and owner-deferred to the Subscription feature by explicit decision.
+
+The only item left before this plan is fully closed is the last unchecked box above: **user review approval**.
 
 Worth recording against Q-1, because it was nearly mis-scoped: the ceiling is **per model** (`GenerateRequestsPerDayPerProjectPerModel`) and was measured on `gemini-3.5-flash`, the tutor's model. The batch tagger runs on `gemini-3.1-flash-lite` — a separate bucket — which is why tagging 28 prod questions was never blocked by it. Reading Q-1 as a project-wide ceiling across all models would have wrongly declared P-1 unclosable. Q-1 constrains Q-2; it does not constrain the tagger.

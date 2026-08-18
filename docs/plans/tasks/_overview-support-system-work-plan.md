@@ -3,6 +3,14 @@
 Generation Date: 2026-08-13
 Target Plan Document: `docs/plans/support-system-work-plan.md`
 
+> **⚠ Per-task files removed 2026-08-18, after the feature closed.** The 18 executor-instruction files (`support-system-work-plan-task-01…18.md`) were deleted to keep the workspace navigable; references to them here and in the `*-phaseN-completion.md` files are **dangling by intent**.
+>
+> Recoverable from git — last commit containing them is **`aabc3de`**:
+> ```
+> git show aabc3de:docs/plans/tasks/support-system-work-plan-task-01.md
+> ```
+> Kept instead: every `*-phaseN-completion.md` (outcomes and measurements) and this overview.
+
 ## Project Overview
 
 ### Purpose and Goals
