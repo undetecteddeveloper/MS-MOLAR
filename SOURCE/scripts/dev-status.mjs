@@ -99,7 +99,10 @@ function loadQuotaRecords() {
   }
 }
 
-const QUOTA_ROLES = ["questions", "answers", "metadata"];
+// "tutor" = đường gia sư Engine 1 — khác UGC nhưng dùng CHUNG key Gemini và
+// chung trần request/ngày, nên phải hiện ở cùng bảng này mới thấy được ai đang
+// ăn hạn ngạch của ai.
+const QUOTA_ROLES = ["questions", "answers", "metadata", "tutor"];
 
 function printQuotaUsage() {
   const records = loadQuotaRecords();
@@ -107,6 +110,10 @@ function printQuotaUsage() {
   const windowStart = now - 60_000;
   const dayStart = pacificDayStartMs(now);
   const sumTokens = (arr) => arr.reduce((acc, r) => acc + (r.totalTokens || 0), 0);
+  // Tách input/output vì đơn giá chênh ~8 lần ($0,30 vs $2,50 / 1M token) —
+  // tổng gộp thì không quy ra tiền được (Subscription PRD U2).
+  const sumIn = (arr) => arr.reduce((acc, r) => acc + (r.inputTokens || 0), 0);
+  const sumOut = (arr) => arr.reduce((acc, r) => acc + (r.outputTokens || 0), 0);
 
   console.log(line());
   console.log("AI usage (Gemini) — cập nhật mỗi 15s (Gemini không có API tra hạn mức còn lại, chỉ tự đếm)");
@@ -124,8 +131,14 @@ function printQuotaUsage() {
       const last60 = roleRecords.filter((r) => r.ts >= windowStart);
       const today = roleRecords.filter((r) => r.ts >= dayStart);
       console.log(`  ${role.padEnd(10)} (${model})`);
-      console.log(`    60s gần nhất : ${last60.length} request · ${sumTokens(last60)} token`);
-      console.log(`    hôm nay      : ${today.length} request · ${sumTokens(today)} token`);
+      console.log(
+        `    60s gần nhất : ${last60.length} request · ${sumTokens(last60)} token` +
+          ` (in ${sumIn(last60)} / out ${sumOut(last60)})`,
+      );
+      console.log(
+        `    hôm nay      : ${today.length} request · ${sumTokens(today)} token` +
+          ` (in ${sumIn(today)} / out ${sumOut(today)})`,
+      );
     }
   }
   console.log(

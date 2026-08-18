@@ -32,6 +32,7 @@ import type {
 } from "./types";
 import type { FileRef } from "./fileRef";
 import { toGeminiPart } from "./fileRef";
+import { recordUsage } from "./quotaTracker";
 
 /** Output của extractor #1 — parts (rỗng nếu đề không chia phần) + câu hỏi. */
 export type ExtractedQuestionFile = {
@@ -269,6 +270,10 @@ export async function extractQuestions(
         responseJsonSchema: QUESTIONS_SCHEMA as unknown as Record<string, unknown>,
       },
     });
+
+    // Đo trước mọi nhánh phân loại — lượt gọi hỏng vẫn tiêu token và vẫn trừ
+    // vào trần request/ngày (Subscription PRD U2).
+    recordUsage("questions", QUESTION_MODEL, response.usageMetadata);
 
     const finishReason = response.candidates?.[0]?.finishReason;
     if (finishReason !== "STOP") {

@@ -13,6 +13,7 @@
 import { makeUgcError } from "./errorCopy";
 import { ANSWER_MODEL, getGeminiClient, logExtractorExit, sdkErrorDetail } from "./gemini";
 import { renderPdfPage } from "./pdf";
+import { recordUsage } from "./quotaTracker";
 import type { ExtractedMeta, Result } from "./types";
 import type { FileRef } from "./fileRef";
 import { toGeminiPart } from "./fileRef";
@@ -112,6 +113,10 @@ export async function extractMeta(file: FileRef): Promise<Result<ExtractedMeta>>
         responseJsonSchema: META_SCHEMA as unknown as Record<string, unknown>,
       },
     });
+
+    // Đo trước mọi nhánh phân loại — lượt gọi hỏng vẫn tiêu token và vẫn trừ
+    // vào trần request/ngày (Subscription PRD U2).
+    recordUsage("metadata", ANSWER_MODEL, response.usageMetadata);
 
     const finishReason = response.candidates?.[0]?.finishReason;
     if (finishReason !== "STOP") {

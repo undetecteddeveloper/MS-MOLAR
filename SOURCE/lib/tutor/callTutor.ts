@@ -15,6 +15,7 @@ import {
   QUESTION_MODEL,
   sdkErrorDetail,
 } from "@/lib/ugc/gemini";
+import { recordUsage } from "@/lib/ugc/quotaTracker";
 
 import { TUTOR_CALL_DEADLINE_MS } from "./constants";
 import { buildTutorPrompt } from "./prompt";
@@ -99,6 +100,14 @@ export async function generateHint(input: TutorPromptInput): Promise<string> {
       contents: [{ text: buildTutorPrompt(input) }],
       config: { abortSignal: deadline.signal },
     });
+
+    // Đo NGAY sau khi có response, TRƯỚC mọi nhánh phân loại: một lượt gọi
+    // finishReason≠STOP hay text rỗng vẫn đã tiêu token thật và vẫn đã trừ vào
+    // trần request/ngày. Ghi ở đây thì cả ba lối (thành công, finishReason,
+    // emptyText) được đếm bằng đúng một dòng, không lối nào tự nhiên biến mất
+    // khỏi phép tính đơn giá (Subscription PRD U2). Không đặt ở lối `catch`:
+    // ở đó không có `response` nên không có token nào để đọc.
+    recordUsage("tutor", QUESTION_MODEL, response.usageMetadata);
 
     const finishReason = response.candidates?.[0]?.finishReason;
     if (finishReason !== "STOP") {
