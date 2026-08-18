@@ -96,6 +96,7 @@ Runs under `npm run test:integration` (plan Task 0.1 config) against **dev**.
 - [ ] Run `npm run test:integration` against dev and `npm test`; confirm the added cases pass
 ### 3. Refactor Phase
 - [ ] Confirm `rateLimit.test.ts` four existing assertion blocks pass **unmodified**
+- [ ] After exporting `recheckOrder()`'s real return type (the rate-limited refusal shape included), add a compile-time link in `SOURCE/tests/e2e/fixture/subscriptionFixtureData.ts` (e.g. `const _fixtureRefusalContract: Awaited<ReturnType<typeof recheckOrder>> = FIXTURE_RECHECK_OUTCOMES.rateLimited;`) and delete the transcribed `FixtureRateLimitedRefusal` / `FixtureRecheckOutcome` declarations — until that link exists, fixture drift against the wire shape is silent
 
 ## Quality Assurance Mechanisms
 - `rateLimit.test.ts` three-family partition — Enforces: every `RATE_LIMITS` key is classified in exactly one family and its family invariants hold — Config: `SOURCE/lib/security/rateLimit.test.ts:93-99, :107-110, :118-121, :127-135`

@@ -70,6 +70,7 @@ Create an order, then in a **fresh request-scoped client that has not called `cr
 - [ ] Implement `listMyOrders()` (SQL `created_at desc`) and `getMyOrder()` (via `toCheckoutOrder`); run `npm run test:integration` against dev
 ### 3. Refactor Phase
 - [ ] Confirm `MyOrderRow.status` is typed `string`, not the union, and that the module performs no JavaScript re-sort
+- [ ] After exporting the real `MyOrderRow`, add a compile-time link in `SOURCE/tests/e2e/fixture/subscriptionFixtureData.ts` (e.g. `const _fixtureRowContract: MyOrderRow = FIXTURE_ORDER_ROWS[0];`) and delete the transcribed `FixtureMyOrderRow` declaration — until that link exists, fixture drift against this type is silent
 
 ## Quality Assurance Mechanisms
 - Real-Postgres integration tests (precedent `recordSkillMastery.int.test.ts`) — Enforces: query correctness, ordering against the matching index, RLS visibility — Config: `SOURCE/vitest.integration.config.ts`

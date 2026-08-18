@@ -25,6 +25,29 @@
 // module boundary and entitlement/order values are supplied as fixtures. No
 // live payOS connection and no real money movement occurs in this lane.
 //
+// HARNESS MODULE — `./subscriptionFixtureData.ts`. It holds everything the
+// three cases below run on:
+//   - entitlement fixtures: FIXTURE_ENTITLEMENT_KNOWN / _UNKNOWN / _EXHAUSTED,
+//     built by spreading FREE_FALLBACK, with FIXTURE_RESETS_AT deliberately on
+//     a different calendar day in ICT than in UTC (FE-2(b)). FE-2(b) MUST first
+//     pin the browser zone via driver.setTimezone(FIXTURE_BROWSER_TIMEZONE):
+//     on an ICT developer machine an unpinned formatter renders the right date
+//     for the wrong reason and the case passes by accident;
+//   - order fixtures: FIXTURE_ORDER_PENDING and _PENDING_NO_QR, _PAID,
+//     _EXPIRED, _CANCELLED, _UNRECOGNISED, plus FIXTURE_ORDER_ROWS for S-05,
+//     all pinned against FIXTURE_NOW;
+//   - the action-module stub layer: createSubscriptionActionStubs(), exposing
+//     createOrderCallCount / recheckOrderCallCount, which are what FE-1's
+//     no-navigation branch and FE-3(f)'s "exactly 1 invocation" assert on. Both
+//     simulate* methods are ASYNC, and holdNextRecheck()/releaseHeldRecheck()
+//     keep a call outstanding: the dogpile guard and the busy state only exist
+//     inside an in-flight window, so FE-3(a)/(e)/(f) drive them through it;
+//   - the driver: SubscriptionDriver / SubscriptionLocator.
+// Named here rather than imported: this file has no consumer for an import
+// until the cases exist, and an unused import is fatal under
+// `eslint --max-warnings 0`. The three slots stay comments-only until plan
+// Tasks 4.6 (FE-1), 2.5 (FE-2) and 3.9 (FE-3) fill them.
+//
 // CONSTRAINTS BINDING ANY IN-PROCESS RENDER CASE ADDED ALONGSIDE THESE.
 // The browser cases below are not subject to jsdom rules, but the companion
 // component cases the frontend DD owns are, and the implementer will write both

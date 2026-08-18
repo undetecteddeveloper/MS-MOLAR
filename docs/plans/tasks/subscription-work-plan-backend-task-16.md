@@ -87,6 +87,7 @@ Each maps one-to-one to one of C-10 seven rendered sentences; **shipping fewer r
 - [ ] Implement the four steps and `recordPaymentSettlement()`; fix the `§18` comment; run only the added tests
 ### 3. Refactor Phase
 - [ ] Add the union exhaustiveness check and confirm all five reason literals are reachable in test
+- [ ] After exporting the real `SettleResult`, add a compile-time link in `SOURCE/tests/e2e/fixture/subscriptionFixtureData.ts` (e.g. `const _fixtureSettleContract: SettleResult = FIXTURE_RECHECK_OUTCOMES.stillPending;`, covering both union arms) and delete the transcribed `FixtureSettleResult` declaration — until that link exists, fixture drift against this union is silent
 
 ## Quality Assurance Mechanisms
 - `npm test` -> `vitest run` — Config: `SOURCE/package.json:10`

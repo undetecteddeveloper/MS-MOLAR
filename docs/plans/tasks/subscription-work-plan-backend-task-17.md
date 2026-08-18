@@ -54,6 +54,7 @@ Exports:
 - [ ] Implement the mapper; run only the added tests
 ### 3. Refactor Phase
 - [ ] Confirm no other module declares a `CheckoutOrder` shape or a competing mapping
+- [ ] After exporting the real `CheckoutOrder`, add a compile-time link in `SOURCE/tests/e2e/fixture/subscriptionFixtureData.ts` (e.g. `const _fixtureContract: CheckoutOrder = FIXTURE_ORDER_PENDING;`) and delete the transcribed `FixtureCheckoutOrder` declaration — until that link exists, fixture drift against this type is silent
 
 ## Quality Assurance Mechanisms
 - `npm test` -> `vitest run` — Config: `SOURCE/package.json:10`
