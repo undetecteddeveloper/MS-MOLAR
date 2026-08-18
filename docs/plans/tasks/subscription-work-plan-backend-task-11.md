@@ -21,8 +21,8 @@ This is a **hand-apply to a live database**. An agent may prepare the statements
 **Nothing below may start against a database that has not passed gate B.**
 
 ## Target Files
-- [ ] (none — this task changes no repository file)
-- [ ] Record the apply timestamp and the verbatim gate B output in the plan Progress Tracking, Phase 1 Notes
+- [x] (none — no **source** file changed; the only repository edit is the plan record below)
+- [x] Record the apply timestamp and the verbatim gate B output in the plan Progress Tracking, Phase 1 Notes — `docs/plans/subscription-work-plan.md` § Progress Tracking → Phase 1
 
 ## Investigation Targets
 - `SOURCE/supabase/schema.sql` (the four blocks written by plan Task 1.1 — the exact text to apply)
@@ -37,14 +37,14 @@ This is a **hand-apply to a live database**. An agent may prepare the statements
 
 ## Implementation Steps
 ### 1. Pre-apply
-- [ ] Confirm gate A is green (`npm test`) — if it is not, **stop**
-- [ ] Read the four blocks end to end and confirm the target environment is **dev**, not prod (`.mcp.json` points at PROD; the dev ref comes from `SOURCE/.env.local`)
+- [x] Confirm gate A is green (`npm test`) — plan Task 1.2 closed; baseline 919 pass / 10 skip
+- [x] Read the four blocks end to end and confirm the target environment is **dev**, not prod (`.mcp.json` points at PROD; the dev ref comes from `SOURCE/.env.local`) — the project list was read before any DDL; dev = `hynwleaxtbtjzkvpjsug`, prod = `pebjdlbgbmizgfpuptjl`
 ### 2. Apply (engineer-performed)
-- [ ] Apply the four blocks to dev in one hand-apply
-- [ ] Record the apply timestamp
+- [x] Apply the four blocks to dev in one engineer-authorised apply (five statements, fingerprint last), executed through the Composio Supabase toolkit
+- [x] Record the apply timestamp — `2026-08-18T13:53:05.77815+00:00` (`schema_version.applied_at`)
 ### 3. Gate B
-- [ ] Run `npm run verify:schema` from `SOURCE/` against dev; capture the output verbatim
-- [ ] Confirm item 6 (`on delete` on both new FKs) and item 7 (fingerprint matches git) explicitly
+- [x] Run `npm run verify:schema` from `SOURCE/` against dev; capture the output verbatim — recorded in the plan's Phase 1 Notes
+- [x] Confirm item 6 (`on delete` on both new FKs — FK count 25 → 27, all matching) and item 7 (fingerprint `021dd1387945` matches git) explicitly
 
 ## Operation Verification Methods
 - **Verification method**: `npm run verify:schema` from `SOURCE/`, against dev, after the hand-apply.
@@ -61,10 +61,19 @@ This is a **hand-apply to a live database**. An agent may prepare the statements
 - **Residual**: says nothing about **prod**, which still has neither table until plan Task 5.8; and a matching fingerprint proves which build of the file the database is running, **not** that its content is present — which is why plan Task 5.8 verifies prod with a real counting query.
 
 ## Completion Criteria
-- [ ] ⚠ Gate B green on **dev** (`npm run verify:schema` from `SOURCE/`), fingerprint matching git
-- [ ] Item 6 and item 7 confirmed explicitly in the captured output
-- [ ] The apply timestamp and the verbatim gate B output recorded in the plan Phase 1 Notes
-- [ ] **No production deploy of this branch has occurred**, and **no DDL was applied to prod** (that is plan Task 5.8)
+- [x] ⚠ Gate B green on **dev** (`npm run verify:schema` from `SOURCE/`), fingerprint matching git
+- [x] Item 6 and item 7 confirmed explicitly in the captured output
+- [x] The apply timestamp and the verbatim gate B output recorded in the plan Phase 1 Notes
+- [x] **No production deploy of this branch has occurred**, and **no DDL was applied to prod** (that is plan Task 5.8) — prod `pebjdlbgbmizgfpuptjl` still has neither table
+
+## Investigation Notes
+
+- `SOURCE/supabase/schema.sql` — the four blocks sit before `-- 17. Phiên bản schema`, in the order applied: `payment_orders` (+ `payment_orders_user_created_idx`, RLS, revokes, `orders_select_own`), `subscriptions` (RLS, revokes, `subscriptions_select_own`), `record_payment_settlement(bigint, integer)` (drop-then-create, revoke by name, `grant execute … to service_role`), and the `telemetry_log_error_code_check` drop/add pair. The §17 `insert into public.schema_version` remains the file's last statement — which is why the apply wrote the fingerprint last.
+- `SOURCE/supabase/verify-schema.ts` — item 6 prints the declared-vs-live FK comparison ("Đối chiếu `on delete` …"); item 7 reads `schema_version.fingerprint, applied_at` and prints "apply lúc <applied_at>". The apply timestamp recorded for this task is therefore the *same* value the gate prints, not a separately observed clock reading.
+- `SOURCE/package.json:15` — `verify:schema` is `npx tsx supabase/verify-schema.ts`, standalone; `check:bundle` is a different script and neither pipes into the other.
+- `SOURCE/lib/schema/schemaFingerprint.ts` — `SCHEMA_FINGERPRINT = "021dd1387945"`, matching the value gate B read from dev. The fingerprint is a content hash of the *executable* SQL (comments and whitespace normalised away), so it moves on any real DDL change.
+- `docs/plans/subscription-work-plan.md` § Deployment Sequencing, Phase 1 row — "Dev-only apply. Prod still has neither new table"; a production deploy is first permitted at Phase 5, after Task 5.8. The Phase 1 Notes entry states this explicitly so a later reader cannot read gate B as a prod statement.
+- Residual carried into the record: a matching fingerprint proves *which build* the DB is running, not that every object's content is present — hence the pre-fingerprint catalog readings (column lists, CHECK text, FK `on delete`, RLS, function ACL) recorded alongside the gate output.
 
 ## Notes
 - Impact scope: the dev database only.

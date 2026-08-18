@@ -536,8 +536,9 @@ flowchart LR
 - [x] **Task 1.2 — Gate A: text-side assertions, including the two new ones.** `npm test` must be green with: `parseForeignKeys.test.ts` (both new FKs declare `on delete`; the four `text` columns add none), `schemaFingerprint.test.ts` (the three fingerprint values agree), **a new allowlist assertion** that the `payment_orders` block's column set is **exactly** the eleven declared (P-1's structural half — an allowlist, not a blocklist, so any twelfth column fails the case), and **a new parse case** that every `error_code in ( … )` occurrence in `schema.sql` — there are now two — yields exactly `TELEMETRY_ERROR_CODES`. `readFileSync`, no database, no credential.
   - Proof obligation: the parse case must find **both** occurrences; a case that finds one and passes is the drift this assertion exists to prevent.
   - **Resolved as written, with the fourth assertion split in two (done 2026-08-18).** `… yields exactly TELEMETRY_ERROR_CODES` **cannot be green today and must not be**: `schema.sql` carries six literals (Task 1.1) while `telemetry.ts:35` still carries four, and widening the CHECK before the code emits the codes is the correct order — **Task 5.5 owns the code side**. Shipped instead, both in `schemaFingerprint.test.ts`: (a) the **contract in force now** — a hand-transcribed six-literal expectation asserted against **both** sites, each pinned to its construct (`create table` inline + `add constraint telemetry_log_error_code_check`), so a widening of one site alone goes red; and (b) a **tripwire** pinning the exact remaining divergence (`SQL \ TELEMETRY_ERROR_CODES === ['user_quota_exhausted','project_budget_exhausted']`, and nothing on the TS side missing from SQL). **The tripwire goes red the moment Task 5.5 widens `telemetry.ts`**, and its failure message carries the final equality assertion to replace it with. Weakening to `toContain`, or comparing the two SQL sites only to each other, was rejected: both hand back a green gate with no discriminating power.
-- [ ] **Task 1.3 — ⚠ BLOCKING MANUAL CHECKPOINT: hand-apply the DDL to dev, then gate B.** Run `npm run verify:schema` **from `SOURCE/`** against dev. All eight checks green, with item 6 (`on delete` of every FK, read from the live catalog through the §16a RPC) and item 7 (the §17 fingerprint) specifically confirmed. **Nothing below may start against a database that has not passed gate B.** This checkpoint has failed silently three times in this repository and is not completable by an agent unsupervised.
+- [x] **Task 1.3 — ⚠ BLOCKING MANUAL CHECKPOINT: hand-apply the DDL to dev, then gate B.** Run `npm run verify:schema` **from `SOURCE/`** against dev. All eight checks green, with item 6 (`on delete` of every FK, read from the live catalog through the §16a RPC) and item 7 (the §17 fingerprint) specifically confirmed. **Nothing below may start against a database that has not passed gate B.** This checkpoint has failed silently three times in this repository and is not completable by an agent unsupervised.
   - Failure response: **stop the phase.** Do not proceed to implementation.
+  - **Done 2026-08-18 — gate B green on dev (apply `2026-08-18T13:53:05.77815+00:00`).** Engineer-authorised apply, executed through the Composio Supabase toolkit against dev `hynwleaxtbtjzkvpjsug` only; prod `pebjdlbgbmizgfpuptjl` **untouched** and **no production deploy of this branch has occurred** (Task 5.8 unchanged). Item 6 confirmed — 27 FKs (up from 25, i.e. the two new keys), every `on delete` matching `schema.sql`; item 7 confirmed — `021dd1387945`, matching `schemaFingerprint.ts`. The fingerprint was written **last**, after the catalog readings, so the DB could not claim a build it had not fully run. Apply timestamp, pre/post-apply catalog readings and the **verbatim** gate B output: § Progress Tracking → Phase 1.
 - [ ] **Task 1.4 — Named values and environment registration.** Create `SOURCE/lib/billing/pricing.ts` (`PREMIUM_PRICE_VND = 39000`, `ORDER_PENDING_WINDOW_MS = 30 * 60 * 1000` — the one constant that feeds `payment_orders.pending_until`, payOS's `expiredAt`, **and** `createOrder()` step (0)'s reuse predicate) and declare `PLAN_LIMITS` in `SOURCE/lib/billing/quota.ts` (`{ free: { tutor: 5, upload: 3 }, premium: { tutor: 500, upload: 15 } }`) — **not** in the frozen `types.ts`.
   **Declare the one period-start derivation here, beside `PLAN_LIMITS`** (I004): `export function periodStartEpoch(plan, anchor, createdAt, now): number` in `SOURCE/lib/billing/quota.ts`, implementing the backend DD `:841-842` formula exactly once — premium ⇒ `subscriptions.period_anchor_at`; free ⇒ `user_profiles.created_at + 30d × floor((now − created_at) / 30d)`; **unchanged during grace** (AC-011: grace grants access, never allowance). It returns the integer epoch that forms the `{periodStartEpoch}` segment of `quota:{kind}:{userId}:{periodStartEpoch}`. **Both the read path (Task 2.1, which needs it for `used` and `resetsAt`) and the write path (Task 5.1, which increments the key) import this function; neither re-derives it.** Two independent derivations three phases apart is the same two-producers-of-one-contract class as CL-01, but **silent**: a rounding or ms-vs-s difference makes the screen say *n* remaining while the gate refuses, and nothing goes red. Add five branches to `SOURCE/lib/env/checkEnv.ts` in the same change that first reads them (`external-resources.md:64`): `PAYOS_CLIENT_ID`, `PAYOS_API_KEY`, `PAYOS_CHECKSUM_KEY` (level matching `GEMINI_API_KEY`'s precedent), `AI_BUDGET_FREE_SHARE` (**warn**, default 50% stated), `AI_BUDGET_DAILY_LIMIT` (**fail-closed**, no default — a missing spend ceiling must not read as an unlimited one). Add all five to `SOURCE/.env.example` with the consequence of leaving each blank.
   - Proof obligations: one unit test **per variable, absent and present**; the absent case for `AI_BUDGET_DAILY_LIMIT` must fail closed, matching `GEMINI_PAID_TIER_ENABLED`'s shape at `paidTier.ts:26`. For `periodStartEpoch()`: literal expected epochs (hardcoded, never read back from the implementation) for premium-with-anchor, free at creation-days 15 / 29 / 31, and a user inside grace whose value is **unchanged** from before the grace boundary. The key-string byte-identity assertion across the read and write paths lands in Task 5.1, once both call sites exist.
@@ -553,7 +554,7 @@ flowchart LR
 
 #### Phase Completion Criteria
 - [ ] Gate A green (`npm test`), including both new text-side assertions
-- [ ] ⚠ Gate B green on **dev** (`npm run verify:schema` from `SOURCE/`), fingerprint matching git
+- [x] ⚠ Gate B green on **dev** (`npm run verify:schema` from `SOURCE/`), fingerprint matching git — Task 1.3, 2026-08-18 (`021dd1387945`); dev only, prod is Task 5.8
 - [ ] `schema.sql` gained **exactly four** new/edited DDL blocks — the number in the header and in the traceability rows; no block was added that lacks a Design Doc **schema** section
 - [ ] `test-rls.ts` Phần 8 passes, with one denial group per table Task 1.1 created (two tables + the function ⇒ three groups)
 - [ ] One unit test per environment variable, absent and present, all green; `periodStartEpoch()`'s literal-epoch cases green
@@ -813,7 +814,93 @@ flowchart LR
 ### Phase 1
 - Start: YYYY-MM-DD HH:MM
 - Complete: YYYY-MM-DD HH:MM
-- Notes: (record the dev apply timestamp and the gate B output verbatim)
+- Notes: the dev apply timestamp and the verbatim gate B output, as required — below.
+
+**Task 1.3 — dev apply + gate B: done 2026-08-18.** Applied to the **dev** project `hynwleaxtbtjzkvpjsug` ("undetecteddeveloper's Project") **only**; prod `pebjdlbgbmizgfpuptjl` ("MS-MOLAR-prod") was **not touched** — the project list was read before any DDL, precisely because `.mcp.json` points at PROD. The apply was engineer-authorised to run through the Composio Supabase toolkit rather than by hand in the SQL Editor; it remains the one engineer-approved apply this checkpoint requires, not an unsupervised agent action.
+
+**Apply timestamp: `2026-08-18T13:53:05.77815+00:00`** — the `schema_version.applied_at` written by the §17 fingerprint upsert, i.e. the same value gate B prints on its item-7 line.
+
+Pre-apply state on dev, captured **before** any DDL: `payment_orders` absent, `subscriptions` absent, `record_payment_settlement` absent, `schema_version.fingerprint` = `d714c313fe1d`.
+
+Applied in five steps, in dependency order, with **the fingerprint deliberately last** so a partial apply could not leave the database claiming a build it had not fully run:
+
+1. `payment_orders` + `payment_orders_user_created_idx` + RLS + revokes + `orders_select_own`
+2. `subscriptions` + RLS + revokes + `subscriptions_select_own`
+3. `record_payment_settlement(bigint, integer)` drop-then-create + revoke by name + `grant execute … to service_role`
+4. `telemetry_log_error_code_check` dropped and re-added **in place** with the six literals
+5. `schema_version` fingerprint upsert → `021dd1387945`
+
+Post-apply catalog verification, performed **before** the fingerprint was written:
+
+- `payment_orders` columns, in order: `order_code, user_id, amount, status, created_at, pending_until, settled_at, qr_payload, account_number, account_name, memo` — exactly **eleven** (P-1's structural half)
+- `subscriptions` columns: `user_id, expires_at, period_anchor_at, updated_at` — exactly **four**
+- `record_payment_settlement(bigint,integer)` present, security = **INVOKER**
+- `telemetry_log_error_code_check` = `CHECK (((error_code IS NULL) OR (error_code = ANY (ARRAY['gemini_unavailable'::text, 'rate_limited'::text, 'server'::text, 'not_eligible'::text, 'user_quota_exhausted'::text, 'project_budget_exhausted'::text]))))`
+- FK `on delete`: `payment_orders` = `n` (set null), `subscriptions` = `c` (cascade)
+- RLS: `payment_orders` = `true`, `subscriptions` = `true`; policies `orders_select_own`, `subscriptions_select_own`
+- Function ACL: `postgres=X/postgres | service_role=X/postgres` — `public`, `anon` and `authenticated` hold **no** EXECUTE
+
+**Gate B, verbatim** — `npm run verify:schema` from `SOURCE/`, against dev:
+
+```text
+> ms-molar@0.1.0 verify:schema
+> npx tsx supabase/verify-schema.ts
+
+
+schema.sql: 10 cột an toàn, exam_answer_key trả 12 cột
+DB thật:    public.questions có 13 cột
+
+Phân loại cột (schema.sql vs DB thật):
+  ✓ Mọi cột của questions đều có đường đọc (được GRANT, hoặc đi qua exam_answer_key)
+  ✓ Mọi cột trong GRANT của schema.sql đều tồn tại thật trên bảng
+     an toàn : id, content, choices, subject, grade, topic, question_type, part_number, image_url, skill_node_id
+     đáp án  : correct_answer, essay_answer, sub_answers
+
+Probe quyền cột bằng JWT `authenticated` thật:
+  ✓ Cột đáp án KHÔNG đọc được qua REST (correct_answer, essay_answer, sub_answers) — Critical #1 đang đóng
+  ✓ Cột an toàn vẫn đọc được bình thường (REVOKE không khoá nhầm)
+
+Probe RPC (id không tồn tại — không đụng dữ liệu ai):
+  ✓ exam_answer_key tồn tại và authenticated gọi được
+  ✓ claim_attempt_answer_key tồn tại và authenticated gọi được
+
+Probe quyền ghi exam_results (attempt_id không tồn tại — không ghi được gì):
+  ✓ authenticated KHÔNG còn quyền INSERT exam_results (42501) — Critical #2 đang đóng
+  ✓ record_exam_result KHÔNG gọi được bằng JWT học sinh (42501) — EXECUTE chỉ service_role
+  ✓ change_support_ticket_status KHÔNG gọi được bằng JWT học sinh (42501) — EXECUTE chỉ service_role
+
+Probe EXECUTE bằng anon key (chưa đăng nhập):
+  ✓ anon KHÔNG gọi được exam_answer_key (42501)
+  ✓ anon KHÔNG gọi được claim_attempt_answer_key (42501)
+
+Probe view exams_with_difficulty (fixture draft tạm, tự dọn):
+  ✓ Đề chưa published KHÔNG lộ qua view (RLS áp dụng — security_invoker đang bật)
+  ✓ rating_count vẫn là aggregate TOÀN CỤC (4 rating trên đề exam-hoa-10)
+
+Đối chiếu `on delete` của mọi khoá ngoại (schema.sql vs catalog thật):
+     schema.sql khai 27 khoá ngoại, DB đang có 27
+  ✓ Mọi khoá ngoại khai trong schema.sql đều tồn tại thật trên DB
+  ✓ Mọi khoá ngoại trên DB đều có trong schema.sql (không có cái nào tạo tay ngoài file)
+  ✓ Không khoá ngoại nào bỏ trống `on delete` trong schema.sql
+  ✓ `on delete` của cả 27 khoá ngoại khớp schema.sql — TD-011 đang đóng
+  ✓ Chuỗi xoá đề thông suốt trên DB thật: mọi bảng phái sinh đều cascade
+
+Phiên bản schema (§17, TD-005):
+  ✓ schema.sql tự khai đúng vân tay của chính nó (021dd1387945)
+  ✓ DB đang chạy đúng bản schema.sql trong git (021dd1387945, apply lúc 2026-08-18T13:53:05.77815+00:00)
+
+Giá trị subject (TD-016):
+  ✓ questions.subject: cả 57 dòng đều canonical
+  ✓ exams.subject: cả 12 dòng đều canonical
+
+✅ Schema verify: DB khớp schema.sql §10 + §11 + §12 + khoá ngoại (§15/§16) + phiên bản (§17) + subject canonical (TD-016).
+```
+
+**Item 6 and item 7, confirmed explicitly in the output above.** Item 6 — the FK count moved from 25 to **27**, which is exactly the two new keys, and `on delete` matches `schema.sql` for all 27, read from the live catalog through the §16a RPC. Item 7 — `DB đang chạy đúng bản schema.sql trong git (021dd1387945, apply lúc 2026-08-18T13:53:05.77815+00:00)`, the same fingerprint `SOURCE/lib/schema/schemaFingerprint.ts` declares.
+
+**What this does NOT establish, stated so no later reader mistakes it.** **Prod has neither table.** No DDL was applied to prod and **no production deploy of this branch has occurred** — that is plan **Task 5.8**, and § Deployment Sequencing's Phase 1 row already says a production deploy is not permitted here. Gate B proves the four objects exist **on dev** with their designed shape; it says nothing about prod, and a matching fingerprint proves *which build* a database is running, **not** that every object's content is present — which is why Task 5.8 verifies prod with a real counting query rather than a fingerprint comparison.
+
+**Phase 1 is not complete at this point**: Tasks 1.4 and 1.5 remain open and Task 1.6 remains blocked-on-design (BU-6). What Task 1.3 unblocks is execution against dev — plan Task 0.8's fixtures, and Tasks 1.5, 2.1, 3.1, 3.8, 6.1, 6.2 plus `npm run test:integration` / `npm run test:localdb`.
 
 ### Phase 2
 - Start: YYYY-MM-DD HH:MM
