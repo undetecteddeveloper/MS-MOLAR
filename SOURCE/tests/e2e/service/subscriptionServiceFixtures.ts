@@ -77,7 +77,9 @@
 //   saying otherwise would be the false claim the sibling fixture-e2e harness was
 //   corrected for. Owners:
 //     - `FixturePaymentStatusResult`            -> backend-task-15 (`lib/billing/payos/`)
-//     - `FIXTURE_AMOUNT_VND`, the 30-min window -> backend-task-12 (`lib/billing/pricing.ts`)
+//     - `FIXTURE_AMOUNT_VND`, the 30-min window -> RECONCILED (backend-task-12 shipped).
+//       Both are now IMPORTED from `lib/billing/pricing.ts`, not transcribed, so `tsc`
+//       does see drift on these two and the caveat above no longer applies to them.
 //     - `FIXTURE_PERIOD_DAYS`, every table and column name -> backend-task-09 (`schema.sql`)
 //   The column names differ from the type transcriptions in one way worth stating:
 //   they cross PostgREST as STRINGS, so no compile-time link is possible for them at
@@ -132,6 +134,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { ORDER_PENDING_WINDOW_MS, PREMIUM_PRICE_VND } from "@/lib/billing/pricing";
 
 // --- Environment ------------------------------------------------------------
 
@@ -173,16 +176,15 @@ export const HAS_LIVE_DB = Boolean(SUPABASE_URL && ANON_KEY && SERVICE_ROLE_KEY)
  *  it cannot reach `order_code` or `user_id` — see the header. */
 export const SUB_SVC_PREFIX = "sub-svc-";
 
-/** `PREMIUM_PRICE_VND` (AC-026). Transcribed — owner backend-task-12. */
-export const FIXTURE_AMOUNT_VND = 39_000;
+/** The real `PREMIUM_PRICE_VND` (AC-026), imported rather than transcribed. A price
+ *  change now moves the seeded amount with it; the previous hand-copied `39_000` would
+ *  have left this lane silently seeding the old price against the new code. */
+export const FIXTURE_AMOUNT_VND = PREMIUM_PRICE_VND;
 
 /** `record_payment_settlement(p_period_days default 30)`. Transcribed — owner
  *  backend-task-09. SVC-1 computes its expected instants from this and asserts them as
  *  literals; it must never read the granted period back from the function under test. */
 export const FIXTURE_PERIOD_DAYS = 30;
-
-/** `ORDER_PENDING_WINDOW_MS`. Transcribed — owner backend-task-12. */
-const ORDER_PENDING_WINDOW_MS = 30 * 60 * 1000;
 
 /** Order codes are allocated from a reserved band far above epoch-milliseconds, which
  *  is what a real `createOrder()` derives its codes from — so a fixture code cannot

@@ -29,11 +29,11 @@ Metadata:
 **`SOURCE/.env.example`** — all five, each with **the consequence of leaving it blank**.
 
 ## Target Files
-- [ ] `SOURCE/lib/billing/pricing.ts` (new)
-- [ ] `SOURCE/lib/billing/quota.ts` (new — `PLAN_LIMITS` + `periodStartEpoch()`; `consumeQuota()` arrives in plan Task 5.1)
-- [ ] `SOURCE/lib/env/checkEnv.ts`
-- [ ] `SOURCE/.env.example`
-- [ ] `SOURCE/lib/billing/__tests__/quota.test.ts` and `SOURCE/lib/env/__tests__/checkEnv.test.ts` (added cases)
+- [x] `SOURCE/lib/billing/pricing.ts` (new)
+- [x] `SOURCE/lib/billing/quota.ts` (new — `PLAN_LIMITS` + `periodStartEpoch()`; `consumeQuota()` arrives in plan Task 5.1)
+- [x] `SOURCE/lib/env/checkEnv.ts`
+- [x] `SOURCE/.env.example`
+- [x] `SOURCE/lib/billing/__tests__/quota.test.ts` and `SOURCE/lib/env/__tests__/checkEnv.test.ts` (added cases)
 
 ## Investigation Targets
 - `SOURCE/lib/env/checkEnv.ts` (the existing per-variable branch shape and levels)
@@ -66,14 +66,14 @@ Metadata:
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
-- [ ] Read all Investigation Targets and record `paidTier.ts:26` fail-closed shape verbatim
-- [ ] Write failing tests first: one per environment variable **absent and present**; `periodStartEpoch()` with **hardcoded literal expected epochs** (never read back from the implementation) for premium-with-anchor, free at creation-days 15 / 29 / 31, and a user inside grace whose value is **unchanged** from before the grace boundary
+- [x] Read all Investigation Targets and record `paidTier.ts:26` fail-closed shape verbatim
+- [x] Write failing tests first: one per environment variable **absent and present**; `periodStartEpoch()` with **hardcoded literal expected epochs** (never read back from the implementation) for premium-with-anchor, free at creation-days 15 / 29 / 31, and a user inside grace whose value is **unchanged** from before the grace boundary
 ### 2. Green Phase
-- [ ] Implement `pricing.ts`, `quota.ts` (`PLAN_LIMITS` + `periodStartEpoch()`), the five `checkEnv.ts` branches and the five `.env.example` entries
-- [ ] Run only the added tests and confirm they pass
+- [x] Implement `pricing.ts`, `quota.ts` (`PLAN_LIMITS` + `periodStartEpoch()`), the five `checkEnv.ts` branches and the five `.env.example` entries
+- [x] Run only the added tests and confirm they pass
 ### 3. Refactor Phase
-- [ ] Confirm the free-user formula exists in exactly one place and no caller copies it
-- [ ] After exporting `PREMIUM_PRICE_VND` and `ORDER_PENDING_WINDOW_MS`, reconcile the two transcriptions in `SOURCE/tests/e2e/service/subscriptionServiceFixtures.ts` — assert `FIXTURE_AMOUNT_VND === PREMIUM_PRICE_VND` and its local 30-minute window against `ORDER_PENDING_WINDOW_MS` (or import the real constants and delete both transcriptions) — until then, a price or window change leaves the service-lane fixture silently seeding the old value
+- [x] Confirm the free-user formula exists in exactly one place and no caller copies it
+- [x] After exporting `PREMIUM_PRICE_VND` and `ORDER_PENDING_WINDOW_MS`, reconcile the two transcriptions in `SOURCE/tests/e2e/service/subscriptionServiceFixtures.ts` — assert `FIXTURE_AMOUNT_VND === PREMIUM_PRICE_VND` and its local 30-minute window against `ORDER_PENDING_WINDOW_MS` (or import the real constants and delete both transcriptions) — until then, a price or window change leaves the service-lane fixture silently seeding the old value
 
 ## Quality Assurance Mechanisms
 - `npm test` -> `vitest run` — Enforces: every unit and text-side gate in the Test Boundaries tables — Config: `SOURCE/package.json:10`, `SOURCE/vitest.config.ts`
@@ -103,14 +103,14 @@ Metadata:
 - **Residual**: single-site ownership is proven here; **byte-identity across the two call sites is proven in plan Task 5.1**, once the write path exists.
 
 ## Completion Criteria
-- [ ] All added tests pass
-- [ ] One unit test **per environment variable, absent and present**, all green
-- [ ] `periodStartEpoch()` literal-epoch cases green (premium-with-anchor; free at days 15 / 29 / 31; grace unchanged)
-- [ ] `PLAN_LIMITS` is `{ free: { tutor: 5, upload: 3 }, premium: { tutor: 500, upload: 15 } }` and is **not** in `types.ts`
-- [ ] `PREMIUM_PRICE_VND = 39000` and `ORDER_PENDING_WINDOW_MS = 30 * 60 * 1000` declared once, in `pricing.ts`
-- [ ] All five variables in `SOURCE/.env.example` with the consequence of leaving each blank
-- [ ] The Binding Decisions Compliance Check evaluates to `Y`, with evidence recorded in Investigation Notes
-- [ ] **No production deploy of this branch has occurred**
+- [x] All added tests pass
+- [x] One unit test **per environment variable, absent and present**, all green
+- [x] `periodStartEpoch()` literal-epoch cases green (premium-with-anchor; free at days 15 / 29 / 31; grace unchanged)
+- [x] `PLAN_LIMITS` is `{ free: { tutor: 5, upload: 3 }, premium: { tutor: 500, upload: 15 } }` and is **not** in `types.ts`
+- [x] `PREMIUM_PRICE_VND = 39000` and `ORDER_PENDING_WINDOW_MS = 30 * 60 * 1000` declared once, in `pricing.ts`
+- [x] All five variables in `SOURCE/.env.example` with the consequence of leaving each blank
+- [x] The Binding Decisions Compliance Check evaluates to `Y`, with evidence recorded in Investigation Notes
+- [x] **No production deploy of this branch has occurred**
 
 ## Notes
 - Impact scope: `SOURCE/lib/billing/**`, `SOURCE/lib/env/checkEnv.ts`, `SOURCE/.env.example`; downstream, plan Tasks 2.1, 3.3, 3.4, 5.1, 5.6.
@@ -118,3 +118,53 @@ Metadata:
 
 ## Investigation Notes
 (Record the literal expected epochs used, the `paidTier.ts:26` shape, and the Binding Decision evidence here.)
+
+### Đã đọc (Investigation Targets)
+
+- **`SOURCE/lib/env/checkEnv.ts`** — hàm THUẦN `checkEnv(env)` nhận env làm tham số (không đọc `process.env`), trả `EnvProblem[]` với `level: "error" | "warn"`. `error` = "tính năng lõi hỏng"; `warn` = "một mảng chức năng lặng lẽ tắt" (định nghĩa ở `:22-24`). Hình dạng một nhánh: `if (!get(NAME)) problems.push({ level, name, impact })`, `impact` mô tả bằng thứ người vận hành quan sát được. Tiền lệ `GEMINI_API_KEY` `:77-80` = **warn**. Tiền lệ `GEMINI_PAID_TIER_ENABLED` `:142-154` = **hai nhánh** (vắng → warn "fail-closed, cố ý"; có nhưng không hợp lệ → warn kèm giá trị bị từ chối).
+- **`SOURCE/lib/billing/paidTier.ts:26` (chép nguyên văn)**: `const AFFIRMATIVE = new Set(["1", "true"]);` — kèm docblock `:22-25`: *"Mọi thứ khác — kể cả không đặt, chuỗi rỗng, "yes", "on", hay một khoảng trắng — đều là TẮT. Quên đặt biến thì hậu quả là KHÔNG BÁN ĐƯỢC, chứ không phải BÁN NHẦM"*. Đọc env **một lần, lúc gọi**, mặc định fail-closed, không có default "mở". `AI_BUDGET_DAILY_LIMIT` lấy đúng hướng đó: vắng ⇒ **từ chối**, không bao giờ ⇒ *không giới hạn*.
+- **`SOURCE/lib/billing/types.ts` (ĐÓNG BĂNG)** — chứa `Plan`, `Quota` (union có discriminant `unknown | known`), `Entitlement`, `FREE_FALLBACK`, `isQuotaExhausted`. **Không có** bảng hạn mức, **không có** kiểu "kind". Xác nhận: `PLAN_LIMITS` không được chuyển vào đây. Task này chỉ *đọc* kiểu `Plan` từ đó, không sửa một ký tự nào.
+- **`SOURCE/lib/billing/readEntitlement.ts:34`** — `export async function readEntitlement(userId: string | null): Promise<Entitlement>`, thân hàm hiện trả `FREE_FALLBACK`. Chữ ký KHÔNG đổi; plan Task 2.1 chỉ thay thân và sẽ `import { periodStartEpoch }`.
+- **`SOURCE/.env.example`** — mỗi khối có tiêu đề `# --- Tên khối (ADR/PRD) ---`, và mỗi biến nêu **hệ quả của việc để trống** (vd `ADMIN_USER_IDS` `:37-38`: "Để trống = KHÔNG AI là admin và /admin trả 404 (fail-closed, cố ý)"). Biến bí mật có tiền tố `⚠ BÍ MẬT`.
+- **`SOURCE/lib/env/__tests__/checkEnv.test.ts`** — `goodEnv(over)` là bộ "không còn gì để báo"; docblock `:26-29` ràng buộc: *"mọi biến có nhánh warn khi vắng đều phải có mặt ở đây"*. Nên năm biến mới **bắt buộc** phải vào `goodEnv()`, nếu không ca "im lặng tuyệt đối" đỏ.
+- **DD § Named values (I012) `:550-561`** — bảng bốn giá trị; `AI_BUDGET_FREE_SHARE` giữ default 50% + `warn`; `AI_BUDGET_DAILY_LIMIT` "integer, no default — absent ⇒ fail closed".
+- **DD § Integration Point I5 `:1071`** — payOS credential ⇒ mức theo tiền lệ `GEMINI_API_KEY` (`:77-80`) = warn; `AI_BUDGET_FREE_SHARE` ⇒ warn kèm default; `AI_BUDGET_DAILY_LIMIT` ⇒ fail-closed theo tiền lệ `GEMINI_PAID_TIER_ENABLED` (`:142-154`).
+- **DD § Field Propagation Map `:1119`** — `quota:{kind}:{userId}:{periodStartEpoch}`, "the period start is *in the key*, so reset needs no job".
+- **DD `:858-866`** (công thức `:841-842` của bản cũ) — nguyên văn:
+  `periodStart = premium ? subscriptions.period_anchor_at : userProfile.created_at + 30d × floor((now − created_at)/30d)`, và *"Grace grants access, never allowance … `periodStart` is unchanged"*.
+- **`docs/adr/ADR-0013` § Implementation Guidance** — *"Keep the pending-order window and the provider's `expiredAt` **the same number**, set from one shared constant."*
+
+### Quyết định đơn vị và hình dạng (ghim ở đây vì hai phía sau đều đọc lại)
+
+- **`periodStartEpoch()` trả về MILLIGIÂY** (`Date.prototype.getTime()`), không phải giây. Lý do: cả hai phía gọi đều đã cầm `Date`/`Date.now()` ở đơn vị ms, nên chọn ms là chọn **không có phép quy đổi nào** ở hai đầu — đúng yêu cầu "no ms/s conversion at either call site" của Connection Map. Một lần `/1000` ở một phía mà không có ở phía kia chính là lỗi I004 mô tả.
+- Tham số thời gian đều là `Date` (`anchor: Date | null`, `createdAt: Date`, `now: Date`). PostgREST trả ISO string ⇒ chỗ gọi làm `new Date(row.created_at)`; đó là một phép chuyển **toàn phần**, khác hẳn việc mỗi chỗ gọi tự chọn đơn vị.
+- Giữ **chữ ký vị trí bốn tham số** `periodStartEpoch(plan, anchor, createdAt, now)` đúng như task file và Connection Map ghim, dù coding-principles gợi ý gộp ≥3 tham số vào object — hợp đồng đã ghim thắng gợi ý phong cách, và đổi nó sẽ là một thay đổi interface ngoài phạm vi task.
+- `PERIOD_MS = 30 ngày` để **private** trong `quota.ts` (chưa có consumer nào ở task này). **Bàn giao cho plan Task 2.1**: `resetsAt = periodStart + 30d` cần đúng khoảng này — hãy *export* hằng đó từ `quota.ts` khi cần, **đừng khai lại 30d ở `readEntitlement.ts`**, vì hai lần khai 30d là đúng hình dạng I004.
+- `quota.ts` và `pricing.ts` **không** có `import "server-only"` ở task này: cả hai chỉ là hằng + số học thuần, chưa chạm Redis hay bí mật nào. Plan Task 5.1 (thêm `consumeQuota()` + Redis) là chỗ thêm nó.
+- **Không ghim cách mã hoá số của `AI_BUDGET_FREE_SHARE`** (0.5 hay 50). PRD `:218`/AC-023 chỉ nói "50%", DD chỉ nói "default 50%"; hai kỹ sư ngang nhau có thể chọn khác nhau, và nhánh mà I5 yêu cầu là nhánh **hiện diện**, không phải nhánh phân tích cú pháp. `checkEnv` vì thế chỉ đòi "một số hữu hạn > 0" — đúng dưới cả hai cách mã hoá — và test khẳng định cả `"0.5"` lẫn `"50"` đều im lặng, để việc không-ghim là một khẳng định chứ không phải một chỗ bỏ sót. Chỗ đọc (`quota.ts`, plan Task 5.1) ghim cách mã hoá.
+
+### Epoch literal dùng trong test (tính độc lập bằng `Date.UTC`, không đọc ngược từ implementation)
+
+`PERIOD_MS = 30 × 24 × 60 × 60 × 1000 = 2_592_000_000`
+
+| Ca | Đầu vào | Epoch kỳ vọng (literal) | ISO |
+|---|---|---|---|
+| Free, ngày 15 | `createdAt = 1768468653123` | `1768468653123` | `2026-01-15T09:17:33.123Z` |
+| Free, ngày 29 | `now = 1770974253123` | `1768468653123` | `2026-01-15T09:17:33.123Z` |
+| Free, ngày 29.999 | `now = 1771060566723` | `1768468653123` | `2026-01-15T09:17:33.123Z` |
+| Free, mili giây CUỐI của kỳ 1 (`created_at + 30d − 1`) | `now = 1771060653122` | `1768468653123` | `2026-01-15T09:17:33.123Z` |
+| Free, đúng ngày 30 | `now = 1771060653123` | `1771060653123` | `2026-02-14T09:17:33.123Z` |
+| Free, ngày 31 | `now = 1771147053123` | `1771060653123` | `2026-02-14T09:17:33.123Z` |
+| Free, ngày 61 | `now = 1773739053123` | `1773652653123` | `2026-03-16T09:17:33.123Z` |
+| Premium, có anchor | `anchor = 1772549110500` | `1772549110500` | `2026-03-03T14:45:10.500Z` |
+| Premium trong ân hạn (`now` = hết hạn + 1 ngày = `1775227510500`) | cùng `anchor` | `1772549110500` — **không đổi** | `2026-03-03T14:45:10.500Z` |
+
+`createdAt` cố ý ở `09:17:33.123Z` = **16:17:33.123 giờ máy này (Asia/Saigon, UTC+7)** — không phải nửa đêm ở *cả hai* múi. Nên epoch kỳ vọng mang theo phần giờ-phút-giây-ms, và **mọi** implementation cắt về mốc ngày (dù cắt theo UTC hay theo giờ địa phương) đều lệch, ở bất kỳ múi giờ nào máy chạy — đó là điều làm các ca này không thể xanh nhờ may mắn của múi giờ +7.
+
+Ca **mili giây cuối** được thêm lúc kiểm chất lượng: ca ngày 29,999 còn cách biên 86,4 **giây**, nên tự nó không phân biệt được một implementation mở kỳ mới sớm vài mili giây (đã kiểm bằng đột biến `floor((now − created + 1)/PERIOD_MS)` — trước khi thêm ca này nó xanh, sau khi thêm nó đỏ). Hai lời gọi kẹp đúng biên: `created + 30d − 1` phải còn là kỳ cũ, `created + 30d` phải là kỳ mới.
+
+### Bằng chứng Binding Decision (ADR-0013 § Implementation Guidance)
+
+**Cách làm dự kiến (trục `contract_schema`)**: khai `ORDER_PENDING_WINDOW_MS = 30 * 60 * 1000` **đúng một lần**, ở `SOURCE/lib/billing/pricing.ts`, không có bản sao nào khác trong `SOURCE/`; ba chỗ tiêu thụ (`payment_orders.pending_until`, `expiredAt` của payOS, vị từ tái dùng bước (0) của `createOrder()`) đều `import` từ đó khi chúng ra đời (plan Task 3.3/3.4).
+
+**Đánh giá Compliance Check: `Y`** — `grep -rn "ORDER_PENDING_WINDOW_MS\|30 \* 60 \* 1000" SOURCE/` sau thay đổi này trả về **đúng một lời khai** (`lib/billing/pricing.ts`), một chú thích trỏ tới nó (`supabase/schema.sql:1629`) và **một chỗ import** (`tests/e2e/service/subscriptionServiceFixtures.ts`, bản chép tay đã bị xoá theo bước Refactor). Không còn chỗ nào khai lại con số 30 phút.

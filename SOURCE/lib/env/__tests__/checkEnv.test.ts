@@ -28,6 +28,14 @@ function goodEnv(over: Env = {}): Env {
     // để trống cũng warn. Bộ này định nghĩa "không còn gì để báo", nên mọi biến
     // có nhánh warn khi vắng đều phải có mặt ở đây.
     GEMINI_PAID_TIER_ENABLED: "1",
+    // payOS (ADR-0013/ADR-0014) + ngân sách AI (PRD R7/AC-023/AC-025) — cùng
+    // lý do như dòng trên: cả năm biến này đều có nhánh warn khi vắng.
+    PAYOS_CLIENT_ID: "payos-client-id",
+    PAYOS_API_KEY: "payos-api-key",
+    PAYOS_CHECKSUM_KEY: "payos-checksum-key",
+    // 0.5 ở đây KHÔNG ghim cách mã hoá — xem ca "0.5 và 50 đều im lặng" bên dưới.
+    AI_BUDGET_FREE_SHARE: "0.5",
+    AI_BUDGET_DAILY_LIMIT: "20",
     ...over,
   };
 }
@@ -126,6 +134,100 @@ describe("checkEnv", () => {
       "không phải giá trị bật"
     );
   });
+
+  // --- payOS + ngân sách AI (backend DD I5, Subscription) -------------------
+
+  it.each([
+    ["PAYOS_CLIENT_ID", "tạo đơn"],
+    ["PAYOS_API_KEY", "tạo đơn"],
+    ["PAYOS_CHECKSUM_KEY", "chữ ký"],
+  ])(
+    "%s thiếu là warn (theo tiền lệ GEMINI_API_KEY), kèm hệ quả cụ thể",
+    (name, mustMention) => {
+      const env = goodEnv({ [name]: "" });
+      const p = checkEnv(env).find((x) => x.name === name);
+      expect(p?.level).toBe("warn");
+      expect(p?.impact).toContain(mustMention);
+    }
+  );
+
+  it.each(["PAYOS_CLIENT_ID", "PAYOS_API_KEY", "PAYOS_CHECKSUM_KEY"])(
+    "%s thiếu HẲN cũng bị bắt, không chỉ chuỗi rỗng",
+    (name) => {
+      const env = goodEnv();
+      delete env[name];
+      expect(names(env)).toContain(name);
+    }
+  );
+
+  it("PAYOS_CHECKSUM_KEY nói đúng hệ quả riêng của nó — tiền đã trả mà đơn không được ghi nhận", () => {
+    // Ba credential hỏng theo hai kiểu khác nhau: thiếu client id/api key thì
+    // KHÔNG tạo được đơn (người dùng thấy ngay). Thiếu checksum key thì đơn
+    // vẫn tạo được, QR vẫn hiện, người dùng vẫn chuyển tiền — chỉ có webhook
+    // là bị từ chối. Đó là ca đắt nhất, nên impact không được nói chung chung.
+    const p = checkEnv(goodEnv({ PAYOS_CHECKSUM_KEY: "" })).find(
+      (x) => x.name === "PAYOS_CHECKSUM_KEY"
+    );
+    expect(p?.impact).toContain("webhook");
+  });
+
+  it("AI_BUDGET_FREE_SHARE thiếu là warn và phải NÓI RA giá trị mặc định", () => {
+    // Nó làm suy yếu một CHÍNH SÁCH (phần bảo lưu cho Premium), không gỡ bỏ
+    // trần chi — nên mức warn kèm default 50%, khác hẳn AI_BUDGET_DAILY_LIMIT.
+    const p = checkEnv(goodEnv({ AI_BUDGET_FREE_SHARE: "" })).find(
+      (x) => x.name === "AI_BUDGET_FREE_SHARE"
+    );
+    expect(p?.level).toBe("warn");
+    expect(p?.impact).toContain("50%");
+  });
+
+  it.each(["0.5", "50"])(
+    "AI_BUDGET_FREE_SHARE = %j im lặng — checkEnv KHÔNG ghim phân số hay phần trăm",
+    (raw) => {
+      // Cả PRD (:218, AC-023) lẫn DD đều chỉ nói "50%", không nói giá trị được
+      // mã hoá thế nào. Chỗ ĐỌC (quota.ts, plan Task 5.1) ghim việc đó; ở đây
+      // ghim trước là bịa ra một hợp đồng rồi bắt task sau đoán lại nó.
+      expect(checkEnv(goodEnv({ AI_BUDGET_FREE_SHARE: raw }))).toEqual([]);
+    }
+  );
+
+  it.each(["50%", "một nửa", "0"])(
+    "AI_BUDGET_FREE_SHARE = %j bị bắt — sai dưới MỌI cách mã hoá",
+    (raw) => {
+      expect(levelOf(goodEnv({ AI_BUDGET_FREE_SHARE: raw }), "AI_BUDGET_FREE_SHARE")).toBe("warn");
+    }
+  );
+
+  it("AI_BUDGET_DAILY_LIMIT thiếu → fail-closed: impact nói TỪ CHỐI, không phải không giới hạn", () => {
+    // Đây là hỏng hóc mà cả việc đăng ký biến này tồn tại để chặn (AC-025):
+    // một trần chi bị thiếu KHÔNG được đọc thành một trần vô hạn. checkEnv
+    // chứng minh phần "có được nói ra không"; phần thực thi là plan Task 5.1.
+    const p = checkEnv(goodEnv({ AI_BUDGET_DAILY_LIMIT: "" })).find(
+      (x) => x.name === "AI_BUDGET_DAILY_LIMIT"
+    );
+    expect(p?.level).toBe("warn");
+    expect(p?.impact).toContain("TỪ CHỐI");
+  });
+
+  it("AI_BUDGET_DAILY_LIMIT thiếu HẲN cũng bị bắt", () => {
+    const env = goodEnv();
+    delete env.AI_BUDGET_DAILY_LIMIT;
+    expect(names(env)).toContain("AI_BUDGET_DAILY_LIMIT");
+  });
+
+  it.each(["20", "1", "5000"])("AI_BUDGET_DAILY_LIMIT = %j im lặng", (raw) => {
+    expect(checkEnv(goodEnv({ AI_BUDGET_DAILY_LIMIT: raw }))).toEqual([]);
+  });
+
+  it.each(["0", "-1", "20.5", "hai mươi", "20 request", "unlimited", "Infinity"])(
+    "AI_BUDGET_DAILY_LIMIT = %j bị bắt — số nguyên dương hoặc không có gì cả",
+    (raw) => {
+      // "unlimited"/"Infinity" là ca đắt nhất: một người vận hành gõ nó với ý
+      // "bỏ trần" và không có gì cãi lại. DD nói "integer, no default", nên nó
+      // phải kêu chứ không được đọc thành một trần vô hạn.
+      expect(levelOf(goodEnv({ AI_BUDGET_DAILY_LIMIT: raw }), "AI_BUDGET_DAILY_LIMIT")).toBe("warn");
+    }
+  );
 
   it("NEXT_PUBLIC_SITE_URL bỏ trống là hợp lệ (siteUrl.ts tự suy ra)", () => {
     expect(checkEnv(goodEnv({ NEXT_PUBLIC_SITE_URL: "" }))).toEqual([]);

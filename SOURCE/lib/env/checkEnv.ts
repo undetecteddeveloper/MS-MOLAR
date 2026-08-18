@@ -156,6 +156,88 @@ export function checkEnv(env: Readonly<Record<string, string | undefined>>): Env
     });
   }
 
+  // --- payOS (ADR-0013/ADR-0014) --------------------------------------------
+  // Ba credential này được đăng ký Ở ĐÂY trong chính thay đổi đầu tiên đọc tới
+  // chúng — docs/project-context/external-resources.md § Payment Gateway đặt ra
+  // nghĩa vụ đó. Mức `warn` theo đúng tiền lệ GEMINI_API_KEY: thiếu thì đường
+  // thanh toán chết chứ app vẫn phục vụ mọi thứ khác, và một deploy sập trang
+  // chủ vì thiếu credential payOS là đổi một hỏng hóc cục bộ lấy một sự cố
+  // toàn site (xem docblock đầu file).
+  if (!get("PAYOS_CLIENT_ID")) {
+    problems.push({
+      level: "warn",
+      name: "PAYOS_CLIENT_ID",
+      impact: "không tạo đơn được — /pricing/checkout hỏng ở bước gọi payOS, không ai mua được Premium",
+    });
+  }
+
+  if (!get("PAYOS_API_KEY")) {
+    problems.push({
+      level: "warn",
+      name: "PAYOS_API_KEY",
+      impact: "không tạo đơn được — payOS từ chối payment request, và đối soát chủ động cũng hỏng",
+    });
+  }
+
+  if (!get("PAYOS_CHECKSUM_KEY")) {
+    // Ca đắt nhất trong ba: đơn VẪN tạo được, QR VẪN hiện, người dùng VẪN
+    // chuyển tiền — chỉ có webhook là không xác minh được và bị từ chối im
+    // lặng. Tiền vào tài khoản mà thuê bao không bao giờ được kích hoạt.
+    problems.push({
+      level: "warn",
+      name: "PAYOS_CHECKSUM_KEY",
+      impact:
+        "không xác minh được chữ ký webhook payOS — người dùng chuyển tiền xong mà đơn KHÔNG BAO GIỜ được ghi nhận",
+    });
+  }
+
+  // --- Ngân sách Gemini toàn dự án (PRD R7/AC-023/AC-025) --------------------
+  // Hai biến, hai hướng hỏng NGƯỢC NHAU, và đó là điểm chính của khối này.
+  const freeShare = get("AI_BUDGET_FREE_SHARE");
+  if (!freeShare) {
+    // Thiếu nó làm suy yếu một CHÍNH SÁCH (phần ngân sách ngày bảo lưu cho
+    // Premium), không gỡ bỏ trần chi — nên chỉ cần nói ra giá trị mặc định.
+    problems.push({
+      level: "warn",
+      name: "AI_BUDGET_FREE_SHARE",
+      impact: "chưa đặt suất bảo lưu cho Premium — dùng mặc định 50% ngân sách ngày cho lưu lượng Free",
+    });
+  } else if (!(Number(freeShare) > 0)) {
+    // KHÔNG kiểm khoảng giá trị: PRD (:218, AC-023) và Design Doc đều chỉ nói
+    // "50%", không nói con số được mã hoá là phân số hay phần trăm — chỗ ĐỌC
+    // (lib/billing/quota.ts) ghim việc đó. Ở đây chỉ bắt thứ SAI DƯỚI MỌI cách
+    // mã hoá: "50%", "một nửa", "0".
+    problems.push({
+      level: "warn",
+      name: "AI_BUDGET_FREE_SHARE",
+      impact: `"${freeShare}" không phải một số dương — suất bảo lưu Premium sẽ rơi về mặc định 50%`,
+    });
+  }
+
+  const budgetLimit = get("AI_BUDGET_DAILY_LIMIT");
+  if (!budgetLimit) {
+    // Hướng ngược lại hoàn toàn, và là lý do biến này được đăng ký (AC-025):
+    // một TRẦN CHI bị thiếu không được phép đọc thành một trần vô hạn. Cùng
+    // lối fail-closed với GEMINI_PAID_TIER_ENABLED ở trên (paidTier.ts:26):
+    // quên đặt thì hậu quả là KHÔNG PHỤC VỤ, chứ không phải TIÊU KHÔNG GIỚI HẠN.
+    problems.push({
+      level: "warn",
+      name: "AI_BUDGET_DAILY_LIMIT",
+      impact:
+        "chưa có trần chi Gemini ngày → mọi lượt gọi AI bị TỪ CHỐI (fail-closed, cố ý — thiếu trần KHÔNG có nghĩa là không giới hạn)",
+    });
+  } else if (!Number.isInteger(Number(budgetLimit)) || Number(budgetLimit) < 1) {
+    // "unlimited"/"Infinity" là ca cần nói to nhất: người vận hành gõ nó với ý
+    // "bỏ trần" và không có gì cãi lại — trong khi Design Doc ghim "integer,
+    // no default". Giá trị 0 cũng bị bắt: nó tắt AI cho toàn dự án, và một
+    // quyết định như thế phải là cố ý chứ không phải một chữ số gõ nhầm.
+    problems.push({
+      level: "warn",
+      name: "AI_BUDGET_DAILY_LIMIT",
+      impact: `"${budgetLimit}" không phải số nguyên dương — trần chi Gemini ngày không dùng được, mọi lượt gọi AI bị TỪ CHỐI`,
+    });
+  }
+
   const siteUrl = get("NEXT_PUBLIC_SITE_URL");
   if (siteUrl && !isParseableHttpUrl(siteUrl)) {
     problems.push({
