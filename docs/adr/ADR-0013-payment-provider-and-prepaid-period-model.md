@@ -175,7 +175,7 @@ Two design rules follow directly, and both are load-bearing rather than stylisti
 
 - PRD: `docs/prd/subscription-prd.md` (v1.2) — D2, D3, D8, D10, R2, R3, R4, R8, R10, R11, R14; risks R-a/R-e/R-f/R-g; U1 (open), U4 (resolved in the handoff).
 - Handoff record: Notion row `3be78ba6-ae12-8145-909d-d2f2a3947745` — §"Đổi chiến lược: UI-TRƯỚC", §"U4 ĐÃ CHỐT", §"HAI RÀNG BUỘC AN TOÀN cho pha UI".
-- `docs/adr/ADR-0014-*` (**not yet written**) — webhook trust boundary, signature verification, replay defence, `PUBLIC_PATHS`. Belongs with the backend Design Doc.
+- `docs/adr/ADR-0014-payment-webhook-trust-boundary.md` (**written 2026-08-18, Accepted**) — webhook trust boundary, signature verification, replay defence, `PUBLIC_PATHS`. Its thesis: the webhook is an untrusted *notification*, never an instruction — every grant re-verifies against `GET /v2/payment-requests/{id}`, so the checksum key stops being sufficient to mint entitlement. Also records that U1 resolved (no sandbox), which strengthens rather than weakens that choice.
 - `docs/adr/ADR-0010-score-write-trust-boundary.md`, `docs/adr/ADR-0011-mastery-write-trust-boundary.md` — precedent for keeping a value-bearing write path outside the reach of a user's own JWT (PRD AC-033); the entitlement write path follows them.
 - `docs/adr/ADR-0001-ugc-content-lifecycle-and-rls-enforcement.md` — no database role model; the technical basis for D10 (no admin billing UI).
 - `docs/project-context/external-resources.md` — §"Background Job Infrastructure" (stays *not applicable* after this feature), §"Rate Limit Store" (Upstash, where the quota counters land), §"Deployment Trigger" (Preview URLs change per build — the reason a webhook can only be registered against the production domain).
