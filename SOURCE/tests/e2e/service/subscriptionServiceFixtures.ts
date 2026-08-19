@@ -71,12 +71,17 @@
 //   account. Deletion order is orders → subscriptions → accounts, so no order is ever
 //   orphaned by the cascade it would otherwise hit.
 //
-// TRANSCRIBED VALUES AND THEIR RECONCILIATION OWNERS. Nothing this module names exists
-//   in code yet, so every constant and every type below is a transcription with NO
-//   compile-time link to the real declaration — `tsc` cannot see drift here, and
+// TRANSCRIBED VALUES AND THEIR RECONCILIATION OWNERS. Most of what this module names
+//   still does not exist in code, so those constants remain transcriptions with NO
+//   compile-time link to the real declaration — `tsc` cannot see drift there, and
 //   saying otherwise would be the false claim the sibling fixture-e2e harness was
 //   corrected for. Owners:
-//     - `FixturePaymentStatusResult`            -> backend-task-15 (`lib/billing/payos/`)
+//     - `FixturePaymentStatusResult`            -> RECONCILED (backend-task-15 shipped).
+//       It is now `Awaited<ReturnType<typeof getPaymentStatus>>` — a compile-time LINK
+//       to the adapter's real return type, not a hand-copied shape. This is the one
+//       transcription whose drift was both silent and load-bearing: the two-property
+//       object IS P-1, so an adapter that grew a third property would have left this
+//       file quietly describing a boundary that no longer existed.
 //     - `FIXTURE_AMOUNT_VND`, the 30-min window -> RECONCILED (backend-task-12 shipped).
 //       Both are now IMPORTED from `lib/billing/pricing.ts`, not transcribed, so `tsc`
 //       does see drift on these two and the caveat above no longer applies to them.
@@ -99,9 +104,10 @@
 //   and the two-property object is the only shape under which `settleOrder()` step 3 can
 //   compare the provider's amount against the stored row, which SVC-1 exercises. Since
 //   the stale line sat in the block a backend-task-15 implementer copies from, it was
-//   corrected in the DD (v1.7) instead of being annotated here. The stub is written to
-//   the two-property object; if backend-task-15 lands anything else, THIS FILE IS WRONG
-//   and nothing will say so until SVC-1 runs.
+//   corrected in the DD (v1.7) instead of being annotated here. backend-task-15 has
+//   since landed the two-property object, and this file no longer restates it: the
+//   type below is derived from the adapter's own signature, so an adapter that landed
+//   anything else is now a `tsc` error here rather than a surprise when SVC-1 runs.
 //
 // COUNTS MEASURE INVOCATION, NOT COMPLETION. Every counter is incremented BEFORE the
 //   hold gate is awaited and before any rejection is thrown, so a call that is in
@@ -135,6 +141,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { ORDER_PENDING_WINDOW_MS, PREMIUM_PRICE_VND } from "@/lib/billing/pricing";
+import type { getPaymentStatus } from "@/lib/billing/payos";
 
 // --- Environment ------------------------------------------------------------
 
@@ -265,15 +272,18 @@ export interface SeedOrderOverrides {
 
 // --- The counted payOS adapter stub -----------------------------------------
 
-export type PayosPaymentStatus = "pending" | "paid" | "cancelled" | "unknown";
+/** `getPaymentStatus()`'s return, LINKED to the adapter rather than transcribed from
+ *  it: exactly two properties, and exactly two is the point (P-1) — the adapter is
+ *  where provider vocabulary stops. A third property appearing on the real return type
+ *  is a compile error in every SVC case that reads this stub, which is the only thing
+ *  that makes the drift visible before a settlement run. See the header.
+ *
+ *  Type-only import: `lib/billing/payos/index.ts` carries `import "server-only"`, so
+ *  pulling it in as a value would throw the moment this module loads. `import type`
+ *  is erased, so the link costs nothing at run time. */
+export type FixturePaymentStatusResult = Awaited<ReturnType<typeof getPaymentStatus>>;
 
-/** `getPaymentStatus()`'s return: exactly two properties, and exactly two is the point
- *  (P-1) — the adapter is where provider vocabulary stops. See the header for the
- *  source disagreement this shape resolves. */
-export interface FixturePaymentStatusResult {
-  status: PayosPaymentStatus;
-  amount: number;
-}
+export type PayosPaymentStatus = FixturePaymentStatusResult["status"];
 
 /** Only `getPaymentStatus` is stubbed. `createPaymentRequest` and
  *  `verifyWebhookSignature` are deliberately absent: neither SVC case reaches them
