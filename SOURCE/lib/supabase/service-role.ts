@@ -25,6 +25,10 @@ import "server-only";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { ScoreResult } from "@/types/result";
 import type { TicketIntent, TicketStatus } from "@/lib/support/types";
+// Hình dạng dòng, khai MỘT chỗ (`lib/billing/checkoutOrder.ts`, plan Task 3.3).
+// `import type` nên bị xoá sạch lúc biên dịch — không có phụ thuộc runtime nào
+// từ tầng hạ tầng lên tầng billing.
+import type { PaymentOrderRow } from "@/lib/billing/checkoutOrder";
 
 /** Private — xem cảnh báo đầu file. KHÔNG export. */
 function serviceRoleClient(): SupabaseClient {
@@ -458,4 +462,81 @@ export async function recordPaymentSettlement(
   // nhau, và chuỗi mới là thứ C-10 đem hiển thị. Chuẩn hoá tại đúng chỗ giá trị
   // rời DB, cùng luật CL-01 đặt cho `pendingUntil`.
   return { expiresAt: new Date(data as string).toISOString() };
+}
+
+/** Tám cột của `PaymentOrderRow` — ĐÚNG những cột hợp đồng `CheckoutOrder` cần,
+ *  không phải cả mười một cột của bảng.
+ *
+ *  MỘT lời khai cho HAI chỗ đọc hình dạng ấy: câu đọc-lại của lệnh insert ngay
+ *  dưới đây, và bước (0) của `createOrder()` (`lib/billing/orderActions.ts`),
+ *  chạy bằng client THEO PHIÊN. Viết ra hai lần là cách chắc chắn nhất để một
+ *  đường trả về bảy trường còn đường kia trả về tám mà không ai thấy — đúng loại
+ *  lệch mà `toCheckoutOrder()` được dựng lên để chặn.
+ *
+ *  `user_id`, `created_at` và `settled_at` cố ý VẮNG MẶT: chúng không đi vào
+ *  C-13, nên khai chúng ở đây chỉ tạo thêm thứ để trôi lệch (cùng lý lẽ với
+ *  `readPaymentOrderForSettlement()` chỉ đọc hai cột). */
+export const PAYMENT_ORDER_CHECKOUT_COLUMNS =
+  "order_code, amount, status, pending_until, qr_payload, account_number, account_name, memo";
+
+/**
+ * Ghi MỘT dòng `payment_orders` và trả lại chính dòng vừa ghi.
+ *
+ * Đường DUY NHẤT trong repo tạo được một đơn: `revoke insert, update, delete on
+ * public.payment_orders from anon, authenticated` (schema.sql) đóng hẳn lối ghi
+ * từ client, nên lượt ghi phải mang danh tính khác (backend DD § "Who writes the
+ * row").
+ *
+ * KHÁC `recordPaymentSettlement()`, hàm này KHÔNG đi qua một hàm SQL, và điều đó
+ * là cố ý: nó không cấp cho ai cái gì. Dòng nó viết ra là một chứng từ trơ cho
+ * tới khi `record_payment_settlement()` giành lấy — nên không có luật nào cần
+ * cưỡng chế trong DB, và thêm một hàm SECURITY DEFINER thứ hai chỉ để chạy một
+ * câu INSERT là mở rộng bề mặt đặc quyền mà không đổi lấy được gì.
+ *
+ * `userId` do NGƯỜI GỌI suy ra từ phiên đăng nhập của chính lời gọi ấy
+ * (`createOrder()` đọc nó từ `auth.getUser()`), không bao giờ từ một tham số của
+ * client — cùng luật ADR-0010/0011 đặt cho danh tính. Đây là điểm khác biệt so
+ * với `recordExamResult()`/`recordPaymentSettlement()`, và lý do khác biệt ấy
+ * chấp nhận được: hai hàm kia CẤP thứ gì đó nên phải tự suy chủ nhân trong SQL,
+ * còn hàm này chỉ ghi một dòng chờ.
+ *
+ * `pendingUntil` là mốc NHÀ CUNG CẤP vừa trả về, chuyển thẳng xuống. Hàm này
+ * không biết cửa sổ đơn chờ dài bao nhiêu và không được phép biết: ADR-0013
+ * § Implementation Guidance đòi đúng MỘT hằng nuôi cả `expiredAt` lẫn
+ * `pending_until`, nên mọi phép tính hạn chót nằm ở adapter, một chỗ.
+ *
+ * Lỗi TRẢ VỀ chứ không ném, cùng hình dạng `recordPaymentSettlement()` dùng:
+ * `createOrder()` phải dịch nó thành một giá trị từ chối cho màn hình, không
+ * phải một exception băng qua biên Server Action.
+ */
+export async function recordPaymentOrder(order: {
+  orderCode: number;
+  userId: string;
+  amountVnd: number;
+  pendingUntil: string;
+  qrPayload: string;
+  accountNumber: string;
+  accountName: string;
+  memo: string;
+}): Promise<{ row: PaymentOrderRow } | { error: { code?: string; message: string } }> {
+  const { data, error } = await serviceRoleClient()
+    .from("payment_orders")
+    .insert({
+      order_code: order.orderCode,
+      user_id: order.userId,
+      amount: order.amountVnd,
+      pending_until: order.pendingUntil,
+      qr_payload: order.qrPayload,
+      account_number: order.accountNumber,
+      account_name: order.accountName,
+      memo: order.memo,
+    })
+    // Đọc lại NGAY trong câu ghi: `status` và `created_at` do DEFAULT của bảng
+    // đặt, nên dựng giá trị trả về từ tham số đầu vào sẽ là đoán mò về thứ CSDL
+    // thực sự đã lưu. Một lượt đọc riêng thì tốn thêm một vòng và mở ra một cửa
+    // sổ để dòng đổi giữa chừng.
+    .select(PAYMENT_ORDER_CHECKOUT_COLUMNS)
+    .single();
+  if (error) return { error: { code: error.code, message: error.message } };
+  return { row: data as unknown as PaymentOrderRow };
 }

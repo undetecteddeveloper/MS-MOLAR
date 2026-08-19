@@ -276,3 +276,473 @@
 //       `createPaymentRequest`'s cumulative invocation count is now EXACTLY 2.
 //   (h) Teardown deletes every row created under this case's fixture user, so
 //       the case passes when run twice in a row and when run in isolation.
+//
+//
+// =============================================================================
+// INT-3 — IMPLEMENTATION (plan Task 3.4, the commit that adds createOrder()'s
+//         step (0) reuse branch)
+// =============================================================================
+// INT-1 and INT-2 above stay comment-only; they are filled by plan Tasks 5.3 and
+// 3.5 respectively. A file carrying at least one real suite no longer trips
+// vitest's "No test suite found", so this lane goes from exit 1 to exit 0 with
+// this commit. That transition is the deliverable, not a side effect.
+//
+// WHAT IS MOCKED, AND WHY IT DOES NOT WEAKEN THE PROOF — exactly two things:
+//   1. `createPaymentRequest` of the payOS adapter. It is an external PAID
+//      service, and the backend DD's Test Boundaries row for `createOrder`
+//      step (0) says "counted, not just stubbed". `getPaymentStatus` is
+//      replaced too, with a throwing stub, so that a regression which reaches
+//      the provider from this path fails loudly instead of hitting the network.
+//   2. `createClient` of `@/lib/supabase/server`, which exists only to build a
+//      client from request COOKIES via `next/headers` (unavailable outside a
+//      Next request). It is replaced by a REAL `@supabase/supabase-js` client
+//      holding a REAL session for the fixture account — the same JWT and the
+//      same RLS-bound identity production uses.
+//   Postgres is NOT mocked. The reuse predicate is decided from a real row's
+//   real `pending_until` against the clock, which is exactly what a mocked
+//   client would stop proving.
+//
+// WHY MISSING CREDENTIALS FAIL THIS LANE INSTEAD OF SKIPPING IT: the backend
+//   DD's Implementation Approach Phase 4 states "CI has no database", and this
+//   lane honours that exclusion by living outside the CI gate entirely, not by
+//   degrading when credentials are absent. `.github/workflows/ci.yml` runs
+//   `npm run lint`, `npx tsc --noEmit`, `npm test` and `npx next build`; it
+//   never runs `npm run test:integration`, and `vitest.config.ts` collects
+//   lib/**, components/**, app/** only, so `tests/**` is unreachable from CI by
+//   two independent routes. The only thing that can invoke this config is a
+//   developer at a keyboard, for whom an absent credential is an operator
+//   error — a broken run, not a documented exclusion. Skipping it silently is
+//   worse than useless: the reporter summary did say "skipped", but the two
+//   things a caller actually acts on did not — the EXIT STATUS was 0, exactly
+//   as for eight real passes, and no warning accompanied it, because vitest
+//   suppresses module-scope console output for a file whose only suite is
+//   skipped. A renamed .env.local therefore certified the same green as
+//   working code. The guard below THROWS AT MODULE SCOPE, i.e. at COLLECTION
+//   time, whenever a credential is absent: the lane exits non-zero and names
+//   the missing variables. Collection is the only placement that holds for
+//   EVERY invocation. A guard registered as a test case is itself a test case,
+//   so vitest's test-name filter removes it: `-t "…"`, ordinary single-case
+//   iteration, gave `Tests 9 skipped (9)` and exit 0 with a credential absent,
+//   and a stray `.only` defeats it the same way. Measured with the throw in
+//   place — same filter, credential absent: `Test Files 1 failed (1)`, exit 1,
+//   message naming the variable; same filter, credentials present: `1 passed |
+//   7 skipped`, exit 0, so the green path is untouched. No named case is kept
+//   beside the throw: both would fire on the same condition, and a collection
+//   failure discards the file's registered tasks (measured `(0 test)` /
+//   `Tests no tests`), so such a case could never run.
+//
+// WHY THE SHARED RATE-LIMIT STORE IS SWITCHED OFF FOR THIS FILE: `guard()` still
+//   runs — the in-RAM sliding window is real and the action still passes through
+//   it — but the AUTHORITATIVE Upstash counter survives across runs, and this
+//   case spends three `createOrder` allowances per run against a ceiling of 15
+//   per hour. Left on, a mutation-testing session would exhaust the ceiling and
+//   the case would fail for an unrelated reason. The shared store has its own
+//   coverage in `lib/security/rateLimitStore.test.ts`; nothing INT-3 claims is
+//   about it.
+//
+// DEV DATABASE ONLY. Credentials come from `SOURCE/.env.local`
+//   (ref `hynwleaxtbtjzkvpjsug`). `SOURCE/.env.local.prod-backup` is never read.
+
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+
+/** Nạp `.env.local` vào `process.env` — vitest không tự nạp và
+ *  `vitest.integration.config.ts` khai không `setupFiles` nào. Chép từ
+ *  `app/(layer2)/__tests__/recordSkillMastery.int.test.ts`, kể cả việc bóc cặp
+ *  nháy bao ngoài (Next.js bóc khi nó nạp file, nên vài giá trị được ghi có
+ *  nháy và vẫn chạy đúng ở production). Không ghi đè biến đã có sẵn. */
+function loadEnvLocal(): void {
+  const path = resolve(__dirname, "../../.env.local");
+  if (!existsSync(path)) return;
+  for (const line of readFileSync(path, "utf8").split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eq = trimmed.indexOf("=");
+    if (eq === -1) continue;
+    const key = trimmed.slice(0, eq).trim();
+    const value = trimmed.slice(eq + 1).trim().replace(/^"(.*)"$/, "$1");
+    if (process.env[key] === undefined) process.env[key] = value;
+  }
+}
+loadEnvLocal();
+
+// Xem "WHY THE SHARED RATE-LIMIT STORE IS SWITCHED OFF" ở đầu khối. Xoá TRƯỚC
+// mọi lượt import, vì `rateLimitStore.ts` đọc env ở lần gọi ĐẦU TIÊN rồi nhớ
+// lại kết quả.
+delete process.env.KV_REST_API_URL;
+delete process.env.KV_REST_API_TOKEN;
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const MISSING_CREDENTIALS = (
+  [
+    ["NEXT_PUBLIC_SUPABASE_URL", SUPABASE_URL],
+    ["NEXT_PUBLIC_SUPABASE_ANON_KEY", ANON_KEY],
+    ["SUPABASE_SERVICE_ROLE_KEY", SERVICE_ROLE_KEY],
+  ] as const
+)
+  .filter(([, value]) => !value)
+  .map(([name]) => name);
+// Xem khối "WHY MISSING CREDENTIALS FAIL THIS LANE INSTEAD OF SKIPPING IT" ở
+// đầu file. Ném ở TẦM MODULE, tức lúc THU THẬP, chứ không đăng ký một ca canh
+// gác: một ca canh gác cũng là một ca, nên nó chịu đúng bộ lọc tên ca của
+// vitest, và `-t "..."` — lối chạy lặp một ca hoàn toàn bình thường — loại nó
+// đi cùng tám ca INT-3 rồi trả về mã thoát 0 y như một lượt chạy xanh (đo được:
+// `Tests 9 skipped (9)`, exit 0). Một `.only` bỏ quên trong file cũng vô hiệu
+// hoá nó bằng đúng cơ chế ấy. Lượt THU THẬP thì không bộ lọc nào chạm tới, nên
+// đây là chỗ duy nhất lời hứa "thiếu credential là làn ĐỎ" đúng với MỌI lối gọi.
+if (MISSING_CREDENTIALS.length > 0) {
+  throw new Error(
+    `Làn integration thiếu ${MISSING_CREDENTIALS.join(", ")}. ` +
+      "Tám ca INT-3 chỉ có giá trị khi chạy với Supabase dev thật (ref " +
+      "hynwleaxtbtjzkvpjsug, credential lấy từ SOURCE/.env.local). Làn này " +
+      "không nằm trong cổng CI, nên thiếu credential là lỗi thao tác chứ " +
+      "không phải môi trường: nó làm làn ĐỎ, chứ không trả về mã thoát 0 " +
+      "giống hệt một lượt chạy tám ca xanh."
+  );
+}
+
+vi.mock("server-only", () => ({}));
+
+/** Adapter payOS — MOCK VÀ ĐẾM. Số lượt gọi là một trong hai khẳng định mà một
+ *  phép so giá trị KHÔNG nhìn thấy (xem "Primary failure mode" ở khối INT-3). */
+const createPaymentRequestMock = vi.fn();
+vi.mock("@/lib/billing/payos", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/billing/payos")>()),
+  createPaymentRequest: createPaymentRequestMock,
+  // Đường tạo đơn KHÔNG được chạm tới lượt hỏi trạng thái. Một stub ném lỗi làm
+  // hồi quy đó lộ ra ngay thay vì lặng lẽ đi ra mạng.
+  getPaymentStatus: vi.fn(async () => {
+    throw new Error("INT-3: createOrder() không được gọi getPaymentStatus()");
+  }),
+}));
+
+/** Chỉ thay ĐƯỜNG LẤY SESSION (cookies của next/headers). Giá trị gán vào holder
+ *  là một client Supabase THẬT đã đăng nhập bằng mật khẩu của tài khoản fixture,
+ *  nên `orders_select_own` là chính sách thật đang áp. */
+const { sessionClientHolder } = vi.hoisted(() => ({
+  sessionClientHolder: { current: null as SupabaseClient | null },
+}));
+vi.mock("@/lib/supabase/server", () => ({
+  createClient: async () => {
+    if (!sessionClientHolder.current) throw new Error("session client chưa sẵn sàng");
+    return sessionClientHolder.current;
+  },
+}));
+
+const { createOrder } = await import("@/lib/billing/orderActions");
+
+// --- Fixture ---------------------------------------------------------------
+
+const FIXTURE_EMAIL = "smithnguyen247+orderint@gmail.com";
+const FIXTURE_PASSWORD = "order-int-password-123";
+
+/** Bốn giá trị chuyển khoản nhà cung cấp trả về. Hằng của fixture, gõ tay: mọi
+ *  phép so "ghi xuống nguyên si" phải có một phía KHÔNG do code đang kiểm dựng. */
+const PROVIDER_QR_PAYLOAD =
+  "00020101021238570010A00000072701270006970436011300110012345670208QRIBFTTA53037045802VN6304INT3";
+const PROVIDER_ACCOUNT_NUMBER = "0011001234567";
+const PROVIDER_ACCOUNT_NAME = "CONG TY TNHH MS MOLAR";
+
+/** Mốc `expiresAt` nhà cung cấp trả về — LITERAL, ghim sẵn, KHÔNG đọc đồng hồ.
+ *  Một stub dựng `Date.now() + ORDER_PENDING_WINDOW_MS` thực hiện ĐÚNG phép tính
+ *  mà lỗi "đồng hồ thứ hai" thực hiện: một bản cài đặt ghi `pending_until` bằng
+ *  `now() + 30 phút` tự tính, thay vì bằng `payment.expiresAt` nhà cung cấp giao,
+ *  vẫn khớp con số ấy và INT-3 vẫn xanh trọn tám ca. Ghim thành literal biến
+ *  phép so ở (e) thành phép so với một giá trị KHÔNG do code đang kiểm dựng ra,
+ *  nên INT-3 tự giết được lỗi đó thay vì đi mượn ca của làn unit.
+ *  Phần mili là `.000` vì adapter thật làm tròn xuống GIÂY trước khi gửi
+ *  `expiredAt` (`lib/billing/payos/index.ts:260`, :294) và không bao giờ phát ra
+ *  độ chính xác mili — stub phải nói đúng thứ tiếng ấy.
+ *  Mốc nằm xa trong tương lai để vị từ tái dùng `pending_until > now()` luôn
+ *  đúng ở lượt tạo thứ hai; nghĩa vụ (g) tự ghi dòng về quá khứ khi cần nhánh kia. */
+const PROVIDER_EXPIRES_AT = "2099-12-31T23:59:59.000Z";
+
+/** Số tiền một đơn Premium, LITERAL — nghĩa vụ (a) của INT-3 đòi đúng thế.
+ *  KHÔNG import `PREMIUM_PRICE_VND`: nhập hằng lên thì phép khẳng định đồng ý
+ *  với mọi lần đổi giá trong tương lai, tức đúng thứ trôi lệch mà literal này
+ *  tồn tại để bắt. */
+const EXPECTED_AMOUNT_VND = 39000;
+
+interface OrderRow {
+  order_code: number;
+  user_id: string | null;
+  amount: number;
+  status: string;
+  pending_until: string;
+}
+
+let admin: SupabaseClient;
+let fixtureUserId: string;
+
+/** Ảnh chụp trạng thái tại từng mốc của dãy thao tác. Toàn bộ dãy chạy MỘT lần
+ *  trong `beforeAll`; mỗi `it` bên dưới đọc ảnh chụp, nên không ca nào phụ thuộc
+ *  vào việc ca kia đã chạy. */
+const snapshot = {
+  pendingCountBefore: -1,
+  first: null as Awaited<ReturnType<typeof createOrder>> | null,
+  rowAfterFirst: null as OrderRow | null,
+  pendingCountAfterFirst: -1,
+  adapterCountAfterFirst: -1,
+  second: null as Awaited<ReturnType<typeof createOrder>> | null,
+  rowAfterSecond: null as OrderRow | null,
+  pendingCountAfterSecond: -1,
+  adapterCountAfterSecond: -1,
+  third: null as Awaited<ReturnType<typeof createOrder>> | null,
+  adapterCountAfterThird: -1,
+};
+
+/** Mọi `order_code` sinh ra trong lần chạy này — teardown xoá theo `user_id`,
+ *  danh sách này chỉ để báo lỗi cho dễ đọc. */
+const createdOrderCodes: number[] = [];
+
+async function ensureFixtureUser(): Promise<string> {
+  const created = await admin.auth.admin.createUser({
+    email: FIXTURE_EMAIL,
+    password: FIXTURE_PASSWORD,
+    email_confirm: true,
+  });
+  if (!created.error) return created.data.user.id;
+
+  const list = await admin.auth.admin.listUsers({ perPage: 1000 });
+  if (list.error) throw list.error;
+  const existing = list.data.users.find((u) => u.email === FIXTURE_EMAIL);
+  if (!existing) throw created.error;
+  const updated = await admin.auth.admin.updateUserById(existing.id, {
+    password: FIXTURE_PASSWORD,
+    email_confirm: true,
+  });
+  if (updated.error) throw updated.error;
+  return existing.id;
+}
+
+/** Nghĩa vụ (h): xoá MỌI dòng ca này tạo ra. Chạy cả trước lẫn sau, nên ca chạy
+ *  được hai lần liên tiếp và chạy được một mình. */
+async function cleanupFixtureOrders(): Promise<void> {
+  const { error } = await admin.from("payment_orders").delete().eq("user_id", fixtureUserId);
+  if (error) throw error;
+}
+
+/** `select count(*) from payment_orders where user_id = A and status = 'pending'`
+ *  — đúng truy vấn PRD AC-027 tự viết ra. */
+async function countPendingOrders(): Promise<number> {
+  const { count, error } = await admin
+    .from("payment_orders")
+    .select("order_code", { count: "exact", head: true })
+    .eq("user_id", fixtureUserId)
+    .eq("status", "pending");
+  if (error) throw error;
+  return count ?? 0;
+}
+
+async function readOrderRow(orderCode: number): Promise<OrderRow | null> {
+  const { data, error } = await admin
+    .from("payment_orders")
+    .select("order_code, user_id, amount, status, pending_until")
+    .eq("order_code", orderCode)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as OrderRow | null) ?? null;
+}
+
+/** Nhà cung cấp trả về một đơn còn hạn, với mốc hết hạn LITERAL `PROVIDER_EXPIRES_AT`.
+ *  Trước đây chỗ này dựng `new Date(Date.now() + ORDER_PENDING_WINDOW_MS)` — đúng
+ *  BẰNG phép tính mà một bản cài đặt đọc đồng hồ lần thứ hai cũng làm, nên nó
+ *  đồng thuận với chính lỗi cần bắt (xem chú thích của hằng). */
+function armProviderStub(): void {
+  createPaymentRequestMock.mockImplementation(
+    async (draft: { orderCode: number; amountVnd: number; memo: string }) => ({
+      qrPayload: PROVIDER_QR_PAYLOAD,
+      accountNumber: PROVIDER_ACCOUNT_NUMBER,
+      accountName: PROVIDER_ACCOUNT_NAME,
+      memo: draft.memo,
+      orderCode: draft.orderCode,
+      amount: draft.amountVnd,
+      expiresAt: PROVIDER_EXPIRES_AT,
+    })
+  );
+}
+
+function orderCodeOf(result: Awaited<ReturnType<typeof createOrder>> | null): number {
+  if (!result || "error" in result) {
+    throw new Error(`INT-3: createOrder() từ chối — ${JSON.stringify(result)}`);
+  }
+  return result.orderCode;
+}
+
+function checkoutOf(result: Awaited<ReturnType<typeof createOrder>> | null) {
+  if (!result || "error" in result) {
+    throw new Error(`INT-3: createOrder() từ chối — ${JSON.stringify(result)}`);
+  }
+  return result;
+}
+
+describe(
+  "INT-3 — một đơn sống cho mỗi người: lần mua thứ hai trong 30 phút tái dùng đúng đơn cũ; sau cửa sổ mới mint đơn mới (AC-026 / AC-027)",
+  () => {
+    beforeAll(async () => {
+      admin = createClient(SUPABASE_URL!, SERVICE_ROLE_KEY!, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+      fixtureUserId = await ensureFixtureUser();
+      await cleanupFixtureOrders();
+
+      const session = createClient(SUPABASE_URL!, ANON_KEY!, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+      const signIn = await session.auth.signInWithPassword({
+        email: FIXTURE_EMAIL,
+        password: FIXTURE_PASSWORD,
+      });
+      if (signIn.error) throw signIn.error;
+      sessionClientHolder.current = session;
+
+      armProviderStub();
+      createPaymentRequestMock.mockClear();
+
+      // --- Dãy thao tác, chạy đúng một lần ---------------------------------
+      snapshot.pendingCountBefore = await countPendingOrders();
+
+      snapshot.first = await createOrder();
+      createdOrderCodes.push(orderCodeOf(snapshot.first));
+      snapshot.rowAfterFirst = await readOrderRow(orderCodeOf(snapshot.first));
+      snapshot.pendingCountAfterFirst = await countPendingOrders();
+      snapshot.adapterCountAfterFirst = createPaymentRequestMock.mock.calls.length;
+
+      // Lần bấm mua thứ hai, KHÔNG chờ.
+      snapshot.second = await createOrder();
+      createdOrderCodes.push(orderCodeOf(snapshot.second));
+      snapshot.rowAfterSecond = await readOrderRow(orderCodeOf(snapshot.first));
+      snapshot.pendingCountAfterSecond = await countPendingOrders();
+      snapshot.adapterCountAfterSecond = createPaymentRequestMock.mock.calls.length;
+
+      // Nghĩa vụ (g): đẩy qua cửa sổ bằng cách GHI một `pending_until` trong quá
+      // khứ, chứ không ngủ 30 phút. Dòng giữ nguyên `status = 'pending'`, nên ca
+      // này phân biệt được vị từ `pending_until > now()` với một vị từ chỉ nhìn
+      // `status`.
+      const expired = await admin
+        .from("payment_orders")
+        .update({ pending_until: new Date(Date.now() - 60_000).toISOString() })
+        .eq("order_code", orderCodeOf(snapshot.first));
+      if (expired.error) throw expired.error;
+
+      snapshot.third = await createOrder();
+      createdOrderCodes.push(orderCodeOf(snapshot.third));
+      snapshot.adapterCountAfterThird = createPaymentRequestMock.mock.calls.length;
+    }, 60_000);
+
+    afterAll(async () => {
+      if (admin && fixtureUserId) await cleanupFixtureOrders();
+    }, 60_000);
+
+    // ---------------------------------------------------------------------
+    // (a) AC-026 — đúng MỘT bản ghi, số tiền 39000, mã duy nhất, trạng thái chờ
+    // ---------------------------------------------------------------------
+    it("(a) sau lần tạo ĐẦU TIÊN: đúng 1 đơn chờ, `amount` là literal 39000, `order_code` duy nhất, status 'pending'", async () => {
+      // Kiểm soát dương: nếu trước đó đã có đơn chờ nào thì "đúng 1" bên dưới
+      // không nói lên điều gì.
+      expect(snapshot.pendingCountBefore).toBe(0);
+      expect(snapshot.pendingCountAfterFirst).toBe(1);
+
+      const row = snapshot.rowAfterFirst;
+      expect(row).not.toBeNull();
+      expect(row!.amount).toBe(EXPECTED_AMOUNT_VND);
+      expect(row!.status).toBe("pending");
+      expect(row!.user_id).toBe(fixtureUserId);
+
+      // "Duy nhất": `order_code` là PRIMARY KEY, nên một lượt đọc theo mã trả về
+      // đúng một dòng — và dòng ấy thuộc về đúng người vừa bấm mua.
+      expect(row!.order_code).toBe(orderCodeOf(snapshot.first));
+      expect(checkoutOf(snapshot.first).amountVnd).toBe(EXPECTED_AMOUNT_VND);
+    });
+
+    // ---------------------------------------------------------------------
+    // (b)(c)(d)(e)(f) AC-027 — lần bấm thứ hai TÁI DÙNG đúng đơn ấy
+    // ---------------------------------------------------------------------
+    it("(b) sau lần tạo THỨ HAI không chờ: truy vấn đếm đơn chờ vẫn trả về ĐÚNG 1", async () => {
+      expect(snapshot.pendingCountAfterSecond).toBe(1);
+    });
+
+    it("(c) hai `orderCode` trả về BẰNG NHAU", async () => {
+      expect(orderCodeOf(snapshot.second)).toBe(orderCodeOf(snapshot.first));
+    });
+
+    it("(d) `createPaymentRequest` được gọi ĐÚNG MỘT LẦN qua cả hai lượt — số đếm, không phải 'đã được gọi'", async () => {
+      // Bản cài đặt ngây thơ (gọi lại nhà cung cấp, vứt kết quả đi, trả về dòng
+      // cũ) xanh ở (b) và (c) và ĐỎ ở đây. Nó là lối hỏng mà khối chú thích
+      // INT-3 gọi tên: một link thanh toán thứ hai cho một lần mua, tốn tiền thật.
+      expect(snapshot.adapterCountAfterFirst).toBe(1);
+      expect(snapshot.adapterCountAfterSecond).toBe(1);
+    });
+
+    it("(e) `pendingUntil` GIỐNG NHAU TỪNG BYTE giữa hai lượt trả về, và dòng trong CSDL không hề đổi", async () => {
+      const first = checkoutOf(snapshot.first);
+      const second = checkoutOf(snapshot.second);
+
+      // Vế 1 — hai giá trị ĐÃ BẮT ĐƯỢC, so với nhau. Không mốc nào được tính lại
+      // ở đây: một `new Date(...)` dựng tại chỗ, hay một lượt gọi lại chính
+      // mapper, sẽ đồng ý với một bản cài đặt khởi động lại đồng hồ đếm ngược.
+      expect(second.pendingUntil).toBe(first.pendingUntil);
+
+      // Vế 2 — DÒNG trong CSDL. Hai lượt đọc PostgREST, so chuỗi với chuỗi: lần
+      // bấm thứ hai không ghi gì lên `pending_until`.
+      expect(snapshot.rowAfterSecond!.pending_until).toBe(snapshot.rowAfterFirst!.pending_until);
+
+      // Vế 3 — mốc trả về CHÍNH LÀ mốc đã lưu. So theo KHOẢNH KHẮC, vì hai phía
+      // dùng hai dạng serialize khác nhau (`+00:00` của PostgREST, `…Z` của hợp
+      // đồng) — nhưng KHÔNG chuẩn hoá bằng mapper đang được kiểm.
+      expect(Date.parse(first.pendingUntil)).toBe(Date.parse(snapshot.rowAfterFirst!.pending_until));
+
+      // Vế 4 — mốc đã lưu là mốc NHÀ CUNG CẤP GIAO, so với một literal ghim sẵn.
+      // Vế 1–3 mới chỉ nói ba giá trị bằng nhau; chúng vẫn bằng nhau khi cả ba
+      // đều là `now() + 30 phút` do chính `createOrder()` tự tính. Chỉ literal
+      // này phân biệt được "ghi lại thứ adapter trả về" với "tự đọc đồng hồ lần
+      // hai" — nó là phía KHÔNG do code đang kiểm dựng ra.
+      expect(Date.parse(snapshot.rowAfterFirst!.pending_until)).toBe(
+        Date.parse(PROVIDER_EXPIRES_AT)
+      );
+      expect(first.pendingUntil).toBe(PROVIDER_EXPIRES_AT);
+    });
+
+    it("(f) `qrPayload` và số tiền giống nhau giữa hai lượt trả về, và `qrPayload` đúng chuỗi nhà cung cấp đã giao", async () => {
+      const first = checkoutOf(snapshot.first);
+      const second = checkoutOf(snapshot.second);
+
+      expect(second.qrPayload).toBe(first.qrPayload);
+      expect(second.amountVnd).toBe(first.amountVnd);
+      // Lưu như đã nhận, không bao giờ tính lại (frontend DD Risk R-11).
+      expect(first.qrPayload).toBe(PROVIDER_QR_PAYLOAD);
+      expect(first.accountNumber).toBe(PROVIDER_ACCOUNT_NUMBER);
+      expect(first.accountName).toBe(PROVIDER_ACCOUNT_NAME);
+    });
+
+    // ---------------------------------------------------------------------
+    // (g) NHÁNH HẾT CỬA SỔ — nửa mà đường chính vẫn xanh khi nó hồi quy
+    // ---------------------------------------------------------------------
+    it("(g) sau khi `pending_until` lùi về quá khứ: lượt tạo THỨ BA mint `orderCode` MỚI và đưa số đếm adapter lên ĐÚNG 2", async () => {
+      expect(orderCodeOf(snapshot.third)).not.toBe(orderCodeOf(snapshot.first));
+      expect(snapshot.adapterCountAfterThird).toBe(2);
+    });
+
+    // ---------------------------------------------------------------------
+    // (h) Teardown xoá sạch — khẳng định tại chỗ, không chỉ đọc code dọn dẹp
+    // ---------------------------------------------------------------------
+    it("(h) mọi dòng ca này tạo ra đều xoá được, nên ca chạy lại lần nữa vẫn bắt đầu từ 0 đơn", async () => {
+      // Chạy THẬT phép dọn rồi đếm lại: đây là điều kiện để ca chạy hai lần liên
+      // tiếp và chạy một mình. Dãy thao tác đã chụp xong ảnh, nên xoá ở đây
+      // không làm hỏng ca nào.
+      await cleanupFixtureOrders();
+      expect(await countPendingOrders()).toBe(0);
+
+      const { data, error } = await admin
+        .from("payment_orders")
+        .select("order_code")
+        .in("order_code", createdOrderCodes);
+      expect(error).toBeNull();
+      expect(data).toEqual([]);
+    });
+  }
+);

@@ -110,6 +110,27 @@ export const RATE_LIMITS = {
   reportExam: { limit: 15, windowMs: 60 * 60 * 1000 },
   updateProfile: { limit: 20, windowMs: 60 * 60 * 1000 },
   submitTicket: { limit: 15, windowMs: 60 * 60 * 1000 },
+  // Hai action của đường thanh toán (AC-037). CÙNG HỌ với khối trên và điều đó
+  // đã được quyết định chứ không suy ra: cả hai chỉ tốn chi phí của CHÍNH ta —
+  // `createOrder` một lượt ghi Postgres, `recheckOrder` một lượt hỏi payOS —
+  // không cái nào tiêu vào một hạn ngạch có trần cứng của bên thứ ba như
+  // explainStep/uploadExam, và không cái nào NHẬN VÀO một credential như
+  // changePassword (backend DD § Rate-limit entries).
+  //
+  // HỆ QUẢ PHẢI TÔN TRỌNG: nhóm tốn-DB khẳng định `limit >= 15` và
+  // `windowMs >= 60_000` (rateLimit.test.ts). Một con số dưới 15 ở đây không chỉ
+  // "trông thận trọng hơn" — nó làm bộ test đỏ. AC-037 chỉ đòi action ĐƯỢC
+  // guard, nên sàn 15 không mâu thuẫn với nó.
+  //
+  // 15 cho `createOrder`: mua gói là việc hiếm, và bước (0) của chính hàm ấy đã
+  // biến một chuỗi bấm dồn thành MỘT đơn duy nhất được dùng lại — nên trần này
+  // canh vòng lặp tự động, không canh người dùng thật.
+  // 30 cho `recheckOrder`: người vừa chuyển khoản sẽ bấm "kiểm tra lại" nhiều
+  // lần trong lúc chờ đối soát, và đó là hành vi ĐÚNG mà C-10 mời họ làm. Rộng
+  // gấp đôi vì nó là thao tác lặp lại theo thiết kế, trong khi vẫn giữ cho
+  // đường dò `order_code` tốn chính suất của kẻ dò (FE-B-02, hệ quả 3).
+  createOrder: { limit: 15, windowMs: 60 * 60 * 1000 },
+  recheckOrder: { limit: 30, windowMs: 60 * 60 * 1000 },
   // Gia sư Socratic (Engine 1, AC-022). NGOẠI LỆ của cả khối trên, và chặt vì
   // một lý do khác hẳn: các mục trên chỉ tốn một dòng DB của CHÍNH ta, còn mục
   // này tiêu vào hạn ngạch của bên thứ ba mà ta không tự nới được. Key Gemini

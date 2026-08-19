@@ -2,6 +2,16 @@
 // Dùng đồng hồ giả để kiểm hành vi cửa sổ trượt mà không phải chờ thật.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+// KHÔNG-OP HÔM NAY, và đó chính là lý do nó được ghi ra đây. Kể từ khi hai
+// action của đường thanh toán vào bảng dưới, đồ thị module mà file này kéo theo
+// chạm tới biên máy chủ — `guard()` là thứ chạy bên trong Server Action. Nếu
+// `rateLimit.ts` hay bất kỳ thứ gì nó import thêm `import "server-only"`, module
+// đó NÉM ngay khi được nạp ngoài bundle server của Next, và file này sẽ đỏ vì
+// MÔI TRƯỜNG chứ không vì một khiếm khuyết. Stub là lưới đỡ đúng một dòng, cùng
+// dạng hơn hai chục file test khác trong repo đang dùng.
+vi.mock("server-only", () => ({}));
+
 import { __resetRateLimitForTests, checkRateLimit, guard, RATE_LIMITS } from "./rateLimit";
 
 beforeEach(() => {
@@ -96,6 +106,12 @@ describe("guard", () => {
     "reportExam",
     "updateProfile",
     "submitTicket",
+    // AC-037, backend DD § Rate-limit entries: cả hai chỉ tốn chi phí của CHÍNH
+    // ta (một lượt ghi Postgres / một lượt hỏi payOS), không tiêu vào hạn ngạch
+    // bên thứ ba và không nhận vào credential — nên chúng thuộc nhóm này, và do
+    // đó chịu cả hai bất biến `limit >= 15` và `windowMs >= 60_000` bên dưới.
+    "createOrder",
+    "recheckOrder",
   ];
   // `uploadExam` thuộc nhóm này chứ KHÔNG phải nhóm tốn-DB, dù nó cũng ghi DB và
   // cũng nhận file: thứ giới hạn nó là hạn ngạch Gemini, y như explainStep, và

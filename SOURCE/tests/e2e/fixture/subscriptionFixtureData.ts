@@ -24,10 +24,11 @@
 // production tree would be missing (frontend DD Risk R-12).
 //
 // TRANSCRIBED CONTRACTS — AND THEIR UNCHECKED WINDOW. `Entitlement` / `Quota`
-// are imported from the frozen `lib/billing/types.ts`, `SettleResult` from
-// `lib/billing/settleOrder.ts` since backend-task-16 shipped it, and
-// `CheckoutOrder` from `lib/billing/checkoutOrder.ts` since backend-task-17
-// shipped it, so a change to any of the four breaks this file at compile time.
+// are imported from the frozen `lib/billing/types.ts`, `CheckoutOrder` from
+// `lib/billing/checkoutOrder.ts` since backend-task-17 shipped it, and
+// `RecheckOutcome` — which subsumes `SettleResult` — from
+// `lib/billing/orderActions.ts` since backend-task-18 shipped it, so a change to
+// any of the four breaks this file at compile time.
 // `MyOrderRow` has no code yet, so its shape is still transcribed from the work
 // plan's Reference Contract Values. Being a transcription, it is structurally
 // INDEPENDENT of the real type — no import, no assignment, no `satisfies` — so
@@ -41,16 +42,20 @@
 //     used as the declared type of `fixtureOrder()`'s return, so every order
 //     fixture is checked field-by-field against the shipped eight-field shape
 //   - `FixtureMyOrderRow`         -> backend-task-19 (`app/(billing)/queries.ts`)
-//   - `SettleResult`              -> DONE, backend-task-16: imported below, and
+//   - `SettleResult`              -> DONE, backend-task-16, then SUPERSEDED by
+//     backend-task-18: the settlement union now arrives inside `RecheckOutcome`,
+//     so there is one import instead of two and no arm is left unchecked
+//   - `FixtureRateLimitedRefusal` -> DONE, backend-task-18: deleted. The
+//     rate-limited arm is `recheckOrder()`'s own declared arm now, and
 //     `FIXTURE_RECHECK_OUTCOMES`'s `satisfies` clause is the compile-time link
-//     over BOTH union arms (the settled arm and all five refusal literals)
-//   - `FixtureRateLimitedRefusal` -> backend-task-18 (`lib/billing/orderActions.ts`)
+//     over the WHOLE union — the settled arm, all five refusal reasons, and the
+//     wrapper-only refusals
 // Each remaining task adds a compile-time link here and deletes the transcribed
 // declaration. Only after that link exists does a tsc error become the failure
 // mode for drift.
 
 import type { CheckoutOrder } from "@/lib/billing/checkoutOrder";
-import type { SettleResult } from "@/lib/billing/settleOrder";
+import type { RecheckOutcome } from "@/lib/billing/orderActions";
 import { FREE_FALLBACK, type Entitlement } from "@/lib/billing/types";
 import { LOCALE_COOKIE, type Locale } from "@/lib/i18n/locales";
 
@@ -381,25 +386,17 @@ export const FIXTURE_ORDER_ROWS_EMPTY: readonly FixtureMyOrderRow[] = [];
 
 // --- Action-module responses ------------------------------------------------
 
-/** C-10's SEVENTH outcome — `guard()`'s refusal (AC-037). Neither Design Doc
- *  states its wire shape: `SettleResult` declares exactly five reasons and
- *  rate-limited is not one of them, and the encoding is decided by the task
- *  that writes `recheckOrder()` — RECONCILIATION OWNER: **backend-task-18**
- *  (`lib/billing/orderActions.ts`). It is modelled here as a
- *  branch of its own, shaped after this repo's shipped typed-refusal convention
- *  (`{ error: "rate_limited" }` — `(layer2)/actions.ts:239`,
- *  `tutorActions.ts:183`), and deliberately NOT as a sixth `reason`: widening
- *  the declared union here would invent a contract this file has no authority
- *  to decide, and would hide the drift instead of surfacing it. */
-export type FixtureRateLimitedRefusal = { error: "rate_limited" };
-
-/** RECONCILED by backend-task-16: the settlement half is now the SHIPPED
- *  `SettleResult`, not a transcription of it. `FIXTURE_RECHECK_OUTCOMES` below
- *  carries `satisfies Record<string, FixtureRecheckOutcome>`, so every fixture
- *  value is checked against the real union at compile time — a sixth reason, a
- *  removed reason or a changed settled arm is a tsc error here rather than a
- *  silent divergence between this file and the money path. */
-export type FixtureRecheckOutcome = SettleResult | FixtureRateLimitedRefusal;
+/** RECONCILED by backend-task-18: `recheckOrder()`'s return type is now IMPORTED
+ *  (above), so this file no longer declares a shape of its own for C-10's
+ *  outcomes. Both transcriptions it used to carry — `FixtureRateLimitedRefusal`
+ *  and `FixtureRecheckOutcome` — are deleted; `RecheckOutcome` covers the
+ *  whole union, the five `SettleResult` reasons plus the wrapper-only refusals
+ *  (`rate_limited`, C-10's seventh outcome under AC-037, and `unauthenticated`).
+ *
+ *  WHAT THAT BUYS, precisely: until this link existed, drift between this file
+ *  and the wire shape was undetectable — a sixth reason, a renamed literal or a
+ *  changed refusal encoding would have left every fixture below still compiling
+ *  and still wrong. Now it is a tsc error IN THIS FILE. */
 
 /** One value per rendered outcome, so a case selects the branch it means rather
  *  than rebuilding the union inline. The keys match C-10's dictionary keys
@@ -412,7 +409,7 @@ export const FIXTURE_RECHECK_OUTCOMES = {
   amountMismatch: { settled: false, reason: "amount_mismatch" },
   providerUnavailable: { settled: false, reason: "provider_unavailable" },
   rateLimited: { error: "rate_limited" },
-} as const satisfies Record<string, FixtureRecheckOutcome>;
+} as const satisfies Record<string, RecheckOutcome>;
 
 // --- Action-module stub layer (the sanctioned mock boundary) -----------------
 
@@ -429,14 +426,14 @@ export interface SubscriptionActionStubs {
   /** Order codes passed to `recheckOrder`, in invocation order. */
   recheckedOrderCodes: number[];
   setCreateOrderResponse(order: CheckoutOrder): void;
-  setRecheckOutcome(outcome: FixtureRecheckOutcome): void;
+  setRecheckOutcome(outcome: RecheckOutcome): void;
   /** Called by the harness's module-boundary override in place of the real
    *  `createOrder()` — counts the invocation, then resolves the configured
    *  order. No provider is contacted and no money moves. */
   simulateCreateOrder(): Promise<CheckoutOrder>;
   /** Called in place of the real `recheckOrder(orderCode)` — counts the
    *  invocation and records the code, then resolves the configured outcome. */
-  simulateRecheckOrder(orderCode: number): Promise<FixtureRecheckOutcome>;
+  simulateRecheckOrder(orderCode: number): Promise<RecheckOutcome>;
   /** Arms the hold: from the next call on, `simulateRecheckOrder` counts and
    *  records as usual and then STAYS UNRESOLVED until `releaseHeldRecheck()`.
    *  The arm is not consumed by the first call — a second, dogpiled call is
@@ -475,7 +472,7 @@ export interface SubscriptionActionStubs {
  *  outcome. */
 export function createSubscriptionActionStubs(): SubscriptionActionStubs {
   let createOrderResponse: CheckoutOrder = FIXTURE_ORDER_PENDING;
-  let recheckOutcome: FixtureRecheckOutcome = FIXTURE_RECHECK_OUTCOMES.stillPending;
+  let recheckOutcome: RecheckOutcome = FIXTURE_RECHECK_OUTCOMES.stillPending;
   let releaseHold: (() => void) | null = null;
   let heldGate: Promise<void> | null = null;
 

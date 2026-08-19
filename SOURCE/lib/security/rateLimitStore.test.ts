@@ -8,6 +8,10 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+// Cùng lý do, cùng một dòng, như `rateLimit.test.ts`: file này nạp `rateLimit.ts`
+// (để gọi `guard`) nên kéo theo đúng đồ thị module ấy. Xem chú thích ở đó.
+vi.mock("server-only", () => ({}));
+
 const evalMock = vi.fn();
 
 vi.mock("@upstash/redis", () => ({
