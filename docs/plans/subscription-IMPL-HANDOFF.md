@@ -1,8 +1,8 @@
-# Subscription — bàn giao pha THỰC THI (phiên 4)
+# Subscription — bàn giao pha THỰC THI (phiên 5)
 
 **Viết 2026-08-19.** Phiên 1–2 đóng pha thiết kế; phiên 2 chạy bước 15→16→phân rã và 8 task đầu;
-phiên 3 đóng Pha 1 và cổng chặn thủ công. Phiên này chạy trọn Pha 2 và mở Pha 3:
-**xong 20/50 task, Pha 0 + Pha 1 + Pha 2 đều đóng, Pha 3 mở với Task 3.1 xong.**
+phiên 3 đóng Pha 1 và cổng chặn thủ công; phiên 4 chạy trọn Pha 2 và mở Pha 3. Phiên này chạy nốt
+**backend của Pha 3: xong 24/50 task, Pha 0–2 đóng, Pha 3 còn đúng 4 task frontend.**
 
 Đọc file này trước, đọc hết, rồi mới mở task file. Nó tồn tại để phiên sau không phải suy lại một
 ngày ngữ cảnh. Nó được **viết lại tại chỗ mỗi phiên**, không bồi thêm — một bàn giao cứ dài ra thì
@@ -21,57 +21,52 @@ không ai đọc nữa, và đó đúng là thứ file này sinh ra để chặn
 | 16 work-planner | xong — `docs/plans/subscription-work-plan.md` **v1.3** |
 | **Batch approval** | **ĐÃ CẤP** 2026-08-18 ("full autonomous run") — vẫn còn hiệu lực |
 | task-decomposer | xong — 50 task file + 7 phase-completion + 1 overview |
-| Vòng build | **20/50 xong. Pha 0 ✅ Pha 1 ✅ Pha 2 ✅ — Pha 3: 1/9** |
+| Vòng build | **24/50 xong. Pha 0 ✅ Pha 1 ✅ Pha 2 ✅ — Pha 3: 5/9, backend ĐÓNG** |
 
-**Hành động kế tiếp: mở `docs/plans/tasks/subscription-work-plan-backend-task-16.md`** (plan Task 3.2 —
-`settleOrder.ts` + `recordPaymentSettlement()`), chạy nó qua giao thức vòng build ở §4. Kỳ vọng khi xong:
-một commit duy nhất, `npm test` và `npm run test:fixture` giữ nguyên nền xanh ở §5.
+**Hành động kế tiếp: mở `docs/plans/tasks/subscription-work-plan-frontend-task-06.md`** (plan Task 3.6),
+chạy qua giao thức vòng build ở §4. Chú ý **đổi làn**: bốn task còn lại của Pha 3 đều là frontend, nên
+executor là `task-executor-frontend` và quality fixer là `quality-fixer-frontend` — định tuyến theo tên
+file, đừng suy đoán.
 
-Pha 2 là **★ điểm xác minh sớm** đầu tiên của plan (plan Tasks 2.2/2.5) và nó đã qua: một component bị gate
-render hạn mức thật từ provider thật, trên cây route thật. Điểm ★ thứ hai là plan Task 3.8 (`frontend-task-08`).
+Điểm ★ xác minh sớm thứ hai là **plan Task 3.8 (`frontend-task-08`)**. Điểm ★ thứ nhất (2.2/2.5) đã qua ở
+phiên 4.
 
 ## 2. Nhánh và commit
 
-Nhánh **`feat/subscription`**. Cây làm việc **sạch**. Tổng cho tính năng này:
-**5 commit dọn nền + 20 commit task (1 task = 1 commit) + 1 commit dọn dẹp tài liệu**.
+Nhánh **`feat/subscription`**. Cây làm việc **sạch**. Tổng: **5 commit dọn nền + 24 commit task
+(1 task = 1 commit) + 1 commit dọn dẹp tài liệu**.
 
-Phiên 4 (7 commit — 6 task + 1 chore):
+Phiên 5 (4 commit, 4 task, không có commit chore):
 
 | Commit | Task | Nội dung |
 |---|---|---|
-| `aa2cf48` | 2.1 | Thân `readEntitlement()` — dẫn xuất lúc đọc, quota từ Redis |
-| `cef31e7` | 2.2 | `EntitlementProvider` mount ở `(layer2)` + `(layer4)` — **điểm xác minh sớm ★** |
-| `aecc72e` | 2.3 | `lib/format/datetime.ts` + `number.ts`, C-09 `OrderStatusBadge`, 13 khoá `billing.*` cho S-05 |
-| `d5ba7d7` | 2.4 | `TutorQuotaNote` mount ở cả hai call site; khai tử prop `formattedResetDate` |
-| `d63a7b7` | 2.5 | FE-2 trên cây route THẬT **+ runner còn thiếu cho làn fixture-e2e** |
-| `4a7419d` | 3.1 | Adapter payOS — module DUY NHẤT được nói tiếng nhà cung cấp |
-| `c435bce` | — | Chore: vá trích dẫn `schema.sql` mục nát + ghi nhận drift của fixture |
+| `18872cd` | 3.2 | `settleOrder` — đường ghi DUY NHẤT gia hạn quyền lợi; 5 lý do từ chối, 4 bước cố định |
+| `1fbe5c9` | 3.3 | `toCheckoutOrder` — một hình dạng dòng, đúng một dạng tuần tự hoá |
+| `0ebf47d` | 3.4 | `createOrder` + `recheckOrder` + 2 lối rate limit + **INT-3**; làn integration bắt đầu chạy thật |
+| `5cdbc23` | 3.5 | `getMyOrder` qua `toCheckoutOrder` — **đóng CL-01** — kèm **INT-2** |
 
 ## 3. ✅ CỔNG CHẶN TASK 1.3 ĐÃ QUA — quy trình phải lặp y hệt cho Task 5.8
 
-Phiên 2 ghi đây là cổng thủ công không agent nào làm được. **Kỹ sư đã chỉ định làm bằng Composio**, và
-nó chạy được. **Task 5.8 (`backend-task-28`, apply prod) dùng lại nguyên quy trình này** — đừng phát minh lại.
+**Kỹ sư đã chỉ định làm bằng Composio**, và nó chạy được. **Task 5.8 (`backend-task-28`, apply prod) dùng
+lại nguyên quy trình này** — đừng phát minh lại.
 
 - **Dev = `hynwleaxtbtjzkvpjsug`**. **Prod = `pebjdlbgbmizgfpuptjl`** (tên "MS-MOLAR-prod").
-  `.mcp.json` trỏ PROD — đọc nhầm ref là kết luận nhầm môi trường.
+  `.mcp.json` trỏ PROD — đọc nhầm ref là kết luận nhầm môi trường. **`SOURCE/.env.local.prod-backup` giữ
+  credential PROD, nằm ngay cạnh `.env.local`** — đừng bao giờ nạp nó hay trỏ một làn test vào nó.
 - Công cụ: `COMPOSIO_SEARCH_TOOLS` → `COMPOSIO_MULTI_EXECUTE_TOOL`, tool slug **`SUPABASE_BETA_RUN_SQL_QUERY`**
   (chạy được DDL, đặt `read_only: false`). Toolkit `supabase` đã ACTIVE.
 - Trình tự đã dùng: liệt kê project để xác nhận đích → chụp trạng thái TRƯỚC → apply theo thứ tự phụ thuộc,
   **từng khối một** (API timeout khoảng 60s) → **kiểm catalog TRƯỚC khi ghi vân tay** → ghi vân tay **CUỐI CÙNG**.
   Vân tay đi cuối là cố ý: paste đứt giữa chừng thì DB thà không biết mình là bản nào, còn hơn khai nhận một
   bản nó chưa chạy hết.
-- Kết quả trên dev: đủ 4 đối tượng; `npm run verify:schema` **8/8 xanh**; khoá ngoại **25 → 27**, mọi `on delete`
-  khớp (TD-011 đóng); vân tay `021dd1387945` apply lúc `2026-08-18T13:53:05.77815+00:00`.
-- **Prod vẫn KHÔNG có bảng nào.** Đó là Task 5.8, và nó chỉ được chạy khi Pha 5 tới lượt.
-
-Hệ quả: làn `test:localdb`, các ca integration và `test-rls.ts` giờ chạy được trên dev thật.
+- Kết quả trên dev: đủ 4 đối tượng; `npm run verify:schema` **8/8 xanh**; khoá ngoại **25 → 27**; vân tay
+  `021dd1387945` apply lúc `2026-08-18T13:53:05.77815+00:00`.
+- **Prod vẫn KHÔNG có bảng nào.** Đó là Task 5.8, chỉ chạy khi Pha 5 tới lượt.
 
 ## 4. Giao thức vòng build (bắt buộc, đừng rút gọn)
 
 Mỗi task: **task-executor → [integration-test-reviewer nếu `requiresTestReview: true`] → quality-fixer →
 orchestrator commit.**
-
-Định tuyến **theo tên file**, không suy đoán:
 
 | Mẫu tên | Executor | Quality fixer |
 |---|---|---|
@@ -80,112 +75,114 @@ orchestrator commit.**
 
 **Orchestrator commit, subagent KHÔNG commit.** Viết câu đó vào mọi prompt.
 
-### 4a. Lớp lỗi tái phát — nay là 12 ca, phải nói thẳng trong mọi prompt
+### 4a. Lớp lỗi tái phát — nay là 15 ca
 
-**Tạo tác khẳng định một năng lực phân biệt mà nó không có.** Đếm chạy: **5 ca phiên 2 + 3 ca phiên 3 +
-4 ca phiên 4 = 12**. (Bản bàn giao phiên 3 ghi "6 lần" — đó là đếm thiếu; nó liệt kê 3 ca của chính nó và
-gộp phiên 2 thành 4 dòng trong khi bản phiên 2 nêu 5 ca. Con số đúng là 12, giữ nó cho đúng.)
+**Tạo tác khẳng định một năng lực phân biệt mà nó không có.** Đếm chạy: 5 (phiên 2) + 3 (phiên 3) +
+4 (phiên 4) + **3 (phiên này)** = **15**.
 
-Bốn ca phiên này:
+Ba ca phiên này, **cả ba do integration-test-reviewer tìm ra, không phải do executor tự khai** — và cả ba
+lần executor đều đã tự chạy đột biến rồi báo "không con nào sống sót":
 
-1. **Task 2.2** — ca kiểm mang **đúng tên khẳng định D005** vẫn **XANH trên một cây render ra rỗng**, vì
-   helper `probeText()` trả `""` qua nhánh dự phòng khi phần tử vắng mặt. integration-test-reviewer bắt được,
-   và chứng minh bằng cách gỡ một mock rồi chạy lại.
-2. **Task 2.3** — đột biến hoán **hai giá trị từ điển** SỐNG SÓT, vì mọi khẳng định badge đọc kỳ vọng ngược ra
-   từ chính từ điển đó, nên phép hoán dịch **cả hai vế** của đẳng thức. Vá bằng các ca literal cố định.
-3. **Task 2.5** — mục (d) của chính FE-2 xanh tầm thường (không provider thì mọi quota đều `unknown`, nên
-   "không note, không số 0, không dấu —" chẳng khẳng định gì), và cả ba dòng mục (g) quét **cùng một nút idle**
-   bất kể trạng thái chúng đặt tên. Cả hai do vòng đỏ của chính executor bắt, rồi vá bằng positive control và
-   `assertStateMaterialised`.
-4. **Ở tầng LÀN, không phải tầng khẳng định** — FE-2 là thứ duy nhất kết toán AC-042 và **không có runner nào
-   chạy nó**, nên nó kết toán con số không. Xem §5.
+1. **Task 3.2** — đường lan lỗi khi lượt đọc đơn ở bước 1 hỏng **không có ca nào phủ**; đổi
+   `if (error) throw error` thành `return null` vẫn để cả 27 ca xanh. Khuyết tật đó báo cho một người
+   ĐÃ TRẢ TIỀN rằng "không tìm thấy đơn" khi thật ra database vừa timeout. Cùng task, một ca khác đọc kỳ
+   vọng ngược ra từ chính fixture nó dựng, nên một bản cài đặt trả nguyên cả dòng vẫn xanh.
+2. **Task 3.4 — ở tầng LÀN, không phải tầng khẳng định.** Cổng canh credential của làn integration cho
+   **exit 0 y hệt nhau** dù 8 ca chạy thật hay 8 ca lặng lẽ bỏ qua: vitest **nuốt `console.warn` ở phạm vi
+   module** khi file chỉ có một suite bị skip. Nghĩa là chính cái "chuyển từ exit 1 sang exit 0" mà task này
+   lấy làm sản phẩm bàn giao lại được sinh ra hệt nhau bởi một `.env.local` bị đổi tên. Vá lần một bằng một
+   ca kiểm **có tên** — vòng rà chỉ ra ca có tên vẫn bị `-t` loại, lại về exit 0. Vá lần hai, và là bản đang
+   dùng: **throw ở phạm vi module, lúc thu thập**.
+3. **Task 3.5** — `MyOrderRow.pendingUntil` **không được khẳng định ở bất kỳ đâu**, vì mọi dòng gieo đặt
+   `pending_until = created_at`. Hoán vị hai trường đó, hoặc ghim cứng `pendingUntil`, đều sống sót qua cả
+   16 ca. Đúng lớp "hai giá trị lấy từ cùng một nguồn thì phép hoán vị dịch cả hai vế".
 
-### 4b. Cách viết prompt có hiệu quả — và một tinh chỉnh mới
+**Bài học rút ra, viết vào prompt: một bảng đột biến báo "không con nào sống sót" chỉ đáng tin khi tập đột
+biến đã đủ.** Executor không tự nghĩ ra được con đột biến nhắm vào chỗ chính nó bỏ quên. Đó là lý do
+integration-test-reviewer vẫn phải chạy, và phiên này nó **có phát hiện thật ở 3 trên 4 task**.
 
-Yêu cầu executor: (a) quan sát **ĐỎ thật** trước khi xanh, (b) nêu rõ mỗi ca kiểm bác bỏ những **bản cài đặt sai
-NÀO**, (c) chạy **đột biến** trên bản sao trong bộ nhớ rồi khôi phục. Cả ba tiếp tục đẻ ra phát hiện thật trong
-**cả 6 task** phiên này.
+### 4b. Cách viết prompt có hiệu quả
 
-**Tinh chỉnh phiên này bổ sung: một giá trị kỳ vọng DẪN TỪ CHÍNH THỨ ĐANG KIỂM thì không chứng minh gì.**
-Ngày tạo bằng cách gọi `formatDate`; chữ badge đọc ngược ra từ từ điển; digest HMAC do chính bản cài đặt sinh ra
-— cả ba trôi cùng lỗi và luôn xanh. Task 3.1 tính mọi digest kỳ vọng bằng `openssl` **ngoài project**, và
-quality-fixer dẫn lại độc lập bằng Python; cả bốn khớp. Viết đúng yêu cầu đó vào prompt.
+Yêu cầu executor: (a) quan sát **ĐỎ thật** trước khi xanh, (b) nêu rõ mỗi ca kiểm bác bỏ những **bản cài đặt
+sai NÀO**, (c) chạy **đột biến** trên bản sao trong bộ nhớ rồi khôi phục, (d) **một giá trị kỳ vọng DẪN TỪ
+CHÍNH THỨ ĐANG KIỂM thì không chứng minh gì** — kể cả dẫn từ đầu vào mà chính bài kiểm dựng ra.
 
-### 4c. Hai quyết định orchestrator, cả hai giải được mà không cần kỹ sư — tiền lệ để dùng lại
+**Bổ sung phiên này:** khi ca kiểm chạm hai trường cùng kiểu (hai mốc thời gian, hai chuỗi), **bắt buộc gieo
+hai giá trị KHÁC NHAU**. Bằng nhau thì phép hoán vị vô hình. Đây là cách Task 3.5 bị lọt.
 
-- **Task 2.4 leo thang `design_compliance_violation`**: render ngày đặt lại làm đỏ hai khẳng định trong file test
-  của Task 2.2. Xung đột có thật, **nhưng lệnh đóng băng các file đó đến từ prompt của orchestrator, không phải
-  từ task file**, mà mục scope boundary của task file chỉ nêu ba file. **UI Spec v1.4 § UI-D17 phân xử**: các
-  khẳng định kia mã hoá suy luận TRƯỚC tu chỉnh ("không truyền prop ⇒ không có ngày"), thứ mà Task 0.3 đã lật.
-  Chỉ sửa đúng hằng số kỳ vọng đã cũ. **Bài học: khi executor leo thang, kiểm xem ràng buộc bị vi phạm nằm ở
-  task file hay ở prompt — nguồn khác nhau thì thẩm quyền khác nhau.**
-- **Runner còn thiếu ở Task 2.5**: cấp phép như một **thiếu sót cơ học của plan Task 0.7** (`frontend-task-01`,
-  task sinh ra ba khung làn), **không phải một lựa chọn thiết kế**. Vì vậy nó thuộc phạm vi sửa, không phải
-  phạm vi hỏi.
+### 4c. Tiền lệ orchestrator
+
+- **Vòng rà trả `needs_revision` thì quay lại executor bằng một lần gọi Agent MỚI**, không SendMessage —
+  guide nói rõ mỗi lần gọi là một ngữ cảnh cô lập.
+- Sau khi executor vá, **chạy lại vòng rà** nếu thay đổi có tính cấu trúc (Task 3.4: đổi cả cơ chế cổng canh
+  → chạy lại, và **vòng hai tìm ra lỗ `-t`**). Nếu vòng rà nêu đích danh N con đột biến và executor đã giết
+  đủ N kèm đầu ra thật, **bỏ qua vòng rà thứ ba** (Task 3.2, 3.5 làm thế, không mất gì).
+- **Prettier KHÔNG phải cổng** trong repo này (không script nào gọi). `npm run lint` là
+  `eslint --max-warnings 0`. Đừng bắt agent reformat để chiều prettier — và ca (h) của INT-2 khẳng định trên
+  **văn bản nguồn** của `queries.ts`, nên reformat file đó sẽ làm nó đỏ.
 
 ## 5. Làn test và nền xanh (số phải tái lập được TRƯỚC khi tin thay đổi của chính mình)
 
-### 5a. Có một làn MỚI
+### 5a. Làn integration nay CHẠY THẬT
 
-`SOURCE/vitest.fixture.config.ts` + script `npm run test:fixture` được tạo ở `d63a7b7`. Trước đó,
-**KHÔNG config đã commit nào thu `tests/e2e/fixture/**`** — FE-2 và sáu driver script anh em **chưa từng chạy
-trong bất kỳ làn đã commit nào**.
+`npm run test:integration` đi từ exit 1 ("No test suite found in file") sang **16 ca xanh, exit 0** trên dev.
+INT-3 vào ở `0ebf47d`, INT-2 vào ở `5cdbc23`. **INT-1 vẫn chỉ có comment** — thuộc task sau.
 
-- Làn này **không cần database, không cần credential, không chạm mạng** (khác hẳn `test:integration` /
-  `test:localdb`), nên nó an toàn để vào cổng CI.
-- `exclude` **liệt kê ĐÍCH DANH sáu script chỉ-có-comment** (history, rating, short-answer-scoring, ba file
-  support-*) thay vì lọc theo mẫu, để mỗi chỗ thiếu vẫn nhìn thấy được; **bật lại một file là xoá đúng một dòng**.
-  **Khi danh sách đó rỗng, gộp làn này vào `npm test`.**
-- `include` glob theo **thư mục**, nên một ca fixture-e2e mới được thu tự động, không phải sửa config.
+**Cổng canh của làn này là một `throw` ở phạm vi module, lúc thu thập.** KHÔNG phải `describe.skipIf`, KHÔNG
+phải `HAS_LIVE_DB`, KHÔNG phải một ca kiểm đã đăng ký. Hình dạng đó là kết quả của hai vòng rà (xem §4a mục 2)
+— **đừng khôi phục lại bất kỳ hình dạng nào trong ba cái kia.** Đo cả hai chiều: thiếu credential kèm bộ lọc
+`-t` → exit 1 và gọi tên biến thiếu; đủ credential kèm cùng bộ lọc → vẫn xanh.
 
 ### 5b. Nền xanh hiện tại
 
 | Lệnh (chạy trong `SOURCE/`) | Kết quả phải tái lập |
 |---|---|
-| `npm test` | **1105 pass / 10 skip** (98 file pass, 1 skip) |
+| `npm test` | **1164 pass / 10 skip** (101 file pass, 1 skip) |
 | `npm run test:fixture` | **23 pass, exit 0** |
+| `npm run test:integration` | **16 pass, exit 0** — chạm dev thật |
 | `npx tsc --noEmit` | **0** |
-| `npm run lint` (`eslint --max-warnings 0`) | sạch |
-| `npm run test:integration`, `npm run test:localdb` | **vẫn exit 1**, "No test suite found in file" |
+| `npm run lint` | sạch |
+| `npm run check:bundle` | exit 0 |
+| `npm run test:localdb` | **vẫn exit 1**, "No test suite found in file" |
 | `next build` | xanh **chỉ khi tắt sandbox** (xem §6) |
 
-- Hai làn exit 1 là **CỐ Ý** (khung mới chỉ có comment). **Đừng bao giờ thêm `--passWithNoTests`** — làm thế là
-  xoá đúng tín hiệu cho biết ca integration chưa được điền.
+- `test:localdb` exit 1 là **CỐ Ý** (khung Pha 6 chỉ có comment). **Đừng bao giờ thêm `--passWithNoTests`.**
 - **Flake đã biết, đừng đuổi:** `components/tutor/ExplainStepAffordance.test.tsx` timeout 5000ms khi chạy song
-  song lúc cache lạnh; chạy riêng **5/5 trong khoảng 3 giây**. Phiên này nó nổ vài lần và **lần nào chạy riêng
-  cũng pass**.
+  song lúc cache lạnh; chạy riêng **5/5 trong khoảng 3 giây**. Phiên này nổ đúng một lần.
+- Sau mỗi lần chạy làn integration, **`payment_orders` trên dev phải về 0 dòng**. Phiên này kiểm sau mọi lượt.
 
-### 5c. Bẫy môi trường thứ hai, nay đã xác nhận hai lần: múi giờ
+### 5c. Bẫy môi trường: múi giờ
 
-Máy dev này chạy **`TZ=Asia/Saigon`** — **đúng cái múi giờ mà `lib/format/datetime.ts` ghim**
-(`Asia/Ho_Chi_Minh`). Hệ quả: một formatter **không ghim** vẫn render y hệt **ở đây** và xanh một cách vô cớ,
-trong khi Vercel chạy UTC.
-
-- Cả bộ test format lẫn FE-2 **tự ép `process.env.TZ`** và mang một **ca canh gác** khẳng định phép ghim đã có
-  hiệu lực.
-- Ca canh gác **chịu lực thật**, đã chứng minh: reviewer bẻ formatter **VÀ** xoá luôn phần ghim → **22 ca xanh,
-  chỉ ca canh gác đỏ**.
-- Khi viết bất kỳ ca kiểm nào chạm ngày/giờ: chọn instant **khác NGÀY LỊCH** giữa UTC và ICT (ví dụ
-  `2026-08-18T17:30:00.000Z`), đừng chọn instant chỉ khác giờ.
+Máy dev chạy **`TZ=Asia/Saigon`** — đúng múi giờ mà `lib/format/datetime.ts` ghim (`Asia/Ho_Chi_Minh`). Một
+formatter **không ghim** vẫn render y hệt **ở đây** và xanh vô cớ, trong khi Vercel chạy UTC. Khi viết ca kiểm
+chạm ngày/giờ: chọn instant **khác NGÀY LỊCH** giữa UTC và ICT (ví dụ `2026-08-18T17:30:00.000Z`), đừng chọn
+instant chỉ khác giờ. Task 3.3 làm đúng thế.
 
 ## 6. Sự thật môi trường (tốn thời gian để phát hiện lại)
 
 - **`TaskCreate` / `TaskUpdate` KHÔNG tồn tại.** Mọi agent sẽ báo thiếu. Bảo agent bỏ lệnh gọi đó nhưng vẫn làm
-  phần việc bên dưới; đây không phải blocker.
+  phần việc bên dưới; không phải blocker. **Hệ quả cho orchestrator: bước "đăng ký toàn bộ flow bằng TaskCreate"
+  mà recipe bắt buộc là KHÔNG làm được** — theo dõi vị trí bằng `_overview-subscription-work-plan.md` + file này,
+  và **nói thẳng với người dùng** thay vì lặng lẽ bỏ.
 - **`next build` TREO vô hạn dưới sandbox mặc định** (turbopack node transform pool: khoảng 2.2 CPU-giây trong
-  20 phút, không ghi gì, không báo lỗi). Chạy với `dangerouslyDisableSandbox: true`. **TREO chứ không FAIL** —
-  đã tốn 35 phút mới phát hiện. `vitest` / `tsc` / `eslint` chạy bình thường trong sandbox.
-- **Bash tool bọc lệnh trong nháy đơn**, nên **nội dung có dấu nháy đơn phá cú pháp shell** ("unexpected EOF").
-  Viết file dài bằng Write tool, đừng heredoc. Commit message tránh dấu nháy đơn.
+  20 phút, không ghi gì, không báo lỗi). **TREO chứ không FAIL.** Chạy với `dangerouslyDisableSandbox: true`.
+  `vitest` / `tsc` / `eslint` chạy bình thường trong sandbox.
+- **Bẫy cwd của runner — mới, tốn 2 lần đỏ oan:** spawn với `cwd: "e:/…"` (chữ ổ đĩa THƯỜNG) làm Vite phân giải
+  module id khác với npm, và `vi.mock("server-only")` **trượt trong im lặng**; file rồi fail lúc collect vì lý do
+  chẳng liên quan gì tới code. **Luôn dùng `E:\…` đúng như npm.**
+- **`2>&1` trong `execSync` làm HỎNG exit code trên nền này** — báo thành công khi thất bại và ngược lại. Đọc
+  trạng thái thật bằng `spawnSync` trên `node_modules/vitest/vitest.mjs`. Đã sinh ra một kết quả "all killed" giả.
+- **Bash tool bọc lệnh trong nháy đơn**, nên **nội dung có dấu nháy đơn phá cú pháp shell**. Viết file dài bằng
+  Write tool, đừng heredoc. Commit message tránh dấu nháy đơn.
 - **App root là `SOURCE/`**, không phải gốc repo. `SOURCE/AGENTS.md` cảnh báo bản Next.js này khác dữ liệu huấn luyện.
 - `test-rls.ts` chạy độc lập bằng `npx tsx supabase/test-rls.ts` (93 phép kiểm), **không** qua vitest.
 - **`npm run verify:schema` = `npx tsx supabase/verify-schema.ts`**, độc lập, chạm DB thật — **không** nằm trong
   `check:bundle`. Script ở `SOURCE/package.json:15` (task file ghi `:13`, sai).
-- **Vitest không có `setupFiles`:** không có matcher `jest-dom`; jsdom khai theo từng file bằng chỉ thị
-  `@vitest-environment jsdom` ở **dòng 1**; `render()` **không** tự cleanup.
+- **Vitest không có `setupFiles` ở BẤT KỲ làn nào:** không có matcher `jest-dom`; jsdom khai theo từng file bằng
+  chỉ thị `@vitest-environment jsdom` ở **dòng 1**; `render()` **không** tự cleanup.
 - Import thừa là **lỗi chí mạng** dưới `eslint --max-warnings 0`.
 - **Ghi tiến độ: Notion qua Composio, database `3b378ba6-ae12-803c-8500-c572b6fc745f`.** `PROCESS.md` đã bị xoá
-  khỏi repo — đừng ghi vào đó.
+  khỏi repo. **Lưu ý: phiên 4 không có dòng nào trong database đó** — đã ghi chú trong dòng của phiên 5.
 
 ## 7. Phiên bản tài liệu hiện tại
 
@@ -193,7 +190,7 @@ trong khi Vercel chạy UTC.
 |---|---|
 | `docs/prd/subscription-prd.md` | v1.6 |
 | `docs/ui-spec/subscription-ui-spec.md` | **v1.6** — thẩm quyền về UI, có mệnh đề Phase Inversion |
-| `docs/design/subscription-backend-design.md` | **v1.9** (lên từ v1.8 ở `c435bce`) |
+| `docs/design/subscription-backend-design.md` | **v1.9** (mục `:1199` sửa câu chữ ở `18872cd`, không lên phiên bản) |
 | `docs/design/subscription-frontend-design.md` | **v1.6** |
 | `docs/plans/subscription-work-plan.md` | **v1.3** |
 
@@ -204,72 +201,70 @@ bảng liệt kê delta v1.3→v1.6 và quy tắc bác bỏ. **Đừng "sửa" n
 
 ## 8. Việc mở thuộc về kỹ sư
 
-### 8a. BU-1…BU-6 (không đổi từ phiên trước)
+### 8a. BU-1…BU-6 (không đổi)
 
 | # | Mục | Chặn gì |
 |---|---|---|
-| **BU-1** | **TBD-02 nội dung pháp lý** | **bật bán + test webhook tiền thật.** `docs/legal/refund-policy.md` còn 3 chỗ chưa điền, chưa nêu pháp nhân bán; **chưa có bản Terms nào** dù R11 đòi 2 trang |
+| **BU-1** | **TBD-02 nội dung pháp lý** | **bật bán + test webhook tiền thật.** `docs/legal/refund-policy.md` còn 3 chỗ chưa điền; **chưa có bản Terms nào** dù R11 đòi 2 trang |
 | **BU-2** | ADR-0018 thư viện QR | không chặn gì |
 | **BU-3** | E-01 phạm vi AC-034 | không chặn gì |
 | **BU-4** | U2 đơn giá thật | **bật bán** — chặn qua BU-6 |
 | **BU-5** | Metric #9 baseline | **bật bán** — truy vấn `telemetry_log` 14 ngày, phải chạy TRƯỚC khi bật bán (AC-055) |
 | **BU-6** | **Đích ghi bền cho AI usage chưa được thiết kế** | **Task 1.6** (không sinh file thực thi), rồi BU-4 |
 
-Chuỗi: **BU-6 → Task 1.6 → BU-4 → Task 6.8.** Không gì trong Pha 2–5 phụ thuộc nó.
+Chuỗi: **BU-6 → Task 1.6 → BU-4 → Task 6.8.** Không gì trong Pha 2–5 phụ thuộc nó. BU-6 đã ghi thành **E-03**
+trong backend DD (Task 0.9), đòi một bản sửa DD thiết kế đủ 6 phần. **Cấm mọi task tự chọn sink.**
 
-**BU-6 đã được ghi thành E-03 trong backend DD** (Task 0.9): nêu rõ mệnh đề nào bị rút, và yêu cầu một bản sửa DD
-thiết kế đủ 6 phần — tên bảng; danh sách cột đầy đủ gồm tách token vào/ra kèm `thoughtsTokenCount` tính theo giá
-output và chiều `role`; FK kèm `on delete`; RLS policy; tập revoke/grant nêu đích danh; ảnh hưởng vân tay §17.
-**Cấm mọi task tự chọn sink.**
-
-### 8b. Phát sinh phiên 4 (mã OP-* chỉ dùng trong file này, không tài liệu nào khác biết)
+### 8b. Việc mở mang mã OP-* (chỉ dùng trong file này)
 
 | # | Mục | Cần input gì để gỡ | Ai sở hữu |
 |---|---|---|---|
-| **OP-1** | **`FIXTURE_ENTITLEMENT_KNOWN` / `_EXHAUSTED` mô tả một hình dạng người dùng backend KHÔNG tạo ra được**: chúng trải `FREE_FALLBACK` (`plan: "free"`) nhưng mang `FIXTURE_TUTOR_LIMIT = 500`, tức `PLAN_LIMITS.premium.tutor` (free là 5); và `FIXTURE_UPLOAD_LIMIT = 5` **không khớp plan NÀO** (free 3, premium 15) | Một quyết định: sửa số fixture cho khớp một plan **và** sửa kèm mọi khẳng định FE-2 ghim theo số đó, hay giữ nguyên và ghi lý do | **Chủ sở hữu module fixture.** Hiện **vô hại** — `TutorQuotaNote` không bao giờ đọc `PLAN_LIMITS` — và **cố ý KHÔNG sửa**, vì các khẳng định FE-2 ghim theo chính con số này. Đã ghi thành comment ngay tại chỗ khai báo ở `c435bce` |
-| **OP-2** | **`ADR-0015` mang cùng lớp mục nát trích dẫn `schema.sql`** mà `c435bce` đã vá cho backend DD và work plan: `:1574` (literal vân tay), cùng `:1385`, `:1429`, `:1513`, `:1009-1015` | Một đợt vệ sinh tài liệu đọc lại từng neo trong file rồi vá — **vá số dòng mà không đọc lại chính là đẻ lại khuyết tật** | Đợt vệ sinh tài liệu kế tiếp (ngoài phạm vi `c435bce`) |
-| **OP-3** | **Một câu hỏi bảo mật cố ý để ngỏ ở Task 3.1**: adapter chỉ ánh xạ ba literal trạng thái mà nguồn trong repo ghi nhận (`PENDING` / `SUCCEEDED` / `CANCELLED`); giá trị khác rơi về `"unknown"` (fail-closed, cứu được bằng `recheckOrder`) | **Một lần giao THẬT ở plan Task 6.7.** Nếu nó dùng literal khác cho trạng thái đã trả tiền, **`toPaymentStatus()` là đúng một dòng cần sửa** | Task 6.7 (webhook tiền thật) |
-| **OP-4** | **Backend DD tự mâu thuẫn, Task 3.1 giải công khai chứ không giải thầm**: mục Consumer Parse Rule của webhook nói HMAC phủ "raw body bytes", còn mục Serialized Format lại quy định canonicalisation `key=value&…` sắp theo khoá của `data`. Digest trên body bytes sẽ **từ chối mọi lần giao thật** | Sửa câu chữ DD cho khớp bản cài đặt: adapter nhận `rawBody: string`, parse **đúng một lần**, **không bao giờ** tuần tự hoá lại, và digest theo canonicalisation nhà cung cấp công bố | Đợt vệ sinh tài liệu kế tiếp — đây là **khuyết tật câu chữ**, không phải khuyết tật code |
+| **OP-1** | `FIXTURE_ENTITLEMENT_KNOWN` / `_EXHAUSTED` mô tả hình dạng người dùng backend KHÔNG tạo ra được (`plan: "free"` nhưng `FIXTURE_TUTOR_LIMIT = 500`; `FIXTURE_UPLOAD_LIMIT = 5` không khớp plan nào) | Sửa số fixture cho khớp một plan **và** sửa kèm mọi khẳng định FE-2 ghim theo số đó, hay giữ nguyên và ghi lý do | Chủ sở hữu module fixture. **Vô hại** hiện tại và **cố ý KHÔNG sửa** — FE-2 ghim theo chính con số này. Đã ghi comment tại chỗ khai báo |
+| **OP-2** | `ADR-0015` mang cùng lớp mục nát trích dẫn `schema.sql`: `:1574`, `:1385`, `:1429`, `:1513`, `:1009-1015` | Một đợt vệ sinh tài liệu **đọc lại từng neo trong file rồi mới vá** — vá số dòng mà không đọc lại chính là đẻ lại khuyết tật | Đợt vệ sinh tài liệu kế tiếp |
+| **OP-3** | Câu hỏi bảo mật cố ý để ngỏ ở Task 3.1: adapter chỉ ánh xạ ba literal trạng thái repo ghi nhận; giá trị khác về `"unknown"` (fail-closed, cứu được bằng `recheckOrder`) | **Một lần giao THẬT ở plan Task 6.7.** Nếu nhà cung cấp dùng literal khác cho trạng thái đã trả tiền, **`toPaymentStatus()` là đúng một dòng cần sửa** | Task 6.7 |
+| **OP-4** | Backend DD tự mâu thuẫn về đầu vào HMAC: Consumer Parse Rule nói "raw body bytes", Serialized Format lại quy định canonicalisation `key=value&…`. Digest trên body bytes sẽ **từ chối mọi lần giao thật** | Sửa câu chữ DD cho khớp bản cài đặt (adapter nhận `rawBody: string`, parse ĐÚNG một lần, không tuần tự hoá lại) | Đợt vệ sinh tài liệu kế tiếp — **khuyết tật câu chữ**, không phải code |
+| **OP-5** | **MỚI.** Chứng minh RLS thật cho phép kiểm chủ sở hữu của `recheckOrder` **chưa có**: ca unit giả lập `@/lib/supabase/server`, nên tiền đề "`orders_select_own` làm đơn của người khác vô hình" do chính bài kiểm cung cấp chứ không phải do cơ chế sinh ra. Một schema thiếu hẳn policy đó vẫn qua được cả 4 ca | Không cần input — **đã có chỗ**: plan Task 6.2 / SVC-2 chạy hai phiên thật | Task 6.2. Ghi ở đây để **đừng tính nghĩa vụ đó là đã hoàn thành** khi lên lịch 6.2 |
+| **OP-6** | **MỚI, nhỏ.** `PAYMENT_ORDER_CHECKOUT_COLUMNS` ở `SOURCE/lib/supabase/service-role.ts:469-472` có comment "một lời khai cho HAI chỗ đọc"; `getMyOrder()` nay là chỗ thứ ba | Sửa con số trong comment | Bất kỳ task nào chạm `service-role.ts` sau này. **Không hành vi nào phụ thuộc** |
 
 ## 9. Nợ kỹ thuật và việc dọn còn nợ
 
-- **Transcription drift:** `subscriptionFixtureData.ts` và `subscriptionServiceFixtures.ts` chép tay type/hằng số
-  của backend; **`tsc` KHÔNG thấy được** vì chúng qua PostgREST dạng chuỗi. Đã trả một phần: Task 1.4 (2 hằng
-  trong làn service chuyển sang import) và Task 3.1 (`FixturePaymentStatusResult` nay dẫn từ
-  `Awaited<ReturnType<typeof getPaymentStatus>>`, và mối nối đó **ràng buộc thật** — thêm một thuộc tính thứ ba
-  vào kiểu trả làm `tsc` đỏ ngay trong file fixture, TS2741). Dòng checklist còn cắm ở backend task
-  **16, 17, 18, 19**. `subscriptionFixtureData.ts:203` vẫn chép tay `39_000`.
-- **Trích dẫn `schema.sql` — đã vá phần lớn, phần còn lại NHỎ và cụ thể:** Task 1.1 chèn 4 khối DDL **NGAY TRƯỚC**
-  header `-- 17. Phiên bản schema`, nên **chỉ những neo tại hoặc dưới điểm chèn mới dịch, đúng 227 dòng**
-  (§17 nay ở `:1824`; file dài 1866 dòng). `c435bce` đã vá 7 trích dẫn trong backend DD + work plan.
-  **`:1381-1382`, `:887-888`, `:1303-1304`, `:1268`, `:1361` và mọi thứ phía trên VẪN ĐÚNG** — bản bàn giao phiên 3
-  ghi `:1381-1382` là mục nát, **điều đó SAI** và đã xác minh lại; đừng "sửa" nó thành sai. Phần còn nợ là OP-2.
-- **`docs/plans/subscription-backend-work-plan.md:50`** (bản **đã bị thay thế**) vẫn bảo implementer chọn sink và
-  còn nêu ưu tiên bảng riêng — đúng cái BU-6 sinh ra để chặn. Không sửa, vì work plan hiện hành ghi rõ việc khai tử
-  file đó là quyết định của kỹ sư. **Chờ kỹ sư: vô hiệu hoá hay lưu trữ.**
-- **Backend DD `:1199`** còn viết tắt `getPaymentStatus() === "paid"`. Reviewer xét là để được. Gộp vào bước
-  Refactor của `backend-task-16` (task kế tiếp).
-- **Checkbox trong `phase0-completion.md`, `phase1-completion.md`, `phase2-completion.md`** còn ô trống dù task đã
-  xong — chỉ là sổ sách, và Final Cleanup sẽ xoá các file này. Nội dung cổng đã được verify thật.
-- **`backend-task-13.md`**: mục "Exit-gate evidence" liệt kê bộ ca TRƯỚC vòng revision (16 checks); mục "Revision
-  after integration-test-reviewer" bên dưới mới là bộ cuối (20 checks). Task 6.4 re-walk nên biết.
-- **Bàn giao trong code còn hiệu lực:** Task 5.1 sở hữu cách mã hoá `AI_BUDGET_FREE_SHARE` (phân số 0.5 hay phần
-  trăm 50 — chưa tài liệu nào nêu; `checkEnv` cố ý chỉ kiểm "số hữu hạn lớn hơn 0").
+- **Transcription drift — đã trả phần lớn.** Phiên này xoá thêm ba khai báo chép tay:
+  `FixtureCheckoutOrder` (Task 3.3), `FixtureRateLimitedRefusal` / `FixtureRecheckOutcome` (Task 3.4),
+  `FixtureMyOrderRow` (Task 3.5). **Mỗi mối nối đều được chứng minh có ràng buộc thật**, không phải giả định:
+  thêm một trường vào kiểu thật làm `tsc` đỏ **ngay trong file fixture** (TS2741), rồi hoàn nguyên. Cả
+  executor lẫn hai tác nhân rà soát đều dựng lại được. **Còn nợ:** `subscriptionFixtureData.ts:203` vẫn chép
+  tay `39_000`.
+- **Trích dẫn `schema.sql`:** phần backend DD + work plan đã vá ở `c435bce`. **`:1381-1382`, `:887-888`,
+  `:1303-1304`, `:1268`, `:1361` và mọi thứ phía trên VẪN ĐÚNG** — bàn giao phiên 3 ghi `:1381-1382` là mục nát,
+  **điều đó SAI**, đã xác minh lại hai lần; đừng "sửa" nó thành sai. Phần còn nợ là OP-2.
+- **`docs/plans/subscription-backend-work-plan.md:50`** (bản **đã bị thay thế**) vẫn bảo implementer chọn sink —
+  đúng cái BU-6 sinh ra để chặn. **Chờ kỹ sư: vô hiệu hoá hay lưu trữ.**
+- **Checkbox trong `phase0/1/2-completion.md`** còn ô trống dù task đã xong — chỉ là sổ sách, Final Cleanup sẽ
+  xoá các file này. Nội dung cổng đã verify thật.
+- **`backend-task-13.md`**: mục "Exit-gate evidence" liệt kê bộ ca TRƯỚC vòng revision (16 checks); mục
+  "Revision after integration-test-reviewer" mới là bộ cuối (20 checks). Task 6.4 re-walk nên biết.
+- **Bàn giao trong code còn hiệu lực:** Task 5.1 sở hữu cách mã hoá `AI_BUDGET_FREE_SHARE` (phân số 0.5 hay
+  phần trăm 50 — chưa tài liệu nào nêu; `checkEnv` cố ý chỉ kiểm "số hữu hạn lớn hơn 0").
+- **`recordPaymentSettlement` KHÔNG truyền `p_period_days`**, dựa vào PostgREST phân giải tham số mặc định của
+  SQL. Cố ý (một lời khai duy nhất cho độ dài kỳ hạn, đặt cạnh `make_interval` dùng nó). **Lần đầu chạm Postgres
+  thật là plan Task 6.1 / SVC-1** — nếu sai thì sai ở đó.
+- **Hai ghi chú cường độ khẳng định ở INT-2**, đã cân nhắc và cố ý không sửa: ca (h) ghim đúng định dạng mã nguồn
+  (`.order("created_at", { ascending: false })`) nên xuống dòng cũng làm đỏ, và nó cấm `.sort(` chứ không cấm
+  `.toSorted(` / `.reverse()`; ca (f) nhận diện mapping bằng 4 khoá nên né được bằng destructuring rename. Cả hai
+  là phòng thủ lớp hai — chứng minh hành vi nằm ở (c)/(d).
 
-## 10. Thứ tự chạy còn lại (30 task)
+## 10. Thứ tự chạy còn lại (26 task)
 
 Từ `docs/plans/tasks/_overview-subscription-work-plan.md`:
 
-- **Pha 3** (còn 8): `backend-16` → `backend-19`, rồi `frontend-06` → `frontend-09` (`backend-15` xong;
-  `frontend-08` là điểm ★ thứ hai)
+- **Pha 3** (còn 4, **tất cả frontend**): `frontend-06` → `frontend-09` (`frontend-08` là điểm ★ thứ hai)
 - **Pha 4** (6): `backend-20`, `frontend-10` → `frontend-14`
 - **Pha 5** (8): `backend-21` → `backend-27`, **`backend-28` ⚠ apply prod (Task 5.8 — quy trình ở §3)**
 - **Pha 6** (8): `backend-29` → `backend-33`, `frontend-15`, **`backend-34` ⚠ tiền thật**, **`backend-35` ⚠ bật bán**
 
-**Ràng buộc thứ tự, giữ nguyên độ nổi bật: `backend-17` / `backend-18` PHẢI chạy trước `backend-19`**
-(CL-01 — `getMyOrder()` phải dùng `toCheckoutOrder()`, nếu không **INT-2 đỏ** vì `pendingUntil` dạng `+00:00`
-khác chuỗi dạng `…Z`). Lớp bẫy này **đã cắn lần nữa ở Task 2.3** (múi giờ/chuỗi thời gian dẫn từ chính thứ đang
-kiểm): **có thật, không phải giả định.**
+**Ràng buộc thứ tự CL-01 đã được thoả và đóng lại** ở `5cdbc23`: `backend-17`/`18` chạy trước `backend-19`, và
+`getMyOrder()` nay dùng `toCheckoutOrder()`. Lớp bẫy sinh ra nó (chuỗi thời gian dẫn từ chính thứ đang kiểm)
+**đã cắn thật hai lần** — Task 2.3 và Task 3.5 — nên đừng coi là giả định.
 
 ## 11. Sau khi hết 50 task
 
