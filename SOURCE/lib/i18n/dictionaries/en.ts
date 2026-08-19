@@ -645,6 +645,61 @@ export const en = {
   "billing.status.cancelled": "Cancelled",
   "billing.status.unrecognised": "Unrecognised",
 
+  // --- C-10 RecheckOrderControl + C-11 PlanSummary (plan Task 3.7) ---------
+  //
+  // BẢY KẾT CỤC, BẢY CÂU, KHÔNG CÂU NÀO TRÙNG CÂU NÀO. Đây là ràng buộc về
+  // NGHĨA chứ không phải về văn phong: "chưa với tới được nhà cung cấp" và
+  // "bạn chưa chuyển tiền" đòi hai hành động NGƯỢC nhau, nên gộp chúng lại là
+  // bảo một người ĐÃ TRẢ đi trả lần nữa (UI Spec C-10, frontend DD Decision 1).
+  //
+  // `stillPending` KHÔNG được mang từ vựng thất bại (AC-036). `role="alert"`
+  // là assertive và không có vai trò lịch sự nào gánh hộ sự phân biệt ấy nữa
+  // (Decision 2, "consequence that does change") — nên toàn bộ nghĩa vụ nằm ở
+  // CHỮ: nói sự thật đang chờ, rồi nói việc cần làm tiếp.
+  //
+  // `amountMismatch` CỐ Ý dẫn tới một CON NGƯỜI: đó là kết cục duy nhất mà tiền
+  // có thể đã dịch chuyển trong khi đường tự động đã dừng. Nút "Send feedback"
+  // của SupportWidget do chính layout này mount, nên câu chữ gọi đúng tên nút
+  // ấy thay vì mở một đường liên hệ thứ hai.
+  "billing.recheck.action": "Check this order again",
+  "billing.recheck.busy": "Checking with the payment provider…",
+  "billing.recheck.settled": "Paid — your Premium period runs to {date}.",
+  "billing.recheck.stillPending":
+    "Still awaiting payment. Transfer the exact amount with the transfer note shown on the payment screen, then check again.",
+  "billing.recheck.notPending": "This order is already closed, so re-checking will not change it.",
+  "billing.recheck.unknownOrder":
+    "We cannot find this order. Use the “Send feedback” button and quote the order code so we can look it up.",
+  "billing.recheck.amountMismatch":
+    "The amount received does not match this order. Use the “Send feedback” button and quote the order code — a person has to settle this one.",
+  "billing.recheck.providerUnavailable":
+    "We could not reach the payment provider. Nothing about your order changed; try again shortly.",
+  "billing.recheck.rateLimited": "You checked several times in a row. Wait a moment, then check again.",
+  // Nhãn của C-15 (S-06). Nằm ở đây vì C-10 là component DUY NHẤT render nó:
+  // `variant` chọn nhãn, và một wrapper không cấp được nhãn nếu không có prop
+  // (frontend DD § E1).
+  "billing.confirm.action": "I have transferred — check now",
+
+  // C-11. Câu `quota.unavailable` phải nói ĐỦ HAI NỬA — bộ đếm không đọc được,
+  // VÀ quyền truy cập không bị ảnh hưởng — vì `Quota.unknown` là hợp đồng
+  // hỏng-MỞ (UI-D2). In "0" là tuyên bố một sự cạn kiệt mà server không hề
+  // cưỡng chế; in "—" đọc ra "đếm được số không". Cả hai biến một hợp đồng
+  // hỏng-mở thành một MÀN HÌNH hỏng-đóng. Cũng vì thế chuỗi này không được
+  // chứa ký tự "0" hay "—".
+  "billing.quota.unavailable":
+    "We could not read your usage counters just now. This does not restrict your access: everything still works.",
+  "billing.orders.planLabel": "Current plan",
+  "billing.orders.planPremiumUntil": "Premium · until {date}",
+  "billing.orders.planPremiumGrace": "Premium · grace period, expires {date}",
+  "billing.orders.resetLabel": "Period resets",
+  // Hai khoá RIÊNG cho hai hạn mức, và chữ của chúng khác nhau đến tận danh từ
+  // cuối câu: một lần hoán nhầm tutor↔upload phải NHÌN THẤY ĐƯỢC trên màn hình
+  // chứ không chỉ sai con số. `billing.quota.remaining` KHÔNG dùng lại được —
+  // nghĩa của nó là ĐÃ DÙNG, và nó chỉ nói về gia sư (frontend DD X-3).
+  "billing.orders.tutorLabel": "Tutor hints",
+  "billing.orders.tutorRemaining": "{count} of {limit} hints left",
+  "billing.orders.uploadLabel": "Exam uploads",
+  "billing.orders.uploadRemaining": "{count} of {limit} uploads left",
+
   // /profile — thông báo lỗi của changeAvatar / changePassword.
   //
   // Server Action trả về KHOÁ, không trả câu chữ của Supabase: thông điệp của

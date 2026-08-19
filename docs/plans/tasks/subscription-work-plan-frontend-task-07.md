@@ -38,9 +38,9 @@ Metadata:
 - `limit − used` **clamped at 0**.
 
 ## Target Files
-- [ ] `SOURCE/components/billing/RecheckOrderControl.tsx` (new)
-- [ ] `SOURCE/app/(billing)/me/orders/_components/PlanSummary.tsx` (new — C-11; place beside the S-05 components per the route-group convention)
-- [ ] `SOURCE/lib/i18n/dictionaries/en.ts`, `SOURCE/lib/i18n/dictionaries/vi.ts` (the seven recheck keys + the remaining S-05 keys)
+- [x] `SOURCE/components/billing/RecheckOrderControl.tsx` (new)
+- [x] `SOURCE/app/(billing)/me/orders/_components/PlanSummary.tsx` (new — C-11; place beside the S-05 components per the route-group convention)
+- [x] `SOURCE/lib/i18n/dictionaries/en.ts`, `SOURCE/lib/i18n/dictionaries/vi.ts` (the seven recheck keys + the remaining S-05 keys)
 
 ## Investigation Targets
 - `docs/ui-spec/subscription-ui-spec.md` (§ Component: `RecheckOrderControl` — C-10 — verify default (idle) + loading (busy) + error + partial (terminal status, `aria-disabled` with reason) states **and all seven** rendered outcomes)
@@ -63,12 +63,12 @@ Metadata:
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
-- [ ] Read all Investigation Targets and copy the seven triples verbatim into the test as **fixed expected strings per locale**
-- [ ] Write the failing assertions: seven sentences, **21 pairwise inequalities** within a locale, the badge state per outcome, one invocation under two synchronous activations, `hasAttribute("disabled") === false` **and** `.disabled === false` in every state, and C-11 unknown branch containing neither `"0"` nor `"—"`
+- [x] Read all Investigation Targets and copy the seven triples verbatim into the test as **fixed expected strings per locale**
+- [x] Write the failing assertions: seven sentences, **21 pairwise inequalities** within a locale, the badge state per outcome, one invocation under two synchronous activations, `hasAttribute("disabled") === false` **and** `.disabled === false` in every state, and C-11 unknown branch containing neither `"0"` nor `"—"`
 ### 2. Green Phase
-- [ ] Implement C-10 and C-11; add all seven keys plus the remaining S-05 keys to **both** dictionaries; run only the added tests
+- [x] Implement C-10 and C-11; add all seven keys plus the remaining S-05 keys to **both** dictionaries; run only the added tests
 ### 3. Refactor Phase
-- [ ] Re-run the i18n identical-string ratio assertion
+- [x] Re-run the i18n identical-string ratio assertion
 
 ## Quality Assurance Mechanisms
 - `npm test` -> `vitest run` — Config: `SOURCE/package.json:10`
@@ -106,12 +106,12 @@ Metadata:
 - **Residual**: agreement between C-11 and the badge after a re-check is asserted in FE-3 and re-checked manually (R-2 / A6).
 
 ## Completion Criteria
-- [ ] All added tests pass: seven sentences, 21 pairwise inequalities, seven badge-state assertions
-- [ ] Exactly one invocation under two synchronous activations; no native `disabled` in any state; `min-h-11`
-- [ ] All seven keys in **both** dictionaries; the identical-string ratio assertion still green
-- [ ] C-11 renders the four AC-056 items in order when both quotas are `known`, and one sentence otherwise with **no `0` and no `—`**; `limit − used` clamped at 0
-- [ ] Every Reference Contracts Compliance Check evaluates to `Y`, with evidence recorded in Investigation Notes
-- [ ] **No production deploy of this branch has occurred**
+- [x] All added tests pass: seven sentences, 21 pairwise inequalities, seven badge-state assertions
+- [x] Exactly one invocation under two synchronous activations; no native `disabled` in any state; `min-h-11`
+- [x] All seven keys in **both** dictionaries; the identical-string ratio assertion still green
+- [x] C-11 renders the four AC-056 items in order when both quotas are `known`, and one sentence otherwise with **no `0` and no `—`**; `limit − used` clamped at 0
+- [x] Every Reference Contracts Compliance Check evaluates to `Y`, with evidence recorded in Investigation Notes
+- [x] **No production deploy of this branch has occurred**
 
 ## Notes
 - Impact scope: `SOURCE/components/billing/RecheckOrderControl.tsx`, C-11, both dictionaries; downstream, plan Tasks 3.9, 4.3.
@@ -119,3 +119,43 @@ Metadata:
 
 ## Investigation Notes
 (Record the seven expected strings per locale, the 21 inequality results, and each Compliance Check result here.)
+
+### Read of Investigation Targets (plan Task 3.7, session 6)
+
+**`docs/ui-spec/subscription-ui-spec.md` § C-10 (`:865-914`)** — Props frozen at `{ orderCode: number; variant: "row" | "primary" }`; `variant` selects **label and `Button` variant only**. Handler order: (1) synchronous `busyRef` early-return before any `setState`, (2) busy ARIA (`aria-busy={true}` boolean + `aria-disabled="true"` string + mutating `aria-describedby` target, **no `aria-live`**), (3) `await recheckOrder(orderCode)`, (4) outcome in a node that **appears** carrying `role="alert"`, (5) clear busy; control stays mounted in every status. Native `disabled` forbidden in every state; `min-h-11`. Seven Result → sentence (key) → badge triples copied verbatim into the test.
+
+**`docs/ui-spec/subscription-ui-spec.md` § C-11 (`:916-955`)** — `<dl>` in one `BentoCell`, four AC-056 items in order (plan, period reset, tutor remaining, uploads remaining); hand-rolled `md:grid-cols-2` (`BentoGrid` hardcodes `sm:grid-cols-12`, `md:` does not override); when either quota is `unknown` the three quota-derived items are replaced by **one** sentence stating both halves — never `0`, never `—`; `limit − used` clamped at 0.
+
+**`docs/design/subscription-frontend-design.md` § Decision 2 / UI-D16 (`:588-676`)** — `router.refresh()` from the client control after the awaited action, before the latch is released; idiom 1 (`role="alert"` on an appearing node) for the outcome, idiom 3 (mutating `aria-describedby`, no `aria-live`) for the busy phase; **no** row-local patch — the server decides what the badge says.
+
+**§ Decision 4 (`:679-712`)** — predicate is `tutor.state === "known" && upload.state === "known"` (**both**, not either); `Math.max(0, limit - used)`; `billing.quota.remaining` must **not** be reused (its semantics are *used*, and it is tutor-specific) — C-11 introduces `billing.orders.tutorRemaining` / `.uploadRemaining`.
+
+**`SOURCE/lib/billing/settleOrder.ts:36-46`** — `SettleResult = { settled: true; expiresAt } | { settled: false; reason: "unknown_order" | "not_pending" | "not_paid_yet" | "amount_mismatch" | "provider_unavailable" }`.
+
+**`SOURCE/lib/billing/orderActions.ts:255-289`** — `recheckOrder(orderCode): Promise<RecheckOutcome>`, `RecheckOutcome = SettleResult | { error: "unauthenticated" | "rate_limited" }`. So the union carries **eight** branches, not seven; the C-10 table covers seven (see the two recorded deviations below).
+
+**`SOURCE/lib/billing/entitlement.tsx` (frozen)** — `useEntitlement()` returns `FREE_FALLBACK` outside a provider; `Quota` narrowing is by `state === "known"`, and `resetsAt` lives inside that variant.
+
+**`SOURCE/components/billing/OrderStatusBadge.tsx`** — badge word comes from `billing.status.*`; glyph is `aria-hidden`. Fixed words pinned by `OrderStatusBadge.test.tsx`: `pending` = "Awaiting payment" / "Chờ thanh toán", `paid` = "Paid" / "Đã thanh toán".
+
+**Dictionaries** — every S-05 foundation key (`billing.orders.title/.empty/.emptyHint/.createdAt/.orderCode/.continuePaying/.loadError`, `billing.amount`, the five `billing.status.*`) already shipped in Task 2.3/3.6. Remaining for this task: the seven `billing.recheck.*` outcome keys, `billing.recheck.action`, `billing.recheck.busy`, `billing.confirm.action` (C-10's `primary` label), `billing.quota.unavailable`, and C-11's item keys.
+
+### Two recorded deviations (neither is in this task's Completion Criteria or Reference Contracts)
+
+1. **Terminal-status `aria-disabled` is NOT implemented here.** The DD (`:745-752`) requires `paid`/`expired`/`cancelled` ⇒ `aria-disabled="true"` + a reason bound by `aria-describedby` + an early-returning handler. That needs the control to know the order's `status`, but **both** the UI Spec (`:869`) and the DD (`:738`) freeze the props at exactly `{ orderCode, variant }`, and the UI Spec's i18n inventory (`:1208-1209`) budgets **no** key for the terminal reason. Implementing it would require an unspecified third prop plus an unbudgeted key, for a branch no Completion Criterion or Reference Contract asserts, and with **no caller yet** (C-10 is mounted by plan Tasks 3.8/3.9/4.3). Deferred as a handoff: whoever mounts C-10 must decide the prop and the key.
+2. **`{ error: "unauthenticated" }` has no row in the C-10 table**, but it is a branch of `RecheckOutcome` and must be handled for exhaustiveness. It reuses the shipped `profile.error.sessionExpired` (present in both locales, exact semantics) rather than inventing an eighth `billing.recheck.*` key — the dictionary's own reuse convention (`en.ts:5-6`). A thrown exception (a real DB failure, not an outcome) renders the shipped generic `billing.orders.loadError`, which is what plan Task 3.9's *"NOT EQUAL to the generic error string"* presupposes exists. Both are asserted distinct from all seven.
+
+### Reference Contracts — Compliance Check results (Exit Gate re-evaluation)
+
+| # | Contract | Result | Evidence |
+|---|---|---|---|
+| 1 | C-10 — all seven outcomes render their own sentence from their own key; badge after re-render matches the third column | **Y** | `RecheckOrderControl.test.tsx` — 7 EN + 7 VI fixed-string cases, each also compared against `dict[key]`; 21 pairwise inequalities per locale (`distinct = 7/7`, `equalPairs = 0`); 7 badge before→after cases plus a case asserting the set of badge-changing outcomes is exactly `["{settled:true}"]`. Mutants M1–M4 and D1–D2 (shared sentence / swapped keys / byte-identical dictionary values) all **KILLED**. |
+| 2 | C-11 — the four AC-056 items, in this order, when both quotas are `known` | **Y** | `PlanSummary.test.tsx` — `terms` and `values` compared with `toEqual` against ordered four-element arrays, per locale. Mutants N4, N5, N8, N9 (wrong source, swapped quotas, collapsed grace, wrong plan word) **KILLED**. |
+| 3 | C-11 — with either quota `unknown`, the output contains neither `"0"` nor `"—"` and shows one sentence covering both facts | **Y** | Both-unknown, tutor-only-unknown and upload-only-unknown cases; `text` asserted `not.toContain("0")` and `not.toContain("—")`; exactly one node carries the sentence; both halves of the sentence asserted separately. Mutants N1 (BOTH→EITHER), N6 (sentence → em dash), N7 (branch removed) and D4 (a `0` and an em dash added to the copy) **KILLED**. |
+
+### Verification evidence
+
+- `npm test` — **1252 passed | 10 skipped** (107 files passed, 1 skipped); baseline was 1182/10 over 105 files, so the 70 added cases (51 C-10 + 19 C-11) are the whole delta and nothing regressed.
+- `npm run test:fixture` 23 passed · `npm run test:integration` 16 passed · `npx tsc --noEmit` exit 0 · `npm run lint` exit 0 · `npm run test:localdb` still the deliberate exit 1 (`No test suite found in file`), no `--passWithNoTests` added.
+- Mutation pass: **33 mutants, 33 killed, 0 survived** (19 on C-10, 4 on the dictionaries, 10 on C-11), each applied to an in-memory copy and the original bytes restored afterwards; exit status read through `spawnSync`, never through `execSync` with `2>&1`.
+- Thin spot in the mutant set, stated rather than hidden: a mutant that merely **unpins** the date formatter cannot be killed on this machine, because its timezone (`Asia/Saigon`) equals the pinned zone. M15 therefore pins the mutant to `UTC` to prove the assertion is timezone-sensitive at all; the true "unpinned formatter" case is only observable on a UTC runtime.

@@ -586,6 +586,35 @@ export const vi: Dictionary = {
   "billing.status.cancelled": "Đã huỷ",
   "billing.status.unrecognised": "Không xác định",
 
+  // --- C-10 RecheckOrderControl + C-11 PlanSummary (plan Task 3.7) ---------
+  // Xem khối tương ứng ở en.ts cho lý do của từng câu. Bảy câu ở đây cũng phải
+  // ĐÔI MỘT KHÁC NHAU, và `stillPending` cũng không được mang từ vựng thất bại.
+  "billing.recheck.action": "Kiểm tra lại đơn này",
+  "billing.recheck.busy": "Đang hỏi lại nhà cung cấp thanh toán…",
+  "billing.recheck.settled": "Đã thanh toán — kỳ Premium của bạn chạy tới {date}.",
+  "billing.recheck.stillPending":
+    "Vẫn đang chờ khoản chuyển. Bạn chuyển đúng số tiền kèm nội dung chuyển khoản ghi trên màn hình thanh toán, rồi kiểm tra lại.",
+  "billing.recheck.notPending": "Đơn này đã đóng rồi, nên kiểm tra lại cũng không đổi được gì.",
+  "billing.recheck.unknownOrder":
+    "Chúng tôi không tìm thấy đơn này. Bạn bấm nút “Gửi phản hồi” và gửi kèm mã đơn để chúng tôi tra giúp.",
+  "billing.recheck.amountMismatch":
+    "Số tiền nhận được không khớp với đơn này. Bạn bấm nút “Gửi phản hồi” và gửi kèm mã đơn — trường hợp này cần một người xử lý.",
+  "billing.recheck.providerUnavailable":
+    "Chúng tôi chưa liên lạc được với nhà cung cấp thanh toán. Đơn của bạn không có gì thay đổi; bạn thử lại sau ít phút.",
+  "billing.recheck.rateLimited": "Bạn vừa kiểm tra liên tiếp nhiều lần. Chờ một chút rồi kiểm tra lại nhé.",
+  "billing.confirm.action": "Tôi đã chuyển khoản — kiểm tra ngay",
+
+  "billing.quota.unavailable":
+    "Chưa đọc được bộ đếm lượt dùng của bạn lúc này. Việc đó không hạn chế quyền truy cập: mọi thứ vẫn chạy bình thường.",
+  "billing.orders.planLabel": "Gói hiện tại",
+  "billing.orders.planPremiumUntil": "Premium · đến {date}",
+  "billing.orders.planPremiumGrace": "Premium · đang ân hạn, hết hạn {date}",
+  "billing.orders.resetLabel": "Kỳ đặt lại vào",
+  "billing.orders.tutorLabel": "Lượt gia sư",
+  "billing.orders.tutorRemaining": "Còn {count}/{limit} lượt gia sư",
+  "billing.orders.uploadLabel": "Lượt tải đề",
+  "billing.orders.uploadRemaining": "Còn {count}/{limit} lượt tải đề",
+
   // /profile — xem chú thích tương ứng trong en.ts.
   "profile.error.sessionExpired": "Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.",
   "profile.error.rateLimited": "Thao tác quá nhiều lần. Thử lại sau {seconds} giây.",
