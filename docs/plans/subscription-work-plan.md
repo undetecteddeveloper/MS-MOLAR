@@ -596,7 +596,7 @@ flowchart LR
 - [ ] ★ **Early verification point passed**: a seeded Premium row makes a gated component render a real plan and a real remaining count; a new account reads `free`
 - [ ] One render test per route group asserting a gated child does **not** receive `FREE_FALLBACK`, both green
 - [ ] Formatter and C-09 unit tests green, including the fabricated-status case
-- [ ] `formattedResetDate` no longer declared on `TutorQuotaNote`; the mount passes no prop
+- [x] `formattedResetDate` no longer declared on `TutorQuotaNote`; the mount passes no prop
 - [ ] FE-2 passes against the real route tree
 - [x] The period-start derivation has exactly one implementation (`periodStartEpoch()` in `quota.ts`), imported by the read path — Task 2.1, 2026-08-19; the counter-key template likewise has one construction site (`quota.ts:64`), scanned by test
 - [ ] **No production deploy of this branch has occurred** — this phase's code reads `subscriptions`, which production does not have until Task 5.8 (see Deployment Sequencing)

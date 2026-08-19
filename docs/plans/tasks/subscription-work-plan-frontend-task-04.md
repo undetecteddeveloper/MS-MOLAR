@@ -23,8 +23,8 @@ Mount at `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.
 **Depends on plan Task 2.2.** Without the `(layer2)` provider this mount renders `null` on **every** render, for **every** user, forever — **and lint, build and the component own unit test all pass through that**.
 
 ## Target Files
-- [ ] `SOURCE/components/billing/TutorQuotaNote.tsx` (prop retired; self-formatting inside the `known` branch)
-- [ ] `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` (`:177`, `:230` — two mounts, **no props**)
+- [x] `SOURCE/components/billing/TutorQuotaNote.tsx` (prop retired; self-formatting inside the `known` branch)
+- [x] `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` (now `:180`, `:234` — two mounts, **no props**)
 
 ## Investigation Targets
 - `docs/ui-spec/subscription-ui-spec.md` (§ Component: `TutorQuotaNote` — C-06 — verify default (`known`) + empty (`unknown` ⇒ `null`) states)
@@ -45,13 +45,13 @@ Mount at `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
-- [ ] Read all Investigation Targets, **starting with the plan Task 0.3 amendment** — confirm it has landed before writing code
-- [ ] **Boundary sweep**: grep for every `TutorQuotaNote` usage and every `formattedResetDate` reference; list them
-- [ ] Write the failing unit test for the `unknown ⇒ null` branch (provider-wrapped)
+- [x] Read all Investigation Targets, **starting with the plan Task 0.3 amendment** — confirm it has landed before writing code
+- [x] **Boundary sweep**: grep for every `TutorQuotaNote` usage and every `formattedResetDate` reference; list them
+- [x] Write the failing unit test for the `unknown ⇒ null` branch (provider-wrapped)
 ### 2. Green Phase
-- [ ] Retire the prop; format inside the `known` branch; mount at `:177` and `:230` with no props; run only the added tests
+- [x] Retire the prop; format inside the `known` branch; mount at `:177` and `:230` with no props; run only the added tests
 ### 3. Refactor Phase
-- [ ] Confirm `formattedResetDate` no longer appears anywhere in the repository
+- [x] Confirm `formattedResetDate` no longer appears in `SOURCE/components/**` or `SOURCE/app/**` (see Investigation Notes for the three deliberate, out-of-scope survivals)
 
 ## Quality Assurance Mechanisms
 - `npm test` -> `vitest run` — Config: `SOURCE/package.json:10`
@@ -73,11 +73,11 @@ Mount at `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.
 - **Residual**: **this task cannot discharge AC-042.** FE-2 (plan Task 2.5) and the manual pass (plan Task 6.5, item iv) discharge it.
 
 ## Completion Criteria
-- [ ] All added tests pass
-- [ ] `formattedResetDate` no longer declared on `TutorQuotaNote`; **the mount passes no prop** at either site
-- [ ] The `unknown ⇒ null` behaviour at `:30` is unchanged
-- [ ] The Reference Contracts Compliance Check evaluates to `Y`, with evidence recorded in Investigation Notes
-- [ ] **No production deploy of this branch has occurred**
+- [x] All added tests pass (16/16 in `TutorQuotaNote.test.tsx`); full suite **1078 pass / 10 skip across 97 files**
+- [x] `formattedResetDate` no longer declared on `TutorQuotaNote`; **the mount passes no prop** at either site
+- [x] The `unknown ⇒ null` behaviour is unchanged (now `:39`; asserted for both locales)
+- [x] The Reference Contracts Compliance Check evaluates to `Y`, with evidence recorded in Investigation Notes
+- [x] **No production deploy of this branch has occurred**
 
 ## Notes
 - Impact scope: `TutorQuotaNote` and the result-detail page; downstream, FE-2 and the manual pass.
@@ -85,4 +85,85 @@ Mount at `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.
 - Ordering: plan Task 0.3 (document amendment) → **this task**. Implementing before the amendment reproduces the unbuildable server-computed-prop design.
 
 ## Investigation Notes
-(Record the boundary sweep, the retired prop references, and the Compliance Check result here.)
+
+### plan Task 0.3 amendment — CONFIRMED landed (checked before any code was written)
+
+- `docs/ui-spec/subscription-ui-spec.md` § UI-D17 now reads: "**The mount passes no prop.** The component formats its own `resetsAt` from **provider context** — `formatDate(tutor.resetsAt, locale)` (UI-D12), with `locale` from `useLocale()` — inside the existing `tutor.state === \"known\"` branch", plus the "*Corrected in v1.4 — the server-side producer this decision named cannot exist*" paragraph.
+- § C-06 delta retitled "mounted, and the reset date is formatted inside the component (corrected in v1.4)".
+- `docs/design/subscription-frontend-design.md` `ui:06` (`:370`) and X-13 (`:1208`) both state the no-prop mount.
+- Conclusion: implementing against the amended (v1.4) text, not the pre-amendment server-computed-prop design.
+
+### Boundary sweep — BEFORE
+
+`TutorQuotaNote` usages (code):
+| Location | Form |
+|---|---|
+| `SOURCE/components/billing/TutorQuotaNote.tsx` | definition, `({ formattedResetDate }: { formattedResetDate?: string })` |
+| `SOURCE/app/(layer2)/__tests__/layout.test.tsx:76,201` | `<TutorQuotaNote />` — already no props (Task 2.2) |
+| `SOURCE/app/(layer4)/__tests__/layout.test.tsx:61,181` | `<TutorQuotaNote />` — already no props (Task 2.2) |
+| `result/detail/page.tsx` | **no mount** — the gap this task closes |
+
+No other consumer exists anywhere in `SOURCE/`.
+
+`formattedResetDate` references (code):
+| Location | Form |
+|---|---|
+| `SOURCE/components/billing/TutorQuotaNote.tsx:23` | prop declaration (retired here) |
+| `SOURCE/components/billing/TutorQuotaNote.tsx:35` | tolerant ternary around the reset-date clause (retired here) |
+| `SOURCE/tests/e2e/fixture/subscription.fixture.e2e.test.ts:76,85,231` | **comments forbidding** any assertion on the prop |
+
+No call site ever passed the prop — it had no producer, exactly as X-13 records.
+
+### Boundary sweep — AFTER
+
+- **Zero** occurrences of `formattedResetDate` in `SOURCE/components/**` and `SOURCE/app/**` (production code and page mounts).
+- Deliberately surviving, and each is out of this task's Target Files:
+  - `SOURCE/tests/e2e/fixture/subscription.fixture.e2e.test.ts:76,85,231` — prohibition comments. Deleting them would remove the guardrail that tells FE-2 never to assert the prop.
+  - `docs/**` — the v1.4 amendment record (UI-D17, C-06, `ui:06`, X-13). This text must survive; it is the record of the correction.
+  - `SOURCE/components/billing/TutorQuotaNote.test.tsx` — names the retired prop inside the assertions that prove it is gone.
+- `TutorQuotaNote` after: definition + its own test + the two Task 2.2 layout tests + **two** mounts at `page.tsx:180` and `:234`.
+
+### Reference Contracts — Compliance Check
+
+| Row | Result | Evidence |
+|---|---|---|
+| Field Propagation Map (`resetsAt`), state-lifecycle-negative | **Y** | `TutorQuotaNote.tsx` calls `formatDate(tutor.resetsAt, locale)` with `locale` from `useLocale()` inside the `tutor.state === "known"` branch; the component takes **no** parameters (`TutorQuotaNote.length === 0`, asserted); both mounts are the bare tag `<TutorQuotaNote />` (asserted, exactly 2 occurrences). |
+
+### Mount placement
+
+Both mounts sit **outside** the `r.hasBeenWrongTwice === true && (...)` gate, as siblings of it. Placing them inside would mean a Free user who never got the same question wrong twice never sees the allowance — the exact failure C-06's own header comment (`:8-12`) exists to prevent, and what AC-042 forbids. Asserted by the "mount nằm NGOÀI cổng `hasBeenWrongTwice`" case.
+
+### What these tests do NOT prove
+
+The unit test is **provider-wrapped**, so it supplies the very thing production could be missing. It does **not** discharge AC-042. FE-2 (plan Task 2.5, real route tree) and the manual pass (plan Task 6.5 item iv) discharge it.
+
+### Resolved — stale `EXPECTED_NOTE` in the two plan Task 2.2 layout tests
+
+Adding the reset date to the `known` branch turned two **pre-existing** assertions red:
+`SOURCE/app/(layer2)/__tests__/layout.test.tsx:128,280` and `SOURCE/app/(layer4)/__tests__/layout.test.tsx:106,266`.
+
+**What was stale.** Both defined `EXPECTED_NOTE` as the count sentence only, carrying the comment *"Không truyền prop nào, nên không có vế 'Resets on …'"* ("no prop is passed, so there is no 'Resets on …' clause"). That is the **pre-amendment** inference. Plan Task 0.3 overturned it: under UI Spec v1.4 § UI-D17 and frontend DD X-13, the no-prop mount renders the reset date **from context**. The landed mounts were already correct (both are the bare `<TutorQuotaNote />`); only the expected *value* was wrong. `getByText` matches the whole text node, so the added clause made it miss.
+
+**Escalated, then authorised.** This was escalated rather than fixed silently, because bending either side would have been wrong. The orchestrator authorised the correction (option 1) and clarified that the "must remain unmodified" freeze over commit `cef31e7` came from the invocation prompt, not from this task file — whose scope boundary names only `ExplainStepAffordance.tsx`, `entitlement.tsx` and `types.ts`. Decision precedence: the design artifacts settle it.
+
+**What changed** — only the constant and its docblock in each file. Mounts, fixtures, probe helpers, the SkipLink stub and every assertion structure are untouched. Each value was re-derived from that file's **own** fixture `resetsAt`, one file at a time, never pasted:
+
+| File | fixture `resetsAt` | `EXPECTED_NOTE` |
+|---|---|---|
+| `(layer2)` | `2026-08-26T12:00:00.000Z` | `7/500 tutor hints used this period. Resets on 26/08/2026.` |
+| `(layer4)` | `2026-08-24T06:30:00.000Z` | `11/500 tutor hints used this period. Resets on 24/08/2026.` |
+
+The date is written as a **literal**, not as `formatDate(EXPECTED_RESETS_AT, …)`: a expected value derived from the formatter under test moves in the same direction as the formatter and proves nothing. The per-file divergence that `cef31e7` deliberately built in survives — verified by observing `(layer4)` **still red** after `(layer2)` alone was corrected.
+
+**The correction did not weaken the assertion — verified, not assumed.**
+
+| Mutation | Result |
+|---|---|
+| `EntitlementProvider` removed from `(layer2)/layout.tsx` only | **CAUGHT** — `(layer2)` 3 failed, `(layer4)` stayed green |
+| `EntitlementProvider` removed from `(layer4)/layout.tsx` only | **CAUGHT** — `(layer4)` 4 failed, `(layer2)` stayed green |
+| Provider kept, counts correct, **only `resetsAt` corrupted** | **CAUGHT** by the corrected assertion |
+| Same corruption against the **pre-amendment pair** (old component + old count-only constant) | **SURVIVED — 1 passed.** The old assertion was blind to `resetsAt` |
+
+The last two rows together are the evidence for the "strictly more discriminating" claim: the rendered date now proves the value travelled **through context**, where before the assertion could only show the quota was non-fallback. A first attempt to show this by swapping only the constant was inconclusive (the old constant fails on any date under exact `getByText` matching), so the decisive experiment restored the whole pre-amendment pair instead.
+
+Both layouts were restored byte-clean after each mutation (`git diff` on both `layout.tsx` files is empty).

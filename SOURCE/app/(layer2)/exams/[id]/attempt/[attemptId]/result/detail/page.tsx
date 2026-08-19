@@ -15,6 +15,7 @@ import { RichText } from "@/components/shared/RichText";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 import { ExplainStepAffordance } from "@/components/tutor/ExplainStepAffordance";
+import { TutorQuotaNote } from "@/components/billing/TutorQuotaNote";
 
 export default async function ResultDetailPage({
   params,
@@ -176,6 +177,7 @@ export default async function ResultDetailPage({
                     {r.hasBeenWrongTwice === true && (
                       <ExplainStepAffordance questionId={r.questionId} attemptId={attemptId} />
                     )}
+                    <TutorQuotaNote />
                   </>
                 ) : (
                   <>
@@ -229,6 +231,7 @@ export default async function ResultDetailPage({
                     {r.hasBeenWrongTwice === true && (
                       <ExplainStepAffordance questionId={r.questionId} attemptId={attemptId} />
                     )}
+                    <TutorQuotaNote />
                   </>
                 )}
               </li>
