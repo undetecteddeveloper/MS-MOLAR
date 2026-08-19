@@ -679,6 +679,39 @@ export const en = {
   // (frontend DD § E1).
   "billing.confirm.action": "I have transferred — check now",
 
+  // --- S-06 /pricing/checkout — C-12 / C-13 / C-14 / C-15 (plan Task 4.3) ---
+  //
+  // Brand tokens ("payOS", "VietQR") deliberately do NOT appear as whole
+  // values: the identical-string budget (i18n.test.ts:54-59) counts a
+  // byte-identical en/vi pair, and a bare brand name is identical by
+  // construction. The sentence around it is written per locale instead.
+  //
+  // `{time}` arrives ALREADY FORMATTED by formatDateTime() — same rule as
+  // `billing.amount`, and for the same reason (translate.ts:27 substitutes
+  // with a raw String()).
+  "billing.checkout.title": "Complete your payment",
+  "billing.checkout.validUntil": "This payment request is valid until {time}.",
+  "billing.checkout.qrLabel": "Scannable code carrying the transfer details",
+  "billing.checkout.noActiveOrder": "There is no payment in progress right now.",
+  "billing.checkout.account": "Bank account number",
+  "billing.checkout.accountName": "Account holder",
+  "billing.checkout.amountLabel": "Amount",
+  "billing.checkout.memo": "Transfer note",
+  // The memo is the field that loses a user their money: a transfer without it
+  // arrives and matches no order, so the sentence states the consequence
+  // rather than merely asking politely.
+  "billing.checkout.memoWarning":
+    "Copy the transfer note exactly as shown. A transfer without it cannot be matched to this order automatically.",
+  // C-14's Partial state. Not in the UI Spec's v1.2 key budget, which lists no
+  // string for it; reusing one of C-10's seven outcome sentences would give
+  // two different reasons one sentence, which that table forbids.
+  "billing.checkout.fieldMissing":
+    "Some of the transfer details are missing from this order. Use the “Send feedback” button and quote the order code before you send any money.",
+  // AC-039's gate (TBD-02 / BU-1). It must say WHY and WHAT HAPPENS NEXT: the
+  // control is reachable precisely so the user can read this.
+  "billing.confirm.legalPending.reason":
+    "The Terms of Service and Refund Policy are not published yet, so payment cannot be confirmed here. Nothing has been charged.",
+
   // C-11. Câu `quota.unavailable` phải nói ĐỦ HAI NỬA — bộ đếm không đọc được,
   // VÀ quyền truy cập không bị ảnh hưởng — vì `Quota.unknown` là hợp đồng
   // hỏng-MỞ (UI-D2). In "0" là tuyên bố một sự cạn kiệt mà server không hề

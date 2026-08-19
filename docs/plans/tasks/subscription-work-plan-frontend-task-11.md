@@ -25,11 +25,11 @@ Wraps C-10 with `variant="primary"` rather than issuing its own action. `LegalLi
 Add the **S-06 `billing.*` keys to both dictionaries**.
 
 ## Target Files
-- [ ] `SOURCE/app/(billing)/pricing/checkout/_components/VietQrCode.tsx`
-- [ ] `SOURCE/app/(billing)/pricing/checkout/_components/TransferDetails.tsx`
-- [ ] `SOURCE/app/(billing)/pricing/checkout/_components/PaymentPanel.tsx`
-- [ ] `SOURCE/app/(billing)/pricing/checkout/_components/PaymentConfirm.tsx`
-- [ ] `SOURCE/lib/i18n/dictionaries/en.ts`, `SOURCE/lib/i18n/dictionaries/vi.ts` (S-06 keys)
+- [x] `SOURCE/app/(billing)/pricing/checkout/_components/VietQrCode.tsx`
+- [x] `SOURCE/app/(billing)/pricing/checkout/_components/TransferDetails.tsx`
+- [x] `SOURCE/app/(billing)/pricing/checkout/_components/PaymentPanel.tsx`
+- [x] `SOURCE/app/(billing)/pricing/checkout/_components/PaymentConfirm.tsx`
+- [x] `SOURCE/lib/i18n/dictionaries/en.ts`, `SOURCE/lib/i18n/dictionaries/vi.ts` (S-06 keys)
 
 ## Investigation Targets
 - `docs/ui-spec/subscription-ui-spec.md` (§ Component: `VietQrCode` — C-12 — verify default (inline SVG) + empty (no payload / no encoder ⇒ not rendered) + error (encoding throws ⇒ page still renders) states)
@@ -57,12 +57,12 @@ Add the **S-06 `billing.*` keys to both dictionaries**.
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
-- [ ] Read all Investigation Targets, including the plan Task 0.6 C-13 superset reconciliation
-- [ ] Write failing tests first: the four `<dl>` pairs in order; the amount equal to `formatVnd()` output; **encoder absent ⇒ nothing rendered and the page still renders**; Partial for `paid` / `expired` / `cancelled` / unrecognised ⇒ **neither QR nor transfer block**; `legalContentReady === false` ⇒ `aria-disabled="true"`, focusable, no-op activation
+- [x] Read all Investigation Targets, including the plan Task 0.6 C-13 superset reconciliation
+- [x] Write failing tests first: the four `<dl>` pairs in order; the amount equal to `formatVnd()` output; **encoder absent ⇒ nothing rendered and the page still renders**; Partial for `paid` / `expired` / `cancelled` / unrecognised ⇒ **neither QR nor transfer block**; `legalContentReady === false` ⇒ `aria-disabled="true"`, focusable, no-op activation
 ### 2. Green Phase
-- [ ] Implement C-12 → C-14 → C-13 → C-15 in that order; add the S-06 keys to **both** dictionaries; run only the added tests
+- [x] Implement C-12 → C-14 → C-13 → C-15 in that order; add the S-06 keys to **both** dictionaries; run only the added tests
 ### 3. Refactor Phase
-- [ ] Confirm no clipboard utility was introduced and no CSP change was made; re-run the i18n ratio assertion
+- [x] Confirm no clipboard utility was introduced and no CSP change was made; re-run the i18n ratio assertion
 
 ## Quality Assurance Mechanisms
 - `npm test` -> `vitest run` — Config: `SOURCE/package.json:10`
@@ -100,14 +100,14 @@ Add the **S-06 `billing.*` keys to both dictionaries**.
 - **Residual**: the **combined** predicate-and-pages test is plan Task 4.5, and both assertions must live in **one** test.
 
 ## Completion Criteria
-- [ ] All added tests pass
-- [ ] The four C-14 `<dl>` pairs render in the fixed order; the amount matches the QR-encoded value
-- [ ] Encoder absent ⇒ C-12 renders nothing and the page still renders; the screen stays completable from C-14
-- [ ] C-13 Partial (`paid` / `expired` / `cancelled` / unrecognised) renders **neither** QR **nor** transfer block
-- [ ] `legalContentReady` computed **only** from the two dictionary keys, server-side, passed as a prop
-- [ ] S-06 keys in **both** dictionaries; identical-string ratio still green
-- [ ] Every Reference Contracts Compliance Check evaluates to `Y`, with evidence recorded in Investigation Notes
-- [ ] **No production deploy of this branch has occurred**
+- [x] All added tests pass
+- [x] The four C-14 `<dl>` pairs render in the fixed order; the amount matches the QR-encoded value
+- [x] Encoder absent ⇒ C-12 renders nothing and the page still renders; the screen stays completable from C-14
+- [x] C-13 Partial (`paid` / `expired` / `cancelled` / unrecognised) renders **neither** QR **nor** transfer block
+- [x] `legalContentReady` computed **only** from the two dictionary keys, server-side, passed as a prop
+- [x] S-06 keys in **both** dictionaries; identical-string ratio still green
+- [x] Every Reference Contracts Compliance Check evaluates to `Y`, with evidence recorded in Investigation Notes
+- [x] **No production deploy of this branch has occurred** (no `vercel` / `vercel --prod` invoked in this session; no commit made by this task)
 
 ## Notes
 - Impact scope: the S-06 component tree and both dictionaries; downstream, plan Tasks 4.4, 4.5, 4.6.
@@ -116,3 +116,52 @@ Add the **S-06 `billing.*` keys to both dictionaries**.
 
 ## Investigation Notes
 (Record the C-13 superset applied, the QR/amount comparison, and each Compliance Check result here.)
+
+### Investigation Targets read (2026-08-19)
+
+- **UI Spec C-12 / C-13 / C-14 / C-15 / C-04(b)** — read in full. C-13's Empty and Partial sets are the v1.6 amendment (plan Task 0.6, LO-01/LO-02): Empty = {no `?order=`, unparseable `?order=`, no matching row, another user's row}; **Partial = {`paid`, `expired`, `cancelled`, unrecognised}**, and in all four *neither* the QR *nor* the transfer block renders — status + `orderCode` + a link to `/me/orders` render instead, and C-10 stays available.
+- **`components/billing/LegalLinks.tsx`** — `"use client"`, no props, renders `billing.legal.linkIntro` + two `<Link>`s. Reused **unchanged**; second call site is the S-06 page.
+- **`components/billing/LegalDocument.tsx`** — `LegalContentPending` renders `role="status"` dashed box. Not touched here (plan Task 4.5 asserts it).
+- **`components/billing/RecheckOrderControl.tsx` (C-10)** — props are **three**: `{ orderCode, variant, status }`. `TERMINAL_STATUSES = {paid, expired, cancelled}`; an unrecognised status is **not** terminal. `LABEL_KEY.primary === "billing.confirm.action"` (already shipped, Task 3.7). `aria-disabled` is the string, `aria-busy` boolean, native `disabled` never used, `aria-describedby` points at C-10's **own** sr-only reason span.
+- **`lib/format/number.ts`** — `formatVnd(amount, locale)` returns digits only; the unit lives in `billing.amount`. Format **before** `t()`.
+- **`lib/billing/paidTier.ts`** — read only. `isPaidTierEnabled()` is **not** imported by anything added in this task.
+- **`lib/security/csp.ts`** — untouched. `img-src`/`connect-src` carry no payOS origin and are emitted unconditionally.
+- **`lib/i18n/dictionaries/en.ts`** — `billing.terms.body` / `billing.refund.body` do **not** exist (only `.pending`). ⇒ `legalContentReady === false` today.
+- **`lib/billing/checkoutOrder.ts`** — the eight-field `CheckoutOrder` and its single mapper.
+
+### Applied decisions (and where they came from)
+
+1. **Composition.** Both component trees (UI Spec § Screen tree :544-548, frontend DD :433-438) place `PaymentPanel`, `LegalLinks`, `PaymentConfirm` as **siblings under `page.tsx`**. Followed literally, so neither C-13's documented props (`{ order }`) nor C-15's grow to carry the other's data. The `status === "pending"` gate has **one** definition — `isPayable()` exported from `PaymentPanel.tsx` and imported by `page.tsx` — so the panel branch and the confirm-control branch cannot drift (frontend DD § Affordances: QR + transfer block + deadline + confirm control are all gated on `status === "pending"` and nothing else).
+2. **C-15's third prop `status`.** C-10 requires `{ orderCode, variant, status }` since plan Task 3.7; C-15 cannot fabricate a status, so it forwards one. Additive prop for data C-15 does not otherwise hold — not a reshape of `{ orderCode, legalContentReady }`.
+3. **C-15's gated branch does not mount C-10.** C-10 derives `aria-disabled` from `busy || terminal` only, and it is **frozen** for this task (not in Target Files), so the legal gate cannot be expressed through it. Gate closed ⇒ C-15 renders its own inert control (same `billing.confirm.action` label, `aria-disabled="true"`, no native `disabled`, focusable, visible reason bound by `aria-describedby`, **no handler at all**). Gate open ⇒ exactly `<RecheckOrderControl variant="primary" …/>`. The "wrap rather than issue your own action" rule is preserved: the gated branch issues **no** action.
+4. **C-13 Partial uses `variant="row"`** for C-10. `variant` selects only the label (C-10 docblock); `primary`'s label is "I have transferred — check now", which is false on a `paid`/`cancelled` order. UI Spec C-13 Partial names no variant, only "C-10's re-check control stays available".
+5. **C-12 and BU-2 (ADR-0018).** **No dependency added.** `package.json` still has no `qr*`/`payos` package. C-12 keeps one local, reversible seam — `encodeQrMatrix(payload): QrMatrix | null`, which returns `null` today — and a real, tested matrix→`<svg>` renderer. **Integration handoff**: when ADR-0018 lands, the *only* change is the body of `encodeQrMatrix()` returning a square boolean matrix; the SVG, the quiet zone, the sizing, the palette and every guard stay as shipped.
+6. **C-14 Partial** omits the missing pair and adds one visible sentence (frontend DD C-14: *"the others render **plus** a visible 'contact support' sentence"*). One key beyond the UI Spec's v1.2 budget table — `billing.checkout.fieldMissing` — because that table budgets no string for this state and reusing a C-10 outcome sentence would give two reasons one string.
+
+### Reference Contracts — planned approach (pre-implementation)
+
+| # | Row | Planned approach | Eval |
+|---|---|---|---|
+| 1 | C-13 eight-field `CheckoutOrder` | C-13 declares `{ order: CheckoutOrder }` and nothing else; the four transfer fields are forwarded to C-14 as the four values it needs, unreshaped | Y |
+| 2 | C-14 four `<dl>` pairs in order | One literal array in source order: account number → account holder → amount → memo | Y |
+| 3 | C-14 amount = `formatVnd()` + `billing.amount` | `t("billing.amount", { amount: formatVnd(amountVnd, locale) })`; a test compares the rendered amount against the amount encoded in the QR-payload fixture | Y |
+| 4 | `orderCode` raw digits | `String(order.orderCode)` in both C-13 branches; no formatter touches it | Y |
+| 5 | `legalContentReady` from the two `en` keys only | `["billing.terms.body","billing.refund.body"].every((k) => k in en)` inside `CheckoutPage`, passed as a prop. `isPaidTierEnabled` is not imported | Y |
+
+### Reference Contracts — evaluated against the SHIPPED implementation (Exit Gate)
+
+| # | Compliance Check | Eval | Evidence |
+|---|---|---|---|
+| 1 | C-13 consumes exactly the eight `CheckoutOrder` fields and declares no extra prop for the same data | **Y** | `PaymentPanel.tsx` props are `{ order: CheckoutOrder }`; the type is imported from `lib/billing/checkoutOrder.ts`, not restated. `page.tsx` passes `order` straight through — nothing rebuilt, copied or recomputed. |
+| 2 | The four `<dl>` pairs render in exactly this order | **Y** | `TransferDetails.test.tsx` asserts `dt` texts `= [account, accountName, amountLabel, memo]` and `dd` texts `= ["19001234567890", "CONG TY MS MOLAR", "39,000 VND", "MSMOLAR3100000000002"]` — four DIFFERENT values, so a swap is visible. Mutants M11 (label swap) and M12 (value swap) both **KILLED**. |
+| 3 | The rendered amount is `formatVnd()` output plus the `billing.amount` unit, and equals the amount encoded in the QR payload | **Y** | Same file: expected `"39,000 VND"` written as a literal, and compared against tag 54 of an EMVCo payload parsed by a TLV reader written inside the test. Mutant M10 (`String(amountVnd)`) **KILLED** on three test files. |
+| 4 | Every `orderCode` rendered on S-06 contains only digits, ungrouped and unlocalised | **Y** | `String(order.orderCode)` in both C-13 branches; asserted in `PaymentPanel.test.tsx` and in the shipped `page.test.tsx` against four grouping idioms and the exponent form. Mutant M25 (`toLocaleString`) **KILLED**. |
+| 5 | `legalContentReady` is computed **only** from the presence of `billing.terms.body` and `billing.refund.body` in `en.ts` | **Y** | `page.tsx`: `const legalContentReady = LEGAL_BODY_KEYS.every((key) => key in en);` evaluated inside `CheckoutPage` (request time), passed to C-15 as a prop. `PaymentConfirm.test.tsx` asserts, on source text, that neither `page.tsx` nor `PaymentConfirm.tsx` mentions `isPaidTierEnabled` / `paidTier` / `GEMINI_PAID_TIER_ENABLED` / `process.env`, and that the predicate is `.every(`, never `.some(`. Mutants M32/M33/M34 all **KILLED**. The combined predicate-and-legal-pages test stays with plan Task 4.5, as specified. |
+
+### Results
+
+- **Dictionaries**: 546 → **557 keys in each** locale (10 from the UI Spec's v1.2 budget + `billing.checkout.fieldMissing`). `billing.confirm.action` appears **exactly once** per locale — not re-added. `tsc --noEmit` exit 0 (parity), `i18n.test.ts` 12/12 including the identical-string ratio.
+- **QR / BU-2**: **no dependency added**. `package.json` still matches no `qr*`/`payos` package. C-12 renders nothing today; the screen is payable from C-14's text block, asserted in `PaymentPanel.test.tsx`.
+- **Mutation run**: 38 mutants, anchors verified unique before each run, **37 killed**. The one survivor is C-12's `payload === ""` guard, which is provably equivalent while the encoder seam returns `null` unconditionally — recorded in the file's own docblock rather than papered over.
+- **Gates**: `npm test` 1384 pass / 10 skip (116 files pass, 1 skip; +43 tests, +5 files over the 1341/111 baseline) · `test:fixture` 45 pass · `tsc --noEmit` 0 · `lint` clean · `check:bundle` PASS · `test:localdb` exit 1 with "No test suite found in file" (unchanged, deliberate).
+- **Scope**: `LegalLinks` and `RecheckOrderControl` reused byte-unchanged; no clipboard utility; `lib/security/csp.ts` untouched; no `PUBLIC_PATHS` change; `app/(billing)/queries.ts` not reformatted.

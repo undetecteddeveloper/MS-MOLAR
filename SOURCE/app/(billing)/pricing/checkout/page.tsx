@@ -38,9 +38,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getMyOrder } from "@/app/(billing)/queries";
+import { LegalLinks } from "@/components/billing/LegalLinks";
 import { PageContainer } from "@/components/layout/PageContainer";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
+import { en } from "@/lib/i18n/dictionaries/en";
 import { getTranslate } from "@/lib/i18n/server";
+import { PaymentConfirm } from "./_components/PaymentConfirm";
+import { isPayable, PaymentPanel } from "./_components/PaymentPanel";
 
 export const metadata: Metadata = { title: "Checkout" };
 
@@ -54,6 +59,22 @@ type SearchParams = Promise<{ order?: string | string[] }>;
  *  toàn phần `１２３` KHÔNG khớp. `Number("１２３")` cũng là `NaN`, nên hàng đó là
  *  lớp thứ hai chứ không phải chỗ regex một mình đỡ. */
 const ORDER_CODE = /^\d+$/;
+
+/** HAI KHOÁ, VÀ CHỈ HAI KHOÁ NÀY, quyết định cổng pháp lý của AC-039 (UI Spec
+ *  § C-15; frontend DD § C-15, quy tắc phát biểu nguyên văn ở v1.2).
+ *
+ *  Vì sao là một phép kiểm `in` lúc CHẠY chứ không phải `t("billing.terms.body")`:
+ *  trỏ tới một khoá không tồn tại là LỖI BIÊN DỊCH, nên vị từ này không thể
+ *  viết bằng một lời gọi dịch trước khi nội dung của PRD U3 hạ cánh.
+ *
+ *  Vì sao chỉ đọc `en`: `MessageKey = keyof typeof en`, nên một khoá có ở
+ *  `en.ts` mà thiếu ở `vi.ts` đã là lỗi tsc — thêm một phép `in vi` chỉ nhắc
+ *  lại một bảo đảm mà bản build đang cưỡng chế rồi.
+ *
+ *  Vì sao KHÔNG suy từ `isPaidTierEnabled()`: hai ổ khoá độc lập đang cùng đóng
+ *  hôm nay, và suy cái này từ cái kia sẽ làm cổng pháp lý biến mất đúng vào lúc
+ *  cờ phát hành được bật (R-9). */
+const LEGAL_BODY_KEYS = ["billing.terms.body", "billing.refund.body"] as const;
 
 /**
  * `?order=` → `orderCode`, hoặc `null`.
@@ -100,6 +121,11 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Sea
   const t = await getTranslate();
   const sp = await searchParams;
 
+  // Tính ngay trong lượt xử lý REQUEST (không phải một hằng số mức module):
+  // ngày nội dung pháp lý của PRD U3 hạ cánh, giá trị này lật mà không cần một
+  // lượt khởi động lại tiến trình nào.
+  const legalContentReady = LEGAL_BODY_KEYS.every((key) => key in en);
+
   const orderCode = parseOrderCode(sp.order);
   // Mã không hợp lệ KHÔNG sinh ra lượt đọc nào — đây là nửa an ninh của quy
   // tắc, không phải một tối ưu.
@@ -111,26 +137,45 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Sea
   // rẽ, một lần: hai container song song là hai chỗ để lệch nhau.
   return (
     <PageContainer as="main" size="small" className="flex flex-col gap-6">
+      <PageHeader title={t("billing.checkout.title")} />
       {order === null ? (
-        // TRẠNG THÁI RỖNG — MỘT nhánh cho cả bốn nguyên nhân. Task 4.3 thêm câu
-        // `billing.checkout.noActiveOrder` NGAY TRÊN liên kết này; nó KHÔNG
-        // được tách nhánh này ra làm hai.
+        // TRẠNG THÁI RỖNG — MỘT nhánh cho cả bốn nguyên nhân, và nó KHÔNG được
+        // tách làm hai: bốn nguyên nhân ra một mặt hiển thị GIỐNG NHAU TỪNG
+        // BYTE là điều kiện được nghiệm thu, không phải một chi tiết trình bày.
         <p className="text-muted-foreground text-sm">
+          {t("billing.checkout.noActiveOrder")}{" "}
           <Link href="/pricing" className="text-brand min-h-11 underline-offset-4 hover:underline">
             {t("billing.quota.upgradeLink")}
           </Link>
         </p>
       ) : (
-        // Task 4.3 thay khối này bằng `<PaymentPanel order={order} />`: `order`
-        // đã là hợp đồng TÁM TRƯỜNG `CheckoutOrder` đúng như `toCheckoutOrder()`
-        // giao, và không có gì ở trang này dựng lại, sao chép hay tính lại nó.
-        // `orderCode` in NGUYÊN SI — người dùng ĐỌC mã này cho bộ phận hỗ trợ,
-        // nên không nhóm nghìn, không viết tắt, không theo ngôn ngữ (UI Spec
-        // § C-08, § C-13).
-        <p className="text-muted-foreground text-sm">
-          {t("billing.orders.orderCode")}{" "}
-          <span className="text-foreground font-mono">{String(order.orderCode)}</span>
-        </p>
+        // `order` đã là hợp đồng TÁM TRƯỜNG `CheckoutOrder` đúng như
+        // `toCheckoutOrder()` giao; không có gì ở trang này dựng lại, sao chép
+        // hay tính lại nó.
+        //
+        // BA ANH EM CÙNG CẤP, ĐÚNG CÂY COMPONENT của UI Spec (§ Screen tree) và
+        // của frontend DD: bảng thanh toán, rồi HAI LIÊN KẾT PHÁP LÝ, rồi nút
+        // xác nhận. Thứ tự DOM ấy chính là AC-039 — nó là thứ tự ĐỌC, không
+        // phải một cách sắp xếp thị giác.
+        //
+        // Cổng mở/đóng dùng LẠI `isPayable()` của C-13 chứ không viết bản thứ
+        // hai: hai vị từ lệch nhau sẽ dựng nút "Tôi đã chuyển khoản" bên cạnh
+        // một tấm bảng vừa nói đơn này đã đóng.
+        <>
+          <PaymentPanel order={order} />
+          {isPayable(order.status) && (
+            <>
+              {/* C-04b, TÁI DÙNG NGUYÊN VẸN. File này ra đời chính là để S-06
+                  không chép bản thứ hai của một nghĩa vụ pháp lý. */}
+              <LegalLinks />
+              <PaymentConfirm
+                orderCode={order.orderCode}
+                status={order.status}
+                legalContentReady={legalContentReady}
+              />
+            </>
+          )}
+        </>
       )}
     </PageContainer>
   );

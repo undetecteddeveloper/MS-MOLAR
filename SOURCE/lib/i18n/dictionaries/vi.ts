@@ -604,6 +604,22 @@ export const vi: Dictionary = {
   "billing.recheck.rateLimited": "Bạn vừa kiểm tra liên tiếp nhiều lần. Chờ một chút rồi kiểm tra lại nhé.",
   "billing.confirm.action": "Tôi đã chuyển khoản — kiểm tra ngay",
 
+  // --- S-06 /pricing/checkout — xem chú thích trong en.ts -------------------
+  "billing.checkout.title": "Hoàn tất thanh toán",
+  "billing.checkout.validUntil": "Lệnh thanh toán này có hiệu lực đến {time}.",
+  "billing.checkout.qrLabel": "Mã quét mang sẵn thông tin chuyển khoản",
+  "billing.checkout.noActiveOrder": "Hiện không có lệnh thanh toán nào đang chờ.",
+  "billing.checkout.account": "Số tài khoản",
+  "billing.checkout.accountName": "Chủ tài khoản",
+  "billing.checkout.amountLabel": "Số tiền",
+  "billing.checkout.memo": "Nội dung chuyển khoản",
+  "billing.checkout.memoWarning":
+    "Bạn chép đúng nguyên văn nội dung chuyển khoản. Thiếu nó thì khoản tiền chuyển tới không tự khớp được với đơn này.",
+  "billing.checkout.fieldMissing":
+    "Đơn này thiếu một vài thông tin chuyển khoản. Bạn bấm nút “Gửi phản hồi” và gửi kèm mã đơn trước khi chuyển bất kỳ khoản tiền nào.",
+  "billing.confirm.legalPending.reason":
+    "Điều khoản dịch vụ và Chính sách hoàn tiền chưa được công bố, nên chưa xác nhận thanh toán ở đây được. Chưa có khoản nào bị trừ.",
+
   "billing.quota.unavailable":
     "Chưa đọc được bộ đếm lượt dùng của bạn lúc này. Việc đó không hạn chế quyền truy cập: mọi thứ vẫn chạy bình thường.",
   "billing.orders.planLabel": "Gói hiện tại",
