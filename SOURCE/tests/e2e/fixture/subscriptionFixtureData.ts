@@ -23,25 +23,32 @@
 // wraps the unit in its own provider supplies the very thing a broken
 // production tree would be missing (frontend DD Risk R-12).
 //
-// TRANSCRIBED CONTRACTS — AND THEIR UNCHECKED WINDOW. `Entitlement` / `Quota`
-// are imported from the frozen `lib/billing/types.ts`, `CheckoutOrder` from
-// `lib/billing/checkoutOrder.ts` since backend-task-17 shipped it, and
+// TRANSCRIBED CONTRACTS — THE WINDOW IS NOW CLOSED. `Entitlement` / `Quota` are
+// imported from the frozen `lib/billing/types.ts`, `CheckoutOrder` from
+// `lib/billing/checkoutOrder.ts` since backend-task-17 shipped it,
 // `RecheckOutcome` — which subsumes `SettleResult` — from
-// `lib/billing/orderActions.ts` since backend-task-18 shipped it, so a change to
-// any of the four breaks this file at compile time.
-// `MyOrderRow` has no code yet, so its shape is still transcribed from the work
-// plan's Reference Contract Values. Being a transcription, it is structurally
-// INDEPENDENT of the real type — no import, no assignment, no `satisfies` — so
-// until the reconciliation lands, drift between this file and the shipped
-// contract is NOT detectable, silently, by tsc or by anything else. That is the
-// same exposure `supportAdminFixtureData.ts` carries for `TicketWithNotes`, and
-// it is accepted only because the real declaration does not exist yet.
-// The reconciliation is owned by the task that first exports each type, and is
+// `lib/billing/orderActions.ts` since backend-task-18 shipped it, and
+// `MyOrderRow` from `app/(billing)/queries.ts` since backend-task-19 shipped it,
+// so a change to any of the five breaks this file at compile time.
+// NO SHAPE BELOW IS TRANSCRIBED ANY MORE, and that is the point of this
+// paragraph rather than a boast: while `MyOrderRow` was still copied from the
+// work plan's Reference Contract Values it was structurally INDEPENDENT of the
+// real type — no import, no assignment, no `satisfies` — so drift between this
+// file and the shipped contract was NOT detectable, silently, by tsc or by
+// anything else. That is the exposure `supportAdminFixtureData.ts` still carries
+// for `TicketWithNotes`; this file no longer carries it.
+// The reconciliation was owned by the task that first exports each type, and was
 // recorded as a checklist line in that task's file:
 //   - `CheckoutOrder`            -> DONE, backend-task-17: imported below and
 //     used as the declared type of `fixtureOrder()`'s return, so every order
 //     fixture is checked field-by-field against the shipped eight-field shape
-//   - `FixtureMyOrderRow`         -> backend-task-19 (`app/(billing)/queries.ts`)
+//   - `MyOrderRow`                -> DONE, backend-task-19: imported below —
+//     `import type`, so `queries.ts`'s `import "server-only"` is erased at
+//     compile time and no runtime dependency on a server module is created —
+//     and used as the declared return type of `toFixtureOrderRow()` and as the
+//     element type of `FIXTURE_ORDER_ROWS`, so every row fixture is checked
+//     field-by-field against the shipped five-field shape. The transcribed
+//     `FixtureMyOrderRow` declaration is DELETED
 //   - `SettleResult`              -> DONE, backend-task-16, then SUPERSEDED by
 //     backend-task-18: the settlement union now arrives inside `RecheckOutcome`,
 //     so there is one import instead of two and no arm is left unchecked
@@ -50,10 +57,10 @@
 //     `FIXTURE_RECHECK_OUTCOMES`'s `satisfies` clause is the compile-time link
 //     over the WHOLE union — the settled arm, all five refusal reasons, and the
 //     wrapper-only refusals
-// Each remaining task adds a compile-time link here and deletes the transcribed
-// declaration. Only after that link exists does a tsc error become the failure
-// mode for drift.
+// Nothing remains on that list. A tsc error in THIS file is now the failure mode
+// for drift on every contract it stands for.
 
+import type { MyOrderRow } from "@/app/(billing)/queries";
 import type { CheckoutOrder } from "@/lib/billing/checkoutOrder";
 import type { RecheckOutcome } from "@/lib/billing/orderActions";
 import { FREE_FALLBACK, type Entitlement } from "@/lib/billing/types";
@@ -199,22 +206,6 @@ export const FIXTURE_ENTITLEMENT_EXHAUSTED: Entitlement = {
 
 // --- Order fixtures ---------------------------------------------------------
 
-/** Transcribed from the frontend DD's `MyOrderRow` — S-05's list item.
- *  RECONCILIATION OWNER: **backend-task-19**, which creates
- *  `app/(billing)/queries.ts` where `MyOrderRow` is first exported. Until then,
- *  drift against it is undetectable (see the file header).
- *
- *  `status` is `string` and not the union on purpose (UI Spec C-09): the value
- *  crosses a database boundary whose CHECK can change without a TypeScript
- *  change, and the unrecognised branch is its honest destination. */
-export type FixtureMyOrderRow = {
-  orderCode: number;
-  amountVnd: number;
-  status: string;
-  createdAt: string;
-  pendingUntil: string;
-};
-
 /** Exactly the four literals `payment_orders.status`'s CHECK permits. */
 export const FIXTURE_PERMITTED_STATUSES = ["pending", "paid", "expired", "cancelled"] as const;
 
@@ -346,11 +337,16 @@ export function fixtureOrderByCode(orderCode: number): CheckoutOrder | null {
 /** S-05 reads `MyOrderRow` and S-06 reads `CheckoutOrder`, but both project the
  *  SAME database row. Deriving one from the other keeps the two
  *  representations from drifting into disagreeing about a single order — a
- *  disagreement FE-3 would then read as a state change it never caused. */
+ *  disagreement FE-3 would then read as a state change it never caused.
+ *
+ *  The declared `MyOrderRow` return type is the COMPILE-TIME LINK to the shipped
+ *  contract (backend-task-19): every row fixture is built here, so a field added
+ *  to, removed from or renamed in `app/(billing)/queries.ts` turns this file red
+ *  instead of drifting in silence. */
 export function toFixtureOrderRow(
   order: CheckoutOrder,
   createdAt: string
-): FixtureMyOrderRow {
+): MyOrderRow {
   return {
     orderCode: order.orderCode,
     amountVnd: order.amountVnd,
@@ -371,7 +367,7 @@ export function toFixtureOrderRow(
  *  row's 35-minute spread is therefore expected and is not a window a code path
  *  produced. No case reads `createdAt` as a deadline; only S-05's sort order
  *  and its rendered date depend on it. */
-export const FIXTURE_ORDER_ROWS: readonly FixtureMyOrderRow[] = [
+export const FIXTURE_ORDER_ROWS: readonly MyOrderRow[] = [
   toFixtureOrderRow(FIXTURE_ORDER_PENDING, "2026-08-18T11:55:00.000Z"),
   toFixtureOrderRow(FIXTURE_ORDER_PENDING_NO_QR, "2026-08-18T11:50:00.000Z"),
   toFixtureOrderRow(FIXTURE_ORDER_PAID, "2026-08-17T09:00:00.000Z"),
@@ -382,7 +378,7 @@ export const FIXTURE_ORDER_ROWS: readonly FixtureMyOrderRow[] = [
 
 /** FE-AC-04's empty-state profile — the four summary items still render above
  *  it, so "no orders" must not be reached by rendering nothing. */
-export const FIXTURE_ORDER_ROWS_EMPTY: readonly FixtureMyOrderRow[] = [];
+export const FIXTURE_ORDER_ROWS_EMPTY: readonly MyOrderRow[] = [];
 
 // --- Action-module responses ------------------------------------------------
 

@@ -435,6 +435,427 @@ vi.mock("@/lib/supabase/server", () => ({
 
 const { createOrder } = await import("@/lib/billing/orderActions");
 
+/** Tài khoản fixture dùng chung cho MỌI ca trong file: tạo nếu chưa có, và nếu
+ *  đã có thì đặt lại mật khẩu + xác nhận email, để một lần chạy trước đó không
+ *  quyết định được lần chạy này đăng nhập nổi hay không.
+ *
+ *  Nhận `email`/`password` làm tham số vì INT-2 và INT-3 mỗi ca một tài khoản
+ *  RIÊNG (xem khối "EXECUTION ORDER" đầu file: không ca nào đọc dòng của ca
+ *  kia). Chép lại thân hàm này cho ca thứ hai là cách chắc chắn nhất để hai lối
+ *  cấp tài khoản trôi lệch — đúng loại lỗi mà cả file này tồn tại để chặn. */
+async function ensureUser(
+  adminClient: SupabaseClient,
+  email: string,
+  password: string
+): Promise<string> {
+  const created = await adminClient.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+  });
+  if (!created.error) return created.data.user.id;
+
+  const list = await adminClient.auth.admin.listUsers({ perPage: 1000 });
+  if (list.error) throw list.error;
+  const existing = list.data.users.find((u) => u.email === email);
+  if (!existing) throw created.error;
+  const updated = await adminClient.auth.admin.updateUserById(existing.id, {
+    password,
+    email_confirm: true,
+  });
+  if (updated.error) throw updated.error;
+  return existing.id;
+}
+
+/** Một client Supabase THẬT đã đăng nhập — không phải mock. Mỗi lượt gọi dựng
+ *  một instance MỚI với một JWT MỚI, nên hai lượt gọi không chia sẻ trạng thái
+ *  trong tiến trình. INT-2 dựa vào đúng tính chất đó (xem nghĩa vụ (b)). */
+async function signedInClient(email: string, password: string): Promise<SupabaseClient> {
+  const session = createClient(SUPABASE_URL!, ANON_KEY!, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const signIn = await session.auth.signInWithPassword({ email, password });
+  if (signIn.error) throw signIn.error;
+  return session;
+}
+
+// =============================================================================
+// INT-2 — IMPLEMENTATION (plan Task 3.5, the commit that changes getMyOrder()'s
+//         mapping step to `toCheckoutOrder(row)` — CL-01)
+// =============================================================================
+// Đọc khối chú thích INT-2 ở đầu file trước: sáu nghĩa vụ (a)…(f) nằm ở đó,
+// nguyên văn, và các ca dưới đây mang đúng nhãn ấy.
+//
+// VÌ SAO PHẢI LÀ HAI CLIENT KHÁC NHAU. Nghĩa vụ (b) đòi lượt đọc lại diễn ra
+// trong một client THEO YÊU CẦU CÒN MỚI, chưa từng gọi `createOrder()`. Nếu
+// dùng lại đúng client đã tạo đơn thì phép so ở (c) có nguy cơ so một giá trị
+// với chính nó qua một đường vòng, và dạng serialize — thứ duy nhất gây ra lỗi
+// CL-01 — sẽ không bao giờ bị chạm tới. `signedInClient()` dựng một instance
+// mới với một JWT mới cho mỗi lượt gọi, và `sessionClientHolder` được chuyển
+// sang instance ĐỌC trước khi `getMyOrder()` chạy.
+//
+// VÌ SAO `pendingUntil` ĐƯỢC SO VỚI MỘT LITERAL GÕ TAY. Vế "hai đường bằng
+// nhau" một mình vẫn xanh khi CẢ HAI đường cùng bỏ chuẩn hoá — lúc đó cả hai
+// nói dạng `+00:00` của PostgREST và hợp đồng C-13 im lặng đổi. Literal
+// `INT2_PROVIDER_EXPIRES_AT` là phía KHÔNG do code đang kiểm dựng ra, nên nó
+// ghim dạng `…Z` chứ không chỉ ghim sự bằng nhau. KHÔNG có phép chuẩn hoá nào
+// được áp lên bất kỳ vế nào trước khi so: gọi lại `toCheckoutOrder()` hay dựng
+// một `new Date(...)` tại chỗ chính là đồng thuận với lỗi cần bắt.
+//
+// HAI CA CUỐI (g)/(h) KHÔNG THUỘC KHUNG INT-2 và không làm tăng ngân sách ca
+// integration (vẫn là INT-1/INT-2/INT-3). Chúng giải quyết nghĩa vụ chứng minh
+// THỨ HAI của cùng plan Task 3.5 — "missing-sort-key ordering": thứ tự được
+// khai ĐÚNG MỘT LẦN, trong module query, bằng SQL, khớp chỉ mục
+// `payment_orders_user_created_idx`. Nghĩa vụ ấy ghi rõ "Mock boundary
+// rationale: none — real database", nên nó không thể trả bằng một ca unit với
+// query builder giả, và nó dùng chung đúng một tài khoản fixture + một lượt
+// dọn dẹp với INT-2 thay vì mở thêm một tài khoản thứ ba.
+
+const { getMyOrder, listMyOrders } = await import("@/app/(billing)/queries");
+
+const INT2_EMAIL = "smithnguyen247+mapperint@gmail.com";
+const INT2_PASSWORD = "mapper-int-password-123";
+
+/** Bốn giá trị chuyển khoản nhà cung cấp trả về cho ca này — gõ tay, và KHÁC
+ *  bộ của INT-3 để một ca không bao giờ khẳng định được nhờ hằng của ca kia.
+ *
+ *  `INT2_PROVIDER_MEMO` cố ý KHÔNG phải `MSMOLAR <orderCode>`: nếu stub trả về
+ *  đúng chuỗi mà `transferMemo()` vừa dựng, thì một bản cài đặt ghi xuống chuỗi
+ *  TỰ TÍNH thay vì chuỗi NHÀ CUNG CẤP TRẢ VỀ vẫn xanh. Một literal cố định
+ *  phân biệt được hai thứ đó — đúng khẳng định "lưu như đã nhận, không bao giờ
+ *  tính lại" (frontend DD Risk R-11) mà nghĩa vụ (e) đòi. */
+const INT2_QR_PAYLOAD =
+  "00020101021238570010A00000072701270006970436011300110012345670208QRIBFTTA53037045802VN6304INT2";
+const INT2_ACCOUNT_NUMBER = "0022002345678";
+const INT2_ACCOUNT_NAME = "CONG TY TNHH MS MOLAR";
+const INT2_PROVIDER_MEMO = "MSMOLAR INT2 FIXED";
+
+/** Mốc `expiresAt` nhà cung cấp trả về — LITERAL, dạng `…Z` có mili giây, đúng
+ *  dạng mà `toCheckoutOrder()` cam kết. Đây là vế "và so với dạng literal mà
+ *  bản cài đặt cam kết" của nghĩa vụ (d). Nằm xa trong tương lai nên dòng luôn
+ *  còn hạn suốt lần chạy. */
+const INT2_PROVIDER_EXPIRES_AT = "2099-11-30T23:59:59.000Z";
+
+/** Dải mã dành riêng cho ba dòng gieo tay của ca thứ tự: TRÊN dải epoch-mili
+ *  giây mà `createOrder()` sinh ra (~1.79e12 hôm nay) và DƯỚI dải
+ *  `FIXTURE_ORDER_CODE_BASE = 8e12` mà làn service-e2e đã giữ chỗ, nên không va
+ *  vào dòng thật lẫn dòng của làn kia. */
+const INT2_SEEDED_CODE_BASE = 7_900_000_000_000;
+
+/** Số tiền của ba dòng gieo tay — KHÁC `PREMIUM_PRICE_VND`, cố ý: nó chứng minh
+ *  `amountVnd` đi ra từ DÒNG chứ không từ một hằng giá nào đó. */
+const INT2_SEEDED_AMOUNT_VND = 12_000;
+
+/** Gieo theo thứ tự [Jan 2, Jan 1, Jan 3] — KHÔNG theo thứ tự thời gian, và
+ *  cũng không theo thứ tự khoá chính. Gieo đúng thứ tự rồi khẳng định vẫn thứ
+ *  tự ấy thì không chứng minh được gì: một bản cài đặt KHÔNG sắp xếp gì cả cũng
+ *  xanh. Ba `status` là ba literal khác nhau của CHECK, nên ca này đồng thời
+ *  cho thấy `status` đi thẳng ra dạng `string`.
+ *
+ *  `pendingUntil` KHÁC `createdAt` trên TỪNG dòng, và đó không phải trang trí:
+ *  gieo hai cột bằng cùng một mốc thì mọi phép khẳng định trên chúng sống sót
+ *  qua một lượt HOÁN ĐỔI `created_at` ⇄ `pending_until` ở tầng map — hai giá
+ *  trị lấy từ cùng một chỗ thì không phép so nào phân biệt được chúng. Tháng 2
+ *  chứ không phải tháng 1 nên khoảng cách giữa hai cột lớn hơn mọi sai lệch múi
+ *  giờ, và cả ba mốc đều đã QUÁ HẠN so với `now()`, nên bước (0) của
+ *  `createOrder()` không bao giờ tái dùng được một dòng gieo. */
+const INT2_SEEDED_ROWS = [
+  {
+    orderCode: INT2_SEEDED_CODE_BASE + 1,
+    createdAt: "2026-01-02T00:00:00+00:00",
+    pendingUntil: "2026-02-11T00:00:00+00:00",
+    status: "paid",
+  },
+  {
+    orderCode: INT2_SEEDED_CODE_BASE + 2,
+    createdAt: "2026-01-01T00:00:00+00:00",
+    pendingUntil: "2026-02-12T00:00:00+00:00",
+    status: "expired",
+  },
+  {
+    orderCode: INT2_SEEDED_CODE_BASE + 3,
+    createdAt: "2026-01-03T00:00:00+00:00",
+    pendingUntil: "2026-02-13T00:00:00+00:00",
+    status: "cancelled",
+  },
+] as const;
+
+const INT2_QUERIES_PATH = resolve(__dirname, "../../app/(billing)/queries.ts");
+
+/** Nguồn của `app/(billing)/queries.ts` đã BÓC chú thích.
+ *
+ *  Nghĩa vụ (f) và ca (h) nói về CODE, không về văn xuôi: một dòng chú thích
+ *  giải thích vì sao KHÔNG được viết `qrPayload:` ở đây mà lại làm chính phép
+ *  khẳng định ấy đỏ là một cổng canh vô dụng, và sửa nó bằng cách đổi cách viết
+ *  chú thích là sửa sai chỗ. */
+function int2QueriesCode(): string {
+  return readFileSync(INT2_QUERIES_PATH, "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:])\/\/.*$/gm, "$1");
+}
+
+interface Int2SeededRowRead {
+  order_code: number;
+  amount: number;
+  status: string;
+  created_at: string;
+  pending_until: string;
+}
+
+let int2Admin: SupabaseClient;
+let int2UserId: string;
+
+/** Ảnh chụp của dãy thao tác, chạy MỘT lần trong `beforeAll`. Mỗi `it` chỉ đọc
+ *  ảnh chụp, nên không ca nào phụ thuộc vào việc ca kia đã chạy. */
+const int2 = {
+  created: null as Awaited<ReturnType<typeof createOrder>> | null,
+  readBack: null as Awaited<ReturnType<typeof getMyOrder>> | null,
+  rawRow: null as Int2SeededRowRead | null,
+  listed: [] as Awaited<ReturnType<typeof listMyOrders>>,
+};
+
+async function int2Cleanup(): Promise<void> {
+  const { error } = await int2Admin.from("payment_orders").delete().eq("user_id", int2UserId);
+  if (error) throw error;
+}
+
+/** Hẹp lại `CheckoutOrder | { error } | null` về `CheckoutOrder`, và NÉM kèm
+ *  giá trị thật khi không phải — một `!` lặng lẽ ở đây sẽ biến "action từ chối"
+ *  thành một lỗi đọc thuộc tính của `null` cách đó ba dòng. */
+function int2Checkout(value: unknown, label: string) {
+  if (!value || typeof value !== "object" || "error" in value) {
+    throw new Error(`INT-2: ${label} không trả về CheckoutOrder — ${JSON.stringify(value)}`);
+  }
+  return value as Exclude<Awaited<ReturnType<typeof getMyOrder>>, null>;
+}
+
+describe(
+  "INT-2 — `toCheckoutOrder()` là mapper DUY NHẤT: `createOrder()` và `getMyOrder()` trả về hai giá trị BẰNG NHAU SÂU cho cùng một đơn (I010 / CL-01)",
+  () => {
+    beforeAll(async () => {
+      int2Admin = createClient(SUPABASE_URL!, SERVICE_ROLE_KEY!, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+      int2UserId = await ensureUser(int2Admin, INT2_EMAIL, INT2_PASSWORD);
+      await int2Cleanup();
+
+      createPaymentRequestMock.mockReset();
+      createPaymentRequestMock.mockImplementation(async (draft: { orderCode: number }) => ({
+        qrPayload: INT2_QR_PAYLOAD,
+        accountNumber: INT2_ACCOUNT_NUMBER,
+        accountName: INT2_ACCOUNT_NAME,
+        memo: INT2_PROVIDER_MEMO,
+        orderCode: draft.orderCode,
+        amount: 0,
+        expiresAt: INT2_PROVIDER_EXPIRES_AT,
+      }));
+
+      // --- Dãy thao tác, chạy đúng một lần --------------------------------
+      // (a) Tạo đơn trong client A.
+      const creatingSession = await signedInClient(INT2_EMAIL, INT2_PASSWORD);
+      sessionClientHolder.current = creatingSession;
+      int2.created = await createOrder();
+      const orderCode = int2Checkout(int2.created, "createOrder()").orderCode;
+
+      // (b) Đọc lại trong client B — MỘT INSTANCE KHÁC, một JWT khác, chưa từng
+      // gọi `createOrder()`. Đây là lượt đọc NGUỘI của backend DD FE-B-01.
+      const readingSession = await signedInClient(INT2_EMAIL, INT2_PASSWORD);
+      sessionClientHolder.current = readingSession;
+      int2.readBack = await getMyOrder(orderCode);
+
+      // Dòng THÔ đúng như PostgREST giao nó — dùng cho vế "cùng khoảnh khắc" ở
+      // (d). Đọc bằng client admin để phép so không đi qua đường đang kiểm.
+      const raw = await int2Admin
+        .from("payment_orders")
+        .select("order_code, amount, status, created_at, pending_until")
+        .eq("order_code", orderCode)
+        .maybeSingle();
+      if (raw.error) throw raw.error;
+      int2.rawRow = raw.data as Int2SeededRowRead;
+
+      // (g) Ba dòng gieo tay, KHÔNG theo thứ tự thời gian. Gieo SAU lượt tạo
+      // đơn: gieo trước thì bước (0) của `createOrder()` có thể tái dùng một
+      // dòng gieo và ca này sẽ đo nhầm thứ khác.
+      for (const seeded of INT2_SEEDED_ROWS) {
+        const inserted = await int2Admin.from("payment_orders").insert({
+          order_code: seeded.orderCode,
+          user_id: int2UserId,
+          amount: INT2_SEEDED_AMOUNT_VND,
+          status: seeded.status,
+          created_at: seeded.createdAt,
+          pending_until: seeded.pendingUntil,
+          qr_payload: INT2_QR_PAYLOAD,
+          account_number: INT2_ACCOUNT_NUMBER,
+          account_name: INT2_ACCOUNT_NAME,
+          memo: INT2_PROVIDER_MEMO,
+        });
+        if (inserted.error) throw inserted.error;
+      }
+      int2.listed = await listMyOrders();
+    }, 60_000);
+
+    afterAll(async () => {
+      if (int2Admin && int2UserId) await int2Cleanup();
+    }, 60_000);
+
+    // ---------------------------------------------------------------------
+    // (a)(b) Hai đường sản xuất đều trả về một `CheckoutOrder`
+    // ---------------------------------------------------------------------
+    it("(a)(b) `createOrder()` trả về một `CheckoutOrder`, và `getMyOrder()` trong một client CÒN MỚI đọc lại được nó với đủ tám trường", async () => {
+      const created = int2Checkout(int2.created, "createOrder()");
+      const readBack = int2Checkout(int2.readBack, "getMyOrder()");
+
+      expect(Object.keys(readBack).sort()).toEqual([
+        "accountName",
+        "accountNumber",
+        "amountVnd",
+        "memo",
+        "orderCode",
+        "pendingUntil",
+        "qrPayload",
+        "status",
+      ]);
+      expect(readBack.orderCode).toBe(created.orderCode);
+      expect(readBack.status).toBe("pending");
+    });
+
+    // ---------------------------------------------------------------------
+    // (c) MỘT phép so BẰNG NHAU SÂU trên toàn bộ giá trị
+    // ---------------------------------------------------------------------
+    it("(c) hai giá trị BẰNG NHAU SÂU — một phép so trên cả object, không bỏ trường nào, không chuẩn hoá vế nào", async () => {
+      const created = int2Checkout(int2.created, "createOrder()");
+      const readBack = int2Checkout(int2.readBack, "getMyOrder()");
+
+      // `toStrictEqual` chứ không `toEqual`: lối hỏng thứ hai mà khối INT-2 gọi
+      // tên là "ai đó thêm một trường thứ chín vào ĐÚNG MỘT đường", và một
+      // trường thừa mang giá trị `undefined` lọt qua `toEqual`.
+      expect(readBack).toStrictEqual(created);
+    });
+
+    // ---------------------------------------------------------------------
+    // (d) `pendingUntil` — so chuỗi TỪNG BYTE, và so với dạng literal đã cam kết
+    // ---------------------------------------------------------------------
+    it("(d) `pendingUntil` giống nhau TỪNG BYTE giữa hai đường, ĐÚNG dạng `…Z` literal, và cùng khoảnh khắc với dòng thô", async () => {
+      const created = int2Checkout(int2.created, "createOrder()");
+      const readBack = int2Checkout(int2.readBack, "getMyOrder()");
+
+      // Vế 1 — hai chuỗi đã bắt được, so thẳng với nhau.
+      expect(readBack.pendingUntil).toBe(created.pendingUntil);
+
+      // Vế 2 — dạng `…Z` mà `toCheckoutOrder()` cam kết, so với một literal gõ
+      // tay. Vế 1 một mình vẫn xanh khi CẢ HAI đường cùng bỏ chuẩn hoá.
+      expect(readBack.pendingUntil).toBe(INT2_PROVIDER_EXPIRES_AT);
+      expect(created.pendingUntil).toBe(INT2_PROVIDER_EXPIRES_AT);
+
+      // Vế 3 — cùng KHOẢNH KHẮC với chuỗi PostgREST giao. So theo thời điểm chứ
+      // không theo chuỗi, vì dạng serialize của hai phía chính là thứ đang được
+      // ghim ở vế 2 — và KHÔNG chuẩn hoá bằng mapper đang được kiểm.
+      expect(Date.parse(readBack.pendingUntil)).toBe(Date.parse(int2.rawRow!.pending_until));
+    });
+
+    // ---------------------------------------------------------------------
+    // (e) Bốn giá trị chuyển khoản, nguyên si như nhà cung cấp đã giao
+    // ---------------------------------------------------------------------
+    it("(e) `qrPayload` / `accountNumber` / `accountName` / `memo` trên CẢ HAI giá trị giống từng byte thứ `createPaymentRequest()` đã trả về", async () => {
+      const created = int2Checkout(int2.created, "createOrder()");
+      const readBack = int2Checkout(int2.readBack, "getMyOrder()");
+
+      for (const value of [created, readBack]) {
+        expect(value.qrPayload).toBe(INT2_QR_PAYLOAD);
+        expect(value.accountNumber).toBe(INT2_ACCOUNT_NUMBER);
+        expect(value.accountName).toBe(INT2_ACCOUNT_NAME);
+        // `memo` KHÔNG phải `MSMOLAR <orderCode>`: xem chú thích của hằng. Một
+        // bản cài đặt tự dựng lại nội dung chuyển khoản đỏ đúng ở dòng này.
+        expect(value.memo).toBe(INT2_PROVIDER_MEMO);
+      }
+    });
+
+    // ---------------------------------------------------------------------
+    // (f) ĐÚNG MỘT mapper tồn tại
+    // ---------------------------------------------------------------------
+    it("(f) `app/(billing)/queries.ts` nhập và gọi `toCheckoutOrder()`, và KHÔNG tự khai một mapping camelCase nào cho dòng này", async () => {
+      const code = int2QueriesCode();
+
+      expect(code).toContain('from "@/lib/billing/checkoutOrder"');
+      expect(code).toContain("toCheckoutOrder(");
+
+      // Bốn trường CHỈ có ở `CheckoutOrder` (chúng không thuộc `MyOrderRow`,
+      // hình chiếu danh sách hợp lệ của cùng module), cộng dấu vân tay của một
+      // lần chuẩn hoá thứ hai. Một mapping nội tuyến cho hợp đồng tám trường
+      // BẮT BUỘC phải mang bốn khoá này.
+      for (const fingerprint of [
+        "qrPayload:",
+        "accountNumber:",
+        "accountName:",
+        "memo:",
+        "toISOString(",
+      ]) {
+        expect(code).not.toContain(fingerprint);
+      }
+    });
+
+    // ---------------------------------------------------------------------
+    // (g)(h) plan Task 3.5, nghĩa vụ chứng minh "missing-sort-key ordering"
+    // ---------------------------------------------------------------------
+    it("(g) các dòng gieo KHÔNG theo thứ tự thời gian quay về `created_at desc`, và `MyOrderRow` mang `status`/`amountVnd` của chính dòng", async () => {
+      const created = int2Checkout(int2.created, "createOrder()");
+
+      // Thứ tự MONG ĐỢI, viết tay theo `created_at` chứ không suy từ kết quả:
+      // đơn vừa tạo (now) → Jan 3 → Jan 2 → Jan 1. Thứ tự GIEO là [Jan 2, Jan
+      // 1, Jan 3] và thứ tự khoá chính là [+1, +2, +3], nên cả "không sắp xếp"
+      // lẫn "sắp theo khoá chính" đều đỏ ở đây.
+      expect(int2.listed.map((row) => row.orderCode)).toEqual([
+        created.orderCode,
+        INT2_SEEDED_CODE_BASE + 3,
+        INT2_SEEDED_CODE_BASE + 1,
+        INT2_SEEDED_CODE_BASE + 2,
+      ]);
+
+      const cancelled = int2.listed.find(
+        (row) => row.orderCode === INT2_SEEDED_CODE_BASE + 3
+      );
+      expect(cancelled).toBeDefined();
+      expect(cancelled!.status).toBe("cancelled");
+      expect(cancelled!.amountVnd).toBe(INT2_SEEDED_AMOUNT_VND);
+
+      // HAI mốc thời gian, hai literal gõ tay KHÁC NHAU, cùng một dòng. Khẳng
+      // định một mình `createdAt` là đủ chừng nào hai cột còn mang cùng một
+      // khoảnh khắc — lúc ấy `createdAt: row.pending_until` / `pendingUntil:
+      // row.created_at` hoán đổi cho nhau vẫn xanh, và `pendingUntil` (thứ
+      // S-05 đọc để dựng dòng chữ hạn chót và để so mốc cho link "tiếp tục
+      // thanh toán") không được QUAN SÁT ở đâu cả. Hai mốc cách nhau hơn một
+      // tháng nên phép hoán đổi đỏ ở ĐÚNG trường bị hỏng.
+      expect(Date.parse(cancelled!.createdAt)).toBe(Date.parse("2026-01-03T00:00:00+00:00"));
+      expect(Date.parse(cancelled!.pendingUntil)).toBe(Date.parse("2026-02-13T00:00:00+00:00"));
+    });
+
+    it("(h) thứ tự được khai bằng SQL trong module query, KHÔNG sắp lại ở JavaScript", async () => {
+      const code = int2QueriesCode();
+
+      // Ca (g) một mình KHÔNG giết được đột biến "bê thứ tự từ SQL sang một
+      // `.sort()` ở JS": kết quả quan sát được y hệt. Điều khác biệt là dòng bị
+      // PostgREST cắt khi chạm trần `readBounded` — sắp ở JS thì phần bị cắt là
+      // phần CHƯA sắp, tức mất những dòng không ai đoán trước được. Chỉ một
+      // phép khẳng định trên CODE phân biệt được hai thứ đó.
+      expect(code).toContain('.order("created_at", { ascending: false })');
+      expect(code).not.toContain(".sort(");
+    });
+
+    // ---------------------------------------------------------------------
+    // Dọn dẹp — khẳng định tại chỗ, không chỉ đọc code dọn dẹp
+    // ---------------------------------------------------------------------
+    it("(i) mọi dòng ca này tạo ra đều xoá được, nên ca chạy lại lần nữa vẫn bắt đầu từ 0 dòng", async () => {
+      await int2Cleanup();
+      const { count, error } = await int2Admin
+        .from("payment_orders")
+        .select("order_code", { count: "exact", head: true })
+        .eq("user_id", int2UserId);
+      expect(error).toBeNull();
+      expect(count ?? 0).toBe(0);
+    });
+  }
+);
+
 // --- Fixture ---------------------------------------------------------------
 
 const FIXTURE_EMAIL = "smithnguyen247+orderint@gmail.com";
@@ -500,23 +921,7 @@ const snapshot = {
 const createdOrderCodes: number[] = [];
 
 async function ensureFixtureUser(): Promise<string> {
-  const created = await admin.auth.admin.createUser({
-    email: FIXTURE_EMAIL,
-    password: FIXTURE_PASSWORD,
-    email_confirm: true,
-  });
-  if (!created.error) return created.data.user.id;
-
-  const list = await admin.auth.admin.listUsers({ perPage: 1000 });
-  if (list.error) throw list.error;
-  const existing = list.data.users.find((u) => u.email === FIXTURE_EMAIL);
-  if (!existing) throw created.error;
-  const updated = await admin.auth.admin.updateUserById(existing.id, {
-    password: FIXTURE_PASSWORD,
-    email_confirm: true,
-  });
-  if (updated.error) throw updated.error;
-  return existing.id;
+  return ensureUser(admin, FIXTURE_EMAIL, FIXTURE_PASSWORD);
 }
 
 /** Nghĩa vụ (h): xoá MỌI dòng ca này tạo ra. Chạy cả trước lẫn sau, nên ca chạy
