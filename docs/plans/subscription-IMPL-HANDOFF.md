@@ -1,7 +1,7 @@
-# Subscription — bàn giao pha THỰC THI (phiên 2)
+# Subscription — bàn giao pha THỰC THI (phiên 3)
 
-**Viết 2026-08-18.** Phiên trước đã đóng pha thiết kế (xem `subscription-HANDOFF.md`).
-Phiên này chạy `recipe-fullstack-implement` bước 15 → 16 → phân rã → vòng build, **xong 8/50 task**.
+**Viết 2026-08-19.** Phiên 1–2 đóng pha thiết kế; phiên 2 chạy bước 15→16→phân rã và 8 task đầu.
+Phiên này chạy tiếp vòng build, **xong 14/50 task, Pha 0 và Pha 1 đều đóng**, và **cổng chặn thủ công đã qua**.
 
 Đọc file này trước. Nó tồn tại để phiên sau không phải suy lại một ngày ngữ cảnh.
 
@@ -13,48 +13,43 @@ Phiên này chạy `recipe-fullstack-implement` bước 15 → 16 → phân rã 
 
 | Bước | Trạng thái |
 |---|---|
-| 1–14 | xong ở các phiên trước; kỹ sư duyệt cổng thiết kế 2026-08-18 |
-| **15** acceptance-test-generator | **xong** — 3 làn đều sinh khung, không làn nào null |
-| **16** work-planner | **xong** — `docs/plans/subscription-work-plan.md` **v1.3** |
-| work plan review | **xong** — `needs_revision` (2 critical) → sửa → `approved_with_conditions` → sửa nốt |
-| **Batch approval** | **ĐÃ CẤP** 2026-08-18 (kỹ sư chọn "full autonomous run") |
-| task-decomposer | **xong** — 50 task file + 7 phase-completion + 1 overview |
-| Vòng build | **8/50 xong.** Phase 0 còn **1 task** |
+| 1–14 | xong; kỹ sư duyệt cổng thiết kế 2026-08-18 |
+| 15 acceptance-test-generator | xong — 3 làn đều sinh khung |
+| 16 work-planner | xong — `docs/plans/subscription-work-plan.md` **v1.3** |
+| **Batch approval** | **ĐÃ CẤP** 2026-08-18 ("full autonomous run") — vẫn còn hiệu lực |
+| task-decomposer | xong — 50 task file + 7 phase-completion + 1 overview |
+| Vòng build | **14/50 xong. Pha 0 ✅ Pha 1 ✅** |
 
-**Hành động kế tiếp: `docs/plans/tasks/subscription-work-plan-backend-task-08.md`** (plan Task 0.9 — leo thang BU-6). Xong nó là hết Phase 0.
+**Hành động kế tiếp: `docs/plans/tasks/subscription-work-plan-backend-task-14.md`** (plan Task 2.1 — mở màn Pha 2).
 
 ## 2. Nhánh và commit
 
-Nhánh **`feat/subscription`** (tạo từ `feat/profile-and-about`). Cây làm việc **sạch**.
+Nhánh **`feat/subscription`**. Cây làm việc **sạch**. 5 commit dọn nền + 14 commit task.
 
-5 commit dọn nền + 8 commit task:
+Phiên 3 (6 commit):
 
-| Commit | Nội dung |
-|---|---|
-| `b47c734` | dọn 52 task file của 3 recipe cũ |
-| `29affe4` | `recordUsage()` nối vào 4 call site (việc dở của phiên trước) |
-| `4769c70` | bộ tài liệu thiết kế subscription |
-| `69714ee` | 3 khung test từ bước 15 |
-| `30d8856` | 50 task file phân rã |
-| `62c2d06` | Task 0.1 — `vitest.integration.config.ts` |
-| `5c04e3c` | Task 0.2 — `vitest.localdb.config.ts` |
-| `d001359` | Task 0.3 — **CL-02**, `TutorQuotaNote` không nhận prop |
-| `803f987` | Task 0.4 — **ST-01**, S2 khởi động được |
-| `b765490` | Task 0.5 — vệ sinh đợt A |
-| `bcb38d9` | Task 0.6 — vệ sinh đợt B |
-| `6041f23` | Task 0.7 — khung fixture-e2e |
-| `24588cb` | Task 0.8 — fixture làn service |
+| Commit | Task | Nội dung |
+|---|---|---|
+| `ad4233b` | 0.9 | Leo thang **BU-6** (E-03), backend DD v1.7 → **v1.8** |
+| `e578d5d` | 1.1 | 4 khối DDL + vân tay `d714c313fe1d` → `021dd1387945` |
+| `afec955` | 1.2 | Cổng A — allowlist 11 cột, ghim CHECK theo construct, dây bẫy |
+| `cc393e7` | 1.3 | **Apply dev + cổng B xanh** |
+| `363daeb` | 1.4 | Hằng số có tên, 5 biến env, một `periodStartEpoch()` |
+| `bed04e9` | 1.5 | **Phần 9** test-rls — 20 phép kiểm RLS trên dev thật |
 
-## 3. ⛔ CỔNG CHẶN Ở TASK 12/50 — cần chính kỹ sư
+## 3. ✅ CỔNG CHẶN TASK 1.3 ĐÃ QUA — đọc để không làm lại
 
-**`backend-task-11` (plan Task 1.3) là bước THỦ CÔNG.** Agent không làm được:
-apply tay `schema.sql` lên **DB dev** qua Supabase SQL Editor, rồi chạy `npm run verify:schema` (gate B).
+Phiên trước ghi đây là cổng thủ công không agent nào làm được. **Kỹ sư đã chỉ định làm bằng Composio**, và nó chạy được.
 
-Không có migration tool trong repo này — `schema.sql` được **paste tay**. Đây là lý do dev/prod trôi lệch âm thầm, và mục Risks của work plan ghi việc đó **đã cắn repo 3 lần**.
+- **Dev = `hynwleaxtbtjzkvpjsug`**. **Prod = `pebjdlbgbmizgfpuptjl`** (tên "MS-MOLAR-prod").
+  `.mcp.json` trỏ PROD — đừng đọc nhầm ref rồi kết luận nhầm môi trường.
+- Công cụ: `COMPOSIO_SEARCH_TOOLS` → `COMPOSIO_MULTI_EXECUTE_TOOL`, tool slug **`SUPABASE_BETA_RUN_SQL_QUERY`** (chạy được DDL, đặt `read_only: false`). Toolkit `supabase` đã ACTIVE.
+- Quy trình đã dùng, **lặp lại y hệt cho Task 5.8 (apply prod)**: liệt kê project để xác nhận đích → chụp trạng thái TRƯỚC → apply theo thứ tự phụ thuộc, từng khối một (API timeout khoảng 60s) → **kiểm catalog TRƯỚC khi ghi vân tay** → ghi vân tay CUỐI CÙNG.
+  Vân tay đi cuối là cố ý: paste đứt giữa chừng thì DB thà không biết mình là bản nào, còn hơn khai nhận một bản nó chưa chạy hết.
+- Kết quả: dev có đủ 4 đối tượng; `npm run verify:schema` **8/8 xanh**; khoá ngoại **25 → 27**, mọi `on delete` khớp (TD-011 đóng); vân tay `021dd1387945` apply lúc `2026-08-18T13:53:05.77815+00:00`.
+- **Prod vẫn KHÔNG có bảng nào.** Đó là Task 5.8.
 
-Chuỗi bị chặn sau nó: làn `test:localdb` (SVC-1/SVC-2), 2 trong 3 ca integration, `test-rls.ts` Phần 8.
-
-**Kỹ sư đã hỏi có bỏ được DB dev không** (cần slot cho dự án khác) — trả lời: **chưa bỏ được**, nó nằm ngay trên đường tới hạn. Nếu buộc phải bỏ, mọi thứ từ Phase 1 trở đi dừng; Phase 0 vẫn chạy hết bình thường.
+Hệ quả: làn `test:localdb`, các ca integration và `test-rls.ts` giờ chạy được trên dev thật.
 
 ## 4. Giao thức vòng build (bắt buộc, đừng rút gọn)
 
@@ -67,29 +62,34 @@ Mỗi task: **task-executor → [integration-test-reviewer nếu `requiresTestRe
 | `*-backend-task-*` | `task-executor` | `quality-fixer` |
 | `*-frontend-task-*` | `task-executor-frontend` | `quality-fixer-frontend` |
 
-**Orchestrator commit, subagent KHÔNG commit.** Nói rõ điều này trong mọi prompt.
+**Orchestrator commit, subagent KHÔNG commit.** Nói rõ trong mọi prompt.
 
-### Lớp review đang bắt lỗi thật — đừng bỏ
+### Lớp lỗi tái phát — đã xuất hiện 6 lần, phải nói thẳng trong mọi prompt
 
-3/8 task bị trả `needs_revision`, và các lỗi đều thuộc **một lớp: khẳng định một năng lực phân biệt mà tạo tác không có.**
+**Tạo tác khẳng định một năng lực phân biệt mà nó không có.** Phiên này bắt thêm 3 ca:
 
-- **Task 0.6** — quality-fixer bắt 4 lỗi, gồm một **cơ chế sai đã bị viết vào UI Spec** (`order_code` là `bigint` nên ca vắng / không phân tích được bị accept-list chặn TRƯỚC khi đọc, không phải "đọc ra 0 dòng"), và một lượt quét trích dẫn thiếu 8/15 chỗ — trong đó `:103` sống sót 2 lần, trích đúng cái rule mà chính task vừa sửa ở mục khác.
-- **Task 0.7** — reviewer bắt: fixture timezone **không thể đỏ trên máy dev** (ambient zone là `Asia/Saigon`, formatter thiếu pin vẫn render ra `2026-09-16` = đáp án đúng); stub đồng bộ **không có cửa sổ in-flight** nên guard chống dogpile của FE-3(f) bản ĐÚNG sẽ đếm 2 và trượt. Vòng 2 reviewer dùng **3 mutant** để chứng minh phép kiểm không rỗng.
-- **Task 0.8** — reviewer bắt `countFixtureRows()` **dùng chung vị từ với teardown**, nên số 0 sau teardown là hệ quả logic chứ không phải quan sát.
+- **Task 1.4** — ca "day 29.999" thực ra cách biên kỳ **86,4 giây**, nên bản cài đặt mở kỳ mới sớm 1ms **sống sót qua toàn bộ suite**. quality-fixer bắt được bằng đột biến.
+- **Task 1.5** — `PS-b` nhận `PGRST202` làm bằng chứng "role không có EXECUTE", nhưng PostgREST trả mã đó cho **mọi** tham chiếu hàm không giải được (sai tên hàm, sai tên tham số). Vế "trạng thái còn nguyên" khi đó đúng một cách tầm thường vì thân hàm không hề chạy.
+- **Task 1.5 (phụ)** — so `period_anchor_at` dạng chuỗi bị sai vì Postgres trả `+00:00` chứ không phải `…Z`. Đúng cái bẫy plan đã cảnh báo cho INT-2/CL-01.
 
-Khi viết prompt cho executor, **nói thẳng lớp lỗi này**. Nó tự lặp lại.
+Ba ca phiên trước: cơ chế sai bị chép vào UI Spec; lượt quét trích dẫn sót 8/15 chỗ; fixture timezone không thể đỏ trên máy dev; helper đếm dùng chung vị từ với teardown.
+
+**Cách viết prompt có hiệu quả:** yêu cầu executor (a) quan sát ĐỎ thật trước khi xanh, (b) nêu rõ ca kiểm bắt được những bản cài đặt sai NÀO, (c) chạy đột biến trên bản sao trong bộ nhớ rồi khôi phục. Cả ba đều đã đẻ ra phát hiện thật trong phiên này.
 
 ## 5. Sự thật môi trường (tốn thời gian để phát hiện lại)
 
-- **`TaskCreate` / `TaskUpdate` KHÔNG tồn tại trong môi trường này.** Recipe bảo đăng ký task là bắt buộc; mọi agent đều báo thiếu. Bảo agent bỏ lệnh gọi nhưng vẫn làm phần việc bên dưới.
-- **App root là `SOURCE/`**, không phải gốc repo. Mọi script npm chạy từ đó. `SOURCE/AGENTS.md` cảnh báo bản Next.js này khác dữ liệu huấn luyện.
-- **`npm run verify:schema` = `npx tsx supabase/verify-schema.ts`**, độc lập — **không** nằm trong `check:bundle` (`node scripts/check-ai-key-bundle.mjs`).
-- **Nền xanh: `vitest` 914 pass / 10 skip, `tsc --noEmit` 0, `eslint --max-warnings 0` 0.** Làn CI gom đúng **89 file, 0 file dưới `tests/`**.
-- **Flake đã biết, đừng đuổi:** `components/tutor/ExplainStepAffordance.test.tsx` timeout 5000ms khi cache lạnh chạy song song; chạy riêng pass 5/5 trong ~680ms. Gặp thì chạy lại.
+- **`TaskCreate` / `TaskUpdate` KHÔNG tồn tại.** Mọi agent sẽ báo thiếu. Bảo agent bỏ lệnh gọi nhưng vẫn làm phần việc bên dưới.
+- **`next build` TREO vô hạn dưới sandbox mặc định** (turbopack node transform pool: khoảng 2.2 CPU-giây trong 20 phút, không ghi gì, không báo lỗi). Chạy với `dangerouslyDisableSandbox: true`. **Treo chứ không FAIL** — tốn 35 phút mới phát hiện. `vitest`/`tsc`/`eslint` chạy bình thường trong sandbox.
+- **Bash tool bọc lệnh trong nháy đơn**, nên **nội dung có dấu nháy đơn sẽ phá cú pháp shell** ("unexpected EOF"). Viết file dài bằng Write tool, đừng heredoc. Commit message tránh dấu nháy đơn.
+- **App root là `SOURCE/`**, không phải gốc repo. `SOURCE/AGENTS.md` cảnh báo bản Next.js này khác dữ liệu huấn luyện.
+- **Nền xanh hiện tại: `vitest` 962 pass / 10 skip trên 90 file**, `tsc --noEmit` 0, `eslint --max-warnings 0` 0.
+- `test-rls.ts` chạy độc lập bằng `npx tsx supabase/test-rls.ts` (93 phép kiểm), **không** qua vitest.
+- **`npm run verify:schema` = `npx tsx supabase/verify-schema.ts`**, độc lập, chạm DB thật — **không** nằm trong `check:bundle`. Script ở `SOURCE/package.json:15` (task file ghi `:13`, sai).
+- **Flake đã biết, đừng đuổi:** `components/tutor/ExplainStepAffordance.test.tsx` timeout 5000ms khi cache lạnh chạy song song; chạy riêng pass 5/5 dưới 1 giây.
 - **`test:integration` và `test:localdb` thoát khác 0** với "No test suite found in file" — khung mới chỉ có comment. **Cố ý**, đừng thêm `--passWithNoTests`.
-- **Vitest không có `setupFiles`:** không có matcher `jest-dom`; jsdom khai theo từng file bằng `// @vitest-environment jsdom` ở **dòng 1**; `render()` **không** tự cleanup.
-- Import thừa là **lỗi chí mạng** dưới `eslint --max-warnings 0` — đó là lý do khung test nêu tên module fixture trong comment thay vì import.
-- Dùng **Bash tool** với heredoc `<<'EOF'` cho commit message. **Đừng dùng cú pháp here-string PowerShell `@'...'@`** — nó để lại ký tự `@` trong subject (đã dính 2 lần, phải `reset --soft` làm lại).
+- **Vitest không có `setupFiles`:** không có matcher `jest-dom`; jsdom khai theo từng file bằng chỉ thị `@vitest-environment jsdom` ở **dòng 1**; `render()` **không** tự cleanup.
+- Import thừa là **lỗi chí mạng** dưới `eslint --max-warnings 0`.
+- Ghi tiến độ: **Notion** qua Composio, database `3b378ba6-ae12-803c-8500-c572b6fc745f`. `PROCESS.md` đã bị xoá khỏi repo.
 
 ## 6. Phiên bản tài liệu hiện tại
 
@@ -97,7 +97,7 @@ Khi viết prompt cho executor, **nói thẳng lớp lỗi này**. Nó tự lặ
 |---|---|
 | `docs/prd/subscription-prd.md` | v1.6 |
 | `docs/ui-spec/subscription-ui-spec.md` | **v1.6** — thẩm quyền về UI, có mệnh đề Phase Inversion |
-| `docs/design/subscription-backend-design.md` | **v1.7** |
+| `docs/design/subscription-backend-design.md` | **v1.8** (E-03 thêm ở Task 0.9) |
 | `docs/design/subscription-frontend-design.md` | **v1.6** |
 | `docs/plans/subscription-work-plan.md` | **v1.3** |
 
@@ -109,37 +109,39 @@ Frontend DD cố ý vẫn trỏ **UI Spec v1.2** ở mục "Referenced UI Spec" 
 
 | # | Mục | Chặn gì |
 |---|---|---|
-| **BU-1** | **TBD-02 nội dung pháp lý** | **bật bán + test webhook tiền thật.** `docs/legal/refund-policy.md` còn 3 chỗ `[điền…]`, chưa nêu pháp nhân bán; **chưa có bản Terms nào** dù R11 đòi 2 trang |
+| **BU-1** | **TBD-02 nội dung pháp lý** | **bật bán + test webhook tiền thật.** `docs/legal/refund-policy.md` còn 3 chỗ chưa điền, chưa nêu pháp nhân bán; **chưa có bản Terms nào** dù R11 đòi 2 trang |
 | **BU-2** | ADR-0018 thư viện QR | không chặn gì |
 | **BU-3** | E-01 phạm vi AC-034 | không chặn gì |
 | **BU-4** | U2 đơn giá thật | **bật bán** — chặn qua BU-6 |
 | **BU-5** | Metric #9 baseline | **bật bán** — truy vấn `telemetry_log` 14 ngày, phải chạy TRƯỚC khi bật bán (AC-055) |
 | **BU-6** | **Đích ghi bền cho AI usage chưa được thiết kế** | **Task 1.6** (không sinh file thực thi), rồi BU-4 |
 
-**BU-6 là mới của phiên này.** Backend DD tự mâu thuẫn: `:79` liệt kê Non-scope, `:145` nói "là việc của tài liệu này" — và **không mục schema nào thiết kế bảng đó**. Kỹ sư được hỏi và trả lời "mọi quyết định kỹ thuật là của bạn"; quyết định đã chọn: **giữ cách ly**, vì bán hàng dù sao vẫn bị BU-1 và BU-5 chặn, nên gỡ BU-6 không mua được gì trên đường tới hạn. `backend-task-08` ghi việc leo thang này vào backend DD.
+Chuỗi: **BU-6 → Task 1.6 → BU-4 → Task 6.8.** Không gì trong Pha 2–5 phụ thuộc nó.
 
-Chuỗi: **BU-6 → Task 1.6 → BU-4 → Task 6.8.** Không gì trong Phase 1–5 phụ thuộc nó; Phase 1 hoàn tất mà không cần nó.
+**BU-6 đã được ghi thành E-03 trong backend DD v1.8** (Task 0.9): nêu rõ mệnh đề nào bị rút, và yêu cầu một bản sửa DD thiết kế đủ 6 phần — tên bảng; danh sách cột đầy đủ gồm tách token vào/ra kèm `thoughtsTokenCount` tính theo giá output và chiều `role`; FK kèm `on delete`; RLS policy; tập revoke/grant nêu đích danh; ảnh hưởng vân tay §17. **Cấm mọi task tự chọn sink.**
 
-## 8. Nợ kỹ thuật đã ghi trong task file, phải trả khi tới
+## 8. Nợ kỹ thuật và việc dọn còn nợ
 
-- **Transcription drift:** `subscriptionFixtureData.ts` và `subscriptionServiceFixtures.ts` chép tay type/hằng số của backend. **`tsc` KHÔNG thấy được trôi lệch** cho tới khi có liên kết biên dịch. Dòng checklist đã cắm vào backend task **09, 12, 15, 16, 17, 18, 19** — mỗi dòng nêu type phải nối và transcription phải xoá.
-- **Banner cũ** ở `SOURCE/tests/e2e/fixture/subscription.fixture.e2e.test.ts:56` nói UI Spec "known-wrong / pending amendment" — **đã sai** từ khi Task 0.3 landing. Thuộc plan Task 2.5 (`frontend-task-05`).
-- **Backend DD `:1199`** còn viết tắt `getPaymentStatus() === "paid"` (đọc như union trần). Reviewer xét là **để được** — đó là văn xuôi trong mục Verification Strategy chứ không phải khối khai báo, và viết đúng nghĩa đen sẽ ra lỗi `tsc` ngay. Gộp vào Refactor của `backend-task-16`.
-- **2 tiêu chí Phase 0 completion** còn `[ ]` dù task chủ (0.3, 0.5) đã `[x]`. Tick khi đóng Phase 0.
+- **Transcription drift:** `subscriptionFixtureData.ts` và `subscriptionServiceFixtures.ts` chép tay type/hằng số của backend; **`tsc` KHÔNG thấy được** vì chúng qua PostgREST dạng chuỗi. Task 1.4 đã trả một phần (2 hằng trong làn service chuyển sang import). Dòng checklist còn cắm ở backend task **12, 15, 16, 17, 18, 19**. `subscriptionFixtureData.ts:203` vẫn chép tay `39_000`.
+- **Trích dẫn `schema.sql` mục nát:** Task 1.1 làm dịch số dòng, nên backend DD (mục Schema `:1597`, telemetry `:1381-1382`) và thân Task 1.1 trong work plan giờ trỏ vị trí cũ. Lớp CL-05/CL-06. Gộp vào đợt vệ sinh tài liệu kế tiếp.
+- **`docs/plans/subscription-backend-work-plan.md:50`** (bản **đã bị thay thế**) vẫn bảo implementer chọn sink và còn nêu ưu tiên bảng riêng — đúng cái BU-6 sinh ra để chặn. Không sửa vì work plan hiện hành ghi rõ việc khai tử file đó là quyết định của kỹ sư. **Chờ kỹ sư: vô hiệu hoá hay lưu trữ.**
+- **Banner cũ** ở `SOURCE/tests/e2e/fixture/subscription.fixture.e2e.test.ts:56` nói UI Spec "known-wrong / pending amendment" — đã sai từ khi Task 0.3 landing. Thuộc plan Task 2.5 (`frontend-task-05`).
+- **Backend DD `:1199`** còn viết tắt `getPaymentStatus() === "paid"`. Reviewer xét là để được. Gộp vào Refactor của `backend-task-16`.
+- **Checkbox trong `phase0-completion.md` và `phase1-completion.md`** còn nhiều ô trống dù task đã xong — chỉ là sổ sách, và Final Cleanup sẽ xoá các file này. Nội dung cổng đã được verify thật.
+- **`backend-task-13.md`**: mục "Exit-gate evidence" liệt kê bộ ca TRƯỚC vòng revision (16 checks); mục "Revision after integration-test-reviewer" bên dưới mới là bộ cuối (20 checks). Task 6.4 re-walk nên biết.
+- **Bàn giao trong code:** Task 2.1 phải **export `PERIOD_MS`** từ `lib/billing/quota.ts` cho `resetsAt` thay vì khai lại 30 ngày. Task 5.1 sở hữu cách mã hoá `AI_BUDGET_FREE_SHARE` (phân số 0.5 hay phần trăm 50 — chưa tài liệu nào nêu, `checkEnv` cố ý chỉ kiểm "số hữu hạn lớn hơn 0").
 
-## 9. Thứ tự chạy còn lại
+## 9. Thứ tự chạy còn lại (36 task)
 
 Từ `docs/plans/tasks/_overview-subscription-work-plan.md`:
 
-- **Phase 0** (còn 1): `backend-08`
-- **Phase 1**: `backend-09`, `backend-10`, **`backend-11` ⚠ THỦ CÔNG**, `backend-12`, `backend-13` — (Task 1.6 ⛔ không sinh file)
-- **Phase 2**: `backend-14`, `frontend-02`, `frontend-03`, `frontend-04`, `frontend-05`
-- **Phase 3**: `backend-15` → `backend-19`, `frontend-06` → `frontend-09`
-- **Phase 4**: `backend-20`, `frontend-10` → `frontend-14`
-- **Phase 5**: `backend-21` → `backend-27`, **`backend-28` ⚠ THỦ CÔNG**
-- **Phase 6**: `backend-29` → `backend-33`, `frontend-15` ⚠, `backend-34` ⚠ tiền thật, `backend-35` ⚠ bật bán
+- **Pha 2**: `backend-14`, `frontend-02`, `frontend-03`, `frontend-04`, `frontend-05` ← **lần đầu chạm frontend**
+- **Pha 3**: `backend-15` → `backend-19`, `frontend-06` → `frontend-09`
+- **Pha 4**: `backend-20`, `frontend-10` → `frontend-14`
+- **Pha 5**: `backend-21` → `backend-27`, **`backend-28` ⚠ apply prod (Task 5.8)**
+- **Pha 6**: `backend-29` → `backend-33`, `frontend-15`, **`backend-34` ⚠ tiền thật**, **`backend-35` ⚠ bật bán**
 
-Ràng buộc thứ tự còn hiệu lực: **`backend-17`/`backend-18` trước `backend-19`** (CL-01 — `getMyOrder()` phải dùng `toCheckoutOrder()`, nếu không INT-2 đỏ vì `pendingUntil` dạng `+00:00` khác chuỗi dạng `…Z`).
+Ràng buộc thứ tự còn hiệu lực: **`backend-17`/`backend-18` trước `backend-19`** (CL-01 — `getMyOrder()` phải dùng `toCheckoutOrder()`, nếu không INT-2 đỏ vì `pendingUntil` dạng `+00:00` khác chuỗi dạng `…Z`). Phiên này đã gặp đúng bẫy đó ở ca SB-f: bẫy **có thật**, không phải giả định.
 
 ## 10. Sau khi hết 50 task
 
