@@ -17,6 +17,11 @@
 
 import type { Plan } from "./types";
 
+/** Hai loại thao tác có hạn mức. Khai ở đây vì `PLAN_LIMITS` và `quotaKey()`
+ *  đều nói về cùng một tập — hai lời khai rời sẽ cho phép thêm một loại vào
+ *  bảng hạn mức mà quên nó ở khoá đếm. */
+export type QuotaKind = "tutor" | "upload";
+
 /** Hạn mức mỗi kỳ 30 ngày, theo gói và theo loại thao tác (PRD R5/D5, R6/D7).
  *
  *  Đơn vị là **thao tác người dùng khởi xướng**, không phải request Gemini:
@@ -28,16 +33,36 @@ import type { Plan } from "./types";
 export const PLAN_LIMITS = {
   free: { tutor: 5, upload: 3 },
   premium: { tutor: 500, upload: 15 },
-} as const satisfies Record<Plan, { tutor: number; upload: number }>;
+} as const satisfies Record<Plan, Record<QuotaKind, number>>;
 
 /** Độ dài một kỳ (PRD A4/A6, `record_payment_settlement(p_period_days => 30)`).
  *
- *  CỐ Ý chưa export: task này chưa có chỗ đọc nào khác. Chỗ tiếp theo cần nó là
- *  `resetsAt = periodStart + 30 ngày` trong `readEntitlement()` — khi đó hãy
- *  export hằng này, ĐỪNG khai lại 30 ngày ở file kia. Hai lời khai của cùng một
+ *  Export vì `readEntitlement()` dựng `resetsAt = periodStart + 30 ngày`. Nó
+ *  `import` hằng này chứ KHÔNG khai lại 30 ngày — hai lời khai của cùng một
  *  khoảng thời gian là đúng hình dạng hỏng mà `periodStartEpoch()` bên dưới
  *  tồn tại để chặn. */
-const PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
+export const PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
+
+/**
+ * Khoá bộ đếm kỳ trên Redis. **Đây là chỗ DUY NHẤT trong repo ghép chuỗi này.**
+ *
+ * Đường ĐỌC (`readEntitlement()` dựng `used`) và đường GHI (`consumeQuota()`
+ * INCR ở cổng) phải cho ra chuỗi GIỐNG HỆT TỪNG BYTE cho cùng một người tại
+ * cùng một thời điểm. Nếu mỗi bên tự ghép — thừa một dấu hai chấm, đổi thứ tự
+ * hai đoạn giữa, hay một bên dùng giây còn bên kia mili giây — thì màn hình báo
+ * "còn n lượt" trong khi cổng từ chối, và KHÔNG CÓ GÌ ĐỎ. Vì thế cả hai phía
+ * gọi hàm này; không phía nào viết lại mẫu khoá.
+ *
+ * @param periodStartEpochMs giá trị `periodStartEpoch()` trả về, nguyên vẹn —
+ *   không làm tròn lại, không quy đổi đơn vị.
+ */
+export function quotaKey(
+  kind: QuotaKind,
+  userId: string,
+  periodStartEpochMs: number
+): string {
+  return `quota:${kind}:${userId}:${periodStartEpochMs}`;
+}
 
 /**
  * Mốc bắt đầu kỳ hiện tại của một người dùng, tính bằng **mili giây** kể từ
