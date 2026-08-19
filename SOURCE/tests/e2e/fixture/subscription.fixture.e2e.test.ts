@@ -1,38 +1,95 @@
-// Subscription (payOS prepaid period) — FIXTURE-E2E lane test skeleton
+// @vitest-environment jsdom
+
+// Subscription (payOS prepaid period) — FIXTURE-E2E lane
 // Design Docs: docs/design/subscription-frontend-design.md (v1.2, Test Boundaries :1018)
 //              docs/design/subscription-backend-design.md (v1.4, Test Boundaries :1121)
-// UI Spec:     docs/ui-spec/subscription-ui-spec.md (v1.3) — see the CORRECTION
-//              block below; UI-D17 / the C-06 delta are generated AGAINST the
-//              correction, not against the shipped spec text.
+// UI Spec:     docs/ui-spec/subscription-ui-spec.md (v1.4) — UI-D17 AS AMENDED;
+//              see the AMENDMENT block below.
 // PRD:         docs/prd/subscription-prd.md (v1.6)
 // Generated:   2026-08-18 | Budget used: integration 3/3, fixture-e2e 3/3, service-e2e 2/2
+// FE-2 filled: 2026-08-19 (plan Task 2.5) — fixture-e2e 1/3 resolved.
 //
 // =============================================================================
 // FILE STATUS — read before editing
 // =============================================================================
-// This file is a SKELETON: comments only, no imports, no test() blocks, no
-// assertions. The implementing task adds them in the same commit as the UI work.
+// FE-2 IS FILLED AND EXECUTABLE. FE-1 and FE-3 are still comment-only reserved
+// slots (plan Tasks 4.6 and 3.9). The `@vitest-environment jsdom` directive on
+// LINE 1 exists for FE-2 and is a per-file declaration, per the repo convention.
 //
-// HARNESS. `SOURCE/vitest.config.ts:19` collects lib/**, components/**, app/**
-// only, so nothing under `SOURCE/tests/` runs under `npm test` — which is why
-// the shipped fixture-e2e scripts live here. Follow the shipped convention in
-// this same directory: a driver-based script written against the structural
-// subset of Playwright that `supportFixtureData.ts` declares (see
-// `support-widget-visibility.fixture.e2e.test.ts:9-17`,
-// `history.fixture.e2e.test.ts`, `rating.fixture.e2e.test.ts`). Do NOT
-// introduce MSW; the frontend DD states it is not used and is not introduced.
-// The backend is fixture-driven: Server Actions are stubbed at the action
-// module boundary and entitlement/order values are supplied as fixtures. No
-// live payOS connection and no real money movement occurs in this lane.
+// HOW THIS LANE RUNS:  `npm run test:fixture`  (from `SOURCE/`).
+//
+// READ THE NEXT PARAGRAPH BEFORE TRUSTING ANYTHING IN THIS FILE. Until plan
+// Task 2.5, THIS LANE HAD NO RUNNER AT ALL. None of the three committed configs
+// collected `tests/e2e/fixture/**` — `vitest.config.ts` takes lib/**,
+// components/** and app/**; `vitest.integration.config.ts` takes
+// tests/integration/**; `vitest.localdb.config.ts` takes tests/e2e/service/**
+// — and no `test:fixture` script existed. The omission was mechanical (plan
+// Task 0.7 emitted three lane skeletons and wired two lanes), but its effect
+// was not: a case in this file could be written, reviewed and merged while
+// never executing anywhere. That is the same "an artifact claiming a
+// discriminating power it does not have" failure this feature keeps producing,
+// one level up — at the LANE rather than at the assertion. `vitest.fixture.config.ts`
+// and the `test:fixture` script were added in plan Task 2.5 under an explicit
+// orchestrator authorisation, and FE-2 is the first case in this directory ever
+// to have run in a committed lane.
+//
+// Note for anyone reaching for a shortcut: a positional filter
+// (`npx vitest run tests/e2e/fixture/...`) collects NOTHING, because it only
+// narrows the configured `include`, and vitest 4 has no `--include` CLI
+// override — it errors with "Unknown option --include". The config is the only
+// way in.
+//
+// WHY THE LANE IS SEPARATE FROM `npm test`, stated plainly because the reason
+// is NOT the reason the other two lanes are separate. `test:integration` and
+// `test:localdb` are held out of CI because they need a real Supabase dev
+// database. This lane needs no database, no credentials and no network, so it
+// COULD safely join the CI gate. It is separate for a mechanical reason: the
+// six other `*.fixture.e2e.test.ts` files here are Playwright-subset DRIVER
+// SCRIPTS with no `test()` blocks, so a directory-wide collection reports "No
+// test suite found in file" for each and exits 1 (measured). They are excluded
+// by name in `vitest.fixture.config.ts`; when that exclude list empties, this
+// lane can fold into `npm test`.
+//
+// `npx tsc --noEmit` and `eslint --max-warnings 0` cover this file as well
+// (tsconfig `include` is `**/*.ts` + `**/*.tsx`).
+//
+// WHY FE-2 IS AN IN-PROCESS RENDER OF THE REAL ROUTE TREE, NOT A DRIVER SCRIPT.
+// The six shipped siblings in this directory (`history.`, `rating.`,
+// `short-answer-scoring.`, the three `support-*.`) are driver scripts written
+// against a structural subset of Playwright, because this repo has no
+// `@playwright/test` and no committed `playwright.config.ts`; each records the
+// same residual — nothing executes them. That convention cannot discharge
+// AC-042, which is the only reason this slot exists: the claim is that the
+// UI-D17 mount ACTUALLY RENDERS, and a script no runner executes proves nothing
+// about what renders. So FE-2 keeps the convention's SUBSTANCE — the real route
+// tree, only the action module and the two data sources stubbed, real
+// dictionaries, no MSW — and drops its FORM, composing
+// `RootLayout -> (layer2)/layout -> the result-detail page` exactly as
+// production composes them and rendering that through
+// `@testing-library/react`. The provider therefore comes from where production
+// puts it (`app/(layer2)/layout.tsx:41`), which is the whole point: delete that
+// mount and FE-2 goes red — which is exactly what a provider-wrapped unit test
+// cannot do. Precedent for rendering a real layout tree this way:
+// `SOURCE/app/(layer2)/__tests__/layout.test.tsx` (plan Task 2.2).
+//
+// WHAT THIS FORM CANNOT COVER, recorded rather than quietly dropped: jsdom
+// paints nothing and lays nothing out, so the PAINTED focus ring, the 360px
+// layout and real client-side navigation stay with the manual browser pass
+// (plan Task 6.5 item iv). FE-2 asserts their structural preconditions — the
+// focus indicator is not suppressed, the upgrade target is `/pricing` — and
+// says so at the assertion itself.
 //
 // HARNESS MODULE — `./subscriptionFixtureData.ts`. It holds everything the
 // three cases below run on:
 //   - entitlement fixtures: FIXTURE_ENTITLEMENT_KNOWN / _UNKNOWN / _EXHAUSTED,
 //     built by spreading FREE_FALLBACK, with FIXTURE_RESETS_AT deliberately on
 //     a different calendar day in ICT than in UTC (FE-2(b)). FE-2(b) MUST first
-//     pin the browser zone via driver.setTimezone(FIXTURE_BROWSER_TIMEZONE):
-//     on an ICT developer machine an unpinned formatter renders the right date
-//     for the wrong reason and the case passes by accident;
+//     pin the ambient zone to FIXTURE_BROWSER_TIMEZONE: on an ICT developer
+//     machine an unpinned formatter renders the right date for the wrong reason
+//     and the case passes by accident. THE MACHINE THIS WAS WRITTEN ON REPORTS
+//     `Asia/Saigon`, so that hazard is live rather than theoretical — FE-2 pins
+//     `process.env.TZ` itself and asserts the pin took effect, instead of
+//     trusting the runner's ambient environment;
 //   - order fixtures: FIXTURE_ORDER_PENDING and _PENDING_NO_QR, _PAID,
 //     _EXPIRED, _CANCELLED, _UNRECOGNISED, plus FIXTURE_ORDER_ROWS for S-05,
 //     all pinned against FIXTURE_NOW;
@@ -43,15 +100,26 @@
 //     keep a call outstanding: the dogpile guard and the busy state only exist
 //     inside an in-flight window, so FE-3(a)/(e)/(f) drive them through it;
 //   - the driver: SubscriptionDriver / SubscriptionLocator.
-// Named here rather than imported: this file has no consumer for an import
-// until the cases exist, and an unused import is fatal under
-// `eslint --max-warnings 0`. The three slots stay comments-only until plan
-// Tasks 4.6 (FE-1), 2.5 (FE-2) and 3.9 (FE-3) fill them.
+// FE-2 consumes the entitlement fixtures, the route/identity constants and the
+// timezone pin. `SubscriptionDriver` and the action-stub layer stay unimported
+// until FE-1 and FE-3 exist — an unused import is fatal under
+// `eslint --max-warnings 0`.
 //
-// CONSTRAINTS BINDING ANY IN-PROCESS RENDER CASE ADDED ALONGSIDE THESE.
-// The browser cases below are not subject to jsdom rules, but the companion
-// component cases the frontend DD owns are, and the implementer will write both
-// in the same task. Reproduced here so they are not re-derived:
+// NO MSW; the sanctioned mock boundary is the ACTION MODULE. FE-2 stubs
+// `explainStep()` (the tutor action module) and the two DATA SOURCES the two
+// server components read from — `readEntitlement()` for the layout and
+// `getResult()` for the page. The layouts, the provider, the page, the
+// components, the dictionaries and the date formatter are all REAL.
+// `readEntitlement()` is a data source and not the thing under test: the
+// skeleton's own mock boundary reads "entitlement is supplied as a FIXTURE at
+// the real (layer2) provider mount", and the entitlement fixtures are
+// `Entitlement` VALUES, which is the shape that arrives at that mount. Stubbing
+// it does not weaken the primary failure mode, because the mount, the context
+// and every consumer below it stay real. (`layout.test.tsx` stubs one layer
+// lower — Supabase plus Redis — because its own claim is about the DERIVATION;
+// FE-2's claim is about what renders.)
+//
+// CONSTRAINTS BINDING ANY IN-PROCESS RENDER CASE IN THIS FILE:
 //   - vitest has NO `setupFiles` in this repo, so `@testing-library/jest-dom`
 //     matchers are UNAVAILABLE. Use plain Vitest matchers and raw DOM reads:
 //     `el.getAttribute("aria-disabled") === "true"`,
@@ -64,26 +132,37 @@
 //     and `vi.mock("next/headers")`. Precedents:
 //     `SOURCE/components/tutor/ExplainStepAffordance.test.tsx:1,28-29,45` and
 //     `SkillRecommendationCard.test.tsx:9-15,22-27`.
-//   - Entitlement provider wrapping ALREADY SHIPS as `renderWith(entitlement)`:
+//   - Entitlement provider wrapping ships as `renderWith(entitlement)` in
 //     `SOURCE/components/tutor/ExplainStepAffordance.paywall.test.tsx:39-55` and
-//     `SOURCE/lib/billing/__tests__/entitlement.test.tsx:49`. Reuse one of those
-//     two forms; do not invent a third.
+//     `SOURCE/lib/billing/__tests__/entitlement.test.tsx:49`. FE-2 MUST NOT use
+//     either form: a case that supplies the provider supplies the very thing a
+//     broken production tree would be missing.
 //
 // =============================================================================
-// CORRECTION APPLIED — UI Spec UI-D17 and the C-06 delta are known-wrong
+// AMENDMENT LANDED — UI Spec v1.4 § UI-D17 and the C-06 delta now state the
+//                    corrected behaviour
 // =============================================================================
-// The shipped UI Spec text says `TutorQuotaNote` is mounted "receiving
+// HISTORY. The earlier UI Spec text said `TutorQuotaNote` is mounted "receiving
 // `formattedResetDate` computed server-side". No such producer can exist: the
 // mount site is an async server component holding no entitlement value, and the
-// frontend DD's `code:02` forbids a second `readEntitlement()` path. The spec
-// text is pending amendment.
+// frontend DD's `code:02` forbids a second `readEntitlement()` path.
 //
-// FE-2 below is generated against the CORRECTED behaviour:
-//   the mount passes NO prop; `TutorQuotaNote` formats its own `resetsAt` from
-//   PROVIDER CONTEXT, inside the existing `tutor.state === "known"` branch
-//   (`SOURCE/components/billing/TutorQuotaNote.tsx:30`).
-// Any assertion on a `formattedResetDate` prop is wrong and must not be added.
+// STATUS: AMENDED AND IMPLEMENTED — this is no longer pending.
+//   - plan Task 0.3 landed the amendment: UI Spec v1.4 § UI-D17 (and the C-06
+//     delta) now state the corrected behaviour directly, and frontend DD X-13
+//     records the same resolution.
+//   - plan Task 2.4 (commit d5ba7d7) implemented it: `TutorQuotaNote` takes NO
+//     props and formats its own `tutor.resetsAt` from PROVIDER CONTEXT inside
+//     the existing `tutor.state === "known"` branch
+//     (`SOURCE/components/billing/TutorQuotaNote.tsx:43`).
 //
+// THE PROHIBITION STILL STANDS, and it is why this block survives its own
+// amendment: any assertion on a `formattedResetDate` prop is wrong and must not
+// be added. Re-adding the prop is the silent failure X-13 names — the mount can
+// pass nothing, the old ternary swallows the date branch, and the note prints
+// the counters with NO date, for everyone, forever, while lint, build and a
+// provider-wrapped unit test all stay green. FE-2(c) is the runtime half of
+// that prohibition.
 //
 // =============================================================================
 // FE-1 — RESERVED SLOT — Purchase journey: /pricing -> /pricing/checkout
@@ -256,6 +335,702 @@
 //   (g) Every interactive element in the new states is Tab-reachable, none
 //       carries native `disabled`, and each has a visible focus ring. (AC-043's
 //       browser-observable half)
+
+// -----------------------------------------------------------------------------
+// FE-2 — IMPLEMENTATION (plan Task 2.5). Everything above this line is the
+// generated annotation block, kept verbatim; everything below is the case.
+// -----------------------------------------------------------------------------
+
+import { createElement, type ReactNode } from "react";
+import { cleanup, render } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+// The two hoisted string constants below are duplicated INSIDE `vi.hoisted`
+// rather than imported, because a `vi.mock` factory runs before this module's
+// import bindings are initialised and would hit a TDZ error. Both are pinned
+// back to their shipped sources by the "fixture preconditions" block, so a
+// rename fails there instead of silently rendering the default locale (or the
+// wrong route) underneath every assertion in this file.
+const { cookieName, routePath, state, getCurrentUserProfileMock, readEntitlementMock, getResultMock, explainStepMock } =
+  vi.hoisted(() => ({
+    cookieName: "ms_locale",
+    routePath: "/exams/exam-subscription-fixture/attempt/attempt-subscription-fixture/result/detail",
+    state: { locale: "en" as "en" | "vi" },
+    getCurrentUserProfileMock: vi.fn(),
+    readEntitlementMock: vi.fn(),
+    getResultMock: vi.fn(),
+    explainStepMock: vi.fn(),
+  }));
+
+// --- Runtime substitutions (NOT product stubs) -------------------------------
+// These stand in for pieces of the Next runtime that only exist inside a real
+// server/build: none of them is a seam FE-2 makes a claim about.
+
+vi.mock("server-only", () => ({}));
+
+vi.mock("next/headers", () => ({
+  cookies: async () => ({
+    get: (name: string) => (name === cookieName ? { value: state.locale } : undefined),
+  }),
+}));
+
+// `next/font/google` is a compiler transform; called as a plain function it
+// throws. Returning the CSS-variable name each call site asked for keeps the
+// real root-layout code path (the `className` interpolation) intact.
+vi.mock("next/font/google", () => {
+  const font = (options: { variable?: string }) => ({
+    variable: options.variable ?? "",
+    className: "",
+  });
+  return { Geist_Mono: font, Source_Serif_4: font, Be_Vietnam_Pro: font };
+});
+
+vi.mock("@vercel/analytics/next", () => ({ Analytics: () => null }));
+
+vi.mock("next/navigation", () => ({
+  usePathname: () => routePath,
+  useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), back: vi.fn() }),
+  // The page redirects when `getResult()` returns null. That never happens on
+  // this fixture, so a call here means the harness is wrong — it must be loud,
+  // not a no-op that leaves a half-rendered tree for the assertions to read.
+  redirect: (url: string) => {
+    throw new Error(`FE-2: unexpected redirect(${url}) — the result fixture should have rendered`);
+  },
+}));
+
+// `SkipLink` is an async Server Component. React 19's client renderer refuses
+// one outright: it suspends and the WHOLE tree comes back empty, i.e. the case
+// would be red for the wrong reason. Same environment limit, same treatment and
+// same reasoning as `app/(layer2)/__tests__/layout.test.tsx:70`. It sits OUTSIDE
+// the provider, so it stands between no assertion in this file.
+vi.mock("@/components/shared/SkipLink", () => ({ SkipLink: () => null }));
+
+// NOT required for the render: the reviewer removed all three and the lane
+// still passed 23/23. They are defensive isolation. These action modules are
+// reachable from the client components the two layouts mount (SiteHeader /
+// LanguageToggle / SupportWidget / HeaderProfile), and at MODULE SCOPE they
+// pull in the Supabase server client, the redis-backed rate-limit `guard` and
+// nodemailer. Stubbing them keeps that construction cost and any future
+// import-time side effect out of a lane whose whole point is needing no
+// database, no credentials and no network.
+vi.mock("@/lib/support/actions", () => ({ submitSupportTicket: vi.fn() }));
+vi.mock("@/lib/i18n/actions", () => ({ setLocale: vi.fn() }));
+vi.mock("@/app/(layer1)/actions", () => ({ signOut: vi.fn() }));
+
+// --- The sanctioned mock boundary + the two data sources ---------------------
+// `explainStep` is the ACTION MODULE (the frontend DD's sanctioned boundary).
+// `getCurrentUserProfile` and `readEntitlement` are the layout's data sources;
+// `getResult` is the page's. The layouts, the EntitlementProvider mount, the
+// page, TutorQuotaNote, ExplainStepAffordance, the dictionaries and
+// `lib/format/datetime.ts` all run REAL.
+vi.mock("@/app/(layer2)/tutorActions", () => ({ explainStep: explainStepMock }));
+vi.mock("@/lib/auth/getCurrentUser", () => ({ getCurrentUserProfile: getCurrentUserProfileMock }));
+vi.mock("@/lib/billing/readEntitlement", () => ({ readEntitlement: readEntitlementMock }));
+vi.mock("@/app/(layer2)/queries", () => ({ getResult: getResultMock }));
+
+import RootLayout from "@/app/layout";
+import Layer2Layout from "@/app/(layer2)/layout";
+import ResultDetailPage from "@/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page";
+import type { ExamResult } from "@/app/(layer2)/queries";
+import { TutorQuotaNote } from "@/components/billing/TutorQuotaNote";
+import type { Entitlement } from "@/lib/billing/types";
+import { LOCALES, type Locale } from "@/lib/i18n/locales";
+import { createTranslate, getDictionary } from "@/lib/i18n/translate";
+import {
+  FIXTURE_ATTEMPT_ID,
+  FIXTURE_BROWSER_TIMEZONE,
+  FIXTURE_ENTITLEMENT_EXHAUSTED,
+  FIXTURE_ENTITLEMENT_KNOWN,
+  FIXTURE_ENTITLEMENT_UNKNOWN,
+  FIXTURE_EXAM_ID,
+  FIXTURE_LOCALE_COOKIE,
+  FIXTURE_RESETS_AT,
+  FIXTURE_RESETS_AT_ICT_DATE,
+  FIXTURE_RESETS_AT_UTC_DATE,
+  FIXTURE_RESULT_DETAIL_ROUTE,
+  FIXTURE_USER,
+} from "./subscriptionFixtureData";
+
+// =============================================================================
+// The timezone pin — `driver.setTimezone(FIXTURE_BROWSER_TIMEZONE)`'s in-process
+// equivalent, and the single most deletable-looking line in this file.
+// =============================================================================
+// `FIXTURE_RESETS_AT` is 19:30Z, which is 02:30 the NEXT calendar day in ICT.
+// The formatter under test pins `timeZone: "Asia/Ho_Chi_Minh"` itself
+// (`lib/format/datetime.ts:34`), so on a machine whose ambient zone ALREADY is
+// ICT a formatter that DROPPED that pin renders byte-identical output and
+// FE-2(b) passes for the wrong reason. The machine this was written on reports
+// `Asia/Saigon`. Node re-reads `process.env.TZ` on assignment, so pinning it
+// here (before any `Intl.DateTimeFormat` is constructed — `formatDate` builds a
+// fresh one per call and caches nothing) reproduces the browser-context pin
+// without depending on how the runner was invoked.
+process.env.TZ = FIXTURE_BROWSER_TIMEZONE;
+
+// =============================================================================
+// Fixtures
+// =============================================================================
+
+/** `FIXTURE_RESETS_AT` as the two calendar days it falls on, in the DD/MM/YYYY
+ *  shape `formatDate` renders — built by REORDERING the fixture module's own
+ *  ISO date constants, never by calling the formatter. A value derived from the
+ *  thing under test moves in lockstep with it and proves nothing. */
+const ICT_DATE = FIXTURE_RESETS_AT_ICT_DATE.split("-").reverse().join("/"); // 16/09/2026
+const UTC_DATE = FIXTURE_RESETS_AT_UTC_DATE.split("-").reverse().join("/"); // 15/09/2026
+
+/** Rendered note, per fixture and locale. Fixed literals typed out by hand
+ *  (repo precedent: `TutorQuotaNote.test.tsx:139-148`, `OrderStatusBadge.test.tsx:99`)
+ *  — an expectation rebuilt from `t(key, values)` drifts with the dictionary and
+ *  with the formatter at once, so it can never fail. The "fixture preconditions"
+ *  block below ties these literals back to the fixture's own numbers and date. */
+const NOTE = {
+  known: {
+    en: "12/500 tutor hints used this period. Resets on 16/09/2026.",
+    vi: "Đã dùng 12/500 lượt gia sư trong kỳ này. Đặt lại vào 16/09/2026.",
+  },
+  exhausted: {
+    en: "500/500 tutor hints used this period. Resets on 16/09/2026.",
+    vi: "Đã dùng 500/500 lượt gia sư trong kỳ này. Đặt lại vào 16/09/2026.",
+  },
+} as const satisfies Record<string, Record<Locale, string>>;
+
+/** `billing.quota.tutorExhausted` / `billing.quota.upgradeLink`, per locale. */
+const EXHAUSTED_COPY = {
+  en: "You've used all your tutor hints for this period.",
+  vi: "Bạn đã dùng hết lượt gia sư của kỳ này.",
+} as const satisfies Record<Locale, string>;
+
+const UPGRADE_LABEL = {
+  en: "See plans",
+  vi: "Xem các gói",
+} as const satisfies Record<Locale, string>;
+
+const SHORT_QID = "question-short-answer-fixture";
+const MCQ_QID = "question-mcq-fixture";
+
+/** Two questions, both `hasBeenWrongTwice: true`, one per BRANCH of the page —
+ *  the short-answer branch (`page.tsx:165-181`) and the mcq branch
+ *  (`page.tsx:182-236`). Each branch decides its own `ExplainStepAffordance`
+ *  mount and carries its own `TutorQuotaNote` mount, so one rendered branch is
+ *  not proof for the other. That is the "BOTH call sites" half of AC-042.
+ *
+ *  DELIBERATE ABSENCE OF `0` AND OF `—` everywhere except the note: FE-2(d)
+ *  asserts neither character stands in for a counter when the quota is
+ *  `unknown`, and it can only do that if nothing ELSE inside a question item
+ *  produces one. Hence non-empty answers (an empty one renders
+ *  `result.skipped` = "— skipped —"), and `correct`/`total` chosen away from 0. */
+const FIXTURE_RESULT: ExamResult = {
+  examId: FIXTURE_EXAM_ID,
+  examTitle: "Fixture exam: photosynthesis",
+  result: {
+    totalScore: 5,
+    correct: 1,
+    total: 2,
+    topicBreakdown: [],
+    perQuestion: [
+      {
+        questionId: SHORT_QID,
+        selected: "chlorophyll",
+        isCorrect: false,
+        scored: true,
+        hasBeenWrongTwice: true,
+      },
+      {
+        questionId: MCQ_QID,
+        selected: "B",
+        correct: "A",
+        isCorrect: false,
+        scored: true,
+        hasBeenWrongTwice: true,
+      },
+    ],
+  },
+  questions: {
+    [SHORT_QID]: {
+      content: "Which pigment captures light inside a leaf?",
+      choices: [],
+      questionType: "short_answer",
+      essayAnswer: "chlorophyll",
+    },
+    [MCQ_QID]: {
+      content: "Where does photosynthesis mostly happen?",
+      choices: [
+        { id: "A", text: "In the chloroplast" },
+        { id: "B", text: "In the nucleus" },
+      ],
+      questionType: "mcq",
+    },
+  },
+  startedAt: "2026-08-18T11:00:00.000Z",
+  submittedAt: "2026-08-18T11:40:00.000Z",
+  overtimeSeconds: 0,
+};
+
+// =============================================================================
+// The render — the REAL route tree, composed the way production composes it
+// =============================================================================
+
+/**
+ * `RootLayout -> (layer2)/layout -> result-detail page`.
+ *
+ * NOTHING here supplies `EntitlementProvider`: it is reached only because
+ * `app/(layer2)/layout.tsx` mounts it. Delete that mount and every assertion
+ * about the note dies — which is the one thing a provider-wrapped unit test
+ * can never do (frontend DD Risk R-12).
+ *
+ * `RootLayout` is in the composition rather than skipped because item (e) is a
+ * per-LOCALE claim: the locale has to arrive the way production delivers it
+ * (cookie -> `getLocale()` -> `I18nProvider` at the root), not from a wrapper
+ * this file chooses.
+ */
+async function renderRoute(entitlement: Entitlement, locale: Locale, child?: ReactNode) {
+  state.locale = locale;
+  readEntitlementMock.mockResolvedValue(entitlement);
+  getResultMock.mockResolvedValue(FIXTURE_RESULT);
+
+  const inner =
+    child ??
+    (await ResultDetailPage({
+      params: Promise.resolve({ id: FIXTURE_EXAM_ID, attemptId: FIXTURE_ATTEMPT_ID }),
+    }));
+
+  return render(await RootLayout({ children: await Layer2Layout({ children: inner }) }));
+}
+
+/** The `<li>` for one question. THROWS when it is missing: an `undefined` here
+ *  would make every "the note is absent" and every "no 0, no —" assertion below
+ *  vacuously true on a tree that rendered nothing at all. Presence first, value
+ *  second. Document order puts the question's own `<li>` before the choice
+ *  `<li>`s nested inside it, so `find` returns the outer one. */
+function questionItem(container: HTMLElement, questionText: string): HTMLElement {
+  const item = Array.from(container.querySelectorAll("li")).find((el) =>
+    (el.textContent ?? "").includes(questionText)
+  );
+  if (!item) {
+    throw new Error(
+      `FE-2: no <li> carrying ${JSON.stringify(questionText)} — the page did not render its question list`
+    );
+  }
+  return item;
+}
+
+/** Both question items, in page order. */
+function questionItems(container: HTMLElement): [HTMLElement, HTMLElement] {
+  return [
+    questionItem(container, FIXTURE_RESULT.questions[SHORT_QID].content),
+    questionItem(container, FIXTURE_RESULT.questions[MCQ_QID].content),
+  ];
+}
+
+/** Every `<p>` whose text is EXACTLY the expected note. Exact, not `includes`:
+ *  `RichText` renders question content into `<p>` too, and a substring match
+ *  would let a note that lost its date still answer here. */
+function notesIn(root: HTMLElement, expected: string): HTMLElement[] {
+  return Array.from(root.querySelectorAll("p")).filter((p) => (p.textContent ?? "") === expected);
+}
+
+/** The affordance's idle button for one question — anchored on the id the
+ *  component derives from the questionId (`ExplainStepAffordance.tsx:55`), so
+ *  it proves THIS call site mounted rather than "some button exists". */
+function idleButtonIn(item: HTMLElement, questionId: string): HTMLElement | null {
+  return item.querySelector(`button[aria-describedby="tutor-${questionId}-reason"]`);
+}
+
+const INTERACTIVE = "a[href], button, input, select, textarea, [tabindex]";
+
+/** Suppresses the UA focus ring without replacing it (the failure) vs restores
+ *  one with a `focus-visible:` utility (fine) vs leaves the UA default alone
+ *  (also fine). jsdom paints nothing, so this is the structural precondition of
+ *  a visible ring, not the ring itself — the painted check is the manual pass
+ *  (plan Task 6.5 item iv). Same shape as the shipped structural check in
+ *  `support-widget-visibility.fixture.e2e.test.ts:112-128`. */
+function focusRingVerdict(el: Element): "restored" | "ua-default" | "suppressed" {
+  const cls = el.getAttribute("class") ?? "";
+  if (/focus-visible:(ring|outline|border|shadow)/.test(cls)) return "restored";
+  if (/(^|\s)(outline-none|outline-hidden)(\s|$)/.test(cls)) return "suppressed";
+  return "ua-default";
+}
+
+type QuotaStateName = "known" | "unknown" | "exhausted";
+
+/**
+ * THROWS unless the quota state named actually reached the DOM.
+ *
+ * This exists because of a measured near-miss, and deleting it silently
+ * un-does the fix: a missing `EntitlementProvider` collapses every quota to
+ * `unknown`, so a case that merely *says* "exhausted" scans the ordinary idle
+ * button and passes. Naming a state is not reaching it.
+ */
+function assertStateMaterialised(
+  container: HTMLElement,
+  items: readonly HTMLElement[],
+  state: QuotaStateName
+): void {
+  if (state === "exhausted") {
+    const upgrades = Array.from(container.querySelectorAll('a[href="/pricing"]'));
+    if (upgrades.length !== items.length) {
+      throw new Error(
+        `FE-2: the exhausted state did not render — expected ${items.length} upgrade links, found ${upgrades.length}`
+      );
+    }
+    if (notesIn(container, NOTE.exhausted.en).length !== items.length) {
+      throw new Error("FE-2: the exhausted state rendered without its counters");
+    }
+    return;
+  }
+  const notes = notesIn(container, NOTE.known.en).length;
+  const expected = state === "known" ? items.length : 0;
+  if (notes !== expected) {
+    throw new Error(`FE-2: the ${state} state did not render — expected ${expected} notes, found ${notes}`);
+  }
+  for (const [index, item] of items.entries()) {
+    if (!idleButtonIn(item, index === 0 ? SHORT_QID : MCQ_QID)) {
+      throw new Error(`FE-2: the ${state} state must keep the tutor button at call site ${index + 1}`);
+    }
+  }
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  getCurrentUserProfileMock.mockResolvedValue({
+    id: FIXTURE_USER.id,
+    email: FIXTURE_USER.email,
+    displayName: "Fixture Learner",
+    avatarUrl: null,
+  });
+});
+
+afterEach(() => {
+  cleanup();
+});
+
+// =============================================================================
+// Fixture preconditions — every literal in this file, tied back to its source
+// =============================================================================
+// None of these is a claim about the product. They exist so that a rename or a
+// fixture edit fails HERE, legibly, instead of silently turning one of the
+// seven items below into an assertion about the wrong thing.
+
+describe("FE-2 preconditions", () => {
+  it("the ambient zone is pinned, and it is NOT the zone the formatter pins", () => {
+    const ambient = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    expect(ambient).toBe(FIXTURE_BROWSER_TIMEZONE);
+    // The whole discriminating power of (b) rests on this inequality: pinned to
+    // Asia/Ho_Chi_Minh, a formatter that dropped its own `timeZone` option
+    // would still render the ICT date and (b) would pass while broken.
+    expect(ambient).not.toBe("Asia/Ho_Chi_Minh");
+  });
+
+  it("the two calendar days really do differ, so (b) can discriminate at all", () => {
+    expect(ICT_DATE).not.toBe(UTC_DATE);
+    expect(new Date(FIXTURE_RESETS_AT).toISOString().slice(0, 10)).toBe(FIXTURE_RESETS_AT_UTC_DATE);
+  });
+
+  it("the hardcoded note literals carry the fixture's own numbers and ICT date", () => {
+    const known = FIXTURE_ENTITLEMENT_KNOWN.tutor;
+    const exhausted = FIXTURE_ENTITLEMENT_EXHAUSTED.tutor;
+    if (known.state !== "known" || exhausted.state !== "known") {
+      throw new Error("FE-2: the known/exhausted entitlement fixtures must both carry a known quota");
+    }
+    expect(exhausted.used).toBe(exhausted.limit); // the branch `isQuotaExhausted` answers true for
+    expect(known.used).toBeLessThan(known.limit);
+    expect(known.resetsAt).toBe(FIXTURE_RESETS_AT);
+    expect(exhausted.resetsAt).toBe(FIXTURE_RESETS_AT);
+
+    for (const locale of LOCALES) {
+      expect(NOTE.known[locale]).toContain(`${known.used}/${known.limit}`);
+      expect(NOTE.known[locale]).toContain(ICT_DATE);
+      expect(NOTE.exhausted[locale]).toContain(`${exhausted.used}/${exhausted.limit}`);
+      expect(NOTE.exhausted[locale]).toContain(ICT_DATE);
+    }
+  });
+
+  it("`unknown` fixture really is the fail-OPEN one", () => {
+    expect(FIXTURE_ENTITLEMENT_UNKNOWN.tutor.state).toBe("unknown");
+  });
+
+  it("the hoisted cookie name and route path match the shipped constants", () => {
+    // `vi.mock` factories cannot import, so these two travel as literals inside
+    // `vi.hoisted`. A rename of either shipped constant lands here.
+    expect(cookieName).toBe(FIXTURE_LOCALE_COOKIE);
+    expect(routePath).toBe(FIXTURE_RESULT_DETAIL_ROUTE);
+  });
+});
+
+// =============================================================================
+// (a) AC-042 — a <p> with BOTH the count and the reset date, beside BOTH call
+//     sites, on the real route tree
+// =============================================================================
+
+describe("FE-2 (a) the note renders beside both ExplainStepAffordance call sites", () => {
+  it.each(LOCALES)("locale %s — one note per question item, each carrying count AND date", async (locale) => {
+    const { container } = await renderRoute(FIXTURE_ENTITLEMENT_KNOWN, locale);
+    const expected = NOTE.known[locale];
+
+    // Presence of the page itself, before anything is read out of it.
+    const [shortItem, mcqItem] = questionItems(container);
+
+    // Both affordance call sites mounted — one per branch, each identified by
+    // ITS OWN questionId. Without this, "two notes" could both be sitting
+    // beside the same call site.
+    expect(idleButtonIn(shortItem, SHORT_QID)).not.toBeNull();
+    expect(idleButtonIn(mcqItem, MCQ_QID)).not.toBeNull();
+
+    // Exactly two notes on the whole page: one per call site, no more.
+    expect(notesIn(container, expected)).toHaveLength(2);
+
+    for (const item of [shortItem, mcqItem]) {
+      const notes = notesIn(item, expected);
+      expect(notes).toHaveLength(1);
+      const note = notes[0];
+      expect(note.tagName).toBe("P");
+      // "Beside" is positional: the note is the item's last element child, i.e.
+      // it sits after the affordance inside the same question, not somewhere
+      // else on the page that happens to be inside the same <li>.
+      expect(item.lastElementChild).toBe(note);
+      // BOTH values, asserted separately — a note that kept the counters and
+      // lost the date is the exact silent failure UI-D17 names.
+      expect(note.textContent).toContain("12/500");
+      expect(note.textContent).toContain(ICT_DATE);
+      expect(note.textContent).toBe(expected);
+    }
+  });
+});
+
+// =============================================================================
+// (b) the rendered date is the PINNED-timezone formatting of the fixture
+// =============================================================================
+
+describe("FE-2 (b) the reset date is the Asia/Ho_Chi_Minh calendar day", () => {
+  it.each(LOCALES)("locale %s — the ICT day, and never the UTC day one earlier", async (locale) => {
+    const { container } = await renderRoute(FIXTURE_ENTITLEMENT_KNOWN, locale);
+    const notes = notesIn(container, NOTE.known[locale]);
+    expect(notes).toHaveLength(2);
+
+    for (const note of notes) {
+      const text = note.textContent ?? "";
+      expect(text).toContain(ICT_DATE);
+      // One day off is a FAILURE, not a rounding difference (frontend DD's
+      // early-verification failure response: stop). Under the UTC pin above,
+      // a formatter that lost `timeZone: "Asia/Ho_Chi_Minh"` renders exactly
+      // this and nothing else changes.
+      expect(text).not.toContain(UTC_DATE);
+    }
+  });
+});
+
+// =============================================================================
+// (c) the mount passes NO prop
+// =============================================================================
+
+describe("FE-2 (c) no prop is passed at the mount site", () => {
+  it("the note the PAGE renders is byte-identical to <TutorQuotaNote /> with no props", async () => {
+    const fromPage = await renderRoute(FIXTURE_ENTITLEMENT_KNOWN, "en");
+    const pageNotes = notesIn(fromPage.container, NOTE.known.en);
+    expect(pageNotes).toHaveLength(2);
+    const pageHtml = pageNotes[0].outerHTML;
+    cleanup();
+
+    // Same real layout tree, same real provider, same fixture — but the note is
+    // invoked here with NO props at all. Identical output is the runtime half
+    // of the `formattedResetDate` prohibition: if the page were feeding the
+    // component anything, these two would differ.
+    const bare = await renderRoute(
+      FIXTURE_ENTITLEMENT_KNOWN,
+      "en",
+      createElement(TutorQuotaNote)
+    );
+    const bareNotes = notesIn(bare.container, NOTE.known.en);
+    expect(bareNotes).toHaveLength(1);
+    expect(bareNotes[0].outerHTML).toBe(pageHtml);
+  });
+
+  it("the component declares no parameter at all — arity 0, not a destructured props object", () => {
+    // `function f({ formattedResetDate })` has arity 1; `function f()` has 0.
+    // An optional prop changes no rendered output, so every DOM assertion in
+    // this file is blind to a re-added declaration. This is not.
+    expect(TutorQuotaNote.length).toBe(0);
+  });
+});
+
+// =============================================================================
+// (d) `unknown` => the note renders NOTHING and the page still renders
+// =============================================================================
+
+describe("FE-2 (d) fail-OPEN: unknown quota hides the note without breaking the page", () => {
+  it.each(LOCALES)("locale %s — no note, no 0 and no — standing in for the counters", async (locale) => {
+    const unknown = await renderRoute(FIXTURE_ENTITLEMENT_UNKNOWN, locale);
+    const [shortItem, mcqItem] = questionItems(unknown.container);
+
+    // The page still renders: both question items exist AND both affordance
+    // call sites still mounted. A fail-OPEN quota must not become a
+    // fail-CLOSED display.
+    expect(idleButtonIn(shortItem, SHORT_QID)).not.toBeNull();
+    expect(idleButtonIn(mcqItem, MCQ_QID)).not.toBeNull();
+    expect(notesIn(unknown.container, NOTE.known[locale])).toHaveLength(0);
+
+    for (const item of [shortItem, mcqItem]) {
+      const text = item.textContent ?? "";
+      // Literal reading of the requirement, and it is only meaningful because
+      // the fixture keeps both characters out of every OTHER part of a question
+      // item (see FIXTURE_RESULT).
+      expect(text).not.toContain("0");
+      expect(text).not.toContain("—");
+      // The note is not merely empty-of-text: no <p> of the note's shape is
+      // rendered at all.
+      expect(item.lastElementChild?.tagName).not.toBe("P");
+    }
+
+    // THE POSITIVE CONTROL, and it is the only reason the four assertions above
+    // mean anything. Mutation-checked: with `EntitlementProvider` deleted from
+    // `(layer2)/layout.tsx` every quota is `unknown`, so "no note, no 0, no —"
+    // is trivially true and this case stayed GREEN against exactly the tree
+    // AC-042 exists to catch. Feeding the SAME harness a `known` quota has to
+    // produce the note — otherwise "absent" means "broken", not "fail-OPEN".
+    // Same shape as `TutorQuotaNote.test.tsx:126-135`.
+    cleanup();
+    const known = await renderRoute(FIXTURE_ENTITLEMENT_KNOWN, locale);
+    expect(notesIn(known.container, NOTE.known[locale])).toHaveLength(2);
+  });
+
+  it.each(LOCALES)("locale %s — the ONLY difference from the known render is the note itself", async (locale) => {
+    // The subtraction identity. Without it, "no note" would also pass on a tree
+    // that quietly dropped half the question item, and "no 0 / no —" would pass
+    // on a blank one.
+    const unknown = await renderRoute(FIXTURE_ENTITLEMENT_UNKNOWN, locale);
+    const unknownTexts = questionItems(unknown.container).map((el) => el.textContent ?? "");
+    cleanup();
+
+    const known = await renderRoute(FIXTURE_ENTITLEMENT_KNOWN, locale);
+    const knownTexts = questionItems(known.container).map((el) => el.textContent ?? "");
+
+    expect(unknownTexts[0]).not.toBe("");
+    expect(knownTexts).toEqual(unknownTexts.map((text) => text + NOTE.known[locale]));
+  });
+});
+
+// =============================================================================
+// (e) AC-041 — the exhausted string is NOT the generic error string
+// =============================================================================
+
+describe("FE-2 (e) the exhausted state is distinguishable from a generic failure", () => {
+  it.each(LOCALES)("locale %s — NOT EQUAL to the resolved t(\"tutor.error\") value", async (locale) => {
+    const { container } = await renderRoute(FIXTURE_ENTITLEMENT_EXHAUSTED, locale);
+    const [shortItem, mcqItem] = questionItems(container);
+
+    // The generic string is resolved at RUNTIME from the real dictionary in the
+    // locale under test — the same lookup `ExplainStepAffordance.tsx:157` makes
+    // for all four explainStep error codes. Not a substring heuristic, not a
+    // literal copied into this file: a copy edit to `tutor.error` moves this
+    // value and the inequality still means what it says.
+    const genericError = createTranslate(getDictionary(locale))("tutor.error");
+    expect(genericError).not.toBe("tutor.error"); // a missing key echoes its own name back
+    expect(genericError.length).toBeGreaterThan(0);
+
+    for (const item of [shortItem, mcqItem]) {
+      // Presence first: the exhausted branch replaced the button entirely.
+      expect(idleButtonIn(item, SHORT_QID)).toBeNull();
+      expect(idleButtonIn(item, MCQ_QID)).toBeNull();
+      const reason = Array.from(item.querySelectorAll("p")).find(
+        (p) => (p.textContent ?? "") === EXHAUSTED_COPY[locale]
+      );
+      if (!reason) {
+        throw new Error(
+          `FE-2(e): the exhausted reason did not render; item.textContent = ${JSON.stringify(item.textContent)}`
+        );
+      }
+      const rendered = reason.textContent ?? "";
+      expect(rendered.length).toBeGreaterThan(0);
+
+      // AC-041, the whole of it.
+      expect(rendered).not.toBe(genericError);
+    }
+
+    // Stronger than the per-node inequality and cheap: the generic error string
+    // appears NOWHERE on a page whose only tutor state is "out of allowance".
+    expect(container.textContent ?? "").not.toContain(genericError);
+
+    // The refusal is derived BEFORE the press, from entitlement — not from an
+    // error code returned after one (UI-D3). Zero action calls prove it.
+    expect(explainStepMock).not.toHaveBeenCalled();
+  });
+
+  it("the counters are still readable in the exhausted state", async () => {
+    // AC-042 does not stop applying once the allowance is gone — that is
+    // precisely when the reset date is the thing the user needs.
+    const { container } = await renderRoute(FIXTURE_ENTITLEMENT_EXHAUSTED, "en");
+    expect(notesIn(container, NOTE.exhausted.en)).toHaveLength(2);
+  });
+});
+
+// =============================================================================
+// (f) the upgrade link goes to /pricing
+// =============================================================================
+
+describe("FE-2 (f) the exhausted state leads to S-01 /pricing", () => {
+  it.each(LOCALES)("locale %s — one upgrade link per call site, href exactly /pricing", async (locale) => {
+    const { container } = await renderRoute(FIXTURE_ENTITLEMENT_EXHAUSTED, locale);
+    const items = questionItems(container);
+
+    for (const item of items) {
+      const links = Array.from(item.querySelectorAll("a")).filter(
+        (a) => (a.textContent ?? "") === UPGRADE_LABEL[locale]
+      );
+      expect(links).toHaveLength(1);
+      // Exact equality, not `startsWith`/`includes`: "/pricing/checkout" and
+      // "/pricing?x" both satisfy a loose check and neither is the S-04 -> S-01
+      // transition.
+      expect(links[0].getAttribute("href")).toBe("/pricing");
+    }
+  });
+});
+
+// =============================================================================
+// (g) AC-043's browser-observable half
+// =============================================================================
+
+describe("FE-2 (g) every interactive element in the new states is reachable and un-suppressed", () => {
+  const cases: Array<[QuotaStateName, Entitlement]> = [
+    ["known", FIXTURE_ENTITLEMENT_KNOWN],
+    ["unknown", FIXTURE_ENTITLEMENT_UNKNOWN],
+    ["exhausted", FIXTURE_ENTITLEMENT_EXHAUSTED],
+  ];
+
+  it.each(cases)("%s — Tab-reachable, no native disabled, focus indicator not suppressed", async (name, entitlement) => {
+    const { container } = await renderRoute(entitlement, "en");
+    const items = questionItems(container);
+
+    // WITHOUT THIS, THIS WHOLE BLOCK MEASURES THE HARNESS. Mutation-checked:
+    // with `EntitlementProvider` deleted from `(layer2)/layout.tsx`, every
+    // quota is `unknown`, so the `known` and `exhausted` rows below scan the
+    // very same idle button the `unknown` row scans — and all three stayed
+    // GREEN against a tree where the state under test never existed. The
+    // assertion is now made against the state, not merely in its name.
+    assertStateMaterialised(container, items, name);
+
+    const interactive = items.flatMap((item) => Array.from(item.querySelectorAll(INTERACTIVE)));
+    // Count BEFORE iterating: a loop over an empty list is green and silent,
+    // and "there are no interactive elements" is exactly what a tree that
+    // rendered nothing looks like. One control per call site, at minimum.
+    expect(interactive.length).toBeGreaterThanOrEqual(items.length);
+
+    for (const el of interactive) {
+      // No jest-dom matchers in this repo — raw DOM reads.
+      expect(el.hasAttribute("disabled")).toBe(false);
+      expect((el as HTMLButtonElement).disabled === true).toBe(false);
+      expect(el.getAttribute("aria-disabled")).not.toBe("true");
+
+      const tabindex = el.getAttribute("tabindex");
+      expect(tabindex === null || Number(tabindex) >= 0).toBe(true);
+
+      (el as HTMLElement).focus();
+      expect(container.ownerDocument.activeElement).toBe(el);
+
+      expect(focusRingVerdict(el)).not.toBe("suppressed");
+    }
+  });
+});
+
 //
 //
 // =============================================================================
