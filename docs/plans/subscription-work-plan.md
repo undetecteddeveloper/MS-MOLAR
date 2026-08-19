@@ -653,7 +653,7 @@ flowchart LR
   - No integration case is filled here — INT-2 was filled by Task 3.5, INT-3 by Task 3.4. Test-case resolution unchanged: **integration 2/3** cumulative.
 - [x] **Task 3.8 — ★ Frontend early verification point.** `/me/orders` renders a real, **non-empty** list for a signed-in user, with C-11 above it, against dev (which has `payment_orders` after Task 1.3). Success criteria: rows newest first; each showing `DD/MM/YYYY HH:mm` in ICT, a thousands-separated amount and a raw `orderCode`; C-11 rendering four items (or the one sentence, with **no `0` and no `—`**); zero horizontal overflow at 360px; the keyboard sweep reaching every control.
   - **Failure response**: if C-11 shows Free for a Premium user, **stop** — the route group or the provider mount is wrong and every downstream test would pass while the screen lied. If a date is one day off, **stop** — the `timeZone` pin is missing or a legacy formatter was used. Neither is a defect to work around; both invalidate the design's premises.
-- [ ] **Task 3.9 — Implement and run fixture-e2e FE-3 (re-check outcome on `/me/orders`).** Assert: an alert node **appears** (absent before, present after); its text **EQUALS** the fixed expected `billing.recheck.stillPending` sentence per locale; the badge still reads the "awaiting payment" word unchanged; **every entitlement-derived value in C-11 is byte-identical before and after** ("no wrong grant" is only proven by a before/after comparison); focus is still on the activated control; the stubbed action module records **exactly 1** invocation under two synchronous activations; the rate-limited sentence **EQUALS** the fixed expected `billing.recheck.rateLimited` string per locale and is **NOT EQUAL** to the generic error string nor to any other outcome sentence in the same locale.
+- [x] **Task 3.9 — Implement and run fixture-e2e FE-3 (re-check outcome on `/me/orders`).** Assert: an alert node **appears** (absent before, present after); its text **EQUALS** the fixed expected `billing.recheck.stillPending` sentence per locale; the badge still reads the "awaiting payment" word unchanged; **every entitlement-derived value in C-11 is byte-identical before and after** ("no wrong grant" is only proven by a before/after comparison); focus is still on the activated control; the stubbed action module records **exactly 1** invocation under two synchronous activations; the rate-limited sentence **EQUALS** the fixed expected `billing.recheck.rateLimited` string per locale and is **NOT EQUAL** to the generic error string nor to any other outcome sentence in the same locale.
   - Test-case resolution for this phase: **2 fixture-e2e cases of 3 (FE-2, FE-3)** cumulative.
 
 #### Phase Completion Criteria
@@ -664,7 +664,7 @@ flowchart LR
 - [ ] **No production deploy of this branch has occurred** — this phase's code reads `payment_orders` and renders S-05, and SVC-2 (Task 6.2) has not run (see Deployment Sequencing)
 - [ ] FE-3 green
 - [ ] `rateLimit.test.ts`'s four existing assertion blocks pass **unmodified**
-- [ ] Test-case resolution: integration 2/3, fixture-e2e 2/3
+- [x] Test-case resolution: integration 2/3, fixture-e2e 2/3
 - [ ] Quality check (staged): `npm run lint`, `npx tsc --noEmit`, `npm test`, `npm run build`
 
 ---

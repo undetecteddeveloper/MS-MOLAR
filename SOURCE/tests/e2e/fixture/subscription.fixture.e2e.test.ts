@@ -8,13 +8,14 @@
 // PRD:         docs/prd/subscription-prd.md (v1.6)
 // Generated:   2026-08-18 | Budget used: integration 3/3, fixture-e2e 3/3, service-e2e 2/2
 // FE-2 filled: 2026-08-19 (plan Task 2.5) — fixture-e2e 1/3 resolved.
+// FE-3 filled: 2026-08-19 (plan Task 3.9) — fixture-e2e 2/3 resolved.
 //
 // =============================================================================
 // FILE STATUS — read before editing
 // =============================================================================
-// FE-2 IS FILLED AND EXECUTABLE. FE-1 and FE-3 are still comment-only reserved
-// slots (plan Tasks 4.6 and 3.9). The `@vitest-environment jsdom` directive on
-// LINE 1 exists for FE-2 and is a per-file declaration, per the repo convention.
+// FE-2 AND FE-3 ARE FILLED AND EXECUTABLE. FE-1 is still a comment-only reserved
+// slot (plan Task 4.6). The `@vitest-environment jsdom` directive on LINE 1 is a
+// per-file declaration, per the repo convention, and both cases depend on it.
 //
 // HOW THIS LANE RUNS:  `npm run test:fixture`  (from `SOURCE/`).
 //
@@ -101,9 +102,9 @@
 //     inside an in-flight window, so FE-3(a)/(e)/(f) drive them through it;
 //   - the driver: SubscriptionDriver / SubscriptionLocator.
 // FE-2 consumes the entitlement fixtures, the route/identity constants and the
-// timezone pin. `SubscriptionDriver` and the action-stub layer stay unimported
-// until FE-1 and FE-3 exist — an unused import is fatal under
-// `eslint --max-warnings 0`.
+// timezone pin; FE-3 consumes the order fixtures and the counted action-stub
+// layer. `SubscriptionDriver` stays unimported until FE-1 exists — an unused
+// import is fatal under `eslint --max-warnings 0`.
 //
 // NO MSW; the sanctioned mock boundary is the ACTION MODULE. FE-2 stubs
 // `explainStep()` (the tutor action module) and the two DATA SOURCES the two
@@ -341,8 +342,8 @@
 // generated annotation block, kept verbatim; everything below is the case.
 // -----------------------------------------------------------------------------
 
-import { createElement, type ReactNode } from "react";
-import { cleanup, render } from "@testing-library/react";
+import { cloneElement, createElement, isValidElement, type ReactNode } from "react";
+import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // The two hoisted string constants below are duplicated INSIDE `vi.hoisted`
@@ -351,8 +352,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // back to their shipped sources by the "fixture preconditions" block, so a
 // rename fails there instead of silently rendering the default locale (or the
 // wrong route) underneath every assertion in this file.
-const { cookieName, routePath, state, getCurrentUserProfileMock, readEntitlementMock, getResultMock, explainStepMock } =
-  vi.hoisted(() => ({
+const {
+  cookieName,
+  routePath,
+  state,
+  getCurrentUserProfileMock,
+  readEntitlementMock,
+  getResultMock,
+  explainStepMock,
+  refreshMock,
+} = vi.hoisted(() => ({
     cookieName: "ms_locale",
     routePath: "/exams/exam-subscription-fixture/attempt/attempt-subscription-fixture/result/detail",
     state: { locale: "en" as "en" | "vi" },
@@ -360,6 +369,14 @@ const { cookieName, routePath, state, getCurrentUserProfileMock, readEntitlement
     readEntitlementMock: vi.fn(),
     getResultMock: vi.fn(),
     explainStepMock: vi.fn(),
+    // COUNTED, not a throwaway `vi.fn()`: `router.refresh()` is step 5 of
+    // C-10's handler and the ONLY mechanism by which the badge, the row and
+    // C-11 catch up with an outcome. Left uncounted, its deletion is invisible
+    // here — the user reads "Paid — your Premium period runs to …" under a
+    // badge still saying "Awaiting payment" and a C-11 still saying "Free",
+    // until they reload by hand. That is the divergence UI-D16 exists to
+    // prevent, so FE-3 (d) reads this counter.
+    refreshMock: vi.fn().mockName("router.refresh"),
   }));
 
 // --- Runtime substitutions (NOT product stubs) -------------------------------
@@ -390,7 +407,7 @@ vi.mock("@vercel/analytics/next", () => ({ Analytics: () => null }));
 vi.mock("next/navigation", () => ({
   usePathname: () => routePath,
   useSearchParams: () => new URLSearchParams(),
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), back: vi.fn() }),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: refreshMock, back: vi.fn() }),
   // The page redirects when `getResult()` returns null. That never happens on
   // this fixture, so a call here means the harness is wrong — it must be loud,
   // not a no-op that leaves a half-rendered tree for the assertions to read.
@@ -425,7 +442,14 @@ vi.mock("@/app/(layer1)/actions", () => ({ signOut: vi.fn() }));
 // page, TutorQuotaNote, ExplainStepAffordance, the dictionaries and
 // `lib/format/datetime.ts` all run REAL.
 vi.mock("@/app/(layer2)/tutorActions", () => ({ explainStep: explainStepMock }));
-vi.mock("@/lib/auth/getCurrentUser", () => ({ getCurrentUserProfile: getCurrentUserProfileMock }));
+// `getCurrentUser` is FE-3's addition: a factory replaces the WHOLE module, and
+// S-05's login gate reads `getCurrentUser` while FE-2's route reads
+// `getCurrentUserProfile`. Without both names on one factory the other lane's
+// route calls `undefined()` before it renders anything.
+vi.mock("@/lib/auth/getCurrentUser", () => ({
+  getCurrentUserProfile: getCurrentUserProfileMock,
+  getCurrentUser: getCurrentUserMock,
+}));
 vi.mock("@/lib/billing/readEntitlement", () => ({ readEntitlement: readEntitlementMock }));
 vi.mock("@/app/(layer2)/queries", () => ({ getResult: getResultMock }));
 
@@ -702,6 +726,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
 });
 
 // =============================================================================
@@ -1115,3 +1140,890 @@ describe("FE-2 (g) every interactive element in the new states is reachable and 
 //       expected `billing.recheck.rateLimited` string per locale, and is NOT
 //       EQUAL to the generic error string nor to any other outcome sentence in
 //       the same locale. (AC-037)
+//
+// -----------------------------------------------------------------------------
+// FE-3 — IMPLEMENTATION (plan Task 3.9). Everything above this line is the
+// generated annotation block, kept verbatim; everything below is the case.
+// -----------------------------------------------------------------------------
+//
+// WHAT THIS SECTION ADDS TO THE SHARED HARNESS ABOVE — stated here because FE-2
+// and FE-3 live in ONE module and therefore share every `vi.mock` in it:
+//   - `getCurrentUser` was appended to the EXISTING `@/lib/auth/getCurrentUser`
+//     factory (see there). S-05's login gate reads it; FE-2's route reads
+//     `getCurrentUserProfile`.
+//   - two NEW module boundaries: `listMyOrders()` — S-05's data source, the same
+//     kind of seam FE-2 opens for `getResult()` — and `recheckOrder()`, which is
+//     THE sanctioned mock boundary for this case and is routed into the COUNTED
+//     stub from `subscriptionFixtureData.ts` rather than into a bare `vi.fn()`,
+//     because (f) asserts an invocation COUNT and (a)/(e) need the in-flight
+//     window that `holdNextRecheck()` provides.
+//   - `resolveServerTree()` — see its own comment.
+// The route tree ITSELF is real: `app/layout.tsx`, `(billing)/layout.tsx`
+// (hence the `EntitlementProvider` mount, which is where C-11's four values
+// come from), `me/orders/page.tsx`, C-07, C-08, C-09, C-10, C-11, both
+// dictionaries and `lib/format/datetime.ts`. The copy is the thing under test,
+// so no dictionary value is stubbed and no expected sentence below is computed
+// from `t()`.
+//
+// THE FULL SET OF MODULE DOUBLES REACHING THE RENDERED S-05 TREE — six
+// modules, not one, and each named here because "only the action module is
+// stubbed" reads as a guarantee that nothing else can be hiding a regression:
+//   1. `@/lib/billing/orderActions` — the SANCTIONED boundary (counted).
+//   2. `@/app/(billing)/queries` — `listMyOrders()`, the data source.
+//   3. `@/lib/auth/getCurrentUser` — S-05's login gate.
+//   4. `@/lib/billing/readEntitlement` — the value `(billing)/layout.tsx`
+//      hands to the real `EntitlementProvider`.
+//   5. `next/navigation` — the whole module, FE-2's factory, four names:
+//      `usePathname()` answers FE-2's result-detail route (nothing on S-05
+//      reads it but nav highlighting, and no assertion below touches it);
+//      `useSearchParams()` answers an empty `URLSearchParams`; `redirect()`
+//      throws loudly; and `useRouter().refresh` is `refreshMock` — a REAL
+//      seam under C-10's handler, not a runtime substitution, which is why
+//      (d) counts it instead of ignoring it.
+//   6. `@/components/shared/SkipLink` — stubbed to `null` inside
+//      `(billing)/layout.tsx` (async Server Component; see its own comment).
+// Nothing else in the tree is replaced.
+
+const { listMyOrdersMock, getCurrentUserMock, recheckOrderMock } = vi.hoisted(() => ({
+  listMyOrdersMock: vi.fn(),
+  getCurrentUserMock: vi.fn(),
+  recheckOrderMock: vi.fn(),
+}));
+
+vi.mock("@/app/(billing)/queries", () => ({ listMyOrders: listMyOrdersMock }));
+vi.mock("@/lib/billing/orderActions", () => ({ recheckOrder: recheckOrderMock }));
+
+import BillingLayout from "@/app/(billing)/layout";
+import MyOrdersPage from "@/app/(billing)/me/orders/page";
+import type { MyOrderRow } from "@/app/(billing)/queries";
+import type { RecheckOutcome } from "@/lib/billing/orderActions";
+import {
+  createSubscriptionActionStubs,
+  FIXTURE_NOW,
+  FIXTURE_ORDER_CANCELLED,
+  FIXTURE_ORDER_EXPIRED,
+  FIXTURE_ORDER_PAID,
+  FIXTURE_ORDER_PENDING,
+  FIXTURE_ORDER_PENDING_NO_QR,
+  FIXTURE_ORDER_ROWS,
+  FIXTURE_ORDER_UNRECOGNISED,
+  FIXTURE_RECHECK_OUTCOMES,
+} from "./subscriptionFixtureData";
+
+// =============================================================================
+// Expected copy — FIXED LITERALS, typed out by hand
+// =============================================================================
+// Same rule as FE-2's `NOTE`, and for FE-3 it is the whole point of the case:
+// AC-036's negative half ("must not read as a failure") has NO observable
+// criterion other than string EQUALITY against an approved sentence. An
+// expectation rebuilt from `t("billing.recheck.stillPending")` moves with the
+// dictionary, so a copy edit that reintroduces failure vocabulary would edit
+// the test at the same time and the case could never fail. Substring matching
+// is the same defect one step weaker: "Something went wrong. Still awaiting
+// payment." contains the approved sentence.
+
+const STILL_PENDING: Record<Locale, string> = {
+  en: "Still awaiting payment. Transfer the exact amount with the transfer note shown on the payment screen, then check again.",
+  vi: "Vẫn đang chờ khoản chuyển. Bạn chuyển đúng số tiền kèm nội dung chuyển khoản ghi trên màn hình thanh toán, rồi kiểm tra lại.",
+};
+
+const RATE_LIMITED: Record<Locale, string> = {
+  en: "You checked several times in a row. Wait a moment, then check again.",
+  vi: "Bạn vừa kiểm tra liên tiếp nhiều lần. Chờ một chút rồi kiểm tra lại nhé.",
+};
+
+/** The sentence a TERMINAL row's control carries as its reason — the shipped
+ *  `billing.recheck.notPending` string, reused rather than duplicated (C-10). */
+const ALREADY_CLOSED: Record<Locale, string> = {
+  en: "This order is already closed, so re-checking will not change it.",
+  vi: "Đơn này đã đóng rồi, nên kiểm tra lại cũng không đổi được gì.",
+};
+
+/** C-10's IN-FLIGHT reason (idiom 3), the sentence the screen-reader user
+ *  hears while the call is outstanding. Pinned like the four above, and for the
+ *  same reason: a length check cannot tell this sentence from
+ *  `billing.recheck.amountMismatch` — one dictionary key over — and swapping
+ *  the two announces a manufactured payment failure ("a person has to settle
+ *  this one") before any result exists. That is the AC-036 vocabulary
+ *  regression, moved from the outcome node into the busy node.
+ *  Written as escapes on purpose: the trailing character is U+2026 HORIZONTAL
+ *  ELLIPSIS, and three periods typed in its place look identical in a diff
+ *  while failing the equality below. Both values verified byte-for-byte
+ *  against `lib/i18n/dictionaries/{en,vi}.ts`.
+ *
+ *  HONEST LIMIT: only the `en` value is compared to rendered output — the busy
+ *  window is reachable in exactly one case below, and that case is `en`-only.
+ *  The `vi` value is held by the distinctness precondition alone until a `vi`
+ *  in-flight case exists. */
+const BUSY: Record<Locale, string> = {
+  en: "Checking with the payment provider\u2026",
+  vi: "\u0110ang h\u1ecfi l\u1ea1i nh\u00e0 cung c\u1ea5p thanh to\u00e1n\u2026",
+};
+
+/** C-09's word for `pending`. (c) asserts the badge still reads THIS after a
+ *  `not_paid_yet` re-check — the "still waiting" half of AC-036. */
+const AWAITING_PAYMENT: Record<Locale, string> = {
+  en: "Awaiting payment",
+  vi: "Chờ thanh toán",
+};
+
+/** C-11's four AC-056 rows for `FIXTURE_ENTITLEMENT_KNOWN`, in document order.
+ *  These are the values (d) compares byte-for-byte across the activation, and
+ *  they are pinned to literals FIRST so that "unchanged" cannot be satisfied by
+ *  a C-11 that rendered nothing, or rendered "0"/"—", at both ends. */
+const SUMMARY_TERMS: Record<Locale, readonly string[]> = {
+  en: ["Current plan", "Period resets", "Tutor hints", "Exam uploads"],
+  vi: ["Gói hiện tại", "Kỳ đặt lại vào", "Lượt gia sư", "Lượt tải đề"],
+};
+
+const SUMMARY_VALUES: Record<Locale, readonly string[]> = {
+  en: ["Free", "16/09/2026", "488 of 500 hints left", "4 of 5 uploads left"],
+  vi: ["Miễn phí", "16/09/2026", "Còn 488/500 lượt gia sư", "Còn 4/5 lượt tải đề"],
+};
+
+/** The six other sentences C-10 can render in the SAME locale, as dictionary
+ *  KEYS. (g) resolves them at runtime and asserts the rate-limited sentence
+ *  equals none of them: an inequality against a runtime value keeps meaning
+ *  what it says after a copy edit, which is exactly the opposite of the
+ *  equality above. `billing.orders.loadError` is the generic string AC-037
+ *  forbids conflating with; `profile.error.sessionExpired` is C-10's seventh
+ *  branch (`unauthenticated`), reused rather than given its own key. */
+const OTHER_OUTCOME_KEYS = [
+  "billing.recheck.settled",
+  "billing.recheck.stillPending",
+  "billing.recheck.notPending",
+  "billing.recheck.unknownOrder",
+  "billing.recheck.amountMismatch",
+  "billing.recheck.providerUnavailable",
+  "profile.error.sessionExpired",
+  "billing.orders.loadError",
+] as const;
+
+// =============================================================================
+// The action-module stub — counted, and shared by every case below
+// =============================================================================
+// `createSubscriptionActionStubs()` rather than a bare `vi.fn()`: the counters,
+// `holdNextRecheck()` and `releaseHeldRecheck()` are the contract plan Task 0.7
+// wrote for exactly these obligations, and re-implementing them here would put
+// FE-3's (f) on a second, unreviewed copy of the guard's own test double.
+// `renderOrdersRoute()` resets it, so no case inherits another's count.
+
+const stubs = createSubscriptionActionStubs();
+
+const PENDING_CODE = FIXTURE_ORDER_PENDING.orderCode;
+
+/** The three rows whose control must be MOUNTED-BUT-REFUSING, and the three
+ *  whose control must be fully active. `refunded` sits in the second group on
+ *  purpose (FE-AC-10): re-checking is the only action that can clear an
+ *  unrecognised status, so a `status !== "pending"` terminal test — which agrees
+ *  with the shipped set on the other five rows — must fail here. */
+const TERMINAL_ORDERS = [FIXTURE_ORDER_PAID, FIXTURE_ORDER_EXPIRED, FIXTURE_ORDER_CANCELLED];
+const ACTIVE_ORDERS = [FIXTURE_ORDER_PENDING, FIXTURE_ORDER_PENDING_NO_QR, FIXTURE_ORDER_UNRECOGNISED];
+
+// =============================================================================
+// The render — S-05 on the REAL route tree
+// =============================================================================
+
+/**
+ * Resolve every ASYNC SERVER COMPONENT in a tree to the elements it returns,
+ * leaving client components untouched for `render()` to run.
+ *
+ * WHY IT EXISTS. FE-2's `render(await Page(props))` works only while the awaited
+ * component has no async CHILD. S-05 has two: `page.tsx` renders C-07
+ * `OrderList`, which renders C-08 `OrderRow`. React 19's client renderer refuses
+ * an async component outright — it suspends and hands back an EMPTY tree, which
+ * is worse than red, because "the alert is absent" and "the summary did not
+ * change" are both trivially true of nothing at all
+ * (`me/orders/__tests__/renderServerTree.tsx` records the same limit).
+ *
+ * The shipped alternative, `renderToReadableStream` + `innerHTML`, cannot be
+ * used here: it produces STRINGS, and FE-3 needs focus, a click and a state
+ * update. So the server half is resolved the way the server resolves it —
+ * by awaiting it — and the client half is then rendered by
+ * `@testing-library/react`, which is exactly the split Next makes.
+ *
+ * The composition itself is NOT rebuilt here: `page.tsx` still decides that
+ * C-11 sits between the header and C-07, `(billing)/layout.tsx` still decides
+ * where `EntitlementProvider` mounts, and C-08 still decides that C-10 is
+ * mounted per row with the row's own status. Delete any of those and every
+ * assertion below dies — which is the property a hand-composed tree would lose.
+ */
+async function resolveServerTree(node: ReactNode): Promise<ReactNode> {
+  if (Array.isArray(node)) {
+    return Promise.all(node.map((child: ReactNode) => resolveServerTree(child)));
+  }
+  if (!isValidElement<{ children?: ReactNode }>(node)) return node;
+  // `async function f() {}` has `f.constructor.name === "AsyncFunction"`; a
+  // client component is an ordinary Function and must NOT be called here (it
+  // would run hooks outside a renderer).
+  if (typeof node.type === "function" && node.type.constructor.name === "AsyncFunction") {
+    const component = node.type as (props: unknown) => Promise<ReactNode>;
+    return resolveServerTree(await component(node.props));
+  }
+  const { children } = node.props;
+  if (children === undefined) return node;
+  return cloneElement(node, undefined, await resolveServerTree(children));
+}
+
+/**
+ * `RootLayout -> (billing)/layout -> /me/orders/page`, composed the way
+ * production composes them and fed the same way: the entitlement arrives as a
+ * `readEntitlement()` VALUE at the real provider mount, and the rows arrive as
+ * a `listMyOrders()` value at the real page.
+ *
+ * Resets the action stub and asserts the count is zero AFTER the render: a
+ * count read later means nothing unless the render itself contributed none, and
+ * a page that re-checks every row on mount is a real (and expensive) mistake.
+ *
+ * PINS THE CLOCK to `FIXTURE_NOW`. `subscriptionFixtureData.ts` writes every
+ * timestamp relative to that instant and says the harness pins it via
+ * `driver.clock.setFixedTime` — true of the browser-driver harness, but this
+ * lane is in-process and has no driver, so the pin is made HERE instead.
+ * Unpinned, `OrderRow.isWindowStillOpen()` reads the real `Date.now()`,
+ * `FIXTURE_PENDING_UNTIL_FUTURE` (12:25 on 2026-08-18) is already past, and
+ * S-05 silently renders WITHOUT the "continue paying" link the fixture was
+ * built to produce. Nothing is red today because no assertion reads that link
+ * — but `before.html`/`after.html` are whole-page strings, so every future
+ * assertion on them would be wall-clock dependent, i.e. green until some
+ * Tuesday. `toFake: ["Date"]` and nothing else: faking `setTimeout` too would
+ * put React's scheduler on a clock this file never advances. `afterEach`
+ * restores the real one.
+ */
+async function renderOrdersRoute(options: {
+  entitlement: Entitlement;
+  locale: Locale;
+  rows?: readonly MyOrderRow[];
+}) {
+  const { entitlement, locale, rows = FIXTURE_ORDER_ROWS } = options;
+  state.locale = locale;
+  vi.useFakeTimers({ toFake: ["Date"], now: new Date(FIXTURE_NOW) });
+  stubs.reset();
+  // Reset beside the action stub, for the same reason: a count read after an
+  // activation means nothing unless this render started at zero.
+  refreshMock.mockClear();
+  recheckOrderMock.mockImplementation((orderCode: number) => stubs.simulateRecheckOrder(orderCode));
+  getCurrentUserMock.mockResolvedValue({ id: FIXTURE_USER.id });
+  readEntitlementMock.mockResolvedValue(entitlement);
+  listMyOrdersMock.mockResolvedValue([...rows]);
+
+  // Children as the third argument, not as a prop: `react/no-children-prop` is
+  // an error under `--max-warnings 0`, and the two forms build the same element.
+  const tree = await resolveServerTree(
+    createElement(RootLayout, null, createElement(BillingLayout, null, createElement(MyOrdersPage)))
+  );
+  if (!isValidElement(tree)) {
+    throw new Error("FE-3: the route tree did not resolve to an element");
+  }
+  const view = render(tree);
+  if (stubs.recheckOrderCallCount !== 0) {
+    throw new Error(
+      `FE-3: rendering S-05 called recheckOrder ${stubs.recheckOrderCallCount} times — every count below would be reading the render, not the activation`
+    );
+  }
+  return view;
+}
+
+// =============================================================================
+// Readers — each one THROWS on absence
+// =============================================================================
+// A `null` here would make "the alert is absent", "nothing changed" and "the
+// badge still says X" all vacuously true against a tree that rendered nothing.
+// Presence first, value second (FE-2's `questionItem` idiom).
+
+function recheckButtonFor(container: HTMLElement, orderCode: number): HTMLButtonElement {
+  // Anchored on the id C-10 derives from the order code
+  // (`RecheckOrderControl.tsx`: `recheck-${orderCode}-reason`), so it proves
+  // THIS row's control mounted rather than "some button exists".
+  const button = container.querySelector(`button[aria-describedby="recheck-${orderCode}-reason"]`);
+  if (!(button instanceof HTMLButtonElement)) {
+    throw new Error(`FE-3: no re-check control for order ${orderCode} — C-08 did not mount C-10 on that row`);
+  }
+  return button;
+}
+
+function rowFor(container: HTMLElement, orderCode: number): HTMLElement {
+  const row = recheckButtonFor(container, orderCode).closest("li");
+  if (!(row instanceof HTMLElement)) {
+    throw new Error(`FE-3: the control for order ${orderCode} is not inside an <li>`);
+  }
+  return row;
+}
+
+function reasonFor(container: HTMLElement, orderCode: number): string {
+  const reason = container.querySelector(`#recheck-${orderCode}-reason`);
+  if (!reason) throw new Error(`FE-3: no reason node for order ${orderCode}`);
+  return reason.textContent ?? "";
+}
+
+function alertsIn(container: HTMLElement): HTMLElement[] {
+  return Array.from(container.querySelectorAll('[role="alert"]'));
+}
+
+function theOnlyAlert(container: HTMLElement): HTMLElement {
+  const alerts = alertsIn(container);
+  if (alerts.length !== 1) {
+    throw new Error(`FE-3: expected exactly one role="alert" node, found ${alerts.length}`);
+  }
+  return alerts[0];
+}
+
+/** C-09's word, with the decorative glyph removed — same reading as the shipped
+ *  `RecheckOrderControl.test.tsx`. The badge is the one `<span>` in the row
+ *  whose first child is `aria-hidden` (that glyph). */
+function badgeTextIn(row: HTMLElement): { full: string; word: string } {
+  const badges = Array.from(row.querySelectorAll("span")).filter((el) =>
+    el.firstElementChild?.hasAttribute("aria-hidden")
+  );
+  if (badges.length !== 1) {
+    throw new Error(`FE-3: expected exactly one status badge in the row, found ${badges.length}`);
+  }
+  const full = badges[0].textContent ?? "";
+  const glyph = badges[0].firstElementChild?.textContent ?? "";
+  const word = full.slice(glyph.length);
+  if (word === "") throw new Error("FE-3: the badge rendered an empty word");
+  return { full, word };
+}
+
+/** C-11's four rows. `<dl>` is C-11's fingerprint on this screen: C-07 and C-08
+ *  build no definition list, so exactly one `<dl>` must exist (the same
+ *  identification `pageMountsPlanSummary.test.tsx` uses). */
+function summaryOf(container: HTMLElement): { terms: string[]; values: string[]; html: string } {
+  const lists = container.querySelectorAll("dl");
+  if (lists.length !== 1) {
+    throw new Error(`FE-3: expected exactly one C-11 <dl>, found ${lists.length}`);
+  }
+  const list = lists[0];
+  return {
+    terms: Array.from(list.querySelectorAll("dt")).map((n) => n.textContent ?? ""),
+    values: Array.from(list.querySelectorAll("dd")).map((n) => n.textContent ?? ""),
+    html: list.outerHTML,
+  };
+}
+
+/** The whole `<main>`, with any outcome node subtracted. (d)'s subtraction
+ *  identity reads this: the ONLY thing a non-settling re-check may add to the
+ *  screen is the alert. Anything else — a locally patched badge, a summary
+ *  recomputed from an optimistic value, a control that swaps itself out — moves
+ *  this string. */
+function pageHtmlWithoutOutcome(container: HTMLElement): string {
+  const main = container.querySelector("main");
+  if (!main) throw new Error("FE-3: the page rendered no <main>");
+  const clone = main.cloneNode(true) as HTMLElement;
+  for (const alert of Array.from(clone.querySelectorAll('[role="alert"]'))) alert.remove();
+  return clone.innerHTML;
+}
+
+function activeElementOf(container: HTMLElement): Element | null {
+  return container.ownerDocument.activeElement;
+}
+
+/** No jest-dom matchers in this repo: the two native-`disabled` reads are made
+ *  raw, and BOTH are made. The attribute and the property are set by different
+ *  mistakes — `disabled={busy}` sets the property with no attribute in some
+ *  renderers — and either one drops the control out of the tab order. */
+function assertNeverNativelyDisabled(button: HTMLButtonElement, where: string): void {
+  // The `if` exists only to name WHICH state failed — three call sites read the
+  // same two properties, and "expected true to be false" alone does not say
+  // whether idle, busy or terminal broke.
+  if (button.hasAttribute("disabled") || button.disabled) {
+    throw new Error(`FE-3: the re-check control carries native \`disabled\` in the ${where} state`);
+  }
+  expect(button.hasAttribute("disabled")).toBe(false);
+  expect(button.disabled).toBe(false);
+}
+
+// =============================================================================
+// The drive — one activation of the pending row's control
+// =============================================================================
+// Every "before" value is READ AND COPIED before the click; the "after" values
+// are read from the same live DOM afterwards. `before` is never recomputed from
+// the fixture at the end, because a value recomputed from the input is not an
+// observation of what was on the screen.
+
+interface Activation {
+  container: HTMLElement;
+  button: HTMLButtonElement;
+  row: HTMLElement;
+  before: { alerts: number; badge: string; summary: ReturnType<typeof summaryOf>; html: string };
+  after: { alerts: number; badge: string; summary: ReturnType<typeof summaryOf>; html: string };
+}
+
+async function activatePendingRow(locale: Locale, outcome: RecheckOutcome): Promise<Activation> {
+  const { container } = await renderOrdersRoute({ entitlement: FIXTURE_ENTITLEMENT_KNOWN, locale });
+  stubs.setRecheckOutcome(outcome);
+
+  const row = rowFor(container, PENDING_CODE);
+  const button = recheckButtonFor(container, PENDING_CODE);
+  const before = {
+    alerts: alertsIn(container).length,
+    badge: badgeTextIn(row).full,
+    summary: summaryOf(container),
+    html: pageHtmlWithoutOutcome(container),
+  };
+
+  // A keyboard user is on the control when it is activated — which is the only
+  // way (e)'s "focus is still there afterwards" can mean anything.
+  button.focus();
+  expect(activeElementOf(container)).toBe(button);
+
+  await act(async () => {
+    button.click();
+  });
+
+  return {
+    container,
+    button,
+    row,
+    before,
+    after: {
+      alerts: alertsIn(container).length,
+      badge: badgeTextIn(row).full,
+      summary: summaryOf(container),
+      html: pageHtmlWithoutOutcome(container),
+    },
+  };
+}
+
+// =============================================================================
+// Fixture preconditions — every literal above, tied back to its source
+// =============================================================================
+// None of these is a claim about the product. They exist so that a fixture edit
+// or a rename fails HERE, legibly, instead of turning one of the seven items
+// below into an assertion about the wrong thing.
+
+describe("FE-3 preconditions", () => {
+  it("the row FE-3 activates is `pending`, and the six fixture rows are the six the cases assume", () => {
+    const rowsByCode = new Map(FIXTURE_ORDER_ROWS.map((row) => [row.orderCode, row]));
+    expect(rowsByCode.get(PENDING_CODE)?.status).toBe("pending");
+
+    // The terminal/active split below IS the partition of the rendered page, so
+    // a seventh fixture row (or a status change) must land here.
+    expect([...TERMINAL_ORDERS, ...ACTIVE_ORDERS].map((o) => o.orderCode).sort()).toEqual(
+      FIXTURE_ORDER_ROWS.map((row) => row.orderCode).sort()
+    );
+    for (const order of TERMINAL_ORDERS) {
+      expect(rowsByCode.get(order.orderCode)?.status).toBe(order.status);
+      expect(["paid", "expired", "cancelled"]).toContain(order.status);
+    }
+    // FE-AC-10: an unrecognised status is NOT terminal.
+    expect(FIXTURE_ORDER_UNRECOGNISED.status).toBe("refunded");
+  });
+
+  it("the clock really is pinned to FIXTURE_NOW, so the fixture's payment window is open", async () => {
+    // Without this case the pin can be deleted and nothing goes red: no
+    // assertion in FE-3 reads the continue-paying link, and every before/after
+    // comparison stays true of a page missing it at BOTH ends. What it costs is
+    // that `before.html` becomes a function of the wall clock.
+    const { container } = await renderOrdersRoute({
+      entitlement: FIXTURE_ENTITLEMENT_KNOWN,
+      locale: "en",
+    });
+    expect(Date.now()).toBe(Date.parse(FIXTURE_NOW));
+    expect(Date.parse(FIXTURE_ORDER_PENDING.pendingUntil)).toBeGreaterThan(Date.now());
+
+    // The observable consequence, read off the rendered row (FE-AC-11): the
+    // window is open, so C-08 offers the way back to the payment screen. The
+    // terminal rows must not.
+    const link = rowFor(container, PENDING_CODE).querySelector(
+      `a[href="/pricing/checkout?order=${PENDING_CODE}"]`
+    );
+    expect(link).not.toBeNull();
+    for (const order of TERMINAL_ORDERS) {
+      expect(rowFor(container, order.orderCode).querySelector('a[href^="/pricing/checkout"]')).toBeNull();
+    }
+  });
+
+  it("the hardcoded C-11 literals carry the fixture's own numbers and its ICT reset date", () => {
+    const { tutor, upload } = FIXTURE_ENTITLEMENT_KNOWN;
+    if (tutor.state !== "known" || upload.state !== "known") {
+      throw new Error("FE-3: the known entitlement fixture must carry both quotas known");
+    }
+    // Two fields of the same shape seeded with DIFFERENT values: equal ones make
+    // a tutor/upload swap invisible in (d).
+    expect(tutor.limit).not.toBe(upload.limit);
+    expect(tutor.used).not.toBe(upload.used);
+
+    for (const locale of LOCALES) {
+      const values = SUMMARY_VALUES[locale];
+      expect(values[1]).toBe(ICT_DATE); // the same cross-day instant FE-2(b) uses
+      expect(values[2]).toContain(String(tutor.limit - tutor.used));
+      expect(values[2]).toContain(String(tutor.limit));
+      expect(values[3]).toContain(String(upload.limit - upload.used));
+      expect(values[3]).toContain(String(upload.limit));
+      // AC-056 asks for what is LEFT, not what was used. A summary printing
+      // `used` renders the fixture's 12 and would still pass the
+      // contains-the-limit check above.
+      expect(values[2]).not.toContain(String(tutor.used));
+      // No item may collapse into another — (d) compares four values, and two
+      // equal ones would hide a swap between them.
+      expect(new Set(values).size).toBe(values.length);
+      expect(new Set(SUMMARY_TERMS[locale]).size).toBe(SUMMARY_TERMS[locale].length);
+    }
+  });
+
+  it("the five expected sentences are distinct from each other in both locales", () => {
+    for (const locale of LOCALES) {
+      const sentences = [
+        STILL_PENDING[locale],
+        RATE_LIMITED[locale],
+        ALREADY_CLOSED[locale],
+        AWAITING_PAYMENT[locale],
+        // BUSY belongs in this set or the equality that pins it is worth
+        // nothing: a busy string that collided with an outcome string would
+        // satisfy both assertions at once.
+        BUSY[locale],
+      ];
+      expect(new Set(sentences).size).toBe(sentences.length);
+      for (const sentence of sentences) expect(sentence.length).toBeGreaterThan(0);
+    }
+    // And across locales: an `en` sentence rendered under the `vi` cookie is a
+    // locale-plumbing failure, not a copy failure, and the per-locale equality
+    // assertions only separate the two if the two differ.
+    expect(STILL_PENDING.en).not.toBe(STILL_PENDING.vi);
+    expect(RATE_LIMITED.en).not.toBe(RATE_LIMITED.vi);
+    expect(BUSY.en).not.toBe(BUSY.vi);
+  });
+});
+
+// =============================================================================
+// (a) the outcome node APPEARS — absent before, present after
+// =============================================================================
+
+describe("FE-3 (a) a role=\"alert\" node is absent before the activation and present after", () => {
+  it.each(LOCALES)("locale %s — nothing on S-05 carries role=alert until the control is activated", async (locale) => {
+    const { container, row, before, after } = await activatePendingRow(
+      locale,
+      FIXTURE_RECHECK_OUTCOMES.stillPending
+    );
+
+    // ABSENT BEFORE, page-wide. A case that only checks "present after" stays
+    // green against a control that renders its alert node unconditionally —
+    // and an alert present at mount announces, to a screen reader, that
+    // something happened when nothing did (C-07's empty state records the same
+    // reasoning for itself).
+    expect(before.alerts).toBe(0);
+    // PRESENT AFTER, and exactly one page-wide: the five OTHER rows' controls
+    // must not have produced an outcome node of their own.
+    expect(after.alerts).toBe(1);
+
+    const alert = theOnlyAlert(container);
+    expect(row.contains(alert)).toBe(true);
+    expect(alert.getAttribute("role")).toBe("alert");
+    // No `aria-live` on the node (C-10, idiom 1): `role="alert"` is announced on
+    // INSERTION, while a pre-inserted live region may never be read at all —
+    // this repo's own SuccessToast finding. A node carrying both is a node
+    // someone re-introduced the pre-inserted region under.
+    expect(alert.hasAttribute("aria-live")).toBe(false);
+    expect((alert.textContent ?? "").length).toBeGreaterThan(0);
+  });
+});
+
+// =============================================================================
+// (b) the sentence EQUALS the approved `billing.recheck.stillPending` string
+// =============================================================================
+
+describe("FE-3 (b) the still-pending outcome reads as an instruction, per locale", () => {
+  it.each(LOCALES)("locale %s — string EQUALITY against the approved sentence", async (locale) => {
+    const { container } = await activatePendingRow(locale, FIXTURE_RECHECK_OUTCOMES.stillPending);
+
+    // Equality, not `toContain`: a sentence that PREFIXES failure vocabulary
+    // onto the approved text ("Something went wrong. Still awaiting payment…")
+    // satisfies every substring check and is the exact regression AC-036 names.
+    expect(theOnlyAlert(container).textContent).toBe(STILL_PENDING[locale]);
+  });
+
+  it("the two locales really do render different text from the same fixture", async () => {
+    // Without this, both per-locale assertions above could be reading the same
+    // hardcoded `en` string through a locale that never reached the tree.
+    const en = await activatePendingRow("en", FIXTURE_RECHECK_OUTCOMES.stillPending);
+    const sentenceEn = theOnlyAlert(en.container).textContent;
+    cleanup();
+    const vi = await activatePendingRow("vi", FIXTURE_RECHECK_OUTCOMES.stillPending);
+    expect(theOnlyAlert(vi.container).textContent).not.toBe(sentenceEn);
+  });
+});
+
+// =============================================================================
+// (c) the badge still reads "awaiting payment" (AC-036)
+// =============================================================================
+
+describe("FE-3 (c) the status badge is unchanged by a re-check that did not settle", () => {
+  it.each(LOCALES)("locale %s — still the `pending` word, before and after", async (locale) => {
+    const { row, before, after } = await activatePendingRow(locale, FIXTURE_RECHECK_OUTCOMES.stillPending);
+
+    // Pinned to a literal FIRST: "unchanged" is worthless if the badge read
+    // "Paid" at both ends, or rendered an empty pill at both ends.
+    expect(badgeTextIn(row).word).toBe(AWAITING_PAYMENT[locale]);
+    // Byte-identical, glyph included — C-09 marks `paid` with a different glyph
+    // AND different classes, so a locally patched badge moves this string even
+    // if the word survived.
+    expect(after.badge).toBe(before.badge);
+  });
+});
+
+// =============================================================================
+// (d) 0 WRONG GRANTS — every entitlement-derived value byte-identical
+// =============================================================================
+
+describe("FE-3 (d) a re-check that does not settle changes nothing about entitlement", () => {
+  it.each(LOCALES)("locale %s — C-11's four AC-056 values are byte-identical across the activation", async (locale) => {
+    const { before, after } = await activatePendingRow(locale, FIXTURE_RECHECK_OUTCOMES.stillPending);
+
+    // NON-DEGENERACY FIRST, against fixed literals. Two empty arrays are
+    // byte-identical, and so are two copies of a summary that says "Premium"
+    // at both ends. Without this half, the comparison below cannot tell "no
+    // wrong grant" from "no summary".
+    expect(before.summary.terms).toEqual([...SUMMARY_TERMS[locale]]);
+    expect(before.summary.values).toEqual([...SUMMARY_VALUES[locale]]);
+
+    // HONEST NOTE ON WHAT THE NEXT FOUR LINES CAN AND CANNOT FAIL FOR. In THIS
+    // harness the before/after comparison cannot fail for any single-file
+    // product mutant, and that is a property of the harness, not of the
+    // product: (i) `EntitlementContext` (`lib/billing/entitlement.tsx:21`)
+    // holds a STATIC value handed down by an async server layout and read via
+    // `use(context)`, so nothing on the client can move it; (ii) there is no
+    // shared store between C-10 and its siblings, so C-10 has no reachable path
+    // to the badge or the summary; (iii) the one path that WOULD legitimately
+    // move them — `router.refresh()` — is `refreshMock` here, so the server
+    // re-render never lands. The discriminating power of (c)/(d) therefore
+    // lives in the literal comparisons (the badge word above and the two
+    // non-degeneracy literals just above) and in the whole-page subtraction
+    // identity below, which IS a genuine before/after measurement. The
+    // `refreshMock` count added at the end of this case is what restores
+    // meaning to the after-half: it measures that the catch-up was scheduled.
+    // KEPT DELIBERATELY: it guards a future shape this screen may take — an
+    // optimistic local patch, or a client-side entitlement store — under which
+    // it becomes the assertion that fails first.
+    //
+    // The comparison itself: captured BEFORE the click, compared against the
+    // live DOM after it.
+    expect(after.summary.terms).toEqual(before.summary.terms);
+    expect(after.summary.values).toEqual(before.summary.values);
+    expect(after.summary.html).toBe(before.summary.html);
+
+    // The subtraction identity: the ONLY difference the whole page is allowed
+    // to show is the outcome node itself. A control that optimistically patched
+    // the badge, or a summary recomputed from a client-side guess, moves this
+    // string even when the four values above happen to survive.
+    expect(after.html).toBe(before.html);
+
+    // …AND the screen is scheduled to catch up. "Nothing moved" is the right
+    // answer here only because the server re-render is what MAY move it: step 5
+    // of C-10's handler is `router.refresh()`, the ONLY mechanism by which the
+    // badge, the row and C-11 ever reflect an outcome. Delete it and this whole
+    // describe stays green while a user who re-checks a PAID order reads
+    // "Paid — your Premium period runs to …" under a badge still saying
+    // "Awaiting payment" and a C-11 still saying "Free", for ever. Exactly one
+    // call per activation: none is the regression above, two is a double
+    // re-render of the whole route.
+    expect(refreshMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("a settled outcome would be a DIFFERENT screen — the harness can see entitlement change at all", async () => {
+    // The positive control for the case above, and the reason its equality is
+    // not vacuous: the same harness, fed a premium entitlement, renders values
+    // that differ from every one of the four asserted `en` values. So "nothing
+    // changed" is a measurement, not a property of a harness that could never
+    // show a change.
+    const premium: Entitlement = {
+      ...FIXTURE_ENTITLEMENT_KNOWN,
+      plan: "premium",
+      expiresAt: "2026-08-18T17:30:00.000Z", // 19/08/2026 in ICT, 18/08 in UTC
+    };
+    const { container } = await renderOrdersRoute({ entitlement: premium, locale: "en" });
+    const summary = summaryOf(container);
+    expect(summary.values[0]).not.toBe(SUMMARY_VALUES.en[0]);
+    expect(summary.values[0]).toBe("Premium · until 19/08/2026");
+  });
+});
+
+// =============================================================================
+// (e) focus survives the outcome, and no state carries native `disabled`
+// =============================================================================
+
+describe("FE-3 (e) the control keeps focus and is never natively disabled", () => {
+  it.each(LOCALES)("locale %s — focus is still on the activated control after the outcome lands", async (locale) => {
+    const { container, button } = await activatePendingRow(locale, FIXTURE_RECHECK_OUTCOMES.stillPending);
+
+    // C-10 never unmounts itself after an outcome (UI-D16), so the keyboard
+    // user is still where they were. A control that swapped itself for its own
+    // alert would send focus to <body> and the sentence would be unreachable by
+    // the very user who most needs it.
+    expect(activeElementOf(container)).toBe(button);
+    assertNeverNativelyDisabled(button, "after the outcome");
+    expect(button.getAttribute("aria-disabled")).toBe("false");
+    expect(button.getAttribute("aria-busy")).toBe("false");
+  });
+
+  it("idle, BUSY and settled: aria-disabled announces, native `disabled` never appears", async () => {
+    const { container } = await renderOrdersRoute({
+      entitlement: FIXTURE_ENTITLEMENT_KNOWN,
+      locale: "en",
+    });
+    const button = recheckButtonFor(container, PENDING_CODE);
+
+    // IDLE.
+    assertNeverNativelyDisabled(button, "idle");
+    expect(button.getAttribute("aria-disabled")).toBe("false");
+    expect(alertsIn(container)).toHaveLength(0);
+
+    // BUSY — only observable inside the in-flight window, which is what the
+    // hold is for. A synchronous stub has no such window and this state would
+    // never be reached.
+    stubs.holdNextRecheck();
+    button.focus();
+    await act(async () => {
+      button.click();
+    });
+    expect(stubs.recheckOrderCallCount).toBe(1);
+    expect(button.getAttribute("aria-busy")).toBe("true");
+    expect(button.getAttribute("aria-disabled")).toBe("true");
+    assertNeverNativelyDisabled(button, "busy");
+    expect(activeElementOf(container)).toBe(button);
+    // The busy REASON changes text (C-10 idiom 3) and the outcome node is still
+    // absent: a screen that announces the result before it has one is announcing
+    // a guess. EQUALITY, not a length: the neighbouring dictionary key
+    // (`billing.recheck.amountMismatch`) is also non-empty, and rendering IT
+    // here tells the screen-reader user the payment failed while the call is
+    // still in flight. A length check cannot see the difference; this is the
+    // one rendered C-10 string FE-3 would otherwise never compare to a literal.
+    expect(reasonFor(container, PENDING_CODE)).toBe(BUSY.en);
+    expect(alertsIn(container)).toHaveLength(0);
+
+    // RELEASED.
+    await act(async () => {
+      stubs.releaseHeldRecheck();
+    });
+    expect(alertsIn(container)).toHaveLength(1);
+    assertNeverNativelyDisabled(button, "after release");
+    expect(activeElementOf(container)).toBe(button);
+  });
+
+  it.each(LOCALES)(
+    "locale %s — a TERMINAL row keeps a focusable control that states its reason and calls nothing",
+    async (locale) => {
+      const { container } = await renderOrdersRoute({ entitlement: FIXTURE_ENTITLEMENT_KNOWN, locale });
+
+      for (const order of TERMINAL_ORDERS) {
+        const button = recheckButtonFor(container, order.orderCode);
+        // Mounted, focusable, and NOT natively disabled — the person with an
+        // order that looks closed is exactly the person who needs to reach this
+        // control and read WHY re-checking will not help (C-10).
+        assertNeverNativelyDisabled(button, `terminal ${order.status}`);
+        button.focus();
+        expect(activeElementOf(container)).toBe(button);
+        expect(button.getAttribute("aria-disabled")).toBe("true");
+        expect(reasonFor(container, order.orderCode)).toBe(ALREADY_CLOSED[locale]);
+
+        // The handler returns EARLY: no action call, no busy phase, no outcome
+        // node. `aria-disabled` only announces — it does not block a DOM click.
+        await act(async () => {
+          button.click();
+        });
+        expect(stubs.recheckOrderCallCount).toBe(0);
+        expect(alertsIn(container)).toHaveLength(0);
+        expect(button.getAttribute("aria-busy")).toBe("false");
+      }
+
+      // THE POSITIVE CONTROL, and the reason the block above is not vacuous: a
+      // control that refused EVERY row would pass all of it. `refunded` is not
+      // terminal (FE-AC-10) — re-checking is the only action that clears an
+      // unrecognised status — so its control must be fully active and must
+      // actually call.
+      for (const order of ACTIVE_ORDERS) {
+        const button = recheckButtonFor(container, order.orderCode);
+        expect(button.getAttribute("aria-disabled")).toBe("false");
+        expect(reasonFor(container, order.orderCode)).toBe("");
+      }
+      const unrecognised = recheckButtonFor(container, FIXTURE_ORDER_UNRECOGNISED.orderCode);
+      await act(async () => {
+        unrecognised.click();
+      });
+      expect(stubs.recheckOrderCallCount).toBe(1);
+      expect(stubs.recheckedOrderCodes).toEqual([FIXTURE_ORDER_UNRECOGNISED.orderCode]);
+    }
+  );
+});
+
+// =============================================================================
+// (f) AC-037 — two synchronous activations, EXACTLY ONE invocation
+// =============================================================================
+
+describe("FE-3 (f) a dogpiled control calls the action exactly once", () => {
+  it("two synchronous activations inside one in-flight window record 1 call, not 2", async () => {
+    const { container } = await renderOrdersRoute({
+      entitlement: FIXTURE_ENTITLEMENT_KNOWN,
+      locale: "en",
+    });
+    const button = recheckButtonFor(container, PENDING_CODE);
+
+    // The hold keeps the first call outstanding, so the second activation lands
+    // INSIDE the window the guard exists for. Without it the guard has nothing
+    // to suppress and the count would be decided by microtask timing.
+    stubs.holdNextRecheck();
+    await act(async () => {
+      button.click();
+      button.click();
+    });
+
+    // A COUNT, not "it was called": one activation stays green while the guard
+    // regresses. The guard is a ref read before any setState and before any
+    // await — a `phase === "busy"` guard reads the PREVIOUS render's value and
+    // lets the second click through, which is precisely the 2 this rejects.
+    expect(stubs.recheckOrderCallCount).toBe(1);
+    // One call against the WRONG order is still a count of one.
+    expect(stubs.recheckedOrderCodes).toEqual([PENDING_CODE]);
+
+    await act(async () => {
+      stubs.releaseHeldRecheck();
+    });
+    expect(stubs.recheckOrderCallCount).toBe(1);
+    expect(theOnlyAlert(container).textContent).toBe(STILL_PENDING.en);
+
+    // And the guard RELEASES: a lock that never opens would also record 1 here,
+    // and would leave the control dead for the rest of the session.
+    await act(async () => {
+      button.click();
+    });
+    expect(stubs.recheckOrderCallCount).toBe(2);
+  });
+});
+
+// =============================================================================
+// (g) AC-037 — the rate-limited refusal is its own sentence
+// =============================================================================
+
+describe("FE-3 (g) the rate-limited refusal is distinct from every other outcome", () => {
+  it.each(LOCALES)("locale %s — EQUALS its approved string, EQUALS no other outcome", async (locale) => {
+    const { container, before, after } = await activatePendingRow(
+      locale,
+      FIXTURE_RECHECK_OUTCOMES.rateLimited
+    );
+
+    expect(before.alerts).toBe(0);
+    const sentence = theOnlyAlert(container).textContent ?? "";
+    expect(sentence).toBe(RATE_LIMITED[locale]);
+
+    // The six other outcome sentences plus the GENERIC error string, resolved
+    // at RUNTIME from the real dictionary in the locale under test — the same
+    // lookups C-10 makes. Not literals copied into this file: a copy edit moves
+    // these values and the inequalities still mean what they say. Conflating
+    // the refusal with `billing.orders.loadError` is exactly what AC-037
+    // forbids, and it is the shape this regression actually takes.
+    const t = createTranslate(getDictionary(locale));
+    for (const key of OTHER_OUTCOME_KEYS) {
+      const other = t(key);
+      expect(other).not.toBe(key); // a missing key echoes its own name back
+      expect(other.length).toBeGreaterThan(0);
+      expect(sentence).not.toBe(other);
+    }
+    // Mutually distinct as a SET, in this locale — the property Task 3.7
+    // claimed and this case measures rather than assumes.
+    const all = OTHER_OUTCOME_KEYS.map((key) => t(key)).concat(sentence);
+    expect(new Set(all).size).toBe(all.length);
+
+    // A refusal is not a settlement either: nothing about entitlement moved.
+    expect(after.summary.values).toEqual(before.summary.values);
+    expect(after.html).toBe(before.html);
+  });
+});
