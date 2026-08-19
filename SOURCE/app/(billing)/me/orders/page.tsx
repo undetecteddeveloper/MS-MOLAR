@@ -13,8 +13,10 @@
 // ở: `(billing)/layout.tsx` là chỗ DUY NHẤT trong repo mount
 // `EntitlementProvider`, và `useEntitlement()` ngoài provider trả `FREE_FALLBACK`
 // — không ném, không cảnh báo, không phân biệt được với một người dùng Free
-// thật (UI-D11). C-11 `PlanSummary` (plan Task 3.7) sẽ đứng giữa PageHeader và
-// danh sách, và nó phụ thuộc hoàn toàn vào provider đó.
+// thật (UI-D11). C-11 `PlanSummary` đứng giữa PageHeader và danh sách, và nó
+// phụ thuộc hoàn toàn vào provider đó: đặt nhầm route group thì màn hình này
+// vẫn render trọn vẹn, chỉ là mọi người dùng Premium đọc được bảng tóm tắt của
+// người dùng Free.
 //
 // KHÔNG có lượt sắp xếp nào ở đây, cũng không ở C-07: `listMyOrders()` đã khai
 // thứ tự bằng SQL, đúng một lần.
@@ -26,6 +28,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { getTranslate } from "@/lib/i18n/server";
 import { OrderList } from "./_components/OrderList";
+import { PlanSummary } from "./_components/PlanSummary";
 
 export const metadata: Metadata = { title: "Your orders" };
 
@@ -42,6 +45,10 @@ export default async function MyOrdersPage() {
   return (
     <PageContainer as="main" size="default" className="flex flex-col gap-6">
       <PageHeader title={t("billing.orders.title")} />
+      {/* NGOÀI OrderList, không phải trong: một người chưa mua gì vẫn phải thấy
+          đủ bốn giá trị của AC-056 (UI Spec § C-11). Không props — C-11 đọc
+          thẳng `useEntitlement()`. */}
+      <PlanSummary />
       <OrderList orders={orders} />
     </PageContainer>
   );
