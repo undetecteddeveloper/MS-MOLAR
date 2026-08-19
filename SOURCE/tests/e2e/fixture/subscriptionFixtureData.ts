@@ -124,6 +124,36 @@ export const FIXTURE_RESETS_AT_UTC_DATE = "2026-09-15";
  *  chosen because it is the value CI already runs under. */
 export const FIXTURE_BROWSER_TIMEZONE = "UTC";
 
+// DRIFT, RECORDED AND DELIBERATELY NOT CORRECTED. These two numbers describe a
+// user shape the backend cannot produce. Both entitlement fixtures below spread
+// `FREE_FALLBACK`, whose `plan` is `"free"`, while carrying a tutor limit of
+// 500 — and 500 is `PLAN_LIMITS.premium.tutor` (`lib/billing/quota.ts`); the
+// FREE tutor limit is 5. The upload limit is further off still: 5 matches
+// NEITHER plan (free 3, premium 15).
+//
+// Harmless today, and for a reason that is a property of the consumer rather
+// than luck: `TutorQuotaNote` prints whatever the entitlement carries
+// (`tutor.used`, `tutor.limit`, `tutor.resetsAt`) and never consults
+// `PLAN_LIMITS` — outside `quota.ts` itself, that table's only importers are
+// `readEntitlement.ts` and two unit-test files. So no rendered string and no
+// FE-2 assertion depends on the plan and the allowance being coherent.
+//
+// NOT corrected here, deliberately, on two grounds. FE-2's expected note
+// literals are hand-written with these exact numbers ("12/500" and "500/500",
+// each in both locales, in `subscription.fixture.e2e.test.ts`), so editing the
+// value turns a green lane red. And what a fixture's user is SUPPOSED to be is
+// a fixture-ownership decision, not something to settle as a side effect of
+// making a test agree with a constant.
+//
+// If you do correct it, these move TOGETHER or the lane goes red for the wrong
+// reason: (1) this constant and `FIXTURE_UPLOAD_LIMIT`; (2)
+// `FIXTURE_ENTITLEMENT_KNOWN.tutor.used`, since 12 is not a legal `used` under
+// a limit of 5; (3) the four hardcoded `NOTE` literals in
+// `subscription.fixture.e2e.test.ts`. The other direction — keep 500 and
+// override `plan: "premium"` on both spreads — is one edit instead of three,
+// but it changes what these fixtures are ABOUT (a premium user, hence a
+// non-null `expiresAt` to decide as well). Which direction is right is the part
+// that needs deciding, not the edit.
 export const FIXTURE_TUTOR_LIMIT = 500;
 export const FIXTURE_UPLOAD_LIMIT = 5;
 
