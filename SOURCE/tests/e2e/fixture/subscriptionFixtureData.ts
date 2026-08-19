@@ -24,30 +24,32 @@
 // production tree would be missing (frontend DD Risk R-12).
 //
 // TRANSCRIBED CONTRACTS — AND THEIR UNCHECKED WINDOW. `Entitlement` / `Quota`
-// are imported from the frozen `lib/billing/types.ts`, and `SettleResult` is
-// imported from `lib/billing/settleOrder.ts` since backend-task-16 shipped it,
-// so a change to any of the three breaks this file at compile time.
-// `CheckoutOrder` and `MyOrderRow` have no code yet, so their shapes are
-// transcribed from the work plan's Reference Contract Values. Being
-// transcriptions, they are structurally INDEPENDENT of the real types — no
-// import, no assignment, no `satisfies` — so until the reconciliation lands,
-// drift between this file and the shipped contract is NOT detectable,
-// silently, by tsc or by anything else. That is the same exposure
-// `supportAdminFixtureData.ts` carries for `TicketWithNotes`, and it is
-// accepted only because the real declarations do not exist yet.
+// are imported from the frozen `lib/billing/types.ts`, `SettleResult` from
+// `lib/billing/settleOrder.ts` since backend-task-16 shipped it, and
+// `CheckoutOrder` from `lib/billing/checkoutOrder.ts` since backend-task-17
+// shipped it, so a change to any of the four breaks this file at compile time.
+// `MyOrderRow` has no code yet, so its shape is still transcribed from the work
+// plan's Reference Contract Values. Being a transcription, it is structurally
+// INDEPENDENT of the real type — no import, no assignment, no `satisfies` — so
+// until the reconciliation lands, drift between this file and the shipped
+// contract is NOT detectable, silently, by tsc or by anything else. That is the
+// same exposure `supportAdminFixtureData.ts` carries for `TicketWithNotes`, and
+// it is accepted only because the real declaration does not exist yet.
 // The reconciliation is owned by the task that first exports each type, and is
 // recorded as a checklist line in that task's file:
-//   - `FixtureCheckoutOrder`      -> backend-task-17 (`lib/billing/checkoutOrder.ts`)
+//   - `CheckoutOrder`            -> DONE, backend-task-17: imported below and
+//     used as the declared type of `fixtureOrder()`'s return, so every order
+//     fixture is checked field-by-field against the shipped eight-field shape
 //   - `FixtureMyOrderRow`         -> backend-task-19 (`app/(billing)/queries.ts`)
 //   - `SettleResult`              -> DONE, backend-task-16: imported below, and
 //     `FIXTURE_RECHECK_OUTCOMES`'s `satisfies` clause is the compile-time link
 //     over BOTH union arms (the settled arm and all five refusal literals)
 //   - `FixtureRateLimitedRefusal` -> backend-task-18 (`lib/billing/orderActions.ts`)
-// Each of those tasks adds a compile-time link here (e.g.
-// `const _fixtureContract: CheckoutOrder = FIXTURE_ORDER_PENDING;`) and deletes
-// the transcribed declaration. Only after that link exists does a tsc error
-// become the failure mode for drift.
+// Each remaining task adds a compile-time link here and deletes the transcribed
+// declaration. Only after that link exists does a tsc error become the failure
+// mode for drift.
 
+import type { CheckoutOrder } from "@/lib/billing/checkoutOrder";
 import type { SettleResult } from "@/lib/billing/settleOrder";
 import { FREE_FALLBACK, type Entitlement } from "@/lib/billing/types";
 import { LOCALE_COOKIE, type Locale } from "@/lib/i18n/locales";
@@ -192,22 +194,6 @@ export const FIXTURE_ENTITLEMENT_EXHAUSTED: Entitlement = {
 
 // --- Order fixtures ---------------------------------------------------------
 
-/** Transcribed from UI Spec C-13's normative eight-field `CheckoutOrder` (work
- *  plan § Reference Contract Values). RECONCILIATION OWNER: **backend-task-17**,
- *  which creates `lib/billing/checkoutOrder.ts` and carries the checklist line
- *  for replacing this declaration with a compile-time link. Until then, drift
- *  against the real `CheckoutOrder` is undetectable (see the file header). */
-export type FixtureCheckoutOrder = {
-  orderCode: number;
-  amountVnd: number;
-  status: string;
-  pendingUntil: string;
-  qrPayload: string;
-  accountNumber: string;
-  accountName: string;
-  memo: string;
-};
-
 /** Transcribed from the frontend DD's `MyOrderRow` — S-05's list item.
  *  RECONCILIATION OWNER: **backend-task-19**, which creates
  *  `app/(billing)/queries.ts` where `MyOrderRow` is first exported. Until then,
@@ -247,13 +233,19 @@ const FIXTURE_ACCOUNT_NAME = "CONG TY TNHH MS MOLAR";
 
 /** The transfer fields are identical across orders (one merchant account) and
  *  the memo carries the order code, so FE-1's byte-for-byte assertions fail on
- *  a blank-but-present `<dd>` instead of passing a presence check. */
+ *  a blank-but-present `<dd>` instead of passing a presence check.
+ *
+ *  The declared `CheckoutOrder` return type is the COMPILE-TIME LINK to the
+ *  shipped contract (backend-task-17): every order fixture below is built here,
+ *  so a field added to, removed from or renamed in
+ *  `lib/billing/checkoutOrder.ts` turns this file red instead of drifting in
+ *  silence. */
 function fixtureOrder(order: {
   orderCode: number;
   status: string;
   pendingUntil: string;
   qrPayload: string;
-}): FixtureCheckoutOrder {
+}): CheckoutOrder {
   return {
     orderCode: order.orderCode,
     amountVnd: FIXTURE_AMOUNT_VND,
@@ -330,7 +322,7 @@ export const FIXTURE_ORDER_UNRECOGNISED = fixtureOrder({
   qrPayload: FIXTURE_QR_PAYLOAD,
 });
 
-export const FIXTURE_ORDERS: readonly FixtureCheckoutOrder[] = [
+export const FIXTURE_ORDERS: readonly CheckoutOrder[] = [
   FIXTURE_ORDER_PENDING,
   FIXTURE_ORDER_PENDING_NO_QR,
   FIXTURE_ORDER_PAID,
@@ -342,7 +334,7 @@ export const FIXTURE_ORDERS: readonly FixtureCheckoutOrder[] = [
 /** `null` for an unknown code — the same value a foreign order yields under
  *  `orders_select_own`, which is what makes C-13's four Empty inputs
  *  indistinguishable. */
-export function fixtureOrderByCode(orderCode: number): FixtureCheckoutOrder | null {
+export function fixtureOrderByCode(orderCode: number): CheckoutOrder | null {
   return FIXTURE_ORDERS.find((order) => order.orderCode === orderCode) ?? null;
 }
 
@@ -351,7 +343,7 @@ export function fixtureOrderByCode(orderCode: number): FixtureCheckoutOrder | nu
  *  representations from drifting into disagreeing about a single order — a
  *  disagreement FE-3 would then read as a state change it never caused. */
 export function toFixtureOrderRow(
-  order: FixtureCheckoutOrder,
+  order: CheckoutOrder,
   createdAt: string
 ): FixtureMyOrderRow {
   return {
@@ -436,12 +428,12 @@ export interface SubscriptionActionStubs {
   recheckOrderCallCount: number;
   /** Order codes passed to `recheckOrder`, in invocation order. */
   recheckedOrderCodes: number[];
-  setCreateOrderResponse(order: FixtureCheckoutOrder): void;
+  setCreateOrderResponse(order: CheckoutOrder): void;
   setRecheckOutcome(outcome: FixtureRecheckOutcome): void;
   /** Called by the harness's module-boundary override in place of the real
    *  `createOrder()` — counts the invocation, then resolves the configured
    *  order. No provider is contacted and no money moves. */
-  simulateCreateOrder(): Promise<FixtureCheckoutOrder>;
+  simulateCreateOrder(): Promise<CheckoutOrder>;
   /** Called in place of the real `recheckOrder(orderCode)` — counts the
    *  invocation and records the code, then resolves the configured outcome. */
   simulateRecheckOrder(orderCode: number): Promise<FixtureRecheckOutcome>;
@@ -482,7 +474,7 @@ export interface SubscriptionActionStubs {
  *  `recheckOrderCallCount === 1`, `releaseHeldRecheck()`, assert the rendered
  *  outcome. */
 export function createSubscriptionActionStubs(): SubscriptionActionStubs {
-  let createOrderResponse: FixtureCheckoutOrder = FIXTURE_ORDER_PENDING;
+  let createOrderResponse: CheckoutOrder = FIXTURE_ORDER_PENDING;
   let recheckOutcome: FixtureRecheckOutcome = FIXTURE_RECHECK_OUTCOMES.stillPending;
   let releaseHold: (() => void) | null = null;
   let heldGate: Promise<void> | null = null;
