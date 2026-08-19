@@ -1,6 +1,14 @@
 // C-08 OrderRow — một đơn thanh toán, một <li> (UI Spec § Component:
 // `OrderRow`; frontend DD § Main Components). Server component; con của nó là
-// client component (C-09, và C-10 sẽ mount ở plan Task 3.7).
+// client component (C-09 và C-10).
+//
+// C-10 MOUNT Ở MỌI DÒNG, MỌI TRẠNG THÁI — không chỉ dòng `pending`. "Đơn trông
+// như đã hết hạn vẫn có thể đã được trả tiền" chính là toàn bộ tiền đề của R10
+// (frontend DD § C-08), nên cái control gỡ được tình trạng ấy không được biến
+// mất đúng lúc cần nhất. Việc phân biệt `paid`/`expired`/`cancelled` với các
+// trạng thái còn lại là của C-10, và nó cần `status` để làm — dòng này đã cầm
+// sẵn giá trị đó (nó cũng đi vào C-09 ngay bên cạnh), nên không có lượt đọc
+// thứ hai nào được sinh ra ở đây.
 //
 // BA GIÁ TRỊ AC-026 — thời điểm tạo, số tiền, `orderCode` — và mỗi giá trị đi
 // qua đúng một đường:
@@ -32,6 +40,7 @@
 import Link from "next/link";
 import type { MyOrderRow } from "@/app/(billing)/queries";
 import { OrderStatusBadge } from "@/components/billing/OrderStatusBadge";
+import { RecheckOrderControl } from "@/components/billing/RecheckOrderControl";
 import { formatDateTime } from "@/lib/format/datetime";
 import { formatVnd } from "@/lib/format/number";
 import { getLocale, getTranslate } from "@/lib/i18n/server";
@@ -79,6 +88,11 @@ export async function OrderRow({ order }: { order: MyOrderRow }) {
 
       <div className="flex flex-wrap items-center gap-3 md:shrink-0 md:justify-end">
         <OrderStatusBadge status={order.status} />
+        {/* `variant="row"` — nhãn hàng, nút outline; `variant="primary"` là
+            của S-06 (C-15). Cùng MỘT `order.status` đi vào cả C-09 lẫn C-10:
+            hai lượt đọc thì hai lượt có thể lệch nhau, và badge nói "đã đóng"
+            trong khi control vẫn mời hỏi lại là đúng dạng lệch đó. */}
+        <RecheckOrderControl orderCode={order.orderCode} variant="row" status={order.status} />
         {canContinuePaying && (
           // Chuỗi CHỮ SỐ THÔ trên query string — đúng dạng mà S-06 chấp nhận
           // (`/^\d+$/`, `Number()` là số nguyên dương an toàn). Nhóm nghìn ở

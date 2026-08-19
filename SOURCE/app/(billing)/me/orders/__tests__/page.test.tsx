@@ -36,7 +36,15 @@ const { listMyOrdersMock, getCurrentUserMock, redirectMock, cookieGetMock } = vi
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: cookieGetMock }) }));
 vi.mock("@/lib/auth/getCurrentUser", () => ({ getCurrentUser: getCurrentUserMock }));
 vi.mock("@/app/(billing)/queries", () => ({ listMyOrders: listMyOrdersMock }));
-vi.mock("next/navigation", () => ({ redirect: redirectMock }));
+
+// C-10 (mounted by C-08, one per row) calls `useRouter()`, which throws
+// "invariant expected app router to be mounted" outside a real app-router tree.
+// Stubbed with the same one-method shape the shipped client-component tests use
+// (ProfileCard.test.tsx, DisplayNameEditor.test.tsx); C-10 itself is REAL.
+vi.mock("next/navigation", () => ({
+  redirect: redirectMock,
+  useRouter: () => ({ refresh: vi.fn() }),
+}));
 
 import MyOrdersPage from "../page";
 import { renderServerTree } from "./renderServerTree";

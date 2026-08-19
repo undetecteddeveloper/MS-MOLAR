@@ -34,6 +34,14 @@ vi.mock("server-only", () => ({}));
 const { cookieGetMock } = vi.hoisted(() => ({ cookieGetMock: vi.fn() }));
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: cookieGetMock }) }));
 
+// C-10 (a client child of this row) calls `useRouter()`, which throws
+// "invariant expected app router to be mounted" outside a real app-router tree
+// — there is no provider in a bare renderToReadableStream. Stubbed with the
+// same one-method shape the shipped client-component tests use
+// (ProfileCard.test.tsx, DisplayNameEditor.test.tsx). C-10 ITSELF is real: the
+// aria and the copy asserted below are the ones that ship.
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+
 import { I18nProvider } from "@/lib/i18n/client";
 import { OrderRow } from "../_components/OrderRow";
 import { renderServerTree } from "./renderServerTree";
@@ -221,11 +229,114 @@ describe("C-08 OrderRow", () => {
       .filter((t) => t.startsWith("sm:"));
     expect(smTokens).toEqual([]);
 
-    const nowrap = li.querySelectorAll(".whitespace-nowrap");
-    expect(nowrap).toHaveLength(0);
+    // The rule is about THIS ROW'S markup — "no `whitespace-nowrap` on the
+    // metadata line" (UI Spec C-08 / frontend DD C-08), the measured 360px
+    // overflow candidate. The shared `Button` primitive carries
+    // `whitespace-nowrap` in its own base class (`components/ui/button.tsx`,
+    // `buttonVariants`), and C-10 mounts one in this row; that class belongs to
+    // the design system's label, not to the line the rule names.
+    //
+    // The exemption is ONE element, and this pins that: a second nowrap button
+    // appearing in the row is a layout change that has to be looked at, not
+    // waved through by a filter that happens to be written as a predicate.
+    const exempt = [...li.querySelectorAll('[data-slot="button"].whitespace-nowrap')];
+    expect(exempt).toHaveLength(1);
+
+    // Everything else is red — a `whitespace-nowrap` C-08 puts on the `<li>`,
+    // either column, either `<p>`, the link, or anything nested inside the
+    // control. The `<li>` is folded in explicitly because `querySelectorAll`
+    // matches DESCENDANTS only: without it the row's own class escapes the
+    // sweep, which is the one element whose nowrap would freeze the whole row
+    // at 360px. Same `concat`-the-root shape the `sm:` sweep above uses.
+    const nowrap = [li, ...li.querySelectorAll("*")].filter(
+      (el) =>
+        el.classList.contains("whitespace-nowrap") &&
+        el.getAttribute("data-slot") !== "button"
+    );
+    expect(nowrap).toEqual([]);
 
     const shrinkable = li.querySelector(".min-w-0");
     if (!shrinkable) throw new Error("no min-w-0 text column");
     expect(shrinkable.textContent).toContain(CODE_RAW);
+  });
+});
+
+// ============================================================================
+// C-10 is MOUNTED here, once per row, in EVERY status.
+// UI Spec § Component: `OrderRow` — C-08 ("Display: … `OrderStatusBadge` ·
+// `RecheckOrderControl`") and § C-10 behaviour (5); frontend DD § C-08 ("The
+// re-check control renders in **every** status — an expired-looking order may
+// still have been paid, which is the entire premise of R10") and § C-10's
+// three-row `status` table.
+//
+// A row that mounts the control only while `pending` passes every C-10 unit
+// test — that component is proven in isolation — and still ships the defect
+// R10 exists to prevent. So the cases below are parameterised over the four DB
+// statuses PLUS an unrecognised one, and each asserts the control is present,
+// carries THIS row's orderCode, and reflects THIS row's status.
+// ============================================================================
+
+const RECHECK_LABEL = "Check this order again"; // billing.recheck.action (en) — variant="row"
+const PRIMARY_LABEL = "I have transferred — check now"; // billing.confirm.action — variant="primary"
+const TERMINAL_REASON = "This order is already closed, so re-checking will not change it."; // billing.recheck.notPending
+
+/** Every fixture keeps PENDING_LIVE's two distinct timestamps and gets its own
+ *  orderCode, so a control wired to a hardcoded or borrowed code is red. */
+function rowWith(orderCode: number, status: string) {
+  return { ...PENDING_LIVE, orderCode, status };
+}
+
+function recheckButtons(container: HTMLElement): HTMLButtonElement[] {
+  return [...container.querySelectorAll("button")] as HTMLButtonElement[];
+}
+
+function onlyRecheckButton(container: HTMLElement): HTMLButtonElement {
+  const buttons = recheckButtons(container);
+  expect(buttons).toHaveLength(1); // not zero (never mounted), not two (mounted twice)
+  return buttons[0];
+}
+
+describe("C-08 mounts C-10", () => {
+  it.each([
+    ["pending", 7311000000001, "false", ""],
+    ["paid", 7311000000002, "true", TERMINAL_REASON],
+    ["expired", 7311000000003, "true", TERMINAL_REASON],
+    ["cancelled", 7311000000004, "true", TERMINAL_REASON],
+    // FE-AC-10: not one of the four DB values ⇒ NOT terminal, control active.
+    ["refunded", 7311000000005, "false", ""],
+  ])(
+    "status %s: exactly one re-check control, wired to this row's orderCode, aria-disabled=%s",
+    async (status, orderCode, ariaDisabled, reasonText) => {
+      const { container } = await renderRow(rowWith(orderCode as number, status as string));
+      const li = requireLi(container);
+      const button = onlyRecheckButton(li);
+
+      expect(button.textContent).toBe(RECHECK_LABEL);
+      expect(button.textContent).not.toBe(PRIMARY_LABEL); // variant="row", not "primary"
+      expect(button.getAttribute("aria-disabled")).toBe(ariaDisabled);
+
+      // The describedby target proves BOTH halves of the wiring: the id carries
+      // this row's own orderCode, and the text carries this row's own status.
+      const reasonId = button.getAttribute("aria-describedby");
+      expect(reasonId).toBe(`recheck-${orderCode}-reason`);
+      expect(li.querySelector(`#${reasonId}`)?.textContent).toBe(reasonText);
+
+      // Never native `disabled`, in any status (UI Spec § C-10).
+      expect(button.hasAttribute("disabled")).toBe(false);
+      expect(button.disabled).toBe(false);
+    }
+  );
+
+  it("mounts the control on a row whose 'continue paying' link is absent", async () => {
+    // PENDING_DEAD: past its window, so C-08 renders no link. The control must
+    // still be there — a dead QR is exactly when a user needs to re-check.
+    const { container } = await renderRow(PENDING_DEAD);
+    expect(continueLink(container)).toBeNull();
+    expect(onlyRecheckButton(requireLi(container)).getAttribute("aria-disabled")).toBe("false");
+  });
+
+  it("renders the control's label in the selected language", async () => {
+    const { container } = await renderRow(rowWith(7311000000006, "pending"), "vi");
+    expect(onlyRecheckButton(requireLi(container)).textContent).toBe("Kiểm tra lại đơn này");
   });
 });

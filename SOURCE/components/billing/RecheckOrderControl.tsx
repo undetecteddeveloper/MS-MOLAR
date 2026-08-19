@@ -37,6 +37,17 @@
 // đúng người cần với tới control này nhất là người có đơn trông như đã đóng và
 // cần đọc *vì sao* hỏi lại cũng không đổi được gì.
 //
+// VÌ SAO CÓ PROP THỨ BA `status` (UI Spec § C-10 hành vi (5) + § State ×
+// Display Matrix cột "Partial"; frontend DD § C-10, bảng `status`). Bảng ấy có
+// BA dòng, và `orderCode` với `variant` không phân biệt nổi dòng nào với dòng
+// nào: một đơn `paid` phải mount, phải focus được, phải mang `aria-disabled`
+// CHUỖI "true" kèm một LÝ DO, và handler của nó phải VỀ SỚM. `status` để kiểu
+// `string` chứ không phải union bốn literal — cùng lý do `MyOrderRow.status`
+// (`(billing)/queries.ts`) và C-09 để `string`: ràng buộc CHECK của CSDL đổi
+// được mà không một dòng TypeScript nào đổi theo, nên nhánh "không nhận ra"
+// phải là một GIÁ TRỊ CHẠY ĐƯỢC, không phải một lỗi biên dịch không bao giờ
+// xảy ra.
+//
 // CONTROL KHÔNG BAO GIỜ TỰ THÁO KHỎI CÂY sau khi có kết cục, nên focus của
 // người dùng bàn phím ở nguyên đó và không cần cơ chế cứu focus nào (UI-D16).
 // Bất kỳ thay đổi tương lai nào gỡ nó đi khi thành công sẽ tái tạo lại đúng vấn
@@ -86,6 +97,21 @@ const ERROR_KEY: Record<Extract<RecheckOutcome, { error: string }>["error"], Mes
   unauthenticated: "profile.error.sessionExpired",
 };
 
+/** Ba giá trị KẾT THÚC, và ĐÚNG ba (frontend DD § C-10: "Terminal statuses are
+ *  `paid`, `expired` and `cancelled`. An unrecognised status is NOT terminal").
+ *
+ *  Viết bằng một tập hợp CHỨ KHÔNG bằng `status !== "pending"`: hai vị từ ấy
+ *  đồng ý ở hai dòng đầu của bảng và LỆCH ở dòng thứ ba — một giá trị không
+ *  nhận ra — mà dòng thứ ba mới là dòng FE-AC-10 bảo vệ. Hỏi lại là hành động
+ *  DUY NHẤT gỡ được một trạng thái lạ, nên một lần đổi ràng buộc CHECK phía
+ *  CSDL không được ship thành một cái khoá lên đúng cái control đó (UI Spec
+ *  C-09: "the row's re-check control stays available").
+ *
+ *  So SÁT NGHĨA, không hạ chữ hoa và không cắt khoảng trắng: "PAID" là một giá
+ *  trị lạ chứ không phải "paid" viết khác đi, và đoán hộ CSDL ở đây là cách
+ *  lặng lẽ mở rộng tập kết thúc. */
+const TERMINAL_STATUSES: ReadonlySet<string> = new Set(["paid", "expired", "cancelled"]);
+
 const LABEL_KEY: Record<RecheckVariant, MessageKey> = {
   row: "billing.recheck.action",
   primary: "billing.confirm.action",
@@ -110,9 +136,13 @@ type Phase =
 export function RecheckOrderControl({
   orderCode,
   variant,
+  status,
 }: {
   orderCode: number;
   variant: RecheckVariant;
+  /** Trạng thái CỦA DÒNG, nguyên si như tầng truy vấn giao. `string`, không
+   *  phải union — xem khối đầu file. */
+  status: string;
 }) {
   const t = useT();
   const locale = useLocale();
@@ -124,8 +154,14 @@ export function RecheckOrderControl({
   // không cần thêm prop idPrefix.
   const reasonId = `recheck-${orderCode}-reason`;
   const busy = phase.kind === "busy";
+  const terminal = TERMINAL_STATUSES.has(status);
 
   async function run() {
+    // Đơn đã đóng thì không có gì để hỏi lại: về sớm TRƯỚC cả chốt bận, nên
+    // không có lượt gọi action, không có pha bận và không có node kết cục nào.
+    // `aria-disabled` chỉ THÔNG BÁO — nó không chặn một cú click DOM, nên chốt
+    // thật phải nằm ở đây (cùng lập luận với `busyRef` ngay dưới).
+    if (terminal) return;
     if (busyRef.current) return; // TRƯỚC mọi setState, TRƯỚC mọi await
     busyRef.current = true;
     setPhase({ kind: "busy" });
@@ -153,7 +189,7 @@ export function RecheckOrderControl({
         onClick={run}
         // Chuỗi "true"/"false" cho aria-disabled, boolean cho aria-busy — đúng
         // quy ước ActionButton/ExplainStepAffordance đã chạy thật.
-        aria-disabled={busy ? "true" : "false"}
+        aria-disabled={busy || terminal ? "true" : "false"}
         aria-busy={busy}
         aria-describedby={reasonId}
       >
@@ -180,8 +216,13 @@ export function RecheckOrderControl({
       {/* Idiom 3: chính việc chuỗi này ĐỔI ("" → lý do bận → "") là cơ chế
           thông báo. Không `aria-live` — người dùng tự khởi động lượt chờ này
           nên một lần ngắt lời là không mong muốn. */}
+      {/* Hai lý do, hai câu, MỘT ô. Câu của trạng thái kết thúc dùng LẠI
+          `billing.recheck.notPending` — đúng câu bảng bảy kết cục đã cấp cho
+          `not_pending`, cùng một sự thật ("đơn này đã đóng rồi") nói cho cùng
+          một người — nên bảng i18n của UI Spec không phải cấp thêm khoá nào,
+          và không có câu thứ hai nào để trôi lệch khỏi câu thứ nhất. */}
       <span id={reasonId} className="sr-only">
-        {busy ? t("billing.recheck.busy") : ""}
+        {busy ? t("billing.recheck.busy") : terminal ? t("billing.recheck.notPending") : ""}
       </span>
     </div>
   );

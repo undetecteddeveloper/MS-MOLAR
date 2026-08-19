@@ -148,7 +148,7 @@ function Row({ locale, status }: { locale: Locale; status: string }) {
   return (
     <I18nProvider locale={locale}>
       <OrderStatusBadge status={status} />
-      <RecheckOrderControl orderCode={ORDER_CODE} variant="row" />
+      <RecheckOrderControl orderCode={ORDER_CODE} variant="row" status={status} />
     </I18nProvider>
   );
 }
@@ -423,7 +423,7 @@ describe("variant chỉ đổi NHÃN và diện mạo, không đổi hành vi", 
   function renderVariant(variant: "row" | "primary", locale: Locale) {
     const view = render(
       <I18nProvider locale={locale}>
-        <RecheckOrderControl orderCode={ORDER_CODE} variant={variant} />
+        <RecheckOrderControl orderCode={ORDER_CODE} variant={variant} status="pending" />
       </I18nProvider>
     );
     return { view, button: within(view.container).getByRole("button") };
@@ -458,5 +458,180 @@ describe("variant chỉ đổi NHÃN và diện mạo, không đổi hành vi", 
       "We could not reach the payment provider. Nothing about your order changed; try again shortly."
     );
     expect(mockRecheck).toHaveBeenCalledWith(ORDER_CODE);
+  });
+});
+
+// ===========================================================================
+// TRẠNG THÁI KẾT THÚC — UI Spec § C-10 hành vi (5) + § State × Display Matrix
+// cột "Partial (terminal status)"; frontend DD § C-10 bảng `status`.
+//
+// Bảng ba dòng của frontend DD là toàn bộ luật, và nó có BA dòng chứ không hai:
+//   · `pending`                       → mount, aria-disabled "false", handler CHẠY
+//   · `paid`/`expired`/`cancelled`    → mount, aria-disabled "true",  handler VỀ SỚM
+//   · BẤT KỲ giá trị nào khác          → mount, aria-disabled "false", handler CHẠY
+//
+// Dòng thứ ba là FE-AC-10 và nó là lý do khối này tồn tại: một vị từ viết
+// `status !== "pending"` thoả hai dòng đầu và SAI ở dòng ba — một lần đổi ràng
+// buộc CHECK phía CSDL sẽ khoá đúng cái control duy nhất gỡ được tình trạng đó
+// (UI Spec C-09: "the row's re-check control stays available"). Vì thế danh sách
+// KHÔNG-kết-thúc dưới đây cố ý gồm cả những giá trị chỉ SÁT BÊN một giá trị kết
+// thúc — "PAID", "paid " — để một vị từ hạ chữ hoa hay cắt khoảng trắng cũng đỏ.
+//
+// KHÔNG khoá nào được cấp thêm trong bảng i18n của UI Spec cho câu lý do này,
+// nên nó DÙNG LẠI `billing.recheck.notPending` — đúng câu mà bảng bảy kết cục ở
+// trên đã ghim. Vì vậy mỗi khẳng định dưới đây có CẢ HAI vế: chuỗi cố định viết
+// tay (ghim CHỮ) và phép so với `en[...]`/`viDict[...]` (ghim KHOÁ).
+// ===========================================================================
+
+const TERMINAL_STATUSES = ["paid", "expired", "cancelled"] as const;
+
+/** Ba giá trị này KHÔNG kết thúc, và mỗi giá trị bác một vị từ sai khác nhau:
+ *  `pending` là dòng một của bảng; "refunded" là FE-AC-10 đúng nghĩa (một giá
+ *  trị CHECK tương lai); "PAID" và "paid " bác một vị từ chuẩn hoá chuỗi trước
+ *  khi so; "" bác một vị từ coi giá trị rỗng là đã đóng. */
+const NON_TERMINAL_STATUSES = ["pending", "refunded", "PAID", "paid ", ""] as const;
+
+const TERMINAL_REASON: Record<Locale, string> = {
+  en: "This order is already closed, so re-checking will not change it.",
+  vi: "Đơn này đã đóng rồi, nên kiểm tra lại cũng không đổi được gì.",
+};
+
+function reasonNode(view: { container: HTMLElement }, button: HTMLElement): Element {
+  const reasonId = button.getAttribute("aria-describedby");
+  expect(reasonId).not.toBeNull();
+  const node = view.container.querySelector(`#${reasonId}`);
+  if (!node) throw new Error(`aria-describedby="${reasonId}" trỏ vào một node KHÔNG tồn tại`);
+  return node;
+}
+
+describe("trạng thái kết thúc: vẫn mount, vẫn focus được, aria-disabled='true', handler về sớm", () => {
+  it.each(TERMINAL_STATUSES)(
+    "%s: nút CÒN trong cây, aria-disabled='true', và lý do đi kèm qua aria-describedby (en)",
+    (status) => {
+      const view = render(<Row locale="en" status={status} />);
+      // getByRole NÉM nếu nút bị gỡ khỏi cây — đó là mutant "biến mất thay vì
+      // aria-disabled", và nó phải chết ở đây chứ không ở một khẳng định mềm.
+      const button = within(view.container).getByRole("button");
+
+      expect(button.getAttribute("aria-disabled")).toBe("true");
+      expect(button.getAttribute("aria-busy")).toBe("false");
+
+      const reason = reasonNode(view, button);
+      expect(reason.textContent).toBe(TERMINAL_REASON.en);
+      expect(reason.textContent).toBe(en["billing.recheck.notPending"]);
+    }
+  );
+
+  it.each(TERMINAL_STATUSES)("%s: cùng câu lý do ấy, bằng tiếng Việt", (status) => {
+    const view = render(<Row locale="vi" status={status} />);
+    const button = within(view.container).getByRole("button");
+
+    expect(button.getAttribute("aria-disabled")).toBe("true");
+    const reason = reasonNode(view, button);
+    expect(reason.textContent).toBe(TERMINAL_REASON.vi);
+    expect(reason.textContent).toBe(viDict["billing.recheck.notPending"]);
+  });
+
+  it.each(TERMINAL_STATUSES)(
+    "%s: KHÔNG disabled gốc, và vẫn nằm trong thứ tự tab (nhận được focus)",
+    (status) => {
+      const view = render(<Row locale="en" status={status} />);
+      const button = within(view.container).getByRole("button") as HTMLButtonElement;
+
+      expect(button.hasAttribute("disabled")).toBe(false);
+      expect(button.disabled).toBe(false);
+      expect(button.tabIndex).toBe(0); // `tabIndex={-1}` cũng gỡ nút khỏi bàn phím
+      button.focus();
+      expect(document.activeElement).toBe(button);
+    }
+  );
+
+  it.each(TERMINAL_STATUSES)(
+    "%s: bấm KHÔNG gọi action lần nào — khẳng định trên SỐ LƯỢT GỌI, không trên giao diện",
+    async (status) => {
+      // Stub này sẽ ĐỔI dòng máy chủ nếu bị gọi: nếu nhánh kết thúc lỡ chạy
+      // action thì không chỉ bộ đếm đỏ, `serverRow` cũng bẩn.
+      stubOutcome({ settled: true, expiresAt: SETTLED_EXPIRES_AT });
+      const view = render(<Row locale="en" status={status} />);
+      const scope = within(view.container);
+      const button = scope.getByRole("button");
+
+      await act(async () => {
+        button.click();
+      });
+
+      expect(mockRecheck.mock.calls.length).toBe(0);
+      expect(refresh.mock.calls.length).toBe(0);
+      expect(scope.queryByRole("alert")).toBeNull();
+      expect(serverRow.status).toBe("pending");
+      // Và nút vẫn ở đúng trạng thái kết thúc, không rơi vào pha bận.
+      expect(button.getAttribute("aria-busy")).toBe("false");
+      expect(button.getAttribute("aria-disabled")).toBe("true");
+    }
+  );
+
+  it.each(NON_TERMINAL_STATUSES)(
+    "%s KHÔNG phải trạng thái kết thúc: aria-disabled='false', lý do rỗng, và action CHẠY (FE-AC-10)",
+    async (status) => {
+      stubOutcome({ settled: false, reason: "not_paid_yet" });
+      const view = render(<Row locale="en" status={status} />);
+      const scope = within(view.container);
+      const button = scope.getByRole("button");
+
+      expect(button.getAttribute("aria-disabled")).toBe("false");
+      expect(reasonNode(view, button).textContent).toBe("");
+
+      await act(async () => {
+        button.click();
+      });
+
+      expect(mockRecheck.mock.calls.length).toBe(1);
+      expect(mockRecheck).toHaveBeenCalledWith(ORDER_CODE);
+      expect(scope.getByRole("alert").textContent).toBe(
+        "Still awaiting payment. Transfer the exact amount with the transfer note shown on the payment screen, then check again."
+      );
+    }
+  );
+
+  it("câu lý do của trạng thái kết thúc KHÁC câu của pha bận — hai lý do, hai câu", () => {
+    const terminal = render(<Row locale="en" status="cancelled" />);
+    const terminalReason = reasonNode(
+      terminal,
+      within(terminal.container).getByRole("button")
+    ).textContent;
+    terminal.unmount();
+    // Ghim vế "kết thúc" trước đã: nếu không, một cài đặt để lý do RỖNG cũng
+    // thoả "hai câu khác nhau" và ca này trở thành vô nghĩa.
+    expect(terminalReason).toBe(TERMINAL_REASON.en);
+
+    mockRecheck.mockImplementation(() => new Promise<RecheckOutcome>(() => {}));
+    const busyView = render(<Row locale="en" status="pending" />);
+    const busyButton = within(busyView.container).getByRole("button");
+    act(() => {
+      busyButton.click();
+    });
+
+    expect(reasonNode(busyView, busyButton).textContent).toBe(
+      "Checking with the payment provider…"
+    );
+    expect(terminalReason).not.toBe(reasonNode(busyView, busyButton).textContent);
+  });
+
+  it("variant primary tuân đúng cùng luật ấy — hành vi không đổi theo variant", async () => {
+    stubOutcome({ settled: true, expiresAt: SETTLED_EXPIRES_AT });
+    const view = render(
+      <I18nProvider locale="en">
+        <RecheckOrderControl orderCode={ORDER_CODE} variant="primary" status="expired" />
+      </I18nProvider>
+    );
+    const button = within(view.container).getByRole("button");
+
+    expect(button.getAttribute("aria-disabled")).toBe("true");
+    expect(reasonNode(view, button).textContent).toBe(TERMINAL_REASON.en);
+
+    await act(async () => {
+      button.click();
+    });
+    expect(mockRecheck.mock.calls.length).toBe(0);
   });
 });

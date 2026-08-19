@@ -25,6 +25,12 @@ vi.mock("server-only", () => ({}));
 const { cookieGetMock } = vi.hoisted(() => ({ cookieGetMock: vi.fn() }));
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: cookieGetMock }) }));
 
+// C-10 (mounted by C-08, one per row) calls `useRouter()`, which throws
+// "invariant expected app router to be mounted" outside a real app-router tree.
+// Stubbed with the same one-method shape the shipped client-component tests use
+// (ProfileCard.test.tsx, DisplayNameEditor.test.tsx); C-10 itself is REAL.
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+
 import { OrderList } from "../_components/OrderList";
 import { renderServerTree } from "./renderServerTree";
 
@@ -164,5 +170,38 @@ describe("C-07 OrderList", () => {
     expect(rows[2].textContent).toContain(WORD_PAID);
     expect(rows[0].textContent).not.toContain(WORD_UNRECOGNISED);
     expect(rows[2].textContent).not.toContain(WORD_UNRECOGNISED);
+  });
+
+  // ==========================================================================
+  // Case 5 — C-10 is mounted once per row, in EVERY status
+  // Rejects: a control mounted only on `pending` rows (the defect R10 exists to
+  // prevent — an expired-looking order may still have been paid); a control
+  // hoisted to the list instead of the row; two controls on one row; a control
+  // carrying a neighbour's orderCode; an unrecognised status treated as
+  // terminal (FE-AC-10 — only the `paid` row is terminal here).
+  // ==========================================================================
+  it("mounts exactly one re-check control per row, each wired to its own row", async () => {
+    const { container } = await renderServerTree(
+      await OrderList({ orders: [ROW_A, ROW_UNRECOGNISED, ROW_C] })
+    );
+
+    const rows = [...container.querySelectorAll("li")];
+    expect(rows).toHaveLength(3);
+    expect(container.querySelectorAll("button")).toHaveLength(3);
+    expect(rows.map((r) => r.querySelectorAll("button").length)).toEqual([1, 1, 1]);
+
+    expect(rows.map((r) => r.querySelector("button")?.getAttribute("aria-describedby"))).toEqual([
+      "recheck-7200000000011-reason",
+      "recheck-4200000000022-reason",
+      "recheck-8200000000033-reason",
+    ]);
+
+    // pending and the unrecognised status stay activatable; only `paid` is
+    // terminal — the three rows must NOT read the same here.
+    expect(rows.map((r) => r.querySelector("button")?.getAttribute("aria-disabled"))).toEqual([
+      "false",
+      "false",
+      "true",
+    ]);
   });
 });
