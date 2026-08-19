@@ -9,13 +9,17 @@
 // Generated:   2026-08-18 | Budget used: integration 3/3, fixture-e2e 3/3, service-e2e 2/2
 // FE-2 filled: 2026-08-19 (plan Task 2.5) — fixture-e2e 1/3 resolved.
 // FE-3 filled: 2026-08-19 (plan Task 3.9) — fixture-e2e 2/3 resolved.
+// FE-1 filled: 2026-08-20 (plan Task 4.6) — fixture-e2e 3/3 resolved, LANE COMPLETE.
 //
 // =============================================================================
 // FILE STATUS — read before editing
 // =============================================================================
-// FE-2 AND FE-3 ARE FILLED AND EXECUTABLE. FE-1 is still a comment-only reserved
-// slot (plan Task 4.6). The `@vitest-environment jsdom` directive on LINE 1 is a
-// per-file declaration, per the repo convention, and both cases depend on it.
+// ALL THREE CASES ARE FILLED AND EXECUTABLE; there is no reserved slot left in
+// this file. The `@vitest-environment jsdom` directive on LINE 1 is a per-file
+// declaration, per the repo convention, and all three cases depend on it.
+// FE-1's implementation sits at the END of the file, after FE-3's, because it
+// runs on the harness FE-3 built; its annotation block stays where it was
+// generated, immediately below this one.
 //
 // HOW THIS LANE RUNS:  `npm run test:fixture`  (from `SOURCE/`).
 //
@@ -103,8 +107,18 @@
 //   - the driver: SubscriptionDriver / SubscriptionLocator.
 // FE-2 consumes the entitlement fixtures, the route/identity constants and the
 // timezone pin; FE-3 consumes the order fixtures and the counted action-stub
-// layer. `SubscriptionDriver` stays unimported until FE-1 exists — an unused
-// import is fatal under `eslint --max-warnings 0`.
+// layer; FE-1 consumes the order fixtures, `fixtureCheckoutRoute()`,
+// `FIXTURE_AMOUNT_VND` and `createOrderCallCount`.
+// `SubscriptionDriver` STAYS UNIMPORTED even now that FE-1 exists, and the
+// earlier note here ("until FE-1 exists") was wrong about why: the driver is a
+// structural subset of Playwright's `Page`, and all three cases in this file are
+// IN-PROCESS renders of the real route tree, so none of them has a browser to
+// drive. It becomes importable when a Playwright harness does, not when a case
+// does. An unused import is fatal under `eslint --max-warnings 0`, so it is not
+// imported "for completeness". What that costs FE-1 is recorded at the case
+// itself: `driver.horizontalOverflowPx()` and `driver.setViewportSize()` have no
+// in-process equivalent, so item (g) is a stated width MODEL plus a structural
+// check, and the painted 360px reading stays with the manual browser pass.
 //
 // NO MSW; the sanctioned mock boundary is the ACTION MODULE. FE-2 stubs
 // `explainStep()` (the tutor action module) and the two DATA SOURCES the two
@@ -361,6 +375,7 @@ const {
   getResultMock,
   explainStepMock,
   refreshMock,
+  pushMock,
 } = vi.hoisted(() => ({
     cookieName: "ms_locale",
     routePath: "/exams/exam-subscription-fixture/attempt/attempt-subscription-fixture/result/detail",
@@ -377,6 +392,14 @@ const {
     // until they reload by hand. That is the divergence UI-D16 exists to
     // prevent, so FE-3 (d) reads this counter.
     refreshMock: vi.fn().mockName("router.refresh"),
+    // FE-1's addition, and counted for the same reason `refreshMock` is:
+    // `router.push()` is the ONLY observable of the S-01 -> S-06 transition in
+    // an in-process render, so FE-1 reads BOTH its count (the fail-closed
+    // branches must produce ZERO, a double-activation must produce ONE) and its
+    // ARGUMENT (the order identifier that has to survive the navigation). A
+    // throwaway `vi.fn()` built fresh inside `useRouter()` — the shape this
+    // replaced — is unreadable from a case: every render hands out a new one.
+    pushMock: vi.fn().mockName("router.push"),
   }));
 
 // --- Runtime substitutions (NOT product stubs) -------------------------------
@@ -407,7 +430,7 @@ vi.mock("@vercel/analytics/next", () => ({ Analytics: () => null }));
 vi.mock("next/navigation", () => ({
   usePathname: () => routePath,
   useSearchParams: () => new URLSearchParams(),
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: refreshMock, back: vi.fn() }),
+  useRouter: () => ({ push: pushMock, replace: vi.fn(), refresh: refreshMock, back: vi.fn() }),
   // The page redirects when `getResult()` returns null. That never happens on
   // this fixture, so a call here means the harness is wrong — it must be loud,
   // not a no-op that leaves a half-rendered tree for the assertions to read.
@@ -1179,19 +1202,38 @@ describe("FE-2 (g) every interactive element in the new states is reachable and 
 //      `useSearchParams()` answers an empty `URLSearchParams`; `redirect()`
 //      throws loudly; and `useRouter().refresh` is `refreshMock` — a REAL
 //      seam under C-10's handler, not a runtime substitution, which is why
-//      (d) counts it instead of ignoring it.
+//      (d) counts it instead of ignoring it. (`useRouter().push` is
+//      `pushMock` since FE-1 landed; nothing on S-05 calls it, and no
+//      assertion in FE-3 reads it.)
 //   6. `@/components/shared/SkipLink` — stubbed to `null` inside
 //      `(billing)/layout.tsx` (async Server Component; see its own comment).
 // Nothing else in the tree is replaced.
 
-const { listMyOrdersMock, getCurrentUserMock, recheckOrderMock } = vi.hoisted(() => ({
-  listMyOrdersMock: vi.fn(),
-  getCurrentUserMock: vi.fn(),
-  recheckOrderMock: vi.fn(),
-}));
+const { listMyOrdersMock, getCurrentUserMock, recheckOrderMock, createOrderMock, getMyOrderMock } =
+  vi.hoisted(() => ({
+    listMyOrdersMock: vi.fn(),
+    getCurrentUserMock: vi.fn(),
+    recheckOrderMock: vi.fn(),
+    // FE-1's two additions, declared HERE rather than in a third `vi.hoisted`
+    // block beside FE-1's own code, because a `vi.mock` factory may only close
+    // over hoisted bindings and the two factories below are the ones that need
+    // them. `createOrder` is FE-1's SANCTIONED mock boundary; `getMyOrder` is
+    // S-06's data source, the same kind of seam `listMyOrders` opens for S-05.
+    // Both names are APPENDED to the existing factories: replacing a module
+    // wholesale means a factory that omits a name makes the other lane's route
+    // call `undefined()`, which is how `getCurrentUser` came to be here.
+    createOrderMock: vi.fn(),
+    getMyOrderMock: vi.fn(),
+  }));
 
-vi.mock("@/app/(billing)/queries", () => ({ listMyOrders: listMyOrdersMock }));
-vi.mock("@/lib/billing/orderActions", () => ({ recheckOrder: recheckOrderMock }));
+vi.mock("@/app/(billing)/queries", () => ({
+  listMyOrders: listMyOrdersMock,
+  getMyOrder: getMyOrderMock,
+}));
+vi.mock("@/lib/billing/orderActions", () => ({
+  recheckOrder: recheckOrderMock,
+  createOrder: createOrderMock,
+}));
 
 import BillingLayout from "@/app/(billing)/layout";
 import MyOrdersPage from "@/app/(billing)/me/orders/page";
@@ -1265,6 +1307,21 @@ const BUSY: Record<Locale, string> = {
 const AWAITING_PAYMENT: Record<Locale, string> = {
   en: "Awaiting payment",
   vi: "Chờ thanh toán",
+};
+
+/** C-09's word for `paid`. FE-1 (g) measures the TERMINAL S-06 screen, which
+ *  the case name describes as "the bigint code beside C-09's badge" — so the
+ *  badge has to be materialised, not assumed. Measured: with only a `<dl>`
+ *  count and a page-wide text check, deleting `<OrderStatusBadge>` from C-13's
+ *  non-payable branch left the whole fixture lane green, i.e. (g) was reporting
+ *  a comfortable zero about a screen it could not tell from a badgeless one.
+ *
+ *  HONEST LIMIT: only `en` is compared to rendered output — (g) is `en`-only,
+ *  because the overflow model is measured in characters and the two locales
+ *  give the same widths for this screen. */
+const PAID_STATUS_WORD: Record<Locale, string> = {
+  en: "Paid",
+  vi: "Đã thanh toán",
 };
 
 /** C-11's four AC-056 rows for `FIXTURE_ENTITLEMENT_KNOWN`, in document order.
@@ -1399,8 +1456,15 @@ async function renderOrdersRoute(options: {
   vi.useFakeTimers({ toFake: ["Date"], now: new Date(FIXTURE_NOW) });
   stubs.reset();
   // Reset beside the action stub, for the same reason: a count read after an
-  // activation means nothing unless this render started at zero.
+  // activation means nothing unless this render started at zero. The three FE-1
+  // seams are cleared here too: S-05 calls none of them today, but a missing
+  // reset in `renderCheckoutRoute()` produced this file's one genuine RED, and
+  // an FE-3 case that later read `pushMock` would otherwise inherit whatever an
+  // FE-1 case left behind — green or red by shuffle seed.
   refreshMock.mockClear();
+  pushMock.mockClear();
+  createOrderMock.mockClear();
+  getMyOrderMock.mockClear();
   recheckOrderMock.mockImplementation((orderCode: number) => stubs.simulateRecheckOrder(orderCode));
   getCurrentUserMock.mockResolvedValue({ id: FIXTURE_USER.id });
   readEntitlementMock.mockResolvedValue(entitlement);
@@ -2025,5 +2089,1267 @@ describe("FE-3 (g) the rate-limited refusal is distinct from every other outcome
     // A refusal is not a settlement either: nothing about entitlement moved.
     expect(after.summary.values).toEqual(before.summary.values);
     expect(after.html).toBe(before.html);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// FE-1 — IMPLEMENTATION (plan Task 4.6). The annotation block for FE-1 is at the
+// TOP of this file and is kept verbatim; this is the case. fixture-e2e 3/3.
+// -----------------------------------------------------------------------------
+//
+// WHY THE CODE IS HERE AND NOT UNDER ITS OWN ANNOTATION BLOCK. FE-1 runs on the
+// harness FE-3 built — `resolveServerTree()`, the counted action stubs, `state`,
+// the readers — and all of those are `const`s declared in FE-3's section. Put
+// FE-1's implementation up at line 253 and every one of them is a temporal-dead-
+// zone hazard the moment anything is read at module-evaluation time rather than
+// inside a callback. The annotation block stays where it was generated; the code
+// follows the harness it depends on.
+//
+// WHAT THIS SECTION ADDS TO THE SHARED HARNESS — three edits, each made where the
+// thing it feeds already lives, and all three STRICTLY ADDITIVE (nothing removed,
+// no existing expectation weakened; FE-2's 23 and FE-3's 22 cases run unchanged):
+//   1. `pushMock` joins the FIRST `vi.hoisted` block and replaces the throwaway
+//      `push: vi.fn()` inside the EXISTING `next/navigation` factory. Nothing in
+//      FE-2 or FE-3 reads `push`; a fresh function per `useRouter()` call is
+//      unreadable from a case, and FE-1's whole boundary claim is about the value
+//      that function is called with.
+//   2. `createOrder` is APPENDED to the existing `@/lib/billing/orderActions`
+//      factory. It is FE-1's SANCTIONED mock boundary.
+//   3. `getMyOrder` is APPENDED to the existing `@/app/(billing)/queries` factory
+//      — S-06's data source, the same kind of seam `listMyOrders` opens for S-05.
+// Appending rather than adding a second `vi.mock` for the same module id is not
+// style: a second factory REPLACES the first, and the name the first supplied
+// then resolves to `undefined` at the other lane's call site. That is exactly how
+// `getCurrentUser` came to live on FE-2's factory.
+//
+// THE FULL SET OF MODULE DOUBLES REACHING FE-1's TWO RENDERED TREES — seven
+// modules, enumerated because "only the action module is stubbed" reads as a
+// guarantee that nothing else can be hiding a regression:
+//   1. `@/lib/billing/orderActions` — `createOrder`, the SANCTIONED boundary,
+//      routed into the counted stub from `subscriptionFixtureData.ts`.
+//      (`recheckOrder` is doubled too and FE-1 reads its count as a ZERO: the
+//      legal-gated C-15 control must not reach C-10's action either.)
+//   2. `@/app/(billing)/queries` — `getMyOrder()`, S-06's data source. It resolves
+//      out of a fixture CATALOGUE by order code, so a code that is well-formed but
+//      WRONG yields `null` and lands on C-13's Empty state — which is what makes
+//      item (b) an identity assertion instead of a shape assertion.
+//   3. `@/lib/auth/getCurrentUser` — both route login gates.
+//   4. `@/lib/billing/readEntitlement` — the value `(billing)/layout.tsx` hands to
+//      the real `EntitlementProvider`; C-02 on S-01 reads it through context.
+//   5. `next/navigation` — see the residual below.
+//   6. `@/components/shared/SkipLink` — async Server Component, stubbed to `null`.
+//   7. `next/font/google`, `@vercel/analytics/next`, `server-only`, `next/headers`
+//      and the three module-scope action imports FE-2 lists — runtime
+//      substitutions, not seams either case makes a claim about.
+// `isPaidTierEnabled()` is NOT among them: it is the real shipped function, and
+// `renderPricingRoute()` drives it the way production does, through
+// `process.env.GEMINI_PAID_TIER_ENABLED`. Mocking it would have replaced the very
+// fail-closed gate item (f) exists to hold.
+//
+// THE ROUTER IS A RUNTIME SUBSTITUTION, AND THAT IS A RECORDED RESIDUAL. FE-1's
+// proof obligation says "do not stub the router: the navigation seam is the thing
+// under test". In a browser harness that is literal. In-process under jsdom there
+// is no Next router to leave real — `useRouter()` outside a Next runtime throws —
+// so the honest reading is preserved instead: FE-1 reads the URL STRING
+// `router.push()` was called with, and feeds THAT STRING to the REAL S-06 route,
+// whose REAL `parseOrderCode()` decides what renders. Every link in the chain that
+// can carry the failure is therefore live: the CTA's serialisation, the query
+// string, S-06's accept-list, and the read it performs (or does not perform).
+// WHAT IS NOT COVERED, recorded rather than quietly dropped: the client-side
+// navigation itself, and everything painted — the 360px layout of item (g) and
+// the focus ring. Those stay with the manual browser pass (plan Task 6.5).
+//
+// THE IN-FLIGHT GATE FOR `createOrder` IS LOCAL TO THIS SECTION, deliberately.
+// `SubscriptionActionStubs` exposes `holdNextRecheck()` / `releaseHeldRecheck()`
+// for `recheckOrder` ONLY, and `subscriptionFixtureData.ts` is not in this task's
+// Target Files — so its shipped contract is not edited here. The gate below WRAPS
+// `simulateCreateOrder()` rather than re-implementing it, so the invocation count
+// FE-1 asserts on is still the fixture module's own counter and not a second,
+// unreviewed copy of it. It is needed for the same reason FE-3's is: `busyRef` is
+// an IN-FLIGHT latch, and against a stub that settles immediately the two clicks
+// of a dogpile are two fully-settled calls whose count is decided by microtask
+// timing rather than by the latch.
+
+import CheckoutPage from "@/app/(billing)/pricing/checkout/page";
+import PricingPage from "@/app/(billing)/pricing/page";
+import type { CheckoutOrder } from "@/lib/billing/checkoutOrder";
+import type { CreateOrderError } from "@/lib/billing/orderActions";
+import {
+  FIXTURE_AMOUNT_VND,
+  fixtureCheckoutRoute,
+  FIXTURE_ORDERS,
+} from "./subscriptionFixtureData";
+
+// =============================================================================
+// Expected copy — FIXED LITERALS, typed out by hand
+// =============================================================================
+// Same rule as FE-2's `NOTE` and FE-3's five sentences. Em dashes are written as
+// `—` escapes on purpose: a hyphen typed in place of one is invisible in a
+// diff and fails the equality below for a reason nobody can see.
+
+const BUY_LABEL: Record<Locale, string> = {
+  en: "Get Premium",
+  vi: "Mua Premium",
+};
+
+/** C-03's partial (unavailable) state — AC-049/AC-054, item (f)'s "readable
+ *  reason". */
+const UNAVAILABLE_REASON: Record<Locale, string> = {
+  en: "Premium isn't on sale yet — we don't sell an allowance we can't deliver. Check back soon.",
+  vi: "Premium chưa mở bán — chúng tôi không bán một hạn mức chưa giao được. Bạn quay lại sau nhé.",
+};
+
+/** C-04b's two link labels. Item (a) is an ORDER claim, but a link whose text is
+ *  not the legal one is not the link AC-039 means, so both are pinned. */
+const TERMS_LABEL: Record<Locale, string> = { en: "Terms of Service", vi: "Điều khoản dịch vụ" };
+const REFUND_LABEL: Record<Locale, string> = { en: "Refund Policy", vi: "Chính sách hoàn tiền" };
+
+/** C-15's label — and it is the SAME dictionary key C-10 uses for
+ *  `variant="primary"` (`RecheckOrderControl.tsx:117`). So the label alone can
+ *  NOT tell the closed legal gate from an open one; `aria-describedby` can, and
+ *  item (e) reads that instead. */
+const CONFIRM_LABEL: Record<Locale, string> = {
+  en: "I have transferred — check now",
+  vi: "Tôi đã chuyển khoản — kiểm tra ngay",
+};
+
+/** C-15's closed-gate reason (BU-1 / TBD-02). It is NOT C-10's "this order is
+ *  already closed" sentence, and telling a live order it is dead is exactly the
+ *  regression the two separate strings exist to prevent. */
+const LEGAL_PENDING_REASON: Record<Locale, string> = {
+  en: "The Terms of Service and Refund Policy are not published yet, so payment cannot be confirmed here. Nothing has been charged.",
+  vi: "Điều khoản dịch vụ và Chính sách hoàn tiền chưa được công bố, nên chưa xác nhận thanh toán ở đây được. Chưa có khoản nào bị trừ.",
+};
+
+/** C-13's Empty state — the ONE state all four unreachable-order causes share.
+ *  Item (b)'s negative control lands here. */
+const NO_ACTIVE_ORDER: Record<Locale, string> = {
+  en: "There is no payment in progress right now.",
+  vi: "Hiện không có lệnh thanh toán nào đang chờ.",
+};
+
+/** C-14's four `<dt>`s, in the structure-order the UI Spec froze: account number
+ *  -> account holder -> amount -> transfer note. */
+const TRANSFER_TERMS: Record<Locale, readonly string[]> = {
+  en: ["Bank account number", "Account holder", "Amount", "Transfer note"],
+  vi: [
+    "Số tài khoản",
+    "Chủ tài khoản",
+    "Số tiền",
+    "Nội dung chuyển khoản",
+  ],
+};
+
+/** THE THOUSANDS-SEPARATED AMOUNT, per locale — item (c)'s second half, and the
+ *  one `<dd>` whose value is PRODUCED rather than passed through. Hand-written:
+ *  an expectation rebuilt from `formatVnd()` moves with the formatter and can
+ *  never fail. The separator differs by locale on purpose (`en-GB` groups with
+ *  `,`, `vi-VN` with `.`), which is also what keeps a locale that never reached
+ *  the tree from satisfying both rows. */
+const AMOUNT_TEXT: Record<Locale, string> = {
+  en: "39,000 VND",
+  vi: "39.000 VNĐ",
+};
+
+// =============================================================================
+// Fixtures owned by FE-1
+// =============================================================================
+
+/** Item (g)'s order: a BIGINT order code — 9007199254740991 is
+ *  `Number.MAX_SAFE_INTEGER`, the largest value `parseOrderCode()` still accepts,
+ *  so it is the widest unbreakable run S-06 can ever be asked to lay out. Built
+ *  by spreading a shipped fixture so every other field stays the one the fixture
+ *  module owns, with the memo re-derived because the memo CARRIES the code
+ *  (`orderActions.ts:99`) and a stale one would make the widest run a lie. */
+function withOrderCode(order: CheckoutOrder, orderCode: number): CheckoutOrder {
+  return { ...order, orderCode, memo: `MSMOLAR ${orderCode}` };
+}
+
+const BIGINT_ORDER_CODE = Number.MAX_SAFE_INTEGER;
+const FE1_ORDER_BIGINT = withOrderCode(FIXTURE_ORDER_PENDING, BIGINT_ORDER_CODE);
+/** The same bigint code on a TERMINAL row: C-09's badge only renders on the
+ *  non-payable branch, and the amount `<dl>` only on the payable one, so item
+ *  (g)'s "beside an amount and a badge" is two measurements, not one. */
+const FE1_ORDER_BIGINT_PAID = withOrderCode(FIXTURE_ORDER_PAID, BIGINT_ORDER_CODE + 0);
+
+/** A well-formed digit string that is NOT any fixture's code. Item (b)'s negative
+ *  control: it must reach the Empty state, which is what proves the roundtrip
+ *  assertion measures the VALUE and not merely the shape. */
+const UNKNOWN_BUT_WELL_FORMED = String(FIXTURE_ORDER_PENDING.orderCode + 7);
+
+// =============================================================================
+// The `createOrder` boundary — counted, gated, and shared by every case below
+// =============================================================================
+
+let createOrderGate: Promise<void> | null = null;
+let releaseCreateOrderGate: (() => void) | null = null;
+let createOrderFailure: { error: CreateOrderError } | null = null;
+
+function holdNextCreateOrder(): void {
+  if (createOrderGate) return;
+  createOrderGate = new Promise<void>((resolve) => {
+    releaseCreateOrderGate = resolve;
+  });
+}
+
+function releaseHeldCreateOrder(): void {
+  releaseCreateOrderGate?.();
+  releaseCreateOrderGate = null;
+  createOrderGate = null;
+}
+
+/** Wraps the fixture module's counted stub: the count is incremented INSIDE
+ *  `simulateCreateOrder()` and synchronously on call (its body has no await
+ *  before the increment), so a held call is already counted — which is the
+ *  property item (b)'s dogpile assertion reads. */
+function installCreateOrderStub(): void {
+  createOrderFailure = null;
+  createOrderMock.mockImplementation(async () => {
+    const settled = stubs.simulateCreateOrder();
+    const gate = createOrderGate;
+    if (gate) await gate;
+    if (createOrderFailure) return createOrderFailure;
+    return settled;
+  });
+}
+
+// =============================================================================
+// The renders — S-01 and S-06 on the REAL route tree
+// =============================================================================
+
+const ORIGINAL_PAID_TIER_FLAG = process.env.GEMINI_PAID_TIER_ENABLED;
+
+/**
+ * `RootLayout -> (billing)/layout -> /pricing/page`.
+ *
+ * `canPurchase` is driven through the REAL `isPaidTierEnabled()` by setting the
+ * env var it reads, not by stubbing the module: AC-054's fail-closed gate is the
+ * thing item (f) holds, and a stubbed gate is a gate that cannot regress. The
+ * page is `force-dynamic` and calls the function per request, so the value is
+ * read at render — no module cache stands between the assignment and the prop.
+ *
+ * Clears `pushMock` and resets the action stub BEFORE the render, then asserts
+ * both are still at zero AFTER it. Clearing afterwards would mask a mount-time
+ * navigation or a mount-time order creation, and a page that creates an order on
+ * mount is a page that charges people for arriving.
+ */
+async function renderPricingRoute(options: { locale: Locale; canPurchase: boolean }) {
+  const { locale, canPurchase } = options;
+  state.locale = locale;
+  process.env.GEMINI_PAID_TIER_ENABLED = canPurchase ? "1" : "";
+  getCurrentUserProfileMock.mockResolvedValue({
+    id: FIXTURE_USER.id,
+    email: FIXTURE_USER.email,
+    displayName: "Fixture Learner",
+    avatarUrl: null,
+  });
+  getCurrentUserMock.mockResolvedValue({ id: FIXTURE_USER.id });
+  readEntitlementMock.mockResolvedValue(FIXTURE_ENTITLEMENT_KNOWN);
+  stubs.reset();
+  releaseHeldCreateOrder();
+  installCreateOrderStub();
+  pushMock.mockClear();
+  recheckOrderMock.mockClear();
+
+  const tree = await resolveServerTree(
+    createElement(RootLayout, null, createElement(BillingLayout, null, createElement(PricingPage)))
+  );
+  if (!isValidElement(tree)) {
+    throw new Error("FE-1: the /pricing route tree did not resolve to an element");
+  }
+  const view = render(tree);
+  if (stubs.createOrderCallCount !== 0) {
+    throw new Error(
+      `FE-1: rendering S-01 called createOrder ${stubs.createOrderCallCount} times — every count below would be reading the render, not the activation`
+    );
+  }
+  if (pushMock.mock.calls.length !== 0) {
+    throw new Error(
+      `FE-1: rendering S-01 navigated ${pushMock.mock.calls.length} times before anyone activated anything`
+    );
+  }
+  return view;
+}
+
+/**
+ * `RootLayout -> (billing)/layout -> /pricing/checkout/page`, fed the RAW
+ * `?order=` value exactly as Next delivers it (a `string`, a `string[]` for a
+ * repeated parameter, or `undefined`). The accept-list in `parseOrderCode()`
+ * runs for real; nothing in this harness parses anything.
+ *
+ * `getMyOrder()` resolves out of a CATALOGUE by code and answers `null` for an
+ * unknown one — the same value RLS `orders_select_own` produces for a foreign
+ * order. That is what turns a wrong-but-well-formed identifier into "someone
+ * else's Empty state" instead of into a silently identical screen.
+ */
+async function renderCheckoutRoute(options: {
+  locale: Locale;
+  order: string | string[] | undefined;
+  orders?: readonly CheckoutOrder[];
+}) {
+  const { locale, order } = options;
+  const catalogue = options.orders ?? FIXTURE_ORDERS;
+  state.locale = locale;
+  getCurrentUserProfileMock.mockResolvedValue({
+    id: FIXTURE_USER.id,
+    email: FIXTURE_USER.email,
+    displayName: "Fixture Learner",
+    avatarUrl: null,
+  });
+  getCurrentUserMock.mockResolvedValue({ id: FIXTURE_USER.id });
+  readEntitlementMock.mockResolvedValue(FIXTURE_ENTITLEMENT_KNOWN);
+  // RESET BEFORE THE RENDER, exactly as `renderPricingRoute()` and
+  // `renderOrdersRoute()` do — and this is not defensive tidiness. Measured:
+  // without it, item (e)'s "activating the gated control called NOTHING" read a
+  // count of 2 left behind by the last (b) case and failed. Had (e) run first,
+  // the same missing line would have made it pass while a gated control that
+  // DID call went unnoticed. A counter read after an activation means nothing
+  // unless this render started at zero.
+  stubs.reset();
+  releaseHeldCreateOrder();
+  installCreateOrderStub();
+  pushMock.mockClear();
+  recheckOrderMock.mockClear();
+  getMyOrderMock.mockClear();
+  getMyOrderMock.mockImplementation(async (orderCode: number) => {
+    return catalogue.find((row) => row.orderCode === orderCode) ?? null;
+  });
+
+  const tree = await resolveServerTree(
+    createElement(
+      RootLayout,
+      null,
+      createElement(
+        BillingLayout,
+        null,
+        createElement(CheckoutPage, { searchParams: Promise.resolve({ order }) })
+      )
+    )
+  );
+  if (!isValidElement(tree)) {
+    throw new Error("FE-1: the /pricing/checkout route tree did not resolve to an element");
+  }
+  const view = render(tree);
+  // S-06 is a READ screen: rendering it must create nothing, re-check nothing
+  // and navigate nowhere. Each of the three is a real (and, for the first, an
+  // expensive) mistake, and none is visible to any assertion below.
+  if (stubs.createOrderCallCount !== 0 || recheckOrderMock.mock.calls.length !== 0) {
+    throw new Error(
+      `FE-1: rendering S-06 called createOrder ${stubs.createOrderCallCount} and recheckOrder ${recheckOrderMock.mock.calls.length} times`
+    );
+  }
+  if (pushMock.mock.calls.length !== 0) {
+    throw new Error(`FE-1: rendering S-06 navigated ${pushMock.mock.calls.length} times`);
+  }
+  return view;
+}
+
+// =============================================================================
+// Readers — each one THROWS on absence (FE-2's `questionItem` idiom)
+// =============================================================================
+
+function mainOf(container: HTMLElement): HTMLElement {
+  const main = container.querySelector("main");
+  if (!(main instanceof HTMLElement)) throw new Error("FE-1: the route rendered no <main>");
+  return main;
+}
+
+function purchaseButton(container: HTMLElement, locale: Locale): HTMLButtonElement {
+  const buttons = Array.from(container.querySelectorAll("button")).filter(
+    (button) => (button.textContent ?? "") === BUY_LABEL[locale]
+  );
+  if (buttons.length !== 1) {
+    throw new Error(
+      `FE-1: expected exactly one purchase control carrying ${JSON.stringify(BUY_LABEL[locale])}, found ${buttons.length}`
+    );
+  }
+  return buttons[0];
+}
+
+function confirmButton(container: HTMLElement, locale: Locale): HTMLButtonElement {
+  const buttons = Array.from(container.querySelectorAll("button")).filter(
+    (button) => (button.textContent ?? "") === CONFIRM_LABEL[locale]
+  );
+  if (buttons.length !== 1) {
+    throw new Error(
+      `FE-1: expected exactly one confirm control carrying ${JSON.stringify(CONFIRM_LABEL[locale])}, found ${buttons.length}`
+    );
+  }
+  return buttons[0];
+}
+
+/** The two C-04b links, page-wide. Page-wide rather than scoped, so a SECOND
+ *  copy of the legal pair — the duplication `LegalLinks.tsx` exists to prevent —
+ *  fails here instead of letting item (a) pick whichever copy happens to sit in
+ *  the right place. */
+function legalLinks(container: HTMLElement): { terms: HTMLAnchorElement; refund: HTMLAnchorElement } {
+  const terms = Array.from(container.querySelectorAll('a[href="/terms"]'));
+  const refund = Array.from(container.querySelectorAll('a[href="/refund-policy"]'));
+  if (terms.length !== 1 || refund.length !== 1) {
+    throw new Error(
+      `FE-1: expected exactly one /terms link and one /refund-policy link, found ${terms.length} and ${refund.length}`
+    );
+  }
+  if (!(terms[0] instanceof HTMLAnchorElement) || !(refund[0] instanceof HTMLAnchorElement)) {
+    throw new Error("FE-1: the legal links are not anchors");
+  }
+  return { terms: terms[0], refund: refund[0] };
+}
+
+/** DOCUMENT ORDER, read from the DOM's own comparator rather than from an index
+ *  into a NodeList — AC-039 is a reading-order claim, and `compareDocumentPosition`
+ *  is the only reading of it that stays correct across nesting depth. */
+function precedesInDocumentOrder(before: Node, after: Node): boolean {
+  return (before.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+}
+
+function alertsInside(root: HTMLElement): HTMLElement[] {
+  return Array.from(root.querySelectorAll('[role="alert"]'));
+}
+
+/** The one C-14 definition list. `<dl>` is C-14's fingerprint on S-06: nothing
+ *  else on this screen builds one (C-11 is not mounted here). */
+function transferPairs(container: HTMLElement): { terms: string[]; values: string[]; pairs: HTMLElement[] } {
+  const lists = mainOf(container).querySelectorAll("dl");
+  if (lists.length !== 1) {
+    throw new Error(`FE-1: expected exactly one C-14 <dl>, found ${lists.length}`);
+  }
+  const list = lists[0];
+  return {
+    terms: Array.from(list.querySelectorAll("dt")).map((node) => node.textContent ?? ""),
+    values: Array.from(list.querySelectorAll("dd")).map((node) => node.textContent ?? ""),
+    pairs: Array.from(list.children).filter((node): node is HTMLElement => node instanceof HTMLElement),
+  };
+}
+
+/** The values C-14 must render for a given order, in structure order — the first
+ *  two and the last are the fixture's OWN strings (an input, not an expectation
+ *  derived from the product); only the amount is a hand-written literal, because
+ *  the amount is the one value the product PRODUCES. */
+function expectedTransferValues(order: CheckoutOrder, locale: Locale): string[] {
+  return [order.accountNumber, order.accountName, AMOUNT_TEXT[locale], order.memo];
+}
+
+/** Restores the release flag this section drives. It is file-scoped, so it also
+ *  runs after every FE-2 and FE-3 case — where it is a no-op, since neither ever
+ *  reads or writes this variable. */
+afterEach(() => {
+  releaseHeldCreateOrder();
+  createOrderFailure = null;
+  if (ORIGINAL_PAID_TIER_FLAG === undefined) {
+    delete process.env.GEMINI_PAID_TIER_ENABLED;
+  } else {
+    process.env.GEMINI_PAID_TIER_ENABLED = ORIGINAL_PAID_TIER_FLAG;
+  }
+});
+
+// =============================================================================
+// Fixture preconditions — every literal above, tied back to its source
+// =============================================================================
+// None of these is a claim about the product. They exist so that a fixture edit
+// or a rename fails HERE, legibly, instead of turning one of the seven items
+// below into an assertion about the wrong thing.
+
+describe("FE-1 preconditions", () => {
+  it("the order FE-1 buys is `pending`, carries a QR payload, and its memo carries its own code", () => {
+    expect(FIXTURE_ORDER_PENDING.status).toBe("pending");
+    expect(FIXTURE_ORDER_PENDING.qrPayload.length).toBeGreaterThan(0);
+    // The memo is the one transfer field that CARRIES the identifier, so it is
+    // also the field a swapped order code shows up in.
+    expect(FIXTURE_ORDER_PENDING.memo).toContain(String(FIXTURE_ORDER_PENDING.orderCode));
+    // Item (d)'s fixture differs in EXACTLY the field under test plus the
+    // identity that has to differ for both to be reachable by code.
+    expect(FIXTURE_ORDER_PENDING_NO_QR.qrPayload).toBe("");
+    expect(FIXTURE_ORDER_PENDING_NO_QR.status).toBe("pending");
+    expect(FIXTURE_ORDER_PENDING_NO_QR.orderCode).not.toBe(FIXTURE_ORDER_PENDING.orderCode);
+    expect(FIXTURE_ORDER_PENDING_NO_QR.accountNumber).toBe(FIXTURE_ORDER_PENDING.accountNumber);
+    expect(FIXTURE_ORDER_PENDING_NO_QR.amountVnd).toBe(FIXTURE_ORDER_PENDING.amountVnd);
+  });
+
+  it("the four expected transfer values are non-blank and MUTUALLY DISTINCT, so a swap is visible", () => {
+    for (const locale of LOCALES) {
+      const values = expectedTransferValues(FIXTURE_ORDER_PENDING, locale);
+      for (const value of values) expect(value.trim().length).toBeGreaterThan(0);
+      // Two fields of the same type seeded with the same value would make a
+      // swap between them invisible in item (c).
+      expect(new Set(values).size).toBe(values.length);
+      expect(new Set(TRANSFER_TERMS[locale]).size).toBe(TRANSFER_TERMS[locale].length);
+      expect(TRANSFER_TERMS[locale]).toHaveLength(4);
+    }
+    expect(TRANSFER_TERMS.en).not.toEqual([...TRANSFER_TERMS.vi]);
+  });
+
+  it("the hand-written amount literal carries the fixture's own number AND a group separator", () => {
+    for (const locale of LOCALES) {
+      // Tied to the fixture: strip everything that is not a digit and the
+      // fixture's amount is what is left. So a fixture price change fails here.
+      expect(AMOUNT_TEXT[locale].replace(/\D/g, "")).toBe(String(FIXTURE_AMOUNT_VND));
+      // …and the GROUPED form is not the raw one. This inequality is the whole
+      // of item (c)'s "thousands separator" claim, stated where it can be read:
+      // `39000 VND` beside a banking app showing `39.000` is how a user stops
+      // paying (UI-D13).
+      expect(AMOUNT_TEXT[locale]).not.toContain(String(FIXTURE_AMOUNT_VND));
+    }
+    // The two locales group with DIFFERENT separators, which is also what stops
+    // a locale that never reached the tree from satisfying both rows of (c).
+    expect(AMOUNT_TEXT.en).not.toBe(AMOUNT_TEXT.vi);
+  });
+
+  it("item (b)'s negative control really is well-formed and really is unknown", () => {
+    // Both halves matter: a control that failed the accept-list would prove
+    // nothing about VALUE identity, and one that resolved to a real order would
+    // not reach the Empty state.
+    expect(UNKNOWN_BUT_WELL_FORMED).toMatch(/^\d+$/);
+    expect(Number.isSafeInteger(Number(UNKNOWN_BUT_WELL_FORMED))).toBe(true);
+    expect(FIXTURE_ORDERS.some((order) => String(order.orderCode) === UNKNOWN_BUT_WELL_FORMED)).toBe(false);
+  });
+
+  it("the bigint fixture is the widest code S-06 can ever accept, and its memo carries it", () => {
+    expect(BIGINT_ORDER_CODE).toBe(Number.MAX_SAFE_INTEGER);
+    expect(Number.isSafeInteger(BIGINT_ORDER_CODE)).toBe(true);
+    expect(String(BIGINT_ORDER_CODE).length).toBeGreaterThan(
+      String(FIXTURE_ORDER_PENDING.orderCode).length
+    );
+    expect(FE1_ORDER_BIGINT.memo).toContain(String(BIGINT_ORDER_CODE));
+    expect(FE1_ORDER_BIGINT.status).toBe("pending");
+    expect(FE1_ORDER_BIGINT_PAID.status).toBe("paid");
+  });
+
+  it("the document-order predicate is NOT vacuous — it answers false when the order is wrong", () => {
+    // The measurement's own positive control. Without it, `precedesInDocumentOrder`
+    // could be a function that returns true for everything and item (a) — the
+    // ORDER claim this whole slot exists for — would be green against the exact
+    // page it is meant to reject.
+    const scratch = document.createElement("div");
+    const first = document.createElement("a");
+    const second = document.createElement("button");
+    scratch.append(first, second);
+    expect(precedesInDocumentOrder(first, second)).toBe(true);
+    expect(precedesInDocumentOrder(second, first)).toBe(false);
+  });
+});
+
+// =============================================================================
+// (a) AC-039 — both legal links PRECEDE the purchase control in document order
+// =============================================================================
+
+describe("FE-1 (a) the legal links come before the purchase control on /pricing", () => {
+  it.each(LOCALES)(
+    "locale %s — both links present, both PRECEDING the control in document order",
+    async (locale) => {
+      const { container } = await renderPricingRoute({ locale, canPurchase: true });
+      const main = mainOf(container);
+      const { terms, refund } = legalLinks(container);
+      const button = purchaseButton(container, locale);
+
+      // Presence, and the labels — a link to /terms carrying some other text is
+      // not the link AC-039 means.
+      expect(terms.textContent).toBe(TERMS_LABEL[locale]);
+      expect(refund.textContent).toBe(REFUND_LABEL[locale]);
+      // Both inside the page's own <main>, not in a header or a footer that
+      // happens to sit above everything.
+      expect(main.contains(terms)).toBe(true);
+      expect(main.contains(refund)).toBe(true);
+      expect(main.contains(button)).toBe(true);
+
+      // THE CLAIM. Presence is not it: with `<LegalLinks />` moved BELOW
+      // `<PurchaseCta />` in `pricing/page.tsx`, every assertion above still
+      // passes and a user can buy before the terms are visible.
+      expect(precedesInDocumentOrder(terms, button)).toBe(true);
+      expect(precedesInDocumentOrder(refund, button)).toBe(true);
+      // Stated from the other side too, because a node CONTAINED BY another
+      // reports FOLLOWING as well: neither link may be inside the control.
+      expect(button.contains(terms)).toBe(false);
+      expect(button.contains(refund)).toBe(false);
+      expect(precedesInDocumentOrder(button, terms)).toBe(false);
+      expect(precedesInDocumentOrder(button, refund)).toBe(false);
+    }
+  );
+
+  it.each(LOCALES)(
+    "locale %s — the same order holds on S-06, where the control is the CONFIRM one",
+    async (locale) => {
+      // AC-039's other half: `checkout/page.tsx` composes C-13, then C-04b, then
+      // C-15 as three siblings, and the reading order is the requirement there
+      // too. Delete `<LegalLinks />` from that page and this is what goes red.
+      const { container } = await renderCheckoutRoute({
+        locale,
+        order: String(FIXTURE_ORDER_PENDING.orderCode),
+      });
+      const { terms, refund } = legalLinks(container);
+      const confirm = confirmButton(container, locale);
+
+      expect(precedesInDocumentOrder(terms, confirm)).toBe(true);
+      expect(precedesInDocumentOrder(refund, confirm)).toBe(true);
+      expect(precedesInDocumentOrder(confirm, terms)).toBe(false);
+    }
+  );
+});
+
+// =============================================================================
+// (b) the navigation carries the SAME order identifier the action produced
+// =============================================================================
+
+describe("FE-1 (b) activating the purchase control lands on S-06 for THAT order", () => {
+  it.each(LOCALES)(
+    "locale %s — the URL is /pricing/checkout?order={the stub's own orderCode}",
+    async (locale) => {
+      const { container } = await renderPricingRoute({ locale, canPurchase: true });
+      stubs.setCreateOrderResponse(FIXTURE_ORDER_PENDING);
+      const button = purchaseButton(container, locale);
+
+      button.focus();
+      await act(async () => {
+        button.click();
+      });
+
+      // Exactly one order created, exactly one navigation. A second of either is
+      // its own bug and neither is visible to a "did it navigate" assertion.
+      expect(stubs.createOrderCallCount).toBe(1);
+      expect(pushMock).toHaveBeenCalledTimes(1);
+
+      const pushed: unknown = pushMock.mock.calls[0]?.[0];
+      if (typeof pushed !== "string") {
+        throw new Error(`FE-1: router.push was called with ${JSON.stringify(pushed)}, not a URL string`);
+      }
+      // IDENTITY, not shape. `fixtureCheckoutRoute()` is the fixture module's own
+      // builder, so this compares against the value the STUB was configured with.
+      // The mutant this rejects is a locale-formatted code
+      // (`orderCode.toLocaleString()` -> "1,755,518,400,001"), which is
+      // well-formed-looking and lands the buyer on the Empty state.
+      expect(pushed).toBe(fixtureCheckoutRoute(FIXTURE_ORDER_PENDING.orderCode));
+      expect(pushed).toContain(String(FIXTURE_ORDER_PENDING.orderCode));
+    }
+  );
+
+  it("THE ROUNDTRIP: the value the CTA navigated with, parsed by the REAL S-06 route, resolves to that same order", async () => {
+    const pricing = await renderPricingRoute({ locale: "en", canPurchase: true });
+    stubs.setCreateOrderResponse(FIXTURE_ORDER_PENDING);
+    await act(async () => {
+      purchaseButton(pricing.container, "en").click();
+    });
+
+    const pushed: unknown = pushMock.mock.calls[0]?.[0];
+    if (typeof pushed !== "string") throw new Error("FE-1: nothing was navigated to");
+    // The consumer's own view of the producer's output: the query string is read
+    // exactly as a browser would hand it to Next, and NOTHING here parses the
+    // order code — `parseOrderCode()` in `checkout/page.tsx` does, for real.
+    const url = new URL(pushed, "https://fixture.invalid");
+    expect(url.pathname).toBe("/pricing/checkout");
+    const raw = url.searchParams.get("order");
+    if (raw === null) throw new Error("FE-1: the navigation carried no ?order= parameter");
+    cleanup();
+
+    const checkout = await renderCheckoutRoute({ locale: "en", order: raw });
+
+    // 1. THE READ HAPPENED, EXACTLY ONCE, WITH THE PRODUCER'S OWN VALUE. This is
+    //    the roundtrip identity: a NUMBER equal to the `orderCode` `createOrder()`
+    //    resolved with. A well-formed-but-different digit string fails here, and
+    //    a code the accept-list rejects produces ZERO calls (the negative
+    //    controls below hold both ends).
+    expect(getMyOrderMock).toHaveBeenCalledTimes(1);
+    expect(getMyOrderMock.mock.calls[0][0]).toBe(FIXTURE_ORDER_PENDING.orderCode);
+    // A number, not a numeric string: `getMyOrder(orderCode)` queries a bigint
+    // column, and `"123"` would compare differently at the boundary it crosses.
+    expect(typeof getMyOrderMock.mock.calls[0][0]).toBe("number");
+
+    // 2. AND THAT ORDER IS WHAT RENDERED — the screen is not the Empty state,
+    //    and the code ON THE ORDER-CODE LINE is the one the purchase produced,
+    //    RAW. Read off C-13's own `select-all` span rather than off the page
+    //    text: measured, a page-wide `toContain` is satisfied by the MEMO, which
+    //    carries the same digits, so a C-13 that printed the code
+    //    locale-formatted ("9,007,199,254,740,991" — the value the user reads out
+    //    to support, UI-D13) survived that reading and is killed by this one.
+    const main = mainOf(checkout.container);
+    const codeLines = main.querySelectorAll("span.select-all");
+    if (codeLines.length !== 1) {
+      throw new Error(`FE-1: expected exactly one order-code line on S-06, found ${codeLines.length}`);
+    }
+    expect(codeLines[0].textContent).toBe(String(FIXTURE_ORDER_PENDING.orderCode));
+    expect(main.textContent ?? "").not.toContain(NO_ACTIVE_ORDER.en);
+    expect(transferPairs(checkout.container).values).toEqual(
+      expectedTransferValues(FIXTURE_ORDER_PENDING, "en")
+    );
+  });
+
+  it("NEGATIVE CONTROL: a well-formed but DIFFERENT code reaches the Empty state, so (b) measures the value", async () => {
+    const { container } = await renderCheckoutRoute({ locale: "en", order: UNKNOWN_BUT_WELL_FORMED });
+
+    // It passed the accept-list — the read really was attempted with it…
+    expect(getMyOrderMock).toHaveBeenCalledTimes(1);
+    expect(getMyOrderMock.mock.calls[0][0]).toBe(Number(UNKNOWN_BUT_WELL_FORMED));
+    // …and resolved to nothing, which is C-13's Empty state. So "we landed on
+    // the checkout page" is NOT the same claim as "we landed on OUR order", and
+    // the roundtrip case above is measuring the difference.
+    expect(mainOf(container).textContent ?? "").toContain(NO_ACTIVE_ORDER.en);
+    expect(mainOf(container).querySelectorAll("dl")).toHaveLength(0);
+  });
+
+  it("NEGATIVE CONTROL: a grouped code — the `toLocaleString()` mutant's output — is refused with ZERO reads", async () => {
+    // `(1755518400001).toLocaleString("en-GB")` is "1,755,518,400,001". This is
+    // the exact string the mutant plants, read here through the real accept-list:
+    // `Number("1,000")` is NaN, so it is the REGEX that stops it, before any
+    // read. Zero reads is the security half of the rule, not an optimisation.
+    const { container } = await renderCheckoutRoute({
+      locale: "en",
+      order: FIXTURE_ORDER_PENDING.orderCode.toLocaleString("en-GB"),
+    });
+    expect(getMyOrderMock).not.toHaveBeenCalled();
+    expect(mainOf(container).textContent ?? "").toContain(NO_ACTIVE_ORDER.en);
+  });
+
+  it("A DOUBLE ACTIVATION CREATES ONE ORDER, AND NAVIGATES ONCE", async () => {
+    const { container } = await renderPricingRoute({ locale: "en", canPurchase: true });
+    stubs.setCreateOrderResponse(FIXTURE_ORDER_PENDING);
+    const button = purchaseButton(container, "en");
+
+    // The hold keeps the first call outstanding, so the second activation lands
+    // INSIDE the window `busyRef` exists for. Without it the guard has nothing to
+    // suppress and the count is decided by microtask timing instead.
+    holdNextCreateOrder();
+    await act(async () => {
+      button.click();
+      button.click();
+    });
+
+    // A COUNT, not "it was called". On money, the second call is a second order
+    // and a second amount the user is asked to transfer. A latch written in state
+    // reads the PREVIOUS render's value and lets this through.
+    expect(stubs.createOrderCallCount).toBe(1);
+    // And nothing has navigated yet: the route is entered only once an orderCode
+    // exists, never optimistically.
+    expect(pushMock).not.toHaveBeenCalled();
+
+    await act(async () => {
+      releaseHeldCreateOrder();
+    });
+    expect(stubs.createOrderCallCount).toBe(1);
+    expect(pushMock).toHaveBeenCalledTimes(1);
+    expect(pushMock.mock.calls[0][0]).toBe(fixtureCheckoutRoute(FIXTURE_ORDER_PENDING.orderCode));
+
+    // THE LATCH IS NOT RELEASED AFTER A SUCCESS, deliberately (PurchaseCta,
+    // rule 4): the navigation is out and this screen is on its way off. Releasing
+    // here would re-open a click-again window on the money path.
+    await act(async () => {
+      button.click();
+    });
+    expect(stubs.createOrderCallCount).toBe(1);
+    expect(pushMock).toHaveBeenCalledTimes(1);
+  });
+
+  // BOTH LOCALES: `PurchaseCta`'s `ERROR_KEY` table maps four refusal codes onto
+  // dictionary keys, and an `en`-only reading leaves the `vi` half of C-03's
+  // error state unasserted anywhere in this lane — a key that resolved in `en`
+  // and fell through in `vi` would ship.
+  it.each(LOCALES)(
+    "locale %s — A FAILED CREATE NAVIGATES ZERO TIMES, SAYS SO, AND RELEASES THE LATCH",
+    async (locale) => {
+      const { container } = await renderPricingRoute({ locale, canPurchase: true });
+      expect(alertsInside(mainOf(container))).toHaveLength(0);
+      createOrderFailure = { error: "rate_limited" };
+      const button = purchaseButton(container, locale);
+
+      await act(async () => {
+        button.click();
+      });
+
+      expect(stubs.createOrderCallCount).toBe(1);
+      // THE CLAIM: no navigation on a refusal. A CTA that navigated optimistically
+      // would send the buyer to an Empty checkout screen and leave them believing
+      // an order exists.
+      expect(pushMock).not.toHaveBeenCalled();
+
+      // The refusal is READABLE, and asserted on TEXT — `RATE_LIMITED` is FE-3's
+      // literal for the same dictionary key, reused rather than duplicated. A
+      // `role="alert"` node carrying the wrong sentence passes every "an alert
+      // appeared" assertion.
+      const alerts = alertsInside(mainOf(container));
+      expect(alerts).toHaveLength(1);
+      expect(alerts[0].textContent).toBe(RATE_LIMITED[locale]);
+      expect(alerts[0].hasAttribute("aria-live")).toBe(false);
+
+      // THE LATCH RELEASED. A lock that never opens leaves the control dead for the
+      // rest of the session — the user cannot retry a transient rate limit, which
+      // is the one error class that clears by itself.
+      createOrderFailure = null;
+      await act(async () => {
+        button.click();
+      });
+      expect(stubs.createOrderCallCount).toBe(2);
+      expect(pushMock).toHaveBeenCalledTimes(1);
+    }
+  );
+});
+
+// =============================================================================
+// (c) the four <dl> pairs, with the fixture's exact values and a grouped amount
+// =============================================================================
+
+describe("FE-1 (c) S-06 renders all four transfer pairs, byte for byte", () => {
+  it.each(LOCALES)("locale %s — four <dt>/<dd> pairs, exact values, grouped amount", async (locale) => {
+    const { container } = await renderCheckoutRoute({
+      locale,
+      order: String(FIXTURE_ORDER_PENDING.orderCode),
+    });
+    const { terms, values, pairs } = transferPairs(container);
+
+    // FOUR PAIRS, structurally: a `<dd>` count of four is not the same as four
+    // PAIRS, and a dangling `<dt>` is how a label loses its value.
+    expect(pairs).toHaveLength(4);
+    for (const pair of pairs) {
+      const dt = pair.querySelectorAll("dt");
+      const dd = pair.querySelectorAll("dd");
+      expect(dt).toHaveLength(1);
+      expect(dd).toHaveLength(1);
+      expect(precedesInDocumentOrder(dt[0], dd[0])).toBe(true);
+      // A blank-but-present `<dd>` passes every presence assertion, and it is
+      // the exact failure AC-028 exists to prevent.
+      expect((dd[0].textContent ?? "").trim().length).toBeGreaterThan(0);
+    }
+
+    expect(terms).toEqual([...TRANSFER_TERMS[locale]]);
+    // THE VALUES THE FIXTURE SUPPLIED, in structure order, byte for byte.
+    expect(values).toEqual(expectedTransferValues(FIXTURE_ORDER_PENDING, locale));
+
+    // The amount, stated separately because it is the one value C-14 PRODUCES:
+    // grouped, and never the raw integer beside a banking app that groups.
+    expect(values[2]).toBe(AMOUNT_TEXT[locale]);
+    expect(values[2]).not.toContain(String(FIXTURE_AMOUNT_VND));
+
+    // AC-028's "selectable text": the three fields a user must copy into a
+    // banking app carry `select-all`. Structural — jsdom selects nothing — and
+    // it is the precondition of the painted behaviour, not the behaviour.
+    const dds = Array.from(mainOf(container).querySelectorAll("dd"));
+    for (const index of [0, 2, 3]) {
+      expect(dds[index].getAttribute("class") ?? "").toContain("select-all");
+    }
+  });
+});
+
+// =============================================================================
+// (d) with `qrPayload` ABSENT the four pairs still render and the screen stays
+//     completable
+// =============================================================================
+
+describe("FE-1 (d) the transfer block is not coupled to the QR", () => {
+  it.each(LOCALES)("locale %s — no payload, still four pairs and still payable", async (locale) => {
+    const { container } = await renderCheckoutRoute({
+      locale,
+      order: String(FIXTURE_ORDER_PENDING_NO_QR.orderCode),
+    });
+    const { terms, values, pairs } = transferPairs(container);
+
+    // THE CLAIM: the four pairs survive the missing payload, with THIS fixture's
+    // own values (its memo carries its own code — the two orders differ in
+    // exactly the field under test plus the identity). The mutant this rejects is
+    // a C-13 that renders C-14 only when `qrPayload` is non-empty, which leaves
+    // nothing on the screen to pay from.
+    expect(pairs).toHaveLength(4);
+    expect(terms).toEqual([...TRANSFER_TERMS[locale]]);
+    expect(values).toEqual(expectedTransferValues(FIXTURE_ORDER_PENDING_NO_QR, locale));
+    expect(values[3]).toContain(String(FIXTURE_ORDER_PENDING_NO_QR.orderCode));
+
+    // STILL COMPLETABLE: the order code is readable, the legal pair is there and
+    // the confirm control is mounted. "Completable" is not "the pairs exist".
+    //
+    // Read off C-13's OWN `select-all` span, the same scoped read the roundtrip
+    // case uses. Measured: a page-wide `toContain` is satisfied by the MEMO
+    // asserted two lines above — it carries the same digits — so a C-13 that
+    // rendered the order-code line only when `qrPayload` is non-empty survived
+    // that reading, and with it the whole repository suite. On this screen the
+    // identifier would then exist only inside a transfer note, which is not the
+    // sense of "completable from text alone" AC-028 means.
+    const codeLines = mainOf(container).querySelectorAll("span.select-all");
+    if (codeLines.length !== 1) {
+      throw new Error(`FE-1(d): expected exactly one order-code line, found ${codeLines.length}`);
+    }
+    expect(codeLines[0].textContent).toBe(String(FIXTURE_ORDER_PENDING_NO_QR.orderCode));
+    expect(mainOf(container).textContent ?? "").not.toContain(NO_ACTIVE_ORDER[locale]);
+    legalLinks(container);
+    confirmButton(container, locale);
+  });
+
+  it("HONEST LIMIT, MEASURED: C-12 renders nothing for EITHER fixture today, so the QR's absence is not the discriminator", async () => {
+    // ADR-0018 (BU-2) is open, so `encodeQrMatrix()` returns null unconditionally
+    // and BOTH screens render zero QR nodes. Recording that here, as an
+    // assertion, keeps anyone from later reading "no <svg> on the no-QR screen"
+    // as evidence of anything: it is equally true of the screen WITH a payload.
+    // What (d) actually measures is the pairs' survival, above.
+    const withQr = await renderCheckoutRoute({
+      locale: "en",
+      order: String(FIXTURE_ORDER_PENDING.orderCode),
+    });
+    expect(mainOf(withQr.container).querySelectorAll('svg[role="img"]')).toHaveLength(0);
+    const withQrPairs = transferPairs(withQr.container).values.length;
+    cleanup();
+
+    const withoutQr = await renderCheckoutRoute({
+      locale: "en",
+      order: String(FIXTURE_ORDER_PENDING_NO_QR.orderCode),
+    });
+    expect(mainOf(withoutQr.container).querySelectorAll('svg[role="img"]')).toHaveLength(0);
+    // Same COUNT of pairs on both screens — the values differ by design (code and
+    // memo), so the fixture module's own instruction is followed: assert each
+    // screen against ITS OWN values, and compare only what must not differ.
+    expect(transferPairs(withoutQr.container).values).toHaveLength(withQrPairs);
+  });
+});
+
+// =============================================================================
+// (e) the legal gate is CLOSED: inert, focusable, and nothing happens
+// =============================================================================
+
+describe("FE-1 (e) `legalContentReady === false` leaves an inert but reachable confirm control", () => {
+  it.each(LOCALES)("locale %s — aria-disabled, no native disabled, Tab-reachable, no action", async (locale) => {
+    const { container } = await renderCheckoutRoute({
+      locale,
+      order: String(FIXTURE_ORDER_PENDING.orderCode),
+    });
+    const main = mainOf(container);
+    const button = confirmButton(container, locale);
+    const orderCode = FIXTURE_ORDER_PENDING.orderCode;
+
+    // IT IS THE GATED CONTROL, not C-10 under the same label. Both render the
+    // SAME string (`billing.confirm.action`), so the label cannot tell them
+    // apart; `aria-describedby` can, and the absence of C-10's own control on a
+    // payable screen is the other half of the same statement.
+    expect(button.getAttribute("aria-describedby")).toBe(`confirm-${orderCode}-legal`);
+    expect(main.querySelectorAll(`button[aria-describedby="recheck-${orderCode}-reason"]`)).toHaveLength(0);
+
+    // ANNOUNCED, NOT REMOVED — both readings, because the attribute and the
+    // property are set by different mistakes and either drops the control out of
+    // the tab order, which is precisely where the person who needs to READ the
+    // reason cannot reach it.
+    expect(button.getAttribute("aria-disabled")).toBe("true");
+    expect(button.hasAttribute("disabled")).toBe(false);
+    expect(button.disabled).toBe(false);
+
+    // TAB-REACHABLE.
+    const tabindex = button.getAttribute("tabindex");
+    expect(tabindex === null || Number(tabindex) >= 0).toBe(true);
+    button.focus();
+    expect(container.ownerDocument.activeElement).toBe(button);
+
+    // THE REASON IS THE LEGAL ONE, and it is VISIBLE — not `sr-only`. A sighted
+    // user looking at a control that does nothing needs the sentence too.
+    const reason = main.querySelector(`#confirm-${orderCode}-legal`);
+    if (!reason) throw new Error("FE-1: the legal-gate reason node is missing");
+    expect(reason.textContent).toBe(LEGAL_PENDING_REASON[locale]);
+    expect(reason.getAttribute("class") ?? "").not.toContain("sr-only");
+
+    // ACTIVATION DOES NOTHING. `aria-disabled` only announces — it does not stop
+    // a DOM click — so the inertness has to be measured, not inferred from the
+    // attribute that claims it.
+    const before = main.innerHTML;
+    await act(async () => {
+      button.click();
+      button.click();
+    });
+    expect(pushMock).not.toHaveBeenCalled();
+    expect(stubs.createOrderCallCount).toBe(0);
+    expect(recheckOrderMock).not.toHaveBeenCalled();
+    expect(alertsInside(main)).toHaveLength(0);
+    expect(main.innerHTML).toBe(before);
+  });
+});
+
+// =============================================================================
+// (f) `canPurchase === false`: no navigation, and a readable reason
+// =============================================================================
+
+describe("FE-1 (f) the release gate holds the purchase control closed", () => {
+  it.each(LOCALES)("locale %s — inert with a readable reason, and ZERO navigations", async (locale) => {
+    const { container } = await renderPricingRoute({ locale, canPurchase: false });
+    const main = mainOf(container);
+    const button = purchaseButton(container, locale);
+
+    expect(button.getAttribute("aria-disabled")).toBe("true");
+    expect(button.hasAttribute("disabled")).toBe(false);
+    expect(button.disabled).toBe(false);
+    button.focus();
+    expect(container.ownerDocument.activeElement).toBe(button);
+
+    // THE READABLE REASON, bound to the control so a screen reader announces it
+    // with the button rather than as a stray paragraph.
+    const reasonId = button.getAttribute("aria-describedby");
+    expect(reasonId).toBe("billing-cta-reason");
+    const reason = main.querySelector(`#${reasonId}`);
+    if (!reason) throw new Error("FE-1: the unavailable reason node is missing");
+    expect(reason.textContent).toBe(UNAVAILABLE_REASON[locale]);
+
+    await act(async () => {
+      button.click();
+      button.click();
+    });
+
+    // FAIL-CLOSED: no order, no navigation, and no error node either — nothing
+    // happened, so nothing is announced.
+    expect(stubs.createOrderCallCount).toBe(0);
+    expect(pushMock).not.toHaveBeenCalled();
+    expect(alertsInside(main)).toHaveLength(0);
+  });
+
+  it("POSITIVE CONTROL: the same harness DOES navigate when the gate is open", async () => {
+    // Without this, "no navigation" is satisfied by a harness in which nothing
+    // could ever navigate — a click that never reaches a handler, a control that
+    // never mounted, a `pushMock` wired to nothing. Measured against the same
+    // render path, one flag apart.
+    const { container } = await renderPricingRoute({ locale: "en", canPurchase: true });
+    const button = purchaseButton(container, "en");
+    expect(button.getAttribute("aria-disabled")).toBe("false");
+    expect(button.hasAttribute("aria-describedby")).toBe(false);
+    stubs.setCreateOrderResponse(FIXTURE_ORDER_PENDING);
+    await act(async () => {
+      button.click();
+    });
+    expect(stubs.createOrderCallCount).toBe(1);
+    expect(pushMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+// =============================================================================
+// (g) 360px — zero horizontal overflow, MEASURED
+// =============================================================================
+// WHAT THIS IS AND WHAT IT IS NOT, stated before the code because the difference
+// decides how much the numbers below are worth. jsdom performs NO layout:
+// `scrollWidth`, `clientWidth` and `getBoundingClientRect()` are all zero here,
+// so `driver.horizontalOverflowPx()` — the browser reading the fixture module
+// specifies — has no in-process equivalent. Eyeballing the markup instead is
+// exactly what the frontend DD's R-6 forbids, so item (g) is discharged as a
+// MODEL: an explicit, stated, deterministic upper-bound width computation over
+// the rendered DOM, run at a 360px viewport, plus the structural precondition
+// that no character model can see. Its own positive control is below it; the
+// PAINTED check remains the manual browser pass (plan Task 6.5).
+
+/** Tailwind's spacing unit, in CSS px. */
+const SPACING_PX = 4;
+const VIEWPORT_360 = 360;
+const ROOT_FONT_SIZE_PX = 16;
+
+/** Only UNPREFIXED utilities apply at 360px: `md:flex-row`, `md:px-6` and every
+ *  other variant is inert at this width, and counting them would model a layout
+ *  that is not the one being measured. */
+function baseClasses(el: Element): string[] {
+  return (el.getAttribute("class") ?? "").split(/\s+/).filter((cls) => cls.length > 0 && !cls.includes(":"));
+}
+
+const FONT_SIZE_PX: Record<string, number> = {
+  "text-xs": 12,
+  "text-sm": 14,
+  "text-base": 16,
+  "text-lg": 18,
+  "text-xl": 20,
+  "text-2xl": 24,
+  "text-3xl": 30,
+};
+
+/** UPPER BOUNDS, not averages. 0.6em is the advance width of every glyph in a
+ *  monospace face; 0.62em is a deliberate over-estimate for the widest glyphs a
+ *  proportional face renders at these sizes (digits and capitals). Over-estimating
+ *  is the safe direction: it can only make this measurement flag MORE, never
+ *  fewer, overflows. */
+const MONO_CHAR_EM = 0.6;
+const PROPORTIONAL_CHAR_EM = 0.62;
+
+function ancestorsWithin(el: Element, root: Element): Element[] {
+  const chain: Element[] = [];
+  let node: Element | null = el;
+  while (node) {
+    chain.push(node);
+    if (node === root) break;
+    node = node.parentElement;
+  }
+  return chain;
+}
+
+function hasClassUpwards(el: Element, root: Element, pattern: RegExp): boolean {
+  return ancestorsWithin(el, root).some((node) => baseClasses(node).some((cls) => pattern.test(cls)));
+}
+
+/** `p-N` / `px-N` / `pl-N` / `pr-N`, summed as CSS px on BOTH sides. */
+function horizontalPaddingPx(el: Element): number {
+  let total = 0;
+  for (const cls of baseClasses(el)) {
+    const all = /^p-(\d+)$/.exec(cls);
+    if (all) total += Number(all[1]) * SPACING_PX * 2;
+    const axis = /^px-(\d+)$/.exec(cls);
+    if (axis) total += Number(axis[1]) * SPACING_PX * 2;
+    const side = /^p([lr])-(\d+)$/.exec(cls);
+    if (side) total += Number(side[2]) * SPACING_PX;
+  }
+  return total;
+}
+
+function availableWidthPx(el: Element, root: Element): number {
+  let width = VIEWPORT_360;
+  for (const node of ancestorsWithin(el, root)) width -= horizontalPaddingPx(node);
+  return width;
+}
+
+function fontSizePx(el: Element, root: Element): number {
+  for (const node of ancestorsWithin(el, root)) {
+    for (const cls of baseClasses(node)) {
+      const size = FONT_SIZE_PX[cls];
+      if (size !== undefined) return size;
+    }
+  }
+  return ROOT_FONT_SIZE_PX;
+}
+
+/** The longest run of characters that CANNOT be broken across lines: one
+ *  character where a break-anywhere utility applies, the whole string where
+ *  wrapping is switched off, and the longest whitespace-delimited token
+ *  otherwise (normal wrapping breaks at spaces and nowhere else). */
+function longestUnbreakableRun(text: string, breakable: boolean, nowrap: boolean): string {
+  const trimmed = text.trim();
+  if (trimmed === "") return "";
+  if (nowrap) return trimmed;
+  if (breakable) return trimmed.slice(0, 1);
+  return trimmed.split(/\s+/).reduce((widest, token) => (token.length > widest.length ? token : widest), "");
+}
+
+interface WidthMeasurement {
+  overflowPx: number;
+  runs: Array<{ text: string; widthPx: number; availablePx: number }>;
+}
+
+/**
+ * The widest unbreakable run in every text-bearing element under `root`, against
+ * the width actually available to it at 360px.
+ *
+ * Two known under-estimates, recorded rather than hidden: flex GAPS between
+ * siblings are ignored (at 360px this feature's rows are stacked — every
+ * `flex-row` in it is `md:`-prefixed), and two text nodes joined by an inline
+ * element are measured separately (an inline join without whitespace would be
+ * one longer run). Both make this reading more permissive, never less, so a
+ * ZERO here is a weaker statement than a browser's zero — which is why the
+ * structural check and the manual pass both stay.
+ */
+function measureHorizontalOverflow(root: HTMLElement): WidthMeasurement {
+  const runs: WidthMeasurement["runs"] = [];
+  let overflowPx = 0;
+  for (const el of Array.from(root.querySelectorAll("*"))) {
+    const own = Array.from(el.childNodes)
+      .filter((node) => node.nodeType === 3)
+      .map((node) => node.textContent ?? "");
+    if (own.length === 0) continue;
+    const breakable = hasClassUpwards(el, root, /^(break-all|break-words|wrap-anywhere|break-anywhere)$/);
+    const nowrap = hasClassUpwards(el, root, /^whitespace-nowrap$/);
+    const mono = hasClassUpwards(el, root, /^font-mono$/);
+    const size = fontSizePx(el, root);
+    const available = availableWidthPx(el, root);
+    for (const text of own) {
+      const run = longestUnbreakableRun(text, breakable, nowrap);
+      if (run === "") continue;
+      const widthPx = run.length * size * (mono ? MONO_CHAR_EM : PROPORTIONAL_CHAR_EM);
+      runs.push({ text: run, widthPx, availablePx: available });
+      overflowPx = Math.max(overflowPx, widthPx - available);
+    }
+  }
+  return { overflowPx: Math.max(0, overflowPx), runs };
+}
+
+describe("FE-1 (g) S-06 does not overflow horizontally at 360px", () => {
+  it("the payable screen, with a MAX_SAFE_INTEGER order code beside the amount", async () => {
+    const { container } = await renderCheckoutRoute({
+      locale: "en",
+      order: String(BIGINT_ORDER_CODE),
+      orders: [FE1_ORDER_BIGINT],
+    });
+    const main = mainOf(container);
+    // The screen really is the one item (g) is about: the bigint code rendered,
+    // and the amount beside it. Measuring a screen that fell back to the Empty
+    // state would report a comfortable zero about nothing.
+    expect(main.textContent ?? "").toContain(String(BIGINT_ORDER_CODE));
+    expect(transferPairs(container).values[2]).toBe(AMOUNT_TEXT.en);
+
+    const measured = measureHorizontalOverflow(main);
+    // The walk actually reached the value under test.
+    expect(measured.runs.some((run) => run.text.includes(String(BIGINT_ORDER_CODE)))).toBe(true);
+    expect(measured.runs.length).toBeGreaterThan(4);
+    // …and the padding model is not silently zero — every run is measured against
+    // less than the full viewport.
+    expect(Math.max(...measured.runs.map((run) => run.availablePx))).toBeLessThan(VIEWPORT_360);
+
+    expect(measured.overflowPx).toBe(0);
+    // DETERMINISTIC: the same DOM measured twice gives the same number. Nothing
+    // in this model reads a clock, a random source or a layout engine.
+    expect(measureHorizontalOverflow(main).overflowPx).toBe(measured.overflowPx);
+  });
+
+  it("the terminal screen, with the same bigint code beside C-09's badge", async () => {
+    const { container } = await renderCheckoutRoute({
+      locale: "en",
+      order: String(BIGINT_ORDER_CODE),
+      orders: [FE1_ORDER_BIGINT_PAID],
+    });
+    const main = mainOf(container);
+    // C-09's badge only renders on the non-payable branch, and the `<dl>` only on
+    // the payable one — so "beside an amount AND a badge" is two measurements.
+    expect(main.querySelectorAll("dl")).toHaveLength(0);
+    expect(main.textContent ?? "").toContain(String(BIGINT_ORDER_CODE));
+    // THE BADGE IS MATERIALISED, not assumed — the sibling payable case guards
+    // the same way on the amount before measuring. `badgeTextIn()` is FE-3's
+    // reading of C-09 (one `<span>` whose first child is the `aria-hidden`
+    // glyph), reused rather than duplicated; it throws when the count is not
+    // one, so a C-13 that dropped the badge cannot reach the measurement below.
+    expect(badgeTextIn(main).word).toBe(PAID_STATUS_WORD.en);
+
+    const measured = measureHorizontalOverflow(main);
+    expect(measured.runs.some((run) => run.text.includes(String(BIGINT_ORDER_CODE)))).toBe(true);
+    expect(measured.overflowPx).toBe(0);
+  });
+
+  it("POSITIVE CONTROL: the measurement reports overflow when there is some", async () => {
+    // Without this the two zeros above are indistinguishable from a function that
+    // returns zero for everything. A 60-character unbreakable token in a
+    // 16px monospace face is 576px wide against ~272px of room inside the card.
+    const { container } = await renderCheckoutRoute({
+      locale: "en",
+      order: String(BIGINT_ORDER_CODE),
+      orders: [FE1_ORDER_BIGINT],
+    });
+    const main = mainOf(container);
+    expect(measureHorizontalOverflow(main).overflowPx).toBe(0);
+
+    const planted = document.createElement("p");
+    planted.setAttribute("class", "font-mono text-base");
+    planted.textContent = "W".repeat(60);
+    const card = main.querySelector("section");
+    if (!card) throw new Error("FE-1: S-06 rendered no <section> to plant into");
+    card.append(planted);
+    const withPlant = measureHorizontalOverflow(main);
+    expect(withPlant.overflowPx).toBeGreaterThan(0);
+
+    planted.remove();
+    expect(measureHorizontalOverflow(main).overflowPx).toBe(0);
+  });
+
+  it("the structural precondition no character model can see: the text column is `min-w-0`", async () => {
+    // A flex ITEM defaults to `min-width: auto`, so it refuses to shrink below its
+    // content and pushes the row wider than the viewport — an overflow produced by
+    // the BOX, not by any glyph, and therefore invisible to the measurement above.
+    // `TransferDetails` carries `min-w-0` on its root and on each pair for exactly
+    // that reason (`PaymentPanel.tsx`: "min-w-0 on the text column because the
+    // transfer note is the overflow candidate measured at 360px").
+    const { container } = await renderCheckoutRoute({
+      locale: "en",
+      order: String(BIGINT_ORDER_CODE),
+      orders: [FE1_ORDER_BIGINT],
+    });
+    const { pairs } = transferPairs(container);
+    for (const pair of pairs) {
+      expect(baseClasses(pair)).toContain("min-w-0");
+    }
+    const column = transferPairs(container).pairs[0].parentElement?.parentElement;
+    if (!column) throw new Error("FE-1: the C-14 text column is missing");
+    expect(baseClasses(column)).toContain("min-w-0");
+
+    // And the two longest copyable strings can break mid-token at all: without a
+    // break utility the account number and the memo are single unbreakable runs,
+    // which is the condition the measurement above turns into a number.
+    const dds = Array.from(mainOf(container).querySelectorAll("dd"));
+    expect(dds[0].getAttribute("class") ?? "").toContain("break-all");
+    expect(dds[3].getAttribute("class") ?? "").toContain("break-all");
   });
 });
