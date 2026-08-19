@@ -571,6 +571,21 @@ export const vi: Dictionary = {
   "billing.quota.remaining": "Đã dùng {used}/{limit} lượt gia sư trong kỳ này.",
   "billing.quota.upgradeLink": "Xem các gói",
 
+  // --- S-05 /me/orders + C-09 OrderStatusBadge — xem chú thích trong en.ts --
+  "billing.amount": "{amount} VNĐ",
+  "billing.orders.title": "Đơn hàng của bạn",
+  "billing.orders.empty": "Bạn chưa đặt đơn nào.",
+  "billing.orders.emptyHint": "Đơn sẽ hiện ở đây ngay khi bạn mua một kỳ Premium.",
+  "billing.orders.createdAt": "Tạo lúc",
+  "billing.orders.orderCode": "Mã đơn",
+  "billing.orders.continuePaying": "Tiếp tục thanh toán",
+  "billing.orders.loadError": "Chưa tải được danh sách đơn của bạn. Bạn thử lại nhé.",
+  "billing.status.pending": "Chờ thanh toán",
+  "billing.status.paid": "Đã thanh toán",
+  "billing.status.expired": "Hết hiệu lực",
+  "billing.status.cancelled": "Đã huỷ",
+  "billing.status.unrecognised": "Không xác định",
+
   // /profile — xem chú thích tương ứng trong en.ts.
   "profile.error.sessionExpired": "Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.",
   "profile.error.rateLimited": "Thao tác quá nhiều lần. Thử lại sau {seconds} giây.",

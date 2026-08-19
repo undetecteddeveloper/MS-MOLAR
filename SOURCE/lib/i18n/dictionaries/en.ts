@@ -622,6 +622,29 @@ export const en = {
   "billing.quota.remaining": "{used}/{limit} tutor hints used this period.",
   "billing.quota.upgradeLink": "See plans",
 
+  // --- S-05 /me/orders + C-09 OrderStatusBadge (UI-D13 / UI-D15) -----------
+  // `{amount}` ở đây ĐÃ LÀ CHUỖI, do formatVnd() dựng xong trước khi t() thay
+  // tham số: translate.ts:27 thay bằng String() thô, nên truyền số 39000 vào
+  // sẽ in "39000 VND" ngay cạnh một mã QR mang "39.000 VNĐ" — hai con số khác
+  // nhau trên màn hình thanh toán là chỗ người dùng dừng trả tiền.
+  "billing.amount": "{amount} VND",
+  "billing.orders.title": "Your orders",
+  "billing.orders.empty": "You have not placed an order yet.",
+  "billing.orders.emptyHint": "An order appears here as soon as you buy a Premium period.",
+  "billing.orders.createdAt": "Created",
+  "billing.orders.orderCode": "Order code",
+  "billing.orders.continuePaying": "Continue paying",
+  "billing.orders.loadError": "We could not load your orders just now. Try again.",
+  // Năm chữ của C-09. CHỮ mang nghĩa, màu chỉ là kênh phụ — nên bốn giá trị
+  // schema cho phép cộng nhánh KHÔNG NHẬN RA phải khác nhau từng chữ một.
+  // Không có "refunded": hoàn tiền là thao tác ngân hàng cộng một câu SQL sửa
+  // tay, schema không có trạng thái đó (payment_orders CHECK).
+  "billing.status.pending": "Awaiting payment",
+  "billing.status.paid": "Paid",
+  "billing.status.expired": "Expired",
+  "billing.status.cancelled": "Cancelled",
+  "billing.status.unrecognised": "Unrecognised",
+
   // /profile — thông báo lỗi của changeAvatar / changePassword.
   //
   // Server Action trả về KHOÁ, không trả câu chữ của Supabase: thông điệp của
