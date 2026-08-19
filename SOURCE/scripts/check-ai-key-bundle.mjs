@@ -3,12 +3,24 @@
 // Chạy SAU `next build`:  node scripts/check-ai-key-bundle.mjs
 // (script npm: `npm run check:bundle` — build trước rồi check).
 //
-// Phủ 2 bí mật:
+// Phủ các bí mật server-only của repo:
 //   1) GEMINI_API_KEY (UGC v2.0, PRD metric 6) — lib/ugc/gemini.ts.
 //   2) SUPABASE_SERVICE_ROLE_KEY (Security review 2026-08-03 #2) —
 //      lib/supabase/service-role.ts. Key này BYPASS TOÀN BỘ RLS, lộ ra client
 //      là mất sạch mọi tầng bảo vệ của dự án cùng lúc, nên đáng canh gắt hơn cả
 //      AI key (lộ AI key chỉ tốn tiền).
+//   3) SUPPORT_SMTP_APP_PASSWORD (ADR-0012) — lib/mail/.
+//   4) BA THÔNG TIN XÁC THỰC payOS (ADR-0013/ADR-0014, Integration Point I8) —
+//      lib/billing/payos/. `PAYOS_CHECKSUM_KEY` là khoá KÝ: ai cầm nó thì ký
+//      được webhook. ADR-0014 đã hạ giá trị của nó xuống — thân webhook chỉ là
+//      GỢI Ý, `settleOrder()` vẫn hỏi lại payOS trước mỗi lượt ghi — nhưng nó
+//      vẫn cho phép sai khiến server ta gọi ra ngoài, và `PAYOS_API_KEY` thì
+//      nói chuyện trực tiếp được với tài khoản merchant.
+//   5) KV_REST_API_TOKEN (Upstash Redis) — lib/security/rateLimitStore.ts,
+//      lib/billing/readEntitlement.ts. Token này ghi/đọc được toàn bộ store
+//      rate-limit và cache entitlement; lộ ra client là bỏ được mọi hạn mức.
+//      Trước đây nó là bí mật server-only DUY NHẤT không có marker nào — được
+//      thêm cùng lượt với payOS (quét cạnh của plan Task 4.1).
 //
 // Cơ chế: quét .next-build/static (mọi thứ ship xuống browser) tìm giá trị thật
 // của từng key (đọc từ env/.env.local nếu có) + các marker chỉ xuất hiện khi
@@ -66,7 +78,15 @@ const SECRETS = [
     value: read("SUPABASE_SERVICE_ROLE_KEY"),
     // "record_exam_result" là marker rẻ mà chắc: tên RPC này CHỈ xuất hiện
     // trong lib/supabase/service-role.ts, module không bao giờ được xuống client.
-    markers: ["SUPABASE_SERVICE_ROLE_KEY", "record_exam_result"],
+    // "record_payment_settlement" là hàm SQL cùng file — đường DUY NHẤT kéo dài
+    // được entitlement (ADR-0014 Decision 3). Nó đắt hơn hẳn: một client bundle
+    // chứa tên này nghĩa là module cầm khoá bypass-RLS đã đi kèm cả đường ghi
+    // vào tiền.
+    markers: [
+      "SUPABASE_SERVICE_ROLE_KEY",
+      "record_exam_result",
+      "record_payment_settlement",
+    ],
   },
   {
     label: "Support mail SMTP credential (ADR-0012)",
@@ -75,6 +95,32 @@ const SECRETS = [
     // (Node-only, không "use client") — lọt vào bundle là dấu hiệu module
     // server-only bị import nhầm từ client.
     markers: ["SUPPORT_SMTP_APP_PASSWORD", "SUPPORT_SMTP_USER", "nodemailer"],
+  },
+  {
+    label: "payOS checksum key (ADR-0014)",
+    value: read("PAYOS_CHECKSUM_KEY"),
+    // "api-merchant.payos.vn" chơi đúng vai của "generativelanguage.googleapis
+    // .com" ở mục AI key: host này CHỈ được viết ra trong lib/billing/payos/
+    // index.ts, module có `import "server-only"`. Nó bắt được cả ca tệ hơn tên
+    // biến env — một module adapter bị kéo nguyên xuống client.
+    markers: ["PAYOS_CHECKSUM_KEY", "api-merchant.payos.vn"],
+  },
+  {
+    label: "payOS API key (ADR-0013)",
+    value: read("PAYOS_API_KEY"),
+    markers: ["PAYOS_API_KEY"],
+  },
+  {
+    // Không phải bí mật theo nghĩa hẹp, nhưng nó là NỬA CÒN LẠI của cặp xác
+    // thực merchant: có API key mà thiếu client id thì không gọi được gì.
+    label: "payOS client id (ADR-0013)",
+    value: read("PAYOS_CLIENT_ID"),
+    markers: ["PAYOS_CLIENT_ID"],
+  },
+  {
+    label: "Upstash Redis token",
+    value: read("KV_REST_API_TOKEN"),
+    markers: ["KV_REST_API_TOKEN", "KV_REST_API_URL"],
   },
 ];
 
@@ -108,4 +154,6 @@ if (failures > 0) {
   console.error(`\n❌ Server-secret bundle check FAIL (${failures} phát hiện).`);
   process.exit(1);
 }
-console.log("✅ Server-secret bundle check PASS — AI key + service-role key không xuống client.");
+console.log(
+  `✅ Server-secret bundle check PASS — ${SECRETS.length} bí mật server-only không xuống client.`
+);

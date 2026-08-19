@@ -4,8 +4,8 @@
 //
 // Trước Subscription, danh sách chỉ có 3 mục và tất cả đều là đường ĐỌC hoặc
 // đổi mã lấy phiên. Subscription thêm hai đường ĐỌC tĩnh (/terms,
-// /refund-policy) và sẽ thêm một đường GHI — webhook payOS, điểm ghi
-// chưa-đăng-nhập ĐẦU TIÊN của dự án (pha backend, ADR-0014, CHƯA về).
+// /refund-policy) và một đường GHI — webhook payOS, điểm ghi chưa-đăng-nhập
+// ĐẦU TIÊN của dự án (ADR-0014), đã về ở plan Task 4.1.
 //
 // ⚠ CON SỐ ĐƯỢC CANH ĐÃ ĐỔI (ADR-0017): là số mục CHO PHÉP GHI, không phải
 // tổng số mục.
@@ -16,10 +16,10 @@
 // lên 6 TRƯỚC khi webhook về, nên lời khẳng định cũ sẽ được thoả mãn bởi đúng
 // sáu mục SAI — một cổng vẫn xanh trong khi thứ nó canh đã đổi nghĩa.
 //
-// Bất biến thay thế, mạnh hơn: HÔM NAY CÓ ĐÚNG 0 MỤC CHO PHÉP GHI. Webhook
-// payOS sẽ là mục ghi đầu tiên và, khi đó, là duy nhất. Tổng số mục vẫn bị
-// ghim bằng so khớp mảng nguyên văn ngay dưới đây, nhưng chỉ để phát hiện
-// thay đổi ngoài ý muốn — nó không còn mang lời khẳng định bảo mật.
+// Bất biến thay thế, mạnh hơn: CÓ ĐÚNG 1 MỤC CHO PHÉP GHI, và nó là webhook
+// payOS. Tổng số mục vẫn bị ghim bằng so khớp mảng nguyên văn ngay dưới đây,
+// nhưng chỉ để phát hiện thay đổi ngoài ý muốn — nó không còn mang lời khẳng
+// định bảo mật.
 //
 // Hệ quả có chủ đích: thêm một trang công khai chỉ-đọc là thay đổi một dòng
 // bình thường; thêm một đường GHI thì vẫn phải là một quyết định có chủ đích.
@@ -36,10 +36,10 @@ const isPublic = (pathname: string) =>
   PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
 describe("thành phần danh sách", () => {
-  it("hiện có đúng 6 mục — 3 mục nền + 2 trang pháp lý + /about, TẤT CẢ đều chỉ-đọc", () => {
-    // Ghim nguyên văn để cả việc thiếu lẫn việc thừa đều bị bắt. Con số 6 ở
-    // đây KHÔNG phải con số 6 của AC-032: đó là 6-sau-khi-có-webhook, còn đây
-    // là 6-toàn-đường-đọc. Xem khối chú thích đầu file và ADR-0017.
+  it("hiện có đúng 7 mục — 6 đường ĐỌC + đúng 1 đường GHI (webhook payOS)", () => {
+    // Ghim nguyên văn để cả việc thiếu lẫn việc thừa đều bị bắt. Con số 7 ở
+    // đây KHÔNG phải con số 6 của AC-032: /about (ADR-0017) về TRƯỚC webhook,
+    // nên tổng đã lệch khỏi cách đếm cũ. Xem khối chú thích đầu file.
     expect(PUBLIC_PATHS).toEqual([
       "/",
       "/login",
@@ -47,10 +47,11 @@ describe("thành phần danh sách", () => {
       "/terms",
       "/refund-policy",
       "/about",
+      "/api/payments/payos/webhook",
     ]);
   });
 
-  it("KHÔNG mục nào là đường cho phép ghi chưa-đăng-nhập", () => {
+  it("ĐÚNG MỘT mục là đường cho phép ghi chưa-đăng-nhập, và đó là webhook payOS", () => {
     // Đây là bất biến bảo mật thật sự (ADR-0017). Nó không kiểm được bằng cách
     // đọc mảng — một chuỗi không nói lên nó phục vụ GET hay POST — nên danh
     // sách dưới đây là bản kê KHAI BÁO, và việc nó phải khớp toàn bộ mảng
@@ -64,11 +65,15 @@ describe("thành phần danh sách", () => {
       "/about",
     ];
     const WRITE_PATHS: string[] = [
-      // Webhook payOS về đây khi ADR-0014 được viết. Lúc đó: đúng 1 mục.
+      // ADR-0014. Nhận POST không đăng nhập từ payOS và có thể kéo dài
+      // entitlement — nên nó là mục GHI, và là mục GHI duy nhất được phép tồn
+      // tại ở đây. Thêm mục thứ hai vào mảng này cần một ADR mới, không phải
+      // một dòng sửa test.
+      "/api/payments/payos/webhook",
     ];
 
     expect([...READ_ONLY_PATHS, ...WRITE_PATHS].sort()).toEqual([...PUBLIC_PATHS].sort());
-    expect(WRITE_PATHS).toHaveLength(0);
+    expect(WRITE_PATHS).toHaveLength(1);
   });
 
   it("không mục nào chứa dấu chấm", () => {
@@ -119,6 +124,29 @@ describe("ngữ nghĩa khớp — bằng HOẶC tiền tố theo đoạn", () =>
   it("`/` chỉ khớp đúng gốc, không khớp mọi thứ", () => {
     expect(isPublic("/")).toBe(true);
     expect(isPublic("/exams")).toBe(false);
+  });
+
+  it("webhook payOS được cho vào (AC-032) — không có nó thì payOS ăn 307", () => {
+    // matcher của proxy.ts KHÔNG loại trừ `/api` (không dấu chấm trong path),
+    // nên middleware CÓ chạy trên đường này. Thiếu mục ⇒ POST của payOS bị đá
+    // về `/?auth=signin` và không đơn nào settle tự động được.
+    expect(isPublic("/api/payments/payos/webhook")).toBe(true);
+  });
+
+  it("mục webhook KHÔNG mở bất kỳ route /api nào khác", () => {
+    // Cách hỏng đắt nhất của mục này không phải gõ sai — mà là bị NỚI thành
+    // tiền tố cha ("/api", "/api/payments") trong một lần "dọn dẹp". Lúc đó
+    // mọi route API tương lai được cho vào mà không ai thêm dòng nào cả.
+    for (const p of [
+      "/api",
+      "/api/payments",
+      "/api/payments/payos",
+      "/api/payments/payos/webhook-test", // anh em cùng tiền tố CHUỖI
+      "/api/payments/sepay/webhook", // adapter khác, ADR-0013 kill criterion
+      "/api/admin",
+    ]) {
+      expect(isPublic(p)).toBe(false);
+    }
   });
 
   it("trang bảng giá KHÔNG công khai", () => {

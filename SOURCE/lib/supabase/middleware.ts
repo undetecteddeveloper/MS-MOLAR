@@ -18,7 +18,7 @@ import { SESSION_COOKIE_OPTIONS } from "./cookieOptions";
  *
  * Ba mục của tính năng Subscription: hai đường ĐỌC tĩnh (/terms,
  * /refund-policy) và một đường GHI — webhook payOS, đường GHI chưa-đăng-nhập
- * ĐẦU TIÊN của dự án — thuộc pha backend và ADR-0014, CHƯA thêm.
+ * ĐẦU TIÊN của dự án (ADR-0014) — đã về đủ.
  *
  * ⚠ RÀNG BUỘC ĐƯỢC ĐẾM LÀ SỐ MỤC CHO PHÉP GHI, KHÔNG PHẢI TỔNG SỐ MỤC
  * (ADR-0017, sửa cách phát biểu của subscription PRD AC-032).
@@ -30,18 +30,27 @@ import { SESSION_COOKIE_OPTIONS } from "./cookieOptions";
  * định "6 mục, 1 mục ghi" khi đó được thoả mãn bởi đúng sáu mục SAI.
  *
  * Thứ thật sự cần canh là: KHÔNG có đường GHI nào chưa-đăng-nhập lọt vào đây
- * mà không phải một quyết định có chủ đích. Hôm nay con số đó là 0. Webhook
- * payOS sẽ là mục ghi đầu tiên và, tại thời điểm đó, là mục ghi duy nhất.
- * Tổng số mục vẫn được ghim bằng phép so khớp mảng nguyên văn trong test,
- * nhưng nó chỉ còn là mô tả — không còn là chỗ dựa của lời khẳng định bảo mật.
+ * mà không phải một quyết định có chủ đích. Hôm nay con số đó là ĐÚNG 1 —
+ * webhook payOS, mục cuối mảng, có ADR-0014 đứng sau. Mục ghi thứ hai cần ADR
+ * của riêng nó. Tổng số mục vẫn được ghim bằng phép so khớp mảng nguyên văn
+ * trong test, nhưng nó chỉ còn là mô tả — không còn là chỗ dựa của lời khẳng
+ * định bảo mật.
  *
  * Đổi lại: thêm một trang công khai chỉ-đọc trở thành thay đổi một dòng bình
  * thường, còn thêm một đường GHI thì vẫn phải dừng người review lại — đúng
  * việc mà cái cổng này sinh ra để làm. */
 // Export để test kiểm được bằng máy thay vì bằng mắt.
 export const PUBLIC_PATHS = [
+  // Trang chủ + form auth. Nếu mục này mất thì chính màn hình đăng nhập cũng
+  // nằm sau đăng nhập — vòng redirect vô tận về chính nó. Đường ĐỌC.
   "/",
+  // Stub redirect sang `/?auth=signin` (auth về content area của `/` từ S#17).
+  // Nó chỉ tồn tại để các link/bookmark `/login` cũ không chết. Đường ĐỌC.
   "/login",
+  // Điểm về của mọi flow PKCE `?code=` (S#23). Request tới đây CHƯA có cookie
+  // session — không whitelist thì bị chặn TRƯỚC khi route handler kịp đổi code
+  // lấy session. Đổi một mã dùng-một-lần mà người gọi phải đã cầm sẵn, không
+  // nhận payload tuỳ ý: xếp cùng nhóm ĐỌC, không phải nhóm GHI.
   "/auth/callback",
   // Bán hàng cho học sinh THCS/THPT thì điều khoản phải đọc được TRƯỚC khi có
   // tài khoản, nếu không thì "đồng ý điều khoản" là đồng ý với một trang bị
@@ -58,6 +67,25 @@ export const PUBLIC_PATHS = [
   // gửi đi. Nếu về sau nó cần một form, đó là một quyết định MỚI theo ràng buộc
   // đã phát biểu lại ở trên, không phải phần mở rộng lặng lẽ của mục này.
   "/about",
+  // ⚠ ĐƯỜNG GHI CHƯA-ĐĂNG-NHẬP DUY NHẤT CỦA DỰ ÁN (ADR-0014, PRD R9/AC-032).
+  // Con số ADR-0017 canh đi từ 0 lên 1 tại đúng dòng này, và 1 là con số các
+  // lần review sau phải giữ — một mục GHI thứ hai cần ADR của riêng nó.
+  //
+  // Vì sao phải whitelist: matcher của proxy.ts KHÔNG loại trừ `/api`, nên
+  // không có dòng này thì POST của payOS ăn một 307 về `/?auth=signin` và mọi
+  // đơn chỉ settle được khi người dùng tự bấm "kiểm tra lại" (PRD R10).
+  //
+  // Vì sao mở một đường GHI cho internet là chấp nhận được: nó KHÔNG cấp gì
+  // cả. Route handler chỉ chuyển tiếp `orderCode` cho `settleOrder()`, và
+  // `settleOrder()` hỏi lại payOS trước mỗi lượt ghi — thân request là một GỢI
+  // Ý, không bao giờ là một chỉ thị (ADR-0014 Decision 1-2). Chữ ký sai dừng
+  // trước cả lượt I/O đầu tiên.
+  //
+  // Phép khớp là BẰNG hoặc tiền tố THEO ĐOẠN, nên mục này KHÔNG mở "/api",
+  // không mở "/api/payments", và không mở một route anh em nào khác dưới
+  // "/api". Ghim bằng máy ở `lib/supabase/__tests__/publicPaths.test.ts` và
+  // `app/api/payments/payos/webhook/__tests__/route.test.ts`.
+  "/api/payments/payos/webhook",
 ];
 
 /** CSP của lượt request này, do proxy.ts sinh (TD-006). */
