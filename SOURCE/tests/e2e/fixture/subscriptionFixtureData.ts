@@ -24,26 +24,31 @@
 // production tree would be missing (frontend DD Risk R-12).
 //
 // TRANSCRIBED CONTRACTS — AND THEIR UNCHECKED WINDOW. `Entitlement` / `Quota`
-// are imported from the frozen `lib/billing/types.ts`, so a change there breaks
-// this file at compile time. `CheckoutOrder`, `MyOrderRow` and `SettleResult`
-// have no code yet, so their shapes are transcribed from the work plan's
-// Reference Contract Values. Being transcriptions, they are structurally
-// INDEPENDENT of the real types — no import, no assignment, no `satisfies` —
-// so until the reconciliation lands, drift between this file and the shipped
-// contract is NOT detectable, silently, by tsc or by anything else. That is the
-// same exposure `supportAdminFixtureData.ts` carries for `TicketWithNotes`, and
-// it is accepted only because the real declarations do not exist yet.
+// are imported from the frozen `lib/billing/types.ts`, and `SettleResult` is
+// imported from `lib/billing/settleOrder.ts` since backend-task-16 shipped it,
+// so a change to any of the three breaks this file at compile time.
+// `CheckoutOrder` and `MyOrderRow` have no code yet, so their shapes are
+// transcribed from the work plan's Reference Contract Values. Being
+// transcriptions, they are structurally INDEPENDENT of the real types — no
+// import, no assignment, no `satisfies` — so until the reconciliation lands,
+// drift between this file and the shipped contract is NOT detectable,
+// silently, by tsc or by anything else. That is the same exposure
+// `supportAdminFixtureData.ts` carries for `TicketWithNotes`, and it is
+// accepted only because the real declarations do not exist yet.
 // The reconciliation is owned by the task that first exports each type, and is
 // recorded as a checklist line in that task's file:
 //   - `FixtureCheckoutOrder`      -> backend-task-17 (`lib/billing/checkoutOrder.ts`)
 //   - `FixtureMyOrderRow`         -> backend-task-19 (`app/(billing)/queries.ts`)
-//   - `FixtureSettleResult`       -> backend-task-16 (`lib/billing/settleOrder.ts`)
+//   - `SettleResult`              -> DONE, backend-task-16: imported below, and
+//     `FIXTURE_RECHECK_OUTCOMES`'s `satisfies` clause is the compile-time link
+//     over BOTH union arms (the settled arm and all five refusal literals)
 //   - `FixtureRateLimitedRefusal` -> backend-task-18 (`lib/billing/orderActions.ts`)
 // Each of those tasks adds a compile-time link here (e.g.
 // `const _fixtureContract: CheckoutOrder = FIXTURE_ORDER_PENDING;`) and deletes
 // the transcribed declaration. Only after that link exists does a tsc error
 // become the failure mode for drift.
 
+import type { SettleResult } from "@/lib/billing/settleOrder";
 import { FREE_FALLBACK, type Entitlement } from "@/lib/billing/types";
 import { LOCALE_COOKIE, type Locale } from "@/lib/i18n/locales";
 
@@ -384,22 +389,6 @@ export const FIXTURE_ORDER_ROWS_EMPTY: readonly FixtureMyOrderRow[] = [];
 
 // --- Action-module responses ------------------------------------------------
 
-/** Transcribed verbatim from the backend DD's `SettleResult`.
- *  RECONCILIATION OWNER: **backend-task-16**, which creates
- *  `lib/billing/settleOrder.ts` where `SettleResult` is first exported. Until
- *  then, drift against it is undetectable (see the file header). */
-export type FixtureSettleResult =
-  | { settled: true; expiresAt: string }
-  | {
-      settled: false;
-      reason:
-        | "unknown_order"
-        | "not_pending"
-        | "not_paid_yet"
-        | "amount_mismatch"
-        | "provider_unavailable";
-    };
-
 /** C-10's SEVENTH outcome — `guard()`'s refusal (AC-037). Neither Design Doc
  *  states its wire shape: `SettleResult` declares exactly five reasons and
  *  rate-limited is not one of them, and the encoding is decided by the task
@@ -412,7 +401,13 @@ export type FixtureSettleResult =
  *  to decide, and would hide the drift instead of surfacing it. */
 export type FixtureRateLimitedRefusal = { error: "rate_limited" };
 
-export type FixtureRecheckOutcome = FixtureSettleResult | FixtureRateLimitedRefusal;
+/** RECONCILED by backend-task-16: the settlement half is now the SHIPPED
+ *  `SettleResult`, not a transcription of it. `FIXTURE_RECHECK_OUTCOMES` below
+ *  carries `satisfies Record<string, FixtureRecheckOutcome>`, so every fixture
+ *  value is checked against the real union at compile time — a sixth reason, a
+ *  removed reason or a changed settled arm is a tsc error here rather than a
+ *  silent divergence between this file and the money path. */
+export type FixtureRecheckOutcome = SettleResult | FixtureRateLimitedRefusal;
 
 /** One value per rendered outcome, so a case selects the branch it means rather
  *  than rebuilding the union inline. The keys match C-10's dictionary keys

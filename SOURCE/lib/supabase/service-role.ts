@@ -70,7 +70,8 @@ export async function recordExamResult(
 }
 
 /**
- * Cộng dồn mastery theo kỹ năng cho một attempt ĐÃ NỘP (ADR-0011, schema.sql §18).
+ * Cộng dồn mastery theo kỹ năng cho một attempt ĐÃ NỘP (ADR-0011, schema.sql
+ * khối "MASTERY WRITE" — schema.sql KHÔNG có mục §18 nào).
  *
  * Anh em ruột của recordExamResult() ở trên, và CỐ Ý là một hàm RIÊNG chứ không
  * phải một tham số thêm của nó: gộp hai việc vào một câu lệnh SQL sẽ khiến một
@@ -78,11 +79,11 @@ export async function recordExamResult(
  * hỏng KHÔNG được làm hỏng việc nộp bài. Hai lời gọi, hai đường xử lý lỗi.
  *
  * KHÔNG nhận userId (record_skill_mastery() suy ra từ attempt + đòi 'submitted',
- * §18) và KHÔNG nhận skill_node_id: việc tra kỹ năng nằm trong SQL (join
- * questions.skill_node_id), nên tầng TS không có, và không cần có, khái niệm
+ * khối MASTERY WRITE) và KHÔNG nhận skill_node_id: việc tra kỹ năng nằm trong
+ * SQL (join questions.skill_node_id), nên tầng TS không có, và không cần có, khái niệm
  * "kỹ năng" nào ở đây.
  *
- * `score.perQuestion` truyền THẲNG, không nắn lại: §18 đọc từng phần tử bằng
+ * `score.perQuestion` truyền THẲNG, không nắn lại: khối đó đọc từng phần tử bằng
  * `pq->>'questionId'` / `(pq->>'isCorrect')::boolean` /
  * `coalesce((pq->>'scored')::boolean, true)`. Đổi tên hay lọc bớt ở đây là cách
  * chắc chắn nhất để hai bên cùng "trông có vẻ đúng" mà lệch nhau.
@@ -368,4 +369,93 @@ export async function addSupportTicketNote(
     note_text: noteText,
   });
   return { error: error ? { message: error.message } : null };
+}
+
+// ---------------------------------------------------------------------------
+// SUBSCRIPTION — đường gia hạn entitlement (ADR-0014, schema.sql khối
+// "SUBSCRIPTION — record_payment_settlement()")
+//
+// Hai thao tác hẹp, và chỉ hai, phục vụ `lib/billing/settleOrder.ts`: đọc dòng
+// đơn để có thứ đem so, rồi gọi hàm SQL gia hạn. KHÔNG thao tác nào nhận user
+// id — danh tính suy ra TRONG SQL từ chính dòng đơn (ADR-0014 Decision 3), y
+// như record_exam_result() suy từ attempt.
+// ---------------------------------------------------------------------------
+
+/**
+ * Đọc dòng `payment_orders` cho một lượt đối soát — CỐ Ý KHÔNG lọc theo chủ sở
+ * hữu, và cái tên nói ra điều đó.
+ *
+ * `settleOrder()` có HAI trigger và một trong hai — webhook — không có phiên
+ * đăng nhập nào (ADR-0014 Decision 1). Một vị từ `user_id` ở đây sẽ phá đúng
+ * trigger đó. Việc kiểm chủ sở hữu nằm một tầng trên, trong `recheckOrder()`,
+ * bằng client THEO PHIÊN dưới `orders_select_own` (backend DD § recheckOrder()
+ * — ownership scoping, FE-B-02).
+ *
+ * Vì thế "ForSettlement" nằm trong tên: đây là một đường đọc bypass RLS. Dùng
+ * lại nó ở một Server Action sẽ biến `recheckOrder` thành máy dò order_code —
+ * đúng thứ FE-B-02 đóng lại.
+ *
+ * Trả về ĐÚNG hai cột: `status` (cổng 'pending' của bước 1) và `amount` (thứ
+ * bước 3 đem so với số nhà cung cấp báo). KHÔNG đọc `user_id`: tầng TS không
+ * có, và không cần có, khái niệm "người thụ hưởng".
+ *
+ * `status` để kiểu `string` chứ không phải union: literal hợp lệ do CHECK trong
+ * schema quyết định, và một dòng mang literal ngoài dự kiến phải rơi vào nhánh
+ * "không phải pending" chứ không phải làm hỏng phép ép kiểu.
+ */
+export async function readPaymentOrderForSettlement(
+  orderCode: number
+): Promise<{ status: string; amount: number } | null> {
+  const { data, error } = await serviceRoleClient()
+    .from("payment_orders")
+    .select("status, amount")
+    .eq("order_code", orderCode)
+    .maybeSingle();
+  // Ném, không nuốt: một sự cố đọc KHÔNG phải một trong năm lý do từ chối của
+  // `SettleResult`. Biến nó thành `unknown_order` là nói với người đã trả tiền
+  // rằng đơn của họ không tồn tại. Tiền lệ listReportedExams().
+  if (error) throw error;
+  if (!data) return null;
+
+  const row = data as { status: string; amount: number };
+  return { status: row.status, amount: row.amount };
+}
+
+/**
+ * Gia hạn entitlement cho một đơn ĐÃ ĐƯỢC XÁC MINH — đường DUY NHẤT trong repo
+ * ghi được vào `subscriptions` (ADR-0014 Decision 1).
+ *
+ * KHÔNG nhận userId, KHÔNG nhận số tiền, KHÔNG nhận trạng thái. Chỉ một
+ * `orderCode`, và hàm SQL tự suy người thụ hưởng từ dòng đơn rồi tự cưỡng chế
+ * cổng `status = 'pending'`. Nghĩa là kể cả khi hàm này bị gọi sai ở đâu đó
+ * trong tương lai, nó vẫn không cấp được quyền cho người khác hay cho một đơn
+ * chưa được xác minh — luật nằm trong DB, không nằm ở call site.
+ *
+ * KHÔNG truyền `p_period_days`: hàm SQL khai `default 30` ngay cạnh phép cộng
+ * dùng nó, nên độ dài kỳ có ĐÚNG MỘT lời khai. Gõ lại 30 ở đây là dựng cái đồng
+ * hồ thứ hai mà ADR-0013 đã một lần cấm cho cửa sổ đơn chờ.
+ *
+ * `expiresAt === null` KHÔNG phải lỗi: `update … where status='pending'` không
+ * khớp dòng nào, tức một trigger khác đã settle xong trước (AC-031). Người gọi
+ * đọc nó thành `not_pending`.
+ *
+ * Lỗi TRẢ VỀ chứ không ném — I6 khai `{ expiresAt } | { error }` — nhưng người
+ * gọi có nghĩa vụ LAN nó ra: nhánh `raise exception` không-người-thụ-hưởng là
+ * một dòng đã 'paid' mà không ai được cấp quyền, đúng trạng thái cần một con
+ * người đối soát bằng tay (D10). Nuốt nó là xoá dấu vết duy nhất của ca đó.
+ */
+export async function recordPaymentSettlement(
+  orderCode: number
+): Promise<{ expiresAt: string | null } | { error: { code?: string; message: string } }> {
+  const { data, error } = await serviceRoleClient().rpc("record_payment_settlement", {
+    p_order_code: orderCode,
+  });
+  if (error) return { error: { code: error.code, message: error.message } };
+  if (data === null || data === undefined) return { expiresAt: null };
+
+  // MỘT hợp đồng, MỘT dạng chuỗi. PostgREST serialize timestamptz ra dạng
+  // `+00:00`, `toISOString()` ra dạng `…Z` — cùng một thời điểm, hai chuỗi khác
+  // nhau, và chuỗi mới là thứ C-10 đem hiển thị. Chuẩn hoá tại đúng chỗ giá trị
+  // rời DB, cùng luật CL-01 đặt cho `pendingUntil`.
+  return { expiresAt: new Date(data as string).toISOString() };
 }
