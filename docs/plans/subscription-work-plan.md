@@ -798,7 +798,7 @@ flowchart LR
   - **Gate**: FE-B-02's escalation condition — S-05 must not reach real users until this passes.
   - Test-case resolution: **service-integration-e2e 2/2** — lane complete.
 - [ ] **Task 6.3 — Full regression across every adopted gate.** `npm test`; `npx tsc --noEmit`; `npm run lint`; `npm run build`; `npm run check:bundle`; `npm run verify:schema` on **dev and prod** (two runs — this is a **standalone script**, not part of `check:bundle`); `SOURCE/supabase/test-rls.ts` including Phần 8; `npm run test:integration` (INT-1…INT-3); `npm run test:localdb` (SVC-1, SVC-2); the three fixture-e2e cases.
-- [ ] **Task 6.4 — Security review.** Walk ADR-0014 end to end against the shipped code. Confirm: zero client write paths to either new table (RLS + explicit revokes + no write policy); identity is never a parameter (`record_payment_settlement` takes an `order_code`, the beneficiary comes from the row); exactly one unauthenticated write path; **P-1** holds — no `transactions[]` field persisted or logged, `getPaymentStatus()`'s return carries exactly two properties, the `payment_orders` column set is exactly eleven; no enumeration oracle on either the read or the action path; refusal reasons are a closed set of codes and no raw payload or bank identifier reaches any log; `npm run check:bundle` covers the checksum key, the API key and the `record_payment_settlement` marker; both new routes are private and dot-free and no CSP change shipped.
+- [x] **Task 6.4 — Security review.** Walk ADR-0014 end to end against the shipped code. Confirm: zero client write paths to either new table (RLS + explicit revokes + no write policy); identity is never a parameter (`record_payment_settlement` takes an `order_code`, the beneficiary comes from the row); exactly one unauthenticated write path; **P-1** holds — no `transactions[]` field persisted or logged, `getPaymentStatus()`'s return carries exactly two properties, the `payment_orders` column set is exactly eleven; no enumeration oracle on either the read or the action path; refusal reasons are a closed set of codes and no raw payload or bank identifier reaches any log; `npm run check:bundle` covers the checksum key, the API key and the `record_payment_settlement` marker; both new routes are private and dot-free and no CSP change shipped.
 - [ ] **Task 6.5 — Manual browser passes (the load-bearing accessibility and layout checks).** `npm run pw` plus a **real mid-range Android**. (i) Golden states 11-24 at **360px** and in **greyscale**; (ii) the keyboard sweep — every control on both screens reachable including every `aria-disabled` one, with no element carrying the native `disabled` attribute or property; (iii) **the frontend's second verification point** — activate re-check on a genuinely paid order and confirm the `role="alert"` node is still in the DOM with its text after the server re-render lands (**R-1 / A5**), `document.activeElement` is still the re-check control (**R-1 / A5b**), the badge changed, and C-11 above it agrees with the badge (**R-2 / A6**); (iv) **FE-AC-26** — signed in as a user whose `tutor` quota is `known`, the note renders a `<p>` with the remaining count and the reset date beside **both** affordance call sites on the result-detail page. A green unit test does **not** discharge (iv).
   - Fallbacks, if (iii) fails: for R-1, lift the outcome to a mounted client parent that owns a single announcement and restores focus (the shape all three shipped `router.refresh()` precedents use) — one thin client wrapper around `OrderList` on S-05; on S-06 `PaymentConfirm` is already that parent. For R-2, on `{settled:true}` only, `router.push("/me/orders")` followed by `router.refresh()`.
 - [ ] **Task 6.6 — Documentation close-out and acceptance-criteria sweep.** Verify every AC in both Design Docs' ownership tables is achieved or explicitly deferred with an owner; re-measure the i18n identical-string ratio (`identical.length / enKeys.length < 0.1`) — `payOS`, `VietQR` and bare numerals are the natural byte-identical offenders, so write the surrounding sentence per locale rather than shipping a bare brand token as a whole value; update the three source documents' status lines; record which of the **five** justified traceability gaps — **TBD-05, TBD-08, TBD-09, ADR-0018/BU-2, and E-01/BU-3** — remain open and why. **Five, not four**: E-01/BU-3's own traceability row states it "requires engineer confirmation before plan approval", so it belongs in this sweep on the same footing as the other four. Also confirm **BU-6** (the undesigned usage sink) — either the backend DD revision landed and Task 1.6 shipped, or it is recorded as still open with U2/BU-4 named as what it holds.
@@ -824,7 +824,7 @@ flowchart LR
 - [ ] `verify:schema` green on **both** dev and prod, fingerprints matching git, prod **content** verified by a real query (not a fingerprint comparison)
 - [ ] `test-rls.ts` Phần 8 passing
 - [ ] Staged quality checks completed (zero errors) across lint, types, tests, build and bundle scan
-- [ ] Security review complete (Task 6.4), including P-1 and the enumeration-oracle checks
+- [x] Security review complete (Task 6.4), including P-1 and the enumeration-oracle checks
 - [ ] Manual browser passes complete, including FE-AC-26 and the second verification point's four observations
 - [ ] `SOURCE/lib/billing/types.ts` unmodified
 - [ ] Real-money end-to-end verified on production (Task 6.7) — **or** explicitly deferred with BU-1 recorded as the reason
@@ -1058,6 +1058,139 @@ longer exits 1 — Tasks 6.1/6.2 filled the SVC-1/SVC-2 skeleton, so its exit 0 
 **Not covered by any command here** (the task's own Residual): the manual browser passes
 at 360px + greyscale (Task 6.5) and the real-money production transaction (Task 6.7).
 No source file was changed by this task — no gate went red.
+
+#### Task 6.4 — security review, ADR-0014 walked end to end (evidence record)
+
+Run at **`a7d3038`**, branch `feat/subscription`, working tree clean before and
+after. All commands from `SOURCE/` via `spawnSync`, `shell: false`, cwd
+`E:/StemWeb_project/MS-MOLAR/SOURCE`, `status === null` checked explicitly.
+**No source file changed** — no item answered `N`.
+
+| # | Claim (ADR-0014 clause) | Y/N | Evidence |
+|---|---|---|---|
+| 1 | Zero client write paths to either new table — RLS + explicit revokes + no write policy | **Y** | `supabase/schema.sql:1653` `enable row level security`, `:1662-1663` `revoke insert, update, delete … from anon, authenticated` + `revoke select … from anon`, `:1665-1667` the only policy is `for select`; `:1693-1700` the same four lines for `subscriptions`. **Live, not text**: `npx tsx supabase/test-rls.ts` → exit 0, `✅ RLS test: tất cả PASS`, Phần 9 = **20 checks**, PO-c/PO-d/PO-e and SB-c/SB-d/SB-e each observed `42501` with a service_role before/after snapshot showing the row untouched; PO-f/SB-g show anon denied `select` (`42501`). Source-side: the only write to `payment_orders` in non-test code is `lib/supabase/service-role.ts:523 .insert`, and there is **no** direct write to `subscriptions` anywhere |
+| 2 | Identity is never a parameter — `record_payment_settlement` takes an `order_code`, the beneficiary comes from the row | **Y** | `schema.sql:1735-1738` signature is `(p_order_code bigint, p_period_days integer default 30)` — no user id; `:1750-1754` `update … returning user_id into v_user_id` derives it; `:1760-1766` a null beneficiary raises rather than guessing. Caller: `lib/supabase/service-role.ts:454-456` passes **only** `{ p_order_code }`. Machine-pinned at `lib/billing/__tests__/settleOrder.test.ts:504` ("nhận ĐÚNG MỘT tham số, và không tham số nào của lời gọi SQL mang danh tính") and `:552` |
+| 3 | Exactly one unauthenticated write path | **Y** | Filesystem scan of `app/**` across **all** code extensions (`.ts .tsx .js .jsx .mjs .cjs` — `allowJs: true`), matching exported `POST/PUT/PATCH/DELETE` against `PUBLIC_PATHS` parsed from `lib/supabase/middleware.ts` itself: **2 route handlers exist in the whole app**; `/auth/callback` exports `GET` only; `/api/payments/payos/webhook` exports `POST` and is public ⇒ **unauthenticated write route handlers = 1**. `middleware.ts:88` is the entry, admitted with a reason comment at `:70-87`. Pinned at `lib/supabase/__tests__/publicPaths.test.ts:54-77` (declared read/write split, `WRITE_PATHS` length 1) and `app/api/payments/payos/webhook/__tests__/route.test.ts:341-345` (`PUBLIC_PATHS.filter(startsWith("/api"))` equals exactly that one string) |
+| 4a | P-1 — no `transactions[]` field persisted or logged | **Y** | Repo-wide grep for `transactions` / `counterAccount` / `counter_account` / `virtualAccount` / `reference` outside tests returns **only comments** (`lib/billing/payos/index.ts:25,68,203`) — no column, no log line, no persisted field. Every `console.*` on the payment path enumerated: `payos/index.ts:88` logs `{site, orderCode, httpStatus, elapsedMs, providerCode}` only; `webhook/route.ts:67` logs one reason code; `orderActions.ts:239` logs a Postgres `message` (which carries no column values). Discriminating test: `payos/__tests__/adapter.test.ts:50-70` feeds a fixture whose `transactions[]` carries exactly the forbidden fields, `:156` counts the returned properties |
+| 4b | `getPaymentStatus()` return carries exactly two properties | **Y** | `lib/billing/payos/index.ts:209-227` returns `{ status, amount }`. Asserted by **count**, not by containment: `adapter.test.ts:155-158` `Object.getOwnPropertyNames(result)).toHaveLength(2)` + `Object.keys(result).sort()` equals `["amount","status"]`, plus a content assertion that no `transactions[]` value survives |
+| 4c | The `payment_orders` column set is exactly eleven | **Y** | `schema.sql:1610-1648` — `order_code, user_id, amount, status, created_at, pending_until, settled_at, qr_payload, account_number, account_name, memo`. **Confirmed live on dev, not only in the file**: `GET /rest/v1/` (PostgREST OpenAPI, service_role, `hynwleaxtbtjzkvpjsug`) → `payment_orders: 11 columns` in exactly that order; `subscriptions: 4 columns`. No drift between git and the applied schema |
+| 5 | No enumeration oracle on either the read or the action path | **Y** | Action path `lib/billing/orderActions.ts:280-288` — a session-scoped read selecting only `order_code`; `orders_select_own` turns another user's row into the same `null` a nonexistent code returns, so both take one branch. Read path `app/(billing)/queries.ts:141-152` — same shape, `getMyOrder()` returns `null` for both. Test asserts **value equality and boundary-call-sequence equality**, not just the same literal: `lib/billing/__tests__/orderActions.test.ts:576-600` compares the whole result object *and* the recorded call log between the foreign-order and nonexistent-order runs, with provider calls and writes both pinned to 0. `guard()` runs before the read (`:274`), so probing spends the prober's own budget |
+| 6 | Refusal reasons are a closed set of codes; no raw payload or bank identifier reaches any log | **Y** | Closed sets at the type level: `settleOrder.ts:36-46` (five literals), `orderActions.ts:67-71` (four), `webhook/route.ts:51` (one, `invalid_signature`). `settleOrder.test.ts:523` asserts all five are reachable **and** that no sixth literal exists. Log discipline: `payos/signature.ts` contains **no** log call at all (docblock `:34-36`); `webhook/route.ts:67` emits `[payos/webhook] refused {"reason":"invalid_signature"}` and nothing else. `route.test.ts:257-271` pins the log call list to that **exact single call**, and `:95-168` re-walks every logged argument with `getOwnPropertyNames` + an `Error` branch (so a body hidden in `err.message` is still caught) against a forbidden list containing the raw body, the signature, the payer account number and name, and the bank reference |
+| 7 | `check:bundle` covers the checksum key, the API key and the `record_payment_settlement` marker | **Y** | `scripts/check-ai-key-bundle.mjs:100-112` — `PAYOS_CHECKSUM_KEY` + `api-merchant.payos.vn`, and `PAYOS_API_KEY`; `:85-89` — `record_payment_settlement` under the service-role entry. Observed: `node scripts/check-ai-key-bundle.mjs` → exit **0**, `✅ … 7 bí mật server-only không xuống client`. **Positive control run** (isolated copy of the script over a fabricated `.next-build/static/chunk-fake.js` containing the string): exit **1**, `❌ Marker server-only "record_payment_settlement" … trong client bundle`; the same tree with a clean file → exit 0. The marker mechanism genuinely fires |
+| 8 | Both new routes private and dot-free; no CSP change shipped | **Y** | The two new routes are `/me/orders` and `/pricing/checkout` (frontend DD §Change Impact Map). Neither is in `PUBLIC_PATHS` (`middleware.ts:43-89`), so `updateSession`'s `!user && !isPublic` redirect (`:167-172`) covers both; neither contains a dot, so `proxy.ts:47`'s matcher does not exclude them. `publicPaths.test.ts:79-84` pins the dot-free rule for the list. **CSP**: `git diff 5a77912 HEAD -- SOURCE/lib/security/csp.ts` is **empty** — the file is byte-identical to its last pre-subscription commit (2026-08-09). `next.config.ts` and `proxy.ts` likewise have no commit after 2026-08-07; the subscription branch touched no CSP surface |
+
+**Reference Contract (P-1, normative) → `Y`.** Both halves hold against the shipped
+code: no `transactions[]`-derived field reaches a column (11-column set confirmed
+live) or a log (every `console.*` on the path enumerated), and `getPaymentStatus()`'s
+return is asserted by property **count**, not by containment.
+
+**Supporting runs.** `vitest run lib/billing app/api/payments lib/supabase/__tests__`
+→ exit 0, `Test Files 11 passed (11)` / `Tests 229 passed (229)`. Dev-database
+hygiene after the RLS lane, by an independent service_role `count: "exact"` query
+(not the lane's own teardown assertion): `payment_orders` **0**, `subscriptions`
+**0**. Prod (`pebjdlbgbmizgfpuptjl`) never contacted; `.env.local.prod-backup` never
+loaded; no production deployment of this branch has occurred.
+
+**The unauthenticated write path, examined on its own terms.** The count is 1 and the
+opening is as narrow as the matcher allows — `middleware.ts:161-163` matches on
+equality or a **segment** prefix, so `/api/payments/payos/webhook` opens neither
+`/api` nor `/api/payments` nor a sibling under `/api/payments/payos`
+(`publicPaths.test.ts:136-150` enumerates six such near-misses as `false`). What
+makes the opening acceptable is not the signature check: `route.ts:59-61` reads the
+body as text and hands the raw string to the adapter, which parses it **exactly once**
+(`signature.ts:113,119`) and reads **one** field after the digest matches (`:130-132`);
+everything downstream re-verifies against payOS (`settleOrder.ts:67-84`) before any
+write. If signature verification were removed entirely, the worst an attacker gains is
+the ability to make the server ask payOS a question — which is ADR-0014's thesis, and
+it holds in the shipped code.
+
+**What a silent failure would look like, and whether anything would catch it.**
+
+- *Signature verification stops discriminating.* HTTP status cannot detect this: the
+  route answers **200 to both** a valid and an invalid signature by design. The only
+  discriminating observable is the **I/O count**, and that is exactly what the tests
+  assert — `route.test.ts:238-243` (`settleOrder` called **0** times on refusal),
+  `:275-284` (adapter receives the raw string, once, with one argument),
+  `:286-303` (verify **before** settle, asserted as an order, not a count). A
+  status-code test would have been worthless here. **Detected.**
+- *The checksum key is misconfigured or mid-rotation.* Every delivery is refused and
+  the endpoint still answers 200 — indistinguishable from silence on the wire. The
+  **only** signal is the `console.error` at `route.ts:67`, and nothing alerts on it.
+  This is ADR-0014's recorded accepted cost (§Negative Consequences), compensated by
+  `recheckOrder()` as the primary recovery path, not by monitoring. **Not detected
+  automatically — accepted, and now re-confirmed rather than assumed.**
+- *A write route is misclassified into the READ group of `PUBLIC_PATHS`.* A path string
+  does not say which verbs it serves, so `publicPaths.test.ts:59-76` rests on the
+  author classifying their own entry honestly. **Not detected.** See OP-11(a) below —
+  measured today as 0 offenders.
+- *A marker is dropped from `check-ai-key-bundle.mjs`.* Nothing reddens; in CI the
+  marker list is the whole net. See OP-11(b) below. **Not detected.**
+
+**A property stronger than the ADR requires, recorded because it is load-bearing.**
+`record_payment_settlement` is `INVOKER` (`schema.sql:1735-1742`, no `security
+definer`), and the table-level `revoke insert, update, delete … from anon,
+authenticated` sits underneath it. An accidental future `grant execute … to
+authenticated` would therefore **still** not mint entitlement — the function body would
+fail `42501` on its own `UPDATE`. A `SECURITY DEFINER` implementation would have
+converted that same mistake into free Premium.
+
+**OP-4 — re-confirmed against the shipped code; still a documentation defect, not a
+code defect.** `subscription-backend-design.md:988` (Consumer Parse Rule) says the HMAC
+is "verified over the **raw bytes**", while the Serialized Format cell on the same row
+says the signature covers the sorted `key=value&…` serialisation of `data`. The two
+cannot both be literal. **The code is right**: `verifyWebhookSignature(rawBody: string)`
+(`signature.ts:113`) takes the wire string, parses it **once** (`:119`), and digests
+`toSignedString(data)` (`:127`) — it never re-serialises the body, which is the failure
+the "raw bytes" phrasing exists to forbid, and which `:813` of the same DD states
+correctly. Route side matches (`route.ts:59` uses `.text()`, not `.json()`), and
+`route.test.ts:190-195` proves the fixture body does not survive a JSON round-trip, so
+a re-serialising implementation would go red. Recorded for the documentation-hygiene
+pass; no code change is warranted and none was made.
+
+**OP-11 verdict — both stay recorded, neither is closed here.**
+
+- **(a) Write-route misclassification in `PUBLIC_PATHS`.** Measured, not assumed: the
+  scan above finds **0** offenders today. The hole is also narrower than first stated —
+  a *new top-level* `app/api/**/route.ts` with a `POST` is **not** public by default
+  (it would have to be added to `PUBLIC_PATHS`), so the genuinely silent case is a write
+  route placed **under an already-public prefix**, e.g.
+  `app/api/payments/payos/webhook/[id]/route.ts` or a route under `/terms`, `/about`,
+  `/refund-policy` — segment-prefix matching admits those with no test going red.
+  Closing it means a committed filesystem-scanning test, i.e. a **new file** outside
+  this task's declared Target Files ("none"). **Recommendation: route to a follow-up
+  task owning `publicPaths.test.ts`**, with the scan above as the ready-made body.
+  Severity **low** today, rising the moment anyone adds a sub-route under a public entry.
+- **(b) `check-ai-key-bundle.mjs`'s marker list is untested.** Confirmed: no `*.test.*`
+  file references the script (repo-wide search); `.github/workflows/ci.yml:74-86` builds
+  with placeholder env then runs `check:bundle`. What the positive control above adds is
+  a distinction worth keeping — the **mechanism** demonstrably fires; what is untested is
+  the **list's contents**, so deleting `record_payment_settlement` from `:88` reddens
+  nothing. Note also that in CI `SUPABASE_SERVICE_ROLE_KEY` and `GEMINI_API_KEY` are set
+  to *placeholders* (`ci.yml:79-80`), so their value-scan leg runs against a
+  tautologically-absent string and **suppresses the `⚠` warning** — the CI run therefore
+  prints 5 warnings instead of 7 and reads as better covered than it is. A pinned-list
+  test would be near-tautological; the useful fix derives each marker from the module it
+  guards. **Recommendation: stays recorded.** Severity **low** (the script is a second
+  net; `import "server-only"` in the guarded modules is the first).
+
+**New findings from this walk (none blocking).**
+
+1. **Low — `app/(billing)/pricing/_components/PurchaseCta.tsx:95`** logs `err` from a
+   rejected `createOrder()` verbatim, client-side. `createOrder()` returns values for
+   every business refusal and only throws on genuine incidents, and Next.js redacts
+   server error messages to a digest in production, so no order content is expected to
+   surface — but this is the one log line on the payment path whose payload is not a
+   fixed shape. Recommendation: narrow it to `err instanceof Error ? err.name : "unknown"`
+   when the file is next touched; not worth a standalone change.
+2. **Informational — the webhook buffers an unbounded request body** (`route.ts:59`
+   `await request.text()`) before the HMAC. "One HMAC and nothing else" is true per
+   request in CPU terms but memory-proportional to body size, and TD-013 leaves no rate
+   limit in front of it. Bounded in practice by the platform's serverless request-body
+   cap, which is **not** asserted anywhere in this repo. Recorded, not actioned.
+3. **Documentation nit — this plan's Completion Criteria and the Task 6.4 file still say
+   `test-rls.ts` "Phần 8"**; the subscription block is `Phần 9` (`test-rls.ts:1965`).
+   Already recorded at the Task 1.5 note above; repeated here only so the sign-off is not
+   read as evidence about the Support System block.
 
 ## Notes
 
