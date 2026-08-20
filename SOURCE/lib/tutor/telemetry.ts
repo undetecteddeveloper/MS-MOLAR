@@ -1,6 +1,6 @@
 // buildTelemetryPayload — hàm THUẦN (pure): không I/O, không đọc ambient state,
 // không import gì (cùng nhà với prompt.ts, computeScore.ts, wrongTwice.ts).
-// Dựng đúng object insert cho `public.telemetry_log` (schema.sql §19).
+// Dựng đúng object insert cho `public.telemetry_log` (schema.sql, khối "TELEMETRY LOG").
 //
 // DÙNG CHUNG, KHÔNG SAO CHÉP: cả `explainStep()` (event_type 'tutor_invoke') lẫn
 // `getSkillRecommendation()` (event_type 'adaptive_route') phải đi qua hàm này
@@ -36,7 +36,7 @@ export const TELEMETRY_ERROR_CODES = ["gemini_unavailable", "rate_limited", "ser
 
 export type TelemetryErrorCode = (typeof TELEMETRY_ERROR_CODES)[number];
 
-/** §19 `event_type text not null check (event_type in (...))`. */
+/** `public.telemetry_log`: `event_type text not null check (event_type in (...))`. */
 export type TelemetryEventType = "adaptive_route" | "tutor_invoke";
 
 /**
@@ -45,8 +45,8 @@ export type TelemetryEventType = "adaptive_route" | "tutor_invoke";
  */
 export interface TelemetryEvent {
   eventType: TelemetryEventType;
-  /** `null` khi không xác định được người dùng; §19 cho phép NULL (`on delete
-   *  set null` — mất danh tính chấp nhận được, mất dòng thì không). */
+  /** `null` khi không xác định được người dùng; `telemetry_log.user_id` cho phép
+   *  NULL (`on delete set null` — mất danh tính chấp nhận được, mất dòng thì không). */
   userId: string | null;
   /** Chỉ có ở 'tutor_invoke'. */
   questionId?: string | null;
@@ -59,7 +59,7 @@ export interface TelemetryEvent {
 
 /**
  * Object truyền thẳng cho `.from("telemetry_log").insert(...)`.
- * `id` và `created_at` CỐ Ý vắng mặt: §19 đã có default (`gen_random_uuid()`,
+ * `id` và `created_at` CỐ Ý vắng mặt: `telemetry_log` đã có default (`gen_random_uuid()`,
  * `now()`) — để DB sinh thì thời điểm log là đồng hồ máy chủ DB, không phải đồng
  * hồ tiến trình gọi.
  */
@@ -72,8 +72,8 @@ export interface TelemetryLogInsert {
   error_code: TelemetryErrorCode | null;
 }
 
-/** Lớp chắn thứ 2: chỉ cho qua ĐÚNG các literal của CHECK §19; mọi thứ khác (kể
- *  cả một `err.message` bị `as` ép vào) thành null. */
+/** Lớp chắn thứ 2: chỉ cho qua ĐÚNG các literal của CHECK
+ *  `telemetry_log_error_code_check`; mọi thứ khác (kể cả một `err.message` bị `as` ép vào) thành null. */
 function toErrorCode(value: unknown): TelemetryErrorCode | null {
   return TELEMETRY_ERROR_CODES.includes(value as TelemetryErrorCode) ? (value as TelemetryErrorCode) : null;
 }
@@ -85,9 +85,9 @@ function toErrorCode(value: unknown): TelemetryErrorCode | null {
  * - Bảo đảm (AC-013): object trả về chỉ chứa 6 cột được gán đích danh dưới đây,
  *   nên không thể mang theo giá trị đáp án nào, dù caller có truyền vào cả cụm
  *   ngữ cảnh lỗi.
- * - `error_code` luôn là `null` hoặc 1 trong các literal của CHECK §19 — không bao
- *   giờ là văn bản tự do, nên lệnh insert cũng không thể bị CHECK từ chối vì cột
- *   này.
+ * - `error_code` luôn là `null` hoặc 1 trong các literal của CHECK
+ *   `telemetry_log_error_code_check` — không bao giờ là văn bản tự do, nên lệnh
+ *   insert cũng không thể bị CHECK từ chối vì cột này.
  */
 export function buildTelemetryPayload(event: TelemetryEvent): TelemetryLogInsert {
   return {

@@ -31,7 +31,7 @@ import { describe, expect, it } from "vitest";
 import { buildTelemetryPayload, TELEMETRY_ERROR_CODES } from "../telemetry";
 import type { TelemetryErrorCode, TelemetryEvent, TelemetryLogInsert } from "../telemetry";
 
-/** Đúng 6 cột app tự điền của §19; `id`/`created_at` do DB sinh (default), nên
+/** Đúng 6 cột app tự điền của `public.telemetry_log`; `id`/`created_at` do DB sinh (default), nên
  *  payload KHÔNG được có chúng — và cũng không được có bất kỳ khoá nào khác:
  *  một khoá lạ chính là dấu vết của việc trải cả object lỗi vào payload. */
 const EXPECTED_COLUMNS = [
@@ -44,8 +44,8 @@ const EXPECTED_COLUMNS = [
 ] as const;
 
 /** Chép tay, CỐ Ý không import từ schema hay implementation: đây là bản sao độc
- *  lập của CHECK constraint §19, để test còn chứng minh được điều gì khi ai đó
- *  nới enum ở phía implementation. */
+ *  lập của CHECK constraint `telemetry_log_error_code_check`, để test còn chứng
+ *  minh được điều gì khi ai đó nới enum ở phía implementation. */
 const SCHEMA_ERROR_CODES = ["gemini_unavailable", "rate_limited", "server", "not_eligible", "user_quota_exhausted", "project_budget_exhausted"];
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
@@ -66,7 +66,7 @@ interface TelemetryFixture {
 
 /** Lỗi mô phỏng đúng theo "primary failure mode": message của exception mang
  *  theo nội dung câu hỏi/đáp án (UGC do người dùng nhập, có thể bị tác động bởi
- *  kẻ tấn công) — đây chính là con đường rò mà CHECK constraint của §19 và test
+ *  kẻ tấn công) — đây chính là con đường rò mà CHECK constraint `telemetry_log_error_code_check` và test
  *  này cùng tồn tại để chặn. */
 const LEAK_SENTINEL = "SENTINEL-CORRECT-ANSWER-leak";
 const LEAK_SUB_ANSWERS_SENTINEL = "SENTINEL-SUB-ANSWERS-leak";
@@ -249,9 +249,9 @@ describe("buildTelemetryPayload — telemetry không bao giờ mang theo đáp �
     );
     expect(unexpectedColumns).toEqual([]);
 
-    // (3) error_code: NGHIÊM NGẶT null hoặc 1 trong các literal của CHECK §19 —
-    // đối chiếu với bản chép tay SCHEMA_ERROR_CODES, không phải với hằng của
-    // implementation, nên nới enum ở implementation vẫn bị bắt tại đây.
+    // (3) error_code: NGHIÊM NGẶT null hoặc 1 trong các literal của CHECK
+    // `telemetry_log_error_code_check` — đối chiếu với bản chép tay SCHEMA_ERROR_CODES,
+    // không phải với hằng của implementation, nên nới enum ở implementation vẫn bị bắt tại đây.
     const badErrorCodes = built
       .filter(({ payload }) => payload.error_code !== null && !SCHEMA_ERROR_CODES.includes(payload.error_code))
       .map(({ fixture, payload }) => `${fixture.label}: ${String(payload.error_code)}`);
@@ -306,8 +306,8 @@ describe("buildTelemetryPayload — telemetry không bao giờ mang theo đáp �
     // tố thì đúng ca này đỏ, còn cả dàn trên vẫn xanh.
     expect(built[8].payload.error_code).toBeNull();
 
-    // (6) Hằng của implementation phải khớp CHECK constraint §19 từng phần tử —
-    // khoá luôn nguồn duy nhất mà cả kiểu lẫn bộ lọc lúc chạy cùng dùng.
+    // (6) Hằng của implementation phải khớp CHECK constraint
+    // `telemetry_log_error_code_check` từng phần tử — khoá luôn nguồn duy nhất mà cả kiểu lẫn bộ lọc lúc chạy cùng dùng.
     expect([...TELEMETRY_ERROR_CODES]).toEqual(SCHEMA_ERROR_CODES);
   });
 });

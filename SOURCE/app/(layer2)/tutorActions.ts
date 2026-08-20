@@ -9,7 +9,7 @@
 // theo tiền lệ rateExam() (actions.ts:177) chứ không theo submitExam(): người
 // gọi là một affordance nằm giữa trang Chi tiết đã render xong, ném lỗi ở đây
 // sẽ đánh sập cả trang vì một gợi ý không lấy được. Chi tiết lỗi thật chỉ đi ra
-// console phía máy chủ; client luôn chỉ nhận đúng 4 mã đóng của §19.
+// console phía máy chủ; client luôn chỉ nhận đúng 4 mã đóng của backend DD § explainStep() Output.
 //
 // ⏱ HẠN CHÓT vs. TRẦN THỜI GIAN CỦA NỀN TẢNG (backend DD § Assumed Behaviors —
 // mục này ĐÃ ĐÓNG, kiểm chứng khi làm task 13):
@@ -49,7 +49,7 @@ type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
 /** Bốn mã đóng của backend DD § explainStep() Output. CỐ Ý viết lại thành literal
  *  thay vì alias `TelemetryErrorCode`: đây là hợp đồng với UI, còn kia là CHECK
- *  constraint của §19 — hai chủ sở hữu khác nhau. Hai tập trùng nhau hôm nay, và
+ *  constraint `telemetry_log_error_code_check` — hai chủ sở hữu khác nhau. Hai tập trùng nhau hôm nay, và
  *  chính lệnh ghi telemetry ở dưới là chỗ tsc bắt được nếu ai thêm mã thứ 5 chỉ ở
  *  một bên. */
 export type ExplainStepError = "not_eligible" | "rate_limited" | "gemini_unavailable" | "server";
@@ -109,7 +109,7 @@ async function fetchOwnAttemptHistory(supabase: SupabaseClient): Promise<WrongTw
  * § explainStep() Invariants).
  *
  * `userId` KHÔNG BAO GIỜ null ở call site này, dù `TelemetryEvent` cho phép:
- * policy §19 `telemetry_insert_own` là `with check (user_id = auth.uid())`, nên
+ * policy `telemetry_insert_own` của `telemetry_log` là `with check (user_id = auth.uid())`, nên
  * một dòng user_id NULL sẽ bị RLS từ chối thẳng — ghi vào đó là mất dòng chứ
  * không phải "mất danh tính". Giá trị truyền vào luôn lấy từ dòng `exam_attempts`
  * đã qua RLS, tức đúng bằng `auth.uid()`. Những lối thoát KHÔNG có userId (không
@@ -305,7 +305,7 @@ export async function explainStep(attemptId: string, questionId: string): Promis
     await recordTutorInvoke(supabase, { userId, questionId, success: true });
     return { hint };
   } catch (err) {
-    // generateHint() đã phân loại sẵn thất bại của nó thành mã của §19 và đã
+    // generateHint() đã phân loại sẵn thất bại của nó thành mã của `telemetry_log.error_code` và đã
     // logTutorExit() kèm metadata; ở đây chỉ chuyển thẳng, không có bảng ánh xạ
     // thứ hai. Lỗi KHÔNG phải TutorCallError = bug phía ta → "server"; chỉ log
     // tên lỗi, không log message (message có thể vọng lại nội dung câu hỏi UGC).

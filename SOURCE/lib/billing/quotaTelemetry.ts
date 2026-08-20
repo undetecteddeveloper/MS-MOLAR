@@ -14,7 +14,7 @@
 //
 // Bảng KHÔNG nằm trong `quota.ts`: hàm ấy không biết gì về telemetry, và không
 // được biết — nó trả lý do theo từ vựng hạn mức, còn việc dịch sang từ vựng
-// CHECK constraint của §19 thuộc về tầng đang cầm ngữ cảnh.
+// CHECK constraint `telemetry_log_error_code_check` thuộc về tầng đang cầm ngữ cảnh.
 //
 // `satisfies Record<…>` khoá hai đầu: một lý do THỨ TƯ trong tương lai là lỗi
 // biên dịch (thiếu khoá), và một mã không nằm trong `TELEMETRY_ERROR_CODES`
