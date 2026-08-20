@@ -33,12 +33,15 @@
 //     kiểu ở dưới nữa).
 "use server";
 
+import { consumeQuota, type ConsumeResult } from "@/lib/billing/quota";
+import { readEntitlement } from "@/lib/billing/readEntitlement";
 import { guard } from "@/lib/security/rateLimit";
 import { computeWrongTwiceQuestionIds, type WrongTwiceAttempt } from "@/lib/scoring/wrongTwice";
 import { createClient } from "@/lib/supabase/server";
 import { generateHint, TutorCallError } from "@/lib/tutor/callTutor";
 import type { TutorPromptInput } from "@/lib/tutor/prompt";
 import { buildTelemetryPayload, type TelemetryErrorCode } from "@/lib/tutor/telemetry";
+import { GEMINI_CALLS_PER_OPERATION } from "@/lib/ugc/gemini";
 import type { PerQuestionResult } from "@/types/result";
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
@@ -51,6 +54,30 @@ type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 export type ExplainStepError = "not_eligible" | "rate_limited" | "gemini_unavailable" | "server";
 
 export type ExplainStepResult = { hint: string } | { error: ExplainStepError };
+
+/**
+ * Ba lý do từ chối của `consumeQuota()` → ba mã `telemetry_log.error_code`
+ * (backend DD § OK-04).
+ *
+ * Bảng này TỒN TẠI vì hai bên KHÔNG phải cùng một chuỗi: `consumeQuota()` trả
+ * `"user_quota" | "project_budget" | "unavailable"`, còn CHECK constraint nhận
+ * `user_quota_exhausted` / `project_budget_exhausted`. Dựa vào "chúng giống
+ * nhau" là dựa vào một điều không đúng. Bảng nằm Ở ĐÂY chứ không trong
+ * `quota.ts`: hàm ấy không biết gì về telemetry, và không được biết.
+ *
+ * `satisfies Record<…>` khoá hai đầu: một lý do THỨ TƯ trong tương lai là lỗi
+ * biên dịch (thiếu khoá), và một mã không nằm trong `TELEMETRY_ERROR_CODES` cũng
+ * vậy — chứ không phải một `null` im lặng ở cột `error_code` phát hiện ra sau
+ * nhiều tháng, khi lớp lọc lúc chạy của `buildTelemetryPayload()` đã nuốt nó.
+ *
+ * `unavailable` KHÔNG có mã riêng: nó là sự cố hạ tầng của CHÍNH TA, và thêm
+ * literal thứ ba sẽ vượt phạm vi R13 đã tuyên.
+ */
+const QUOTA_REFUSAL_TELEMETRY_CODE = {
+  user_quota: "user_quota_exhausted",
+  project_budget: "project_budget_exhausted",
+  unavailable: "server",
+} as const satisfies Record<Extract<ConsumeResult, { ok: false }>["reason"], TelemetryErrorCode>;
 
 /** Đúng bộ cột AN TOÀN cần cho prompt. `correct_answer`/`sub_answers`/
  *  `essay_answer` không có ở đây, và cũng không thể có: §10c đã REVOKE chúng
@@ -145,13 +172,16 @@ async function recordTutorInvoke(
  *      Validation; đặt lên trước phần tái kiểm tra là chặt hơn chứ không lỏng
  *      hơn (mọi bất biến của DD vẫn giữ), và giữ cho một vòng lặp tự động chỉ
  *      tốn một lệnh đọc thay vì một lần quét toàn bộ lịch sử.
- *   3. Tái kiểm tra sai-hai-lần PHÍA SERVER — cổng bảo mật thật. Cờ
+ *   3. Hạn mức kỳ + ngân sách ngày — cổng chi phí thứ hai, và cũng đứng trước
+ *      mọi thứ tốn kém. Bị từ chối thì client nhận `not_eligible` (một trong
+ *      bốn mã đóng), còn LÝ DO thật chỉ đi vào `telemetry_log.error_code`.
+ *   4. Tái kiểm tra sai-hai-lần PHÍA SERVER — cổng bảo mật thật. Cờ
  *      `hasBeenWrongTwice` mà UI dùng chỉ là tiện ích hiển thị (UI Spec D1);
  *      hàm này tự tính lại từ lịch sử trong DB, không tin bất cứ thứ gì người
  *      gọi khai.
- *   4. Đọc câu hỏi bằng client thường (không phải claim_attempt_answer_key/
+ *   5. Đọc câu hỏi bằng client thường (không phải claim_attempt_answer_key/
  *      exam_answer_key) → không thể nhận về đáp án.
- *   5. Gọi Gemini, rồi ghi telemetry cho MỌI lối thoát có danh tính người dùng.
+ *   6. Gọi Gemini, rồi ghi telemetry cho MỌI lối thoát có danh tính người dùng.
  */
 export async function explainStep(attemptId: string, questionId: string): Promise<ExplainStepResult> {
   const supabase = await createClient();
@@ -183,7 +213,35 @@ export async function explainStep(attemptId: string, questionId: string): Promis
     return { error: "rate_limited" };
   }
 
-  // 3. Tái kiểm tra phía server (AC-021).
+  // 3. Hạn mức kỳ + ngân sách ngày (I2 — AC-014/AC-015/AC-022/AC-023/AC-024).
+  //    ĐỨNG SAU rate limit, cố ý: `consumeQuota()` INCR rồi mới so, nên gọi nó
+  //    cho một lượt đã bị chặn là tính phí một suất cho một lượt không bao giờ
+  //    chạm tới Gemini. Và đứng TRƯỚC mọi thứ tốn kém còn lại, vì đây là cổng
+  //    chi phí thứ hai — một lượt bị từ chối phải phát ĐÚNG 0 request Gemini.
+  //
+  //    HAI MÃ, và chỉ một trong hai ra tới client:
+  //      · client nhận `not_eligible` — MỘT trong bốn mã đóng ở `:51`, đúng mã
+  //        nhánh tái kiểm tra ở dưới trả. Bắt buộc, không phải sở thích (UI Spec
+  //        UI-D3): bốn mã ấy render ra ĐÚNG MỘT câu, nên tách "hết lượt" thành
+  //        mã thứ năm sẽ để lộ ngược lại rằng phía server có vòng tái kiểm tra
+  //        điều kiện. Người dùng biết mình hết lượt TRƯỚC KHI BẤM, suy từ quyền
+  //        lợi (AC-041, C-05 `ExplainStepAffordance.tsx:96-99`) — không phải từ
+  //        một mã lỗi SAU khi bấm.
+  //      · `telemetry_log.error_code` nhận mã PHÂN BIỆT. Đó là chỗ DUY NHẤT sự
+  //        phân biệt tồn tại, và là thứ AC-047 truy vấn được.
+  const ent = await readEntitlement(userId);
+  const consumed = await consumeQuota("tutor", userId, ent, GEMINI_CALLS_PER_OPERATION.tutor);
+  if (!consumed.ok) {
+    await recordTutorInvoke(supabase, {
+      userId,
+      questionId,
+      success: false,
+      errorCode: QUOTA_REFUSAL_TELEMETRY_CODE[consumed.reason],
+    });
+    return { error: "not_eligible" };
+  }
+
+  // 4. Tái kiểm tra phía server (AC-021).
   const history = await fetchOwnAttemptHistory(supabase);
   if (!history) {
     await recordTutorInvoke(supabase, { userId, questionId, success: false, errorCode: "server" });
@@ -209,7 +267,7 @@ export async function explainStep(attemptId: string, questionId: string): Promis
     return { error: "not_eligible" };
   }
 
-  // 4. Nội dung câu hỏi — chỉ cột an toàn.
+  // 5. Nội dung câu hỏi — chỉ cột an toàn.
   const { data: question, error: questionErr } = await supabase
     .from("questions")
     .select(TUTOR_QUESTION_COLUMNS)
@@ -243,7 +301,7 @@ export async function explainStep(attemptId: string, questionId: string): Promis
     return { error: "not_eligible" };
   }
 
-  // 5. Gọi Gemini. KHÔNG gọi buildTutorPrompt() ở đây: generateHint() đã dựng
+  // 6. Gọi Gemini. KHÔNG gọi buildTutorPrompt() ở đây: generateHint() đã dựng
   //    prompt bên trong (callTutor.ts), gọi lần nữa là dựng hai lần cùng một
   //    chuỗi và mở đường cho hai bản prompt trôi lệch nhau.
   const options = questionRow.choices ?? [];

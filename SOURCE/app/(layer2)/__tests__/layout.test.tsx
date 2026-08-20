@@ -338,14 +338,55 @@ describe("Binding decision ADR-0013 — một phép tính quyền lợi, KHÔNG 
   const sourceRoot = path.join(HERE, "..", "..", "..");
 
   /** Ba layout route group được phép gọi, cộng chính module định nghĩa hàm.
-   *  Mọi file khác dưới app/, components/ VÀ lib/ chỉ được đọc context qua
-   *  `useEntitlement()`. */
-  const ALLOWED = [
+   *  Mọi file ĐƯỜNG RENDER khác dưới app/, components/ VÀ lib/ chỉ được đọc
+   *  context qua `useEntitlement()`. */
+  const RENDER_PATH_ALLOWED = [
     "app/(billing)/layout.tsx",
     "app/(layer2)/layout.tsx",
     "app/(layer4)/layout.tsx",
     "lib/billing/readEntitlement.ts",
   ];
+
+  /** Server Action được phép gọi `readEntitlement()`, VÀ VÌ SAO. Mỗi dòng ở đây
+   *  phải tự biện minh — đây không phải chỗ nối thêm cho hết đỏ.
+   *
+   *  ADR-0013 cấm HAI BẢN CÀI ĐẶT, không cấm hai chỗ GỌI. Hại mà nó gọi tên là
+   *  "Two independent implementations of a money-adjacent predicate is the
+   *  shortest path to two different answers on the same account" — một Server
+   *  Action gọi chính `readEntitlement()` là bản cài đặt DUY NHẤT được gọi từ
+   *  một chỗ thứ hai. Hai lối thoát thay thế mới đúng là thứ đẻ ra câu trả lời
+   *  thứ hai: tự suy quyền lợi bên trong `consumeQuota()`, hay nhận quyền lợi
+   *  do client gửi lên.
+   *
+   *  Và phương thuốc mà nhánh ĐƯỜNG RENDER kê KHÔNG TỒN TẠI ở đây: một Server
+   *  Action là một request riêng, không có React context nào để
+   *  `useEntitlement()` đọc; còn tin vào quyền lợi do người gọi khai thì giả
+   *  mạo được, ngay trong file có bất biến là không tin bất cứ thứ gì người gọi
+   *  khai. Một luật mà đường tuân thủ duy nhất của nó không tồn tại nổi trong
+   *  file đang bị xử là luật quá rộng, không phải một vi phạm.
+   *
+   *  ADR-0013 cũng tự xếp Server Action là cơ chế SẴN CÓ chứ không phải tầng
+   *  mới: "Purchase and reconciliation are Server Actions, per the existing
+   *  precedent". */
+  const SERVER_ACTION_ALLOWED = [
+    // Cổng hạn mức gia sư (plan Task 5.3, backend DD I2). `consumeQuota()` cần
+    // `ent.plan` cho PLAN_LIMITS/budgetCeiling và `ent[kind]` cho mốc kỳ, mà
+    // `readEntitlement()` là nguồn duy nhất của giá trị đó.
+    "app/(layer2)/tutorActions.ts",
+  ];
+
+  /** Directive prologue của một Server Action: một string literal đứng MỘT MÌNH
+   *  ở DÒNG MÃ ĐẦU TIÊN của file.
+   *
+   *  Khớp dòng đầu chứ KHÔNG `includes()`: chữ "use server" nằm trong một
+   *  comment hay trong một chuỗi khác không được phép đổi cách phân loại một
+   *  file — nếu không, một page chỉ cần nhắc tới directive trong ghi chú là tự
+   *  chuyển mình sang danh sách lỏng hơn.
+   *
+   *  Chỉ nháy kép: `.prettierrc` đặt `singleQuote: false` nên cả repo là nháy
+   *  kép. Một file viết tay bằng nháy đơn rơi vào nhánh ĐƯỜNG RENDER, tức bị
+   *  siết CHẶT hơn chứ không lỏng ra — hướng sai an toàn. */
+  const SERVER_ACTION_PROLOGUE = /^"use server";?$/;
 
   function walk(dir: string, out: string[] = []): string[] {
     for (const entry of readdirSync(dir)) {
@@ -356,23 +397,65 @@ describe("Binding decision ADR-0013 — một phép tính quyền lợi, KHÔNG 
     return out;
   }
 
-  it("không page/component/helper nào dưới các layout gọi readEntitlement() — họ đọc context", () => {
+  function isServerActionModule(source: string): boolean {
+    const firstCodeLine = codeLines(source)
+      .map((line) => line.trim())
+      .find((line) => line.length > 0);
+    return firstCodeLine !== undefined && SERVER_ACTION_PROLOGUE.test(firstCodeLine);
+  }
+
+  /**
+   * Mọi file nhắc `readEntitlement` trên DÒNG MÃ, chia đúng HAI rổ theo
+   * directive — phân loại theo cách file chạy, không theo đường dẫn của nó.
+   *
+   * Hai rổ dựng từ CÙNG một mảng bằng hai vị từ bù nhau, nên không file nào lọt
+   * khỏi cả hai. Đó là toàn bộ lý do tách, thay vì nối một dòng vào một danh
+   * sách phẳng: danh sách phẳng nhận thêm một entry im lặng cho mỗi task, còn ở
+   * đây một page hay component đặt nhầm rổ vẫn đỏ ở ca ĐƯỜNG RENDER.
+   */
+  function entitlementCallers(): { renderPath: string[]; serverActions: string[] } {
+    const renderPath: string[] = [];
+    const serverActions: string[] = [];
+
     // `lib/` PHẢI nằm trong phạm vi quét: một đường đọc thứ hai đặt trong một
     // helper dưới lib/ mà một page import là VÔ HÌNH với cả hai lớp bảo vệ còn
     // lại — vô hình với ca quét (nếu chỉ quét app/ + components/) và vô hình
     // với bộ đếm `subscriptions` lúc chạy, vì bộ đếm đó chỉ quan sát các lời
     // gọi phát ra trong lượt render layout với `children` do test cấp.
-    const offenders = walk(path.join(sourceRoot, "app"))
+    const files = walk(path.join(sourceRoot, "app"))
       .concat(walk(path.join(sourceRoot, "components")))
-      .concat(walk(path.join(sourceRoot, "lib")))
+      .concat(walk(path.join(sourceRoot, "lib")));
+
+    for (const full of files) {
+      const source = readFileSync(full, "utf8");
       // Chỉ xét dòng MÃ: `quota.ts` nhắc tên `readEntitlement()` trong văn xuôi
       // ba lần và không lời nào là một đường đọc.
-      .filter((f) => /\breadEntitlement\b/.test(codeLines(readFileSync(f, "utf8")).join("\n")))
-      .map((f) => path.relative(sourceRoot, f).split(path.sep).join("/"))
-      .filter((rel) => !ALLOWED.includes(rel));
+      if (!/\breadEntitlement\b/.test(codeLines(source).join("\n"))) continue;
+      const rel = path.relative(sourceRoot, full).split(path.sep).join("/");
+      (isServerActionModule(source) ? serverActions : renderPath).push(rel);
+    }
+
+    return { renderPath, serverActions };
+  }
+
+  it("không page/component/helper nào dưới các layout gọi readEntitlement() — họ đọc context", () => {
+    const offenders = entitlementCallers().renderPath.filter(
+      (rel) => !RENDER_PATH_ALLOWED.includes(rel)
+    );
 
     // Tiền lệ có thật của kiểu trôi này: profile/page.tsx:37 gọi lại
     // getCurrentUserProfile() ngay dưới layout đã gọi nó (backend DD :870).
+    expect(offenders).toEqual([]);
+  });
+
+  it("chỉ những Server Action ĐƯỢC LIỆT KÊ mới gọi readEntitlement() — nhánh này không siết được bằng context", () => {
+    // Nửa MỚI của cổng. Một Server Action mới chạm vào quyền lợi sẽ đỏ ở đây
+    // cho tới khi có người viết ra lý do vào `SERVER_ACTION_ALLOWED` — chứ
+    // không âm thầm thừa hưởng chỗ trống của một danh sách phẳng.
+    const offenders = entitlementCallers().serverActions.filter(
+      (rel) => !SERVER_ACTION_ALLOWED.includes(rel)
+    );
+
     expect(offenders).toEqual([]);
   });
 });

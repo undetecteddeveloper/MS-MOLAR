@@ -174,12 +174,20 @@
 // =============================================================================
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import type { Entitlement } from "@/lib/billing/types";
+import type { ExplainStepError } from "../tutorActions";
 
-const { fromMock, guardMock, generateHintMock } = vi.hoisted(() => ({
-  fromMock: vi.fn(),
-  guardMock: vi.fn(),
-  generateHintMock: vi.fn(),
-}));
+const { fromMock, guardMock, generateHintMock, consumeQuotaMock, readEntitlementMock } = vi.hoisted(
+  () => ({
+    fromMock: vi.fn(),
+    guardMock: vi.fn(),
+    generateHintMock: vi.fn(),
+    consumeQuotaMock: vi.fn(),
+    readEntitlementMock: vi.fn(),
+  })
+);
 
 // tutorActions.ts pulls in "server-only" transitively (supabase/server, gemini) —
 // stub it, same pattern as getResult.int.test.ts / submitExam.int.test.ts.
@@ -207,8 +215,25 @@ vi.mock("@/lib/tutor/callTutor", async (importOriginal) => ({
   generateHint: generateHintMock,
 }));
 
+// Mock boundary 4 — consumeQuota() only (plan Task 5.1). PLAN_LIMITS, quotaKey()
+// and periodStartEpoch() stay REAL: the gate under test is the CALL, not the
+// counter arithmetic, which quota.test.ts already owns end to end. Spreading the
+// original also keeps `QuotaKind` real, so tsc proves the "tutor" argument is a
+// member of the union rather than a runtime assertion here doing it.
+vi.mock("@/lib/billing/quota", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/billing/quota")>()),
+  consumeQuota: consumeQuotaMock,
+}));
+
+// Mock boundary 5 — readEntitlement(). It is a DATA SOURCE for the gate, not the
+// thing under test (its own derivation is proven in readEntitlement.test.ts), and
+// leaving it real would route a second, unrelated set of reads through the same
+// mocked `from()` chain and make `tablesTouched` meaningless.
+vi.mock("@/lib/billing/readEntitlement", () => ({ readEntitlement: readEntitlementMock }));
+
 const { TutorCallError } = await import("@/lib/tutor/callTutor");
 const { explainStep } = await import("../tutorActions");
+
 
 const USER_ID = "user-1";
 /** Lượt đang xem. */
@@ -367,13 +392,30 @@ function mockExplainStepChain(scenario: Scenario) {
   return { insertPayloads, selectArgsByTable, eqArgsByTable, tablesTouched };
 }
 
+/** Quyền lợi mà `readEntitlement()` trả cho lượt gọi này. Giá trị cụ thể không
+ *  quan trọng với cổng — điều quan trọng là ĐÚNG object ấy đi tới `consumeQuota`,
+ *  chứ không phải một bản dựng lại lần thứ hai bên trong action. */
+const ENTITLEMENT: Entitlement = {
+  plan: "free",
+  expiresAt: null,
+  inGracePeriod: false,
+  tutor: { state: "known", used: 5, limit: 5, resetsAt: "2026-09-19T00:00:00.000Z" },
+  upload: { state: "known", used: 0, limit: 3, resetsAt: "2026-09-19T00:00:00.000Z" },
+};
+
 beforeEach(() => {
   fromMock.mockReset();
   guardMock.mockReset();
   generateHintMock.mockReset();
+  consumeQuotaMock.mockReset();
+  readEntitlementMock.mockReset();
   // Mặc định: KHÔNG bị rate limit — mỗi test tự bật ca ngược lại nếu cần.
   guardMock.mockResolvedValue({ ok: true, retryAfterSeconds: 0 });
+  // Mặc định: hạn mức CÒN — cũng vậy, ca từ chối do từng test tự bật.
+  consumeQuotaMock.mockResolvedValue({ ok: true });
+  readEntitlementMock.mockResolvedValue(ENTITLEMENT);
 });
+
 
 describe("explainStep() — Test 1 (AC-021): server-side wrong-twice re-verification is the real eligibility gate", () => {
   it("resolves { error: 'not_eligible' } for a questionId outside the server-recomputed set, and never reaches generateHint()", async () => {
@@ -558,5 +600,231 @@ describe("explainStep() — Test 4 (AC-022): rate limiting rejects before any Ge
     expect(guardMock).toHaveBeenCalledWith("explainStep", USER_ID);
     // "Trước" chứ không chỉ "thay vì": chưa hề đọc tới câu hỏi khi bị chặn.
     expect(tablesTouched).not.toContain("questions");
+  });
+});
+
+// =============================================================================
+// Test 5 (plan Task 5.3 — I2 / AC-014/AC-015/AC-022/AC-023/AC-024 + UI-D3):
+// the quota gate refuses BEFORE Gemini, and the refusal is attributable in
+// telemetry while staying indistinguishable to the client.
+// =============================================================================
+// Hai mã RỜI NHAU đi ra từ cùng một nhánh, và chỉ một trong hai ra tới client:
+//   · phía client — đúng một trong BỐN literal của `ExplainStepError` (`:51`),
+//     ở đây là `not_eligible`, cùng mã mà nhánh tái kiểm tra đã trả từ trước;
+//   · phía `telemetry_log.error_code` — mã PHÂN BIỆT (`user_quota_exhausted` /
+//     `project_budget_exhausted`, còn `unavailable` ⇒ `server`).
+// Bằng chứng thật của "trước Gemini" KHÔNG phải giá trị trả về (cả bốn mã đều
+// render ra MỘT câu, nên giá trị trả về không phân biệt nổi cổng đặt trước hay
+// đặt sau lời gọi) mà là SỐ LẦN gọi `generateHint()` — phải bằng 0.
+describe("explainStep() — Test 5 (plan Task 5.3): the quota gate refuses before Gemini and attributes the refusal only in telemetry", () => {
+  /** Kỳ vọng chép tay, KHÔNG đọc lại từ bảng ánh xạ đang được kiểm tra. */
+  const CLIENT_CODE_FOR_QUOTA_REFUSAL = "not_eligible";
+
+  it("user_quota refusal: client gets not_eligible, telemetry gets user_quota_exhausted, and generateHint() is called 0 times", async () => {
+    const { insertPayloads, tablesTouched } = mockExplainStepChain({
+      attempt: { user_id: USER_ID },
+      question: QUESTION_ROW,
+    });
+    consumeQuotaMock.mockResolvedValue({ ok: false, reason: "user_quota" });
+
+    // Câu ĐỦ điều kiện: thứ duy nhất chặn lượt gọi này là hạn mức.
+    const result = await explainStep(ATTEMPT_ID, Q_ELIGIBLE);
+
+    expect(result).toEqual({ error: CLIENT_CODE_FOR_QUOTA_REFUSAL });
+    // Nghĩa vụ chính: 0 request Gemini trong ca bị chặn. Đặt cổng SAU lời gọi
+    // thì dòng này thành 1 — và không assert nào khác trong file phân biệt được
+    // hai cách đặt ấy, vì giá trị trả về giống hệt nhau.
+    expect(generateHintMock).toHaveBeenCalledTimes(0);
+    expect(insertPayloads).toHaveLength(1);
+    expect(insertPayloads[0]).toMatchObject({
+      event_type: "tutor_invoke",
+      success: false,
+      user_id: USER_ID,
+      question_id: Q_ELIGIBLE,
+      error_code: "user_quota_exhausted",
+    });
+    // Danh sách ĐẦY ĐỦ chứ không phải `not.toContain("questions")`: cổng đứng
+    // trước CẢ lượt quét lịch sử wrong-twice lẫn lượt đọc câu hỏi, nên một lượt
+    // bị chặn chỉ chạm đúng hai bảng.
+    expect(tablesTouched).toEqual(["exam_attempts", "telemetry_log"]);
+  });
+
+  it("project_budget refusal: the SAME client code but a DIFFERENT telemetry code — the two policy refusals are not collapsed into one constant", async () => {
+    // Ca này là thứ duy nhất phân biệt được một bảng ánh xạ THẬT với một hằng
+    // số: gieo HAI giá trị khác nhau vào cùng một cột, rồi đọc ra hai giá trị.
+    const { insertPayloads } = mockExplainStepChain({
+      attempt: { user_id: USER_ID },
+      question: QUESTION_ROW,
+    });
+
+    consumeQuotaMock.mockResolvedValueOnce({ ok: false, reason: "user_quota" });
+    const userQuotaResult = await explainStep(ATTEMPT_ID, Q_ELIGIBLE);
+
+    consumeQuotaMock.mockResolvedValueOnce({ ok: false, reason: "project_budget" });
+    const budgetResult = await explainStep(ATTEMPT_ID, Q_ELIGIBLE);
+
+    // Phía client: KHÔNG phân biệt được (đúng UI-D3).
+    expect(userQuotaResult).toEqual({ error: CLIENT_CODE_FOR_QUOTA_REFUSAL });
+    expect(budgetResult).toEqual(userQuotaResult);
+
+    // Phía telemetry: phân biệt được, và bằng hai literal chép tay.
+    expect(insertPayloads.map((p) => p.error_code)).toEqual([
+      "user_quota_exhausted",
+      "project_budget_exhausted",
+    ]);
+    // Nói thẳng bất biến, không để nó chỉ ngụ ý trong mảng trên: một bản cài đặt
+    // trả cùng một hằng cho cả hai lý do vẫn qua được `toMatchObject` từng ca
+    // nếu ta chỉ gieo MỘT giá trị.
+    expect(insertPayloads[0].error_code).not.toBe(insertPayloads[1].error_code);
+    expect(generateHintMock).toHaveBeenCalledTimes(0);
+  });
+
+  it("unavailable refusal (AC-024, Redis down): telemetry reuses server rather than opening a third literal, and still 0 Gemini calls", async () => {
+    const { insertPayloads } = mockExplainStepChain({
+      attempt: { user_id: USER_ID },
+      question: QUESTION_ROW,
+    });
+    consumeQuotaMock.mockResolvedValue({ ok: false, reason: "unavailable" });
+
+    const result = await explainStep(ATTEMPT_ID, Q_ELIGIBLE);
+
+    expect(result).toEqual({ error: CLIENT_CODE_FOR_QUOTA_REFUSAL });
+    expect(insertPayloads).toHaveLength(1);
+    // `unavailable` là SỰ CỐ HẠ TẦNG CỦA TA, không phải một quyết định chính
+    // sách — nó dùng lại `server` chứ không mở thêm literal thứ ba (R13 scope).
+    expect(insertPayloads[0].error_code).toBe("server");
+    expect(generateHintMock).toHaveBeenCalledTimes(0);
+  });
+
+  it("the telemetry code is never the value handed back to the client, in all three reasons", async () => {
+    // Bất biến ĐỌC ĐƯỢC của UI-D3 ở phía server: thứ ghi vào cột và thứ trả ra
+    // cho người gọi là hai giá trị KHÁC NHAU. Một "đơn giản hoá" tương lai trả
+    // thẳng mã telemetry ra client hỏng ở đúng ba dòng cuối.
+    const { insertPayloads } = mockExplainStepChain({
+      attempt: { user_id: USER_ID },
+      question: QUESTION_ROW,
+    });
+
+    const returned: string[] = [];
+    for (const reason of ["user_quota", "project_budget", "unavailable"]) {
+      consumeQuotaMock.mockResolvedValueOnce({ ok: false, reason });
+      const result = await explainStep(ATTEMPT_ID, Q_ELIGIBLE);
+      returned.push((result as { error: string }).error);
+    }
+
+    expect(returned).toEqual(["not_eligible", "not_eligible", "not_eligible"]);
+    expect(insertPayloads.map((p) => p.error_code)).toEqual([
+      "user_quota_exhausted",
+      "project_budget_exhausted",
+      "server",
+    ]);
+    expect(insertPayloads[0].error_code).not.toBe(returned[0]);
+    expect(insertPayloads[1].error_code).not.toBe(returned[1]);
+    expect(insertPayloads[2].error_code).not.toBe(returned[2]);
+  });
+
+  it("positive control: quota granted, so the SAME fixture reaches generateHint() once and the success row carries no error code", async () => {
+    // Không có ca này thì mọi "0 lần gọi" ở trên có thể xanh chỉ vì hàm hỏng ở
+    // một bước sớm hơn cổng.
+    const { insertPayloads } = mockExplainStepChain({
+      attempt: { user_id: USER_ID },
+      question: QUESTION_ROW,
+    });
+    generateHintMock.mockResolvedValue(HINT_TEXT);
+
+    expect(await explainStep(ATTEMPT_ID, Q_ELIGIBLE)).toEqual({ hint: HINT_TEXT });
+    expect(generateHintMock).toHaveBeenCalledTimes(1);
+    expect(insertPayloads).toHaveLength(1);
+    expect(insertPayloads[0]).toMatchObject({ success: true, error_code: null });
+  });
+
+  it("calls consumeQuota exactly once, with the tutor kind, the RLS-derived userId, the entitlement just read, and a cost of 1", async () => {
+    mockExplainStepChain({ attempt: { user_id: USER_ID }, question: QUESTION_ROW });
+    generateHintMock.mockResolvedValue(HINT_TEXT);
+
+    await explainStep(ATTEMPT_ID, Q_ELIGIBLE);
+
+    // `1` là literal chép tay (kế hoạch: tutor = 1 request Gemini), KHÔNG đọc ra
+    // từ `GEMINI_CALLS_PER_OPERATION`. Đọc ra từ bảng thì ca này xanh với MỌI
+    // giá trị của bảng, kể cả khi call site ghim cứng một số khác.
+    expect(consumeQuotaMock).toHaveBeenCalledTimes(1);
+    expect(consumeQuotaMock).toHaveBeenCalledWith("tutor", USER_ID, ENTITLEMENT, 1);
+    // `userId` lấy từ dòng attempt đã qua RLS, đúng lối `guard()` ở trên — không
+    // thêm một round-trip `auth.getUser()` thứ hai.
+    expect(readEntitlementMock).toHaveBeenCalledWith(USER_ID);
+  });
+
+  it("a rate-limited call never reaches the quota gate — a refused call must not also burn a period unit", async () => {
+    mockExplainStepChain({ attempt: { user_id: USER_ID }, question: QUESTION_ROW });
+    guardMock.mockResolvedValue({ ok: false, retryAfterSeconds: 42 });
+
+    expect(await explainStep(ATTEMPT_ID, Q_ELIGIBLE)).toEqual({ error: "rate_limited" });
+    // Thứ tự hai cổng là quan sát được, và nó có hậu quả thật: `consumeQuota()`
+    // INCR trước rồi mới so, nên gọi nó cho một lượt đã bị chặn là tính phí một
+    // suất cho một lượt không bao giờ chạm tới Gemini.
+    expect(consumeQuotaMock).toHaveBeenCalledTimes(0);
+    expect(generateHintMock).toHaveBeenCalledTimes(0);
+  });
+});
+
+// =============================================================================
+// Test 6 (UI-D3 / AC-041): the client-visible union stays exactly four literals
+// =============================================================================
+// Cổng này là KIỂU + VĂN BẢN, cố ý: hai nửa bắt hai lỗi khác nhau. Kiểu bắt việc
+// THÊM một literal vào union (một `Record<ExplainStepError, …>` thiếu khoá là
+// lỗi biên dịch); văn bản bắt việc TRẢ RA một chuỗi ngoài bốn mã ở một nhánh
+// mới mà chưa test nào chạm tới.
+describe("explainStep() — Test 6 (UI-D3): the client-visible refusal union is still exactly four literals", () => {
+  const TUTOR_ACTIONS_SOURCE = readFileSync(
+    path.join(process.cwd(), "app/(layer2)/tutorActions.ts"),
+    "utf8"
+  );
+
+  it("ExplainStepError has exactly the four declared members — a fifth is a compile error and fails here too", () => {
+    // `Record<ExplainStepError, true>`: thêm literal thứ 5 vào union ⇒ thiếu
+    // khoá ⇒ tsc đỏ; đổi tên một literal ⇒ excess property ⇒ tsc đỏ. Dòng
+    // `Object.keys` bên dưới ghim SỐ LƯỢNG lúc chạy, cho ca mà ai đó sửa luôn
+    // object này cho khớp với một union đã nới.
+    const everyClientCode: Record<ExplainStepError, true> = {
+      not_eligible: true,
+      rate_limited: true,
+      gemini_unavailable: true,
+      server: true,
+    };
+
+    expect(Object.keys(everyClientCode).sort()).toEqual([
+      "gemini_unavailable",
+      "not_eligible",
+      "rate_limited",
+      "server",
+    ]);
+  });
+
+  it("every literal the action RETURNS to the client is a member of those four — the two quota codes never leave the telemetry payload", () => {
+    // Quét văn bản nguồn chứ không gọi hàm: một nhánh từ chối MỚI (chưa có test
+    // nào chạm tới) vẫn bị bắt ở đây, còn một dàn ca chỉ phủ các nhánh đã biết
+    // thì không.
+    const returned = [...TUTOR_ACTIONS_SOURCE.matchAll(/return \{ error: "([^"]+)" \}/g)].map(
+      (m) => m[1]
+    );
+
+    expect(returned.length).toBeGreaterThan(0);
+    expect([...new Set(returned)].sort()).toEqual(["not_eligible", "rate_limited", "server"]);
+    // Nói thẳng điều UI-D3 cấm: hai mã phân biệt CHỈ được sống trong payload
+    // telemetry — không bao giờ trong một câu lệnh `return`, và không bao giờ
+    // trong chính union.
+    for (const quotaCode of ["user_quota_exhausted", "project_budget_exhausted"]) {
+      expect(TUTOR_ACTIONS_SOURCE).not.toContain(`return { error: "${quotaCode}" }`);
+      expect(TUTOR_ACTIONS_SOURCE).not.toContain(`| "${quotaCode}"`);
+    }
+  });
+
+  it("the tutor gate reads its Gemini cost from GEMINI_CALLS_PER_OPERATION, never from a literal at the call site", () => {
+    // Nghĩa vụ của plan Task 5.2: con số là MỘT sự thật, không phải một bản sao.
+    // Ca hành vi ở trên khoá GIÁ TRỊ `1`; ca này khoá NGUỒN của nó — hai lời
+    // khai rời nhau về cùng một chi phí là đúng thứ Task 5.2 tồn tại để xoá.
+    expect(TUTOR_ACTIONS_SOURCE).toMatch(
+      /consumeQuota\(\s*"tutor",\s*userId,\s*ent,\s*GEMINI_CALLS_PER_OPERATION\.tutor\s*\)/
+    );
   });
 });
