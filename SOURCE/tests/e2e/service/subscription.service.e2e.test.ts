@@ -9,11 +9,11 @@
 // =============================================================================
 // FILE STATUS — read before editing
 // =============================================================================
-// SVC-1 IS IMPLEMENTED AND EXECUTED (backend-task-29 / plan Task 6.1); its code
-// lives at the FOOT of this file, below the SVC-2 block, so both reserved-slot
-// annotations stay adjacent and readable. SVC-2 IS STILL A SKELETON: comments
-// only, no describe/it, no assertions, and plan Task 6.2 / backend-task-30 adds
-// them in the same commit as its implementation.
+// SVC-1 AND SVC-2 ARE BOTH IMPLEMENTED AND EXECUTED (backend-task-29 / plan
+// Task 6.1, and backend-task-30 / plan Task 6.2); their code lives at the FOOT
+// of this file, below both reserved-slot annotation blocks, so those two
+// annotations stay adjacent and readable. The lane is complete at 2/2 cases and
+// no skeleton remains in this file.
 //
 // WHY THIS LANE EXISTS FOR THIS FEATURE. Both cases below qualify on the
 // lane's own criterion — "data persists across a real DB write" — and neither
@@ -350,7 +350,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => {
     if (!sessionHolder.current) {
-      throw new Error("SVC-1: chưa có phiên fixture nào đang hoạt động");
+      throw new Error("làn service: chưa có phiên fixture nào đang hoạt động");
     }
     return sessionHolder.current;
   },
@@ -369,11 +369,18 @@ vi.mock("@/lib/billing/payos", async (importOriginal) => {
     ...actual,
     getPaymentStatus: (orderCode: number) => {
       const adapter = adapterHolder.current;
-      if (!adapter) throw new Error("SVC-1: stub payOS chưa được gắn vào holder");
+      if (!adapter) {
+        throw new Error(
+          "làn service: stub payOS chưa được gắn vào holder — mỗi describe tự NHẬN " +
+            "holder trong beforeAll của chính nó"
+        );
+      }
       return adapter.simulateGetPaymentStatus(orderCode);
     },
     createPaymentRequest: () => {
-      throw new Error("SVC-1 không bao giờ tạo payment request — xem HARD SCOPE LIMIT");
+      throw new Error(
+        "không ca nào trong làn này tạo payment request — xem HARD SCOPE LIMIT"
+      );
     },
   };
 });
@@ -386,7 +393,25 @@ const fixture = createSubscriptionServiceFixture({
   orderCodeBlock: 0,
   sessionHolder,
 });
-adapterHolder.current = fixture.adapter;
+
+/** `caseTag` VÀ khối mã đều khác SVC-1 — registry của module fixture ném ngay lúc
+ *  dựng nếu trùng — nên tài khoản, dòng đơn và lệnh xoá của hai làn không với tới
+ *  nhau được. */
+const svc2Fixture = createSubscriptionServiceFixture({
+  caseTag: "svc2",
+  orderCodeBlock: 1,
+  sessionHolder,
+});
+
+// HAI describe DÙNG CHUNG MỘT `vi.mock`, nên holder adapter được MỖI describe tự
+// NHẬN trong `beforeAll` của chính nó, chứ KHÔNG gán một lần ở mức module như bản
+// một-describe trước đây. Gán một lần là một phụ thuộc thứ tự ẩn: describe nào
+// chạy sau cũng đọc bộ đếm của fixture describe kia, nên phép đếm 0 của SVC-2 —
+// thứ chứng minh nhánh từ chối không tốn lượt gọi nhà cung cấp nào — sẽ đúng vì
+// nhìn nhầm một bộ đếm chứ không vì hành vi. Hai describe không bao giờ chạy xen
+// kẽ nhau (một suite chạy hết mới tới suite kia, kể cả dưới
+// `--sequence.shuffle.tests`), nên "ai vào thì nhận" là đủ và không cần trả lại
+// holder lúc ra.
 
 // --- Hằng số kỳ vọng, VIẾT TAY -----------------------------------------------
 
@@ -501,6 +526,7 @@ describe.skipIf(!HAS_LIVE_DB)(
   "SVC-1 — settlement cấp đúng MỘT kỳ, đúng MỘT lần, và chỉ sau khi nhà cung cấp nói đã trả",
   () => {
     beforeAll(async () => {
+      adapterHolder.current = fixture.adapter;
       await fixture.setUp();
     }, HOOK_TIMEOUT_MS);
 
@@ -1015,6 +1041,330 @@ describe.skipIf(!HAS_LIVE_DB)(
         await fixture.setUp();
       },
       HOOK_TIMEOUT_MS
+    );
+  }
+);
+
+// =============================================================================
+// SVC-2 — IMPLEMENTATION (plan Task 6.2 / backend-task-30)
+// =============================================================================
+// CÂU HỎI CỦA CẢ KHỐI NÀY LÀ VỀ CHÍNH SÁCH, KHÔNG PHẢI VỀ TYPESCRIPT.
+//   `recheckOrder()` không so `user_id` với ai cả: nó đọc dòng đơn bằng client
+//   THEO PHIÊN và giao toàn bộ phép phân quyền cho `orders_select_own`
+//   (`for select to authenticated using (user_id = auth.uid())`, schema.sql
+//   §payment_orders). Nên một ca chỉ chứng minh "TypeScript có kiểm chủ sở hữu"
+//   sẽ thoả MẶT CHỮ của task này mà để nguyên đúng thứ nó tồn tại để đóng. Ca
+//   (b+c) vì thế hỏi CHÍNH SÁCH trực tiếp — phiên của B, một câu select thẳng
+//   xuống `payment_orders` — trước khi hỏi hành động.
+//
+// HÌNH DẠNG QUAN SÁT ĐƯỢC CỦA MỘT LƯỢT TỪ CHỐI BỞI RLS LÀ 0 DÒNG, KHÔNG PHẢI MỘT
+//   LỖI, và nhầm chỗ này là cách một ca RLS im lặng không bao giờ đỏ được.
+//   `expect(error).not.toBeNull()` ở đây SAI HÌNH DẠNG: policy không sinh lỗi, và
+//   một "hàm không tồn tại" hay một sự cố mạng lại thoả nó. Khẳng định đúng là
+//   `error` BẰNG null VÀ tập dòng RỖNG, kèm HAI đối chứng dương trong CÙNG ca —
+//   A đọc ĐƯỢC dòng của A qua đúng đường ấy, và service_role vẫn thấy dòng — nên
+//   một policy cấm tất, một dòng không tồn tại, một bảng trống, hay một lượt đọc
+//   hỏng đều không giả dạng được "đã chặn đúng".
+//
+// VÌ SAO (b), (c) VÀ (d) LÀ MỘT `it()`. Phép bằng nhau sâu là một khẳng định
+//   trên HAI giá trị, nên tách thành hai `it()` thì hai giá trị ấy chỉ nối được
+//   với nhau bằng biến mức module — đúng khuyết tật phụ thuộc thứ tự mà khối
+//   (a+b+c) của SVC-1 đã bị gỡ ra khỏi. Ở đây chúng là `const` cục bộ trong một
+//   hàm và không ca nào khác đọc tới được.
+//
+// VÌ SAO ĐỐI CHỨNG DƯƠNG (a) NẰM RIÊNG MỘT `it()`. Nó tự dựng tiền đề của chính
+//   nó (dọn subscriptions, seed đơn riêng) nên không áp thứ tự lên ai; tách ra
+//   để một lượt hỏng "hành động từ chối TẤT CẢ" hiện ra thành một ca đỏ mang tên
+//   nó, thay vì làm đỏ ca kia ở một khẳng định không liên quan.
+
+/** Thu mọi lối ra console trong lúc `run()` chạy — sáu phương thức, vì một cài
+ *  đặt rò rỉ không có nghĩa vụ chọn `console.log`. Trả về CẢ giá trị lẫn chuỗi
+ *  nhật ký, nên ca gọi không phải giữ trạng thái ngoài phạm vi hàm.
+ *
+ *  `mockRestore()` trong `finally`: một lời gọi ném mà vẫn để nguyên spy sẽ nuốt
+ *  mọi dòng log của phần còn lại của file. */
+async function captureConsole<T>(run: () => Promise<T>): Promise<{ value: T; output: string }> {
+  const lines: string[] = [];
+  const methods = ["log", "info", "warn", "error", "debug", "trace"] as const;
+  const spies = methods.map((method) =>
+    vi.spyOn(console, method).mockImplementation((...args: unknown[]) => {
+      lines.push(args.map(stringifyLogArg).join(" "));
+    })
+  );
+  try {
+    const value = await run();
+    return { value, output: lines.join("\n") };
+  } finally {
+    for (const spy of spies) spy.mockRestore();
+  }
+}
+
+/** Một `Error` được ghi ra nhật ký mang thông tin trong `message` VÀ trong
+ *  `stack`; `JSON.stringify(err)` trả về `{}` và sẽ giấu mất cả hai. */
+function stringifyLogArg(arg: unknown): string {
+  if (typeof arg === "string") return arg;
+  if (arg instanceof Error) return `${arg.name}: ${arg.message}\n${arg.stack ?? ""}`;
+  try {
+    return JSON.stringify(arg) ?? String(arg);
+  } catch {
+    return String(arg);
+  }
+}
+
+interface LogSecret {
+  label: string;
+  value: string;
+}
+
+/** Trả về NHÃN của những bí mật xuất hiện trong `output`. Trả nhãn chứ không trả
+ *  boolean: một ca đỏ khi ấy nói ra CÁI GÌ đã rò, không chỉ nói rằng có rò. */
+function leakedLabels(output: string, secrets: LogSecret[]): string[] {
+  return secrets.filter((secret) => output.includes(secret.value)).map((secret) => secret.label);
+}
+
+describe.skipIf(!HAS_LIVE_DB)(
+  "SVC-2 — recheckOrder() theo phạm vi chủ sở hữu: đơn của người khác VÔ HÌNH y hệt một mã không tồn tại",
+  () => {
+    beforeAll(async () => {
+      adapterHolder.current = svc2Fixture.adapter;
+      await svc2Fixture.setUp();
+    }, HOOK_TIMEOUT_MS);
+
+    afterAll(async () => {
+      await svc2Fixture.tearDown();
+      expect(await svc2Fixture.countFixtureRows()).toEqual({
+        paymentOrders: 0,
+        subscriptions: 0,
+        authUsers: 0,
+      });
+    }, HOOK_TIMEOUT_MS);
+
+    // Trợ giúp của RIÊNG describe này, đóng quanh `svc2Fixture`. Khai trong thân
+    // describe chứ không ở mức module: các trợ giúp cùng vai ở nửa trên file đóng
+    // quanh fixture của SVC-1, và một ca SVC-2 lỡ gọi nhầm sẽ đọc tài khoản của
+    // làn kia — một lượt xanh vì nhìn nhầm chỗ.
+    async function orderRowOf(orderCode: number): Promise<PaymentOrderRow> {
+      const row = await svc2Fixture.readOrderRow(orderCode);
+      if (!row) throw new Error(`đơn ${orderCode} không còn trong payment_orders`);
+      return row;
+    }
+
+    /** CẢ dòng, tuần tự hoá nguyên trạng: `readOrderRow()` dùng `select("*")`, nên
+     *  một cột thứ mười hai thêm vào sau này vẫn tham gia phép so "y hệt từng
+     *  byte" thay vì bị phép chiếu bỏ ra ngoài. */
+    async function orderSnapshot(orderCode: number): Promise<string> {
+      return JSON.stringify(await orderRowOf(orderCode));
+    }
+
+    async function subscriptionCount(role: FixtureUserRole): Promise<number> {
+      const res = await svc2Fixture
+        .admin()
+        .from("subscriptions")
+        .select("user_id", { count: "exact", head: true })
+        .eq("user_id", svc2Fixture.userId(role));
+      if (res.error) throw res.error;
+      return res.count ?? 0;
+    }
+
+    /** Phạm vi là ĐÚNG `user_id` của tài khoản fixture — không bao giờ một vị từ
+     *  rộng. Đưa một vai về "chưa từng mua" để phép đếm 0 sau đó có nghĩa. */
+    async function clearSubscriptionOf(role: FixtureUserRole): Promise<void> {
+      const res = await svc2Fixture
+        .admin()
+        .from("subscriptions")
+        .delete()
+        .eq("user_id", svc2Fixture.userId(role));
+      if (res.error) throw res.error;
+    }
+
+    // =========================================================================
+    // (a) — ĐỐI CHỨNG DƯƠNG: chính chủ gọi trên đơn của chính mình thì ĐI TIẾP
+    // =========================================================================
+    // Cài đặt SAI bị ca này loại: một hành động từ chối TẤT CẢ. Không có ca này,
+    //   (b) và (c) chứng minh đúng con số không — `.eq("order_code", -1)`, một
+    //   policy cấm tất, một bảng trống, hay một `return unknown_order` đặt ngay
+    //   dòng đầu hàm đều làm hai nhánh kia xanh. Đây là nửa "chỉ từ chối vì đúng
+    //   lý do" của nghĩa vụ chứng minh.
+    it(
+      "(a) ĐỐI CHỨNG DƯƠNG — A gọi recheckOrder() trên đơn CỦA CHÍNH MÌNH ⇒ đọc thấy dòng, đi tiếp tới nhà cung cấp và settle",
+      async () => {
+        await clearSubscriptionOf("A");
+        expect(await subscriptionCount("A")).toBe(0);
+
+        const seeded = await svc2Fixture.seedPendingOrder("A");
+        svc2Fixture.adapter.reset();
+        svc2Fixture.adapter.setPaymentStatus({ status: "paid", amount: seeded.amountVnd });
+        svc2Fixture.useSession("A");
+
+        const outcome = await recheckOrder(seeded.orderCode);
+
+        // Đi TIẾP, tức lượt đọc theo phiên đã TRẢ VỀ một dòng: đúng cái mà (b) và
+        // (c) khẳng định là KHÔNG xảy ra cho B.
+        assertSettled(outcome);
+        expect(svc2Fixture.adapter.getPaymentStatusCallCount).toBe(1);
+        expect(svc2Fixture.adapter.getPaymentStatusOrderCodes).toEqual([seeded.orderCode]);
+
+        const after = await orderRowOf(seeded.orderCode);
+        expect(after.status).toBe("paid");
+        expect(after.settled_at).not.toBeNull();
+        expect(await subscriptionCount("A")).toBe(1);
+      },
+      CASE_TIMEOUT_MS
+    );
+
+    // =========================================================================
+    // (b+c+d+e+f+g) — hai lượt từ chối KHÔNG PHÂN BIỆT ĐƯỢC: ở giá trị, ở chi
+    //                 phí, ở dấu vết trên CSDL và ở nhật ký
+    // =========================================================================
+    // Cài đặt SAI bị khối này loại:
+    //   (1) lượt đọc chủ sở hữu đi bằng `service_role` (hoặc nhánh
+    //       `if (!data) return unknown_order` bị gỡ, để `settleOrder()` — thứ
+    //       ĐƯỢC PHÉP đọc bằng service_role — trả lời thay): B đọc thấy đơn của
+    //       A, adapter bị gọi, dòng của A đổi trạng thái. Đây là máy dò mà
+    //       FE-B-02 tồn tại để chặn, và nó KHÔNG làm hỏng một phép biên dịch nào.
+    //   (2) hai nhánh trả về hai giá trị khác nhau, hoặc một nhánh mang thêm một
+    //       trường ("owner", "exists", một gợi ý trạng thái): phép bằng nhau sâu
+    //       `toStrictEqual` bắt được, kể cả khi trường thừa mang `undefined`.
+    //   (3) nhánh đơn-của-người-khác chạm nhà cung cấp TRƯỚC khi từ chối: hai giá
+    //       trị vẫn bằng nhau nhưng độ trễ tách được chúng ra. Bộ đếm 0 khẳng
+    //       định RIÊNG cho từng nhánh là thứ duy nhất trong file bắt được.
+    //   (4) một dòng nhật ký chẩn đoán mang chủ sở hữu / số tiền / số tài khoản /
+    //       nội dung chuyển khoản (AC-034) — máy dò đọc log thay vì đọc giá trị.
+    // KHÔNG chỉ có phép bằng nhau sâu: hai nhánh cùng trả `{error:"rate_limited"}`
+    //   cũng bằng nhau sâu. Nên mỗi giá trị còn bị so với MỘT LITERAL VIẾT TAY.
+    it(
+      "(b+c+d+e+f+g) B gọi trên đơn của A và trên một mã không ai sở hữu ⇒ hai kết quả BẰNG NHAU SÂU và đúng bằng {settled:false,reason:'unknown_order'}, mỗi nhánh 0 lượt gọi nhà cung cấp, dòng của A y hệt từng byte, 0 dòng subscriptions, 0 rò rỉ nhật ký",
+      async () => {
+        // --- Tiền đề, được BẢO ĐẢM chứ không trông cậy ----------------------
+        await clearSubscriptionOf("A");
+        await clearSubscriptionOf("B");
+        expect(await subscriptionCount("A")).toBe(0);
+        expect(await subscriptionCount("B")).toBe(0);
+
+        const seeded = await svc2Fixture.seedPendingOrder("A");
+        // Cấp phát trong khối dành riêng của làn NHƯNG KHÔNG seed: mã này không
+        // ai sở hữu theo cấu tạo, và nằm trong khối nên tearDown vẫn quét qua.
+        const unownedCode = svc2Fixture.nextOrderCode();
+        expect(unownedCode).not.toBe(seeded.orderCode);
+        // "Không ai sở hữu" nói bằng service_role — thứ bỏ qua RLS — nên nó là
+        // một phát biểu về CSDL, không phải về tầm nhìn của một phiên.
+        expect(await svc2Fixture.readOrderRow(unownedCode)).toBeNull();
+
+        const rowBefore = await orderRowOf(seeded.orderCode);
+        const snapshotBefore = JSON.stringify(rowBefore);
+        expect(rowBefore.status).toBe("pending");
+        expect(rowBefore.user_id).toBe(svc2Fixture.userId("A"));
+        // Hai danh tính KHÁC nhau thật: một fixture lỡ đăng nhập cả hai vai vào
+        // cùng một tài khoản sẽ làm cả ca này vô nghĩa mà vẫn xanh.
+        expect(rowBefore.user_id).not.toBe(svc2Fixture.userId("B"));
+
+        // --- CHÍNH SÁCH, hỏi thẳng: đây là thứ đang bị kiểm ------------------
+        // Phiên của B, một câu select xuống thẳng bảng. Không TypeScript nào của
+        // ta nằm giữa; thứ quyết định là `orders_select_own`.
+        const foreignRead = await svc2Fixture
+          .sessionFor("B")
+          .from("payment_orders")
+          .select("*")
+          .eq("order_code", seeded.orderCode);
+        expect(foreignRead.error).toBeNull();
+        expect(foreignRead.data).toEqual([]);
+
+        // ĐỐI CHỨNG DƯƠNG 1 — cùng câu, cùng mã, chỉ khác danh tính: chính chủ
+        // ĐỌC ĐƯỢC. Một policy cấm tất sẽ đỏ ở đây.
+        const ownerRead = await svc2Fixture
+          .sessionFor("A")
+          .from("payment_orders")
+          .select("*")
+          .eq("order_code", seeded.orderCode);
+        expect(ownerRead.error).toBeNull();
+        expect(ownerRead.data).toHaveLength(1);
+        expect(Number((ownerRead.data as PaymentOrderRow[])[0].order_code)).toBe(seeded.orderCode);
+
+        // ĐỐI CHỨNG DƯƠNG 2 — dòng CÓ THẬT vào lúc B bị từ chối: `rowBefore` vừa
+        // được service_role đọc lên ngay trên kia, nên "0 dòng" của B không thể
+        // là "bảng trống" hay "đơn đã bị xoá".
+        expect(Number(rowBefore.order_code)).toBe(seeded.orderCode);
+
+        // Mã không ai sở hữu, cũng qua phiên của B: 0 dòng, không lỗi — CÙNG hình
+        // dạng quan sát được như đơn của người khác, ngay tại tầng CSDL.
+        const unownedRead = await svc2Fixture
+          .sessionFor("B")
+          .from("payment_orders")
+          .select("*")
+          .eq("order_code", unownedCode);
+        expect(unownedRead.error).toBeNull();
+        expect(unownedRead.data).toEqual([]);
+
+        // --- Máy dò nhật ký, và phép TỰ KIỂM của chính nó -------------------
+        // Bốn thứ AC-034 cấm, lấy từ dòng đã seed (giá trị fixture ĐÃ YÊU CẦU),
+        // không suy ra từ mã đang bị kiểm.
+        const secrets: LogSecret[] = [
+          { label: "chủ sở hữu", value: svc2Fixture.userId("A") },
+          { label: "số tiền", value: String(seeded.amountVnd) },
+          { label: "số tài khoản", value: rowBefore.account_number },
+          { label: "nội dung chuyển khoản", value: rowBefore.memo },
+        ];
+        expect(secrets).toHaveLength(4);
+        // MỘT DANH SÁCH RỖNG cũng cho `leakedLabels(...) === []`, và một spy chưa
+        // gắn cũng thế: hai lượt xanh vì máy dò hỏng đọc y hệt hai lượt xanh vì
+        // không có gì rò. Con chim hoàng yến này chạy qua ĐÚNG cỗ máy ấy và đòi
+        // nó bắt được CẢ BỐN — nếu nó không bắt nổi bốn thứ đang phơi ra thì hai
+        // khẳng định `[]` bên dưới không có giá trị gì.
+        const canary = await captureConsole(async () => {
+          console.error("[canary]", secrets.map((secret) => secret.value).join(" "));
+          return null;
+        });
+        expect(leakedLabels(canary.output, secrets)).toEqual(secrets.map((secret) => secret.label));
+
+        // --- NHÁNH (b): B + orderCode CỦA A ---------------------------------
+        // Adapter được nạp "ĐÃ TRẢ" đúng số tiền của dòng: nếu phép phân phạm vi
+        // hỏng, lượt gọi này KHÔNG âm thầm trôi qua — nó settle đơn của A, và ba
+        // khẳng định dưới đây (bộ đếm, ảnh chụp byte, phép đếm subscriptions)
+        // cùng đỏ. Nạp "chưa trả" sẽ làm một lượt rò rỉ trở nên êm hơn.
+        svc2Fixture.adapter.reset();
+        svc2Fixture.adapter.setPaymentStatus({ status: "paid", amount: seeded.amountVnd });
+        svc2Fixture.useSession("B");
+
+        const foreign = await captureConsole(() => recheckOrder(seeded.orderCode));
+
+        // (e) RIÊNG cho nhánh này — `reset()` ngay trên kia nên con số 0 dưới đây
+        // chỉ nói về đúng lời gọi vừa rồi.
+        expect(svc2Fixture.adapter.getPaymentStatusCallCount).toBe(0);
+        expect(svc2Fixture.adapter.getPaymentStatusOrderCodes).toEqual([]);
+        // (f) KHÔNG một lượt ghi nào: cả dòng, so bằng chuỗi.
+        expect(await orderSnapshot(seeded.orderCode)).toBe(snapshotBefore);
+        expect(await subscriptionCount("A")).toBe(0);
+        expect(await subscriptionCount("B")).toBe(0);
+        // (g) không dòng nhật ký nào mang bốn thứ AC-034 cấm.
+        expect(leakedLabels(foreign.output, secrets)).toEqual([]);
+
+        // --- NHÁNH (c): B + mã KHÔNG AI SỞ HỮU ------------------------------
+        svc2Fixture.adapter.reset();
+        svc2Fixture.adapter.setPaymentStatus({ status: "paid", amount: seeded.amountVnd });
+        svc2Fixture.useSession("B");
+
+        const nonexistent = await captureConsole(() => recheckOrder(unownedCode));
+
+        expect(svc2Fixture.adapter.getPaymentStatusCallCount).toBe(0);
+        expect(svc2Fixture.adapter.getPaymentStatusOrderCodes).toEqual([]);
+        expect(await orderSnapshot(seeded.orderCode)).toBe(snapshotBefore);
+        // Nhánh này cũng không được MINT ra dòng nào cho mã nó vừa hỏi.
+        expect(await svc2Fixture.readOrderRow(unownedCode)).toBeNull();
+        expect(await subscriptionCount("A")).toBe(0);
+        expect(await subscriptionCount("B")).toBe(0);
+        expect(leakedLabels(nonexistent.output, secrets)).toEqual([]);
+
+        // --- (d) BẰNG NHAU SÂU, MỘT khẳng định trên CẢ giá trị ---------------
+        // `toStrictEqual` chứ không `toEqual`: `toEqual` bỏ qua các trường mang
+        // `undefined`, nên một nhánh trả thêm `{ owner: undefined }` vẫn lọt.
+        expect(foreign.value).toStrictEqual(nonexistent.value);
+        // …và literal VIẾT TAY, vì riêng phép bằng nhau sâu thì hai nhánh cùng
+        // hỏng theo một kiểu (cùng `rate_limited`, cùng `unauthenticated`) vẫn
+        // thoả.
+        expect(foreign.value).toStrictEqual({ settled: false, reason: "unknown_order" });
+        expect(nonexistent.value).toStrictEqual({ settled: false, reason: "unknown_order" });
+      },
+      CASE_TIMEOUT_MS
     );
   }
 );
