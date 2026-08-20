@@ -37,12 +37,20 @@
 // loại sẽ làm script FAIL kèm hướng dẫn — thay vì lặng lẽ trở thành trang trắng
 // 42501 ở production vài tuần sau (TD-001).
 //
-// Script KHÔNG ĐỂ LẠI GÌ, và đó là một mệnh đề mạnh hơn "chỉ đọc" — vì nó
-// không còn đúng theo nghĩa đen: (5) tạo một đề nháp fixture rồi tự dọn trong
-// `finally`, và (9) PHÁT ra ba lệnh ghi mà mọi lệnh đều PHẢI bị từ chối ở tầng
-// quyền, kèm hậu kiểm bằng service_role rằng không dòng nào lọt vào. Không có
-// DDL ở bất kỳ đâu, và mọi RPC được probe bằng id không tồn tại nên không khoá
-// attempt của ai, không settle đơn của ai.
+// Script KHÔNG ĐỂ LẠI DỮ LIỆU, kể cả khi FAIL — và đó là một mệnh đề mạnh hơn
+// "chỉ đọc", vì nó không còn đúng theo nghĩa đen: (5) tạo một đề nháp fixture
+// rồi tự dọn trong `finally`, và (9) PHÁT ra ba lệnh ghi mà mọi lệnh đều PHẢI
+// bị từ chối ở tầng quyền, kèm hậu kiểm bằng service_role rằng không dòng nào
+// lọt vào. Nhánh PASS sạch vì không có gì được ghi; nhánh FAIL sạch vì dòng lọt
+// vào bị XOÁ theo marker của chính probe NGAY TRƯỚC khi lời khẳng định được
+// báo — nếu không, đúng lượt chạy phát hiện DB hỏng lại là lượt để lại một đơn
+// hàng thật và một entitlement sống. Không có DDL ở bất kỳ đâu, và mọi RPC được
+// probe bằng id không tồn tại nên không khoá attempt của ai, không settle đơn
+// của ai.
+//
+// NGOẠI LỆ DUY NHẤT, và là lý do lane này CHƯA được chĩa vào production:
+// `signInProbeUser()` tạo-hoặc-đặt-lại-password tài khoản probe, nên tài khoản
+// đó TỒN TẠI LẠI sau khi script chạy xong. Xem cảnh báo ở đầu mục 9.
 //
 // Cách chạy:  cd SOURCE && npx tsx supabase/verify-schema.ts
 // Chạy khi:   sau mỗi lần apply schema.sql, và trước khi deploy code đụng §10.
@@ -136,6 +144,21 @@ function isAuthorizationDenial(error: { code?: string; message?: string } | null
     error.code === "42501" ||
     /permission denied|violates row-level security policy/i.test(error.message ?? "")
   );
+}
+
+/**
+ * Mô tả kết quả QUÉT RÁC của một probe mục 9, để ghép vào thông điệp FAIL.
+ *
+ * `null` = hậu kiểm thấy sạch nên không có gì để xoá. Ngược lại là kết quả của
+ * lệnh `delete` theo marker: người đọc log cần biết NGAY dòng lọt vào đã biến
+ * mất hay vẫn còn, vì nếu vẫn còn thì đó là một entitlement/đơn hàng thật đang
+ * nằm trong DB dưới tên tài khoản probe.
+ */
+function describeSweep(sweep: { error: { code?: string; message?: string } | null } | null): string {
+  if (sweep === null) return "không có gì để quét";
+  return sweep.error
+    ? `QUÉT HỎNG (${sweep.error.code ?? sweep.error.message ?? "?"}) — RÁC CÒN NGUYÊN, phải xoá tay`
+    : "đã quét sạch bằng service_role";
 }
 
 // --- Parse schema.sql (nguồn chân lý) --------------------------------------
@@ -672,8 +695,19 @@ async function main() {
   // Ba lệnh dưới đây là BA ĐỐI TƯỢNG DDL, mỗi đối tượng một lệnh — cùng cách
   // chia mà `test-rls.ts` Phần 9 dùng (PO-* / SB-* / PS-*).
   //
-  // ⚠ KHÔNG lệnh nào được phép GHI, và đó là điều kiện để mục này chạy được
-  // trên PRODUCTION: cả ba phải bị từ chối ở tầng quyền. Hai payload đầu dùng
+  // ⚠ KHÔNG CHĨA LANE NÀY VÀO PRODUCTION, chừng nào nhánh tạo-hoặc-đặt-lại
+  // password trong `signInProbeUser()` chưa được chặn. Lý do rất cụ thể:
+  // `PROBE_EMAIL`/`PROBE_PASSWORD` là hằng nằm trong source ĐÃ COMMIT, và
+  // `signInProbeUser()` không chỉ đăng nhập — nó TẠO tài khoản đó (hoặc đặt lại
+  // password và `email_confirm` nếu đã có). Chạy trên prod nghĩa là tự tay cấp
+  // cho auth tenant production một tài khoản ĐÃ XÁC THỰC với password ai đọc
+  // repo cũng biết, và tài khoản đó ở lại sau khi script thoát. Việc "cả ba
+  // lệnh đều bị từ chối" nói lên chất lượng của DDL, KHÔNG phải giấy phép chạy
+  // trên prod — hai chuyện đó độc lập, và đây là chuyện chưa được quyết
+  // (plan Task 5.8 / register: gate B trên prod bị chặn bởi đúng quyết định
+  // này). Cho tới lúc đó: chỉ DEV.
+  //
+  // KHÔNG lệnh nào được phép GHI: cả ba phải bị từ chối ở tầng quyền. Hai payload đầu dùng
   // giá trị mốc riêng của verify-schema (khác hẳn bộ của test-rls.ts) và mỗi
   // lệnh có HẬU KIỂM bằng service_role theo một VỊ TỪ KHÁC vị từ đã dùng để
   // ghi — hỏi theo `memo` / `period_anchor_at` chứ không theo `order_code` /
@@ -724,11 +758,21 @@ async function main() {
     .select("order_code")
     .eq("memo", SUB_PROBE_MEMO);
   const poClean = !poResidue.error && (poResidue.data?.length ?? 0) === 0;
+  // QUÉT TRƯỚC KHI BÁO. Nhánh FAIL là nhánh duy nhất có rác, và đúng ở nhánh đó
+  // "script không để lại gì" mới đáng giá: dòng lọt vào là một ĐƠN HÀNG THẬT
+  // mang mốc của probe, sinh ra bởi một lượt CHẨN ĐOÁN trên DB đang hỏng. Xoá
+  // theo ĐÚNG marker đã hậu kiểm (`memo`), bằng chính admin client — cùng cách
+  // `test-rls.ts` dọn `SUB_ORDER_FORGED` ngay sau positive control. Quét cả khi
+  // hậu kiểm LỖI: lúc đó không ai biết có dòng nào lọt hay không, và một lệnh
+  // delete theo marker là vô hại nếu thật ra không có gì.
+  const poSweep = poClean
+    ? null
+    : await admin.from("payment_orders").delete().eq("memo", SUB_PROBE_MEMO);
   assert(
     isAuthorizationDenial(poIns.error) && poClean,
     isAuthorizationDenial(poIns.error) && poClean
       ? "authenticated KHÔNG tự INSERT được payment_orders (42501) và không dòng nào lọt vào — AC-033 đang đóng"
-      : `authenticated GHI ĐƯỢC hoặc bị chặn SAI LÝ DO trên payment_orders (mong đợi 42501, nhận: ${poIns.error?.code ?? "KHÔNG CÓ LỖI"}${poIns.error && !isAuthorizationDenial(poIns.error) ? ` = ràng buộc dữ liệu, KHÔNG phải quyền — \`revoke insert\` có thể đã bị gỡ` : ""}; số dòng lọt vào: ${poResidue.error ? `hậu kiểm lỗi ${poResidue.error.code}` : (poResidue.data?.length ?? "?")}) — apply lại khối SUBSCRIPTION của schema.sql`
+      : `authenticated GHI ĐƯỢC hoặc bị chặn SAI LÝ DO trên payment_orders (mong đợi 42501, nhận: ${poIns.error?.code ?? "KHÔNG CÓ LỖI"}${poIns.error && !isAuthorizationDenial(poIns.error) ? ` = ràng buộc dữ liệu, KHÔNG phải quyền — \`revoke insert\` có thể đã bị gỡ` : ""}; số dòng lọt vào: ${poResidue.error ? `hậu kiểm lỗi ${poResidue.error.code}` : (poResidue.data?.length ?? "?")}; rác: ${describeSweep(poSweep)}) — apply lại khối SUBSCRIPTION của schema.sql`
   );
 
   const sbIns = await probe.from("subscriptions").insert({
@@ -741,11 +785,20 @@ async function main() {
     .select("user_id")
     .eq("period_anchor_at", SUB_PROBE_ANCHOR);
   const sbClean = !sbResidue.error && (sbResidue.data?.length ?? 0) === 0;
+  // Quét trước khi báo — ở bảng này còn gấp. Dòng lọt vào KHÔNG phải rác vô
+  // hại: nó là một ENTITLEMENT SỐNG (`expires_at` = 2099) gắn vào chính tài
+  // khoản probe, mà email/password của tài khoản đó là hằng nằm trong source đã
+  // commit. Để nó lại nghĩa là một lượt chẩn đoán vừa CẤP Premium-tới-2099 cho
+  // một tài khoản ai đọc repo cũng đăng nhập được. Marker là `period_anchor_at`
+  // — đúng vị từ hậu kiểm, khác vị từ đã dùng để ghi.
+  const sbSweep = sbClean
+    ? null
+    : await admin.from("subscriptions").delete().eq("period_anchor_at", SUB_PROBE_ANCHOR);
   assert(
     isAuthorizationDenial(sbIns.error) && sbClean,
     isAuthorizationDenial(sbIns.error) && sbClean
       ? "authenticated KHÔNG tự INSERT được subscriptions (42501) và không dòng nào lọt vào — không ai tự cấp được entitlement"
-      : `authenticated GHI ĐƯỢC hoặc bị chặn SAI LÝ DO trên subscriptions (mong đợi 42501, nhận: ${sbIns.error?.code ?? "KHÔNG CÓ LỖI"}${sbIns.error && !isAuthorizationDenial(sbIns.error) ? ` = ràng buộc dữ liệu, KHÔNG phải quyền — \`revoke insert\` có thể đã bị gỡ` : ""}; số dòng lọt vào: ${sbResidue.error ? `hậu kiểm lỗi ${sbResidue.error.code}` : (sbResidue.data?.length ?? "?")}) — apply lại khối SUBSCRIPTION của schema.sql`
+      : `authenticated GHI ĐƯỢC hoặc bị chặn SAI LÝ DO trên subscriptions (mong đợi 42501, nhận: ${sbIns.error?.code ?? "KHÔNG CÓ LỖI"}${sbIns.error && !isAuthorizationDenial(sbIns.error) ? ` = ràng buộc dữ liệu, KHÔNG phải quyền — \`revoke insert\` có thể đã bị gỡ` : ""}; số dòng lọt vào: ${sbResidue.error ? `hậu kiểm lỗi ${sbResidue.error.code}` : (sbResidue.data?.length ?? "?")}; rác: ${describeSweep(sbSweep)}) — apply lại khối SUBSCRIPTION của schema.sql`
   );
 
   // Cùng lớp EXECUTE-chỉ-service_role như record_exam_result ở mục 4, và xử lý
