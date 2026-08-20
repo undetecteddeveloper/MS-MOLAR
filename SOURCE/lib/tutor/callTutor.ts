@@ -10,7 +10,7 @@
 // là việc của explainStep() (app/(layer2)/tutorActions.ts).
 
 import {
-  getGeminiClient,
+  generateContent,
   makeDeadlineSignal,
   QUESTION_MODEL,
   sdkErrorDetail,
@@ -94,8 +94,7 @@ export async function generateHint(input: TutorPromptInput): Promise<string> {
   const startedAt = Date.now();
   const deadline = makeDeadlineSignal(TUTOR_CALL_DEADLINE_MS);
   try {
-    const client = getGeminiClient();
-    const response = await client.models.generateContent({
+    const response = await generateContent({
       model: QUESTION_MODEL,
       contents: [{ text: buildTutorPrompt(input) }],
       config: { abortSignal: deadline.signal },

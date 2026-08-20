@@ -15,7 +15,7 @@ import { makeUgcError } from "./errorCopy";
 import { LIMITS } from "./limits";
 import {
   FATAL_CALL_DEADLINE_MS,
-  getGeminiClient,
+  generateContent,
   logExtractorExit,
   makeDeadlineSignal,
   QUESTION_MODEL,
@@ -259,8 +259,7 @@ export async function extractQuestions(
   const startedAt = Date.now();
   const deadline = makeDeadlineSignal(FATAL_CALL_DEADLINE_MS);
   try {
-    const client = getGeminiClient();
-    const response = await client.models.generateContent({
+    const response = await generateContent({
       model: QUESTION_MODEL,
       contents: [toGeminiPart(file), { text: PROMPT }],
       config: {

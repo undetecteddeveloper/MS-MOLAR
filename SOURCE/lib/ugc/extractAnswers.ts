@@ -10,7 +10,7 @@ import { makeUgcError } from "./errorCopy";
 import {
   ANSWER_MODEL,
   FATAL_CALL_DEADLINE_MS,
-  getGeminiClient,
+  generateContent,
   logExtractorExit,
   makeDeadlineSignal,
   sdkErrorDetail,
@@ -160,8 +160,7 @@ export async function extractAnswers(
   const startedAt = Date.now();
   const deadline = makeDeadlineSignal(FATAL_CALL_DEADLINE_MS);
   try {
-    const client = getGeminiClient();
-    const response = await client.models.generateContent({
+    const response = await generateContent({
       model: ANSWER_MODEL,
       contents: [toGeminiPart(file), { text: PROMPT }],
       config: {

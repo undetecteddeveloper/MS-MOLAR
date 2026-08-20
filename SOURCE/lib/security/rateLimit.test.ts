@@ -13,6 +13,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 
 import { __resetRateLimitForTests, checkRateLimit, guard, RATE_LIMITS } from "./rateLimit";
+// Bảng giá mỗi thao tác sống cạnh điểm phát Gemini — file này TIÊU THỤ nó, và
+// cố ý không giữ một bản sao (backend DD `:1080`, AC-020).
+import { GEMINI_CALLS_PER_OPERATION } from "@/lib/ugc/gemini";
 
 beforeEach(() => {
   __resetRateLimitForTests();
@@ -192,11 +195,18 @@ describe("guard", () => {
   // GEMINI, không phải số lần bấm nút — explainStep 1 request/lần, uploadExam
   // 2–3 (extractQuestions + extractAnswers + extractMeta ở chế độ Automatic).
   //
-  // Ghim số nhân tại chỗ: ngày nào pipeline thêm một lời gọi AI thứ tư thì sửa
-  // hằng số này, và case sẽ nói ngay trần nào phải hạ theo.
+  // Số nhân KHÔNG còn được gõ lại ở đây: nó ĐỌC từ GEMINI_CALLS_PER_OPERATION,
+  // khai cạnh chính điểm phát Gemini (lib/ugc/gemini.ts, backend DD I10). Trước
+  // đây hai con số này là một LỜI KHAI THỨ HAI của cùng một sự thật — thêm một
+  // lời gọi AI thứ tư vào pipeline mà quên sửa ở đây thì trần vẫn "xanh" trong
+  // khi một tài khoản đã vét sạch hạn ngạch project, và không có gì đỏ.
+  //
+  // `uploadExam` lấy nhánh `uploadAutomatic` (3) chứ không phải `uploadTyped`
+  // (2): case dưới đây tính TRƯỜNG HỢP XẤU NHẤT của một tài khoản, và người
+  // dùng chọn được chế độ Automatic cho cả 5 lượt/ngày.
   const GEMINI_REQUESTS_PER_CALL: Record<(typeof SUPPLIER_CAPPED_ACTIONS)[number], number> = {
-    explainStep: 1,
-    uploadExam: 3,
+    explainStep: GEMINI_CALLS_PER_OPERATION.tutor,
+    uploadExam: GEMINI_CALLS_PER_OPERATION.uploadAutomatic,
   };
 
   it("keeps ONE account's whole daily Gemini budget under the project quota", () => {
