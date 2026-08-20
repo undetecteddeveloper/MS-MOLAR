@@ -2,6 +2,8 @@
 // Dùng đồng hồ giả để kiểm hành vi cửa sổ trượt mà không phải chờ thật.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 
 // KHÔNG-OP HÔM NAY, và đó chính là lý do nó được ghi ra đây. Kể từ khi hai
 // action của đường thanh toán vào bảng dưới, đồ thị module mà file này kéo theo
@@ -215,5 +217,55 @@ describe("guard", () => {
       0
     );
     expect(worstCasePerUser).toBeLessThanOrEqual(SUPPLIER_DAILY_QUOTA);
+  });
+
+  // B-01 (backend DD § Recorded Decision B-01): trần gia sư ĐI THEO cờ phát hành
+  // trả phí, và nhánh BẬT chỉ đọc được sau MỘT LẦN NẠP LẠI module — `RATE_LIMITS`
+  // được tính một lần lúc nạp, nên bảng đã import ở đầu file này vĩnh viễn là
+  // nhánh cờ TẮT. Bỏ `vi.resetModules()` thì case vẫn chạy nhưng đọc lại đúng
+  // bảng cũ, tức là vẫn xanh cả khi trần bị đóng cứng thành 3.
+  //
+  // Giá trị stub là " TRUE " chứ không phải "1", và đó là phần thứ hai của case:
+  // chỉ `isPaidTierEnabled()` mới coi chuỗi đó là BẬT (có trim, không phân biệt
+  // hoa thường). Một lần đọc thẳng `process.env.GEMINI_PAID_TIER_ENABLED === "1"`
+  // viết lại trong rateLimit.ts sẽ đọc ra 3 ở đây — tức bản sao thứ hai của tập
+  // giá trị "được coi là BẬT" bị bắt bằng HÀNH VI, không bằng lời hứa.
+  //
+  // KHÔNG áp bất biến SUPPLIER_DAILY_QUOTA (20) cho biến thể này, và đó là một
+  // quyết định chứ không phải sơ suất: 20 là sự thật của bậc MIỄN PHÍ. Cờ chỉ
+  // được bật SAU khi dự án đã bật thanh toán Google (AC-048); từ lúc đó thứ chặn
+  // một tài khoản không còn là hạn ngạch 20/ngày của cả project mà là hạn ngạch
+  // theo gói của chính người đó (lib/billing/quota.ts) và hoá đơn ta phải trả.
+  it("follows the paid-tier release flag: the tutor ceiling rises with it, the window does not", async () => {
+    vi.stubEnv("GEMINI_PAID_TIER_ENABLED", " TRUE ");
+    vi.resetModules();
+    try {
+      const { RATE_LIMITS: PAID_TIER_LIMITS } = await import("./rateLimit");
+
+      expect(PAID_TIER_LIMITS.explainStep.limit).toBeGreaterThanOrEqual(50);
+      expect(PAID_TIER_LIMITS.explainStep.windowMs).toBe(24 * 60 * 60 * 1000);
+      // HAI GIÁ TRỊ KHÁC NHAU trên cùng một khoá là thứ duy nhất phân biệt được
+      // một điều kiện thật với một hằng số: bảng nạp lúc cờ TẮT vẫn phải đọc ra 3.
+      expect(RATE_LIMITS.explainStep.limit).toBe(3);
+
+      // Tripwire ĐỌC VĂN BẢN NGUỒN, nên TRUNG TÍNH VỀ HÀNH VI: một bản sao TRUNG
+      // THỰC của tập AFFIRMATIVE chép vào rateLimit.ts sẽ chạy y hệt và không
+      // case hành vi nào thấy được nó — chỉ nguồn mới thấy. (Bản sao KHÔNG trung
+      // thực thì " TRUE " ở trên đã bắt.) Bỏ dòng chú thích trước khi quét, theo
+      // đúng lối `codeLines` của lib/billing/__tests__/quota.test.ts: chính
+      // comment của rateLimit.ts có nhắc tên biến môi trường đó.
+      const rateLimitSource = readFileSync(
+        path.join(process.cwd(), "lib/security/rateLimit.ts"),
+        "utf8"
+      );
+      const codeOnly = rateLimitSource
+        .split("\n")
+        .filter((line) => !line.trim().startsWith("//"))
+        .join("\n");
+      expect(codeOnly).not.toContain("process.env");
+    } finally {
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    }
   });
 });

@@ -24,6 +24,7 @@
 // NHẬP gọi dồn dập một Server Action — spam report, spam rating, nộp bài liên
 // tục.
 
+import { isPaidTierEnabled } from "@/lib/billing/paidTier";
 import { hitSharedStore, isSharedStoreConfigured } from "./rateLimitStore";
 
 /** Bản ghi thời điểm các lần gọi gần đây của một khoá. */
@@ -152,10 +153,20 @@ export const RATE_LIMITS = {
   // UGC: đủ để nhiều người dùng KHÁC NHAU mỗi người vẫn nhận được số gợi ý có
   // nghĩa trong ngày, mà không một ai vét sạch ngân sách của cả project.
   //
-  // Đây là TRẦN TẠM, không phải con số cuối. Nó sẽ được thay bằng hạn ngạch theo
-  // gói khi tính năng thuê bao lên: khi đó trần đọc từ gói của người dùng chứ
-  // không còn là một hằng số chung cho mọi người.
-  explainStep: { limit: 3, windowMs: 24 * 60 * 60 * 1000 },
+  // TRẦN NÀY ĐI THEO CỜ PHÁT HÀNH TRẢ PHÍ (B-01, backend DD § Recorded Decision
+  // B-01) — cờ TẮT: 3/ngày, đúng phần chia từ 20 lượt/ngày nói ở trên; cờ BẬT:
+  // 50/ngày, vì lúc đó dự án đã bật thanh toán Google (AC-048) và hạn ngạch
+  // 20/ngày của bậc miễn phí không còn là thứ đang chặn. 50 nằm TRÊN 16,7
+  // lượt/ngày mà gói Premium (500 lượt/kỳ 30 ngày) đã bán, nên guard này không
+  // cắt vào thứ người dùng đã trả tiền; phần đã mua được đo bằng hạn ngạch theo
+  // gói (lib/billing/quota.ts), còn đây vẫn chỉ là lưới chặn vòng lặp tự động.
+  //
+  // CỬA SỔ 24 GIỜ Ở CẢ HAI NHÁNH: lý lẽ khớp đơn vị bên trên không phụ thuộc cờ.
+  //
+  // Cờ đọc QUA `isPaidTierEnabled()`, không đọc lại `process.env` ở đây: tập giá
+  // trị được coi là BẬT của một cổng fail-closed chỉ được khai một nơi
+  // (paidTier.ts), bản sao thứ hai sẽ trôi lệch trong im lặng.
+  explainStep: { limit: isPaidTierEnabled() ? 50 : 3, windowMs: 24 * 60 * 60 * 1000 },
   // Trích xuất đề bằng AI (Layer 4, extractAndAssemble). CÙNG HỌ với explainStep
   // ở trên — cùng lý do, cùng đơn vị cửa sổ, và CÙNG MỘT HẠN NGẠCH THẬT: comment
   // của explainStep đã ghi rõ "cùng key đó còn phục vụ trích xuất PDF ở
