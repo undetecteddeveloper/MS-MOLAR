@@ -958,6 +958,107 @@ Giá trị subject (TD-016):
 - Complete: YYYY-MM-DD HH:MM
 - Notes:
 
+#### Task 6.3 — full regression across every adopted gate (evidence record)
+
+Run at **`52cc734`**, branch `feat/subscription`, all commands from `SOURCE/`.
+Working tree clean before and after (`git status --porcelain` empty; only the
+gitignored `.next/` was rewritten). Every gate launched via `spawnSync`,
+`shell: false`, cwd `E:/StemWeb_project/MS-MOLAR/SOURCE`, with `status === null`
+checked explicitly — no `2>&1` in `execSync`, no piping through `tail`, no `.cmd`
+shim, since each of those destroys or fakes the exit code.
+
+| Gate | Verbatim final line | Status | Result |
+|---|---|---|---|
+| `npm test` | `Test Files  118 passed \| 1 skipped (119)` / `Tests  1481 passed \| 10 skipped (1491)` | 0 | green |
+| `npm run test:integration` | `Test Files  2 passed (2)` / `Tests  31 passed (31)` | 0 | green |
+| `npm run test:fixture` | `Test Files  1 passed (1)` / `Tests  77 passed (77)` | 0 | green |
+| `npm run test:localdb` | `Test Files  1 passed (1)` / `Tests  11 passed (11)` | 0 | green |
+| `npx tsc --noEmit` | (no output) | 0 | green |
+| `npm run lint` | (no output) | 0 | green |
+| `npm run build` | `✓ Generating static pages using 7 workers (24/24) in 1008ms` | 0 | green — 24/24 |
+| `npm run check:bundle` | `✅ Server-secret bundle check PASS — 7 bí mật server-only không xuống client.` | 0 | green |
+| `npm run verify:schema` **(dev)** | `✅ Schema verify: DB khớp schema.sql §10 + §11 + §12 + khoá ngoại (§15/§16) + phiên bản (§17) + subject canonical (TD-016).` | 0 | green — 22 ✓ / 0 ✗ across 9 sections |
+| `npm run verify:schema` **(prod)** | — | — | **NOT RUN — see below** |
+| `npx tsx supabase/test-rls.ts` | `✅ RLS test: tất cả PASS.` | 0 | green — **93 ✓ / 0 ✗** |
+
+**Exit code alone was not accepted as evidence for any gate that emits a count.**
+`vitest -t` treats its pattern as a regex, and the service-lane test names literally
+contain `(a+b+c)` — a `-t` filter there matches zero tests and still exits 0, which
+reads identically to a pass. Counts were read off the `Tests` line instead.
+The two gates that emit *no* output on success each got a discriminating check:
+`tsc --noEmit --listFiles` → **1984 files** typechecked (1980 under `SOURCE/`,
+including `lib/billing/*`); `eslint --format json` → **426 files** linted,
+0 errors / 0 warnings, 65 of them billing files. Neither green is an empty run.
+
+**Test-case resolution — discharged per case, not per lane** (a lane total does not
+prove which cases ran). From `--reporter=verbose`:
+- **integration 3/3** — INT-1 / INT-2 / INT-3 all present as passing suites in
+  `tests/integration/subscription.int.test.ts` (13 / 8 / 8 passing lines).
+- **fixture-e2e 3/3** — FE-1 / FE-2 / FE-3 all passing in
+  `tests/e2e/fixture/subscription.fixture.e2e.test.ts` (33 / 23 / 23).
+- **service-integration-e2e 2/2** — 9 SVC-1 cases + 2 SVC-2 cases = the 11 in the lane.
+- **Unresolved tests: 0.**
+
+**`test-rls.ts` — the subscription block is `Phần 9`, not `Phần 8`.** `Phần 8` is the
+User Support System (ST-a…ST-e, `:1729`); by the time Task 1.5 landed that number was
+taken, so the subscription block became `Phần 9` (`:1965`, PO-a…PO-f / SB-a…SB-g /
+PS-a/PS-b). The QA-mechanism row `:92` above and task-31 both still say "new Phần 8" —
+**stale label only**; one run executes both and both are green. `Phần 9`'s own teardown
+post-check reports `còn lại: 0 đơn / 0 entitlement`.
+
+**`verify:schema` — dev green, prod deliberately NOT run.**
+`supabase/verify-schema.ts:163-180` (`signInProbeUser`) unconditionally calls
+`admin.auth.admin.createUser` with a hardcoded `PROBE_EMAIL`/`PROBE_PASSWORD`, and on
+"already exists" falls through to `updateUserById`, **resetting that account's password**
+to the same hardcoded value. Against prod that plants a known-password account in
+production auth. Environment is selected by `SCHEMA_ENV_FILE` (`:77-78`); unset ⇒
+`.env.local` ⇒ dev (`hynwleaxtbtjzkvpjsug`), which is what ran. **Prod Gate B stays owned
+by Task 5.8** ("before any deploy that reads the new tables"); no production deployment
+of this branch has occurred, so nothing is unblocked by the deferral. Completion
+Criterion `:824` (`verify:schema` green on **both** environments) therefore remains
+**open**, with Task 5.8 as its named owner.
+
+Dev fingerprint: **`021dd1387945`**, matching `supabase/schema.sql:1862` and
+`lib/schema/schemaFingerprint.ts:41` in git; DB applied `2026-08-18T13:53:05Z`.
+27/27 foreign keys match `schema.sql`, TD-011 and TD-005 both reported closed.
+
+**Two honest reductions in evidentiary strength, recorded rather than glossed:**
+1. `check:bundle` printed three warnings — `⚠ Không đọc được giá trị payOS checksum key
+   / API key / client id — chỉ quét theo marker.` The three payOS secrets have no value
+   in `.env.local`, so for those three the **literal-value scan did not run**; only the
+   marker scan did (`PAYOS_CHECKSUM_KEY`, `api-merchant.payos.vn`, `PAYOS_API_KEY`,
+   `PAYOS_CLIENT_ID`). The markers are still discriminating, but the value leg is not
+   evidence here. The other 4 of the 7 secrets were scanned by value **and** marker.
+2. `verify:schema` has not been touched since `0879739` (2026-08-14) and contains **no
+   subscription-specific probe** — no column/RPC probe for `payment_orders`,
+   `subscriptions` or `record_payment_settlement`. It covers them only indirectly, via
+   the whole-file fingerprint and the 27-FK reconciliation. The direct authorization
+   evidence for the new objects is `test-rls.ts` Phần 9, not this gate.
+
+**Flakes: none occurred this run.** Both documented flakes
+(`components/tutor/ExplainStepAffordance.test.tsx`,
+`app/(layer2)/__tests__/recordSkillMastery.int.test.ts`) passed inside the full parallel
+`npm test`, so no isolation re-run was needed.
+
+**Real-database hygiene.** Predicate-free full-table reads against dev
+(`GET /rest/v1/<table>?select=*`, `Prefer: count=exact`, service_role — deliberately
+**not** `fixture.countFixtureRows()`, two of whose three legs are tautological after
+teardown): `payment_orders` **0 → 0**, `subscriptions` **0 → 0** (`content-range: */0`,
+`http=200` on all four reads). Prod (`pebjdlbgbmizgfpuptjl`) was never contacted and
+`.env.local.prod-backup` was never loaded; the count script hard-fails if the URL is not
+the dev project.
+
+**`--passWithNoTests` confirmed absent from every executable location** — a repo-wide
+search (all `.ts/.mts/.mjs/.js/.json/.yml/.yaml/.md`, excluding `node_modules`) returns
+hits **only** in `docs/**/*.md` prose. Not in `package.json`, not in any of the four
+`vitest.*.config.ts`, not in `.github/workflows/ci.yml`. Note that `test:localdb` no
+longer exits 1 — Tasks 6.1/6.2 filled the SVC-1/SVC-2 skeleton, so its exit 0 with
+**11 tests** is earned, not suppressed.
+
+**Not covered by any command here** (the task's own Residual): the manual browser passes
+at 360px + greyscale (Task 6.5) and the real-money production transaction (Task 6.7).
+No source file was changed by this task — no gate went red.
+
 ## Notes
 
 - **App root is `SOURCE/`, not the repository root.** Every `npm` script in this plan runs from `SOURCE/`. `SOURCE/AGENTS.md` warns that this Next.js version differs from model training data — read the relevant guide in `node_modules/next/dist/docs/` before writing App Router code.
