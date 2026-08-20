@@ -30,6 +30,7 @@
 
 import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 const ROOT = resolve(import.meta.dirname, "..");
 // `.next-build` — production distDir tách riêng khỏi dev (next.config.ts S#36).
@@ -57,17 +58,20 @@ function* walk(dir) {
   }
 }
 
-if (!existsSync(STATIC_DIR)) {
-  console.error(`❌ Không thấy ${STATIC_DIR} — chạy \`next build\` trước.`);
-  process.exit(1);
-}
-
 const envLocal = loadEnvLocal();
 const read = (name) => process.env[name] ?? envLocal[name];
 
 // `markers` = chuỗi chỉ có thể lọt vào bundle khi module server-only bị import
 // nhầm từ client. `value` = chính giá trị bí mật (chỉ check khi đọc được).
-const SECRETS = [
+//
+// ĐƯỢC EXPORT để `lib/security/checkAiKeyBundleSecrets.test.ts` ghim nguyên văn
+// nhãn + marker. Trên CI, `markers` là TOÀN BỘ tấm lưới: bước "Check bundle"
+// của .github/workflows/ci.yml không có khối `env:` nào (bốn giá trị giả chỉ
+// thuộc phạm vi bước Build) và `.env.local` không tồn tại ở đó, nên cả bảy
+// `value` là `undefined`, cả bảy dòng cảnh báo được in, và nhánh so-khớp-GIÁ-TRỊ
+// chạy 0 trên 7 lần. Không cấu hình nào của workflow này làm nó chạy hữu ích
+// được, vì thứ nó sẽ quét chính là mấy chuỗi placeholder mà build vừa nướng vào.
+export const SECRETS = [
   {
     label: "AI key",
     value: read("GEMINI_API_KEY"),
@@ -124,36 +128,48 @@ const SECRETS = [
   },
 ];
 
-for (const s of SECRETS) {
-  if (!s.value) {
-    // Không fail: CI/máy khác có thể không có sẵn env. Marker vẫn được quét.
-    console.warn(`⚠ Không đọc được giá trị ${s.label} — chỉ quét theo marker.`);
+// Thân CLI, nguyên văn như trước — chỉ được bọc vào một hàm và gọi CHỈ KHI file
+// này là entry point. Không có lớp bọc đó thì một lượt `import { SECRETS }` từ
+// test sẽ chạy luôn cả lượt quét và `process.exit(1)` khi chưa có bản build.
+function main() {
+  if (!existsSync(STATIC_DIR)) {
+    console.error(`❌ Không thấy ${STATIC_DIR} — chạy \`next build\` trước.`);
+    process.exit(1);
   }
-}
 
-let failures = 0;
-for (const file of walk(STATIC_DIR)) {
-  const content = readFileSync(file, "utf8");
   for (const s of SECRETS) {
-    if (s.value && content.includes(s.value)) {
-      console.error(`❌ GIÁ TRỊ ${s.label} xuất hiện trong client bundle: ${file}`);
-      failures += 1;
+    if (!s.value) {
+      // Không fail: CI/máy khác có thể không có sẵn env. Marker vẫn được quét.
+      console.warn(`⚠ Không đọc được giá trị ${s.label} — chỉ quét theo marker.`);
     }
-    for (const marker of s.markers) {
-      if (content.includes(marker)) {
-        console.error(
-          `❌ Marker server-only "${marker}" (${s.label}) trong client bundle: ${file}`
-        );
+  }
+
+  let failures = 0;
+  for (const file of walk(STATIC_DIR)) {
+    const content = readFileSync(file, "utf8");
+    for (const s of SECRETS) {
+      if (s.value && content.includes(s.value)) {
+        console.error(`❌ GIÁ TRỊ ${s.label} xuất hiện trong client bundle: ${file}`);
         failures += 1;
+      }
+      for (const marker of s.markers) {
+        if (content.includes(marker)) {
+          console.error(
+            `❌ Marker server-only "${marker}" (${s.label}) trong client bundle: ${file}`
+          );
+          failures += 1;
+        }
       }
     }
   }
+
+  if (failures > 0) {
+    console.error(`\n❌ Server-secret bundle check FAIL (${failures} phát hiện).`);
+    process.exit(1);
+  }
+  console.log(
+    `✅ Server-secret bundle check PASS — ${SECRETS.length} bí mật server-only không xuống client.`
+  );
 }
 
-if (failures > 0) {
-  console.error(`\n❌ Server-secret bundle check FAIL (${failures} phát hiện).`);
-  process.exit(1);
-}
-console.log(
-  `✅ Server-secret bundle check PASS — ${SECRETS.length} bí mật server-only không xuống client.`
-);
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();

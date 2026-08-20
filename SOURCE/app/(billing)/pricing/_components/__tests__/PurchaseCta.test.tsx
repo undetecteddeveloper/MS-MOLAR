@@ -160,6 +160,127 @@ async function clickAndSettle(view: ReturnType<typeof render>) {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Pháp y LOG (frontend DD § Logging: "identifiers and closed error codes only,
+// never an amount, an account number, a memo or a payload").
+//
+// Một khẳng định trên SỐ LƯỢT GỌI `console.error` không nói gì về tính chất đó:
+// `console.error(msg, err)` gọi đúng một lần và vẫn in nguyên nội dung đơn.
+// Nên ở đây khẳng định đặt trên HÌNH DẠNG ĐỐI SỐ, và lối lấy chuỗi bên dưới là
+// bản chép của `app/api/payments/payos/webhook/__tests__/route.test.ts:95-168`.
+//
+// CHÉP chứ không import: file kia không export helper nào, và nó không nằm
+// trong phạm vi sửa của task này. Cùng quy ước đã dùng cho `parseOrderCodeAsS06Does`
+// ngay trên và cho `isPublic` trong publicPaths.test.ts — bản chép kèm địa chỉ
+// bản gốc, để một lần bản gốc đổi thì người sửa biết còn hai chỗ nữa.
+// ---------------------------------------------------------------------------
+
+/** `digest` mà Next gắn lên một lỗi băng qua biên Server Action. Đây là thứ
+ *  DUY NHẤT được phép đi vào log — đúng hình dạng `(billing)/me/orders/error.tsx:39`
+ *  và `(billing)/pricing/checkout/error.tsx:43` đã chạy thật. */
+const THROWN_DIGEST = "9f1c2b7ae4";
+
+/** Lỗi ném ra mang THEO nội dung đơn, vì đó là hình dạng thật của lỗi trên
+ *  đường này: một lỗi Postgres/PostgREST băng qua Server Action mang nguyên văn
+ *  câu chữ của nó, kể cả số tiền và số tài khoản. Một fixture `new Error("boom")`
+ *  làm mọi khẳng định dưới đây XANH trên cả bản chưa sửa — nó không có gì để rò. */
+function orderShapedRejection(): Error {
+  const err = new Error(
+    `insert into "payment_orders" failed — Key (order_code)=(${ORDER_CODE}); ` +
+      `amount=${STUB_ORDER.amountVnd}; account_number=${STUB_ORDER.accountNumber}; ` +
+      `account_name=${STUB_ORDER.accountName}; memo=${STUB_ORDER.memo}; ` +
+      `qr=${STUB_ORDER.qrPayload}`
+  );
+  (err as Error & { digest?: string }).digest = THROWN_DIGEST;
+  return err;
+}
+
+/** Mọi chuỗi bị cấm xuất hiện trong BẤT KỲ đối số nào của BẤT KỲ lời gọi log
+ *  nào. `orderCode` KHÔNG nằm ở đây — DD cho phép định danh — nhưng nó vẫn bị
+ *  loại, bằng phép so khớp HÌNH DẠNG nguyên vẹn ở cuối case: đối số phải đúng
+ *  bằng `{ digest }`, không thừa một trường nào. */
+const FORBIDDEN_IN_LOGS = [
+  String(STUB_ORDER.amountVnd),
+  STUB_ORDER.accountNumber,
+  STUB_ORDER.accountName,
+  STUB_ORDER.memo,
+  STUB_ORDER.qrPayload,
+  orderShapedRejection().message,
+];
+
+const CONSOLE_METHODS = ["error", "warn", "log", "info", "debug"] as const;
+
+type LogCall = { method: string; args: unknown[] };
+let logCalls: LogCall[] = [];
+
+/** Gom MỌI chuỗi quan sát được từ một giá trị đã log.
+ *
+ *  KHÔNG dùng `JSON.stringify`, và đó là điểm mấu chốt: `console.error(msg, err)`
+ *  với `err` là `Error` cho ra `{}` — `Error#message` KHÔNG enumerable, nên một
+ *  phép quét dựa trên `JSON.stringify` bỏ sót ĐÚNG cái nó đi tìm và case này sẽ
+ *  xanh trên chính bản đang hỏng. `getOwnPropertyNames` cộng nhánh `Error`
+ *  riêng thì không. */
+function collectStrings(value: unknown, out: string[], seen: Set<object>): void {
+  if (typeof value === "string") {
+    out.push(value);
+    return;
+  }
+  if (typeof value === "number" || typeof value === "bigint" || typeof value === "boolean") {
+    out.push(String(value));
+    return;
+  }
+  if (value === null || value === undefined) return;
+  if (typeof value !== "object") {
+    out.push(String(value));
+    return;
+  }
+  if (seen.has(value)) return;
+  seen.add(value);
+  if (value instanceof Error) {
+    out.push(value.message);
+    if (value.stack) out.push(value.stack);
+  }
+  for (const key of Object.getOwnPropertyNames(value)) {
+    out.push(key);
+    let nested: unknown;
+    try {
+      nested = (value as Record<string, unknown>)[key];
+    } catch {
+      continue;
+    }
+    collectStrings(nested, out, seen);
+  }
+}
+
+function loggedStrings(): string[] {
+  const out: string[] = [];
+  const seen = new Set<object>();
+  for (const call of logCalls) collectStrings(call.args, out, seen);
+  return out;
+}
+
+function expectNothingSensitiveLogged(): void {
+  const strings = loggedStrings();
+  for (const forbidden of FORBIDDEN_IN_LOGS) {
+    const leak = strings.find((s) => s.includes(forbidden));
+    expect(
+      leak === undefined,
+      `chuỗi cấm ${JSON.stringify(forbidden)} xuất hiện trong log: ${JSON.stringify(leak)}`
+    ).toBe(true);
+  }
+}
+
+/** Bọc MỌI lối ra console, không riêng `console.error`: một lượt rò dời sang
+ *  `console.warn` sẽ vô hình với một spy đơn lẻ. */
+function spyOnConsole(): void {
+  logCalls = [];
+  for (const method of CONSOLE_METHODS) {
+    vi.spyOn(console, method).mockImplementation((...args: unknown[]) => {
+      logCalls.push({ method, args });
+    });
+  }
+}
+
 beforeEach(() => {
   mockCreate.mockReset();
   push.mockReset();
@@ -365,10 +486,10 @@ describe("thất bại: 0 lượt điều hướng, và một câu CỤ THỂ", 
     }
   );
 
-  it("action NÉM ⇒ câu lỗi chung, 0 lượt điều hướng, nút không kẹt", async () => {
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+  it("action NÉM ⇒ câu lỗi chung, 0 lượt điều hướng, nút không kẹt, và log KHÔNG mang nội dung đơn", async () => {
+    spyOnConsole();
     try {
-      mockCreate.mockRejectedValue(new Error("network down"));
+      mockCreate.mockRejectedValue(orderShapedRejection());
       const view = render(<Cta locale="en" />);
       await clickAndSettle(view);
 
@@ -376,9 +497,23 @@ describe("thất bại: 0 lượt điều hướng, và một câu CỤ THỂ", 
       expect(alert.textContent).toBe(GENERIC.en);
       expect(push.mock.calls.length).toBe(0);
       expect(buttonOf(view.container).getAttribute("aria-busy")).toBe("false");
-      expect(errorSpy.mock.calls.length).toBe(1);
+
+      // Không một chuỗi nhạy cảm nào, ở BẤT KỲ lối ra console nào.
+      expectNothingSensitiveLogged();
+
+      // Và HÌNH DẠNG, không phải số lượt: đúng một lời gọi mang nhãn này, với
+      // đúng hai đối số, đối số thứ hai đúng bằng `{ digest }`. Một bản thêm
+      // `orderCode`, `err` hay bất cứ trường nào khác sẽ đỏ ở đây kể cả khi
+      // trường đó tình cờ không chứa chuỗi cấm nào.
+      const threw = logCalls.filter((c) => c.args[0] === "[PurchaseCta] createOrder threw");
+      expect(threw.length).toBe(1);
+      expect(threw[0].method).toBe("error");
+      expect(threw[0].args).toEqual([
+        "[PurchaseCta] createOrder threw",
+        { digest: THROWN_DIGEST },
+      ]);
     } finally {
-      errorSpy.mockRestore();
+      vi.restoreAllMocks();
     }
   });
 });

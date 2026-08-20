@@ -172,8 +172,19 @@ export function RecheckOrderControl({
       // hàng đơn và C-11 đều đọc lại từ nguồn duy nhất là database.
       router.refresh();
     } catch (err) {
-      // Chỉ id + kiểu lỗi, không bao giờ log nội dung đơn (frontend DD § Logging).
-      console.error("[RecheckOrderControl] recheckOrder threw", { orderCode, err });
+      // CHỈ `digest` — định danh Next gắn lên lỗi lúc nó băng qua biên Server
+      // Action, đối chiếu được với log máy chủ. Đúng hình dạng hai file
+      // `error.tsx` của nhóm route này đã chạy thật
+      // (`(billing)/me/orders/error.tsx:39`, `(billing)/pricing/checkout/error.tsx:43`),
+      // và đúng thứ frontend DD § Logging đòi.
+      //
+      // KHÔNG log `err`: câu chữ của một lỗi Postgres/PostgREST băng qua đây
+      // mang nguyên số tiền, số tài khoản và memo của đơn. `Error#message`
+      // không enumerable nên một lượt rò kiểu đó KHÔNG lộ ra dưới
+      // `JSON.stringify` — nó chỉ lộ ra ở console thật, tức là muộn.
+      console.error("[RecheckOrderControl] recheckOrder threw", {
+        digest: (err as { digest?: string } | null)?.digest,
+      });
       setPhase({ kind: "threw" });
     } finally {
       busyRef.current = false;

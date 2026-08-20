@@ -204,6 +204,132 @@ async function activate(locale: Locale, outcome: RecheckOutcome) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Pháp y LOG (frontend DD § Logging: "identifiers and closed error codes only,
+// never an amount, an account number, a memo or a payload").
+//
+// Khẳng định cũ ở case "action NÉM" là một cái spy `mockImplementation(() => {})`
+// — nó nuốt đối số và không hỏi gì về chúng. `console.error(msg, { orderCode, err })`
+// đi qua nó không một vết xước trong khi `err.message` mang nguyên số tiền và
+// số tài khoản. Nên khẳng định phải đặt trên HÌNH DẠNG ĐỐI SỐ.
+//
+// Lối lấy chuỗi bên dưới là bản chép của
+// `app/api/payments/payos/webhook/__tests__/route.test.ts:95-168`. CHÉP chứ
+// không import: file kia không export helper nào và không nằm trong phạm vi
+// sửa của task này — cùng quy ước bản-chép-kèm-địa-chỉ mà file này đã dùng cho
+// các chuỗi cố định của UI Spec C-10.
+// ---------------------------------------------------------------------------
+
+/** `digest` mà Next gắn lên một lỗi băng qua biên Server Action — thứ DUY NHẤT
+ *  được phép đi vào log, đúng hình dạng `(billing)/me/orders/error.tsx:39` và
+ *  `(billing)/pricing/checkout/error.tsx:43` đã chạy thật. */
+const THROWN_DIGEST = "4b0d81e37c";
+
+/** Bốn trường chuyển khoản của đơn (UI Spec C-13). Chúng KHÔNG được render ở
+ *  đây — chúng có mặt chỉ để làm chuỗi cấm, vì đó chính là những gì một lỗi
+ *  Postgres/PostgREST mang theo khi băng qua `recheckOrder()`. */
+const ORDER_AMOUNT_VND = 39000;
+const ORDER_ACCOUNT_NUMBER = "0123456789";
+const ORDER_ACCOUNT_NAME = "CONG TY MS MOLAR";
+const ORDER_MEMO = `MSMOLAR ${ORDER_CODE}`;
+
+/** Lỗi ném ra MANG THEO nội dung đơn. Một fixture `new Error("db read failed")`
+ *  không có gì để rò, nên nó làm mọi khẳng định dưới đây xanh trên cả bản chưa
+ *  sửa — tức là chứng minh đúng con số 0. */
+function orderShapedRejection(): Error {
+  const err = new Error(
+    `select on "payment_orders" failed — Key (order_code)=(${ORDER_CODE}); ` +
+      `amount=${ORDER_AMOUNT_VND}; account_number=${ORDER_ACCOUNT_NUMBER}; ` +
+      `account_name=${ORDER_ACCOUNT_NAME}; memo=${ORDER_MEMO}`
+  );
+  (err as Error & { digest?: string }).digest = THROWN_DIGEST;
+  return err;
+}
+
+/** Mọi chuỗi bị cấm trong BẤT KỲ đối số nào của BẤT KỲ lời gọi log nào.
+ *  `orderCode` KHÔNG nằm ở đây — DD cho phép định danh — nhưng nó vẫn bị loại
+ *  bằng phép so khớp HÌNH DẠNG nguyên vẹn ở cuối case: đối số phải đúng bằng
+ *  `{ digest }`, không thừa một trường nào. */
+const FORBIDDEN_IN_LOGS = [
+  String(ORDER_AMOUNT_VND),
+  ORDER_ACCOUNT_NUMBER,
+  ORDER_ACCOUNT_NAME,
+  ORDER_MEMO,
+  orderShapedRejection().message,
+];
+
+const CONSOLE_METHODS = ["error", "warn", "log", "info", "debug"] as const;
+
+type LogCall = { method: string; args: unknown[] };
+let logCalls: LogCall[] = [];
+
+/** Gom MỌI chuỗi quan sát được từ một giá trị đã log.
+ *
+ *  KHÔNG dùng `JSON.stringify`, và đó là điểm mấu chốt: `console.error(msg, { err })`
+ *  cho ra `{"err":{}}` — `Error#message` KHÔNG enumerable, nên một phép quét
+ *  dựa trên `JSON.stringify` bỏ sót ĐÚNG cái nó đi tìm và case này sẽ xanh trên
+ *  chính bản đang hỏng. `getOwnPropertyNames` cộng nhánh `Error` riêng thì không. */
+function collectStrings(value: unknown, out: string[], seen: Set<object>): void {
+  if (typeof value === "string") {
+    out.push(value);
+    return;
+  }
+  if (typeof value === "number" || typeof value === "bigint" || typeof value === "boolean") {
+    out.push(String(value));
+    return;
+  }
+  if (value === null || value === undefined) return;
+  if (typeof value !== "object") {
+    out.push(String(value));
+    return;
+  }
+  if (seen.has(value)) return;
+  seen.add(value);
+  if (value instanceof Error) {
+    out.push(value.message);
+    if (value.stack) out.push(value.stack);
+  }
+  for (const key of Object.getOwnPropertyNames(value)) {
+    out.push(key);
+    let nested: unknown;
+    try {
+      nested = (value as Record<string, unknown>)[key];
+    } catch {
+      continue;
+    }
+    collectStrings(nested, out, seen);
+  }
+}
+
+function loggedStrings(): string[] {
+  const out: string[] = [];
+  const seen = new Set<object>();
+  for (const call of logCalls) collectStrings(call.args, out, seen);
+  return out;
+}
+
+function expectNothingSensitiveLogged(): void {
+  const strings = loggedStrings();
+  for (const forbidden of FORBIDDEN_IN_LOGS) {
+    const leak = strings.find((s) => s.includes(forbidden));
+    expect(
+      leak === undefined,
+      `chuỗi cấm ${JSON.stringify(forbidden)} xuất hiện trong log: ${JSON.stringify(leak)}`
+    ).toBe(true);
+  }
+}
+
+/** Bọc MỌI lối ra console, không riêng `console.error`: một lượt rò dời sang
+ *  `console.warn` sẽ vô hình với một spy đơn lẻ. */
+function spyOnConsole(): void {
+  logCalls = [];
+  for (const method of CONSOLE_METHODS) {
+    vi.spyOn(console, method).mockImplementation((...args: unknown[]) => {
+      logCalls.push({ method, args });
+    });
+  }
+}
+
 beforeEach(() => {
   mockRecheck.mockReset();
   refresh.mockReset();
@@ -278,10 +404,10 @@ describe("hai kết cục ngoài bảng — không nhánh nào rơi vào câu c�
     for (const row of OUTCOMES) expect(sentence).not.toBe(row.en);
   });
 
-  it("action NÉM thì hiện câu lỗi chung, khác cả bảy câu, và nút không kẹt busy", async () => {
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+  it("action NÉM thì hiện câu lỗi chung, khác cả bảy câu, nút không kẹt busy, và log KHÔNG mang nội dung đơn", async () => {
+    spyOnConsole();
     try {
-      mockRecheck.mockRejectedValue(new Error("db read failed"));
+      mockRecheck.mockRejectedValue(orderShapedRejection());
       const view = render(<Row locale="en" status="pending" />);
       const scope = within(view.container);
       const button = scope.getByRole("button");
@@ -293,8 +419,24 @@ describe("hai kết cục ngoài bảng — không nhánh nào rơi vào câu c�
       for (const row of OUTCOMES) expect(sentence).not.toBe(row.en);
       expect(button.getAttribute("aria-busy")).toBe("false");
       expect(button.hasAttribute("disabled")).toBe(false);
+
+      // Không một chuỗi nhạy cảm nào, ở BẤT KỲ lối ra console nào.
+      expectNothingSensitiveLogged();
+
+      // Và HÌNH DẠNG, không phải số lượt: đúng một lời gọi mang nhãn này, với
+      // đúng hai đối số, đối số thứ hai đúng bằng `{ digest }`. Bản cũ log
+      // `{ orderCode, err }` sẽ đỏ ở đây kể cả nếu `err` tình cờ rỗng.
+      const threw = logCalls.filter(
+        (c) => c.args[0] === "[RecheckOrderControl] recheckOrder threw"
+      );
+      expect(threw.length).toBe(1);
+      expect(threw[0].method).toBe("error");
+      expect(threw[0].args).toEqual([
+        "[RecheckOrderControl] recheckOrder threw",
+        { digest: THROWN_DIGEST },
+      ]);
     } finally {
-      errorSpy.mockRestore();
+      vi.restoreAllMocks();
     }
   });
 });

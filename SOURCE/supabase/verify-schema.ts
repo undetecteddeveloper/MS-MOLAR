@@ -17,6 +17,10 @@
 //   6. `on delete` của MỌI khoá ngoại  <- catalog thật, qua RPC §16a (TD-011)
 //   7. DB đang chạy BẢN NÀO của schema.sql <- vân tay §17 (TD-005)
 //   8. Mọi `subject` nằm trong SUBJECTS    <- dữ liệu, không phải cấu trúc (TD-016)
+//   9. Client KHÔNG ghi được vào tiền      <- payment_orders / subscriptions /
+//      record_payment_settlement, mỗi đối tượng một lệnh bị TỪ CHỐI (ADR-0013/
+//      ADR-0014, AC-033). Trước mục này, ba đối tượng đó không được cổng nào
+//      quan sát ngoài vân tay (7) — mà vân tay chỉ nói file khớp file.
 //
 // (1)–(6) soi từng mảnh cụ thể, và chỉ bắt được đúng những thứ đã từng hỏng.
 // (7) soi phần còn lại: gộp toàn bộ file thành một vân tay, nên một bản vá nằm
@@ -33,8 +37,12 @@
 // loại sẽ làm script FAIL kèm hướng dẫn — thay vì lặng lẽ trở thành trang trắng
 // 42501 ở production vài tuần sau (TD-001).
 //
-// Script CHỈ ĐỌC: không insert/update/delete, không DDL. RPC được probe bằng id
-// không tồn tại nên không khoá attempt của ai.
+// Script KHÔNG ĐỂ LẠI GÌ, và đó là một mệnh đề mạnh hơn "chỉ đọc" — vì nó
+// không còn đúng theo nghĩa đen: (5) tạo một đề nháp fixture rồi tự dọn trong
+// `finally`, và (9) PHÁT ra ba lệnh ghi mà mọi lệnh đều PHẢI bị từ chối ở tầng
+// quyền, kèm hậu kiểm bằng service_role rằng không dòng nào lọt vào. Không có
+// DDL ở bất kỳ đâu, và mọi RPC được probe bằng id không tồn tại nên không khoá
+// attempt của ai, không settle đơn của ai.
 //
 // Cách chạy:  cd SOURCE && npx tsx supabase/verify-schema.ts
 // Chạy khi:   sau mỗi lần apply schema.sql, và trước khi deploy code đụng §10.
@@ -109,6 +117,25 @@ function assert(cond: boolean, msg: string) {
     console.error(`  ✗ ${msg}`);
     failures += 1;
   }
+}
+
+/** Lỗi trả về có thuộc hạng QUYỀN hay không — bản chép NGUYÊN VẸN vị từ ở
+ *  `supabase/test-rls.ts` (§ `isAuthorizationDenial`). Chép chứ không import vì
+ *  test-rls.ts là một script chạy thẳng, không export gì; đổi một bên mà quên
+ *  bên kia là làm hai cổng nói hai chuyện khác nhau về cùng một DDL.
+ *
+ *  ĐÂY LÀ CHỖ MỤC 9 SỐNG HOẶC CHẾT, cùng bài học đã viết ở mục 4: một lệnh ghi
+ *  bị từ chối vì thiếu cột NOT NULL (23502), sai khoá ngoại (23503), trùng khoá
+ *  (23505) hay sai kiểu (22P02) cũng "thất bại", và một khẳng định `error !== null`
+ *  sẽ XANH trong khi `revoke` đã bị gỡ mất. Chỉ 42501 (permission denied cho
+ *  bảng, do `revoke`) và thông báo vi phạm row-level security (do KHÔNG có
+ *  policy ghi) mới là "bị TỪ CHỐI CẤP QUYỀN"; mọi mã ràng buộc đều bị loại. */
+function isAuthorizationDenial(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  return (
+    error.code === "42501" ||
+    /permission denied|violates row-level security policy/i.test(error.message ?? "")
+  );
 }
 
 // --- Parse schema.sql (nguồn chân lý) --------------------------------------
@@ -630,9 +657,116 @@ async function main() {
     );
   }
 
+  // ==========================================================================
+  // 9. SUBSCRIPTION — client KHÔNG ghi được vào tiền (ADR-0013/ADR-0014,
+  //    PRD AC-033, khối SUBSCRIPTION của schema.sql)
+  //
+  // VÌ SAO MỤC NÀY TỒN TẠI: trước nó, `verify:schema` không nhắc tới
+  // `payment_orders`, `subscriptions` hay `record_payment_settlement` một lần
+  // nào — grep trả về rỗng. Thứ DUY NHẤT quan sát được ba đối tượng đó là vân
+  // tay toàn file ở mục 7, mà một vân tay khớp KHÔNG nói gì về nội dung: nó chỉ
+  // nói file trong git và file đã paste là một. Nếu ai đó `grant insert` tay
+  // trên dashboard sau lượt paste, vân tay vẫn khớp từng byte. Vậy mà "gate B
+  // xanh trên prod" lại là tiêu chí ra hàng CỦA CHÍNH khối này (plan Task 5.8).
+  //
+  // Ba lệnh dưới đây là BA ĐỐI TƯỢNG DDL, mỗi đối tượng một lệnh — cùng cách
+  // chia mà `test-rls.ts` Phần 9 dùng (PO-* / SB-* / PS-*).
+  //
+  // ⚠ KHÔNG lệnh nào được phép GHI, và đó là điều kiện để mục này chạy được
+  // trên PRODUCTION: cả ba phải bị từ chối ở tầng quyền. Hai payload đầu dùng
+  // giá trị mốc riêng của verify-schema (khác hẳn bộ của test-rls.ts) và mỗi
+  // lệnh có HẬU KIỂM bằng service_role theo một VỊ TỪ KHÁC vị từ đã dùng để
+  // ghi — hỏi theo `memo` / `period_anchor_at` chứ không theo `order_code` /
+  // `user_id` — vì một lệnh bị RLS chặn có thể trả "thành công rỗng", nên mã
+  // lỗi một mình chưa bao giờ đủ. Lệnh thứ ba là RPC với một mã đơn KHÔNG TỒN
+  // TẠI: `update … where order_code = … and status = 'pending'` khớp 0 dòng,
+  // hàm rơi vào nhánh `if not found then return null` và dừng TRƯỚC lệnh insert
+  // vào subscriptions — nên kể cả khi EXECUTE bị hở, nó vẫn là no-op.
+  //
+  // Payload thì ĐẦY ĐỦ và HỢP LỆ về mọi ràng buộc (đủ cột NOT NULL, `amount > 0`,
+  // `status` trong CHECK, `user_id` là FK CÓ THẬT của chính phiên probe), và
+  // khẳng định đi qua `isAuthorizationDenial()` chứ không qua `error !== null`.
+  // Hai điều đó cùng nhau loại giả thuyết "bị từ chối vì DỮ LIỆU": 42501 được
+  // Postgres ném lúc kiểm quyền, TRƯỚC khi ràng buộc nào được đánh giá.
+  // ==========================================================================
+  console.log("\nProbe quyền ghi khối SUBSCRIPTION (ADR-0013/0014 — mọi lệnh phải bị TỪ CHỐI):");
+
+  const probeUserId = (await probe.auth.getUser()).data.user?.id ?? null;
+  assert(
+    probeUserId !== null,
+    probeUserId !== null
+      ? "Phiên probe có user_id thật — payload dưới đây trỏ vào một khoá ngoại CÓ THẬT"
+      : "Không đọc được user_id của phiên probe — ba check dưới KHÔNG loại được giả thuyết 'bị chặn vì khoá ngoại'"
+  );
+
+  // Bộ giá trị mốc RIÊNG của verify-schema, cố ý khác dải của test-rls.ts
+  // (9_900_000_000_00x) để hai script không bao giờ hậu kiểm trúng rác của nhau.
+  const SUB_PROBE_ORDER = 9_800_000_000_001;
+  const SUB_PROBE_MEMO = "[verify-schema] probe memo — khong phai don that";
+  const SUB_PROBE_PENDING_UNTIL = "2099-04-05T06:07:08.000Z";
+  const SUB_PROBE_EXPIRES = "2099-05-06T07:08:09.000Z";
+  const SUB_PROBE_ANCHOR = "2099-06-07T08:09:10.000Z";
+
+  const poIns = await probe.from("payment_orders").insert({
+    order_code: SUB_PROBE_ORDER,
+    user_id: probeUserId,
+    amount: 199_000,
+    status: "pending",
+    pending_until: SUB_PROBE_PENDING_UNTIL,
+    // payOS `qrCode` là PAYLOAD VietQR/EMVCo, không phải URL (UI-D14).
+    qr_payload: "[verify-schema] 00020101021138540010A00000072701",
+    account_number: "0000000000",
+    account_name: "[VERIFY-SCHEMA] TAI KHOAN PROBE",
+    memo: SUB_PROBE_MEMO,
+  });
+  const poResidue = await admin
+    .from("payment_orders")
+    .select("order_code")
+    .eq("memo", SUB_PROBE_MEMO);
+  const poClean = !poResidue.error && (poResidue.data?.length ?? 0) === 0;
+  assert(
+    isAuthorizationDenial(poIns.error) && poClean,
+    isAuthorizationDenial(poIns.error) && poClean
+      ? "authenticated KHÔNG tự INSERT được payment_orders (42501) và không dòng nào lọt vào — AC-033 đang đóng"
+      : `authenticated GHI ĐƯỢC hoặc bị chặn SAI LÝ DO trên payment_orders (mong đợi 42501, nhận: ${poIns.error?.code ?? "KHÔNG CÓ LỖI"}${poIns.error && !isAuthorizationDenial(poIns.error) ? ` = ràng buộc dữ liệu, KHÔNG phải quyền — \`revoke insert\` có thể đã bị gỡ` : ""}; số dòng lọt vào: ${poResidue.error ? `hậu kiểm lỗi ${poResidue.error.code}` : (poResidue.data?.length ?? "?")}) — apply lại khối SUBSCRIPTION của schema.sql`
+  );
+
+  const sbIns = await probe.from("subscriptions").insert({
+    user_id: probeUserId,
+    expires_at: SUB_PROBE_EXPIRES,
+    period_anchor_at: SUB_PROBE_ANCHOR,
+  });
+  const sbResidue = await admin
+    .from("subscriptions")
+    .select("user_id")
+    .eq("period_anchor_at", SUB_PROBE_ANCHOR);
+  const sbClean = !sbResidue.error && (sbResidue.data?.length ?? 0) === 0;
+  assert(
+    isAuthorizationDenial(sbIns.error) && sbClean,
+    isAuthorizationDenial(sbIns.error) && sbClean
+      ? "authenticated KHÔNG tự INSERT được subscriptions (42501) và không dòng nào lọt vào — không ai tự cấp được entitlement"
+      : `authenticated GHI ĐƯỢC hoặc bị chặn SAI LÝ DO trên subscriptions (mong đợi 42501, nhận: ${sbIns.error?.code ?? "KHÔNG CÓ LỖI"}${sbIns.error && !isAuthorizationDenial(sbIns.error) ? ` = ràng buộc dữ liệu, KHÔNG phải quyền — \`revoke insert\` có thể đã bị gỡ` : ""}; số dòng lọt vào: ${sbResidue.error ? `hậu kiểm lỗi ${sbResidue.error.code}` : (sbResidue.data?.length ?? "?")}) — apply lại khối SUBSCRIPTION của schema.sql`
+  );
+
+  // Cùng lớp EXECUTE-chỉ-service_role như record_exam_result ở mục 4, và xử lý
+  // PGRST202 y hệt: ở đây "không thấy hàm" là một lệch SCHEMA có thật, nên nó
+  // được báo bằng câu riêng thay vì được tính là đã-chặn-được.
+  const psRpc = await probe.rpc("record_payment_settlement", {
+    p_order_code: SUB_PROBE_ORDER,
+    p_period_days: 30,
+  });
+  assert(
+    psRpc.error?.code === "42501",
+    psRpc.error?.code === "42501"
+      ? "record_payment_settlement KHÔNG gọi được bằng JWT học sinh (42501) — EXECUTE chỉ service_role"
+      : psRpc.error?.code === "PGRST202"
+        ? "record_payment_settlement chưa tồn tại (PGRST202) — apply khối SUBSCRIPTION của schema.sql; đường DUY NHẤT gia hạn entitlement đang KHÔNG có mặt trên DB này"
+        : `authenticated VẪN gọi được record_payment_settlement (chạy tới thân hàm, mã ${psRpc.error?.code ?? "không có lỗi"}) — thiếu \`revoke all on function … from public, anon, authenticated\``
+  );
+
   console.log(
     failures === 0
-      ? "\n✅ Schema verify: DB khớp schema.sql §10 + §11 + §12 + khoá ngoại (§15/§16) + phiên bản (§17) + subject canonical (TD-016)."
+      ? "\n✅ Schema verify: DB khớp schema.sql §10 + §11 + §12 + khoá ngoại (§15/§16) + phiên bản (§17) + subject canonical (TD-016) + khối SUBSCRIPTION chỉ-đọc (ADR-0013/0014)."
       : `\n❌ Schema verify: ${failures} check FAIL — DB và schema.sql đang lệch nhau.`
   );
   process.exit(failures === 0 ? 0 : 1);
