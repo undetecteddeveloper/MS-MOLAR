@@ -10,7 +10,7 @@ Layer mix: **backend**, with the frontend surfaces it feeds already shipped (C-0
 | 5.1 `quota.ts` — `consumeQuota()` | `subscription-work-plan-backend-task-21.md` | backend | [ ] |
 | 5.2 gemini chokepoint + cost table | `subscription-work-plan-backend-task-22.md` | backend | [ ] |
 | 5.3 tutor gate (UI-D3 / AC-041 constraint) | `subscription-work-plan-backend-task-23.md` | backend | [ ] |
-| 5.4 upload gate + **INT-1** | `subscription-work-plan-backend-task-24.md` | backend | [ ] |
+| 5.4 upload gate + **INT-1** | `subscription-work-plan-backend-task-24.md` | backend | [x] |
 | 5.5 telemetry codes + OK-04 mapping | `subscription-work-plan-backend-task-25.md` | backend | [ ] |
 | 5.6 B-01 tier-conditional limit | `subscription-work-plan-backend-task-26.md` | backend | [ ] |
 | 5.7 AC-047 telemetry distinguishability | `subscription-work-plan-backend-task-27.md` | backend | [ ] |

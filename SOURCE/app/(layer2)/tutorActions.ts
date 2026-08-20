@@ -33,7 +33,8 @@
 //     kiểu ở dưới nữa).
 "use server";
 
-import { consumeQuota, type ConsumeResult } from "@/lib/billing/quota";
+import { consumeQuota } from "@/lib/billing/quota";
+import { QUOTA_REFUSAL_TELEMETRY_CODE } from "@/lib/billing/quotaTelemetry";
 import { readEntitlement } from "@/lib/billing/readEntitlement";
 import { guard } from "@/lib/security/rateLimit";
 import { computeWrongTwiceQuestionIds, type WrongTwiceAttempt } from "@/lib/scoring/wrongTwice";
@@ -55,29 +56,11 @@ export type ExplainStepError = "not_eligible" | "rate_limited" | "gemini_unavail
 
 export type ExplainStepResult = { hint: string } | { error: ExplainStepError };
 
-/**
- * Ba lý do từ chối của `consumeQuota()` → ba mã `telemetry_log.error_code`
- * (backend DD § OK-04).
- *
- * Bảng này TỒN TẠI vì hai bên KHÔNG phải cùng một chuỗi: `consumeQuota()` trả
- * `"user_quota" | "project_budget" | "unavailable"`, còn CHECK constraint nhận
- * `user_quota_exhausted` / `project_budget_exhausted`. Dựa vào "chúng giống
- * nhau" là dựa vào một điều không đúng. Bảng nằm Ở ĐÂY chứ không trong
- * `quota.ts`: hàm ấy không biết gì về telemetry, và không được biết.
- *
- * `satisfies Record<…>` khoá hai đầu: một lý do THỨ TƯ trong tương lai là lỗi
- * biên dịch (thiếu khoá), và một mã không nằm trong `TELEMETRY_ERROR_CODES` cũng
- * vậy — chứ không phải một `null` im lặng ở cột `error_code` phát hiện ra sau
- * nhiều tháng, khi lớp lọc lúc chạy của `buildTelemetryPayload()` đã nuốt nó.
- *
- * `unavailable` KHÔNG có mã riêng: nó là sự cố hạ tầng của CHÍNH TA, và thêm
- * literal thứ ba sẽ vượt phạm vi R13 đã tuyên.
- */
-const QUOTA_REFUSAL_TELEMETRY_CODE = {
-  user_quota: "user_quota_exhausted",
-  project_budget: "project_budget_exhausted",
-  unavailable: "server",
-} as const satisfies Record<Extract<ConsumeResult, { ok: false }>["reason"], TelemetryErrorCode>;
+// Ánh xạ OK-04 (`consumeQuota()` reason → `telemetry_log.error_code`) sống ở
+// `@/lib/billing/quotaTelemetry` — MỘT bản khai duy nhất, dùng chung với cổng
+// upload trong `app/(layer4)/actions.ts`. Trước đây mỗi file giữ một bản sao
+// literal và không có gì ghim chúng vào nhau; xem khối chú thích của module ấy
+// để biết vì sao chỗ hợp nhất phải là một module KHÔNG `"use server"`.
 
 /** Đúng bộ cột AN TOÀN cần cho prompt. `correct_answer`/`sub_answers`/
  *  `essay_answer` không có ở đây, và cũng không thể có: §10c đã REVOKE chúng

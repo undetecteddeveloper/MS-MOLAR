@@ -19,6 +19,9 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { consumeQuota } from "@/lib/billing/quota";
+import { QUOTA_REFUSAL_TELEMETRY_CODE } from "@/lib/billing/quotaTelemetry";
+import { readEntitlement } from "@/lib/billing/readEntitlement";
 import { createClient } from "@/lib/supabase/server";
 import { guard } from "@/lib/security/rateLimit";
 import { assembleExamLenient, validateAssembledExam } from "@/lib/ugc/assembleExam";
@@ -29,7 +32,7 @@ import { extractMeta } from "@/lib/ugc/extractMeta";
 import { extractQuestions } from "@/lib/ugc/extractQuestions";
 import type { FileRef } from "@/lib/ugc/fileRef";
 import { assembledFromRows, questionIdentityFromId } from "@/lib/ugc/fromRows";
-import { ANSWER_MODEL, QUESTION_MODEL } from "@/lib/ugc/gemini";
+import { ANSWER_MODEL, GEMINI_CALLS_PER_OPERATION, QUESTION_MODEL } from "@/lib/ugc/gemini";
 import { LIMITS } from "@/lib/ugc/limits";
 import {
   normalizeMeta,
@@ -48,6 +51,12 @@ import type {
   UgcError,
 } from "@/lib/ugc/types";
 import { checkUploadFile, isAllowedMime, validateExamMeta } from "@/lib/ugc/validateInput";
+
+// Ánh xạ OK-04 (`consumeQuota()` reason → `telemetry_log.error_code`) sống ở
+// `@/lib/billing/quotaTelemetry` — MỘT bản khai duy nhất, dùng chung với cổng
+// gia sư trong `app/(layer2)/tutorActions.ts`. Trước đây mỗi file giữ một bản
+// sao literal và không có gì ghim chúng vào nhau; xem khối chú thích của module
+// ấy để biết vì sao chỗ hợp nhất phải là một module KHÔNG `"use server"`.
 
 const UPLOADS_BUCKET = "exam-uploads";
 const IMAGES_BUCKET = "exam-images";
@@ -191,6 +200,13 @@ export async function extractAndAssemble(formData: FormData): Promise<UgcActionF
   // Thiếu entryMode (client cũ) → manual: giữ nguyên hành vi v2.1.
   const entryMode: EntryMode =
     (formData.get("entryMode") as string | null) === "automatic" ? "automatic" : "manual";
+  // Chế độ Automatic phát THÊM một call metadata ở stage 5 (ADR-0007), tức
+  // 3 request thay vì 2. Suy ĐÚNG MỘT LẦN, ở đây — điểm sớm nhất suy được, vì
+  // `entryMode` vừa mới có — rồi CẢ HAI chỗ tiêu thụ đọc lại chính const này:
+  // cổng hạn mức ngay dưới (đặt chỗ ngân sách) và stage 5 (quyết định có phát
+  // call thứ ba hay không). Hai lần suy độc lập sẽ cho phép cổng đặt chỗ 2 mà
+  // pipeline phát 3, và không có gì đỏ ở đâu cả (backend DD I004).
+  const metaCall = entryMode === "automatic";
   console.log(
     `[ugc-pipeline] ▶ START extractAndAssemble user=${user.id.slice(0, 8)} mode=${entryMode} ${
       isRerun ? "(re-run)" : "(mới)"
@@ -260,6 +276,56 @@ export async function extractAndAssemble(formData: FormData): Promise<UgcActionF
   const qRef = qRefOr.ref;
   const aRef = aRefOr.ref;
 
+  // --- 2b. Hạn mức kỳ + ngân sách ngày (I3 — AC-017/018/019/024/053). -----
+  //
+  // TRƯỚC nhánh rẽ ở dưới, nên nhánh XỬ LÝ LẠI cũng bị đếm. Đó là toàn bộ điểm
+  // của bản vá: khối đếm cũ lấy "số dòng `exams` tạo trong 24h" làm cơ sở và
+  // nằm gọn trong nhánh `else`, nên một lượt xử lý lại — vốn không tạo dòng nào
+  // — tiêu 2–3 request Gemini mà không tiêu suất nào. Gói được bán bằng LƯỢT,
+  // và một lượt xử lý lại là một lượt.
+  //
+  // SAU stage 1–2, và đây là chỗ MUỘN NHẤT còn hợp lệ, cố ý: `consumeQuota()`
+  // INCR rồi mới so, nên gọi nó trước phần validate metadata/file sẽ tính phí
+  // một suất kỳ cho một lượt bị chính validate từ chối và không bao giờ chạm
+  // tới Gemini. Đây đúng là lý lẽ khiến `tutorActions.ts` xếp cổng hạn mức SAU
+  // `guard()`. Mọi ràng buộc của DD vẫn giữ: gọi MỘT lần, trước nhánh rẽ, và
+  // trước byte Gemini đầu tiên.
+  //
+  // Chi phí lấy từ BẢNG GIÁ (`GEMINI_CALLS_PER_OPERATION`, lib/ugc/gemini.ts)
+  // chứ không phải một literal ở đây, và nó rẽ theo CHÍNH `metaCall` — cùng
+  // const mà stage 5 đọc. `consumeQuota()` nhích ngân sách bằng ĐÚNG MỘT lệnh
+  // `INCRBY` phát TRƯỚC mọi request: một ĐẶT CHỖ, không phải một cái tích từng
+  // lượt gọi. Ba request của stage 5 chạy trong một `Promise.all`, nên một lời
+  // từ chối rơi vào giữa chúng sẽ bỏ lại một lượt bóc đề dở dang đã tiêu cả
+  // tiền nhà cung cấp lẫn suất của người dùng.
+  const ent = await readEntitlement(user.id);
+  const consumed = await consumeQuota(
+    "upload",
+    user.id,
+    ent,
+    metaCall ? GEMINI_CALLS_PER_OPERATION.uploadAutomatic : GEMINI_CALLS_PER_OPERATION.uploadTyped
+  );
+  if (!consumed.ok) {
+    // Lý do PHÂN BIỆT chỉ tồn tại ở đây (OK-04) — xem khối chú thích của
+    // `quotaTelemetry.ts`: đường upload chưa có `event_type` nào trong
+    // `telemetry_log`, nên console máy chủ là nơi duy nhất nó sống.
+    console.warn(
+      `[extractAndAssemble] cổng hạn mức từ chối: reason=${consumed.reason} ` +
+        `error_code=${QUOTA_REFUSAL_TELEMETRY_CODE[consumed.reason]}`
+    );
+    log.info(`Cổng hạn mức từ chối lượt này (${consumed.reason}) — 0 request Gemini`);
+    // Hết suất của GÓI là một câu trả lời về chính sách, và Free lẫn Premium
+    // nhận CÙNG một câu (AC-053 đòi "cùng mã lý do" với AC-018). Hai lý do còn
+    // lại là trần chi của cả dự án hoặc sự cố hạ tầng của ta — nói với người
+    // dùng rằng họ hết lượt sẽ là nói sai.
+    return consumed.reason === "user_quota"
+      ? failure(
+          "validation",
+          "You have used every exam upload in your current plan period. Your allowance resets when the next period starts."
+        )
+      : failure("server", "Exam uploads are temporarily unavailable. Please try again later.");
+  }
+
   // --- 3. Re-run cho đề của mình, hoặc guard tần suất khi tạo mới. ---------
   stageT = log.now();
   log.stage(3, isRerun ? "Reset đề cũ để xử lý lại (re-run)" : "Tạo bản ghi đề mới (status=processing)");
@@ -328,19 +394,15 @@ export async function extractAndAssemble(formData: FormData): Promise<UgcActionF
     }
     log.ok(3, "reset đề", `examId=${examId}`, stageT);
   } else {
-    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const { count } = await supabase
-      .from("exams")
-      .select("id", { count: "exact", head: true })
-      .eq("author_id", user.id)
-      .gte("created_at", since);
-    if ((count ?? 0) >= LIMITS.MAX_UPLOADS_PER_DAY) {
-      log.fail(3, "guard tần suất", `đã đạt ${LIMITS.MAX_UPLOADS_PER_DAY} lượt/ngày`, stageT);
-      return failure(
-        "validation",
-        `Upload limit reached (${LIMITS.MAX_UPLOADS_PER_DAY} per day). Try again tomorrow.`
-      );
-    }
+    // Guard tần suất theo SỐ DÒNG (30 dòng `exams` tạo trong 24h) từng đứng ở
+    // đây và đã bị XOÁ, không phải để lại chạy song song: nó đếm sai đơn vị
+    // (dòng tạo ra, chứ không phải thao tác thực hiện) và chỉ có mặt ở nhánh
+    // này, nên nhánh xử-lý-lại không bao giờ đi qua nó. Cổng thay thế là
+    // `consumeQuota("upload", …)` ở mục 2b, đứng TRƯỚC cả hai nhánh. Hai cổng
+    // chạy song song sẽ làm lý do từ chối phụ thuộc vào cái nào bắn trước.
+    // Tên hằng cũ cố ý KHÔNG nhắc lại ở đây: khẳng định vắng mặt của INT-1 đọc
+    // toàn văn file, và một cái tên còn sót trong chú thích đọc y hệt một cái
+    // tên còn sót trong mã.
 
     // Snapshot tên tác giả (ADR-0003) từ profile của chính mình.
     const { data: profile } = await supabase
@@ -414,7 +476,8 @@ export async function extractAndAssemble(formData: FormData): Promise<UgcActionF
   // --- 5. AI extraction (server-only, song song — v2.2 thêm call metadata
   //        NON-FATAL ở chế độ Automatic; không thêm độ trễ wall-clock). -------
   stageT = log.now();
-  const metaCall = entryMode === "automatic";
+  // `metaCall` suy một lần ở đầu hàm và cổng hạn mức ở mục 2b đã đặt chỗ ngân
+  // sách theo CHÍNH giá trị này — suy lại ở đây là mở đường cho hai con số.
   log.stage(
     5,
     `Trích xuất bằng AI (${metaCall ? 3 : 2} call song song)`,

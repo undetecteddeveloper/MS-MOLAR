@@ -373,6 +373,13 @@ describe("Binding decision ADR-0013 — một phép tính quyền lợi, KHÔNG 
     // `ent.plan` cho PLAN_LIMITS/budgetCeiling và `ent[kind]` cho mốc kỳ, mà
     // `readEntitlement()` là nguồn duy nhất của giá trị đó.
     "app/(layer2)/tutorActions.ts",
+    // Cổng hạn mức UPLOAD (plan Task 5.4, backend DD I3) — cùng một lý lẽ, cùng
+    // một `consumeQuota()`, chỉ khác `kind`. `extractAndAssemble` đứng trước
+    // nhánh `rerunExamId` và phải biết gói của người dùng để chọn hạn mức kỳ và
+    // trần ngân sách; không có React context nào ở đây để `useEntitlement()`
+    // đọc, và tin vào quyền lợi do FormData khai thì giả mạo được — trong đúng
+    // một hàm có bất biến là không tin bất cứ thứ gì người gọi khai.
+    "app/(layer4)/actions.ts",
   ];
 
   /** Directive prologue của một Server Action: một string literal đứng MỘT MÌNH
