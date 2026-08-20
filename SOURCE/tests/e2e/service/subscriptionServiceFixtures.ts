@@ -43,6 +43,20 @@
 //   writes can end up reachable by scope 1 alone — which is what an account deletion
 //   would then strand, since it nulls `user_id` rather than deleting the row.
 //
+//   WHICH OF THE THREE SCOPES IS ACTUALLY PROVEN, and by what. Stated because the
+//   paragraph above is a normative claim, and a normative claim no test reaches is the
+//   defect shape this lane exists to catch.
+//     - Scope 2 (block) is PROVEN, by SVC-1's orphan case: it manufactures the one row
+//       shape scope 2 uniquely reaches — `user_id` NULL — and asserts the row is gone
+//       after `tearDown()`. Deleting the block delete below makes that case red.
+//     - Scope 1 (`user_id`) is UNPROVEN in the service lane, and cannot be proven there:
+//       a row reachable by scope 1 ALONE must sit outside the reserved block, and
+//       `requireCodeInBlock()` refuses to seed one. Only a case that drives production
+//       `createOrder()` — which mints its own code — can build one, and no SVC-1 case
+//       does. Deleting the `user_id` delete below therefore leaves the whole lane green.
+//     - Scope 3 (email prefix) is exercised by every `setUp()`, which tears down first.
+//   Teardown's row counts prove the UNION of scopes 1 and 2, not either one alone.
+//
 // WHAT `countFixtureRows()` CAN AND CANNOT OBSERVE — stated because a leak detector that
 //   cannot fail is worse than none, since it reads as evidence.
 //     - `authUsers` is ENTAILED, not observed: `tearDown()` deletes every listed account
