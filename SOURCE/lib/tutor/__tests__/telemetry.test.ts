@@ -46,7 +46,7 @@ const EXPECTED_COLUMNS = [
 /** Chép tay, CỐ Ý không import từ schema hay implementation: đây là bản sao độc
  *  lập của CHECK constraint §19, để test còn chứng minh được điều gì khi ai đó
  *  nới enum ở phía implementation. */
-const SCHEMA_ERROR_CODES = ["gemini_unavailable", "rate_limited", "server", "not_eligible"];
+const SCHEMA_ERROR_CODES = ["gemini_unavailable", "rate_limited", "server", "not_eligible", "user_quota_exhausted", "project_budget_exhausted"];
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 const QUESTION_ID = "q-derivative-001";
@@ -140,6 +140,46 @@ const FIXTURES: TelemetryFixture[] = [
     } as unknown as TelemetryEvent,
     answerKeySentinels: LEAK_SENTINELS,
   },
+  {
+    // R13 (AC-045): mã mới thứ nhất. Đây là ca chứng minh bộ lọc runtime cho
+    // mã này ĐI QUA — không có nó, một bộ lọc còn dừng ở bốn mã cũ vẫn xanh
+    // hết dàn trên, chỉ khác là error_code thành null lúc ghi thật.
+    label: "tutor_invoke/failure/user-quota",
+    event: {
+      eventType: "tutor_invoke",
+      userId: USER_ID,
+      questionId: QUESTION_ID,
+      success: false,
+      errorCode: "user_quota_exhausted",
+    },
+    answerKeySentinels: LEAK_SENTINELS,
+  },
+  {
+    // Mã mới thứ hai, GIÁ TRỊ KHÁC ca trên và event_type khác: hai ca cùng kiểu
+    // mà cùng một giá trị thì không phân biệt được ánh xạ với hằng số.
+    label: "adaptive_route/failure/project-budget",
+    event: {
+      eventType: "adaptive_route",
+      userId: USER_ID,
+      skillNodeId: null,
+      success: false,
+      errorCode: "project_budget_exhausted",
+    },
+    answerKeySentinels: LEAK_SENTINELS,
+  },
+  {
+    // Ca SÁT NGHĨA: chuỗi chỉ khác mã thật ở phần đuôi. Bộ lọc phải là bộ lọc
+    // đối sánh ĐẦY ĐỦ, không phải so tiền tố — CHECK của Postgres so đầy đủ.
+    label: "near-miss-code",
+    event: {
+      eventType: "tutor_invoke",
+      userId: USER_ID,
+      questionId: QUESTION_ID,
+      success: false,
+      errorCode: "user_quota_exhausted_v2" as TelemetryErrorCode,
+    },
+    answerKeySentinels: LEAK_SENTINELS,
+  },
 ];
 
 /** Trả về mô tả từng sentinel BỊ RÒ, kèm ĐÚNG tên cột rò — dùng mảng thay vì
@@ -177,7 +217,7 @@ function findLeaks(payload: TelemetryLogInsert, sentinels: string[], where: stri
 // Primary failure mode: a future maintainer routes a caught exception's
 //   `err.message` (which could echo attacker-influenced UGC question content, per
 //   Security Considerations) into `error_code` or any other telemetry column
-//   instead of the constrained 4-member enum — reopening exactly the leak path
+//   instead of the constrained closed enum — reopening exactly the leak path
 //   the schema's own CHECK constraint (`error_code in (...)`) and this unit test
 //   both exist to prevent, per the schema's stated design intent ("Mã có cấu
 //   trúc, KHÔNG BAO GIỜ free-text/exception message").
@@ -185,8 +225,8 @@ function findLeaks(payload: TelemetryLogInsert, sentinels: string[], where: stri
 //   assert every field of the constructed payload is either a structurally-safe
 //   value (uuid, boolean, timestamp, or a closed enum member) or, for the one
 //   string-shaped field capable of holding free text (error_code), assert it is
-//   STRICTLY one of the 4 named literals ('gemini_unavailable' | 'rate_limited' |
-//   'server' | 'not_eligible') and never the raw simulated Error's .message —
+//   STRICTLY one of the named literals of the CHECK constraint (R13 widened it
+//   to six) and never the raw simulated Error's .message —
 //   over a fixture battery that includes a simulated Error whose .message
 //   contains the sentinel string, proving that string never reaches the payload
 //   under any exercised code path.
@@ -209,7 +249,7 @@ describe("buildTelemetryPayload — telemetry không bao giờ mang theo đáp �
     );
     expect(unexpectedColumns).toEqual([]);
 
-    // (3) error_code: NGHIÊM NGẶT null hoặc 1 trong 4 literal của CHECK §19 —
+    // (3) error_code: NGHIÊM NGẶT null hoặc 1 trong các literal của CHECK §19 —
     // đối chiếu với bản chép tay SCHEMA_ERROR_CODES, không phải với hằng của
     // implementation, nên nới enum ở implementation vẫn bị bắt tại đây.
     const badErrorCodes = built
@@ -255,6 +295,16 @@ describe("buildTelemetryPayload — telemetry không bao giờ mang theo đáp �
     expect(built[1].payload.error_code).toBe("gemini_unavailable");
     // Còn mã bịa từ err.message thì thành null, không phải chuỗi rác.
     expect(built[4].payload.error_code).toBeNull();
+
+    // Hai mã R13 cũng phải ĐI QUA, và đi qua thành ĐÚNG mã của nhánh sinh ra
+    // nó. Hai ca dùng HAI giá trị khác nhau: một builder trả hằng số, hay một
+    // bộ lọc ánh xạ nhầm hai nhánh vào nhau, chỉ bị bắt khi có cả hai.
+    expect(built[6].payload.error_code).toBe("user_quota_exhausted");
+    expect(built[7].payload.error_code).toBe("project_budget_exhausted");
+    // Mà bộ lọc vẫn phải là BỘ LỌC chứ không thành ống dẫn: một mã sát nghĩa
+    // nhưng không nằm trong CHECK vẫn thành null. Đổi `includes` thành so tiền
+    // tố thì đúng ca này đỏ, còn cả dàn trên vẫn xanh.
+    expect(built[8].payload.error_code).toBeNull();
 
     // (6) Hằng của implementation phải khớp CHECK constraint §19 từng phần tử —
     // khoá luôn nguồn duy nhất mà cả kiểu lẫn bộ lọc lúc chạy cùng dùng.

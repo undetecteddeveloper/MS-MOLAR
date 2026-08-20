@@ -14,7 +14,7 @@
 // dùng nhập. Cơ chế chặn có HAI LỚP, cả hai đều nằm ở file này, cùng lối với
 // prompt.ts:
 //   1. Kiểu `TelemetryEvent` KHÔNG CÓ trường nào chứa nổi văn bản tự do —
-//      `errorCode` là union 4 phần tử sinh từ `TELEMETRY_ERROR_CODES`.
+//      `errorCode` là union ĐÓNG sinh từ `TELEMETRY_ERROR_CODES`.
 //   2. Thân hàm chỉ gán ĐÍCH DANH 6 cột — không trải `...event`, không
 //      JSON.stringify(event), không lặp Object.entries(event) — và lọc
 //      `errorCode` LÚC CHẠY qua chính bộ hằng ấy, nên một giá trị bị `as` ép qua
@@ -30,9 +30,9 @@
 // "best-effort" thành điểm hỏng thứ hai của luồng học sinh đang chờ, điều backend
 // DD cấm tường minh.
 
-/** Đúng bằng CHECK constraint của §19 — nguồn DUY NHẤT cho cả kiểu lẫn bộ lọc
- *  lúc chạy, nên hai thứ đó không thể trôi lệch nhau. */
-export const TELEMETRY_ERROR_CODES = ["gemini_unavailable", "rate_limited", "server", "not_eligible"] as const;
+/** Đúng bằng CHECK constraint `telemetry_log_error_code_check` — SÁU mã sau R13,
+ *  ĐÚNG THỨ TỰ schema.sql; nguồn DUY NHẤT cho cả kiểu lẫn bộ lọc lúc chạy. */
+export const TELEMETRY_ERROR_CODES = ["gemini_unavailable", "rate_limited", "server", "not_eligible", "user_quota_exhausted", "project_budget_exhausted"] as const;
 
 export type TelemetryErrorCode = (typeof TELEMETRY_ERROR_CODES)[number];
 
@@ -72,8 +72,8 @@ export interface TelemetryLogInsert {
   error_code: TelemetryErrorCode | null;
 }
 
-/** Lớp chắn thứ 2: chỉ cho qua đúng 4 literal của §19; mọi thứ khác (kể cả một
- *  `err.message` bị `as` ép vào) thành null. */
+/** Lớp chắn thứ 2: chỉ cho qua ĐÚNG các literal của CHECK §19; mọi thứ khác (kể
+ *  cả một `err.message` bị `as` ép vào) thành null. */
 function toErrorCode(value: unknown): TelemetryErrorCode | null {
   return TELEMETRY_ERROR_CODES.includes(value as TelemetryErrorCode) ? (value as TelemetryErrorCode) : null;
 }
@@ -85,7 +85,7 @@ function toErrorCode(value: unknown): TelemetryErrorCode | null {
  * - Bảo đảm (AC-013): object trả về chỉ chứa 6 cột được gán đích danh dưới đây,
  *   nên không thể mang theo giá trị đáp án nào, dù caller có truyền vào cả cụm
  *   ngữ cảnh lỗi.
- * - `error_code` luôn là `null` hoặc 1 trong 4 literal của CHECK §19 — không bao
+ * - `error_code` luôn là `null` hoặc 1 trong các literal của CHECK §19 — không bao
  *   giờ là văn bản tự do, nên lệnh insert cũng không thể bị CHECK từ chối vì cột
  *   này.
  */

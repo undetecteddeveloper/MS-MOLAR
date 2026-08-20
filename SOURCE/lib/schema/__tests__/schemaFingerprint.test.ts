@@ -139,9 +139,6 @@ const SCHEMA_TELEMETRY_ERROR_CODES = [
   "project_budget_exhausted",
 ];
 
-/** Hai literal mà R13 thêm — phía SQL đã có, phía code CHƯA (plan Task 5.5). */
-const CODES_PENDING_ON_TS_SIDE = ["user_quota_exhausted", "project_budget_exhausted"];
-
 const ERROR_CODE_IN_RE = /error_code\s+in\s*\(([^)]*)\)/gi;
 const SQL_LITERAL_RE = /'([^']*)'/g;
 
@@ -236,38 +233,29 @@ describe("schema.sql — hai danh sách error_code phải khớp nhau (AC-045)",
     expect(sites[1].codes).not.toEqual(sites[0].codes);
   });
 
-  it("BẪY cho plan Task 5.5: TELEMETRY_ERROR_CODES còn thiếu ĐÚNG hai mã R13", () => {
-    // Vì sao không phải assert cuối cùng (`mỗi site === TELEMETRY_ERROR_CODES`,
-    // backend DD § R13): hôm nay nó KHÔNG xanh nổi, và đó là thứ tự ĐÚNG — nới
-    // CHECK trước, code phát mã sau (plan Task 5.5 sở hữu telemetry.ts, task
-    // này không được chạm vào). Làm nhẹ assert thành `toContain` thì trả về một
-    // cổng xanh không phân biệt được gì.
+  it("hằng TS và CẢ HAI danh sách SQL trùng khít — cùng literal, cùng thứ tự (backend DD § R13)", () => {
+    // Đây là assert cuối cùng mà ca "BẪY cho plan Task 5.5" (đã xoá cùng commit
+    // nới TELEMETRY_ERROR_CODES) tự chỉ định cho thời điểm phía code bắt kịp
+    // phía SQL: không ghim ĐỘ LỆCH nữa, mà ghim ĐẲNG THỨC.
     //
-    // Nên ca này ghim ĐỘ LỆCH, chính xác tới từng mã. Nó đỏ theo CẢ HAI chiều:
-    // phía SQL đổi (đã có ca trên), và phía code nới ra — kể cả nới đúng. Cái
-    // đỏ ở Task 5.5 là TÍN HIỆU, không phải hỏng: thông điệp dưới đây nói rõ
-    // phải thay bằng gì.
-    const sqlCodes = parseErrorCodeSites(schemaSql)[0].codes;
-    const tsCodes = [...TELEMETRY_ERROR_CODES] as string[];
-
+    // Mạnh hơn hẳn cái bẫy nó thay, chứ không nhẹ đi: bẫy so hai HIỆU tập hợp
+    // nên mù với THỨ TỰ (đảo hai literal ở một phía vẫn cho hai hiệu rỗng) và
+    // chỉ đọc site[0] nên mù với danh sách thứ hai. Assert này so nguyên hai
+    // site, nên đỏ cho cả ba kiểu trôi: thiếu mã, thừa mã, và đảo thứ tự.
+    //
+    // KHÔNG làm nhẹ thành `toContain`: cổng chỉ hỏi "có chứa không" vẫn xanh khi
+    // phía code mang thừa một mã mà CHECK từ chối — đúng lỗi 23514 lúc chạy.
     expect(
-      tsCodes.filter((code) => !sqlCodes.includes(code)),
-      `TELEMETRY_ERROR_CODES mang mã mà CHECK constraint KHÔNG nhận → mọi lượt\n` +
-        `ghi telemetry với mã đó bị Postgres từ chối (23514). Chiều lệch này\n` +
-        `không bao giờ chấp nhận được: sửa schema.sql trước.\nThừa ở phía code:`
-    ).toEqual([]);
-
-    expect(
-      sqlCodes.filter((code) => !tsCodes.includes(code)),
-      `\n\nPhía code đã bắt kịp phía SQL (hoặc lệch theo kiểu khác).\n` +
-        `Nếu đây là plan Task 5.5 (telemetry.ts:35 vừa nhận hai mã R13): XOÁ ca\n` +
-        `này và thay bằng assert cuối cùng mà backend DD § R13 yêu cầu —\n` +
-        `  expect(parseErrorCodeSites(schemaSql)).toEqual([\n` +
-        `    { construct: "create table", codes: [...TELEMETRY_ERROR_CODES] },\n` +
-        `    { construct: "add constraint", codes: [...TELEMETRY_ERROR_CODES] },\n` +
-        `  ]);\n` +
-        `Ca này là BẪY giữ chỗ cho đúng thời điểm đó, không phải hợp đồng vĩnh viễn.\n` +
-        `Đang lệch:`
-    ).toEqual(CODES_PENDING_ON_TS_SIDE);
+      parseErrorCodeSites(schemaSql),
+      `TELEMETRY_ERROR_CODES và CHECK constraint của telemetry_log đã trôi lệch.\n` +
+        `Thừa ở phía code = mọi lượt ghi telemetry mang mã đó bị Postgres từ chối\n` +
+        `(23514). Thiếu ở phía code = nhánh từ chối ghi null vào error_code, và\n` +
+        `truy vấn vận hành không còn phân biệt được nguyên nhân (AC-047). Sửa CẢ\n` +
+        `BA chỗ trong cùng một commit: hai danh sách SQL + lib/tutor/telemetry.ts.\n` +
+        `Đọc được:`
+    ).toEqual([
+      { construct: "create table", codes: [...TELEMETRY_ERROR_CODES] },
+      { construct: "add constraint", codes: [...TELEMETRY_ERROR_CODES] },
+    ]);
   });
 });

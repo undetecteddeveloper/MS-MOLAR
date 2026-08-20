@@ -91,3 +91,62 @@ Add `consumeQuota("tutor", userId, ent, 1)` **beside** the existing `guard("expl
 
 ## Investigation Notes
 (Record the state sweep, the asserted inequality, and the Compliance Check result here.)
+
+### Session 2026-08-20 — Investigation (pre-implementation), ESCALATED before the Red phase
+
+**Investigation Targets read in full:** `tutorActions.ts`, `ExplainStepAffordance.tsx`,
+`lib/billing/quota.ts`, `lib/tutor/telemetry.ts`, `lib/tutor/callTutor.ts`,
+`lib/tutor/__tests__/telemetry.test.ts` (`:49`, `:261`),
+`lib/schema/__tests__/schemaFingerprint.test.ts` (`:138-143`),
+backend DD (`:224`, `:1068` I2), work plan Phase 5 (Tasks 5.1–5.8),
+task-25 (plan Task 5.5) as the owner of the telemetry constant.
+
+**State sweep — every refusal branch of `explainStep()` today, and the code each returns:**
+
+| Branch | Line | Client code | Telemetry `errorCode` written |
+|---|---|---|---|
+| `exam_attempts` read failed | `:169` | `server` | *(none — no `userId` yet)* |
+| attempt not found / not owned | `:171` | `not_eligible` | *(none — no `userId` yet)* |
+| `guard("explainStep")` refused | `:183` | `rate_limited` | `rate_limited` |
+| history read failed | `:191` | `server` | `server` |
+| server-side wrong-twice re-check failed | `:209` | `not_eligible` | `not_eligible` |
+| question read failed | `:222` | `server` | `server` |
+| question missing / essay | `:243` | `not_eligible` | `not_eligible` |
+| `generateHint()` threw | `:276` | `TutorCallError.code` else `server` | same value |
+
+All eight return a member of the four-literal union at `:51` — confirmed verbatim:
+`export type ExplainStepError = "not_eligible" | "rate_limited" | "gemini_unavailable" | "server";`
+No branch discloses *why* beyond those four. `callTutor.ts` carries no access control,
+quota or budget import (only `recordUsage` from `lib/ugc/quotaTracker`, the pre-existing
+supplier-side counter, and a `TelemetryErrorCode` type import).
+
+**BLOCKER — the task's two halves cannot both hold today (escalated, no implementation written).**
+
+The client half is implementable now. The telemetry half is not:
+
+1. `lib/tutor/telemetry.ts:35` — `TELEMETRY_ERROR_CODES` is still the **four** literals
+   `["gemini_unavailable","rate_limited","server","not_eligible"]`. It is the sole source of
+   both the type (`:37`) and the **runtime filter** `toErrorCode()` (`:78`).
+2. Therefore a refusal branch that passes `"user_quota_exhausted"` to `recordTutorInvoke()`
+   (a) does not type-check (`TelemetryEvent.errorCode` is `TelemetryErrorCode | null`), and
+   (b) even forced through with a cast, is **nulled at runtime** by `toErrorCode()` before the
+   insert — `telemetry_log.error_code` would receive `null`, not the distinct code. The task's
+   Completion Criterion *"the quota distinction exists only in `telemetry_log.error_code`"*
+   would be **false in the shipped path** while a mock-boundary assertion stayed green: exactly
+   the defect class this plan hunts.
+3. Widening `TELEMETRY_ERROR_CODES` here is **not available to this task**: it is
+   plan Task 5.5 / backend-task-25's Target File, and widening it without also updating
+   `telemetry.test.ts:49` (hand transcription, still four) and
+   `schemaFingerprint.test.ts:143` (`CODES_PENDING_ON_TS_SIDE`, the deliberate tripwire that
+   *"goes red the moment Task 5.5 widens `telemetry.ts`"`) turns two shipped guards RED —
+   and this task's own Quality Assurance Mechanisms require `telemetry.test.ts:261` to
+   **pass unmodified**.
+4. The backend DD's own I2 row (`:1068`) states the verification for this integration point as
+   *"Unit test: `ok:false` ⇒ zero `callTutor` invocations"* only; the OK-04 mapping is carried by
+   I11 / plan Task 5.5, whose Target Files list both refusal sites for exactly that reason.
+
+**Reference Contracts Compliance Check — deferred (`Unknown`), not evaluated against an
+implementation, because implementation was stopped before the Red phase.** The single row
+(UI-D3) is satisfiable and was planned as: client-visible union untouched at four literals;
+the quota refusal returns `not_eligible`; `ExplainStepAffordance.tsx` untouched. No file under
+`SOURCE/` was modified in this session — `ExplainStepAffordance.tsx` is byte-unmodified.
