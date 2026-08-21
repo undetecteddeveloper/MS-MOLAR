@@ -659,9 +659,20 @@ describe("orderActions.ts — không có con số cửa sổ thứ hai nào tron
     const source = readFileSync(resolve(__dirname, "../orderActions.ts"), "utf8");
     // Bỏ chú thích trước khi soi: khối chú thích của file CÓ nhắc tên hằng, và
     // nhắc tới nó bằng lời không phải là dựng lại nó bằng số.
+    // TÁCH THEO /\r?\n/, KHÔNG PHẢI "\n" — đây là tính đúng đắn, không phải gu.
+    // Trong regex JavaScript, dấu `.` KHÔNG khớp `\r` (CR là một ký tự kết thúc
+    // dòng). Tách một file CRLF bằng "\n" để lại `\r` ở đuôi mỗi dòng, nên `.*`
+    // trong `//.*$` dừng TRƯỚC `\r` và `$` (không có cờ `m`) không bao giờ khớp:
+    // lượt bỏ chú thích lặng lẽ không làm gì cả, và ca này đỏ vì một dòng CHÚ
+    // THÍCH có nhắc tên hằng — đúng thứ mà lượt bỏ chú thích sinh ra để tha.
+    //
+    // Đã xảy ra thật, không phải phòng xa: git trên Windows đổi file sang CRLF
+    // lúc checkout, ca này xanh trước đó và đỏ ngay sau một lần chuyển nhánh,
+    // trong khi KHÔNG một dòng mã nguồn nào đổi. Tách kiểu này thì kết quả
+    // không phụ thuộc vào `core.autocrlf` của máy đang chạy.
     const code = source
       .replace(/\/\*[\s\S]*?\*\//g, "")
-      .split("\n")
+      .split(/\r?\n/)
       .map((line) => line.replace(/\/\/.*$/, ""))
       .join("\n");
 
