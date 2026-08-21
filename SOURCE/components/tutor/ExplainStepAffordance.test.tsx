@@ -226,7 +226,17 @@ describe("ExplainStepAffordance", () => {
     // phải đợi riêng. Chờ đúng <strong> chứ không chờ chuỗi: nó vừa là bằng chứng
     // chunk đã về, vừa là chính thứ nghĩa vụ chứng minh của case này cần (đường
     // render đi qua markdown, không phải plain-text).
-    await waitFor(() => expect(container.querySelector("strong")).not.toBeNull());
+    // TIMEOUT DÀI CÓ CHỦ Ý, không phải nới lỏng khẳng định: mốc chờ vẫn là
+    // <strong> XUẤT HIỆN, y như cũ. Cái đổi là NGÂN SÁCH thời gian. Mặc định
+    // 1000ms của waitFor đủ khi chạy riêng file này, nhưng chunk markdown+KaTeX
+    // ở trên là một import ĐỘNG 122.5 KB, và khi cả 120 file test chạy song
+    // song thì lượt resolve ấy thường xuyên vượt 1s — ca này vì thế đỏ khoảng
+    // một nửa số lần chạy toàn bộ suite, xanh 100% khi chạy một mình. Một ca
+    // đỏ ngẫu nhiên là ca không ai còn đọc, nên nó được sửa chứ không bị bỏ
+    // qua. Một lượt render THẬT SỰ hỏng vẫn đỏ ở đây, chỉ là chậm hơn.
+    await waitFor(() => expect(container.querySelector("strong")).not.toBeNull(), {
+      timeout: 15_000,
+    });
 
     expect(container.textContent).toContain("Xem lại");
     expect(container.textContent).toContain("định luật bảo toàn");
