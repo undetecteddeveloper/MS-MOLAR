@@ -128,6 +128,12 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ a
 // desktop/mobile. `--hero-line-duration`/`--hero-line-delay` lệch dần theo
 // index (delay ÂM để mỗi đường vào ngay giữa chu kỳ thay vì cùng xuất phát
 // từ 0%) — 6 đường trôi lệch pha nhau, không đồng bộ như một khối cứng.
+/** Hệ số NHANH LÊN của nhịp trôi (engineer 2026-08-21: "nhanh hơn ~15%").
+ *  CHIA cho hệ số này chứ không nhân: "nhanh hơn 15%" nói về TỐC ĐỘ, mà tốc độ
+ *  tỉ lệ NGHỊCH với thời lượng — nhân 0.85 sẽ ra nhanh hơn 17.6%, không phải 15%.
+ *  Chu kỳ vì thế đi từ 22–37s xuống 19.1–32.2s. */
+const DRIFT_SPEEDUP = 1.15;
+
 function HeroLines() {
   const lines = [
     [0, 18, 100, 2],
@@ -158,7 +164,10 @@ function HeroLines() {
           className="hero-line-drift"
           style={
             {
-              "--hero-line-duration": `${22 + i * 3}s`,
+              "--hero-line-duration": `${((22 + i * 3) / DRIFT_SPEEDUP).toFixed(2)}s`,
+              // Trễ ÂM giữ nguyên −4s mỗi đường: việc của nó chỉ là đẩy mỗi
+              // đường vào một pha khác nhau, và sáu chu kỳ vốn đã dài ngắn
+              // khác nhau nên chúng tự trôi rời nhau — không cần co theo.
               "--hero-line-delay": `${-i * 4}s`,
             } as React.CSSProperties
           }

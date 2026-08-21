@@ -35,40 +35,65 @@ export type NavIntent = {
 // cũng chuyển trang bình thường mà không có gì hiện lên).
 //
 // Hệ quả phải chấp nhận: một thẻ <a href> chỉ dùng làm nút JS (có href thật,
-// handler tự huỷ) sẽ bật lớp phủ nhầm. Đúng trường hợp đó ĐÃ tồn tại — xem
-// `markPageNavigationBlocked` bên dưới — nên nó không còn là giả định nữa.
+// handler tự huỷ) sẽ bật lớp phủ nhầm. Đúng trường hợp đó ĐÃ tồn tại — màn làm
+// bài — nên nó không còn là giả định nữa. Xem khối CHỐT ĐIỀU HƯỚNG bên dưới.
 
 // ============================================================================
-// Cú bấm điều hướng BỊ HUỶ bởi một interceptor khác
+// CHỐT ĐIỀU HƯỚNG — khi có ai đó đang chặn mọi cú bấm rời trang
 // ============================================================================
-// `useLeaveGuard` (màn làm bài) cũng nghe `click` trên `document` ở pha CAPTURE
-// và `preventDefault()` mọi liên kết nội bộ để hỏi xác nhận trước khi rời trang.
-// Hai interceptor cùng node, cùng pha ⇒ thứ tự chạy do thứ tự ĐĂNG KÝ quyết
-// định, mà thứ tự đó lại do thứ tự mount của cây React quyết định (effect của
-// con chạy trước effect của cha) — không có gì để dựa vào.
+// `useLeaveGuard` (màn làm bài) nghe `click` trên `document` ở pha CAPTURE và
+// `preventDefault()` MỌI liên kết nội bộ để hỏi xác nhận trước khi rời trang.
+// Trong lúc nó còn sống, KHÔNG cú bấm liên kết nào thật sự đi đâu cả — nên lớp
+// phủ "đang tải" không được bật cho bất kỳ cú nào trong số đó.
 //
-// Đo được 2026-08-21 ở 390×844: chạm ô "Đề thi" trong khi đang làm bài thì lớp
-// phủ "LOADING" (z-90) bật lên ĐÈ LÊN hộp thoại xác nhận rời trang (z-50) và
-// đứng đó tới hết hẹn giờ 12 giây — vì lượt điều hướng bị huỷ nên không có
-// route nào commit để tắt nó. Người dùng nhìn thấy màn hình "đang tải" cho một
-// thứ sẽ không bao giờ tải.
+// ⚠ ĐỌC TRƯỚC KHI ĐỔI CƠ CHẾ NÀY — đây là bản ghi của một lần đã sửa SAI ⚠
 //
-// `defaultPrevented` không dùng được (lý do ngay phía trên), nên bên huỷ phải
-// NÓI RA. WeakSet chứ không phải gắn thuộc tính lên event: không đụng vào object
-// của trình duyệt, không cần ép kiểu, và entry tự biến mất cùng event.
-const blockedClicks = new WeakSet<Event>();
+// Bản sửa đầu (2026-08-21, sáng): đánh dấu từng EVENT bị huỷ vào một WeakSet,
+// rồi bên lớp phủ hoãn quyết định bằng `queueMicrotask` để "chờ bên kia kịp
+// đánh dấu". Nó KHÔNG chạy, và nó qua được cả test lẫn lượt kiểm thủ công —
+// đó mới là phần đáng nhớ:
+//
+//   - Sự kiện do TRÌNH DUYỆT phát (người dùng chạm thật): sau MỖI listener,
+//     stack JS rỗng ⇒ trình duyệt chạy một microtask checkpoint NGAY TẠI ĐÓ.
+//     Microtask của lớp phủ vì thế chạy TRƯỚC listener thứ hai, tức trước khi
+//     bên huỷ kịp đánh dấu. Đo được:
+//         ["microtask saw marked=false", "guard marked"]
+//   - Sự kiện do SCRIPT phát (`element.click()`): dispatch nằm TRONG một lượt
+//     gọi JS nên stack chưa rỗng ⇒ không có checkpoint nào giữa chừng, cả hai
+//     listener chạy xong rồi microtask mới chạy. Đo được:
+//         ["guard marked", "microtask saw marked=true"]
+//     jsdom cũng cư xử đúng kiểu này.
+//
+//   ⇒ Một bug CHỈ tồn tại với cú chạm thật, mà cả unit test (jsdom) lẫn lượt
+//     xác minh bằng `element.click()` đều báo xanh. Muốn kiểm lại lớp này thì
+//     phải dùng cú bấm THẬT của trình duyệt (Playwright `locator.click()`),
+//     đừng dùng `element.click()`.
+//
+// Nên cơ chế nay KHÔNG dựa vào thứ tự hay thời điểm gì hết: bên chặn giữ một
+// CHỐT suốt thời gian nó còn sống, bên lớp phủ hỏi chốt đó ĐỒNG BỘ ngay đầu
+// handler. Thứ tự hai listener chạy ra sao cũng cho cùng một kết quả.
+//
+// Đếm chứ không phải cờ boolean: hai màn làm bài không bao giờ cùng mount,
+// nhưng một cái đếm thì đúng cả khi StrictMode gắn/tháo effect hai lần, còn
+// một cờ boolean sẽ bị lượt tháo thứ nhất tắt mất trong khi lượt gắn thứ hai
+// vẫn đang cần nó.
+let navigationGuards = 0;
 
-/** Bên chặn gọi ngay sau `preventDefault()`: "cú bấm này KHÔNG đi đâu cả". */
-export function markPageNavigationBlocked(event: Event): void {
-  blockedClicks.add(event);
+/** Bên chặn giữ chốt suốt thời gian nó chặn. Trả hàm nhả — gọi trong cleanup
+ *  của effect. Hàm nhả tự chống gọi trùng, nên StrictMode không làm âm bộ đếm. */
+export function acquireNavigationGuard(): () => void {
+  navigationGuards += 1;
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    navigationGuards -= 1;
+  };
 }
 
-/** Bên hiển thị hỏi lại — nhưng phải hỏi ở CUỐI lượt dispatch (queueMicrotask),
- *  không phải ngay trong handler: nếu bên chặn chạy sau thì lúc đó nó chưa kịp
- *  đánh dấu. Microtask chạy sau khi cả lượt dispatch kết thúc nên đúng ở cả hai
- *  thứ tự. */
-export function isPageNavigationBlocked(event: Event): boolean {
-  return blockedClicks.has(event);
+/** `true` khi đang có ai đó chặn mọi cú bấm rời trang ⇒ lớp phủ phải im. */
+export function isNavigationGuarded(): boolean {
+  return navigationGuards > 0;
 }
 
 // ============================================================================

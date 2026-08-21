@@ -48,7 +48,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useT } from "@/lib/i18n/client";
 import {
-  isPageNavigationBlocked,
+  isNavigationGuarded,
   onPageNavigationIndicatorStart,
   startsPageNavigation,
 } from "@/lib/nav/pageNavigation";
@@ -92,6 +92,13 @@ export function RouteLoadingOverlay() {
     }
 
     function onClick(event: MouseEvent) {
+      // Có ai đó đang chặn mọi cú bấm rời trang (màn làm bài — useLeaveGuard)?
+      // Thì cú bấm này không đi đâu cả, và lớp phủ phải im. Hỏi ĐỒNG BỘ ngay
+      // đầu handler, KHÔNG hoãn: xem khối CHỐT ĐIỀU HƯỚNG trong
+      // lib/nav/pageNavigation.ts — bản hoãn bằng queueMicrotask đã được thử
+      // và nó sai với đúng thứ duy nhất đáng quan tâm, cú chạm thật.
+      if (isNavigationGuarded()) return;
+
       // `closest` chứ không phải `event.target` trực tiếp: bấm vào chữ hay icon
       // bên trong <a> thì target là node con, phải leo lên mới thấy thẻ neo.
       // `instanceof HTMLAnchorElement` loại thẻ <a> của SVG — cùng selector
@@ -111,15 +118,7 @@ export function RouteLoadingOverlay() {
       });
       if (!navigates) return;
 
-      // HOÃN tới cuối lượt dispatch. Một interceptor khác trên cùng `document`,
-      // cùng pha capture (useLeaveGuard ở màn làm bài) có thể huỷ chính cú bấm
-      // này, và thứ tự chạy giữa hai listener là do thứ tự mount quyết định —
-      // hỏi ngay tại đây thì nửa số trường hợp hỏi trước khi bên kia kịp trả
-      // lời. Xem khối chú thích trong lib/nav/pageNavigation.ts.
-      queueMicrotask(() => {
-        if (isPageNavigationBlocked(event)) return;
-        showOverlay();
-      });
+      showOverlay();
     }
 
     document.addEventListener("click", onClick, true);

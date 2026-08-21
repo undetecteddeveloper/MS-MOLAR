@@ -414,7 +414,8 @@
    trông như đang "sống" trong không gian thay vì một hoạ tiết
    tĩnh. ease-in-out vì đây là chuyển động TRÊN MÀN HÌNH (không
    phải vào/ra), biên độ cực nhỏ (dưới 1% toạ độ viewBox) và chu
-   kỳ rất dài (22–37s, so le theo từng đường) để không lấn át tiêu
+   kỳ rất dài (19–32s, so le theo từng đường — xem DRIFT_SPEEDUP ở
+   app/page.tsx) để không lấn át tiêu
    đề/form phía trước — mắt gần như không bắt được chuyển động
    TỪNG KHOẢNH KHẮC, chỉ cảm nhận được nền "sống" khi nhìn tổng
    thể một lúc, đúng tinh thần trang trí chứ không phải chỉ báo.

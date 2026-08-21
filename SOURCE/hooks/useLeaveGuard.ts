@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  markPageNavigationBlocked,
+  acquireNavigationGuard,
   startPageNavigationIndicator,
 } from "@/lib/nav/pageNavigation";
 
@@ -52,23 +52,21 @@ export function useLeaveGuard(active: boolean) {
       }
       e.preventDefault();
       e.stopPropagation();
-      // `stopPropagation` KHÔNG chặn được các listener khác trên CÙNG node
-      // (đó là việc của `stopImmediatePropagation`), mà RouteLoadingOverlay
-      // cũng nghe click ở `document` pha capture. Không nói ra thì nó bật lớp
-      // phủ "LOADING" toàn màn hình cho một lượt điều hướng vừa bị huỷ, đè lên
-      // chính hộp thoại đang hỏi — và đứng đó hết 12 giây hẹn giờ vì chẳng có
-      // route nào commit để tắt. Dùng `stopImmediatePropagation` thay cho dòng
-      // này KHÔNG giải quyết được: nếu listener của lớp phủ đăng ký trước thì
-      // nó đã chạy xong rồi.
-      markPageNavigationBlocked(e);
       setPendingHref(url.pathname + url.search);
     }
 
     window.addEventListener("beforeunload", onBeforeUnload);
     document.addEventListener("click", onClickCapture, true);
+    // Giữ CHỐT suốt thời gian guard còn sống: trong lúc này không cú bấm liên
+    // kết nào thật sự rời trang, nên RouteLoadingOverlay phải im với tất cả
+    // chúng. Nó đọc chốt ĐỒNG BỘ nên thứ tự hai listener chạy ra sao cũng
+    // không đổi kết quả — xem khối CHỐT ĐIỀU HƯỚNG ở lib/nav/pageNavigation.ts
+    // để biết vì sao bản đánh dấu-từng-event trước đó không chạy.
+    const releaseGuard = acquireNavigationGuard();
     return () => {
       window.removeEventListener("beforeunload", onBeforeUnload);
       document.removeEventListener("click", onClickCapture, true);
+      releaseGuard();
     };
   }, [active]);
 

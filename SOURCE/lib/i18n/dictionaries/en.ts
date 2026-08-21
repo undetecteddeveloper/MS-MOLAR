@@ -104,6 +104,15 @@ export const en = {
   // Tên hiển thị của website. Khớp `applicationName`/`title` trong
   // app/layout.tsx — đổi tên thương hiệu thì sửa ĐÚNG khoá này (và metadata),
   // đừng rải chuỗi vào từng component.
+  // Tiêu đề của MỤC 2 (engineer chốt 2026-08-21). Ba mục không dùng chung
+  // một tiêu đề nữa: mục 2 nói về AI nên nó tự xưng bằng chính điều đó.
+  // ("home.tabAi" cũ từng giữ chuỗi này ở vị trí eyebrow — eyebrow đã bỏ, chữ
+  // thì quay lại làm tiêu đề.)
+  "home.aiHeadline": "AI-powered",
+  // Đứng trước logo Gemini. Có nhãn chứ không để logo đứng trần: một dấu hiệu
+  // thương hiệu bên thứ ba đặt trần giữa trang dễ đọc thành "đối tác/được
+  // chứng thực", trong khi sự thật chỉ là ta GỌI API của họ (ADR-0006).
+  "home.poweredBy": "Powered by",
   "home.siteName": "MS-MOLAR",
   // Mỗi mục đúng MỘT dòng mô tả ngắn — giữ ngắn là có chủ đích, đây là thẻ
   // giới thiệu chứ không phải trang tính năng.

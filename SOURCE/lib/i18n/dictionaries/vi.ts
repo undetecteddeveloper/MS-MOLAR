@@ -76,6 +76,8 @@ export const vi: Dictionary = {
   "home.slidePosition": "{current} trên {total}",
   "home.carouselPause": "Tạm dừng tự động chuyển mục",
   "home.carouselPlay": "Tiếp tục tự động chuyển mục",
+  "home.aiHeadline": "Có tích hợp AI",
+  "home.poweredBy": "Vận hành bởi",
   "home.siteName": "MS-MOLAR",
   "home.aiDescription":
     "AI bóc tách từng câu hỏi từ file đề bạn tải lên, và chấm bài ngay khi bạn nộp.",

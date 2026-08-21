@@ -14,7 +14,8 @@
     "test:fixture": "vitest run --config vitest.fixture.config.ts",
     "check:bundle": "node scripts/check-ai-key-bundle.mjs",
     "verify:schema": "npx tsx supabase/verify-schema.ts",
-    "pw": "node scripts/pw/cli.mjs"
+    "pw": "node scripts/pw/cli.mjs",
+    "verify:leave-guard": "node scripts/verify-leave-guard.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",

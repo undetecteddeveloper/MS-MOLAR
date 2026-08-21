@@ -13,7 +13,7 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  markPageNavigationBlocked,
+  acquireNavigationGuard,
   startPageNavigationIndicator,
 } from "@/lib/nav/pageNavigation";
 import { RouteLoadingOverlay } from "./RouteLoadingOverlay";
@@ -64,11 +64,11 @@ function setLocation(url: string) {
   search = window.location.search;
 }
 
-/** Bấm một liên kết. Quyết định bật lớp phủ được HOÃN tới cuối lượt dispatch
- *  (queueMicrotask) để nghe được lời huỷ từ useLeaveGuard — xem
- *  RouteLoadingOverlay.tsx. `act` bất đồng bộ là thứ duy nhất vừa xả được hàng
- *  microtask đó vừa xả nốt lượt render tiếp theo của React; một `fireEvent.click`
- *  trần rồi `expect` ngay sau sẽ đọc trúng trạng thái của khung hình TRƯỚC. */
+/** Bấm một liên kết rồi xả nốt lượt render tiếp theo của React — `act` bất đồng
+ *  bộ làm cả hai; `fireEvent.click` trần rồi `expect` ngay sau có thể đọc trúng
+ *  trạng thái của khung hình TRƯỚC.
+ *  ⚠ Đây là cú bấm do SCRIPT phát. Nó KHÔNG thay được một cú chạm thật khi cần
+ *  kiểm thứ tự listener — xem khối cảnh báo ở describe bên dưới. */
 async function clickLink(el: Element) {
   await act(async () => {
     fireEvent.click(el);
@@ -162,34 +162,63 @@ describe("RouteLoadingOverlay", () => {
   // z-90 lên chính hộp thoại (z-50) và đứng đó hết 12 giây hẹn giờ, vì lượt
   // điều hướng bị huỷ nên không có route nào commit để tắt nó.
   //
-  // Hai listener cùng nằm trên `document`, cùng pha capture, và thứ tự chạy do
-  // thứ tự mount quyết định — nên phải kiểm CẢ HAI chiều, không chỉ chiều mà
-  // hôm nay tình cờ đang đúng.
-  it("cú bấm bị huỷ (useLeaveGuard) KHÔNG bật lớp phủ — bên huỷ chạy SAU", async () => {
+  // ⚠ BẢN SỬA ĐẦU CỦA BUG NÀY QUA ĐƯỢC TEST MÀ VẪN HỎNG NGOÀI ĐỜI ⚠
+  // Nó đánh dấu từng event rồi để lớp phủ hỏi lại trong `queueMicrotask`.
+  // jsdom dispatch sự kiện TRONG một lượt gọi JS nên không có microtask
+  // checkpoint giữa hai listener → microtask chạy sau cả hai → test xanh.
+  // Trình duyệt thật thì chạy checkpoint sau MỖI listener → microtask chạy
+  // TRƯỚC listener thứ hai → lớp phủ quyết định khi chưa ai kịp đánh dấu.
+  // Vì thế ĐỪNG viết lại test theo kiểu "giả lập thứ tự hai listener" ở đây:
+  // jsdom không mô phỏng được đúng cái làm nên bug, nên một test như vậy chỉ
+  // chứng minh được điều nó tự dựng ra.
+  // Thứ kiểm được ở jsdom, và cũng là thứ DUY NHẤT bản sửa mới dựa vào: khi
+  // chốt đang được giữ thì lớp phủ im — bất kể thứ tự nào.
+  it("đang có CHỐT điều hướng (useLeaveGuard) → cú bấm liên kết KHÔNG bật lớp phủ", async () => {
     render(<RouteLoadingOverlay />);
-    const a = anchor("/history");
+    const release = acquireNavigationGuard();
 
-    // Đăng ký sau ⇒ chạy sau lớp phủ. Đây là lý do lớp phủ phải hoãn quyết định.
-    const guard = (e: Event) => markPageNavigationBlocked(e);
-    document.addEventListener("click", guard, true);
-    await clickLink(a);
-    document.removeEventListener("click", guard, true);
-
+    await clickLink(anchor("/history"));
     expect(isPending()).toBe(false);
     // Và không có hẹn giờ 12 giây nào bị bỏ lại để bật/tắt gì về sau.
     act(() => vi.advanceTimersByTime(12_000));
     expect(isPending()).toBe(false);
+
+    release();
   });
 
-  it("cú bấm bị huỷ KHÔNG bật lớp phủ kể cả khi bên huỷ chạy TRƯỚC", async () => {
-    const guard = (e: Event) => markPageNavigationBlocked(e);
-    document.addEventListener("click", guard, true);
+  it("nhả chốt rồi thì lớp phủ hoạt động lại như thường", async () => {
     render(<RouteLoadingOverlay />);
+    const release = acquireNavigationGuard();
+    release();
 
     await clickLink(anchor("/history"));
-    document.removeEventListener("click", guard, true);
+    expect(isPending()).toBe(true);
+  });
 
+  it("chốt đếm chồng — nhả một lần không mở khoá khi còn bên khác đang giữ", async () => {
+    render(<RouteLoadingOverlay />);
+    const releaseA = acquireNavigationGuard();
+    const releaseB = acquireNavigationGuard();
+    releaseA();
+
+    await clickLink(anchor("/history"));
     expect(isPending()).toBe(false);
+
+    releaseB();
+  });
+
+  it("hàm nhả gọi hai lần không làm âm bộ đếm (StrictMode gắn/tháo effect hai lượt)", async () => {
+    render(<RouteLoadingOverlay />);
+    const release = acquireNavigationGuard();
+    release();
+    release();
+
+    // Nếu bộ đếm âm, một lượt acquire sau đó sẽ không đưa nó về > 0 được nữa.
+    const release2 = acquireNavigationGuard();
+    await clickLink(anchor("/history"));
+    expect(isPending()).toBe(false);
+
+    release2();
   });
 
   it("điều hướng KHÔNG qua cú bấm nào (router.push sau khi xác nhận rời) vẫn bật được", async () => {

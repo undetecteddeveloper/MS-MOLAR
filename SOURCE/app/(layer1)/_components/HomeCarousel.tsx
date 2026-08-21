@@ -212,19 +212,55 @@ function IntroBody() {
   );
 }
 
-/** Mục 2 và 3 — tên website + MỘT dòng mô tả ngắn. */
+/** Mục 2 và 3 — một tiêu đề ngắn + MỘT dòng mô tả.
+ *
+ *  Mục 2 (AI) không dùng chung tiêu đề với mục 3 nữa (engineer chốt
+ *  2026-08-21): nó tự xưng "AI-powered" và kèm logo Gemini. Mục 3 giữ nguyên
+ *  tên website. */
 function FeatureBody({ slideIndex }: { slideIndex: number }) {
   const t = useT();
-  const descriptionKey: MessageKey =
-    slideIndex === 1 ? "home.aiDescription" : "home.adaptiveDescription";
+  const isAi = slideIndex === 1;
+  const descriptionKey: MessageKey = isAi ? "home.aiDescription" : "home.adaptiveDescription";
 
   return (
     <>
-      {/* Tên website đứng ở vị trí h1 của mục 1 nhưng là h2: mỗi trang chỉ được
-          có một h1, và h1 đó thuộc về mục "Giới thiệu". */}
+      {/* h2 chứ không phải h1: mỗi trang chỉ được có một h1, và h1 đó thuộc về
+          mục "Giới thiệu". */}
       <h2 className="max-w-3xl font-serif text-2xl leading-[1.15] font-semibold tracking-tight text-[#1B1512] sm:text-4xl lg:text-5xl">
-        {t("home.siteName")}
+        {t(isAi ? "home.aiHeadline" : "home.siteName")}
       </h2>
+
+      {/* Dòng ghi công Gemini — ngay dưới tiêu đề "AI-powered", vì nó trả lời
+          đúng câu hỏi mà tiêu đề vừa đặt ra: AI nào.
+          `mt-4` chứ không `mt-5` như đoạn mô tả: đây là phần PHỤ THUỘC tiêu đề,
+          bó sát hơn để mắt đọc nó như một dòng của tiêu đề chứ không phải một
+          khối mới. */}
+      {isAi && (
+        <div className="mt-4 flex items-center gap-2.5">
+          <span className="font-sans text-xs text-[#1B1512]/60 sm:text-sm">
+            {t("home.poweredBy")}
+          </span>
+          {/* PNG chứ không phải SVG (engineer đổi 2026-08-21): bản SVG mất màu
+              khi render — nó dựng hình bằng filter/clip-path của Illustrator và
+              trình duyệt trả về một khối đen đặc, mất cả tia sáng gradient. PNG
+              nền trong suốt thì đúng màu ở mọi nơi.
+              Tệp đã được CẮT SÁT NÉT và hạ về 640px ngang: bản tải về là
+              2000×1314 với ~65% diện tích trong suốt, canh lề kiểu đó thì không
+              tài nào đặt cạnh một dòng chữ cho thẳng hàng được.
+              KHÔNG `unoptimized`: đây là PNG nên optimizer của Next xử lý bình
+              thường (nó chỉ từ chối SVG) — ảnh xuống client thành WebP đúng cỡ.
+              `alt="Gemini"`: đây là CHỮ, không phải hoa văn — người dùng trình
+              đọc màn hình phải nghe được tên, nếu không dòng này chỉ còn
+              "Powered by" cụt. */}
+          <Image
+            src="/images/gemini-logo.png"
+            alt="Gemini"
+            width={640}
+            height={147}
+            className="h-5 w-auto sm:h-6"
+          />
+        </div>
+      )}
 
       <p className="mt-5 max-w-xl font-sans text-sm leading-[1.7] text-[#1B1512]/80 sm:text-lg">
         {t(descriptionKey)}
