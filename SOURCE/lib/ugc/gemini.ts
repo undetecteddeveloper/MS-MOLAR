@@ -9,15 +9,11 @@
 import "server-only";
 import { GoogleGenAI } from "@google/genai";
 
-// LƯU Ý (2026-07-17): "gemini-2.5-flash"/"gemini-2.5-flash-lite" (chọn ban đầu
-// theo rate-limit công bố) hoá ra KHÔNG gọi được với key thật — 2.5-flash trả
-// 404 "no longer available to new users", dòng 2.0-flash trả 429 quota (tài
-// khoản mới không có quota free cho 2 dòng model cũ này). Xác nhận bằng
-// client.models.list() + gọi thử trực tiếp: chỉ dòng 3.x hoạt động.
-/** Model đọc file đề (multimodal, ảnh + PDF). */
-export const QUESTION_MODEL = "gemini-3.5-flash";
-/** Model đọc file đáp án (rẻ hơn). */
-export const ANSWER_MODEL = "gemini-3.1-flash-lite";
+// Tên model sống ở lib/ai/models.ts, KHÔNG ở đây: file này `import "server-only"`
+// nên script tsx (supabase/tagQuestionSkills.ts) không import được, và trước đây
+// script phải viết cứng lại tên model — đổi model ở một chỗ thì chỗ kia trôi mà
+// không ai biết. Re-export để mọi caller sẵn có không phải đổi đường import.
+export { ANSWER_MODEL, QUESTION_MODEL } from "@/lib/ai/models";
 
 let client: GoogleGenAI | null = null;
 
@@ -42,6 +38,68 @@ export function getGeminiClient(): GoogleGenAI {
     });
   }
   return client;
+}
+
+// --- Điểm phát DUY NHẤT + bảng giá mỗi thao tác (backend DD I10) ------------
+
+/**
+ * Số request Gemini mà MỘT thao tác người dùng phát ra.
+ *
+ * Khai ở ĐÂY vì đây là chỗ duy nhất con số là một SỰ THẬT chứ không phải một
+ * bản sao: mọi request đi ra đều qua `generateContent()` ngay bên dưới, nên
+ * "pipeline phát mấy lời gọi" trả lời được bằng cách đọc file này. Mọi nơi khác
+ * cần con số — `consumeQuota()` ở cổng (lib/billing/quota.ts) và trần ngày của
+ * `rateLimit.test.ts` — IMPORT hằng này. Hai lời khai rời nhau là đúng hình
+ * dạng hỏng mà thiết kế v1.4 sinh ra để sửa: bộ đếm ngân sách tính 1 trong khi
+ * pipeline tiêu 3, và không có gì đỏ ở đâu cả.
+ *
+ * Đơn vị là REQUEST NHÀ CUNG CẤP, không phải lượt người dùng — gói được bán
+ * bằng lượt (`PLAN_LIMITS`), ngân sách dự án đếm bằng request.
+ *
+ *   · `tutor` = 1 — `generateHint()`.
+ *   · `uploadTyped` = 2 — `extractQuestions` + `extractAnswers`.
+ *   · `uploadAutomatic` = 3 — thêm `extractMeta` (ADR-0007), lối tốn nhất và
+ *     là con số phải dùng cho mọi phép tính TRẦN (worst case).
+ *
+ * Ba khoá này là danh sách ĐẦY ĐỦ. Thêm một lời gọi AI thứ tư vào pipeline thì
+ * sửa ở đây, và mọi chỗ tiêu thụ sẽ nói ngay cái gì phải đổi theo.
+ */
+export const GEMINI_CALLS_PER_OPERATION = {
+  tutor: 1,
+  uploadTyped: 2,
+  uploadAutomatic: 3,
+} as const;
+
+/** Hình dạng request của SDK, LẤY TỪ CHÍNH SDK. Khai lại bằng tay ở đây sẽ đẻ
+ *  ra một hợp đồng thứ hai trôi lệch khỏi `@google/genai` sau mỗi lần nâng cấp,
+ *  đúng cái mà module này tồn tại để chặn. */
+type GenerateContentRequest = Parameters<GoogleGenAI["models"]["generateContent"]>[0];
+
+/**
+ * **Điểm phát Gemini DUY NHẤT của cả repo** (AC-021 — "0 đường vòng").
+ *
+ * Ống dẫn TRONG SUỐT, và sự trong suốt đó là toàn bộ hợp đồng: không bắt lỗi,
+ * KHÔNG RETRY, không phân loại, không nắn request cũng không đọc response.
+ * Vào sao ra vậy, lỗi ném lên nguyên instance.
+ *
+ * Vì sao cố ý rỗng:
+ *   · **Retry** đã là việc của SDK (`RETRY_ATTEMPTS` ở trên). Thêm một tầng
+ *     thử lại ở đây nhân chi phí thật lên mà bộ đếm ngân sách — vốn ĐẶT CHỖ
+ *     theo số lời gọi LOGIC — không nhìn thấy một lượt nào.
+ *   · **Phân loại lỗi** thuộc về bốn caller, và bốn caller phân loại KHÁC NHAU:
+ *     `EXTRACTION_FAILED` (fatal), `META_EXTRACTION_FAILED` (non-fatal, AC-040)
+ *     và `TutorCallError` của gia sư. Gom về đây là gộp ba hợp đồng lỗi thành
+ *     một, tức lấy mất quyền sở hữu hình dạng lỗi của chính chỗ đang cầm ngữ
+ *     cảnh — cùng lằn ranh mà `consumeQuota()` giữ với telemetry.
+ *
+ * Cái nó ĐỔI so với gọi thẳng `getGeminiClient().models.generateContent()`:
+ * câu hỏi "repo này phát được bao nhiêu request Gemini, và từ đâu" có đúng một
+ * chỗ để đọc, và AC-020 có một mối nối để đếm mà không cần mạng.
+ */
+export function generateContent(
+  request: GenerateContentRequest,
+): ReturnType<GoogleGenAI["models"]["generateContent"]> {
+  return getGeminiClient().models.generateContent(request);
 }
 
 // --- Chẩn đoán extractor (recipe-diagnose 2026-07) --------------------------

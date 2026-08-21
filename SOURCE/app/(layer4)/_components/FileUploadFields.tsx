@@ -8,6 +8,7 @@
 // hỗ trợ drag & drop thật, không chỉ click-to-browse.
 
 import { useRef, useState } from "react";
+import { useT } from "@/lib/i18n/client";
 import { LIMITS } from "@/lib/ugc/limits";
 
 const MAX_MB = Math.round(LIMITS.MAX_FILE_BYTES / (1024 * 1024));
@@ -24,6 +25,7 @@ interface DropzoneProps {
 }
 
 function Dropzone({ id, label, hint, file, onSelect, disabled, error }: DropzoneProps) {
+  const t = useT();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [hover, setHover] = useState(false);
@@ -67,12 +69,16 @@ function Dropzone({ id, label, hint, file, onSelect, disabled, error }: Dropzone
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
         className={[
-          "mt-1.5 grid h-28 cursor-pointer place-items-center rounded-[4px] border border-dashed px-3 text-center transition-colors duration-200",
+          "mt-1.5 grid h-28 cursor-pointer place-items-center rounded-[4px] border border-dashed px-3 text-center transition-[border-color,background-color,transform] duration-200 active:scale-[0.99]",
           error
             ? "border-brand"
             : dragOver || file
               ? "border-ring"
               : "border-border hover:border-ring",
+          // Kéo file rê qua: phóng nhẹ + tô nền mờ để báo "thả vào đây" rõ hơn
+          // chỉ đổi màu viền — dragOver là trạng thái CHỦ ĐỘNG chờ hành động
+          // thả, nên phản hồi mạnh hơn hover thường.
+          dragOver ? "scale-[1.02] bg-ring/5" : "",
           disabled ? "pointer-events-none opacity-60" : "",
         ].join(" ")}
       >
@@ -91,7 +97,7 @@ function Dropzone({ id, label, hint, file, onSelect, disabled, error }: Dropzone
             showText ? "opacity-100" : "opacity-0",
           ].join(" ")}
         >
-          {file ? file.name : "Drag & drop, or click to upload"}
+          {file ? file.name : t("upload.dragDrop")}
         </span>
       </div>
 
@@ -108,7 +114,7 @@ function Dropzone({ id, label, hint, file, onSelect, disabled, error }: Dropzone
             disabled={disabled}
             className="shrink-0 text-xs text-muted-foreground underline-offset-4 hover:text-brand hover:underline disabled:opacity-60"
           >
-            Remove
+            {t("common.remove")}
           </button>
         )}
       </div>
@@ -150,12 +156,13 @@ export function FileUploadFields({
   questionError,
   answerError,
 }: FileUploadFieldsProps) {
-  const hint = `PNG, JPEG, WebP, or PDF · up to ${MAX_MB} MB · PDF up to ${LIMITS.MAX_PDF_PAGES} pages`;
+  const t = useT();
+  const hint = t("upload.fileHint", { mb: MAX_MB, pages: LIMITS.MAX_PDF_PAGES });
   return (
     <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
       <Dropzone
         id="question-file"
-        label="Exam Paper"
+        label={t("upload.examPaper")}
         hint={hint}
         file={questionFile}
         onSelect={onSelectQuestion}
@@ -164,7 +171,7 @@ export function FileUploadFields({
       />
       <Dropzone
         id="answer-file"
-        label="Answer Key"
+        label={t("upload.answerKey")}
         hint={hint}
         file={answerFile}
         onSelect={onSelectAnswer}

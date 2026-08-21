@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { getMyExam } from "@/app/(layer4)/queries";
 import { ReviewScreen } from "@/app/(layer4)/_components/ReviewScreen";
+import { PageContainer } from "@/components/layout/PageContainer";
 
 export default async function ReviewExamPage({
   params,
@@ -29,13 +30,13 @@ export default async function ReviewExamPage({
   const { src } = await searchParams;
 
   return (
-    <main className="mx-auto w-full max-w-3xl px-6 py-10">
+    <PageContainer as="main" size="default">
       <ReviewScreen
         examId={detail.id}
         status={detail.status}
         initialExam={detail.exam}
         srcAuto={src === "auto"}
       />
-    </main>
+    </PageContainer>
   );
 }

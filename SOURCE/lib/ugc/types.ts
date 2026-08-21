@@ -92,9 +92,34 @@ export type UgcError = {
   /** Phần chứa câu lỗi; null = lỗi toàn file HOẶC đề 1 phần (copy khi đó chỉ
    * ghi "Câu N", không có "Phần P"). */
   partNumber: number | null;
+  /** Copy tiếng Anh bake sẵn. Giữ lại làm fallback cho log server, message của
+   * UgcActionError và test — KHÔNG dùng để hiển thị: UI gọi `formatUgcError(t, e)`
+   * để dựng câu theo ngôn ngữ đang chọn. */
   message: string;
+  /** Tham số thô để dựng lại câu ở ngôn ngữ bất kỳ lúc render. */
+  params: UgcErrorParams;
   /** v2.2 (ADR-0007): lỗi META_* trỏ vào field metadata thay vì câu hỏi —
    * ErrorPanel link tới khối metadata, không tới card câu. */
+  field?: MetaFieldName;
+};
+
+/** Tham số tuỳ code — chỉ dùng field liên quan. Khai ở đây (không phải
+ * errorCopy.ts) để `UgcError` tham chiếu được mà không tạo vòng import. */
+export type UgcErrorParams = {
+  /** Phần chứa câu lỗi — CHỈ truyền với đề nhiều phần (nhãn "Phần P Câu N");
+   * bỏ qua với đề 1 phần (nhãn "Câu N" như v2.0). */
+  partNumber?: number;
+  /** WRONG_CHOICE_COUNT: số lựa chọn đọc được. */
+  choiceCount?: number;
+  /** WRONG_SUB_ITEM_COUNT: số ý đọc được. */
+  subItemCount?: number;
+  /** EMPTY_CHOICE / CHOICE_TOO_LONG: nhãn lựa chọn (A–D). */
+  choiceLabel?: string;
+  /** ANSWER_COUNT_MISMATCH: số đáp án / số câu hỏi / số không khớp. */
+  answerCount?: number;
+  questionCount?: number;
+  unmatchedCount?: number;
+  /** META_INCOMPLETE / META_INVALID: field metadata bị lỗi (v2.2, ADR-0007). */
   field?: MetaFieldName;
 };
 

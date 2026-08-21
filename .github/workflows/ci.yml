@@ -38,13 +38,15 @@ jobs:
 
       - run: npm ci
 
-      # KHÔNG chặn — source còn 2 lỗi react-hooks có sẵn (ExamTimer,
-      # SuccessToast) mà sửa đúng cách phải đổi cấu trúc component, không nên
-      # độn vào lượt dựng CI. Chi tiết + điều kiện để bỏ dòng continue-on-error:
-      # docs/TECH-DEBT.md § TD-010. Bước này vẫn in đủ log để thấy lỗi mới.
+      # CHẶN merge từ 2026-08-04 (TD-010 đã trả). Trước đó bước này
+      # `continue-on-error: true` vì source có sẵn 2 lỗi react-hooks — nghĩa là
+      # lỗi lint MỚI lẫn vào giữa hai lỗi cũ mà không ai thấy. Cả hai đã sửa
+      # (ExamTimer → useEffectEvent, SuccessToast → state dẫn xuất) và
+      # `npm run lint` nay chạy với `--max-warnings 0`, nên cảnh báo mới cũng
+      # chặn chứ không chỉ lỗi. Cảnh báo cố ý phải tắt tại chỗ kèm lý do
+      # (xem AttemptPdfTemplate.tsx) chứ không nới cổng ở đây.
       - name: ESLint
         run: npm run lint
-        continue-on-error: true
 
       - name: TypeScript
         run: npx tsc --noEmit

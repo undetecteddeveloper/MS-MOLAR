@@ -6,8 +6,20 @@
 // Level cell) vs "detail" (serif, exam-detail Difficulty cell) — tự trả về
 // <dd> để khớp đúng slot cũ (dl ExamCard / dl exam-detail).
 
-import type { CommunityDifficulty } from "@/lib/rating";
+"use client";
+
+import { useT } from "@/lib/i18n/client";
+import type { MessageKey } from "@/lib/i18n/translate";
+import type { Bucket, CommunityDifficulty } from "@/lib/rating";
 import { formatMean } from "@/lib/rating";
+
+/** Bucket là giá trị NGHIỆP VỤ (khớp view SQL) — chỉ nhãn hiển thị đổi theo
+ *  ngôn ngữ, giá trị gốc giữ nguyên. */
+const BUCKET_KEY: Record<Bucket, MessageKey> = {
+  Easy: "exams.levelEasy",
+  Medium: "exams.levelMedium",
+  Hard: "exams.levelHard",
+};
 
 interface DifficultyBadgeProps {
   /** null (chưa đủ ngưỡng RATING_THRESHOLD lượt) hoặc undefined (field thiếu,
@@ -17,8 +29,9 @@ interface DifficultyBadgeProps {
 }
 
 export function DifficultyBadge({ communityDifficulty, variant }: DifficultyBadgeProps) {
+  const t = useT();
   const label = communityDifficulty
-    ? `${communityDifficulty.bucket} · ${formatMean(communityDifficulty.mean)}`
+    ? `${t(BUCKET_KEY[communityDifficulty.bucket])} · ${formatMean(communityDifficulty.mean)}`
     : "—";
 
   if (variant === "detail") {

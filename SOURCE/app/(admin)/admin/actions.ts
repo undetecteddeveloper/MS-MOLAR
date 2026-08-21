@@ -4,6 +4,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isAdminUserId } from "@/lib/auth/admin";
+import { getTranslate } from "@/lib/i18n/server";
 import { moderateExam } from "@/lib/supabase/service-role";
 
 export type ModerationState = { error?: string; info?: string } | null;
@@ -23,9 +24,11 @@ export async function moderateExamAction(
   const action = String(formData.get("action") ?? "");
   const reason = String(formData.get("reason") ?? "");
 
-  if (!examId) return { error: "Missing exam id." };
+  const t = await getTranslate();
+
+  if (!examId) return { error: t("admin.errMissingExamId") };
   if (action !== "remove" && action !== "restore") {
-    return { error: "Unknown moderation action." };
+    return { error: t("admin.errUnknownAction") };
   }
 
   const supabase = await createClient();
@@ -37,18 +40,18 @@ export async function moderateExamAction(
   // trang này không nên xác nhận sự tồn tại của nó cho người lạ.
   if (!user || !isAdminUserId(user.id)) {
     console.warn("[moderateExamAction] từ chối:", user?.id ?? "chưa đăng nhập");
-    return { error: "Not allowed." };
+    return { error: t("admin.errNotAllowed") };
   }
 
   const { error } = await moderateExam(examId, action, user.id, reason);
   if (error) {
     console.error("[moderateExamAction]", error.message);
-    return { error: "Could not apply the change. Try again." };
+    return { error: t("admin.errCouldNotApply") };
   }
 
   revalidatePath("/admin");
   revalidatePath("/exams");
   return {
-    info: action === "remove" ? "Exam removed from the catalog." : "Exam restored as a draft.",
+    info: action === "remove" ? t("admin.examRemoved") : t("admin.examRestored"),
   };
 }

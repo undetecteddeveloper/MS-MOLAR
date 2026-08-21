@@ -1,7 +1,11 @@
-# PROJECT_OVERVIEW — TrangNguyenDigi
+# PROJECT_OVERVIEW — TrangNguyenDigi (MS-MOLAR)
 
-> Tài liệu nền tảng cho agent và engineer. Đọc file này trước khi đọc `WORKFLOW.md` hoặc `PROCESS.md`.
-> Cập nhật file này khi có quyết định kỹ thuật mới — không được để thông tin lỗi thời tồn tại.
+> Tài liệu nền tảng cho agent và engineer.
+> Cập nhật file này khi có quyết định kỹ thuật mới — xoá phần đã lỗi thời thay vì
+> để nó tồn tại song song với sự thật (rà soát 2026-08-06: đã bỏ toàn bộ phần mô
+> tả tầm nhìn 3D ban đầu — xem §10; 2026-08-07: `PROCESS.md` — nhật ký từng phiên
+> — đã bị xoá, nợ kỹ thuật còn mở đã chuyển hết sang `TECH-DEBT.md`; tiến độ theo
+> phiên nay ghi ở Notion, xem `.claude/MEMORY.md`).
 
 ---
 
@@ -9,12 +13,11 @@
 
 | Mục | Giá trị |
 |---|---|
-| **Tên dự án** | TrangNguyenDigi |
+| **Tên dự án** | TrangNguyenDigi (tên repo local: MS-MOLAR) |
 | **Repo** | `github.com/undetecteddeveloper/TrangNguyenDigi.git` |
 | **Giao tiếp agent ↔ engineer** | Tiếng Việt |
-| **PROCESS.md** | Tiếng Việt |
 | **Solo hay team** | Solo (1 engineer) |
-| **Tài liệu liên quan** | `WORKFLOW.md`, `PROCESS.md` |
+| **Tài liệu liên quan** | `DESIGN.md` (design token), `TECH-DEBT.md`, `docs/DEPLOYMENT.md`. Tiến độ từng phiên: Notion (xem `.claude/MEMORY.md`) |
 
 ---
 
@@ -30,198 +33,83 @@
 
 ---
 
-## 2. Design Philosophy
+## 2. Design System
 
-Hai nguyên lý chỉ đạo mọi quyết định thiết kế:
-
-**Progressive Disclosure** — Chỉ hiển thị những gì user cần ở thời điểm đó. Layer 1 chỉ có một quyết định. Layer 2 không có distraction. Complexity tăng dần theo hành trình.
-
-**Spatial Memory** — Mỗi layer có visual language riêng biệt. User biết mình đang ở đâu mà không cần breadcrumb hay label.
-
-| Layer | Visual Language |
-|---|---|
-| Layer 1 — Entry & Identity | Spatial / 3D (bàn, đồ vật, không gian) |
-| Layer 2 — Core Loop | Focused / tối giản (như tờ giấy trắng) |
-| Layer 3 — Reflection | Analytical / data (charts, số liệu) |
-| Layer 4 — Content Infrastructure | Structured / editorial (content management UI) |
+Nguồn thiết kế duy nhất là **`DESIGN.md`** (root repo) — theme "Mực & Sơn mài"
+(Ink & Lacquer): biên tập cổ điển kiểu New York Times kết hợp bảng màu sơn mài
+truyền thống Việt Nam, phẳng (không 3D, không box-shadow/gradient). Coi
+`DESIGN.md` là authoritative cho mọi màu sắc/typography/spacing/component token
+— file này không lặp lại nội dung đó.
 
 ---
 
-## 3. UI Architecture — Layer System
+## 3. UI Architecture — Route Groups
 
-Xem `WORKFLOW.md` Mục 1 để biết quy tắc dependency và điều kiện hoàn thành layer.
+| Route group | Chức năng |
+|---|---|
+| `(layer1)` — Entry & Identity | Đăng nhập / đăng ký, OAuth callback, reset password |
+| `(layer2)` — Core Loop *(ưu tiên cao nhất)* | Chọn đề (browse/filter), làm bài (timer, flag câu), nộp bài, xem kết quả |
+| `(layer3)` — Reflection / Analytics | Phân tích điểm yếu, gợi ý ôn tập — đang xây dở (xem `docs/design/analytics-layer3-*`) |
+| `(layer4)` — Content Infrastructure (UGC) | Upload đề (PDF → Gemini extract), review trước khi publish, quản lý đề của tôi |
+| `(HM)` — History | Lịch sử làm bài đã nộp, xem lại + lưu/chia sẻ PDF kết quả |
+| `(admin)` | Trang kiểm duyệt nội bộ — danh sách đề bị report, gỡ/khôi phục (auth qua `ADMIN_USER_IDS`, không có role trong DB — xem ADR-0001) |
 
-### Layer 1 — Entry & Identity
-- Homepage 3D: scene chiếc bàn gỗ + máy Mac (Three.js trên desktop, CSS Parallax 2.5D trên mobile)
-- Click vào Mac → fade transition → vào Layer 2
-- Login / Signup
-- Personalization: đổi model máy tính, sticky notes
-
-### Layer 2 — Core Loop *(ưu tiên cao nhất)*
-- Chọn đề (browse / filter / random / gợi ý)
-- Làm bài: timer, flag câu để xem lại
-- Nộp bài: xem đáp án + breakdown theo chủ đề
-
-### Layer 3 — Reflection *(xây sau khi Layer 1–2 ổn định)*
-- Phân tích điểm yếu, gợi ý ôn tập
-
-### Layer 4 — Content Infrastructure *(xây sau)*
-- Quản lý, cập nhật, kiểm duyệt đề
-- Version control cho từng câu hỏi
-- Confidence scoring + quarantine system
-- Thiết kế như plugin độc lập — không hardcode vào core
-
-### Layer HM — History *(độc lập với Layer 3, không phụ thuộc tiến độ Analytics)*
-- Lịch sử làm bài: trang liệt kê các attempt đã nộp và có điểm
-- Phạm vi: danh sách history của các attempt đã submit + lưu/chia sẻ PDF kết quả (save/share)
+Layer HM và (admin) độc lập với tiến độ Layer 3 (Analytics) — không phụ thuộc lẫn nhau.
 
 ---
 
 ## 4. Tech Stack
 
-### Quyết định & Lý do
+**Tiêu chí ưu tiên:** Latency thấp · Responsive mạnh · Bảo mật đủ dùng · Nhẹ trên thiết bị tầm trung.
 
-**Tiêu chí ưu tiên:** Latency thấp · Responsive mạnh · Bảo mật đủ dùng · Nhẹ trên thiết bị tầm trung
-
----
-
-#### Frontend — Next.js 15 (App Router) + TypeScript
-
-| Tiêu chí | Lý do chọn Next.js |
-|---|---|
-| Latency thấp | SSR/ISR render trước HTML — user nhận nội dung ngay, không chờ JS hydrate |
-| SEO | Canvas 3D không được index; Next.js gánh text qua HTML chuẩn |
-| Image | Built-in `next/image` tự optimize, lazy load, WebP conversion |
-| Routing | App Router maps tự nhiên với layer structure |
-| TypeScript | Bắt lỗi tại compile time — quan trọng khi solo dev không có reviewer |
-
-Styling: **Tailwind CSS** — utility-first, không có unused CSS trong production build.
-Component primitives: **shadcn/ui** (Radix UI) — accessible, unstyled, customizable.
-
----
-
-#### 3D & Animation — Three.js + GSAP
-
-| Thư viện | Phạm vi sử dụng |
-|---|---|
-| **Three.js** | Scene 3D Layer 1 — desktop only |
-| **GSAP** | Transition giữa các layer, micro-animations |
-| **CSS Parallax + Gyroscope** | Fallback cho mobile (thay WebGL) — giữ đủ chức năng cốt lõi |
-
-> **Quan trọng:** Three.js chỉ load khi user trên desktop và trình duyệt hỗ trợ WebGL. Mobile nhận fallback 2.5D — không bao giờ load Three.js.
-
----
-
-#### Backend & Database — Supabase
-
-Supabase được chọn thay Firebase vì đáp ứng tốt hơn cả hai tiêu chí hiệu suất và bảo mật:
-
-| Tiêu chí | Supabase |
-|---|---|
-| **Latency thấp** | PostgreSQL + connection pooling (PgBouncer) · Edge Functions chạy gần user |
-| **Bảo mật cơ bản** | Built-in Auth (email, OAuth) · JWT tự động · HTTPS mặc định |
-| **Bảo mật nâng cao** | Row Level Security (RLS) — policy trực tiếp ở DB, không thể bypass qua API · MFA support |
-| **Truy vấn phức tạp** | PostgreSQL mạnh hơn Firestore cho dữ liệu đề thi có nhiều quan hệ |
-| **Realtime** | Subscriptions nếu cần tính năng live sau này |
-
-Supabase cung cấp trong một platform: **Auth · Database · Storage · Edge Functions · Realtime**.
-
----
-
-#### Deployment — Vercel
-
-- Native Next.js support, zero-config
-- Global Edge Network → giảm latency từ VN
-- Preview deployments tự động khi push PR
-- Analytics + Web Vitals built-in
-
----
-
-### Stack Summary
-
-```
-Frontend   : Next.js 15 (App Router) + TypeScript + Tailwind CSS
-UI Lib     : shadcn/ui (Radix UI)
-3D/Anim    : Three.js (desktop) + GSAP + CSS Parallax (mobile)
-Backend    : Supabase (PostgreSQL + Auth + Storage + Edge Functions)
-Deployment : Vercel
-Testing    : Xem Mục 6
-```
+| Lớp | Lựa chọn | Lý do |
+|---|---|---|
+| Frontend | Next.js 16 (App Router) + TypeScript + React 19 | SSR/ISR giảm latency; App Router map tự nhiên vào route group theo layer; TypeScript bắt lỗi compile-time khi solo dev không có reviewer |
+| Styling | Tailwind CSS v4 | Utility-first, không CSS thừa trong production build |
+| Component primitives | base-ui + `class-variance-authority` (`SOURCE/components/ui/`) | Unstyled, accessible, dễ áp token của `DESIGN.md` |
+| Backend & DB | Supabase (PostgreSQL + Auth + Storage) | RLS ở tầng DB (không thể bypass qua API), Auth built-in, PostgreSQL đủ mạnh cho dữ liệu đề thi nhiều quan hệ |
+| UGC extraction | Google Gemini API | Trích câu hỏi/đáp án từ PDF đề thi upload lên |
+| PDF export | jsPDF + html2canvas | Xem ADR-0009 (lý do không dùng `@react-pdf/renderer`) |
+| Deployment | Vercel, region `sin1` (Singapore) | Gần Supabase prod và người dùng VN — xem `docs/DEPLOYMENT.md` §2.2b |
+| Testing | Vitest (unit/component) | Xem §6 |
 
 ---
 
 ## 5. Project Structure
 
 ```
-TrangNguyenDigi/
-├── SOURCE/                  # Toàn bộ source code
-│   ├── app/                 # Next.js App Router pages & layouts
-│   │   ├── (layer1)/        # Entry & Identity routes
-│   │   ├── (layer2)/        # Core Loop routes
-│   │   ├── (layer3)/        # Reflection routes
-│   │   ├── (layer4)/        # Content Infrastructure routes
-│   │   └── (HM)/            # History — lịch sử làm bài (attempt history)
-│   ├── components/          # Shared UI components
-│   │   ├── ui/              # shadcn/ui primitives
-│   │   └── [feature]/       # Feature-specific components
-│   ├── lib/                 # Utilities, helpers, Supabase client
-│   ├── hooks/               # Custom React hooks
-│   └── types/               # TypeScript type definitions
-├── ASSETS/                  # Static media không qua build pipeline
-│   ├── models/              # 3D models (.glb/.gltf) — curated only
-│   ├── fonts/               # Custom fonts
-│   └── images/              # Raw images trước khi optimize
-├── TEXT/                    # Nội dung & bản thảo (tách khỏi code)
-│   ├── copy/                # UI copy, labels, messages
-│   └── docs/                # Tài liệu nội bộ (WORKFLOW, PROCESS, etc.)
-├── PROCESS.md               # State memory của workflow hiện tại
-├── WORKFLOW.md              # Quy trình agent
+MS-MOLAR/
+├── SOURCE/                  # Toàn bộ source code (Next.js app, Root Directory trên Vercel)
+│   ├── app/                 # App Router — route groups (layer1..4, HM, admin, auth)
+│   ├── components/          # Shared UI (components/ui = primitives, components/[feature])
+│   ├── lib/                 # Utilities, Supabase client, security, ugc, pdf, schema...
+│   └── supabase/            # schema.sql, seed.ts, test-rls.ts, verify-schema.ts
+├── docs/                    # PRD, ADR, Design Doc, UI Spec, work plan theo từng feature
+├── SCREENSHOT/              # Ảnh tham chiếu thiết kế + screenshot tạm (Playwright MCP)
+├── DESIGN.md                # Design token — nguồn duy nhất, xem §2
+├── TECH-DEBT.md             # Sổ ghi nợ kỹ thuật
 └── PROJECT_OVERVIEW.md      # File này
-cộng thêm TEMP_SCREENSHOT để lưu full size screeshot từ localhost của agent và TEMPLATE để lưu mẫu layout cho agent
 ```
-
-> **Quy tắc ASSETS/models:** Chỉ import model đã được kiểm tra format, polygon count và license. Không import model tùy ý từ ngoài vào.
 
 ---
 
 ## 6. Testing Strategy
 
-Vì dự án chưa có test suite, testing được triển khai theo pha:
-
-| Pha | Giai đoạn | Công cụ | Phạm vi |
-|---|---|---|---|
-| **Pha 0** | Layer 1–2 (đầu dự án) | Thủ công | Build chạy được, render đúng trên Chrome/Firefox/Safari + Android mid-range |
-| **Pha 1** | Khi Layer 2 ổn định | **Vitest** | Unit test cho business logic (tính điểm, xử lý đề) |
-| **Pha 2** | Khi Layer 3 bắt đầu | **Playwright** | E2E test các user flow chính (chọn đề → làm → nộp) |
-
-> **Agent lưu ý:** Ở Pha 0, bước Testing trong WORKFLOW = kiểm tra thủ công theo checklist. Agent không tự dựng test framework khi chưa được chỉ định chuyển sang Pha 1.
-
-**Checklist Testing Pha 0 (thủ công):**
-- `npm run build` không có lỗi
-- Render đúng trên viewport 375px (mobile) và 1280px (desktop)
-- Không có console error khi chạy
-- Các route liên quan đến feature vừa làm hoạt động đúng
+- **Vitest** (`npm run test` trong `SOURCE/`) — unit/component test cho business logic và component có rủi ro hồi quy (vd `ExamTimer`, `SuccessToast`). Bắt buộc cho mọi bugfix có hình dạng lặp lại được.
+- **`SOURCE/supabase/test-rls.ts`** — test cách ly RLS hai-user trên Postgres thật (không mock).
+- **`SOURCE/supabase/verify-schema.ts`** — đối chiếu `schema.sql` khai báo với hành vi thật của DB (cột, khoá ngoại, `on delete`) sau mỗi lần apply schema.
+- **Playwright MCP** — dùng để agent lái trình duyệt thật kiểm tra thủ công (không phải bộ E2E test tự động chạy trong CI); xem `.mcp.json` và `[[playwright-mcp-screenshot-quality]]` trong memory.
 
 ---
 
 ## 7. Git Conventions
 
-### Khởi tạo (lần đầu tiên)
-
-```bash
-git init
-git remote add origin https://github.com/undetecteddeveloper/TrangNguyenDigi.git
-git branch -M main
-```
-
-> Agent thực hiện đoạn này ở lần **Git đầu tiên** của dự án, trước `git add`.
-
 ### Commit Message Format
 
-Theo Conventional Commits với layer scope:
+Theo Conventional Commits:
 
 ```
-<type>(<layer>/<module>): <mô tả ngắn bằng tiếng Anh>
+<type>(<scope>): <mô tả ngắn>
 ```
 
 | Type | Khi nào |
@@ -234,17 +122,9 @@ Theo Conventional Commits với layer scope:
 | `chore` | Config, dependencies, build |
 | `docs` | Tài liệu nội bộ |
 
-Ví dụ:
-```
-feat(layer1/auth): add Google OAuth login flow
-fix(layer2/exam): handle null answer on submit
-style(layer1/homepage): adjust Mac model lighting
-```
+### Branching
 
-### Branching (khi dự án lớn hơn)
-
-Hiện tại: push thẳng lên `main`.
-Khi Layer 2 hoàn thành: chuyển sang `main` + `dev` + feature branches.
+Việc nhỏ: push thẳng `main`. Feature lớn: nhánh riêng (vd `feat/rating-system`) rồi merge vào `main` — Vercel tự tạo Preview deploy cho mỗi feature branch (trỏ Supabase project **dev**, xem `docs/DEPLOYMENT.md`).
 
 ---
 
@@ -253,23 +133,20 @@ Khi Layer 2 hoàn thành: chuyển sang `main` + `dev` + feature branches.
 ### Performance
 - **Target:** Lighthouse Performance Score ≥ 85 trên mobile (mid-range Android)
 - First Contentful Paint (FCP) ≤ 2.5s trên 3G
-- Three.js scene chỉ load sau khi user tương tác (lazy init) — không block LCP
 
 ### Security
 - Supabase RLS bắt buộc trên mọi table chứa dữ liệu user
 - Không lưu sensitive data (điểm, lịch sử) ở localStorage
 - Input validation ở cả client (TypeScript types) và server (Supabase policies)
-- Auth token không được expose trong URL
+- Chi tiết đầy đủ + trạng thái từng mục: `docs/security-review-2026-08-03.md`, `docs/TECH-DEBT.md`
 
 ### Accessibility
 - Toàn bộ interactive element có keyboard navigation
 - Alt text cho mọi `<img>`
-- Canvas 3D có text fallback cho screen reader
 
-### SEO (đặc biệt quan trọng vì Layer 1 dùng Canvas)
-- Mọi nội dung quan trọng phải có trong HTML (không chỉ trong canvas)
-- `<title>`, `<meta description>`, Open Graph tags đầy đủ
-- Navbar và Footer là HTML thuần — gánh toàn bộ crawlable text
+### SEO
+- `<title>`, `<meta description>`, Open Graph tags đầy đủ (`opengraph-image.tsx`, `sitemap.ts`, `robots.ts`)
+- Navbar và Footer là HTML thuần, crawlable
 
 ---
 
@@ -277,11 +154,10 @@ Khi Layer 2 hoàn thành: chuyển sang `main` + `dev` + feature branches.
 
 | Rủi ro | Mức độ | Biện pháp |
 |---|---|---|
-| Three.js quá nặng trên Android tầm trung | Cao | Fallback CSS 2.5D bắt buộc; test trên thiết bị thực trước khi merge Layer 1 |
-| Layer 1 quá tối giản → user mới không biết làm gì | Trung bình | Thêm subtle pulse animation trên Mac + hint text nhỏ; không phá vỡ thẩm mỹ |
-| SEO bị mất vì canvas không được index | Trung bình | Navbar/Footer HTML gánh text; kiểm tra với Google Rich Results Test |
-| Feedback loop sai hướng (user học sai → hệ thống học theo) | Thấp (Layer 4) | Ground Truth layer cứng cho đề chính thức Bộ GD&ĐT — không bị kéo xuống bởi report |
-| Mất personalization data của user | Thấp | Lưu trên Supabase (không phải localStorage); export/backup cần thiết kế sớm |
+| Layer 1 quá tối giản → user mới không biết làm gì | Trung bình | Hint text nhỏ; không phá vỡ thẩm mỹ biên tập của `DESIGN.md` |
+| Feedback loop sai hướng (user học sai → hệ thống học theo) | Thấp (Layer 3) | Ground Truth layer cứng cho đề chính thức Bộ GD&ĐT — không bị kéo xuống bởi report |
+| Mất personalization/lịch sử của user | Thấp | Lưu trên Supabase (không phải localStorage) |
+| Nợ kỹ thuật đang mở có thể nổ khi chạm tới | Xem `docs/TECH-DEBT.md` | Theo dõi + đánh giá lại định kỳ, không để mục cũ tự tin sai |
 
 ---
 
@@ -291,11 +167,10 @@ Ghi lại các quyết định kỹ thuật quan trọng để tránh revisit kh
 
 | Ngày | Quyết định | Lý do |
 |---|---|---|
-| — | Next.js 15 thay vì React thuần | SSR/ISR giảm latency, SEO tốt hơn cho Canvas-heavy site |
+| — | Next.js (App Router) thay vì React thuần | SSR/ISR giảm latency, SEO tốt hơn |
 | — | Supabase thay vì Firebase | PostgreSQL + RLS mạnh hơn cho dữ liệu đề thi phức tạp; bảo mật tốt hơn |
-| — | Three.js chỉ trên desktop | Mobile mid-range VN không đủ GPU để chạy WebGL ổn định |
-| — | shadcn/ui thay vì MUI/Antd | Unstyled primitives dễ customize hơn cho visual language riêng từng layer |
-| — | Testing Pha 0 là thủ công | Chưa đủ codebase để viết test có ý nghĩa; tránh over-engineering sớm |
-| 2026-07-27 | History (lịch sử làm bài) tách thành layer riêng `(HM)` thay vì gộp vào Layer 3 (Reflection) | Layer 3 hiện đang dở dang cho Analytics (chưa commit); tách History thành layer riêng để triển khai độc lập, không phụ thuộc tiến độ Analytics; quyết định theo yêu cầu sản phẩm trực tiếp |
+| — | shadcn-style primitives (base-ui + cva) thay vì MUI/Antd | Unstyled, dễ customize theo token riêng của `DESIGN.md` |
+| 2026-07-27 | History (lịch sử làm bài) tách thành layer riêng `(HM)` thay vì gộp vào Layer 3 (Reflection) | Layer 3 dở dang cho Analytics; tách để triển khai độc lập |
+| **2026-08-06** | **Bỏ hẳn tầm nhìn ban đầu: homepage 3D (Three.js scene bàn gỗ + máy Mac, GSAP transition, "Spatial Memory" visual-language-per-layer)** | Không bao giờ được implement — `package.json` không có `three`/`gsap`; `(layer1)` thực tế là trang đăng nhập phẳng. Theme thật đang dùng là "Mực & Sơn mài" (`DESIGN.md`), editorial/phẳng, ưu tiên tốc độ tải trên Android tầm trung hơn hiệu ứng 3D. Tài liệu cũ mô tả 3D đã bị xoá khỏi file này ở lần rà soát 2026-08-06 để tránh gây hiểu nhầm cho agent đọc sau. |
 
 > Agent: Khi engineer ra quyết định kỹ thuật mới trong quá trình làm việc, thêm vào bảng này và ghi ngày.

@@ -20,6 +20,14 @@ create table if not exists public.user_profiles (
   created_at   timestamptz not null default now()
 );
 
+-- Ảnh đại diện (ADR-0016). Cột này giữ ĐƯỜNG DẪN OBJECT trong bucket `avatars`
+-- (`{auth.uid()}/{uuid}.{ext}`), KHÔNG phải URL tải được: bucket private nên mọi
+-- lượt đọc phải ký lại lúc render (lib/auth/getCurrentUser.ts). Ai lưu URL vào
+-- đây thì sau 1 giờ nó chết mà không có gì báo.
+-- Nullable + additive: handle_new_user() bên dưới insert danh sách cột CỐ ĐỊNH
+-- nên trigger không bị ảnh hưởng.
+alter table public.user_profiles add column if not exists avatar_url text;
+
 -- Tự tạo user_profiles khi có user mới trong auth.users (chuẩn Supabase).
 -- SECURITY DEFINER để bypass RLS lúc insert tự động.
 -- S#24: OAuth (Google/Facebook) không set 'display_name' trong
@@ -223,7 +231,12 @@ create policy "results_insert_own" on public.exam_results
 -- 1. exams — cột lifecycle/tác giả/file nguồn + CHECK status
 -- ----------------------------------------------------------------------------
 alter table public.exams add column if not exists status text not null default 'processing';
-alter table public.exams add column if not exists author_id uuid references auth.users(id);
+-- `on delete` viết RÕ chứ không để mặc định — xem §16: mọi khoá ngoại phải khai
+-- hành vi xoá, và `verify:schema` fail nếu có cái nào bỏ trống.
+-- Dòng này CHỈ có hiệu lực trên DB trắng; §16b mới là nơi sở hữu hành vi thật
+-- (`add column if not exists` không chạy lại trên DB đã có cột, nên đổi ở đây
+-- không đủ). Giữ hai chỗ NÓI CÙNG MỘT THỨ để đọc §L4 không hiểu nhầm.
+alter table public.exams add column if not exists author_id uuid references auth.users(id) on delete set null;
 alter table public.exams add column if not exists author_display_name text;   -- ADR-0003: snapshot tên tác giả
 alter table public.exams add column if not exists reviewed_at timestamptz;    -- set khi publish
 alter table public.exams add column if not exists question_file_path text;    -- path trong exam-uploads (nguồn re-run)
@@ -570,6 +583,49 @@ left join (
   group by exam_id
 ) agg on agg.exam_id = e.id;
 
+-- ----------------------------------------------------------------------------
+-- 9b. Skill Taxonomy (Engine 1 Adaptive AI & Feedback, PRD R1/R2, D1) — Math
+--     only. Nodes + prerequisite edges (DAG); reviewed by the engineer before
+--     ship (A2), not authored here. questions.skill_node_id is nullable —
+--     a question may legitimately have no skill (D2: NULL instead of a
+--     guess). Placed HERE (before §10, not appended at the end) because §10c
+--     below is edited in place to grant skill_node_id, and that edit needs
+--     the column to already exist earlier in the file's execution order.
+-- ----------------------------------------------------------------------------
+create table if not exists public.skill_nodes (
+  id         text primary key,           -- slug, vd 'luy-thua', 'logarit'
+  label_vi   text not null,               -- nhãn tiếng Việt hiển thị (AC-004)
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.skill_prerequisites (
+  skill_node_id        text not null references public.skill_nodes(id) on delete cascade,
+  prerequisite_node_id text not null references public.skill_nodes(id) on delete cascade,
+  primary key (skill_node_id, prerequisite_node_id)
+);
+alter table public.skill_prerequisites drop constraint if exists skill_prerequisites_no_self_check;
+alter table public.skill_prerequisites add constraint skill_prerequisites_no_self_check
+  check (skill_node_id <> prerequisite_node_id);
+
+alter table public.questions add column if not exists skill_node_id text
+  references public.skill_nodes(id) on delete set null;
+-- `set null`: xoá một skill node không được kéo xoá câu hỏi theo — câu hỏi vẫn
+-- hợp lệ, chỉ mất tag (giống questions.correct_answer nullable đã xử lý case
+-- "chưa đủ dữ liệu" bằng nullable thay vì xoá dòng).
+
+alter table public.skill_nodes enable row level security;
+drop policy if exists "skill_nodes_select_authenticated" on public.skill_nodes;
+create policy "skill_nodes_select_authenticated" on public.skill_nodes
+  for select to authenticated using (true);
+
+alter table public.skill_prerequisites enable row level security;
+drop policy if exists "skill_prerequisites_select_authenticated" on public.skill_prerequisites;
+create policy "skill_prerequisites_select_authenticated" on public.skill_prerequisites
+  for select to authenticated using (true);
+-- Không có policy ghi cho client — tiền lệ "Seeded content" (§5 comment cũ):
+-- taxonomy do kỹ sư duyệt rồi seed qua service_role (seedSkillTaxonomy.ts),
+-- không phải nội dung người dùng ghi qua app.
+
 -- ============================================================================
 -- ANSWER-KEY COLUMN LOCKDOWN (Security review 2026-08-03, Critical #1)
 --
@@ -748,7 +804,7 @@ grant execute on function public.claim_attempt_answer_key(uuid) to authenticated
 -- ----------------------------------------------------------------------------
 revoke select on public.questions from anon, authenticated;
 grant select (
-  id, content, choices, subject, grade, topic, question_type, part_number, image_url
+  id, content, choices, subject, grade, topic, question_type, part_number, image_url, skill_node_id
 ) on public.questions to anon, authenticated;
 
 -- ============================================================================
@@ -1031,7 +1087,10 @@ create table if not exists public.exam_moderation_log (
   id         uuid primary key default gen_random_uuid(),
   exam_id    text not null references public.exams(id) on delete cascade,
   action     text not null check (action in ('remove','restore')),
-  actor_id   uuid references auth.users(id),
+  -- `set null` (§16b, TD-012): nhật ký kiểm toán KHÔNG được biến mất theo tài
+  -- khoản người đã bấm gỡ, nên KHÔNG cascade. Mất DANH TÍNH actor thì chịu
+  -- được; mất cả DÒNG thì biến "xoá tài khoản" thành "xoá dấu vết".
+  actor_id   uuid references auth.users(id) on delete set null,
   reason     text,
   created_at timestamptz not null default now()
 );
@@ -1078,3 +1137,730 @@ alter table public.attempt_answers
 alter table public.attempt_answers
   add constraint attempt_answers_question_id_fkey
   foreign key (question_id) references public.questions (id) on delete cascade;
+
+-- ----------------------------------------------------------------------------
+-- 16. Khoá ngoại: khai hành vi xoá RÕ RÀNG + đường đọc metadata (2026-08-04).
+--
+--     Vì sao có phần này (TECH-DEBT TD-011): bug xoá đề ngày 2026-08-04 là một
+--     khoá ngoại thiếu `on delete` — mặc định NO ACTION — và nó đi lọt qua MỌI
+--     cổng đang có: tsc xanh, vitest xanh, `verify:schema` xanh. Lý do rất cụ
+--     thể: `verify-schema.ts` chỉ quan sát được DB qua PostgREST, mà PostgREST
+--     KHÔNG phơi `information_schema`; cách duy nhất suy ra `on delete` từ phía
+--     client là thật sự xoá một dòng cha rồi xem dòng con có đi theo không —
+--     đúng thứ bị cấm vì script phải an toàn để chạy trên production.
+--
+--     §16a mở một đường ĐỌC metadata thật, để `verify:schema` so thẳng
+--     `on delete` của mọi khoá ngoại với schema.sql thay vì suy từ hành vi.
+--     §16b chuẩn hoá hai khoá ngoại duy nhất còn để mặc định.
+--
+--     Quy ước từ nay: MỌI `references` trong file này phải viết kèm `on delete`,
+--     kể cả khi hành vi mong muốn đúng bằng mặc định. `verify:schema` fail nếu
+--     có cái nào bỏ trống. Đây mới là chỗ bắt được bug — nó bắt lúc ĐỌC DIFF,
+--     trước khi SQL kịp chạy ở đâu.
+-- ----------------------------------------------------------------------------
+
+-- 16a. Metadata khoá ngoại, đọc được qua PostgREST.
+--
+--      SECURITY INVOKER (mặc định), CỐ Ý — không phải SECURITY DEFINER: pg_catalog
+--      vốn đã đọc được với mọi role, nên definer chỉ thêm một hàm leo quyền vào
+--      bề mặt tấn công mà không mua được gì. EXECUTE bị khoá về service_role vì
+--      sơ đồ khoá ngoại là thông tin về cấu trúc hệ thống, không phải dữ liệu
+--      người dùng — không có lý do gì để trình duyệt hỏi được.
+--
+--      Hàm CHỈ ĐỌC catalog: không DML, không DDL, chạy trên production vô hại.
+create or replace function public.schema_foreign_keys()
+returns table (
+  constraint_name  text,
+  child_schema     text,
+  child_table      text,
+  child_columns    text[],
+  parent_schema    text,
+  parent_table     text,
+  parent_columns   text[],
+  on_delete        text,
+  on_update        text
+)
+language sql
+stable
+set search_path = ''
+as $$
+  select
+    c.conname::text,
+    cn.nspname::text,
+    ct.relname::text,
+    (select pg_catalog.array_agg(a.attname::text order by k.ord)
+       from pg_catalog.unnest(c.conkey) with ordinality as k(attnum, ord)
+       join pg_catalog.pg_attribute a
+         on a.attrelid = c.conrelid and a.attnum = k.attnum),
+    pn.nspname::text,
+    pt.relname::text,
+    (select pg_catalog.array_agg(a.attname::text order by k.ord)
+       from pg_catalog.unnest(c.confkey) with ordinality as k(attnum, ord)
+       join pg_catalog.pg_attribute a
+         on a.attrelid = c.confrelid and a.attnum = k.attnum),
+    -- pg_constraint lưu hành vi xoá thành MỘT KÝ TỰ; dịch ra chữ để so trực
+    -- tiếp với cú pháp viết trong schema.sql, không phải tra bảng khi đọc log.
+    case c.confdeltype
+      when 'a' then 'no action'
+      when 'r' then 'restrict'
+      when 'c' then 'cascade'
+      when 'n' then 'set null'
+      when 'd' then 'set default'
+      else c.confdeltype::text
+    end,
+    case c.confupdtype
+      when 'a' then 'no action'
+      when 'r' then 'restrict'
+      when 'c' then 'cascade'
+      when 'n' then 'set null'
+      when 'd' then 'set default'
+      else c.confupdtype::text
+    end
+  from pg_catalog.pg_constraint c
+  join pg_catalog.pg_class     ct on ct.oid = c.conrelid
+  join pg_catalog.pg_namespace cn on cn.oid = ct.relnamespace
+  join pg_catalog.pg_class     pt on pt.oid = c.confrelid
+  join pg_catalog.pg_namespace pn on pn.oid = pt.relnamespace
+  where c.contype = 'f'
+    and cn.nspname = 'public'
+  order by ct.relname, c.conname
+$$;
+
+-- Supabase cấp sẵn EXECUTE cho anon/authenticated qua default privileges, và
+-- `revoke from public` KHÔNG gỡ được cái đó — phải gọi tên hai role (bài học
+-- §10b, chỗ đã một lần bỏ lọt đúng lỗi này).
+revoke all on function public.schema_foreign_keys() from public, anon, authenticated;
+grant execute on function public.schema_foreign_keys() to service_role;
+
+-- 16b. Hai khoá ngoại duy nhất trỏ `auth.users` mà không cascade —
+--      `on delete set null` (TECH-DEBT TD-012, sửa 2026-08-07).
+--
+--      Lịch sử ngắn, vì nó giải thích vì sao dòng dưới KHÔNG phải `no action`:
+--      2026-08-04 mục này viết rõ `no action` (đúng bằng hành vi mặc định đang
+--      có) và ghi lại thành TD-012 với nhận định "chưa chạm tới được, ngày làm
+--      tính năng xoá tài khoản thì đổi sang set null". 2026-08-07 đổi luôn.
+--      Lý do đổi sớm: `no action` KHÔNG mua được gì hôm nay (không có đường nào
+--      trong app xoá tài khoản — đã grep `deleteUser`/`admin.deleteUser`), nó
+--      chỉ hẹn giờ một lần 23503 cho người viết tính năng đó. Còn `set null`
+--      hôm nay cũng KHÔNG đổi hành vi gì, vì không có lệnh xoá nào để chạm tới.
+--      Hai lựa chọn cùng giá ở hiện tại; một cái đúng sẵn ở tương lai.
+--
+--      Vì sao `set null` là đáp án chứ không phải cascade:
+--      - `exams.author_id` nullable, và ADR-0003 đã snapshot `author_display_name`
+--        ngay trên hàng đề — chính là để đề sống sót qua việc tác giả biến mất.
+--        Cascade sẽ xoá sạch đề CÔNG KHAI của người khác đang làm dở.
+--      - `exam_moderation_log.actor_id` nullable. Nhật ký kiểm toán mất DANH
+--        TÍNH người bấm còn chấp nhận được; mất cả DÒNG thì không — cascade
+--        biến "xoá tài khoản" thành "xoá luôn dấu vết mình đã làm gì".
+alter table public.exams
+  drop constraint if exists exams_author_id_fkey;
+alter table public.exams
+  add constraint exams_author_id_fkey
+  foreign key (author_id) references auth.users (id) on delete set null;
+
+alter table public.exam_moderation_log
+  drop constraint if exists exam_moderation_log_actor_id_fkey;
+alter table public.exam_moderation_log
+  add constraint exam_moderation_log_actor_id_fkey
+  foreign key (actor_id) references auth.users (id) on delete set null;
+
+-- ============================================================================
+-- MASTERY WRITE (Engine 1 Adaptive AI, ADR-0011, PRD R3/AC-011)
+--
+-- Mirrors §11's SCORE WRITE LOCKDOWN shape exactly: client loses all write
+-- access, a privileged service_role-only INVOKER function derives user_id
+-- from the attempt row (never a parameter), requires status='submitted'.
+--
+-- DELIBERATELY a SEPARATE function from record_exam_result(), not an
+-- extension of it: PRD Reliability NFR requires a failed mastery update to
+-- NOT break exam submission. Extending record_exam_result() would make the
+-- two writes atomic (one statement, one implicit transaction) — a mastery-
+-- side failure would roll back the score insert too. See ADR-0011.
+-- ============================================================================
+
+create table if not exists public.user_skill_mastery (
+  user_id       uuid not null references auth.users(id) on delete cascade,
+  skill_node_id text not null references public.skill_nodes(id) on delete cascade,
+  correct_count int not null default 0,
+  total_count   int not null default 0,
+  last_wrong_at timestamptz,             -- null = chưa từng sai trên skill này
+  updated_at    timestamptz not null default now(),
+  primary key (user_id, skill_node_id)
+);
+
+alter table public.user_skill_mastery enable row level security;
+
+-- Không có insert/update policy cho authenticated: KHÔNG có trường hợp hợp lệ
+-- nào client tự ghi mastery — mọi ghi đi qua record_skill_mastery() dưới đây
+-- (service_role, bypass RLS). Revoke tường minh dù RLS không có policy nào
+-- cho các thao tác ghi (defense-in-depth, tiền lệ §11a).
+revoke insert, update, delete on public.user_skill_mastery from anon, authenticated;
+
+drop policy if exists "mastery_select_own" on public.user_skill_mastery;
+create policy "mastery_select_own" on public.user_skill_mastery
+  for select using (user_id = auth.uid());
+
+drop function if exists public.record_skill_mastery(uuid, jsonb);
+create function public.record_skill_mastery(
+  p_attempt_id   uuid,
+  p_per_question jsonb
+)
+returns void
+language plpgsql
+volatile
+set search_path = public, pg_temp
+as $$
+declare
+  v_user_id uuid;
+begin
+  -- Cùng cưỡng chế với record_exam_result(): user_id suy ra từ attempt, đòi
+  -- status='submitted' — người gọi không tự khai được user_id hay attempt
+  -- chưa nộp.
+  select a.user_id into v_user_id
+    from public.exam_attempts a
+   where a.id = p_attempt_id
+     and a.status = 'submitted';
+
+  if v_user_id is null then
+    raise exception 'record_skill_mastery: attempt % không tồn tại hoặc chưa submitted', p_attempt_id
+      using errcode = 'check_violation';
+  end if;
+
+  -- Gộp theo skill_node_id: câu scored=false hoặc skill_node_id null KHÔNG
+  -- đóng góp gì (AC-010/AC-029) — WHERE lọc cả hai điều kiện, join là INNER
+  -- nên câu không khớp questions (hiếm, xem Data Contracts) cũng tự loại.
+  -- scored thiếu (undefined ở TS, JSON.stringify bỏ key) → coalesce về true,
+  -- khớp đúng quy ước "undefined = true" của computeScore.ts.
+  insert into public.user_skill_mastery
+    (user_id, skill_node_id, correct_count, total_count, last_wrong_at, updated_at)
+  select
+    v_user_id,
+    q.skill_node_id,
+    count(*) filter (where (pq->>'isCorrect')::boolean),
+    count(*),
+    max(now()) filter (where not (pq->>'isCorrect')::boolean),
+    now()
+  from jsonb_array_elements(p_per_question) as pq
+  join public.questions q on q.id = pq->>'questionId'
+  where coalesce((pq->>'scored')::boolean, true)
+    and q.skill_node_id is not null
+  group by q.skill_node_id
+  on conflict (user_id, skill_node_id) do update
+  set correct_count = public.user_skill_mastery.correct_count + excluded.correct_count,
+      total_count   = public.user_skill_mastery.total_count + excluded.total_count,
+      last_wrong_at = coalesce(excluded.last_wrong_at, public.user_skill_mastery.last_wrong_at),
+      updated_at    = now();
+end;
+$$;
+
+-- Revoke ĐÍCH DANH — xem ghi chú §10b về default privileges của Supabase.
+revoke all on function public.record_skill_mastery(uuid, jsonb) from public, anon, authenticated;
+grant execute on function public.record_skill_mastery(uuid, jsonb) to service_role;
+
+-- ============================================================================
+-- TELEMETRY LOG (Engine 1 Adaptive AI, PRD R4/AC-012/AC-013)
+--
+-- Ghi lại lời gọi tutor/adaptive để quan sát được sau khi ship (AC-012), KHÔNG
+-- BAO GIỜ chứa answer-key material (AC-013 — schema không có cột nào để chứa
+-- correct_answer/sub_answers/essay_answer, đúng bằng thiết kế). Bảng vận hành,
+-- không phải dữ liệu người dùng tự xem — tiền lệ exam_moderation_log: RLS bật
+-- + không policy đọc nào cho authenticated/anon.
+-- ============================================================================
+create table if not exists public.telemetry_log (
+  id            uuid primary key default gen_random_uuid(),
+  -- `set null`: nhật ký vận hành không nên biến mất theo tài khoản (tiền lệ
+  -- §16b, TD-012) — mất DANH TÍNH chấp nhận được, mất DÒNG thì không.
+  user_id       uuid references auth.users(id) on delete set null,
+  event_type    text not null check (event_type in ('adaptive_route', 'tutor_invoke')),
+  question_id   text references public.questions(id) on delete set null,
+  skill_node_id text references public.skill_nodes(id) on delete set null,
+  success       boolean not null,
+  -- Mã có cấu trúc, KHÔNG BAO GIỜ free-text/exception message — chặn một
+  -- con đường vô tình nhét nội dung câu hỏi (UGC, attacker-influenced) vào
+  -- log qua err.message.
+  error_code    text check (
+    error_code is null or error_code in (
+      'gemini_unavailable', 'rate_limited', 'server', 'not_eligible',
+      -- Mới ở R13/AC-045 — xem khối SUBSCRIPTION telemetry_log ở cuối file:
+      -- sửa TẠI CHỖ ở đây là để một lần provision MỚI đúng; cặp drop/add
+      -- dưới đó là để dev/prod (đã tồn tại, nên `create table if not
+      -- exists` là no-op) cũng đúng. Thiếu một trong hai = hình dạng TD-005.
+      'user_quota_exhausted', 'project_budget_exhausted'
+    )
+  ),
+  created_at    timestamptz not null default now()
+);
+
+alter table public.telemetry_log enable row level security;
+
+-- Chỉ GHI được (lúc invoke), KHÔNG đọc được — quan sát vận hành (AC-012) đi
+-- qua service_role/SQL Editor, không qua app. Revoke tường minh SELECT/UPDATE/
+-- DELETE dù RLS không có policy nào cho các thao tác đó (defense-in-depth,
+-- tiền lệ §11a).
+revoke select, update, delete on public.telemetry_log from anon, authenticated;
+revoke insert on public.telemetry_log from anon;
+
+drop policy if exists "telemetry_insert_own" on public.telemetry_log;
+create policy "telemetry_insert_own" on public.telemetry_log
+  for insert to authenticated with check (user_id = auth.uid());
+
+-- ============================================================================
+-- User Support System v1 (PRD support-system-prd.md v1.2, ADR-0012, Design
+-- Doc support-system-backend-design.md) — support_tickets + support_ticket_notes
+-- + support-screenshots storage policies. Idempotent.
+-- ============================================================================
+create table if not exists public.support_tickets (
+  id                          uuid primary key default gen_random_uuid(),
+  user_id                     uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  intent                      text not null,
+  message                     text not null,
+  page_url                    text,          -- null cho phép (AC-010: khoảng trống metadata không chặn submit)
+  user_agent                  text,
+  screen_width                integer,
+  screen_height               integer,
+  screenshot_path             text,          -- 1 cột scalar = tối đa 1 ảnh cấu trúc (AC-011, metric 7)
+  status                      text not null default 'new',
+  notify_failed               boolean not null default false,           -- AC-032
+  first_status_transition_at  timestamptz,                              -- AC-016/AC-047, null khi còn 'new'
+  created_at                  timestamptz not null default now()
+);
+
+alter table public.support_tickets drop constraint if exists support_tickets_intent_check;
+alter table public.support_tickets add constraint support_tickets_intent_check
+  check (intent in ('bug', 'suggestion', 'question'));
+
+alter table public.support_tickets drop constraint if exists support_tickets_status_check;
+alter table public.support_tickets add constraint support_tickets_status_check
+  check (status in ('new', 'in_progress', 'resolved'));                 -- AC-029 (DB layer)
+
+alter table public.support_tickets drop constraint if exists support_tickets_message_not_empty_check;
+alter table public.support_tickets add constraint support_tickets_message_not_empty_check
+  check (length(btrim(message)) > 0);
+
+alter table public.support_tickets drop constraint if exists support_tickets_message_length_check;
+alter table public.support_tickets add constraint support_tickets_message_length_check
+  check (length(message) <= 1000);   -- LIMITS.MAX_SUPPORT_MESSAGE (SOURCE/lib/ugc/limits.ts) — TBD-07 resolved: 1000
+
+create index if not exists support_tickets_created_at_idx on public.support_tickets (created_at desc);
+
+alter table public.support_tickets enable row level security;
+
+drop policy if exists "support_tickets_insert_own" on public.support_tickets;
+create policy "support_tickets_insert_own" on public.support_tickets
+  for insert to authenticated with check (user_id = auth.uid());
+
+drop policy if exists "support_tickets_select_own" on public.support_tickets;
+create policy "support_tickets_select_own" on public.support_tickets
+  for select to authenticated using (user_id = auth.uid());            -- AC-015; không có UI đọc trong v1 (D3) nhưng RLS vẫn bật
+
+-- KHÔNG có policy update/delete cho `authenticated`: đổi status, ghi cờ
+-- notify_failed đều đi qua service role trong Server Action admin/hệ thống,
+-- không mở surface cho student tự sửa nội dung/status ticket của mình.
+
+-- ----------------------------------------------------------------------------
+-- change_support_ticket_status(p_ticket_id, p_status) — đường DUY NHẤT ghi
+-- first_status_transition_at, atomic CASE trong cùng câu UPDATE (AC-047).
+--
+-- CỐ Ý KHÔNG phải SECURITY DEFINER, cùng lý do với record_exam_result() (§11b):
+-- service_role đã bypass RLS và còn nguyên quyền UPDATE trên support_tickets,
+-- nên hàm chạy đúng dưới quyền người gọi (INVOKER, mặc định của Postgres khi
+-- không khai `security definer`). Giữ INVOKER để phòng thủ theo lớp: lỡ ai đó
+-- `grant execute ... to authenticated` thì học sinh/admin vẫn không đổi được
+-- status qua đường này, vì `support_tickets` không có policy update nào cho
+-- `authenticated` (xem trên) — phải hỏng cả hai chỗ mới khai thác được.
+--
+-- p_status validate lại NGAY TRONG hàm — lớp cưỡng chế thứ ba, độc lập với
+-- validate ở changeTicketStatusAction (defensive) và CHECK constraint ở trên
+-- (authoritative backstop, AC-029).
+-- ----------------------------------------------------------------------------
+drop function if exists public.change_support_ticket_status(uuid, text);
+create function public.change_support_ticket_status(
+  p_ticket_id uuid,
+  p_status    text
+)
+returns table (status text, first_status_transition_at timestamptz)
+language plpgsql
+volatile
+set search_path = public, pg_temp
+as $$
+begin
+  if p_status not in ('new', 'in_progress', 'resolved') then
+    raise exception 'change_support_ticket_status: status % không hợp lệ', p_status
+      using errcode = 'check_violation';
+  end if;
+
+  return query
+    update public.support_tickets t
+       set status = p_status,
+           first_status_transition_at = case
+             when t.status = 'new' and p_status <> 'new' then now()
+             else t.first_status_transition_at
+           end
+     where t.id = p_ticket_id
+    returning t.status, t.first_status_transition_at;
+end;
+$$;
+
+-- Revoke ĐÍCH DANH anon + authenticated (không chỉ PUBLIC), giống record_exam_result
+-- §11b — thiếu dòng này thì bất kỳ authenticated nào (không riêng admin, vì DB
+-- không có role admin — ADR-0001) gọi thẳng RPC này cũng đổi được status của
+-- ticket bất kỳ, bỏ qua hoàn toàn isAdminUserId() re-check ở tầng Server Action.
+revoke all on function public.change_support_ticket_status(uuid, text)
+  from public, anon, authenticated;
+grant execute on function public.change_support_ticket_status(uuid, text)
+  to service_role;
+
+-- Internal notes: KHÔNG BAO GIỜ là cột trên support_tickets (D4). Idiom
+-- "strict" giống exam_moderation_log/schema_version — KHÁC telemetry_log's
+-- narrow form (telemetry_log có insert path từ app, notes thì KHÔNG).
+create table if not exists public.support_ticket_notes (
+  id          uuid primary key default gen_random_uuid(),
+  ticket_id   uuid not null references public.support_tickets(id) on delete cascade,
+  admin_id    uuid references auth.users(id) on delete set null,       -- audit row sống sót nếu admin bị xoá (giống exam_moderation_log.actor_id)
+  note_text   text not null,
+  created_at  timestamptz not null default now()
+);
+
+alter table public.support_ticket_notes drop constraint if exists support_ticket_notes_text_not_empty_check;
+alter table public.support_ticket_notes add constraint support_ticket_notes_text_not_empty_check
+  check (length(btrim(note_text)) > 0);
+
+create index if not exists support_ticket_notes_ticket_idx on public.support_ticket_notes (ticket_id, created_at);
+
+alter table public.support_ticket_notes enable row level security;
+revoke all on public.support_ticket_notes from anon, authenticated;
+-- ZERO policy nào — service role (bypass RLS) là đường ghi/đọc duy nhất
+-- (AC-025, AC-026, AC-048). `authenticated` không có INSERT path — không
+-- policy nào cấp, và `revoke all` xoá cả grant tầng bảng.
+
+-- Bucket "support-screenshots" tạo ngoài SQL (setup-storage.ts BUCKETS array),
+-- private (public:false), kèm fileSizeLimit/allowedMimeTypes ở tầng Storage
+-- (backstop — enforcement chính vẫn ở Server Action, xem TBD-02 rationale).
+drop policy if exists "support_screenshots_insert_own" on storage.objects;
+create policy "support_screenshots_insert_own" on storage.objects
+  for insert to authenticated with check (
+    bucket_id = 'support-screenshots'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+-- KHÔNG select/update/delete policy cho `authenticated`: student không đọc
+-- lại ảnh mình gửi (D3 — không có "my tickets"); admin đọc qua signed URL do
+-- service role tạo (bypass RLS hoàn toàn — AC-013: không authenticated nào
+-- khác, kể cả không phải tác giả, có quyền đọc trực tiếp qua policy này).
+
+-- ----------------------------------------------------------------------------
+-- Storage policies — bucket "avatars" (ADR-0016, PRD AC-031/AC-032/AC-033)
+--     Bucket tạo ngoài SQL (setup-storage.ts BUCKETS), private (public:false),
+--     kèm fileSizeLimit/allowedMimeTypes ở tầng Storage (backstop — enforcement
+--     chính vẫn ở Server Action changeAvatar).
+--     Path convention: {auth.uid()}/{uuid}.{ext} → mọi policy dưới đây dùng
+--     CHUNG một vị từ sở hữu, chép từ "support_screenshots_insert_own" §16:
+--       bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text
+--
+--     ⚠ CÓ select ở đây, trong khi support-screenshots CỐ Ý KHÔNG có. Khác biệt
+--     nằm ở đường đọc, không phải ở mức nhạy cảm: ảnh support do service role
+--     ký hộ cho admin, còn ảnh đại diện thì CHÍNH CHỦ đọc lại object của mình
+--     bằng client PHIÊN CỦA MÌNH để ký signed URL (getCurrentUserProfile →
+--     storage.createSignedUrl). Thiếu policy select thì createSignedUrl trả lỗi
+--     và mọi avatar âm thầm tụt về initials — trông như "user chưa có ảnh" chứ
+--     không như một bug (PRD R-f).
+--
+--     Nếu SQL Editor báo "must be owner of table objects", tạo qua Dashboard →
+--     Storage → Policies (nội dung y hệt), giống §8.
+-- ----------------------------------------------------------------------------
+drop policy if exists "avatars_select_own" on storage.objects;
+create policy "avatars_select_own" on storage.objects
+  for select to authenticated using (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+drop policy if exists "avatars_insert_own" on storage.objects;
+create policy "avatars_insert_own" on storage.objects
+  for insert to authenticated with check (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+drop policy if exists "avatars_update_own" on storage.objects;
+create policy "avatars_update_own" on storage.objects
+  for update to authenticated using (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  ) with check (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+-- delete: đổi ảnh là upload key MỚI rồi xoá key cũ (best-effort, changeAvatar
+-- bước 7). Không có policy này thì object cũ ở lại vĩnh viễn.
+drop policy if exists "avatars_delete_own" on storage.objects;
+create policy "avatars_delete_own" on storage.objects
+  for delete to authenticated using (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+-- ============================================================================
+-- SUBSCRIPTION — payment_orders (PRD R8, ADR-0013/ADR-0014)
+--
+-- Chứng từ tiền, KHÔNG phải trạng thái phái sinh: nó sống lâu hơn tài khoản
+-- (`on delete set null`, PRD R-g) để một khiếu nại vẫn đối soát được. Client
+-- chỉ ĐỌC đơn của chính mình; mọi lệnh ghi đi qua service_role.
+-- ============================================================================
+create table if not exists public.payment_orders (
+  -- payOS đòi orderCode là SỐ NGUYÊN; bigint là kiểu vừa khít, và đây cũng là
+  -- khoá của nhà cung cấp cho cả webhook lẫn GET /v2/payment-requests/{id}.
+  order_code    bigint primary key,
+  -- CHO PHÉP NULL kèm `on delete set null`, cố ý (PRD R-g): chứng từ tiền phải
+  -- sống lâu hơn tài khoản. Cái giá là settlement một đơn mồ côi sẽ không tìm
+  -- ra người thụ hưởng và từ chối — đúng kết cục fail-closed mong muốn.
+  user_id       uuid references auth.users(id) on delete set null,
+  amount        integer not null check (amount > 0),
+  -- KHÔNG có trạng thái 'refunded': hoàn tiền là một thao tác ngân hàng cộng
+  -- một câu SQL sửa tay (D10). Bịa ra một status mà code không bao giờ đặt là
+  -- tạo một trạng thái chỉ tới được bằng một nhánh code không tồn tại (đúng
+  -- cảnh báo của ADR-0013).
+  status        text not null default 'pending'
+                check (status in ('pending', 'paid', 'expired', 'cancelled')),
+  created_at    timestamptz not null default now(),
+  -- Soi gương `expiredAt` của chính payOS trên payment request. MỘT hằng số
+  -- dùng chung nuôi cả hai (ADR-0013 Implementation Guidance) — hai đồng hồ
+  -- lệch nhau đẻ ra một QR mà bên này tưởng còn sống, bên kia tưởng đã chết.
+  -- Hằng đó là `ORDER_PENDING_WINDOW_MS` (lib/billing/pricing.ts).
+  pending_until timestamptz not null,
+  settled_at    timestamptz,
+
+  -- Bốn cột chuyển khoản (UI Spec C-13, FE-B-01) ----------------------------
+  -- Bốn trường còn lại của CheckoutOrder (UI Spec C-13). Chúng được LƯU chứ
+  -- không suy ra, vì đúng một lý do: phải đọc được trên một lần vào nguội
+  -- /pricing/checkout?order=… mà trong phiên KHÔNG có lượt gọi createOrder()
+  -- nào — link "tiếp tục thanh toán" (AC-027), một lần F5, một bookmark.
+  -- Ghi MỘT LẦN, từ phản hồi create-request của payOS, trong chính câu insert
+  -- tạo dòng; không bao giờ tính lại lúc đọc (frontend Risk R-11). Số tài
+  -- khoản hay memo đổi dưới chân một đơn đang bay là cùng loại lỗi mà
+  -- settleOrder() bước 3 từ chối trên số tiền.
+  -- NOT NULL cưỡng chế được vì lượt gọi nhà cung cấp đi TRƯỚC insert: payOS
+  -- không trả lời thì không dòng nào được ghi.
+  qr_payload     text not null,   -- payOS `qrCode`: một PAYLOAD VietQR/EMVCo, KHÔNG phải URL (UI-D14)
+  account_number text not null,   -- AC-028 — tài khoản NHẬN của mình, không bao giờ của người trả
+  account_name   text not null,   -- AC-028 — chủ tài khoản nhận
+  memo           text not null    -- AC-028 — payOS `description`; chuỗi nhà cung cấp đối soát theo
+);
+
+create index if not exists payment_orders_user_created_idx
+  on public.payment_orders (user_id, created_at desc);
+
+alter table public.payment_orders enable row level security;
+
+-- Client chỉ ĐỌC được đơn của chính mình và KHÔNG ghi được gì. Hai nơi đọc là
+-- S-05 ("đơn của tôi", R10) và S-06 (màn thanh toán). Đúng một policy này là
+-- TOÀN BỘ đường đọc của cả hai: với bốn cột chuyển khoản ở trên, một select
+-- theo chủ sở hữu trả đủ tám trường CheckoutOrder, nên S-06 không cần action
+-- thứ hai và không cần gọi nhà cung cấp để render (FE-B-01). Revoke tường minh
+-- dù RLS không có policy nào cho các thao tác ghi (defense-in-depth, tiền lệ
+-- §11a).
+revoke insert, update, delete on public.payment_orders from anon, authenticated;
+revoke select on public.payment_orders from anon;
+
+drop policy if exists "orders_select_own" on public.payment_orders;
+create policy "orders_select_own" on public.payment_orders
+  for select to authenticated using (user_id = auth.uid());
+
+-- ============================================================================
+-- SUBSCRIPTION — subscriptions (entitlement; PRD R2/R3/R4, ADR-0013)
+--
+-- Kỳ trả trước, KHÔNG phải subscription do nhà cung cấp đẩy: entitlement được
+-- SUY RA lúc đọc bằng cách so `expires_at` (cộng 3 ngày ân hạn, PRD D8/R4) với
+-- now(). Không boolean, không status enum, không sự kiện vòng đời từ provider,
+-- và do đó không job định kỳ nào trong repo này.
+-- ============================================================================
+create table if not exists public.subscriptions (
+  -- `cascade`, khác payment_orders: dòng này không phải chứng từ tiền, nó là
+  -- trạng thái phái sinh. Tài khoản đi thì nó đi theo.
+  user_id          uuid primary key references auth.users(id) on delete cascade,
+  -- MỘT giá trị vòng đời duy nhất. Không boolean, không status enum (PRD
+  -- R2/AC-004; metric #4 đếm đúng loại cột này và kỳ vọng bằng 0).
+  expires_at       timestamptz not null,
+  -- KHÔNG phải bản chép lại của expires_at (backend DD, MSA-1): sau một lần mua
+  -- sớm, `expires_at − 30d` chính là hạn CŨ — nó trả lời một câu hỏi khác. Đây
+  -- là mốc bắt đầu kỳ HẠN MỨC 30 ngày hiện tại (A4), đặt trong CÙNG câu lệnh
+  -- gia hạn expires_at — chính điều đó làm ca mua sớm của AC-016 được thêm
+  -- NGÀY mà không được thêm một suất hạn mức thứ hai.
+  period_anchor_at timestamptz not null,
+  updated_at       timestamptz not null default now()
+);
+
+alter table public.subscriptions enable row level security;
+
+revoke insert, update, delete on public.subscriptions from anon, authenticated;
+revoke select on public.subscriptions from anon;
+
+drop policy if exists "subscriptions_select_own" on public.subscriptions;
+create policy "subscriptions_select_own" on public.subscriptions
+  for select to authenticated using (user_id = auth.uid());
+
+-- ============================================================================
+-- SUBSCRIPTION — record_payment_settlement() (ADR-0014, PRD AC-009/031/033)
+--
+-- Đường DUY NHẤT gia hạn được entitlement. Anh em với record_exam_result()
+-- (§11b) và record_skill_mastery() (khối MASTERY WRITE), và theo cả hai từng
+-- mệnh đề: INVOKER (mặc định của Postgres khi không khai `security definer` —
+-- service_role vốn đã bypass RLS), danh tính SUY RA từ dòng đơn hàng, revoke
+-- ĐÍCH DANH khỏi public/anon/authenticated, và DROP-THEN-CREATE như cả hai.
+--
+-- KHÔNG dùng `create or replace`: ngoại lệ duy nhất trong file này
+-- (exam_rating_aggregate, §12a) tồn tại vì có view phụ thuộc vào hàm đó; hàm
+-- này KHÔNG có đối tượng nào phụ thuộc, nên tiền đề của ngoại lệ vắng mặt. Khác
+-- biệt không phải thẩm mỹ: `create or replace` giữ im lặng một chữ ký cũ nếu
+-- sau này danh sách tham số đổi — trên đường tiền, đó là hai hàm settlement
+-- gọi được trong khi tài liệu mô tả một.
+--
+-- Idempotency là mệnh đề `status = 'pending'` NẰM TRONG UPDATE ... RETURNING,
+-- không phải một phép kiểm riêng: hai lượt settlement đồng thời (webhook và nút
+-- "kiểm tra lại" bấm cùng lúc) tranh cùng một dòng, một bên thắng, UPDATE của
+-- bên kia không khớp dòng nào và hàm no-op. Đó là AC-031, và nó không cần bảng
+-- nonce, không cần đồng hồ (ADR-0014 Decision 4).
+--
+-- SAI LỆCH ĐƯỢC GHI NHẬN so với ADR-0014 Implementation Guidance ("Two
+-- statements is a window"): thân hàm này dùng HAI câu lệnh. Thứ làm nó an toàn
+-- không phải câu chữ mà là ngữ nghĩa giao dịch — thân plpgsql chạy trong một
+-- giao dịch ngầm duy nhất, và câu lệnh đầu khoá dòng đơn hàng dưới vị từ
+-- `status = 'pending'`, nên một settlement đồng thời của cùng order_code sẽ
+-- chặn rồi khớp 0 dòng. Dạng một-câu-lệnh (CTE ghi dữ liệu) bị loại vì nhánh
+-- `raise exception` không-người-thụ-hưởng bên dưới không có tương đương trong
+-- CTE. Đây là SAI LỆCH, không phải tuân thủ; ca đồng thời trên Postgres thật là
+-- thứ CHỨNG MINH nó, thay vì giả định.
+-- ============================================================================
+drop function if exists public.record_payment_settlement(bigint, integer);
+create function public.record_payment_settlement(
+  p_order_code bigint,
+  p_period_days integer default 30
+)
+returns timestamptz
+language plpgsql
+volatile
+set search_path = public, pg_temp
+as $$
+declare
+  v_user_id uuid;
+  v_new_expires timestamptz;
+begin
+  -- Một câu lệnh giành lấy đơn. Nếu nó không còn 'pending' (đã paid, expired,
+  -- cancelled, hoặc không tồn tại) thì không khớp gì và ta trả null.
+  update public.payment_orders
+     set status = 'paid', settled_at = now()
+   where order_code = p_order_code
+     and status = 'pending'
+  returning user_id into v_user_id;
+
+  if not found then
+    return null;                 -- phát lại hoặc đơn lạ: no-op, không phải lỗi
+  end if;
+
+  if v_user_id is null then
+    -- Đơn sống sót qua một tài khoản đã xoá (on delete set null). Fail closed
+    -- và để lại dấu vết ồn ào: dòng giờ là 'paid' mà không có người thụ hưởng —
+    -- đúng trạng thái cần một con người đối soát bằng tay (D10).
+    raise exception 'settlement for order % has no beneficiary', p_order_code
+      using errcode = 'check_violation';
+  end if;
+
+  -- GIA HẠN, không bao giờ ghi đè (PRD R3, ADR-0013). max(hiện có, now()) là
+  -- thứ làm việc mua sớm THÊM ngày thay vì tịch thu ngày.
+  insert into public.subscriptions (user_id, expires_at, period_anchor_at, updated_at)
+  values (v_user_id, now() + make_interval(days => p_period_days), now(), now())
+  on conflict (user_id) do update
+    set expires_at = greatest(public.subscriptions.expires_at, now())
+                     + make_interval(days => p_period_days),
+        -- CÙNG câu lệnh với phép gia hạn ở trên: ca mua sớm của AC-016 được
+        -- thêm NGÀY và đúng một kỳ hạn mức, không bao giờ hai.
+        period_anchor_at = now(),
+        updated_at = now()
+  returning expires_at into v_new_expires;
+
+  return v_new_expires;
+end;
+$$;
+
+-- Supabase mặc định cấp EXECUTE cho public trên hàm mới. Revoke ĐÍCH DANH là
+-- thứ duy nhất gỡ được nó (ADR-0011/ADR-0014 Implementation Guidance — nhắc
+-- lại vì quên nó thì im lặng; xem thêm ghi chú §10b).
+revoke all on function public.record_payment_settlement(bigint, integer)
+  from public, anon, authenticated;
+grant execute on function public.record_payment_settlement(bigint, integer)
+  to service_role;
+
+-- ============================================================================
+-- SUBSCRIPTION — telemetry_log.error_code mở rộng TẠI CHỖ (PRD R13,
+-- AC-045/046/047)
+--
+-- CHECK hiện có được khai INLINE trong khối TELEMETRY LOG ở trên. Hai chỗ sửa,
+-- và BẮT BUỘC cả hai — không chỗ nào một mình là đúng:
+--   (1) danh sách inline sửa thành sáu literal, để một lần provision MỚI là
+--       đúng;
+--   (2) cặp drop/add dưới đây, để một DB ĐÃ provision là đúng — `create table
+--       if not exists` là no-op trên dev và prod, cả hai đều đã tồn tại, nên
+--       chỉ sửa inline sẽ đúng hình dạng TD-005: đúng trong git, vắng mặt ở
+--       mọi database.
+-- Constraint được THAY dưới CHÍNH TÊN của nó, không bao giờ dựng song song một
+-- cái thứ hai — bài học §10c ("Bắt buộc theo thứ tự này"), thứ AC-045 gọi tên
+-- trực tiếp.
+-- ============================================================================
+alter table public.telemetry_log
+  drop constraint if exists telemetry_log_error_code_check;
+alter table public.telemetry_log
+  add constraint telemetry_log_error_code_check check (
+    error_code is null or error_code in (
+      'gemini_unavailable', 'rate_limited', 'server', 'not_eligible',
+      -- Mới trong tính năng này. Tên chọn ĐÚNG BẰNG chuỗi lý do từ chối của
+      -- consumeQuota(), để giá trị trong log và nhánh sinh ra nó không thể bị
+      -- ánh xạ nhầm.
+      'user_quota_exhausted',      -- AC-014/AC-015/AC-018/AC-053: hạn mức gói của CHÍNH người dùng
+      'project_budget_exhausted'   -- AC-022/AC-023: ngân sách ngày toàn dự án của R7
+    )
+  );
+
+-- ----------------------------------------------------------------------------
+-- 17. Phiên bản schema — DB tự khai nó đang chạy bản nào (2026-08-07).
+--
+--     Vì sao có phần này (TECH-DEBT TD-005): file này được paste TAY vào SQL
+--     Editor. Không có bản ghi "môi trường nào đang ở phiên bản nào", nên code
+--     và DB lệch nhau mà KHÔNG có gì báo. Đã xảy ra thật hai lần:
+--       - bản vá §10: code chuyển sang RPC trong khi DB chưa có hàm;
+--       - bản vá cascade 2026-08-04 (bug xoá đề): áp lên prod, QUÊN dev. Suốt
+--         3 ngày Preview deploy vẫn chết 23503 trong khi tsc/vitest/verify đều
+--         xanh — vì không cổng nào biết dev đang chạy bản nào.
+--
+--     Từ nay `verify:schema` và `instrumentation.ts` đọc bảng này và so với vân
+--     tay của schema.sql trong git. Lệch = có người quên paste, và nó nói ra.
+--
+--     ⚠ ĐÂY KHÔNG PHẢI MIGRATION TOOL. Không thứ tự áp, không rollback, không
+--     biết đi từ bản A sang bản B. Nó trả lời đúng MỘT câu: "DB này có đang
+--     chạy đúng file schema.sql trong git không?". Trả nợ trọn vẹn TD-005 vẫn
+--     là Supabase CLI migrations.
+-- ----------------------------------------------------------------------------
+create table if not exists public.schema_version (
+  id          smallint primary key default 1 check (id = 1),
+  fingerprint text not null,
+  applied_at  timestamptz not null default now()
+);
+
+-- Sơ đồ hệ thống, không phải dữ liệu người dùng — không có lý do gì để trình
+-- duyệt đọc được. RLS bật + KHÔNG policy nào = anon/authenticated không thấy
+-- gì; service_role bỏ qua RLS nên `verify:schema` và server vẫn đọc được.
+alter table public.schema_version enable row level security;
+revoke all on public.schema_version from anon, authenticated;
+
+-- Khối dưới đây PHẢI là câu lệnh CUỐI CÙNG của file, cố ý: nếu paste bị đứt
+-- giữa chừng (timeout, lỗi ở §nào đó), vân tay KHÔNG được ghi — DB thà không
+-- biết mình là bản nào, còn hơn khai nhận một bản nó chưa chạy hết.
+--
+-- Nội dung giữa hai marker KHÔNG tính vào vân tay (nếu tính thì băm chứa chính
+-- nó — xem lib/schema/schemaFingerprint.ts).
+-- @schema-fingerprint-begin
+insert into public.schema_version (id, fingerprint)
+values (1, '021dd1387945')
+on conflict (id) do update
+  set fingerprint = excluded.fingerprint,
+      applied_at  = now();
+-- @schema-fingerprint-end

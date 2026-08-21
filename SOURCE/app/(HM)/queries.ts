@@ -3,6 +3,7 @@
 // snake_case DB → camelCase mapping and throw-on-infrastructure-error convention.
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { readBounded } from "@/lib/supabase/boundedRead";
 
 export type MyHistoryEntry = {
   attemptId: string;
@@ -45,14 +46,23 @@ export async function listMyHistory(): Promise<MyHistoryEntry[]> {
   //    hạ khỏi 'published') làm cả dòng bị loại, đúng ngữ nghĩa "omitted, not
   //    defaulted" của Exams-Visibility Edge Case — nay do DB cưỡng chế thay vì
   //    do map/filter ở JS.
-  const { data, error } = await supabase
-    .from("exam_results")
-    .select(
-      "attempt_id, total_score, exam_attempts!inner(exam_id, started_at, submitted_at, exams!inner(title, subject))"
-    )
-    .eq("exam_attempts.status", "submitted")
-    .eq("exam_attempts.exams.status", "published");
-  if (error) throw error;
+  // Biên tường minh (P3). Đáng chú ý riêng ở hàm này: comment dưới đây dựa vào
+  // "tập lịch sử của một user vốn nhỏ/bounded qua RLS" để biện minh cho việc sắp
+  // xếp ở JS. RLS bó tập về MỘT người, nó KHÔNG bó số lượt người đó làm — nên
+  // "bounded" ở đó là bounded theo hành vi, không phải theo cấu trúc. `readBounded`
+  // biến giả định đó thành một thứ đo được: vượt trần thì có tiếng, chứ không âm
+  // thầm mất những lượt CŨ NHẤT (sắp ở JS nên phần bị PostgREST cắt là phần chưa
+  // sắp — mất dòng nào là do thứ tự PK, không ai đoán trước được).
+  const rows = (await readBounded(
+    "listMyHistory",
+    supabase
+      .from("exam_results")
+      .select(
+        "attempt_id, total_score, exam_attempts!inner(exam_id, started_at, submitted_at, exams!inner(title, subject))"
+      )
+      .eq("exam_attempts.status", "submitted")
+      .eq("exam_attempts.exams.status", "published")
+  )) as EmbeddedRow[];
 
   // Sắp xếp ở JS, KHÔNG phải .order() DB-side: với embed to-one, supabase-js's
   // `.order(col, { referencedTable })` chỉ sắp xếp BÊN TRONG resource lồng (dành
@@ -61,7 +71,7 @@ export async function listMyHistory(): Promise<MyHistoryEntry[]> {
   // lịch sử của một user vốn nhỏ/bounded qua RLS — cùng căn cứ với quyết định lọc
   // client-side-của-server-fetch ở lib/history/filterEntries.ts. So sánh chuỗi là
   // đúng thứ tự thời gian vì PostgREST trả timestamptz dạng ISO-8601 cùng offset.
-  return (data as unknown as EmbeddedRow[])
+  return rows
     .map(
       (r): MyHistoryEntry => ({
         attemptId: r.attempt_id,

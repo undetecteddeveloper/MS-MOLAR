@@ -88,9 +88,32 @@
 //       .eq("exam_attempts.exams_with_difficulty.status", "published"), the guard
 //       previously owned by getExam(). Without it an unpublished/withdrawn exam's
 //       result would become readable: a visibility regression, not a perf one.
-//   (e) Round-trip no-regression guard — exactly 2 .from() calls are issued, in
-//       order: "exam_results" then "questions". Re-splitting the join would undo
-//       the optimization while every output assertion still passed.
+//   (e) Round-trip no-regression guard — the collapsed join must never be
+//       re-split into SEQUENTIAL round trips. Engine 1 added a second
+//       exam_results read (the cross-attempt wrong-twice history) issued inside
+//       the same Promise.all, so a call count alone can no longer tell
+//       "parallel" apart from "re-split": the obligation is therefore proven by
+//       holding BOTH reads open on their own gates and asserting both were
+//       issued while NEITHER had resolved. Holding only one open would make the
+//       guard directional — the opposite sequential ordering would stay green.
+//       Re-splitting would undo the optimization while every output assertion
+//       still passed.
+//   (f) hasBeenWrongTwice end-to-end (Engine 1 backend task 09) — the flag is
+//       computed from the cross-attempt history and applied only to scored,
+//       incorrect rows, and the history read is UNSCOPED (no .eq() narrowing it
+//       to one exam/attempt). Obligations (a)-(e) all pass with the history
+//       mapped to nothing, i.e. with the feature permanently dead; this is the
+//       only one that fails. It needs a thenable fake builder, because the
+//       history read awaits the builder directly rather than .maybeSingle().
+//   (g) Additive-enrichment degradation — a failing history read must NOT reject
+//       getResult(). The joined read stays fail-loud (no row means no page), but
+//       this one is display gating: on error it logs and yields an EMPTY history,
+//       so no row can be flagged. UI Spec § D1 / AC-024 defines false and absent
+//       as the same fail-closed state ("Absent/false = affordance does not
+//       render"), so the mapping formula is applied unchanged and needs no
+//       "history unavailable" mode of its own.
+//       Without this, a transient failure of a feature the page shipped without
+//       would break the whole already-live result-detail page.
 // Verification points / expected results / pass criteria:
 //   - Obligation (a): the exam_attempts mock's recorded .select() call
 //     argument equals the exact literal string
@@ -111,8 +134,8 @@
 // sub_answers/essay_answer are REVOKEd from the `authenticated` role, so the
 // SECURITY DEFINER function (schema.sql §10a) is the only path that still yields
 // them, and only to the exam's author or someone who has already submitted an
-// attempt on it. Obligation (e) below still counts 2 round trips; it just counts
-// one .from() and one .rpc() instead of two .from()s.
+// attempt on it. Obligation (e) counts that trip as the .rpc() rather than as a
+// second .from().
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -217,6 +240,9 @@ function mockGetResultChain(attemptRow: {
           eqCalls.push(args);
           return builder;
         },
+        // Lệnh đọc lịch sử wrong-twice đi qua `readBounded` (P3), nó áp biên bằng
+        // .limit() trước khi await builder.
+        limit: () => builder,
         maybeSingle: async () => ({
           data: {
             ...RESULT_ROW,
@@ -250,10 +276,16 @@ describe("getResult() — additive select extension, byte-identical pre-existing
     // The 2 columns are now requested through the embed rather than a separate
     // exam_attempts round trip, but dropping either still breaks AC-009 — so the
     // obligation is unchanged in substance, only in where the columns appear.
-    const selectArg = examResultsSelectMock.mock.calls[0][0] as string;
-    expect(selectArg).toContain("exam_attempts!inner(");
-    expect(selectArg).toContain("started_at");
-    expect(selectArg).toContain("submitted_at");
+    //
+    // The join is located by its SHAPE, not by call index: two exam_results reads
+    // now share this recorder (the join and the cross-attempt history read), and
+    // swapping the two entries inside getResult()'s Promise.all is behaviour-
+    // identical yet would flip the index and fail this obligation spuriously.
+    const selectArgs = examResultsSelectMock.mock.calls.map(([arg]) => arg as string);
+    const joinSelectArg = selectArgs.find((arg) => arg.includes("exam_attempts!inner("));
+    expect(joinSelectArg).toBeDefined();
+    expect(joinSelectArg).toContain("started_at");
+    expect(joinSelectArg).toContain("submitted_at");
   });
 
   it("obligation (d): the published-visibility filter is applied on the embedded exam (round-trip collapse must not drop getExam()'s guard)", async () => {
@@ -271,21 +303,92 @@ describe("getResult() — additive select extension, byte-identical pre-existing
     expect(eqCalls).toContainEqual(["exam_attempts.exams_with_difficulty.status", "published"]);
   });
 
-  it("obligation (e): exactly 2 round trips are issued — exam_results (joined) then the exam_answer_key RPC (no-regression guard on the round-trip collapse)", async () => {
-    mockGetResultChain({
-      started_at: "2026-07-20T10:00:00.000Z",
-      submitted_at: "2026-07-20T10:30:00.000Z",
+  it("obligation (e): the joined read and the cross-attempt history read are both in flight before EITHER resolves, and the answer key still costs exactly one further round trip (no-regression guard on the round-trip collapse)", async () => {
+    // Deliberately NOT mockGetResultChain: this obligation needs BOTH exam_results
+    // reads held open mid-flight, which that shared helper cannot express. Holding
+    // only one open makes the guard directional — the opposite sequential ordering
+    // (history first, then join) would stay green.
+    let joinSettled = false;
+    let historySettled = false;
+    let releaseJoin!: () => void;
+    let releaseHistory!: () => void;
+    const joinGate = new Promise<void>((resolve) => {
+      releaseJoin = resolve;
+    });
+    const historyGate = new Promise<void>((resolve) => {
+      releaseHistory = resolve;
     });
 
-    await getResult(ATTEMPT_ID);
+    rpcMock.mockImplementation(async (fn: string) => {
+      if (fn === "exam_answer_key") return { data: QUESTION_ROWS, error: null };
+      throw new Error(`unexpected rpc: ${fn}`);
+    });
 
-    // Was 4 sequential round trips (exam_results -> exam_attempts -> exams_with_
+    fromMock.mockImplementation((table: string) => {
+      if (table !== "exam_results") throw new Error(`unexpected table: ${table}`);
+      const builder: Record<string, unknown> = {
+        select: () => builder,
+        eq: () => builder,
+        limit: () => builder,
+        // The joined read completes through maybeSingle()...
+        maybeSingle: async () => {
+          await joinGate;
+          joinSettled = true;
+          return {
+            data: {
+              ...RESULT_ROW,
+              exam_attempts: {
+                started_at: "2026-07-20T10:00:00.000Z",
+                submitted_at: "2026-07-20T10:30:00.000Z",
+                exams_with_difficulty: EMBEDDED_EXAM,
+              },
+            },
+            error: null,
+          };
+        },
+        // ...the history read awaits the builder itself (PostgREST builders are
+        // thenable), so its trip completes here instead.
+        then: (onFulfilled: (value: unknown) => unknown) =>
+          historyGate.then(() => {
+            historySettled = true;
+            return onFulfilled({ data: [], error: null });
+          }),
+      };
+      return builder;
+    });
+
+    const pending = getResult(ATTEMPT_ID);
+    // A macrotask boundary drains every pending microtask, so by this point the
+    // implementation has issued every read it is going to issue before either
+    // gate opens. Deterministic, not a race.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Was 4 SEQUENTIAL round trips (exam_results -> exam_attempts -> exams_with_
     // difficulty -> questions, ~816ms measured); the embed collapses the first 3
     // into one (~385ms). A future edit that re-splits them would silently undo
-    // that without failing any output assertion. The 2nd trip became an RPC when
-    // the answer columns were locked down (Critical #1) — still one trip, and
-    // still keyed off the exam the join already resolved (no extra lookup).
-    expect(fromMock.mock.calls.map(([table]) => table)).toEqual(["exam_results"]);
+    // that without failing any output assertion.
+    //
+    // Engine 1 added a 2nd exam_results read (the cross-attempt history) inside
+    // the SAME Promise.all, so counting .from() calls no longer distinguishes
+    // "parallel" from "re-split". The property guarded instead is symmetric:
+    // both reads are already issued while NEITHER has resolved. Either sequential
+    // ordering — join-then-history or history-then-join — leaves exactly one call
+    // recorded here and fails.
+    expect(fromMock.mock.calls.map(([table]) => table)).toEqual(["exam_results", "exam_results"]);
+    expect({ joinSettled, historySettled }).toEqual({ joinSettled: false, historySettled: false });
+
+    releaseJoin();
+    releaseHistory();
+    await pending;
+
+    // What is NOT guarded by this obligation: the cost of the parallel reads
+    // themselves (a 3rd parallel exam_results read would still pass the check
+    // above once added to this literal), nor what the history read returns —
+    // that is obligation (f)'s job. What IS guarded: nothing becomes sequential,
+    // and the answer key still costs exactly one further trip, keyed off the exam
+    // the join already resolved (no extra lookup) — it became an RPC when the
+    // answer columns were locked down (Critical #1).
+    expect(fromMock.mock.calls.map(([table]) => table)).toEqual(["exam_results", "exam_results"]);
     expect(rpcMock).toHaveBeenCalledTimes(1);
     expect(rpcMock).toHaveBeenCalledWith("exam_answer_key", { p_exam_id: "exam-1" });
   });
@@ -305,6 +408,178 @@ describe("getResult() — additive select extension, byte-identical pre-existing
     expect(result!.startedAt.length).toBeGreaterThan(0);
     expect(result!.startedAt).toBe("2026-07-20T10:00:00.000Z");
     expect(result!.submittedAt).toBe("2026-07-20T10:30:00.000Z");
+  });
+
+  it("obligation (f): hasBeenWrongTwice is computed from the UNSCOPED cross-attempt history and applied only to scored, incorrect rows", async () => {
+    // The attempt being viewed — the three branches of the gating formula
+    // (scored+wrong / correct / unscored), authored by hand.
+    const viewedPerQuestion = [
+      { questionId: "q-wrong-twice", selected: "A", isCorrect: false, scored: true },
+      { questionId: "q-correct", selected: "B", isCorrect: true, scored: true },
+      { questionId: "q-essay", selected: "bài làm", isCorrect: false, scored: false },
+    ];
+    // This user's FULL exam_results history, i.e. what the unscoped read returns.
+    // q-wrong-twice: scored-wrong on 2 DISTINCT attempts        -> eligible.
+    // q-essay:       wrong on those same 2 attempts but scored:false -> never eligible.
+    // q-correct:     correct throughout                          -> not eligible.
+    const historyRows = [
+      { attempt_id: "attempt-1", per_question: viewedPerQuestion },
+      {
+        attempt_id: "attempt-2",
+        per_question: [
+          { questionId: "q-wrong-twice", selected: "C", isCorrect: false, scored: true },
+          { questionId: "q-correct", selected: "B", isCorrect: true, scored: true },
+          { questionId: "q-essay", selected: "bài làm", isCorrect: false, scored: false },
+        ],
+      },
+    ];
+
+    const historyEqCalls: unknown[][] = [];
+    let historySelectArg = "";
+
+    rpcMock.mockImplementation(async (fn: string) => {
+      if (fn === "exam_answer_key") return { data: QUESTION_ROWS, error: null };
+      throw new Error(`unexpected rpc: ${fn}`);
+    });
+
+    fromMock.mockImplementation((table: string) => {
+      if (table !== "exam_results") throw new Error(`unexpected table: ${table}`);
+      let isHistoryRead = false;
+      const builder: Record<string, unknown> = {
+        select: (arg: string) => {
+          isHistoryRead = !arg.includes("exam_attempts!inner(");
+          if (isHistoryRead) historySelectArg = arg;
+          return builder;
+        },
+        eq: (...args: unknown[]) => {
+          if (isHistoryRead) historyEqCalls.push(args);
+          return builder;
+        },
+        limit: () => builder,
+        maybeSingle: async () => ({
+          data: {
+            ...RESULT_ROW,
+            per_question: viewedPerQuestion,
+            exam_attempts: {
+              started_at: "2026-07-20T10:00:00.000Z",
+              submitted_at: "2026-07-20T10:30:00.000Z",
+              exams_with_difficulty: EMBEDDED_EXAM,
+            },
+          },
+          error: null,
+        }),
+        // PostgREST query builders are THENABLE and the history read awaits the
+        // builder directly (no .maybeSingle()). Without this, `await builder`
+        // yields the builder object, data/error destructure to undefined, the
+        // history degrades to [] — and mapping it to nothing would pass every
+        // other obligation in this file while the feature is permanently dead.
+        then: (onFulfilled: (value: unknown) => unknown) =>
+          Promise.resolve().then(() => onFulfilled({ data: historyRows, error: null })),
+      };
+      return builder;
+    });
+
+    const result = await getResult(ATTEMPT_ID);
+
+    expect(result).not.toBeNull();
+    const [wrongTwiceRow, correctRow, essayRow] = result!.result.perQuestion;
+
+    // Scored + currently wrong + wrong on >=2 distinct attempts -> true, with every
+    // pre-existing field of the row carried through untouched.
+    expect(wrongTwiceRow).toEqual({
+      questionId: "q-wrong-twice",
+      selected: "A",
+      isCorrect: false,
+      scored: true,
+      hasBeenWrongTwice: true,
+    });
+    // The flag is meaningless for a correct row and for an unscored row: undefined,
+    // not false (UI Spec D1's rule, applied consumer-side by getResult()).
+    expect(correctRow.questionId).toBe("q-correct");
+    expect(correctRow.hasBeenWrongTwice).toBeUndefined();
+    expect(essayRow.questionId).toBe("q-essay");
+    expect(essayRow.hasBeenWrongTwice).toBeUndefined();
+
+    // The history read must span ALL of the user's attempts. RLS (results_select_own)
+    // already scopes it to the caller, so any .eq() here would narrow it further —
+    // that is where the real per-exam/per-attempt scoping failure mode lives, and it
+    // is unrepresentable in computeWrongTwiceQuestionIds() itself (its input type
+    // carries no exam identity at all).
+    expect(historyEqCalls).toEqual([]);
+    // attempt_id is what makes "2 DISTINCT attempts" countable; dropping it would
+    // collapse every row into a single anonymous attempt.
+    expect(historySelectArg).toContain("attempt_id");
+    expect(historySelectArg).toContain("per_question");
+  });
+
+  it("obligation (g): a failing history read degrades to no flag instead of rejecting the whole page", async () => {
+    // Same viewed attempt as (f) — its first row WOULD be hasBeenWrongTwice:true
+    // if the history read had succeeded, so this fixture isolates the degradation.
+    const viewedPerQuestion = [
+      { questionId: "q-wrong-twice", selected: "A", isCorrect: false, scored: true },
+      { questionId: "q-correct", selected: "B", isCorrect: true, scored: true },
+    ];
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    rpcMock.mockImplementation(async (fn: string) => {
+      if (fn === "exam_answer_key") return { data: QUESTION_ROWS, error: null };
+      throw new Error(`unexpected rpc: ${fn}`);
+    });
+
+    fromMock.mockImplementation((table: string) => {
+      if (table !== "exam_results") throw new Error(`unexpected table: ${table}`);
+      const builder: Record<string, unknown> = {
+        select: () => builder,
+        eq: () => builder,
+        limit: () => builder,
+        // The joined read still succeeds: the page's core data is fine, which is
+        // exactly the situation in which rejecting would be the wrong behaviour.
+        maybeSingle: async () => ({
+          data: {
+            ...RESULT_ROW,
+            per_question: viewedPerQuestion,
+            exam_attempts: {
+              started_at: "2026-07-20T10:00:00.000Z",
+              submitted_at: "2026-07-20T10:30:00.000Z",
+              exams_with_difficulty: EMBEDDED_EXAM,
+            },
+          },
+          error: null,
+        }),
+        then: (onFulfilled: (value: unknown) => unknown) =>
+          Promise.resolve().then(() =>
+            onFulfilled({ data: null, error: { code: "57014", message: "statement timeout" } })
+          ),
+      };
+      return builder;
+    });
+
+    const result = await getResult(ATTEMPT_ID);
+
+    // Resolves rather than rejecting — the already-shipped result-detail page
+    // keeps working when only this additive enrichment fails.
+    expect(result).not.toBeNull();
+    expect(result!.examId).toBe("exam-1");
+    expect(result!.examTitle).toBe("Sample Exam");
+    expect(result!.result.totalScore).toBe(8.5);
+    // Fail-closed per UI Spec § D1 / AC-024, which treats false and absent
+    // identically ("hasBeenWrongTwice false or absent -> shall not render").
+    // The degraded history is an EMPTY history, so the Reference Contract's
+    // formula is applied unchanged and a scored+wrong row yields false — not
+    // undefined. Forcing undefined here would mean teaching the mapping to tell
+    // "history unavailable" apart from "history empty": a new mode for zero
+    // observable difference. The property that matters is that it is never true.
+    expect(result!.result.perQuestion[0].questionId).toBe("q-wrong-twice");
+    expect(result!.result.perQuestion[0].hasBeenWrongTwice).toBe(false);
+    // The correct row is still gated out entirely.
+    expect(result!.result.perQuestion[1].hasBeenWrongTwice).toBeUndefined();
+
+    // The degradation is logged, not swallowed — and the log carries no row content.
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(warnSpy.mock.calls[0])).toContain("57014");
+    expect(JSON.stringify(warnSpy.mock.calls[0])).not.toContain("q-wrong-twice");
+
+    warnSpy.mockRestore();
   });
 
   it("obligation (c): a null submitted_at maps to ExamResult.submittedAt === null exactly (not coerced, not omitted)", async () => {

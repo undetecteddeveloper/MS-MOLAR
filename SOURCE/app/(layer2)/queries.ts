@@ -3,12 +3,19 @@
 // Xem BACK-END-ARCHITECTURE-MAP.md Mục 4.2.
 import "server-only";
 
+import {
+  EXAM_RANK_GRADE_MATCH_WEIGHT,
+  EXAM_RANK_RECENCY_WEIGHT,
+} from "@/lib/adaptive/constants";
+import { rankExamIds } from "@/lib/adaptive/rankExams";
 import { createClient } from "@/lib/supabase/server";
+import { readBounded } from "@/lib/supabase/boundedRead";
 import { communityDifficultyFrom, RATING_MIN } from "@/lib/rating";
+import { computeWrongTwiceQuestionIds, type WrongTwiceAttempt } from "@/lib/scoring/wrongTwice";
 import { resolveSignedImageUrl } from "@/lib/ugc/imageUrl";
 import type { Exam } from "@/types/exam";
 import type { Choice, PublicQuestion } from "@/types/question";
-import type { ScoreResult } from "@/types/result";
+import type { PerQuestionResult, ScoreResult } from "@/types/result";
 
 // --- Mappers (snake_case DB → camelCase type) ----------------------------
 
@@ -27,14 +34,23 @@ type ExamRow = {
   /** Rating System (ADR-0008): từ view exams_with_difficulty, không phải bảng exams. */
   rating_count: number;
   avg_overall: number | null;
+  /** Xếp hạng cá nhân hoá (ADR-0015): tín hiệu mới-cũ. KHÔNG đi vào `Exam` —
+   *  `toExam` chỉ map các field có tên, nên hợp đồng `Exam` vẫn y nguyên. */
+  created_at: string;
 };
 
 // Cột đề dùng chung cho mọi query exams (S#27: school/school_year/semester;
 // UGC v2.0: author_display_name cho byline; v2.1: parts cho heading phần;
 // Rating System: rating_count/avg_overall — chỉ tồn tại khi đọc qua view
-// exams_with_difficulty, KHÔNG phải cột trên bảng exams (ADR-0008 Decision 1/2).
+// exams_with_difficulty, KHÔNG phải cột trên bảng exams (ADR-0008 Decision 1/2);
+// ADR-0015: created_at cho xếp hạng — view đã phơi sẵn qua `e.*`, không phải
+// nới hình dạng view (schema.sql:1009-1015 đóng băng hình dạng đó).
+//
+// CẢNH BÁO: chuỗi này có một BẢN SAO CHÉP TAY ở SOURCE/scripts/perf-layers.ts
+// (:122-123) và hai bản trôi lệch trong im lặng — sửa ở đây thì sửa luôn ở đó,
+// đúng như header của chính file benchmark đó đã ghi.
 const EXAM_COLUMNS =
-  "id, title, question_ids, duration_minutes, subject, grade, school, school_year, semester, author_display_name, parts, rating_count, avg_overall";
+  "id, title, question_ids, duration_minutes, subject, grade, school, school_year, semester, author_display_name, parts, rating_count, avg_overall, created_at";
 
 function toExam(row: ExamRow): Exam {
   return {
@@ -94,8 +110,15 @@ export interface ExamFilters {
   dir?: SortDirection;
 }
 
-/** Đề cho Exam Browser, lọc tuỳ chọn theo môn/lớp/trường/niên khóa/học kỳ/độ khó (S#27, Rating System). */
-export async function listExams(filters?: ExamFilters): Promise<Exam[]> {
+/**
+ * Lấy các DÒNG đề thô cho Exam Browser (nội bộ — không export).
+ *
+ * Tách ra khỏi `listExams` để `listExamsRanked` dùng lại đúng cùng một truy vấn
+ * mà không phải chép lại chuỗi lọc, và để `listExams` giữ nguyên hành vi quan
+ * sát được (ADR-0015 Decision 1). Trả dòng thô chứ không phải `Exam`: xếp hạng
+ * cần `created_at`, thứ mà `toExam` cố ý không map sang hợp đồng presentation.
+ */
+async function fetchExamRows(filters?: ExamFilters): Promise<ExamRow[]> {
   const supabase = await createClient();
   // R-7 guard (UGC v2.0): chỉ đề published vào catalog — dù RLS cho tác giả đọc
   // đề chưa published của mình, filter tường minh này chặn nó lọt vào browser.
@@ -135,9 +158,25 @@ export async function listExams(filters?: ExamFilters): Promise<Exam[]> {
   } else {
     query = query.order("id");
   }
-  const { data, error } = await query;
-  if (error) throw error;
-  return (data as unknown as ExamRow[]).map(toExam);
+  // Biên tường minh (P3): đây là lệnh đọc DUY NHẤT chạy trên nội dung TOÀN CỤC
+  // — nó lớn theo số đề published của cả site, không theo hoạt động của một
+  // người. Nên nó là lệnh đọc sẽ chạm trần PostgREST TRƯỚC TIÊN, và hậu quả của
+  // việc chạm trần ở đây là đề biến mất khỏi catalog mà không ai được báo.
+  return (await readBounded("listExams", query)) as ExamRow[];
+}
+
+/**
+ * Đề cho Exam Browser, lọc tuỳ chọn theo môn/lớp/trường/niên khóa/học kỳ/độ khó
+ * (S#27, Rating System).
+ *
+ * Thứ tự trả về của hàm này là thứ tự DB-side: theo `?sort` nếu có, còn không
+ * thì `.order("id")`. Đó KHÔNG (còn) là thứ tự mặc định mà /exams hiển thị —
+ * thứ tự đó do `listExamsRanked` quyết (ADR-0015 Decision 1b). Giữ nguyên ở đây
+ * có chủ ý: hàm này là khối xây dựng nội bộ, và một thứ tự nền ổn định làm đầu
+ * vào của bộ xếp hạng tất định hơn thứ tự tuỳ Postgres.
+ */
+export async function listExams(filters?: ExamFilters): Promise<Exam[]> {
+  return (await fetchExamRows(filters)).map(toExam);
 }
 
 /** Giá trị khả dụng để dựng bộ lọc (distinct, đã sort) — S#27 thêm school/year/semester. */
@@ -149,11 +188,14 @@ export async function listExamFacets(): Promise<{
   semesters: string[];
 }> {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("exams")
-    .select("subject, grade, school, school_year, semester");
-  if (error) throw error;
-  const rows = data as unknown as {
+  // Cùng nhóm rủi ro với `fetchExamRows`: lớn theo số đề của CẢ SITE. Chạm trần
+  // ở đây hỏng theo kiểu khó truy hơn — không phải đề biến mất, mà là một giá
+  // trị biến mất khỏi BỘ LỌC, nên người dùng không lọc được tới nhóm đề đó nữa
+  // dù bản thân các đề vẫn nằm trong catalog.
+  const rows = (await readBounded(
+    "listExamFacets",
+    supabase.from("exams").select("subject, grade, school, school_year, semester")
+  )) as {
     subject: string;
     grade: number;
     school: string | null;
@@ -196,12 +238,141 @@ export async function getExam(id: string): Promise<Exam | null> {
  */
 export async function listMySubmittedExamIds(): Promise<Set<string>> {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("exam_attempts")
-    .select("exam_id")
-    .eq("status", "submitted");
-  if (error) throw error;
-  return new Set((data as unknown as { exam_id: string }[]).map((row) => row.exam_id));
+  const rows = (await readBounded(
+    "listMySubmittedExamIds",
+    supabase.from("exam_attempts").select("exam_id").eq("status", "submitted")
+  )) as { exam_id: string }[];
+  return new Set(rows.map((row) => row.exam_id));
+}
+
+// --- Xếp hạng cá nhân hoá cho /exams (ADR-0015) -----------------------------
+
+/** Dòng lượt-làm-bài + lớp của đề, lấy kèm trong CÙNG một round-trip. */
+type AttemptRow = {
+  id: string;
+  exam_id: string;
+  submitted_at: string | null;
+  // ĐÃ ĐO 2026-08-16 (câu hỏi analytics-layer3 để ngỏ, nay đóng lại): PostgREST
+  // trả embed to-one này dưới dạng OBJECT — `{"exams":{"grade":10}}` — kiểm
+  // bằng chính @supabase/supabase-js trên dev (hynwleaxtbtjzkvpjsug, 40 dòng
+  // qua đường anon key + JWT thật, RLS bật). Trên prod (pebjdlbgbmizgfpuptjl)
+  // xác nhận gián tiếp mà chắc chắn: `exam_attempts_exam_id_fkey` là khoá ngoại
+  // MỘT cột `exam_id -> exams`, và chính chiều many-to-one đó là thứ PostgREST
+  // dùng để quyết to-one. Vẫn khai CẢ HAI hình dạng: chi phí bằng 0, còn thứ
+  // được bảo vệ là một giả định về thư viện bên thứ ba có thể đổi khi nâng cấp.
+  exams: { grade: number } | { grade: number }[] | null;
+};
+
+function gradeOfAttempt(row: AttemptRow): number | null {
+  const embedded = Array.isArray(row.exams) ? row.exams[0] : row.exams;
+  return typeof embedded?.grade === "number" ? embedded.grade : null;
+}
+
+export interface RankedExamList {
+  exams: Exam[];
+  /**
+   * Cùng tập id mà `listMySubmittedExamIds()` trả, nhưng suy ra từ CHÍNH lượt
+   * đọc mà bộ xếp hạng dùng — nhờ vậy băng "đã làm" và huy hiệu "đã làm" trên
+   * thẻ đề không thể bất đồng với nhau.
+   */
+  submittedExamIds: Set<string>;
+}
+
+/**
+ * Danh sách đề cho /exams, ĐÃ xếp hạng cho người dùng hiện tại, kèm tập id đã nộp.
+ *
+ * Đây là thứ trang gọi thay cho `listExams` + `listMySubmittedExamIds`
+ * (ADR-0015 Decision 1b). Ba lượt đọc chạy SONG SONG trong cùng một
+ * `Promise.all`, nên thời gian thêm vào bị chặn bởi lượt chậm nhất chứ không
+ * phải tổng ba lượt — ngân sách là +1 lượt đọc ròng, 0 lượt ghi (PRD NFR).
+ *
+ * Vì sao gộp ở tầng trang chứ không nhét vào trong `listExams`: nhét vào trong
+ * thì `exam_attempts` bị đọc HAI lần mỗi lần render (một cho băng, một ở trang
+ * cho nút đánh giá), tức thêm một round-trip liên vùng ~50-60ms cho MỖI lần
+ * bấm bộ lọc — mà mỗi lần bấm là một lần render lại toàn phần.
+ *
+ * `?sort=` tường minh thì KHÔNG xếp hạng gì cả: học sinh đã nói ra thứ tự họ
+ * muốn (PRD D3/AC-016). Bộ lọc thì ngược lại — vẫn xếp hạng, trên tập đã hẹp
+ * lại (AC-015), và `?dir` mà không kèm `?sort` cũng vẫn xếp hạng (AC-037: một
+ * chiều mà không có trục để áp vào thì không phải là một phát biểu về thứ tự).
+ *
+ * Không đọc danh tính ở đâu cả: mọi lượt đọc đều được RLS giới hạn về đúng
+ * người gọi, và quy ước của repo là KHÔNG thêm predicate `user_id` bằng tay
+ * (xem (layer3)/queries.ts:90-99).
+ */
+export async function listExamsRanked(filters?: ExamFilters): Promise<RankedExamList> {
+  const supabase = await createClient();
+
+  // Hai lệnh đọc dưới đây lớn theo hoạt động của MỘT người (RLS khoá về
+  // auth.uid()), nên chậm chạm trần hơn hẳn catalog. Vẫn đặt biên: chạm trần ở
+  // đây làm tín hiệu xếp hạng bị tính trên dữ liệu thiếu, và thứ tự sai thì
+  // không có cách nào nhìn ra bằng mắt — nó chỉ là một thứ tự khác.
+  const [rows, attemptRows, resultRows] = await Promise.all([
+    fetchExamRows(filters),
+    readBounded(
+      "listExamsRanked.attempts",
+      supabase
+        .from("exam_attempts")
+        .select("id, exam_id, submitted_at, exams!inner(grade)")
+        .eq("status", "submitted")
+    ) as Promise<AttemptRow[]>,
+    readBounded(
+      "listExamsRanked.results",
+      supabase.from("exam_results").select("attempt_id, total_score")
+    ) as Promise<{ attempt_id: string; total_score: number | string }[]>,
+  ]);
+
+  const submittedExamIds = new Set(attemptRows.map((row) => row.exam_id));
+
+  // `total_score` là numeric(4,2) — PostgREST có thể trả về chuỗi. Ép số một
+  // lần ở biên thay vì để `rankExamIds` phải biết chuyện đó.
+  const scoreByAttempt = new Map<string, number>();
+  for (const row of resultRows) {
+    const score = Number(row.total_score);
+    if (Number.isFinite(score)) scoreByAttempt.set(row.attempt_id, score);
+  }
+
+  // Lượt thiếu lớp (embed lệch hình dạng) bị BỎ khỏi tín hiệu lớp chứ không
+  // được gán một lớp đoán bừa — nhưng vẫn nằm trong `submittedExamIds` ở trên,
+  // nên băng "đã làm" không bao giờ mất đề.
+  const attempts = attemptRows.flatMap((row) => {
+    const grade = gradeOfAttempt(row);
+    if (grade === null) return [];
+    return [
+      {
+        examId: row.exam_id,
+        grade,
+        submittedAt: row.submitted_at,
+        totalScore: scoreByAttempt.get(row.id) ?? null,
+      },
+    ];
+  });
+
+  // `?sort` tường minh thắng cá nhân hoá — trả thẳng thứ tự DB-side.
+  if (filters?.sort) {
+    return { exams: rows.map(toExam), submittedExamIds };
+  }
+
+  const orderedIds = rankExamIds({
+    candidates: rows.map((row) => ({
+      id: row.id,
+      grade: row.grade,
+      createdAt: row.created_at,
+    })),
+    attempts,
+    weights: {
+      gradeMatch: EXAM_RANK_GRADE_MATCH_WEIGHT,
+      recency: EXAM_RANK_RECENCY_WEIGHT,
+    },
+  });
+
+  const rowById = new Map(rows.map((row) => [row.id, row]));
+  const exams = orderedIds.flatMap((id) => {
+    const row = rowById.get(id);
+    return row ? [toExam(row)] : [];
+  });
+
+  return { exams, submittedExamIds };
 }
 
 /**
@@ -308,6 +479,48 @@ export type ExamResult = {
   overtimeSeconds: number;
 };
 
+/** Lịch sử làm bài của CHÍNH user đang đăng nhập, rút gọn còn đúng phần
+ * computeWrongTwiceQuestionIds() cần (Engine 1, backend DD § Data Contracts).
+ *
+ * KHÔNG lọc user_id: policy `results_select_own` (schema.sql §RLS) đã giới hạn
+ * `user_id = auth.uid()`, và cột user_id không nằm trong projection này. Cũng
+ * không lọc trạng thái: exam_results chỉ có dòng cho attempt ĐÃ NỘP, vì
+ * record_exam_result() là đường ghi duy nhất và nó đòi status='submitted'.
+ *
+ * Dòng đang xem cũng nằm trong tập này — đúng theo contract ("across all
+ * attempts including the current one being viewed").
+ *
+ * SUY GIẢM MỀM khi query lỗi, KHÁC với vòng 1 của getResult(): đây là dữ liệu
+ * LÀM GIÀU cho một cờ hiển thị, không phải dữ liệu cốt lõi của trang. Trả []
+ * → mọi hasBeenWrongTwice thành undefined → affordance không hiện, đúng trạng
+ * thái fail-closed UI Spec §D1 đã định nghĩa ("Absent/false = affordance does
+ * not render", AC-024). Ném lỗi ở đây sẽ đánh sập cả màn Chi tiết vốn đã chạy
+ * tốt từ trước tính năng này — một lỗi nặng hơn hẳn lỗi nó báo. */
+async function fetchWrongTwiceAttempts(
+  supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<WrongTwiceAttempt[]> {
+  // `readBounded` NÉM lỗi hạ tầng thay vì trả `error`, nên đường suy giảm mềm
+  // của hàm này chuyển sang try/catch. Rộng hơn bản cũ chứ không hẹp hơn: nó bắt
+  // cả exception, thứ mà nhánh `if (error)` cũ để lọt lên trên và đánh sập đúng
+  // màn Chi tiết mà cả đoạn docblock trên cam kết không làm sập.
+  let rows: { attempt_id: string; per_question: PerQuestionResult[] | null }[];
+  try {
+    rows = (await readBounded(
+      "getResult.wrongTwiceHistory",
+      supabase.from("exam_results").select("attempt_id, per_question")
+    )) as { attempt_id: string; per_question: PerQuestionResult[] | null }[];
+  } catch (err) {
+    // Chỉ code + message: `details`/`hint` của PostgREST có thể chứa giá trị
+    // dòng dữ liệu, không được đưa vào log.
+    const e = err as { code?: string; message?: string };
+    console.warn("[getResult] đọc lịch sử wrong-twice thất bại:", e.code, e.message);
+    return [];
+  }
+  // per_question là jsonb → về lý thuyết có thể null với dòng hỏng; hàm thuần
+  // nhận kiểu mảng chặt nên chuẩn hoá ngay tại ranh giới dữ liệu này.
+  return rows.map((r) => ({ attemptId: r.attempt_id, perQuestion: r.per_question ?? [] }));
+}
+
 /**
  * Kết quả của một attempt đã nộp. null nếu attempt không tồn tại / chưa nộp /
  * không thuộc về user (RLS lọc) → caller redirect về trang đề (Q2=A).
@@ -329,14 +542,22 @@ export async function getResult(attemptId: string): Promise<ExamResult | null> {
   // của getExam() (RLS lọc, VÀ thêm filter published tường minh chồng lên).
   // Chỉ lấy id/title của đề vì đó là tất cả những gì hàm này dùng — cố ý KHÔNG
   // kéo cả EXAM_COLUMNS để không ngụ ý rằng có sẵn nguyên contract `Exam`.
-  const { data: joined, error: joinedErr } = await supabase
-    .from("exam_results")
-    .select(
-      "total_score, correct, total, per_question, topic_breakdown, overtime_seconds, exam_attempts!inner(started_at, submitted_at, exams_with_difficulty!inner(id, title))"
-    )
-    .eq("attempt_id", attemptId)
-    .eq("exam_attempts.exams_with_difficulty.status", "published")
-    .maybeSingle();
+  //
+  // Song song (KHÔNG nối đuôi) với vòng 1: lịch sử làm bài cho cờ
+  // hasBeenWrongTwice. Hai query không phụ thuộc nhau — cái sau chỉ cần user
+  // đang đăng nhập, không cần exam.id — nên gộp Promise.all giữ nguyên số RTT
+  // quan sát được của getResult() (Engine 1 backend DD § Integration Points).
+  const [{ data: joined, error: joinedErr }, wrongTwiceAttempts] = await Promise.all([
+    supabase
+      .from("exam_results")
+      .select(
+        "total_score, correct, total, per_question, topic_breakdown, overtime_seconds, exam_attempts!inner(started_at, submitted_at, exams_with_difficulty!inner(id, title))"
+      )
+      .eq("attempt_id", attemptId)
+      .eq("exam_attempts.exams_with_difficulty.status", "published")
+      .maybeSingle(),
+    fetchWrongTwiceAttempts(supabase),
+  ]);
   if (joinedErr) throw joinedErr;
   if (!joined) return null;
 
@@ -351,11 +572,22 @@ export async function getResult(attemptId: string): Promise<ExamResult | null> {
   const attempt = row.exam_attempts;
   const exam = attempt.exams_with_difficulty;
 
+  // Cờ chỉ có nghĩa với câu ĐANG sai VÀ có chấm — mọi dòng khác để undefined
+  // (backend DD § Data Contracts, Consumer-side gating: điều kiện nằm ở phía
+  // caller chứ không nằm trong computeWrongTwiceQuestionIds()). Mọi trường cũ
+  // của mỗi dòng giữ nguyên giá trị, chỉ thêm đúng một trường tuỳ chọn.
+  const wrongTwiceQuestionIds = computeWrongTwiceQuestionIds(wrongTwiceAttempts);
+  const perQuestion: PerQuestionResult[] = row.per_question.map((r) => ({
+    ...r,
+    hasBeenWrongTwice:
+      r.scored !== false && !r.isCorrect ? wrongTwiceQuestionIds.has(r.questionId) : undefined,
+  }));
+
   const result: ScoreResult = {
     totalScore: row.total_score,
     correct: row.correct,
     total: row.total,
-    perQuestion: row.per_question,
+    perQuestion,
     topicBreakdown: row.topic_breakdown,
   };
 

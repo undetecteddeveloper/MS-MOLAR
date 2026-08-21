@@ -5,10 +5,11 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { recordExamResult } from "@/lib/supabase/service-role";
+import { recordExamResult, recordSkillMastery } from "@/lib/supabase/service-role";
 import { guard } from "@/lib/security/rateLimit";
 import { isValidPartScore } from "@/lib/rating";
 import { computeScore } from "@/lib/scoring/computeScore";
+import { LIMITS } from "@/lib/ugc/limits";
 import type { ChoiceId, Question } from "@/types/question";
 
 /**
@@ -71,7 +72,7 @@ export async function submitExam(
   // Rate limit (Security review Low). Khoá lấy từ chính dòng attempt vừa đọc —
   // RLS đã lọc về attempt của người gọi nên user_id này đáng tin, và không tốn
   // thêm round-trip nào (khác với gọi auth.getUser()).
-  const rl = guard("submitExam", attempt.user_id as string);
+  const rl = await guard("submitExam", attempt.user_id as string);
   if (!rl.ok) {
     throw new Error(
       `Too many submissions. Try again in ${rl.retryAfterSeconds} seconds.`
@@ -135,11 +136,14 @@ export async function submitExam(
     .map((id) => byId.get(id))
     .filter((q): q is Question => q !== undefined);
 
-  // 4. Batch-insert answers (null nếu bỏ trống; cắt 500 ký tự khớp CHECK v2.1).
+  // 4. Batch-insert answers (null nếu bỏ trống; cắt khớp CHECK v2.1).
+  // LIMITS.MAX_ATTEMPT_ANSWER thay số 500 viết cứng: ô nhập tự luận ở
+  // QuestionRenderer đọc CÙNG hằng số đó để đếm ký tự còn lại — hai nơi lệch
+  // nhau thì người làm bài gõ tới trần mà vẫn bị cắt âm thầm ở đây.
   const answerRows = questions.map((q) => ({
     attempt_id: attemptId,
     question_id: q.id,
-    answer: answers[q.id]?.slice(0, 500) ?? null,
+    answer: answers[q.id]?.slice(0, LIMITS.MAX_ATTEMPT_ANSWER) ?? null,
   }));
   const { error: ansErr } = await supabase
     .from("attempt_answers")
@@ -159,6 +163,30 @@ export async function submitExam(
   if (resErr) {
     console.error("[submitExam] recordExamResult", resErr.code, resErr.message);
     throw new Error("Could not save your result. Try again.");
+  }
+
+  // 7. Cộng dồn mastery theo kỹ năng (Engine 1, ADR-0011) — BƯỚC RIÊNG, chạy
+  // SAU khi điểm đã ghi xong, và ĐƯỢC PHÉP HỎNG. Không gộp vào
+  // record_exam_result(): cùng một câu lệnh nghĩa là cùng một transaction, nên
+  // một dữ liệu bất thường bên mastery sẽ rollback luôn dòng điểm — hỏng đường
+  // load-bearing vì một lý do học sinh không liên quan gì.
+  //
+  // try/catch KHÔNG thừa dù recordSkillMastery() trả {error} thay vì ném: nó
+  // vẫn ném được khi thiếu env service-role (serviceRoleClient()). Cả hai lối
+  // đều chỉ log — nuốt ở đây là cơ chế DUY NHẤT giữ lời hứa "mastery hỏng không
+  // làm hỏng nộp bài", nên đừng đổi thành throw.
+  //
+  // Hệ quả đã chấp nhận (ADR-0011): request chết giữa bước 6 và bước 7 để lại
+  // bài đã chấm mà chưa có mastery, và nhánh idempotent ở trên nghĩa là nộp lại
+  // KHÔNG tự chữa. Đó là khoảng hở hẹp đã ghi nhận, không phải chỗ để thêm cơ
+  // chế bù — điểm thì không bao giờ bị rollback vì lý do này.
+  try {
+    const { error: masteryErr } = await recordSkillMastery(attemptId, score);
+    if (masteryErr) {
+      console.error("[submitExam] recordSkillMastery", masteryErr.code, masteryErr.message);
+    }
+  } catch (err) {
+    console.error("[submitExam] recordSkillMastery", err);
   }
 
   redirect(`/exams/${examId}/attempt/${attemptId}/result`);
@@ -207,7 +235,7 @@ export async function rateExam(
 
   // Rate limit (Security review Low) — rateExam là UPSERT nên unique
   // (exam_id,user_id) KHÔNG chặn được việc gọi lại liên tục để sửa điểm.
-  const rl = guard("rateExam", eligible.user_id as string);
+  const rl = await guard("rateExam", eligible.user_id as string);
   if (!rl.ok) return { error: "rate_limited" };
 
   // user_id KHÔNG truyền vào — cột default auth.uid() (không nhận từ input).

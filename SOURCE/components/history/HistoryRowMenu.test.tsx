@@ -12,9 +12,20 @@
 //
 // Mock boundary + conventions identical to ActionButton.test.tsx: mocks
 // generateAttemptPdfFile/downloadPdfFile/canShareFile + navigator.share, no
-// jest-dom matchers, no auto-cleanup (render() results scoped via `within`).
+// jest-dom matchers. Trigger-button assertions still scope via `within
+// (container)` (unaffected, never portaled) — but the `role="menu"` panel
+// itself is rendered via `createPortal(..., document.body)` since 2026-08-09
+// (HistoryRowMenu.tsx: bottom-sheet/BottomNav clipping fix, see that file's
+// header comment), so it is no longer a descendant of `container` and must
+// be queried via `screen` (document.body-scoped) instead. This file DOES now
+// call `cleanup()` per test (unlike the rest of the suite) specifically
+// because `screen` queries the whole document — without it, an unclosed
+// menu left mounted by one test would leak into the next test's `screen`
+// query and break `getByRole`'s single-match assumption. `within(container)`
+// elsewhere in the codebase never needed this because it was never
+// document-scoped to begin with.
 
-import { fireEvent, render, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HistoryRowMenu } from "./HistoryRowMenu";
 import type { AttemptPdfData } from "@/lib/pdf/generateAttemptPdf";
@@ -68,6 +79,7 @@ beforeEach(() => {
 afterEach(() => {
   // @ts-expect-error — test-only cleanup of the stubbed Web Share API surface
   delete window.navigator.share;
+  cleanup(); // unmounts (incl. the portaled menu) — see file header comment
 });
 
 describe("HistoryRowMenu", () => {
@@ -91,7 +103,7 @@ describe("HistoryRowMenu", () => {
     const { container } = renderMenu();
     fireEvent.click(within(container).getByRole("button", { name: /More actions/ }));
 
-    const menu = within(container).getByRole("menu");
+    const menu = screen.getByRole("menu");
     expect(within(menu).getByRole("menuitem", { name: /Save/ })).toBeTruthy();
     expect(within(menu).getByRole("menuitem", { name: /Share/ })).toBeTruthy();
     const link = within(menu).getByRole("menuitem", { name: "View details" });
@@ -104,10 +116,10 @@ describe("HistoryRowMenu", () => {
 
     const { container } = renderMenu();
     fireEvent.click(within(container).getByRole("button", { name: /More actions/ }));
-    fireEvent.click(within(container).getByRole("menuitem", { name: /Save/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Save/ }));
 
     await waitFor(() => expect(mockDownload).toHaveBeenCalledWith(file));
-    await waitFor(() => expect(within(container).queryByRole("menu")).toBeNull());
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
   });
 
   it("(d) Share success (native) calls navigator.share and auto-closes the menu", async () => {
@@ -118,10 +130,10 @@ describe("HistoryRowMenu", () => {
 
     const { container } = renderMenu();
     fireEvent.click(within(container).getByRole("button", { name: /More actions/ }));
-    fireEvent.click(within(container).getByRole("menuitem", { name: /Share/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Share/ }));
 
     await waitFor(() => expect(navigator.share).toHaveBeenCalledWith({ files: [file] }));
-    await waitFor(() => expect(within(container).queryByRole("menu")).toBeNull());
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
   });
 
   it("(e) Share fallback (canShareFile false) downloads instead, shows a status line, and keeps the menu open", async () => {
@@ -131,12 +143,12 @@ describe("HistoryRowMenu", () => {
 
     const { container } = renderMenu();
     fireEvent.click(within(container).getByRole("button", { name: /More actions/ }));
-    fireEvent.click(within(container).getByRole("menuitem", { name: /Share/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Share/ }));
 
     await waitFor(() => expect(mockDownload).toHaveBeenCalledWith(file));
-    const status = await within(container).findByRole("status");
+    const status = await screen.findByRole("status");
     expect(status.textContent).toBe("Downloaded — sharing isn't supported in this browser.");
-    expect(within(container).getByRole("menu")).not.toBeNull(); // stays open
+    expect(screen.getByRole("menu")).not.toBeNull(); // stays open
   });
 
   it("(f) a generation failure shows an inline alert inside the menu and keeps it open for retry", async () => {
@@ -144,29 +156,29 @@ describe("HistoryRowMenu", () => {
 
     const { container } = renderMenu();
     fireEvent.click(within(container).getByRole("button", { name: /More actions/ }));
-    fireEvent.click(within(container).getByRole("menuitem", { name: /Save/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Save/ }));
 
-    const alert = await within(container).findByRole("alert");
+    const alert = await screen.findByRole("alert");
     expect(alert.textContent).toBe("Couldn't generate the PDF. Try again.");
-    expect(within(container).getByRole("menu")).not.toBeNull(); // stays open
+    expect(screen.getByRole("menu")).not.toBeNull(); // stays open
 
     // Retry succeeds and then auto-closes.
     const file = mockFile();
     mockGenerate.mockResolvedValueOnce(file);
-    fireEvent.click(within(container).getByRole("menuitem", { name: /Save/ }));
-    await waitFor(() => expect(within(container).queryByRole("menu")).toBeNull());
+    fireEvent.click(screen.getByRole("menuitem", { name: /Save/ }));
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
   });
 
   it("(g) clicking the scrim (outside the menu) closes it without triggering an action", () => {
     const { container } = renderMenu();
     fireEvent.click(within(container).getByRole("button", { name: /More actions/ }));
-    expect(within(container).getByRole("menu")).not.toBeNull();
+    expect(screen.getByRole("menu")).not.toBeNull();
 
     const scrim = container.querySelector('button[aria-hidden="true"]');
     expect(scrim).not.toBeNull();
     fireEvent.click(scrim!);
 
-    expect(within(container).queryByRole("menu")).toBeNull();
+    expect(screen.queryByRole("menu")).toBeNull();
     expect(mockGenerate).not.toHaveBeenCalled();
   });
 
@@ -181,13 +193,13 @@ describe("HistoryRowMenu", () => {
 
     const { container } = renderMenu();
     fireEvent.click(within(container).getByRole("button", { name: /More actions/ }));
-    const saveItem = within(container).getByRole("menuitem", { name: /Save/ });
+    const saveItem = screen.getByRole("menuitem", { name: /Save/ });
     fireEvent.click(saveItem);
-    fireEvent.click(within(container).getByRole("menuitem", { name: /Saving/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Saving/ }));
 
     expect(mockGenerate).toHaveBeenCalledTimes(1);
     resolveGenerate(mockFile());
-    await waitFor(() => expect(within(container).queryByRole("menu")).toBeNull());
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
     expect(mockGenerate).toHaveBeenCalledTimes(1);
   });
 });

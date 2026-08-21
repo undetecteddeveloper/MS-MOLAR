@@ -1,6 +1,24 @@
-"use client";
-
 // RichText — render nội dung markdown + LaTeX (GĐ 3 M3.1 Task 5).
+//
+// ⚠ CỐ Ý KHÔNG CÓ `"use client"` (TD-021, 2026-08-17) ⚠
+//
+// Component này thuần render: không hook, không state, không handler, không API
+// trình duyệt. Bỏ directive đi biến nó thành component DÙNG CHUNG — server
+// component render nó ở SERVER (chỉ ra HTML), client component import nó thì nó
+// đi vào bundle như trước. Đó không phải tinh chỉnh nhỏ: cây phụ thuộc của file
+// này (react-markdown + remark-gfm + remark-math + rehype-katex +
+// rehype-sanitize + katex) là 122.5 KB gzip — CHUNK CLIENT LỚN NHẤT của dự án,
+// đo bằng bản build thật, lớn hơn toàn bộ phần JS còn lại của phần lớn route.
+//
+// Vì thế: THÊM `"use client"` VÀO ĐÂY LÀ ĐẨY 122.5 KB GZIP SANG TRÌNH DUYỆT cho
+// MỌI route render nội dung câu hỏi, kể cả route thuần đọc. Cần state/hook thì
+// bọc một component client MỎNG ở ngoài rồi truyền chuỗi vào, đừng đổi file này.
+//
+// Đã ĐO cả 4 tổ hợp trên bản build thật, vì một mình directive này KHÔNG đủ:
+// route /result/detail chỉ tụt 181.8K → 60.7K gzip khi file này bỏ "use client"
+// VÀ ExplainStepAffordance nạp động; bỏ directive mà vẫn còn một import tĩnh từ
+// component client thì route đứng nguyên 181.8K.
+//
 // Dùng cho nội dung câu hỏi và lựa chọn đáp án (Layer 2), tái dùng được cho layer khác.
 //
 // HARDENED cho nội dung KHÔNG TIN CẬY (UGC v2.0, ADR-0002 / Task 3.1 — Gate B):
@@ -140,6 +158,53 @@ const SANITIZE_SCHEMA: typeof defaultSchema = {
   },
 };
 
+// remark-math CHỈ hiểu $…$ / $$…$$. Nguồn đề (và Gemini, dù prompt yêu cầu $…$)
+// thường xuyên trả delimiter LaTeX chuẩn \(…\) và \[…\]. Markdown coi "\(" là
+// escape của "(" nên công thức bị hạ xuống văn bản thường, mất hẳn — không lỗi,
+// không cảnh báo. Quy đổi TRƯỚC khi vào markdown là chỗ duy nhất sửa được cả
+// nội dung ĐÃ lưu trong DB lẫn nội dung upload sau này.
+// Chỉ đổi khi có cặp đóng/mở khớp nhau; sanitize vẫn chạy cuối nên không nới
+// thêm quyền gì cho nội dung không tin cậy.
+export function normalizeMathDelimiters(text: string): string {
+  return text
+    .replace(/\\\[([\s\S]+?)\\\]/g, (_m, body: string) => `$$${body}$$`)
+    .replace(/\\\(([\s\S]+?)\\\)/g, (_m, body: string) => `$${body}$`);
+}
+
+// Ở ngữ cảnh INLINE (nhãn lựa chọn A–D, ý a–d của câu Đúng/Sai) không tồn tại
+// khái niệm "khối": chuỗi là một nhãn, không phải một tài liệu. Nhưng parser
+// markdown vẫn chạy đủ ngữ pháp khối, nên một nhãn hợp lệ mà TÌNH CỜ trùng
+// marker khối sẽ bị nuốt sạch chữ.
+//
+// Bug prod 2026-08-17: đề Sinh học 12 có câu cả 4 lựa chọn là "1." "2." "3."
+// "4."; đề Vật lí 11 câu 21 có B = "1.". Markdown đọc "1." là marker danh sách
+// đánh số → <ol><li></li></ol> RỖNG. Trên màn làm bài lựa chọn hiện ra trống
+// trơn, trong khi DB lưu đúng và validate EMPTY_CHOICE vẫn pass (chuỗi có ký
+// tự) — không lỗi, không cảnh báo, chỉ mất chữ.
+//
+// Escape bằng backslash (cú pháp escape chuẩn của markdown) thay vì đổi parser:
+// giữ nguyên mọi định dạng INLINE hợp lệ (đậm/nghiêng/`code`/math) mà chỉ vô
+// hiệu hoá đúng phần ngữ pháp khối. Chế độ block (thân câu hỏi) KHÔNG áp dụng —
+// ở đó danh sách đánh số là nội dung thật của đề.
+export function escapeBlockMarkers(text: string): string {
+  return text
+    .split("\n")
+    .map((line) =>
+      line
+        // Danh sách đánh số: "1." / "10)" — cả khi đứng một mình (nhãn lựa chọn).
+        .replace(/^(\s*)(\d{1,9})([.)])(?=\s|$)/, "$1$2\\$3")
+        // Gạch đầu dòng: "- 5", "* x", "+ 2".
+        .replace(/^(\s*)([-*+])(?=\s|$)/, "$1\\$2")
+        // Đường kẻ ngang: "---", "***", "___".
+        .replace(/^(\s*)([-*_])([-*_]{2,})\s*$/, "$1\\$2$3")
+        // Heading ATX: "# 3".
+        .replace(/^(\s*)(#{1,6})(?=\s|$)/, "$1\\$2")
+        // Blockquote: "> 7".
+        .replace(/^(\s*)>/, "$1\\>")
+    )
+    .join("\n");
+}
+
 const INLINE_COMPONENTS: Components = {
   // Gỡ <p> để text chảy inline trong nhãn lựa chọn (vẫn giữ math/format con).
   p: ({ children }) => <>{children}</>,
@@ -164,7 +229,7 @@ export function RichText({ text, className, inline = false }: RichTextProps) {
       ]}
       components={inline ? INLINE_COMPONENTS : undefined}
     >
-      {text}
+      {inline ? escapeBlockMarkers(normalizeMathDelimiters(text)) : normalizeMathDelimiters(text)}
     </ReactMarkdown>
   );
 

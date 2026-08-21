@@ -1,5 +1,6 @@
 "use client";
 import { useT } from "@/lib/i18n/client";
+import type { MessageKey } from "@/lib/i18n/translate";
 
 // RateButton — điều khiển "Rate" trên mỗi ExamCard (Rating System, R4). LÀ
 // sibling của Link thẻ đề (stretched-link restructure, code:F1) — KHÔNG lồng
@@ -27,9 +28,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 
 export type RateEligibility = "eligible" | "not-attempted" | "logged-out";
 
-const DISABLED_REASON: Record<Exclude<RateEligibility, "eligible">, string> = {
-  "not-attempted": "Finish this exam first",
-  "logged-out": "Log in to rate",
+const DISABLED_REASON_KEY: Record<Exclude<RateEligibility, "eligible">, MessageKey> = {
+  "not-attempted": "rating.finishExamFirst",
+  "logged-out": "rating.logInToRate",
 };
 
 interface RateButtonProps {
@@ -37,8 +38,13 @@ interface RateButtonProps {
   eligibility: RateEligibility;
 }
 
+// `inline-flex min-h-11 items-center`: chữ 12px chỉ cao 16px, nên vùng chạm
+// trước 2026-08-07 đo được 63×16px — dưới hẳn ngưỡng 44–48px mà tài liệu
+// Mobile-Layout-Research-MS §4.3 đặt ra cho phần tử tương tác trên cảm ứng.
+// Nới bằng CHIỀU CAO TỐI THIỂU chứ không phải padding: padding sẽ đẩy nút ra
+// khỏi mép phải thẻ mà nó đang canh theo (`justify-end` ở ExamCard).
 const RATE_BUTTON_CLASS =
-  "relative z-10 text-xs font-medium uppercase tracking-[0.14em] transition-opacity";
+  "relative z-10 inline-flex min-h-11 items-center text-xs font-medium uppercase tracking-[0.14em] transition-opacity";
 
 export function RateButton({ examId, eligibility }: RateButtonProps) {
   const t = useT();
@@ -54,7 +60,7 @@ export function RateButton({ examId, eligibility }: RateButtonProps) {
   }
 
   const reasonId = `rate-reason-${examId}`;
-  const reason = DISABLED_REASON[eligibility];
+  const reason = t(DISABLED_REASON_KEY[eligibility]);
 
   return (
     <Tooltip>

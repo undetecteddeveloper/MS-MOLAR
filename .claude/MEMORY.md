@@ -10,47 +10,68 @@
   - `smithnguyen247+se2rater1@gmail.com` … `+se2rater10@gmail.com` — 10 tài khoản dùng để test rating threshold (N=3 raters)
   - ⚠️ KHÔNG đụng `smithnguyen247@gmail.com` và `nguyenphatbentre904@gmail.com` — đây là tài khoản thật của user (không có `+alias`)
 
-## 1b. Định hướng chụp screenshot bằng Playwright (tránh downscale)
-
-Claude Code có giới hạn cứng của API Anthropic: ảnh bị downscale nếu cạnh dài nhất vượt 8000px (1 ảnh) hoặc 2000px (nhiều ảnh cùng lúc trong context) — không có setting nào tắt được. Khi cần chụp lại **toàn bộ layout của một trang** để xem/chỉnh sửa UI, đây là định hướng nên theo (không phải luật cứng, tuỳ ngữ cảnh mà linh hoạt):
-
-- Đừng chụp `fullPage: true` nguyên trang dài — chụp **từng phần nhỏ** (theo section/viewport, hoặc element-scoped screenshot dùng `ref` từ `browser_snapshot`) rồi ghép lại trong đầu khi review.
-- Nếu một trang cần nhiều ảnh (nhiều section), có thể **tạo subfolder riêng cho nhóm screenshot của trang đó** (ví dụ `SCREENSHOT\temporary_screenshot\<ten-trang>\`) để dễ quản lý và dễ dọn dẹp sau khi dùng xong, thay vì đổ chung vào `temporary_screenshot`.
-- Việc chia nhỏ ảnh cũng giúp né giới hạn 2000px khi context đang tích luỹ nhiều ảnh cùng lúc.
-
 ## 2. Workflow tổng thể mỗi phiên
 
 Ba pha, chạy theo thứ tự. Pha 2 tồn tại để pha 1 của phiên SAU tìm lại được việc dang dở.
 
 ### Pha 1 — Checking (đầu phiên)
 
-1. **Tool**: xác nhận thứ sắp dùng còn sống, đừng giả định. Supabase/Playwright/Composio là MCP — gọi thử một lệnh đọc rẻ tiền trước khi dựa vào nó.
-   - `vercel` CLI: đã cài, đã đăng nhập (`undetecteddeveloper`), `SOURCE/.vercel` đã link project `ms-molar`. Kiểm nhanh bằng `vercel whoami`.
-   - `composio` CLI: **KHÔNG cài được trên Windows** — installer chính chủ từ chối, đòi WSL. Dùng Composio MCP thay thế (`COMPOSIO_SEARCH_TOOLS` → `COMPOSIO_MULTI_EXECUTE_TOOL`, toolkit `notion` đã connected). Đừng phí lượt thử cài lại.
-2. **Việc dang dở**: đọc Notion database **MS-MOLAR** (`3b378ba6-ae12-803c-8500-c572b6fc745f`) — lọc row khác trạng thái "Hoàn tất". Kèm `docs/TECH-DEBT.md` và `docs/plans/`.
+1. **Tool**: xác nhận thứ sắp dùng còn sống, đừng giả định. 
+   - `composio` MCP: Dùng Composio MCP (`COMPOSIO_SEARCH_TOOLS` → `COMPOSIO_MULTI_EXECUTE_TOOL`, toolkit `notion`, `supabase`, `vercel`, `google drive` đã connected). Composio CLI không được hỗ trợ trên Window. Bỏ qua thay vì cố cài.
+2. **Việc dang dở**: đọc Notion database **MS-MOLAR** (`3b378ba6-ae12-803c-8500-c572b6fc745f`) — lọc row khác trạng thái "Hoàn tất". Kèm `docs/TECH-DEBT.md` + `docs/plans/` + git commited list.
 3. Chỉ tiếp tục việc cũ khi engineer yêu cầu; mặc định hỏi trước khi tự nối tiếp.
 
 ### Pha 2 — Notion (ghi nhận)
 
-Tạo/cập nhật row trong database MS-MOLAR. Thuộc tính: `Tên nhiệm vụ`, `Trạng thái` (Chưa bắt đầu/Đang thực hiện/Hoàn tất), `Mô tả`, `Loại nhiệm vụ`, `Mức độ ưu tiên`, `Mức độ công sức`. Thân page ghi **số đo và lý do**, không chỉ liệt kê việc — phiên sau đọc lại cần hiểu *tại sao*, không chỉ *cái gì*.
+Tạo/cập nhật row trong database MS-MOLAR. Thuộc tính: `Tên nhiệm vụ`, `Trạng thái` (Chưa bắt đầu/Đang thực hiện/Hoàn tất), `Mô tả`, `Loại nhiệm vụ`, `Mức độ ưu tiên`, `Mức độ công sức`, `Hạn chót` (hỏi nếu chưa biết). Thân page ghi **số đo và lý do**, không chỉ liệt kê việc — phiên sau đọc lại cần hiểu *tại sao*, không chỉ *cái gì*.
 
-`PROCESS.md` (root, >3000 dòng) từ 2026-08-06 là **lịch sử chỉ-đọc**, không append nữa. Cần tra quyết định cũ thì đọc ~200 dòng cuối (`tail -n 200`), đừng đọc hết.
+Mọi nợ kỹ thuật còn mở trong đó đã chuyển vào `TECH-DEBT.md`; các mục còn lại đều đã được phiên sau giải quyết. Quyết định cũ giờ tra ở Notion database MS-MOLAR (row đã đóng) hoặc git log.
 
 ### Pha 3 — Implementation
 
-1. **Code**: theo recipe của plugin `dev-workflows-fullstack` (skills `recipe-plan` / `recipe-implement` / `recipe-fullstack-build` / `recipe-front-*` / `recipe-review`; agent chuyên biệt như `quality-fixer`, `code-reviewer` gọi qua Agent tool khi engineer yêu cầu).
-2. **Cổng verify** — chạy đủ 4, trong `SOURCE/`, TRƯỚC khi commit:
+1. **Code**: nghiên cứu các thông tin liên quan đến mission hoặc task --> khởi động `dev-workflows-fullstack` với `/recipe-fullstack-implement` (hoặc skills `recipe-plan` / `recipe-implement` / `recipe-fullstack-build` / `recipe-front-*` / `recipe-review`; agent chuyên biệt như `quality-fixer`, `code-reviewer`. Chỉ inovke đối với mission - các task lớn).
+2. **UI audit**: Thực hiện workflow kiểm tra UI theo `E:\StemWeb_project\MS-MOLAR\.claude\skills\ui-audit\ui-interaction-audit.skill` - Lưu ý: sử dụng Playwright CLI (thay vì bản MCP server như trong skill)
+3. **Cổng verify** — chạy đủ 4, trong `SOURCE/`, TRƯỚC khi commit:
    `npx tsc --noEmit` · `npx eslint --max-warnings 0` · `npx vitest run` · `npm run build`
    `next build` bắt lỗi ranh giới server/client mà `tsc` không thấy — đừng bỏ.
-3. **Commit + push**: branch trước, không commit thẳng `main` trừ khi engineer bảo thế.
+4. **Commit + push**: branch trước, không commit thẳng `main` trừ khi engineer bảo thế.
    ⚠️ Cây làm việc thường có sẵn thay đổi CHƯA COMMIT của engineer. Trước mọi `git checkout -- <file>` / `git restore`, đối chiếu `git status` đầu phiên xem file đó đã bẩn từ trước chưa — revert nhầm là xoá việc của họ, không hoàn lại được.
-4. **Deploy**: **tự làm bằng `vercel` CLI** (đã cài + đăng nhập + link sẵn), chạy trong `SOURCE/`:
+5. **Deploy**: **tự làm bằng `vercel` qua `composio MCP`** (đã cài + đăng nhập + link sẵn), chạy trong `SOURCE/`:
    - Preview: `vercel` → trả link, gửi engineer duyệt.
    - Production: `vercel --prod`, hoặc promote bản preview đã duyệt.
    - Mặc định đi preview trước với thay đổi diện rộng (theme, i18n, auth); chỉ vào thẳng prod khi engineer bảo.
    - Push `main` cũng kích hoạt build prod tự động — coi chừng deploy hai lần.
    - Có skill `vercel:deploy` và `vercel:status`. Env/Supabase prod: `docs/DEPLOYMENT.md`.
-5. **Đóng vòng**: cập nhật lại row Notion (trạng thái + kết quả verify + link deploy + việc còn lại).
+6. **Đóng vòng**: cập nhật lại row Notion (trạng thái + kết quả verify + link deploy + việc còn lại).
+
+### Pha 3.5 — Kiểm DB prod TRƯỚC khi launch (TD-005, đã nổ 4 lần)
+
+Deploy Vercel **không đụng gì tới database**. "Code đã live trên prod" và "DB
+prod có đủ bảng/cột cho code đó chạy" là hai trạng thái ĐỘC LẬP — CI (`tsc`,
+`vitest`, `next build`) chỉ so khớp fingerprint **cục bộ trong repo**, không
+hỏi database thật. Từng nổ 4 lần (TD-005, gần nhất 2026-08-15: prod thiếu
+nguyên schema Support System + Engine 1 — 6 bảng — vì bước "apply schema.sql
+lên prod trước launch" chỉ tồn tại dưới dạng câu ghi chú trong work plan,
+không phải checklist item có ai tick).
+
+**Bắt buộc TRƯỚC khi coi một feature có bảng/cột mới là "xong" trên production**
+(không phải chỉ khi deploy code — ngay cả khi chỉ nghi ngờ, hoặc trước khi
+đóng row Notion sang "Hoàn tất"):
+
+1. So fingerprint: `select fingerprint from public.schema_version` trên prod
+   (qua Composio `SUPABASE_RUN_READ_ONLY_QUERY`, ref lấy từ
+   `SUPABASE_LIST_ALL_PROJECTS`) đối chiếu với literal ở cuối
+   `SOURCE/supabase/schema.sql` (khối `insert into public.schema_version`).
+   Lệch = prod đang tụt lại, bất kể code đã deploy hay chưa.
+2. Nếu lệch: xác nhận với engineer trước khi apply DDL lên prod (dữ liệu thật,
+   không tự quyết một mình) — kiểm trước `drop table`/`truncate`/`delete`/
+   `update` nào chạm dữ liệu hiện có, apply qua `SUPABASE_APPLY_A_MIGRATION`
+   (file lớn thì tách theo ranh giới câu lệnh, tôn trọng khối `$$...$$`), rồi
+   hậu kiểm bằng truy vấn thật (đếm bảng, thử insert/select qua phiên user
+   thật) — đừng tin mỗi thông báo "success".
+3. Không đợi "trước khi launch" như một lời hứa mơ hồ — kiểm ngay khi
+   `schema.sql` đổi trong cùng phiên đó, cho MỌI project Supabase đang connect
+   (dev lẫn prod), không chỉ project đang test.
 
 ## 3. Theme — "Mực & Sơn mài" (Ink & Lacquer)
 

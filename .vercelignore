@@ -1,0 +1,16 @@
+# Cache build/dev cục bộ — Vercel tự build lại phía họ, đẩy lên là vô nghĩa.
+# Lý do có file này (2026-08-16): deploy chết với "File size limit exceeded
+# (100 MB)" vì SOURCE/.next/dev/cache/turbopack/*.sst có file 248 MB. Không có
+# .vercelignore thì toàn bộ cache đó bị gói theo — upload 278 MB cho một app
+# Next.js nhỏ, và một file đơn lẻ vượt trần 100 MB của Vercel.
+SOURCE/.next
+SOURCE/.next-build
+node_modules
+SOURCE/node_modules
+
+# Ảnh tham chiếu thiết kế + screenshot tạm, không phải tài sản runtime.
+SCREENSHOT
+
+# Tài liệu nội bộ — không cần cho build.
+docs
+.claude

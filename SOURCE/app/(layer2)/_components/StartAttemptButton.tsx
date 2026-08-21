@@ -16,7 +16,7 @@ export async function StartAttemptButton({ examId }: { examId: string }) {
     <form action={start}>
       <button
         type="submit"
-        className="bg-brand text-brand-foreground w-full rounded-[4px] px-6 py-3 font-medium transition-colors duration-200 hover:bg-[#8F2523] sm:w-auto sm:px-12"
+        className="bg-brand text-brand-foreground w-full rounded-full px-6 py-3 font-medium transition-colors duration-200 hover:bg-[#8F2523] sm:w-auto sm:px-12"
       >
         {t("exams.start")}
       </button>

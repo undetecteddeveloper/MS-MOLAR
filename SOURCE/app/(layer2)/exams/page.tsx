@@ -9,9 +9,8 @@
 // Visual language "tờ giấy trắng / focused". Bộ lọc qua URL searchParams → re-query.
 
 import {
-  listExams,
+  listExamsRanked,
   listExamFacets,
-  listMySubmittedExamIds,
   type ExamSort,
   type ExamLevel,
   type SortDirection,
@@ -19,6 +18,8 @@ import {
 import { ExamBrowser } from "@/app/(layer2)/_components/ExamBrowser";
 import { ExamFilters } from "@/app/(layer2)/_components/ExamFilters";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
+import { getTranslate } from "@/lib/i18n/server";
+import { PageContainer } from "@/components/layout/PageContainer";
 
 type SearchParams = Promise<{
   subject?: string;
@@ -51,27 +52,53 @@ export default async function ExamsPage({ searchParams }: { searchParams: Search
   // lạ → undefined (dùng chiều mặc định của trục, giữ hành vi cũ).
   const dir: SortDirection | undefined = sp.dir === "asc" || sp.dir === "desc" ? sp.dir : undefined;
 
-  const [exams, facets, submittedExamIds, user] = await Promise.all([
-    listExams({ subject, grade, school, schoolYear: year, semester, sort, level, dir }),
+  const t = await getTranslate();
+  // ADR-0015 Decision 1b: `listExamsRanked` thay CẢ `listExams` lẫn
+  // `listMySubmittedExamIds` ở trang này. Nó tự sở hữu lượt đọc `exam_attempts`
+  // và trả về luôn tập id đã nộp, nên băng xếp hạng "đã làm" và huy hiệu "đã
+  // làm" trên thẻ đề dùng CHUNG một giá trị, không thể lệch nhau — và không có
+  // lượt đọc `exam_attempts` nào bị lặp lại mỗi lần bấm bộ lọc.
+  // `listMySubmittedExamIds()` KHÔNG bị sửa: nó còn một chỗ dùng khác
+  // (exams/[id]/rate/page.tsx).
+  const [ranked, facets, user] = await Promise.all([
+    listExamsRanked({ subject, grade, school, schoolYear: year, semester, sort, level, dir }),
     listExamFacets(),
-    listMySubmittedExamIds(),
     getCurrentUser(),
   ]);
+  const { exams, submittedExamIds } = ranked;
 
   return (
     // Theme root "Mực & Sơn mài" (S#17) — scope .theme-ebp đã xóa, block/nav
     // lấy từ biến mặc định ở :root (globals.css).
     <div className="bg-background">
-      <main className="mx-auto w-full max-w-6xl">
+      {/* padding="none": trang này tự quản lý khoảng đệm bên trong — cột
+          *Filter phải dính mép trái để sticky/overlay đúng chỗ, còn lưới card
+          có padding riêng. Đây chính là lối thoát tường minh mà PageContainer
+          chừa sẵn, thay vì phải bỏ container để lách. */}
+      <PageContainer as="main" size="full" padding="none">
         {/* Trang này CỐ Ý không có tiêu đề nhìn thấy được — bố cục là bộ lọc +
             lưới thẻ, thêm chữ "Exams" to sẽ thừa. Nhưng đây là trang duy nhất
             của site không có <h1> nào, nên người dùng trình đọc màn hình mất mốc
             định vị và mất luôn khả năng nhảy theo tiêu đề (WCAG 1.3.1 / 2.4.6).
             sr-only giữ nguyên thiết kế mà vẫn trả lại mốc đó. */}
-        <h1 className="sr-only">Exams</h1>
+        <h1 className="sr-only">{t("exams.title")}</h1>
         {/* MỘT block căn giữa: *Filter (trái, sticky, overlay) + lưới ExamCard
             tối đa 3 cột (phải, flex-1). mx-auto của <main> giữ block căn giữa. */}
-        <div className="relative flex items-start">
+        {/* `max-md:flex-col`: dưới 768px bộ lọc là một hàng NGANG phía trên lưới
+            thẻ, không phải một rail dọc bên cạnh — ở 360px không còn bề ngang
+            nào để chia cho hai cột.
+            `max-md:items-stretch` (2026-08-09, lỗi thật phát hiện qua ảnh chụp
+            prod của engineer): `items-start` chỉ đúng Ý khi trục chính là NGANG
+            (desktop `flex-row` — không kéo cột *Filter/lưới đề cao bằng nhau).
+            `max-md:flex-col` đổi trục chính sang DỌC, và cùng lúc đó
+            `align-items` chuyển sang điều khiển chiều NGANG — `flex-start` khiến
+            khối bọc <ExamBrowser> (dưới) co theo bề rộng NỘI DUNG thay vì giãn
+            hết màn hình, hở khoảng trắng bên phải với đề tiêu đề/tên trường
+            ngắn (che khuất với đề dài vì nội dung tự nhiên đã đủ rộng). Khối
+            *Filter đã tự vá đúng lỗi này cho chính nó (`max-md:w-full
+            max-md:self-stretch`, ExamFilters.tsx) — vá ở đây thay vì lặp lại
+            per-child để không sót đứa con nào trong tương lai. */}
+        <div className="relative flex items-start max-md:flex-col max-md:items-stretch">
           <ExamFilters
             subjects={facets.subjects}
             grades={facets.grades}
@@ -95,7 +122,7 @@ export default async function ExamsPage({ searchParams }: { searchParams: Search
             />
           </div>
         </div>
-      </main>
+      </PageContainer>
     </div>
   );
 }

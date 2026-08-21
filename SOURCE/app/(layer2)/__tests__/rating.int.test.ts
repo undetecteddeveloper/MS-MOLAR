@@ -30,7 +30,7 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(async () => ({ from: fromMock })),
 }));
 
-const { listExams } = await import("../queries");
+const { listExams, listExamsRanked } = await import("../queries");
 const { rateExam, getMyRating } = await import("../actions");
 
 type BuilderCall = { method: string; args: unknown[] };
@@ -45,7 +45,9 @@ function createQueryBuilder(result: { data: unknown[]; error: null }) {
       calls.push({ method, args });
       return builder;
     };
-  for (const method of ["select", "eq", "gte", "lt", "order"]) {
+  // "limit": các lệnh đọc danh sách đi qua `readBounded` (P3), nó áp biên bằng
+  // .limit() trước khi await builder.
+  for (const method of ["select", "eq", "gte", "lt", "order", "limit"]) {
     builder[method] = chain(method);
   }
   builder.then = (onFulfilled: (value: typeof result) => unknown) =>
@@ -381,6 +383,13 @@ describe("listExams — Hardest-sort and Level-filter query construction (Test 2
     expect(calls.some((c) => c.method === "gte" || c.method === "lt")).toBe(false);
   });
 
+  // RE-SCOPED 2026-08-16 (exam-recommendation v1.2, Success Criteria #5): câu
+  // này KHÔNG còn là phát biểu về thứ tự mặc định mà /exams hiển thị — thứ tự
+  // đó nay do listExamsRanked quyết (ADR-0015 Decision 1b, xem describe cuối
+  // file). Nó vẫn đúng và vẫn có giá trị với tư cách hợp đồng của LƯỢT FETCH
+  // NỀN: listExams giữ nguyên hành vi, và một thứ tự nền ổn định là thứ làm
+  // đầu vào của bộ xếp hạng tất định. Giữ lại chứ KHÔNG xoá — xoá nó là đúng
+  // hình dạng rủi ro R-d.
   it("no sort/no level falls back to .order(id), with no gte/lt (AC-023 regression guard, obligation c)", async () => {
     const { builder, calls } = createQueryBuilder({ data: [], error: null });
     fromMock.mockReturnValue(builder);
@@ -429,6 +438,12 @@ describe("listExams — dir overrides a sort axis's default direction (ExamFilte
     expect(calls).toContainEqual({ method: "order", args: ["created_at", { ascending: false }] });
   });
 
+  // RE-SCOPED 2026-08-16 (exam-recommendation v1.2, Success Criteria #5 / I005):
+  // `dir` không kèm `sort` vẫn là no-op Ở TẦNG NÀY — listExams vẫn .order("id").
+  // Nhưng ở tầng TRANG thì không còn no-op: listExamsRanked xếp hạng cá nhân hoá
+  // cho đúng trường hợp đó (PRD AC-037 — một chiều mà không có trục để áp vào
+  // thì không phải là một phát biểu về thứ tự). Hai câu không mâu thuẫn; chúng
+  // nói về hai tầng khác nhau, và câu ở tầng trang nằm ở describe cuối file.
   it("dir without sort is a no-op — falls back to .order(id) same as no filters at all", async () => {
     const { builder, calls } = createQueryBuilder({ data: [], error: null });
     fromMock.mockReturnValue(builder);
@@ -498,3 +513,195 @@ describe("toExam — communityDifficulty mapping is additive, byte-identical bel
   });
 });
 
+
+// =============================================================================
+// listExamsRanked — hợp đồng thứ tự MẶC ĐỊNH của /exams + ngân sách round-trip
+// =============================================================================
+// PRD: docs/prd/exam-recommendation-prd.md (v1.2) — AC-001/015/016/021/037,
+//      Success Criteria #5; ADR-0015 Decision 1b/6.
+//
+// Thêm MỚI (2026-08-16), không thay thế câu nào: hai assertion `.order("id")`
+// ở trên vẫn xanh và vẫn nói đúng về listExams. Cái được ghim ở đây là thứ
+// KHÁC — thứ tự mà trang thực sự render, và số lượt đi mạng để có nó.
+describe("listExamsRanked — thứ tự mặc định của /exams và ngân sách round-trip", () => {
+  beforeEach(() => {
+    fromMock.mockReset();
+  });
+
+  const examRow = (id: string, grade: number, createdAt: string) => ({
+    id,
+    title: `Đề ${id}`,
+    question_ids: ["q1"],
+    duration_minutes: 45,
+    subject: "Toán",
+    grade,
+    school: null,
+    school_year: null,
+    semester: null,
+    author_display_name: null,
+    parts: null,
+    rating_count: 0,
+    avg_overall: null,
+    created_at: createdAt,
+  });
+
+  /**
+   * Một builder RIÊNG cho mỗi bảng — khác hẳn `fromMock.mockReturnValue(builder)`
+   * dùng ở các test trên, và đó chính là điểm mấu chốt: dùng chung một builder
+   * thì mọi lượt đọc đều được phục vụ cùng một fixture đề, và `exam_attempts`
+   * sẽ nhận nhầm dòng đề làm lịch sử làm bài — test vẫn XANH trong khi đang đo
+   * sai thứ. Map theo tên bảng để chuyện đó không xảy ra được.
+   */
+  function mockTables(byTable: Record<string, unknown[]>) {
+    const order: string[] = [];
+    fromMock.mockImplementation((table: string) => {
+      order.push(table);
+      const { builder } = createQueryBuilder({ data: byTable[table] ?? [], error: null });
+      return builder;
+    });
+    return order;
+  }
+
+  it("không có ?sort: thứ tự là xếp hạng cá nhân hoá, KHÔNG phải thứ tự id", async () => {
+    // Theo id thì "a" đứng đầu. Theo xếp hạng: "a" đã nộp nên bị đẩy xuống, và
+    // giữa hai đề chưa làm thì "z" (lớp 12, khớp lịch sử) trên "m" (lớp 9).
+    mockTables({
+      exams_with_difficulty: [
+        examRow("a", 12, "2026-01-01T00:00:00.000Z"),
+        examRow("m", 9, "2026-06-01T00:00:00.000Z"),
+        examRow("z", 12, "2026-02-01T00:00:00.000Z"),
+      ],
+      exam_attempts: [
+        {
+          id: "att-1",
+          exam_id: "a",
+          submitted_at: "2026-05-01T00:00:00.000Z",
+          exams: { grade: 12 },
+        },
+      ],
+      exam_results: [{ attempt_id: "att-1", total_score: 5 }],
+    });
+
+    const { exams, submittedExamIds } = await listExamsRanked({});
+
+    expect(exams.map((e) => e.id)).toEqual(["z", "m", "a"]);
+    expect(submittedExamIds).toEqual(new Set(["a"]));
+  });
+
+  it("?dir không kèm ?sort vẫn được xếp hạng cá nhân hoá (AC-037)", async () => {
+    mockTables({
+      exams_with_difficulty: [
+        examRow("a", 12, "2026-01-01T00:00:00.000Z"),
+        examRow("z", 12, "2026-06-01T00:00:00.000Z"),
+      ],
+      exam_attempts: [],
+      exam_results: [],
+    });
+
+    const { exams } = await listExamsRanked({ dir: "asc" });
+
+    // Thứ tự id sẽ là a,z — xếp hạng cho z trước vì mới hơn.
+    expect(exams.map((e) => e.id)).toEqual(["z", "a"]);
+  });
+
+  it("?sort tường minh thắng cá nhân hoá: thứ tự DB-side giữ nguyên (AC-016)", async () => {
+    mockTables({
+      exams_with_difficulty: [
+        examRow("a", 12, "2026-01-01T00:00:00.000Z"),
+        examRow("z", 12, "2026-06-01T00:00:00.000Z"),
+      ],
+      exam_attempts: [],
+      exam_results: [],
+    });
+
+    const { exams } = await listExamsRanked({ sort: "oldest" });
+
+    expect(exams.map((e) => e.id)).toEqual(["a", "z"]);
+  });
+
+  it("0 đề bị thêm hay mất so với tập ứng viên (AC-021)", async () => {
+    mockTables({
+      exams_with_difficulty: [
+        examRow("a", 12, "2026-01-01T00:00:00.000Z"),
+        examRow("b", 9, "2026-02-01T00:00:00.000Z"),
+        examRow("c", 12, "2026-03-01T00:00:00.000Z"),
+      ],
+      exam_attempts: [
+        { id: "att-1", exam_id: "b", submitted_at: null, exams: { grade: 9 } },
+      ],
+      exam_results: [],
+    });
+
+    const { exams } = await listExamsRanked({});
+
+    expect(exams.map((e) => e.id).sort()).toEqual(["a", "b", "c"]);
+  });
+
+  // Hình dạng THẬT đã đo 2026-08-16 là OBJECT (xem chú thích ở AttemptRow trong
+  // queries.ts). Case này giữ lại cho nhánh MẢNG vì nó bảo vệ một giả định về
+  // thư viện bên thứ ba, thứ có thể đổi khi nâng cấp @supabase/supabase-js —
+  // không phải vì hình dạng còn là ẩn số.
+  it("embed to-one trả về MẢNG vẫn đọc được lớp (phòng khi PostgREST/SDK đổi hành vi)", async () => {
+    mockTables({
+      exams_with_difficulty: [
+        examRow("g9", 9, "2026-06-01T00:00:00.000Z"),
+        examRow("g12", 12, "2026-01-01T00:00:00.000Z"),
+      ],
+      exam_attempts: [
+        { id: "att-1", exam_id: "other", submitted_at: null, exams: [{ grade: 12 }] },
+      ],
+      exam_results: [],
+    });
+
+    const { exams } = await listExamsRanked({});
+
+    // Lớp đọc được -> g12 (khớp lớp) thắng g9 dù g9 mới hơn. Nếu embed bị bỏ
+    // qua thì thứ tự sẽ là g9,g12 và câu này đỏ.
+    expect(exams.map((e) => e.id)).toEqual(["g12", "g9"]);
+  });
+
+  it("ngân sách: đúng 3 lượt đọc, đúng 3 bảng, 0 lượt ghi (ADR-0015 Decision 6)", async () => {
+    const tables = mockTables({
+      exams_with_difficulty: [examRow("a", 12, "2026-01-01T00:00:00.000Z")],
+      exam_attempts: [],
+      exam_results: [],
+    });
+
+    await listExamsRanked({});
+
+    expect(tables).toHaveLength(3);
+    expect([...tables].sort()).toEqual(["exam_attempts", "exam_results", "exams_with_difficulty"]);
+  });
+
+  it("ba lượt đọc chạy SONG SONG: cả ba được phát trước khi lượt nào kịp resolve", async () => {
+    // Đây là hồi quy thực sự sẽ xảy ra: ai đó chèn một `await` vào giữa hai
+    // lượt đọc và biến chúng thành tuần tự. Mock hoãn resolve để "chúng chạy
+    // song song" trở thành một câu kiểm chứng được, offline, không cần DB.
+    const issued: string[] = [];
+    let settle: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      settle = resolve;
+    });
+
+    fromMock.mockImplementation((table: string) => {
+      issued.push(table);
+      const builder: Record<string, unknown> = {};
+      for (const method of ["select", "eq", "gte", "lt", "order", "limit"]) {
+        builder[method] = () => builder;
+      }
+      builder.then = (onFulfilled: (value: { data: unknown[]; error: null }) => unknown) =>
+        gate.then(() => onFulfilled({ data: [], error: null }));
+      return builder;
+    });
+
+    const pending = listExamsRanked({});
+    // Nhường microtask cho cả ba nhánh của Promise.all được phát đi.
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(issued).toHaveLength(3);
+
+    settle();
+    await pending;
+  });
+});

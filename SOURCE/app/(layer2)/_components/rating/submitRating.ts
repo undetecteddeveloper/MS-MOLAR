@@ -4,17 +4,21 @@
 // (SOURCE/app/(layer2)/actions.ts) — không đổi khi redesign UI.
 
 import { rateExam } from "@/app/(layer2)/actions";
-import { rateErrorMessage, type PartId, type PartScore } from "@/lib/rating";
+import type { PartId, PartScore, RateExamError } from "@/lib/rating";
 
+// Trả về CODE lỗi thay vì message đã dịch sẵn — `rateErrorMessage` (lib/rating)
+// bake tiếng Anh và có test đơn vị assert đúng chuỗi đó, nên giữ nguyên làm dữ
+// liệu thuần. RatingRubric (client, có `t`) tự map code → câu theo ngôn ngữ
+// đang chọn, cùng kiến trúc với formatUgcError.
 export async function submitRating(
   examId: string,
   scores: Record<PartId, PartScore>
-): Promise<{ ok: true } | { ok: false; message: string }> {
+): Promise<{ ok: true } | { ok: false; error: RateExamError }> {
   const res = await rateExam(examId, {
     partI: scores.mcq,
     partII: scores.true_false,
     partIII: scores.short_answer,
   });
   if (!res.error) return { ok: true };
-  return { ok: false, message: rateErrorMessage(res.error) };
+  return { ok: false, error: res.error };
 }

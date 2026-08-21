@@ -125,7 +125,7 @@ export function ReportExam({ examId, initiallyReported }: ReportExamProps) {
                 type="button"
                 onClick={onSubmit}
                 disabled={submitting}
-                className="bg-brand text-brand-foreground rounded-[4px] px-4 py-2 text-xs font-medium tracking-[0.14em] uppercase transition-opacity hover:opacity-90 disabled:opacity-60"
+                className="bg-brand text-brand-foreground rounded-full px-4 py-2 text-xs font-medium tracking-[0.14em] uppercase transition-opacity hover:opacity-90 disabled:opacity-60"
               >
                 {submitting ? t("report.submitting") : t("report.submit")}
               </button>

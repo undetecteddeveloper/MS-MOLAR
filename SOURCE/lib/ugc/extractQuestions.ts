@@ -15,7 +15,7 @@ import { makeUgcError } from "./errorCopy";
 import { LIMITS } from "./limits";
 import {
   FATAL_CALL_DEADLINE_MS,
-  getGeminiClient,
+  generateContent,
   logExtractorExit,
   makeDeadlineSignal,
   QUESTION_MODEL,
@@ -32,6 +32,7 @@ import type {
 } from "./types";
 import type { FileRef } from "./fileRef";
 import { toGeminiPart } from "./fileRef";
+import { recordUsage } from "./quotaTracker";
 
 /** Output của extractor #1 — parts (rỗng nếu đề không chia phần) + câu hỏi. */
 export type ExtractedQuestionFile = {
@@ -258,8 +259,7 @@ export async function extractQuestions(
   const startedAt = Date.now();
   const deadline = makeDeadlineSignal(FATAL_CALL_DEADLINE_MS);
   try {
-    const client = getGeminiClient();
-    const response = await client.models.generateContent({
+    const response = await generateContent({
       model: QUESTION_MODEL,
       contents: [toGeminiPart(file), { text: PROMPT }],
       config: {
@@ -269,6 +269,10 @@ export async function extractQuestions(
         responseJsonSchema: QUESTIONS_SCHEMA as unknown as Record<string, unknown>,
       },
     });
+
+    // Đo trước mọi nhánh phân loại — lượt gọi hỏng vẫn tiêu token và vẫn trừ
+    // vào trần request/ngày (Subscription PRD U2).
+    recordUsage("questions", QUESTION_MODEL, response.usageMetadata);
 
     const finishReason = response.candidates?.[0]?.finishReason;
     if (finishReason !== "STOP") {

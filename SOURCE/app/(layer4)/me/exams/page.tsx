@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { listMyExams } from "@/app/(layer4)/queries";
 import { MyExamsList } from "@/app/(layer4)/_components/MyExamsList";
+import { PageContainer } from "@/components/layout/PageContainer";
 
 export default async function MyExamsPage({
   searchParams,
@@ -18,8 +19,8 @@ export default async function MyExamsPage({
   const exams = await listMyExams();
 
   return (
-    <main className="mx-auto w-full max-w-3xl px-6 py-10">
+    <PageContainer as="main" size="default">
       <MyExamsList exams={exams} justPublished={published === "1"} />
-    </main>
+    </PageContainer>
   );
 }

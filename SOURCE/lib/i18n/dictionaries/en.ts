@@ -23,6 +23,7 @@ export const en = {
   "common.back": "Back",
   "common.signOut": "Sign out",
   "common.myExams": "My exams",
+  "common.profile": "Profile",
   "common.displayName": "Display name",
   "common.displayNameHint": "Max 12 characters, letters and dots only.",
   "common.browseExams": "Browse exams",
@@ -43,6 +44,10 @@ export const en = {
   "common.sending": "Sending…",
   "common.done": "Done",
   "common.restore": "Restore",
+  // Lớp phủ chuyển trang (components/layout/RouteLoadingOverlay.tsx). Ngắn và
+  // không có dấu ba chấm như "common.saving"/"common.processing": ba chuỗi kia
+  // là nhãn NÚT đang bận, còn chuỗi này đứng một mình giữa màn hình.
+  "common.loading": "Loading",
 
   // --- Điều hướng ---------------------------------------------------------
   "nav.home": "Home",
@@ -53,6 +58,11 @@ export const en = {
   "nav.account": "Account",
   "nav.language": "Language",
   "nav.switchTo": "Switch to {language}",
+  // Nhãn cho <nav> của thanh điều hướng đáy (mobile). Trang có HAI landmark
+  // `navigation` cùng lúc (header + thanh đáy) nên mỗi cái phải có tên riêng,
+  // nếu không người dùng trình đọc màn hình chỉ nghe "navigation, navigation".
+  "nav.primary": "Primary",
+  "nav.secondary": "Account and language",
 
   // --- Trang chủ ----------------------------------------------------------
   "home.eyebrow": "Online exam practice platform",
@@ -69,6 +79,42 @@ export const en = {
   "home.instantGrading": "instant grading",
   "home.bodyPart3": " and weakness analysis so you study the right things and improve faster.",
   "home.getStarted": "Get started",
+  // Lối vào /about ở góc dưới-trái trang chủ (AboutPrompt.tsx). Câu hỏi + lời
+  // mời chứ không phải nhãn "About": /about là trang giới thiệu + liên hệ, và
+  // một nhãn trơ trọi ở chân trang thì không nói được nó chứa gì.
+  "home.aboutPrompt": "Looking for information about us? Tap here",
+
+  // --- Băng chuyền trang chủ (HomeCarousel) -------------------------------
+  // Ba mục cùng một chuỗi. Mục "Giới thiệu" dùng lại nguyên văn các khoá
+  // `home.eyebrow`/`home.headline`/`home.bodyPart*` ở trên — nó CHÍNH LÀ nhóm
+  // nội dung hero cũ, không viết lại.
+  "home.carouselLabel": "Platform highlights",
+  // `aria-roledescription` — thay chữ "group" mà trình đọc màn hình đọc mặc
+  // định bằng tên đúng của thành phần. DỊCH được, và phải dịch: nó được đọc to
+  // bằng ngôn ngữ của trang.
+  "home.carouselRole": "carousel",
+  "home.slideRole": "slide",
+  "home.slidePosition": "{current} of {total}",
+  // Nhãn cụm nút điều khiển (WCAG 2.2.2 cho tạm dừng/phát).
+  "home.carouselPause": "Pause automatic slideshow",
+  "home.carouselPlay": "Resume automatic slideshow",
+  "home.carouselPrev": "Previous highlight",
+  "home.carouselNext": "Next highlight",
+  // `tabAi`/`tabAdaptive` giữ tên khoá cũ dù dãy tab đã bỏ: chúng nay là dòng
+  // eyebrow của mục 2 và 3. Đổi tên khoá chỉ để đẹp sẽ chạm vào cả hai từ điển
+  // mà không đổi được gì người dùng thấy.
+  "home.tabAi": "AI-powered",
+  "home.tabAdaptive": "Adaptive learning",
+  // Tên hiển thị của website. Khớp `applicationName`/`title` trong
+  // app/layout.tsx — đổi tên thương hiệu thì sửa ĐÚNG khoá này (và metadata),
+  // đừng rải chuỗi vào từng component.
+  "home.siteName": "MS-MOLAR",
+  // Mỗi mục đúng MỘT dòng mô tả ngắn — giữ ngắn là có chủ đích, đây là thẻ
+  // giới thiệu chứ không phải trang tính năng.
+  "home.aiDescription":
+    "AI extracts every question from the PDFs you upload, and grades your answers the moment you submit.",
+  "home.adaptiveDescription":
+    "Each attempt reshapes what you practise next, so revision time lands where your score actually moves.",
 
   // --- Xác thực -----------------------------------------------------------
   "auth.email": "Email",
@@ -111,9 +157,12 @@ export const en = {
   "player.submitting": "Submitting…",
   "player.chooseAnswer": "Choose an answer",
   "player.yourAnswer": "Your answer",
+  "player.answeredCount": "{done}/{total} done",
   "player.tfNotScored": "True/False — stored, not auto-scored yet.",
   "player.shortAnswerScored": "Short answer — auto-scored after you submit.",
-  "player.essayNotScored": "Essay question — answer on paper. Stored, not auto-scored yet.",
+  "player.essayNotScored": "Essay — your working is saved with the attempt, not auto-scored yet.",
+  "player.essayPlaceholder": "Write your working here…",
+  "player.charsLeft": "{remaining} characters left",
   "player.leaveTitle": "Leave this exam?",
   "player.leaveBody":
     "Your answers haven't been submitted yet. If you leave now, the progress of this attempt will be lost.",
@@ -122,11 +171,17 @@ export const en = {
   "player.flagged": "Flagged",
   "player.flagHint": "Flag this question for review",
   "player.unflagHint": "Unflag this question",
+  "player.previous": "Previous",
+  "player.answeredStatus": "answered",
 
   // --- Kết quả ------------------------------------------------------------
   "result.title": "Result",
   "result.time": "Time",
   "result.submittedAfterTime": "Submitted after time.",
+  "result.overtimeBody":
+    "This attempt went {time} over the allotted time, so the score is not a valid timed result.",
+  "result.storedAnswerLabel": "Stored answer:",
+  "result.skippedLabel": "Skipped",
   "result.return": "Return",
   "result.attemptDetails": "Attempt details",
   "result.notAutoScored": "Not auto-scored",
@@ -174,11 +229,32 @@ export const en = {
   "analytics.noDataHint": "Complete a submitted attempt in this range to see analytics.",
   "analytics.timeRangeFilter": "Time range filter",
   "analytics.barTitle": "Correct vs. Incorrect by Subject",
-  "analytics.barHint": "Hover a subject for details",
+  // Trung tính về thiết bị: chuột thì rê, cảm ứng thì chạm — một chuỗi đúng cho
+  // cả hai, thay vì "Hover…" vốn là hướng dẫn không làm theo được bằng ngón tay.
+  "analytics.barHint": "Select a subject for details",
   "analytics.barAlt": "Correct vs. incorrect answers by subject",
   "analytics.needsReview": "Needs review",
   "analytics.donutTitle": "Most Frequently Practiced Subject",
   "analytics.donutAlt": "Practice session share by subject",
+  "analytics.tabBar": "Bar",
+  "analytics.tabDonut": "Donut",
+  "analytics.rangeWeek": "Week",
+  "analytics.rangeMonth": "Month",
+  "analytics.rangeAll": "All time",
+  "analytics.donutSubtitle": "% share of practice sessions by subject, this {range}",
+  // SkillRecommendationCard (Engine 1). Nối vào ngay khối `analytics.*` này chứ
+  // không thêm khối mới ở cuối file: thẻ gợi ý sống trên chính route
+  // /me/dashboard vốn đã sở hữu namespace này, tách ra là làm phân mảnh nó.
+  // Nhãn kỹ năng (skillLabel) KHÔNG có ở đây — đó là nội dung chương trình học
+  // do backend trả về, không phải chữ giao diện.
+  "analytics.recommendTitle": "What to practise next",
+  "analytics.recommendColdStart":
+    "Not enough data yet — practise a Math exam to get your first recommendation.",
+  "analytics.recommendWhy": "Why this skill?",
+  "analytics.recommendReasonPrerequisiteGate":
+    "A skill you haven't mastered yet comes before this one.",
+  "analytics.recommendReasonLowestMastery": "This is the skill you're weakest at right now.",
+  "analytics.recommendReasonRecentlyWrong": "You got this one wrong recently.",
 
   // --- Tải đề lên (UGC) ---------------------------------------------------
   "upload.title": "Import Exam Document",
@@ -255,6 +331,495 @@ export const en = {
   "error.notFoundBody":
     "The link may be broken, or the exam may have been unpublished or deleted by its author.",
   "error.reference": "Reference:",
+
+  // --- Dùng chung (bổ sung) -----------------------------------------------
+  "common.all": "All",
+  "common.subject": "Subject",
+  "common.grade": "Grade",
+  "common.share": "Share",
+  "common.active": "active",
+
+  // --- Bộ lọc & độ khó ----------------------------------------------------
+  "exams.sortNewest": "Newest",
+  "exams.sortOldest": "Oldest",
+  "exams.sortHardest": "Hardest",
+  "exams.levelEasy": "Easy",
+  "exams.levelMedium": "Medium",
+  "exams.levelHard": "Hard",
+  "exams.gradeValue": "Grade {grade}",
+  "rating.finishExamFirst": "Finish this exam first",
+  "rating.logInToRate": "Log in to rate",
+  "rating.partOf": "Part {part} of {total}",
+  "rating.rateFromTo": "{name} — rate from 1 (easiest) to 10 (hardest)",
+  "rating.prev": "Prev",
+  "rating.submitRating": "Submit rating",
+  "rating.submitted": "Rating submitted",
+  "rating.unrated": "UNRATED",
+  "rating.rated": "RATED",
+  "rating.partiallyRated": "{rated}/{total} RATED",
+  "rating.mcqEyebrow": "PART I · MULTIPLE CHOICE",
+  "rating.mcqName": "Multiple Choice",
+  "rating.mcqDescription":
+    "Four options per question, one correct answer. Tests basic recall and understanding.",
+  "rating.tfEyebrow": "PART II · TRUE / FALSE",
+  "rating.tfName": "True / False",
+  "rating.tfDescription":
+    "Four sub-statements per question, mark each true or false. One wrong sub-statement forfeits the whole question — no guessing by elimination.",
+  "rating.saEyebrow": "PART III · SHORT ANSWER",
+  "rating.saName": "Short Answer",
+  "rating.saDescription":
+    "No options to pick from — solve and enter a single numeric answer. No room for guesswork.",
+  "rating.errIneligible": "You need to finish this exam before you can rate it.",
+  "rating.errInvalid": "Please rate all three parts from 1 to 10.",
+  "rating.errRateLimited": "You're rating too quickly. Please wait a moment and try again.",
+  "rating.errServer": "Couldn't save your rating right now. Please try again.",
+
+  // --- Lịch sử (bổ sung) --------------------------------------------------
+  "history.sharing": "Sharing…",
+  "history.moreActionsFor": "More actions for {title}",
+  "history.pdfFooterPrefix": "Generated by MS-MOLAR · summary only, not a full transcript",
+  "history.exam": "Exam",
+  "history.score": "Score",
+  "history.submitted": "Submitted",
+  "history.minimumScore": "Minimum score",
+  "history.maximumScore": "Maximum score",
+  "history.submittedFrom": "Submitted from date",
+  "history.submittedTo": "Submitted to date",
+
+  // --- Trạng thái đề UGC --------------------------------------------------
+  "status.processing": "Processing",
+  "status.needsReview": "Needs review",
+  "status.draft": "Draft",
+  "status.published": "Published",
+  "status.needsFixing": "Needs fixing",
+
+  // --- Kiểm duyệt (bổ sung) -----------------------------------------------
+  "admin.intro":
+    "Signed in as {email}. Removing an exam pulls it from the catalog immediately and stops new attempts; the author cannot undo it.",
+  "admin.awaitingReview": "Awaiting review",
+  "admin.removed": "Removed",
+  "admin.oneReport": "1 report",
+  "admin.reportCount": "{count} reports",
+  "admin.statusLabel": "status:",
+  "admin.errMissingExamId": "Missing exam id.",
+  "admin.errUnknownAction": "Unknown moderation action.",
+  "admin.errNotAllowed": "Not allowed.",
+  "admin.errCouldNotApply": "Could not apply the change. Try again.",
+  "admin.examRemoved": "Exam removed from the catalog.",
+  "admin.examRestored": "Exam restored as a draft.",
+
+  // --- Tải đề lên (bổ sung) -----------------------------------------------
+  "upload.fieldTitle": "Title",
+  "upload.fieldSubject": "Subject",
+  "upload.fieldGrade": "Grade",
+  "upload.examDuration": "Exam Duration",
+  "upload.examPaper": "Exam Paper",
+  "upload.answerKey": "Answer Key",
+  "upload.fileHint": "PNG, JPEG, WebP, or PDF · up to {mb} MB · PDF up to {pages} pages",
+  "upload.maxFileSize": "Maximum file size: {mb}MB each · PDF up to {pages} pages.",
+  "upload.filledAutomatically": "— filled in automatically",
+  "upload.automaticNote":
+    "AI will scan your uploaded files and extract the exam automatically — you can still edit any field.",
+  "upload.manualNote":
+    "Fill in every exam detail yourself; AI will still extract the questions and answers.",
+  "upload.extractingWithMeta":
+    "Reading your exam details, questions and answers… this can take a moment.",
+  "upload.extractingFiles": "Reading your files and assembling the exam… this can take a moment.",
+  "upload.reviewBeforePublish": "You'll review everything before it's published.",
+  "upload.errTitleRequired": "Please enter the exam title.",
+  "upload.errSubjectRequired": "Please select the subject.",
+  "upload.errGradeRange": "Please enter a grade between {min} and {max}.",
+  "upload.errDurationRequired": "Please enter the exam duration.",
+  "upload.errQuestionFileRequired": "Please attach the exam paper.",
+  "upload.errAnswerFileRequired": "Please attach the answer key.",
+  // Nhãn định danh câu — dùng CHUNG cho card câu hỏi và cho copy lỗi UGC
+  // (lib/ugc/errorCopy.ts), để hai chỗ không bao giờ gọi cùng một câu bằng
+  // hai cái tên khác nhau.
+  "upload.questionLabel": "Question {number}",
+  "upload.partQuestionLabel": "Part {part} Question {number}",
+  "upload.partLabel": "Part {part}",
+  "upload.oneQuestion": "1 question",
+  "upload.questionCount": "{count} questions",
+  "upload.typeMcq": "Multiple choice",
+  "upload.typeEssay": "Essay",
+  "upload.typeTrueFalse": "True/False (Đúng/Sai)",
+  "upload.typeShortAnswer": "Short answer",
+  "upload.emptyPlaceholder": "— empty —",
+  "upload.markChoiceCorrect": "Mark choice {choice} correct",
+  "upload.choicePlaceholder": "Choice {choice}",
+  "upload.correctAnswer": "Correct answer",
+  "upload.fromYourAnswerFile": "— from your answer file",
+  "upload.statementPlaceholder": "Statement {item})",
+  "upload.answerForItem": "Answer for {item})",
+  "upload.tfPerStatement": "Đ/S per statement — from your answer file.",
+  "upload.shortAnswerExample": "e.g. 1260 / 1,04",
+  "upload.fixIssuesFirst": "Fix all issues before publishing.",
+  "upload.deleteBody":
+    "“{title}” and its questions and files will be permanently removed. This can't be undone.",
+  "upload.publishedBanner": "Your exam is published and now visible in the catalog.",
+  "upload.tabPending": "Pending",
+  "upload.tabPublished": "Published",
+  "upload.actionReviewFix": "Review & fix",
+  "upload.actionContinueReview": "Continue review",
+  "upload.actionContinue": "Continue",
+  "upload.gradeShort": "Grade {grade}",
+  "upload.publishedAt": "Published {date}",
+
+  // --- Lỗi trích xuất đề (UgcError) ---------------------------------------
+  // `{q}` là nhãn câu đã dựng sẵn ("Question 3" / "Part 2 Question 3") —
+  // formatUgcError ghép vào, đừng thay bằng số trần.
+  "ugcError.oneIssueToFix": "1 issue to fix before you can publish:",
+  "ugcError.issuesToFix": "{count} issues to fix before you can publish:",
+  "ugcError.noQuestionsFound":
+    "No questions were recognized in the question file. Re-upload a clearer file.",
+  "ugcError.tooManyQuestions": "Too many questions — an exam can have at most {max}.",
+  "ugcError.wrongChoiceCount":
+    "{q} — {count} choices were read; an MCQ needs exactly 4 (A–D). Edit below or re-upload.",
+  "ugcError.emptyStem": "{q} — the question text is empty; add it below.",
+  "ugcError.emptyChoice": "{q} — choice {choice} is empty.",
+  "ugcError.answerCountMismatch":
+    "The answer file has {answers} answers but the question file has {questions} questions ({unmatched} unmatched).",
+  "ugcError.answerMissing":
+    "{q} — no answer found in your answer file. Add it to the file or set it below.",
+  "ugcError.imageCropFailed":
+    "{q} — the image couldn't be cropped. Re-upload the file or remove the image.",
+  "ugcError.extractionFailed": "Couldn't read your files right now. Please try again.",
+  "ugcError.fileTooLarge": "That file is too large (max {mb} MB).",
+  "ugcError.tooManyPages": "That file has too many pages (max {max}).",
+  "ugcError.stemTooLong": "{q} — the question text is too long (max {max} characters).",
+  "ugcError.choiceTooLong": "{q} — choice {choice} is too long (max {max} characters).",
+  "ugcError.essayAnswerTooLong": "{q} — the model answer is too long (max {max} characters).",
+  "ugcError.wrongSubItemCount":
+    "{q} — {count} sub-items were read; a true/false question needs {min}–{max} items (a–d). Edit below or re-upload.",
+  "ugcError.shortAnswerTooLong": "{q} — the expected answer is too long (max {max} characters).",
+  "ugcError.metaIncomplete": "Exam details — {field} is missing. Add it above before publishing.",
+  "ugcError.metaInvalid": "Exam details — {field} is out of range. Correct it above.",
+  "ugcError.metaInvalidRange":
+    "Exam details — {field} is out of range ({range}). Correct it above.",
+  "ugcError.metaExtractionFailed":
+    "Exam details — we couldn't read the exam details from your file. Fill them in above.",
+  "ugcError.durationRange": "{min}–{max} minutes",
+  "ugcError.fieldTitle": "the title",
+  "ugcError.fieldSubject": "the subject",
+  "ugcError.fieldGrade": "the grade",
+  "ugcError.fieldDuration": "the duration",
+  "ugcError.fieldSchool": "the school",
+  "ugcError.fieldSchoolYear": "the school year",
+  "ugcError.fieldSemester": "the semester",
+  "ugcError.fieldRequired": "a required field",
+  "ugcError.fieldGeneric": "a field",
+
+  // User Support System v1 — sendSupportNotification subject only (NOT the
+  // support.* widget block, that's a separate later addition). Deliberately
+  // NOT prefixed "support." to avoid colliding with that block's key set.
+  "mail.ticketIntent.bug": "bug report",
+  "mail.ticketIntent.suggestion": "suggestion",
+  "mail.ticketIntent.question": "question",
+
+  // User Support System v1 — support.* widget block (student-facing only;
+  // support.admin.* is a separate later addition, task-14's responsibility).
+  // common.cancel/common.retry/common.working are REUSED, not duplicated here.
+  "support.trigger.label": "Send feedback",
+  "support.dialog.title": "Send feedback",
+  "support.intent.groupLabel": "Feedback type",
+  "support.intent.bug": "Bug report",
+  "support.intent.suggestion": "Suggestion",
+  "support.intent.question": "Question",
+  "support.validation.intentRequired": "Please pick a feedback type.",
+  "support.message.label": "Message",
+  "support.message.placeholder": "Describe what you'd like to share…",
+  "support.message.count": "{count}/{max}",
+  "support.validation.messageRequired": "Please enter a message.",
+  "support.screenshot.label": "Attach a screenshot (optional)",
+  "support.screenshot.chooseFile": "Choose file",
+  "support.screenshot.remove": "Remove image",
+  "support.screenshot.uploading": "Uploading image…",
+  "support.screenshot.tooLarge": "That image is over {maxMb}MB. Try a smaller one.",
+  "support.screenshot.invalidType": "Only PNG, JPEG, or WebP images are accepted.",
+  "support.screenshot.rejected": "That image isn't valid — try another one or send without it.",
+  "support.submit": "Send",
+  "support.submitting": "Sending…",
+  "support.error.rateLimited": "You're sending a bit fast — try again in a few minutes.",
+  "support.error.network": "Couldn't send — might be a network issue. Please try again.",
+  "support.error.generic": "Couldn't send right now. Please try again.",
+  "support.ack.title": "Sent!",
+  "support.ack.message": "Thanks for the feedback. We'll take a look soon.",
+  "support.ack.reference": "Reference: {ref}",
+  "support.ack.close": "Close",
+
+  // Admin inbox (/admin/tickets) — task-13/14.
+  "support.admin.title": "Support inbox",
+  "support.admin.empty": "No feedback yet.",
+  "support.admin.notifyFailed": "Notification email failed",
+  "support.admin.screenshotAlt": "Screenshot attached by the student",
+  "support.admin.notesEmpty": "No internal notes yet.",
+  "support.admin.notePlaceholder": "Internal note (admins only)…",
+  "support.admin.noteSubmit": "Save note",
+  "support.admin.noteError": "Couldn't save the note. Please try again.",
+  "support.admin.statusError": "Couldn't update status. Please try again.",
+  "support.admin.status.new": "New",
+  "support.admin.status.inProgress": "In progress",
+  "support.admin.status.resolved": "Resolved",
+
+  // --- Gia sư AI (Explain this step) — Engine 1 Adaptive AI ---
+  // ExplainStepAffordance. `common.retry` được TÁI DÙNG cho nhãn thử lại ở
+  // trạng thái lỗi (tiền lệ LABEL_KEY của ActionButton) nên không thêm khoá mới.
+  // `tutor.error` là MỘT câu chung cho cả bốn mã lỗi của explainStep(): tách
+  // riêng từng mã sẽ để lộ có một vòng tái kiểm tra điều kiện phía server
+  // (not_eligible) cho phía client dò được.
+  "tutor.explainThisStep": "Explain this step",
+  "tutor.busy": "Getting a hint…",
+  "tutor.error": "Couldn't load a hint. Try again.",
+  "tutor.hintEyebrow": "Hint",
+
+  // --- Subscription / Premium prepaid period (payOS) — UI Spec S-01..S-04 ----
+  // Giá viết THÀNH CHỮ ở đây chứ không nội suy số (UI-D4): repo không có bộ
+  // định dạng số nào (0 lần Intl.NumberFormat), và đường thay tham số của i18n
+  // là String() thô nên `{price}` với 39000 sẽ ra "39000". Hai ngôn ngữ viết
+  // khác nhau ("39.000 VNĐ" / "39,000 VND") vừa đúng quy ước từng nơi, vừa
+  // tránh tính vào ngưỡng <10% khoá trùng byte của i18n.test.ts:54-59.
+  //
+  // KHÔNG chuỗi nào ở đây được nói "tự động gia hạn": cổng A2A/VietQR không có
+  // auto-renew, đây là KỲ TRẢ TRƯỚC (ADR-0013). Nói sai chỗ này là hứa một thứ
+  // sản phẩm không làm được.
+  "billing.pricing.eyebrow": "Plans",
+  "billing.pricing.title": "Choose your plan",
+  "billing.pricing.description":
+    "Taking exams, submitting, results, history and Layer 3 analytics stay free for every account. A plan only changes how much AI tutoring and exam uploading you get.",
+  "billing.plan.free.name": "Free",
+  "billing.plan.free.price": "0 VND",
+  "billing.plan.free.period": "always",
+  "billing.plan.free.line1": "5 tutor hints per 30 days",
+  "billing.plan.free.line2": "3 exam uploads per 30 days",
+  "billing.plan.free.line3": "The full core loop, unlimited",
+  "billing.plan.free.line4": "Layer 3 analytics included",
+  "billing.plan.premium.name": "Premium",
+  "billing.plan.premium.price": "39,000 VND",
+  "billing.plan.premium.period": "per 30 days, paid up front",
+  "billing.plan.premium.line1": "500 tutor hints per 30 days",
+  "billing.plan.premium.line2": "15 exam uploads per 30 days",
+  "billing.plan.premium.line3": "A reserved share of the daily AI budget",
+  "billing.plan.premium.line4": "Buy early and your remaining days carry over",
+  "billing.plan.current": "Your current plan",
+  "billing.cta.buy": "Get Premium",
+  "billing.cta.unavailableReason":
+    "Premium isn't on sale yet — we don't sell an allowance we can't deliver. Check back soon.",
+  "billing.noAutoRenew":
+    "This plan does not renew itself. When the 30 days are up, nothing is charged and nothing is stored — you buy again by hand whenever you want to.",
+  "billing.legal.terms": "Terms of Service",
+  "billing.legal.refund": "Refund Policy",
+  "billing.legal.linkIntro": "Before you buy, please read:",
+  "billing.terms.title": "Terms of Service",
+  "billing.terms.eyebrow": "Legal",
+  "billing.terms.pending":
+    "This document is being finalised and is not ready yet. Nothing is on sale until it is.",
+  "billing.refund.title": "Refund Policy",
+  "billing.refund.eyebrow": "Legal",
+  "billing.refund.pending":
+    "This document is being finalised and is not ready yet. Nothing is on sale until it is.",
+  "billing.terms.body":
+    'Last updated: 21/08/2026.\n\n## 1. Introduction\n\nMS-MOLAR ("the Service", "we") is an online exam-practice platform for secondary and high-school students in Vietnam. It provides an exam bank, automatic marking, an AI Tutor that explains solutions, and related study tools.\n\nThese Terms of Service ("Terms") apply to everyone who uses the Service ("User", "you"). By creating an account or using the Service, you agree to these Terms and to the Refund Policy for Premium referred to in Section 6.\n\n## 2. Who the Service is for\n\nThe Service is designed mainly for secondary and high-school students, most of whom are under 18.\n\n- If you are under 16 (a "child" under the Law on Children 2016), your use of the Service and our processing of your personal data require the consent of a parent or guardian, under Article 20 of Decree No. 13/2023/NĐ-CP on personal data protection. We encourage parents and guardians to learn about the Service before their child uses it, and particularly before any Premium payment.\n- If you are between 16 and 18, you may use the Service yourself to the extent your civil capacity allows under the Civil Code 2015, but transactions beyond everyday needs should be made with the knowledge and agreement of a parent or guardian.\n\n## 3. Your account\n\n- Provide accurate details when you register (name, year group, contact information).\n- Use one account only. Do not share, lend, or resell your account.\n- You are responsible for keeping your login details secure. If you suspect your account has been accessed without permission, contact us through the Support section straight away.\n\n## 4. What the Service provides\n\n- The Free and Premium plans differ in what they include; the details are in the Refund Policy.\n- Content produced by the AI Tutor (solutions, explanations) is generated automatically and may contain mistakes. It is a study aid, not a replacement for a teacher, and it guarantees no particular exam result.\n- We may adjust, add to, or discontinue features over time in order to improve the Service.\n\n## 5. Rules of use\n\nWhen using the Service, you agree not to:\n\n- Use the Service to cheat in official examinations (for example, bringing a device that can reach the Service into an exam room against the examination rules).\n- Spam the Service, over-extract from it, or use scripts or bots to abuse AI Tutor hints or exam uploads.\n- Copy, redistribute, or sell MS-MOLAR content or exam bank material without permission.\n- Attempt unauthorised access to the system, interfere with the source code, or reverse-engineer the Service.\n- Post content that breaks the law, infringes the rights of others, or is inappropriate for a school setting.\n\nBreaking these rules may lead to suspension or termination of the account without a refund of unused Premium, under Section 3 of the Refund Policy.\n\n## 6. Payment and Premium\n\nBuying, extending, and refunding Premium are governed in detail by the Refund Policy for Premium, which forms an inseparable part of these Terms.\n\n## 7. Intellectual property\n\n- The exam bank, solutions, interface, and other content created by MS-MOLAR belong to MS-MOLAR (or to those who license it to MS-MOLAR) and are protected under intellectual property law.\n- When you upload an exam or other material ("User Content"), you grant MS-MOLAR the right to use, store, and process that material (for example, to mark it or generate AI solutions) as far as is necessary to provide the Service. You confirm that you hold the rights needed to upload it.\n\n## 8. Personal data\n\nWe collect and process some personal data (account details, exam history, payment data) in order to run the Service, under Decree No. 13/2023/NĐ-CP on personal data protection, as reinforced by the Law on Personal Data Protection No. 91/2025/QH15. For users who are children, data is processed in line with Section 2 of these Terms.\n\nWe do not store or process your card or bank account details; payment is handled by our partner payOS, as described in the Refund Policy.\n\n## 9. Limits of liability\n\nTo the extent the law allows, MS-MOLAR is not responsible for:\n\n- Any particular study outcome or examination result.\n- Errors in content produced by the AI Tutor, notwithstanding our efforts on quality.\n- Service interruptions caused by technical faults, maintenance, or causes reasonably outside our control.\n\n## 10. Suspension and termination\n\nWe may suspend or terminate an account that breaches these Terms. You may stop using the Service and ask for your account to be deleted at any time through the Support section.\n\n## 11. Changes to these Terms\n\nWe may update these Terms over time. Material changes will be announced on this page or through the contact channel in your account.\n\n## 12. Governing law and language\n\nThese Terms are governed by the law of Vietnam. They were drafted in Vietnamese; where this English text and the Vietnamese text differ, the Vietnamese version is the one that applies.\n\n## 13. Who provides the Service, and contact\n\nThe MS-MOLAR Service is provided by Nguyễn Anh Phát, trading online as an individual under the MS-MOLAR brand.\n\nFor any question about these Terms, please get in touch through the Support section of your account.',
+  "billing.refund.body":
+    "Last updated: 21/08/2026.\n\n## 1. What Premium is\n\nMS-MOLAR offers two plans:\n\n- Price — Free: no charge. Premium: 39.000 VNĐ per 30-day period.\n- AI Tutor — Free: 5 hints per period. Premium: 500 hints per period.\n- Exam upload — Free: 3 uploads per period. Premium: 15 uploads per period.\n- Taking exams, viewing results, browsing history — Free: included. Premium: included.\n\nPremium is prepaid for a single 30-day period and is paid through payOS by bank transfer or VietQR (an A2A model — a direct transfer between two bank accounts).\n\n## 2. Important: Premium does not renew itself\n\n> Please be clear on this before you buy: MS-MOLAR never charges you automatically to extend Premium.\n\nThe reason is the payment method. VietQR and bank transfer (A2A) cannot take a recurring payment the way a credit card can. So:\n\n- When the 30 days are up, your account returns to Free on its own. Nothing further is charged unless you choose to buy again.\n- You buy again by hand each time you want to continue on Premium.\n- After a period ends you have a 3-day grace window: Premium access continues, but no new allowance is granted — you are spending what is left from the previous period. After those 3 days the account moves fully to Free.\n- If you buy again while your current period is still running, the new days are added on top of the existing ones. You lose nothing you have already paid for, and nothing is overwritten.\n\n## 3. Refunds\n\nAs a rule, MS-MOLAR does not refund Premium purchases, except where the fault is a system or payment error on our side.\n\nCases we will consider for a refund:\n\n- You were charged but your account was not activated as Premium, because of a technical fault.\n- You were charged twice for the same transaction.\n- You were charged an amount other than the listed price (39.000 VNĐ).\n\nCases we do not refund:\n\n- Changing your mind after a purchase that activated Premium successfully.\n- Not using your full Premium allowance within the period.\n- Dissatisfaction with your study results or with the quality of the AI's hints.\n\nHow to request a refund:\n\n- Send a request through the Support section of your account, with the transaction code or a screenshot of the payment confirmation.\n- We will review it and reply within 7 working days.\n- If the request is valid, the money is returned by bank transfer to the same account the payment came from, within 10 working days.\n\nPlease note: refunds are currently processed by hand, so actual processing time may differ from the periods above in some cases.\n\n## 4. Buyers under 18\n\nMost MS-MOLAR users are secondary and high-school students, and many are under 18. A Premium purchase is made on the student's own account; a parent may help by scanning the payment QR code, but the transaction is recorded against the student's account.\n\nWe encourage parents and guardians to take an interest and to talk with their child about using a paid plan before any payment is made.\n\n## 5. Payment security\n\nMS-MOLAR does not store or process any card or bank account details. Every transaction happens over VietQR or bank transfer (A2A) inside your own banking app, through our payment partner payOS.\n\n## 6. Who provides the service\n\nPremium is provided by Nguyễn Anh Phát, trading online as an individual under the MS-MOLAR brand, in accordance with Decree No. 52/2013/NĐ-CP and Decree No. 85/2021/NĐ-CP on e-commerce.\n\n## 7. Changes to this policy\n\nThis policy may be updated over time. Material changes will be announced on this page or through the contact channel in your account.\n\n## 8. Language\n\nThis policy was drafted in Vietnamese. Where this English text and the Vietnamese text differ, the Vietnamese version is the one that applies.",
+  "billing.quota.tutorExhausted": "You've used all your tutor hints for this period.",
+  "billing.quota.resetsAt": "Resets on {date}.",
+  "billing.quota.remaining": "{used}/{limit} tutor hints used this period.",
+  "billing.quota.upgradeLink": "See plans",
+
+  // --- S-05 /me/orders + C-09 OrderStatusBadge (UI-D13 / UI-D15) -----------
+  // `{amount}` ở đây ĐÃ LÀ CHUỖI, do formatVnd() dựng xong trước khi t() thay
+  // tham số: translate.ts:27 thay bằng String() thô, nên truyền số 39000 vào
+  // sẽ in "39000 VND" ngay cạnh một mã QR mang "39.000 VNĐ" — hai con số khác
+  // nhau trên màn hình thanh toán là chỗ người dùng dừng trả tiền.
+  "billing.amount": "{amount} VND",
+  "billing.orders.title": "Your orders",
+  "billing.orders.empty": "You have not placed an order yet.",
+  "billing.orders.emptyHint": "An order appears here as soon as you buy a Premium period.",
+  "billing.orders.createdAt": "Created",
+  "billing.orders.orderCode": "Order code",
+  "billing.orders.continuePaying": "Continue paying",
+  "billing.orders.loadError": "We could not load your orders just now. Try again.",
+  // Năm chữ của C-09. CHỮ mang nghĩa, màu chỉ là kênh phụ — nên bốn giá trị
+  // schema cho phép cộng nhánh KHÔNG NHẬN RA phải khác nhau từng chữ một.
+  // Không có "refunded": hoàn tiền là thao tác ngân hàng cộng một câu SQL sửa
+  // tay, schema không có trạng thái đó (payment_orders CHECK).
+  "billing.status.pending": "Awaiting payment",
+  "billing.status.paid": "Paid",
+  "billing.status.expired": "Expired",
+  "billing.status.cancelled": "Cancelled",
+  "billing.status.unrecognised": "Unrecognised",
+
+  // --- C-10 RecheckOrderControl + C-11 PlanSummary (plan Task 3.7) ---------
+  //
+  // BẢY KẾT CỤC, BẢY CÂU, KHÔNG CÂU NÀO TRÙNG CÂU NÀO. Đây là ràng buộc về
+  // NGHĨA chứ không phải về văn phong: "chưa với tới được nhà cung cấp" và
+  // "bạn chưa chuyển tiền" đòi hai hành động NGƯỢC nhau, nên gộp chúng lại là
+  // bảo một người ĐÃ TRẢ đi trả lần nữa (UI Spec C-10, frontend DD Decision 1).
+  //
+  // `stillPending` KHÔNG được mang từ vựng thất bại (AC-036). `role="alert"`
+  // là assertive và không có vai trò lịch sự nào gánh hộ sự phân biệt ấy nữa
+  // (Decision 2, "consequence that does change") — nên toàn bộ nghĩa vụ nằm ở
+  // CHỮ: nói sự thật đang chờ, rồi nói việc cần làm tiếp.
+  //
+  // `amountMismatch` CỐ Ý dẫn tới một CON NGƯỜI: đó là kết cục duy nhất mà tiền
+  // có thể đã dịch chuyển trong khi đường tự động đã dừng. Nút "Send feedback"
+  // của SupportWidget do chính layout này mount, nên câu chữ gọi đúng tên nút
+  // ấy thay vì mở một đường liên hệ thứ hai.
+  "billing.recheck.action": "Check this order again",
+  "billing.recheck.busy": "Checking with the payment provider…",
+  "billing.recheck.settled": "Paid — your Premium period runs to {date}.",
+  "billing.recheck.stillPending":
+    "Still awaiting payment. Transfer the exact amount with the transfer note shown on the payment screen, then check again.",
+  "billing.recheck.notPending": "This order is already closed, so re-checking will not change it.",
+  "billing.recheck.unknownOrder":
+    "We cannot find this order. Use the “Send feedback” button and quote the order code so we can look it up.",
+  "billing.recheck.amountMismatch":
+    "The amount received does not match this order. Use the “Send feedback” button and quote the order code — a person has to settle this one.",
+  "billing.recheck.providerUnavailable":
+    "We could not reach the payment provider. Nothing about your order changed; try again shortly.",
+  "billing.recheck.rateLimited":
+    "You checked several times in a row. Wait a moment, then check again.",
+  // Nhãn của C-15 (S-06). Nằm ở đây vì C-10 là component DUY NHẤT render nó:
+  // `variant` chọn nhãn, và một wrapper không cấp được nhãn nếu không có prop
+  // (frontend DD § E1).
+  "billing.confirm.action": "I have transferred — check now",
+
+  // --- S-06 /pricing/checkout — C-12 / C-13 / C-14 / C-15 (plan Task 4.3) ---
+  //
+  // Brand tokens ("payOS", "VietQR") deliberately do NOT appear as whole
+  // values: the identical-string budget (i18n.test.ts:54-59) counts a
+  // byte-identical en/vi pair, and a bare brand name is identical by
+  // construction. The sentence around it is written per locale instead.
+  //
+  // `{time}` arrives ALREADY FORMATTED by formatDateTime() — same rule as
+  // `billing.amount`, and for the same reason (translate.ts:27 substitutes
+  // with a raw String()).
+  "billing.checkout.title": "Complete your payment",
+  "billing.checkout.validUntil": "This payment request is valid until {time}.",
+  "billing.checkout.qrLabel": "Scannable code carrying the transfer details",
+  "billing.checkout.noActiveOrder": "There is no payment in progress right now.",
+  "billing.checkout.account": "Bank account number",
+  "billing.checkout.accountName": "Account holder",
+  "billing.checkout.amountLabel": "Amount",
+  "billing.checkout.memo": "Transfer note",
+  // The memo is the field that loses a user their money: a transfer without it
+  // arrives and matches no order, so the sentence states the consequence
+  // rather than merely asking politely.
+  "billing.checkout.memoWarning":
+    "Copy the transfer note exactly as shown. A transfer without it cannot be matched to this order automatically.",
+  // C-14's Partial state. Not in the UI Spec's v1.2 key budget, which lists no
+  // string for it; reusing one of C-10's seven outcome sentences would give
+  // two different reasons one sentence, which that table forbids.
+  "billing.checkout.fieldMissing":
+    "Some of the transfer details are missing from this order. Use the “Send feedback” button and quote the order code before you send any money.",
+  // AC-039's gate (TBD-02 / BU-1). It must say WHY and WHAT HAPPENS NEXT: the
+  // control is reachable precisely so the user can read this.
+  "billing.confirm.legalPending.reason":
+    "The Terms of Service and Refund Policy are not published yet, so payment cannot be confirmed here. Nothing has been charged.",
+
+  // C-11. Câu `quota.unavailable` phải nói ĐỦ HAI NỬA — bộ đếm không đọc được,
+  // VÀ quyền truy cập không bị ảnh hưởng — vì `Quota.unknown` là hợp đồng
+  // hỏng-MỞ (UI-D2). In "0" là tuyên bố một sự cạn kiệt mà server không hề
+  // cưỡng chế; in "—" đọc ra "đếm được số không". Cả hai biến một hợp đồng
+  // hỏng-mở thành một MÀN HÌNH hỏng-đóng. Cũng vì thế chuỗi này không được
+  // chứa ký tự "0" hay "—".
+  "billing.quota.unavailable":
+    "We could not read your usage counters just now. This does not restrict your access: everything still works.",
+  "billing.orders.planLabel": "Current plan",
+  "billing.orders.planPremiumUntil": "Premium · until {date}",
+  "billing.orders.planPremiumGrace": "Premium · grace period, expires {date}",
+  "billing.orders.resetLabel": "Period resets",
+  // Hai khoá RIÊNG cho hai hạn mức, và chữ của chúng khác nhau đến tận danh từ
+  // cuối câu: một lần hoán nhầm tutor↔upload phải NHÌN THẤY ĐƯỢC trên màn hình
+  // chứ không chỉ sai con số. `billing.quota.remaining` KHÔNG dùng lại được —
+  // nghĩa của nó là ĐÃ DÙNG, và nó chỉ nói về gia sư (frontend DD X-3).
+  "billing.orders.tutorLabel": "Tutor hints",
+  "billing.orders.tutorRemaining": "{count} of {limit} hints left",
+  "billing.orders.uploadLabel": "Exam uploads",
+  "billing.orders.uploadRemaining": "{count} of {limit} uploads left",
+
+  // /profile — thông báo lỗi của changeAvatar / changePassword.
+  //
+  // Server Action trả về KHOÁ, không trả câu chữ của Supabase: thông điệp của
+  // nhà cung cấp trên đường mật khẩu là một oracle (updateUser trả nguyên văn
+  // "New password should be different from the old password"). Đây là chỗ khác
+  // biệt có chủ đích so với sáu chỗ còn lại trong app/(layer1)/actions.ts, nơi
+  // error.message vẫn được trả thẳng.
+  //
+  // NGOẠI LỆ: bốn câu của validatePassword vẫn về nguyên văn tiếng Anh và được
+  // ánh xạ ở phía client (UI-D10) — đưa chúng vào đây là tạo bản sao thứ hai
+  // của chính sách mật khẩu.
+  "profile.error.sessionExpired": "Your session has expired. Sign in again.",
+  "profile.error.rateLimited": "Too many attempts. Try again in {seconds} seconds.",
+  "profile.error.generic": "Something went wrong. Try again.",
+  "profile.avatar.invalidType": "Only JPG, PNG and WebP images are accepted.",
+  "profile.avatar.tooLarge": "That image is over {maxMb}MB. Choose a smaller one.",
+  "profile.avatar.uploadFailed": "The picture was not saved. Try again.",
+  "profile.password.errorCurrentRequired": "Enter your current password.",
+  "profile.password.errorCurrentWrong": "That is not your current password.",
+  "profile.password.errorMismatch": "The two new passwords do not match.",
+  // So sánh hai chuỗi ta đã cầm trong tay, TRƯỚC mọi lượt mạng — không phải đọc
+  // câu trả lời của Supabase rồi đoán ngược ra.
+  "profile.password.errorSameAsCurrent":
+    "The new password must be different from your current one.",
+
+  // --- /profile — giao diện (UI Spec profile-and-about-ui-spec.md §i18n) ----
+  //
+  // Bốn khoá `profile.password.errorTooShort|TooLong|OnlySpaces|TooCommon` là
+  // bản dịch của bốn câu validatePassword trả về NGUYÊN VĂN tiếng Anh (UI-D10).
+  // Chúng được nối với nhau bằng đối chiếu literal ở
+  // app/(layer3)/profile/_components/errorMessages.ts, và một test canh literal
+  // đó khớp đúng đầu ra thật của lib/auth/passwordPolicy.ts — sửa câu chữ bên
+  // đó mà quên bên này thì FAIL BUILD, không phải âm thầm rơi về câu chung.
+  "profile.tab.info": "Info",
+  "profile.tab.usage": "Usage",
+  "profile.eyebrow": "Account",
+  "profile.title": "Your profile",
+  "profile.description": "What this account is, and the parts of it you can change.",
+  "profile.email.label": "Registered email",
+  "profile.email.readOnly": "Cannot be changed",
+  "profile.name.change": "Change name",
+  "profile.name.saved": "Display name updated.",
+  "profile.name.errorEmpty": "Enter a display name.",
+  "profile.name.errorTooLong": "Display name must be {max} characters or fewer.",
+  "profile.name.errorCharset": "Display name may only contain letters and dots.",
+  "profile.password.label": "Password",
+  "profile.password.masked": "Your password is not shown here.",
+  "profile.password.noReveal":
+    "Passwords are stored hashed, so nobody — us included — can show yours again.",
+  "profile.password.change": "Change password",
+  "profile.password.current": "Current password",
+  "profile.password.new": "New password",
+  "profile.password.confirm": "Confirm new password",
+  "profile.password.hint": "At least {min} characters.",
+  "profile.password.submit": "Update password",
+  "profile.password.changed": "Password changed. Other devices will need to sign in again.",
+  "profile.password.errorTooShort": "Use at least {min} characters.",
+  "profile.password.errorTooLong":
+    "That password is too long (max {maxBytes} bytes — accented letters count as more than one).",
+  "profile.password.errorOnlySpaces": "A password cannot be only spaces.",
+  "profile.password.errorTooCommon": "That password is too common. Choose a different one.",
+  "profile.avatar.label": "Profile picture",
+  "profile.avatar.change": "Change picture",
+  "profile.avatar.chooseFile": "Choose an image",
+  "profile.avatar.hint": "JPG, PNG or WebP, up to {maxMb}MB.",
+  "profile.avatar.selected": "Selected: {name}",
+  "profile.avatar.uploading": "Uploading…",
+  "profile.avatar.saved": "Profile picture updated.",
+  "profile.error.network": "The connection dropped before that finished. Try again.",
+
+  // /about — trang giới thiệu + liên hệ (PRD R10, ADR-0017). Chỉ NHÃN nằm ở
+  // đây; tên/email/số điện thoại là giá trị giống nhau ở cả hai ngôn ngữ nên
+  // được giữ trong chính page.tsx (xem comment ở đó).
+  "about.eyebrow": "About",
+  "about.title": "About Us",
+  "about.intro":
+    "MS-MOLAR is an exam-practice platform for Vietnamese secondary and high-school students. You can reach us directly using the details below.",
+  "about.owner": "Site owner",
+  "about.email": "Contact email",
+  "about.phone": "Contact phone",
+  "about.placeholderNotice":
+    "These contact details are placeholders. They will be replaced with real information before launch.",
 } as const;
 
 /** Tập khoá hợp lệ — mọi ngôn ngữ khác phải phủ đủ. */

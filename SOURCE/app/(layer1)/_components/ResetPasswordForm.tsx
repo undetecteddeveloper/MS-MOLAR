@@ -31,7 +31,7 @@ export function ResetPasswordForm() {
       <button
         type="submit"
         disabled={pending}
-        className="self-start rounded-[4px] bg-[#A62C2B] px-7 py-2.5 text-xs font-medium tracking-[0.14em] text-[#EDE1C8] uppercase transition-colors hover:bg-[#8F2523] disabled:opacity-60"
+        className="self-start rounded-full bg-[#A62C2B] px-7 py-2.5 text-xs font-medium tracking-[0.14em] text-[#EDE1C8] uppercase transition-colors hover:bg-[#8F2523] disabled:opacity-60"
       >
         {pending ? t("common.saving") : t("auth.setNewPassword")}
       </button>

@@ -2,47 +2,49 @@
 
 // SidebarProfile — ô profile góc dưới-trái sidebar homepage (Layer 1, S#17
 // vòng sửa 1). Chỉ render khi ĐÃ đăng nhập (guest thấy tag "Account" trong nav
-// thay thế). Click → dropup (mở LÊN TRÊN vì ô nằm đáy màn hình) gồm:
-//  - "Edit": đổi Tên hiển thị ngay tại chỗ qua updateProfile Server Action
-//    (ràng buộc như HeaderProfile: ≤12 ký tự, chỉ chữ cái + dấu chấm — lọc lúc
-//    gõ ở client, server validate lại authoritative).
-//  - "Sign out": signOut Server Action → về /?auth=signin.
+// thay thế). Click → dropup (mở LÊN TRÊN vì ô nằm đáy màn hình) gồm ba đường:
+// "Profile" → /profile, "My exams" → /me/exams, "Sign out" → signOut Server
+// Action → về /?auth=signin.
 // Panel dropup nền ngà trên sidebar đen sơn mài (phân lớp bằng màu nền +
-// hairline — DESIGN.md, không shadow). Nhãn tiếng Anh đồng bộ homepage.
-import Image from "next/image";
+// hairline, không shadow). Nhãn tiếng Anh đồng bộ homepage.
+//
+// MỤC "EDIT" ĐÃ BỎ (2026-08-17) — xem chú thích cùng nội dung ở đầu
+// components/shared/HeaderProfile.tsx. Tóm tắt: nó là bản cài đặt thứ ba của
+// việc sửa tên hiển thị, trên bề mặt chật nhất, và /profile đã làm việc đó tử tế
+// hơn (có nhãn, có role="alert", có bản dịch).
 import Link from "next/link";
-import { useActionState, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import { signOut, updateProfile, type AuthState } from "@/app/(layer1)/actions";
+import { useState } from "react";
+import { signOut } from "@/app/(layer1)/actions";
 import { useT } from "@/lib/i18n/client";
+import { Avatar } from "@/components/shared/Avatar";
 
-const AVATAR = "/images/user-avatar-placeholder.png";
+// ⚠ components/shared/HeaderProfile.tsx là BẢN SINH ĐÔI gần như từng chữ của
+// file này. Mọi thay đổi ở đây phải làm ở CẢ HAI, nếu không hai ô tài khoản của
+// cùng một sản phẩm sẽ trôi ra khác nhau — đúng thứ AC-040 cấm.
 
-export function SidebarProfile({ displayName: initial }: { displayName: string }) {
+/** Giống hệt `itemCls` của HeaderProfile. Cố ý chép chứ không import chéo: hai
+ *  file này là cặp sinh đôi được canh bằng mắt và bằng chú thích ở trên, không
+ *  phải hai chỗ gọi của một component chung — gộp chúng là một việc riêng, và
+ *  là việc phải làm cho CẢ trigger lẫn panel chứ không chỉ một dòng class. */
+function itemCls(tone: "default" | "brand" = "default"): string {
+  return [
+    "block w-full rounded-[4px] px-3 py-2 text-center font-sans text-sm transition-colors hover:bg-[#E3D5B6]",
+    tone === "brand" ? "text-brand" : "text-[#1B1512]",
+  ].join(" ");
+}
+
+export function SidebarProfile({
+  displayName,
+  avatarUrl,
+}: {
+  displayName: string;
+  avatarUrl: string | null;
+}) {
   const t = useT();
   const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const [displayName, setDisplayName] = useState(initial);
-  const [draft, setDraft] = useState(initial);
-  const router = useRouter();
-  const [state, formAction, pending] = useActionState<AuthState, FormData>(updateProfile, null);
-  const wasPending = useRef(false);
-
-  // Server Action xong (pending true → false) không lỗi → chốt tên mới, đóng
-  // form, refresh data server (persist DB thật, không chỉ state ảo client).
-  useEffect(() => {
-    if (wasPending.current && !pending && !state?.error) {
-      setDisplayName(draft);
-      setEditing(false);
-      router.refresh();
-    }
-    wasPending.current = pending;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pending]);
 
   function close() {
     setOpen(false);
-    setEditing(false);
   }
 
   return (
@@ -64,7 +66,10 @@ export function SidebarProfile({ displayName: initial }: { displayName: string }
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center gap-3 rounded-md border border-[#EDE1C8]/12 px-3 py-2.5 transition-colors hover:border-[#EDE1C8]/30"
       >
-        <Image src={AVATAR} alt="" width={32} height={32} className="shrink-0 rounded-full" />
+        {/* Avatar thay cho <Image> + ảnh placeholder cục bộ. next/image chỉ chạy
+            được với ảnh cục bộ ở đây: next.config.ts không khai remotePatterns
+            nào, nên một URL Supabase đưa vào <Image> là lỗi LÚC CHẠY. */}
+        <Avatar src={avatarUrl} name={displayName} size={32} />
         <span className="min-w-0 flex-1 truncate text-left font-sans text-sm text-[#EDE1C8]">
           {displayName}
         </span>
@@ -77,78 +82,20 @@ export function SidebarProfile({ displayName: initial }: { displayName: string }
           role="menu"
           className="absolute bottom-full left-0 z-20 mb-2 w-full rounded-md border border-[#D8C9A8] bg-[#EDE1C8] p-1"
         >
-          {!editing ? (
-            <>
-              <button
-                type="button"
-                onClick={() => {
-                  setDraft(displayName);
-                  setEditing(true);
-                }}
-                className="block w-full rounded-[4px] px-3 py-2 text-center font-sans text-sm text-[#1B1512] transition-colors hover:bg-[#E3D5B6]"
-              >
-                {t("common.edit")}
-              </button>
-              {/* My exams (UGC v2.0, Task 6.1) — giữa Edit và Sign out (D7). */}
-              <Link
-                role="menuitem"
-                href="/me/exams"
-                onClick={close}
-                className="block w-full rounded-[4px] px-3 py-2 text-center font-sans text-sm text-[#1B1512] transition-colors hover:bg-[#E3D5B6]"
-              >
-                {t("common.myExams")}
-              </Link>
-              <form action={signOut}>
-                <button
-                  type="submit"
-                  className="block w-full rounded-[4px] px-3 py-2 text-center font-sans text-sm text-[#1B1512] transition-colors hover:bg-[#E3D5B6]"
-                >
-                  {t("common.signOut")}
-                </button>
-              </form>
-            </>
-          ) : (
-            <form action={formAction} className="flex flex-col items-center gap-2 p-2">
-              <label htmlFor="sidebar-profile-display-name" className="sr-only">
-                {t("common.displayName")}
-              </label>
-              <input
-                id="sidebar-profile-display-name"
-                name="displayName"
-                value={draft}
-                onChange={(e) => {
-                  // Ràng buộc: ≤12 ký tự, chỉ chữ cái (kể cả có dấu) + dấu chấm.
-                  const filtered = e.target.value.replace(/[^\p{L}.]/gu, "").slice(0, 12);
-                  setDraft(filtered);
-                }}
-                maxLength={12}
-                autoFocus
-                className="w-full rounded-[4px] border border-[color:var(--input)] bg-transparent px-3 py-2 text-center font-sans text-sm text-[#1B1512] outline-none focus:border-[color:var(--ring)]"
-              />
-              <p className="px-1 text-center font-sans text-[0.65rem] text-[color:var(--muted-foreground)]">
-                {t("common.displayNameHint")}
-              </p>
-              {state?.error && (
-                <p className="px-1 text-center font-sans text-xs text-[#A62C2B]">{state.error}</p>
-              )}
-              <div className="flex w-full gap-2">
-                <button
-                  type="submit"
-                  disabled={pending || draft.length === 0}
-                  className="flex-1 rounded-[4px] bg-[#A62C2B] px-3 py-1.5 font-sans text-xs font-medium text-[#EDE1C8] transition-colors hover:bg-[#8F2523] disabled:opacity-60"
-                >
-                  {pending ? t("common.saving") : t("common.save")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEditing(false)}
-                  className="flex-1 rounded-[4px] border border-[#D8C9A8] px-3 py-1.5 font-sans text-xs text-[#1B1512] transition-colors hover:bg-[#E3D5B6]"
-                >
-                  {t("common.cancel")}
-                </button>
-              </div>
-            </form>
-          )}
+          <Link role="menuitem" href="/profile" onClick={close} className={itemCls()}>
+            {t("common.profile")}
+          </Link>
+          <Link role="menuitem" href="/me/exams" onClick={close} className={itemCls()}>
+            {t("common.myExams")}
+          </Link>
+          {/* Đỏ son cho CHỮ, không phải cho nền — xem chú thích tương ứng ở
+              HeaderProfile. Panel nền ngà nên dùng --brand, không phải
+              --brand-on-dark. */}
+          <form action={signOut}>
+            <button role="menuitem" type="submit" className={itemCls("brand")}>
+              {t("common.signOut")}
+            </button>
+          </form>
         </div>
       )}
     </div>

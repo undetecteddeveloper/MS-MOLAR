@@ -1,5 +1,8 @@
+import { Suspense } from "react";
 import type { Metadata, Viewport } from "next";
 import { Geist_Mono, Source_Serif_4, Be_Vietnam_Pro } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
+import { RouteLoadingOverlay } from "@/components/layout/RouteLoadingOverlay";
 import { I18nProvider } from "@/lib/i18n/client";
 import { getLocale } from "@/lib/i18n/server";
 import { SITE_URL } from "@/lib/siteUrl";
@@ -41,9 +44,24 @@ export const metadata: Metadata = {
   },
   description: DESCRIPTION,
   applicationName: "MS-MOLAR",
-  // Site chỉ có duy nhất `/` là public; phần còn lại nằm sau đăng nhập nên
-  // không có gì để index. Chi tiết per-path nằm ở app/robots.ts.
+  // Ba trang public: `/`, `/terms`, `/refund-policy` (hai trang sau do tính
+  // năng Subscription thêm — PRD R11). Phần còn lại nằm sau đăng nhập nên không
+  // có gì để index. Chi tiết per-path ở app/robots.ts và app/sitemap.ts.
+  //
+  // `canonical: "/"` ở ĐÂY là canonical MẶC ĐỊNH của root layout, không phải
+  // lời khẳng định rằng chỉ có một trang public. Trang nào cần canonical riêng
+  // thì tự khai `alternates` trong `export const metadata` của chính nó.
   alternates: { canonical: "/" },
+  // Verify quyền sở hữu site trong Google Search Console bằng thẻ meta.
+  //
+  // Đây là bước CHẶN của mọi việc SEO còn lại (SEO-TODO.md § "Việc cần làm"):
+  // chưa verify thì không submit được sitemap, không "Request Indexing" được,
+  // và phải ngồi chờ Google tình cờ bò vào. Bản thân token là thứ NGƯỜI phải
+  // lấy từ tài khoản Search Console, nên chỗ này chỉ dựng sẵn đường dẫn: đặt
+  // `GOOGLE_SITE_VERIFICATION` trên Vercel là thẻ tự xuất hiện, không phải sửa
+  // code + deploy lại. Không đặt → không render thẻ nào (Next bỏ qua undefined),
+  // không phải một thẻ rỗng làm Google báo verify hỏng.
+  verification: { google: process.env.GOOGLE_SITE_VERIFICATION },
   openGraph: {
     type: "website",
     siteName: "MS-MOLAR",
@@ -71,6 +89,13 @@ export const metadata: Metadata = {
 // Màu thanh địa chỉ trên mobile — đen sơn mài, khớp sidebar homepage.
 export const viewport: Viewport = {
   themeColor: "#1B1512",
+  // `viewport-fit=cover` — BẮT BUỘC để `env(safe-area-inset-*)` trả giá trị
+  // thật. Thiếu nó thì mọi safe-area inset luôn bằng 0 và thanh điều hướng đáy
+  // (BottomNav) sẽ nằm lọt dưới thanh Home ảo của iPhone: người dùng thấy nút
+  // nhưng bấm không trúng. Đây là kiểu hỏng IM LẶNG — không lỗi, không cảnh
+  // báo, chỉ là các ô cuối cùng không phản hồi trên đúng những thiết bị có
+  // notch/home indicator.
+  viewportFit: "cover",
 };
 
 export default async function RootLayout({
@@ -91,7 +116,24 @@ export default async function RootLayout({
       className={`${geistMono.variable} ${sourceSerif.variable} ${beVietnamPro.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">
-        <I18nProvider locale={locale}>{children}</I18nProvider>
+        {/* Lớp phủ "Loading" lúc chuyển trang phải nằm TRONG I18nProvider (nó
+            đọc `useT`) và ở root layout — layout của từng route group sẽ
+            remount theo route, tức là chính lúc cần nó nhất thì nó biến mất.
+
+            <Suspense> là bắt buộc vì component đọc `useSearchParams()`: trên
+            một route được prerender tĩnh, Next bắt cả cây phải rơi về render
+            phía client nếu không có ranh giới này — và đặt ở root layout thì
+            "cả cây" nghĩa là toàn bộ trang. Hiện KHÔNG route nào của dự án là
+            tĩnh (`next build` in ƒ cho tất cả), nên ranh giới này chưa đổi gì
+            hôm nay; nó ở đây để cái ngày ai đó làm một trang tĩnh không kéo
+            theo một cú hồi quy hiệu năng không ai nối được về nguyên nhân. */}
+        <I18nProvider locale={locale}>
+          {children}
+          <Suspense fallback={null}>
+            <RouteLoadingOverlay />
+          </Suspense>
+        </I18nProvider>
+        <Analytics />
       </body>
     </html>
   );

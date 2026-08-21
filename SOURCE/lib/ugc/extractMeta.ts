@@ -11,8 +11,9 @@
 // chuỗi in trên đề; parse là việc của normalizeMeta (code thuần).
 
 import { makeUgcError } from "./errorCopy";
-import { ANSWER_MODEL, getGeminiClient, logExtractorExit, sdkErrorDetail } from "./gemini";
+import { ANSWER_MODEL, generateContent, logExtractorExit, sdkErrorDetail } from "./gemini";
 import { renderPdfPage } from "./pdf";
+import { recordUsage } from "./quotaTracker";
 import type { ExtractedMeta, Result } from "./types";
 import type { FileRef } from "./fileRef";
 import { toGeminiPart } from "./fileRef";
@@ -101,9 +102,12 @@ export async function extractMeta(file: FileRef): Promise<Result<ExtractedMeta>>
   // Vẫn instrument 4 lối thoát để chẩn đoán server-side (không log payload).
   const startedAt = Date.now();
   try {
-    const client = getGeminiClient();
+    // Client được dựng BÊN TRONG generateContent(), tức SAU khi rasterise trang
+    // 1 — trước đây getGeminiClient() chạy trước. Khác biệt duy nhất: khi server
+    // thiếu GEMINI_API_KEY, ta phí công render một trang trước khi ném. Cùng
+    // `catch`, cùng META_EXTRACTION_FAILED, vẫn NON-FATAL (AC-040).
     const pageRef = await firstPageRef(file);
-    const response = await client.models.generateContent({
+    const response = await generateContent({
       model: ANSWER_MODEL,
       contents: [toGeminiPart(pageRef), { text: PROMPT }],
       config: {
@@ -112,6 +116,10 @@ export async function extractMeta(file: FileRef): Promise<Result<ExtractedMeta>>
         responseJsonSchema: META_SCHEMA as unknown as Record<string, unknown>,
       },
     });
+
+    // Đo trước mọi nhánh phân loại — lượt gọi hỏng vẫn tiêu token và vẫn trừ
+    // vào trần request/ngày (Subscription PRD U2).
+    recordUsage("metadata", ANSWER_MODEL, response.usageMetadata);
 
     const finishReason = response.candidates?.[0]?.finishReason;
     if (finishReason !== "STOP") {

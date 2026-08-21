@@ -12,6 +12,10 @@ import { redirect } from "next/navigation";
 import { getResult } from "@/app/(layer2)/queries";
 import { decodeTfAnswer, formatSubAnswers } from "@/lib/ugc/tfCodec";
 import { RichText } from "@/components/shared/RichText";
+import { PageContainer } from "@/components/layout/PageContainer";
+import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
+import { ExplainStepAffordance } from "@/components/tutor/ExplainStepAffordance";
+import { TutorQuotaNote } from "@/components/billing/TutorQuotaNote";
 
 export default async function ResultDetailPage({
   params,
@@ -31,19 +35,32 @@ export default async function ResultDetailPage({
 
   return (
     <div className="bg-background">
-      <main className="mx-auto w-full max-w-2xl px-6 py-8">
+      <PageContainer as="main" size="small">
         {/* preload order 1–3 — các block fade lần lượt sau navbar (S#21). */}
         <header
           className="preload-fade flex flex-col gap-2"
           style={{ "--preload-order": 1 } as React.CSSProperties}
         >
+          {/* Đây là route SÂU NHẤT của app (đề → lượt làm → kết quả → chi tiết).
+              Trước đây lối ra duy nhất là nút "← Back to results" tuốt dưới đáy
+              trang, sau một danh sách dài bằng số câu hỏi. Breadcrumbs trả lại
+              cả vị trí lẫn lối ra ở NGAY ĐẦU trang. */}
+          <Breadcrumbs
+            className="mb-1 text-xs"
+            items={[
+              { label: t("nav.exams"), href: "/exams" },
+              { label: examTitle, href: `/exams/${examId}` },
+              { label: t("result.title"), href: resultHref },
+              { label: t("result.attemptDetails") },
+            ]}
+          />
           <span className="eyebrow">{t("result.attemptDetails")}</span>
           <h1 className="text-foreground font-serif text-2xl leading-snug">{examTitle}</h1>
           <p className="text-muted-foreground text-sm">
             <span className="text-foreground font-medium tabular-nums">
               {result.correct}/{result.total}
             </span>{" "}
-            correct
+            {t("common.correct").toLowerCase()}
           </p>
         </header>
 
@@ -67,7 +84,7 @@ export default async function ResultDetailPage({
               return (
                 <li key={r.questionId} className="border-border flex flex-col gap-4 border-t pt-6">
                   <div className="flex items-baseline justify-between gap-3">
-                    <span className="eyebrow">Question {i + 1}</span>
+                    <span className="eyebrow">{t("upload.questionLabel", { number: i + 1 })}</span>
                     <span className="text-muted-foreground text-xs font-medium">
                       {t("result.notAutoScored")}
                     </span>
@@ -100,10 +117,11 @@ export default async function ResultDetailPage({
                   <div className="flex flex-col gap-1 text-sm">
                     <p className="text-muted-foreground">
                       {t("result.yourAnswerLabel")}{" "}
-                      <span className="text-foreground">{studentInput || "— skipped —"}</span>
+                      <span className="text-foreground">{studentInput || t("result.skipped")}</span>
                     </p>
                     <p className="text-muted-foreground">
-                      Stored answer: <span className="text-[#4F7942]">{storedAnswer || "—"}</span>
+                      {t("result.storedAnswerLabel")}{" "}
+                      <span className="text-[#4F7942]">{storedAnswer || "—"}</span>
                     </p>
                   </div>
                 </li>
@@ -113,10 +131,10 @@ export default async function ResultDetailPage({
             // không dùng green neon lạnh); wrong giữ destructive. Green=correct
             // là convention chuẩn, áp cho mọi marking correct bên dưới.
             const status = r.isCorrect
-              ? { label: "Correct", cls: "text-[#4F7942]" }
+              ? { label: t("common.correct"), cls: "text-[#4F7942]" }
               : r.selected
-                ? { label: "Wrong", cls: "text-destructive" }
-                : { label: "Skipped", cls: "text-muted-foreground" };
+                ? { label: t("common.wrong"), cls: "text-destructive" }
+                : { label: t("result.skippedLabel"), cls: "text-muted-foreground" };
 
             // TBD-04 resolution: reuse `status.cls` (already computed above for
             // the status chip) for the "Your answer" line's color — avoids a
@@ -126,7 +144,7 @@ export default async function ResultDetailPage({
             return (
               <li key={r.questionId} className="border-border flex flex-col gap-4 border-t pt-6">
                 <div className="flex items-baseline justify-between gap-3">
-                  <span className="eyebrow">Question {i + 1}</span>
+                  <span className="eyebrow">{t("upload.questionLabel", { number: i + 1 })}</span>
                   <span className={`text-xs font-medium ${status.cls}`}>{status.label}</span>
                 </div>
 
@@ -137,64 +155,84 @@ export default async function ResultDetailPage({
                   />
                 )}
 
+                {/* Engine 1 (AC-023/024): gia sư "Giải thích bước này" mount ở
+                    CUỐI cả hai nhánh CÓ CHẤM (short_answer và mcq), ngay trước
+                    khi đóng <li>, và CHỈ khi cờ đúng bằng true — vắng mặt/false/
+                    undefined đều không mount (fail-closed, UI Spec D1). Nhánh
+                    KHÔNG chấm ở trên không có mount này: câu không chấm không thể
+                    mang một `hasBeenWrongTwice` có nghĩa. Cờ này chỉ là tiện ích
+                    hiển thị — explainStep() tự tái kiểm tra điều kiện phía server. */}
                 {isShortAnswer ? (
-                  <div className="flex flex-col gap-1 text-sm">
-                    <p className="text-muted-foreground">
-                      {t("result.yourAnswerLabel")}{" "}
-                      <span className={status.cls}>{r.selected || t("result.skipped")}</span>
-                    </p>
-                    <p className="text-muted-foreground">
-                      {t("result.correctAnswerLabel")}{" "}
-                      <span className="text-[#4F7942]">{q?.essayAnswer || "—"}</span>
-                    </p>
-                  </div>
+                  <>
+                    <div className="flex flex-col gap-1 text-sm">
+                      <p className="text-muted-foreground">
+                        {t("result.yourAnswerLabel")}{" "}
+                        <span className={status.cls}>{r.selected || t("result.skipped")}</span>
+                      </p>
+                      <p className="text-muted-foreground">
+                        {t("result.correctAnswerLabel")}{" "}
+                        <span className="text-[#4F7942]">{q?.essayAnswer || "—"}</span>
+                      </p>
+                    </div>
+                    {r.hasBeenWrongTwice === true && (
+                      <ExplainStepAffordance questionId={r.questionId} attemptId={attemptId} />
+                    )}
+                    <TutorQuotaNote />
+                  </>
                 ) : (
-                  <ul className="flex flex-col gap-2">
-                    {q?.choices.map((choice) => {
-                      const isCorrect = choice.id === r.correct;
-                      const isSelectedWrong = choice.id === r.selected && r.selected !== r.correct;
+                  <>
+                    <ul className="flex flex-col gap-2">
+                      {q?.choices.map((choice) => {
+                        const isCorrect = choice.id === r.correct;
+                        const isSelectedWrong =
+                          choice.id === r.selected && r.selected !== r.correct;
 
-                      const rowCls = isCorrect
-                        ? "border-[#4F7942] bg-[#4F7942]/10"
-                        : isSelectedWrong
-                          ? "border-destructive bg-destructive/8"
-                          : "border-border bg-card";
-                      const badgeCls = isCorrect
-                        ? "border-[#4F7942] bg-[#4F7942] text-[#EDE1C8]"
-                        : isSelectedWrong
-                          ? "border-destructive bg-destructive text-brand-foreground"
-                          : "border-border text-muted-foreground";
+                        const rowCls = isCorrect
+                          ? "border-[#4F7942] bg-[#4F7942]/10"
+                          : isSelectedWrong
+                            ? "border-destructive bg-destructive/8"
+                            : "border-border bg-card";
+                        const badgeCls = isCorrect
+                          ? "border-[#4F7942] bg-[#4F7942] text-[#EDE1C8]"
+                          : isSelectedWrong
+                            ? "border-destructive bg-destructive text-brand-foreground"
+                            : "border-border text-muted-foreground";
 
-                      return (
-                        <li
-                          key={choice.id}
-                          className={`flex items-start gap-3 rounded-lg border p-3 ${rowCls}`}
-                        >
-                          <span
-                            aria-hidden
-                            className={`flex size-7 shrink-0 items-center justify-center rounded-md border font-mono text-sm font-medium ${badgeCls}`}
+                        return (
+                          <li
+                            key={choice.id}
+                            className={`flex items-start gap-3 rounded-lg border p-3 ${rowCls}`}
                           >
-                            {choice.id}
-                          </span>
-                          <RichText
-                            text={choice.text}
-                            inline
-                            className="text-card-foreground pt-0.5 text-base leading-relaxed"
-                          />
-                          {isCorrect && (
-                            <span className="ml-auto shrink-0 self-center font-mono text-[0.65rem] tracking-wide text-[#4F7942] uppercase">
-                              Correct answer
+                            <span
+                              aria-hidden
+                              className={`flex size-7 shrink-0 items-center justify-center rounded-md border font-mono text-sm font-medium ${badgeCls}`}
+                            >
+                              {choice.id}
                             </span>
-                          )}
-                          {isSelectedWrong && (
-                            <span className="text-destructive ml-auto shrink-0 self-center font-mono text-[0.65rem] tracking-wide uppercase">
-                              Your choice
-                            </span>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
+                            <RichText
+                              text={choice.text}
+                              inline
+                              className="text-card-foreground pt-0.5 text-base leading-relaxed"
+                            />
+                            {isCorrect && (
+                              <span className="ml-auto shrink-0 self-center font-mono text-[0.65rem] tracking-wide text-[#4F7942] uppercase">
+                                {t("result.correctAnswer")}
+                              </span>
+                            )}
+                            {isSelectedWrong && (
+                              <span className="text-destructive ml-auto shrink-0 self-center font-mono text-[0.65rem] tracking-wide uppercase">
+                                {t("result.yourChoice")}
+                              </span>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    {r.hasBeenWrongTwice === true && (
+                      <ExplainStepAffordance questionId={r.questionId} attemptId={attemptId} />
+                    )}
+                    <TutorQuotaNote />
+                  </>
                 )}
               </li>
             );
@@ -212,7 +250,7 @@ export default async function ResultDetailPage({
             ← Back to results
           </Link>
         </div>
-      </main>
+      </PageContainer>
     </div>
   );
 }

@@ -13,6 +13,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import type { MyExamListItem } from "@/app/(layer4)/queries";
+import { useT } from "@/lib/i18n/client";
 import { ExamRow } from "./ExamRow";
 import {
   Tabs,
@@ -37,6 +38,7 @@ export function MyExamsList({
   exams: MyExamListItem[];
   justPublished: boolean;
 }) {
+  const t = useT();
   const pending = exams.filter((exam) => exam.status !== "published");
   const published = exams.filter((exam) => exam.status === "published");
 
@@ -47,50 +49,48 @@ export function MyExamsList({
           role="status"
           className="rounded-lg border border-[#3f7d4f] bg-[#3f7d4f]/8 px-4 py-3 text-sm text-[#2f6b3f]"
         >
-          ✓ Your exam is published and now visible in the catalog.
+          ✓ {t("upload.publishedBanner")}
         </div>
       )}
 
-      <div>
-        <h1 className="text-2xl text-foreground">My exams</h1>
-        <div className="mt-3 h-0.5 w-10 bg-[#B8863B]" aria-hidden />
-        <div className="mt-3 flex items-center justify-between gap-4">
-          <p className="text-sm text-muted-foreground">
-            Check your exams before they go live.
-          </p>
-          <Link
-            href="/upload"
-            className="shrink-0 rounded-[4px] bg-brand px-4 py-2 text-xs font-medium uppercase tracking-[0.14em] text-brand-foreground transition-opacity hover:opacity-90"
-          >
-            Upload an exam
-          </Link>
-        </div>
+      {/* Tiêu đề trang bỏ khỏi UI nhìn thấy được — điều hướng đã đủ ngữ cảnh;
+          h1 sr-only giữ mốc cho trình đọc màn hình (cùng quy ước /exams). */}
+      <h1 className="sr-only">{t("common.myExams")}</h1>
+      <div className="flex justify-end">
+        <Link
+          href="/upload"
+          className="shrink-0 rounded-[4px] bg-brand px-4 py-2 text-xs font-medium uppercase tracking-[0.14em] text-brand-foreground transition-opacity hover:opacity-90"
+        >
+          {t("upload.uploadAnExam")}
+        </Link>
       </div>
 
       {exams.length === 0 ? (
         <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border px-6 py-16 text-center">
-          <p className="text-muted-foreground">
-            You haven&apos;t uploaded any exams yet.
-          </p>
+          <p className="text-muted-foreground">{t("upload.noneUploaded")}</p>
           <Link
             href="/upload"
             className="text-sm text-brand underline-offset-4 hover:underline"
           >
-            Upload an exam
+            {t("upload.uploadAnExam")}
           </Link>
         </div>
       ) : (
         <Tabs defaultValue="pending">
           <TabsList>
-            <TabsTab value="pending">Pending ({pending.length})</TabsTab>
-            <TabsTab value="published">Published ({published.length})</TabsTab>
+            <TabsTab value="pending">
+              {t("upload.tabPending")} ({pending.length})
+            </TabsTab>
+            <TabsTab value="published">
+              {t("upload.tabPublished")} ({published.length})
+            </TabsTab>
             <TabsIndicator />
           </TabsList>
 
           <TabsPanel value="pending" className="mt-4">
             {pending.length === 0 ? (
               <p className="py-12 text-center text-sm text-muted-foreground">
-                Nothing pending — nice and tidy.
+                {t("upload.nothingPending")}
               </p>
             ) : (
               <ExamListScroll>
@@ -104,7 +104,7 @@ export function MyExamsList({
           <TabsPanel value="published" className="mt-4">
             {published.length === 0 ? (
               <p className="py-12 text-center text-sm text-muted-foreground">
-                No exams published yet.
+                {t("upload.nonePublished")}
               </p>
             ) : (
               <ExamListScroll>

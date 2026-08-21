@@ -129,7 +129,7 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
                   <button
                     type="submit"
                     disabled={resetPending}
-                    className="rounded-[4px] bg-[#A62C2B] px-7 py-2.5 text-xs font-medium tracking-[0.14em] text-[#EDE1C8] uppercase transition-colors hover:bg-[#8F2523] disabled:opacity-60"
+                    className="rounded-full bg-[#A62C2B] px-7 py-2.5 text-xs font-medium tracking-[0.14em] text-[#EDE1C8] uppercase transition-colors hover:bg-[#8F2523] disabled:opacity-60"
                   >
                     {resetPending ? t("common.sending") : t("auth.sendResetLink")}
                   </button>
@@ -196,7 +196,7 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
                   <button
                     type="submit"
                     disabled={pending}
-                    className="rounded-[4px] bg-[#A62C2B] px-7 py-2.5 text-xs font-medium tracking-[0.14em] text-[#EDE1C8] uppercase transition-colors hover:bg-[#8F2523] disabled:opacity-60"
+                    className="rounded-full bg-[#A62C2B] px-7 py-2.5 text-xs font-medium tracking-[0.14em] text-[#EDE1C8] uppercase transition-colors hover:bg-[#8F2523] disabled:opacity-60"
                   >
                     {pending
                       ? t("common.processing")

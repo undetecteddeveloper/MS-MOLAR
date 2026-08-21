@@ -9,6 +9,12 @@ export const LIMITS = {
   MIN_SUB_ITEMS: 2,
   MAX_SUB_ITEMS: 4,
   MAX_SHORT_ANSWER: 100,
+  // Trần cho BÀI LÀM của người thi (attempt_answers.answer), KHÁC với
+  // MAX_ESSAY_ANSWER ở dưới — cái đó là đáp án mẫu của tác giả đề, lưu ở
+  // questions.essay_answer. Giá trị này PHẢI khớp CHECK trong
+  // supabase/schema.sql: `length(answer) <= 500`. Lệch xuống thì cắt oan bài
+  // làm; lệch lên thì Postgres từ chối nguyên lượt nộp bài lúc submit.
+  MAX_ATTEMPT_ANSWER: 500,
   MAX_TITLE: 200,
   MAX_STEM: 2000,
   MAX_CHOICE: 500,
@@ -33,6 +39,10 @@ export const LIMITS = {
   ] as const,
   // Guard chi phí nhẹ theo user (app-layer, không phải DB).
   MAX_UPLOADS_PER_DAY: 30,
+  // User Support System v1 (support-system-backend-design.md §Business Logic).
+  MAX_SUPPORT_MESSAGE: 1000, // TBD-07 resolved — matches MAX_REPORT_REASON
+  MAX_SCREENSHOT_BYTES: 8 * 1024 * 1024, // 8MB — nhỏ hơn MAX_FILE_BYTES(15MB), còn dư dưới bodySizeLimit 32MB toàn cục
+  ALLOWED_SCREENSHOT_MIME: ["image/png", "image/jpeg", "image/webp"] as const,
 } as const;
 
 export type AllowedMime = (typeof LIMITS.ALLOWED_MIME)[number];

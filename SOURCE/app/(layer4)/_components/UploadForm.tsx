@@ -17,6 +17,8 @@
 
 import { useState, useTransition } from "react";
 import { extractAndAssemble } from "@/app/(layer4)/actions";
+import { useT } from "@/lib/i18n/client";
+import type { Translate } from "@/lib/i18n/translate";
 import { LIMITS } from "@/lib/ugc/limits";
 import type { UgcActionError } from "@/lib/ugc/types";
 import {
@@ -38,14 +40,15 @@ const EMPTY_META: ExamMetaFormValue = {
   semester: "",
 };
 
-/** Validate required field phía client — CHỈ chế độ Manual (AC-036). */
-function validateRequired(m: ExamMetaFormValue): Record<string, string> {
+/** Validate required field phía client — CHỈ chế độ Manual (AC-036). Nhận `t`
+ * làm tham số vì đây là hàm thuần ngoài component: hook chỉ gọi được bên trong. */
+function validateRequired(m: ExamMetaFormValue, t: Translate): Record<string, string> {
   const errors: Record<string, string> = {};
-  if (!m.title.trim()) errors.title = "Please enter the exam title.";
-  if (!m.subject.trim()) errors.subject = "Please select the subject.";
+  if (!m.title.trim()) errors.title = t("upload.errTitleRequired");
+  if (!m.subject.trim()) errors.subject = t("upload.errSubjectRequired");
   const grade = Number(m.grade);
   if (!m.grade.trim() || !Number.isInteger(grade) || grade < LIMITS.MIN_GRADE || grade > LIMITS.MAX_GRADE) {
-    errors.grade = `Please enter a grade between ${LIMITS.MIN_GRADE} and ${LIMITS.MAX_GRADE}.`;
+    errors.grade = t("upload.errGradeRange", { min: LIMITS.MIN_GRADE, max: LIMITS.MAX_GRADE });
   }
   const duration = Number(m.durationMinutes);
   if (
@@ -54,12 +57,13 @@ function validateRequired(m: ExamMetaFormValue): Record<string, string> {
     duration < LIMITS.MIN_DURATION ||
     duration > LIMITS.MAX_DURATION
   ) {
-    errors.durationMinutes = "Please enter the exam duration.";
+    errors.durationMinutes = t("upload.errDurationRequired");
   }
   return errors;
 }
 
 export function UploadForm() {
+  const t = useT();
   const [meta, setMeta] = useState<ExamMetaFormValue>(EMPTY_META);
   const [entryMode, setEntryMode] = useState<EntryMode>("automatic");
   const [metaOpen, setMetaOpen] = useState(false);
@@ -84,10 +88,10 @@ export function UploadForm() {
     if (pending) return;
 
     // Automatic: metadata optional (AC-037) — chỉ chặn thiếu file.
-    const requiredErrors = isAutomatic ? {} : validateRequired(meta);
+    const requiredErrors = isAutomatic ? {} : validateRequired(meta, t);
     const nextFileErrors: { question?: string; answer?: string } = {};
-    if (!questionFile) nextFileErrors.question = "Please attach the exam paper.";
-    if (!answerFile) nextFileErrors.answer = "Please attach the answer key.";
+    if (!questionFile) nextFileErrors.question = t("upload.errQuestionFileRequired");
+    if (!answerFile) nextFileErrors.answer = t("upload.errAnswerFileRequired");
 
     if (Object.keys(requiredErrors).length > 0 || nextFileErrors.question || nextFileErrors.answer) {
       setClientErrors(Object.keys(requiredErrors).length > 0 ? requiredErrors : null);
@@ -121,14 +125,10 @@ export function UploadForm() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-3xl text-foreground">Import Exam Document</h1>
-        <div className="mt-2 h-px w-12 bg-ring" />
-        <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-          Upload the exam and answer key to the system. Choose automatic mode to let AI
-          scan the document, or enter details manually for more control.
-        </p>
-      </div>
+      {/* Tiêu đề trang bỏ khỏi UI nhìn thấy được — điều hướng đã đủ ngữ cảnh
+          (mục Upload trên navbar tô sáng); h1 sr-only giữ mốc cho trình đọc
+          màn hình (cùng quy ước /exams). */}
+      <h1 className="sr-only">{t("upload.title")}</h1>
 
       <ImportInstructions />
 
@@ -160,9 +160,9 @@ export function UploadForm() {
             className="flex w-full items-center justify-between gap-4 px-4 py-3.5 text-left text-sm font-medium text-foreground"
           >
             <span>
-              Exam details{" "}
+              {t("upload.examDetails")}{" "}
               <span className="font-normal text-muted-foreground">
-                — filled in automatically
+                {t("upload.filledAutomatically")}
               </span>
             </span>
             <span
@@ -184,8 +184,7 @@ export function UploadForm() {
             <div className="overflow-hidden">
               <div className="px-4 pb-4">
                 <p className="mb-4 text-xs leading-relaxed text-muted-foreground">
-                  Leave these empty — we&apos;ll read them from your file. You can edit
-                  everything before publishing. Anything you type here wins over the AI.
+                  {t("upload.leaveEmptyHint")}
                 </p>
                 <MetadataFields
                   value={meta}
@@ -225,14 +224,21 @@ export function UploadForm() {
 
       {pending && <ExtractionProgress metaStep={isAutomatic} />}
 
-      <div className="flex justify-start pt-2">
+      {/* Canh GIỮA ở mọi bề rộng — trước đây desktop canh trái riêng (đọc
+          nhịp theo lề trái của form), nhưng vì 2 dropzone phía trên đứng
+          thành CẶP đối xứng (grid 2 cột đều nhau), một nút canh trái bên
+          dưới đọc như lệch tâm so với cặp đó chứ không phải "điểm kết thúc
+          rõ ràng" như dự tính — engineer xác nhận lệch (2026-08-09). Canh
+          giữa để nút luôn là điểm hội tụ của cả 2 khung phía trên, ở mọi
+          breakpoint. */}
+      <div className="flex justify-center pt-2">
         <button
           type="button"
           onClick={onSubmit}
           disabled={pending}
-          className="rounded-[4px] bg-brand px-7 py-2.5 text-xs font-medium uppercase tracking-[0.14em] text-brand-foreground transition-colors duration-200 hover:bg-[#8F2523] disabled:opacity-60"
+          className="min-h-11 rounded-[4px] bg-brand px-7 py-2.5 text-xs font-medium uppercase tracking-[0.14em] text-brand-foreground transition-[background-color,transform] duration-200 hover:bg-[#8F2523] active:scale-[0.97] disabled:pointer-events-none disabled:opacity-60"
         >
-          {pending ? "Processing…" : "Start"}
+          {pending ? t("common.processing") : t("upload.start")}
         </button>
       </div>
     </div>

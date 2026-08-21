@@ -7,15 +7,15 @@
 // giá trị tác giả gõ luôn thắng AI (normalizeMeta).
 
 import { useState } from "react";
+import { useT } from "@/lib/i18n/client";
+import type { MessageKey } from "@/lib/i18n/translate";
 import type { EntryMode } from "@/lib/ugc/types";
 
 export type { EntryMode };
 
-const NOTE: Record<EntryMode, string> = {
-  automatic:
-    "AI will scan your uploaded files and extract the exam automatically — you can still edit any field.",
-  manual:
-    "Fill in every exam detail yourself; AI will still extract the questions and answers.",
+const NOTE_KEY: Record<EntryMode, MessageKey> = {
+  automatic: "upload.automaticNote",
+  manual: "upload.manualNote",
 };
 
 export function EntryModeField({
@@ -27,12 +27,13 @@ export function EntryModeField({
   onChange: (mode: EntryMode) => void;
   disabled?: boolean;
 }) {
+  const t = useT();
   const [focused, setFocused] = useState(false);
 
   return (
     <div>
       <label htmlFor="entry-mode" className="eyebrow block">
-        Entry Mode
+        {t("upload.entryMode")}
       </label>
       <div className="relative mt-1.5">
         <select
@@ -42,10 +43,10 @@ export function EntryModeField({
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           disabled={disabled}
-          className="w-full appearance-none rounded-[4px] border border-border bg-transparent px-3 py-2.5 text-sm text-foreground outline-none transition-colors duration-200 focus:border-ring disabled:opacity-60"
+          className="min-h-11 w-full appearance-none rounded-[4px] border border-border bg-transparent px-3 py-2.5 text-sm text-foreground outline-none transition-colors duration-200 focus:border-ring disabled:opacity-60"
         >
-          <option value="automatic">Automatic</option>
-          <option value="manual">Manual</option>
+          <option value="automatic">{t("upload.automatic")}</option>
+          <option value="manual">{t("upload.manual")}</option>
         </select>
         <span
           aria-hidden
@@ -62,7 +63,7 @@ export function EntryModeField({
         aria-live="polite"
         className="mt-1.5 animate-in fade-in slide-in-from-top-1 text-xs text-muted-foreground duration-[250ms]"
       >
-        {NOTE[value]}
+        {t(NOTE_KEY[value])}
       </p>
     </div>
   );

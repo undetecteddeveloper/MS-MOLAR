@@ -46,8 +46,6 @@
       "Bash(node -e \"const b=require\\('fs'\\).readFileSync\\('ASSETS/images/computer.png'\\);console.log\\('w',b.readUInt32BE\\(16\\),'h',b.readUInt32BE\\(20\\)\\);\")",
       "Bash(mkdir -p SOURCE/public/images)",
       "Bash(cp ASSETS/images/computer.png SOURCE/public/images/computer.png)",
-      "Bash(python -c ' *)",
-      "Bash(node -e ' *)",
       "Bash(sed -E 's/=\\(.{6}\\).*/=\\\\1****\\(masked\\)/' .env.local)",
       "Bash(curl -s -o /dev/null -w \"project host -> HTTP %{http_code} | %{time_total}s\\\\n\" --max-time 15 \"https://hynwleaxtbtjzkvpjsug.supabase.co\")",
       "Bash(nslookup hynwleaxtbtjzkvpjsug.supabase.co 8.8.8.8)",
@@ -72,7 +70,6 @@
       "PowerShell(Remove-Item -Force \"e:\\\\StemWeb_project\\\\MS-MOLAR\\\\SOURCE\\\\lib\\\\random\\\\shuffle.ts\"; if \\(-not \\(Get-ChildItem \"e:\\\\StemWeb_project\\\\MS-MOLAR\\\\SOURCE\\\\lib\\\\random\" -ErrorAction SilentlyContinue\\)\\) { Remove-Item -Force \"e:\\\\StemWeb_project\\\\MS-MOLAR\\\\SOURCE\\\\lib\\\\random\" }; \"deleted\")",
       "PowerShell($conns = Get-NetTCPConnection -LocalPort 3000,3001,3002 -State Listen -ErrorAction SilentlyContinue; if \\($conns\\) { $conns | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { try { Stop-Process -Id $_ -Force -Confirm:$false; \"killed PID $_\" } catch { \"fail PID $_\" } } } else { \"no dev server running\" })",
       "PowerShell(Set-Location e:\\\\StemWeb_project\\\\MS-MOLAR\\\\SOURCE; npm run build 2>&1 | Select-Object -Last 25; \"build exit: $LASTEXITCODE\")",
-      "Bash(python3 -c ' *)",
       "Bash(git ls-tree *)",
       "Bash(echo \"EXIT:$?\")",
       "Bash(echo \"ESLINT_EXIT:$?\")",
@@ -82,14 +79,44 @@
       "Bash(git commit -q -m 'chore\\(repo\\): remove legacy templates/docs, add tooling config, tidy gitignore *)",
       "Bash(awk '{print $1}')",
       "Bash(git commit -q -m 'feat\\(layer4/ugc\\): AI-assisted exam upload — multi-part national format + Gemini *)",
-      "Bash(git checkout *)",
       "Bash(rm -rf \"app/\\(layer4\\)/admin\")",
       "Bash(rm -f \"app/\\(layer4\\)/_components/ImportContentManagement.tsx\")",
       "Bash(echo \"TSC_EXIT:$?\")",
-      "Bash(echo \"TSC:$?\")"
+      "Bash(echo \"TSC:$?\")",
+      "Bash(cd /e/StemWeb_project/MS-MOLAR/SOURCE && npx vitest run lib/adaptive 2>&1 | tail -6 && rm -f supabase/skill-tagging-report-*.json && npx tsx supabase/tagQuestionSkills.ts 2>&1 | tail -6)",
+      "Bash(cp components/tutor/useTutorAction.ts /tmp/useTutorAction.bak.ts)",
+      "Bash(sed -i 's/await explainStep\\(attemptId, questionId\\)/await explainStep\\(questionId, attemptId\\)/' components/tutor/useTutorAction.ts)",
+      "Bash(cd \"e:/StemWeb_project/MS-MOLAR/SOURCE\" && sed -i 's/if \\(busyRef.current\\) return; \\\\/\\\\/ AC-025 — kiểm TRƯỚC mọi cập nhật state/if \\(phase === \"busy\"\\) return;/' components/tutor/useTutorAction.ts && grep -n 'phase === \"busy\"' components/tutor/useTutorAction.ts && npx vitest run components/tutor/ExplainStepAffordance.test.tsx 2>&1 | grep -E \"×|Tests \" | head -8; cp /tmp/useTutorAction.bak.ts components/tutor/useTutorAction.ts)",
+      "Bash(cd \"e:/StemWeb_project/MS-MOLAR/SOURCE\" && sed -i 's/if \\(busyRef.current\\) return; \\\\/\\\\/ AC-025 — kiểm TRƯỚC mọi cập nhật state/if \\(phase === \"busy\"\\) return;/' components/tutor/useTutorAction.ts && npx vitest run components/tutor/ExplainStepAffordance.test.tsx 2>&1 | grep -E \"×|Tests \" | head -8; cp /tmp/useTutorAction.bak.ts components/tutor/useTutorAction.ts && npx vitest run components/tutor/ExplainStepAffordance.test.tsx 2>&1 | grep -E \"Tests |Test Files\")",
+      "Bash(cp components/tutor/ExplainStepAffordance.tsx /tmp/ESA.bak.tsx)",
+      "Bash(sed -i 's|        onClick={run}|        onClick={run}\\\\n        disabled={phase === \"error\"}|' components/tutor/ExplainStepAffordance.tsx)",
+      "Bash(rm components/tutor/__mutcheck.tmp.test.tsx)",
+      "Bash(mv components/tutor/useTutorAction.ts.orig components/tutor/useTutorAction.ts)",
+      "Bash(perl -i.orig -pe 's/await explainStep\\\\\\(attemptId, questionId\\\\\\)/await explainStep\\(questionId, attemptId\\)/' components/tutor/useTutorAction.ts)",
+      "Bash(perl -i.orig -pe 's|<RichText text=\\\\{hint\\\\}.*|<p>{hint}</p>|' components/tutor/ExplainStepAffordance.tsx)",
+      "Bash(mv components/tutor/ExplainStepAffordance.tsx.orig components/tutor/ExplainStepAffordance.tsx)",
+      "Bash(perl -i.orig -pe 's|\\(<RichText text=\\\\{hint\\\\}.*\\)|$1\\\\n        <Button type=\"button\" onClick={run}>{t\\(\"tutor.explainThisStep\"\\)}</Button>|' components/tutor/ExplainStepAffordance.tsx)",
+      "Bash(perl -i.orig -pe 's|\\(\\\\s+\\)onClick=\\\\{run\\\\}|$1onClick={run}\\\\n        disabled={phase === \"error\"}|' components/tutor/ExplainStepAffordance.tsx)",
+      "Bash(perl -i.orig -pe 's|<p role=\"alert\" className|<p className|' components/tutor/ExplainStepAffordance.tsx)",
+      "Bash(perl -i.orig -pe 's|^\\\\s+busyRef\\\\.current = false;|      // MUTATION: lock never released|' components/tutor/useTutorAction.ts)",
+      "Bash(perl -i.orig -pe 's|^  attemptId: string;|  attemptId: string;\\\\n  skillNodeId?: string \\\\| null;|; s|export function ExplainStepAffordance\\\\\\(\\\\{ questionId, attemptId \\\\}|export function ExplainStepAffordance\\({ questionId, attemptId, skillNodeId }|; s|\\\\{phase === \"error\" \\\\? t\\\\\\(\"common.retry\"\\\\\\) : t\\\\\\(\"tutor.explainThisStep\"\\\\\\)\\\\}|{phase === \"error\" ? t\\(\"common.retry\"\\) : skillNodeId ? t\\(\"tutor.explainThisStep\"\\) : t\\(\"tutor.explainThisStep\"\\)}|' components/tutor/ExplainStepAffordance.tsx)",
+      "Bash(cp components/tutor/useTutorAction.ts /tmp/uta.bak.ts)",
+      "Bash(sed -i 's/if \\(busyRef.current\\) return; \\\\/\\\\/ AC-025 — kiểm TRƯỚC mọi cập nhật state/if \\(phase === \"busy\"\\) return;/' components/tutor/useTutorAction.ts)",
+      "Bash(cp \"app/\\(layer3\\)/_components/SkillRecommendationCard.tsx\" /tmp/src.bak)",
+      "Bash(sed -i 's/\"recently-wrong\": \"analytics.recommendReasonRecentlyWrong\"/\"recently-wrong\": \"analytics.recommendReasonLowestMastery\"/' \"app/\\(layer3\\)/_components/SkillRecommendationCard.tsx\")",
+      "Bash(cp /tmp/src.bak \"app/\\(layer3\\)/_components/SkillRecommendationCard.tsx\")",
+      "Bash(rm /tmp/src.bak)",
+      "Bash(perl -i -pe 's/\"analytics\\\\.recommendWhy\": \"Why this skill\\\\?\"/\"analytics.recommendWhy\": \"Why?\"/' \"lib/i18n/dictionaries/en.ts\")"
+    ],
+    "additionalDirectories": [
+      "E:\\StemWeb_project\\MS-MOLAR\\supabase",
+      "\\tmp"
     ]
   },
   "enabledMcpjsonServers": [
     "playwright"
-  ]
+  ],
+  "enabledPlugins": {
+    "composio@composio": true
+  }
 }

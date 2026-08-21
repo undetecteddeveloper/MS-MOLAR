@@ -12,6 +12,7 @@
 import { useT } from "@/lib/i18n/client";
 
 import type { ChoiceId, PublicQuestion, SubItemId } from "@/types/question";
+import { LIMITS } from "@/lib/ugc/limits";
 import { decodeTfAnswer, encodeTfAnswer } from "@/lib/ugc/tfCodec";
 import { RichText } from "@/components/shared/RichText";
 import { QuestionFigure } from "@/components/shared/QuestionFigure";
@@ -19,6 +20,7 @@ import { AnswerChoice } from "./AnswerChoice";
 import { FlagButton } from "./FlagButton";
 
 const SUB_ITEM_IDS: SubItemId[] = ["a", "b", "c", "d"];
+const MAX_ATTEMPT_ANSWER = LIMITS.MAX_ATTEMPT_ANSWER;
 
 interface QuestionRendererProps {
   /** Số thứ tự câu (1-based) — để hiển thị "Câu N". */
@@ -46,11 +48,28 @@ export function QuestionRenderer({
   return (
     <div className="border-border flex flex-col gap-5 rounded-lg border p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <span className="eyebrow">Question {index}</span>
+        <span className="eyebrow">{t("upload.questionLabel", { number: index })}</span>
         <FlagButton flagged={flagged} onToggle={onToggleFlag} />
       </div>
 
-      <RichText text={question.content} className="text-foreground text-lg leading-relaxed" />
+      {/* Nội dung câu hỏi — `font-serif` + một nấc cỡ chữ so với trước.
+          Serif KHÔNG phải trang trí: DESIGN.md xếp serif cho "tiêu đề & nội
+          dung đọc", và màn xem lại bài (result/detail) VỐN ĐÃ render thân câu
+          hỏi bằng `font-serif text-lg` — player mới là chỗ lệch chuẩn. Cho hai
+          màn cùng một khuôn mặt chữ nghĩa là cùng một câu hỏi trông giống nhau
+          dù đang làm bài hay đang dò lại.
+          Nó cũng tách thân câu hỏi khỏi phần CÒN LẠI của màn hình, vốn sans
+          hết: nhãn "Câu N", nút, và quan trọng nhất là các LỰA CHỌN
+          (AnswerChoice, sans 16px). Trước thay đổi này câu hỏi 18px và lựa chọn
+          16px cùng font cùng màu — cách nhau đúng 2px, nên mắt không có mỏ neo
+          để biết đọc cái nào trước. Nay khác cả font lẫn cỡ (20px so với 16px).
+          Giữ 18px ở mobile: màn hẹp thì mỗi nấc cỡ chữ ăn thêm một dòng, và
+          khu vực trả lời bên dưới cao CỐ ĐỊNH 238px nên phần đọc được của câu
+          hỏi là thứ bị ép trước tiên. */}
+      <RichText
+        text={question.content}
+        className="text-foreground font-serif text-lg leading-[1.75] text-pretty sm:text-xl"
+      />
 
       {/* Hình thân câu (UGC v2.0, Task 5.2) — chỉ render nếu có + origin hợp lệ. */}
       {question.imageUrl && (
@@ -140,7 +159,7 @@ export function QuestionRenderer({
               id={`short-${question.id}`}
               value={selectedAnswer ?? ""}
               onChange={(e) => onSelectAnswer(e.target.value)}
-              maxLength={100}
+              maxLength={LIMITS.MAX_SHORT_ANSWER}
               className="border-border bg-card text-foreground focus:border-ring w-full max-w-xs rounded-md border px-3 py-2 text-sm outline-none"
               placeholder="e.g. 1260 / 1,04"
             />
@@ -150,9 +169,38 @@ export function QuestionRenderer({
           </div>
         )}
 
-        {/* essay: người làm bài không nhập bài luận trong player MVP. */}
+        {/* essay: ô nhập bài làm (bug prod 2026-08-17 — trước đây chỉ hiện một
+            dòng chữ "làm ra giấy", nên với đề toàn tự luận như Toán 8 thì màn
+            làm bài KHÔNG có chỗ nào để trả lời: người dùng đọc đó là mất field.
+            Bản MVP cũ giả định mọi đề đều trắc nghiệm.)
+            Vẫn KHÔNG chấm tự động (computeScore không bao giờ chấm essay) —
+            chữ dưới ô nói đúng điều đó thay vì hứa hẹn.
+            maxLength = TRẦN THẬT của DB: attempt_answers.answer CHECK
+            length <= 500. Cắt ở client + đếm ký tự còn lại để người làm bài
+            thấy giới hạn TRƯỚC khi gõ hụt, thay vì bị Postgres từ chối nguyên
+            lượt nộp bài lúc submit. */}
         {type === "essay" && (
-          <p className="text-muted-foreground text-sm italic">{t("player.essayNotScored")}</p>
+          <div className="flex h-full flex-col gap-2">
+            <label htmlFor={`essay-${question.id}`} className="text-muted-foreground text-xs">
+              {t("player.yourAnswer")}
+            </label>
+            <textarea
+              id={`essay-${question.id}`}
+              value={selectedAnswer ?? ""}
+              onChange={(e) => onSelectAnswer(e.target.value)}
+              maxLength={MAX_ATTEMPT_ANSWER}
+              placeholder={t("player.essayPlaceholder")}
+              className="border-border bg-card text-foreground focus:border-ring min-h-32 w-full flex-1 resize-y rounded-md border px-3 py-2 text-sm leading-relaxed outline-none"
+            />
+            <div className="text-muted-foreground flex items-center justify-between gap-3 text-xs">
+              <span className="italic">{t("player.essayNotScored")}</span>
+              <span className="shrink-0 tabular-nums">
+                {t("player.charsLeft", {
+                  remaining: MAX_ATTEMPT_ANSWER - (selectedAnswer?.length ?? 0),
+                })}
+              </span>
+            </div>
+          </div>
         )}
       </div>
     </div>

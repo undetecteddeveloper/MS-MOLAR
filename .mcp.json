@@ -2,7 +2,11 @@
   "mcpServers": {
     "playwright": {
       "command": "npx",
-      "args": ["@playwright/mcp@latest"]
+      "args": [
+        "@playwright/mcp@latest",
+        "--viewport-size", "1280x720",
+        "--output-dir", "E:/StemWeb_project/MS-MOLAR/SCREENSHOT/temporary_screenshot"
+      ]
     },
     "supabase": {
       "command": "npx",

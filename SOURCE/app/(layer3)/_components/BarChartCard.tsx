@@ -65,17 +65,37 @@ export function BarChartCard({
     return PLOT_TOP + (1 - value / niceMax) * PLOT_HEIGHT;
   }
 
-  function handleMouseMove(e: React.MouseEvent, stat: SubjectStats) {
+  // Nhận bất kỳ sự kiện nào có toạ độ con trỏ — chuột LẪN chạm. Trước
+  // 2026-08-07 hàm này khai `React.MouseEvent` và chỉ được gọi từ
+  // `onMouseMove`, nên trên điện thoại toàn bộ tooltip là vùng chết: dòng gợi ý
+  // ngay trên biểu đồ ghi "Rê chuột lên một môn để xem chi tiết" — một hướng
+  // dẫn không thể làm theo bằng ngón tay (tài liệu §4.3: hiệu ứng hover phải
+  // có đường tương đương khi chạm).
+  function showTooltipAt(point: { clientX: number; clientY: number }, stat: SubjectStats) {
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
     setTooltip({
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
+      x: point.clientX - rect.left,
+      y: point.clientY - rect.top,
       containerWidth: rect.width,
       subject: stat.subject,
       correct: stat.correct,
       wrong: stat.wrong,
     });
+  }
+
+  // Chạm: bật chi tiết của nhóm được chạm; chạm LẠI đúng nhóm đó thì tắt.
+  // Chỉ xử lý pointerType khác "mouse" — chuột đã có đường hover riêng, để cả
+  // hai cùng chạy sẽ thành click-để-khoá lẫn hover-để-hiện tranh nhau.
+  function handlePointerDown(e: React.PointerEvent, stat: SubjectStats) {
+    if (e.pointerType === "mouse") return;
+    if (hovered === stat.subject) {
+      setHovered(null);
+      setTooltip(null);
+      return;
+    }
+    setHovered(stat.subject);
+    showTooltipAt(e, stat);
   }
 
   return (
@@ -96,23 +116,30 @@ export function BarChartCard({
                 className="inline-block h-2.5 w-2.5"
                 style={{ backgroundColor: CORRECT_COLOR }}
               />
-              <span className="text-muted-foreground tracking-wide uppercase">Correct</span>
+              <span className="text-muted-foreground tracking-wide uppercase">{t("common.correct")}</span>
             </span>
             <span className="flex items-center gap-1.5">
               <span className="inline-block h-2.5 w-2.5" style={{ backgroundColor: WRONG_COLOR }} />
-              <span className="text-muted-foreground tracking-wide uppercase">Wrong</span>
+              <span className="text-muted-foreground tracking-wide uppercase">{t("common.wrong")}</span>
             </span>
           </div>
         </div>
 
-        <div ref={containerRef} className="relative mt-4">
-          <svg
-            role="img"
-            aria-label={t("analytics.barAlt")}
-            viewBox={`0 0 ${VB_WIDTH} ${VB_HEIGHT}`}
-            preserveAspectRatio="xMidYMid meet"
-            className="h-auto w-full"
-          >
+        {/* overflow-x-auto + min-w: viewBox rộng 920 đơn vị, ép vừa 350px thì
+            nhãn 12px co còn ~4,5px — có vẽ ra cũng không ai đọc được. Cho khối
+            biểu đồ tự cuộn ngang trong khung của NÓ (không để cả trang cuộn
+            ngang) là cách tài liệu khuyến nghị cho nội dung rộng; min-w-[560px]
+            giữ nhãn ở cỡ đọc được. Từ 768px trở lên bỏ min-w để biểu đồ trải
+            hết bề ngang card như cũ. */}
+        <div className="-mx-1 mt-4 overflow-x-auto px-1 md:mx-0 md:overflow-x-visible md:px-0">
+          <div ref={containerRef} className="relative min-w-[560px] md:min-w-0">
+            <svg
+              role="img"
+              aria-label={t("analytics.barAlt")}
+              viewBox={`0 0 ${VB_WIDTH} ${VB_HEIGHT}`}
+              preserveAspectRatio="xMidYMid meet"
+              className="h-auto w-full"
+            >
             {ticks.map((t) => {
               const y = scaleY(t);
               return (
@@ -159,7 +186,8 @@ export function BarChartCard({
                     setHovered(null);
                     setTooltip(null);
                   }}
-                  onMouseMove={(e) => handleMouseMove(e, stat)}
+                  onMouseMove={(e) => showTooltipAt(e, stat)}
+                  onPointerDown={(e) => handlePointerDown(e, stat)}
                 >
                   <rect
                     x={slotX}
@@ -215,10 +243,15 @@ export function BarChartCard({
               }
             >
               <div className="font-medium">{tooltip.subject}</div>
-              <div>Correct: {tooltip.correct}</div>
-              <div>Wrong: {tooltip.wrong}</div>
+              <div>
+                {t("common.correct")}: {tooltip.correct}
+              </div>
+              <div>
+                {t("common.wrong")}: {tooltip.wrong}
+              </div>
             </div>
           )}
+          </div>
         </div>
       </div>
     </div>
