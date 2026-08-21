@@ -771,6 +771,8 @@ export const en = {
   // app/(layer3)/profile/_components/errorMessages.ts, và một test canh literal
   // đó khớp đúng đầu ra thật của lib/auth/passwordPolicy.ts — sửa câu chữ bên
   // đó mà quên bên này thì FAIL BUILD, không phải âm thầm rơi về câu chung.
+  "profile.tab.info": "Info",
+  "profile.tab.usage": "Usage",
   "profile.eyebrow": "Account",
   "profile.title": "Your profile",
   "profile.description": "What this account is, and the parts of it you can change.",

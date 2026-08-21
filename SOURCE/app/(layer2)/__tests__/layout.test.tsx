@@ -343,6 +343,12 @@ describe("Binding decision ADR-0013 — một phép tính quyền lợi, KHÔNG 
   const RENDER_PATH_ALLOWED = [
     "app/(billing)/layout.tsx",
     "app/(layer2)/layout.tsx",
+    // (layer3) gia nhập danh sách này khi /profile có tab Usage: tab đó render
+    // `PlanSummary` (C-11), và một layout KHÔNG mount provider thì
+    // `useEntitlement()` trả `FREE_FALLBACK` — người Premium thấy hạn mức
+    // Free, im lặng. Đây là một LAYOUT mount provider, đúng hình dạng ba dòng
+    // còn lại; nó không phải một đường đọc thứ hai.
+    "app/(layer3)/layout.tsx",
     "app/(layer4)/layout.tsx",
     "lib/billing/readEntitlement.ts",
   ];

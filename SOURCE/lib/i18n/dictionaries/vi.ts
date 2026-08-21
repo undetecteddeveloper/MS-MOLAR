@@ -649,6 +649,8 @@ export const vi: Dictionary = {
   "profile.password.errorSameAsCurrent": "Mật khẩu mới phải khác mật khẩu hiện tại.",
 
   // --- /profile — giao diện; xem chú thích tương ứng trong en.ts -----------
+  "profile.tab.info": "Thông tin",
+  "profile.tab.usage": "Mức dùng",
   "profile.eyebrow": "Tài khoản",
   "profile.title": "Hồ sơ của bạn",
   "profile.description": "Tài khoản này gồm những gì, và những phần bạn đổi được.",

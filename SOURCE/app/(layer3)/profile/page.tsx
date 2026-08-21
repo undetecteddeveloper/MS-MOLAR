@@ -15,7 +15,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUserProfile } from "@/lib/auth/getCurrentUser";
 import { getTranslate } from "@/lib/i18n/server";
 import { PageContainer } from "@/components/layout/PageContainer";
-import { ProfileCard } from "./_components/ProfileCard";
+import { ProfileTabs } from "./_components/ProfileTabs";
 
 // KHÔNG khai `alternates.canonical` — khác /terms và /about một cách có chủ ý.
 // Hai trang kia cần được index nên phải sửa lại mặc định `canonical: "/"` của
@@ -44,7 +44,7 @@ export default async function ProfilePage() {
           cùng quy ước với /exams (trang đầu tiên áp dụng, xem exams/page.tsx). */}
       <h1 className="sr-only">{t("profile.title")}</h1>
       <div className="preload-fade mt-6" style={{ "--preload-order": 1 } as React.CSSProperties}>
-        <ProfileCard user={user} />
+        <ProfileTabs user={user} />
       </div>
     </PageContainer>
   );
