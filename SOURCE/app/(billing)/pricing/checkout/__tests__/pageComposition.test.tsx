@@ -101,21 +101,28 @@ describe("S-06 — a pending order", () => {
   });
 
   // ==========================================================================
-  // The gate as the page ships it today. Rejects: a page that hands C-15 a
-  // hard-coded `true`, or that forgets the prop and lets the control default to
-  // operable while /terms and /refund-policy are placeholders.
+  // The gate as the page ships it TODAY — và hôm nay nó MỞ: nội dung pháp lý
+  // thật đã hạ cánh (BU-1), nên C-15 mount C-10 và nút thao tác được.
   //
-  // NOTE: the combined "predicate false AND both legal pages still render
-  // LegalContentPending" case is plan Task 4.5's, deliberately not duplicated.
+  // Ca này trước đây khẳng định chiều ngược lại (nút trơ + câu lý do pháp lý).
+  // Nó KHÔNG bị xoá, nó bị LẬT: vẫn đúng một khẳng định về việc trang truyền
+  // prop THẬT cho C-15 chứ không phải một hằng. Rejects: một trang hardcode
+  // `false` (nút trơ trong khi hai trang pháp lý đã có nội dung), một trang
+  // quên prop, và — như trước — bất kỳ `disabled` gốc nào.
+  //
+  // NOTE: ca kết hợp "vị từ đúng VÀ hai trang pháp lý render nội dung thật" là
+  // của plan Task 4.5, cố ý không nhân bản ở đây.
   // ==========================================================================
-  it("ships the confirm control inert, with the legal reason stated", async () => {
+  it("ships the confirm control operable, with no legal-pending reason", async () => {
     const { container, text } = await renderPage(ORDER);
 
     const control = container.querySelector("button");
     if (control === null) throw new Error("S-06 rendered no confirm control");
-    expect(control.getAttribute("aria-disabled")).toBe("true");
+    // Chuỗi "false", không phải thiếu thuộc tính: C-10 luôn KHAI BÁO trạng thái.
+    expect(control.getAttribute("aria-disabled")).toBe("false");
+    // Bất biến không đổi theo cổng: không bao giờ `disabled` gốc.
     expect(control.hasAttribute("disabled")).toBe(false);
-    expect(text).toContain(en["billing.confirm.legalPending.reason"]);
+    expect(text).not.toContain(en["billing.confirm.legalPending.reason"]);
   });
 });
 

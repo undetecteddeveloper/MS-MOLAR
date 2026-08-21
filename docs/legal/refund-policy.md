@@ -1,10 +1,10 @@
-# Chính Sách Hoàn Tiền — Gói Premium (TrạngNguyênDigi)
+# Chính Sách Hoàn Tiền — Gói Premium (MS-MOLAR)
 
-*Cập nhật lần cuối: [điền ngày]*
+*Cập nhật lần cuối: 21/08/2026*
 
 ## 1. Tổng quan gói Premium
 
-TrạngNguyênDigi cung cấp hai gói:
+MS-MOLAR cung cấp hai gói:
 
 | | Free | Premium |
 |---|---|---|
@@ -17,7 +17,7 @@ Gói Premium là gói **trả trước (prepaid)** cho một kỳ 30 ngày, than
 
 ## 2. QUAN TRỌNG: Gói Premium KHÔNG tự động gia hạn
 
-> ⚠️ Đây là điều bạn cần biết rõ trước khi mua: TrạngNguyênDigi **không** tự động trừ tiền để gia hạn gói Premium.
+> ⚠️ Đây là điều bạn cần biết rõ trước khi mua: MS-MOLAR **không** tự động trừ tiền để gia hạn gói Premium.
 
 Lý do: hình thức thanh toán VietQR/chuyển khoản ngân hàng (A2A) không hỗ trợ trừ tiền định kỳ như thẻ tín dụng. Vì vậy:
 
@@ -28,7 +28,7 @@ Lý do: hình thức thanh toán VietQR/chuyển khoản ngân hàng (A2A) khôn
 
 ## 3. Chính sách hoàn tiền
 
-Về nguyên tắc, TrạngNguyênDigi **không hoàn tiền** cho các giao dịch mua gói Premium, ngoại trừ trường hợp có lỗi hệ thống hoặc lỗi thanh toán thuộc về chúng tôi.
+Về nguyên tắc, MS-MOLAR **không hoàn tiền** cho các giao dịch mua gói Premium, ngoại trừ trường hợp có lỗi hệ thống hoặc lỗi thanh toán thuộc về chúng tôi.
 
 **Các trường hợp được xem xét hoàn tiền:**
 - Bạn đã bị trừ tiền nhưng tài khoản **không được kích hoạt Premium** do lỗi kỹ thuật.
@@ -42,24 +42,24 @@ Về nguyên tắc, TrạngNguyênDigi **không hoàn tiền** cho các giao d�
 
 **Cách yêu cầu hoàn tiền:**
 1. Gửi yêu cầu qua mục Hỗ trợ trong tài khoản của bạn, kèm mã giao dịch hoặc ảnh chụp màn hình xác nhận thanh toán.
-2. Chúng tôi sẽ xem xét và phản hồi trong vòng [điền số ngày — gợi ý: 3–5 ngày làm việc].
-3. Nếu yêu cầu hợp lệ, tiền sẽ được hoàn qua chuyển khoản ngân hàng về đúng tài khoản đã thực hiện thanh toán, trong vòng [điền số ngày làm việc].
+2. Chúng tôi sẽ xem xét và phản hồi trong vòng 7 ngày làm việc.
+3. Nếu yêu cầu hợp lệ, tiền sẽ được hoàn qua chuyển khoản ngân hàng về đúng tài khoản đã thực hiện thanh toán, trong vòng 10 ngày làm việc.
 
 *Lưu ý: việc xử lý hoàn tiền hiện được thực hiện thủ công, nên thời gian xử lý thực tế có thể khác với thời hạn nêu trên trong một số trường hợp.*
 
 ## 4. Người mua là học sinh chưa đủ 18 tuổi
 
-Phần lớn người dùng TrạngNguyênDigi là học sinh THCS/THPT, trong đó nhiều bạn chưa đủ 18 tuổi. Việc mua gói Premium được thực hiện trên tài khoản cá nhân của học sinh; phụ huynh có thể hỗ trợ quét mã QR thanh toán, nhưng giao dịch được ghi nhận trên tài khoản của học sinh.
+Phần lớn người dùng MS-MOLAR là học sinh THCS/THPT, trong đó nhiều bạn chưa đủ 18 tuổi. Việc mua gói Premium được thực hiện trên tài khoản cá nhân của học sinh; phụ huynh có thể hỗ trợ quét mã QR thanh toán, nhưng giao dịch được ghi nhận trên tài khoản của học sinh.
 
 Chúng tôi khuyến khích phụ huynh/người giám hộ quan tâm và trao đổi với con em về việc sử dụng gói trả phí trước khi thanh toán.
 
 ## 5. Bảo mật thanh toán
 
-TrạngNguyênDigi không lưu trữ hoặc xử lý bất kỳ thông tin thẻ/tài khoản ngân hàng nào. Toàn bộ giao dịch được thực hiện qua VietQR/chuyển khoản ngân hàng (A2A) trực tiếp trong ứng dụng ngân hàng của bạn, thông qua đối tác thanh toán payOS.
+MS-MOLAR không lưu trữ hoặc xử lý bất kỳ thông tin thẻ/tài khoản ngân hàng nào. Toàn bộ giao dịch được thực hiện qua VietQR/chuyển khoản ngân hàng (A2A) trực tiếp trong ứng dụng ngân hàng của bạn, thông qua đối tác thanh toán payOS.
 
 ## 6. Đơn vị cung cấp dịch vụ
 
-Gói Premium được cung cấp bởi TrạngNguyênDigi.
+Gói Premium hiện được cung cấp bởi Nguyễn Anh Phát, với tư cách cá nhân kinh doanh trực tuyến dưới thương hiệu MS-MOLAR, theo quy định tại Nghị định số 52/2013/NĐ-CP và Nghị định số 85/2021/NĐ-CP về thương mại điện tử.
 
 ## 7. Thay đổi chính sách
 

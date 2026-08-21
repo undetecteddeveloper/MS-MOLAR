@@ -298,6 +298,10 @@ type ConfirmProps = Parameters<typeof PaymentConfirm>[0];
  *  "the match I meant" are indistinguishable once a `?.props` read is taken: a
  *  renamed component or a moved mount would otherwise quietly turn every
  *  assertion below into an assertion about `undefined`. */
+/** Tên đơn vị bán, BU-1. Trang pháp lý nào không nêu nó thì không phải nội
+ *  dung pháp lý hoàn chỉnh — xem work-plan § Engineer-owned open items. */
+const LEGAL_SELLING_ENTITY = "Nguyễn Anh Phát";
+
 function elementsOfType<P>(node: ReactNode, type: unknown): ReactElement<P>[] {
   if (Array.isArray(node)) {
     return node.flatMap((child: ReactNode) => elementsOfType<P>(child, type));
@@ -353,70 +357,99 @@ describe("C-15 legal gate — R-9, where the predicate COMES FROM (plan Task 4.5
   // whole point: split into two, each half keeps passing while the predicate
   // and the pages drift apart — precisely R-9's failure shape.
   //
+  // ĐÃ LẬT CHIỀU KHI BU-1 ĐÓNG. Trước đây ca này khẳng định cổng ĐANG ĐÓNG:
+  // vị từ `false` và cả hai trang render `LegalContentPending`. Nội dung pháp
+  // lý thật đã hạ cánh (hai khoá `.body`, hai trang render `LegalProse`), nên
+  // cùng một bất biến — vị từ và trang KHÔNG được trôi lệch khỏi nhau — nay
+  // được phát biểu ở chiều ngược lại. Ca này KHÔNG bị nới lỏng: nó vẫn đỏ ở cả
+  // hai chiều trôi lệch.
+  //
   // It goes red on EITHER direction of the drift:
-  //   • the two body keys land in `en.ts` while the pages still render the
-  //     placeholder ⇒ the predicate flips to true, half one fails;
-  //   • the pages ship real content while the keys never land ⇒ half two fails.
-  // Rejects, today: a predicate hard-coded `true`; a predicate reading any key
-  // other than the two the design names; a legal page that has quietly stopped
-  // rendering `LegalContentPending` while the gate stayed shut.
+  //   • một khoá `.body` bị xoá khỏi `en.ts` trong khi trang vẫn render nội
+  //     dung thật ⇒ vị từ lật về false, nửa một đỏ;
+  //   • một trang quay lại render `LegalContentPending` trong khi hai khoá vẫn
+  //     còn ⇒ nửa hai đỏ.
+  // Và một khẳng định nữa mà BU-1 tự đòi: mỗi trang phải NÊU TÊN đơn vị bán.
+  // Một trang điều khoản không có pháp nhân/cá nhân chịu trách nhiệm là đúng
+  // thứ mà cổng này tồn tại để chặn.
   // ==========================================================================
-  it("the shipped predicate is false AND both legal pages still render LegalContentPending", async () => {
+  it("the shipped predicate is true AND both legal pages render real content", async () => {
     // ── half one: the predicate, as the shipped page actually passes it ─────
     const props = confirmMountedBy(await renderCheckoutPage());
-    expect(props.legalContentReady).toBe(false);
+    expect(props.legalContentReady).toBe(true);
 
     // ── half two: the two real pages, rendered ──────────────────────────────
     const terms = await TermsPage();
     const refund = await RefundPolicyPage();
 
-    // Component identity first: `LegalContentPending` itself, not "some node
-    // that happens to carry the placeholder text". Real legal content would
-    // replace this element, and that must be what makes this test red.
-    expect(elementsOfType(terms, LegalContentPending).length).toBe(1);
-    expect(elementsOfType(refund, LegalContentPending).length).toBe(1);
-
-    // …then the rendered DOM, because "present in the tree" and "reaches the
-    // page" are different claims (a `return null` inside would satisfy only
-    // the first). `toEqual([…])` pins the COUNT as well as the text.
-    const placeholders = (container: HTMLElement) =>
-      Array.from(container.querySelectorAll('[role="status"]')).map((node) =>
-        (node.textContent ?? "").trim()
-      );
+    // Component identity first: `LegalContentPending` must be GONE from both
+    // trees, not merely invisible.
+    expect(elementsOfType(terms, LegalContentPending).length).toBe(0);
+    expect(elementsOfType(refund, LegalContentPending).length).toBe(0);
 
     const termsDom = await renderServerTree(terms);
     const refundDom = await renderServerTree(refund);
-    expect(placeholders(termsDom.container)).toEqual([en["billing.terms.pending"]]);
-    expect(placeholders(refundDom.container)).toEqual([en["billing.refund.pending"]]);
 
-    // AC-040's sentence is a product fact, not a legal clause, so it ships
-    // ahead of PRD U3 — and its presence must not be mistaken for content.
+    // Không còn ô giữ chỗ `role="status"` nào trên hai trang này.
+    expect(termsDom.container.querySelectorAll('[role="status"]').length).toBe(0);
+    expect(refundDom.container.querySelectorAll('[role="status"]').length).toBe(0);
+
+    // Thân văn bản thật sự TỚI ĐƯỢC trang, và tới dưới dạng có cấu trúc: mốc
+    // <h2> là thứ trình đọc màn hình dùng để nhảy mục trong một văn bản dài.
+    expect(termsDom.container.querySelectorAll("h2").length).toBeGreaterThan(0);
+    expect(refundDom.container.querySelectorAll("h2").length).toBeGreaterThan(0);
+
+    // BU-1: cả hai trang phải nêu tên đơn vị cung cấp dịch vụ.
+    expect(termsDom.container.textContent ?? "").toContain(LEGAL_SELLING_ENTITY);
+    expect(refundDom.container.textContent ?? "").toContain(LEGAL_SELLING_ENTITY);
+
+    // Và không còn dấu vết chỗ-điền nào lọt lên trang công khai.
+    expect(termsDom.container.textContent ?? "").not.toMatch(/\[điền|HỌ VÀ TÊN/);
+    expect(refundDom.container.textContent ?? "").not.toMatch(/\[điền|HỌ VÀ TÊN/);
+
+    // AC-040's sentence is a product fact, not a legal clause, and it keeps its
+    // lead position above the body.
     expect(refundDom.container.textContent ?? "").toContain(en["billing.noAutoRenew"]);
   });
 
   // ==========================================================================
-  // THE R-9 KILL, and the one state that does not exist today: the paid tier
-  // switched ON with the legal content still missing. `legalContentReady =
-  // isPaidTierEnabled()` is indistinguishable from the shipped predicate in
-  // every other world — both are false — and it flips to `true` right here,
-  // mounting C-10 and handing a user a working "I have transferred" button
-  // while /terms and /refund-policy are still placeholders.
+  // THE R-9 KILL. Nguy cơ không đổi: ai đó viết `legalContentReady =
+  // isPaidTierEnabled()` và hai ổ khoá độc lập biến thành một.
   //
-  // The live control is mounted from the props the REAL page produced, not
-  // from a literal `false`. That is what couples the interactive half to the
-  // wiring: a page that opened the gate mounts C-10 here, the click reaches
-  // `recheckOrder()`, and the invocation count stops being zero.
+  // CHIỀU PHÂN BIỆT ĐÃ ĐỔI, VÌ THẾ GIỚI ĐÃ ĐỔI. Khi cả hai ổ khoá còn ĐÓNG,
+  // thứ phân biệt được hai cách viết là "cờ BẬT mà cổng vẫn đóng". Nội dung
+  // pháp lý nay đã có, nên thứ phân biệt được là chiều ngược lại: **cờ TẮT mà
+  // cổng vẫn MỞ**. Với `legalContentReady = isPaidTierEnabled()` thì dòng đó
+  // đọc ra `false`; với vị từ thật thì `true`. Ca này vì thế vẫn giết đúng
+  // một lỗi đó, chỉ là từ phía bên kia.
+  //
+  // Nửa sau giữ NGUYÊN hợp đồng trơ-mà-với-tới-được của C-15, chỉ khác là nó
+  // được dựng từ prop `legalContentReady={false}` tường minh thay vì từ trạng
+  // thái của trang: đó là hợp đồng của COMPONENT, và nó phải tiếp tục đúng cho
+  // ngày nội dung pháp lý bị gỡ xuống hoặc một khoá `.body` bị xoá nhầm.
   // ==========================================================================
-  it("keeps the gate shut with the paid tier ON, and the shut control stays reachable and inert", async () => {
+  it("derives the legal gate from the content keys, not from the paid-tier flag", async () => {
+    // ── cờ TẮT ─────────────────────────────────────────────────────────────
+    vi.stubEnv("GEMINI_PAID_TIER_ENABLED", "");
+    expect(isPaidTierEnabled()).toBe(false);
+    // Vị từ thật KHÔNG đọc cờ này: cổng pháp lý vẫn mở.
+    expect(confirmMountedBy(await renderCheckoutPage()).legalContentReady).toBe(true);
+
+    // ── cờ BẬT ─────────────────────────────────────────────────────────────
     vi.stubEnv("GEMINI_PAID_TIER_ENABLED", "1");
-    // The `canPurchase === true` world is asserted, not assumed: without this
-    // line the case could be passing against a flag that never turned on.
     expect(isPaidTierEnabled()).toBe(true);
+    expect(confirmMountedBy(await renderCheckoutPage()).legalContentReady).toBe(true);
+  });
 
+  // ==========================================================================
+  // C-15's SHUT branch — hợp đồng của component, độc lập với trạng thái hôm
+  // nay của nội dung pháp lý. Dựng từ prop tường minh vì trang thật không còn
+  // sinh ra trạng thái này; ngày một khoá `.body` bị gỡ, đây là hành vi phải
+  // quay lại đúng như mô tả.
+  // ==========================================================================
+  it("the shut control stays reachable and inert, and activating it does nothing", async () => {
     const props = confirmMountedBy(await renderCheckoutPage());
-    expect(props.legalContentReady).toBe(false);
-
-    const { container } = render(<PaymentConfirm {...props} />);
+    const { container } = render(<PaymentConfirm {...props} legalContentReady={false} />);
     const button = container.querySelector("button");
     if (!(button instanceof HTMLButtonElement)) throw new Error("C-15 rendered no button");
 

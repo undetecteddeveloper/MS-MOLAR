@@ -1,23 +1,22 @@
-// /terms — UI Spec S-02. Điều khoản dịch vụ, CÔNG KHAI (PRD R11/AC-038).
+// /terms — UI Spec S-02. Điều khoản dịch vụ, CÔNG KHAI (PRD R11).
 //
-// Đường dẫn phải nằm trong PUBLIC_PATHS đúng chuỗi "/terms" — cơ chế khớp là
-// `pathname === p || pathname.startsWith(`${p}/`)`, nên "/terms-of-service" sẽ
-// KHÔNG được mục "/terms" phủ, và một đường dẫn có dấu chấm thì không bao giờ
-// tới được middleware (proxy.ts:46-48 loại nó khỏi matcher).
+// Khai lại `canonical` vì trang này nằm ngoài nhóm route có sẵn khai báo chung;
+// thiếu nó thì hai đường dẫn cùng trỏ về một nội dung.
 //
-// KHÔNG static export được dù trang thuần văn bản: ngôn ngữ đọc từ cookie phía
-// server (lib/i18n/server.ts:9-21), nên mọi trang có bản dịch đều là dynamic.
-// Đây là đánh đổi đã chấp nhận cho cả site, ghi ra để không ai đi tìm cách
-// prerender nó rồi phát hiện là không thể.
+// NỘI DUNG TỚI TỪ TỪ ĐIỂN, KHÔNG TỪ FILE .md. `docs/legal/term-of-service.md`
+// là bản duyệt của con người; chuỗi `billing.terms.body` là bản đã đưa vào
+// từ điển để dịch được sang hai ngôn ngữ và để `t()` là đường đọc DUY NHẤT.
+// Đọc file lúc chạy sẽ đưa một lượt I/O vào một trang tĩnh và bỏ qua i18n.
+//
+// KHOÁ NÀY LÀ MỘT CỔNG, không chỉ là một chuỗi: `billing.terms.body` là một
+// trong hai khoá mà C-15 (checkout/page.tsx) kiểm bằng `in` để quyết định có
+// bật nút xác nhận thanh toán hay không. Xoá nó đi là đóng cổng bán hàng.
 
 import type { Metadata } from "next";
-import { LegalContentPending, LegalDocument } from "@/components/billing/LegalDocument";
+import { LegalDocument } from "@/components/billing/LegalDocument";
+import { LegalProse } from "@/components/billing/LegalProse";
 import { getTranslate } from "@/lib/i18n/server";
 
-// `alternates.canonical` PHẢI khai lại: root layout đặt mặc định `canonical:
-// "/"` cho mọi trang, thứ vốn đúng khi `/` là trang public duy nhất. Để nguyên
-// thì trang này tự khai mình là bản sao của trang chủ và sẽ không được index
-// riêng — hỏng im lặng, chỉ lộ ra ở Search Console.
 export const metadata: Metadata = {
   title: "Terms of Service",
   alternates: { canonical: "/terms" },
@@ -27,8 +26,7 @@ export default async function TermsPage() {
   const t = await getTranslate();
   return (
     <LegalDocument title={t("billing.terms.title")}>
-      {/* Nội dung thật chờ PRD U3 — chủ sở hữu là engineer, không phải agent. */}
-      <LegalContentPending message={t("billing.terms.pending")} />
+      <LegalProse body={t("billing.terms.body")} />
     </LegalDocument>
   );
 }
