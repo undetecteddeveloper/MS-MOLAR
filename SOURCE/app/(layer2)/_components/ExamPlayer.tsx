@@ -8,6 +8,8 @@
 // M3.2 Task 1: mobile vuốt trái/phải chuyển câu (useSwipe); desktop dùng phím ← → .
 "use client";
 
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { useEffect, useRef, useTransition } from "react";
 import { submitExam } from "@/app/(layer2)/actions";
 import { useT } from "@/lib/i18n/client";
@@ -99,7 +101,12 @@ export function ExamPlayer({
   }
 
   return (
-    <div className="bg-background">
+    // `data-exam-focus`: dấu để CSS biết trang này chạy ở chế độ tập trung
+    // (BottomNav không render dưới 768px) và bỏ khoảng chừa chân trang —
+    // xem `.pb-bottom-nav:has(...)` trong globals.css. Thuộc tính chứ không
+    // phải class: nó là DỮ LIỆU trạng thái cho một quy tắc khác đọc, không
+    // phải kiểu dáng của chính khối này.
+    <div data-exam-focus className="bg-background">
       {/* S#28: modal xác nhận rời trang (mở khi guard chặn một click nav). */}
       <LeaveExamDialog open={pendingHref !== null} onCancel={cancelLeave} onLeave={confirmLeave} />
 
@@ -110,12 +117,16 @@ export function ExamPlayer({
         {/* Header — tên đề (trái) · đồng hồ + nút Nộp bài (phải). Không sticky:
             khu vực trả lời đã tự cuộn trong khung 238px (QuestionRenderer) nên
             trang hiếm khi cần cuộn dài. preload order 1 — fade sau navbar (S#21). */}
-        {/* Dưới 768px khối này DÍNH ĐỈNH (dưới navbar h-15) và nén lại: đồng hồ
-            đếm ngược là thông tin phải nhìn thấy LIÊN TỤC trong một bài thi có
-            giờ, nhưng trước thay đổi này nó cuộn mất ngay khi người dùng bắt
-            đầu đọc câu hỏi đầu tiên. Tiêu đề đề rút còn một dòng (`truncate`)
-            để dải sticky không ăn quá nhiều chiều cao — ở 360×800 mỗi 40px giữ
-            lại là một dòng câu hỏi đọc được thêm. */}
+        {/* Dưới 768px khối này DÍNH ĐỈNH và nén lại: đồng hồ đếm ngược là thông
+            tin phải nhìn thấy LIÊN TỤC trong một bài thi có giờ, nhưng trước
+            thay đổi này nó cuộn mất ngay khi người dùng bắt đầu đọc câu hỏi đầu
+            tiên. Tiêu đề đề rút còn một dòng (`truncate`) để dải sticky không
+            ăn quá nhiều chiều cao — ở 360×800 mỗi 40px giữ lại là một dòng câu
+            hỏi đọc được thêm.
+            `top-0` chứ không phải `top-15`: từ 2026-08-21 SiteHeader ẩn hẳn
+            dưới 768px trên route này (isExamFocusRoute), nên không còn 60px
+            navbar nào để né — giữ `top-15` sẽ chừa một dải trống đúng bằng
+            navbar đã biến mất. */}
         {/* KHÔNG `flex-wrap`: tên đề do người dùng đặt nên độ dài không có
             trần thực tế (MAX_TITLE = 200). Với `flex-wrap` + tiêu đề chỉ
             truncate ở mobile, một tên đề dài đẩy cụm đồng hồ + Nộp bài xuống
@@ -126,20 +137,42 @@ export function ExamPlayer({
             chỗ, phần chữ bên trái co lại và cắt bằng dấu ba chấm ở MỌI bề
             rộng — `title` giữ lại tên đầy đủ khi rê chuột. */}
         <div
-          className="preload-fade flex items-end justify-between gap-4 max-md:bg-background/95 max-md:sticky max-md:top-15 max-md:z-20 max-md:-mx-4 max-md:items-center max-md:gap-2 max-md:px-4 max-md:py-2 max-md:backdrop-blur"
+          className="preload-fade flex items-end justify-between gap-4 max-md:bg-background/95 max-md:sticky max-md:top-0 max-md:z-20 max-md:-mx-4 max-md:items-center max-md:gap-2 max-md:px-4 max-md:py-2 max-md:backdrop-blur"
           style={{ "--preload-order": 1 } as React.CSSProperties}
         >
+          {/* Lối quay về /exams — bản MOBILE. Dưới 768px cả SiteHeader lẫn
+              BottomNav đều ẩn ở route này (isExamFocusRoute), nên nếu không có
+              nút này thì lối ra duy nhất là nút Back của trình duyệt — và với
+              một trang có hộp thoại "bạn có chắc muốn rời?" thì để người dùng
+              phải dùng nút Back là đúng cái mà hộp thoại đó sinh ra để tránh.
+              CHỈ mũi tên, không chữ: dải sticky này tính chi phí từng 40px
+              chiều cao (xem comment khối cha) và bề ngang còn phải chia cho
+              tên đề + đồng hồ. `size-11` = sàn 44px vùng chạm (§4.3).
+              `-ml-3` kéo nút ra để MÉP TRÁI CỦA ICON (không phải của nút) thẳng
+              hàng với mép nội dung: 44px nút − 20px icon = 12px đệm mỗi bên,
+              nên lùi đúng 12px thì icon rơi vào đúng 16px của `px-4`.
+              `<Link>` thật, không phải router.push: interceptor của
+              useLeaveGuard bắt theo thẻ <a>, nên nút này đi qua cùng một hộp
+              thoại xác nhận như mọi liên kết khác. */}
+          <Link
+            href="/exams"
+            aria-label={t("player.backToExams")}
+            className="text-muted-foreground hover:text-foreground active:text-foreground -ml-3 flex size-11 shrink-0 items-center justify-center rounded-md transition-colors md:hidden"
+          >
+            <ArrowLeft aria-hidden className="size-5" strokeWidth={2} />
+          </Link>
+
           <div className="min-w-0 flex-1">
             {/* Về danh sách đề — TÁI DÙNG <Breadcrumbs> (đã có sẵn ở
                 exams/[id]/page.tsx), không dựng link riêng: đây đúng là lý do
                 Breadcrumbs ra đời — "← Back" chỉ nói ĐI ĐÂU chứ không nói ĐANG
                 Ở ĐÂU. `<Link>` bên trong nó vẫn là thẻ <a> thật nên interceptor
-                của useLeaveGuard bắt được y hệt navbar/BottomNav — hiện modal
-                xác nhận thay vì rời thẳng và mất bài đang làm dở.
+                của useLeaveGuard bắt được y hệt navbar — hiện modal xác nhận
+                thay vì rời thẳng và mất bài đang làm dở.
                 Ẩn trên mobile: dải sticky đã tính chi phí từng 40px chiều cao
-                (xem comment khối cha), và BottomNav đã có sẵn ô "Đề thi" luôn
-                hiện — thêm breadcrumb ở đây là hai lối cùng chức năng chồng
-                lên nhau trên một màn hình hẹp. */}
+                (xem comment khối cha), và ở dải đó nút mũi tên ngay bên trái đã
+                làm đúng việc này rồi — hai lối cùng chức năng trên một màn hình
+                hẹp chỉ tốn chỗ. */}
             <Breadcrumbs
               items={[{ label: t("nav.exams"), href: "/exams" }, { label: examTitle }]}
               className="mb-1.5 text-xs max-md:hidden"
@@ -245,7 +278,7 @@ export function ExamPlayer({
                 bên dưới — nên mỗi lần chuyển câu là một lần cuộn xuống rồi
                 cuộn ngược lên. Đề 40 câu thì khoảng cách đó nhân lên.
                 bottom = chiều cao BottomNav + safe-area (§6.2). */}
-            <div className="border-border mt-4 flex items-center justify-between gap-3 border-t pt-4 max-md:bg-background/95 max-md:sticky max-md:bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom,0px))] max-md:z-20 max-md:-mx-4 max-md:px-4 max-md:pb-3 max-md:backdrop-blur">
+            <div className="border-border mt-4 flex items-center justify-between gap-3 border-t pt-4 max-md:bg-background/95 max-md:sticky max-md:bottom-[env(safe-area-inset-bottom,0px)] max-md:z-20 max-md:-mx-4 max-md:px-4 max-md:pb-3 max-md:backdrop-blur">
               <button
                 type="button"
                 onClick={prev}

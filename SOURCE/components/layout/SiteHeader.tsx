@@ -29,7 +29,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { HeaderProfile, type MenuUser } from "@/components/shared/HeaderProfile";
 import { LanguageToggle } from "@/components/shared/LanguageToggle";
-import { GUEST_NAV_ITEMS, NAV_ITEMS, isNavItemActive } from "@/lib/nav/items";
+import { GUEST_NAV_ITEMS, NAV_ITEMS, isExamFocusRoute, isNavItemActive } from "@/lib/nav/items";
 import { useT } from "@/lib/i18n/client";
 
 export function SiteHeader({ user = null }: { user?: MenuUser | null }) {
@@ -37,11 +37,21 @@ export function SiteHeader({ user = null }: { user?: MenuUser | null }) {
   const t = useT();
   const items = user ? NAV_ITEMS : GUEST_NAV_ITEMS;
 
+  // Chế độ tập trung khi đang làm bài — ẩn header trên MOBILE, giữ nguyên trên
+  // ≥768px (ở đó 60px header không phải khoản chi đáng kể, và desktop không có
+  // thanh đáy nên đây là lối điều hướng duy nhất). `max-md:hidden` chứ không
+  // phải `return null`: xem isExamFocusRoute trong lib/nav/items.ts.
+  const focusMode = isExamFocusRoute(pathname);
+
   return (
     // preload order 0 — navbar là khối đầu tiên của chuỗi fade (S#21).
     // h-15 (60px, S#21): các sticky offset dưới navbar (ExamFilters,
     // ExamPlayer top bar) phải dùng top-15 khớp theo.
-    <header className="preload-fade sticky top-0 z-30 border-b border-[color:var(--nav-border)] bg-[var(--nav-bg)] backdrop-blur">
+    <header
+      className={`preload-fade sticky top-0 z-30 border-b border-[color:var(--nav-border)] bg-[var(--nav-bg)] backdrop-blur${
+        focusMode ? " max-md:hidden" : ""
+      }`}
+    >
       <div className="mx-auto flex h-15 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
         {/* Logo — neo về trang chủ. Trước 2026-08-07 nó bị `max-sm:hidden` vì 5
             tag không đủ chỗ ở màn hẹp; nay tag đã dọn xuống BottomNav nên logo

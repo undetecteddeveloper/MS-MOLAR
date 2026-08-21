@@ -57,7 +57,16 @@ export async function HistoryList({
         //    đệm trang + khối tiêu đề + đệm đáy cho BottomNav. `dvh` chứ không
         //    `vh`: thanh địa chỉ trình duyệt ẩn/hiện khi cuộn làm `vh` sai số
         //    (§3.2 tài liệu mobile).
-        <ul className="flex max-h-[calc(100dvh-15rem)] flex-col gap-3 overflow-y-auto pr-2 md:max-h-[30rem]">
+        // `md:pr-2` chứ không phải `pr-2`: rãnh 8px này sinh ra để thanh cuộn
+        // cổ điển của desktop không đè lên mép phải thẻ. Trên mobile thanh cuộn
+        // là kiểu PHỦ (overlay, không chiếm bề rộng — đo được clientWidth ===
+        // offsetWidth === 358 ở 390×844), nên nó không che gì cả mà chỉ bóp thẻ
+        // lại 8px: thẻ rộng 350px trong khi nút FILTERS ngay phía trên rộng 358
+        // và cùng bắt đầu ở x=16. Hai khối xếp chồng lệch nhau 8px ở đúng một
+        // phía là kiểu lệch mắt bắt được ngay mà không chỉ ra được vì sao.
+        // Từ 768px trở lên bộ lọc là một rail dọc BÊN TRÁI, không còn khối nào
+        // nằm trên để so mép — nên ở đó rãnh cuộn giữ nguyên.
+        <ul className="flex max-h-[calc(100dvh-15rem)] flex-col gap-3 overflow-y-auto md:max-h-[30rem] md:pr-2">
           {entries.map((entry) => (
             <HistoryRow key={entry.attemptId} entry={entry} />
           ))}

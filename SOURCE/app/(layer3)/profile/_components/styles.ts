@@ -41,6 +41,17 @@ export const fieldHintCls = "mt-1 text-xs text-muted-foreground";
 export const outlineButtonCls =
   "border-border text-foreground hover:bg-accent focus-visible:border-ring focus-visible:ring-ring/50 inline-flex min-h-11 items-center justify-center rounded-[4px] border px-4 py-2 text-sm transition-colors outline-none focus-visible:ring-3 aria-disabled:opacity-60";
 
+/**
+ * Nhãn đóng vai NÚT cho một `<input type="file">` mang `peer sr-only` đứng ngay
+ * TRƯỚC nó. Giống `outlineButtonCls` từng nét trừ hai chỗ, và cả hai đều bắt
+ * buộc: vòng tiêu điểm phải soi qua `peer-focus-visible:*` vì `<label>` không
+ * bao giờ nhận tiêu điểm — cái nhận là input ẩn — nên `focus-visible:*` gắn
+ * thẳng lên nhãn sẽ không khớp lần nào; và `cursor-pointer` vì nhãn không phải
+ * nút nên trình duyệt không tự đổi con trỏ.
+ */
+export const outlineFilePickerCls =
+  "border-border text-foreground hover:bg-accent peer-focus-visible:border-ring peer-focus-visible:ring-ring/50 inline-flex min-h-11 cursor-pointer items-center justify-center rounded-[4px] border px-4 py-2 text-sm transition-colors peer-focus-visible:ring-3";
+
 /** Hành động CHÍNH duy nhất của tính năng: nút gửi của hộp thoại đổi mật khẩu. */
 export const pillButtonCls =
   "bg-brand text-brand-foreground focus-visible:ring-ring/50 inline-flex min-h-11 items-center justify-center rounded-full px-4 py-2 text-xs font-medium tracking-[0.14em] uppercase transition-opacity outline-none hover:opacity-90 focus-visible:ring-3 aria-disabled:opacity-60";

@@ -47,7 +47,11 @@ import Image from "next/image";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useT } from "@/lib/i18n/client";
-import { startsPageNavigation } from "@/lib/nav/pageNavigation";
+import {
+  isPageNavigationBlocked,
+  onPageNavigationIndicatorStart,
+  startsPageNavigation,
+} from "@/lib/nav/pageNavigation";
 
 /** Trần thời gian giữ lớp phủ khi không có tín hiệu kết thúc nào (xem §3). */
 const SAFETY_TIMEOUT_MS = 12_000;
@@ -77,6 +81,16 @@ export function RouteLoadingOverlay() {
       setPendingAt(null);
     }
 
+    /** Bật lớp phủ cho URL đang đứng, kèm hẹn giờ chặn trên (§3 đầu file). */
+    function showOverlay() {
+      clear();
+      setPendingAt(locationKey(window.location.pathname, window.location.search));
+      safetyTimer.current = setTimeout(() => {
+        safetyTimer.current = null;
+        setPendingAt(null);
+      }, SAFETY_TIMEOUT_MS);
+    }
+
     function onClick(event: MouseEvent) {
       // `closest` chứ không phải `event.target` trực tiếp: bấm vào chữ hay icon
       // bên trong <a> thì target là node con, phải leo lên mới thấy thẻ neo.
@@ -97,21 +111,28 @@ export function RouteLoadingOverlay() {
       });
       if (!navigates) return;
 
-      clear();
-      setPendingAt(locationKey(window.location.pathname, window.location.search));
-      safetyTimer.current = setTimeout(() => {
-        safetyTimer.current = null;
-        setPendingAt(null);
-      }, SAFETY_TIMEOUT_MS);
+      // HOÃN tới cuối lượt dispatch. Một interceptor khác trên cùng `document`,
+      // cùng pha capture (useLeaveGuard ở màn làm bài) có thể huỷ chính cú bấm
+      // này, và thứ tự chạy giữa hai listener là do thứ tự mount quyết định —
+      // hỏi ngay tại đây thì nửa số trường hợp hỏi trước khi bên kia kịp trả
+      // lời. Xem khối chú thích trong lib/nav/pageNavigation.ts.
+      queueMicrotask(() => {
+        if (isPageNavigationBlocked(event)) return;
+        showOverlay();
+      });
     }
 
     document.addEventListener("click", onClick, true);
     window.addEventListener("popstate", clear);
     window.addEventListener("pageshow", clear);
+    // Điều hướng bằng `router.push()` không có cú bấm nào để bắt — bên gọi tự
+    // báo (useLeaveGuard khi người dùng xác nhận "Rời trang").
+    const unsubscribe = onPageNavigationIndicatorStart(showOverlay);
     return () => {
       document.removeEventListener("click", onClick, true);
       window.removeEventListener("popstate", clear);
       window.removeEventListener("pageshow", clear);
+      unsubscribe();
       if (safetyTimer.current !== null) clearTimeout(safetyTimer.current);
     };
   }, []);

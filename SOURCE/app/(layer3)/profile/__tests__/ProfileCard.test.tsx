@@ -15,6 +15,7 @@ vi.mock("@/app/(layer1)/actions", () => ({
 }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 
+import { AVATAR_LIMITS } from "@/lib/profile/limits";
 import { ProfileCard } from "../_components/ProfileCard";
 
 const USER = {
@@ -55,9 +56,72 @@ describe("khối danh tính", () => {
     const { container } = render(<ProfileCard user={USER} />);
 
     expect(screen.getByText("Cannot be changed")).toBeDefined();
-    // Không hộp thoại nào đang mở → toàn bộ input trên thẻ chỉ có đúng ô file
-    // của bộ chọn ảnh khi nó mở; lúc nghỉ thì không có input nào cả.
-    expect(container.querySelectorAll("input").length).toBe(0);
+    // Lúc nghỉ, ô nhập DUY NHẤT trên thẻ là bộ chọn tệp ảnh (nó luôn nằm trong
+    // cây từ 2026-08-21, xem describe bên dưới). Không có ô text nào — email
+    // không sửa được thì cũng không được có chỗ để gõ vào.
+    const inputs = Array.from(container.querySelectorAll("input"));
+    expect(inputs.map((i) => i.type)).toEqual(["file"]);
+  });
+});
+
+// Bộ chọn ảnh chuyển từ AvatarUploader sang ĐÂY (2026-08-21): bấm "Đổi ảnh"
+// nay mở thẳng trình quản lý tệp của máy thay vì mở một khối chỉ chứa đúng một
+// nút "Chọn ảnh". Ba tính chất của khuôn `peer sr-only` phải sống sót qua lần
+// chuyển chỗ đó, nên chúng theo chân xuống đây.
+describe("bộ chọn ảnh — mở thẳng trình quản lý tệp", () => {
+  function avatarInput(): HTMLInputElement {
+    return screen.getByLabelText("Change picture") as HTMLInputElement;
+  }
+
+  it("'Đổi ảnh' là NHÃN của input file, không phải nút mở một khối trung gian", () => {
+    render(<ProfileCard user={USER} />);
+
+    // Nhãn trỏ đúng vào ô file → cú chạm đầu tiên mở trình quản lý tệp.
+    expect(avatarInput().type).toBe("file");
+    // Và không có nút nào mang chữ đó — nút thì phải có onClick để mở gì đó.
+    expect(screen.queryByRole("button", { name: "Change picture" })).toBeNull();
+  });
+
+  it("input thật là `peer sr-only`, KHÔNG phải `hidden` — giữ điểm dừng Tab và ở lại cây a11y", () => {
+    render(<ProfileCard user={USER} />);
+
+    const input = avatarInput();
+    expect(input.className).toContain("sr-only");
+    expect(input.className).toContain("peer");
+    expect(input.className).not.toContain("hidden");
+    expect(input.hidden).toBe(false);
+  });
+
+  it("chỉ nhận đúng ba MIME mà Server Action nhận", () => {
+    render(<ProfileCard user={USER} />);
+    expect(avatarInput().getAttribute("accept")).toBe(AVATAR_LIMITS.ALLOWED_MIME.join(","));
+  });
+
+  it("nhãn hiển thị phản chiếu focus của input ẩn qua peer-focus-visible", () => {
+    render(<ProfileCard user={USER} />);
+    const label = screen.getByText("Change picture");
+    expect(label.className).toContain("peer-focus-visible:border-ring");
+  });
+
+  it("aria-describedby của input trỏ tới một node CÓ THẬT, ngay cả khi chưa chọn gì", () => {
+    render(<ProfileCard user={USER} />);
+    const id = avatarInput().getAttribute("aria-describedby") as string;
+    expect(document.getElementById(id)?.textContent).toBe("JPG, PNG or WebP, up to 2MB.");
+  });
+
+  it("chọn tệp → khối xem trước hiện ra, và `value` được reset để chọn LẠI vẫn bắn onChange", () => {
+    render(<ProfileCard user={USER} />);
+    const input = avatarInput();
+    const file = new File(["x"], "chan-dung.png", { type: "image/png" });
+    Object.defineProperty(input, "files", { value: [file], configurable: true });
+
+    act(() => {
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+
+    expect(screen.getByText("chan-dung.png")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Save" })).toBeDefined();
+    expect(input.value).toBe("");
   });
 });
 
@@ -92,7 +156,7 @@ describe("hàng mật khẩu", () => {
   it("nói rõ VÌ SAO không thể hiện lại được", () => {
     render(<ProfileCard user={USER} />);
     expect(
-      screen.getByText("Passwords are stored hashed, so nobody — us included — can show yours again.")
+      screen.getByText("Hashed — not even we can show it again.")
     ).toBeDefined();
   });
 });

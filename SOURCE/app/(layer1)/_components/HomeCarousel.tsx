@@ -6,20 +6,27 @@
 // từ trước, giữ NGUYÊN VĂN), "Có tích hợp AI" và "Học tập thích ứng". Hai mục
 // sau hiển thị tên website + một dòng mô tả ngắn.
 //
-// Điều hướng: TỰ ĐỘNG sau mỗi 7 giây, cộng cặp nút ‹ › ở góc trên bên phải,
-// cộng vuốt ngang trên cảm ứng (useSwipe — dùng lại đúng hook của Exam Player).
+// Điều hướng: TỰ ĐỘNG sau mỗi 7 giây, cộng vuốt ngang trên cảm ứng (useSwipe —
+// dùng lại đúng hook của Exam Player).
+//
+// KHÔNG còn chrome nhìn thấy được ở đầu băng chuyền (engineer chốt 2026-08-21):
+// dòng eyebrow in hoa, vạch đồng 40×2 và cụm nút ‹ › ⏸ đã bỏ khỏi CẢ desktop
+// lẫn mobile. Hero mở thẳng bằng tiêu đề; ba mục vẫn luân phiên như cũ.
 //
 // Bốn ràng buộc quanh việc TỰ CHẠY (nội dung ở đây là văn bản cần ĐỌC, nên tự
 // đổi mục giữa lúc đang đọc là cách chắc chắn nhất làm người dùng đọc dở):
-//  1. Có nút TẠM DỪNG. Đây là YÊU CẦU BẮT BUỘC, không phải tuỳ chọn: WCAG 2.2.2
-//     (Pause, Stop, Hide) áp cho mọi nội dung tự động chuyển động quá 5 giây và
-//     nằm song song với nội dung khác. Nó là nút thứ ba trong cụm ‹ › nên không
-//     thêm một ổ điều khiển mới ở chỗ khác.
+//  1. Vẫn PHẢI còn cách tạm dừng. WCAG 2.2.2 (Pause, Stop, Hide) áp cho mọi nội
+//     dung tự động chuyển động quá 5 giây và nằm song song với nội dung khác —
+//     bỏ nút đi thì tiêu chí gãy, chứ không phải bỏ đi là hết trách nhiệm. Nên
+//     nút tạm dừng còn nguyên nhưng ẩn khỏi mắt thường và chỉ hiện khi nhận
+//     TIÊU ĐIỂM bàn phím, đúng khuôn SkipLink của repo (`sr-only` +
+//     `focus:not-sr-only`). KHÔNG dùng `hidden`/`display:none`: thứ đó cắt luôn
+//     khỏi thứ tự Tab, tức xoá cơ chế chứ không phải ẩn nó. Nút `absolute` lúc
+//     hiện → hiện ra không đẩy bố cục hero đi đâu.
 //  2. Tạm dừng khi con trỏ rê lên HOẶC khi tiêu điểm bàn phím đang ở bên trong
 //     — hai tín hiệu "người dùng đang đọc/đang thao tác chỗ này".
-//  3. Người dùng tự chuyển mục (bấm ‹ › / vuốt) thì DỪNG HẲN. Họ vừa nói rõ
-//     muốn xem mục nào; kéo họ đi tiếp sau 7 giây là bỏ qua điều đó. Muốn chạy
-//     lại thì bấm nút phát.
+//  3. Người dùng tự chuyển mục (vuốt) thì DỪNG HẲN. Họ vừa nói rõ muốn xem mục
+//     nào; kéo họ đi tiếp sau 7 giây là bỏ qua điều đó.
 //  4. Tôn trọng `prefers-reduced-motion: reduce` — không tự chạy.
 //
 // Ngữ nghĩa ARIA dùng mẫu CAROUSEL (`aria-roledescription="carousel"` + mỗi mục
@@ -33,7 +40,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Pause, Play } from "lucide-react";
+import { Pause, Play } from "lucide-react";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useSwipe } from "@/hooks/useSwipe";
 import { useT } from "@/lib/i18n/client";
@@ -59,9 +66,8 @@ function usePrefersReducedMotion() {
   );
 }
 
-/** Dòng chữ nhỏ in hoa phía trên tiêu đề, đổi theo mục đang hiện. */
-const EYEBROW_KEYS: MessageKey[] = ["home.eyebrow", "home.tabAi", "home.tabAdaptive"];
-const SLIDE_COUNT = EYEBROW_KEYS.length;
+/** Ba mục: Giới thiệu · Có tích hợp AI · Học tập thích ứng. */
+const SLIDE_COUNT = 3;
 
 export function HomeCarousel() {
   const t = useT();
@@ -85,7 +91,7 @@ export function HomeCarousel() {
 
   // MỌI đường người dùng tự chuyển mục đều đi qua đây → dừng hẳn tự chạy
   // (ràng buộc 3 ở đầu file). Nút phát/tạm dừng KHÔNG gọi hàm này.
-  // Vòng lặp ở hai đầu: cụm ‹ › luôn bấm được, không có nút chết.
+  // Vòng lặp ở hai đầu: vuốt tới đâu cũng còn mục kế, không có đầu chết.
   function step(delta: number) {
     setActive((i) => (i + delta + SLIDE_COUNT) % SLIDE_COUNT);
     setPlaying(false);
@@ -104,51 +110,31 @@ export function HomeCarousel() {
       role="group"
       aria-roledescription={t("home.carouselRole")}
       aria-label={t("home.carouselLabel")}
-      className="w-full"
+      className="relative w-full"
       onMouseEnter={() => setSuspended(true)}
       onMouseLeave={() => setSuspended(false)}
       onFocus={() => setSuspended(true)}
       onBlur={() => setSuspended(false)}
     >
-      {/* ---------- Hàng đầu: eyebrow (trái) · cụm điều khiển (phải) ----------
-          Eyebrow được kéo RA NGOÀI các panel xếp chồng và đổi chữ theo mục đang
-          hiện. Làm vậy để cụm ‹ › đứng ngang hàng với nó bằng flex thay vì phải
-          `absolute` đè lên vùng nội dung — nếu đè, dòng đầu của tiêu đề (serif,
-          dài) sẽ chui xuống dưới nút ở màn hẹp. Đây cũng là lý do vạch đồng nằm
-          luôn ở ngoài: eyebrow + vạch là KHUNG cố định, chỉ phần chữ bên dưới
-          mới trượt. */}
-      <div className="flex items-center justify-between gap-4">
-        <p className="min-w-0 truncate font-sans text-xs font-medium tracking-[0.2em] text-[color:var(--muted-foreground)] uppercase">
-          {t(EYEBROW_KEYS[active])}
-        </p>
-
-        <div className="flex shrink-0 items-center gap-0.5">
-          {/* Ẩn nút tạm dừng khi hệ điều hành đã bật giảm chuyển động: ở đó
-              carousel vốn không tự chạy, nên một nút "tạm dừng" cho thứ đang
-              đứng yên chỉ gây rối. */}
-          {!reducedMotion && (
-            <ControlButton
-              onClick={() => setPlaying((p) => !p)}
-              label={playing ? t("home.carouselPause") : t("home.carouselPlay")}
-            >
-              {playing ? (
-                <Pause aria-hidden className="size-4" strokeWidth={2} />
-              ) : (
-                <Play aria-hidden className="size-4" strokeWidth={2} />
-              )}
-            </ControlButton>
+      {/* Ổ tạm dừng giữ cho WCAG 2.2.2 — ẩn với chuột, hiện khi Tab tới (ràng
+          buộc 1 ở đầu file). Ẩn HẲN khi hệ điều hành đã bật giảm chuyển động:
+          ở đó băng chuyền vốn không tự chạy, một nút "tạm dừng" cho thứ đang
+          đứng yên chỉ gây rối, và trạng thái đó cũng không có tiêu chí nào cần
+          thoả. */}
+      {!reducedMotion && (
+        <button
+          type="button"
+          onClick={() => setPlaying((p) => !p)}
+          aria-label={playing ? t("home.carouselPause") : t("home.carouselPlay")}
+          className="bg-background sr-only rounded-sm border-2 border-[color:var(--ring)] text-[#1B1512] focus:not-sr-only focus:absolute focus:top-0 focus:right-0 focus:z-20 focus:flex focus:size-11 focus:items-center focus:justify-center"
+        >
+          {playing ? (
+            <Pause aria-hidden className="size-4" strokeWidth={2} />
+          ) : (
+            <Play aria-hidden className="size-4" strokeWidth={2} />
           )}
-          <ControlButton onClick={() => step(-1)} label={t("home.carouselPrev")}>
-            <ChevronLeft aria-hidden className="size-5" strokeWidth={2} />
-          </ControlButton>
-          <ControlButton onClick={() => step(1)} label={t("home.carouselNext")}>
-            <ChevronRight aria-hidden className="size-5" strokeWidth={2} />
-          </ControlButton>
-        </div>
-      </div>
-
-      {/* Vạch đồng 40×2 — dấu mở section của DESIGN.md. */}
-      <div className="mt-4 h-0.5 w-10 bg-[#B8863B]" aria-hidden />
+        </button>
+      )}
 
       {/* ---------- Vùng mục ----------
           `overflow-hidden` là BẮT BUỘC, không phải trang trí: mục không hoạt
@@ -185,31 +171,6 @@ export function HomeCarousel() {
   );
 }
 
-/** Nút điều khiển của băng chuyền — kích thước và trạng thái đồng nhất cho cả
- *  ba (tạm dừng · trước · sau). `min-h-11 min-w-11` = sàn 44px cho vùng chạm
- *  (Mobile-Layout-Research-MS §4.3); icon nhỏ hơn nhiều nên phần dôi ra là vùng
- *  nhận chạm vô hình, đúng cách tài liệu khuyến nghị nới hitbox. */
-function ControlButton({
-  onClick,
-  label,
-  children,
-}: {
-  onClick: () => void;
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      className="flex min-h-11 min-w-11 items-center justify-center rounded-sm text-[color:var(--muted-foreground)] transition-colors hover:text-[#1B1512] active:text-[color:var(--brand)]"
-    >
-      {children}
-    </button>
-  );
-}
-
 /** Mục 1 "Giới thiệu" — nhóm nội dung hero vốn có của trang chủ, giữ nguyên. */
 function IntroBody() {
   const t = useT();
@@ -219,7 +180,7 @@ function IntroBody() {
           (ml-auto). flex-wrap để màn hẹp thì logo xuống dòng thay vì bóp méo.
           Logo ẨN dưới 1024px — ở dải đó SiteHeader đã hiện logo rồi, lặp lại
           lần hai trong hero chỉ ăn mất chiều cao vốn đã chật. */}
-      <div className="mt-5 flex flex-wrap items-center gap-6 lg:gap-8">
+      <div className="flex flex-wrap items-center gap-6 lg:gap-8">
         <h1 className="max-w-3xl min-w-0 flex-1 basis-64 font-serif text-xl leading-[1.2] font-semibold tracking-tight text-[#1B1512] sm:text-3xl lg:text-4xl">
           {t("home.headline")}
         </h1>
@@ -261,7 +222,7 @@ function FeatureBody({ slideIndex }: { slideIndex: number }) {
     <>
       {/* Tên website đứng ở vị trí h1 của mục 1 nhưng là h2: mỗi trang chỉ được
           có một h1, và h1 đó thuộc về mục "Giới thiệu". */}
-      <h2 className="mt-5 max-w-3xl font-serif text-2xl leading-[1.15] font-semibold tracking-tight text-[#1B1512] sm:text-4xl lg:text-5xl">
+      <h2 className="max-w-3xl font-serif text-2xl leading-[1.15] font-semibold tracking-tight text-[#1B1512] sm:text-4xl lg:text-5xl">
         {t("home.siteName")}
       </h2>
 

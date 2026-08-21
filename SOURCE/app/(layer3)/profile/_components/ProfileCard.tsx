@@ -10,6 +10,7 @@ import { Pencil } from "lucide-react";
 import type { CurrentUserProfile } from "@/lib/auth/getCurrentUser";
 import { useT } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n/translate";
+import { AVATAR_LIMITS } from "@/lib/profile/limits";
 import { Avatar } from "@/components/shared/Avatar";
 import { SuccessToast } from "@/components/ui/SuccessToast";
 import { AvatarUploader } from "./AvatarUploader";
@@ -17,13 +18,17 @@ import { ChangePasswordDialog } from "./ChangePasswordDialog";
 import { DisplayNameEditor } from "./DisplayNameEditor";
 import { PasswordRow } from "./PasswordRow";
 import { SignOutButton } from "./SignOutButton";
-import type { ProfileMessage } from "./errorMessages";
-import { outlineButtonCls } from "./styles";
+import { profileMessage, type ProfileMessage } from "./errorMessages";
+import { outlineFilePickerCls } from "./styles";
 
 /** Nút mở và khối sửa nằm ở hai chỗ khác nhau trong cây, nên `aria-controls`
  *  là thứ duy nhất nối chúng lại cho trình đọc màn hình. */
 const AVATAR_PANEL_ID = "profile-avatar-panel";
 const NAME_PANEL_ID = "profile-name-panel";
+/** Ô chọn tệp ảnh sống ở ĐÂY (cạnh nhãn của nó) chứ không trong AvatarUploader:
+ *  `htmlFor` cần input, và mẫu `peer-focus-visible` cần nó là anh em liền kề. */
+const AVATAR_INPUT_ID = "profile-avatar";
+const AVATAR_HINT_ID = "profile-avatar-hint";
 
 interface ProfileCardProps {
   user: CurrentUserProfile;
@@ -38,12 +43,16 @@ export function ProfileCard({ user }: ProfileCardProps) {
   const [toast, setToast] = useState<{ key: MessageKey | null; n: number }>({ key: null, n: 0 });
   const [status, setStatus] = useState<ProfileMessage | null>(null);
   const passwordTriggerRef = useRef<HTMLButtonElement>(null);
-  // Trình đổi ảnh do thẻ này sở hữu, không do AvatarUploader tự giữ: nút mở nằm
-  // trong cụm danh tính ở đầu thẻ còn khối sửa nằm bên dưới nó, hai chỗ khác
-  // nhau trong cây DOM. Một component không thể render hai mảnh vào hai nơi mà
-  // không có ai đứng trên cả hai.
-  const [avatarOpen, setAvatarOpen] = useState(false);
-  const avatarTriggerRef = useRef<HTMLButtonElement>(null);
+  // Trình đổi ảnh do thẻ này sở hữu, không do AvatarUploader tự giữ: bộ chọn
+  // tệp nằm trong cụm danh tính ở đầu thẻ còn khối xem trước nằm bên dưới nó,
+  // hai chỗ khác nhau trong cây DOM. Một component không thể render hai mảnh
+  // vào hai nơi mà không có ai đứng trên cả hai.
+  //
+  // Trạng thái là TỆP ĐÃ CHỌN, không phải một cờ "đang mở": khối bên dưới không
+  // còn lý do tồn tại nào khác ngoài việc xem trước một tệp cụ thể, nên "có tệp"
+  // và "đang mở" là cùng một điều — hai biến cho một điều thì sẽ có ngày lệch.
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
   // Cùng lý do với avatar: bút chì nằm trong cụm danh tính, khối sửa nằm dưới.
   const [nameOpen, setNameOpen] = useState(false);
   const nameTriggerRef = useRef<HTMLButtonElement>(null);
@@ -53,17 +62,36 @@ export function ProfileCard({ user }: ProfileCardProps) {
     nameTriggerRef.current?.focus();
   }
 
-  // Nút "Đổi ảnh" ở LẠI trong cây khi khối sửa mở (chỉ đổi nhãn), nên trả focus
-  // là một lệnh gọi thẳng — không cần ref "chờ nút mọc lại" + effect như bản
-  // trước, khi nút bị gỡ khỏi cây lúc đang sửa và focus() rơi vào khoảng không.
+  function handleAvatarPick(e: React.ChangeEvent<HTMLInputElement>) {
+    const picked = e.target.files?.[0];
+    // Reset BẮT BUỘC: `change` chỉ bắn khi giá trị đổi, nên chọn LẠI đúng tệp
+    // vừa huỷ sẽ im lặng không làm gì nếu giá trị cũ còn nằm đó.
+    e.target.value = "";
+    if (!picked) return;
+    setAvatarFile(picked);
+    // Người dùng trình đọc màn hình không thấy ảnh xem trước; câu này là thứ
+    // duy nhất xác nhận cú chọn vừa rồi đã "vào".
+    setStatus({ key: "profile.avatar.selected", values: { name: picked.name } });
+  }
+
+  // Bộ chọn tệp ở LẠI trong cây khi khối xem trước mở, nên trả tiêu điểm là một
+  // lệnh gọi thẳng. Đích là chính cái <input> ẩn chứ không phải nhãn: nhãn
+  // không nhận được tiêu điểm, và vòng focus của nó vốn đã soi từ input qua
+  // `peer-focus-visible` — nên trả về input là trả về đúng thứ người dùng nhìn
+  // thấy là "đang đứng ở nút Đổi ảnh".
   function closeAvatar() {
-    setAvatarOpen(false);
-    avatarTriggerRef.current?.focus();
+    setAvatarFile(null);
+    setStatus(null);
+    avatarInputRef.current?.focus();
   }
 
   function reportSuccess(key: MessageKey) {
     setToast((prev) => ({ key, n: prev.n + 1 }));
   }
+
+  // `{maxMb}` được điền một chỗ duy nhất, ở đây, từ chính hằng số mà Server
+  // Action dùng — không có bản chép nào để lệch.
+  const avatarHint = profileMessage("profile.avatar.hint");
 
   // Trả focus về nút mở trên MỌI đường đóng — Escape, scrim, Huỷ, thành công.
   // Panel chỉ biết cách tự lấy focus lúc mở, không biết trả về đâu, nên việc
@@ -85,27 +113,44 @@ export function ProfileCard({ user }: ProfileCardProps) {
               cái nhãn ấy chỉ tồn tại để làm chỗ treo một cái nút.
               `justify-center md:justify-start` bám theo `text-center
               md:text-left` của cụm cha — dưới 768px cụm xếp dọc và căn giữa. */}
-          <div className="flex items-center justify-center gap-1 md:justify-start">
-            {/* <p>, KHÔNG phải heading: đây là DỮ LIỆU, không phải cấu trúc tài
-                liệu — nên nó cũng không được nhận serif (globals.css tự gán
-                serif cho h1/h2/h3). */}
-            <p className="text-foreground truncate text-xl font-medium">{user.displayName}</p>
-            {/* `size-11` = sàn chạm 44px (Mobile-Layout-Research-MS §4.3) —
-                biểu tượng nhỏ nhưng vùng bấm thì không. `-my-2` nuốt phần cao
-                thừa để cụm danh tính không cao thêm vì một cái nút.
-                aria-label bắt buộc: nút chỉ có biểu tượng không có chữ nào cho
-                trình đọc màn hình, và <svg> bên trong là aria-hidden. */}
-            <button
-              ref={nameTriggerRef}
-              type="button"
-              aria-label={t("profile.name.change")}
-              aria-expanded={nameOpen}
-              aria-controls={NAME_PANEL_ID}
-              onClick={() => (nameOpen ? closeName() : setNameOpen(true))}
-              className="text-muted-foreground hover:text-brand focus-visible:border-ring focus-visible:ring-ring/50 -my-2 inline-flex size-11 shrink-0 items-center justify-center rounded-[4px] border border-transparent transition-colors outline-none focus-visible:ring-3"
-            >
-              <Pencil aria-hidden className="size-4" />
-            </button>
+          <div className="flex items-center justify-center md:justify-start">
+            {/* Bọc tên + bút chì trong một khối co theo NỘI DUNG, để dưới 768px
+                cái được căn giữa là khối này chứ không phải "tên cộng thêm 44px
+                nút". Trước đây bút chì nằm trong dòng chảy của hàng căn giữa,
+                nên tâm của hàng rơi vào giữa cụm tên+nút và cái tên bị đẩy lệch
+                trái đúng nửa bề rộng nút — đo được ở 390px: tâm tên 172 so với
+                tâm email 195, lệch 23px. Nó đọc thành "chữ bị đặt sai chỗ" chứ
+                không ai nhìn ra thủ phạm là cái nút bên cạnh.
+                Cách chữa: dưới 768px bút chì ra khỏi dòng chảy (`absolute
+                left-full`) — nó vẫn đứng ngay cạnh tên, nhưng không còn góp bề
+                rộng nào vào phép căn giữa. Từ 768px trở lên hàng căn TRÁI nên
+                không có gì để lệch, giữ nguyên dòng chảy cũ. */}
+            <span className="relative flex min-w-0 items-center gap-1">
+              {/* <p>, KHÔNG phải heading: đây là DỮ LIỆU, không phải cấu trúc
+                  tài liệu — nên nó cũng không được nhận serif (globals.css tự
+                  gán serif cho h1/h2/h3). */}
+              <p className="text-foreground truncate text-xl font-medium">{user.displayName}</p>
+              {/* `size-11` = sàn chạm 44px (Mobile-Layout-Research-MS §4.3) —
+                  biểu tượng nhỏ nhưng vùng bấm thì không. `md:-my-2` nuốt phần
+                  cao thừa để cụm danh tính không cao thêm vì một cái nút; chỉ
+                  cần từ 768px vì dưới ngưỡng đó nút đã ra khỏi dòng chảy và
+                  không đóng góp chiều cao nào.
+                  `max-md:ml-1` giữ đúng khe 4px mà `gap-1` tạo ra ở dòng chảy —
+                  phần tử absolute không nhận gap, nên khe phải khai bằng lề.
+                  aria-label bắt buộc: nút chỉ có biểu tượng không có chữ nào cho
+                  trình đọc màn hình, và <svg> bên trong là aria-hidden. */}
+              <button
+                ref={nameTriggerRef}
+                type="button"
+                aria-label={t("profile.name.change")}
+                aria-expanded={nameOpen}
+                aria-controls={NAME_PANEL_ID}
+                onClick={() => (nameOpen ? closeName() : setNameOpen(true))}
+                className="text-muted-foreground hover:text-brand focus-visible:border-ring focus-visible:ring-ring/50 inline-flex size-11 shrink-0 items-center justify-center rounded-[4px] border border-transparent transition-colors outline-none focus-visible:ring-3 max-md:absolute max-md:top-1/2 max-md:left-full max-md:ml-1 max-md:-translate-y-1/2 md:-my-2"
+              >
+                <Pencil aria-hidden className="size-4" />
+              </button>
+            </span>
           </div>
           <p className="text-muted-foreground truncate text-sm">
             <span className="sr-only">{t("profile.email.label")}: </span>
@@ -115,18 +160,44 @@ export function ProfileCard({ user }: ProfileCardProps) {
         </div>
         {/* Nút đổi ảnh đứng cạnh thứ nó sửa. `md:ml-auto` đẩy nó về mép phải
             trên desktop; dưới 768px cụm xếp dọc và căn giữa nên nút tự nằm dưới
-            avatar, vẫn ngay cạnh đối tượng của nó. */}
+            avatar, vẫn ngay cạnh đối tượng của nó.
+
+            Đây là NHÃN của bộ chọn tệp, không phải nút mở một khối sửa (đổi
+            2026-08-21). Trước đây bấm "Đổi ảnh" mở ra một khối chỉ chứa đúng
+            một nút "Chọn ảnh" — tức người dùng phải bấm HAI lần, và lần thứ
+            nhất chẳng cho họ thông tin hay lựa chọn gì để mà cân nhắc. Nay
+            trình quản lý tệp của máy mở ngay từ cú chạm đầu tiên; khối bên dưới
+            chỉ xuất hiện SAU khi đã có tệp, và lúc đó nó có việc thật để làm
+            (xem trước + Lưu, bước hai của UI-D11).
+
+            `<label htmlFor>` chứ không phải `<button onClick={input.click()}>`:
+            nhãn mở hộp thoại tệp bằng hành vi gốc của trình duyệt, không phụ
+            thuộc vào việc lượt kích hoạt của người dùng còn hiệu lực hay không
+            ở thời điểm JS chạy. */}
         <div className="md:ml-auto md:shrink-0">
-          <button
-            ref={avatarTriggerRef}
-            type="button"
-            aria-expanded={avatarOpen}
-            aria-controls={AVATAR_PANEL_ID}
-            onClick={() => (avatarOpen ? closeAvatar() : setAvatarOpen(true))}
-            className={outlineButtonCls}
-          >
+          {/* `peer sr-only`, KHÔNG `hidden`: SR-ONLY giữ điểm dừng Tab và giữ ô
+              này trong cây trợ năng, còn `hidden` thì xoá cả hai. Cùng khuôn
+              với ScreenshotAttachment.tsx và với chính khối này trước đây. */}
+          <input
+            ref={avatarInputRef}
+            id={AVATAR_INPUT_ID}
+            type="file"
+            accept={AVATAR_LIMITS.ALLOWED_MIME.join(",")}
+            onChange={handleAvatarPick}
+            aria-describedby={AVATAR_HINT_ID}
+            className="peer sr-only"
+          />
+          <label htmlFor={AVATAR_INPUT_ID} className={outlineFilePickerCls}>
             {t("profile.avatar.change")}
-          </button>
+          </label>
+          {/* Giới hạn định dạng/dung lượng nói cho người dùng trình đọc màn
+              hình biết TRƯỚC khi họ đi vào thư viện ảnh. sr-only chứ không hiện
+              ra: thuộc tính `accept` đã lọc sẵn danh sách tệp cho người dùng
+              nhìn thấy được, nên với họ dòng này chỉ là một ghi chú thừa trong
+              một thẻ vốn đã nhiều chữ. */}
+          <span id={AVATAR_HINT_ID} className="sr-only">
+            {t(avatarHint.key, avatarHint.values)}
+          </span>
         </div>
       </div>
 
@@ -144,9 +215,10 @@ export function ProfileCard({ user }: ProfileCardProps) {
         />
       )}
 
-      {avatarOpen && (
+      {avatarFile && (
         <AvatarUploader
           id={AVATAR_PANEL_ID}
+          file={avatarFile}
           onClose={closeAvatar}
           onSuccess={reportSuccess}
           onStatus={setStatus}

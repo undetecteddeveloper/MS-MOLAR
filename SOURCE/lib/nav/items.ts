@@ -44,3 +44,25 @@ export function isNavItemActive(pathname: string, href: string): boolean {
   if (href === "/") return pathname === "/";
   return pathname.startsWith(href);
 }
+
+/** Màn ĐANG LÀM BÀI — `/exams/{id}/attempt/{attemptId}` và chỉ đúng nó.
+ *
+ *  Dưới 768px route này chạy ở chế độ TẬP TRUNG: cả SiteHeader lẫn BottomNav
+ *  đều không hiện. Lý do là chi phí chiều cao — ở 390×844 hai thanh đó ăn
+ *  60 + 56 = 116px, tức 14% màn hình, cho một trang mà người dùng đến để làm
+ *  đúng MỘT việc và không được rời đi ngoài ý muốn (đã có sẵn hộp thoại xác
+ *  nhận rời trang). Đổi lại, ExamPlayer phải tự mọc một lối quay về
+ *  /exams — không có thanh điều hướng nào để dựa vào nữa.
+ *
+ *  Khớp CHÍNH XÁC, không `startsWith`: `.../result` và `.../result/detail`
+ *  nằm dưới cùng tiền tố nhưng là trang XEM KẾT QUẢ — bài đã nộp xong, không
+ *  còn gì để tập trung, và người dùng ở đó cần điều hướng bình thường.
+ *
+ *  Đặt ở đây cùng `isNavItemActive` vì cùng một lý do: hai thanh điều hướng
+ *  phải quyết định GIỐNG HỆT nhau. Hai bản so khớp riêng thì sẽ có ngày một
+ *  thanh biến mất còn thanh kia ở lại. */
+const EXAM_ATTEMPT_PATH = /^\/exams\/[^/]+\/attempt\/[^/]+$/;
+
+export function isExamFocusRoute(pathname: string): boolean {
+  return EXAM_ATTEMPT_PATH.test(pathname);
+}

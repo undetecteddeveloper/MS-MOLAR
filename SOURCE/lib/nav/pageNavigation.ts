@@ -35,9 +35,62 @@ export type NavIntent = {
 // cũng chuyển trang bình thường mà không có gì hiện lên).
 //
 // Hệ quả phải chấp nhận: một thẻ <a href> chỉ dùng làm nút JS (có href thật,
-// handler tự huỷ) sẽ bật lớp phủ nhầm. Repo hiện không có thẻ nào như vậy, và
-// lớp phủ `pointer-events-none` + hẹn giờ chặn trên nên trường hợp đó là phiền
-// mắt trong vài giây, không phải khoá người dùng lại.
+// handler tự huỷ) sẽ bật lớp phủ nhầm. Đúng trường hợp đó ĐÃ tồn tại — xem
+// `markPageNavigationBlocked` bên dưới — nên nó không còn là giả định nữa.
+
+// ============================================================================
+// Cú bấm điều hướng BỊ HUỶ bởi một interceptor khác
+// ============================================================================
+// `useLeaveGuard` (màn làm bài) cũng nghe `click` trên `document` ở pha CAPTURE
+// và `preventDefault()` mọi liên kết nội bộ để hỏi xác nhận trước khi rời trang.
+// Hai interceptor cùng node, cùng pha ⇒ thứ tự chạy do thứ tự ĐĂNG KÝ quyết
+// định, mà thứ tự đó lại do thứ tự mount của cây React quyết định (effect của
+// con chạy trước effect của cha) — không có gì để dựa vào.
+//
+// Đo được 2026-08-21 ở 390×844: chạm ô "Đề thi" trong khi đang làm bài thì lớp
+// phủ "LOADING" (z-90) bật lên ĐÈ LÊN hộp thoại xác nhận rời trang (z-50) và
+// đứng đó tới hết hẹn giờ 12 giây — vì lượt điều hướng bị huỷ nên không có
+// route nào commit để tắt nó. Người dùng nhìn thấy màn hình "đang tải" cho một
+// thứ sẽ không bao giờ tải.
+//
+// `defaultPrevented` không dùng được (lý do ngay phía trên), nên bên huỷ phải
+// NÓI RA. WeakSet chứ không phải gắn thuộc tính lên event: không đụng vào object
+// của trình duyệt, không cần ép kiểu, và entry tự biến mất cùng event.
+const blockedClicks = new WeakSet<Event>();
+
+/** Bên chặn gọi ngay sau `preventDefault()`: "cú bấm này KHÔNG đi đâu cả". */
+export function markPageNavigationBlocked(event: Event): void {
+  blockedClicks.add(event);
+}
+
+/** Bên hiển thị hỏi lại — nhưng phải hỏi ở CUỐI lượt dispatch (queueMicrotask),
+ *  không phải ngay trong handler: nếu bên chặn chạy sau thì lúc đó nó chưa kịp
+ *  đánh dấu. Microtask chạy sau khi cả lượt dispatch kết thúc nên đúng ở cả hai
+ *  thứ tự. */
+export function isPageNavigationBlocked(event: Event): boolean {
+  return blockedClicks.has(event);
+}
+
+// ============================================================================
+// Điều hướng KHÔNG đi qua cú bấm nào
+// ============================================================================
+// Lớp phủ chỉ biết tới điều hướng bắt đầu từ một thẻ <a>. Nhưng `useLeaveGuard`
+// khi người dùng bấm "Rời trang" lại đi bằng `router.push()` — không có cú bấm
+// nào để bắt, nên nếu không có kênh này thì chính lượt điều hướng THẬT (lượt
+// duy nhất người dùng đã xác nhận) là lượt duy nhất không có chỉ báo chờ.
+type IndicatorListener = () => void;
+const indicatorListeners = new Set<IndicatorListener>();
+
+/** Gọi ngay trước một `router.push()` thủ công để lớp phủ chờ bật lên. */
+export function startPageNavigationIndicator(): void {
+  for (const listener of indicatorListeners) listener();
+}
+
+/** Lớp phủ đăng ký nhận tín hiệu trên. Trả hàm huỷ đăng ký. */
+export function onPageNavigationIndicatorStart(listener: IndicatorListener): () => void {
+  indicatorListeners.add(listener);
+  return () => indicatorListeners.delete(listener);
+}
 
 /** `true` khi cú bấm sẽ đưa người dùng sang một PATH khác trong cùng site. */
 export function startsPageNavigation(intent: NavIntent): boolean {

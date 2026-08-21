@@ -22,7 +22,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BarChart3, ClipboardList, History, Home, Upload, type LucideIcon } from "lucide-react";
-import { NAV_ITEMS, isNavItemActive } from "@/lib/nav/items";
+import { NAV_ITEMS, isExamFocusRoute, isNavItemActive } from "@/lib/nav/items";
 import { useT } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n/translate";
 
@@ -42,6 +42,13 @@ const ICONS: Partial<Record<MessageKey, LucideIcon>> = {
 export function BottomNav() {
   const pathname = usePathname();
   const t = useT();
+
+  // Chế độ tập trung khi đang làm bài (isExamFocusRoute). Thanh này vốn CHỈ
+  // hiện dưới 768px (`md:hidden`), nên "không render" ở đây đúng bằng "ẩn trên
+  // mobile" — không cần thêm class nào. Đọc pathname lúc render chứ không phải
+  // trong effect ⇒ bản dựng phía server đã đúng, không có một khung hình nào
+  // thanh này kịp nháy lên rồi biến mất.
+  if (isExamFocusRoute(pathname)) return null;
 
   return (
     <nav

@@ -59,7 +59,6 @@ export const vi: Dictionary = {
   "nav.secondary": "Tài khoản và ngôn ngữ",
 
   // --- Trang chủ ----------------------------------------------------------
-  "home.eyebrow": "Nền tảng luyện đề trực tuyến",
   "home.headline":
     "Nền tảng học trực tuyến đa môn, đa khối lớp — phân tích dấu chân số và tổng hợp nội dung do người dùng đóng góp",
   "home.bodyPart1": "Ngân hàng câu hỏi ",
@@ -77,10 +76,6 @@ export const vi: Dictionary = {
   "home.slidePosition": "{current} trên {total}",
   "home.carouselPause": "Tạm dừng tự động chuyển mục",
   "home.carouselPlay": "Tiếp tục tự động chuyển mục",
-  "home.carouselPrev": "Mục trước",
-  "home.carouselNext": "Mục sau",
-  "home.tabAi": "Có tích hợp AI",
-  "home.tabAdaptive": "Học tập thích ứng",
   "home.siteName": "MS-MOLAR",
   "home.aiDescription":
     "AI bóc tách từng câu hỏi từ file đề bạn tải lên, và chấm bài ngay khi bạn nộp.",
@@ -119,6 +114,7 @@ export const vi: Dictionary = {
   "exams.descending": "Giảm dần",
 
   // --- Làm bài ------------------------------------------------------------
+  "player.backToExams": "Về danh sách đề",
   "player.timeRemaining": "Thời gian còn lại",
   "player.lastMinute": "Phút cuối",
   "player.minutesRemaining": "Còn {count} phút",
@@ -663,8 +659,7 @@ export const vi: Dictionary = {
   "profile.name.errorCharset": "Tên hiển thị chỉ được gồm chữ cái và dấu chấm.",
   "profile.password.label": "Mật khẩu",
   "profile.password.masked": "Mật khẩu của bạn không hiển thị ở đây.",
-  "profile.password.noReveal":
-    "Mật khẩu được lưu ở dạng băm, nên không ai — kể cả chúng tôi — hiển thị lại được.",
+  "profile.password.noReveal": "Đã băm — chúng tôi cũng không xem lại được.",
   "profile.password.change": "Đổi mật khẩu",
   "profile.password.current": "Mật khẩu hiện tại",
   "profile.password.new": "Mật khẩu mới",
@@ -679,7 +674,6 @@ export const vi: Dictionary = {
   "profile.password.errorTooCommon": "Mật khẩu này quá phổ biến. Hãy chọn mật khẩu khác.",
   "profile.avatar.label": "Ảnh đại diện",
   "profile.avatar.change": "Đổi ảnh",
-  "profile.avatar.chooseFile": "Chọn ảnh",
   "profile.avatar.hint": "JPG, PNG hoặc WebP, tối đa {maxMb}MB.",
   "profile.avatar.selected": "Đã chọn: {name}",
   "profile.avatar.uploading": "Đang tải ảnh lên…",

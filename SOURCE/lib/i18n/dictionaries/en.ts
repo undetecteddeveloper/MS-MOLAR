@@ -65,7 +65,6 @@ export const en = {
   "nav.secondary": "Account and language",
 
   // --- Trang chủ ----------------------------------------------------------
-  "home.eyebrow": "Online exam practice platform",
   "home.headline":
     "Multi-Subject & Multi-Grade Online Learning Platform with Digital Footprint Analytics and User-Generated Content Synthesis",
   // Đoạn mô tả ở hero có HAI cụm được gạch chân vàng đồng nằm giữa câu, nên
@@ -86,8 +85,11 @@ export const en = {
 
   // --- Băng chuyền trang chủ (HomeCarousel) -------------------------------
   // Ba mục cùng một chuỗi. Mục "Giới thiệu" dùng lại nguyên văn các khoá
-  // `home.eyebrow`/`home.headline`/`home.bodyPart*` ở trên — nó CHÍNH LÀ nhóm
-  // nội dung hero cũ, không viết lại.
+  // `home.headline`/`home.bodyPart*` ở trên — nó CHÍNH LÀ nhóm nội dung hero
+  // cũ, không viết lại.
+  // Bỏ 2026-08-21 cùng lúc với chrome của băng chuyền: `home.eyebrow`,
+  // `home.tabAi`, `home.tabAdaptive` (dòng eyebrow không còn hiển thị) và
+  // `home.carouselPrev`/`home.carouselNext` (không còn nút ‹ ›).
   "home.carouselLabel": "Platform highlights",
   // `aria-roledescription` — thay chữ "group" mà trình đọc màn hình đọc mặc
   // định bằng tên đúng của thành phần. DỊCH được, và phải dịch: nó được đọc to
@@ -95,16 +97,10 @@ export const en = {
   "home.carouselRole": "carousel",
   "home.slideRole": "slide",
   "home.slidePosition": "{current} of {total}",
-  // Nhãn cụm nút điều khiển (WCAG 2.2.2 cho tạm dừng/phát).
+  // Nhãn nút tạm dừng/phát (WCAG 2.2.2). Nút ẩn với chuột, chỉ hiện khi Tab
+  // tới — nhãn vì thế là thứ DUY NHẤT mô tả nó, phải nói đủ nghĩa một mình.
   "home.carouselPause": "Pause automatic slideshow",
   "home.carouselPlay": "Resume automatic slideshow",
-  "home.carouselPrev": "Previous highlight",
-  "home.carouselNext": "Next highlight",
-  // `tabAi`/`tabAdaptive` giữ tên khoá cũ dù dãy tab đã bỏ: chúng nay là dòng
-  // eyebrow của mục 2 và 3. Đổi tên khoá chỉ để đẹp sẽ chạm vào cả hai từ điển
-  // mà không đổi được gì người dùng thấy.
-  "home.tabAi": "AI-powered",
-  "home.tabAdaptive": "Adaptive learning",
   // Tên hiển thị của website. Khớp `applicationName`/`title` trong
   // app/layout.tsx — đổi tên thương hiệu thì sửa ĐÚNG khoá này (và metadata),
   // đừng rải chuỗi vào từng component.
@@ -148,6 +144,11 @@ export const en = {
   "exams.descending": "Descending",
 
   // --- Làm bài ------------------------------------------------------------
+  // Nhãn lối quay về danh sách đề trong màn làm bài. CHỈ tồn tại ở bản mobile
+  // (dưới 768px SiteHeader + BottomNav đều ẩn), và nút chỉ có mũi tên — nhãn
+  // này là thứ DUY NHẤT nói nó đi đâu, nên phải nói ra đích chứ không phải
+  // "Quay lại" trơn.
+  "player.backToExams": "Back to the exam list",
   "player.timeRemaining": "Time remaining",
   "player.lastMinute": "Last minute",
   "player.minutesRemaining": "{count} minutes remaining",
@@ -785,8 +786,13 @@ export const en = {
   "profile.name.errorCharset": "Display name may only contain letters and dots.",
   "profile.password.label": "Password",
   "profile.password.masked": "Your password is not shown here.",
-  "profile.password.noReveal":
-    "Passwords are stored hashed, so nobody — us included — can show yours again.",
+  // Rút gọn 2026-08-21: bản cũ ("Passwords are stored hashed, so nobody — us
+  // included — can show yours again.", 74 ký tự) chiếm hai dòng ở 390px cho
+  // một ghi chú phụ nằm dưới một hàng vốn đã đủ nghĩa. Bản mới 39 ký tự =
+  // một dòng, và vẫn nói đủ CẢ HAI điều phải nói: mật khẩu được băm, và
+  // chính chúng tôi cũng không xem lại được. Câu sau mới là câu người dùng
+  // cần — đừng rút gọn tiếp bằng cách bỏ nó.
+  "profile.password.noReveal": "Hashed — not even we can show it again.",
   "profile.password.change": "Change password",
   "profile.password.current": "Current password",
   "profile.password.new": "New password",
@@ -801,7 +807,6 @@ export const en = {
   "profile.password.errorTooCommon": "That password is too common. Choose a different one.",
   "profile.avatar.label": "Profile picture",
   "profile.avatar.change": "Change picture",
-  "profile.avatar.chooseFile": "Choose an image",
   "profile.avatar.hint": "JPG, PNG or WebP, up to {maxMb}MB.",
   "profile.avatar.selected": "Selected: {name}",
   "profile.avatar.uploading": "Uploading…",

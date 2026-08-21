@@ -11,6 +11,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  markPageNavigationBlocked,
+  startPageNavigationIndicator,
+} from "@/lib/nav/pageNavigation";
 
 export function useLeaveGuard(active: boolean) {
   const router = useRouter();
@@ -48,6 +52,15 @@ export function useLeaveGuard(active: boolean) {
       }
       e.preventDefault();
       e.stopPropagation();
+      // `stopPropagation` KHÔNG chặn được các listener khác trên CÙNG node
+      // (đó là việc của `stopImmediatePropagation`), mà RouteLoadingOverlay
+      // cũng nghe click ở `document` pha capture. Không nói ra thì nó bật lớp
+      // phủ "LOADING" toàn màn hình cho một lượt điều hướng vừa bị huỷ, đè lên
+      // chính hộp thoại đang hỏi — và đứng đó hết 12 giây hẹn giờ vì chẳng có
+      // route nào commit để tắt. Dùng `stopImmediatePropagation` thay cho dòng
+      // này KHÔNG giải quyết được: nếu listener của lớp phủ đăng ký trước thì
+      // nó đã chạy xong rồi.
+      markPageNavigationBlocked(e);
       setPendingHref(url.pathname + url.search);
     }
 
@@ -62,7 +75,13 @@ export function useLeaveGuard(active: boolean) {
   const cancelLeave = useCallback(() => setPendingHref(null), []);
 
   const confirmLeave = useCallback(() => {
-    if (pendingHref) router.push(pendingHref);
+    if (pendingHref) {
+      // Lượt điều hướng THẬT bắt đầu ở đây, và nó không đi qua cú bấm <a> nào
+      // nên lớp phủ chờ không tự thấy. Báo tay — nếu không thì đúng lượt người
+      // dùng vừa xác nhận lại là lượt duy nhất bấm xong không có phản hồi gì.
+      startPageNavigationIndicator();
+      router.push(pendingHref);
+    }
     setPendingHref(null);
   }, [pendingHref, router]);
 
