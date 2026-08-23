@@ -13,12 +13,21 @@ import { HistoryRowMenu } from "@/components/history/HistoryRowMenu";
 import { formatCompletionTime, formatSubmittedDate } from "@/lib/history/format";
 import type { AttemptPdfData } from "@/lib/pdf/generateAttemptPdf";
 
-export function HistoryRow({ entry }: { entry: MyHistoryEntry }) {
+export function HistoryRow({
+  entry,
+  examineeName,
+}: {
+  entry: MyHistoryEntry;
+  examineeName: string;
+}) {
   const pdfInput: AttemptPdfData = {
+    subject: entry.subject,
     examTitle: entry.examTitle,
     totalScore: entry.totalScore,
-    startedAt: entry.startedAt,
+    examineeName,
     submittedAt: entry.submittedAt,
+    correct: entry.correct,
+    total: entry.total,
   };
 
   return (

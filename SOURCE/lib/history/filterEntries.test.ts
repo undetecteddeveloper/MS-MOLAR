@@ -11,6 +11,8 @@ function entry(overrides: Partial<MyHistoryEntry>): MyHistoryEntry {
     totalScore: 5,
     startedAt: "2026-07-10T00:00:00.000Z",
     submittedAt: "2026-07-10T00:10:00.000Z",
+    correct: 8,
+    total: 10,
     ...overrides,
   };
 }

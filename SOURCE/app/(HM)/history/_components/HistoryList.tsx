@@ -19,9 +19,11 @@ import { HistoryRow } from "./HistoryRow";
 export async function HistoryList({
   entries,
   isFiltered = false,
+  examineeName,
 }: {
   entries: MyHistoryEntry[];
   isFiltered?: boolean;
+  examineeName: string;
 }) {
   const t = await getTranslate();
   return (
@@ -68,7 +70,7 @@ export async function HistoryList({
         // nằm trên để so mép — nên ở đó rãnh cuộn giữ nguyên.
         <ul className="flex max-h-[calc(100dvh-15rem)] flex-col gap-3 overflow-y-auto md:max-h-[30rem] md:pr-2">
           {entries.map((entry) => (
-            <HistoryRow key={entry.attemptId} entry={entry} />
+            <HistoryRow key={entry.attemptId} entry={entry} examineeName={examineeName} />
           ))}
         </ul>
       )}

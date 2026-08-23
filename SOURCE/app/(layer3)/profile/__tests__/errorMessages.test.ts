@@ -23,7 +23,11 @@ vi.mock("@/lib/security/rateLimit", () => ({
 }));
 
 import { updateProfile } from "@/app/(layer1)/actions";
-import { validatePassword } from "@/lib/auth/passwordPolicy";
+import {
+  PASSWORD_MAX_BYTES,
+  PASSWORD_MIN_LENGTH,
+  validatePassword,
+} from "@/lib/auth/passwordPolicy";
 import { DISPLAY_NAME_MAX } from "@/lib/profile/displayName";
 import {
   PASSWORD_POLICY_KEYS,
@@ -72,11 +76,14 @@ describe("cổng build: bốn câu của validatePassword (UI-D10)", () => {
   it("resolveActionError dịch câu chính sách sang khoá riêng, kèm tham số", () => {
     const short = resolveActionError(validatePassword(POLICY_SAMPLES.tooShort) as string);
     expect(short.key).toBe("profile.password.errorTooShort");
-    expect(short.values?.min).toBe(10);
+    // Suy từ hằng số, KHÔNG viết số cứng: bản cũ ghi thẳng 10 nên khi chính
+    // sách đổi, test này fail vì một lý do chẳng liên quan gì tới thứ nó đang
+    // kiểm (rằng tham số ĐƯỢC TRUYỀN, không phải giá trị cụ thể là bao nhiêu).
+    expect(short.values?.min).toBe(PASSWORD_MIN_LENGTH);
 
     const long = resolveActionError(validatePassword(POLICY_SAMPLES.tooLong) as string);
     expect(long.key).toBe("profile.password.errorTooLong");
-    expect(long.values?.maxBytes).toBe(72);
+    expect(long.values?.maxBytes).toBe(PASSWORD_MAX_BYTES);
 
     expect(resolveActionError(validatePassword(POLICY_SAMPLES.onlySpaces) as string).key).toBe(
       "profile.password.errorOnlySpaces"

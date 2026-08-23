@@ -173,7 +173,7 @@ Rendering/interaction ACs verifiable in jsdom or a real browser. AC-001/002(data
 - [ ] **When** the `/history` list read fails, `(HM)/history/error.tsx` shall render a `role="alert"` message with a "Retry" control that calls `reset()`. (AC-019 rendering half)
 
 **PDF content and branding**
-- [ ] **When** Save or Share triggers PDF generation (either surface), the resulting file's content shall be limited to score, completion time, and exam title — `AttemptPdfData`'s type has no field capable of carrying per-question content. (AC-006)
+- [ ] **When** Save or Share triggers PDF generation (either surface), the resulting file's content shall be limited to score, exam title/subject, examinee name, submitted time, and aggregate correct/wrong/total counts — `AttemptPdfData`'s type has no field capable of carrying per-question content (2026-08-22 redesign added examinee name + aggregate counts; still no per-question field). (AC-006)
 - [ ] **Given** the History-row and Result-page Save/Share actions, **when** the code is inspected, both shall import `generateAttemptPdfFile` from the same module (`SOURCE/lib/pdf/generateAttemptPdf.ts`) — exactly one implementation. (AC-007)
 - [x] **When** `AttemptPdfTemplate` renders, its visual style shall use only `DESIGN.md` "Ink & Lacquer" values expressed as literal hex/rgba strings. (AC-008)
 

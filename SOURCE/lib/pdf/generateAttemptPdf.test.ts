@@ -60,10 +60,13 @@ const { generateAttemptPdfFile, downloadPdfFile, canShareFile } = await import(
 );
 
 const SAMPLE_DATA: AttemptPdfData = {
+  subject: "Math",
   examTitle: "Mock Exam #3",
   totalScore: 8.5,
-  startedAt: "2026-07-15T09:00:00.000Z",
+  examineeName: "Nguyen Phat",
   submittedAt: "2026-07-15T09:12:34.000Z",
+  correct: 8,
+  total: 10,
 };
 
 describe("generateAttemptPdf — dynamic-import boundary (Binding Decision: placement)", () => {

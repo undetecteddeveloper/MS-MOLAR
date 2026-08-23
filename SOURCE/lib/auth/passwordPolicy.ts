@@ -12,8 +12,20 @@
 // vẫn đăng nhập được — không khoá cửa người đang dùng; họ sẽ bị áp luật này ở
 // lần đổi mật khẩu kế tiếp.
 
-/** Tối thiểu 10 ký tự — dài hơn mặc định 6 của Supabase. */
-export const PASSWORD_MIN_LENGTH = 10;
+/**
+ * Tối thiểu 8 ký tự — vẫn dài hơn mặc định 6 của Supabase.
+ *
+ * Hạ từ 10 xuống 8 (2026-08-22, sau phản hồi người dùng "field mật khẩu khó
+ * quá"): 8 CHÍNH LÀ sàn mà NIST SP 800-63B đặt ra cho mật khẩu người dùng tự
+ * chọn — tức con số 10 cũ nghiêm hơn chính tiêu chuẩn mà file này viện dẫn ở
+ * đầu, mà không có phân tích rủi ro nào biện minh cho phần nghiêm thêm đó.
+ * Với một sản phẩm luyện đề cho học sinh phổ thông, mỗi ký tự bắt buộc thêm là
+ * một phần trăm bỏ cuộc lúc đăng ký, đổi lấy một mức tăng an toàn mà
+ * blocklist bên dưới vốn đã lo phần lớn.
+ *
+ * KHÔNG hạ xuống 6: dưới sàn NIST thì không còn chỗ dựa tiêu chuẩn nào nữa.
+ */
+export const PASSWORD_MIN_LENGTH = 8;
 
 /**
  * Trần 72 BYTE là giới hạn thật của bcrypt (thuật toán Supabase Auth dùng):

@@ -65,7 +65,16 @@ export function ScoreScale({ value, onChange, labelledBy }: ScoreScaleProps) {
   }
 
   return (
-    <div role="radiogroup" aria-labelledby={labelledBy} className="flex flex-wrap gap-1.5">
+    // flex-nowrap + overflow-x-auto (not flex-wrap): all 10 circles must stay
+    // on one row — wrapping to a second row (8+2) is the exact layout bug this
+    // replaced. Circles shrink to h-6/w-6 below the `sm` breakpoint so the row
+    // still fits inside RatingRubric's narrower mobile padding; overflow-x-auto
+    // is only a safety net for anything narrower than that.
+    <div
+      role="radiogroup"
+      aria-labelledby={labelledBy}
+      className="flex flex-nowrap justify-center gap-1 overflow-x-auto sm:gap-1.5 sm:overflow-visible"
+    >
       {CIRCLES.map((n) => {
         const checked = value === n;
         return (
@@ -81,7 +90,7 @@ export function ScoreScale({ value, onChange, labelledBy }: ScoreScaleProps) {
             tabIndex={n === rovingValue ? 0 : -1}
             onClick={() => selectAndFocus(n)}
             onKeyDown={(e) => onKeyDown(e, n)}
-            className={`flex h-8 w-8 items-center justify-center rounded-full border text-sm tabular-nums transition-all duration-150 focus-visible:ring-2 focus-visible:ring-[color:var(--ring)] focus-visible:outline-none motion-safe:active:scale-90 ${
+            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs tabular-nums transition-all duration-150 focus-visible:ring-2 focus-visible:ring-[color:var(--ring)] focus-visible:outline-none motion-safe:active:scale-90 sm:h-8 sm:w-8 sm:text-sm ${
               checked
                 ? "border-brand bg-brand font-semibold text-brand-foreground"
                 : "border-border text-foreground hover:border-brand"

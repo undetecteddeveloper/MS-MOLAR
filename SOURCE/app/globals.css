@@ -383,29 +383,13 @@
 }
 
 .preload-fade {
-  animation: preload-fade var(--preload-duration) var(--preload-ease) both;
-  /* `order - 1`, sàn 0 (audit hiệu năng 2026-08-21): order 0 VÀ order 1 cùng
-     xuất phát ngay, chỉ order 2 trở đi mới xếp hàng chờ.
-
-     Vì sao: `fill-mode: both` giữ element ở opacity 0 SUỐT thời gian trễ, và
-     khối order 1 chính là phần tử LCP của trang chủ (đo được: đoạn mô tả hero,
-     32.580px²). Nó ngồi vô hình 250ms trước khi bắt đầu hiện, và LCP cộng đúng
-     ngần đó. Đo trên Chromium thật, tiết lưu 4× CPU + 4G chậm (412×823):
-     LCP 1704ms khi còn trễ, 1356ms khi tắt hẳn `.preload-fade` — 348ms, tức
-     ~20% LCP, cho một khoảng chờ không vẽ ra thứ gì.
-
-     Chuỗi cascade KHÔNG mất: navbar và khối nội dung đầu fade cùng lúc, còn
-     các khối dưới vẫn vào sau theo nhịp cũ 250ms. `max()` giữ sàn ở 0 để một
-     `--preload-order: 0` không sinh ra trễ ÂM (hợp lệ trong CSS, và nó sẽ tua
-     animation vào giữa chừng — element hiện ra ở nửa mờ). */
-  animation-delay: calc(max(var(--preload-order, 0) - 1, 0) * var(--preload-step));
-}
-
-/* Tôn trọng user tắt animation (a11y). */
-@media (prefers-reduced-motion: reduce) {
-  .preload-fade {
-    animation: none;
-  }
+  /* Tắt hẳn animation (2026-08-22) — không chỉ dưới prefers-reduced-motion
+     nữa. Phép đo ở trên đã tự chỉ ra: tắt hẳn `.preload-fade` giảm LCP 348ms
+     (~20%, đo trên Chromium thật, throttle 4× CPU + 4G chậm). Chuỗi fade
+     "trang trí" lúc vào trang cũ vốn chỉ trễ hiển thị chứ không hỏng gì khi
+     bỏ — bù lại là mọi lượt chuyển trang hiện nội dung ngay thay vì chờ tới
+     1.5s theo tầng --preload-order. */
+  animation: none;
 }
 
 /* ============================================================

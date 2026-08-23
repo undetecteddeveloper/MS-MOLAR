@@ -10,6 +10,7 @@ import { useT } from "@/lib/i18n/client";
 
 import { useActionState, useState } from "react";
 import { updatePassword, type AuthState } from "@/app/(layer1)/actions";
+import { PASSWORD_MIN_LENGTH } from "@/lib/auth/passwordPolicy";
 
 export function ResetPasswordForm() {
   const t = useT();
@@ -20,7 +21,9 @@ export function ResetPasswordForm() {
       <Field id="password" name="password" label="New password" autoComplete="new-password" />
       <Field id="confirm" name="confirm" label="Confirm new password" autoComplete="new-password" />
 
-      <p className="text-xs text-[color:var(--muted-foreground)]">{t("auth.passwordHint")}</p>
+      <p className="text-xs text-[color:var(--muted-foreground)]">
+        {t("auth.passwordHint", { min: PASSWORD_MIN_LENGTH })}
+      </p>
 
       {state?.error && (
         <p role="alert" className="text-sm text-[#A62C2B]">
@@ -64,7 +67,9 @@ function Field({
           name={name}
           type={show ? "text" : "password"}
           required
-          minLength={6}
+          // Lấy từ hằng số chung, KHÔNG viết số cứng: bản cũ ghi 6 trong khi
+          // server bắt 10, nên trình duyệt cho gửi rồi server mới từ chối.
+          minLength={PASSWORD_MIN_LENGTH}
           autoComplete={autoComplete}
           className="w-full bg-transparent py-2 text-[#1B1512] outline-none"
         />

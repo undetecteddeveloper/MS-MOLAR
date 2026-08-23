@@ -13,6 +13,8 @@ export type MyHistoryEntry = {
   totalScore: number;
   startedAt: string;
   submittedAt: string;
+  correct: number;
+  total: number;
 };
 
 /** Shape PostgREST trả về cho embed lồng exam_results → exam_attempts → exams.
@@ -21,6 +23,8 @@ export type MyHistoryEntry = {
 type EmbeddedRow = {
   attempt_id: string;
   total_score: number;
+  correct: number;
+  total: number;
   exam_attempts: {
     exam_id: string;
     started_at: string;
@@ -58,7 +62,7 @@ export async function listMyHistory(): Promise<MyHistoryEntry[]> {
     supabase
       .from("exam_results")
       .select(
-        "attempt_id, total_score, exam_attempts!inner(exam_id, started_at, submitted_at, exams!inner(title, subject))"
+        "attempt_id, total_score, correct, total, exam_attempts!inner(exam_id, started_at, submitted_at, exams!inner(title, subject))"
       )
       .eq("exam_attempts.status", "submitted")
       .eq("exam_attempts.exams.status", "published")
@@ -81,6 +85,8 @@ export async function listMyHistory(): Promise<MyHistoryEntry[]> {
         totalScore: r.total_score,
         startedAt: r.exam_attempts.started_at,
         submittedAt: r.exam_attempts.submitted_at,
+        correct: r.correct,
+        total: r.total,
       })
     )
     .sort((a, b) => (a.submittedAt < b.submittedAt ? 1 : a.submittedAt > b.submittedAt ? -1 : 0));

@@ -19,23 +19,30 @@ const SOURCE_PATH = join(process.cwd(), "components/pdf/AttemptPdfTemplate.tsx")
 const SOURCE_TEXT = readFileSync(SOURCE_PATH, "utf-8");
 
 const BASE_PROPS: AttemptPdfTemplateProps = {
+  subject: "Math",
   examTitle: "Mock Exam #3",
   totalScore: 8.5,
+  examineeName: "Nguyen Phat",
   submittedDateLabel: "12/07/2026",
-  completionTimeLabel: "12m 34s",
-  generatedAtLabel: "31/07/2026 09:00",
+  submittedTimeLabel: "09:00",
+  correct: 8,
+  total: 10,
 };
 
 describe("AttemptPdfTemplate", () => {
-  it("renders with all 5 required fields", () => {
+  it("renders with all required fields", () => {
     const { container } = render(<AttemptPdfTemplate {...BASE_PROPS} />);
 
+    expect(container.textContent).toContain("Math");
     expect(container.textContent).toContain("Mock Exam #3");
     expect(container.textContent).toContain("8.5");
     expect(container.textContent).toContain("/10");
+    expect(container.textContent).toContain("Nguyen Phat");
     expect(container.textContent).toContain("12/07/2026");
-    expect(container.textContent).toContain("12m 34s");
-    expect(container.textContent).toContain("31/07/2026 09:00");
+    expect(container.textContent).toContain("09:00");
+    // correct=8, total=10 → wrong=2, computed internally (not a caller prop).
+    expect(container.textContent).toContain("8");
+    expect(container.textContent).toContain("2");
   });
 
   it("formats totalScore internally via toFixed(1), not pre-formatted by the caller", () => {
@@ -72,10 +79,13 @@ describe("AttemptPdfTemplate", () => {
     const props: AttemptPdfTemplateProps = BASE_PROPS;
     expect(Object.keys(props).sort()).toEqual(
       [
-        "completionTimeLabel",
+        "correct",
         "examTitle",
-        "generatedAtLabel",
+        "examineeName",
+        "subject",
         "submittedDateLabel",
+        "submittedTimeLabel",
+        "total",
         "totalScore",
       ].sort()
     );

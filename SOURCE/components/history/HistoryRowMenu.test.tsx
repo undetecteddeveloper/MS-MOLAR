@@ -47,10 +47,13 @@ const mockDownload = vi.mocked(downloadPdfFile);
 const mockCanShare = vi.mocked(canShareFile);
 
 const PDF_INPUT: AttemptPdfData = {
+  subject: "Vật lý",
   examTitle: "Đề Vật Lý 10",
   totalScore: 7,
-  startedAt: "2026-07-01T00:00:00.000Z",
+  examineeName: "Nguyen Phat",
   submittedAt: "2026-07-01T00:10:00.000Z",
+  correct: 7,
+  total: 10,
 };
 
 function mockFile(): File {

@@ -465,6 +465,7 @@ export type ResultQuestion = {
 export type ExamResult = {
   examId: string;
   examTitle: string;
+  subject: string;
   result: ScoreResult;
   /** questionId → nội dung + lựa chọn (để render Chi tiết từng câu, Task 4). */
   questions: Record<string, ResultQuestion>;
@@ -551,7 +552,7 @@ export async function getResult(attemptId: string): Promise<ExamResult | null> {
     supabase
       .from("exam_results")
       .select(
-        "total_score, correct, total, per_question, topic_breakdown, overtime_seconds, exam_attempts!inner(started_at, submitted_at, exams_with_difficulty!inner(id, title))"
+        "total_score, correct, total, per_question, topic_breakdown, overtime_seconds, exam_attempts!inner(started_at, submitted_at, exams_with_difficulty!inner(id, title, subject))"
       )
       .eq("attempt_id", attemptId)
       .eq("exam_attempts.exams_with_difficulty.status", "published")
@@ -566,7 +567,7 @@ export async function getResult(attemptId: string): Promise<ExamResult | null> {
     exam_attempts: {
       started_at: string;
       submitted_at: string | null;
-      exams_with_difficulty: { id: string; title: string };
+      exams_with_difficulty: { id: string; title: string; subject: string };
     };
   };
   const attempt = row.exam_attempts;
@@ -634,6 +635,7 @@ export async function getResult(attemptId: string): Promise<ExamResult | null> {
   return {
     examId: exam.id,
     examTitle: exam.title,
+    subject: exam.subject,
     result,
     questions,
     startedAt: attempt.started_at,

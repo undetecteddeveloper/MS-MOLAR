@@ -21,6 +21,8 @@ import type { MessageKey } from "@/lib/i18n/translate";
 import { useState } from "react";
 import { BarChartCard } from "./BarChartCard";
 import { DonutChartCard } from "./DonutChartCard";
+import { WeakTopicsCard } from "./WeakTopicsCard";
+import type { TopicWeakness } from "@/lib/analytics/weakTopics";
 import {
   DEFAULT_RANGE,
   RANGE_ORDER,
@@ -48,8 +50,10 @@ const RANGE_LABEL_KEY: Record<TimeRange, MessageKey> = {
 
 export function AnalyticsDashboard({
   dataByRange,
+  weakTopicsByRange,
 }: {
   dataByRange: Record<TimeRange, SubjectStats[]>;
+  weakTopicsByRange: Record<TimeRange, TopicWeakness[]>;
 }) {
   const t = useT();
   const [tab, setTab] = useState<Tab>("bar");
@@ -57,6 +61,7 @@ export function AnalyticsDashboard({
   const [filterTouched, setFilterTouched] = useState(false);
 
   const data = dataByRange[range];
+  const weakTopics = weakTopicsByRange[range];
 
   const filterSlot = (
     <select
@@ -122,7 +127,13 @@ export function AnalyticsDashboard({
             </div>
           </div>
         ) : tab === "bar" ? (
-          <BarChartCard data={data} filterSlot={filterSlot} />
+          <>
+            <BarChartCard data={data} filterSlot={filterSlot} />
+            {/* Chỉ ở tab BAR: tab đó nói "môn nào sai nhiều", thẻ này nói tiếp
+                "trong đó sửa cái gì" — cùng một mạch đọc. Tab DONUT nói về tỷ
+                trọng luyện tập, một câu hỏi khác hẳn. */}
+            <WeakTopicsCard topics={weakTopics} />
+          </>
         ) : (
           <DonutChartCard
             data={data}

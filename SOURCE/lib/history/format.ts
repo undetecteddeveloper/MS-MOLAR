@@ -23,6 +23,14 @@ export function formatSubmittedDate(submittedAt: string | null): string {
   return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()}`;
 }
 
+/** "HH:mm" (24h, local time); never throws; "—" for null or an unparseable date. */
+export function formatSubmittedTime(submittedAt: string | null): string {
+  if (submittedAt === null) return EM_DASH;
+  const d = parseDate(submittedAt);
+  if (d === null) return EM_DASH;
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
 /**
  * "Hh Mm" (>=60min), "Mm Ss" (>=60s, <60min), "Ss" (<60s), per UI Spec HistoryRow
  * format spec. Never throws; "—" when submittedAt is null, either timestamp is

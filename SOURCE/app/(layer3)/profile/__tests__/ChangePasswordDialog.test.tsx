@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/app/(layer1)/actions", () => ({ changePassword: vi.fn() }));
 
 import { changePassword } from "@/app/(layer1)/actions";
+import { PASSWORD_MIN_LENGTH } from "@/lib/auth/passwordPolicy";
 import { ChangePasswordDialog } from "../_components/ChangePasswordDialog";
 
 const changePasswordMock = vi.mocked(changePassword);
@@ -216,7 +217,11 @@ describe("aria-describedby chỉ tồn tại khi lỗi tồn tại", () => {
   it("ô mật khẩu mới luôn được gợi ý mô tả, và gợi ý đó nêu sàn độ dài", () => {
     renderDialog();
     const describedBy = fields().next.getAttribute("aria-describedby") as string;
-    expect(document.getElementById(describedBy)?.textContent).toBe("At least 10 characters.");
+    // Suy từ hằng số: thứ đang kiểm là "gợi ý CÓ nêu sàn độ dài", không phải
+    // sàn đó bằng bao nhiêu — viết số cứng làm test fail mỗi lần chính sách đổi.
+    expect(document.getElementById(describedBy)?.textContent).toBe(
+      `At least ${PASSWORD_MIN_LENGTH} characters.`
+    );
   });
 });
 

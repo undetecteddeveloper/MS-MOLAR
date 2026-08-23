@@ -7,10 +7,11 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { readBounded } from "@/lib/supabase/boundedRead";
 import { aggregateAttemptsByRange, type AttemptRow } from "@/lib/analytics/aggregateAttempts";
+import { rankWeakTopicsByRange, type TopicWeakness } from "@/lib/analytics/weakTopics";
 import { MASTERY_CLEARED_THRESHOLD } from "@/lib/adaptive/constants";
 import { recommendNextSkill } from "@/lib/adaptive/route";
 import { buildTelemetryPayload } from "@/lib/tutor/telemetry";
-import type { SubjectStats, TimeRange } from "@/lib/fake-data/analytics";
+import { NEEDS_REVIEW_THRESHOLD, type SubjectStats, type TimeRange } from "@/lib/fake-data/analytics";
 import type { SkillRecommendation } from "@/types/adaptive";
 
 // PostgREST embedded shape: exam_results -> exam_attempts (!inner, to-one) ->
@@ -19,6 +20,7 @@ import type { SkillRecommendation } from "@/types/adaptive";
 type EmbeddedRow = {
   correct: number;
   total: number;
+  topic_breakdown: { topic: string; correct: number; total: number }[] | null;
   exam_attempts: {
     submitted_at: string | null;
     status: string;
@@ -26,17 +28,28 @@ type EmbeddedRow = {
   };
 };
 
-export async function getAnalyticsByRange(): Promise<Record<TimeRange, SubjectStats[]>> {
+export interface AnalyticsPageData {
+  statsByRange: Record<TimeRange, SubjectStats[]>;
+  weakTopicsByRange: Record<TimeRange, TopicWeakness[]>;
+}
+
+export async function getAnalyticsByRange(): Promise<AnalyticsPageData> {
   const supabase = await createClient();
 
   // Biên tường minh (P3). Chạm trần ở đây hỏng theo kiểu riêng, tệ hơn một danh
   // sách thiếu dòng: đầu ra của hàm này là SỐ LIỆU TỔNG HỢP, nên dữ liệu thiếu
   // không hiện ra thành chỗ trống mà thành một con số SAI nhìn hoàn toàn hợp lý.
+  //
+  // `topic_breakdown` đi kèm trong CHÍNH lệnh đọc này chứ không phải một lệnh
+  // thứ hai: hai bộ số liệu rút ra từ cùng một tập dòng, tách ra đọc lại là
+  // thêm một round-trip cho dữ liệu đã nằm sẵn trong tay.
   const embedded = (await readBounded(
     "getAnalyticsByRange",
     supabase
       .from("exam_results")
-      .select("correct, total, exam_attempts!inner(submitted_at, status, exams!inner(subject))")
+      .select(
+        "correct, total, topic_breakdown, exam_attempts!inner(submitted_at, status, exams!inner(subject))"
+      )
       .eq("exam_attempts.status", "submitted")
   )) as EmbeddedRow[];
 
@@ -47,7 +60,24 @@ export async function getAnalyticsByRange(): Promise<Record<TimeRange, SubjectSt
     subject: row.exam_attempts.exams.subject,
   }));
 
-  return aggregateAttemptsByRange(rows, new Date());
+  const topicRows = embedded.map((row) => ({
+    subject: row.exam_attempts.exams.subject,
+    submittedAt: row.exam_attempts.submitted_at,
+    topicBreakdown: row.topic_breakdown ?? [],
+  }));
+
+  // Cùng mốc `now` cho cả hai reducer — hai lượt `new Date()` riêng có thể rơi
+  // vào hai phía của một biên range và làm biểu đồ mâu thuẫn với danh sách
+  // ngay bên cạnh nó.
+  const now = new Date();
+
+  // Dùng LẠI ngưỡng "NEEDS REVIEW" của biểu đồ: nếu một môn bị gắn cờ theo mốc
+  // 75% mà danh sách chủ đề lại lọc theo mốc khác, người đọc sẽ thấy một môn
+  // "cần ôn" không có chủ đề nào bên dưới nó, và không có gì giải thích vì sao.
+  return {
+    statsByRange: aggregateAttemptsByRange(rows, now),
+    weakTopicsByRange: rankWeakTopicsByRange(topicRows, now, NEEDS_REVIEW_THRESHOLD),
+  };
 }
 
 // --- Engine 1: gợi ý kỹ năng nên luyện tiếp (PRD R3) ------------------------

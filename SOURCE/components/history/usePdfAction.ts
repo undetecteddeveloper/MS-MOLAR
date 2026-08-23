@@ -47,12 +47,18 @@ export function usePdfAction(action: "save" | "share", pdfInput: AttemptPdfData)
     busyRef.current = true;
     setPhase("busy");
     try {
-      // Chân trang dịch ở ĐÂY chứ không ở nơi dựng pdfInput: HistoryRow là
-      // server component, còn hook này luôn chạy client nên bắt được ngôn ngữ
-      // đang bật mà không phải kéo `t` qua props từng chỗ gọi.
+      // Nhãn dịch ở ĐÂY chứ không ở nơi dựng pdfInput: HistoryRow là server
+      // component, còn hook này luôn chạy client nên bắt được ngôn ngữ đang
+      // bật mà không phải kéo `t` qua props từng chỗ gọi.
       const file = await generateAttemptPdfFile({
         ...pdfInput,
-        footerPrefix: t("history.pdfFooterPrefix"),
+        resultTitleLabel: t("history.pdfResultTitle"),
+        scoreLabel: t("history.pdfScoreLabel"),
+        examineeLabel: t("history.pdfExamineeLabel"),
+        submittedLabel: t("history.pdfSubmittedLabel"),
+        correctLabel: t("history.pdfCorrectLabel"),
+        wrongLabel: t("history.pdfWrongLabel"),
+        totalQuestionsLabel: t("history.pdfTotalQuestions", { total: pdfInput.total }),
       });
       if (action === "save") {
         downloadPdfFile(file);

@@ -569,6 +569,7 @@ const MCQ_QID = "question-mcq-fixture";
 const FIXTURE_RESULT: ExamResult = {
   examId: FIXTURE_EXAM_ID,
   examTitle: "Fixture exam: photosynthesis",
+  subject: "Biology",
   result: {
     totalScore: 5,
     correct: 1,

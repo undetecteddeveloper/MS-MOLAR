@@ -12,7 +12,7 @@
 // change.
 
 import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/auth/getCurrentUser";
+import { getCurrentUserProfile } from "@/lib/auth/getCurrentUser";
 import { getTranslate } from "@/lib/i18n/server";
 import { listMyHistory } from "@/app/(HM)/queries";
 import { filterHistoryEntries, type HistoryEntryFilters } from "@/lib/history/filterEntries";
@@ -44,7 +44,7 @@ function parseDate(raw: string | undefined): string | undefined {
 }
 
 export default async function HistoryPage({ searchParams }: { searchParams: SearchParams }) {
-  const user = await getCurrentUser();
+  const user = await getCurrentUserProfile();
   if (!user) redirect("/?auth=signin");
 
   const t = await getTranslate();
@@ -88,6 +88,7 @@ export default async function HistoryPage({ searchParams }: { searchParams: Sear
             <HistoryList
               entries={filteredEntries}
               isFiltered={entries.length > 0 && filteredEntries.length !== entries.length}
+              examineeName={user.displayName}
             />
           </div>
         </div>

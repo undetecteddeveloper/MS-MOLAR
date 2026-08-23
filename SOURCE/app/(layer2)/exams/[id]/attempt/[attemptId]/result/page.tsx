@@ -13,6 +13,7 @@
 import Link from "next/link";
 import { getTranslate } from "@/lib/i18n/server";
 import { redirect } from "next/navigation";
+import { getCurrentUserProfile } from "@/lib/auth/getCurrentUser";
 import { getMyRating } from "@/app/(layer2)/actions";
 import { getResult } from "@/app/(layer2)/queries";
 import { ScoreCard } from "@/app/(layer2)/_components/ScoreCard";
@@ -36,22 +37,30 @@ export default async function ResultPage({
     redirect(`/exams/${id}`);
   }
 
-  const { examTitle, result } = data;
+  const { examTitle, subject, result } = data;
   // Đã rated trước đó chưa → nhãn nút rating "Edit your rating"/"Rate this
   // exam" (AC-006/013), cùng pattern mapFromMyRating(getMyRating(id)) như
   // /exams/[id]/rate/page.tsx.
   const initialScores = mapFromMyRating(await getMyRating(id));
   const hasRated = initialScores !== undefined;
 
+  // Lấy lại profile (displayName cho PDF) — layer2/layout.tsx đã gọi
+  // getCurrentUserProfile() một lần cho cả cây, gọi lại ở page là tiền lệ đã
+  // có sẵn trong repo (profile/page.tsx:37), không phải cách mới.
+  const user = await getCurrentUserProfile();
+
   // Task 12: computed once here (no extra round trip, AC-009) and passed
   // down to ScoreCard/ResultActions — same shared formatter/type HistoryRow
   // (Task 13) and generateAttemptPdf.ts use, so all surfaces stay in sync.
   const completionTimeLabel = formatCompletionTime(data.startedAt, data.submittedAt);
   const pdfInput: AttemptPdfData = {
+    subject,
     examTitle,
     totalScore: result.totalScore,
-    startedAt: data.startedAt,
+    examineeName: user?.displayName ?? "",
     submittedAt: data.submittedAt,
+    correct: result.correct,
+    total: result.total,
   };
 
   return (

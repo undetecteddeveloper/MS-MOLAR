@@ -91,7 +91,8 @@ export const vi: Dictionary = {
   "auth.resetIntro": "Nhập email tài khoản của bạn, chúng tôi sẽ gửi liên kết đặt lại mật khẩu.",
   "auth.setNewPassword": "Đặt mật khẩu mới",
   "auth.signedInAs": "Đang đăng nhập bằng",
-  "auth.passwordHint": "Ít nhất 6 ký tự.",
+  // {min} — xem chú thích ở en.ts: số cứng cũ ("6") mâu thuẫn với luật server.
+  "auth.passwordHint": "Ít nhất {min} ký tự.",
   "auth.signIn": "Đăng nhập",
   "auth.signUp": "Đăng ký",
   "auth.resetPassword": "Đặt lại mật khẩu",
@@ -219,6 +220,14 @@ export const vi: Dictionary = {
   "analytics.recommendReasonLowestMastery": "Đây là kỹ năng bạn đang yếu nhất lúc này.",
   "analytics.recommendReasonRecentlyWrong": "Bạn vừa làm sai kỹ năng này gần đây.",
 
+  // WeakTopicsCard — đặt cùng vị trí tương đối với en.ts.
+  "analytics.weakTopicsTitle": "Cần sửa chỗ nào",
+  "analytics.weakTopicsHint": "Những chủ đề bạn làm đúng ít nhất trong khoảng này.",
+  "analytics.weakTopicsEmpty": "Chưa có chỗ nào nổi lên rõ rệt.",
+  "analytics.weakTopicsEmptyHint":
+    "Bạn làm thêm vài đề nữa nhé — một chủ đề cần ít nhất {min} câu đã làm mới xuất hiện ở đây.",
+  "analytics.weakTopicScore": "Đúng {correct}/{total} · {accuracy}%",
+
   // --- Tải đề lên (UGC) ---------------------------------------------------
   "upload.title": "Tải đề lên",
   "upload.intro":
@@ -323,16 +332,13 @@ export const vi: Dictionary = {
   "rating.partiallyRated": "ĐÃ CHẤM {rated}/{total}",
   "rating.mcqEyebrow": "PHẦN I · TRẮC NGHIỆM",
   "rating.mcqName": "Trắc nghiệm",
-  "rating.mcqDescription":
-    "Bốn lựa chọn mỗi câu, một đáp án đúng. Kiểm tra khả năng ghi nhớ và hiểu cơ bản.",
+  "rating.mcqDescription": "Bốn lựa chọn, một đáp án đúng — kiểm tra ghi nhớ và hiểu cơ bản.",
   "rating.tfEyebrow": "PHẦN II · ĐÚNG / SAI",
   "rating.tfName": "Đúng / Sai",
-  "rating.tfDescription":
-    "Bốn ý nhỏ mỗi câu, đánh dấu đúng hoặc sai cho từng ý. Sai một ý là mất điểm cả câu — không đoán mò bằng loại trừ được.",
+  "rating.tfDescription": "Đánh dấu đúng/sai từng ý nhỏ. Sai một ý là mất điểm cả câu.",
   "rating.saEyebrow": "PHẦN III · TRẢ LỜI NGẮN",
   "rating.saName": "Trả lời ngắn",
-  "rating.saDescription":
-    "Không có lựa chọn sẵn — tự giải và nhập một đáp số duy nhất. Không có chỗ cho đoán mò.",
+  "rating.saDescription": "Không có lựa chọn — tự giải và nhập một đáp số duy nhất.",
   "rating.errIneligible": "Bạn cần làm xong đề này trước khi chấm độ khó.",
   "rating.errInvalid": "Bạn chấm đủ cả ba phần, mỗi phần từ 1 đến 10 nhé.",
   "rating.errRateLimited": "Bạn đang chấm quá nhanh. Đợi một chút rồi thử lại nhé.",
@@ -341,7 +347,13 @@ export const vi: Dictionary = {
   // --- Lịch sử (bổ sung) --------------------------------------------------
   "history.sharing": "Đang chia sẻ…",
   "history.moreActionsFor": "Thao tác khác cho {title}",
-  "history.pdfFooterPrefix": "Tạo bởi MS-MOLAR · chỉ là bản tóm tắt, không phải bảng điểm đầy đủ",
+  "history.pdfResultTitle": "KẾT QUẢ BÀI THI",
+  "history.pdfScoreLabel": "ĐIỂM SỐ",
+  "history.pdfExamineeLabel": "NGƯỜI THI",
+  "history.pdfSubmittedLabel": "THỜI GIAN NỘP BÀI",
+  "history.pdfCorrectLabel": "CÂU ĐÚNG",
+  "history.pdfWrongLabel": "CÂU SAI",
+  "history.pdfTotalQuestions": "Tổng cộng {total} câu",
   "history.exam": "Đề thi",
   "history.score": "Điểm",
   "history.submitted": "Ngày nộp",

@@ -16,9 +16,10 @@
 // card giãn/nở mượt khi số field thay đổi giữa 2 tab, thay vì nhảy khựng.
 "use client";
 
-import { useActionState, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { requestPasswordReset, signIn, signInWithOAuth, signUp, type AuthState } from "../actions";
 import { useT } from "@/lib/i18n/client";
+import { PASSWORD_MIN_LENGTH } from "@/lib/auth/passwordPolicy";
 
 type Mode = "signin" | "signup";
 
@@ -162,12 +163,26 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
                     required
                     icon={<MailIcon className="size-4" />}
                   />
+                  {/* Sàn độ dài CHỈ gắn ở tab Đăng ký. Tab Đăng nhập tuyệt
+                      đối không được có `minLength`/gợi ý: tài khoản cũ đặt từ
+                      thời luật 6 ký tự vẫn đăng nhập được (chính sách chỉ áp
+                      cho mật khẩu MỚI — xem lib/auth/passwordPolicy.ts), nên
+                      một ràng buộc ở trình duyệt tại đây sẽ khoá cửa đúng
+                      những người đang dùng sản phẩm.
+
+                      Gợi ý hiện SẴN chứ không đợi lỗi: người dùng báo "không
+                      nhập được mật khẩu" chính vì luật chỉ lộ ra sau một vòng
+                      gửi lên server, không có gì nói trước. */}
                   <Field
                     id="password"
                     name="password"
                     type="password"
                     placeholder={t("auth.password")}
                     required
+                    minLength={isSignup ? PASSWORD_MIN_LENGTH : undefined}
+                    hint={
+                      isSignup ? t("auth.passwordHint", { min: PASSWORD_MIN_LENGTH }) : undefined
+                    }
                     icon={<LockIcon className="size-4" />}
                   />
                 </div>
@@ -324,6 +339,8 @@ function Field({
   placeholder,
   icon,
   required,
+  minLength,
+  hint,
 }: {
   id: string;
   name: string;
@@ -332,38 +349,53 @@ function Field({
   placeholder: string;
   icon: React.ReactNode;
   required?: boolean;
+  minLength?: number;
+  /** Câu gợi ý ĐÃ DỊCH, hiện ngay dưới field. Bỏ trống thì không render gì. */
+  hint?: string;
 }) {
   const t = useT();
   // S#24: toggle hiện/ẩn — chỉ áp dụng cho field password.
   const [show, setShow] = useState(false);
   const isPassword = type === "password";
   const inputType = isPassword ? (show ? "text" : "password") : type;
+  // useId: form này render được hai lần trên một trang (card + view reset), nên
+  // id cố định suy từ `id` prop sẽ đụng nhau và aria-describedby trỏ nhầm ô.
+  const hintId = `${useId()}-hint`;
 
   return (
-    <label
-      htmlFor={id}
-      className="flex items-center gap-3 border-b border-[color:var(--input)] pb-1 text-[color:var(--muted-foreground)] transition-colors focus-within:border-[color:var(--ring)] focus-within:text-[#1B1512]"
-    >
-      <span className="shrink-0">{icon}</span>
-      <input
-        id={id}
-        name={name}
-        type={inputType}
-        required={required}
-        placeholder={placeholder}
-        className="w-full bg-transparent py-2 text-[#1B1512] outline-none placeholder:text-[color:var(--muted-foreground)]/70"
-      />
-      {isPassword && (
-        <button
-          type="button"
-          onClick={() => setShow((v) => !v)}
-          aria-label={show ? t("auth.hidePassword") : t("auth.showPassword")}
-          className="shrink-0 text-[color:var(--muted-foreground)] transition-colors hover:text-[#1B1512]"
-        >
-          {show ? <EyeOffIcon className="size-4" /> : <EyeIcon className="size-4" />}
-        </button>
+    <div>
+      <label
+        htmlFor={id}
+        className="flex items-center gap-3 border-b border-[color:var(--input)] pb-1 text-[color:var(--muted-foreground)] transition-colors focus-within:border-[color:var(--ring)] focus-within:text-[#1B1512]"
+      >
+        <span className="shrink-0">{icon}</span>
+        <input
+          id={id}
+          name={name}
+          type={inputType}
+          required={required}
+          minLength={minLength}
+          aria-describedby={hint ? hintId : undefined}
+          placeholder={placeholder}
+          className="w-full bg-transparent py-2 text-[#1B1512] outline-none placeholder:text-[color:var(--muted-foreground)]/70"
+        />
+        {isPassword && (
+          <button
+            type="button"
+            onClick={() => setShow((v) => !v)}
+            aria-label={show ? t("auth.hidePassword") : t("auth.showPassword")}
+            className="shrink-0 text-[color:var(--muted-foreground)] transition-colors hover:text-[#1B1512]"
+          >
+            {show ? <EyeOffIcon className="size-4" /> : <EyeIcon className="size-4" />}
+          </button>
+        )}
+      </label>
+      {hint && (
+        <p id={hintId} className="mt-1.5 text-xs text-[color:var(--muted-foreground)]">
+          {hint}
+        </p>
       )}
-    </label>
+    </div>
   );
 }
 

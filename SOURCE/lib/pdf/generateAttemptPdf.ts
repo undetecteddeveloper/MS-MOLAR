@@ -6,36 +6,25 @@
 // so the heavy libraries never load until the first Save/Share click.
 import { createElement } from "react";
 import { AttemptPdfTemplate } from "@/components/pdf/AttemptPdfTemplate";
-import { buildPdfFilename, formatCompletionTime, formatSubmittedDate } from "@/lib/history/format";
+import { buildPdfFilename, formatSubmittedDate, formatSubmittedTime } from "@/lib/history/format";
 
 export interface AttemptPdfData {
+  subject: string;
   examTitle: string;
   totalScore: number;
-  startedAt: string;
+  examineeName: string;
   submittedAt: string | null;
-  /** Câu chân trang đã dịch — usePdfAction bơm vào từ `t`. Bỏ trống thì
-   *  template dùng bản tiếng Anh mặc định của nó. */
-  footerPrefix?: string;
-}
-
-function pad2(n: number): string {
-  return String(n).padStart(2, "0");
-}
-
-/**
- * "DD/MM/YYYY HH:mm". Local, unexported helper — `lib/history/format.ts`
- * (Task 07's already-completed, already-tested contract) exports only
- * formatSubmittedDate/formatCompletionTime/buildPdfFilename, so the
- * "generated at" label used only by the PDF template is kept local here
- * rather than expanding that module's out-of-scope contract.
- */
-function formatGeneratedAt(date: Date): string {
-  const day = pad2(date.getDate());
-  const month = pad2(date.getMonth() + 1);
-  const year = date.getFullYear();
-  const hours = pad2(date.getHours());
-  const minutes = pad2(date.getMinutes());
-  return `${day}/${month}/${year} ${hours}:${minutes}`;
+  correct: number;
+  total: number;
+  /** Nhãn đã dịch — usePdfAction bơm vào từ `t`. Bỏ trống thì template dùng
+   *  bản tiếng Anh mặc định của nó (AttemptPdfTemplate's own defaults). */
+  resultTitleLabel?: string;
+  scoreLabel?: string;
+  examineeLabel?: string;
+  submittedLabel?: string;
+  correctLabel?: string;
+  wrongLabel?: string;
+  totalQuestionsLabel?: string;
 }
 
 export async function generateAttemptPdfFile(data: AttemptPdfData): Promise<File> {
@@ -54,17 +43,26 @@ export async function generateAttemptPdfFile(data: AttemptPdfData): Promise<File
 
   try {
     const submittedDateLabel = formatSubmittedDate(data.submittedAt);
-    const completionTimeLabel = formatCompletionTime(data.startedAt, data.submittedAt);
+    const submittedTimeLabel = formatSubmittedTime(data.submittedAt);
 
     flushSync(() => {
       root.render(
         createElement(AttemptPdfTemplate, {
+          subject: data.subject,
           examTitle: data.examTitle,
           totalScore: data.totalScore,
+          examineeName: data.examineeName,
           submittedDateLabel,
-          completionTimeLabel,
-          generatedAtLabel: formatGeneratedAt(new Date()),
-          footerPrefix: data.footerPrefix,
+          submittedTimeLabel,
+          correct: data.correct,
+          total: data.total,
+          resultTitleLabel: data.resultTitleLabel,
+          scoreLabel: data.scoreLabel,
+          examineeLabel: data.examineeLabel,
+          submittedLabel: data.submittedLabel,
+          correctLabel: data.correctLabel,
+          wrongLabel: data.wrongLabel,
+          totalQuestionsLabel: data.totalQuestionsLabel,
         }),
       );
     });

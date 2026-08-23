@@ -24,7 +24,7 @@ export default async function DashboardPage() {
   // Ngữ nghĩa lỗi giữ nguyên như trước: một lệnh đọc hỏng thì cả trang đi vào
   // xử lý lỗi cấp trang — đúng thứ `await getAnalyticsByRange()` trần vẫn làm,
   // và đúng điều UI Spec đã chốt cho thẻ gợi ý (không có UI lỗi riêng cho nó).
-  const [dataByRange, recommendation] = await Promise.all([
+  const [{ statsByRange, weakTopicsByRange }, recommendation] = await Promise.all([
     getAnalyticsByRange(),
     getSkillRecommendation(),
   ]);
@@ -41,7 +41,7 @@ export default async function DashboardPage() {
       </div>
 
       <div className="mt-6">
-        <AnalyticsDashboard dataByRange={dataByRange} />
+        <AnalyticsDashboard dataByRange={statsByRange} weakTopicsByRange={weakTopicsByRange} />
       </div>
     </PageContainer>
   );
