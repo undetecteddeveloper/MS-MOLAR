@@ -19,12 +19,33 @@
 // Hình ban đầu đến từ bước trích xuất.
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { QuestionFigure } from "@/components/shared/QuestionFigure";
-import { RichText } from "@/components/shared/RichText";
 import { useT } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n/translate";
 import { LIMITS } from "@/lib/ugc/limits";
 import type { AssembledQuestion, ChoiceId, SubItemId } from "@/lib/ugc/types";
+
+// RichText NẠP ĐỘNG (TD-023, 2026-08-27) — cây phụ thuộc của nó
+// (react-markdown + remark-* + rehype-katex + katex) là 102 KB br, chunk client
+// lớn nhất dự án, và màn này là route NẶNG NHẤT của site (đo trên prod
+// 2026-08-27: 354 KB JS, LCP 5.1s, INP 2.5s trên máy tầm trung 4× CPU).
+//
+// `ssr` để MẶC ĐỊNH (true), KHÔNG tắt: cả 5 chỗ dùng RichText ở dưới đều nằm
+// trong nhánh XEM (`editing === false`) — chế độ SỬA là input/textarea chuỗi
+// NGUỒN, không có preview trực tiếp. Nên nội dung câu hỏi vẫn được render ở
+// server và có mặt trong HTML đầu tiên; `dynamic` chỉ đẩy 102 KB kia ra khỏi
+// đường hydrate ban đầu, KHÔNG đổi thứ người dùng nhìn thấy. Đặt `ssr: false`
+// ở đây sẽ biến màn review thành trang trống rồi mới có chữ — đúng cái bẫy mà
+// TD-023 đã cảnh báo với màn làm bài.
+//
+// Vì sao màn này KHÔNG dùng cách của màn làm bài (render sẵn ở server rồi
+// truyền node xuống — xem app/(layer2)/_components/questionNodes.tsx): ở đó
+// nội dung câu hỏi là BẤT BIẾN trong suốt lượt làm bài, còn ở đây tác giả sửa
+// được chính chuỗi nguồn đó, nên node render sẵn sẽ ôi ngay khi có một lần sửa.
+const RichText = dynamic(() =>
+  import("@/components/shared/RichText").then((m) => m.RichText),
+);
 
 const CHOICE_IDS: ChoiceId[] = ["A", "B", "C", "D"];
 const SUB_ITEM_IDS: SubItemId[] = ["a", "b", "c", "d"];

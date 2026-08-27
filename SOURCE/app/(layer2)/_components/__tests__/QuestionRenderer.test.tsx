@@ -37,6 +37,10 @@ import { fireEvent, render, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { PublicQuestion } from "@/types/question";
 import { QuestionRenderer } from "../QuestionRenderer";
+// TD-023: nội dung câu hỏi nay render ở SERVER rồi truyền xuống. Test dùng
+// ĐÚNG hàm render đó thay vì tự dựng node giả — nếu không, test sẽ xanh trong
+// khi cặp server/client ngoài đời đã lệch nhau.
+import { renderQuestionNodes } from "../questionNodes";
 
 // Fixtures — minimal literal PublicQuestion per questionType, authored
 // independently of QuestionRenderer.tsx's own rendered output.
@@ -76,6 +80,7 @@ function renderQuestion(question: PublicQuestion, onSelectAnswer = vi.fn()) {
     <QuestionRenderer
       index={1}
       question={question}
+      nodes={renderQuestionNodes([question])[0]}
       selectedAnswer={undefined}
       onSelectAnswer={onSelectAnswer}
       flagged={false}

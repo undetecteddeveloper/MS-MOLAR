@@ -22,7 +22,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BarChart3, ClipboardList, History, Home, Upload, type LucideIcon } from "lucide-react";
-import { NAV_ITEMS, isExamFocusRoute, isNavItemActive } from "@/lib/nav/items";
+import { NAV_ITEMS, isExamFocusRoute, isNavItemActive, navPrefetch } from "@/lib/nav/items";
 import { useT } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n/translate";
 
@@ -39,7 +39,7 @@ const ICONS: Partial<Record<MessageKey, LucideIcon>> = {
   "nav.upload": Upload,
 };
 
-export function BottomNav() {
+export function BottomNav({ signedIn = false }: { signedIn?: boolean }) {
   const pathname = usePathname();
   const t = useT();
 
@@ -70,6 +70,9 @@ export function BottomNav() {
             <li key={item.key} className="min-w-0 flex-1">
               <Link
                 href={item.href}
+                // Xem `navPrefetch`: với khách, prefetch một đích sau-đăng-nhập
+                // đổi lấy một 307 + một lượt render server hoàn toàn bỏ đi.
+                prefetch={navPrefetch(item, signedIn)}
                 aria-current={active ? "page" : undefined}
                 // min-h-14 = 56px: trên ngưỡng 44–48px mà tài liệu §4.3 yêu cầu
                 // cho vùng chạm. Chia đều `flex-1` nên bề ngang mỗi ô ở 360px

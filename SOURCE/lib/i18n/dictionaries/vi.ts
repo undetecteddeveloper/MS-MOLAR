@@ -115,6 +115,12 @@ export const vi: Dictionary = {
   "exams.toggleSortDirection": "Đổi chiều sắp xếp",
   "exams.ascending": "Tăng dần",
   "exams.descending": "Giảm dần",
+  // Phân trang (TD-026).
+  "exams.pagination": "Các trang danh sách đề",
+  "exams.previousPage": "Trước",
+  "exams.nextPage": "Sau",
+  "exams.pageOf": "Trang {page} / {pageCount}",
+  "exams.totalCount": "{total} đề",
 
   // --- Làm bài ------------------------------------------------------------
   "player.backToExams": "Về danh sách đề",

@@ -37,7 +37,7 @@ export default async function BillingLayout({ children }: { children: React.Reac
           {children}
         </div>
       </EntitlementProvider>
-      <BottomNav />
+      <BottomNav signedIn={Boolean(user)} />
       <SupportWidget user={user} />
     </div>
   );

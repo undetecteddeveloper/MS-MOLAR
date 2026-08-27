@@ -21,6 +21,7 @@ import { useExamPlayer } from "@/hooks/useExamPlayer";
 import { useLeaveGuard } from "@/hooks/useLeaveGuard";
 import { useSwipe } from "@/hooks/useSwipe";
 import type { PublicQuestion } from "@/types/question";
+import type { QuestionNodes } from "./questionNodes.types";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 
@@ -29,6 +30,12 @@ interface ExamPlayerProps {
   examTitle: string;
   durationMinutes: number;
   questions: PublicQuestion[];
+  /**
+   * Nội dung ĐÃ RENDER SẴN Ở SERVER của TỪNG câu, cùng thứ tự với `questions`
+   * (TD-023 — xem `questionNodes.tsx`). Server phải giao đủ N câu một lần vì
+   * đổi câu là tương tác client: server không biết `current` bằng bao nhiêu.
+   */
+  questionNodes: QuestionNodes[];
   /** Tiêu đề các PHẦN (đề chuẩn 2025, v2.1) — hiện nhãn phần của câu hiện tại. */
   parts?: { number: number; title: string }[];
 }
@@ -38,6 +45,7 @@ export function ExamPlayer({
   examTitle,
   durationMinutes,
   questions,
+  questionNodes,
   parts,
 }: ExamPlayerProps) {
   const t = useT();
@@ -257,6 +265,7 @@ export function ExamPlayer({
             <QuestionRenderer
               index={current + 1}
               question={question}
+              nodes={questionNodes[current]}
               selectedAnswer={answers[question.id]}
               onSelectAnswer={(value) => {
                 selectAnswer(question.id, value);

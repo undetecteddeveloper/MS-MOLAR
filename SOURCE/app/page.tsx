@@ -108,7 +108,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ a
         </div>
       </main>
 
-      <BottomNav />
+      <BottomNav signedIn={Boolean(user)} />
       <SupportWidget user={user} />
     </div>
   );

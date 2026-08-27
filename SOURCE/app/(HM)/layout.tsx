@@ -23,7 +23,7 @@ export default async function HMLayout({ children }: { children: React.ReactNode
       <div id="main-content" tabIndex={-1} className="pb-bottom-nav">
         {children}
       </div>
-      <BottomNav />
+      <BottomNav signedIn={Boolean(user)} />
       <SupportWidget user={user} />
     </div>
   );

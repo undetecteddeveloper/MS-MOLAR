@@ -154,6 +154,12 @@ export const en = {
   "exams.toggleSortDirection": "Toggle sort direction",
   "exams.ascending": "Ascending",
   "exams.descending": "Descending",
+  // Phân trang (TD-026) — `/exams` cắt trang ở tầng trình bày, xem `paginate()`.
+  "exams.pagination": "Exam list pages",
+  "exams.previousPage": "Previous",
+  "exams.nextPage": "Next",
+  "exams.pageOf": "Page {page} of {pageCount}",
+  "exams.totalCount": "{total} exams",
 
   // --- Làm bài ------------------------------------------------------------
   // Nhãn lối quay về danh sách đề trong màn làm bài. CHỈ tồn tại ở bản mobile

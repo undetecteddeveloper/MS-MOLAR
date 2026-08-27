@@ -15,17 +15,36 @@
 
 import type { MessageKey } from "@/lib/i18n/translate";
 
-export type NavItem = { key: MessageKey; href: string };
+export type NavItem = {
+  key: MessageKey;
+  href: string;
+  /**
+   * Đích này nằm SAU đăng nhập (không có trong `PUBLIC_PATHS` của
+   * `lib/supabase/middleware.ts`). Ghim bằng máy ở `__tests__/items.test.ts`
+   * — hai danh sách lệch nhau thì test đỏ, không phải người đi rà.
+   *
+   * Dùng để TẮT PREFETCH cho khách chưa đăng nhập (đo prod 2026-08-27):
+   * `<Link>` của Next prefetch mọi đích trong vùng nhìn thấy, nên với khách,
+   * mỗi đích có `guarded` sinh ra một 307 từ proxy rồi trình duyệt ĐI THEO
+   * redirect sang `/?auth=signin` — tức MỘT LƯỢT RENDER SERVER ĐẦY ĐỦ cho một
+   * trang người dùng không yêu cầu. Bốn mục dưới đây × (307 + render) = 13
+   * lượt gọi function lãng phí trên MỖI lần khách mở trang chủ, và không có
+   * gì trong số đó đi vào cache của lần điều hướng thật (đích thật là
+   * `/?auth=signin`, không phải `/exams`). Cùng thứ lãng phí mà `app/robots.ts`
+   * đã chặn cho crawler — chỉ khác là lần này site tự gây ra cho chính mình.
+   */
+  guarded?: boolean;
+};
 
 /** Năm đích chính. Đây cũng ĐÚNG là năm ô của BottomNav trên mobile —
  *  §4.2 khuyến nghị bóc tách các phân hệ cốt lõi ra thanh đáy. */
 export const NAV_ITEMS: NavItem[] = [
   { key: "nav.home", href: "/" },
-  { key: "nav.exams", href: "/exams" },
-  { key: "nav.analytics", href: "/me/dashboard" },
-  { key: "nav.history", href: "/history" },
+  { key: "nav.exams", href: "/exams", guarded: true },
+  { key: "nav.analytics", href: "/me/dashboard", guarded: true },
+  { key: "nav.history", href: "/history", guarded: true },
   // UGC v2.0 (Task 6.1): Import→Upload cho MỌI user; KHÔNG có mục admin.
-  { key: "nav.upload", href: "/upload" },
+  { key: "nav.upload", href: "/upload", guarded: true },
 ];
 
 /** Guest thấy thêm tag "Account" (→ mở form auth trong trang chủ).
@@ -35,6 +54,21 @@ export const GUEST_NAV_ITEMS: NavItem[] = [
   ...NAV_ITEMS,
   { key: "nav.account", href: "/?auth=signin" },
 ];
+
+/**
+ * Giá trị `prefetch` cho `<Link>` của một mục nav.
+ *
+ * `false` CHỈ với khách chưa đăng nhập trên đích sau-đăng-nhập (xem `guarded`).
+ * Người đã đăng nhập giữ nguyên prefetch: với họ đích là thật, 307 không xảy
+ * ra, và prefetch làm đúng việc nó sinh ra để làm.
+ *
+ * Trả `undefined` chứ không phải `true` cho nhánh còn lại — để `<Link>` giữ
+ * mặc định của Next (prefetch theo viewport + heuristic của nó) thay vì ta ép
+ * một giá trị và vô tình khoá luôn hành vi đó lại.
+ */
+export function navPrefetch(item: NavItem, signedIn: boolean): false | undefined {
+  return !signedIn && item.guarded ? false : undefined;
+}
 
 /** Mục nào đang được chọn, theo `pathname` hiện tại.
  *  "/" phải so BẰNG chứ không `startsWith` — nếu không thì mọi route đều khớp

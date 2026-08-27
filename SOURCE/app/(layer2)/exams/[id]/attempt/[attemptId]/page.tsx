@@ -5,6 +5,7 @@
 import { notFound } from "next/navigation";
 import { getExamForPlayer } from "@/app/(layer2)/queries";
 import { ExamPlayer } from "@/app/(layer2)/_components/ExamPlayer";
+import { renderQuestionNodes } from "@/app/(layer2)/_components/questionNodes";
 
 export default async function ExamPlayerPage({
   params,
@@ -24,6 +25,9 @@ export default async function ExamPlayerPage({
       examTitle={data.exam.title}
       durationMinutes={data.exam.durationMinutes}
       questions={data.questions}
+      // TD-023: markdown + LaTeX render Ở ĐÂY (server), không ở ExamPlayer —
+      // giữ 126 KB br của RichText khỏi bundle màn làm bài.
+      questionNodes={renderQuestionNodes(data.questions)}
       parts={data.exam.parts}
     />
   );

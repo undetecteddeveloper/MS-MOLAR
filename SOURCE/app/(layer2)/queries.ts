@@ -10,12 +10,19 @@ import {
 import { rankExamIds } from "@/lib/adaptive/rankExams";
 import { createClient } from "@/lib/supabase/server";
 import { readBounded } from "@/lib/supabase/boundedRead";
+import { EXAMS_PAGE_SIZE, paginateExams } from "@/lib/exams/paginate";
 import { communityDifficultyFrom, RATING_MIN } from "@/lib/rating";
 import { computeWrongTwiceQuestionIds, type WrongTwiceAttempt } from "@/lib/scoring/wrongTwice";
 import { resolveSignedImageUrl } from "@/lib/ugc/imageUrl";
 import type { Exam } from "@/types/exam";
 import type { Choice, PublicQuestion } from "@/types/question";
 import type { PerQuestionResult, ScoreResult } from "@/types/result";
+
+// `EXAMS_PAGE_SIZE`/`paginateExams` ở `lib/exams/paginate.ts` — file này có
+// `import "server-only"`, nên một hàm THUẦN nằm trong đây thì không test được
+// mà không dựng cả một môi trường server giả. Re-export để chỗ gọi không phải
+// biết chuyện đó.
+export { EXAMS_PAGE_SIZE, paginateExams };
 
 // --- Mappers (snake_case DB → camelCase type) ----------------------------
 
@@ -269,7 +276,14 @@ function gradeOfAttempt(row: AttemptRow): number | null {
 }
 
 export interface RankedExamList {
+  /** Đề của TRANG đang xem (đã cắt), không phải toàn bộ tập khớp bộ lọc. */
   exams: Exam[];
+  /** Trang hiện tại, 1-based và đã kẹp vào [1, pageCount]. */
+  page: number;
+  /** Tổng số trang; luôn >= 1 (danh sách rỗng vẫn là "trang 1 / 1"). */
+  pageCount: number;
+  /** Tổng số đề khớp bộ lọc TRONG cửa sổ xếp hạng — xem ghi chú TD-026. */
+  total: number;
   /**
    * Cùng tập id mà `listMySubmittedExamIds()` trả, nhưng suy ra từ CHÍNH lượt
    * đọc mà bộ xếp hạng dùng — nhờ vậy băng "đã làm" và huy hiệu "đã làm" trên
@@ -300,7 +314,10 @@ export interface RankedExamList {
  * người gọi, và quy ước của repo là KHÔNG thêm predicate `user_id` bằng tay
  * (xem (layer3)/queries.ts:90-99).
  */
-export async function listExamsRanked(filters?: ExamFilters): Promise<RankedExamList> {
+export async function listExamsRanked(
+  filters?: ExamFilters,
+  page = 1
+): Promise<RankedExamList> {
   const supabase = await createClient();
 
   // Hai lệnh đọc dưới đây lớn theo hoạt động của MỘT người (RLS khoá về
@@ -350,7 +367,7 @@ export async function listExamsRanked(filters?: ExamFilters): Promise<RankedExam
 
   // `?sort` tường minh thắng cá nhân hoá — trả thẳng thứ tự DB-side.
   if (filters?.sort) {
-    return { exams: rows.map(toExam), submittedExamIds };
+    return { ...paginateExams(rows.map(toExam), page), submittedExamIds };
   }
 
   const orderedIds = rankExamIds({
@@ -372,7 +389,9 @@ export async function listExamsRanked(filters?: ExamFilters): Promise<RankedExam
     return row ? [toExam(row)] : [];
   });
 
-  return { exams, submittedExamIds };
+  // XẾP HẠNG TRƯỚC, CẮT TRANG SAU — thứ tự này là toàn bộ quyết định của
+  // TD-026, xem `paginate()`.
+  return { ...paginateExams(exams, page), submittedExamIds };
 }
 
 /**
