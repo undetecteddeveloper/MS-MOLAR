@@ -24,8 +24,12 @@ còn nơi nào khác giữ lịch sử nợ ngoài chính file này.)*
 > mở". Ghi lại vì nếu không thì phiên sau sẽ đọc chúng như việc bị bỏ quên rồi đi
 > làm lại đúng cuộc thảo luận này.
 >
-> **TD-027 thì khác** — nó mở vì đã THỬ một hướng, ĐO, và hướng đó không hiệu
-> quả. Số đo phủ định nằm ngay trong mục; đọc trước khi thử lại cùng cách.
+> **TD-027 đã TRẢ** (2026-08-27, cùng ngày) — xem phần "Đã trả". Nó từng mở vì
+> một hướng đi đã bị số đo bác bỏ; hướng thứ hai (đổi kiến trúc) thì ăn.
+>
+> **TD-028 thì khác cả hai** — nó không bị chặn bởi tiền hay credential, và cũng
+> chưa ai thử gì cả. Nó mở vì một TIỀN ĐỀ đã hết hạn: thuật toán xếp hạng đề cố
+> ý bỏ tín hiệu MÔN vì lúc thiết kế kho đề chỉ có Toán, và hôm nay thì không.
 >
 > - **TD-013**: đã kê 4 đường (Upstash chặn theo IP trong `proxy.ts` — $0, ship
 >   được ngay, nhưng function đã bị gọi rồi mới từ chối được / Cloudflare free —
@@ -36,48 +40,69 @@ còn nơi nào khác giữ lịch sử nợ ngoài chính file này.)*
 >   mở** — cơ chế PHÁT HIỆN lệch (fingerprint `schema_version` + test CI + check
 >   lúc khởi động) vẫn đang chạy và vẫn bắt được drift.
 
-### TD-027 — Màn SỬA ĐỀ vẫn 356 KB JS, và `next/dynamic` KHÔNG phải cách chữa
-**Từ:** 2026-08-27 (tách ra khi trả nửa TD-023 — nửa này đã thử, đã đo, đã gỡ)
-**Loại:** hiệu năng, đã có số đo phủ định một hướng đi
+### TD-028 — Xếp hạng đề KHÔNG có tín hiệu môn, và tiền đề cho phép bỏ nó đã hết hạn
+**Từ:** 2026-08-27 (phát hiện khi engineer hỏi "yếu Toán/Sinh thì đề Toán/Sinh
+có lên đầu không?" — câu trả lời là KHÔNG)
+**Loại:** sản phẩm — thuật toán làm ĐÚNG thiết kế, nhưng thiết kế dựa trên một
+số đo đã cũ
 
-`/me/exams/[id]` là route nặng nhất site: **356.2 KB br** JS tải về, trong đó
-**126.3 KB** là chunk markdown+KaTeX — cùng chunk mà TD-021 gỡ khỏi
-`/result/detail` và TD-023 vừa gỡ khỏi màn làm bài.
+`rankExamIds()` (`lib/adaptive/rankExams.ts`) xếp `/exams` theo khoá:
 
-**KHÔNG gỡ được bằng cách của màn làm bài** (server render sẵn rồi truyền node
-xuống): tác giả SỬA được chính chuỗi nguồn đó, nên node render sẵn ôi ngay ở
-lần sửa đầu tiên. Đây là khác biệt bản chất, không phải chuyện chưa ai làm.
+```
+[ band ASC, priorScore ASC NULLS LAST, affinity DESC, id ASC ]
+affinity = 1.0 × tỉ-trọng-LỚP + 0.25 × độ-MỚI
+```
 
-**ĐÃ THỬ `next/dynamic` (giữ `ssr` mặc định) VÀ ĐÃ ĐO TRÊN PRODUCTION —
-KHÔNG ĐƯỢC GÌ. Đã revert:**
+`grep subject lib/adaptive/rankExams.ts` → **0 dòng**. Môn học không nằm trong
+bất kỳ khoá nào. Điểm số cũng chỉ vào được qua `priorScore`, mà `priorScore`
+là điểm của **đúng đề đó**, không phải năng lực theo môn.
 
-| | trước | sau `next/dynamic` |
+**Vì sao "yếu môn X ⇒ đề môn X lên đầu" KHÔNG xảy ra, và còn ngược lại:**
+`band` là khoá CỨNG — mọi đề CHƯA làm đứng trên MỌI đề ĐÃ làm. Nên học sinh
+làm hết đề Toán và điểm thấp thì đúng những đề đó bị đẩy XUỐNG ĐÁY, dưới cả
+những đề môn khác chưa đụng tới. `priorScore` (điểm tệ lên trước) chỉ sắp xếp
+BÊN TRONG băng đã-làm, tức bên dưới toàn bộ băng chưa-làm. Đây là hành vi ĐÚNG
+theo PRD AC-019 (D5: "làm lại đề từng làm dở"), không phải bug — nhưng nó
+không phải thứ người dùng đọc chữ "gợi ý" sẽ mong đợi.
+
+**Tiền đề đã hết hạn — đây mới là phần đáng ghi thành nợ.** Comment ở đầu
+`rankExams.ts` nói rõ v1 bỏ tín hiệu môn vì số đo prod **2026-08-16**: "3 đề
+published đều là Toán (nên sở thích môn là hằng số, không đổi được thứ tự
+nào)". Đo lại prod hôm nay (2026-08-27):
+
+| | 2026-08-16 (lúc chốt thiết kế) | 2026-08-27 (hôm nay) |
 |---|---|---|
-| JS tải về | 354.3 KB br | **356.2 KB** (nhích LÊN, thêm 1 chunk) |
-| TBT | 404ms | **460ms** (nhích LÊN) |
-| LCP | 3668ms | 3632ms (trong sai số) |
+| đề published | 3 | **6** |
+| môn | 1 (Toán) | **4** — Toán 3, Hoá 1, **Sinh 1**, Lý 1 |
+| lớp | — | 4 (lớp 8, 10, 11, 12) |
 
-Lý do: `next/dynamic` với `ssr` mặc định chỉ đưa chunk ra khỏi danh sách chunk
-EAGER của route. Trình duyệt VẪN phải nạp nó để HYDRATE đúng cây mà server đã
-render. Đổi lại nhận thêm một ranh giới Suspense và ba test phải chuyển sang
-`waitFor`. `ssr: false` thì càng tệ — thành "trang trống rồi mới có chữ".
+Tín hiệu môn KHÔNG còn là hằng số. Lý do duy nhất để bỏ nó đã biến mất.
 
-**BÀI HỌC VỀ PHÉP ĐO, quan trọng hơn cả món nợ:** manifest báo
-`169.9 → 68.7 KB (−60%)` và con số đó LÀ THẬT — nhưng nó đếm thứ
-`page_client-reference-manifest.js` KHAI, không đếm thứ trình duyệt TẢI. Suýt
-nữa thì một "thắng lợi −60%" được ghi vào sổ trong khi route không đổi gì. Đúng
-khoảng cách giữa "build nói gì" và "người dùng nhận gì" mà TD-025 sinh ra để
-canh — nên **đo byte bằng Resource Timing trên deploy THẬT, đừng tin manifest.**
+**Còn "yếu Sinh học" thì sao:** prod CÓ đề Sinh học 12 (`ugc-40f1e6b5`, 40
+câu), nên câu hỏi không còn giả định nữa. Nhưng năng lực theo KỸ NĂNG sống ở
+`user_skill_mastery` + `recommendNextSkill()` (`lib/adaptive/route.ts`), và thứ
+đó chỉ chảy vào **SkillRecommendationCard ở dashboard Layer 3** — nó KHÔNG có
+đường nào đi tới thứ tự của `/exams`. Hai hệ gợi ý chạy song song mà không nói
+chuyện với nhau.
 
-**Sẽ nổ thế nào nếu quên:** không nổ, nó chỉ chậm — TBT ~460ms trên máy tầm
-trung ở màn mà tác giả phải đọc lại 40 câu trước khi publish. Ít người dùng hơn
-màn làm bài, và họ kiên nhẫn hơn, nên ưu tiên thấp hơn TD-023.
+**Sẽ nổ thế nào nếu quên:** không nổ. Nó chỉ lặng lẽ gợi ý sai đối tượng, và vì
+v1 CỐ Ý không có nhãn/không có telemetry/không có click-through (PRD "Release
+partition") nên KHÔNG có cách nào phát hiện bằng số liệu — chỉ có người dùng tự
+thấy danh sách vô duyên. Càng thêm môn thì càng lệch.
 
-**Cách trả (chưa làm):** đổi KIẾN TRÚC, không đổi cách import. Vấn đề thật là
-`ReviewScreen` render CẢ 40 câu cùng lúc trong client state. Hai hướng đáng đo:
-ảo hoá danh sách (chỉ mount câu trong khung nhìn), hoặc tách chế độ XEM thành
-cây server render sẵn và chỉ mount editor client cho ĐÚNG câu đang sửa. Cả hai
-đều là việc riêng — đừng làm chung với việc khác.
+**Cách trả (chưa làm, và cần engineer chốt SẢN PHẨM trước khi chốt mã):**
+câu hỏi thật không phải "thêm tín hiệu môn thế nào" mà "gợi ý đề nên phục vụ
+điều gì" — ôn lại chỗ yếu, hay khám phá đề mới? Hai đáp án dẫn tới hai thuật
+toán khác nhau, và khoá `band` hiện tại đang trả lời "khám phá đề mới".
+Ba việc, làm được độc lập:
+  1. Nối `user_skill_mastery` → điểm yếu theo MÔN, thành một số hạng trong
+     `affinity`. Rẻ nhất, không đụng `band`.
+  2. Xét lại `band`: có nên cho một đề đã làm điểm rất thấp vượt lên trên đề
+     chưa làm không. Đây là câu hỏi sản phẩm, không phải câu hỏi kỹ thuật.
+  3. Bật lại tầng "độ khó cộng đồng" — nó bị tắt vì 0 đề đạt `rating_count >= 3`
+     hồi 2026-08-16; kiểm lại xem điều kiện đó còn đúng không.
+Trọng số nằm sẵn ở `lib/adaptive/constants.ts`, đã có tên và có ghi chú — thêm
+một số hạng là diff nhỏ. Phần khó là quyết định, không phải mã.
 
 ### TD-013 — Không có rate limit nào cho lưu lượng CHƯA đăng nhập
 **Từ:** 2026-08-07 (tách ra khi trả TD-008; trước đó nằm lẫn trong mục đó)
@@ -197,7 +222,68 @@ một lần chạy lại toàn file trên DB có dữ liệu đại diện, mớ
 
 ## Đã trả
 
-### ~~TD-023 — Hai route vẫn vượt ngân sách JS~~ (trả NỬA: màn LÀM BÀI)
+### ~~TD-027 — Màn SỬA ĐỀ vẫn 356 KB JS~~
+**Trả:** 2026-08-27 — cùng ngày mở. Mở lúc sáng vì một hướng đi bị số đo bác
+bỏ; trả lúc chiều bằng hướng thứ hai. Cả hai lượt đều đo trên deploy THẬT.
+
+**Số đo trên PRODUCTION, CÙNG một URL** (`/me/exams/ugc-89de5937…`, đề 40 câu —
+đúng URL đã cho ra con số 354.3 KB của mốc gốc), máy tầm trung (CPU ×4 + slow
+4G), 3 lượt:
+
+| | mốc gốc | thử `next/dynamic` (đã gỡ) | **nay** |
+|---|---|---|---|
+| JS tải về | 354.3 KB br | 356.2 KB | **230.2 KB** (−124.1, **−35%**) |
+| chunk >100KB ở lượt tải đầu | có (126.3 KB) | có | **KHÔNG CÓ** |
+| TBT | 404ms | 460ms | **346ms** |
+| LCP | 3668ms | 3632ms | 3640ms (đứng yên) |
+| CLS | — | — | 0 |
+
+**Byte là bằng chứng cứng** (phép đếm tất định qua Resource Timing). **TBT thì
+đọc dè chừng**: 404ms là số của một PHIÊN ĐO KHÁC, nên −58ms nằm trong vùng mà
+nhiễu giữa hai phiên còn nói được chuyện. Đừng trích nó như một thắng lợi
+14% — thắng lợi thật ở đây là byte, và là chuyện dưới đây.
+
+**Thứ đáng giá hơn cả con số: byte của route nay ĐỘC LẬP với số câu hỏi.**
+Đo bốn đề khác nhau, tất cả đều ra **230.2 KB**: 5 câu, 18 câu, 22 câu, 40 câu.
+Trước đây mỗi câu đều kéo theo phần render markdown+KaTeX vào cây client, nên
+đề càng dài trang càng nặng — tức món nợ tự lớn lên theo nội dung người dùng
+tải lên. Nay nó là hằng số.
+
+**Cách làm — đổi KIẾN TRÚC, không đổi cách import:**
+  - `renderReviewNodes()` (server, `_components/reviewNodes.tsx`) render sẵn
+    nội dung mọi câu. Node đi xuống client dưới dạng phần tử host trong RSC
+    payload — client hydrate được mà KHÔNG cần một dòng mã nào của
+    react-markdown/KaTeX. Đúng cơ chế TD-023 đã chứng minh ở màn làm bài.
+  - CHỈ chuỗi tác giả VỪA SỬA mới cần `RichText` ở client, nạp động với
+    `ssr: false`. Ở đây `ssr: false` KHÔNG phải cái bẫy "trang trống rồi mới có
+    chữ" mà TD-023 cảnh báo, vì lượt tải đầu không bao giờ đi vào nhánh đó:
+    state khởi tạo TỪ `initialExam` — đúng thứ server vừa render — nên mọi chuỗi
+    đều khớp. Muốn chuỗi khác đi thì tác giả PHẢI bấm "Sửa" trước, và cú bấm đó
+    hâm nóng chunk. Đo được đúng như thiết kế: bấm "Sửa" → +126.3 KB, đúng một
+    chunk, đúng lúc đó.
+  - `RenderedText` giữ `source` NGAY CẠNH `node`, nên phép kiểm "node này còn
+    dùng được không" là một so sánh cục bộ tại chỗ hiển thị. Không có cờ dirty
+    nào phải xuyên ba tầng component — tức không có trạng thái thứ hai để lệch
+    pha với `exam`.
+
+**Đã kiểm là CHỮ VẪN HIỆN, không chỉ là byte giảm** — đây là rủi ro thật của
+bản vá này (mất công thức mà không ai báo lỗi, vì vẫn có chữ hiện ra):
+  - đề Hoá 10 (18 câu, 110 dấu `$`) trên prod: **54 node `.katex`**, với 0 byte
+    KaTeX tải về. Đề Sinh 12 (40 câu): 7 node.
+  - HTML server trả về đã chứa sẵn nội dung câu hỏi, bọc trong `<p>` do
+    ReactMarkdown sinh — kiểm bằng cách so chuỗi với body của chính response
+    đầu tiên, trước khi có JS nào chạy.
+  - 7 test ghim CẢ HAI đường (node server / chuỗi vừa sửa), kể cả đường "không
+    có node nào" — nếu nhánh nạp động im lặng trả rỗng thì tác giả mất trắng
+    nội dung câu hỏi, nên nó phải có test riêng.
+
+**Bẫy còn nguyên cho lần sau:** `lib/.../reviewNodes.types.ts` giữ className +
+`reviewNodeKey`, và nó KHÔNG được phép import `RichText`. Lý do không phải
+"cho gọn": component client cần className, và nếu chúng lấy className từ file
+có `RichText` thì 126.3 KB quay lại bundle, im lặng, không cổng nào bắt được —
+đúng như TD-021 đã đo (một import tĩnh sót lại là route đứng nguyên 181.8K).
+
+### ~~TD-023 — Hai route vẫn vượt ngân sách JS~~ (trả CẢ HAI: xem TD-027 cho nửa sau)
 **Trả:** 2026-08-27 — màn làm bài. Màn SỬA ĐỀ **không trả được bằng cách này**,
 tách thành **TD-027** ở phần "Đang mở" kèm số đo chứng minh.
 **Verify:** `next build` thật + đọc `page_client-reference-manifest.js` từng route.

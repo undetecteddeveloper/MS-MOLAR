@@ -10,6 +10,16 @@
 // phân biệt được các đề hôm nay. Chi tiết + điều kiện bật lại từng tầng: PRD
 // mục "Release partition".
 //
+// ⚠ TIỀN ĐỀ Ở ĐOẠN TRÊN ĐÃ HẾT HẠN — ĐỌC TD-028 TRƯỚC KHI TIN NÓ (2026-08-27) ⚠
+// Câu "3 đề published đều là Toán" đúng vào 2026-08-16 và KHÔNG còn đúng nữa.
+// Đo lại prod 2026-08-27: 6 đề published, 4 MÔN (Toán 3, Hoá 1, Sinh 1, Lý 1),
+// 4 lớp (8/10/11/12). Tức lý do DUY NHẤT để bỏ tín hiệu môn đã biến mất, và
+// hàm này nay xếp hạng mà không biết gì về môn — học sinh yếu một môn không
+// được đẩy đề môn đó lên, và vì `band` là khoá cứng thì đề họ ĐÃ làm (kể cả
+// làm điểm thấp) còn bị đẩy xuống DƯỚI mọi đề chưa làm của môn khác.
+// Đây là hành vi ĐÚNG theo PRD AC-019/D5, không phải bug — nhưng nó dựa trên
+// một quan sát về kho đề đã cũ 11 ngày. TD-028 ghi đủ số đo và ba hướng sửa.
+//
 // Hàm THUẦN, cùng quy ước với recommendNextSkill() (route.ts:5-8): mọi state
 // được tiêm vào, KHÔNG đọc Date.now(), KHÔNG đọc biến module, KHÔNG I/O, sort
 // trên bản sao. Nhờ vậy nó chạy được ở mỗi lần render mà không cần cache.
