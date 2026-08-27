@@ -18,154 +18,20 @@ còn nơi nào khác giữ lịch sử nợ ngoài chính file này.)*
 
 ## Đang mở
 
-### TD-026 — Không có phân trang thật; mọi danh sách vẫn đọc một lượt tới trần
-**Từ:** 2026-08-17 (tách ra khi làm P3 — phần PHÁT HIỆN đã xong, phần PHÂN TRANG chưa)
-**Loại:** hiệu năng + đúng đắn dữ liệu, chặn bởi một quyết định thiết kế chưa có
-
-12 lệnh đọc danh sách trong 4 file `queries.ts` không có `.limit()`/`.range()`
-nào (audit 2026-08-15 đếm 17 lời gọi `.from()`; 12 trong số đó là đọc DANH SÁCH
-thật, phần còn lại bị chặn sẵn bởi `maybeSingle()`/`.in(question_ids)`/`count
-head`). Đánh giá lúc đó là "để yên": đo được `listExams` 150ms, chi phí để yên
-nhỏ hơn chi phí sửa. Đánh giá đó ĐÚNG về độ trễ và bỏ sót kiểu hỏng thật —
-`max_rows` của PostgREST cắt danh sách ở đúng trần, status 200, không error,
-không cảnh báo.
-
-**Đã trả PHẦN PHÁT HIỆN (2026-08-17)** — `lib/supabase/boundedRead.ts`:
-- `POSTGREST_MAX_ROWS = 1000`, **đo qua Management API trên CẢ HAI project**
-  (prod `pebjdlbgbmizgfpuptjl`, dev `hynwleaxtbtjzkvpjsug` — cùng giá trị). Hỏi
-  cả hai chứ không một, đúng bài học TD-005.
-- `LIST_ROW_CEILING = 500` + **dòng mồi**: mỗi lệnh đọc xin `501` dòng, dòng thứ
-  501 không bao giờ đi vào kết quả — sự tồn tại của nó là bằng chứng duy nhất
-  rằng dữ liệu đã vượt trần khai. Nhận đủ mồi → `console.error` kèm tên query.
-- Vì sao dòng mồi chứ không so `rows.length === max_rows`: cách sau không phân
-  biệt được "đúng 1000 dòng thật" với "bị cắt ở 1000", và nó phụ thuộc vào việc
-  hằng số trong repo còn khớp cấu hình PostgREST — thứ đổi được từ dashboard
-  Supabase mà không ai phải sửa một dòng code nào.
-- Fail-OPEN (trả 500 dòng đầu, không throw) — cùng lập luận TD-009: một danh
-  sách thiếu dòng mà làm sập cả trang là đổi hỏng hóc cục bộ lấy sự cố toàn site.
-
-Số đo prod lúc trả: 6 đề published · 8 đề tổng · 154 câu hỏi · 53 lượt làm bài ·
-3 dòng kết quả · 20 skill node / 15 cạnh. Tức dư địa ~3 bậc độ lớn, và **đó là
-lý do món nợ này nguy hiểm chứ không phải lý do bỏ qua nó**: nó chỉ nổ khi site
-bắt đầu có người dùng, tức đúng lúc tệ nhất, và nổ trong im lặng.
-
-**VÌ SAO MỤC NÀY CHƯA XOÁ:** cái vừa dựng là cơ chế PHÁT HIỆN, không phải phân
-trang. Không có `?page`, không có cursor, không có UI. Nó trả lời đúng một câu —
-"danh sách này có đang bị cắt cụt không?" — và im lặng về câu còn lại: "làm sao
-người dùng xem được phần còn lại".
-
-**Vì sao chưa trả ngay:** phân trang cho `/exams` VA CHẠM với ADR-0015. Xếp hạng
-cá nhân hoá cần TOÀN BỘ tập ứng viên để rank (`rankExamIds` nhận `candidates`
-rồi mới sinh thứ tự), nên phân trang DB-side sẽ phá chính thứ tự mà ADR-0015
-dựng ra. Ba đường đi, mỗi đường đổi một cam kết khác nhau: rank-rồi-cắt (giữ
-thứ tự, không giảm tải DB), cắt-rồi-rank (giảm tải, thứ tự sai theo trang), hay
-chuyển hẳn ranking xuống SQL (đúng cả hai, viết lại nhiều nhất). Chọn bừa một
-trong ba rồi viết code là cách chắc chắn phải viết lại — cùng hình dạng với lý
-do TD-022 chưa trả.
-
-**Sẽ nổ thế nào nếu quên:** khi một danh sách vượt 500 dòng, `console.error` nổ
-trong log Vercel và KHÔNG có gì khác xảy ra — người dùng vẫn thấy một danh sách
-trông hoàn chỉnh, thiếu phần cuối. Cổng này chỉ có giá trị KHI CÓ NGƯỜI ĐỌC LOG;
-nó biến một sự cố vô hình thành một sự cố nhìn thấy được, nó không tự sửa gì cả.
-
-**Cách trả:** quyết định một trong ba đường trên cho `/exams` trước (đó là danh
-sách duy nhất lớn theo nội dung TOÀN CỤC, nên nó chạm trần trước tiên), rồi mới
-tới các danh sách theo-user (`listMyHistory`, `listMyExams`) — chúng lớn chậm
-hơn hẳn và không vướng ranking.
-
-### TD-025 — Không có cổng nào xác nhận CSS/JS đã DEPLOY THẬT khớp với build cục bộ
-**Từ:** 2026-08-17 (tách ra khi trả TD-024 — bản thân sự cố đã sửa, nhưng lỗ hổng quy trình để nó lọt qua vẫn còn nguyên)
-**Loại:** khoảng trống quy trình verify, đã có bằng chứng nổ thật một lần
-
-TD-024 là một khối CSS thuần (không qua class Tailwind) thêm vào cuối
-`globals.css`, biến mất hoàn toàn khỏi bundle CSS mà Vercel build ra — trong
-khi `next build` chạy trên đúng commit đó ở máy local lại cho kết quả đúng.
-Cả **5 cổng verify chuẩn của dự án** (`tsc --noEmit`, `eslint --max-warnings
-0`, `vitest run`, `next build`, `check:bundle`) đều XANH trước khi ship, vì
-không cổng nào trong số đó hỏi câu "asset đã lên Vercel thật có khớp asset
-build local không" — tất cả chỉ kiểm cục bộ. Đây là hình dạng TD-005 (schema
-DB lệch giữa local/deploy) lặp lại ở một TẦNG KHÁC: build artifact tĩnh
-(CSS/JS) thay vì database.
-
-**Sẽ nổ thế nào:** một CSS/JS thay đổi khác (không nhất thiết dạng CSS thuần
-cuối file — chưa xác định được chính xác điều kiện kích hoạt bug build cache
-này) lên production mà không ai biết, cho tới khi người dùng thật báo lại một
-hiện tượng nhìn như bug UI (English: visual bug) — đúng như TD-024 đã xảy ra:
-5 cổng xanh, `next build` local sạch, nhưng người dùng thấy trang hỏng. Không
-có log, không có cảnh báo nào tự nổi lên — chỉ phát hiện được bằng cách chủ
-động tải trang production thật rồi so `getComputedStyle`/nội dung file CSS đã
-deploy với source.
-
-**Vì sao chưa trả ngay:** nguyên nhân gốc (vì sao Vercel build cache không phát
-hiện đúng thay đổi CSS thuần nằm cuối file) chưa xác định được — TD-024 sửa
-bằng cách buộc nội dung file đổi thật để né cache, không phải bằng cách hiểu
-đúng cơ chế cache của Turbopack trên Vercel. Không có API nào (kể cả qua
-Composio) lộ tham số "bỏ qua build cache" cho lượt deploy, nên không kiểm
-chứng được giả thuyết bằng cách tắt cache rồi build lại.
-
-**Cách trả (chưa làm):** thêm một bước `curl` kiểm CSS/JS đã deploy thật
-(so nội dung hoặc chỉ tra `grep` một class/rule mới thêm) vào quy trình sau
-mỗi lần ship UI có đụng `globals.css` hoặc thêm asset tĩnh mới — làm thủ công
-trước, rồi cân nhắc script hoá nếu tái diễn đủ nhiều lần để đáng công.
-
-### TD-022 — Không có ngân sách Gemini ở mức PROJECT, chỉ có trần theo từng user
-**Từ:** 2026-08-17 (tách ra khi trả TD-019 — phần TD-019 không trả được)
-**Loại:** phòng thủ đúng tầng nhưng thiếu một tầng, chặn bởi thiết kế
-
-TD-019 đã bịt đường vét hạn ngạch KHÔNG GIỚI HẠN. Phần còn lại KHÔNG cùng một
-bài toán: mọi trần hiện có đều khoá theo `user.id`, nên chúng bó được MỘT tài
-khoản chứ không bó được TỔNG. Số đo cụ thể: sau TD-019, một tài khoản tiêu tối
-đa 18 request Gemini/ngày (explainStep 3×1 + uploadExam 5×3) trên hạn ngạch
-**20 request/ngày cho CẢ project** (`GenerateRequestsPerDayPerProjectPerModel-FreeTier`,
-đọc từ thân phản hồi 429). Nghĩa là **2 tài khoản dùng hết phần mình là hết sạch
-hạn ngạch của mọi người** — hoàn toàn hợp lệ, không ai vượt trần nào.
-
-**Sẽ nổ thế nào:** không phải lỗi sai kết quả mà là tính năng tắt lịm giữa ngày.
-Người thứ ba bấm "Giải thích bước này" nhận lỗi 429 dù chưa dùng lượt nào của
-mình; tác giả thứ ba upload đề thì pipeline chết ở stage 5. Không mã lỗi nào chỉ
-về đúng nguyên nhân ("người khác đã dùng hết"), nên người sau sẽ đi debug nhầm
-hướng — đúng hình dạng TD-009: fail-closed im lặng.
-
-**Vì sao chưa trả ngay:** trần theo user đếm được bằng một khoá có sẵn; ngân sách
-project cần một bộ đếm CHUNG không theo user (khoá kiểu `gemini:project:<ngày>`)
-và, quan trọng hơn, cần một QUYẾT ĐỊNH sản phẩm cho lúc cạn ngân sách — xếp hàng,
-từ chối, hay hạ cấp sang đường không-AI. Chọn bừa một trong ba rồi viết code là
-cách chắc chắn phải viết lại. Bộ đếm chung đã có sẵn hạ tầng (`rateLimitStore.ts`,
-Upstash cùng region), nên phần thiếu là thiết kế chứ không phải công cụ.
-
-**Cách trả:** hoặc nâng hạn ngạch Gemini lên gói trả phí (làm số 20 hết là ràng
-buộc chính), hoặc thêm bộ đếm mức project + đường hạ cấp. Ghi chú sẵn trong
-`RATE_LIMITS.explainStep`: các trần này rồi sẽ đọc từ gói thuê bao của người dùng
-chứ không còn là hằng số chung — khi đó TD-022 nên được trả CÙNG lúc, không phải
-trước đó.
-
-### TD-023 — Hai route vẫn vượt ngân sách JS, và lý do là bản chất chứ không phải sơ suất
-**Từ:** 2026-08-17 (đo khi trả TD-021)
-**Loại:** hiệu năng, đã đo, chưa có cách sửa rẻ
-
-Sau TD-021, còn đúng hai route vượt ngưỡng ~170 KB gzip (First Load JS, ngân sách
-JS di động tiêu chuẩn) — đo trên bản `next build` thật:
-- `/me/exams/[id]` — **188.4 KB gzip** (620.0 KB raw), màn sửa đề của tác giả.
-- `/exams/[id]/attempt/[attemptId]` — **185.6 KB gzip** (606.2 KB raw), màn LÀM BÀI.
-
-Cả hai vượt vì cùng một chunk markdown+KaTeX 122.5 KB gzip mà TD-021 đã gỡ được
-khỏi route Chi tiết kết quả. Ở đây KHÔNG gỡ được bằng cùng cách: `ExamPlayer` và
-`QuestionEditor` là component client thật (state làm bài, ô nhập, timer), nên nội
-dung câu hỏi buộc phải render được ở client. Nạp động cũng không cứu: khác với
-bảng gợi ý của gia sư (chỉ hiện sau khi người dùng CHỦ ĐỘNG bấm), nội dung câu
-hỏi là thứ phải có NGAY — nạp động chỉ đổi "tải chậm" thành "trang trống rồi mới
-có chữ".
-
-**Sẽ nổ thế nào:** không nổ, nó chỉ chậm — và chậm đúng ở màn quan trọng nhất,
-với đúng nhóm người dùng yếu thế nhất (học sinh dùng 3G/máy tầm thấp). ~200ms
-parse/compile thêm trên máy tầm trung, trước khi bài thi tương tác được.
-
-**Cách trả (chưa làm, cần đo trước khi tin):** tách phần hiển thị câu hỏi thành
-server component rồi truyền xuống client component qua `children` — RSC cho phép
-đúng việc này, và TD-021 đã dọn sẵn nửa đường (RichText nay render được ở server).
-Việc còn lại là dựng lại ranh giới của ExamPlayer/QuestionEditor sao cho state làm
-bài không cần sở hữu cây nội dung. Đây là đổi kiến trúc component, không phải một
-dòng config — đừng làm chung với một việc khác.
+> **2026-08-27 — hai mục dưới đây còn mở LÀ DO ENGINEER QUYẾT ĐỊNH, không phải
+> do chưa ai đụng tới.** Cả hai bị chặn bởi một khoản chi hoặc một credential mà
+> chỉ engineer cấp được; khi được hỏi thẳng trong phiên đó, engineer chọn "để
+> mở". Ghi lại vì nếu không thì phiên sau sẽ đọc chúng như việc bị bỏ quên rồi đi
+> làm lại đúng cuộc thảo luận này.
+>
+> - **TD-013**: đã kê 4 đường (Upstash chặn theo IP trong `proxy.ts` — $0, ship
+>   được ngay, nhưng function đã bị gọi rồi mới từ chối được / Cloudflare free —
+>   $0, chặn ở biên thật, đổi DNS / Vercel Pro ~$20/tháng — cấu hình thuần / để
+>   mở). Chọn: **để mở**.
+> - **TD-005**: đã kê 3 đường (dựng Supabase CLI migrations kèm mật khẩu DB cả
+>   hai project / chỉ scaffold + runbook, engineer tự chạy / để mở). Chọn: **để
+>   mở** — cơ chế PHÁT HIỆN lệch (fingerprint `schema_version` + test CI + check
+>   lúc khởi động) vẫn đang chạy và vẫn bắt được drift.
 
 ### TD-013 — Không có rate limit nào cho lưu lượng CHƯA đăng nhập
 **Từ:** 2026-08-07 (tách ra khi trả TD-008; trước đó nằm lẫn trong mục đó)
@@ -284,6 +150,147 @@ một lần chạy lại toàn file trên DB có dữ liệu đại diện, mớ
 ---
 
 ## Đã trả
+
+### ~~TD-023 — Hai route vẫn vượt ngân sách JS~~
+**Trả:** 2026-08-27
+**Verify:** `next build` thật + đọc `page_client-reference-manifest.js` từng route.
+
+**Số đo LẠI trên PRODUCTION trước khi sửa** (máy tầm trung, 4× CPU throttle +
+slow 4G, 3 lượt/route lấy trung vị, `https://ms-molar.vercel.app`) — và số đo
+này SỬA LẠI tiền đề của chính mục TD-023 cũ:
+
+TD-023 viết "còn ĐÚNG HAI route vượt ngưỡng ~170 KB". Sai. Đo bằng JS THẬT SỰ
+TẢI VỀ (Resource Timing `encodedBodySize`, tức byte đã nén br mà trình duyệt
+thật nhận) thì **MỌI route đều vượt** — nền chung đã là 205 KB br, đo ở
+`/terms`, một trang chỉ có chữ. Con số 188.4/185.6 KB cũ là "First Load JS" của
+`next build` (gzip, cách đếm khác), không phải thứ người dùng tải.
+
+| Route | JS tải về (br) | LCP | INP (max) | TBT | CLS |
+|---|---|---|---|---|---|
+| `/me/exams/[id]` (sửa đề) | 354.3 KB | 5.1s | 2544ms | 2388ms | 0 |
+| `/exams/[id]/attempt/[attemptId]` (làm bài) | 351.8 KB | 3.7s | 328ms | 1591ms | 0 |
+| nền chung (`/terms`) | 205.4 KB | 2.3s | 128ms | 343ms | 0 |
+
+Cả hai route nặng nhất vượt vì CÙNG một chunk markdown+KaTeX **126.3 KB br**
+(`0k3qsrq5-u33w.js`) — đúng chunk mà TD-021 đã gỡ được khỏi `/result/detail`.
+
+**Đã trả bằng HAI cách khác nhau, vì hai route KHÔNG cùng một bài toán** — và
+đây là chỗ mục TD-023 cũ đoán chưa đúng khi kê một cách chung cho cả hai:
+
+- **Màn LÀM BÀI** — dùng đúng cách TD-023 đề xuất: render nội dung câu hỏi ở
+  SERVER (`app/(layer2)/_components/questionNodes.tsx`) rồi truyền phần tử
+  React xuống `ExamPlayer`/`QuestionRenderer`/`AnswerChoice`. Làm được vì nội
+  dung câu hỏi BẤT BIẾN trong suốt một lượt làm bài. Server giao đủ N câu một
+  lần (client mới biết `current`, server không).
+- **Màn SỬA ĐỀ** — KHÔNG làm được như trên, và lý do là bản chất: tác giả sửa
+  chính chuỗi nguồn đó, nên node render sẵn ôi ngay lần sửa đầu tiên. Dùng
+  `next/dynamic` GIỮ `ssr` mặc định: cả 5 chỗ dùng `RichText` đều nằm trong
+  nhánh XEM (`editing === false`) — chế độ SỬA là input/textarea chuỗi nguồn,
+  không có preview trực tiếp — nên nội dung vẫn render ở server và có mặt trong
+  HTML đầu tiên; `dynamic` chỉ đẩy 126 KB ra khỏi đường hydrate ban đầu.
+  `ssr: false` ở đây sẽ là "trang trống rồi mới có chữ", đúng cái bẫy TD-023
+  cảnh báo.
+
+**Kết quả đo trên build thật** (chunk client mà mỗi route THAM CHIẾU, br):
+`/me/exams/[id]` **169.9 → 68.7 KB** (−101.2 KB, −60%); route làm bài không còn
+tham chiếu chunk markdown+KaTeX nữa (nay là chunk nạp động của riêng màn sửa đề).
+
+**Vì sao mục này KHÔNG để lại phần dư:** nền chung 205 KB br là React 19 +
+runtime Next 16 + app shell, không phải thứ gỡ được bằng ranh giới component.
+Muốn hạ tiếp thì đó là một quyết định về FRAMEWORK, không phải một món nợ.
+
+### ~~TD-025 — Không có cổng nào xác nhận CSS/JS đã DEPLOY THẬT khớp với build cục bộ~~
+**Trả:** 2026-08-27
+**Verify:** chạy CẢ HAI CHIỀU — xanh với bản deploy khớp, ĐỎ khi tiêm một khối
+CSS hình dạng TD-024 vào artifact cục bộ rồi chạy lại.
+
+`npm run verify:deployed -- <base-url>` (`scripts/verify-deployed-assets.mjs`).
+
+**Nó so cái gì:** không phải hash file. Vercel build trên hạ tầng của nó nên tên
+chunk và byte KHÔNG BAO GIỜ khớp `.next-build` cục bộ, kể cả khi mọi thứ đúng —
+một cổng đỏ 100% số lần là một cổng bị tắt trong tuần đầu. Thứ so được là NỘI
+DUNG NGỮ NGHĨA: mỗi biến CSS khai báo (`--foo:`) và mỗi class selector mà build
+cục bộ sinh ra, bản deploy phải có đủ.
+
+**Phép so là ĐỘ PHỦ THEO TỪNG FILE, và đó là bài học từ chính lần chạy đầu:**
+gộp toàn bộ CSS cục bộ rồi so với CSS của mấy route công khai cho ra 139 "class
+thiếu" — tất cả đều là KaTeX, thiếu vì ĐÚNG (KaTeX chỉ nạp ở route có nội dung
+câu hỏi). Nên mỗi file chỉ có hai trạng thái hợp lệ: không được nạp (độ phủ ≤2%
+→ bỏ qua) hoặc được nạp (phải ĐỦ TUYỆT ĐỐI, thiếu 1 token cũng đỏ). Trạng thái
+thứ ba — nạp một phần — chính là hình dạng TD-024.
+
+**Vì sao ngưỡng "đủ" là 100% chứ không phải 98%:** khối CSS mất tích của TD-024
+là MỘT khối cuối file, vài class trên tổng số hàng trăm → 99.2% độ phủ → xanh →
+trang vẫn hỏng. Một ngưỡng phần trăm ở đây sẽ để lọt đúng bug sinh ra cổng này.
+
+**Chạy khi nào:** sau MỖI lần ship UI có đụng `globals.css` hoặc thêm asset tĩnh
+mới, với URL prod hoặc preview. Cần `.next-build` của ĐÚNG commit đang deploy —
+script tự từ chối nếu không có build cục bộ.
+
+**Phần nó KHÔNG trả:** nguyên nhân gốc (vì sao build cache của Vercel bỏ sót
+thay đổi CSS thuần) vẫn CHƯA xác định được, đúng như TD-025 cũ ghi. Đây là cổng
+PHÁT HIỆN, không phải bản vá. Nó biến một sự cố vô hình thành một sự cố nhìn
+thấy được — nó không sửa gì cả.
+
+### ~~TD-026 — Không có phân trang thật~~
+**Trả:** 2026-08-27 (phần QUYẾT ĐỊNH + phân trang cho `/exams`)
+**Verify:** `lib/exams/__tests__/paginate.test.ts` — 12 case, ghim cả phép số
+học lẫn bất biến "cắt trang KHÔNG sắp xếp lại".
+
+**Quyết định (engineer uỷ quyền 2026-08-27): XẾP HẠNG TRƯỚC RỒI CẮT.**
+`/exams` nay có `?page=`, 12 đề/trang (`lib/exams/paginate.ts`,
+`app/(layer2)/_components/ExamPagination.tsx`).
+
+Vì sao đường này trong ba đường TD-026 kê:
+- **Cắt-rồi-xếp (DB-side `.range()`)** giảm tải DB nhiều nhất và PHÁ ADR-0015:
+  `rankExamIds` chỉ còn nhìn thấy 12 đề của trang hiện tại, nên "xếp hạng cá
+  nhân hoá" thành "xếp hạng trong phạm vi 12 đề tình cờ nằm cạnh nhau". Thứ tự
+  sai theo trang là kiểu hỏng KHÔNG NHÌN RA ĐƯỢC — trang vẫn đầy đề, chỉ là sai
+  đề. Loại.
+- **Ranking xuống SQL** đúng cả hai vế, và là một bản viết lại của thuật toán đã
+  có test, cho một catalog hiện có **8 đề** (đo prod 2026-08-27). Chi phí đi
+  trước nhu cầu.
+- **Xếp-rồi-cắt** giữ ADR-0015 NGUYÊN VẸN: `rankExamIds` vẫn nhận trọn tập ứng
+  viên, thứ tự y hệt trước, phân trang thuần tuý là chuyện TRÌNH BÀY. Không
+  giảm tải DB — đó là cái giá ĐÃ BIẾT, không phải sơ suất.
+
+MỘT ngữ nghĩa phân trang cho CẢ HAI nhánh (`?sort` tường minh lẫn mặc định cá
+nhân hoá), cố ý: hai ngữ nghĩa khác nhau làm tổng số trang nhảy khi người dùng
+đổi kiểu sắp xếp, và không có cách nào giải thích điều đó cho họ.
+
+**⚠ PHẦN CÒN LẠI, đừng đọc nhầm mục này là đã xong hết:** đây KHÔNG phải phân
+trang không giới hạn. `fetchExamRows` vẫn đọc trong biên `LIST_ROW_CEILING`
+(500), nên tập ứng viên — và do đó tổng số trang — bị chặn ở cửa sổ đó. Vượt 500
+đề thì `readBounded` kêu vào log (dòng mồi) và ĐÓ là tín hiệu chuyển sang đường
+SQL, KHÔNG phải để nới hằng số lên. Các danh sách theo-user (`listMyHistory`,
+`listMyExams`) chưa phân trang — chúng lớn chậm hơn hẳn và không vướng ranking,
+đúng thứ tự ưu tiên mà TD-026 cũ đã kê.
+
+### ~~TD-022 — Không có ngân sách Gemini ở mức PROJECT~~
+**Trả:** thực ra đã trả bởi đợt Subscription (commit `72a729d`), SAU khi mục này
+được viết — mục này ĐỨNG SAI suốt từ đó. Xác minh lại 2026-08-27.
+**Verify:** đọc `lib/billing/quota.ts` + cả hai điểm gọi.
+
+Ngân sách mức project ĐÃ TỒN TẠI và làm đúng thứ TD-022 đòi:
+- `ai:budget:{ngày Pacific}` — bộ đếm **KHÔNG theo user**, `INCRBY` bằng đúng SỐ
+  REQUEST Gemini sẽ phát (`geminiCalls` là tham số **BẮT BUỘC, không có giá trị
+  mặc định** — một mặc định `1` tái tạo im lặng chính cái under-count 2–3× mà nó
+  sinh ra để sửa).
+- Cửa sổ theo NGÀY PACIFIC, khớp đơn vị reset của nhà cung cấp.
+- ĐẶT CHỖ trước khi phát request, hoàn lại cả hai bộ đếm khi bị từ chối.
+- `project_budget` là một lý do **PHÂN BIỆT** với `user_quota` — đúng lời phàn
+  nàn cốt lõi của TD-022 ("không mã lỗi nào chỉ về đúng nguyên nhân"). Đường
+  upload nói với người dùng "tạm thời không dùng được", KHÔNG nói "bạn hết
+  lượt", vì nói thế là nói sai (`app/(layer4)/actions.ts`). Telemetry giữ mã
+  phân biệt `project_budget_exhausted` (`lib/billing/quotaTelemetry.ts`).
+- Fail-CLOSED khi Redis không tới được (`unavailable` → từ chối), cố ý KHÔNG
+  thừa kế lớp đệm RAM của `rateLimit.ts` — bộ đếm process-local nhân lên theo số
+  instance nên không bao giờ chặn nổi một ngân sách toàn dự án.
+
+**Bài học ghi lại vì nó sẽ tái diễn:** một món nợ được trả ở một nhánh khác
+(Subscription) mà sổ nợ không ai cập nhật thì nó vẫn "đang mở" trong mắt mọi
+phiên sau — và phiên sau sẽ đi làm lại một việc đã xong. Trả nợ và ĐÓNG SỔ là
+hai việc, không phải một.
 
 ### ~~TD-024 — Overlay "Loading" hiện toàn phần trên MỌI tải trang production, không do bấm gì~~
 **Từ:** 2026-08-17 (engineer báo lại kèm ảnh chụp — overlay "LOADING" phủ kín
