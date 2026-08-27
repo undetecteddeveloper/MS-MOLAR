@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { LanguageToggle } from "@/components/shared/LanguageToggle";
 import { getTranslate } from "@/lib/i18n/server";
-import { GUEST_NAV_ITEMS, NAV_ITEMS } from "@/lib/nav/items";
+import { GUEST_NAV_ITEMS, NAV_ITEMS, navPrefetch } from "@/lib/nav/items";
 import type { MessageKey } from "@/lib/i18n/translate";
 import { SidebarProfile } from "./SidebarProfile";
 
@@ -49,6 +49,12 @@ export async function HomeSidebar({
             <Link
               key={item.key}
               href={item.href}
+              // Khách chưa đăng nhập KHÔNG prefetch đích sau-đăng-nhập: mỗi
+              // lượt như vậy là một 307 rồi trình duyệt ĐI THEO redirect sang
+              // `/?auth=signin` — một lượt render server bỏ đi (xem
+              // `navPrefetch`). Sidebar này là nav CHÍNH của trang chủ, tức
+              // đúng chỗ khách gặp đầu tiên.
+              prefetch={navPrefetch(item, Boolean(user))}
               aria-current={isActive ? "page" : undefined}
               className={[
                 // Highlight CHỮ đỏ son (engineer chốt — không thêm bg cho tag);

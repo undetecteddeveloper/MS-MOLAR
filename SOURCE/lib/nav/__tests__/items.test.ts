@@ -17,6 +17,8 @@
 // @category: core-functionality
 // @dependency: none — hai hằng số thuần, không I/O
 
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { GUEST_NAV_ITEMS, NAV_ITEMS, navPrefetch } from "../items";
 import { PUBLIC_PATHS } from "@/lib/supabase/middleware";
@@ -52,6 +54,66 @@ describe("NAV_ITEMS.guarded khớp PUBLIC_PATHS", () => {
       "/history",
       "/upload",
     ]);
+  });
+});
+
+describe("mọi thanh điều hướng đều đi qua navPrefetch", () => {
+  // ĐÂY LÀ MỘT TEST QUÉT MÃ NGUỒN, và nó tồn tại vì một lỗi thật.
+  //
+  // Bản vá prefetch đầu tiên (2026-08-27) sửa SiteHeader + BottomNav rồi coi
+  // như xong — đo lại trên preview thì lãng phí VẪN NGUYÊN, vì trang chủ dùng
+  // một nav THỨ BA (`HomeSidebar`) cũng đọc cùng danh sách. Đúng cái bệnh mà
+  // `lib/nav/items.ts` ra đời để chữa: danh sách thì gộp được về một chỗ,
+  // nhưng CÁCH DÙNG nó thì vẫn nằm rải rác ở từng component.
+  //
+  // Kiểm bằng render thì phải dựng ba component với ba bộ prop khác nhau và
+  // vẫn sót component thứ tư khi ai đó thêm nó. Quét nguồn thì bắt được đúng
+  // câu hỏi cần hỏi: "có file nào render NAV_ITEMS mà không hỏi navPrefetch
+  // không?"
+  const roots = ["app", "components"];
+
+  function walk(dir: string): string[] {
+    return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+      const p = join(dir, e.name);
+      if (e.isDirectory()) return e.name === "__tests__" ? [] : walk(p);
+      return p.endsWith(".tsx") || p.endsWith(".ts") ? [p] : [];
+    });
+  }
+
+  it("không file nào render danh sách nav mà bỏ qua navPrefetch", () => {
+    const offenders: string[] = [];
+
+    for (const root of roots) {
+      for (const file of walk(root)) {
+        const src = readFileSync(file, "utf8");
+        // Chỉ quan tâm file THỰC SỰ import danh sách rồi map ra <Link>.
+        const importsList = /import\s*\{[^}]*\b(NAV_ITEMS|GUEST_NAV_ITEMS)\b[^}]*\}\s*from\s*["']@\/lib\/nav\/items["']/.test(
+          src
+        );
+        if (!importsList) continue;
+        if (!src.includes("<Link")) continue;
+        if (!src.includes("navPrefetch")) offenders.push(file.replace(/\\/g, "/"));
+      }
+    }
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("quét thật sự tìm thấy các nav đang có — nếu 0 file thì phép quét đã hỏng", () => {
+    // Không có mục này thì một regex gõ sai sẽ cho ra "0 file vi phạm" và test
+    // trên xanh vĩnh viễn trong khi nó không còn kiểm gì cả.
+    const navFiles = roots
+      .flatMap((r) => walk(r))
+      .filter((f) => {
+        const src = readFileSync(f, "utf8");
+        return (
+          /import\s*\{[^}]*\b(NAV_ITEMS|GUEST_NAV_ITEMS)\b[^}]*\}\s*from\s*["']@\/lib\/nav\/items["']/.test(
+            src
+          ) && src.includes("<Link")
+        );
+      });
+
+    expect(navFiles.length).toBeGreaterThanOrEqual(3);
   });
 });
 
