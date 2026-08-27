@@ -18,11 +18,14 @@ còn nơi nào khác giữ lịch sử nợ ngoài chính file này.)*
 
 ## Đang mở
 
-> **2026-08-27 — hai mục dưới đây còn mở LÀ DO ENGINEER QUYẾT ĐỊNH, không phải
+> **2026-08-27 — TD-013 và TD-005 còn mở LÀ DO ENGINEER QUYẾT ĐỊNH, không phải
 > do chưa ai đụng tới.** Cả hai bị chặn bởi một khoản chi hoặc một credential mà
 > chỉ engineer cấp được; khi được hỏi thẳng trong phiên đó, engineer chọn "để
 > mở". Ghi lại vì nếu không thì phiên sau sẽ đọc chúng như việc bị bỏ quên rồi đi
 > làm lại đúng cuộc thảo luận này.
+>
+> **TD-027 thì khác** — nó mở vì đã THỬ một hướng, ĐO, và hướng đó không hiệu
+> quả. Số đo phủ định nằm ngay trong mục; đọc trước khi thử lại cùng cách.
 >
 > - **TD-013**: đã kê 4 đường (Upstash chặn theo IP trong `proxy.ts` — $0, ship
 >   được ngay, nhưng function đã bị gọi rồi mới từ chối được / Cloudflare free —
@@ -32,6 +35,49 @@ còn nơi nào khác giữ lịch sử nợ ngoài chính file này.)*
 >   hai project / chỉ scaffold + runbook, engineer tự chạy / để mở). Chọn: **để
 >   mở** — cơ chế PHÁT HIỆN lệch (fingerprint `schema_version` + test CI + check
 >   lúc khởi động) vẫn đang chạy và vẫn bắt được drift.
+
+### TD-027 — Màn SỬA ĐỀ vẫn 356 KB JS, và `next/dynamic` KHÔNG phải cách chữa
+**Từ:** 2026-08-27 (tách ra khi trả nửa TD-023 — nửa này đã thử, đã đo, đã gỡ)
+**Loại:** hiệu năng, đã có số đo phủ định một hướng đi
+
+`/me/exams/[id]` là route nặng nhất site: **356.2 KB br** JS tải về, trong đó
+**126.3 KB** là chunk markdown+KaTeX — cùng chunk mà TD-021 gỡ khỏi
+`/result/detail` và TD-023 vừa gỡ khỏi màn làm bài.
+
+**KHÔNG gỡ được bằng cách của màn làm bài** (server render sẵn rồi truyền node
+xuống): tác giả SỬA được chính chuỗi nguồn đó, nên node render sẵn ôi ngay ở
+lần sửa đầu tiên. Đây là khác biệt bản chất, không phải chuyện chưa ai làm.
+
+**ĐÃ THỬ `next/dynamic` (giữ `ssr` mặc định) VÀ ĐÃ ĐO TRÊN PRODUCTION —
+KHÔNG ĐƯỢC GÌ. Đã revert:**
+
+| | trước | sau `next/dynamic` |
+|---|---|---|
+| JS tải về | 354.3 KB br | **356.2 KB** (nhích LÊN, thêm 1 chunk) |
+| TBT | 404ms | **460ms** (nhích LÊN) |
+| LCP | 3668ms | 3632ms (trong sai số) |
+
+Lý do: `next/dynamic` với `ssr` mặc định chỉ đưa chunk ra khỏi danh sách chunk
+EAGER của route. Trình duyệt VẪN phải nạp nó để HYDRATE đúng cây mà server đã
+render. Đổi lại nhận thêm một ranh giới Suspense và ba test phải chuyển sang
+`waitFor`. `ssr: false` thì càng tệ — thành "trang trống rồi mới có chữ".
+
+**BÀI HỌC VỀ PHÉP ĐO, quan trọng hơn cả món nợ:** manifest báo
+`169.9 → 68.7 KB (−60%)` và con số đó LÀ THẬT — nhưng nó đếm thứ
+`page_client-reference-manifest.js` KHAI, không đếm thứ trình duyệt TẢI. Suýt
+nữa thì một "thắng lợi −60%" được ghi vào sổ trong khi route không đổi gì. Đúng
+khoảng cách giữa "build nói gì" và "người dùng nhận gì" mà TD-025 sinh ra để
+canh — nên **đo byte bằng Resource Timing trên deploy THẬT, đừng tin manifest.**
+
+**Sẽ nổ thế nào nếu quên:** không nổ, nó chỉ chậm — TBT ~460ms trên máy tầm
+trung ở màn mà tác giả phải đọc lại 40 câu trước khi publish. Ít người dùng hơn
+màn làm bài, và họ kiên nhẫn hơn, nên ưu tiên thấp hơn TD-023.
+
+**Cách trả (chưa làm):** đổi KIẾN TRÚC, không đổi cách import. Vấn đề thật là
+`ReviewScreen` render CẢ 40 câu cùng lúc trong client state. Hai hướng đáng đo:
+ảo hoá danh sách (chỉ mount câu trong khung nhìn), hoặc tách chế độ XEM thành
+cây server render sẵn và chỉ mount editor client cho ĐÚNG câu đang sửa. Cả hai
+đều là việc riêng — đừng làm chung với việc khác.
 
 ### TD-013 — Không có rate limit nào cho lưu lượng CHƯA đăng nhập
 **Từ:** 2026-08-07 (tách ra khi trả TD-008; trước đó nằm lẫn trong mục đó)
@@ -151,8 +197,9 @@ một lần chạy lại toàn file trên DB có dữ liệu đại diện, mớ
 
 ## Đã trả
 
-### ~~TD-023 — Hai route vẫn vượt ngân sách JS~~
-**Trả:** 2026-08-27
+### ~~TD-023 — Hai route vẫn vượt ngân sách JS~~ (trả NỬA: màn LÀM BÀI)
+**Trả:** 2026-08-27 — màn làm bài. Màn SỬA ĐỀ **không trả được bằng cách này**,
+tách thành **TD-027** ở phần "Đang mở" kèm số đo chứng minh.
 **Verify:** `next build` thật + đọc `page_client-reference-manifest.js` từng route.
 
 **Số đo LẠI trên PRODUCTION trước khi sửa** (máy tầm trung, 4× CPU throttle +
@@ -199,20 +246,18 @@ Cả hai route nặng nhất vượt vì CÙNG một chunk markdown+KaTeX **126.
   React xuống `ExamPlayer`/`QuestionRenderer`/`AnswerChoice`. Làm được vì nội
   dung câu hỏi BẤT BIẾN trong suốt một lượt làm bài. Server giao đủ N câu một
   lần (client mới biết `current`, server không).
-- **Màn SỬA ĐỀ** — KHÔNG làm được như trên, và lý do là bản chất: tác giả sửa
-  chính chuỗi nguồn đó, nên node render sẵn ôi ngay lần sửa đầu tiên. Dùng
-  `next/dynamic` GIỮ `ssr` mặc định: cả 5 chỗ dùng `RichText` đều nằm trong
-  nhánh XEM (`editing === false`) — chế độ SỬA là input/textarea chuỗi nguồn,
-  không có preview trực tiếp — nên nội dung vẫn render ở server và có mặt trong
-  HTML đầu tiên; `dynamic` chỉ đẩy 126 KB ra khỏi đường hydrate ban đầu.
-  `ssr: false` ở đây sẽ là "trang trống rồi mới có chữ", đúng cái bẫy TD-023
-  cảnh báo.
+- **Màn SỬA ĐỀ** — đã THỬ `next/dynamic` và ĐÃ ĐO trên production sau khi
+  deploy: **không được gì cả.** Đã revert. Chi tiết ở TD-027.
 
 **Kết quả — đo hai chỗ, vì mỗi chỗ trả lời một câu khác nhau:**
 
-*Trên build thật* (chunk client mà mỗi route THAM CHIẾU, br): `/me/exams/[id]`
-**169.9 → 68.7 KB** (−101.2 KB, −60%); route làm bài không còn tham chiếu chunk
-markdown+KaTeX nữa (nay là chunk nạp động của riêng màn sửa đề).
+*Trên build thật* (chunk client mà mỗi route THAM CHIẾU, br): route làm bài
+không còn tham chiếu chunk markdown+KaTeX nữa.
+
+⚠ Ở đây suýt lọt một kết luận SAI, ghi lại vì nó rẻ và sẽ tái diễn: manifest
+cũng báo `/me/exams/[id]` **169.9 → 68.7 KB (−60%)**, và con số đó LÀ THẬT
+nhưng ĐO SAI THỨ — nó đếm cái manifest KHAI, không đếm cái trình duyệt TẢI. Đo
+lại trên prod thì route đó **354.3 → 356.2 KB**, tức nhích LÊN. Xem TD-027.
 
 *Trên PREVIEW deploy thật*, đo back-to-back với prod cùng máy cùng điều kiện —
 màn LÀM BÀI:
@@ -225,10 +270,11 @@ màn LÀM BÀI:
 | LCP | 3408ms | 3072ms |
 | CLS | 0.021 | **0** |
 
-Màn SỬA ĐỀ **chưa đo được trên deploy thật**: tài khoản test trên DB dev không
-sở hữu đề nào ở trạng thái sửa được, nên không có URL để tải. Con số của nó là
-con số BUILD (−101.2 KB ở trên) — thật, nhưng là byte tham chiếu, không phải
-byte đã tải. Ai chạm vào route đó lần sau nên đo nốt vế còn lại.
+**Đã xác nhận LẠI trên PRODUCTION sau khi merge** (cùng máy, cùng điều kiện):
+màn làm bài **351.8 → 225.7 KB br**, TBT **512 → 256ms**, và chunk 126.3 KB
+không còn nằm trong danh sách chunk của route. Tức khoản này có thật, đã live.
+
+Màn SỬA ĐỀ: xem TD-027 — cách đã thử không hiệu quả và đã được gỡ bỏ.
 
 **Vì sao mục này KHÔNG để lại phần dư:** nền chung 205 KB br là React 19 +
 runtime Next 16 + app shell, không phải thứ gỡ được bằng ranh giới component.

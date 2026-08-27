@@ -19,33 +19,33 @@
 // Hình ban đầu đến từ bước trích xuất.
 
 import { useState } from "react";
-import dynamic from "next/dynamic";
 import { QuestionFigure } from "@/components/shared/QuestionFigure";
+import { RichText } from "@/components/shared/RichText";
 import { useT } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n/translate";
 import { LIMITS } from "@/lib/ugc/limits";
 import type { AssembledQuestion, ChoiceId, SubItemId } from "@/lib/ugc/types";
 
-// RichText NẠP ĐỘNG (TD-023, 2026-08-27) — cây phụ thuộc của nó
-// (react-markdown + remark-* + rehype-katex + katex) là 102 KB br, chunk client
-// lớn nhất dự án, và màn này là route NẶNG NHẤT của site (đo trên prod
-// 2026-08-27: 354 KB JS, LCP 5.1s, INP 2.5s trên máy tầm trung 4× CPU).
+// ⚠ RichText Ở ĐÂY LÀ IMPORT TĨNH, VÀ ĐÓ LÀ KẾT LUẬN CÓ SỐ ĐO — ĐỪNG "TỐI ƯU"
+// LẠI BẰNG next/dynamic (TD-027, đo 2026-08-27) ⚠
 //
-// `ssr` để MẶC ĐỊNH (true), KHÔNG tắt: cả 5 chỗ dùng RichText ở dưới đều nằm
-// trong nhánh XEM (`editing === false`) — chế độ SỬA là input/textarea chuỗi
-// NGUỒN, không có preview trực tiếp. Nên nội dung câu hỏi vẫn được render ở
-// server và có mặt trong HTML đầu tiên; `dynamic` chỉ đẩy 102 KB kia ra khỏi
-// đường hydrate ban đầu, KHÔNG đổi thứ người dùng nhìn thấy. Đặt `ssr: false`
-// ở đây sẽ biến màn review thành trang trống rồi mới có chữ — đúng cái bẫy mà
-// TD-023 đã cảnh báo với màn làm bài.
+// Đã thử đúng cách đó và ĐÃ ĐO trên production sau khi deploy. Kết quả: KHÔNG
+// được gì cả.
+//   · byte tải về:  354.3 → 356.2 KB br  (nhích LÊN, thêm một chunk)
+//   · TBT:          404 → 460ms          (nhích LÊN)
+//   · LCP:          3668 → 3632ms        (trong sai số)
+// Chunk markdown+KaTeX 126.3 KB VẪN được tải — `next/dynamic` với `ssr` mặc
+// định chỉ đưa nó ra khỏi danh sách chunk EAGER của route, còn trình duyệt vẫn
+// phải nạp nó để HYDRATE đúng cây mà server đã render. Đổi lại ta nhận thêm một
+// ranh giới Suspense và ba test phải chuyển sang `waitFor`.
 //
-// Vì sao màn này KHÔNG dùng cách của màn làm bài (render sẵn ở server rồi
-// truyền node xuống — xem app/(layer2)/_components/questionNodes.tsx): ở đó
-// nội dung câu hỏi là BẤT BIẾN trong suốt lượt làm bài, còn ở đây tác giả sửa
-// được chính chuỗi nguồn đó, nên node render sẵn sẽ ôi ngay khi có một lần sửa.
-const RichText = dynamic(() =>
-  import("@/components/shared/RichText").then((m) => m.RichText),
-);
+// Bài học rộng hơn, vì nó suýt lọt: con số "chunk client tham chiếu 169.9 →
+// 68.7 KB" đọc từ `page_client-reference-manifest.js` LÀ THẬT nhưng ĐO SAI THỨ
+// — nó đếm thứ manifest khai, không đếm thứ trình duyệt tải. Cùng khoảng cách
+// giữa "build nói gì" và "người dùng nhận gì" mà TD-025 sinh ra để canh.
+//
+// Muốn hạ route này thật thì phải đổi KIẾN TRÚC (đừng render cả 40 câu một
+// lượt), không phải đổi cách import. Xem TD-027.
 
 const CHOICE_IDS: ChoiceId[] = ["A", "B", "C", "D"];
 const SUB_ITEM_IDS: SubItemId[] = ["a", "b", "c", "d"];
