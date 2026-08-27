@@ -6,13 +6,21 @@
 // chữ cái là cách người làm bài gọi tên đáp án ("chọn câu B"), nên nó phải nằm
 // trong tên khả truy cập của radio.
 
+import type { ReactNode } from "react";
 import type { Choice, ChoiceId } from "@/types/question";
-import { RichText } from "@/components/shared/RichText";
 
 interface AnswerChoiceProps {
   /** name của nhóm radio — để mỗi câu là một nhóm độc lập. */
   name: string;
   choice: Choice;
+  /**
+   * Nhãn lựa chọn ĐÃ RENDER SẴN Ở SERVER (TD-023) — markdown + LaTeX của
+   * `choice.text`, dựng bởi `renderQuestionNodes`. Trước đây component này
+   * tự gọi `<RichText text={choice.text}>`, và vì nó là component client thì
+   * cả cây phụ thuộc 126 KB br của RichText đi thẳng vào bundle của màn làm
+   * bài. `choice` vẫn được truyền vào vì `choice.id` là giá trị của radio.
+   */
+  label: ReactNode;
   selected: boolean;
   onSelect: (id: ChoiceId) => void;
 }
@@ -20,6 +28,7 @@ interface AnswerChoiceProps {
 export function AnswerChoice({
   name,
   choice,
+  label,
   selected,
   onSelect,
 }: AnswerChoiceProps) {
@@ -54,11 +63,7 @@ export function AnswerChoice({
       {/* Dấu cách THẬT: tên khả truy cập nối các phần tử inline không tự chèn
           khoảng trắng — thiếu nó screen reader đọc liền "Be^x + C". Flex bỏ qua
           text node chỉ chứa khoảng trắng nên hình thức không đổi. */}{" "}
-      <RichText
-        text={choice.text}
-        inline
-        className="flex-1 text-base leading-relaxed text-card-foreground"
-      />
+      {label}
     </label>
   );
 }

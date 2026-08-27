@@ -29,7 +29,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { HeaderProfile, type MenuUser } from "@/components/shared/HeaderProfile";
 import { LanguageToggle } from "@/components/shared/LanguageToggle";
-import { GUEST_NAV_ITEMS, NAV_ITEMS, isExamFocusRoute, isNavItemActive } from "@/lib/nav/items";
+import {
+  GUEST_NAV_ITEMS,
+  NAV_ITEMS,
+  isExamFocusRoute,
+  isNavItemActive,
+  navPrefetch,
+} from "@/lib/nav/items";
 import { useT } from "@/lib/i18n/client";
 
 export function SiteHeader({ user = null }: { user?: MenuUser | null }) {
@@ -100,6 +106,10 @@ export function SiteHeader({ user = null }: { user?: MenuUser | null }) {
                 <li key={item.key}>
                   <Link
                     href={item.href}
+                    // Khách chưa đăng nhập KHÔNG prefetch đích sau-đăng-nhập:
+                    // mỗi lượt như vậy là một 307 + một lượt render server của
+                    // `/?auth=signin` mà không ai yêu cầu (xem `navPrefetch`).
+                    prefetch={navPrefetch(item, Boolean(user))}
                     aria-current={isActive ? "page" : undefined}
                     className={[
                       // `flex items-center py-2`: chữ 12px chỉ cao ~16px nên

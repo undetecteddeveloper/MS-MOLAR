@@ -47,7 +47,7 @@ export default async function Layer2Layout({ children }: { children: React.React
           {children}
         </div>
       </EntitlementProvider>
-      <BottomNav />
+      <BottomNav signedIn={Boolean(user)} />
       <SupportWidget user={user} />
     </div>
   );

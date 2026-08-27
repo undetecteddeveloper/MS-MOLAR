@@ -8,22 +8,45 @@
 //
 // @category: core-functionality
 // @dependency: none — real AnswerChoice + real RichText, no mocks
+//   (TD-023: RichText nay chạy Ở SERVER qua `renderQuestionNodes`, nên test
+//   gọi đúng hàm đó để dựng nhãn — vẫn là RichText thật, chỉ khác nơi gọi.
+//   Dựng node giả ở đây sẽ bỏ lọt đúng thứ test này canh: LaTeX trong nhãn.)
 
 // Không có auto-cleanup của RTL trong cấu hình vitest này (không globals,
 // không setupFile) → mọi truy vấn phải bó trong `container`, không dùng
 // `screen` (document tích luỹ qua các test trong cùng file).
 import { fireEvent, render, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { Choice } from "@/types/question";
+import type { Choice, PublicQuestion } from "@/types/question";
 import { AnswerChoice } from "../AnswerChoice";
+import { renderQuestionNodes } from "../questionNodes";
 
 const CHOICE: Choice = { id: "B", text: "e^x + C" };
+
+/** Nhãn lựa chọn dựng bằng ĐÚNG đường mà server dùng ngoài đời (TD-023). */
+function labelFor(choice: Choice) {
+  const question: PublicQuestion = {
+    id: "q1",
+    content: "",
+    choices: [choice],
+    subject: "Toán",
+    grade: 12,
+    topic: "Tích phân",
+  };
+  return renderQuestionNodes([question])[0].choices[choice.id];
+}
 
 function renderChoice(choice: Choice = CHOICE, selected = false, onSelect = vi.fn()) {
   return {
     onSelect,
     ...render(
-      <AnswerChoice name="question-q1" choice={choice} selected={selected} onSelect={onSelect} />,
+      <AnswerChoice
+        name="question-q1"
+        choice={choice}
+        label={labelFor(choice)}
+        selected={selected}
+        onSelect={onSelect}
+      />,
     ),
   };
 }

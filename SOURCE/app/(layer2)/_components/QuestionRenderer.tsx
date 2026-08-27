@@ -14,7 +14,7 @@ import { useT } from "@/lib/i18n/client";
 import type { ChoiceId, PublicQuestion, SubItemId } from "@/types/question";
 import { LIMITS } from "@/lib/ugc/limits";
 import { decodeTfAnswer, encodeTfAnswer } from "@/lib/ugc/tfCodec";
-import { RichText } from "@/components/shared/RichText";
+import type { QuestionNodes } from "./questionNodes.types";
 import { QuestionFigure } from "@/components/shared/QuestionFigure";
 import { AnswerChoice } from "./AnswerChoice";
 import { FlagButton } from "./FlagButton";
@@ -27,6 +27,14 @@ interface QuestionRendererProps {
   index: number;
   /** Không cần đáp án để render — dùng PublicQuestion (bảo mật, M2.6/v2.1). */
   question: PublicQuestion;
+  /**
+   * Nội dung câu hỏi ĐÃ RENDER SẴN Ở SERVER (TD-023) — thân câu, nhãn lựa
+   * chọn, nội dung ý a–d. Component này là client (state làm bài), nên gọi
+   * `<RichText>` ở đây kéo cả 126 KB br markdown+KaTeX vào bundle của màn làm
+   * bài. `question` vẫn cần: id/loại câu/số ý/imageUrl đều là dữ liệu, không
+   * phải nội dung cần render.
+   */
+  nodes: QuestionNodes;
   /** Input hiện tại của câu này (string — xem useExamPlayer), undefined nếu chưa. */
   selectedAnswer?: string;
   onSelectAnswer: (value: string) => void;
@@ -37,6 +45,7 @@ interface QuestionRendererProps {
 export function QuestionRenderer({
   index,
   question,
+  nodes,
   selectedAnswer,
   onSelectAnswer,
   flagged,
@@ -66,10 +75,7 @@ export function QuestionRenderer({
           Giữ 18px ở mobile: màn hẹp thì mỗi nấc cỡ chữ ăn thêm một dòng, và
           khu vực trả lời bên dưới cao CỐ ĐỊNH 238px nên phần đọc được của câu
           hỏi là thứ bị ép trước tiên. */}
-      <RichText
-        text={question.content}
-        className="text-foreground font-serif text-lg leading-[1.75] text-pretty sm:text-xl"
-      />
+      {nodes.content}
 
       {/* Hình thân câu (UGC v2.0, Task 5.2) — chỉ render nếu có + origin hợp lệ. */}
       {question.imageUrl && (
@@ -90,6 +96,7 @@ export function QuestionRenderer({
                 key={choice.id}
                 name={`question-${question.id}`}
                 choice={choice}
+                label={nodes.choices[choice.id]}
                 selected={selectedAnswer === choice.id}
                 onSelect={(id: ChoiceId) => onSelectAnswer(id)}
               />
@@ -113,11 +120,7 @@ export function QuestionRenderer({
                   <span className="text-muted-foreground w-4 shrink-0 font-mono text-sm">
                     {sid})
                   </span>
-                  <RichText
-                    text={item.text}
-                    inline
-                    className="text-card-foreground flex-1 text-sm leading-relaxed"
-                  />
+                  {nodes.subItems[sid]}
                   <div
                     className="flex shrink-0 gap-1"
                     role="group"

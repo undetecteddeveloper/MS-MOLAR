@@ -11,13 +11,32 @@
 //
 // @category: core-functionality
 // @dependency: none — real QuestionEditor + real RichText, no mocks
+//
+// TD-023 (2026-08-27): RichText nay NẠP ĐỘNG (next/dynamic) trong QuestionEditor
+// — 102 KB br ra khỏi đường hydrate ban đầu của route nặng nhất site. Hệ quả với
+// test: cây React chỉ có nội dung đã render SAU khi chunk kia resolve, nên mọi
+// khẳng định về `.katex` phải `await`. Cố ý KHÔNG mock `next/dynamic`: mock đi
+// thì test sẽ xanh kể cả khi ranh giới nạp động hỏng, tức là mất đúng thứ nó canh.
 
 // Không có auto-cleanup của RTL trong cấu hình vitest này → truy vấn bó trong
 // `container`, không dùng `screen`.
-import { fireEvent, render, within } from "@testing-library/react";
+import { fireEvent, render, waitFor, within } from "@testing-library/react";
+
 import { describe, expect, it, vi } from "vitest";
 import type { AssembledQuestion } from "@/lib/ugc/types";
 import { QuestionEditor } from "../QuestionEditor";
+
+/** NGÂN SÁCH CHỜ cho ranh giới `next/dynamic` + một lượt render KaTeX thật.
+ *
+ *  Đây là một con số NGÂN SÁCH, không phải một lời khẳng định về hiệu năng:
+ *  mặc định 1000ms của RTL đủ khi chạy một mình (đo 1290ms khi chạy CẢ BỘ) và
+ *  hụt khi 120 file test cùng tranh CPU, tức là một test ĐỎ NGẪU NHIÊN theo
+ *  tải máy — thứ vô dụng hơn cả không có test, vì nó dạy người đọc bỏ qua màu
+ *  đỏ. Nới rộng ở đây KHÔNG làm yếu điều đang canh: nếu nội dung không bao giờ
+ *  render thì `waitFor` vẫn đỏ, chỉ là muộn hơn. (Cùng bài học với
+ *  ExplainStepAffordance.test.tsx.) */
+const DYNAMIC_RENDER_BUDGET_MS = 5000;
+
 
 const MCQ: AssembledQuestion = {
   part: 1,
@@ -39,16 +58,21 @@ function renderEditor(question: AssembledQuestion = MCQ, onChange = vi.fn()) {
 }
 
 describe("QuestionEditor — LaTeX ở chế độ xem", () => {
-  it("stem có công thức render thành math, không in chuỗi nguồn", () => {
+  it("stem có công thức render thành math, không in chuỗi nguồn", async () => {
     const { container } = renderEditor();
 
-    expect(container.querySelector(".katex")).not.toBeNull();
+    await waitFor(() => expect(container.querySelector(".katex")).not.toBeNull(), {
+      timeout: DYNAMIC_RENDER_BUDGET_MS,
+    });
     expect(container.textContent).not.toContain("$\\frac{1}{2} + \\frac{1}{3}$");
   });
 
-  it("lựa chọn A–D có công thức cũng render thành math", () => {
+  it("lựa chọn A–D có công thức cũng render thành math", async () => {
     const { container } = renderEditor();
 
+    await waitFor(() => expect(container.querySelector("annotation")).not.toBeNull(), {
+      timeout: DYNAMIC_RENDER_BUDGET_MS,
+    });
     const annotations = Array.from(container.querySelectorAll("annotation")).map(
       (a) => a.textContent,
     );
@@ -65,7 +89,7 @@ describe("QuestionEditor — LaTeX ở chế độ xem", () => {
     expect(within(container).getByDisplayValue("$\\frac{5}{6}$")).toBeTruthy();
   });
 
-  it("ý a–d của true_false cũng render math ở chế độ xem", () => {
+  it("ý a–d của true_false cũng render math ở chế độ xem", async () => {
     const { container } = renderEditor({
       part: 2,
       number: 1,
@@ -76,6 +100,8 @@ describe("QuestionEditor — LaTeX ở chế độ xem", () => {
       topic: "Hàm số",
     });
 
-    expect(container.querySelector(".katex")).not.toBeNull();
+    await waitFor(() => expect(container.querySelector(".katex")).not.toBeNull(), {
+      timeout: DYNAMIC_RENDER_BUDGET_MS,
+    });
   });
 });

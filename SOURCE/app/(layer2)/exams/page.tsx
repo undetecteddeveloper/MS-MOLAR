@@ -17,6 +17,7 @@ import {
 } from "@/app/(layer2)/queries";
 import { ExamBrowser } from "@/app/(layer2)/_components/ExamBrowser";
 import { ExamFilters } from "@/app/(layer2)/_components/ExamFilters";
+import { ExamPagination } from "@/app/(layer2)/_components/ExamPagination";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { getTranslate } from "@/lib/i18n/server";
 import { PageContainer } from "@/components/layout/PageContainer";
@@ -30,6 +31,7 @@ type SearchParams = Promise<{
   sort?: string;
   level?: string;
   dir?: string;
+  page?: string;
 }>;
 
 export default async function ExamsPage({ searchParams }: { searchParams: SearchParams }) {
@@ -51,6 +53,11 @@ export default async function ExamsPage({ searchParams }: { searchParams: Search
   // Direction toggle (ExamFilters) — đảo chiều trục `sort` đang chọn; giá trị
   // lạ → undefined (dùng chiều mặc định của trục, giữ hành vi cũ).
   const dir: SortDirection | undefined = sp.dir === "asc" || sp.dir === "desc" ? sp.dir : undefined;
+  // Phân trang (TD-026). Giá trị lạ/âm/không phải số → trang 1, cùng quy ước
+  // "unknown value → mặc định" với các tham số trên; `listExamsRanked` còn kẹp
+  // lần nữa vào [1, pageCount] nên `?page=999` cho ra trang cuối, không phải
+  // một lưới trắng.
+  const page = Number.parseInt(sp.page ?? "", 10);
 
   const t = await getTranslate();
   // ADR-0015 Decision 1b: `listExamsRanked` thay CẢ `listExams` lẫn
@@ -61,11 +68,14 @@ export default async function ExamsPage({ searchParams }: { searchParams: Search
   // `listMySubmittedExamIds()` KHÔNG bị sửa: nó còn một chỗ dùng khác
   // (exams/[id]/rate/page.tsx).
   const [ranked, facets, user] = await Promise.all([
-    listExamsRanked({ subject, grade, school, schoolYear: year, semester, sort, level, dir }),
+    listExamsRanked(
+      { subject, grade, school, schoolYear: year, semester, sort, level, dir },
+      Number.isFinite(page) ? page : 1
+    ),
     listExamFacets(),
     getCurrentUser(),
   ]);
-  const { exams, submittedExamIds } = ranked;
+  const { exams, submittedExamIds, page: currentPage, pageCount, total } = ranked;
 
   return (
     // Theme root "Mực & Sơn mài" (S#17) — scope .theme-ebp đã xóa, block/nav
@@ -119,6 +129,23 @@ export default async function ExamsPage({ searchParams }: { searchParams: Search
               exams={exams}
               submittedExamIds={submittedExamIds}
               isLoggedIn={user !== null}
+            />
+            {/* `sp` TRỪ `page`: mỗi link phân trang phải mang theo đúng bộ lọc
+                đang bật, nếu không bấm sang trang 2 sẽ âm thầm reset bộ lọc. */}
+            <ExamPagination
+              page={currentPage}
+              pageCount={pageCount}
+              total={total}
+              params={{
+                subject: sp.subject,
+                grade: sp.grade,
+                school: sp.school,
+                year: sp.year,
+                semester: sp.semester,
+                sort: sp.sort,
+                level: sp.level,
+                dir: sp.dir,
+              }}
             />
           </div>
         </div>

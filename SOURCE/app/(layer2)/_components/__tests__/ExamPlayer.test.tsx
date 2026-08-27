@@ -27,6 +27,9 @@ import { fireEvent, render, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PublicQuestion } from "@/types/question";
 import { ExamPlayer } from "../ExamPlayer";
+// TD-023: nội dung câu hỏi render ở SERVER. Dùng đúng hàm render thật để test
+// không xanh trong khi cặp server/client ngoài đời đã lệch.
+import { renderQuestionNodes } from "../questionNodes";
 
 // submitExam kéo theo lib/supabase/server (server-only) — không gọi trong test
 // này (không bấm Nộp bài) nên mock để tránh lỗi import "server-only" dưới jsdom.
@@ -65,6 +68,7 @@ function renderPlayer() {
       examTitle="Đề kiểm tra giữa kỳ"
       durationMinutes={30}
       questions={QUESTIONS}
+      questionNodes={renderQuestionNodes(QUESTIONS)}
     />
   );
   currentUnmount = result.unmount;
