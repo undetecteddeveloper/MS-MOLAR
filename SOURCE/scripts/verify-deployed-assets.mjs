@@ -94,11 +94,42 @@ function classSelectors(css) {
 }
 
 async function main() {
-  const base = (process.argv[2] || "").replace(/\/+$/, "");
-  if (!base) {
+  const rawArg = process.argv[2] || "";
+  if (!rawArg) {
     console.error("Dùng: npm run verify:deployed -- <base-url>");
-    console.error("  vd: npm run verify:deployed -- https://ms-molar.vercel.app");
+    console.error("  prod:    npm run verify:deployed -- https://ms-molar.vercel.app");
+    console.error("  preview: npm run verify:deployed -- 'https://<deploy>.vercel.app/?_vercel_share=<token>'");
     process.exit(2);
+  }
+
+  // Preview deploy nằm sau Deployment Protection của Vercel. Cách vào là link
+  // chia sẻ `?_vercel_share=<token>` — nó KHÔNG tự cho qua, nó redirect một
+  // lượt để ĐẶT COOKIE. `fetch` của Node không giữ cookie, nên ta phải tự nhặt
+  // `set-cookie` từ chuỗi redirect rồi gắn lại vào mọi request sau.
+  const parsed = new URL(rawArg);
+  const shareToken = parsed.searchParams.get("_vercel_share");
+  parsed.search = "";
+  const base = parsed.toString().replace(/\/+$/, "");
+  const jar = [];
+
+  async function get(url, init = {}) {
+    const headers = { ...(init.headers || {}) };
+    if (jar.length > 0) headers.cookie = jar.join("; ");
+    return fetch(url, { ...init, headers });
+  }
+
+  if (shareToken) {
+    // `redirect: manual` để đọc được `set-cookie` của TỪNG chặng — theo tự
+    // động thì cookie của chặng giữa bị nuốt mất.
+    let next = `${base}/?_vercel_share=${encodeURIComponent(shareToken)}`;
+    for (let hop = 0; hop < 5 && next; hop++) {
+      const res = await fetch(next, { redirect: "manual", headers: jar.length ? { cookie: jar.join("; ") } : {} });
+      for (const c of res.headers.getSetCookie?.() ?? []) jar.push(c.split(";")[0]);
+      const loc = res.headers.get("location");
+      next = loc ? new URL(loc, next).toString() : null;
+      if (!loc) break;
+    }
+    console.log(`Deployment Protection: đã đổi share token lấy ${jar.length} cookie.`);
   }
 
   if (!fs.existsSync(DIST)) {
@@ -132,10 +163,28 @@ async function main() {
   const cssUrls = new Set();
   const scriptUrls = new Set();
   for (const route of ROUTES) {
-    const res = await fetch(base + route, { redirect: "follow" });
+    const res = await get(base + route, { redirect: "follow" });
     if (!res.ok) {
       fail(`GET ${route} → HTTP ${res.status}. Không lấy được HTML để soi asset.`);
       continue;
+    }
+    // ⚠ CHẶN NHẦM LẪN TỐN KÉM NHẤT CỦA CỔNG NÀY ⚠
+    // Deployment Protection redirect sang `vercel.com/sso-api…`. Nếu cứ thế
+    // đem so, ta sẽ đi so CSS của TRANG ĐĂNG NHẬP VERCEL với build của mình,
+    // thấy thiếu sạch biến, rồi hô "production hỏng — đây chính là TD-024".
+    // Đã xảy ra thật ở lần chạy đầu trên preview (2026-08-27). Một cổng báo
+    // sai kiểu đó chỉ cần đúng một lần là mất hết uy tín và bị tắt — nên
+    // trường hợp này phải có THÔNG BÁO RIÊNG, nói đúng việc phải làm.
+    if (new URL(res.url).origin !== new URL(base).origin) {
+      console.error(
+        `\n❌ ${route} bị chuyển sang ${new URL(res.url).origin} — bản deploy này đang bật\n` +
+          "   Deployment Protection, nên thứ tải về là trang đăng nhập của Vercel chứ KHÔNG\n" +
+          "   phải trang của mình. Đây KHÔNG phải TD-024.\n" +
+          "   Cách chạy đúng với preview: truyền nguyên link chia sẻ, kèm token:\n" +
+          "     npm run verify:deployed -- 'https://<deploy>.vercel.app/?_vercel_share=<token>'"
+      );
+      process.exitCode = 1;
+      return;
     }
     const html = await res.text();
     for (const m of html.matchAll(/<link[^>]+rel="stylesheet"[^>]+href="([^"]+)"/g)) cssUrls.add(m[1]);
@@ -151,7 +200,7 @@ async function main() {
 
   let deployedCss = "";
   for (const u of cssUrls) {
-    const res = await fetch(u.startsWith("http") ? u : base + u);
+    const res = await get(u.startsWith("http") ? u : base + u);
     if (!res.ok) {
       fail(`Không tải được CSS đã deploy: ${u} → HTTP ${res.status}`);
       continue;
@@ -235,7 +284,7 @@ async function main() {
   let jsChecked = 0;
   for (const u of scriptUrls) {
     if (!u.includes("/_next/")) continue;
-    const res = await fetch(u.startsWith("http") ? u : base + u, { method: "HEAD" });
+    const res = await get(u.startsWith("http") ? u : base + u, { method: "HEAD" });
     if (!res.ok) fail(`Script đã khai trong HTML nhưng KHÔNG tải được: ${u} → HTTP ${res.status}`);
     else jsChecked++;
   }

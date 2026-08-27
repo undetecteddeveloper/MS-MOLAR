@@ -156,8 +156,8 @@ một lần chạy lại toàn file trên DB có dữ liệu đại diện, mớ
 **Verify:** `next build` thật + đọc `page_client-reference-manifest.js` từng route.
 
 **Số đo LẠI trên PRODUCTION trước khi sửa** (máy tầm trung, 4× CPU throttle +
-slow 4G, 3 lượt/route lấy trung vị, `https://ms-molar.vercel.app`) — và số đo
-này SỬA LẠI tiền đề của chính mục TD-023 cũ:
+slow 4G, 3 lượt/route lấy trung vị) — và số đo này SỬA LẠI tiền đề của chính
+mục TD-023 cũ, ở đúng MỘT vế:
 
 TD-023 viết "còn ĐÚNG HAI route vượt ngưỡng ~170 KB". Sai. Đo bằng JS THẬT SỰ
 TẢI VỀ (Resource Timing `encodedBodySize`, tức byte đã nén br mà trình duyệt
@@ -165,11 +165,28 @@ thật nhận) thì **MỌI route đều vượt** — nền chung đã là 205 
 `/terms`, một trang chỉ có chữ. Con số 188.4/185.6 KB cũ là "First Load JS" của
 `next build` (gzip, cách đếm khác), không phải thứ người dùng tải.
 
-| Route | JS tải về (br) | LCP | INP (max) | TBT | CLS |
+⚠ **CẢNH BÁO VỀ CHÍNH PHÉP ĐO NÀY — đọc trước khi trích số ở dưới.** Lượt đo
+đầu tiên trong phiên 2026-08-27 cho ra `/me/exams/[id]` LCP 5.1s / INP 2544ms /
+TBT 2388ms. **Những con số đó SAI** và đã bị loại: lúc đó máy đang chạy song
+song một `next build` cục bộ, và ở chế độ 4× CPU throttle thì TBT/INP đo được
+là hàm của tải máy chứ không phải của trang. Bảng dưới là lượt đo LẠI, chạy
+back-to-back với bản preview trên cùng một máy ở cùng điều kiện — đó là phép so
+duy nhất có nghĩa. **Byte thì không bị ảnh hưởng** (byte là byte), nên các con
+số KB ở cả hai lượt đo đều đứng.
+
+Bài học, vì nó rẻ và sẽ tái diễn: một phép đo hiệu năng có CPU throttle mà chạy
+cạnh một build là một phép đo hỏng. Luôn đo A và B back-to-back trên cùng máy,
+đừng so một lượt đo hôm nay với một lượt đo lúc khác.
+
+| Route (prod, trước khi sửa) | JS tải về (br) | LCP | INP (max) | TBT | CLS |
 |---|---|---|---|---|---|
-| `/me/exams/[id]` (sửa đề) | 354.3 KB | 5.1s | 2544ms | 2388ms | 0 |
-| `/exams/[id]/attempt/[attemptId]` (làm bài) | 351.8 KB | 3.7s | 328ms | 1591ms | 0 |
-| nền chung (`/terms`) | 205.4 KB | 2.3s | 128ms | 343ms | 0 |
+| `/me/exams/[id]` (sửa đề) | 354.3 KB | 3.7s | 112ms | 404ms | 0 |
+| `/exams/[id]/attempt/[attemptId]` (làm bài) | 351.8 KB | 3.4s | 144ms | 512ms | 0.021 |
+| nền chung (`/terms`) | 205.4 KB | 2.3s | 128ms | 242ms | 0 |
+
+Nói cho rõ vì nó đổi cách đọc cả mục này: **đo sạch thì site KHÔNG hỏng.** CLS
+0 gần như mọi nơi, TTFB ~60ms, INP nằm trong ngưỡng tốt (<200ms) ở mọi route.
+Cái vượt ngưỡng là BYTE và TBT, và chúng vượt ở đúng hai route.
 
 Cả hai route nặng nhất vượt vì CÙNG một chunk markdown+KaTeX **126.3 KB br**
 (`0k3qsrq5-u33w.js`) — đúng chunk mà TD-021 đã gỡ được khỏi `/result/detail`.
@@ -191,9 +208,27 @@ Cả hai route nặng nhất vượt vì CÙNG một chunk markdown+KaTeX **126.
   `ssr: false` ở đây sẽ là "trang trống rồi mới có chữ", đúng cái bẫy TD-023
   cảnh báo.
 
-**Kết quả đo trên build thật** (chunk client mà mỗi route THAM CHIẾU, br):
-`/me/exams/[id]` **169.9 → 68.7 KB** (−101.2 KB, −60%); route làm bài không còn
-tham chiếu chunk markdown+KaTeX nữa (nay là chunk nạp động của riêng màn sửa đề).
+**Kết quả — đo hai chỗ, vì mỗi chỗ trả lời một câu khác nhau:**
+
+*Trên build thật* (chunk client mà mỗi route THAM CHIẾU, br): `/me/exams/[id]`
+**169.9 → 68.7 KB** (−101.2 KB, −60%); route làm bài không còn tham chiếu chunk
+markdown+KaTeX nữa (nay là chunk nạp động của riêng màn sửa đề).
+
+*Trên PREVIEW deploy thật*, đo back-to-back với prod cùng máy cùng điều kiện —
+màn LÀM BÀI:
+
+| | prod (trước) | preview (sau) |
+|---|---|---|
+| JS tải về | 351.8 KB br | **225.6 KB br** (−126.2 KB, −36%) |
+| TBT | 512ms | **256ms** (−50%) |
+| INP trung vị / max | 112 / 144ms | **40 / 56ms** |
+| LCP | 3408ms | 3072ms |
+| CLS | 0.021 | **0** |
+
+Màn SỬA ĐỀ **chưa đo được trên deploy thật**: tài khoản test trên DB dev không
+sở hữu đề nào ở trạng thái sửa được, nên không có URL để tải. Con số của nó là
+con số BUILD (−101.2 KB ở trên) — thật, nhưng là byte tham chiếu, không phải
+byte đã tải. Ai chạm vào route đó lần sau nên đo nốt vế còn lại.
 
 **Vì sao mục này KHÔNG để lại phần dư:** nền chung 205 KB br là React 19 +
 runtime Next 16 + app shell, không phải thứ gỡ được bằng ranh giới component.
@@ -204,7 +239,11 @@ Muốn hạ tiếp thì đó là một quyết định về FRAMEWORK, không ph
 **Verify:** chạy CẢ HAI CHIỀU — xanh với bản deploy khớp, ĐỎ khi tiêm một khối
 CSS hình dạng TD-024 vào artifact cục bộ rồi chạy lại.
 
-`npm run verify:deployed -- <base-url>` (`scripts/verify-deployed-assets.mjs`).
+```
+prod:    npm run verify:deployed -- https://ms-molar.vercel.app
+preview: npm run verify:deployed -- 'https://<deploy>.vercel.app/?_vercel_share=<token>'
+```
+(`scripts/verify-deployed-assets.mjs`; token lấy từ link chia sẻ của Vercel.)
 
 **Nó so cái gì:** không phải hash file. Vercel build trên hạ tầng của nó nên tên
 chunk và byte KHÔNG BAO GIỜ khớp `.next-build` cục bộ, kể cả khi mọi thứ đúng —
@@ -226,6 +265,21 @@ trang vẫn hỏng. Một ngưỡng phần trăm ở đây sẽ để lọt đú
 **Chạy khi nào:** sau MỖI lần ship UI có đụng `globals.css` hoặc thêm asset tĩnh
 mới, với URL prod hoặc preview. Cần `.next-build` của ĐÚNG commit đang deploy —
 script tự từ chối nếu không có build cục bộ.
+
+**Bài học thứ hai, cũng từ lần chạy thật đầu tiên — trên PREVIEW:** cổng báo
+đỏ "thiếu 7 biến CSS TRỌNG YẾU — production đang hỏng". Sai hoàn toàn. Preview
+nằm sau Deployment Protection, nên mọi request ăn một redirect sang
+`vercel.com/sso-api`, và cổng đã hồn nhiên đi so CSS của TRANG ĐĂNG NHẬP VERCEL
+(9 file, 4.3 MB) với build của mình.
+
+Đó là kiểu báo sai NGUY HIỂM NHẤT một cổng có thể mắc: nó không im lặng, nó hô
+to đúng cái tên đáng sợ nhất, và nó sai. Đúng một lần như vậy là đủ để người
+đọc thôi tin nó. Nên script nay KIỂM ORIGIN của response cuối chuỗi redirect —
+lệch origin thì báo RIÊNG ("bản deploy đang bật Deployment Protection, đây
+KHÔNG phải TD-024") kèm đúng câu lệnh phải chạy, và nó tự đổi
+`?_vercel_share=<token>` lấy cookie để đi tiếp được.
+
+**Đã chạy thật trên preview của chính đợt này:** 603/603 token có mặt đủ.
 
 **Phần nó KHÔNG trả:** nguyên nhân gốc (vì sao build cache của Vercel bỏ sót
 thay đổi CSS thuần) vẫn CHƯA xác định được, đúng như TD-025 cũ ghi. Đây là cổng
