@@ -277,6 +277,19 @@ function GetStarted() {
     <div className="mt-8">
       <Link
         href="/exams"
+        // KHÔNG prefetch, không phụ thuộc trạng thái đăng nhập — và hai lý do
+        // KHÁC NHAU cho hai nhóm người dùng (đo trên preview 2026-08-27):
+        //  · KHÁCH: `/exams` nằm sau đăng nhập, nên prefetch nó = một 307 rồi
+        //    trình duyệt đi theo redirect sang `/?auth=signin` = một lượt render
+        //    server bỏ đi. Cùng thứ lãng phí mà `navPrefetch` đã chặn cho các
+        //    thanh điều hướng; nút này KHÔNG đi qua NAV_ITEMS nên nó phải tự
+        //    khai (và test quét nguồn ở lib/nav/__tests__ không với tới đây).
+        //  · ĐÃ ĐĂNG NHẬP: `/exams` ĐÃ được ba thanh điều hướng trên cùng trang
+        //    prefetch rồi (HomeSidebar/SiteHeader/BottomNav) — lượt ở đây chỉ là
+        //    bản trùng.
+        // Nút này render 3 lần (mỗi slide carousel một lần), nên khoản tiết
+        // kiệm cũng nhân ba.
+        prefetch={false}
         className="group inline-flex min-h-11 items-center gap-3 rounded-full border-2 border-[#1B1512] px-8 py-3 font-sans text-xs font-medium tracking-[0.16em] text-[#1B1512] uppercase transition-colors hover:border-[#A62C2B] hover:bg-[#A62C2B] hover:text-[#EDE1C8]"
       >
         {t("home.getStarted")}
