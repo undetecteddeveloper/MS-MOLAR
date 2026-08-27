@@ -8,6 +8,7 @@
 import { useT } from "@/lib/i18n/client";
 import type { AssembledQuestion, ExtractedPart, UgcError } from "@/lib/ugc/types";
 import { QuestionEditor } from "./QuestionEditor";
+import { reviewNodeKey, type ReviewNodes } from "./reviewNodes.types";
 
 interface AssembledQuestionListProps {
   questions: AssembledQuestion[];
@@ -18,6 +19,8 @@ interface AssembledQuestionListProps {
     number: number,
     patch: Partial<AssembledQuestion>,
   ) => void;
+  /** Nội dung server render sẵn, tra theo `reviewNodeKey` (TD-027). Chỉ đi qua đây. */
+  nodes?: ReviewNodes;
 }
 
 export function AssembledQuestionList({
@@ -25,6 +28,7 @@ export function AssembledQuestionList({
   parts,
   errors,
   onChangeQuestion,
+  nodes,
 }: AssembledQuestionListProps) {
   const t = useT();
   // Khoá lỗi composite — khớp validateAssembledExam (partNumber null = đề 1 phần).
@@ -44,6 +48,7 @@ export function AssembledQuestionList({
             question={q}
             hasError={errorKeys.has(`${q.part}:${q.number}`)}
             onChange={(patch) => onChangeQuestion(q.part, q.number, patch)}
+            nodes={nodes?.[reviewNodeKey(q.part, q.number)]}
           />
         ))}
       </ul>
@@ -70,6 +75,7 @@ export function AssembledQuestionList({
                   question={q}
                   hasError={errorKeys.has(`${q.part}:${q.number}`)}
                   onChange={(patch) => onChangeQuestion(q.part, q.number, patch)}
+                  nodes={nodes?.[reviewNodeKey(q.part, q.number)]}
                 />
               ))}
           </ul>
