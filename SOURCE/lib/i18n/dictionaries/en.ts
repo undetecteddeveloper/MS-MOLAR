@@ -113,13 +113,28 @@ export const en = {
   // thương hiệu bên thứ ba đặt trần giữa trang dễ đọc thành "đối tác/được
   // chứng thực", trong khi sự thật chỉ là ta GỌI API của họ (ADR-0006).
   "home.poweredBy": "Powered by",
-  "home.siteName": "MS-MOLAR",
+  // Tiêu đề MỤC 3 (engineer chốt 2026-08-27). Trước đây mục này chỉ in lại tên
+  // website — không nói thêm được gì mà hai mục kia chưa nói. Nay nó nêu đúng
+  // thứ đo được: tốc độ. Con số trong phần mô tả là SỐ ĐO THẬT trên prod
+  // (2026-08-27), không phải chữ quảng cáo — xem ghi chú ở home.performanceDescription.
+  "home.performanceHeadline": "Best performance",
   // Mỗi mục đúng MỘT dòng mô tả ngắn — giữ ngắn là có chủ đích, đây là thẻ
   // giới thiệu chứ không phải trang tính năng.
   "home.aiDescription":
     "AI extracts every question from the PDFs you upload, and grades your answers the moment you submit.",
-  "home.adaptiveDescription":
-    "Each attempt reshapes what you practise next, so revision time lands where your score actually moves.",
+  // ⚠ Có SỐ trong chuỗi này, nên nó là một LỜI KHẲNG ĐỊNH KIỂM CHỨNG ĐƯỢC, không
+  // phải khẩu hiệu. Đo trên production ms-molar.vercel.app ngày 2026-08-27,
+  // 3 lượt/route, hai hồ sơ máy:
+  //   · TTFB 59–66ms trên MỌI route, ở CẢ desktop lẫn mobile tầm trung
+  //     (CPU ×4 + slow 4G) — đó là nguồn của "khoảng 60 mili-giây".
+  //   · CLS 0 hoặc 0.0003 trên mọi route — nguồn của "không xê dịch một dòng".
+  // CỐ Ý không nhắc LCP: desktop 672ms nhưng mobile tầm trung 2596ms, nên mọi
+  // câu chữ về "hiện ra dưới một giây" sẽ SAI với đúng nhóm người dùng đông
+  // nhất. Chỉ khẳng định thứ đúng ở CẢ HAI hồ sơ.
+  // Ai sửa lại trang này mà làm hai con số trên xấu đi thì phải sửa cả câu chữ
+  // ở đây — hoặc bỏ nó đi.
+  "home.performanceDescription":
+    "Every page starts coming back in about 60 milliseconds, and settles without a single shift — you start reading the moment it arrives, not after a spinner.",
 
   // --- Xác thực -----------------------------------------------------------
   "auth.email": "Email",

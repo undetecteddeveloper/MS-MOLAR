@@ -78,11 +78,11 @@ export const vi: Dictionary = {
   "home.carouselPlay": "Tiếp tục tự động chuyển mục",
   "home.aiHeadline": "Có tích hợp AI",
   "home.poweredBy": "Vận hành bởi",
-  "home.siteName": "MS-MOLAR",
+  "home.performanceHeadline": "Hiệu năng vượt trội",
   "home.aiDescription":
     "AI bóc tách từng câu hỏi từ file đề bạn tải lên, và chấm bài ngay khi bạn nộp.",
-  "home.adaptiveDescription":
-    "Mỗi lần làm bài định lại nội dung luyện tiếp theo, để thời gian ôn rơi đúng chỗ giúp điểm số nhích lên.",
+  "home.performanceDescription":
+    "Mỗi trang bắt đầu phản hồi trong khoảng 60 mili-giây và dựng xong không xê dịch một dòng nào — bạn đọc được ngay khi trang tới, không phải đợi vòng xoay.",
 
   // --- Xác thực -----------------------------------------------------------
   "auth.email": "Email",

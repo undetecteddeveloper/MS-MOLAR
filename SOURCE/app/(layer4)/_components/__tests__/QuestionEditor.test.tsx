@@ -2,27 +2,40 @@
 
 // QuestionEditor — màn review sau upload phải HIỂN THỊ công thức, không in nguồn.
 //
-// Trước bản vá này layer4 không dùng <RichText> ở đâu cả: tác giả upload đề Toán
-// và nhìn thấy "$\frac{1}{2}$" nguyên văn ở màn duyệt, trong khi màn làm bài lại
-// render đúng. Không có cách nào biết đề hiển thị đúng hay sai trước khi publish.
+// Trước bản vá đầu tiên layer4 không dùng <RichText> ở đâu cả: tác giả upload đề
+// Toán và nhìn thấy "$\frac{1}{2}$" nguyên văn ở màn duyệt, trong khi màn làm bài
+// lại render đúng. Không có cách nào biết đề hiển thị đúng hay sai trước khi
+// publish. Chế độ SỬA cố ý giữ chuỗi NGUỒN trong input — sửa công thức thì phải
+// sửa được LaTeX. Test này ghim đúng ranh giới đó: xem = đã render, sửa = nguồn thô.
 //
-// Chế độ SỬA cố ý giữ chuỗi NGUỒN trong input — sửa công thức thì phải sửa được
-// LaTeX. Test này ghim đúng ranh giới đó: xem = đã render, sửa = nguồn thô.
+// TD-027 (2026-08-27) đổi CÁCH đạt được điều đó mà KHÔNG được đổi chính điều đó,
+// nên file này nay ghim CẢ HAI đường:
+//   · chuỗi CHƯA bị sửa  → dùng node server dựng sẵn (`nodes`), 0 byte JS client;
+//   · chuỗi ĐÃ bị sửa    → nạp động RichText ở client rồi render.
+// Đường thứ hai là thứ dễ hỏng trong im lặng nhất: nếu nó gãy, tác giả vẫn thấy
+// chữ (chuỗi nguồn) nên không ai báo lỗi — chỉ là công thức không còn hiện ra
+// nữa, đúng cái bug mà file này sinh ra để chặn.
 //
 // @category: core-functionality
 // @dependency: none — real QuestionEditor + real RichText, no mocks
 
-
 // Không có auto-cleanup của RTL trong cấu hình vitest này → truy vấn bó trong
 // `container`, không dùng `screen`.
-import { fireEvent, render, within } from "@testing-library/react";
+import { fireEvent, render, waitFor, within } from "@testing-library/react";
 
 import { describe, expect, it, vi } from "vitest";
 import type { AssembledQuestion } from "@/lib/ugc/types";
 import { QuestionEditor } from "../QuestionEditor";
+import { renderReviewNodes } from "../reviewNodes";
+import { reviewNodeKey } from "../reviewNodes.types";
 
-
-
+// Nạp động (`next/dynamic`) trong jsdom phải đi qua cả cây module
+// react-markdown + remark + rehype + katex, và nó chỉ được KHỞI ĐỘNG khi nhánh
+// "chuỗi đã sửa" chạy — tức không có cách nào hâm nóng trước trong test.
+// Mặc định 1000ms của `waitFor` đã đo được 1290ms một lần khi chạy CẢ bộ test
+// (máy đang bận), nên nó là nguồn flake chứ không phải một phép kiểm. Ghim
+// thành hằng số có tên để lần sau ai chỉnh còn biết mình đang chỉnh cái gì.
+const LAZY_CHUNK_BUDGET_MS = 5000;
 
 const MCQ: AssembledQuestion = {
   part: 1,
@@ -39,8 +52,23 @@ const MCQ: AssembledQuestion = {
   topic: "Phân số",
 };
 
+/** Dựng node y hệt server làm cho chính câu này (đường đi thật của trang). */
+function nodesFor(question: AssembledQuestion) {
+  return renderReviewNodes([question])[reviewNodeKey(question.part, question.number)];
+}
+
 function renderEditor(question: AssembledQuestion = MCQ, onChange = vi.fn()) {
-  return { onChange, ...render(<QuestionEditor question={question} onChange={onChange} hasError={false} />) };
+  return {
+    onChange,
+    ...render(
+      <QuestionEditor
+        question={question}
+        onChange={onChange}
+        hasError={false}
+        nodes={nodesFor(question)}
+      />,
+    ),
+  };
 }
 
 describe("QuestionEditor — LaTeX ở chế độ xem", () => {
@@ -82,5 +110,55 @@ describe("QuestionEditor — LaTeX ở chế độ xem", () => {
     });
 
     expect(container.querySelector(".katex")).not.toBeNull();
+  });
+});
+
+describe("QuestionEditor — node server sẵn có so với chuỗi vừa bị sửa (TD-027)", () => {
+  it("chuỗi CHƯA đụng tới thì dùng thẳng node của server, không cần chunk client", () => {
+    // Không `waitFor`: khẳng định ở đây chính là "có ngay, đồng bộ". Nếu một
+    // ngày nào đó nhánh này phải chờ, tức node của server đã ngừng được dùng và
+    // cả route quay lại tải 126.3 KB — test đỏ ngay tại dòng này.
+    const { container } = renderEditor();
+
+    expect(container.querySelector(".katex")).not.toBeNull();
+  });
+
+  it("chuỗi ĐÃ sửa khác node của server thì vẫn render math (nạp động)", async () => {
+    // Đúng đường đi của tác giả: bấm Sửa (hâm nóng chunk) → gõ công thức mới →
+    // bấm Xong. Node của server lúc này ôi, nên chỗ hiển thị phải tự dựng lại
+    // bằng chunk client. Đây là nhánh mà `ssr: false` phụ thuộc vào.
+    const question = { ...MCQ, stem: "$x^2$" };
+    const nodes = nodesFor(question);
+    const edited = { ...question, stem: "Đã sửa: $\\sqrt{9}=3$." };
+
+    // Dựng với node của chuỗi CŨ nhưng câu hỏi mang chuỗi MỚI — chính trạng
+    // thái mà ReviewScreen rơi vào ngay sau một lần gõ.
+    const { container } = render(
+      <QuestionEditor question={edited} onChange={vi.fn()} hasError={false} nodes={nodes} />,
+    );
+
+    await waitFor(
+      () => {
+        const annotations = Array.from(container.querySelectorAll("annotation")).map(
+          (a) => a.textContent,
+        );
+        expect(annotations).toContain("\\sqrt{9}=3");
+      },
+      { timeout: LAZY_CHUNK_BUDGET_MS },
+    );
+    // Và chuỗi nguồn KHÔNG được lọt ra màn hình — đúng bug ban đầu.
+    expect(container.textContent).not.toContain("$\\sqrt{9}=3$");
+  });
+
+  it("không có node nào (câu server chưa từng thấy) thì vẫn render math", async () => {
+    // `nodes` vắng mặt là trạng thái hợp lệ, không phải lỗi. Nếu nhánh này im
+    // lặng trả về chuỗi rỗng thì tác giả mất hẳn nội dung câu hỏi.
+    const { container } = render(
+      <QuestionEditor question={MCQ} onChange={vi.fn()} hasError={false} />,
+    );
+
+    await waitFor(() => expect(container.querySelector(".katex")).not.toBeNull(), {
+      timeout: LAZY_CHUNK_BUDGET_MS,
+    });
   });
 });

@@ -33,6 +33,7 @@ import { ExtractionErrorPanel } from "./ExtractionErrorPanel";
 import { AssembledQuestionList } from "./AssembledQuestionList";
 import { MetadataFields, type ExamMetaFormValue } from "./MetadataFields";
 import { PublishBar } from "./PublishBar";
+import type { ReviewNodes } from "./reviewNodes.types";
 
 interface ReviewScreenProps {
   examId: string;
@@ -40,6 +41,16 @@ interface ReviewScreenProps {
   initialExam: AssembledExam;
   /** v2.2: phiên đến từ extract Automatic (?src=auto) — bật marker AI. */
   srcAuto?: boolean;
+  /**
+   * Nội dung câu hỏi mà SERVER đã render sẵn từ `initialExam` (TD-027).
+   *
+   * Nó khớp với `initialExam`, KHÔNG khớp với `exam` trong state — và đó là
+   * chủ đích: mỗi chỗ hiển thị tự so chuỗi của mình với chuỗi đã dựng ra node
+   * (`RenderedText.source`) rồi quyết định dùng lại hay dựng lại. Nhờ vậy
+   * component này không phải theo dõi "câu nào đã bị sửa" — một trạng thái
+   * thứ hai song song với `exam` thì chỉ có thể lệch pha.
+   */
+  nodes?: ReviewNodes;
 }
 
 /** State → SaveExamPatch. v2.2: subject/grade gửi kèm khi CHƯA publish (server
@@ -97,6 +108,7 @@ export function ReviewScreen({
   status: initialStatus,
   initialExam,
   srcAuto,
+  nodes,
 }: ReviewScreenProps) {
   const t = useT();
   const [exam, setExam] = useState<AssembledExam>(initialExam);
@@ -255,6 +267,7 @@ export function ReviewScreen({
         parts={exam.parts}
         errors={errors}
         onChangeQuestion={onChangeQuestion}
+        nodes={nodes}
       />
 
       <PublishBar

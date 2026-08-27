@@ -3,8 +3,8 @@
 // HomeCarousel — băng chuyền giới thiệu nền tảng ở trang chủ (Layer 1).
 //
 // Ba mục trong cùng MỘT chuỗi: "Giới thiệu" (chính là nhóm nội dung hero đã có
-// từ trước, giữ NGUYÊN VĂN), "Có tích hợp AI" và "Học tập thích ứng". Hai mục
-// sau hiển thị tên website + một dòng mô tả ngắn.
+// từ trước, giữ NGUYÊN VĂN), "Có tích hợp AI" và "Hiệu năng vượt trội". Hai mục
+// sau là một tiêu đề ngắn + một dòng mô tả.
 //
 // Điều hướng: TỰ ĐỘNG sau mỗi 7 giây, cộng vuốt ngang trên cảm ứng (useSwipe —
 // dùng lại đúng hook của Exam Player).
@@ -66,7 +66,7 @@ function usePrefersReducedMotion() {
   );
 }
 
-/** Ba mục: Giới thiệu · Có tích hợp AI · Học tập thích ứng. */
+/** Ba mục: Giới thiệu · Có tích hợp AI · Hiệu năng vượt trội. */
 const SLIDE_COUNT = 3;
 
 export function HomeCarousel() {
@@ -215,19 +215,27 @@ function IntroBody() {
 /** Mục 2 và 3 — một tiêu đề ngắn + MỘT dòng mô tả.
  *
  *  Mục 2 (AI) không dùng chung tiêu đề với mục 3 nữa (engineer chốt
- *  2026-08-21): nó tự xưng "AI-powered" và kèm logo Gemini. Mục 3 giữ nguyên
- *  tên website. */
+ *  2026-08-21): nó tự xưng "AI-powered" và kèm logo Gemini.
+ *
+ *  Mục 3 nay là "Best performance" (engineer chốt 2026-08-27) — trước đó nó chỉ
+ *  in lại tên website, thứ mà SiteHeader và logo hero đã nói rồi. Dòng mô tả của
+ *  nó dẫn SỐ ĐO THẬT trên prod chứ không phải khẩu hiệu; nguồn của từng con số
+ *  ghi ngay cạnh chuỗi trong `lib/i18n/dictionaries/en.ts`. Đổi kiến trúc làm
+ *  chậm site đi thì câu đó thành nói dối — nên nó được coi là một khẳng định
+ *  phải bảo trì, không phải chữ trang trí. */
 function FeatureBody({ slideIndex }: { slideIndex: number }) {
   const t = useT();
   const isAi = slideIndex === 1;
-  const descriptionKey: MessageKey = isAi ? "home.aiDescription" : "home.adaptiveDescription";
+  const descriptionKey: MessageKey = isAi
+    ? "home.aiDescription"
+    : "home.performanceDescription";
 
   return (
     <>
       {/* h2 chứ không phải h1: mỗi trang chỉ được có một h1, và h1 đó thuộc về
           mục "Giới thiệu". */}
       <h2 className="max-w-3xl font-serif text-2xl leading-[1.15] font-semibold tracking-tight text-[#1B1512] sm:text-4xl lg:text-5xl">
-        {t(isAi ? "home.aiHeadline" : "home.siteName")}
+        {t(isAi ? "home.aiHeadline" : "home.performanceHeadline")}
       </h2>
 
       {/* Dòng ghi công Gemini — ngay dưới tiêu đề "AI-powered", vì nó trả lời

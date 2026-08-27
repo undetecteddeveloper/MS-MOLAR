@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { getMyExam } from "@/app/(layer4)/queries";
 import { ReviewScreen } from "@/app/(layer4)/_components/ReviewScreen";
+import { renderReviewNodes } from "@/app/(layer4)/_components/reviewNodes";
 import { PageContainer } from "@/components/layout/PageContainer";
 
 export default async function ReviewExamPage({
@@ -36,6 +37,9 @@ export default async function ReviewExamPage({
         status={detail.status}
         initialExam={detail.exam}
         srcAuto={src === "auto"}
+        // TD-027: markdown + LaTeX render Ở ĐÂY (server), không ở QuestionEditor
+        // — giữ 126.3 KB br của RichText khỏi lượt tải đầu của màn sửa đề.
+        nodes={renderReviewNodes(detail.exam.questions)}
       />
     </PageContainer>
   );

@@ -1,7 +1,9 @@
 "use client";
 
 // QuestionEditor — sửa tại chỗ một câu (UI Spec §QuestionEditor / Task 6.4 + D1).
-// Chế độ XEM render qua <RichText> (markdown + LaTeX) — GIỐNG HỆT màn làm bài.
+// Chế độ XEM hiển thị markdown + LaTeX đã render — GIỐNG HỆT màn làm bài. Từ
+// TD-027, phần tử đó do SERVER dựng sẵn và đi xuống qua prop `nodes`; chỉ chuỗi
+// tác giả VỪA SỬA mới cần tới chunk RichText ở client (xem khối ⚠ bên dưới).
 // Trước đây màn này in thẳng chuỗi nguồn, nên đề có công thức hiện ra dưới dạng
 // "$\frac{1}{2}$" và tác giả không có cách nào biết đề sẽ hiển thị đúng hay
 // không cho tới khi đã publish. Chế độ SỬA vẫn là chuỗi NGUỒN (phải sửa được
@@ -18,34 +20,86 @@
 // hình riêng — ngoài 5 action Task 4.1); MVP chỉ cho GỠ hình (đặt imageUrl=null).
 // Hình ban đầu đến từ bước trích xuất.
 
-import { useState } from "react";
+import dynamic from "next/dynamic";
+import { useState, type ReactNode } from "react";
 import { QuestionFigure } from "@/components/shared/QuestionFigure";
-import { RichText } from "@/components/shared/RichText";
 import { useT } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n/translate";
 import { LIMITS } from "@/lib/ugc/limits";
 import type { AssembledQuestion, ChoiceId, SubItemId } from "@/lib/ugc/types";
+import {
+  answerPresentation,
+  CHOICE_CLASS,
+  STEM_CLASS,
+  SUB_ITEM_CLASS,
+  type RenderedText,
+  type ReviewQuestionNodes,
+} from "./reviewNodes.types";
 
-// ⚠ RichText Ở ĐÂY LÀ IMPORT TĨNH, VÀ ĐÓ LÀ KẾT LUẬN CÓ SỐ ĐO — ĐỪNG "TỐI ƯU"
-// LẠI BẰNG next/dynamic (TD-027, đo 2026-08-27) ⚠
+// ---------------------------------------------------------------------------
+// RichText Ở MÀN NÀY: node của SERVER là chính, chunk client là đường lui
+// (TD-027, 2026-08-27)
+// ---------------------------------------------------------------------------
 //
-// Đã thử đúng cách đó và ĐÃ ĐO trên production sau khi deploy. Kết quả: KHÔNG
-// được gì cả.
-//   · byte tải về:  354.3 → 356.2 KB br  (nhích LÊN, thêm một chunk)
-//   · TBT:          404 → 460ms          (nhích LÊN)
-//   · LCP:          3668 → 3632ms        (trong sai số)
-// Chunk markdown+KaTeX 126.3 KB VẪN được tải — `next/dynamic` với `ssr` mặc
-// định chỉ đưa nó ra khỏi danh sách chunk EAGER của route, còn trình duyệt vẫn
-// phải nạp nó để HYDRATE đúng cây mà server đã render. Đổi lại ta nhận thêm một
-// ranh giới Suspense và ba test phải chuyển sang `waitFor`.
+// Chế độ XEM lấy phần tử đã render sẵn từ `renderReviewNodes` (server) qua prop
+// `nodes`. Nhờ vậy chunk markdown+KaTeX 126.3 KB br KHÔNG nằm trong lượt tải
+// đầu của route — nó đi xuống dưới dạng phần tử host trong RSC payload, thứ
+// client hydrate được mà không cần một dòng mã nào của react-markdown/KaTeX.
 //
-// Bài học rộng hơn, vì nó suýt lọt: con số "chunk client tham chiếu 169.9 →
-// 68.7 KB" đọc từ `page_client-reference-manifest.js` LÀ THẬT nhưng ĐO SAI THỨ
-// — nó đếm thứ manifest khai, không đếm thứ trình duyệt tải. Cùng khoảng cách
-// giữa "build nói gì" và "người dùng nhận gì" mà TD-025 sinh ra để canh.
+// ⚠ ĐỪNG ĐỔI `LazyRichText` THÀNH IMPORT TĨNH, VÀ ĐỪNG BỎ `ssr: false` ⚠
+// Một import tĩnh RichText ở file này kéo nguyên 126.3 KB trở lại bundle và
+// xoá sạch khoản tiết kiệm — đúng như TD-021 đã đo (route /result/detail đứng
+// nguyên 181.8K khi còn MỘT import tĩnh sót lại). Còn `ssr` mặc định thì đã
+// được ĐO trên production và KHÔNG được gì: 354.3 → 356.2 KB br, TBT 404 →
+// 460ms, vì server vẫn render nên trình duyệt vẫn phải nạp chunk để hydrate.
 //
-// Muốn hạ route này thật thì phải đổi KIẾN TRÚC (đừng render cả 40 câu một
-// lượt), không phải đổi cách import. Xem TD-027.
+// BẤT BIẾN khiến `ssr: false` an toàn ở đây (nó KHÔNG an toàn ở chỗ khác):
+// nhánh `LazyRichText` chỉ chạy khi chuỗi hiện tại KHÁC chuỗi mà server đã
+// render. Ở lượt tải đầu, state khởi tạo từ `initialExam` — chính thứ server
+// vừa render — nên mọi chuỗi đều khớp và không nhánh nào chạm tới chunk. Muốn
+// chuỗi khác đi thì tác giả PHẢI bấm "Sửa" trước, và cú bấm đó đã gọi
+// `warmRichText()`. Tức chunk được nạp trong lúc tác giả đang gõ, chứ không
+// phải lúc họ bấm "Xong" rồi ngồi chờ. Đây là lý do đây KHÔNG phải cái bẫy
+// "trang trống rồi mới có chữ" mà TD-023 cảnh báo.
+//
+// Cùng một `import()` cho cả `dynamic` lẫn `warmRichText` — bundler gộp về
+// MỘT chunk và promise của module được nhớ, nên hâm nóng không tải hai lần.
+
+const LazyRichText = dynamic(
+  () => import("@/components/shared/RichText").then((m) => m.RichText),
+  { ssr: false }
+);
+
+/** Bắt đầu nạp chunk RichText NGAY khi tác giả vào chế độ sửa — xem bất biến ở trên. */
+function warmRichText() {
+  void import("@/components/shared/RichText");
+}
+
+/**
+ * Một đoạn nội dung ở chế độ XEM.
+ *
+ * `rendered` là node server dựng sẵn kèm CHÍNH chuỗi đã dựng ra nó. Còn khớp
+ * thì dùng lại (0 byte JS); tác giả vừa sửa thì chuỗi lệch và ta dựng lại bằng
+ * chunk client. So sánh CỤC BỘ như thế nên không có cờ dirty nào phải xuyên
+ * qua ba tầng component — xem `RenderedText` trong reviewNodes.types.ts.
+ *
+ * `rendered` vắng mặt là chuyện hợp lệ chứ không phải lỗi: nó cũng là đường
+ * chạy khi component được dùng ngoài trang thật (test đơn lẻ).
+ */
+function ViewText({
+  text,
+  rendered,
+  className,
+  inline = false,
+}: {
+  text: string;
+  rendered: RenderedText | undefined;
+  className: string;
+  inline?: boolean;
+}): ReactNode {
+  if (rendered && rendered.source === text) return rendered.node;
+  return <LazyRichText text={text} inline={inline} className={className} />;
+}
 
 const CHOICE_IDS: ChoiceId[] = ["A", "B", "C", "D"];
 const SUB_ITEM_IDS: SubItemId[] = ["a", "b", "c", "d"];
@@ -63,12 +117,15 @@ interface QuestionEditorProps {
   onChange: (patch: Partial<AssembledQuestion>) => void;
   /** Câu này có lỗi (để viền cảnh báo). */
   hasError: boolean;
+  /** Nội dung server render sẵn cho CHÍNH câu này (TD-027). Vắng = render ở client. */
+  nodes?: ReviewQuestionNodes;
 }
 
 export function QuestionEditor({
   question,
   onChange,
   hasError,
+  nodes,
 }: QuestionEditorProps) {
   const t = useT();
   const [editing, setEditing] = useState(false);
@@ -88,7 +145,13 @@ export function QuestionEditor({
           <span className="text-xs text-muted-foreground">{t(TYPE_LABEL_KEY[q.type])}</span>
           <button
             type="button"
-            onClick={() => setEditing((v) => !v)}
+            onClick={() => {
+              // Vào chế độ sửa = tác giả sắp làm chuỗi lệch khỏi node của
+              // server, tức sắp cần chunk RichText. Nạp NGAY từ đây để nó về
+              // trong lúc họ đang gõ, chứ không phải lúc họ bấm "Xong" rồi chờ.
+              if (!editing) warmRichText();
+              setEditing((v) => !v);
+            }}
             className="text-xs text-muted-foreground underline-offset-4 hover:text-brand hover:underline"
           >
             {editing ? t("common.done") : t("common.edit")}
@@ -107,7 +170,7 @@ export function QuestionEditor({
           placeholder={t("upload.questionText")}
         />
       ) : (
-        <RichText text={q.stem} className="mt-3 text-foreground" />
+        <ViewText text={q.stem} rendered={nodes?.stem} className={STEM_CLASS} />
       )}
 
       {/* Hình */}
@@ -172,7 +235,12 @@ export function QuestionEditor({
                     placeholder={t("upload.choicePlaceholder", { choice: cid })}
                   />
                 ) : choice ? (
-                  <RichText text={choice.text} inline className="flex-1 text-sm text-foreground" />
+                  <ViewText
+                    text={choice.text}
+                    rendered={nodes?.choices[cid]}
+                    className={CHOICE_CLASS}
+                    inline
+                  />
                 ) : (
                   <span className="flex-1 text-sm text-foreground">{empty}</span>
                 )}
@@ -220,7 +288,12 @@ export function QuestionEditor({
                     placeholder={t("upload.statementPlaceholder", { item: sid })}
                   />
                 ) : item ? (
-                  <RichText text={item.text} inline className="flex-1 text-sm text-foreground" />
+                  <ViewText
+                    text={item.text}
+                    rendered={nodes?.subItems[sid]}
+                    className={SUB_ITEM_CLASS}
+                    inline
+                  />
                 ) : (
                   <span className="flex-1 text-sm text-foreground">{empty}</span>
                 )}
@@ -274,10 +347,10 @@ export function QuestionEditor({
               placeholder={t("upload.shortAnswerExample")}
             />
           ) : q.essayAnswer ? (
-            <RichText
+            <ViewText
               text={q.essayAnswer}
-              inline
-              className="mt-1 block rounded-[4px] border border-border bg-card px-3 py-1.5 text-sm text-foreground"
+              rendered={nodes?.answer}
+              {...answerPresentation(q.type)}
             />
           ) : (
             <p className="mt-1 rounded-[4px] border border-border bg-card px-3 py-1.5 text-sm text-foreground">
@@ -303,9 +376,10 @@ export function QuestionEditor({
               className="mt-1 w-full resize-y rounded-[4px] border border-border bg-card p-3 text-sm text-foreground outline-none focus:border-brand"
             />
           ) : q.essayAnswer ? (
-            <RichText
+            <ViewText
               text={q.essayAnswer}
-              className="mt-1 rounded-[4px] border border-border bg-card p-3 text-sm text-foreground"
+              rendered={nodes?.answer}
+              {...answerPresentation(q.type)}
             />
           ) : (
             <p className="mt-1 rounded-[4px] border border-border bg-card p-3 text-sm text-foreground">
