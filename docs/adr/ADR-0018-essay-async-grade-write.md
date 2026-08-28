@@ -23,7 +23,7 @@ The PRD locks *what* a graded essay looks like (W1–W8) and *when* grading runs
 
 Established in the PRD and re-verified in the tree while writing this ADR. None is re-litigated below; they are the boundary conditions.
 
-- **F1 — A graded essay still persists `scored:false` and `isCorrect:false`.** `record_skill_mastery()` excludes a per-question row only on `coalesce((pq->>'scored')::boolean, true)` (`schema.sql:1345`), and `computeWrongTwiceQuestionIds()` only on `row.scored === false` (`lib/scoring/wrongTwice.ts:45`). W1 is therefore the only persisted shape in which D7 holds without editing either. The band lives in new keys; readers branch on a **new lifecycle field**, never on `scored` or `isCorrect`.
+- **F1 — A graded essay still persists `scored:false` and `isCorrect:false`.** `record_skill_mastery()` excludes a per-question row only on `coalesce((pq->>'scored')::boolean, true)` (`schema.sql:1354`), and `computeWrongTwiceQuestionIds()` only on `row.scored === false` (`lib/scoring/wrongTwice.ts:45`). W1 is therefore the only persisted shape in which D7 holds without editing either. The band lives in new keys; readers branch on a **new lifecycle field**, never on `scored` or `isCorrect`.
 - **F2 — A 429 is the most likely free-tier failure, and is not terminal.** AC-065 requires in-pass retry with backoff before a question may become `failed`. Only a non-429 error or exhaustion of those retries is terminal.
 - **F3 — Stored `pending` can never be written to `failed` by anything in this release.** `after()` shares the invocation and dies with it; `vercel.json` has no cron; there is no queue. W6 forbids adding a background writer. The deadline is applied at **read** time by a pure derivation function.
 
@@ -241,7 +241,7 @@ The one genuinely new question asynchrony raises is **which write may land secon
 
 - **New**: one Groq emission module (`server-only`, one endpoint constant, own retry loop); one Groq model constant in `lib/ai/models.ts`; a Groq daily budget counter; two SQL functions in a new `schema.sql` section; two named operations in `lib/supabase/service-role.ts`.
 - **Changed**: `computeScore()` emits the lifecycle field, the earned/max keys and a zeroed attempt counter for essay questions; `scripts/check-ai-key-bundle.mjs` gains a `GROQ_API_KEY` entry; `verify-schema.ts` gains grant assertions for both functions.
-- **Unchanged, and asserted as unchanged**: `schema.sql:1345` (`record_skill_mastery`), `lib/scoring/wrongTwice.ts`, `record_exam_result()`, the `exam_results` DDL, every `consumeQuota()` call site.
+- **Unchanged, and asserted as unchanged**: `schema.sql:1354` (`record_skill_mastery`), `lib/scoring/wrongTwice.ts`, `record_exam_result()`, the `exam_results` DDL, every `consumeQuota()` call site.
 
 ## Implementation Guidance
 
@@ -268,7 +268,7 @@ The one genuinely new question asynchrony raises is **which write may land secon
 
 ## References
 
-- `SOURCE/supabase/schema.sql` §10b, §11a, §11b, and the MASTERY WRITE block (`:1345`).
+- `SOURCE/supabase/schema.sql` §10b, §11a, §11b, and the MASTERY WRITE block (`:1354`).
 - `SOURCE/lib/supabase/service-role.ts`; `SOURCE/lib/billing/quota.ts:290–400`; `SOURCE/lib/ugc/gemini.ts`; `SOURCE/lib/scoring/wrongTwice.ts:45`; `SOURCE/scripts/check-ai-key-bundle.mjs`; `SOURCE/lib/support/actions.ts:127` (the `after()` ordering precedent).
 - Production measurement 2026-08-27 (ref `pebjdlbgbmizgfpuptjl`, read-only): 152 questions, 13 essay, 100% `essay_answer` coverage, **0** essay answers ever submitted, fingerprint `021dd1387945` matching the repo.
 
