@@ -62,7 +62,7 @@ biggest_risks:
   - "HistoryRowMenu.test.tsx nhạy thời gian (dùng waitFor, không dùng fake timer) và đã flaky MỘT LẦN dưới tải song song; một lượt đỏ đơn lẻ ở file này không tự nó chứng minh có defect."
 unknowns:
   - "FE-OQ-1: MyHistoryEntry cần boolean THỨ HAI (hasIncompleteEssay) để O-8 thoả trên /history — cần một sửa đổi một dòng ở hợp đồng của backend Design Doc."
-  - "FE-OQ-2: UI Spec O-5 — giữ HAI khoá chân trang player (mặc định của tài liệu này) hay MỘT khoá kèm ràng buộc thứ tự ship. Tài liệu này KHÔNG tự chọn."
+  - "FE-OQ-2 — ĐÃ ĐÓNG 2026-08-29 (kỹ sư): giữ HAI khoá + cờ server-only truyền xuống bằng prop tuỳ chọn, tức phương án (a), đúng mặc định của tài liệu này. Lý do được chốt cùng: (b) nhỏ hơn ở mọi cột đo được nhưng giao tính đúng đắn câu chữ cho thứ tự commit, và C-F6 (một kỹ sư, không staging) là chính lý do thứ tự đó không đáng cược."
   - "FE-OQ-3: chi phí payload của per_question trong listMyHistory() chưa đo (kế thừa UI Spec O-3 → backend OQ-3)."
 ```
 
@@ -502,7 +502,7 @@ Gate này áp cho sáu phần tử mang bề mặt bảo trì mà lát cắt fro
 | (c) `NEXT_PUBLIC_*` | **Trượt UI-D7** | 0 | 1 biến env công khai | Không | Không | Bản sao thứ hai của một sự thật ở phía bên kia biên |
 | (d) chân trang render ở server | AC-051, AC-067, UI-D7 | 0 | 1 prop (`ReactNode[]`) | Có (2 biên) | Không | Một `ReactNode` mỗi câu thay cho một boolean cho cả bài; nặng hơn hẳn cho cùng một sự thật |
 
-**4. Chọn: (a) — nhưng đây là một lựa chọn CÓ ĐIỀU KIỆN, và tài liệu này KHÔNG tự đóng nó.**
+**4. Chọn: (a). ĐÃ ĐƯỢC KỸ SƯ XÁC NHẬN 2026-08-29 — FE-OQ-2 đóng.** *(Đoạn dưới giữ nguyên lập luận đã dẫn tới lựa chọn, vì lý do mới là thứ phiên sau cần, không phải kết quả.)*
 
 (c) trượt UI-D7 thẳng. (d) làm cùng việc bằng một payload lớn hơn nhiều lần. Cuộc so thật là **(a) vs (b)**, và (b) **nhỏ hơn ở mọi cột định lượng** — 0 prop, 0 biên, 0 khoá thừa.
 

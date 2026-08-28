@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| **Version** | 1.0 |
-| **Date** | 2026-08-28 |
+| **Version** | 1.2 |
+| **Date** | 2026-08-29 |
 | **Status** | Draft — thiết kế backend cho chấm tự luận tự động: hai hàm SQL đặc quyền của ADR-0018, hợp đồng khoá jsonb mới trong `exam_results.per_question`, điểm phát Groq, bộ đếm ngân sách riêng, hàm suy diễn vòng đời đọc-lúc-render, Server Action chấm lại, telemetry, và hai thay đổi schema thủ công. **Toàn bộ bề mặt React/hiển thị nằm ngoài phạm vi** — do `docs/ui-spec/essay-auto-scoring-ui-spec.md` và một frontend Design Doc riêng sở hữu; tài liệu này cung cấp hợp đồng dữ liệu mà chúng tiêu thụ. |
 | **PRD** | `docs/prd/essay-auto-scoring-prd.md` v1.2 (Draft — D1–D13 khoá, W1–W8, C1–C5, AC-001–AC-072) |
 | **UI Spec** | `docs/ui-spec/essay-auto-scoring-ui-spec.md` v1.1 (Draft — UI-D1…UI-D13, RS-0…RS-6, O-1…O-8) |
@@ -109,7 +109,8 @@ Sự thật mức dự án nằm ở `docs/project-context/external-resources.md
 
 - [x] Hai hàm SQL mới trong một khối `schema.sql` mới đặt **sau §11** và được §11 trỏ tới (ADR-0018 Implementation Guidance #1), kèm khối `revoke`/`grant` chép nguyên hình dạng §11b.
 - [x] Hai thao tác mới ở `SOURCE/lib/supabase/service-role.ts` (11 → 13): `claimEssayGradingAttempt()`, `recordEssayGrade()`.
-- [x] `SOURCE/lib/scoring/essayLifecycle.ts` (mới, thuần) — literal năm khoá jsonb, `ESSAY_BANDS`, `ESSAY_MAX_ATTEMPTS`, `ESSAY_MAX_POINTS`, `ESSAY_PENDING_DEADLINE_MS`, `newEssayEntry()`, `deriveEssayView()`, `summariseEssays()`.
+- [x] `SOURCE/lib/scoring/essayLifecycle.ts` (mới, thuần) — literal năm khoá jsonb, `ESSAY_BANDS`, `ESSAY_MAX_ATTEMPTS`, `ESSAY_MAX_POINTS`, `ESSAY_PENDING_DEADLINE_MS`, `newEssayEntry()`, `deriveEssayView()`, `summariseEssays()`, `isEssayUnresolved()`, **`isEssayIncomplete()`**, **`hasUnresolvedEssay()`**, **`hasIncompleteEssay()`**.
+- [x] `SOURCE/lib/pdf/generateAttemptPdf.ts` — `AttemptPdfData` (:11) nhận **một** trường `hasIncompleteEssay: boolean`, để hai lối xuất PDF (`result/page.tsx:56` và `HistoryRow.tsx:23`) không thể mang hai sự thật khác nhau về cùng một lượt thi (§ Hai vị từ mức-mảng).
 - [x] `SOURCE/lib/scoring/computeScore.ts` — tách nhánh `if (!isScored(q))`, thêm tham số thứ ba `options` (mặc định giữ nguyên hành vi hôm nay), trích `hasEssayGroundTruth()` dùng chung với `isScored()`, sửa **lý do** trong hai khối comment (header :17-18, doc `isScored()` :35).
 - [x] `SOURCE/lib/essay/` (mới): `groqClient.ts` (điểm phát duy nhất), `prompt.ts` (dựng prompt, thuần), `parseGrade.ts` (parse + validate, thuần), `budget.ts` (bộ đếm ngày Groq), `gradeEssays.ts` (điều phối pass, server-only).
 - [x] `SOURCE/lib/billing/budgetDay.ts` (mới) — **một** lời khai duy nhất của khoá ngày Pacific + TTL, được cả `quota.ts` lẫn `lib/essay/budget.ts` import. Đây là lời giải cho "forced choice" ADR-0018 giao xuống (§ Forced choice).
@@ -300,6 +301,12 @@ ID mang tiền tố `EG-BE-` (Essay Grading, Backend) để không đụng dải
 - [ ] **EG-BE-028** — Sau thay đổi, `LIMITS.MAX_ATTEMPT_ANSWER` **phải** bằng đúng trần trong `attempt_answers_answer_check` trên **cả hai** database, và `npm run verify:schema` **phải** đỏ nếu chúng lệch nhau.
 - [ ] **EG-BE-029** — Prompt gia sư (đường Gemini) **phải** cắt `studentAnswer` ở một trần **khai riêng**, để việc nâng trần DB **không** làm tăng chi phí token của Gemini.
 
+### Một sự thật, một lối tính (O-8 / D-13)
+
+- [ ] **EG-BE-034** — **Với cùng một mảng `per_question` và cùng `created_at`**, `hasIncompleteEssay()` và `hasUnresolvedEssay()` **phải** trả về đúng những giá trị mà `summariseEssays()` ngụ ý: `hasUnresolvedEssay(...) === (summariseEssays(...)?.unresolvedCount ?? 0) > 0`. Ghim bằng một test chạy cả hai đường trên cùng fixture, để hai lối tính một sự thật không trôi lệch.
+- [ ] **EG-BE-035** — **Khi** một lượt thi có ít nhất một câu tự luận ở RS-6, `hasIncompleteEssay` **phải** là `true` ở **cả** `ExamResult` **và** `MyHistoryEntry` cho cùng `attemptId`; và **khi** không có câu nào ở RS-6, nó **phải** là `false` ở cả hai — kể cả với một lượt thi không có câu tự luận nào và với một dòng ghi trước khi tính năng ship (**không bao giờ** `undefined`).
+- [ ] **EG-BE-036** — RS-6 **phải** được suy ra ở **đúng một chỗ**: biểu thức `state === "failed" && !retryAvailable` **phải không** xuất hiện ở bất kỳ file nào ngoài `SOURCE/lib/scoring/essayLifecycle.ts`. Kiểm bằng một phép quét mã nguồn, cùng lối phép quét điểm phát.
+
 ### Hồi quy
 
 - [ ] **EG-BE-030** — **Nếu** `questionType` là `'mcq'`, `'true_false'` hoặc `'short_answer'`, **thì** `totalScore`, `correct`, `total`, `perQuestion` và `topicBreakdown` **phải** giống hệt bản trước thay đổi trên mọi fixture hiện có.
@@ -342,7 +349,7 @@ Nhiệm vụ bắt buộc kiểm lại từng số dòng thay vì tin theo. Bố
 
 | Type | Path | Description |
 |---|---|---|
-| New | `SOURCE/lib/scoring/essayLifecycle.ts` | **Thuần.** Literal năm khoá jsonb, `ESSAY_BANDS`, `ESSAY_MAX_POINTS`, `ESSAY_MAX_ATTEMPTS`, `ESSAY_PENDING_DEADLINE_MS`; `newEssayEntry()`, `deriveEssayView()`, `summariseEssays()`, `isEssayUnresolved()`. Đặt cạnh `computeScore.ts`/`wrongTwice.ts` vì đây là module thuần thứ ba mà **cả** đường ghi lẫn đường đọc cùng import; đặt trong `lib/essay/` sẽ kéo đường đọc vào một thư mục toàn module `server-only`. |
+| New | `SOURCE/lib/scoring/essayLifecycle.ts` | **Thuần.** Literal năm khoá jsonb, `ESSAY_BANDS`, `ESSAY_MAX_POINTS`, `ESSAY_MAX_ATTEMPTS`, `ESSAY_PENDING_DEADLINE_MS`; `newEssayEntry()`, `deriveEssayView()`, `summariseEssays()`, `isEssayUnresolved()`, `isEssayIncomplete()`, `hasUnresolvedEssay()`, `hasIncompleteEssay()`. Đặt cạnh `computeScore.ts`/`wrongTwice.ts` vì đây là module thuần thứ ba mà **cả** đường ghi lẫn đường đọc cùng import; đặt trong `lib/essay/` sẽ kéo đường đọc vào một thư mục toàn module `server-only`. **Không** dựng module thứ hai cho hai vị từ mới (§ D-13) — chúng là cùng một phép suy diễn trên cùng dữ liệu. |
 | New | `SOURCE/lib/essay/groqClient.ts` | `import "server-only"`. **Điểm phát Groq DUY NHẤT**: một hằng endpoint export, một `POST` bằng `fetch`, vòng lặp retry của chính ta, phân loại lỗi thành union đóng. |
 | New | `SOURCE/lib/essay/prompt.ts` | **Thuần.** Dựng prompt: khối rubric chung, vùng tham chiếu có nhãn (`essay_answer`), vùng dữ liệu có nhãn (bài làm học sinh). Không I/O. |
 | New | `SOURCE/lib/essay/parseGrade.ts` | **Thuần.** Parse + validate response; trả `{ ok: true, band, lowConfidence }` hoặc `{ ok: false, reason }`. Không bao giờ ném. |
@@ -353,7 +360,9 @@ Nhiệm vụ bắt buộc kiểm lại từng số dòng thay vì tin theo. Bố
 | Existing (modified) | `SOURCE/lib/scoring/computeScore.ts` | Tham số thứ ba `options`; tách nhánh `if (!isScored(q))` (:99-101); trích `hasEssayGroundTruth()` dùng chung với `isScored()` :40; sửa **lý do** ở comment :17-18 và :35. `isScored()` **không đổi hành vi**. |
 | Existing (modified) | `SOURCE/app/(layer2)/actions.ts` | `submitExam()` đọc cờ, truyền `options`, đăng ký `after()` trước `redirect()` (:192). |
 | Existing (modified) | `SOURCE/app/(layer2)/queries.ts` | `getResult()`: `created_at` vào select (:579-581) và vào `ResultRow` (:469-475); gắn `essay` cho từng dòng và `essaySummary` cho cả lượt (cạnh chỗ gắn `hasBeenWrongTwice` ở :606-610). |
-| Existing (modified) | `SOURCE/app/(HM)/queries.ts` | `listMyHistory()`: `per_question, created_at` vào select (:64-66); `MyHistoryEntry` (:8-18) nhận **một** trường boolean; `EmbeddedRow` (:23-34) nhận hai trường. |
+| Existing (modified) | `SOURCE/app/(HM)/queries.ts` | `listMyHistory()`: `per_question, created_at` vào select (:64-66); `MyHistoryEntry` (:8-18) nhận **hai** trường boolean (`hasUnresolvedEssay`, `hasIncompleteEssay` — § D-13); `EmbeddedRow` (:23-34) nhận hai trường. |
+| Existing (modified) | `SOURCE/lib/pdf/generateAttemptPdf.ts` | `AttemptPdfData` (:11) nhận `hasIncompleteEssay: boolean`. **Kiểu này là chỗ hợp lưu của cả hai lối xuất PDF**, nên đặt trường ở đây là thứ khiến hai lối không thể bất đồng. Hợp đồng của `generateAttemptPdfFile()` (:30) không đổi về mặt chữ ký. |
+| Existing (modified) | `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/page.tsx` (:56), `SOURCE/app/(HM)/history/_components/HistoryRow.tsx` (:23) | Hai chỗ dựng `AttemptPdfData`; mỗi chỗ điền `hasIncompleteEssay` từ nguồn đã suy sẵn của chính đường đọc mình (`ExamResult` / `MyHistoryEntry`). **Không** chỗ nào tự viết lại biểu thức RS-6. |
 | Existing (modified) | `SOURCE/lib/supabase/service-role.ts` | Hai thao tác mới (11 → 13). **Sự kiện TD-029**: đây là thao tác thứ 12 và 13; thao tác thứ **14** buộc phải xét lại. |
 | Existing (modified) | `SOURCE/lib/ai/models.ts` | `ESSAY_GRADER_MODEL`. |
 | Existing (modified) | `SOURCE/lib/ugc/limits.ts` | `MAX_ATTEMPT_ANSWER: 500 → 4000`; comment :12-16 đang viết cứng `500` phải sửa cùng lúc. |
@@ -366,7 +375,8 @@ Nhiệm vụ bắt buộc kiểm lại từng số dòng thay vì tin theo. Bố
 | Existing (modified) | `SOURCE/lib/schema/schemaFingerprint.ts` | `SCHEMA_FINGERPRINT` (:41) — chỗ ghim vân tay **thứ hai**. |
 | Existing (modified) | `SOURCE/supabase/verify-schema.ts` | Hai assertion grant; cổng trần ký tự; cổng ghim `ESSAY_MAX_ATTEMPTS`. |
 | Existing (modified) | `SOURCE/supabase/test-rls.ts` | Phần 10, cases `EG-a…EG-e`. |
-| Existing (modified) | `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/page.tsx` | `export const maxDuration` — route segment của `submitExam()`. |
+| Existing (modified) | `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/page.tsx` | `export const maxDuration` — route segment của `submitExam()`. **Cộng chỗ đọc cờ thứ ba** (§ Ba chỗ đọc phía server): Server Component này đọc `ESSAY_GRADING_ENABLED` và truyền xuống `ExamPlayer` như prop `essayGradingEnabled?: boolean`. Nó là **cổng câu chữ**, không phải cổng hành vi. |
+| Existing (modified — prop truyền tiếp) | `SOURCE/app/(layer2)/_components/ExamPlayer.tsx` (:29-41), `SOURCE/app/(layer2)/_components/QuestionRenderer.tsx` (:45-53) | Nhận `essayGradingEnabled?: boolean`, **tuỳ chọn, mặc định `false`** — đã kiểm: cả hai hiện không khai prop nào như vậy, nên bắt buộc sẽ làm mọi chỗ dựng đỏ và `ExamPlayer.test.tsx` phải sửa. Hai file này thuộc phạm vi **Design Doc frontend**; liệt kê ở đây vì chúng là chỗ hạ cánh của một biến env mà tài liệu này sở hữu. |
 | Existing (modified) | `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` | `export const maxDuration` — route segment của `retryEssayGrading()`. Nhánh **có-chấm** (:133 trở đi) **không đụng tới** ⇒ deferral TBD-02 còn hiệu lực. |
 | Existing (modified — comment/test) | `SOURCE/types/result.ts` (:14-17), `computeScore.test.ts` (:4, :131), `prompt.test.ts` (:238, :251), `wrongTwice.test.ts` (:112, :132), `tutorActions.ts` (:269-272), `result/detail/page.tsx` (:6) | **Bảy chỗ khác** cũng khẳng định luật cũ thành sự thật, ngoài bốn chỗ AC-051 nêu tên. Sửa **lý do**, không sửa giá trị (§ D-09). |
 | Existing (reused, untouched) | `SOURCE/lib/scoring/wrongTwice.ts`, `SOURCE/types/question.ts`, `SOURCE/lib/billing/quotaTelemetry.ts`, `SOURCE/lib/supabase/boundedRead.ts`, `SOURCE/lib/ugc/gemini.ts` | Tham chiếu pattern; không sửa. |
@@ -435,6 +445,9 @@ Nhiệm vụ bắt buộc kiểm lại từng số dòng thay vì tin theo. Bố
 | `supabase/test-rls.ts:1244-1382` (Phần 4, S-a…S-e), `:1601-1671` (Phần 7, MM-a/MM-b) | Pattern reference — S-b (:1314-1320) **đã** chứng minh học sinh không `UPDATE` được `exam_results`; hai case mới chỉ cần phủ EXECUTE của hai hàm mới. |
 | `lib/supabase/boundedRead.ts:55`, `:74`, `:113-118` | Ràng buộc — `LIST_ROW_CEILING = 500`; đầu vào cho phép đo payload của OQ-3. |
 | `lib/scoring/__tests__/computeScore.test.ts:68-79`, `:131-139` | Integration point — helper `essay()` **không** đặt `essayAnswer`, nên khối test hiện có giữ nguyên xanh (§ D-10). |
+| `lib/pdf/generateAttemptPdf.ts:11` (`AttemptPdfData`), `:30` (`generateAttemptPdfFile`) | Data contract — kiểm bằng grep toàn repo: kiểu này có **hai** chỗ dựng (`app/(layer2)/exams/[id]/attempt/[attemptId]/result/page.tsx:56`, `app/(HM)/history/_components/HistoryRow.tsx:23`) và **sáu** chỗ chỉ truyền tiếp (`ResultActions.tsx:16`, `ActionButton.tsx:45`, `HistoryRowMenu.tsx:49`, `usePdfAction.ts:40`, cùng hai file test). Đây là bằng chứng cho § D-13: đặt trường ở kiểu này chạm cả hai lối xuất bằng một lần sửa. |
+| `app/(layer2)/_components/__tests__/QuestionRenderer.test.tsx:112`, `:116`, `:119` | Coupled sites — `:119` ghim `maxLength` bằng literal `500` (chỗ ghép cặp của AC-048); `:112` ghim nguyên văn `player.essayNotScored` bản tiếng Anh (chỗ ghép cặp của AC-051, hỏng ở một thời điểm khác). Xem § D-14. |
+| `components/ui/button.tsx:44-47` | Tham chiếu — biến thể viên thuốc được phơi qua nhóm **`shape`** (`shape="pill"`), **không** phải `variant`. Tài liệu này không dựng component nào nên không dùng nó; ghi lại vì UI Spec §UI-D2 trích nó là `variant="pill"` và một tài liệu downstream sẽ chép theo (xem báo cáo kèm bản sửa này). |
 | `vercel.json` (toàn file) | Bằng chứng — không `crons`, không `functions`; C2 và trần thời lượng mặc định. |
 | `TECH-DEBT.md:43-90` (TD-029), `:189` (TD-005) | Governance — hai điều kiện buộc xét lại, và chế độ hỏng của schema áp tay. |
 
@@ -455,6 +468,9 @@ Không có input codebase-analysis nào được truyền vào, nên bảng này
 | **D-09** | AC-051 nêu **bốn** khẳng định trong mã về luật cũ; thực tế có **mười một** | `transform` | Bốn chỗ AC-051 nêu: `computeScore.ts:17-18` + `:35`, `types/result.ts:14-17`, `QuestionRenderer.tsx:179-180`, `prompt.ts:36`. Bảy chỗ nữa tìm được bằng grep: `computeScore.test.ts:4` (header) và `:131` (tiêu đề describe), `prompt.test.ts:238` + `:251`, `wrongTwice.test.ts:112` + `:132`, `tutorActions.ts:269-272`, `result/detail/page.tsx:6`. Tất cả nói *"essay không bao giờ được chấm"*; sự thật mới là *"band được ghi NGOÀI `computeScore`, và dòng cố ý ở lại `scored:false`"*. Sửa **lý do**, giữ nguyên **giá trị** và **hành vi**. | grep toàn repo, đã liệt kê ở § Implementation Path Mapping |
 | **D-10** | Helper `essay()` trong `computeScore.test.ts` và bài học `topicBreakdown-q3-callsite` của lát cắt short_answer | `preserve` | Helper `essay()` (`:68-79`) **không** đặt `essayAnswer`, nên fixture của nó là câu không-chấm-được (AC-018) và **không phát khoá nào** — khối test `:131-139` giữ nguyên xanh mà không phải sửa. Rút ra từ tiền lệ: khi thêm tham số thứ ba `essayAnswer` vào helper, giá trị mặc định **phải là `undefined`**, không phải một chuỗi không rỗng. Lát cắt short_answer đã bị đúng cái bẫy này (mặc định `"1260"` làm vỡ assertion 2-phần-tử của khối `topicBreakdown`), và bài học đó được áp dụng trước ở đây thay vì phải phát hiện lại. | `computeScore.test.ts:68-79`, `:131-139`; `docs/design/short-answer-scoring-backend-design.md` § Fact Disposition `topicBreakdown-q3-callsite` |
 | **D-11** | Chuỗi hiển thị `upload.essayStored` nói với **tác giả đề** rằng tự luận "chưa chấm tự động" | `out-of-scope` (kèm cảnh báo) | `vi.ts:271` / `en.ts:334` (`"Tự luận — đã lưu, chưa chấm tự động."`), render ở `app/(layer4)/_components/QuestionEditor.tsx:15`. Nó trở thành **sai** khi cổng AC-067 qua. Ranh giới loại nó ra: D6 giữ **bề mặt của tác giả không đổi**, và bốn màn hình của UI Spec không gồm `(layer4)`. Nhưng nó không được im lặng — ghi thành **OQ-5** để kỹ sư chọn dứt điểm. | `vi.ts:271`, `en.ts:334`, `QuestionEditor.tsx:15` |
+| **D-13** | **Hợp đồng dữ liệu không thoả được O-8 ở lối vào `/history`** — tìm ra bởi Design Doc frontend (finding F-06), đã kiểm lại và đúng | `transform` | O-8 chốt: **không** chặn xuất PDF ở RS-6, **nhưng** tệp phải in `result.essay.pdfIncomplete`, và điều kiện in là *"có ít nhất một câu ở RS-6"*. RS-6 = `essayState === 'failed' && !retryAvailable`. Trên trang kết quả tính được; trên `/history` thì **không**: `MyHistoryEntry` chỉ mang `hasUnresolvedEssay`, và RS-6 không suy ra được từ nó. Hai lối xuất khi ấy sinh **hai tệp khác nhau cho một lượt thi** — hai artefact cho một sự thật, đúng thứ AC-007 tồn tại để chặn. Kết quả mới: một vị từ thuần `isEssayIncomplete()` cộng hai hàm gấp mức-mảng trong **cùng** module `essayLifecycle.ts` (không module thứ hai), một trường boolean **thứ hai** `hasIncompleteEssay` trên `MyHistoryEntry`, trường cùng tên trên `ExamResult`, và trường cùng tên trên `AttemptPdfData` — kiểu **đã** dùng chung bởi cả hai lối xuất. **Không DDL**: cả hai boolean suy từ `per_question`, đã có trong cả hai select. | `lib/pdf/generateAttemptPdf.ts:11` (`AttemptPdfData`), `:30` (`generateAttemptPdfFile`); hai chỗ dựng ở `result/page.tsx:56` và `HistoryRow.tsx:23`; hợp lưu ở `components/history/usePdfAction.ts:40` |
+| **D-14** | **Chỗ ghép cặp thứ ba của trần ký tự mà AC-048 KHÔNG nêu tên** | `transform` | `SOURCE/app/(layer2)/_components/__tests__/QuestionRenderer.test.tsx` ghim **hai** thứ mà tính năng này dịch chuyển, và chúng thuộc **hai AC khác nhau, hỏng vào hai thời điểm khác nhau** — nên gộp chúng lại là cách chắc chắn để sửa nhầm một cái: **(a) `:119` — `expect(textarea?.maxLength).toBe(500)`** là chỗ ghép cặp của **AC-048**; nó đỏ **ngay** khi `LIMITS.MAX_ATTEMPT_ANSWER` lên 4000, nên nó phải di chuyển trong **cùng commit** với bước 12. Comment `:116` cũng viết cứng *"CHECK length <= 500"* và đi kèm. **(b) `:112` — chuỗi `"Essay — your working is saved with the attempt, not auto-scored yet."`** (đúng `en.ts:197` = `player.essayNotScored`) là chỗ ghép cặp của **AC-051**, **không** của AC-048; nó ở nguyên **xanh** suốt giai đoạn tính năng còn tắt, vì UI-D8 **giữ** khoá cũ và `QuestionRenderer` là client component nên cờ tới nó bằng prop, mặc định tắt. Nó chỉ thành chỗ ghép cặp khi một test bắt đầu chạy nhánh **bật**. **Lập luận này ĐÃ ĐƯỢC XÁC NHẬN, không còn là suy đoán** (v1.2): kỹ sư chốt FE-OQ-2 theo phương án (a), và Design Doc frontend §MSA-F2 pin đúng hình dạng mà lập luận này dựa vào — prop `essayGradingEnabled?: boolean` **tuỳ chọn, mặc định `false`**. `QuestionRenderer.test.tsx` dựng component **không** truyền prop đó, nên nó nhận mặc định `false`, nên nó render `player.essayNotScored`, nên chuỗi ghim ở `:112` vẫn đúng. Nếu prop từng được đổi thành **bắt buộc**, hoặc mặc định thành `true`, thì `:112` đỏ ngay và trở thành chỗ ghép cặp của AC-051 sớm hơn dự kiến. Danh sách chỗ ghép cặp của AC-048 vì thế là **bốn** ở tầng mã (schema.sql, `limits.ts`, `submitExam` slice, test này) cộng cổng `verify-schema` — mục (3) của AC-048 thì **tự di chuyển** (§ D-04). | `app/(layer2)/_components/__tests__/QuestionRenderer.test.tsx:112`, `:116`, `:119`; `lib/i18n/dictionaries/en.ts:197` |
+| **D-15** | **v1.0 khẳng định `ESSAY_GRADING_ENABLED` "đọc ở đúng một chỗ" — SAI, và sai theo hai hướng độc lập** | `transform` | Hướng thứ nhất, **mâu thuẫn nội bộ ngay trong v1.0**: § Cờ tính năng viết "đọc ở đúng một chỗ (`submitExam()`)" trong khi chính đoạn đó, vài dòng dưới, lại viết *"`retryEssayGrading()` cũng kiểm cờ"*. Hai câu trong cùng một mục phủ định nhau. Hướng thứ hai, **mâu thuẫn với UI-D8**: chân trang ô tự luận phải chọn giữa hai khoá i18n theo cờ, mà `QuestionRenderer` là client component nên cờ **phải** được một Server Component đọc rồi truyền xuống — một chỗ đọc thứ ba. Kết quả mới: **ba** chỗ đọc phía server, phân thành **hai loại mục đích** (hai cổng hành vi, một cổng câu chữ), tất cả đọc **một** biến để chúng lật cùng lúc trong một lượt deploy. **Không** thêm `NEXT_PUBLIC_*` (UI-D7 cấm). *Ghi chú về nguồn: bản vá này được đặt hàng với con số "hai chỗ đọc"; con số đúng là **ba**, vì chỗ đọc trong `retryEssayGrading()` là của chính tài liệu này và người đặt hàng không có nó trong tầm nhìn. Viết "hai" sẽ đưa một lỗi mới vào đây để sửa một lỗi cũ.* | `app/(layer2)/actions.ts` (`submitExam`), `app/(layer2)/essayActions.ts` (`retryEssayGrading`), `app/(layer2)/exams/[id]/attempt/[attemptId]/page.tsx` (segment); `ExamPlayer.tsx:29-41` và `QuestionRenderer.tsx:45-53` (đã kiểm: **chưa** có prop nào như vậy, nên prop mới phải tuỳ chọn) |
 | **D-12** | `describe("computeScore — true_false (2026-07-21 re-enable)")` mang ngày **chưa xác minh** | `out-of-scope` | `computeScore.test.ts:93` vẫn ghi `2026-07-21`; ngày đúng theo `git log` là `2026-07-27` (đã ghi ở `docs/design/short-answer-scoring-backend-design.md` § Prerequisite ADRs). Header `computeScore.ts:8` **đã** được sửa thành `2026-07-27`. Ranh giới loại nó ra: đây là món nợ tài liệu đã có chủ (lát cắt short_answer đã lên lịch), và tính năng này không sửa khối test đó. Ghi ra để lần sửa header tiếp theo dọn luôn. | `computeScore.test.ts:93` vs `computeScore.ts:8` |
 
 ## Design
@@ -474,7 +490,9 @@ Direct Impact:
   - SOURCE/app/(layer2)/essayActions.ts (MỚI — Server Action chấm lại)
   - SOURCE/app/(layer2)/actions.ts (submitExam đọc cờ, truyền options, đăng ký after() trước redirect :192)
   - SOURCE/app/(layer2)/queries.ts (getResult: created_at vào select + ResultRow; gắn essay + essaySummary)
-  - SOURCE/app/(HM)/queries.ts (listMyHistory: per_question + created_at vào select; MyHistoryEntry +1 boolean)
+  - SOURCE/app/(HM)/queries.ts (listMyHistory: per_question + created_at vào select; MyHistoryEntry +2 boolean — hasUnresolvedEssay, hasIncompleteEssay)
+  - SOURCE/lib/pdf/generateAttemptPdf.ts (AttemptPdfData +1 trường hasIncompleteEssay — kiểu dùng chung của CẢ HAI lối xuất PDF)
+  - SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/page.tsx và SOURCE/app/(HM)/history/_components/HistoryRow.tsx (hai chỗ dựng AttemptPdfData, mỗi chỗ điền trường mới từ đường đọc của mình)
   - SOURCE/lib/supabase/service-role.ts (11 -> 13 thao tác)
   - SOURCE/lib/ai/models.ts (ESSAY_GRADER_MODEL)
   - SOURCE/lib/ugc/limits.ts (MAX_ATTEMPT_ANSWER 500 -> 4000, và comment :12-16)
@@ -517,8 +535,9 @@ No Ripple Effect:
 |---|---|---|---|---|
 | `computeScore(questions, answers)` | `computeScore(questions, answers, options?)` | Không | Không | Tham số thứ ba **tuỳ chọn**, mặc định `{ essayGrading: false }` — mọi call site hiện có (một chỗ production `actions.ts:154`, cộng test) giữ nguyên hành vi byte-identical. |
 | `isScored(q)` | *(không đổi)* | — | — | Cố ý không đổi. Đây là điều làm W1 đúng mà không phải sửa SQL hay `wrongTwice.ts`. |
-| `getResult(attemptId): ExamResult \| null` | cùng chữ ký; `ExamResult` **thêm** `essaySummary?: EssaySummary`, mỗi `PerQuestionResult` **thêm** `essay?: EssayView` | Không | Không | Hai trường **tuỳ chọn**, cùng lối `hasBeenWrongTwice` (`types/result.ts:19-24`) đã dựng: trường suy-lúc-đọc mà `computeScore` không bao giờ đặt. Dòng cũ ⇒ cả hai `undefined`. |
-| `listMyHistory(): MyHistoryEntry[]` | cùng chữ ký; `MyHistoryEntry` **thêm** `hasUnresolvedEssay: boolean` | Không | Không | Trường **bắt buộc** nhưng luôn tính được (`false` khi không có khoá nào) ⇒ không có ca `undefined` cho consumer phải xử. |
+| `getResult(attemptId): ExamResult \| null` | cùng chữ ký; `ExamResult` **thêm** `essaySummary?: EssaySummary` và `hasIncompleteEssay: boolean`, mỗi `PerQuestionResult` **thêm** `essay?: EssayView` | Không | Không | Hai trường tuỳ chọn theo lối `hasBeenWrongTwice` (`types/result.ts:19-24`): trường suy-lúc-đọc mà `computeScore` không bao giờ đặt; dòng cũ ⇒ `undefined`. `hasIncompleteEssay` thì **bắt buộc và luôn tính được** (`false` khi không có khoá nào) — nó là điều kiện in chú thích PDF và một ca `undefined` ở đó là một tệp PDF không quyết được nội dung. |
+| `listMyHistory(): MyHistoryEntry[]` | cùng chữ ký; `MyHistoryEntry` **thêm** `hasUnresolvedEssay: boolean` **và** `hasIncompleteEssay: boolean` | Không | Không | Hai trường **bắt buộc**, luôn tính được (`false` khi không có khoá nào) ⇒ không có ca `undefined` cho consumer phải xử. Hai trường chứ không một: chúng mang **hai sự thật rời nhau** (còn đang chạy ⇒ chặn xuất; đã kết thúc mà không có điểm ⇒ in chú thích), và gộp chúng là đúng chỗ F-06 đã hỏng (§ D-13). |
+| `AttemptPdfData` (`lib/pdf/generateAttemptPdf.ts:11`) | **thêm** `hasIncompleteEssay: boolean` | Không | Không | Trường bắt buộc trên một kiểu **đã được cả hai lối xuất dùng chung**. Hai chỗ dựng (`result/page.tsx:56`, `HistoryRow.tsx:23`) phải điền nó; `tsc` bắt được chỗ nào quên vì trường không tuỳ chọn. Sáu consumer khác của kiểu này (`ResultActions`, `ActionButton`, `HistoryRowMenu`, `usePdfAction`, cùng hai file test của chúng) chỉ **truyền tiếp**, không đọc, nên không đổi. |
 | *(chưa có)* | `claimEssayGradingAttempt(attemptId, questionId)` | — | Không | Thao tác mới ở `service-role.ts`, hình dạng chép từ `recordSkillMastery()`. |
 | *(chưa có)* | `recordEssayGrade(attemptId, questionId, state, earned, max, lowConfidence)` | — | Không | Như trên. **Sáu tham số** — vượt khuyến nghị 0–2 của coding-principles, nhưng chữ ký do ADR-0018 Decision 1 chốt nguyên văn và không được diễn đạt lại; gói vào object sẽ làm lời gọi `.rpc()` lệch khỏi tên tham số SQL (`p_*`), tức thêm một phép ánh xạ mà cả hai anh em ở cùng file đều không có. |
 | *(chưa có)* | `retryEssayGrading(attemptId, questionId)` | — | Không | Server Action mới, typed-result theo tiền lệ `explainStep()`. |
@@ -1055,6 +1074,68 @@ export interface EssaySummary {
 
 Sáu trường, và mỗi trường được **một chuỗi hiển thị của UI Spec** dùng đích danh: `earned`/`max` → `result.essay.points`; `gradedCount` → `result.essay.denominator`; `pendingCount` → `result.essay.stillGrading` và prop poller; `failedCount` → `result.essay.someFailed`; `unresolvedCount` → `result.essay.pdfBlocked`. Không trường nào tồn tại mà không có consumer đã được đặt tên.
 
+##### Hai vị từ mức-mảng, và vì sao chúng phải là hàm chứ không phải hai phép gấp tại chỗ
+
+*(Bổ sung sau khi Design Doc frontend tiêu thụ hợp đồng này và tìm ra F-06 — xem § Discrepancy D-13.)*
+
+`unresolvedCount` ở trên chỉ tồn tại **bên trong** `EssaySummary`, và `EssaySummary` là `undefined` với dòng cũ. Điều đó đủ cho trang kết quả, nhưng **không** đủ cho `/history`: ở đó không có `EssaySummary` nào, và điều kiện in chú thích PDF của **O-8** — *"có ít nhất một câu tự luận ở RS-6"* — **không suy ra được** từ một boolean "còn câu chưa giải quyết". Hai lối xuất PDF khi ấy sinh ra **hai tệp khác nhau cho cùng một lượt thi**: một tệp có dòng chú thích, một tệp không. Đó là hai artefact cho một sự thật, đúng thứ AC-007 tồn tại để chặn.
+
+Nên **hai** sự thật được khai thành **hai vị từ**, mỗi cái mang **đúng một** sự thật và được đặt tên theo chính sự thật đó:
+
+```yaml
+Contract: isEssayIncomplete(view: EssayView): boolean
+Input:
+  Type: view — kết quả của deriveEssayView() cho MỘT câu tự luận
+Output:
+  Type: boolean
+  Guarantees:
+    - true khi và chỉ khi view.state === "failed" && !view.retryAvailable  (đúng RS-6)
+    - Phủ CẢ HAI đường vào RS-6: 'failed' đã lưu với essayAttempts >= 3, VÀ pending-quá-hạn
+      với essayAttempts >= 3 (RS-5 hết lượt suy ra thành cùng một hình dạng)
+  On Error: không bao giờ ném
+Invariants:
+  - Đây là lời khai DUY NHẤT của "RS-6" trong toàn repo. Không consumer nào được viết lại
+    biểu thức `state === "failed" && !retryAvailable`; điều kiện in chú thích PDF ở HAI lối
+    xuất phải đọc cùng một hàm, nếu không hai tệp cho một lượt thi sẽ khác nhau.
+  - RS-1 (không chấm được, thiếu ground truth) KHÔNG tính là incomplete. Đây là một QUYẾT ĐỊNH
+    theo O-8, không phải một sơ suất: O-8 chốt điều kiện in là RS-6, và RS-1 đã tự nói ra sự
+    thật của nó trên màn hình bằng nhãn `result.notAutoScored`. deriveEssayView() trả null
+    cho RS-0/RS-1, nên chúng không bao giờ tới được vị từ này.
+```
+
+```yaml
+Contract: hasIncompleteEssay(rows: PerQuestionResult[], createdAt: string, now: Date): boolean
+        hasUnresolvedEssay(rows: PerQuestionResult[], createdAt: string, now: Date): boolean
+Input:
+  Type: rows — mảng per_question đọc lên từ DB; createdAt — exam_results.created_at;
+        now — đồng hồ TIÊM VÀO (cùng lý do với deriveEssayView)
+Output:
+  Type: boolean
+  Guarantees:
+    - hasIncompleteEssay  === rows có ít nhất một view thoả isEssayIncomplete()   (điều kiện O-8)
+    - hasUnresolvedEssay  === rows có ít nhất một view thoả isEssayUnresolved()   (chốt PDF, AC-058)
+    - LUÔN TÍNH ĐƯỢC: false khi không dòng nào mang khoá essayState (dòng cũ, tính năng tắt,
+      hoặc lượt thi không có câu tự luận). KHÔNG BAO GIỜ undefined — consumer không có ca nào
+      phải xử lý ngoài true/false.
+  On Error: không bao giờ ném
+Invariants:
+  - Hai boolean này RỜI NHAU theo cấu trúc: unresolved = RS-2 | RS-4 | RS-5-còn-lượt;
+    incomplete = RS-6. Không câu tự luận nào thoả cả hai cùng lúc.
+  - `summariseEssays(...)?.unresolvedCount > 0` PHẢI bằng `hasUnresolvedEssay(...)` trên cùng
+    đầu vào. Hai đường tính cùng một sự thật là đúng hình dạng hỏng mà F-06 đã tìm ra một lần,
+    nên một test ghim đẳng thức này lại (EG-BE-034) thay vì để nó trôi.
+```
+
+**Ba kiểu nhận thêm trường `hasIncompleteEssay`, cùng tên vì cùng sự thật:**
+
+| Kiểu | File | Vì sao ở đây |
+|---|---|---|
+| `ExamResult` | `SOURCE/app/(layer2)/queries.ts` | `getResult()` là chỗ duy nhất cầm `created_at` (nó **không** lộ `createdAt` ra ngoài — § Field Propagation Map giữ nguyên quyết định đó), nên nó phải tự gấp và phơi kết quả. |
+| `MyHistoryEntry` | `SOURCE/app/(HM)/queries.ts` | `/history` không có `EssaySummary`; đây là boolean **thứ hai**, cạnh `hasUnresolvedEssay`. |
+| `AttemptPdfData` | `SOURCE/lib/pdf/generateAttemptPdf.ts:11` | **Kiểu chung của cả hai lối xuất PDF** — đã kiểm: nó được dựng ở `app/(layer2)/exams/[id]/attempt/[attemptId]/result/page.tsx:56` **và** `app/(HM)/history/_components/HistoryRow.tsx:23`, rồi cả hai đi qua `components/history/usePdfAction.ts:40`. Đặt trường ở đây là chỗ duy nhất khiến hai lối xuất **không thể** mang hai sự thật khác nhau. |
+
+**Không DDL.** Cả hai boolean suy ra từ `per_question`, thứ mà UI-D11 đã thêm vào select của `listMyHistory()` và § D-02 đã thêm `created_at` vào select của `getResult()`. Ngân sách hai-thay-đổi-schema của PRD không bị đụng tới, và Escalation 2 đã đóng cửa đó.
+
 #### `lib/essay/groqClient.ts` (biên phát — module DUY NHẤT chạm mạng Groq)
 
 ```yaml
@@ -1282,7 +1363,8 @@ Invariants: KHÔNG nhận userId. earned/max BẮT BUỘC là null khi state ===
 | `essayState`, `essayEarned`, `essayMax`, `essayLowConfidence`, `essayGradedAt` | `record_essay_grade()` (SQL) → `exam_results.per_question` | **transformed** | `essayGradedAt` là `to_jsonb(now())` ⇒ chuỗi ISO-8601 với offset, do **đồng hồ của DB** sinh, không phải đồng hồ tiến trình gọi | Đọc bằng `pq->>'essayGradedAt'` | Lấy từ `now()` trong SQL vì cùng lý do `record_exam_result()` tự tính `overtime_seconds` (`schema.sql:917-920`): người gọi không được phép tự khai một dấu thời gian. |
 | `essayAttempts` | `exam_results` (DB) → `deriveEssayView()` (TS) → **DỪNG** | **dropped** | — | — | **Cố ý bị bỏ ở đúng biên này.** `EssayView` không có trường nào mang nó, nên nó không băng qua được biên server→client dù call site có muốn (UI-D9/AC-044/O-2). Nó chỉ tồn tại để tính ra `retryAvailable`. |
 | `retryAvailable` | `deriveEssayView()` (server) → RSC payload → component (client) | **preserved** | JSON boolean, trong object `essay` của mỗi `PerQuestionResult` | React đọc thẳng | Đây là câu trả lời cho O-2: suy ở **hàm dùng chung** `deriveEssayView()` (không phải trong `getResult()`, để `/history` dùng lại được đúng phép suy ấy), và đi vào payload dưới **khoá `essay.retryAvailable`**. |
-| `per_question` (mảng thô) | `exam_results` (DB) → `listMyHistory()` (TS) → **DỪNG** | **dropped** | — | — | UI-D11: mảng thô được đọc trong hàm map rồi rút về **một** boolean `hasUnresolvedEssay`; nó **không** vào `MyHistoryEntry` và **không** băng qua biên component. `HistoryRow` không có việc gì phải đọc điểm từng câu. |
+| `per_question` (mảng thô) | `exam_results` (DB) → `listMyHistory()` (TS) → **DỪNG** | **dropped** | — | — | UI-D11: mảng thô được đọc trong hàm map rồi rút về **hai** boolean (`hasUnresolvedEssay`, `hasIncompleteEssay`); nó **không** vào `MyHistoryEntry` và **không** băng qua biên component. `HistoryRow` không có việc gì phải đọc điểm từng câu. |
+| `hasIncompleteEssay` | `hasIncompleteEssay()` (server) → `ExamResult` / `MyHistoryEntry` → `AttemptPdfData` → nội dung tệp PDF | **preserved** | JSON boolean; trong tệp PDF nó chọn có in `result.essay.pdfIncomplete` hay không | Consumer đọc thẳng boolean; **không** consumer nào được tự suy lại RS-6 | Băng qua **hai** đường đọc độc lập và hội tụ ở **một** kiểu (`AttemptPdfData`). Đây là điều làm hai lối xuất PDF sinh ra cùng một tệp cho cùng một lượt thi (§ D-13). |
 | `exam_results.created_at` | DB → `getResult()` / `listMyHistory()` (TS) → `deriveEssayView()` → **DỪNG** | **dropped** (sau khi dùng) | chuỗi ISO-8601 do PostgREST trả | `new Date(createdAt)` bên trong hàm suy diễn | Không lộ ra `ExamResult` hay `MyHistoryEntry`: nó là **đầu vào** của phép suy diễn, không phải dữ liệu mà bề mặt nào cần. Bề mặt nào cũng chỉ cần *kết quả*. |
 | `questions.essay_answer` | DB → `claim_attempt_answer_key()` → `submitExam` → `after()` → prompt Groq → **DỪNG** | **dropped** | Văn bản thuần, nội suy vào vùng tham chiếu có nhãn của prompt | Model đọc như văn bản | **Không bao giờ** băng qua biên xuống client trong lúc làm bài (`PublicQuestion` Omit, `types/question.ts:63`, AC-043). Trang xem lại **sau khi nộp** vẫn hiển thị nó qua đường `exam_answer_key()` sẵn có (`queries.ts:633-657`) — hành vi đó không đổi và không phải thứ AC-043 ràng buộc. |
 | `attempt_answers.answer` (bài làm) | DB/bộ nhớ → prompt Groq | **preserved** (trong vùng dữ liệu có nhãn) | Văn bản thuần, phân tách bằng hàng rào | Model đọc như **dữ liệu cần chấm**, không phải chỉ dẫn | Đây là bề mặt tiêm chích. Trung hoà bằng bố cục prompt (AC-040), không bằng phép lọc ký tự — lọc ký tự là một cuộc chạy đua không thắng được với biến thể zero-width/bidi, và AC-042 đo **kết quả** chứ không đo phép lọc. |
@@ -1920,11 +2002,37 @@ it("AC-034 — mẫu quét CỦA GEMINI khớp ZERO dòng trong module Groq", ()
 
 **`ESSAY_GRADING_ENABLED`** — server-only, **không** `NEXT_PUBLIC_*`. Lý do không phải bí mật (giá trị của nó chẳng có gì bí): hai bản sao của cùng một sự thật ở hai phía biên rồi sẽ lệch nhau, và bên lệch sẽ là bên nói dối học sinh (UI-D7).
 
-- Đọc ở **đúng một chỗ**: `submitExam()`, ngay trước lượt gọi `computeScore()`. `"true"` (đã trim) bật; **mọi giá trị khác, kể cả vắng mặt, tắt**. Fail-closed, và ship ở trạng thái vắng mặt.
+Quy tắc đọc, ở mọi chỗ: `"true"` (đã trim) bật; **mọi giá trị khác, kể cả vắng mặt, tắt**. Fail-closed, và ship ở trạng thái vắng mặt.
+
+#### Ba chỗ đọc phía server, thuộc HAI loại mục đích
+
+*(Sửa ở v1.2. Bản v1.0 viết "đọc ở đúng một chỗ" và điều đó **sai** — xem § D-15. Kỹ sư đã chốt FE-OQ-2 ngày 2026-08-29 và Design Doc frontend §MSA-F2 pin hình dạng đường truyền.)*
+
+| # | Chỗ đọc | Loại | Nó quyết định cái gì |
+|---|---|---|---|
+| 1 | `submitExam()` (`app/(layer2)/actions.ts`), ngay trước lượt gọi `computeScore()` | **Cổng hành vi** | Có phát năm khoá `essay*` hay không, và có đăng ký `after()` hay không |
+| 2 | `retryEssayGrading()` (`app/(layer2)/essayActions.ts`) | **Cổng hành vi** | Một lượt chấm lại có với tới được provider hay không khi tính năng đang tắt |
+| 3 | **Segment trang làm bài** (`app/(layer2)/exams/[id]/attempt/[attemptId]/page.tsx`) | **Cổng câu chữ** | **Chỉ** chọn giữa hai khoá i18n cho chân trang ô tự luận. Không chạm hành vi chấm |
+
+**Ba chỗ này KHÔNG phải ba lượt đọc thừa của một quyết định.** Hai chỗ đầu cưỡng chế **hành vi** — chúng là thứ khiến "tắt cờ ⇒ 0 request Groq" đúng bằng cấu trúc chứ không bằng trí nhớ; bỏ chỗ (2) thì tắt cờ vẫn để nút chấm lại đốt ngân sách. Chỗ thứ ba cưỡng chế **một câu chữ**: nó quyết định `QuestionRenderer` in `player.essayNotScored` hay `player.essayScored`, và nó không có quyền gì với việc chấm. Gộp chúng lại là gộp hai loại trách nhiệm khác nhau vào một lượt đọc.
+
+**Chỗ đọc (3) KHÔNG thay được bằng một lượt đọc phía client.** Đó là ràng buộc của UI-D7 và nó không thương lượng: một `NEXT_PUBLIC_*` tạo ra bản sao thứ hai của cùng một sự thật ở hai phía biên, và khi hai bản lệch nhau thì bên nói dối học sinh chính là bên client. `page.tsx` là Server Component, nên nó đọc env rồi **truyền giá trị xuống như một prop**; `QuestionRenderer` (client component) **không bao giờ tự đọc env**.
+
+**Đường truyền, đúng như Design Doc frontend §MSA-F2 chốt:**
+
+```
+page.tsx  ──(đọc process.env.ESSAY_GRADING_ENABLED)──▶  ExamPlayer
+          ──essayGradingEnabled?: boolean──▶  QuestionRenderer  ──▶ chọn 1 trong 2 khoá i18n
+```
+
+Prop là **tuỳ chọn, mặc định `false`**, và tính tuỳ-chọn đó **gánh việc chứ không phải cho gọn**: `ExamPlayer` (`app/(layer2)/_components/ExamPlayer.tsx:29-41`) và `QuestionRenderer` (`:45-53`) hiện **không** khai prop nào như thế, nên một prop bắt buộc sẽ làm mọi chỗ dựng hiện có đỏ ở `tsc`. Tuỳ chọn + mặc định `false` giữ `app/(layer2)/_components/__tests__/ExamPlayer.test.tsx` **xanh mà không phải sửa**, và mặc định ấy trùng đúng với trạng thái ship (tắt).
+
+**Quyết định của kỹ sư (FE-OQ-2, 2026-08-29) — phương án (a): hai khoá i18n cộng một cờ đọc phía server truyền xuống bằng prop.** Phương án bị loại là (b): **một** khoá i18n, và xếp lịch sao cho commit đổi chữ chỉ đáp xuống **sau** cổng ZDR của AC-067. Lý do ghi cùng quyết định: (b) nhỏ hơn ở mọi cột đo được, nhưng nó **giao tính đúng đắn của câu chữ cho thứ tự commit** — và với một kỹ sư, không staging (C5), thứ tự ấy không đáng để đặt cược: nếu nó trượt, màn làm bài hứa chấm tự động trong khi cỗ máy chấm không chạy, đúng khuyết tật mà R12 tồn tại để chấm dứt. (a) đúng **bất kể** thứ tự commit. Điều này cũng đóng UI Spec **O-5**, vốn để ngỏ giữa đúng hai phương án này và mặc định là hai khoá.
 - Đăng ký ở `checkEnv.ts` mức **`warn`** kèm hệ quả nói bằng thứ người vận hành quan sát được: *"chưa bật chấm tự luận → mọi câu tự luận vẫn hiện 'chưa chấm tự động', đúng như trước tính năng này"*. Mức `warn` chứ không `error` vì một môi trường không bật chấm là một môi trường **hoàn toàn hợp lệ** — đó chính là trạng thái ship.
-- **Cơ chế kill switch:** đặt biến về bất cứ giá trị nào khác `"true"` (hoặc xoá nó) rồi redeploy. Hệ quả dây chuyền, tất cả đều là "không làm gì":
+- **Cơ chế kill switch:** đặt biến về bất cứ giá trị nào khác `"true"` (hoặc xoá nó) rồi redeploy. **Cả ba chỗ đọc lật cùng lúc trong cùng một lượt deploy** — đó là lý do cả ba đọc **một** biến chứ không phải ba biến. Hệ quả dây chuyền, tất cả đều là "không làm gì":
   - `computeScore()` **ngừng phát khoá** cho các lượt nộp mới ⇒ mọi câu tự luận mới rơi vào RS-0, nhánh không-chấm chung đang có, in `result.notAutoScored` — **đúng như hôm nay, không đổi một byte**.
   - `after()` **không được đăng ký** (call site kiểm cùng cờ) ⇒ 0 request Groq, 0 lượt đặt chỗ ngân sách.
+  - **Chân trang ô tự luận trên màn làm bài quay về `player.essayNotScored`** (chuỗi cũ, nguyên văn), vì `page.tsx` truyền `essayGradingEnabled={false}` xuống. Đây là chỗ đọc (3), và nó là thứ khiến "tắt cờ ⇒ mọi bề mặt về đúng hành vi hôm nay" đúng **trọn vẹn** thay vì đúng ở ba trên bốn màn hình: thiếu nó, màn làm bài sẽ tiếp tục hứa chấm tự động trong khi không có gì chấm.
   - `EssayGradingPoller` **không mount** (`pendingCount === 0`) ⇒ 0 byte JS thêm vào trang kết quả.
   - Chốt PDF **không bao giờ đóng**; `/history` không hiện dấu nào.
   - **Lượt thi đã chấm trước khi tắt giữ nguyên khoá và tiếp tục render bình thường.** Cờ điều khiển việc **phát khoá mới**, không điều khiển việc **đọc khoá cũ** (UI-D7). Đây là điều làm kill switch an toàn: tắt nó không xoá mất kết quả của ai.
@@ -2000,7 +2108,7 @@ Sự bất đối xứng duy nhất cần biết: một lượt thi nộp **tron
     - *Phụ thuộc:* bước 1, 9.
 11. **`essayActions.ts` + `maxDuration` trang chi tiết + telemetry (mã, event type, call site).**
     - *Phụ thuộc:* bước 4 (CHECK đã nới), 9, 10.
-12. **Cắt prompt gia sư + nâng `LIMITS.MAX_ATTEMPT_ANSWER` 500 → 4000.** **Phép cắt phải đáp xuống TRƯỚC hoặc CÙNG lượt nâng trần**, không bao giờ sau: giữa hai lượt đó, một câu `short_answer` tự soạn 4000 ký tự chảy thẳng vào prompt Gemini.
+12. **Cắt prompt gia sư + nâng `LIMITS.MAX_ATTEMPT_ANSWER` 500 → 4000 + sửa `QuestionRenderer.test.tsx:119` (và comment `:116`).** **Phép cắt phải đáp xuống TRƯỚC hoặc CÙNG lượt nâng trần**, không bao giờ sau: giữa hai lượt đó, một câu `short_answer` tự soạn 4000 ký tự chảy thẳng vào prompt Gemini. **`:119` phải đi trong CÙNG commit** — nó ghim `maxLength` bằng literal `500` và đỏ ngay khi hằng đổi (§ D-14). Chuỗi ở `:112` **không** thuộc bước này; nó là chỗ ghép cặp của AC-051 và ở nguyên xanh chừng nào cờ còn tắt.
     - *Phụ thuộc:* bước 4 (CHECK của DB đã nới trên **cả hai** database và cổng đã xanh) — đây là điều kiện R-f, và nó không thương lượng.
 13. **Mười một comment/tiêu đề test khẳng định luật cũ (§ D-09)** — sửa lý do.
     - *Phụ thuộc:* không; làm cùng bước 7 để tài liệu và hành vi đổi trong cùng một commit.
@@ -2240,7 +2348,9 @@ Thay đổi này **sửa đổi hành vi sẵn có** ở ba đường ống, nê
 | AC-055 | § D-06 — **bảy** chỗ ghép cặp, không phải hai | — |
 | AC-056 | Chỉ mã có cấu trúc; ba quy tắc log console | — |
 | AC-057 | `essaySummary.pendingCount`/`failedCount`; `hasUnresolvedEssay` cho `/history` | EG-BE-026 |
-| AC-058 | `essaySummary.unresolvedCount` (loại RS-6 theo O-8) | — |
+| AC-058 | `essaySummary.unresolvedCount` (trang kết quả) và `hasUnresolvedEssay` (`/history`) — RS-6 **không** bị chặn, theo O-8 | EG-BE-034 |
+| **O-8** *(quyết định của kỹ sư, không phải một AC của PRD)* | Điều kiện in `result.essay.pdfIncomplete` = `hasIncompleteEssay`, suy từ **một** vị từ `isEssayIncomplete()` và mang qua `AttemptPdfData` — kiểu chung của cả hai lối xuất (§ Hai vị từ mức-mảng, § D-13) | EG-BE-034, EG-BE-035, EG-BE-036 |
+| AC-048 | *(bổ sung)* chỗ ghép cặp thứ ba ở `QuestionRenderer.test.tsx:119` + comment `:116` (§ D-14) | EG-BE-028 |
 | AC-059 | `essaySummary.gradedCount` là mẫu số; chỉ `graded` đóng góp (W7) | EG-BE-027 |
 | AC-060 | § Hợp đồng khoá jsonb; unit test ba trạng thái | EG-BE-001, EG-BE-004 |
 | AC-061 | Hạn chờ là hằng **của backend**; cận polling là hằng **của UI Spec**; không cái nào suy từ cái kia | EG-BE-023 |
@@ -2300,4 +2410,7 @@ Những gì không giải được từ PRD, ADR, UI Spec và mã, ghi thành m�
 
 | Date | Version | Changes | Author |
 |---|---|---|---|
+| 2026-08-29 | 1.2 | **Sửa § Cờ tính năng sau khi kỹ sư chốt FE-OQ-2.** v1.0 khẳng định `ESSAY_GRADING_ENABLED` "đọc ở **đúng một chỗ**"; khẳng định đó **sai**, và sai theo **hai** hướng độc lập (§ D-15): nó mâu thuẫn với chính đoạn văn của mình (`retryEssayGrading()` cũng kiểm cờ), và nó mâu thuẫn với UI-D8 (chân trang phải chọn khoá i18n theo cờ, mà `QuestionRenderer` là client component). Bản vá ghi **ba** chỗ đọc phía server, phân thành **hai loại mục đích**: hai **cổng hành vi** (`submitExam()` quyết định có phát khoá và có đăng ký `after()` không; `retryEssayGrading()` quyết định một lượt chấm lại có với tới provider được không) và một **cổng câu chữ** (segment trang làm bài, **chỉ** chọn giữa hai khoá i18n). Cả ba đọc **một** biến nên chúng lật cùng lúc trong một lượt deploy. Ghi rõ chỗ đọc thứ ba **không** thay được bằng một lượt đọc client — UI-D7 cấm `NEXT_PUBLIC_*`, và bản sao thứ hai của một sự thật ở hai phía biên rồi sẽ lệch, với bên client là bên nói dối học sinh. Đường truyền pin đúng theo Design Doc frontend §MSA-F2: `page.tsx` → `ExamPlayer` → `QuestionRenderer` qua prop `essayGradingEnabled?: boolean`, **tuỳ chọn, mặc định `false`** — đã kiểm rằng cả hai component hiện **không** khai prop nào như vậy, nên tính tuỳ-chọn là thứ giữ `ExamPlayer.test.tsx` xanh mà không phải sửa. Ghi lại quyết định (a) hai khoá i18n và phương án (b) bị loại (một khoá + xếp lịch commit sau cổng ZDR) kèm lý do: (b) nhỏ hơn ở mọi cột đo được nhưng giao tính đúng đắn của câu chữ cho **thứ tự commit**, thứ không đáng đặt cược dưới C5 — đồng thời **đóng UI Spec O-5**. Ripple đã xử: **kill switch** nay nêu cả việc chân trang quay về `player.essayNotScored` (thiếu nó thì "tắt cờ ⇒ về đúng hành vi hôm nay" chỉ đúng ở ba trên bốn màn hình); **D-14** nay nói **tường minh** rằng lập luận "`QuestionRenderer.test.tsx:112` ở nguyên xanh" **đã được xác nhận** chứ không còn là suy đoán, cộng điều kiện làm nó hỏng (prop thành bắt buộc, hoặc mặc định thành `true`); Implementation Path Mapping thêm segment trang làm bài và hai component truyền tiếp. **OQ-1…OQ-6 không đổi.** | Design Doc (Claude) |
+| 2026-08-29 | 1.2 | **Sửa § Cờ tính năng sau khi kỹ sư chốt FE-OQ-2.** v1.0 viết `ESSAY_GRADING_ENABLED` "đọc ở đúng một chỗ (`submitExam()`)" — **sai theo hai hướng độc lập** (D-15). Hướng một là mâu thuẫn **nội bộ**: vài dòng dưới, chính mục đó đã viết `retryEssayGrading()` cũng kiểm cờ. Hướng hai là mâu thuẫn với **UI-D8**: chân trang ô tự luận chọn giữa hai khoá i18n theo cờ, mà `QuestionRenderer` là client component nên cờ phải được một Server Component đọc rồi truyền xuống. Con số đúng là **ba** chỗ đọc phía server, thuộc **hai loại mục đích** — hai cổng **hành vi** (`submitExam()`, `retryEssayGrading()`, thứ khiến "tắt cờ ⇒ 0 request Groq" đúng bằng cấu trúc; bỏ cái thứ hai thì nút chấm lại vẫn đốt ngân sách) và một cổng **câu chữ** (segment trang làm bài, chỉ chọn khoá i18n, không chạm hành vi chấm). *Ghi chú về nguồn: bản vá được đặt hàng với con số "hai"; viết "hai" sẽ đưa một lỗi mới vào để sửa một lỗi cũ, nên tài liệu ghi **ba**.* Đường truyền pin theo Design Doc frontend §MSA-F2: `page.tsx` đọc env → `ExamPlayer` → `QuestionRenderer` qua prop **tuỳ chọn** `essayGradingEnabled?: boolean` mặc định `false` — tính tuỳ-chọn gánh việc chứ không phải cho gọn, vì prop bắt buộc sẽ làm mọi chỗ dựng hiện có đỏ ở `tsc` và làm `ExamPlayer.test.tsx` phải sửa. **Không** `NEXT_PUBLIC_*` (UI-D7). Đóng luôn UI Spec **O-5**. **OQ-1…OQ-6 không đổi.** | Design Doc (Claude) |
+| 2026-08-28 | 1.1 | **Bản vá hợp đồng dữ liệu, đóng FE-OQ-1 / finding F-06 của Design Doc frontend.** Hợp đồng ở v1.0 **không thoả được O-8 ở lối vào `/history`**: điều kiện in `result.essay.pdfIncomplete` là "có ít nhất một câu ở RS-6", nhưng `MyHistoryEntry` chỉ mang `hasUnresolvedEssay`, và RS-6 không suy ra được từ nó — nên hai lối xuất PDF sẽ sinh **hai tệp khác nhau cho cùng một lượt thi**. Đã kiểm lại và đúng. Bản vá: **(1)** thêm vị từ thuần `isEssayIncomplete()` cộng hai hàm gấp mức-mảng `hasIncompleteEssay()` / `hasUnresolvedEssay()` vào **cùng** module `SOURCE/lib/scoring/essayLifecycle.ts` (tên file xác nhận lại từ v1.0; **không** dựng module thứ hai); **(2)** `MyHistoryEntry` nhận boolean **thứ hai** `hasIncompleteEssay` — không gộp vào `hasUnresolvedEssay`, vì hai trường mang hai sự thật rời nhau (còn đang chạy ⇒ chặn xuất; đã kết thúc mà không có điểm ⇒ in chú thích); **(3)** `AttemptPdfData` (`lib/pdf/generateAttemptPdf.ts:11` — **tên thật đã kiểm bằng grep**, cùng hai chỗ dựng và sáu chỗ truyền tiếp) nhận cùng trường cùng tên, nên hai lối xuất đọc **một** sự thật; `ExamResult` nhận nó luôn để giữ nguyên quyết định v1.0 rằng `createdAt` không lộ ra ngoài `getResult()`. Cả ba trường **luôn tính được**, mặc định `false`, không ca `undefined` nào. **Không DDL** — cả hai boolean suy từ `per_question`, thứ đã có trong cả hai select; ngân sách hai-thay-đổi-schema không bị đụng. Thêm **EG-BE-034…036** (ghim hai lối tính vào nhau; hai đường đọc phải đồng ý; RS-6 chỉ được suy ở đúng một file). Thêm **D-13** (chính finding này) và **D-14** (chỗ ghép cặp thứ ba của trần ký tự mà AC-048 không nêu tên: `QuestionRenderer.test.tsx:119` ghim `maxLength` = 500 — thuộc AC-048, đỏ ngay khi hằng đổi; `:112` ghim nguyên văn chuỗi chân trang — thuộc **AC-051**, hỏng ở một thời điểm khác, nên hai cái không được gộp). Ghi nhận `components/ui/button.tsx:44-47` phơi viên thuốc qua **`shape="pill"`**, không phải `variant="pill"` — tài liệu này chưa từng khẳng định điều ngược lại, ghi lại vì UI Spec §UI-D2 có. **OQ-1…OQ-6 không đổi.** | Design Doc (Claude) |
 | 2026-08-28 | 1.0 | Bản đầu. Viết dựa trên PRD v1.2, ADR-0018 (Proposed, cả hai escalation đã giải), UI Spec v1.1, và một lượt kiểm mã độc lập trong phiên viết. **Đóng UI Spec O-1** (năm khoá jsonb: `essayState`, `essayEarned`, `essayMax`, `essayLowConfidence`, `essayAttempts`, cộng khoá thứ sáu `essayGradedAt` chỉ có lúc settle) và **phần còn lại của O-2** (`retryAvailable` suy ở hàm dùng chung `deriveEssayView()`, vào payload dưới khoá `essay.retryAvailable`; `EssayView` **không có** trường số lượt, nên con số không băng qua biên được về mặt cấu trúc). **Giải "forced choice" của ADR-0018**: chuyển phép suy ngày Pacific + TTL sang `lib/billing/budgetDay.ts` thay vì nhân bản hay export năm helper — `quota.ts` **không lớn thêm một export nào**, và phép chuyển được chứng minh bảo toàn hành vi bằng việc test hiện có giữ nguyên xanh mà không sửa. **Đặt tên biến trần chi**: `GROQ_BUDGET_DAILY_LIMIT`, đăng ký ở `checkEnv.ts` theo khuôn `AI_BUDGET_DAILY_LIMIT`. **Chốt trần ký tự 4000** bằng lập luận và nói rõ nó **không có cơ sở thực nghiệm**. **Kiểm lại toàn bộ số dòng được trích ở tài liệu upstream** — bốn trường hợp trôi lệch +9 trong `schema.sql` (đáng kể nhất: filter `scored` của `record_skill_mastery()` ở **:1354** chứ không phải :1345) cộng một lệch −1 ở `types/result.ts`. **Mười hai khác biệt được định đoạt** (D-01…D-12), trong đó ba cái brief nêu tên và chín cái tìm được trong phiên này — đáng kể nhất: **không có đường đọc CHECK constraint nào từ DB** nên AC-048(5) phải dùng probe hành vi phân biệt bằng mã lỗi (D-05); AC-055 có **bảy** chỗ ghép cặp chứ không phải hai (D-06); AC-051 có **mười một** chỗ chứ không phải bốn (D-09); vân tay schema ghim ở **hai** chỗ (D-08); và hai "coupled site" của AC-048 mục (3) **tự di chuyển** theo alias hằng (D-04). **Nêu thành văn giới hạn phân giải telemetry** mà Escalation 2 bắt buộc. Sáu câu hỏi mở (OQ-1…OQ-6) ghi kèm đầu vào cần, người chịu trách nhiệm và điều kiện leo thang. | Design Doc (Claude) |
