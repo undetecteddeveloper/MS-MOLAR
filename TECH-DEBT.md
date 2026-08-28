@@ -40,6 +40,63 @@ còn nơi nào khác giữ lịch sử nợ ngoài chính file này.)*
 >   mở** — cơ chế PHÁT HIỆN lệch (fingerprint `schema_version` + test CI + check
 >   lúc khởi động) vẫn đang chạy và vẫn bắt được drift.
 
+### TD-029 — Kill criterion của ADR-0010 đã NỔ, và ta cố ý đi tiếp
+**Từ:** 2026-08-28 (phát hiện khi soạn ADR-0018; engineer chọn "đi tiếp + mở
+một dòng nợ" khi được hỏi thẳng)
+**Loại:** kiến trúc — mẫu hình đang dùng vẫn ĐÚNG, nhưng cái ngưỡng tự ta đặt
+ra để bảo "dừng lại mà xét lại" thì đã bị vượt qua
+
+ADR-0010 tự viết điều kiện khai tử cho chính nó:
+
+> *"If `service-role.ts` grows beyond a handful of tightly-scoped operations,
+> **or if a second caller needs privileged writes**, revisit: either a dedicated
+> least-privilege Postgres role (INSERT on `exam_results` only, via direct
+> connection) or moving scoring server-side behind a real backend identity."*
+
+**Cả hai vế đều đã thoả, và thoả TRƯỚC KHI chấm tự luận được đề xuất.** Bản
+nháp đầu của ADR-0018 tưởng module này có 5 operation; đếm thật (grep) ra
+**11**: `recordExamResult` :61, `recordSkillMastery` :95, `listReportedExams`
+:131, `moderateExam` :181, `flagSupportTicketNotifyFailed` :219,
+`listSupportTickets` :263, `changeSupportTicketStatus` :337,
+`addSupportTicketNote` :365, `readPaymentOrderForSettlement` :410,
+`recordPaymentSettlement` :451, `recordPaymentOrder` :512. Hệ thống thanh toán
+và hệ thống hỗ trợ mới là thứ đẩy nó qua "a handful" — không phải essay.
+
+Vế thứ hai còn khớp gần như nguyên văn: Server Action bấm chấm lại (AC-072) là
+**một caller thứ hai cần quyền ghi đặc quyền vào đúng bảng đó**.
+
+ADR-0018 sẽ đưa con số lên **13** (`claimEssayGradingAttempt`,
+`recordEssayGrade`).
+
+**Vì sao chấp nhận đi tiếp thay vì xét lại ngay:** thứ làm nổ ngưỡng là
+payments + support, nên chặn tính năng chấm tự luận lại KHÔNG sửa được cái đã
+nổ — nó chỉ hoãn một tính năng đã đi được 2/7 chặng tài liệu, để đổi lấy một
+cuộc di trú hạ tầng cắt ngang scoring, mastery, payments và support (tức là
+một ADR riêng + work plan riêng). Thiết kế trong ADR-0018 vẫn đúng *bên trong*
+mẫu hình hiện tại; nó chỉ không trả lời câu "mẫu hình này còn nên là mẫu hình
+không".
+
+**Cái sẽ nổ nếu quên:** ngưỡng này mất tác dụng vĩnh viễn. Một tiêu chí khai tử
+đã nổ mà không ai đọc thì bằng đúng với việc chưa từng viết ra — và lần sau
+người thêm operation thứ 14 sẽ lại đọc ADR-0010, lại thấy ngưỡng, lại tưởng nó
+chưa nổ. Rủi ro thực chất: mọi operation trong file này chạy bằng `service_role`
+— khoá vạn năng vượt qua RLS — nên bán kính nổ của MỘT lỗi call site tăng theo
+số operation, và 13 thì không còn kiểm bằng mắt trong một lần review được nữa.
+
+**Cái gì buộc phải xét lại (không phải "khi nào rảnh"):**
+- operation thứ **14** được thêm vào `lib/supabase/service-role.ts`; HOẶC
+- một đề xuất mutate `exam_results` tại chỗ lần thứ **ba** (ADR-0018 đã là lần
+  thứ nhất và thứ hai — claim và settle).
+
+**Đường đã kê (chưa chọn):** (a) role Postgres least-privilege qua kết nối
+trực tiếp, đúng như ADR-0010 nêu tên; (b) tách scoring ra sau một backend
+identity thật; (c) để mở — đang là lựa chọn hiện tại, có ngày tháng.
+
+**Verify khi trả:** `grep -c "^export async function" SOURCE/lib/supabase/service-role.ts`
+không còn là thước đo duy nhất — bản trả nợ phải chỉ ra được operation nào
+KHÔNG còn cần `service_role` nữa, và `test-rls.ts` phải có ca chứng minh
+identity mới không làm được thứ `service_role` làm được.
+
 ### TD-028 — Xếp hạng đề KHÔNG có tín hiệu môn, và tiền đề cho phép bỏ nó đã hết hạn
 **Từ:** 2026-08-27 (phát hiện khi engineer hỏi "yếu Toán/Sinh thì đề Toán/Sinh
 có lên đầu không?" — câu trả lời là KHÔNG)

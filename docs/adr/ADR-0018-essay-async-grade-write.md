@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed — 2026-08-28. Bearing document for `docs/prd/essay-auto-scoring-prd.md` v1.2 (constraints C1/C2, contract W1–W8, requirements R1/R2/R6/R7).
+Proposed — 2026-08-28. Both escalations resolved by the engineer on 2026-08-28 (Escalation 1 → `TD-029`; Escalation 2 → degraded resolution accepted). Bearing document for `docs/prd/essay-auto-scoring-prd.md` v1.2 (constraints C1/C2, contract W1–W8, requirements R1/R2/R6/R7).
 
 - Parent: **ADR-0010** (score write trust boundary) — this ADR exercises the escape hatch ADR-0010 named in its own Consequences: *"Any future retake / rescore feature must go through the same privileged path rather than an `UPDATE` policy."* It does not overturn ADR-0010; it is the first caller of that clause, and it amends one of its properties (see *Amendment to ADR-0010* below).
 - Sibling: **ADR-0011** (mastery write trust boundary) — supplies the "a second privileged operation is a separate function, not a parameter of the first" precedent this ADR reuses twice.
@@ -131,8 +131,8 @@ Ordering is fixed by AC-072 and is a requirement, not an implementation detail: 
 | **Why not delay the `exam_results` insert until grading finishes** | Breaks D4 and AC-003: a submitted attempt would have no result row at all, so the result page would have nothing to render and `record_skill_mastery()` would sit behind a provider. |
 | **Why not `.from("exam_results").update()` from TypeScript** | Moves ownership, transition legality and race resolution to a call site, where each is a convention rather than a rule. ADR-0010 rejected exactly this reasoning for the insert. |
 | **Cost accepted** | `exam_results` rows are no longer immutable after insert (see Amendment). Budget is over-reserved on first-try successes. One attempt can be lost to a platform cut-off. A hand-declared provider response shape. |
-| **Known unknowns** | Groq free-tier 429 frequency at real volume is unmeasured, because zero essay answers exist in production. How the duplicate-write rejection is attributed in telemetry — see *Escalation 2*. |
-| **Kill criteria** | If a *third* in-place mutation of `exam_results` is proposed, stop treating each as an exception and revisit the table's shape. **ADR-0010's own kill criterion is not a future risk here — it has already fired; see *Escalation 1*.** |
+| **Known unknowns** | Groq free-tier 429 frequency at real volume is unmeasured, because zero essay answers exist in production. Groq free-tier 429 frequency is the remaining one; the duplicate-write attribution question is closed — see *Escalation 2*. |
+| **Kill criteria** | If a *third* in-place mutation of `exam_results` is proposed, stop treating each as an exception and revisit the table's shape. **ADR-0010's own kill criterion is not a future risk here — it has already fired, and is now tracked as `TD-029`; see *Escalation 1*.** |
 | **Not decided here** | The lifecycle field's identifier, the earned/max key names, the attempt-counter key name, the pending deadline, `MAX_IN_PASS_RETRIES`, backoff shape, the concurrency cap, the Groq model constant's value, the raised character ceiling, prompt and rubric text, telemetry codes — all Design Doc. Also Design Doc: whether the Groq daily counter **duplicates** `quota.ts`'s Pacific-day/TTL/fail-closed ladder or **exports** it (see *Forced choice: the Groq counter* below), and the name of its daily-limit env var, which `checkEnv.ts` must gate at startup. |
 
 ### Escalation 1 — ADR-0010's kill criterion has already fired, on both limbs
@@ -146,18 +146,30 @@ Both limbs are already satisfied, independently of this feature:
 - Eleven operations is past "a handful" — the payment and support systems crossed it before essay grading was proposed.
 - The retry Server Action (AC-072) is a second caller needing a privileged write into the same table, which is the second limb stated almost verbatim.
 
-**This is an engineer decision, not a drafting detail, and this ADR does not resolve it.** The design in Decisions 1–4 is correct *within* the existing privileged-identity pattern; it is silent on whether that pattern should still be the pattern. Two dispositions are legitimate and the choice belongs upstream of the Design Doc:
+**RESOLVED 2026-08-28 (engineer): proceed, and open a tracked TECH-DEBT row — `TD-029`.**
 
-1. **Proceed, and record that the criterion is knowingly deferred** — with a dated note saying the revisit is owed and naming what would force it (a fourteenth operation, or a third in-place mutation of `exam_results`).
-2. **Revisit now**, toward the least-privilege Postgres role ADR-0010 named, before adding operations twelve and thirteen.
+The design in Decisions 1–4 is correct *within* the existing privileged-identity pattern; it is silent on whether that pattern should still be the pattern, and that second question is now `TD-029`'s, not this ADR's.
 
-Deferring silently is the one option this ADR rules out, because a criterion that fires and is never read is the same as not having written one.
+Reasoning recorded with the decision: what tripped the threshold is payments and support, so blocking essay grading does not fix the thing that fired. Revisiting now would mean a cross-cutting migration through scoring, mastery, payments and support — its own ADR and work plan — with this feature parked behind it. What the decision buys instead is that the fired criterion is written somewhere a future session actually reads.
+
+Deferring *silently* was the one option ruled out, because a criterion that fires and is never read is the same as not having written one. `TD-029` is what makes it read: it names the two conditions that force the revisit rather than leaving it to judgement —
+
+1. a **fourteenth** operation added to `lib/supabase/service-role.ts`; or
+2. a **third** proposed in-place mutation of `exam_results` (this ADR is already the first and second — claim and settle).
+
+A dated note inside a Proposed ADR was rejected as the mechanism: it is only found by someone already reading this file, which is precisely not the person about to add operation fourteen.
 
 ### Escalation 2 — `telemetry_log` cannot attribute a grading attempt
 
 Decision 3 says a refused duplicate write "goes to telemetry (R13)". Verified against `schema.sql:1369–1392`, `telemetry_log`'s columns are `id, user_id, event_type, question_id, skill_node_id, success, error_code, created_at` — there is **no `attempt_id`**, and the payload builder (`lib/tutor/telemetry.ts:66–73`) is pinned to exactly six app-filled columns by an exhaustive test.
 
-Grading attempts are keyed `(attempt_id, question_id)` (AC-064). `question_id` alone cannot separate two attempts on the same question by the same student, so as things stand a duplicate-write rejection is recordable only at `(user, question, day)` resolution. Either that degraded resolution is accepted and said so, or `telemetry_log` gains a column — which would be a **third** hand-applied schema change against a PRD that budgets two. The Design Doc must choose explicitly; this ADR does not.
+Grading attempts are keyed `(attempt_id, question_id)` (AC-064). `question_id` alone cannot separate two attempts on the same question by the same student, so as things stand a duplicate-write rejection is recordable only at `(user, question, day)` resolution.
+
+**RESOLVED 2026-08-28 (engineer): accept the degraded resolution, and state the limit explicitly.** `telemetry_log` gains no column, the PRD's two-change budget holds, and the payload builder (`lib/tutor/telemetry.ts:66–73`) with its exhaustive six-column test stays untouched.
+
+The Design Doc's telemetry section **must say this in the document, not only in code**: a duplicate-write rejection is attributable to `(user, question, day)` and **not** to a specific attempt, so two rejections on the same question by the same student on the same day are indistinguishable in telemetry. Recorded rather than hidden, because the failure mode is a future session reading a rejection count and inferring a per-attempt rate from it.
+
+Why this is affordable: a refused duplicate is a **rare diagnostic signal, not a metric anyone counts** — it fires only in the AC-063 race. Weighed against it, TD-005 has fired four times, so every hand-applied schema change avoided is risk genuinely removed rather than deferred. Routing the event to server logs instead was considered and rejected: it would put this one signal outside the telemetry surface every other event uses, and out of reach of SQL.
 
 ### Forced choice: the Groq counter
 
@@ -251,7 +263,8 @@ The one genuinely new question asynchrony raises is **which write may land secon
 - `docs/adr/ADR-0010-score-write-trust-boundary.md` — the boundary amended here.
 - `docs/adr/ADR-0011-mastery-write-trust-boundary.md` — "a second privileged operation is a separate function".
 - `docs/design/short-answer-scoring-backend-design.md` — the Design Doc pair this feature's documents mirror.
-- `docs/TECH-DEBT.md` TD-005 — the hand-applied-SQL failure mode Phase 3.5 exists to prevent.
+- `TECH-DEBT.md` TD-005 — the hand-applied-SQL failure mode Phase 3.5 exists to prevent.
+- `TECH-DEBT.md` TD-029 — the fired ADR-0010 kill criterion this ADR proceeds past by decision (Escalation 1).
 
 ## References
 
@@ -264,5 +277,6 @@ The one genuinely new question asynchrony raises is **which write may land secon
 | Date | Change |
 |---|---|
 | 2026-08-28 | Initial draft (Proposed). Six decisions recorded; ADR-0010 amended on the row-immutability reading only. |
+| 2026-08-28 | **Both escalations resolved by the engineer.** *Escalation 1* — proceed inside the existing privileged-identity pattern, with the fired ADR-0010 kill criterion opened as **`TD-029`** in `TECH-DEBT.md`, which names the two conditions that force the revisit (a 14th `service-role.ts` operation, or a 3rd in-place `exam_results` mutation). A dated note inside this ADR was rejected as the mechanism because it is only read by someone already in this file. *Escalation 2* — accept `(user, question, day)` attribution; `telemetry_log` gains no column, the PRD's two-change budget holds, and the Design Doc must state the resolution limit in prose. |
 | 2026-08-28 | **Phase 3.5 baseline moved before this feature wrote any DDL.** `main` gained three commits after this branch forked (`004d628`, `8f9148e`, `7894417`); `004d628` narrowed exam rating from a 1–10 to a 1–5 star scale, which is a `schema.sql` change, and it carries a data-mutating `update` over `exam_difficulty_ratings`. The fingerprint therefore moved `021dd1387945` → **`29931beeb950`**, and that migration **has already been applied to prod** (verified read-only against ref `pebjdlbgbmizgfpuptjl`, `applied_at` 2026-08-28 11:53 UTC). Prod and `main` are in sync; the clean Phase 3.5 baseline for this feature's two new functions is `29931beeb950`, not the value recorded in the draft. `main` was merged into this branch so the UI Spec and Design Docs are written against the tree that actually ships. Re-verified as **unchanged** by that merge: `globals.css` gained only `.rich-text` table rules, so the token inventory the UI Spec depends on (still no `--success`/`--warning`) is unaffected. |
 | 2026-08-28 | Corrected after codebase analysis. **(1)** The draft counted `service-role.ts` at five operations and this feature as "the sixth and seventh"; it holds **eleven**, and ADR-0010's kill criterion has **already fired on both limbs** — promoted from a Known-unknown to **Escalation 1**, an engineer decision this ADR does not resolve. **(2)** `telemetry_log` has no `attempt_id`, so Decision 3's telemetry claim is not reconstructible per attempt — **Escalation 2**. **(3)** AC-029 has a second coupled site (`checkAiKeyBundleSecrets.test.ts`, exhaustive `toEqual` + `length === 7`) — guidance #5. **(4)** A host-keyed Groq emission scan would capture `check-ai-key-bundle.mjs` itself — new guidance #5b separates the bundle marker from the scan key. **(5)** The Groq counter's duplicate-or-export choice named explicitly, since every helper it needs is module-private in `quota.ts`. |
