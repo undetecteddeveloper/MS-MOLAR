@@ -2,16 +2,30 @@
 
 | | |
 |---|---|
-| **Version** | 1.0 |
-| **Date** | 2026-08-28 |
-| **Status** | Draft — hiện thực hoá lát cắt hiển thị mà `docs/ui-spec/essay-auto-scoring-ui-spec.md` v1.1 đặc tả, tiêu thụ các hợp đồng do `docs/design/essay-auto-scoring-backend-design.md` v1.0 chốt. |
+| **Version** | 1.1 |
+| **Date** | 2026-08-29 |
+| **Status** | Draft — hiện thực hoá lát cắt hiển thị mà `docs/ui-spec/essay-auto-scoring-ui-spec.md` **v1.2** đặc tả, tiêu thụ các hợp đồng do `docs/design/essay-auto-scoring-backend-design.md` **v1.2** chốt. |
 | **PRD** | `docs/prd/essay-auto-scoring-prd.md` v1.2 (AC-001–AC-072) |
 | **ADR** | `docs/adr/ADR-0018-essay-async-grade-write.md` (Proposed, Decision 1–6, Amendment to ADR-0010, cả hai Escalation đã giải) |
-| **UI Spec** | `docs/ui-spec/essay-auto-scoring-ui-spec.md` v1.1 — nguồn chuẩn của cấu trúc component, máy trạng thái render RS-0…RS-6, 29 chuỗi hiển thị, hằng polling và yêu cầu a11y. Tài liệu này **kế thừa nguyên vẹn** 13 quyết định UI-D1…UI-D13 và **không mở lại** cái nào. |
-| **Backend Design** | `docs/design/essay-auto-scoring-backend-design.md` v1.0 — nguồn chuẩn của năm khoá jsonb, `EssayView`, `EssaySummary`, hạn chờ suy-lúc-đọc và chữ ký Server Action. Tài liệu này **tiêu thụ**, không thiết kế lại. |
+| **UI Spec** | `docs/ui-spec/essay-auto-scoring-ui-spec.md` **v1.2** (bảng đầu file của tài liệu đó còn ghi "1.0" — bản ghi có thẩm quyền là § Update History, dòng `2026-08-29 | 1.2`) — nguồn chuẩn của cấu trúc component, máy trạng thái render RS-0…RS-6, 29 chuỗi hiển thị, hằng polling và yêu cầu a11y. Tài liệu này **kế thừa nguyên vẹn** 13 quyết định UI-D1…UI-D13 và **không mở lại** cái nào. |
+| **Backend Design** | `docs/design/essay-auto-scoring-backend-design.md` **v1.2** — nguồn chuẩn của năm khoá jsonb, `EssayView`, `EssaySummary`, hạn chờ suy-lúc-đọc và chữ ký Server Action. Tài liệu này **tiêu thụ**, không thiết kế lại. |
 | **Tiền lệ về cấu trúc** | `docs/design/short-answer-scoring-frontend-design.md` (cùng bài toán, lát cắt hiển thị), `docs/design/history-frontend-design.md` (bề mặt `/history`, `ActionButton`, đường ống PDF) |
 | **Nhánh** | `design/adr-0018-essay-async-grade-write` |
 | **Kiểm lại mã trong phiên viết** | **Mọi** số dòng trích trong tài liệu này được đọc lại từ file thật trong phiên viết — kể cả những số đã có ở UI Spec và ở backend Design Doc. Bốn trường hợp lệch được ghi ở § Fact Disposition Table. |
+
+## Contract deltas since v1.0 — cái gì đổi ở thượng nguồn, dưới chân tài liệu này
+
+Bản v1.0 của tài liệu này viết trên UI Spec v1.1 và backend Design Doc v1.0. Cả hai đã đổi. Bảng này liệt kê **chỉ** những gì đổi ở **hợp đồng** — nó tồn tại để một lượt đọc sau không phải so hai tài liệu dòng-với-dòng, và để một Work Plan dựng từ tài liệu này không kế thừa một câu hỏi đã có lời đáp.
+
+| Nguồn | Đổi gì | Tài liệu này phản ánh ở đâu |
+|---|---|---|
+| **Backend v1.1** (2026-08-28) | **Đóng FE-OQ-1 / finding F-06.** Thêm `hasIncompleteEssay: boolean` — **bắt buộc, cùng một tên** — trên **ba** kiểu: `ExamResult`, `MyHistoryEntry`, `AttemptPdfData` (`SOURCE/lib/pdf/generateAttemptPdf.ts:11`). Thêm vị từ `isEssayIncomplete(view: EssayView): boolean` cộng hai hàm gấp `hasIncompleteEssay(rows, createdAt, now)` / `hasUnresolvedEssay(rows, createdAt, now)` trong `SOURCE/lib/scoring/essayLifecycle.ts` | § MSA-F5 (tên trường + lập luận "một tên, ba kiểu"), § `EssayView` — hợp đồng client (bảng "chỗ nào đọc cái nào"), § AttemptPdfTemplate (**bỏ** phép suy lại ở trang kết quả), § Data Contracts, § Implementation Path Mapping, F-06, R-F9 |
+| **Backend v1.1** | Ba tiêu chí mới ghim hợp đồng đó: **EG-BE-034** (`hasUnresolvedEssay(...) === (summariseEssays(...)?.unresolvedCount ?? 0) > 0`), **EG-BE-035** (`hasIncompleteEssay` bằng nhau trên `ExamResult` và `MyHistoryEntry` cho cùng `attemptId`, **không bao giờ** `undefined`), **EG-BE-036** (biểu thức `state === "failed" && !retryAvailable` **không** xuất hiện ngoài `essayLifecycle.ts`) | § `EssayView` — hợp đồng client, § AttemptPdfTemplate, § Test Boundaries, FE-OQ-1 (đã đóng) |
+| **Backend v1.2** (2026-08-29) | **Sửa § Cờ tính năng.** v1.0 nói `ESSAY_GRADING_ENABLED` *"đọc ở đúng một chỗ"*; đúng là **ba** chỗ đọc phía server, thuộc **hai** loại trách nhiệm: hai **cổng hành vi** (`submitExam()`, `retryEssayGrading()`) và một **cổng câu chữ** (segment trang làm bài `app/(layer2)/exams/[id]/attempt/[attemptId]/page.tsx`, chỉ chọn giữa hai khoá i18n). Cả ba đọc **một** biến nên chúng lật cùng lúc trong một lượt deploy | § MSA-F2, § QuestionRenderer, § Feature-Off Window |
+| **UI Spec v1.3** (2026-08-29) | **Đóng O-5**: giữ **hai** khoá chân trang player + một cờ server-only truyền xuống bằng prop tuỳ chọn (mặc định `false`). Đây là phương án (a) mà tài liệu này vốn đã mặc định | § MSA-F2 bước 4–5, FE-OQ-2 (đã đóng), bảng diễn đạt lại AC (dòng AC-051) |
+| **Quyết định của kỹ sư** (2026-08-29) | **UI-D3 được ghi thành một diễn đạt lại AC có cờ, KHÔNG sửa PRD.** AC-011 nói "combining", AC-057 nêu đích danh `ScoreCard.tsx`; thiết kế đặt một khối riêng bên dưới và giữ `ScoreCard` ở **0 diff** | Bảng diễn đạt lại AC (dòng mới **AC-011 / AC-057**) |
+
+**Không hợp đồng nào bị đảo ngược.** Cả năm dòng trên là **thêm** hoặc **làm rõ**; không trường nào đổi kiểu, không quyết định nào của UI Spec bị lật, và không phần nào của thiết kế trong tài liệu này phải làm lại. Bốn chỗ tài liệu này **phải sửa** vì chúng đã lệch khỏi hợp đồng mới được ghi ở § Update History (v1.1).
 
 ## Overview
 
@@ -58,10 +72,10 @@ main_constraints:
 biggest_risks:
   - "Một nhánh render vô tình đọc `r.scored === false` hoặc `r.isCorrect` sẽ in 'Chưa chấm tự động' cạnh một con điểm (AC-053) và không có test nào hiện có bắt được — giảm nhẹ bằng CẤU TRÚC PROPS (§ Hard Rule) chứ không bằng kỷ luật."
   - "Poller unmount trước khi kịp đọc lên câu 'đã chấm xong toàn bộ' nếu điều kiện mount là `pendingCount > 0` như UI Spec viết — đây là một lỗ thật, đã sửa ở § EssayGradingPoller (F-05)."
-  - "PDF xuất từ /history KHÔNG biết được có câu nào ở RS-6 hay không, vì MyHistoryEntry chỉ mang một boolean 'chưa giải quyết' — O-8 không thoả được ở entry point đó nếu không thêm một boolean thứ hai (F-06, FE-OQ-1)."
+  - "GIẢM NHẸ XONG (F-06 → FE-OQ-1, đóng 2026-08-29): PDF xuất từ /history từng không biết được có câu nào ở RS-6 hay không. Backend v1.1 đặt hasIncompleteEssay lên CẢ BA kiểu (ExamResult, MyHistoryEntry, AttemptPdfData) với một tên duy nhất; EG-BE-035 ghim đẳng thức giữa hai lối xuất. Rủi ro còn lại chỉ là dùng sai nguồn ở call site, và § EssayView — hợp đồng client có bảng chỉ rõ chỗ nào đọc cái nào."
   - "HistoryRowMenu.test.tsx nhạy thời gian (dùng waitFor, không dùng fake timer) và đã flaky MỘT LẦN dưới tải song song; một lượt đỏ đơn lẻ ở file này không tự nó chứng minh có defect."
 unknowns:
-  - "FE-OQ-1: MyHistoryEntry cần boolean THỨ HAI (hasIncompleteEssay) để O-8 thoả trên /history — cần một sửa đổi một dòng ở hợp đồng của backend Design Doc."
+  - "FE-OQ-1 — ĐÃ ĐÓNG 2026-08-29 (backend Design Doc v1.1): hasIncompleteEssay: boolean, BẮT BUỘC, cùng tên trên ExamResult + MyHistoryEntry + AttemptPdfData, suy bằng vị từ isEssayIncomplete() trong SOURCE/lib/scoring/essayLifecycle.ts. Ghim bằng EG-BE-034 (một sự thật, một lối tính), EG-BE-035 (bằng nhau ở hai lối xuất), EG-BE-036 (RS-6 khai đúng một chỗ). KHÔNG còn chặn lát nào."
   - "FE-OQ-2 — ĐÃ ĐÓNG 2026-08-29 (kỹ sư): giữ HAI khoá + cờ server-only truyền xuống bằng prop tuỳ chọn, tức phương án (a), đúng mặc định của tài liệu này. Lý do được chốt cùng: (b) nhỏ hơn ở mọi cột đo được nhưng giao tính đúng đắn câu chữ cho thứ tự commit, và C-F6 (một kỹ sư, không staging) là chính lý do thứ tự đó không đáng cược."
   - "FE-OQ-3: chi phí payload của per_question trong listMyHistory() chưa đo (kế thừa UI Spec O-3 → backend OQ-3)."
 ```
@@ -100,9 +114,9 @@ Sự thật mức dự án nằm ở `docs/project-context/external-resources.md
 
 #### Scope
 
-- **S-01 Result Summary** (`SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/page.tsx`): chèn `EssayScoreLine` giữa `ScoreCard` và khối "Nộp sau giờ"; truyền `blockedReason` + `essayIncomplete` xuống `ResultActions`; mount `EssayGradingPoller`.
+- **S-01 Result Summary** (`SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/page.tsx`): chèn `EssayScoreLine` giữa `ScoreCard` và khối "Nộp sau giờ"; truyền `blockedReason` + `hasIncompleteEssay` xuống `ResultActions`; mount `EssayGradingPoller`.
 - **S-02 Result Detail** (`…/result/detail/page.tsx`): thêm một **nhánh con tự luận bên trong** nhánh `notScored` sẵn có (`:75`); mount `EssayGradingPoller`.
-- **S-03 History** (`SOURCE/app/(HM)/history/_components/HistoryRow.tsx`): thêm badge "Đang chấm" cuối dòng meta; truyền `blockedReason` + `essayIncomplete` xuống `HistoryRowMenu`.
+- **S-03 History** (`SOURCE/app/(HM)/history/_components/HistoryRow.tsx`): thêm badge "Đang chấm" cuối dòng meta; truyền `blockedReason` + `hasIncompleteEssay` xuống `HistoryRowMenu`.
 - **S-04 Exam Player** (`SOURCE/app/(layer2)/_components/QuestionRenderer.tsx`): đổi khoá chân trang ô tự luận theo cờ AC-067. Trần ký tự **tự di chuyển** theo hằng (F-03) — file này không sửa gì cho trần.
 - **Đường ống PDF**: chốt chặn ở `SOURCE/components/history/usePdfAction.ts`; hai entry point (`ActionButton`, `HistoryRowMenu`) nhận prop mới; `AttemptPdfTemplate` nhận dòng `result.essay.pdfIncomplete`.
 - **i18n**: 29 chuỗi ở `SOURCE/lib/i18n/dictionaries/en.ts` và `vi.ts`.
@@ -199,7 +213,7 @@ Backend sắp bắt đầu ghi band tự luận vào `exam_results.per_question`
 
 ### Current Challenges
 
-1. **Hai trường phân biệt sai.** `r.scored === false` đúng với tự luận ở **cả sáu** trạng thái render; `r.isCorrect === false` cũng vậy. Không cái nào phân biệt được gì, mà cả hai đều nằm ngay trong object mà mọi nhánh render đang cầm.
+1. **Hai trường phân biệt sai.** `r.scored === false` đúng với tự luận ở **cả bảy** trạng thái render (RS-0…RS-6); `r.isCorrect === false` cũng vậy. Không cái nào phân biệt được gì, mà cả hai đều nằm ngay trong object mà mọi nhánh render đang cầm.
 2. **Trang kết quả là Server Component.** Không có đường nào để client kéo dữ liệu mới về mà không thêm một route (AC-022 cấm) hoặc dựng một nguồn sự thật thứ hai cho band.
 3. **Không có tiền lệ polling.** Đã kiểm bằng grep toàn repo: `(layer2)` có **0** lượt `router.refresh()`, **0** lượt `visibilityState`, và `setInterval` duy nhất nằm ở `(layer1)/_components/HomeCarousel.tsx:88`.
 4. **Đường ống PDF có hai cửa.** `ResultActions` → `ActionButton` và `HistoryRowMenu` đều đi qua `usePdfAction` → `generateAttemptPdfFile`. Chốt ở một cửa để nguyên cửa kia mở.
@@ -210,7 +224,7 @@ Backend sắp bắt đầu ghi band tự luận vào `exam_results.per_question`
 #### Functional Requirements
 
 - **FR-1** — Trang kết quả hiện điểm tự luận (earned/max) như một khối **riêng, có nhãn**, cạnh `ScoreCard` chứ không bên trong (AC-011, UI-D3).
-- **FR-2** — Trang chi tiết hiện đúng một trong sáu trạng thái render cho mỗi câu tự luận, rẽ trên `essayState` (AC-053, UI-D1).
+- **FR-2** — Trang chi tiết hiện đúng một trong **bảy** trạng thái render (RS-0…RS-6) cho mỗi câu tự luận, rẽ trên `essayState` (AC-053, UI-D1).
 - **FR-3** — Trang tự cập nhật khi còn câu đang chấm, có cận riêng, dừng được, và làm mới thủ công được (AC-020/021/061).
 - **FR-4** — Nút chấm lại chỉ mở từ trạng thái `failed`, thao tác được **chỉ bằng bàn phím**, và ở trần lượt thì **vẫn ở lại cây** kèm lý do đọc lên được (AC-025/028/063/064).
 - **FR-5** — Xuất PDF bị chặn khi còn câu chưa giải quyết, ở **cả hai** entry point (AC-058, UI-D4).
@@ -311,13 +325,13 @@ Mỗi tiêu chí dưới đây là một điều kiện **quan sát được tr�
 | **Existing (modified)** | `SOURCE/components/history/usePdfAction.ts` | Tham số thứ ba `blockedReason` (**bắt buộc**) + một dòng về sớm ở đầu `run()` (`:46`) |
 | **Existing (modified)** | `SOURCE/components/history/ActionButton.tsx` | Prop `blockedReason` (bắt buộc); `aria-disabled` (`:62`) và ô lý do (`:95-97`) nhận nhánh mới; `TooltipContent` (`:99`) hiện lý do khi bị chặn |
 | **Existing (modified)** | `SOURCE/components/history/HistoryRowMenu.tsx` | Prop `blockedReason` (bắt buộc) → **cả hai** lượt `usePdfAction` (`:116-117`); `MenuAction` nhận `blockedReason` + `blockedText` |
-| **Existing (modified)** | `SOURCE/app/(HM)/history/_components/HistoryRow.tsx` | Badge cuối dòng meta (`:37-40`); `blockedReason` + `essayIncomplete` xuống `HistoryRowMenu` (`:44-48`); `pdfInput` (`:23-31`) nhận `essayIncomplete` |
+| **Existing (modified)** | `SOURCE/app/(HM)/history/_components/HistoryRow.tsx` | Badge cuối dòng meta (`:37-40`); `blockedReason` + `hasIncompleteEssay` xuống `HistoryRowMenu` (`:44-48`); `pdfInput` (`:23-31`) nhận `hasIncompleteEssay` |
 | **Existing (modified)** | `SOURCE/app/(layer2)/_components/ResultActions.tsx` | Nhận `blockedReason`, chuyển xuống hai `ActionButton` (`:19-20`) |
 | **Existing (modified)** | `SOURCE/app/(layer2)/_components/QuestionRenderer.tsx` | Prop tuỳ chọn `essayGradingEnabled`; chân trang (`:199`) chọn khoá; comment `:179-180` sửa **lý do** |
 | **Existing (modified)** | `SOURCE/app/(layer2)/_components/ExamPlayer.tsx` | Prop tuỳ chọn `essayGradingEnabled` (`:28-41`), chuyển thẳng xuống `QuestionRenderer` (`:265`) |
-| **Existing (modified)** | `SOURCE/components/pdf/AttemptPdfTemplate.tsx` | Prop `essayIncomplete: boolean` + `essayIncompleteLabel?: string`; một `<p>` mới sau `totalQuestionsLabel` (`:125`) |
-| **Existing (modified)** | `SOURCE/lib/pdf/generateAttemptPdf.ts` | `AttemptPdfData` (`:11-28`) nhận `essayIncomplete: boolean` + `essayIncompleteLabel?: string`; chuyển tiếp xuống template |
-| **Existing (modified)** | `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/page.tsx` | Chèn `EssayScoreLine` (giữa `:86` và `:92`); mount poller; `pdfInput` (`:56-64`) nhận `essayIncomplete`; `ResultActions` (`:108`) nhận `blockedReason` |
+| **Existing (modified)** | `SOURCE/components/pdf/AttemptPdfTemplate.tsx` | Prop `hasIncompleteEssay: boolean` + `essayIncompleteLabel?: string`; một `<p>` mới sau `totalQuestionsLabel` (`:125`) |
+| **Existing (modified)** | `SOURCE/lib/pdf/generateAttemptPdf.ts` | `AttemptPdfData` (`:11-28`) nhận `hasIncompleteEssay: boolean` + `essayIncompleteLabel?: string`; chuyển tiếp xuống template |
+| **Existing (modified)** | `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/page.tsx` | Chèn `EssayScoreLine` (giữa `:86` và `:92`); mount poller; `pdfInput` (`:56-64`) nhận `hasIncompleteEssay`; `ResultActions` (`:108`) nhận `blockedReason` |
 | **Existing (modified)** | `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` | Nhánh con tự luận trong `if (notScored)` (`:75`); mount poller; comment `:6` sửa **lý do** |
 | **Existing (modified)** | `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/page.tsx` | Đọc cờ AC-067 (server) và truyền xuống `<ExamPlayer>` (`:23-31`) |
 | **Existing (modified)** | `SOURCE/lib/i18n/dictionaries/en.ts` | 29 khoá mới (**28 thêm mới**, 1 giữ nguyên) — `en.ts` là nơi kiểu `Dictionary` sinh ra nên phải sửa **trước** |
@@ -338,7 +352,7 @@ Tìm bằng `Glob` + `Grep` theo domain ("essay", "grading", "poll", "badge", "l
 | Khối điểm phụ trên trang kết quả | *(không có)* | **New** | `ScoreCard` là component duy nhất trên trang nhận điểm, và nó nhận `ScoreResult` chứ không nhận cặp earned/max thứ hai. UI-D3 cấm gộp |
 | Vòng lặp hẹn giờ | `app/(layer2)/_components/ExamTimer.tsx`; `app/(layer1)/_components/HomeCarousel.tsx:88` (`setInterval`) | **New**, mượn **cơ chế** của `ExamTimer` | `ExamTimer` đếm ngược một con số cục bộ và gọi một callback; nó không làm mới server và không có ngân sách. `HomeCarousel` dùng `setInterval` — đúng thứ AB-6 nói phải tránh |
 | Control có lý do a11y + chốt đồng bộ | `RecheckOrderControl.tsx`, `ExplainStepAffordance.tsx`, `ActionButton.tsx` | **New**, chép **pattern** (bảy bước + ba idiom) | Ba file là ba domain khác nhau, mỗi cái khoá cứng một tập lý do riêng. Đây là **lần áp dụng thứ tư** của pattern — Rule of Three đã đạt, nên câu hỏi trích xuất được xét ở § MSA-F4 |
-| Hook sinh PDF | `components/history/usePdfAction.ts` | **Extend** | Đúng một đường ống (AC-007). Thêm tham số, không fork |
+| Hook sinh PDF | `components/history/usePdfAction.ts` | **Extend** | Đúng một đường ống (**`history-prd` AC-007**). Thêm tham số, không fork |
 | Nhãn "đang chấm" trên hàng lịch sử | `HistoryRow.tsx` | **Extend** | Hàng đã có dòng meta; badge đi vào cuối dòng đó |
 
 **Không có component nào là technical debt cần ADR cải tiến trước.** Ba khuyết tật của `OrderStatusBadge` (hex cứng, `?? default`, mượn màu "đúng") đã được chính file đó ghi ra và UI Spec đã quyết định **không chép** — đó là một quyết định né debt, không phải một đề xuất sửa debt.
@@ -367,11 +381,11 @@ Mọi định danh mà thiết kế này giả định là **đã tồn tại**,
 | `useEffectEvent` | `react` (dùng ở `ExamTimer.tsx:8`, `:31`) | **verified** — có sẵn trong phiên bản React đang dùng |
 | `EssayView`, `EssayRenderState`, `EssaySummary` | `SOURCE/lib/scoring/essayLifecycle.ts` | **requires new creation** — **do backend Design Doc sở hữu**, § Data Contracts của tài liệu đó |
 | `deriveEssayView()`, `summariseEssays()`, `isEssayUnresolved()` | `SOURCE/lib/scoring/essayLifecycle.ts` | **requires new creation** — backend sở hữu |
-| `isEssayIncomplete()` | `SOURCE/lib/scoring/essayLifecycle.ts` | **requires new creation** — **frontend yêu cầu**, chưa có trong danh sách của backend Design Doc → FE-OQ-1 |
+| `isEssayIncomplete()`, `hasIncompleteEssay()`, `hasUnresolvedEssay()` | `SOURCE/lib/scoring/essayLifecycle.ts` | **requires new creation** — backend sở hữu. Do frontend yêu cầu (F-06), **đã được backend v1.1 chấp nhận và khai** |
 | `retryEssayGrading(attemptId, questionId)` | `SOURCE/app/(layer2)/essayActions.ts` | **requires new creation** — backend sở hữu |
 | `ExamResult.essaySummary`, `PerQuestionResult.essay` | `queries.ts` / `types/result.ts` | **requires new creation** — backend sở hữu (§ Interface Change Matrix của backend DD) |
 | `MyHistoryEntry.hasUnresolvedEssay` | `SOURCE/app/(HM)/queries.ts` | **requires new creation** — backend sở hữu |
-| `MyHistoryEntry.hasIncompleteEssay` | `SOURCE/app/(HM)/queries.ts` | **requires new creation** — **frontend yêu cầu**, chưa có trong hợp đồng backend → FE-OQ-1 |
+| `hasIncompleteEssay` trên `ExamResult`, `MyHistoryEntry`, `AttemptPdfData` | `SOURCE/app/(layer2)/queries.ts`, `SOURCE/app/(HM)/queries.ts`, `SOURCE/lib/pdf/generateAttemptPdf.ts:11` | **requires new creation** — backend sở hữu, **đã có trong backend v1.1**. **Một tên, ba kiểu** (§ MSA-F5) |
 | Cờ `ESSAY_GRADING_ENABLED` | `process.env`, đọc ở server | **requires new creation** — backend sở hữu; frontend chỉ nhận một boolean đã đọc sẵn |
 | `docs/adr/ADR-COMMON-*` | — | **không tồn tại** (kiểm bằng `ls docs/adr/`) |
 
@@ -427,7 +441,7 @@ Không có input `Codebase Analysis` nào được truyền vào, nên bảng n�
 | **F-03** | AC-048 mục (3) và backend D-04 nói hai coupled site của trần ký tự **tự di chuyển** theo hằng | `preserve` **kèm bổ sung** | Đúng: `QuestionRenderer.tsx:23` khai alias, `:194` và `:202` đọc alias — nâng `LIMITS.MAX_ATTEMPT_ANSWER` là đủ cho **mã**. **Nhưng có một coupled site thứ ba mà cả AC-048 lẫn backend D-04 đều không nêu**: `QuestionRenderer.test.tsx:119` khoá cứng `expect(textarea?.maxLength).toBe(500)`, và `:112` khoá **nguyên văn** chuỗi chân trang tiếng Anh. Cả hai đỏ ngay lượt nâng trần / đổi chuỗi | `QuestionRenderer.tsx:23`, `:194`, `:202`; `QuestionRenderer.test.tsx:112`, `:119` |
 | **F-04** | UI Spec UI-D11 và § HistoryRow gọi trường mới là `entry.essayUnresolved` | `transform` | Backend Design Doc chốt tên là **`hasUnresolvedEssay`** (§ Interface Change Matrix, § Field Propagation Map). Hai tên cho một trường là đúng chỗ hai bề mặt sẽ lệch nhau, nên tài liệu này dùng **tên của backend** và ghi lại sự lệch thay vì im lặng theo một trong hai | backend DD § Interface Change Matrix; `app/(HM)/queries.ts:8-18` |
 | **F-05** | UI Spec § EssayGradingPoller: *"**Không mount** khi `pendingCount === 0`"* | `transform` | Quy tắc này **phá chính AC-023**: câu thông báo `result.essay.announceAllDone` phải được đọc lên **đúng lúc** số câu chưa giải quyết chạm 0 — nhưng ở đúng lượt render đó, quy tắc trên gỡ poller (và vùng `aria-live` của nó) khỏi cây. Trình đọc màn hình không đọc nội dung vừa bị xoá. Điều kiện mount đổi thành **`essaySummary !== undefined`**, và poller tự nó **không lên lịch gì** khi `pendingCount === 0`. Lời hứa "tính năng tắt ⇒ không mount" **giữ nguyên**, vì `summariseEssays()` trả `undefined` khi không phần tử nào mang `essayState` | UI Spec § EssayGradingPoller; backend DD § Data Contracts (`summariseEssays` trả `undefined`); AB-7 |
-| **F-06** | UI Spec O-8 chốt điều kiện in dòng PDF là *"có ít nhất một câu tự luận ở RS-6"* | `transform` | Điều kiện đó **không tính được** ở `/history`: `MyHistoryEntry` chỉ mang **một** boolean (`hasUnresolvedEssay`), và RS-6 = `failed` ∧ `!retryAvailable` **không** suy ra được từ nó. Hai entry point cùng xuất PDF cho **cùng một lượt thi** mà một bên in dòng chú thích còn bên kia không, là hai artefact khác nhau cho một sự thật — đúng thứ AC-007 tồn tại để chặn. Kết quả: cần **một boolean thứ hai** `hasIncompleteEssay` trên `MyHistoryEntry`, suy từ **cùng một** hàm dùng chung → FE-OQ-1, MSA-F5 | `app/(HM)/queries.ts:8-18`; backend DD § Data Contracts (`EssaySummary` không có `exhaustedCount`) |
+| **F-06** | UI Spec O-8 chốt điều kiện in dòng PDF là *"có ít nhất một câu tự luận ở RS-6"* | `transform` | Điều kiện đó **không tính được** ở `/history`: `MyHistoryEntry` chỉ mang **một** boolean (`hasUnresolvedEssay`), và RS-6 = `failed` ∧ `!retryAvailable` **không** suy ra được từ nó. Hai entry point cùng xuất PDF cho **cùng một lượt thi** mà một bên in dòng chú thích còn bên kia không, là hai artefact khác nhau cho một sự thật — đúng thứ **`history-prd` AC-007** tồn tại để chặn. Kết quả: cần **một boolean thứ hai** `hasIncompleteEssay` trên `MyHistoryEntry`, suy từ **cùng một** hàm dùng chung → FE-OQ-1, MSA-F5 | `app/(HM)/queries.ts:8-18`; backend DD § Data Contracts (`EssaySummary` không có `exhaustedCount`) **ĐÃ ĐÓNG bởi backend Design Doc v1.1** (§ D-13 của tài liệu đó ghi nhận finding này, kiểm lại và chấp nhận): `hasIncompleteEssay: boolean`, bắt buộc, **cùng một tên** trên `ExamResult` + `MyHistoryEntry` + `AttemptPdfData`, suy bằng vị từ `isEssayIncomplete()`. Ghim bằng EG-BE-034..036. |
 | **F-07** | UI Spec O-7: TBD-02 (`true_false` render danh sách lựa chọn rỗng trong nhánh **có-chấm**) hoãn có chủ đích | `preserve` | **Xác nhận lại trong phiên này**: nhánh có-chấm nằm ở `result/detail/page.tsx:130-238` và **không có** thay đổi nào của tính năng này đáp xuống đó — nhánh tự luận là một nhánh con **bên trong** `if (notScored)` ở `:75-128`. Deferral còn hiệu lực | `result/detail/page.tsx:73`, `:75`, `:133` |
 | **F-08** | UI Spec § Bảng trạng thái render trình bày RS-4 (còn lượt) và RS-5 (kẹt pending) như hai dòng, RS-5 luôn *"Có, hoạt động"* | `transform` | Hợp đồng backend làm cho **RS-5 không luôn có nút hoạt động**: `deriveEssayView()` trả `retryAvailable: essayAttempts < 3` cho ca stuck-pending, và `essayAttempts` **đạt được 3** khi cả ba lượt claim đều bị nền tảng cắt trước lúc settle. Một câu như vậy lưu `pending` nhưng render **RS-6**. Đây là kết quả **đúng** (không lượt chấm nào còn được phép) và nó không cần nhánh mới: frontend chỉ nhìn `state` + `retryAvailable`, nên RS-4/RS-5/RS-6 **tự** phân loại lại. Ghi ra để không ai đọc bảng UI Spec rồi đi tìm một nhánh "pending + hết lượt" không tồn tại | backend DD § State Transitions and Invariants (dòng RS-5), § Error Handling (dòng "Invocation bị cắt") |
 | **F-09** | UI Spec Golden State 10 đòi *"không có JS của poller trong bundle của trang"* khi tính năng tắt | `transform` | Không kiểm được, và có lẽ không đúng: một module `"use client"` được import **tĩnh** bởi một Server Component nằm trong bundle client của route bất kể có mount hay không (AB-10), và repo **không có** script đo bundle theo route để chứng minh hoặc bác bỏ. Phát biểu lại thành một lời hứa **kiểm được**: khi tính năng tắt, poller **không mount**, **không lên lịch một timer nào**, và **không gọi `router.refresh()` lần nào** — cả ba assert được bằng RTL + fake timer. Không dùng `next/dynamic` cho poller (§ MSA-F3 giải thích) | AB-10; `package.json` scripts |
@@ -448,7 +462,7 @@ Gate này áp cho sáu phần tử mang bề mặt bảo trì mà lát cắt fro
 
 ### MSA-F1 — `blockedReason` băng qua biên `usePdfAction` → hai entry point (cross-boundary prop)
 
-**1. Yêu cầu cố định.** AC-058 (chặn xuất PDF khi còn câu chưa giải quyết, ở **cả hai** entry point theo UI-D4); AC-010 (chốt chống nháy đúp hiện có **không đổi**); UI-D5 (control ở lại thứ tự tab, lý do phơi bày qua `aria-describedby`); ràng buộc DOM của `ActionButton` (`:16-29`: mọi node phụ thuộc pha ở **bên trong** hộp `relative` của nút, để `grid-cols-3` không lệch và `/history` không tái diễn lỗi cuộn vô tận).
+**1. Yêu cầu cố định.** AC-058 (chặn xuất PDF khi còn câu chưa giải quyết, ở **cả hai** entry point theo UI-D4); **`history-prd` AC-010** (chốt chống nháy đúp hiện có **không đổi**); UI-D5 (control ở lại thứ tự tab, lý do phơi bày qua `aria-describedby`); ràng buộc DOM của `ActionButton` (`:16-29`: mọi node phụ thuộc pha ở **bên trong** hộp `relative` của nút, để `grid-cols-3` không lệch và `/history` không tái diễn lỗi cuộn vô tận).
 
 **2. Phương án.**
 
@@ -461,14 +475,14 @@ Gate này áp cho sáu phần tử mang bề mặt bảo trì mà lát cắt fro
 
 | Phương án | Yêu cầu hiện tại được phủ | State bền mới | Prop/mode/biến thể mới | Băng qua biên component | Breaking change / migration | Ghi chú chi phí chủ quan |
 |---|---|---|---|---|---|---|
-| (a) prop bắt buộc ×3 | AC-058 (cả hai cửa), AC-010, UI-D5, ràng buộc DOM | 0 | 3 | Có (2 biên) | Có — **15** lượt render trong 2 file test | Một entry point PDF **mới** không biên dịch được nếu không quyết định về chốt chặn |
+| (a) prop bắt buộc ×3 | AC-058 (cả hai cửa), `history-prd` AC-010, UI-D5, ràng buộc DOM | 0 | 3 | Có (2 biên) | Có — **15** lượt render trong 2 file test | Một entry point PDF **mới** không biên dịch được nếu không quyết định về chốt chặn |
 | (b) prop tuỳ chọn ×3 | như (a) | 0 | 3 | Có (2 biên) | Không | Một entry point mới **mặc định không chặn**, im lặng — đúng chế độ hỏng UI-D4 tồn tại để chặn |
 | (c) cờ trong `AttemptPdfData` | **Trượt** — xem dưới | 0 | 1 | Có (0 biên mới) | Không | Nhỏ nhất mọi cột |
 | (d) chốt ở hai nút | **Trượt AC-058 mở rộng (UI-D4)** | 0 | 2 | Có (0 biên mới) | Không | Hai bản sao của cùng một chốt ⇒ hai chỗ để trôi lệch |
 
 **4. Chọn: (a).**
 
-(c) nhỏ nhất nhưng **trượt** vì một lý do về nghĩa, không phải về khẩu vị: `AttemptPdfData` là **hợp đồng đầu vào của bộ sinh PDF** (`lib/pdf/generateAttemptPdf.ts:11-28`, tiêu thụ ở `:30` trở đi). Cờ chặn là một quyết định **không gọi bộ sinh**; đặt nó trong hợp đồng đầu vào bắt hợp đồng đó mang một trường mà chính nó không bao giờ đọc. PRD § Dependencies nói đúng hình dạng này: *"the block is a state on those controls, not a change to the PDF generator's contract."* — và chính sự phân biệt đó là thứ cho phép `essayIncomplete` (MSA-F5) **được** vào `AttemptPdfData`, vì bộ sinh **có** đọc nó.
+(c) nhỏ nhất nhưng **trượt** vì một lý do về nghĩa, không phải về khẩu vị: `AttemptPdfData` là **hợp đồng đầu vào của bộ sinh PDF** (`lib/pdf/generateAttemptPdf.ts:11-28`, tiêu thụ ở `:30` trở đi). Cờ chặn là một quyết định **không gọi bộ sinh**; đặt nó trong hợp đồng đầu vào bắt hợp đồng đó mang một trường mà chính nó không bao giờ đọc. PRD § Dependencies nói đúng hình dạng này: *"the block is a state on those controls, not a change to the PDF generator's contract."* — và chính sự phân biệt đó là thứ cho phép `hasIncompleteEssay` (MSA-F5) **được** vào `AttemptPdfData`, vì bộ sinh **có** đọc nó.
 
 (d) trượt UI-D4: `/history` là nơi học sinh quay lại nhiều ngày sau, tức là nơi PDF dễ được xuất nhất; chốt ở một nút để nguyên cửa kia mở.
 
@@ -508,7 +522,7 @@ Gate này áp cho sáu phần tử mang bề mặt bảo trì mà lát cắt fro
 
 Yêu cầu mà (b) không thoả **không phải** một yêu cầu kỹ thuật: nó là **AC-067 đọc như một khoảng thời gian có thật**. Tính năng ship ở trạng thái tắt, bài làm được lưu, và **không** được chấm tự động. Nếu commit đổi chữ đáp xuống trước khi cổng ZDR qua, màn làm bài hứa một việc chưa chạy — đúng khuyết tật mà R12 tồn tại để chấm dứt. (b) đúng **nếu và chỉ nếu** Work Plan giữ được thứ tự; (a) đúng bất kể thứ tự.
 
-**Đây là UI Spec O-5, và nó thuộc về kỹ sư, không thuộc về tài liệu này.** Tài liệu này đặc tả (a) làm **mặc định** vì đó là mặc định của UI Spec, và ghi ra chính xác cái gì đổi nếu kỹ sư chọn (b):
+**UI Spec O-5 đã đóng cùng ngày (v1.2) với đúng phương án này.** Bảng dưới giữ lại **cái gì sẽ phải đổi nếu (b) được chọn** — không phải một lựa chọn còn mở, mà là bản ghi cho phép một lượt đọc sau kiểm được rằng phương án bị loại đã được cân đủ, và cho phép mở lại có căn cứ nếu ràng buộc C-F6 đổi (vd có staging):
 
 | Nếu chọn (b) | Việc phải làm |
 |---|---|
@@ -517,11 +531,21 @@ Yêu cầu mà (b) không thoả **không phải** một yêu cầu kỹ thuật
 | Test | `QuestionRenderer.test.tsx:112` đổi sang chuỗi mới; **không** cần ca "cờ tắt" |
 | Work Plan | Task đổi chuỗi mang một **dependency cứng** lên task ghi nhận dated console check của AC-067 |
 
+**Ba chỗ đọc cờ, không phải một — và chỉ MỘT trong ba thuộc lát cắt này** *(backend Design Doc v1.2 sửa lại điểm này; bản v1.0 của nó nói "đọc ở đúng một chỗ" và điều đó sai)*:
+
+| # | Chỗ đọc | Loại trách nhiệm | Ai sở hữu |
+|---|---|---|---|
+| 1 | `submitExam()` (`app/(layer2)/actions.ts`) | **Cổng hành vi** — có phát năm khoá `essay*` và có đăng ký `after()` hay không | Backend |
+| 2 | `retryEssayGrading()` (`app/(layer2)/essayActions.ts`) | **Cổng hành vi** — một lượt chấm lại có với tới provider được không khi cờ tắt | Backend |
+| 3 | Segment trang làm bài (`app/(layer2)/exams/[id]/attempt/[attemptId]/page.tsx`) | **Cổng câu chữ** — **chỉ** chọn giữa hai khoá i18n cho chân trang; không chạm việc chấm | **Lát cắt này** |
+
+Ba chỗ này **không** phải ba lượt đọc thừa của một quyết định: hai chỗ đầu cưỡng chế **hành vi** (bỏ chỗ (2) thì tắt cờ vẫn để nút chấm lại đốt ngân sách), chỗ thứ ba cưỡng chế **một câu chữ**. Cả ba đọc **một** biến, nên chúng lật cùng lúc trong **một** lượt deploy — đó là điều làm kill switch an toàn. Lát cắt frontend chỉ chịu trách nhiệm chỗ (3), và trách nhiệm đó dừng ở việc **đọc ở server rồi truyền xuống bằng prop**; `QuestionRenderer` (client) **không bao giờ** tự đọc env.
+
 **5. Phương án bị loại.**
 
 - **(c) `NEXT_PUBLIC_*`** — trượt UI-D7; dựng bản sao thứ hai của một sự thật ở phía client.
 - **(d) chân trang render ở server** — đúng nhưng đắt: một `ReactNode` mỗi câu thay cho một boolean cho cả bài.
-- **(b) một khoá + ràng buộc thứ tự** — **chưa loại**; đang chờ quyết định của kỹ sư (FE-OQ-2). Nếu chọn thì (a) bị loại chứ không phải (b).
+- **(b) một khoá + ràng buộc thứ tự ship** — **BỊ LOẠI 2026-08-29 (kỹ sư, FE-OQ-2 đóng).** Nhỏ hơn (a) ở mọi cột đo được, nhưng nó giao tính đúng đắn của câu chữ cho **thứ tự commit**; với một kỹ sư và không staging (C-F6), một lượt trượt thứ tự làm màn làm bài hứa chấm tự động trong khi cỗ máy chấm không chạy. (a) đúng **bất kể** thứ tự commit. UI Spec v1.3 ghi cùng quyết định và đóng O-5.
 
 ---
 
@@ -594,13 +618,13 @@ Yêu cầu mà (b) không thoả **không phải** một yêu cầu kỹ thuật
 
 ---
 
-### MSA-F5 — Dòng "PDF thiếu phần tự luận": `essayIncomplete` băng qua biên, và boolean thứ hai trên `/history` (cross-boundary field)
+### MSA-F5 — Dòng "PDF thiếu phần tự luận": `hasIncompleteEssay` băng qua biên, và boolean thứ hai trên `/history` (cross-boundary field)
 
-**1. Yêu cầu cố định.** UI Spec **O-8 (đã chốt)** — PDF **không** bị chặn ở RS-6, **nhưng** tệp phải mang khoá `result.essay.pdfIncomplete`, với điều kiện in là *"có ít nhất một câu tự luận ở RS-6"*, **không** phải *"lượt thi có câu tự luận"*; AC-007 (**đúng một** hiện thực sinh PDF, dùng bởi cả hai entry point); AC-009 (chỉ dùng dữ liệu trang/hàng đã nạp — **không** round trip thêm); UI-D11 (mảng `per_question` thô **không** băng qua biên vào cây component); ADR-0009 (`AttemptPdfTemplate` chỉ hex/rgb literal).
+**1. Yêu cầu cố định.** UI Spec **O-8 (đã chốt)** — PDF **không** bị chặn ở RS-6, **nhưng** tệp phải mang khoá `result.essay.pdfIncomplete`, với điều kiện in là *"có ít nhất một câu tự luận ở RS-6"*, **không** phải *"lượt thi có câu tự luận"*; **`history-prd` AC-007** (**đúng một** hiện thực sinh PDF, dùng bởi cả hai entry point); **`history-prd` AC-009** (chỉ dùng dữ liệu trang/hàng đã nạp — **không** round trip thêm); UI-D11 (mảng `per_question` thô **không** băng qua biên vào cây component); ADR-0009 (`AttemptPdfTemplate` chỉ hex/rgb literal).
 
 **2. Phương án.**
 
-- **(a) `AttemptPdfData` nhận `essayIncomplete: boolean` (bắt buộc); `MyHistoryEntry` nhận boolean THỨ HAI `hasIncompleteEssay`; cả hai bề mặt suy bằng CÙNG hàm `isEssayIncomplete()`** *(chọn)*.
+- **(a) Một trường `hasIncompleteEssay: boolean` (bắt buộc) trên **cả ba** kiểu — `ExamResult`, `MyHistoryEntry`, `AttemptPdfData` — suy bằng CÙNG vị từ `isEssayIncomplete()`** *(chọn; **backend Design Doc v1.1 đã hiện thực hoá đúng phương án này** — xem § Contract deltas)*.
 - **(b) Chỉ trang kết quả in dòng đó; `/history` không** — trừ đi: 0 trường mới trên `MyHistoryEntry`.
 - **(c) Một trường enum duy nhất trên `MyHistoryEntry`: `essayPdfState: "none" | "blocked" | "incomplete"`** — trừ đi: 1 trường thay vì 2.
 - **(d) Thêm `exhaustedCount` vào `EssaySummary` và cho `MyHistoryEntry` mang cả `EssaySummary`** — trừ đi: 0 predicate mới.
@@ -610,15 +634,19 @@ Yêu cầu mà (b) không thoả **không phải** một yêu cầu kỹ thuật
 
 | Phương án | Yêu cầu hiện tại được phủ | State bền mới | Prop/mode/biến thể mới | Băng qua biên component | Breaking change / migration | Ghi chú chi phí chủ quan |
 |---|---|---|---|---|---|---|
-| (a) 2 boolean + 1 predicate dùng chung | O-8, AC-007, AC-009, UI-D11, ADR-0009 | 0 | 2 trường (1 trên `AttemptPdfData`, 1 trên `MyHistoryEntry`) + 1 hàm thuần | Có (2 biên) | **Có** — cần một dòng sửa ở hợp đồng backend (FE-OQ-1) | Mỗi trường mang **đúng một** sự thật, mang tên của sự thật đó |
-| (b) chỉ trang kết quả | **Trượt O-8 + AC-007** | 0 | 1 trường | Có (1 biên) | Không | Cùng lượt thi, hai tệp khác nhau tuỳ cửa nào bấm |
-| (c) một enum ba giá trị | O-8, AC-007, AC-009, UI-D11 | 0 | 1 trường + **1 quy tắc ưu tiên** | Có (2 biên) | Có | "blocked" và "incomplete" **không loại trừ nhau**; enum ép một quy tắc ưu tiên ngầm mà giá trị thứ tư sẽ phá |
-| (d) `EssaySummary` sang `/history` | O-8, AC-007, UI-D11 | 0 | 1 trường (6 số) + 1 trường trên `EssaySummary` | Có (2 biên) | Có | Sáu số băng qua biên cho một câu hỏi yes/no |
+| (a) **một tên** trên ba kiểu + 1 predicate dùng chung | O-8, history-prd AC-007, history-prd AC-009, UI-D11, ADR-0009 | 0 | 1 tên trường (`ExamResult`, `MyHistoryEntry`, `AttemptPdfData`) + 1 hàm thuần | Có (2 biên) | Không — **đã có trong backend v1.1** | Trường mang **đúng một** sự thật, mang tên của sự thật đó, và **cùng một tên ở cả ba kiểu** — đó chính là thứ khiến hai lối xuất PDF không thể bất đồng |
+| (b) chỉ trang kết quả | **Trượt O-8 + `history-prd` AC-007** | 0 | 1 trường | Có (1 biên) | Không | Cùng lượt thi, hai tệp khác nhau tuỳ cửa nào bấm |
+| (c) một enum ba giá trị | O-8, `history-prd` AC-007, `history-prd` AC-009, UI-D11 | 0 | 1 trường + **1 quy tắc ưu tiên** | Có (2 biên) | Có | "blocked" và "incomplete" **không loại trừ nhau**; enum ép một quy tắc ưu tiên ngầm mà giá trị thứ tư sẽ phá |
+| (d) `EssaySummary` sang `/history` | O-8, `history-prd` AC-007, UI-D11 | 0 | 1 trường (6 số) + 1 trường trên `EssaySummary` | Có (2 biên) | Có | Sáu số băng qua biên cho một câu hỏi yes/no |
 | (e) số học trên `EssaySummary` | O-8 ở **S-01**; **trượt ở `/history`** | 0 | 1 trường | Có (1 biên) | Không | Một biểu thức ba hạng tử không tên; không ai đọc nó mà biết nó nghĩa gì |
 
-**4. Chọn: (a).**
+**4. Chọn: (a) — và tên trường là `hasIncompleteEssay`, ở CẢ BA kiểu.**
 
-(b) trượt thẳng: một học sinh bấm "Lưu" từ `/history` và một học sinh bấm "Lưu" từ trang kết quả, **cùng một lượt thi**, phải nhận **cùng một tệp**. Đó là tinh thần của AC-007 (một đường ống) đọc ở mức artefact chứ không chỉ ở mức mã.
+**Cùng một tên ở ba kiểu là cơ chế, không phải mỹ học.** Lý do backend Design Doc nêu khi đóng FE-OQ-1: `AttemptPdfData` (`SOURCE/lib/pdf/generateAttemptPdf.ts:11`) là **kiểu hợp lưu** của cả hai lối xuất PDF — nó được dựng ở `result/page.tsx:56` **và** `HistoryRow.tsx:23`, rồi cả hai đi qua `usePdfAction.ts:40`. Đặt **một** trường, mang **một** tên, ở đúng chỗ hợp lưu đó là thứ duy nhất khiến hai lối xuất **không thể** mang hai sự thật khác nhau. Một tên thứ hai ở phía frontend đánh bại chính cơ chế ấy tại đúng cái biên nó được dựng ra để bảo vệ — và nó là **cùng lớp lỗi** mà tài liệu này đã bắt được ở thượng nguồn với F-04 (`essayUnresolved` vs `hasUnresolvedEssay`).
+
+*(Bản v1.0 của tài liệu này gọi trường trên `AttemptPdfData` là `essayIncomplete`. Đó là một tên **thứ hai** cho cùng một sự thật, và vì cả hai tài liệu khai nó **bắt buộc** trên **cùng** kiểu ở `generateAttemptPdf.ts:11`, cái nào đáp xuống trước cũng làm cái kia đỏ ở `tsc`. Tên của backend thắng, và lý do là lý do của chính nó: nó nhất quán với `hasUnresolvedEssay` trên cùng kiểu, và nó là cái tên mà EG-BE-035 assert lên.)*
+
+(b) trượt thẳng: một học sinh bấm "Lưu" từ `/history` và một học sinh bấm "Lưu" từ trang kết quả, **cùng một lượt thi**, phải nhận **cùng một tệp**. Đó là tinh thần của `history-prd` AC-007 (một đường ống) đọc ở mức artefact chứ không chỉ ở mức mã. **Đây là điều EG-BE-035 ghim lại**: `hasIncompleteEssay` phải là `true` ở **cả** `ExamResult` **và** `MyHistoryEntry` cho cùng `attemptId`.
 
 (c) nhỏ hơn (a) đúng một trường, nhưng đổi lấy một **quy tắc ưu tiên ngầm**: một lượt thi có thể vừa có câu chưa giải quyết (⇒ chặn) vừa có câu hết lượt (⇒ chú thích). Enum buộc phải chọn một, và "blocked" thắng vì lúc đó PDF không xuất được — đúng cho hôm nay, nhưng nó **giấu** sự thật thứ hai bên trong một tên gọi, và giá trị thứ tư sẽ phá quy tắc đó lặng lẽ. Hai boolean độc lập, mỗi cái mang tên sự thật của mình, không có chế độ hỏng ấy.
 
@@ -626,7 +654,7 @@ Yêu cầu mà (b) không thoả **không phải** một yêu cầu kỹ thuật
 
 (e) là phương án đáng cân nhắc nhất và **trượt vì phạm vi**: nó chỉ chạy được ở nơi có `EssaySummary`, tức S-01, còn `/history` không có. Ngoài ra `failedCount − (unresolvedCount − pendingCount)` là một biểu thức không tên nối ba trường lại bằng một bất biến ngầm; đổi định nghĩa của `unresolvedCount` (vd nếu O-8 lật lại) sẽ làm nó sai **im lặng**. `isEssayIncomplete(view) = view.state === "failed" && !view.retryAvailable` nói thẳng ra điều nó nghĩa, và nó dùng đúng **hai** trường mà `EssayView` đã có — nên nó **không** đòi thêm trường nào ở hợp đồng đã chốt.
 
-**Vì sao `essayIncomplete` ĐƯỢC vào `AttemptPdfData` trong khi `blockedReason` thì KHÔNG** (đối chiếu MSA-F1): `AttemptPdfData` là hợp đồng **đầu vào của bộ sinh**. `essayIncomplete` **được bộ sinh đọc** — nó quyết định một dòng có in ra hay không. `blockedReason` là quyết định **không gọi** bộ sinh. Cùng một tiêu chí, hai kết luận ngược nhau, và tiêu chí đó là *"trường này có được thứ nhận nó đọc không?"*.
+**Vì sao `hasIncompleteEssay` ĐƯỢC vào `AttemptPdfData` trong khi `blockedReason` thì KHÔNG** (đối chiếu MSA-F1): `AttemptPdfData` là hợp đồng **đầu vào của bộ sinh**. `hasIncompleteEssay` **được bộ sinh đọc** — nó quyết định một dòng có in ra hay không. `blockedReason` là quyết định **không gọi** bộ sinh. Cùng một tiêu chí, hai kết luận ngược nhau, và tiêu chí đó là *"trường này có được thứ nhận nó đọc không?"*.
 
 **Ghi ra một sự căng, không giấu:** câu thứ hai của `result.essay.pdfIncomplete` (*"Điểm trong tệp chưa bao gồm phần tự luận."*) **đúng với mọi** lượt thi có tự luận, không riêng lượt có câu ở RS-6 — vì `totalScore` trong PDF là con số `/10` cũ, mà UI-D3 giữ nguyên cơ sở tính. Điều kiện in vẫn là RS-6 vì **O-8 đã chốt như vậy**, và vì nhiệm vụ của dòng đó là cảnh báo một câu **không bao giờ được chấm**, chứ không phải mô tả cơ sở tính điểm (việc đó `EssayScoreLine` làm trên màn hình). Nếu sau này kỹ sư muốn điều kiện rộng hơn, đó là **một dòng** ở phép suy boolean, không phải một thay đổi hợp đồng.
 
@@ -682,7 +710,7 @@ Yêu cầu mà (b) không thoả **không phải** một yêu cầu kỹ thuật
 
 **Hệ quả trực tiếp lên UI, và vì sao nó không tự lộ ra:**
 
-- `r.scored === false` **luôn đúng** với tự luận ở **cả sáu** trạng thái render ⇒ nó không phân biệt được gì. Một nhánh keyed trên nó **vẫn chạy, vẫn render ra một cái gì đó** — nó chỉ in nhãn `result.notAutoScored` cạnh một con điểm vừa được chấm (đúng điều AC-053 cấm). Không crash, không cảnh báo, không test hiện có nào bắt được.
+- `r.scored === false` **luôn đúng** với tự luận ở **cả bảy** trạng thái render (RS-0…RS-6) ⇒ nó không phân biệt được gì. Một nhánh keyed trên nó **vẫn chạy, vẫn render ra một cái gì đó** — nó chỉ in nhãn `result.notAutoScored` cạnh một con điểm vừa được chấm (đúng điều AC-053 cấm). Không crash, không cảnh báo, không test hiện có nào bắt được.
 - `r.isCorrect === false` **luôn đúng** với tự luận ⇒ chip Đúng/Sai/Bỏ trống (`result/detail/page.tsx:133-137`) **không bao giờ được render cho tự luận**. Một câu tự luận không đúng, không sai, không "bỏ trống" — nó có một **band**, hoặc có một **trạng thái vòng đời**.
 
 **Cách quy tắc được cưỡng chế, theo thứ tự từ mạnh nhất tới yếu nhất:**
@@ -734,7 +762,7 @@ Yêu cầu mà (b) không thoả **không phải** một yêu cầu kỹ thuật
 |---|---|---|---|
 | **V0 — Nền tảng nhỏ nhất** | 29 khoá i18n ở `en.ts` rồi `vi.ts`; `EssayLifecycleBadge` + test | **L2** | Chưa có bề mặt nào dùng; cổng là `npx tsc --noEmit` (AB-12) + test badge |
 | **V1 — S-01 đọc được** | `EssayScoreLine` + test; chèn vào `result/page.tsx` | **L1** — *lần đầu tiên toàn bộ UI vận hành được*: mở trang kết quả của một lượt thi có tự luận đã chấm và **nhìn thấy điểm tự luận** | Đây là điểm tích hợp chính của cả lát cắt |
-| **V2 — S-02 đọc được** | `EssayReviewBlock` + test; nhánh con trong `if (notScored)` | **L1** | Từng câu hiện đúng một trong sáu trạng thái |
+| **V2 — S-02 đọc được** | `EssayReviewBlock` + test; nhánh con trong `if (notScored)` | **L1** | Từng câu hiện đúng một trong bảy trạng thái (RS-0…RS-6) |
 | **V3 — Chốt PDF (hai cửa)** | `usePdfAction` + `ActionButton` + `HistoryRowMenu` + `ResultActions` + `HistoryRow`; **15** lượt render test sửa cùng commit; `MyHistoryEntry` hai boolean; dòng `pdfIncomplete` trong template | **L1 + L2** | `/history` và S-01 cùng chặn/mở khoá; tệp PDF mang dòng chú thích |
 | **V4 — Chấm lại** | `EssayRegradeControl` + test | **L1** | Nút chạy thật, đi qua Server Action, `router.refresh()` đáp xuống |
 | **V5 — Poller** | `EssayGradingPoller` + test fake-timer; mount ở S-01 và S-02 | **L1** | Trang tự cập nhật; vùng live đọc lên |
@@ -877,12 +905,22 @@ export interface EssaySummary {
 }
 ```
 
-Nó tới frontend qua **hai** trường tuỳ chọn, cả hai theo đúng lối `hasBeenWrongTwice` đã dựng (`types/result.ts:19-24` — một trường suy-lúc-đọc mà `computeScore()` không bao giờ đặt):
+Nó tới frontend qua **ba** trường trên `ExamResult`, hai trong đó tuỳ chọn theo đúng lối `hasBeenWrongTwice` đã dựng (`types/result.ts:19-24` — một trường suy-lúc-đọc mà `computeScore()` không bao giờ đặt):
 
-- `PerQuestionResult.essay?: EssayView` — **một câu**.
+- `PerQuestionResult.essay?: EssayView` — **một câu**. `undefined` ⇒ RS-0/RS-1.
 - `ExamResult.essaySummary?: EssaySummary` — **cả lượt thi**; `undefined` khi không phần tử nào mang `essayState` (row cũ / tính năng tắt).
+- `ExamResult.hasIncompleteEssay: boolean` — **bắt buộc, không bao giờ `undefined`**. Điều kiện in dòng chú thích PDF (O-8), gấp sẵn ở `getResult()` vì đó là **chỗ duy nhất** cầm `created_at`, thứ mà phép suy diễn cần và thứ mà § Field Propagation Map cố ý **không** cho lộ ra ngoài.
 
-Và qua **hai boolean** trên `MyHistoryEntry` cho `/history`: `hasUnresolvedEssay: boolean`, `hasIncompleteEssay: boolean` (cái thứ hai là FE-OQ-1).
+Và qua **hai boolean** trên `MyHistoryEntry` cho `/history`: `hasUnresolvedEssay: boolean`, `hasIncompleteEssay: boolean` — **cùng tên** với trường trên `ExamResult` và trên `AttemptPdfData`, vì cùng một sự thật (§ MSA-F5).
+
+**Ba nguồn của "còn câu chưa giải quyết", và chỗ nào dùng cái nào** — viết ra vì đây là chỗ dễ chọn nhầm:
+
+| Bề mặt | Đọc gì cho "chưa giải quyết" (chốt PDF, AC-058) | Đọc gì cho "có câu RS-6" (dòng PDF, O-8) |
+|---|---|---|
+| S-01 / S-02 | `essaySummary.unresolvedCount > 0` | `hasIncompleteEssay` |
+| S-03 `/history` | `entry.hasUnresolvedEssay` | `entry.hasIncompleteEssay` |
+
+Hai đường tính "chưa giải quyết" (`unresolvedCount > 0` và `hasUnresolvedEssay()`) là **hai lối tính một sự thật** — chính hình dạng hỏng mà F-06 đã tìm ra một lần. Backend **không** để nó trôi: **EG-BE-034** ghim đẳng thức `hasUnresolvedEssay(...) === (summariseEssays(...)?.unresolvedCount ?? 0) > 0` trên cùng fixture. Frontend không có việc gì phải làm thêm ngoài việc **không tự suy lại cái nào trong hai**.
 
 **Bốn quy tắc tiêu thụ — đây là phần frontend chịu trách nhiệm:**
 
@@ -1035,7 +1073,7 @@ Invariants:
 
 Server Component async, gọi từ **bên trong** nhánh `if (notScored)` sẵn có của `result/detail/page.tsx:75`.
 
-**Vị trí chính xác trong file, và vì sao.** `:73` tính `const notScored = r.scored === false;` rồi rẽ nhánh trên đó. Theo W1, câu tự luận **luôn** rơi vào nhánh ấy, ở **cả sáu** trạng thái render. Nên trình bày tự luận là một **nhánh con bên trong nhánh không-chấm**, rẽ trên `r.essay` — **không phải** một nhánh mới cạnh nó, và tuyệt đối **không phải** một sửa đổi trong nhánh có-chấm (`:130-238`). Hai hệ quả cần nêu tên: chip Đúng/Sai/Bỏ trống (`:133-137`) **không bao giờ** render cho tự luận vì nó nằm trong nhánh kia; và **TBD-02 không bị kích hoạt** (F-07).
+**Vị trí chính xác trong file, và vì sao.** `:73` tính `const notScored = r.scored === false;` rồi rẽ nhánh trên đó. Theo W1, câu tự luận **luôn** rơi vào nhánh ấy, ở **cả bảy** trạng thái render (RS-0…RS-6). Nên trình bày tự luận là một **nhánh con bên trong nhánh không-chấm**, rẽ trên `r.essay` — **không phải** một nhánh mới cạnh nó, và tuyệt đối **không phải** một sửa đổi trong nhánh có-chấm (`:130-238`). Hai hệ quả cần nêu tên: chip Đúng/Sai/Bỏ trống (`:133-137`) **không bao giờ** render cho tự luận vì nó nằm trong nhánh kia; và **TBD-02 không bị kích hoạt** (F-07).
 
 ```yaml
 Contract: EssayReviewBlock({ index, essay, studentAnswer, storedAnswer, attemptId, questionId }): Promise<JSX.Element>
@@ -1376,7 +1414,7 @@ Chữ ký hôm nay là `usePdfAction(action, pdfInput)` (`:40`). Chữ ký mới
 ```ts
 async function run() {
   if (blockedReason !== null) return; // AC-058 — TRƯỚC cả chốt bận
-  if (busyRef.current) return;        // AC-010, giữ nguyên
+  if (busyRef.current) return;        // AC-010 (history-prd) — comment nguyên văn của mã hiện có, giữ nguyên
   busyRef.current = true;
   // … phần còn lại KHÔNG ĐỔI
 }
@@ -1386,7 +1424,7 @@ Kết quả: `phase` **ở nguyên `"idle"`**. Không pha bận, không sinh fil
 
 **Vì sao chốt ở hook chứ không ở hai nút** — UI-D4, và MSA-F1 phương án (d). AC-058 nêu tên duy nhất `ResultActions.tsx`, nhưng `/history` chạm **cùng một đường ống** qua `HistoryRowMenu.tsx:116-117` → `usePdfAction` → `generateAttemptPdfFile`. Lý do tồn tại của AC-058 là *"một artefact vĩnh viễn không được mang một con điểm sẽ đổi sau một tiếng"* — đó là tính chất của **lượt làm bài**, không phải của **cái nút đã bị bấm**.
 
-**`essayIncomplete` đi đường khác `blockedReason`** (MSA-F5): nó nằm trong `AttemptPdfData` vì bộ sinh **đọc** nó, và `usePdfAction` bơm nhãn đã dịch xuống cùng bảy nhãn hiện có (`:53-62`):
+**`hasIncompleteEssay` đi đường khác `blockedReason`** (MSA-F5): nó nằm trong `AttemptPdfData` vì bộ sinh **đọc** nó, và `usePdfAction` bơm nhãn đã dịch xuống cùng bảy nhãn hiện có (`:53-62`):
 
 ```ts
 const file = await generateAttemptPdfFile({
@@ -1394,7 +1432,7 @@ const file = await generateAttemptPdfFile({
   resultTitleLabel: t("history.pdfResultTitle"),
   // … sáu nhãn hiện có, KHÔNG ĐỔI …
   // Nhãn bơm VÔ ĐIỀU KIỆN, đúng lối bảy nhãn trên; TEMPLATE mới là nơi quyết
-  // định có in hay không, dựa trên dữ liệu `essayIncomplete` của chính pdfInput.
+  // định có in hay không, dựa trên dữ liệu `hasIncompleteEssay` của chính pdfInput.
   essayIncompleteLabel: t("result.essay.pdfIncomplete"),
 });
 ```
@@ -1454,7 +1492,7 @@ Server Component. Ba thay đổi:
 
 1. **Badge cuối dòng meta.** Dòng meta hôm nay (`:37-40`) là `{score}/10 · {ngày} · {thời gian làm}`. Thêm `<EssayLifecycleBadge state="pending" />` **vào cuối** dòng đó khi `entry.hasUnresolvedEssay === true`.
 2. **`blockedReason`** truyền xuống `HistoryRowMenu` (`:44-48`) từ **cùng** boolean: `entry.hasUnresolvedEssay ? "essay_unresolved" : null`.
-3. **`essayIncomplete`** vào `pdfInput` (`:23-31`): `essayIncomplete: entry.hasIncompleteEssay`.
+3. **`hasIncompleteEssay`** vào `pdfInput` (`:23-31`): `hasIncompleteEssay: entry.hasIncompleteEssay`.
 
 **Vì sao badge đặt cuối chứ không chèn cạnh con điểm.** Chuỗi ba giá trị nối bằng `·` là một **đơn vị đọc**; chèn một badge vào giữa sẽ cắt nó. Đặt cuối thì badge đọc như một **chú thích cho cả dòng** — đúng nghĩa của nó: nó nói về **lượt thi**, không nói riêng về con điểm.
 
@@ -1522,7 +1560,7 @@ export interface AttemptPdfData {
   /** ≥1 câu tự luận ở RS-6 (failed, hết lượt). Dựng ở CẢ HAI nơi tạo pdfInput
    *  bằng CÙNG một predicate isEssayIncomplete() — xem MSA-F5. BẮT BUỘC: một
    *  nơi tạo pdfInput thứ ba phải quyết định, không được mặc định im lặng. */
-  essayIncomplete: boolean;
+  hasIncompleteEssay: boolean;
   // … bảy nhãn tuỳ chọn hiện có, KHÔNG ĐỔI …
   /** Nhãn đã dịch — usePdfAction bơm vào từ `t`, đúng lối bảy nhãn trên. */
   essayIncompleteLabel?: string;
@@ -1537,7 +1575,7 @@ export interface AttemptPdfData {
 {/* ADR-0009: chỉ hex literal, không Tailwind class, không components/ui.
     #605a52 = cùng giá trị EYEBROW (:45) đang dùng — KHÔNG thêm màu mới, và
     KHÔNG dùng đỏ: dòng này là một chú thích, không phải một lỗi. */}
-{essayIncomplete && (
+{hasIncompleteEssay && (
   <p style={{ color: "#605a52", fontSize: 12, marginTop: 10, lineHeight: 1.5 }}>
     {essayIncompleteLabel ?? DEFAULT_ESSAY_INCOMPLETE_LABEL}
   </p>
@@ -1546,12 +1584,19 @@ export interface AttemptPdfData {
 
 `DEFAULT_ESSAY_INCOMPLETE_LABEL` là một hằng tiếng Anh, đúng lối sáu nhãn mặc định hiện có (`:31-40`) — để template vẫn đứng một mình khi render ngoài luồng `t()` (unit test).
 
-**Điều kiện in là "≥1 câu ở RS-6", KHÔNG phải "lượt thi có câu tự luận".** Đây là O-8 nguyên văn. `essayIncomplete` được suy bằng **một** predicate dùng chung:
+**Điều kiện in là "≥1 câu ở RS-6", KHÔNG phải "lượt thi có câu tự luận".** Đây là O-8 nguyên văn. Trường được **suy ở server, một lần, bằng một vị từ**, rồi **đọc thẳng** ở cả hai chỗ dựng `pdfInput` — frontend **không** suy lại:
 
-| Nơi dựng `pdfInput` | Biểu thức |
-|---|---|
-| `result/page.tsx:56-64` | `result.perQuestion.some((r) => isEssayIncomplete(r.essay))` |
-| `HistoryRow.tsx:23-31` | `entry.hasIncompleteEssay` — suy ở `listMyHistory()` bằng **cùng** `isEssayIncomplete()` |
+| Nơi dựng `pdfInput` | Biểu thức | Nguồn |
+|---|---|---|
+| `result/page.tsx:56-64` | `data.hasIncompleteEssay` | `ExamResult.hasIncompleteEssay` — `getResult()` gấp sẵn (backend v1.1) |
+| `HistoryRow.tsx:23-31` | `entry.hasIncompleteEssay` | `MyHistoryEntry.hasIncompleteEssay` — `listMyHistory()` gấp sẵn |
+
+**Vì sao trang kết quả KHÔNG tự suy lại, dù nó có sẵn `perQuestion`.** Bản v1.0 của tài liệu này viết `result.perQuestion.some((r) => isEssayIncomplete(r.essay))`. Hai lý do độc lập khiến biểu thức đó sai, và cả hai đều là lý do **cấu trúc**:
+
+1. **Nó không type-check.** Backend khai `isEssayIncomplete(view: EssayView): boolean`, còn `deriveEssayView()` trả `EssayView | null`, nên `PerQuestionResult.essay` ở trang là `EssayView | undefined`. Truyền thẳng vào là một lỗi `tsc`, và "sửa" nó bằng `r.essay!` hay `?? …` là đúng lối bỏ kiểu mà typescript-rules cấm.
+2. **Nó làm EG-BE-035 không assert được.** Tiêu chí đó đòi `hasIncompleteEssay` là `true` trên **cả** `ExamResult` **và** `MyHistoryEntry` cho cùng `attemptId`. Nếu trang tự suy tại chỗ thì `ExamResult` **không mang** trường ấy, và tiêu chí không có gì để đối chiếu — hai lối xuất PDF lại đọc hai thứ khác nhau, tức là đúng chế độ hỏng F-06 đã tìm ra.
+
+**Quy tắc *biểu thức* thì vẫn nguyên và vẫn đúng:** RS-6 chỉ được khai **một lần**, ở `isEssayIncomplete()` trong `SOURCE/lib/scoring/essayLifecycle.ts`. Không file frontend nào viết `state === "failed" && !retryAvailable` — điều này do **EG-BE-036** quét mã ghim lại, và lát cắt frontend không vi phạm nó ở cả hai bản.
 
 **Một sự căng ghi ra chứ không giấu.** Câu thứ hai của chuỗi (*"Điểm trong tệp chưa bao gồm phần tự luận."*) **đúng với mọi** lượt thi có tự luận, không riêng lượt có RS-6 — vì `totalScore` trong PDF là con số `/10` cũ mà UI-D3 giữ nguyên cơ sở tính. Điều kiện in vẫn là RS-6 vì **O-8 đã chốt như vậy**, và vì nhiệm vụ của dòng đó là cảnh báo một câu **không bao giờ được chấm** (một sự thật mà người đọc tệp **không có cách nào khác** để biết), chứ không phải mô tả cơ sở tính điểm (việc đó `EssayScoreLine` làm trên màn hình). Nếu sau này kỹ sư muốn điều kiện rộng hơn, đó là **một dòng** ở phép suy boolean, không phải một thay đổi hợp đồng.
 
@@ -1567,7 +1612,7 @@ Tính năng ship ở trạng thái **tắt**. Cửa sổ đó có thật và có
 | **S-02** Result Detail | **Y hệt hôm nay.** Mọi câu tự luận rơi vào nhánh không-chấm **chung, không đổi** (`:75-128`): "Bạn trả lời:" / "Đáp án đã lưu:" / nhãn `result.notAutoScored`. `EssayReviewBlock` không được gọi; `EssayRegradeControl` không tồn tại trên trang | `r.essay === undefined` |
 | **S-03** `/history` | **Y hệt hôm nay.** `hasUnresolvedEssay === false` và `hasIncompleteEssay === false` cho mọi hàng ⇒ không badge, menu ⋯ đủ ba mục hoạt động, PDF không mang dòng chú thích | `summariseEssays()`/predicate trả false khi không có khoá |
 | **S-04** Exam Player | Chân trang giữ **nguyên văn** `player.essayNotScored` — câu cũ **vẫn đúng** trong cửa sổ này | `essayGradingEnabled === false` (mặc định) |
-| **Tệp PDF** | Không có dòng `pdfIncomplete` | `essayIncomplete === false` |
+| **Tệp PDF** | Không có dòng `pdfIncomplete` | `hasIncompleteEssay === false` |
 
 **Lời hứa được phát biểu cho kiểm được** (F-09): *"khi tính năng tắt, poller **không mount**, **không lên lịch timer nào**, **không gọi `router.refresh()` lần nào**"* — ba mệnh đề assert được bằng RTL + fake timer. Lời hứa "0 byte JS trong bundle" **không** được viết ra, vì nó không đúng với một import tĩnh (AB-10) và repo không có công cụ để chứng minh hay bác bỏ nó.
 
@@ -1592,9 +1637,9 @@ Bảng dưới là **toàn bộ** bề mặt props mà lát cắt này đưa và
 | `ResultActions` | `blockedReason` | **Có** | — | như trên |
 | `QuestionRenderer` | `essayGradingEnabled?: boolean` | Không (mặc định `false`) | Giá trị env thô | Mặc định `false` là fail-**closed**; MSA-F2 |
 | `ExamPlayer` | `essayGradingEnabled?: boolean` | Không | — | Chuyển tiếp thuần |
-| `AttemptPdfData` | `essayIncomplete: boolean`, `essayIncompleteLabel?: string` | Boolean **có**, nhãn không | `blockedReason` | MSA-F5 — bộ sinh **đọc** cái thứ nhất, **không bao giờ chạy** với cái thứ hai |
+| `AttemptPdfData` | `hasIncompleteEssay: boolean`, `essayIncompleteLabel?: string` | Boolean **có**, nhãn không | `blockedReason` | MSA-F5 — bộ sinh **đọc** cái thứ nhất, **không bao giờ chạy** với cái thứ hai |
 | `AttemptPdfTemplateProps` | cùng hai trường | như trên | — | — |
-| `MyHistoryEntry` | `hasUnresolvedEssay: boolean`, `hasIncompleteEssay: boolean` | Tất cả | `per_question` thô | UI-D11; FE-OQ-1 cho trường thứ hai |
+| `MyHistoryEntry` | `hasUnresolvedEssay: boolean`, `hasIncompleteEssay: boolean` | Tất cả | `per_question` thô | UI-D11; trường thứ hai do backend v1.1 thêm sau finding F-06 |
 
 ### UI Error State Design
 
@@ -1636,12 +1681,12 @@ Toàn bộ state phía client của lát cắt này, và **vòng đời** của 
 | Hành động của người dùng | Component | Gọi gì | Nhận gì | Hệ quả trên màn hình |
 |---|---|---|---|---|
 | Mở trang kết quả | `result/page.tsx` (server) | `getResult(attemptId)` | `ExamResult` kèm `essaySummary?` và `essay?` mỗi câu | Render đầy đủ; poller mount nếu `essaySummary` có |
-| Mở trang chi tiết | `result/detail/page.tsx` (server) | `getResult(attemptId)` | như trên | Mỗi câu render đúng một trong sáu trạng thái |
+| Mở trang chi tiết | `result/detail/page.tsx` (server) | `getResult(attemptId)` | như trên | Mỗi câu render đúng một trong bảy trạng thái (RS-0…RS-6) |
 | Mở `/history` | `HistoryList` (server) | `listMyHistory()` | `MyHistoryEntry[]` kèm hai boolean | Badge + trạng thái chặn của menu |
 | *(không có — tự động)* | `EssayGradingPoller` | `router.refresh()` | *(không có giá trị trả về; một lượt render server mới)* | Trạng thái từng câu cập nhật **tại chỗ**; vùng `polite` đọc lên nếu có tiến triển |
 | Bấm "Cập nhật" | `EssayGradingPoller` | `router.refresh()` ×1 | *(như trên)* | Ngân sách nạp lại; khối "đã dừng" biến mất |
 | Bấm "Chấm lại" | `EssayRegradeControl` | `retryEssayGrading(attemptId, questionId)` | `{ ok: true } \| { ok: false; reason: RetryRefusal }` | `role="alert"` nếu từ chối; **luôn** `router.refresh()` sau đó |
-| Bấm Lưu / Chia sẻ (không bị chặn) | `ActionButton` / `HistoryRowMenu` | `generateAttemptPdfFile(pdfInput + nhãn)` | `File` | Tải xuống / chia sẻ; tệp mang dòng `pdfIncomplete` nếu `essayIncomplete` |
+| Bấm Lưu / Chia sẻ (không bị chặn) | `ActionButton` / `HistoryRowMenu` | `generateAttemptPdfFile(pdfInput + nhãn)` | `File` | Tải xuống / chia sẻ; tệp mang dòng `pdfIncomplete` nếu `hasIncompleteEssay` |
 | Bấm Lưu / Chia sẻ (**bị chặn**) | như trên | **không gọi gì** | — | **Không có gì quan sát được**; lý do đã ở `aria-describedby` từ trước |
 | Bấm "Xem chi tiết" trong menu ⋯ | `HistoryRowMenu` | *(điều hướng thường)* | — | Sang S-01; **không bao giờ bị chặn** |
 | Gõ vào ô tự luận | `QuestionRenderer` | *(không gọi gì)* | — | Bộ đếm ký tự cập nhật; chân trang tĩnh |
@@ -1658,7 +1703,7 @@ Lát cắt này **không** đưa giá trị nào qua một biên tuần tự ho�
 | `essaySummary: EssaySummary` | như trên | **preserved** | JSON object sáu số | như trên | Chỉ `result/page.tsx` và điều kiện mount poller đọc |
 | `hasUnresolvedEssay`, `hasIncompleteEssay` | `listMyHistory()` (server) → `HistoryList` → `HistoryRow` | **preserved** | JSON boolean | React đọc thẳng | Mảng `per_question` thô **DỪNG** ở `listMyHistory()` (UI-D11) |
 | `blockedReason` | `page.tsx`/`HistoryRow` → `ResultActions`/`HistoryRowMenu` → `usePdfAction` | **transformed** (`boolean` → `"essay_unresolved" \| null`) | Không tuần tự hoá — prop trong tiến trình | So sánh `!== null` ở dòng đầu `run()` | Union một giá trị **có chủ đích**: nó để chỗ cho lý do thứ hai mà không phải đổi kiểu, và nó đọc ra được ở call site |
-| `essayIncomplete` | `page.tsx`/`HistoryRow` → `AttemptPdfData` → `generateAttemptPdfFile()` → `AttemptPdfTemplate` | **preserved** | Prop boolean; **không** rời tiến trình | Template gate `{essayIncomplete && …}` | Đây là trường **duy nhất** của lát cắt này đi vào hợp đồng đầu vào của bộ sinh PDF, và lý do là bộ sinh **đọc** nó |
+| `hasIncompleteEssay` | `page.tsx`/`HistoryRow` → `AttemptPdfData` → `generateAttemptPdfFile()` → `AttemptPdfTemplate` | **preserved** | Prop boolean; **không** rời tiến trình | Template gate `{hasIncompleteEssay && …}` | Đây là trường **duy nhất** của lát cắt này đi vào hợp đồng đầu vào của bộ sinh PDF, và lý do là bộ sinh **đọc** nó |
 | `essayIncompleteLabel` | `usePdfAction` → `AttemptPdfData` → template | **preserved** | Chuỗi đã dịch | `?? DEFAULT_ESSAY_INCOMPLETE_LABEL` | Đúng lối bảy nhãn hiện có (`usePdfAction.ts:53-62`) |
 | Chuỗi `result.essay.pdfIncomplete` | Cây React off-screen → **html2canvas rasterise** → jsPDF → **tệp PDF** | **transformed** (chữ → pixel) | **Điểm ảnh trong một tệp PDF** — biên tuần tự hoá thật sự duy nhất của lát cắt này | Người đọc tệp (con người). **Không** có consumer máy | Ràng buộc ADR-0009 áp lên đúng chỗ này: mọi style trong nhánh đó phải là hex/rgb literal, nếu không html2canvas ném hoặc render sai. Xem § Risks R-F4 |
 | `essayGradingEnabled` | `page.tsx` (server, đọc env) → `ExamPlayer` → `QuestionRenderer` | **preserved** | Prop boolean trong RSC payload | React đọc thẳng | **Không** `NEXT_PUBLIC_*` (UI-D7): giá trị env không bao giờ băng qua biên; chỉ một boolean đã đọc sẵn |
@@ -1692,7 +1737,7 @@ Lát cắt này **không** đưa vào cấu trúc dữ liệu mới nào. Ba hì
 
 1. **Chốt PDF về sớm mà không báo gì** — không phải nuốt lỗi: **không có lỗi nào xảy ra**. Trạng thái bị chặn được công bố **trước** cú bấm qua `aria-disabled` + `aria-describedby` + tooltip. Một node `role="alert"` sau cú bấm sẽ **nói dối** rằng vừa có gì đó hỏng.
 2. **Poller nuốt lỗi `router.refresh()`** — nó **có** log, nó **không** trả giá trị mặc định, và thất bại kéo dài **vẫn có biểu hiện nhìn thấy được** (khối "đã dừng" + nút "Cập nhật"). Đây là ca *"một lượt refresh trượt do mạng chập chờn là ca thường của người dùng mục tiêu"*, và báo động cho nó là báo động cho thứ tự khỏi ở tick sau.
-3. **Band ngoài tập ⇒ không render dòng điểm** — nó **có** `console.warn` (server), nó **không** `??` về `0`, và nó **không** `as`. Đây là "nhánh thứ năm" theo lối `OrderStatusBadge.tsx:68-75`: giá trị lạ có một **diện mạo riêng** thay vì đội lốt một giá trị hợp lệ. Biến nó thành `0` là biến một defect thành một điểm số (AC-007 cấm đúng điều đó).
+3. **Band ngoài tập ⇒ không render dòng điểm** — nó **có** `console.warn` (server), nó **không** `??` về `0`, và nó **không** `as`. Đây là "nhánh thứ năm" theo lối `OrderStatusBadge.tsx:68-75`: giá trị lạ có một **diện mạo riêng** thay vì đội lốt một giá trị hợp lệ. Biến nó thành `0` là biến một defect thành một điểm số (**essay PRD AC-007** cấm đúng điều đó: *"a rejected response … is **not** silently recorded as band 0"* — đây là một trong hai chỗ hiếm hoi tài liệu này viện dẫn AC-007 của **đúng** PRD).
 
 **Không có Error Boundary mới.** Ba component server không có nhánh ném; hai component client bắt lỗi tại chỗ vì một promise bị từ chối trong event handler **không** băng qua Error Boundary — cùng lập luận đã ghi ở `RecheckOrderControl.tsx:63-69`.
 
@@ -1755,7 +1800,7 @@ Lát cắt này **không** đưa vào cấu trúc dữ liệu mới nào. Ba hì
 3. **Không câu nào giải thích *vì sao* band là band đó.** Phản hồi theo tiêu chí nằm trong Won't Have — một đầu ra thứ hai do model viết là một bề mặt tiêm chích thứ hai.
 4. **Không câu thông báo cho lượt chấm lại THÀNH CÔNG.** Band xuất hiện **là** lời khẳng định; một câu "đã chấm lại xong" đặt cạnh một con số vừa hiện ra là nói hai lần cùng một điều.
 
-**Ba chuỗi có tham số**, và tham số nào từ đâu — viết ra vì đây là chỗ dễ nối nhầm:
+**Sáu chuỗi có tham số**, và tham số nào từ đâu — viết ra vì đây là chỗ dễ nối nhầm:
 
 | Khoá | Tham số | Nguồn |
 |---|---|---|
@@ -1933,7 +1978,7 @@ Chuẩn **WCAG 2.1 AA**. Công nghệ hỗ trợ mục tiêu: TalkBack trên And
 | `EssayGradingPoller` | `pendingCount`, `resolvedCount` | Gọi `router.refresh()` | Nuốt + log; tick kế tiếp vẫn lên lịch |
 | `usePdfAction` | `action`, `pdfInput`, `blockedReason` | `{ phase, run }` | Không đổi; trạng thái chặn **không** sinh lỗi |
 | `ActionButton` / `HistoryRowMenu` | + `blockedReason` | Không đổi | Không đổi |
-| `AttemptPdfTemplate` | + `essayIncomplete`, `essayIncompleteLabel?` | *(không có)* | Nhãn vắng ⇒ dùng hằng tiếng Anh mặc định |
+| `AttemptPdfTemplate` | + `hasIncompleteEssay`, `essayIncompleteLabel?` | *(không có)* | Nhãn vắng ⇒ dùng hằng tiếng Anh mặc định |
 
 **Xung đột với quy ước hiện có, đã kiểm và ghi ra:**
 
@@ -2008,11 +2053,11 @@ No Ripple Effect:
 | `MenuAction` (nội bộ) | `label`, `busyLabel`, `errorText`, `icon`, `phase`, `onClick`, `fallbackText?` | + `blockedReason`, `blockedText` | Không | Không | Nội bộ file; hai call site (`:189-196`, `:197-205`). **9 prop** — vượt khuyến nghị 3–7; chấp nhận vì đây là một hàm render nội bộ file, không phải một component xuất khẩu, và tách nó ra sẽ tạo một bề mặt công khai cho một thứ chỉ có hai người gọi ở cùng file |
 | `QuestionRenderer` | `index`, `question`, `nodes`, `selectedAnswer`, `onSelectAnswer`, `flagged`, `onToggleFlag` | + `essayGradingEnabled?` | Không | Không | **Tuỳ chọn, mặc định `false`** ⇒ mọi call site hiện có giữ hành vi byte-identical; `QuestionRenderer.test.tsx` chỉ đỏ vì **chuỗi** và **maxLength**, không vì prop |
 | `ExamPlayer` | 6 prop | + `essayGradingEnabled?` | Không | Không | Tuỳ chọn ⇒ `ExamPlayer.test.tsx` giữ nguyên xanh |
-| `AttemptPdfData` | 7 dữ liệu + 7 nhãn tuỳ chọn | + `essayIncomplete` (bắt buộc), `essayIncompleteLabel?` | Không | Không | Boolean bắt buộc ⇒ **hai** nơi dựng `pdfInput` phải quyết định; nơi thứ ba không biên dịch được |
+| `AttemptPdfData` | 7 dữ liệu + 7 nhãn tuỳ chọn | + `hasIncompleteEssay` (bắt buộc), `essayIncompleteLabel?` | Không | Không | Boolean bắt buộc ⇒ **hai** nơi dựng `pdfInput` phải quyết định; nơi thứ ba không biên dịch được |
 | `AttemptPdfTemplateProps` | 8 dữ liệu + 7 nhãn | + hai trường như trên | Không | Không | Nhãn có mặc định tiếng Anh, đúng lối `:31-40` |
 | `PerQuestionResult` | 6 trường | + `essay?: EssayView` | Không | Không | **Backend sở hữu.** Tuỳ chọn, cùng lối `hasBeenWrongTwice` (`types/result.ts:19-24`); row cũ ⇒ `undefined` |
 | `ExamResult` | 8 trường | + `essaySummary?: EssaySummary` | Không | Không | **Backend sở hữu.** Tuỳ chọn |
-| `MyHistoryEntry` | 9 trường | + `hasUnresolvedEssay`, `hasIncompleteEssay` | Không | Không | **Backend sở hữu** (trường thứ hai là FE-OQ-1). Bắt buộc nhưng **luôn tính được** (`false` khi không có khoá) ⇒ không có ca `undefined` cho consumer phải xử |
+| `MyHistoryEntry` | 9 trường | + `hasUnresolvedEssay`, `hasIncompleteEssay` | Không | Không | **Backend sở hữu** (backend v1.1). Bắt buộc nhưng **luôn tính được** (`false` khi không có khoá) ⇒ không có ca `undefined` cho consumer phải xử |
 
 **Không wrapper nào, không adapter nào, không migration path nào.** Mọi thay đổi là **thêm trường** hoặc **thêm tham số**; không trường nào đổi kiểu, không trường nào đổi nghĩa, không trường nào bị xoá. Ba prop bắt buộc gây lỗi biên dịch ở đúng **17** chỗ đã đếm được (2 production + 15 test), và đó là **cơ chế**, không phải chi phí ngoài dự kiến.
 
@@ -2025,9 +2070,9 @@ No Ripple Effect:
 | # | Phụ thuộc | Ai sở hữu | Chặn lát nào |
 |---|---|---|---|
 | B-1 | `SOURCE/lib/scoring/essayLifecycle.ts` — `EssayRenderState`, `EssayView`, `EssaySummary`, `deriveEssayView()`, `summariseEssays()`, `isEssayUnresolved()` | Backend | V0 trở đi (kiểu), V1 trở đi (dữ liệu) |
-| B-2 | `isEssayIncomplete()` trong cùng file | Backend — **FE-OQ-1** | V3 |
+| B-2 | `isEssayIncomplete()` + `hasIncompleteEssay()` + `hasUnresolvedEssay()` trong cùng file | Backend — **đã chốt ở v1.1** | V3 |
 | B-3 | `getResult()` gắn `essay?` + `essaySummary?` | Backend | V1 |
-| B-4 | `listMyHistory()` trả **hai** boolean | Backend — trường thứ hai là **FE-OQ-1** | V3 |
+| B-4 | `listMyHistory()` trả **hai** boolean; `getResult()` trả `hasIncompleteEssay` | Backend — **đã chốt ở v1.1** | V3 |
 | B-5 | `retryEssayGrading()` Server Action | Backend | V4 |
 | B-6 | Cờ `ESSAY_GRADING_ENABLED` đọc được ở server | Backend | V6 |
 
@@ -2177,7 +2222,7 @@ Lát cắt frontend **không có tầng dữ liệu**. Nó tiêu thụ hai hàm 
 | # | Điểm | Cách xác minh | Đạt khi |
 |---|---|---|---|
 | IV-1 | Hợp đồng đọc chạy thật | Mở `/result` của một lượt thi gieo sẵn có 1 câu `graded` | `EssayScoreLine` hiện `1 / 1 điểm` + câu mẫu số; `ScoreCard` **không đổi một pixel** |
-| IV-2 | Sáu trạng thái render | Gieo một lượt thi có đủ RS-0…RS-6, mở `/result/detail` | Mỗi thẻ hiện đúng badge/chữ/nút theo bảng § EssayReviewBlock; **không** thẻ nào hiện chip Đ/S; **không** thẻ nào hiện `result.notAutoScored` trừ RS-0/RS-1 |
+| IV-2 | Bảy trạng thái render (RS-0…RS-6) | Gieo một lượt thi có đủ RS-0…RS-6, mở `/result/detail` | Mỗi thẻ hiện đúng badge/chữ/nút theo bảng § EssayReviewBlock; **không** thẻ nào hiện chip Đ/S; **không** thẻ nào hiện `result.notAutoScored` trừ RS-0/RS-1 |
 | IV-3 | Chốt PDF hai cửa | Bấm Lưu ở `/result` và ở `/history` cho **cùng** lượt thi còn pending | Cả hai: không sinh tệp, không lỗi, nút vẫn Tab tới được, đọc được lý do |
 | IV-4 | Poller | Mở `/result` với 1 câu pending, chờ backend ghi band | Trang tự cập nhật trong ≤ 10 giây; badge đổi; trình đọc màn hình đọc câu tiến triển |
 | IV-5 | Chấm lại | Bấm "Chấm lại" trên RS-4 | Nút vào pha bận, action chạy, `router.refresh()` đáp xuống, band hoặc `role="alert"` xuất hiện |
@@ -2272,8 +2317,8 @@ Những phương án ở **mức lát cắt**, khác với các phương án ở
 | **R-F6** | `HistoryRowMenu.test.tsx` đỏ vì flake chứ không vì defect, và bị đọc nhầm theo cả hai hướng | Thấp | Quy trình ghi thành văn (F-11): **chạy lại đơn luồng** rồi mới kết luận. Không mặc định "flaky", không mặc định "defect" |
 | **R-F7** | 28 khoá i18n sửa ở `vi.ts` mà quên `en.ts` (hoặc ngược lại) | Thấp | `npx tsc --noEmit` là cổng: `Dictionary` sinh từ `en.ts`, thiếu khoá ở `vi.ts` là lỗi biên dịch (AB-12). Thứ tự sửa được ghi rõ (§ i18n) |
 | **R-F8** | Poller đốt 18 lượt RSC đầy đủ trên mạng chậm mà không giải quyết được gì | Thấp | Hai trần độc lập; bỏ tick khi tab ẩn **không tiêu ngân sách**; nhịp hai pha; và khi dừng thì có một nút thủ công thay vì im lặng |
-| **R-F9** | `MyHistoryEntry` thiếu boolean thứ hai ⇒ O-8 không thoả trên `/history`, hai cửa xuất ra hai tệp khác nhau | Trung bình | **FE-OQ-1** — phải đóng **trước** lát V3. Nếu backend từ chối, phương án dự phòng là (e) trong MSA-F5 cho S-01 cộng **không** in dòng ở `/history`, và điều đó phải được ghi lại như một sự lệch chấp nhận có ý thức, không phải một sự bỏ sót |
-| **R-F10** | Câu chữ chân trang player ship sai giai đoạn (hứa một việc chưa chạy) | Trung bình | **FE-OQ-2** phải đóng trước lát V6. Mặc định của tài liệu này (hai khoá) **đúng bất kể thứ tự ship**; phương án gọn hơn thì không |
+| **R-F9** | Hai lối xuất PDF đọc hai nguồn khác nhau cho "có câu RS-6" ⇒ cùng một lượt thi ra hai tệp khác nhau | **Đã đóng** | Backend v1.1 đặt `hasIncompleteEssay` **cùng một tên** trên `ExamResult`, `MyHistoryEntry` và `AttemptPdfData` — kiểu hợp lưu của cả hai lối xuất; **EG-BE-035** ghim đẳng thức giữa hai bề mặt, **EG-BE-036** ghim rằng RS-6 chỉ khai một chỗ. Phần còn lại thuộc frontend là **không tự suy lại** (bản v1.0 đã vi phạm ở một chỗ và đã sửa — § AttemptPdfTemplate) |
+| **R-F10** | Câu chữ chân trang player ship sai giai đoạn (hứa một việc chưa chạy) | **Đã đóng** | **FE-OQ-2 đóng 2026-08-29**: phương án hai khoá + cờ đọc phía server, **đúng bất kể thứ tự commit**. Phương án một khoá (đúng-nếu-thứ-tự-giữ) đã bị loại. Rủi ro còn lại là một lượt hiện thực quên nối prop — bắt bằng ca RTL "cờ tắt ⇒ chuỗi cũ" ở § QuestionRenderer |
 
 ## AC Traceability (PRD → Design)
 
@@ -2317,35 +2362,35 @@ Những phương án ở **mức lát cắt**, khác với các phương án ở
 | AC-072 | Uỷ quyền **trước** đo đếm ở lối vào chấm lại | **Không có bề mặt frontend.** UI **không** được coi việc ẩn nút là cơ chế cưỡng chế — ghi thành invariant của `EssayRegradeControl` | § Security điểm 1 |
 | O-8 | PDF không bị chặn ở RS-6, nhưng mang dòng chú thích | `AttemptPdfTemplate` sau `:125`; điều kiện **≥1 câu RS-6** | FE-AC-19; IV-6 |
 
-**Ba AC được diễn đạt lại có chủ đích, đánh dấu để code-verifier không đọc thành trôi lệch:**
+**Bốn AC được diễn đạt lại có chủ đích, đánh dấu để code-verifier không đọc thành trôi lệch.** Cả bốn là quyết định của kỹ sư được ghi lại **thành một diễn đạt lại có cờ** thay vì sửa PRD — chúng nằm ở đây để một lượt đối chiếu PRD↔mã về sau đọc ra "cố ý", không đọc ra "trôi lệch":
 
 | AC | Câu chữ gốc | Cách tài liệu này hiện thực | Vì sao |
 |---|---|---|---|
 | **AC-058 / AC-064** | *"as genuinely disabled controls"* / *"removed, or disabled with a programmatically exposed reason"* | **Không bao giờ** `disabled` gốc; thay bằng: focusable + `aria-disabled="true"` + `aria-describedby` → `sr-only` lý do + **chốt về sớm đồng bộ** trong handler | **UI-D5.** Đọc theo nghĩa đen sẽ ra thuộc tính HTML `disabled`, mà repo đã sửa đúng lỗi đó **hai lần** và **ba file hiện hành cấm nó thành văn** (AB-9). `disabled` rút đi cả tiêu điểm lẫn *lý do* — đúng hai thứ mà chính hai AC này muốn có |
-| **AC-051** | *"`player.essayNotScored` **is replaced**"* | **Giữ** khoá cũ và **thêm** `player.essayScored`; cờ AC-067 chọn khoá | **UI-D8.** AC-067 tạo ra một **khoảng thời gian có thật** trong đó câu cũ vẫn **đúng**. Xoá chuỗi cũ trong cùng commit buộc phải ship một câu **sai** suốt khoảng đó. Phương án một khoá còn mở — **FE-OQ-2** |
+| **AC-051** | *"`player.essayNotScored` **is replaced**"* | **Giữ** khoá cũ và **thêm** `player.essayScored`; cờ AC-067 chọn khoá | **UI-D8.** AC-067 tạo ra một **khoảng thời gian có thật** trong đó câu cũ vẫn **đúng**. Xoá chuỗi cũ trong cùng commit buộc phải ship một câu **sai** suốt khoảng đó. **Kỹ sư chốt phương án hai khoá ngày 2026-08-29 (FE-OQ-2 đóng, UI Spec O-5 đóng)** — phương án một khoá đã bị loại, không còn là một lựa chọn để mở lại |
 | **AC-058** (phạm vi) | Nêu tên duy nhất `ResultActions.tsx` | Chốt đặt ở `usePdfAction`, phủ **cả** `/history` | **UI-D4.** `/history` chạm cùng đường ống, và nó là nơi học sinh quay lại nhiều ngày sau — tức nơi PDF **dễ được xuất nhất** |
+| **AC-011 / AC-057** | AC-011: điểm trên trang kết quả suy ra bằng cách **"combining"** bộ ba cũ với khoá earned/max. AC-057: nêu đích danh `SOURCE/app/(layer2)/_components/ScoreCard.tsx` là nơi mang dấu "đang chấm" *"alongside the attempt's number"* | Một khối **riêng, có nhãn riêng** — `EssayScoreLine` — render **ngay dưới** `ScoreCard`. **`ScoreCard` giữ 0 diff**: `/10`, `Đúng`, `Sai` giữ đúng cơ sở tính hôm nay, và dấu "đang chấm" nằm trong khối mới chứ không nằm trong `ScoreCard`. Trên `/history` không có căng thẳng này — `HistoryRow` không phải `ScoreCard`, nên badge nằm thẳng trong dòng meta | **UI-D3 (kỹ sư chốt; ghi thành một diễn đạt lại có cờ, KHÔNG sửa PRD — quyết định 2026-08-29).** Đọc "combining" theo nghĩa đen là **định nghĩa lại `total`**, mà `ScoreCard.tsx:19` dựng `wrong = result.total - result.correct` ngay tại chỗ — đổi nghĩa `total` làm ô "Sai" **sai lặng lẽ**. Và nó làm **điểm tiêu đề dịch chuyển một tiếng sau khi nộp**, đúng cái mà *Amendment to ADR-0010* nói ba bề mặt phải **tôn trọng**, chứ không phải cái để tái tạo. AC-057 tự nó đòi con số hiện tại **giữ nguyên nghĩa hôm nay**; một dòng riêng thoả **cả** AC-011 lẫn AC-057, gộp thì chỉ thoả được một |
 
 ## Open Questions
 
 Những gì không giải được từ UI Spec, backend Design Doc, PRD, ADR và mã — ghi thành mục có số thay vì đoán im lặng.
 
-- **FE-OQ-1 — `MyHistoryEntry` cần boolean THỨ HAI để O-8 thoả trên `/history`.**
-  *Vấn đề:* backend Design Doc chốt **một** trường (`hasUnresolvedEssay`). Điều kiện in dòng `pdfIncomplete` là *"≥1 câu ở RS-6"*, tức `state === "failed" && !retryAvailable` — **không** suy ra được từ một boolean "chưa giải quyết", và `EssaySummary` (nơi có thể suy bằng số học) **không** băng qua biên tới `/history`. Hệ quả nếu bỏ qua: cùng một lượt thi xuất ra **hai tệp khác nhau** tuỳ cửa nào được bấm.
-  *Đầu vào cần:* một sửa đổi ở hợp đồng backend — thêm `hasIncompleteEssay: boolean` vào `MyHistoryEntry`, suy trong `listMyHistory()` bằng một predicate mới `isEssayIncomplete(view)` = `view.state === "failed" && !view.retryAvailable` trong `SOURCE/lib/scoring/essayLifecycle.ts`. Cả hai là **thêm**, không đổi gì đã chốt.
-  *Người chịu trách nhiệm:* kỹ sư, cùng lượt sửa backend Design Doc.
-  *Điều kiện leo thang:* **chặn lát V3.** Nếu bị từ chối, phương án dự phòng là MSA-F5 (e) cho S-01 và **không** in dòng ở `/history`, và sự lệch đó phải được ghi lại như một chấp nhận có ý thức chứ không phải một sự bỏ sót.
+- **FE-OQ-1 — ~~`MyHistoryEntry` cần boolean THỨ HAI để O-8 thoả trên `/history`~~ — ĐÃ ĐÓNG 2026-08-29 (backend Design Doc v1.1). KHÔNG còn chặn lát nào.**
+  *Vấn đề đã nêu (giữ lại để truy vết):* hợp đồng ở backend v1.0 chốt **một** trường (`hasUnresolvedEssay`). Điều kiện in dòng `pdfIncomplete` là *"≥1 câu ở RS-6"* — **không** suy ra được từ một boolean "chưa giải quyết", và `EssaySummary` **không** băng qua biên tới `/history`. Hệ quả nếu bỏ qua: cùng một lượt thi xuất ra **hai tệp khác nhau** tuỳ cửa nào được bấm (finding F-06).
+  *Cách đóng:* backend v1.1 thêm **`hasIncompleteEssay: boolean`, bắt buộc, CÙNG MỘT TÊN trên ba kiểu** — `ExamResult` (`SOURCE/app/(layer2)/queries.ts`), `MyHistoryEntry` (`SOURCE/app/(HM)/queries.ts`), `AttemptPdfData` (`SOURCE/lib/pdf/generateAttemptPdf.ts:11`) — suy bằng **một** vị từ `isEssayIncomplete(view: EssayView): boolean` trong `SOURCE/lib/scoring/essayLifecycle.ts`, cộng hai hàm gấp `hasIncompleteEssay(rows, createdAt, now)` và `hasUnresolvedEssay(rows, createdAt, now)`. `AttemptPdfData` là **chỗ hợp lưu** của cả hai lối xuất, nên một trường ở đó là thứ khiến hai lối **không thể** bất đồng.
+  *Ghim bằng:* **EG-BE-034** (một sự thật, một lối tính: `hasUnresolvedEssay(...) === (summariseEssays(...)?.unresolvedCount ?? 0) > 0`), **EG-BE-035** (`hasIncompleteEssay` bằng nhau trên `ExamResult` và `MyHistoryEntry` cho cùng `attemptId`, và **không bao giờ** `undefined`), **EG-BE-036** (biểu thức `state === "failed" && !retryAvailable` **không** xuất hiện ngoài `essayLifecycle.ts`).
+  *Trách nhiệm còn lại của frontend:* **không tự suy lại** cái nào trong hai boolean; đọc đúng nguồn theo bảng ở § `EssayView` — hợp đồng client. Bản v1.0 của tài liệu này đã vi phạm đúng điều đó ở một chỗ (trang kết quả tự suy) và điều đó đã được sửa — xem § AttemptPdfTemplate.
 
-- **FE-OQ-2 — Hai khoá chân trang player, hay một khoá cộng ràng buộc thứ tự ship? (UI Spec O-5)**
-  *Vấn đề:* tài liệu này mặc định **hai** khoá (MSA-F2 phương án (a)), đúng mặc định của UI Spec. Phương án gọn hơn — **một** khoá, với Work Plan ràng buộc commit đổi chữ chỉ đáp xuống **sau** khi cổng AC-067 đã qua — nhỏ hơn ở **mọi** cột định lượng (0 prop, 0 biên, 0 khoá thừa), nhưng nó **giao tính đúng đắn của câu chữ cho lịch trình**, mà C-F6 (một kỹ sư, không staging, không hạ tầng feature flag) là chính lý do lịch trình ở đây không đáng đặt cược.
-  *Đầu vào cần:* một quyết định của kỹ sư. § MSA-F2 liệt kê **chính xác** cái gì đổi nếu chọn phương án một khoá (bốn dòng: khoá i18n, prop, test, dependency của Work Plan).
-  *Người chịu trách nhiệm:* kỹ sư, trước khi lát V6 được lên lịch.
-  *Điều kiện leo thang:* **chặn lát V6**, không chặn V0–V5.
+- **FE-OQ-2 — ~~Hai khoá chân trang player, hay một khoá cộng ràng buộc thứ tự ship? (UI Spec O-5)~~ — ĐÃ ĐÓNG 2026-08-29 (kỹ sư). KHÔNG còn chặn lát nào.**
+  *Quyết định:* **phương án (a) — hai khoá i18n, cộng một cờ server-only truyền xuống bằng prop tuỳ chọn (mặc định `false`).** Đúng mặc định của tài liệu này và của UI Spec; UI Spec v1.3 ghi cùng quyết định và đóng O-5.
+  *Lý do được ghi cùng quyết định:* (b) — một khoá, với Work Plan ràng buộc commit đổi chữ chỉ đáp xuống **sau** cổng AC-067 — nhỏ hơn ở **mọi** cột đo được (0 prop, 0 biên, 0 khoá thừa), **nhưng** nó giao tính đúng đắn của câu chữ cho **thứ tự commit**. Với một kỹ sư, không staging (C-F6), thứ tự ấy không đáng đặt cược: nếu nó trượt, màn làm bài hứa chấm tự động trong khi cỗ máy chấm không chạy — đúng khuyết tật R12 tồn tại để chấm dứt. (a) đúng **bất kể** thứ tự commit.
+  *Hệ quả đã đáp xuống thiết kế:* § MSA-F2 bước 4 và bước 5 (phương án (b) nằm trong danh sách bị loại), § QuestionRenderer, và ba chỗ đọc cờ mà backend v1.2 liệt kê (§ Contract deltas).
 
 - **FE-OQ-3 — Chi phí payload của `per_question` trong `listMyHistory()`** *(thừa kế UI Spec O-3 → backend OQ-3)*.
   *Vấn đề:* `readBounded` chặn ở `LIST_ROW_CEILING = 500` (`lib/supabase/boundedRead.ts:74`), nhưng trần đó **chưa được đo** với `per_question` trong select. Đây là chi phí mà UI-D11 chấp nhận, không giảm nhẹ.
   *Đầu vào cần:* một phép đo trên dev với số hàng bằng trần, ghi kích thước payload trước/sau.
   *Người chịu trách nhiệm:* kỹ sư (backend sở hữu truy vấn), trước Work Plan.
-  *Điều kiện leo thang:* nếu payload phình quá mức chấp nhận được, phương án thay thế là một RPC trả sẵn hai boolean — nhưng đó là **DDL**, tức TD-005 một lần nữa, nên **không được chọn mà không có số đo**.
+  *Điều kiện leo thang:* nếu payload phình quá mức chấp nhận được, phương án thay thế là một RPC trả sẵn hai boolean — nhưng đó là **DDL**, tức TD-005 một lần nữa, nên **không được chọn mà không có số đo**. **Và nó không phải một fallback kỹ thuật mà là một lượt leo thang phạm vi**: chọn nó nâng số thay đổi schema áp tay của tính năng này từ **hai lên ba**, mở lại đúng cái ngân sách mà ADR-0018 Escalation 2 đã được giải **bằng cách chấp nhận độ phân giải telemetry suy giảm** để giữ. Ai chọn RPC phải chọn cả việc mở lại Escalation 2, và phải nói ra điều đó chứ không được coi là một chi tiết hiện thực.
 
 - **FE-OQ-4 — `router.refresh()` có thật sự giữ tiêu điểm không? (AB-5 chưa xác minh)**
   *Vấn đề:* thiết kế dựa vào việc một lượt refresh reconcile **tại chỗ** với key ổn định và không unmount control nào. Ba lớp bảo vệ đều là **suy luận cấu trúc**; repo **không có** một lượt đo trực tiếp cho đúng cặp (refresh + focus).
@@ -2361,8 +2406,8 @@ Những gì không giải được từ UI Spec, backend Design Doc, PRD, ADR v�
 
 **Trong repo**
 
-- `docs/ui-spec/essay-auto-scoring-ui-spec.md` v1.1 — UI-D1…UI-D13, RS-0…RS-6, Copy Inventory 29 chuỗi, hằng polling, Golden States, Accessibility. **O-1** (đóng bởi backend DD), **O-2** (đóng), **O-3** (→ FE-OQ-3), **O-4** (không chặn ship), **O-5** (→ FE-OQ-2), **O-7** (xác nhận lại ở F-07), **O-8** (đã chốt; hiện thực ở § AttemptPdfTemplate).
-- `docs/design/essay-auto-scoring-backend-design.md` v1.0 — năm khoá jsonb, `EssayView`/`EssaySummary`, `deriveEssayView()`, `retryEssayGrading()`, hạn chờ 10 phút, cờ `ESSAY_GRADING_ENABLED`.
+- `docs/ui-spec/essay-auto-scoring-ui-spec.md` **v1.2** — UI-D1…UI-D13, RS-0…RS-6, Copy Inventory 29 chuỗi, hằng polling, Golden States, Accessibility. **O-1** (đóng bởi backend DD), **O-2** (đóng), **O-3** (→ FE-OQ-3), **O-4** (không chặn ship), **O-5** (**đóng ở v1.2**: giữ hai khoá), **O-7** (xác nhận lại ở F-07), **O-8** (đã chốt; hiện thực ở § AttemptPdfTemplate).
+- `docs/design/essay-auto-scoring-backend-design.md` **v1.2** — năm khoá jsonb, `EssayView`/`EssaySummary`, `deriveEssayView()`, `retryEssayGrading()`, hạn chờ 10 phút, cờ `ESSAY_GRADING_ENABLED`. **v1.1** thêm `hasIncompleteEssay` trên ba kiểu + `isEssayIncomplete()` + EG-BE-034..036 (đóng FE-OQ-1); **v1.2** sửa § Cờ tính năng thành **ba** chỗ đọc phía server.
 - `docs/prd/essay-auto-scoring-prd.md` v1.2 — AC-001–AC-072, W1–W8, C1–C5.
 - `docs/adr/ADR-0018-essay-async-grade-write.md` — Decision 1–6 (đặc biệt **D3** first-write-wins và **D4** tiêu lượt lúc claim), Amendment to ADR-0010.
 - `docs/adr/ADR-0009-pdf-generation-library-choice.md` — ràng buộc hex/rgb literal cho `AttemptPdfTemplate`, nạp động chỉ trong handler.
@@ -2380,4 +2425,5 @@ Không tra cứu ngoài trong phiên này. Lát cắt này **không** giới thi
 
 | Date | Version | Changes | Author |
 |---|---|---|---|
+| 2026-08-29 | 1.1 | **Lượt đối soát sau khi thượng nguồn đổi** (UI Spec v1.2, backend Design Doc v1.1 + v1.2). Không thiết kế lại phần nào; bốn chỗ đã lệch khỏi hợp đồng mới được sửa, cộng bốn chỗ làm rõ. **(1) Tên trường trên `AttemptPdfData` đổi từ `essayIncomplete` sang `hasIncompleteEssay`** — tên của backend thắng, vì nó nhất quán với `hasUnresolvedEssay` trên **cùng** kiểu và vì lý do tồn tại của cái tên là **cùng một tên trên cả ba kiểu** (`ExamResult`, `MyHistoryEntry`, `AttemptPdfData`), thứ khiến hai lối xuất PDF không thể bất đồng; một tên thứ hai đánh bại cơ chế đó tại đúng cái biên nó bảo vệ. Cả hai tài liệu khai trường này **bắt buộc** trên cùng kiểu ở `generateAttemptPdf.ts:11`, nên hai tên là một lỗi `tsc` chờ sẵn. Đây là **cùng lớp lỗi** mà tài liệu này đã bắt ở thượng nguồn với F-04. **(2) Bỏ phép suy lại ở trang kết quả.** v1.0 viết `result.perQuestion.some((r) => isEssayIncomplete(r.essay))`; nay đọc `ExamResult.hasIncompleteEssay`. Hai lý do cấu trúc: biểu thức cũ **không type-check** (`isEssayIncomplete(view: EssayView)` vs `PerQuestionResult.essay: EssayView | undefined`), và nó làm **EG-BE-035 không assert được** vì `ExamResult` khi ấy không mang trường để đối chiếu. Quy tắc *biểu thức* thì không đổi và không vi phạm EG-BE-036. **(3) FE-OQ-1 đóng** (backend v1.1) — gỡ khỏi `unknowns`, `biggest_risks`, § Open Questions, R-F9, F-06, và **bỏ cổng chặn lát V3**, để một Work Plan dựng từ tài liệu này không chặn một lát vào một câu hỏi đã có lời đáp. **(4) FE-OQ-2 đóng xong ở ba chỗ còn sót** — MSA-F2 bước 5 (phương án (b) vào danh sách bị loại kèm lý do), § Open Questions, và dòng AC-051 của bảng diễn đạt lại. **(5) Thêm dòng diễn đạt lại AC thứ tư: AC-011 / AC-057 → UI-D3** (khối riêng dưới `ScoreCard`, `ScoreCard` 0 diff), theo quyết định của kỹ sư ghi lại **thành một diễn đạt lại có cờ thay vì sửa PRD**. **(6) Ba ID acceptance criteria mượn nhầm PRD được gán nguồn**: `history-prd` AC-007 / AC-009 / AC-010 (AC-010 là phát hiện thêm ngoài phạm vi lượt rà). Trong **essay** PRD, AC-007 và AC-009 mang nghĩa khác hẳn; một lượt viện dẫn AC-007 của **đúng** essay PRD (band-0-âm-thầm) được đánh dấu tại chỗ. Bảng AC Traceability **không** bị thổi phồng: nó vốn không liệt kê essay AC-007/AC-009, vì cả hai không có bề mặt frontend. **(7) FE-OQ-3**: nói rõ chọn RPC là một **lượt leo thang phạm vi** — nâng số thay đổi schema áp tay từ hai lên ba, mở lại chính ngân sách mà ADR-0018 Escalation 2 được giải để giữ. **(8) Đếm lại**: bảy trạng thái render (RS-0…RS-6), không phải sáu, ở năm chỗ; sáu chuỗi có tham số, không phải ba. Thêm § Contract deltas since v1.0 ở đầu tài liệu. Ghi chú: bảng đầu file của UI Spec còn ghi "Version 1.0" trong khi § Update History của chính nó ghi 1.2 — tài liệu này theo bản ghi có thẩm quyền và nêu sự lệch ra. | Design Doc (Claude) |
 | 2026-08-28 | 1.0 | Bản đầu. Viết dựa trên UI Spec v1.1, backend Design Doc v1.0, PRD v1.2, ADR-0018, và một lượt kiểm mã độc lập trong phiên viết. **Thay toàn bộ chỗ giữ của UI Spec bằng literal của backend** (`essayState`, `essayEarned`, `essayMax`, `essayLowConfidence`, `essayAttempts`) và ghi rõ rằng **frontend không đọc thẳng khoá nào trong số đó** — nó chỉ đọc `EssayView` (F-01). **Mười một khác biệt được định đoạt** (F-01…F-11), trong đó bốn cái là phát hiện mới của phiên này: `button.tsx` khai biến thể tên **`shape`** chứ không `variant` (F-02); `QuestionRenderer.test.tsx` có **hai** coupled site mà cả AC-048 lẫn backend D-04 đều không nêu (F-03); điều kiện mount poller của UI Spec (`pendingCount > 0`) **phá AC-023** vì nó gỡ vùng `aria-live` đúng lượt render cần đọc (F-05); và điều kiện in dòng PDF của O-8 **không tính được** ở `/history` với hợp đồng backend hiện tại (F-06 → FE-OQ-1). Cộng hai khác biệt về tên và về phân loại: `hasUnresolvedEssay` (backend) vs `essayUnresolved` (UI Spec) — theo backend (F-04); và RS-5 **không luôn** có nút hoạt động vì `essayAttempts` đạt được 3 với một dòng còn lưu `pending` (F-08). **Sáu gate Minimal Surface** (MSA-F1…F6), trong đó MSA-F6 là chỗ **The Hard Rule được cưỡng chế bằng kiểu**: `EssayReviewBlock` cố ý **không nhận** `PerQuestionResult`, nên một nhánh đọc `scored`/`isCorrect` **không biên dịch được** thay vì chỉ bị cấm bằng lời. **Sửa hai khoá i18n tự phát minh** thành hai khoá tái dùng đã có ở cả hai ngôn ngữ (`profile.error.sessionExpired`, `profile.error.generic`), giữ bảng đúng **29 chuỗi / 28 khoá mới** như UI Spec chốt. **Phát biểu lại lời hứa "0 byte JS"** của UI Spec thành ba mệnh đề kiểm được, vì một import tĩnh nằm trong bundle route bất kể có mount hay không và repo không có công cụ đo bundle theo route (F-09, AB-10). **Chốt kỹ thuật render test** bằng bằng chứng đã ghi trong repo: hai Server Component có con async **phải** dùng `renderServerTree()`, vì `render(await …)` trả cây **rỗng** và assertion phủ định sẽ pass trên hư không (AB-2 → R-F2), kèm quy tắc "mỗi ca phải có ≥1 assertion dương". Năm câu hỏi mở (FE-OQ-1…FE-OQ-5) ghi kèm đầu vào cần, người chịu trách nhiệm và điều kiện leo thang; **FE-OQ-1 chặn lát V3**, **FE-OQ-2 chặn lát V6**, ba mục còn lại không chặn. | Design Doc (Claude) |

@@ -6,7 +6,7 @@
 | **Date** | 2026-08-29 |
 | **Status** | Draft — thiết kế backend cho chấm tự luận tự động: hai hàm SQL đặc quyền của ADR-0018, hợp đồng khoá jsonb mới trong `exam_results.per_question`, điểm phát Groq, bộ đếm ngân sách riêng, hàm suy diễn vòng đời đọc-lúc-render, Server Action chấm lại, telemetry, và hai thay đổi schema thủ công. **Toàn bộ bề mặt React/hiển thị nằm ngoài phạm vi** — do `docs/ui-spec/essay-auto-scoring-ui-spec.md` và một frontend Design Doc riêng sở hữu; tài liệu này cung cấp hợp đồng dữ liệu mà chúng tiêu thụ. |
 | **PRD** | `docs/prd/essay-auto-scoring-prd.md` v1.2 (Draft — D1–D13 khoá, W1–W8, C1–C5, AC-001–AC-072) |
-| **UI Spec** | `docs/ui-spec/essay-auto-scoring-ui-spec.md` v1.2 (Draft — UI-D1…UI-D13, RS-0…RS-6, O-1…O-8) |
+| **UI Spec** | `docs/ui-spec/essay-auto-scoring-ui-spec.md` v1.3 (Draft — UI-D1…UI-D13, RS-0…RS-6, O-1…O-8) |
 | **ADR** | `docs/adr/ADR-0018-essay-async-grade-write.md` (Proposed, 2026-08-28 — Decision 1–6, Amendment to ADR-0010, hai Escalation đã được kỹ sư giải quyết) |
 | **Nhánh** | `design/adr-0018-essay-async-grade-write` (đã merge `main` @ `7894417`) |
 | **Codebase analysis** | **Không có** output codebase-analyzer nào được truyền vào tài liệu này. Mọi sự thật về mã dưới đây do chính tài liệu này xác minh lại bằng Read/Grep trong phiên viết (xem § Code Inspection Evidence), và **mọi số dòng được trích dẫn ở PRD/ADR/UI Spec đều được kiểm lại chứ không tin theo** — năm trích dẫn đã trôi lệch (bốn `+9` trong `schema.sql`, một `−1` ở `types/result.ts`), cộng một trích dẫn khớp một phần (xem § Bảng đối chiếu số dòng). Vì không có `focusAreas`, § Fact Disposition Table được thay bằng § Discrepancy Disposition Table với cùng vai trò: buộc mỗi sự thật về hành vi hiện có phải có một định đoạt ghi ra được. |
@@ -27,7 +27,7 @@ Tài liệu này biến PRD v1.2 + ADR-0018 thành chi tiết cài đặt backen
 
 ### Referenced UI Spec
 
-- UI Spec path: `docs/ui-spec/essay-auto-scoring-ui-spec.md` v1.2
+- UI Spec path: `docs/ui-spec/essay-auto-scoring-ui-spec.md` v1.3
 - Tài liệu này **đóng O-1** (định danh thật của năm khoá jsonb — § Hợp đồng khoá jsonb) và **phần còn lại của O-2** (`retryAvailable` suy ở đâu, khoá payload nào — § Data Contracts / `EssayView`). Mọi bảng của UI Spec dùng chỗ giữ `<lifecycle>` / `<earned>` / `<max>` / `<lowConfidence>` phải được thay bằng literal ở § Hợp đồng khoá jsonb **trước khi code**.
 - Tài liệu này **tiêu thụ** (không định nghĩa lại) các quyết định UI: UI-D1 (rẽ nhánh trên `essayState`, không bao giờ trên `scored`/`isCorrect`), UI-D6 (một hàm suy diễn duy nhất; `pending` quá hạn render y hệt `failed`), UI-D7 (tính năng tắt ⇒ **không phát khoá**), UI-D9 (client nhận boolean, không nhận số đếm), UI-D11 (`/history` nhận một boolean đã suy ra), UI-D13 (khoá vắng mặt và giá trị lạ cùng nhánh render, chỉ cái thứ hai ghi log).
 - Bảy trạng thái render RS-0…RS-6 của UI Spec là **đầu ra** của hàm suy diễn ở § `deriveEssayView()`; bảng ánh xạ RS ↔ giá trị trả về nằm ở § State Transitions and Invariants.
@@ -2394,7 +2394,7 @@ Những gì không giải được từ PRD, ADR, UI Spec và mã, ghi thành m�
 
 - `docs/prd/essay-auto-scoring-prd.md` v1.2 — D1–D13, W1–W8, C1–C5, AC-001–AC-072, Production Measurement 2026-08-27.
 - `docs/adr/ADR-0018-essay-async-grade-write.md` — Decision 1–6, Amendment to ADR-0010, Escalation 1 (→ TD-029) và Escalation 2 (giới hạn phân giải telemetry), Forced choice (§ MSA-3).
-- `docs/ui-spec/essay-auto-scoring-ui-spec.md` v1.2 — UI-D1…UI-D13, RS-0…RS-6, Copy Inventory, O-1 (đóng ở § Hợp đồng khoá jsonb), O-2 (đóng ở § MSA-2 + § Field Propagation Map), O-3 (chuyển thành OQ-3), O-8 (đã chốt; ảnh hưởng `unresolvedCount`).
+- `docs/ui-spec/essay-auto-scoring-ui-spec.md` v1.3 — UI-D1…UI-D13, RS-0…RS-6, Copy Inventory, O-1 (đóng ở § Hợp đồng khoá jsonb), O-2 (đóng ở § MSA-2 + § Field Propagation Map), O-3 (chuyển thành OQ-3), O-8 (đã chốt; ảnh hưởng `unresolvedCount`).
 - `docs/adr/ADR-0010-score-write-trust-boundary.md` — ranh giới bị sửa đổi; tiêu chí khai tử đã nổ.
 - `docs/adr/ADR-0011-mastery-write-trust-boundary.md` — "thao tác đặc quyền thứ hai là một hàm riêng"; carve-out độ tin cậy.
 - `docs/adr/ADR-0005-multi-part-national-exam-format.md` — `essay_answer` là ground truth.
