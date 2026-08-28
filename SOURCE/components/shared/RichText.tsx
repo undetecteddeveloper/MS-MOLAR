@@ -171,6 +171,52 @@ export function normalizeMathDelimiters(text: string): string {
     .replace(/\\\(([\s\S]+?)\\\)/g, (_m, body: string) => `$${body}$`);
 }
 
+// `\begin{tabular}` KHÔNG phải môi trường toán: KaTeX không hiểu nó, và bảng
+// trong đề thường nằm ngoài `$…$` nên remark-math cũng không chạm tới. Kết quả
+// là toàn bộ mã nguồn LaTeX của bảng đổ ra màn hình dưới dạng chữ thô — bug
+// prod đề Sinh học 12 câu 38 (bảng kiểu gen/số lượng), khác hẳn `\begin{cases}`
+// vốn nằm trong `$…$` và được KaTeX render đúng.
+//
+// Quy đổi sang bảng GFM tại tầng RENDER chứ không sửa dữ liệu: chữa được cả
+// nội dung ĐÃ nằm trong DB lẫn nội dung upload sau này (prompt trích xuất đã
+// được dặn dùng bảng markdown, nhưng model vẫn có thể lệch).
+const TABULAR_RE = /\\begin\{tabular\}(?:\s*\{[^}]*\})?([\s\S]*?)\\end\{tabular\}/g;
+
+/** Bỏ mọi đường kẻ ngang LaTeX (\hline, booktabs) — GFM tự kẻ bảng. */
+const TABLE_RULE_RE = /\\(?:hline|toprule|midrule|bottomrule)\b/g;
+
+function toMarkdownRow(cells: string[]): string {
+  // `|` trong ô sẽ cắt nhầm cột của GFM → escape trước khi ghép.
+  return `| ${cells.map((c) => c.trim().replace(/\|/g, "\\|")).join(" | ")} |`;
+}
+
+export function tabularToMarkdownTable(text: string): string {
+  return text.replace(TABULAR_RE, (whole, body: string) => {
+    const rows = body
+      .replace(TABLE_RULE_RE, "")
+      // `\\` kết thúc dòng; `\\[2pt]` là cùng lệnh kèm khoảng cách dòng.
+      .split(/\\\\(?:\s*\[[^\]]*\])?/)
+      // `&` phân cột, trừ `\&` (dấu và theo nghĩa đen).
+      .map((row) => row.split(/(?<!\\)&/).map((c) => c.trim()))
+      .filter((cells) => cells.some((c) => c.length > 0));
+
+    // Không đọc ra nổi hàng nào thì trả nguyên văn — thà hiện mã nguồn còn hơn
+    // nuốt mất nội dung câu hỏi.
+    if (rows.length === 0) return whole;
+
+    const columns = Math.max(...rows.map((r) => r.length));
+    const pad = (cells: string[]) => [...cells, ...Array(columns - cells.length).fill("")];
+    const [header, ...rest] = rows;
+    return [
+      "",
+      toMarkdownRow(pad(header)),
+      toMarkdownRow(Array(columns).fill("---")),
+      ...rest.map((cells) => toMarkdownRow(pad(cells))),
+      "",
+    ].join("\n");
+  });
+}
+
 // Ở ngữ cảnh INLINE (nhãn lựa chọn A–D, ý a–d của câu Đúng/Sai) không tồn tại
 // khái niệm "khối": chuỗi là một nhãn, không phải một tài liệu. Nhưng parser
 // markdown vẫn chạy đủ ngữ pháp khối, nên một nhãn hợp lệ mà TÌNH CỜ trùng
@@ -229,7 +275,11 @@ export function RichText({ text, className, inline = false }: RichTextProps) {
       ]}
       components={inline ? INLINE_COMPONENTS : undefined}
     >
-      {inline ? escapeBlockMarkers(normalizeMathDelimiters(text)) : normalizeMathDelimiters(text)}
+      {inline
+        ? escapeBlockMarkers(normalizeMathDelimiters(text))
+        : // tabular TRƯỚC: thân bảng có thể chứa `\\[2pt]` (giãn dòng), đủ
+          // giống `\[…\]` để normalizeMathDelimiters cắn nhầm nếu chạy trước.
+          normalizeMathDelimiters(tabularToMarkdownTable(text))}
     </ReactMarkdown>
   );
 

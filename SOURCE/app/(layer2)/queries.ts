@@ -11,7 +11,12 @@ import { rankExamIds } from "@/lib/adaptive/rankExams";
 import { createClient } from "@/lib/supabase/server";
 import { readBounded } from "@/lib/supabase/boundedRead";
 import { EXAMS_PAGE_SIZE, paginateExams } from "@/lib/exams/paginate";
-import { communityDifficultyFrom, RATING_MIN } from "@/lib/rating";
+import {
+  BUCKET_HARD_MIN,
+  BUCKET_MEDIUM_MIN,
+  communityDifficultyFrom,
+  RATING_MIN,
+} from "@/lib/rating";
 import { computeWrongTwiceQuestionIds, type WrongTwiceAttempt } from "@/lib/scoring/wrongTwice";
 import { resolveSignedImageUrl } from "@/lib/ugc/imageUrl";
 import type { Exam } from "@/types/exam";
@@ -97,12 +102,13 @@ const DEFAULT_ASCENDING: Record<ExamSort, boolean> = {
 };
 
 // Ranh giới avg_overall theo bucket (nửa-mở, khớp SOURCE/lib/rating's bucket()):
-// [1,4) Easy / [4,7) Medium / [7,10] Hard. Lọc DB-side (ADR-0008 Implementation
-// Guidance — không merge/lọc aggregate ở JS); cận dưới Easy tái dùng RATING_MIN.
+// [1, 2.5) Easy / [2.5, 3.5) Medium / [3.5, 5] Hard trên thang sao 1-5. Lọc
+// DB-side (ADR-0008 Implementation Guidance — không merge/lọc aggregate ở JS);
+// hai cận lấy thẳng từ lib/rating để không thể lệch với bucket().
 const LEVEL_RANGES: Record<ExamLevel, { gte: number; lt?: number }> = {
-  easy: { gte: RATING_MIN, lt: 4 },
-  medium: { gte: 4, lt: 7 },
-  hard: { gte: 7 },
+  easy: { gte: RATING_MIN, lt: BUCKET_MEDIUM_MIN },
+  medium: { gte: BUCKET_MEDIUM_MIN, lt: BUCKET_HARD_MIN },
+  hard: { gte: BUCKET_HARD_MIN },
 };
 
 export interface ExamFilters {

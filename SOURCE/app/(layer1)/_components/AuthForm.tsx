@@ -237,13 +237,13 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
                       provider="google"
                       label="Google"
                       pending={oauthPending}
-                      icon={<GoogleIcon className="size-4" />}
+                      icon={<GoogleIcon className="size-5" />}
                     />
                     <SocialButton
                       provider="facebook"
                       label="Facebook"
                       pending={oauthPending}
-                      icon={<FacebookIcon className="size-4" />}
+                      icon={<FacebookIcon className="size-5" />}
                     />
                   </div>
                 </div>
@@ -399,6 +399,10 @@ function Field({
   );
 }
 
+// Chỉ LOGO, không kèm chữ "Google"/"Facebook" (engineer 2026-08-28: logo màu
+// thương hiệu đã tự nói lên nó là gì). Tên nhà cung cấp vẫn phải tới được trình
+// đọc màn hình và tooltip chuột — `aria-label` + `title` gánh phần đó, nên chữ
+// biến mất khỏi màn hình chứ không biến mất khỏi giao diện.
 function SocialButton({
   provider,
   label,
@@ -416,10 +420,11 @@ function SocialButton({
       name="provider"
       value={provider}
       disabled={pending}
-      className="flex items-center gap-1.5 text-[color:var(--muted-foreground)] transition-colors hover:text-[#1B1512] disabled:opacity-60"
+      aria-label={label}
+      title={label}
+      className="grid size-11 place-items-center rounded-full border border-[#D8C9A8] bg-[#EDE1C8] transition-colors hover:border-[#1B1512]/30 hover:bg-[#1B1512]/[0.04] disabled:opacity-60"
     >
       {icon}
-      <span>{label}</span>
     </button>
   );
 }
@@ -469,12 +474,28 @@ function LockIcon({ className }: { className?: string }) {
   );
 }
 
+// Logo Google 4 màu chính thức (đỏ/vàng/lục/lam) và Facebook xanh #1877F2 —
+// màu HARDCODE chứ không `currentColor`: đây là tài sản thương hiệu của bên
+// thứ ba, không phải icon giao diện, và từ 2026-08-28 chúng là thứ DUY NHẤT
+// nhận diện nút (không còn nhãn chữ bên cạnh).
 function GoogleIcon({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden className={className}>
+    <svg viewBox="0 0 24 24" aria-hidden className={className}>
       <path
-        d="M12 11v3h4.2c-.5 1.6-1.9 2.7-4.2 2.7A4.7 4.7 0 0 1 12 7.3c1.2 0 2.3.5 3 1.2l2.1-2.1A7.6 7.6 0 0 0 12 4a8 8 0 1 0 0 16c4.6 0 7.7-3.2 7.7-7.8 0-.5 0-.9-.1-1.2H12Z"
-        fill="currentColor"
+        fill="#4285F4"
+        d="M23.5 12.27c0-.82-.07-1.6-.21-2.36H12v4.47h6.45a5.52 5.52 0 0 1-2.39 3.62v3.01h3.87c2.26-2.09 3.57-5.17 3.57-8.74Z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.87-3.01c-1.08.72-2.45 1.15-4.06 1.15-3.13 0-5.78-2.11-6.72-4.96H1.28v3.11A11.99 11.99 0 0 0 12 24Z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M5.28 14.27a7.2 7.2 0 0 1 0-4.54V6.62H1.28a12 12 0 0 0 0 10.76l4-3.11Z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.43-3.43C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.69 1.28 6.62l4 3.11C6.22 6.88 8.87 4.75 12 4.75Z"
       />
     </svg>
   );
@@ -482,10 +503,10 @@ function GoogleIcon({ className }: { className?: string }) {
 
 function FacebookIcon({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden className={className}>
+    <svg viewBox="0 0 24 24" aria-hidden className={className}>
       <path
-        d="M14 8.5V7c0-.7.3-1 1-1h1.5V3H14c-2.2 0-3.5 1.3-3.5 3.7V8.5H8.5v3h2V21h3.5v-9.5H17l.5-3H14Z"
-        fill="currentColor"
+        fill="#1877F2"
+        d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.09 10.13 24v-8.44H7.08v-3.49h3.05V9.41c0-3.02 1.79-4.69 4.53-4.69 1.31 0 2.68.24 2.68.24v2.96h-1.51c-1.49 0-1.96.93-1.96 1.89v2.26h3.33l-.53 3.49h-2.8V24C19.61 23.09 24 18.1 24 12.07Z"
       />
     </svg>
   );

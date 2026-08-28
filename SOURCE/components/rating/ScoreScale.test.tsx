@@ -23,12 +23,12 @@ function Harness({ initial }: { initial?: PartScore }) {
 }
 
 describe("ScoreScale", () => {
-  it("renders exactly ten radios labelled 1..10 in order — no out-of-range value representable", () => {
+  it("renders exactly five star radios labelled 1..5 in order — no out-of-range value representable", () => {
     render(<Harness />);
     const radios = screen.getAllByRole("radio");
-    expect(radios).toHaveLength(10);
+    expect(radios).toHaveLength(5);
     expect(radios.map((r) => r.getAttribute("aria-label"))).toEqual(
-      Array.from({ length: 10 }, (_, i) => String(i + 1))
+      Array.from({ length: 5 }, (_, i) => String(i + 1))
     );
   });
 
@@ -38,7 +38,7 @@ describe("ScoreScale", () => {
     expect(group.getAttribute("aria-labelledby")).toBe("scale-label");
   });
 
-  it("default: none checked, roving tabindex sits on circle 1 (group entered at the start)", () => {
+  it("default: none checked, roving tabindex sits on star 1 (group entered at the start)", () => {
     render(<Harness />);
     const radios = screen.getAllByRole("radio");
     radios.forEach((r) => expect(r.getAttribute("aria-checked")).toBe("false"));
@@ -46,17 +46,34 @@ describe("ScoreScale", () => {
     radios.slice(1).forEach((r) => expect(r.tabIndex).toBe(-1));
   });
 
-  it("prefilled value: that circle is checked and holds the roving tabindex", () => {
-    render(<Harness initial={7 as PartScore} />);
+  it("prefilled value: that star is checked and holds the roving tabindex", () => {
+    render(<Harness initial={4 as PartScore} />);
     const radios = screen.getAllByRole("radio");
-    expect(radios[6].getAttribute("aria-checked")).toBe("true");
-    expect(radios[6].tabIndex).toBe(0);
+    expect(radios[3].getAttribute("aria-checked")).toBe("true");
+    expect(radios[3].tabIndex).toBe(0);
     radios.forEach((r, i) => {
-      if (i !== 6) expect(r.tabIndex).toBe(-1);
+      if (i !== 3) expect(r.tabIndex).toBe(-1);
     });
   });
 
-  it("ArrowRight moves selection to the next circle — checked follows focus", () => {
+  // Sao "đầy" là tín hiệu THỊ GIÁC của một thang sao: chọn 4 sao thì 1-4 đều
+  // tô đặc, không chỉ mỗi sao 4 — trong khi aria-checked vẫn chỉ đúng một ô
+  // (radiogroup hợp lệ). Hai lớp này cố ý lệch nhau, nên phải có test canh.
+  it("selecting n fills stars 1..n, leaves the rest outlined, but checks only n", () => {
+    render(<Harness initial={3 as PartScore} />);
+    const radios = screen.getAllByRole("radio");
+    const fill = radios.map((r) => r.querySelector("svg")?.getAttribute("fill"));
+    expect(fill).toEqual(["currentColor", "currentColor", "currentColor", "none", "none"]);
+    expect(radios.map((r) => r.getAttribute("aria-checked"))).toEqual([
+      "false",
+      "false",
+      "true",
+      "false",
+      "false",
+    ]);
+  });
+
+  it("ArrowRight moves selection to the next star — checked follows focus", () => {
     render(<Harness />);
     const radios = screen.getAllByRole("radio");
     radios[0].focus();
@@ -76,34 +93,34 @@ describe("ScoreScale", () => {
     expect(radios[2].getAttribute("aria-checked")).toBe("true");
   });
 
-  it("ArrowRight wraps from circle 10 to circle 1", () => {
-    render(<Harness initial={10 as PartScore} />);
+  it("ArrowRight wraps from star 5 to star 1", () => {
+    render(<Harness initial={5 as PartScore} />);
     const radios = screen.getAllByRole("radio");
-    radios[9].focus();
-    fireEvent.keyDown(radios[9], { key: "ArrowRight" });
+    radios[4].focus();
+    fireEvent.keyDown(radios[4], { key: "ArrowRight" });
     expect(radios[0].getAttribute("aria-checked")).toBe("true");
   });
 
-  it("ArrowLeft/ArrowUp moves to the previous circle and wraps from 1 to 10", () => {
+  it("ArrowLeft/ArrowUp moves to the previous star and wraps from 1 to 5", () => {
     render(<Harness initial={1 as PartScore} />);
     const radios = screen.getAllByRole("radio");
     radios[0].focus();
     fireEvent.keyDown(radios[0], { key: "ArrowLeft" });
-    expect(radios[9].getAttribute("aria-checked")).toBe("true");
+    expect(radios[4].getAttribute("aria-checked")).toBe("true");
   });
 
-  it("Home selects circle 1, End selects circle 10", () => {
-    render(<Harness initial={5 as PartScore} />);
+  it("Home selects star 1, End selects star 5", () => {
+    render(<Harness initial={3 as PartScore} />);
     const radios = screen.getAllByRole("radio");
-    radios[4].focus();
-    fireEvent.keyDown(radios[4], { key: "End" });
-    expect(radios[9].getAttribute("aria-checked")).toBe("true");
+    radios[2].focus();
+    fireEvent.keyDown(radios[2], { key: "End" });
+    expect(radios[4].getAttribute("aria-checked")).toBe("true");
 
-    fireEvent.keyDown(radios[9], { key: "Home" });
+    fireEvent.keyDown(radios[4], { key: "Home" });
     expect(radios[0].getAttribute("aria-checked")).toBe("true");
   });
 
-  it("Space selects the focused (unchecked) circle", () => {
+  it("Space selects the focused (unchecked) star", () => {
     render(<Harness />);
     const radios = screen.getAllByRole("radio");
     radios[2].focus();
@@ -111,18 +128,18 @@ describe("ScoreScale", () => {
     expect(radios[2].getAttribute("aria-checked")).toBe("true");
   });
 
-  it("Enter selects the focused (unchecked) circle", () => {
+  it("Enter selects the focused (unchecked) star", () => {
     render(<Harness />);
     const radios = screen.getAllByRole("radio");
-    radios[8].focus();
-    fireEvent.keyDown(radios[8], { key: "Enter" });
-    expect(radios[8].getAttribute("aria-checked")).toBe("true");
+    radios[3].focus();
+    fireEvent.keyDown(radios[3], { key: "Enter" });
+    expect(radios[3].getAttribute("aria-checked")).toBe("true");
   });
 
-  it("clicking a circle selects it directly", () => {
+  it("clicking a star selects it directly", () => {
     render(<Harness />);
     const radios = screen.getAllByRole("radio");
-    fireEvent.click(radios[5]);
-    expect(radios[5].getAttribute("aria-checked")).toBe("true");
+    fireEvent.click(radios[1]);
+    expect(radios[1].getAttribute("aria-checked")).toBe("true");
   });
 });

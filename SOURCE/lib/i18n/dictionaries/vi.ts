@@ -168,14 +168,11 @@ export const vi: Dictionary = {
 
   // --- Chấm độ khó --------------------------------------------------------
   "rating.rate": "Chấm →",
-  "rating.rubric": "Thang độ khó",
   "rating.overall": "Tổng thể",
   "rating.rateAllParts": "Chấm đủ cả ba phần mới gửi được.",
   "rating.needAttemptTitle": "Bạn cần làm xong đề này trước",
   "rating.needAttemptBody": "Hoàn thành một lượt làm bài trên đề này rồi mới chấm được độ khó.",
   "rating.title": "Chấm độ khó",
-  "rating.intro":
-    "Chấm mỗi phần từ 1 (dễ nhất) tới 10 (khó nhất). Điểm tổng thể là trung bình của ba phần.",
 
   // --- Báo cáo đề ---------------------------------------------------------
   "report.title": "Báo cáo đề này",
@@ -328,10 +325,10 @@ export const vi: Dictionary = {
   "exams.gradeValue": "Lớp {grade}",
   "rating.finishExamFirst": "Bạn làm xong đề này đã nhé",
   "rating.logInToRate": "Đăng nhập để chấm",
-  "rating.partOf": "Phần {part}/{total}",
-  "rating.rateFromTo": "{name} — chấm từ 1 (dễ nhất) tới 10 (khó nhất)",
+  "rating.partOf": "{part}/{total}",
+  "rating.rateFromTo": "{name} — chấm từ 1 sao (dễ nhất) tới 5 sao (khó nhất)",
   "rating.prev": "Trước",
-  "rating.submitRating": "Gửi đánh giá",
+  "rating.submitRating": "Gửi",
   "rating.submitted": "Đã gửi đánh giá",
   "rating.unrated": "CHƯA CHẤM",
   "rating.rated": "ĐÃ CHẤM",
@@ -346,7 +343,7 @@ export const vi: Dictionary = {
   "rating.saName": "Trả lời ngắn",
   "rating.saDescription": "Không có lựa chọn — tự giải và nhập một đáp số duy nhất.",
   "rating.errIneligible": "Bạn cần làm xong đề này trước khi chấm độ khó.",
-  "rating.errInvalid": "Bạn chấm đủ cả ba phần, mỗi phần từ 1 đến 10 nhé.",
+  "rating.errInvalid": "Bạn chấm đủ cả ba phần, mỗi phần từ 1 đến 5 sao nhé.",
   "rating.errRateLimited": "Bạn đang chấm quá nhanh. Đợi một chút rồi thử lại nhé.",
   "rating.errServer": "Chưa lưu được đánh giá lúc này. Bạn thử lại nhé.",
 

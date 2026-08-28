@@ -494,21 +494,30 @@ create table if not exists public.exam_difficulty_ratings (
   id          uuid primary key default gen_random_uuid(),
   exam_id     text not null references public.exams(id) on delete cascade,
   user_id     uuid not null default auth.uid() references auth.users(id) on delete cascade,
-  score_part1 int not null,                       -- Phần I  (mcq)          1..10
-  score_part2 int not null,                       -- Phần II (true_false)   1..10
-  score_part3 int not null,                       -- Phần III(short_answer) 1..10
+  score_part1 int not null,                       -- Phần I  (mcq)          1..5 sao
+  score_part2 int not null,                       -- Phần II (true_false)   1..5 sao
+  score_part3 int not null,                       -- Phần III(short_answer) 1..5 sao
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now(),
   unique (exam_id, user_id)                        -- 1 rating / user / đề (upsert khoá)
 );
 
--- Mỗi điểm phần là số nguyên trong [1,10] (AC-002). Một CHECK gộp cả 3 cột.
+-- Mỗi điểm phần là số SAO nguyên trong [1,5] (AC-002). Một CHECK gộp cả 3 cột.
+-- Thang cũ là [1,10]; khi thu về [1,5] phải QUY ĐỔI dữ liệu có sẵn TRƯỚC khi
+-- siết CHECK, nếu không lệnh add constraint sẽ bị chính các dòng cũ chặn lại.
+-- ceil(n/2) giữ nguyên thứ tự khó/dễ và không tạo ra giá trị 0.
+update public.exam_difficulty_ratings
+set score_part1 = ceil(score_part1 / 2.0),
+    score_part2 = ceil(score_part2 / 2.0),
+    score_part3 = ceil(score_part3 / 2.0)
+where score_part1 > 5 or score_part2 > 5 or score_part3 > 5;
+
 alter table public.exam_difficulty_ratings drop constraint if exists ratings_scores_range_check;
 alter table public.exam_difficulty_ratings add constraint ratings_scores_range_check
   check (
-    score_part1 between 1 and 10
-    and score_part2 between 1 and 10
-    and score_part3 between 1 and 10
+    score_part1 between 1 and 5
+    and score_part2 between 1 and 5
+    and score_part3 between 1 and 5
   );
 
 -- RLS: mỗi write policy AND 3 điều kiện — (a) user_id = auth.uid(); (b) đề đã
@@ -1859,7 +1868,7 @@ revoke all on public.schema_version from anon, authenticated;
 -- nó — xem lib/schema/schemaFingerprint.ts).
 -- @schema-fingerprint-begin
 insert into public.schema_version (id, fingerprint)
-values (1, '021dd1387945')
+values (1, '29931beeb950')
 on conflict (id) do update
   set fingerprint = excluded.fingerprint,
       applied_at  = now();

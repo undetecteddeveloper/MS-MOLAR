@@ -58,7 +58,7 @@ function createQueryBuilder(result: { data: unknown[]; error: null }) {
 // =============================================================================
 // Test 1 — rateExam: validation gate, upsert call shape, non-leaking error mapping
 // =============================================================================
-// AC-002: "...each accepted value is an integer in [1, 10] and a value outside that
+// AC-002: "...each accepted value is an integer in [1, 5] and a value outside that
 //   range or a non-integer is not submittable."
 // AC-012: "...their existing rating row is updated in place (no second row is created)
 //   and the new three scores replace the old ones."
@@ -83,7 +83,7 @@ function createQueryBuilder(result: { data: unknown[]; error: null }) {
 //   of the mapped { error: "server" }; OR a re-rate issues a bare INSERT instead of an
 //   upsert keyed on (exam_id, user_id).
 // Proof obligation:
-//   (a) a call with any part score non-integer or outside [1,10] resolves to
+//   (a) a call with any part score non-integer or outside [1,5] resolves to
 //       { error: "invalid" } and the mocked client's upsert is never invoked (AC-002);
 //   (b) a call with three valid scores invokes upsert(..., { onConflict: "exam_id,user_id" })
 //       exactly once, with score_part1/2/3 mapped from partI/partII/partIII (AC-012);
@@ -96,7 +96,7 @@ describe("rateExam — validation gate, upsert call shape, non-leaking error map
     fromMock.mockReset();
   });
 
-  const validScores = { partI: 8, partII: 7, partIII: 9 };
+  const validScores = { partI: 4, partII: 3, partIII: 5 };
 
   // Khoá rate-limit lấy từ chính dòng attempt của precheck. Mỗi test dùng một
   // id RIÊNG (ngẫu nhiên) để bộ đếm in-memory của lib/security/rateLimit không
@@ -135,10 +135,10 @@ describe("rateExam — validation gate, upsert call shape, non-leaking error map
   }
 
   it("obligation (a): a non-integer or out-of-range part score resolves to {error:'invalid'} without touching the Supabase client (AC-002)", async () => {
-    const outOfRange = await rateExam("exam-1", { partI: 11, partII: 5, partIII: 5 });
+    const outOfRange = await rateExam("exam-1", { partI: 6, partII: 5, partIII: 5 });
     expect(outOfRange).toEqual({ error: "invalid" });
 
-    const nonInteger = await rateExam("exam-1", { partI: 5.5, partII: 5, partIII: 5 });
+    const nonInteger = await rateExam("exam-1", { partI: 2.5, partII: 5, partIII: 5 });
     expect(nonInteger).toEqual({ error: "invalid" });
 
     expect(fromMock).not.toHaveBeenCalled();
@@ -157,7 +157,7 @@ describe("rateExam — validation gate, upsert call shape, non-leaking error map
     // Considerations). objectContaining would let a leaked client-supplied user_id
     // pass through this assertion undetected.
     expect(upsertMock).toHaveBeenCalledWith(
-      { exam_id: "exam-1", score_part1: 8, score_part2: 7, score_part3: 9 },
+      { exam_id: "exam-1", score_part1: 4, score_part2: 3, score_part3: 5 },
       { onConflict: "exam_id,user_id" }
     );
   });
@@ -246,11 +246,11 @@ describe("getMyRating — caller's own three stored scores, or null (Test 1 exte
   }
 
   it("returns {partI,partII,partIII} mapped from score_part1/2/3 when a row exists", async () => {
-    mockRow({ score_part1: 8, score_part2: 7, score_part3: 9 });
+    mockRow({ score_part1: 4, score_part2: 3, score_part3: 5 });
 
     const result = await getMyRating("exam-1");
 
-    expect(result).toEqual({ partI: 8, partII: 7, partIII: 9 });
+    expect(result).toEqual({ partI: 4, partII: 3, partIII: 5 });
   });
 
   it("returns null when the caller has not rated this exam", async () => {
@@ -303,14 +303,14 @@ describe("getMyRating — caller's own three stored scores, or null (Test 1 exte
 //   service-integration-e2e lane (Test SE2) and the backend phase-0 spike (S1-S4).
 // Primary failure mode: sort:"hardest" omits nullsFirst:false, or omits the chained
 //   secondary .order("created_at").order("id") tie-break; OR a level bucket's .gte/.lt
-//   pair does not match [1,4)/[4,7)/[7,10]; OR the pre-existing .eq("status","published")
+//   pair does not match [1,2.5)/[2.5,3.5)/[3.5,5]; OR the pre-existing .eq("status","published")
 //   guard is dropped when the source relation swaps to the view.
 // Proof obligation:
 //   (a) for sort:"hardest", assert .order() is called with
 //       ("avg_overall", { ascending: false, nullsFirst: false }) followed by
 //       .order("created_at") then .order("id") (AC-019/020);
 //   (b) for level:"easy"/"medium"/"hard", assert the exact .gte/.lt boundary pair per
-//       bucket ([1,4) / [4,7) / [7,10]) and that .eq("status","published") is still
+//       bucket ([1,2.5) / [2.5,3.5) / [3.5,5]) and that .eq("status","published") is still
 //       present in the chain (AC-017/021);
 //   (c) for sort:"newest"/"oldest" and no level filter, assert the pre-existing chain
 //       is unchanged (regression guard for AC-023 continuity — no accidental
@@ -336,8 +336,8 @@ describe("listExams — Hardest-sort and Level-filter query construction (Test 2
   });
 
   it.each([
-    ["easy", 1, 4],
-    ["medium", 4, 7],
+    ["easy", 1, 2.5],
+    ["medium", 2.5, 3.5],
   ] as const)(
     "level:'%s' chains .gte(avg_overall,%d).lt(avg_overall,%d) and preserves .eq(status,published) (AC-017/021, obligation b)",
     async (level, gte, lt) => {
@@ -352,13 +352,13 @@ describe("listExams — Hardest-sort and Level-filter query construction (Test 2
     }
   );
 
-  it("level:'hard' chains .gte(avg_overall,7) with no upper bound and preserves .eq(status,published) (AC-017/021, obligation b)", async () => {
+  it("level:'hard' chains .gte(avg_overall,3.5) with no upper bound and preserves .eq(status,published) (AC-017/021, obligation b)", async () => {
     const { builder, calls } = createQueryBuilder({ data: [], error: null });
     fromMock.mockReturnValue(builder);
 
     await listExams({ level: "hard" });
 
-    expect(calls).toContainEqual({ method: "gte", args: ["avg_overall", 7] });
+    expect(calls).toContainEqual({ method: "gte", args: ["avg_overall", 3.5] });
     expect(calls.some((c) => c.method === "lt")).toBe(false);
     expect(calls).toContainEqual({ method: "eq", args: ["status", "published"] });
   });
@@ -502,14 +502,14 @@ describe("toExam — communityDifficulty mapping is additive, byte-identical bel
 
   it("at-threshold row (rating_count=3) maps avg_overall/rating_count through communityDifficultyFrom without re-deriving bucket logic locally", async () => {
     const { builder } = createQueryBuilder({
-      data: [{ ...baseRow, rating_count: 3, avg_overall: 6.0 }],
+      data: [{ ...baseRow, rating_count: 3, avg_overall: 3.0 }],
       error: null,
     });
     fromMock.mockReturnValue(builder);
 
     const [exam] = await listExams();
 
-    expect(exam.communityDifficulty).toEqual({ bucket: "Medium", mean: 6.0, count: 3 });
+    expect(exam.communityDifficulty).toEqual({ bucket: "Medium", mean: 3.0, count: 3 });
   });
 });
 

@@ -30,6 +30,7 @@ import { useT } from "@/lib/i18n/client";
 import { useState } from "react";
 import {
   PART_IDS,
+  RATING_MAX,
   formatMean,
   overall,
   type PartId,
@@ -149,15 +150,13 @@ export function RatingRubric({ examId, initialScores }: RatingRubricProps) {
     }
   }
 
-  const submitLabel = submitState === "submitting" ? t("report.submitting") : t("rating.submitRating");
+  const submitLabel =
+    submitState === "submitting" ? t("report.submitting") : t("rating.submitRating");
 
   return (
     <div className="border-border bg-card rounded-xl border p-6 sm:p-8">
-      <div className="flex items-baseline justify-between gap-4">
-        <h2 id={headingId} className="eyebrow">
-          {t("rating.rubric")}
-        </h2>
-        <span className="eyebrow text-muted-foreground">
+      <div className="flex items-baseline justify-end gap-4">
+        <span id={headingId} className="eyebrow text-muted-foreground">
           {t("rating.partOf", { part: activeIndex + 1, total: PART_IDS.length })}
         </span>
       </div>
@@ -171,19 +170,13 @@ export function RatingRubric({ examId, initialScores }: RatingRubricProps) {
         aria-label={t(labelKeys.name)}
       >
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-          <div>
-            <p className="eyebrow">{t(labelKeys.eyebrow)}</p>
-            <p className="text-foreground mt-1 font-serif text-lg">{t(labelKeys.name)}</p>
-          </div>
+          <p className="eyebrow">{t(labelKeys.eyebrow)}</p>
           <p className="text-brand font-serif text-lg tabular-nums transition-colors duration-200">
-            {score !== undefined ? formatMean(score) : "—"}
-            <span className="text-muted-foreground font-sans text-sm">/10</span>
+            {score ?? "—"}
+            <span className="text-muted-foreground font-sans text-sm">/{RATING_MAX}</span>
           </p>
         </div>
-        <p className="text-muted-foreground mt-1.5 max-w-prose text-sm leading-relaxed">
-          {t(labelKeys.description)}
-        </p>
-        <div className="mt-3.5">
+        <div className="mt-4">
           <span id={scaleLabelId} className="sr-only">
             {t("rating.rateFromTo", { name: t(labelKeys.name) })}
           </span>
@@ -221,7 +214,7 @@ export function RatingRubric({ examId, initialScores }: RatingRubricProps) {
             {readoutValue}
             <span className="text-muted-foreground font-sans text-base">
               {" "}
-              /10 · {readoutStatus}
+              /{RATING_MAX} · {readoutStatus}
             </span>
           </p>
         </div>
