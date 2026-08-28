@@ -52,7 +52,7 @@ submitExam()  ──(student JWT, RLS)──▶ attempt_answers    upsert
 | The single Gemini emission point **does not retry** — retry is delegated to the SDK — because a retry layer above a reservation-based budget counter multiplies real spend the counter cannot see. | `lib/ugc/gemini.ts`, `generateContent()` header |
 | `consumeQuota()` reserves the **worst case** before a burst (`uploadAutomatic: 3`) and accepts over-counting as the safe direction. Redis unreachable ⇒ refuse. | `lib/billing/quota.ts:290–400` |
 | The bundle guard's strongest markers are **host strings** (`generativelanguage.googleapis.com`, `api-merchant.payos.vn`) — they catch a whole module pulled client-side, not merely an env-var name. | `scripts/check-ai-key-bundle.mjs` |
-| The schema fingerprint is the last statement in `schema.sql`, and any new SQL moves it (`021dd1387945` today, matching prod). | `schema.sql` tail |
+| The schema fingerprint is the last statement in `schema.sql`, and any new SQL moves it (**`29931beeb950`** today, matching prod — see the 2026-08-28 correction below; `021dd1387945` was the value when this ADR was drafted). | `schema.sql` tail |
 
 ---
 
@@ -222,7 +222,7 @@ The one genuinely new question asynchrony raises is **which write may land secon
 
 ### Neutral
 
-- Two new SQL functions move the schema fingerprint off `021dd1387945`. Per Phase 3.5 / TD-005 this is a prod-DDL event requiring the engineer's confirmation before it is applied; deploying the code without it produces a green build and a runtime failure on the first essay.
+- Two new SQL functions move the schema fingerprint off **`29931beeb950`** (the current prod value; the draft said `021dd1387945`, which the 1–5 star rating change superseded before this feature reached DDL). Per Phase 3.5 / TD-005 this is a prod-DDL event requiring the engineer's confirmation before it is applied; deploying the code without it produces a green build and a runtime failure on the first essay.
 - `record_exam_result()`'s signature, the `exam_results` columns, `PLAN_LIMITS` and `QuotaKind` are all unchanged.
 
 ## Architecture Impact
@@ -264,4 +264,5 @@ The one genuinely new question asynchrony raises is **which write may land secon
 | Date | Change |
 |---|---|
 | 2026-08-28 | Initial draft (Proposed). Six decisions recorded; ADR-0010 amended on the row-immutability reading only. |
+| 2026-08-28 | **Phase 3.5 baseline moved before this feature wrote any DDL.** `main` gained three commits after this branch forked (`004d628`, `8f9148e`, `7894417`); `004d628` narrowed exam rating from a 1–10 to a 1–5 star scale, which is a `schema.sql` change, and it carries a data-mutating `update` over `exam_difficulty_ratings`. The fingerprint therefore moved `021dd1387945` → **`29931beeb950`**, and that migration **has already been applied to prod** (verified read-only against ref `pebjdlbgbmizgfpuptjl`, `applied_at` 2026-08-28 11:53 UTC). Prod and `main` are in sync; the clean Phase 3.5 baseline for this feature's two new functions is `29931beeb950`, not the value recorded in the draft. `main` was merged into this branch so the UI Spec and Design Docs are written against the tree that actually ships. Re-verified as **unchanged** by that merge: `globals.css` gained only `.rich-text` table rules, so the token inventory the UI Spec depends on (still no `--success`/`--warning`) is unaffected. |
 | 2026-08-28 | Corrected after codebase analysis. **(1)** The draft counted `service-role.ts` at five operations and this feature as "the sixth and seventh"; it holds **eleven**, and ADR-0010's kill criterion has **already fired on both limbs** — promoted from a Known-unknown to **Escalation 1**, an engineer decision this ADR does not resolve. **(2)** `telemetry_log` has no `attempt_id`, so Decision 3's telemetry claim is not reconstructible per attempt — **Escalation 2**. **(3)** AC-029 has a second coupled site (`checkAiKeyBundleSecrets.test.ts`, exhaustive `toEqual` + `length === 7`) — guidance #5. **(4)** A host-keyed Groq emission scan would capture `check-ai-key-bundle.mjs` itself — new guidance #5b separates the bundle marker from the scan key. **(5)** The Groq counter's duplicate-or-export choice named explicitly, since every helper it needs is module-private in `quota.ts`. |
