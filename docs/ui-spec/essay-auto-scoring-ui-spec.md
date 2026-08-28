@@ -2,11 +2,11 @@
 
 | | |
 |---|---|
-| **Version** | 1.0 |
-| **Date** | 2026-08-28 |
+| **Version** | 1.3 |
+| **Date** | 2026-08-29 |
 | **Status** | Draft — sẵn sàng cho chuỗi Design Doc (backend + frontend) → Work Plan. |
 | **PRD** | `docs/prd/essay-auto-scoring-prd.md` v1.2 (Draft — D1–D13 khoá, W1–W8, C1–C5, AC-001–AC-072) |
-| **ADR** | `docs/adr/ADR-0018-essay-async-grade-write.md` (Proposed, 2026-08-28 — Decision 1–6, Amendment to ADR-0010; cả hai Escalation đã được kỹ sư giải quyết trong chính file đó) |
+| **ADR** | `docs/adr/ADR-0018-essay-async-grade-write.md` (**Accepted 2026-08-29** — Decision 1–6, Amendment to ADR-0010; cả hai Escalation đã được kỹ sư giải quyết trong chính file đó) |
 | **Nhánh** | `design/adr-0018-essay-async-grade-write` |
 | **Tiền lệ về cấu trúc** | `docs/ui-spec/short-answer-scoring-ui-spec.md` (lát cắt hiển thị của cùng bài toán), `docs/ui-spec/history-ui-spec.md` (mẫu Decisions Record + a11y pattern) |
 
@@ -84,6 +84,8 @@ Theo **globals.css**, vì ba lý do độc lập: (1) `docs/project-context/exte
 
 ### UI-D3 — Dòng điểm tự luận là **một dòng riêng có nhãn, đặt CẠNH `ScoreCard`**; `ScoreCard` không đổi một dòng nào
 
+> **Đây là lần diễn đạt lại AC thứ tư của tài liệu này, và là CÓ CHỦ ĐÍCH — đừng đọc thành trôi lệch.** PRD AC-011 nói điểm được "**combining**" bộ ba cũ với earned/max của tự luận, và AC-057 gọi đích danh `ScoreCard.tsx` là bề mặt hiện dấu "đang chấm" *"alongside the attempt's number"*. UI-D3 từ chối cả hai: `ScoreCard` là **vùng 0-diff**, không gộp gì cả, và dấu hiệu nằm ở `EssayScoreLine` NGAY DƯỚI thẻ. Hai lý do: gộp vào sẽ định nghĩa lại `total` và **phá phép suy `wrong = total − correct`** đang chạy trong chính component đó; và một con điểm tiêu đề nhảy một tiếng sau khi nộp đúng là thứ Amendment của ADR-0010 nói ba bề mặt phải tôn trọng. Kỹ sư chốt ngày 2026-08-29: **ghi nhận diễn đạt lại**, KHÔNG sửa câu chữ PRD — nên AC-011/AC-057 vẫn đọc như cũ, và chỗ đối chiếu là đây, ADR-0018 (Amendment) và Design Doc frontend (bảng restatement).
+
 **Quyết định (kỹ sư chốt, ghi lại nguyên vẹn — không mở lại).** `ScoreCard.tsx` giữ nguyên props và nguyên phần render. Số `/10`, ô `Đúng` và ô `Sai` giữ **đúng cơ sở tính hôm nay**. Kết quả tự luận là một **khối riêng, có nhãn riêng**, render ngay **dưới** `ScoreCard` (component `EssayScoreLine`, § Component: EssayScoreLine).
 
 **Vì sao không đặt một hàng BÊN TRONG `ScoreCard`.** Ba ô của `ScoreCard` (`Đúng` / `Sai` / `Thời gian`) đều phái sinh từ bộ ba cũ, và `wrong = result.total - result.correct` được tính ngay trong file. Một hàng thứ tư nằm cạnh chúng ngụ ý một **quan hệ số học không tồn tại**: điểm tự luận không cộng vào `total`, không cộng vào `correct`, và mẫu số của nó (số câu tự luận **đã chấm xong**) là một mẫu số khác hẳn.
@@ -125,7 +127,7 @@ AC-058 viết *"as genuinely disabled controls with an accessible reason, not si
 
 ### UI-D6 — Trạng thái "kẹt pending" được **suy ra**, và được render **giống hệt** `failed`
 
-**Quyết định.** Bề mặt render **năm** trạng thái từ **ba** giá trị lưu. `pending` quá hạn (AC-026) render **y hệt** `failed` còn lượt: cùng chữ "Chấm thất bại", cùng nút "Chấm lại".
+**Quyết định.** Bề mặt render **bảy** trạng thái (RS-0…RS-6) từ **ba** giá trị lưu — trong đó **năm** trạng thái (RS-2…RS-6) là các trạng thái có mang khoá lifecycle. `pending` quá hạn (AC-026) render **y hệt** `failed` còn lượt: cùng chữ "Chấm thất bại", cùng nút "Chấm lại".
 
 **Lý do.** Với học sinh, hai tình huống ấy có **cùng một cách xử lý duy nhất** (bấm chấm lại), nên hai câu chữ khác nhau chỉ ngụ ý hai cách chữa khác nhau mà thực ra không có. Phân biệt "writer-landed failed" với "deadline-derived failed" là chuyện của telemetry và của metric #1 vs #2(b) (PRD), không phải chuyện của màn hình.
 
@@ -178,9 +180,9 @@ Nếu kỹ sư muốn con số hiện ra, xem **O-2**.
 
 **Lý do.** Ngôn ngữ đọc từ **cookie phía server** (`SOURCE/lib/i18n/server.ts`), và `I18nProvider` nhận `locale` từ root layout — tức đổi ngôn ngữ vốn đã đi qua một lượt render server. Nên chuỗi render ở server **không** cũ đi so với chuỗi render ở client, và lý do khiến `OrderStatusBadge` phải là client (nó sống trong một cây client) không áp dụng ở đây: cả `result/page.tsx`, `result/detail/page.tsx` lẫn `HistoryRow.tsx` đều là Server Component. Đường cập nhật của nhãn là `router.refresh()` — tức là **một lượt render server**, đúng nơi nhãn đang sống. Đổi lại: 0 KB JS thêm cho ba bề mặt trong trạng thái đã ổn định.
 
-### UI-D11 — `/history` nhận **một boolean đã suy ra**, không nhận `per_question`
+### UI-D11 — `/history` nhận **hai boolean đã suy ra**, không nhận `per_question`
 
-**Quyết định.** `listMyHistory()` (`SOURCE/app/(HM)/queries.ts`) bổ sung `per_question` và `created_at` vào lượt `select`, suy ra **một** boolean ngay trong hàm map, và chỉ boolean đó vào `MyHistoryEntry`. Dữ liệu `per_question` thô **không** băng qua biên vào cây component.
+**Quyết định.** `listMyHistory()` (`SOURCE/app/(HM)/queries.ts`) bổ sung `per_question` và `created_at` vào lượt `select`, suy ra **hai** boolean ngay trong hàm map, và chỉ hai boolean đó vào `MyHistoryEntry`: **`hasUnresolvedEssay`** (chốt chặn xuất PDF) và **`hasIncompleteEssay`** (điều kiện in dòng `result.essay.pdfIncomplete` trong tệp). *(Sửa ở v1.3. Bản v1.2 nói **một** boolean tên `essayUnresolved`. Một boolean là KHÔNG ĐỦ: RS-6 = `failed` ∧ `!retryAvailable` không suy ra được từ "chưa giải quyết", nên lối xuất PDF ở `/history` sẽ in ra một tệp KHÁC với lối xuất ở trang kết quả cho cùng một lượt thi — xem Design Doc backend D-13 và frontend F-06. Tên trường cũng lấy theo hợp đồng backend.)* Dữ liệu `per_question` thô **không** băng qua biên vào cây component.
 
 **Lý do.** `MyHistoryEntry` hiện **không** mang `per_question` (đã kiểm: `attemptId, examId, examTitle, subject, totalScore, startedAt, submittedAt, correct, total`), nên AC-057 trên `/history` **không thể** thoả nếu không đụng truy vấn — đây là một thay đổi bắt buộc, không phải tuỳ chọn, và PRD không nêu tên nó. Giữ mảng thô ra ngoài cây component vì `HistoryRow` không có việc gì phải đọc điểm từng câu; một prop boolean là bề mặt nhỏ nhất đủ cho cả nhãn (AC-057) lẫn chốt PDF (AC-058).
 
@@ -295,7 +297,7 @@ flowchart TD
 
 ## Lifecycle State Machine (as rendered)
 
-Đây là hợp đồng trung tâm của tài liệu. **Ba** giá trị lưu, **sáu** trạng thái render.
+Đây là hợp đồng trung tâm của tài liệu. **Ba** giá trị lưu, **bảy** trạng thái render (RS-0…RS-6). *(Sửa ở v1.3: bản trước đếm "sáu" ở đây và "năm" ở UI-D6 cho cùng một bảng bảy dòng.)*
 
 ```mermaid
 stateDiagram-v2
@@ -337,7 +339,7 @@ stateDiagram-v2
 | **RS-2** | **Pending** | `<lifecycle> = pending` **và** `now() − created_at ≤ hạn chờ` | `◌ Đang chấm` | Bài làm của học sinh; **không** hiện đáp án mẫu; **không** nhãn `result.notAutoScored` | Không |
 | **RS-3** | **Graded** | `<lifecycle> = graded` | `● Đã chấm` | Điểm `{band} / 1` + bài làm + đáp án mẫu; nếu cờ thấp tin cậy: thêm chữ **"Cần xem lại"** | Không (AC-063) |
 | **RS-4** | **Failed (còn lượt)** | `<lifecycle> = failed` **và** `retryAvailable` | `✕ Chấm thất bại` | Bài làm + câu giải thích + ghi chú về lượt | **Có**, hoạt động |
-| **RS-5** | **Stuck-pending** | `<lifecycle> = pending` **và** `now() − created_at > hạn chờ` | `✕ Chấm thất bại` | **Giống hệt RS-4** (UI-D6) | **Có**, hoạt động |
+| **RS-5** | **Stuck-pending** | `<lifecycle> = pending` **và** `now() − created_at > hạn chờ` **và** `retryAvailable` | `✕ Chấm thất bại` | **Giống hệt RS-4** (UI-D6) | **Có**, hoạt động. *(Sửa ở v1.3: bản v1.2 nói nút LUÔN hoạt động ở RS-5. Sai — `essayAttempts` có thể chạm 3 trên một dòng VẪN đang lưu `pending` (ba lượt claim đều bị cắt trước khi settle), khi đó `retryAvailable` là false và dòng đó render **RS-6**. Frontend tự phân loại đúng vì nó chỉ đọc `retryAvailable`. Xem Design Doc frontend F-08.)* |
 | **RS-6** | **Exhausted** | `<lifecycle> = failed` **và** `!retryAvailable` | `✕ Chấm thất bại` | Bài làm + câu "hết lượt, hệ thống sẽ không tự chấm lại" | **Có mặt**, `aria-disabled="true"` + lý do (UI-D5) — **không bao giờ bị gỡ, không bao giờ present-but-inert** |
 
 **"Chưa giải quyết" (unresolved)** — thuật ngữ mà AC-057/AC-058 dùng — được định nghĩa **một lần** ở đây và mọi bề mặt dùng đúng định nghĩa này: một câu tự luận là **chưa giải quyết** khi nó ở **RS-2** hoặc **RS-4** hoặc **RS-5**. RS-0, RS-1, RS-3 và RS-6 đều là **đã giải quyết**.
@@ -559,7 +561,7 @@ Ba lựa chọn a11y ở đây đều là quyết định, không phải mặc �
 
 **Props:** `pendingCount: number` (số câu ở **RS-2**, đã suy ra ở server), `resolvedCount: number` (số câu đã giải quyết, để dựng câu thông báo). Poller **không** nhận band, không nhận bài làm, không nhận `attemptId` — nó không gọi gì cả ngoài `router.refresh()`.
 
-**Không mount** khi `pendingCount === 0` — quyết định của trang cha, không phải của poller. Hệ quả: khi tính năng còn tắt (UI-D7) và với mọi lượt thi không có tự luận, **không một byte JS nào** được thêm vào trang.
+**Không mount** khi `essaySummary === undefined` — quyết định của trang cha, không phải của poller. *(Sửa ở v1.3. Bản v1.2 nói điều kiện là `pendingCount === 0`, và điều đó **phá chính AC-023**: câu `result.essay.announceAllDone` phải được đọc lên ĐÚNG lúc số câu chưa giải quyết chạm 0, nhưng ở đúng lượt render đó quy tắc cũ gỡ poller — và vùng `aria-live` của nó — khỏi cây, nên không còn gì để đọc. Xem Design Doc frontend F-05.)* Kết luận cho giai đoạn tính năng TẮT **không đổi**: `summariseEssays()` trả `undefined` khi không có khoá nào, nên với mọi lượt thi không có tự luận poller vẫn không mount — đó là lý do lỗi này trông vô hại khi đọc lướt.
 
 #### State × Display Matrix
 
@@ -567,7 +569,7 @@ Ba lựa chọn a11y ở đây đều là quyết định, không phải mặc �
 |---|---|---|
 | **Default (đang poll)** | `pendingCount > 0`, chưa chạm cận | **Không có gì nhìn thấy được.** Chỉ vùng `sr-only` rỗng. Trang **không** hiện spinner toàn cục — nhãn "Đang chấm" trên từng câu đã là chỉ báo, và một spinner thứ hai sẽ nói rằng cả trang đang tải trong khi phần lớn nội dung đã sẵn |
 | **Loading** | *(trùng Default)* | Trạng thái "đang chờ" của tính năng này thuộc về **từng câu**, không thuộc về poller |
-| **Empty** | `pendingCount === 0` | Component **không mount** |
+| **Empty** | `essaySummary === undefined` | Component **không mount**. Khi `essaySummary` tồn tại nhưng `pendingCount === 0`, component **vẫn mount** ở trạng thái ngủ — giữ vùng `aria-live` sống để AC-023 đọc được câu báo xong |
 | **Error** | `router.refresh()` ném lỗi | Bắt và **giữ im lặng với người dùng**, `console.error` với `digest` (đúng pattern `RecheckOrderControl`); tick kế tiếp vẫn được lên lịch. Lý do: một lượt refresh trượt do mạng chập chờn **là** ca thường của người dùng mục tiêu; hiện lỗi cho nó sẽ báo động về một thứ tự khỏi ở tick sau |
 | **Partial (chạm cận, còn pending)** | Chạm 1 trong 2 trần trong khi `pendingCount > 0` | Dòng chữ *"Trang đã ngừng tự cập nhật."* + nút **"Cập nhật"** (nút thật, trong thứ tự tab) |
 
@@ -648,7 +650,7 @@ Ba lựa chọn a11y ở đây đều là quyết định, không phải mặc �
 
 ```
 if (blockedReason !== null) return;   // AC-058 — trước cả chốt bận
-if (busyRef.current) return;          // AC-010, giữ nguyên
+if (busyRef.current) return;          // history-prd AC-010 (chống bấm kép), giữ nguyên
 ```
 
 Kết quả: `phase` **ở nguyên `"idle"`**. Không pha bận, không sinh file, không node lỗi — vì không có lỗi nào xảy ra. Lý do đã nằm sẵn ở `aria-describedby` của control trước cả khi người dùng bấm; một node `role="alert"` bật lên sau cú bấm sẽ nói rằng có gì đó vừa hỏng, trong khi thứ vừa xảy ra là **một quy tắc đã được công bố từ trước**.
@@ -732,7 +734,7 @@ Kết quả: `phase` **ở nguyên `"idle"`**. Không pha bận, không sinh fil
 
 **Đổi.** `SOURCE/app/(HM)/history/_components/HistoryRow.tsx` (Server Component).
 
-Dòng meta hôm nay là `{score}/10 · {ngày} · {thời gian làm}`. Thêm `EssayLifecycleBadge state="pending"` **vào cuối** dòng đó khi `entry.essayUnresolved === true`.
+Dòng meta hôm nay là `{score}/10 · {ngày} · {thời gian làm}`. Thêm `EssayLifecycleBadge state="pending"` **vào cuối** dòng đó khi `entry.hasUnresolvedEssay === true`.
 
 **Vì sao đặt cuối chứ không chèn cạnh con điểm.** Chuỗi ba giá trị nối bằng `·` là một đơn vị đọc; chèn một badge vào giữa sẽ cắt nó. Đặt cuối thì badge đọc như một **chú thích cho cả dòng** — đúng nghĩa của nó: nó nói về lượt thi, không nói riêng về con điểm.
 
@@ -740,13 +742,13 @@ Dòng meta hôm nay là `{score}/10 · {ngày} · {thời gian làm}`. Thêm `Es
 
 `blockedReason` truyền xuống `HistoryRowMenu` từ **cùng một** boolean.
 
-`entry.essayUnresolved` do `listMyHistory()` suy ra ở server (UI-D11), qua đúng hàm suy diễn dùng chung của UI-D6.
+`entry.hasUnresolvedEssay` và `entry.hasIncompleteEssay` do `listMyHistory()` suy ra ở server (UI-D11), qua đúng hàm suy diễn dùng chung của UI-D6.
 
 #### State × Display Matrix
 
 | State | Default | Loading | Empty | Error | Partial |
 |---|---|---|---|---|---|
-| Display | Dòng meta như hôm nay, không badge | N/A — Server Component; skeleton mức danh sách do `(HM)/history/loading.tsx` lo, không đổi | N/A — trạng thái rỗng thuộc `HistoryList` | N/A — lỗi đọc danh sách do `(HM)/history/error.tsx` lo, không đổi | **`essayUnresolved === true`** → dòng meta + `◌ Đang chấm`; menu ⋯ chặn PDF |
+| Display | Dòng meta như hôm nay, không badge | N/A — Server Component; skeleton mức danh sách do `(HM)/history/loading.tsx` lo, không đổi | N/A — trạng thái rỗng thuộc `HistoryList` | N/A — lỗi đọc danh sách do `(HM)/history/error.tsx` lo, không đổi | **`hasUnresolvedEssay === true`** → dòng meta + `◌ Đang chấm`; menu ⋯ chặn PDF |
 
 #### Interaction Definition
 
@@ -754,7 +756,7 @@ Dòng meta hôm nay là `{score}/10 · {ngày} · {thời gian làm}`. Thêm `Es
 |---|---|---|---|---|---|
 | AC-057 | Khi lượt thi còn ≥1 câu tự luận chưa giải quyết | — (render server) | Badge "Đang chấm" ở cuối dòng meta; con số `/10` giữ nghĩa hôm nay | Partial | — |
 | AC-012 | Khi lượt thi không có khoá vòng đời nào (row cũ) | — | Hàng render **byte-for-byte** như hôm nay | Default | — |
-| AC-058 | Khi `essayUnresolved === true` | Mở menu ⋯ | Xem § Component: HistoryRowMenu | Blocked | — |
+| AC-058 | Khi `hasUnresolvedEssay === true` | Mở menu ⋯ | Xem § Component: HistoryRowMenu | Blocked | — |
 
 ---
 
@@ -893,7 +895,7 @@ Không thêm breakpoint tuỳ biến nào (dự án cố ý không khai breakpoi
 | Nút Lưu/Chia sẻ | **Extend** | `SOURCE/components/history/ActionButton.tsx` | Thêm prop, đổi chữ ô lý do; **không** thêm node in-flow |
 | Menu ⋯ | **Extend** | `SOURCE/components/history/HistoryRowMenu.tsx` | Thêm prop, chuyển xuống cả hai `usePdfAction` |
 | Hàng lịch sử | **Extend** | `SOURCE/app/(HM)/history/_components/HistoryRow.tsx` | Thêm badge + truyền `blockedReason` |
-| Truy vấn lịch sử | **Extend** | `SOURCE/app/(HM)/queries.ts` | Thêm `per_question` + `created_at` vào select; suy ra **một** boolean (UI-D11) |
+| Truy vấn lịch sử | **Extend** | `SOURCE/app/(HM)/queries.ts` | Thêm `per_question` + `created_at` vào select; suy ra **hai** boolean `hasUnresolvedEssay` + `hasIncompleteEssay` (UI-D11) |
 | Ô nhập tự luận | **Extend (chỉ chữ + hằng)** | `SOURCE/app/(layer2)/_components/QuestionRenderer.tsx` | Một chuỗi + một trần; `<textarea>` không đổi |
 | `ScoreCard` | **Reuse, 0 thay đổi** | `SOURCE/app/(layer2)/_components/ScoreCard.tsx` | UI-D3 |
 | `ResultActions` | **Extend (chỉ truyền prop)** | `SOURCE/app/(layer2)/_components/ResultActions.tsx` | Nhận `blockedReason`, chuyển xuống hai `ActionButton` |
@@ -974,7 +976,7 @@ Mỗi mục dưới đây là một ảnh chụp cần xác nhận bằng mắt 
 7. **Hồi quy RS-0/RS-1.** Một câu tự luận không có `essay_answer` (và một row cũ trước khi ship) render **byte-for-byte** như hôm nay: "Bạn trả lời" / "Đáp án đã lưu" / nhãn "Chưa chấm tự động". Bất kỳ diff nào ở đây là hồi quy.
 8. **Hồi quy `/history`.** Một lượt thi **không có** tự luận render hàng giống hệt hôm nay, menu ⋯ đủ ba mục hoạt động. Một lượt thi **có** tự luận chưa xong hiện `◌ Đang chấm` cuối dòng meta và hai mục PDF mang lý do.
 9. **Player, tính năng bật.** Chân trang đọc *"Tự luận — chấm tự động sau khi bạn nộp bài."*; bộ đếm ký tự khớp trần DB mới.
-10. **Player, tính năng tắt (AC-067).** Chân trang giữ chữ cũ; trang kết quả không có khối tự luận nào; **không có JS của poller trong bundle của trang**.
+10. **Player, tính năng tắt (AC-067).** Chân trang giữ chữ cũ; trang kết quả không có khối tự luận nào; và — thay cho câu **"không có JS của poller trong bundle của trang"** ở bản v1.2 — ba mệnh đề **kiểm được**: `EssayGradingPoller` **không mount**, **không** một timer nào được lên lịch, và `router.refresh()` **không** được gọi lần nào. *(Sửa ở v1.3. Câu cũ vừa không kiểm được — repo không có công cụ đo bundle theo route, `check:bundle` chỉ quét khoá AI — vừa nhiều khả năng SAI: một module `"use client"` được import TĨNH bởi Server Component nằm trong bundle client của route bất kể có mount hay không. Một mục nghiệm thu không thể pass cũng không thể fail thì không phải mục nghiệm thu. Xem Design Doc frontend F-09.)*
 
 ### Layout Constraints
 
@@ -1058,16 +1060,16 @@ Chuẩn: **WCAG 2.1 AA**. Công nghệ hỗ trợ mục tiêu: TalkBack trên An
 
 | ID | Mô tả | Owner | Deadline |
 |---|---|---|---|
-| **O-1** | Định danh thật của `<lifecycle>`, `<earned>`, `<max>`, cờ thấp tin cậy và bộ đếm lượt bên trong `per_question`. UI Spec dùng chỗ giữ; **mọi bảng trong tài liệu này phải được thay literal trước khi code**. Ràng buộc từ phía UI: cả năm khoá phải có mặt **ngay từ lượt insert** (ADR-0018 Decision 4 đã đòi bộ đếm lượt được phát lúc insert), nếu không thì RS-2 không phân biệt được với RS-0 | Design Doc backend | Trước khi Design Doc frontend "Accepted" |
+| **O-1** | ~~Định danh thật của `<lifecycle>`, `<earned>`, `<max>`, cờ thấp tin cậy và bộ đếm lượt.~~ **ĐÃ ĐÓNG bởi Design Doc backend v1.0 (2026-08-28)**, § Hợp đồng khoá jsonb: **`essayState`**, **`essayEarned`**, **`essayMax`**, **`essayLowConfidence`**, **`essayAttempts`** — cả năm phát ra **ngay từ lượt insert**, đúng ràng buộc O-1 đặt ra (nếu không thì RS-2 không phân biệt được với RS-0) — cộng khoá thứ sáu **`essayGradedAt`** cố ý vắng mặt cho tới lúc settle. **Nghĩa vụ còn sống, tách riêng:** mọi chỗ giữ chỗ `<lifecycle>` / `<earned>` / `<max>` còn sót trong các bảng của chính tài liệu này phải được thay bằng literal **trước khi code** | Design Doc backend — **đã đóng** | ✅ |
 | **O-2** | ~~boolean hay con số?~~ **ĐÃ CHỐT 2026-08-28 (kỹ sư): boolean `retryAvailable`, ĐÚNG NHƯ UI-D9.** Lý do được ghi lại cùng quyết định: một con số hiện ra sẽ **tụt xuống mà học sinh không làm gì cả** (ADR-0018 Decision 4 tiêu lượt lúc claim), và học sinh sẽ đọc đúng cái đó là ứng dụng làm mất bài của mình. Boolean không có chế độ hỏng ấy, và không có câu chữ nào hứa một con số mà hệ thống có thể không giữ được. Còn lại cho Design Doc backend, **không phải câu hỏi cho kỹ sư nữa**: boolean này suy ra ở đâu (`getResult()` hay một hàm suy diễn dùng chung) và nó đi vào payload bằng khoá gì | Design Doc backend | Trước Design Doc frontend "Accepted" |
-| **O-3** | UI-D11 thêm `per_question` + `created_at` vào lượt `select` của `listMyHistory()`. Chi phí payload **chưa được đo** với `readBounded` ở trần hiện tại. Cần một phép đo trên dev với số hàng bằng trần; nếu payload phình quá mức chấp nhận được, phương án thay thế là một RPC trả sẵn boolean — nhưng đó là **DDL**, tức là TD-005 lần nữa, nên không được chọn mà không có số đo | Kỹ sư | Trước Work Plan |
+| **O-3** | UI-D11 thêm `per_question` + `created_at` vào lượt `select` của `listMyHistory()`. Chi phí payload **chưa được đo** với `readBounded` ở trần hiện tại. Cần một phép đo trên dev với số hàng bằng trần; nếu payload phình quá mức chấp nhận được, phương án thay thế là một RPC trả sẵn boolean — nhưng đó là **DDL**, tức là TD-005 lần nữa, nên không được chọn mà không có số đo. **Và nó không chỉ là DDL:** chọn RPC sẽ nâng số thay đổi schema thủ công từ **HAI lên BA**, tức mở lại đúng ngân sách mà ADR-0018 Escalation 2 đã dựa vào để chốt "không thêm cột telemetry". Vì vậy đây **không phải một fallback kỹ thuật mà là một escalation về phạm vi**, và phép đo payload là **cổng vào cứng của Work Plan**, không phải một ghi chú nằm trong ba mục Open Question | Kỹ sư | Trước Work Plan |
 | **O-4** | Trạng thái "Đã chấm" hiện được đánh dấu bằng **độ đậm + `--foreground`** vì `globals.css` **không có** `--success`/`--warning`. Nếu sản phẩm muốn một màu tích cực thật, việc đó là **thêm token `--success` + đóng TBD-04** của `short-answer-scoring-ui-spec.md` (nơi `#4F7942` đang là hex cứng lặp lại nhiều lần), **không** phải chép hex vào tính năng này. Tài liệu này cố ý **không** phát minh một hex | Kỹ sư / chủ sản phẩm | Không chặn ship; quyết định trước khi ai đó chép `#4F7942` lần nữa |
 | **O-5** | ~~hai khoá chân trang player hay một khoá kèm ràng buộc thứ tự ship?~~ **ĐÃ CHỐT 2026-08-29 (kỹ sư): GIỮ HAI KHOÁ**, đúng mặc định của tài liệu này (UI-D8), cộng một cờ **server-only** đọc ở segment trang làm bài và truyền xuống dưới dạng prop tuỳ chọn `essayGradingEnabled?: boolean` (mặc định `false`) qua `ExamPlayer` → `QuestionRenderer`. Phương án một-khoá nhỏ hơn ở **mọi cột đo được** (0 prop, 0 biên băng qua, 0 khoá thừa) nhưng nó giao tính đúng đắn của câu chữ cho **thứ tự commit**; với một kỹ sư và không có staging (C-F6), thứ tự đó không đáng đặt cược — trượt một lần là màn làm bài hứa một việc chưa chạy, đúng khuyết tật R12 tồn tại để chấm dứt. Cờ **không** được là `NEXT_PUBLIC_*` (UI-D7): hai bản sao của một sự thật ở hai phía biên rồi sẽ lệch nhau | Kỹ sư — **đã chốt** | ✅ |
 | **O-6** | Bốn hằng polling (5s×12, 10s×6, trần 18 lượt, trần 120s) được chốt từ **mục tiêu độ trễ trong PRD**, không từ đo đạc: vòng round-trip Singapore→Groq **chưa được đo** (C4). Sau lần đo đầu tiên, nếu độ trễ chấm điển hình vượt xa 60 giây thì nhịp hai pha nên dịch theo — nhưng **hạn chờ đọc-lúc-render vẫn là một con số khác và không dịch theo** (AC-061) | Kỹ sư, khi có số đo | Trước ship, cùng lúc chốt hạn chờ |
-| **O-7** | TBD-02 (`true_false` render danh sách lựa chọn rỗng trong nhánh **có-chấm**) được **hoãn có chủ đích**: tính năng này không đụng nhánh đó (UI-D6 / `EssayReviewBlock`). Nếu Design Doc phát hiện buộc phải sửa nhánh có-chấm, TBD-02 **vào phạm vi PR đó** và sự hoãn này hết hiệu lực | Design Doc frontend | Xác nhận lại lúc viết Design Doc |
+| **O-7** | ~~TBD-02 hoãn — xác nhận lại lúc viết Design Doc.~~ **ĐÃ XÁC NHẬN 2026-08-28**, đúng ở bước được hẹn: Design Doc frontend **F-07** kiểm lại nhánh có-chấm (`result/detail/page.tsx:130-238`) và thấy **không** thay đổi nào của tính năng này đáp xuống đó; Design Doc backend xác nhận độc lập trong § Non-Scope. Hoãn còn hiệu lực. **Kích hoạt còn sống:** nếu về sau có thay đổi nào chạm nhánh có-chấm, TBD-02 vào phạm vi của chính PR đó | Design Doc frontend — **đã xác nhận** | ✅ |
 | **O-8** | ~~Có nên chặn xuất PDF ở **RS-6**?~~ **ĐÃ CHỐT 2026-08-28 (kỹ sư): KHÔNG chặn, nhưng PDF phải MANG MỘT DÒNG CHÚ THÍCH.** Chặn ở RS-6 là chặn vĩnh viễn, và AC-058 tự nêu tên `failed past its retry cap` trong danh sách mở khoá — một học sinh có câu tự luận hỏng không phải do lỗi của mình mà vĩnh viễn không xuất được kết quả của chính mình là tệ hơn. Nhưng phương án "không chặn, không chú thích" cũng bị loại: khi đó tệp PDF **trông như một kết quả đầy đủ và không có gì trên đó nói ngược lại**, người đọc không có cách nào biết một câu bị thiếu khỏi điểm. Nên: xuất được, kèm khoá `result.essay.pdfIncomplete` in **trong tệp**. Ràng buộc xuống Design Doc frontend: cần một chỗ trong bố cục PDF cho dòng này, và điều kiện in nó là *có ít nhất một câu tự luận ở RS-6*, không phải *có câu tự luận* | Kỹ sư — **đã chốt** | ✅ |
 
-*Mọi TBD ở trên đều có owner và mốc. **O-2** và **O-8** đã được kỹ sư chốt ngày 2026-08-28, **O-5** ngày 2026-08-29 — cả ba không còn chặn gì. **O-1** đã được Design Doc backend đóng (năm khoá jsonb có tên thật). **O-1** vẫn chặn Design Doc frontend (nó là các định danh khoá jsonb mà Design Doc backend sẽ đặt tên). Các mục còn lại không chặn.*
+*Mọi TBD ở trên đều có owner và mốc. **O-2** và **O-8** đã được kỹ sư chốt ngày 2026-08-28, **O-5** ngày 2026-08-29 — cả ba không còn chặn gì. **O-1** đã được Design Doc backend đóng (năm khoá jsonb có tên thật, cộng `essayGradedAt`). **O-1** vẫn chặn Design Doc frontend (nó là các định danh khoá jsonb mà Design Doc backend sẽ đặt tên). Các mục còn lại không chặn.*
 
 ---
 
@@ -1075,6 +1077,7 @@ Chuẩn: **WCAG 2.1 AA**. Công nghệ hỗ trợ mục tiêu: TalkBack trên An
 
 | Date | Version | Changes | Author |
 |------|---------|---------|--------|
+| 2026-08-29 | 1.3 | **Vòng đối chiếu sau hai lượt review (design-sync + document-reviewer).** Bản v1.2 vẫn tự xưng là "nguồn chân lý" trong khi mang bốn phát biểu mà Design Doc frontend đã chứng minh là sai, cộng hai lỗi metadata. Sửa: **(1)** UI-D11 từ **một** boolean `essayUnresolved` sang **hai** boolean `hasUnresolvedEssay` + `hasIncompleteEssay` theo tên của hợp đồng backend — một boolean không suy ra được RS-6, nên hai lối xuất PDF sẽ in hai tệp khác nhau cho cùng một lượt thi (F-06/D-13). **(2)** Điều kiện mount poller `pendingCount === 0` → `essaySummary !== undefined`: quy tắc cũ gỡ vùng `aria-live` đúng ở lượt render phải đọc câu báo xong, tức **phá AC-023** (F-05). **(3)** RS-5 không phải lúc nào cũng còn lượt chấm lại — `essayAttempts` chạm 3 trên một dòng vẫn `pending` thì nó là RS-6 (F-08). **(4)** Golden State 10 thay câu "không có JS của poller trong bundle" — không kiểm được và nhiều khả năng sai — bằng ba mệnh đề kiểm được (F-09). **(5)** Header version 1.0 → 1.3 (Update History đã ghi tới 1.2 mà header chưa đổi). **(6)** O-1 và O-7 đánh dấu đã đóng đúng dạng, gỡ câu tự mâu thuẫn "O-1 đã đóng và vẫn chặn". **(7)** O-3: nêu rõ fallback RPC sẽ nâng thay đổi schema từ hai lên ba, mở lại ngân sách Escalation 2 đã dựa vào. **(8)** UI-D3 ghi thành lần diễn đạt lại AC thứ tư (AC-011/AC-057), theo quyết định của kỹ sư là ghi nhận thay vì sửa PRD. | UI Spec (Claude) |
 | 2026-08-29 | 1.2 | **O-5 được kỹ sư chốt: GIỮ HAI KHOÁ** chân trang player + một cờ server-only truyền xuống bằng prop tuỳ chọn (mặc định `false`), **không** dùng `NEXT_PUBLIC_*` (UI-D7). Phương án một-khoá nhỏ hơn ở mọi cột đo được nhưng nó đặt cược vào thứ tự commit, mà C-F6 (một kỹ sư, không staging) là chính lý do không nên cược. **O-1** đã được Design Doc backend đóng. Sửa một lỗi của v1.0: `button.tsx:46` là `shape="pill"`, không phải `variant="pill"`. | UI Spec (Claude) |
 | 2026-08-28 | 1.1 | **O-2 và O-8 được kỹ sư chốt trong cùng ngày.** O-2 → boolean `retryAvailable`, giữ nguyên UI-D9 (một con số sẽ tụt mà học sinh không làm gì — chế độ hỏng mà boolean không có). O-8 → **không** chặn xuất PDF ở RS-6, **nhưng** thêm khoá mới `result.essay.pdfIncomplete` in trong chính tệp: phương án "không chặn, không chú thích" bị loại vì tệp khi đó trông như kết quả đầy đủ và không có gì trên đó nói ngược lại. Số chuỗi hiển thị: 28 → 29. | UI Spec (Claude) |
 | 2026-08-28 | 1.0 | Bản đầu. Viết dựa trên PRD v1.2 và ADR-0018 (Proposed, cả hai escalation đã được kỹ sư giải quyết 2026-08-28). Chốt hai nhóm giá trị PRD giao xuống UI Spec: cận polling (5s×12 → 10s×6, trần 18 lượt / 120 giây, độc lập với hạn chờ đọc-lúc-render) và toàn bộ chữ hiển thị. Ghi 13 quyết định UI (UI-D1…UI-D13), trong đó ba mâu thuẫn của PRD đã được kỹ sư giải quyết được chép vào nguyên vẹn (UI-D3 dòng điểm riêng cạnh `ScoreCard`; UI-D4 chốt PDF ở `usePdfAction`, mở rộng phạm vi AC-058 ra `/history`; UI-D5 diễn đạt lại "genuinely disabled control" thành pattern `aria-disabled` của repo). Hai lần **diễn đạt lại AC có chủ đích** được đánh dấu rõ kèm lý do để không bị đọc thành trôi lệch: UI-D5 (AC-058/AC-064) và UI-D8 (AC-051). Không token màu mới nào được phát minh; khoảng trống `--success`/`--warning` được ghi thành O-4 thay vì lấp bằng một hex. | UI Spec (Claude) |
