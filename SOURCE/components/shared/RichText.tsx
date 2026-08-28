@@ -286,5 +286,9 @@ export function RichText({ text, className, inline = false }: RichTextProps) {
   if (inline) {
     return <span className={className}>{markdown}</span>;
   }
-  return <div className={className}>{markdown}</div>;
+  // `rich-text`: móc cho phần trình bày mà markdown TỰ sinh ra và không call
+  // site nào đặt class được — bảng GFM (globals.css). Mỗi chỗ gọi truyền
+  // className typography riêng, nên nếu không có móc chung ở đây thì kiểu bảng
+  // phải chép lại ở từng chỗ, và chỗ thêm sau sẽ thiếu.
+  return <div className={className ? `rich-text ${className}` : "rich-text"}>{markdown}</div>;
 }
