@@ -2,7 +2,7 @@
 // Dùng bởi toExam (map avg_overall → communityDifficulty) và rateExam (validate).
 
 export const RATING_MIN = 1;
-export const RATING_MAX = 10;
+export const RATING_MAX = 5;
 /** Ngưỡng hiển thị/xếp hạng. Bản sao SQL nằm trong view exams_with_difficulty
  *  (số 3). Không thể chia sẻ hằng số vật lý băng qua SQL/TS → test đảm bảo khớp. */
 export const RATING_THRESHOLD = 3;
@@ -10,7 +10,7 @@ export const RATING_THRESHOLD = 3;
 export type Bucket = "Easy" | "Medium" | "Hard";
 export type CommunityDifficulty = { bucket: Bucket; mean: number; count: number };
 
-/** Số nguyên trong [1,10]. Dùng ở rateExam trước khi ghi (AC-002). */
+/** Số nguyên trong [1,5]. Dùng ở rateExam trước khi ghi (AC-002). */
 export function isValidPartScore(n: unknown): n is number {
   return typeof n === "number" && Number.isInteger(n) && n >= RATING_MIN && n <= RATING_MAX;
 }
@@ -20,11 +20,17 @@ export function overall(p1: number, p2: number, p3: number): number {
   return (p1 + p2 + p3) / 3;
 }
 
-/** Bucket theo nửa-mở: [1,4) Easy / [4,7) Medium / [7,10] Hard.
- *  Ranh giới: 4.0→Medium, 7.0→Hard, 10.0→Hard (AC-018). Dùng mean CHƯA làm tròn. */
+/** Ranh giới bucket trên thang SAO 1-5: 1-2 sao → Easy, 3 sao → Medium,
+ *  4-5 sao → Hard. Export vì queries.ts lọc bucket DB-side và phải dùng ĐÚNG
+ *  hai con số này (ADR-0008: không re-bucket ở JS). */
+export const BUCKET_MEDIUM_MIN = 2.5;
+export const BUCKET_HARD_MIN = 3.5;
+
+/** Bucket theo nửa-mở: [1, 2.5) Easy / [2.5, 3.5) Medium / [3.5, 5] Hard.
+ *  Ranh giới: 2.5→Medium, 3.5→Hard, 5.0→Hard (AC-018). Dùng mean CHƯA làm tròn. */
 export function bucket(mean: number): Bucket {
-  if (mean < 4) return "Easy";
-  if (mean < 7) return "Medium";
+  if (mean < BUCKET_MEDIUM_MIN) return "Easy";
+  if (mean < BUCKET_HARD_MIN) return "Medium";
   return "Hard";
 }
 
@@ -52,9 +58,9 @@ export function communityDifficultyFrom(
 // ============================================================
 
 export type PartId = "mcq" | "true_false" | "short_answer";
-/** Số nguyên 1-10 — literal union (không phải `number` trần) để không thể
- *  biểu diễn giá trị ngoài khoảng ở tầng kiểu (AC-002/024). */
-export type PartScore = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+/** Số nguyên 1-5 (số sao) — literal union (không phải `number` trần) để không
+ *  thể biểu diễn giá trị ngoài khoảng ở tầng kiểu (AC-002/024). */
+export type PartScore = 1 | 2 | 3 | 4 | 5;
 
 export const PART_IDS: readonly PartId[] = ["mcq", "true_false", "short_answer"];
 
@@ -121,7 +127,7 @@ export function rateErrorMessage(error: RateExamError): string {
     case "ineligible":
       return "You need to finish this exam before you can rate it.";
     case "invalid":
-      return "Please rate all three parts from 1 to 10.";
+      return "Please rate all three parts from 1 to 5 stars.";
     case "rate_limited":
       return "You're rating too quickly. Please wait a moment and try again.";
     case "server":

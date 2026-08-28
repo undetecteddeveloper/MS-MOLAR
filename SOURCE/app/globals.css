@@ -509,3 +509,33 @@
     animation: route-loading-pulse 1600ms ease-in-out infinite;
   }
 }
+
+/* Bảng trong nội dung câu hỏi (RichText → bảng GFM, kể cả bảng quy đổi từ
+   `\begin{tabular}`). Không có khối này thì bảng vẫn ra <table> đúng cấu trúc
+   nhưng ô sát nhau tới mức dòng tiêu đề dính liền thành một chuỗi — đo trên
+   production 2026-08-28: "Các loài ốcKiểu genSố lượng".
+
+   Style ở ĐÂY chứ không ở từng chỗ gọi <RichText>: thẻ <table>/<th>/<td> do
+   chính markdown sinh ra, không call site nào chạm được vào chúng để đặt
+   class. Theo quy tắc Elevation của theme — chỉ đường kẻ mảnh, không đổ bóng. */
+.rich-text table {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  margin-block: 0.75rem;
+  font-size: 0.9375rem;
+}
+
+.rich-text th,
+.rich-text td {
+  padding: 0.375rem 0.875rem;
+  text-align: left;
+  vertical-align: top;
+  border: 1px solid var(--border);
+}
+
+.rich-text th {
+  font-weight: 600;
+}

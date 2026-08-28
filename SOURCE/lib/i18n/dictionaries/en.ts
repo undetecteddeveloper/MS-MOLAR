@@ -226,14 +226,11 @@ export const en = {
 
   // --- Chấm độ khó --------------------------------------------------------
   "rating.rate": "Rate →",
-  "rating.rubric": "Difficulty rubric",
   "rating.overall": "Overall",
   "rating.rateAllParts": "Rate all three parts to submit.",
   "rating.needAttemptTitle": "You need to finish this exam first",
   "rating.needAttemptBody": "Complete an attempt on this exam before you can rate its difficulty.",
   "rating.title": "Difficulty rating",
-  "rating.intro":
-    "Rate each part from 1 (easiest) to 10 (hardest). Your overall score is the average of the three.",
 
   // --- Báo cáo đề ---------------------------------------------------------
   "report.title": "Report this exam",
@@ -392,10 +389,10 @@ export const en = {
   "exams.gradeValue": "Grade {grade}",
   "rating.finishExamFirst": "Finish this exam first",
   "rating.logInToRate": "Log in to rate",
-  "rating.partOf": "Part {part} of {total}",
-  "rating.rateFromTo": "{name} — rate from 1 (easiest) to 10 (hardest)",
+  "rating.partOf": "{part}/{total}",
+  "rating.rateFromTo": "{name} — rate from 1 star (easiest) to 5 stars (hardest)",
   "rating.prev": "Prev",
-  "rating.submitRating": "Submit rating",
+  "rating.submitRating": "Submit",
   "rating.submitted": "Rating submitted",
   "rating.unrated": "UNRATED",
   "rating.rated": "RATED",
@@ -411,7 +408,7 @@ export const en = {
   "rating.saName": "Short Answer",
   "rating.saDescription": "No options — solve and enter a single numeric answer.",
   "rating.errIneligible": "You need to finish this exam before you can rate it.",
-  "rating.errInvalid": "Please rate all three parts from 1 to 10.",
+  "rating.errInvalid": "Please rate all three parts from 1 to 5 stars.",
   "rating.errRateLimited": "You're rating too quickly. Please wait a moment and try again.",
   "rating.errServer": "Couldn't save your rating right now. Please try again.",
 

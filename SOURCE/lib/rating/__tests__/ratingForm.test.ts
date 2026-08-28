@@ -45,11 +45,11 @@ describe("readoutModel — running mean + status suffix (frontend DD derived-rea
   });
 
   it("1 rated -> running mean of that part, '1/3 RATED'", () => {
-    expect(readoutModel({ mcq: 6 })).toEqual({ value: "6.0", status: "1/3 RATED" });
+    expect(readoutModel({ mcq: 3 })).toEqual({ value: "3.0", status: "1/3 RATED" });
   });
 
   it("2 rated -> running mean of the two, '2/3 RATED'", () => {
-    expect(readoutModel({ mcq: 6, true_false: 8 })).toEqual({ value: "7.0", status: "2/3 RATED" });
+    expect(readoutModel({ mcq: 3, true_false: 5 })).toEqual({ value: "4.0", status: "2/3 RATED" });
   });
 
   it("3 rated -> overall(p1,p2,p3), 'RATED' (matches server AC-003)", () => {
@@ -60,8 +60,8 @@ describe("readoutModel — running mean + status suffix (frontend DD derived-rea
   });
 
   it("3 rated with a non-terminating mean -> one-decimal rounding via formatMean", () => {
-    expect(readoutModel({ mcq: 7, true_false: 8, short_answer: 9 })).toEqual({
-      value: "8.0",
+    expect(readoutModel({ mcq: 3, true_false: 4, short_answer: 5 })).toEqual({
+      value: "4.0",
       status: "RATED",
     });
   });
@@ -75,7 +75,7 @@ describe("rateErrorMessage — copy map verbatim (Reference Contract row 2)", ()
   });
 
   it("'invalid' -> exact copy", () => {
-    expect(rateErrorMessage("invalid")).toBe("Please rate all three parts from 1 to 10.");
+    expect(rateErrorMessage("invalid")).toBe("Please rate all three parts from 1 to 5 stars.");
   });
 
   it("'server' -> exact copy", () => {
@@ -91,10 +91,10 @@ describe("mapFromMyRating — getMyRating() -> initialScores (frontend DD § Dat
   });
 
   it("{partI,partII,partIII} -> {mcq,true_false,short_answer}", () => {
-    expect(mapFromMyRating({ partI: 3, partII: 7, partIII: 10 })).toEqual({
-      mcq: 3,
-      true_false: 7,
-      short_answer: 10,
+    expect(mapFromMyRating({ partI: 1, partII: 3, partIII: 5 })).toEqual({
+      mcq: 1,
+      true_false: 3,
+      short_answer: 5,
     });
   });
 });

@@ -144,6 +144,7 @@ Structure rules:
 
 Transcription rules:
 - Transcribe the stem verbatim, including math as LaTeX ($...$) where the source shows formulas. Do NOT include the "Câu N" prefix, the choices, or the sub-items in the stem.
+- Only $...$ / $$...$$ math is rendered. For a data table in the stem, write a GitHub-flavoured markdown table (a "| cell | cell |" row per line, a "| --- | --- |" separator after the header). NEVER emit a LaTeX environment such as \\begin{tabular} outside math — it renders as raw source text.
 - For mcq, transcribe exactly the choices printed for options A, B, C, D.
 - For true_false, transcribe each sub-item a)–d) text into subItems.
 - NEVER mark, guess, or indicate a correct answer anywhere. Transcribe only.

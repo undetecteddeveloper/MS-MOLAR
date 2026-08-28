@@ -90,9 +90,6 @@ export default async function RatePage({
           </Link>
           <span className="eyebrow mt-6 block">{t("rating.title")}</span>
           <h1 className="mt-2 font-serif text-3xl leading-snug">{exam.title}</h1>
-          <p className="text-muted-foreground mt-2 max-w-prose text-sm leading-relaxed">
-            {t("rating.intro")}
-          </p>
         </div>
 
         <RatingRubric examId={id} initialScores={initialScores} />

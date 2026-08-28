@@ -4,6 +4,8 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  BUCKET_HARD_MIN,
+  BUCKET_MEDIUM_MIN,
   RATING_MAX,
   RATING_MIN,
   RATING_THRESHOLD,
@@ -14,29 +16,34 @@ import {
   overall,
 } from "../index";
 
-describe("bucket — ranh giới nửa-mở [1,4) Easy / [4,7) Medium / [7,10] Hard (AC-018)", () => {
-  it("bucket(3.9) → Easy", () => {
-    expect(bucket(3.9)).toBe("Easy");
+describe("bucket — ranh giới nửa-mở [1,2.5) Easy / [2.5,3.5) Medium / [3.5,5] Hard (AC-018)", () => {
+  it("bucket(2.4) → Easy", () => {
+    expect(bucket(2.4)).toBe("Easy");
   });
 
-  it("bucket(4.0) → Medium", () => {
-    expect(bucket(4.0)).toBe("Medium");
+  it("bucket(2.5) → Medium", () => {
+    expect(bucket(2.5)).toBe("Medium");
   });
 
-  it("bucket(6.9) → Medium", () => {
-    expect(bucket(6.9)).toBe("Medium");
+  it("bucket(3.4) → Medium", () => {
+    expect(bucket(3.4)).toBe("Medium");
   });
 
-  it("bucket(7.0) → Hard", () => {
-    expect(bucket(7.0)).toBe("Hard");
+  it("bucket(3.5) → Hard", () => {
+    expect(bucket(3.5)).toBe("Hard");
   });
 
   it("bucket(1.0) → Easy (cận dưới)", () => {
     expect(bucket(1.0)).toBe("Easy");
   });
 
-  it("bucket(10.0) → Hard (cận trên)", () => {
-    expect(bucket(10.0)).toBe("Hard");
+  it("bucket(5.0) → Hard (cận trên)", () => {
+    expect(bucket(5.0)).toBe("Hard");
+  });
+
+  it("ranh giới xuất khẩu khớp bucket() — queries.ts lọc DB-side bằng chính chúng", () => {
+    expect(BUCKET_MEDIUM_MIN).toBe(2.5);
+    expect(BUCKET_HARD_MIN).toBe(3.5);
   });
 });
 
@@ -45,8 +52,8 @@ describe("overall — mean 3 điểm phần (AC-003)", () => {
     expect(overall(3, 3, 3)).toBe(3);
   });
 
-  it("overall(7,8,9) → 8", () => {
-    expect(overall(7, 8, 9)).toBe(8);
+  it("overall(3,4,5) → 4", () => {
+    expect(overall(3, 4, 5)).toBe(4);
   });
 
   it("overall(1,1,4) → 2", () => {
@@ -56,13 +63,13 @@ describe("overall — mean 3 điểm phần (AC-003)", () => {
 
 describe("communityDifficultyFrom — threshold gating (AC-014/015)", () => {
   it("count < RATING_THRESHOLD (2 ratings) → null", () => {
-    expect(communityDifficultyFrom(6.0, 2)).toBeNull();
+    expect(communityDifficultyFrom(3.0, 2)).toBeNull();
   });
 
   it("count === RATING_THRESHOLD (3 ratings) → {bucket, mean, count}", () => {
-    expect(communityDifficultyFrom(6.0, 3)).toEqual({
+    expect(communityDifficultyFrom(3.0, 3)).toEqual({
       bucket: "Medium",
-      mean: 6.0,
+      mean: 3.0,
       count: 3,
     });
   });
@@ -72,25 +79,29 @@ describe("communityDifficultyFrom — threshold gating (AC-014/015)", () => {
   });
 });
 
-describe("isValidPartScore — số nguyên trong [1,10] (AC-002)", () => {
+describe("isValidPartScore — số nguyên trong [1,5] (AC-002)", () => {
   it("0 → false (dưới RATING_MIN)", () => {
     expect(isValidPartScore(0)).toBe(false);
   });
 
-  it("11 → false (trên RATING_MAX)", () => {
-    expect(isValidPartScore(11)).toBe(false);
+  it("6 → false (trên RATING_MAX)", () => {
+    expect(isValidPartScore(6)).toBe(false);
   });
 
-  it("5.5 → false (không nguyên)", () => {
-    expect(isValidPartScore(5.5)).toBe(false);
+  it("10 → false (điểm thang CŨ 1-10 không còn hợp lệ)", () => {
+    expect(isValidPartScore(10)).toBe(false);
+  });
+
+  it("2.5 → false (không nguyên)", () => {
+    expect(isValidPartScore(2.5)).toBe(false);
   });
 
   it("1 → true (cận dưới hợp lệ)", () => {
     expect(isValidPartScore(1)).toBe(true);
   });
 
-  it("10 → true (cận trên hợp lệ)", () => {
-    expect(isValidPartScore(10)).toBe(true);
+  it("5 → true (cận trên hợp lệ)", () => {
+    expect(isValidPartScore(5)).toBe(true);
   });
 });
 
@@ -105,18 +116,18 @@ describe("threshold agreement — RATING_THRESHOLD khớp bản sao SQL của vi
 });
 
 describe("formatMean — làm tròn 1 chữ số thập phân để hiển thị (AC-014)", () => {
-  it('formatMean(7.24) → "7.2"', () => {
-    expect(formatMean(7.24)).toBe("7.2");
+  it('formatMean(3.24) → "3.2"', () => {
+    expect(formatMean(3.24)).toBe("3.2");
   });
 
-  it('formatMean(7) → "7.0"', () => {
-    expect(formatMean(7)).toBe("7.0");
+  it('formatMean(4) → "4.0"', () => {
+    expect(formatMean(4)).toBe("4.0");
   });
 });
 
 describe("RATING_MIN/RATING_MAX — hằng số miền giá trị điểm phần (AC-002)", () => {
-  it("RATING_MIN === 1, RATING_MAX === 10", () => {
+  it("RATING_MIN === 1, RATING_MAX === 5 (thang sao)", () => {
     expect(RATING_MIN).toBe(1);
-    expect(RATING_MAX).toBe(10);
+    expect(RATING_MAX).toBe(5);
   });
 });
