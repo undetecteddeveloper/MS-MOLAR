@@ -131,9 +131,37 @@ Ordering is fixed by AC-072 and is a requirement, not an implementation detail: 
 | **Why not delay the `exam_results` insert until grading finishes** | Breaks D4 and AC-003: a submitted attempt would have no result row at all, so the result page would have nothing to render and `record_skill_mastery()` would sit behind a provider. |
 | **Why not `.from("exam_results").update()` from TypeScript** | Moves ownership, transition legality and race resolution to a call site, where each is a convention rather than a rule. ADR-0010 rejected exactly this reasoning for the insert. |
 | **Cost accepted** | `exam_results` rows are no longer immutable after insert (see Amendment). Budget is over-reserved on first-try successes. One attempt can be lost to a platform cut-off. A hand-declared provider response shape. |
-| **Known unknowns** | Whether `service-role.ts` stays narrow — this ADR adds the **sixth and seventh** operations to a module ADR-0010 sized at "a handful". Groq free-tier 429 frequency at real volume is unmeasured, because zero essay answers exist in production. |
-| **Kill criteria** | If a *third* in-place mutation of `exam_results` is proposed, stop treating each as an exception and revisit the table's shape. If `service-role.ts` keeps growing, ADR-0010's own kill criterion (a dedicated least-privilege Postgres role) fires — this ADR does not raise that threshold. |
-| **Not decided here** | The lifecycle field's identifier, the earned/max key names, the attempt-counter key name, the pending deadline, `MAX_IN_PASS_RETRIES`, backoff shape, the concurrency cap, the Groq model constant's value, the raised character ceiling, prompt and rubric text, telemetry codes — all Design Doc. |
+| **Known unknowns** | Groq free-tier 429 frequency at real volume is unmeasured, because zero essay answers exist in production. How the duplicate-write rejection is attributed in telemetry — see *Escalation 2*. |
+| **Kill criteria** | If a *third* in-place mutation of `exam_results` is proposed, stop treating each as an exception and revisit the table's shape. **ADR-0010's own kill criterion is not a future risk here — it has already fired; see *Escalation 1*.** |
+| **Not decided here** | The lifecycle field's identifier, the earned/max key names, the attempt-counter key name, the pending deadline, `MAX_IN_PASS_RETRIES`, backoff shape, the concurrency cap, the Groq model constant's value, the raised character ceiling, prompt and rubric text, telemetry codes — all Design Doc. Also Design Doc: whether the Groq daily counter **duplicates** `quota.ts`'s Pacific-day/TTL/fail-closed ladder or **exports** it (see *Forced choice: the Groq counter* below), and the name of its daily-limit env var, which `checkEnv.ts` must gate at startup. |
+
+### Escalation 1 — ADR-0010's kill criterion has already fired, on both limbs
+
+This ADR's first draft asserted that `lib/supabase/service-role.ts` held five operations and that this feature would add "the sixth and seventh". **That count was wrong and is corrected here.** The module exports **eleven** operations today (`recordExamResult` :61, `recordSkillMastery` :95, `listReportedExams` :131, `moderateExam` :181, `flagSupportTicketNotifyFailed` :219, `listSupportTickets` :263, `changeSupportTicketStatus` :337, `addSupportTicketNote` :365, `readPaymentOrderForSettlement` :410, `recordPaymentSettlement` :451, `recordPaymentOrder` :512). This feature would make it **thirteen**.
+
+ADR-0010's kill criterion reads in full: *"If `service-role.ts` grows beyond a handful of tightly-scoped operations, **or if a second caller needs privileged writes**, revisit: either a dedicated least-privilege Postgres role (INSERT on `exam_results` only, via direct connection) or moving scoring server-side behind a real backend identity."*
+
+Both limbs are already satisfied, independently of this feature:
+
+- Eleven operations is past "a handful" — the payment and support systems crossed it before essay grading was proposed.
+- The retry Server Action (AC-072) is a second caller needing a privileged write into the same table, which is the second limb stated almost verbatim.
+
+**This is an engineer decision, not a drafting detail, and this ADR does not resolve it.** The design in Decisions 1–4 is correct *within* the existing privileged-identity pattern; it is silent on whether that pattern should still be the pattern. Two dispositions are legitimate and the choice belongs upstream of the Design Doc:
+
+1. **Proceed, and record that the criterion is knowingly deferred** — with a dated note saying the revisit is owed and naming what would force it (a fourteenth operation, or a third in-place mutation of `exam_results`).
+2. **Revisit now**, toward the least-privilege Postgres role ADR-0010 named, before adding operations twelve and thirteen.
+
+Deferring silently is the one option this ADR rules out, because a criterion that fires and is never read is the same as not having written one.
+
+### Escalation 2 — `telemetry_log` cannot attribute a grading attempt
+
+Decision 3 says a refused duplicate write "goes to telemetry (R13)". Verified against `schema.sql:1369–1392`, `telemetry_log`'s columns are `id, user_id, event_type, question_id, skill_node_id, success, error_code, created_at` — there is **no `attempt_id`**, and the payload builder (`lib/tutor/telemetry.ts:66–73`) is pinned to exactly six app-filled columns by an exhaustive test.
+
+Grading attempts are keyed `(attempt_id, question_id)` (AC-064). `question_id` alone cannot separate two attempts on the same question by the same student, so as things stand a duplicate-write rejection is recordable only at `(user, question, day)` resolution. Either that degraded resolution is accepted and said so, or `telemetry_log` gains a column — which would be a **third** hand-applied schema change against a PRD that budgets two. The Design Doc must choose explicitly; this ADR does not.
+
+### Forced choice: the Groq counter
+
+Decision 6 says the Groq counter takes "`consumeQuota()`'s existing shape". That phrase does not settle whether it reuses `consumeQuota()`'s *code*, and it cannot be resolved by preference alone: every helper the Groq counter needs is module-private in `lib/billing/quota.ts` — `BUDGET_TTL_SECONDS` :132, `BUDGET_TIME_ZONE` :141, `PACIFIC_DAY` :179, `budgetKey()` :186, `dailyBudgetLimit()` :202. So the Design Doc must either duplicate the Pacific-day derivation (a second clock, the exact failure `quota.ts:9–18` exists to warn about) or export those helpers (an edit to a file the PRD calls untouched — though the sentence's real scope is `QuotaKind`, `PLAN_LIMITS` and the call sites, all of which can genuinely stay untouched). Note the Groq counter needs **no** `Entitlement` and no plan split (AC-066), so `budgetCeiling()` and `freeShare()` are not among the helpers in question.
 
 ### Amendment to ADR-0010
 
@@ -186,7 +214,7 @@ The one genuinely new question asynchrony raises is **which write may land secon
 
 ### Negative
 
-- `service-role.ts` grows to seven operations. ADR-0010 sized it at "a handful" and made its growth the explicit kill criterion; this ADR spends part of that budget and does not raise the ceiling.
+- `service-role.ts` grows from eleven operations to thirteen, past a threshold ADR-0010 set and that was already crossed before this feature existed (Escalation 1).
 - Two privileged round-trips per graded essay (claim + settle) instead of one.
 - Result rows mutate after insert (see Amendment) — a new fact three surfaces must respect and every future reader must be told.
 - Budget is over-reserved on first-try successes, putting effective daily throughput below the nominal request ceiling.
@@ -209,7 +237,8 @@ The one genuinely new question asynchrony raises is **which write may land secon
 2. **Mirror ADR-0010's grant block verbatim** — `revoke all on function … from public, anon, authenticated`, then `grant execute … to service_role`. Revoking only from `public` leaves both functions callable by students; see the §10b note on Supabase default privileges.
 3. **Extend `verify-schema.ts`** to assert that `authenticated` cannot execute either function, distinguishing `42501` from an incidental failure — the existing §10/§11 assertions are the template. This gate is also where AC-048's fifth coupled site (the raised character ceiling) lands.
 4. **Extend `test-rls.ts`** with cases proving a student JWT can neither call either function nor `UPDATE` `exam_results` directly.
-5. **Add `GROQ_API_KEY` to `SECRETS`** with markers `["GROQ_API_KEY", "api.groq.com"]`. Do not use an SDK package name as a marker — there is no SDK (Decision 5).
+5. **Add `GROQ_API_KEY` to `SECRETS`** with markers `["GROQ_API_KEY", "api.groq.com"]`. Do not use an SDK package name as a marker — there is no SDK (Decision 5). **AC-029 has two coupled sites, not one**: `SECRETS` is exported and pinned verbatim by `lib/security/checkAiKeyBundleSecrets.test.ts` — an exhaustive `toEqual` over label+markers at `:34` and a literal `expect(SECRETS.length).toBe(7)` at `:74`. Both move in the same commit, or CI's "Lint · Types · Tests" job goes red.
+5b. **Key the Groq emission scan on the endpoint-constant identifier or the module import — never on the host string.** `api.groq.com` is about to appear in `scripts/check-ai-key-bundle.mjs` (guidance #5), and that file matches the chokepoint scan's `SOURCE_FILE` pattern (which deliberately includes `.mjs`) while not matching `TEST_FILE`. A host-keyed Groq scan would therefore classify the bundle guard itself as an emission site and force it into one of the two exhaustive `toEqual` lists — turning the strongest AI-safety guard in the repo into a list of exceptions. The bundle marker and the scan key must be **different strings by construction**: the guard looks for the host literal, the scan looks for the identifier.
 6. **Test array-order preservation directly** (Decision 1b): grade the *second* essay of a three-essay attempt and assert the full `questionId` sequence is unchanged. A test that asserts only that the band landed will pass while the page shuffles.
 7. **Test duplicate-write rejection at the SQL boundary**, not only through the TypeScript wrapper: two settles for one pair, asserting the stored band equals the first and the second reports zero rows (AC-062).
 8. **Do not add a background writer** for stored `pending` (F3/W6), including "cleanup on next login". If a metric looks wrong, the metric's SQL is what changes.
@@ -235,3 +264,4 @@ The one genuinely new question asynchrony raises is **which write may land secon
 | Date | Change |
 |---|---|
 | 2026-08-28 | Initial draft (Proposed). Six decisions recorded; ADR-0010 amended on the row-immutability reading only. |
+| 2026-08-28 | Corrected after codebase analysis. **(1)** The draft counted `service-role.ts` at five operations and this feature as "the sixth and seventh"; it holds **eleven**, and ADR-0010's kill criterion has **already fired on both limbs** — promoted from a Known-unknown to **Escalation 1**, an engineer decision this ADR does not resolve. **(2)** `telemetry_log` has no `attempt_id`, so Decision 3's telemetry claim is not reconstructible per attempt — **Escalation 2**. **(3)** AC-029 has a second coupled site (`checkAiKeyBundleSecrets.test.ts`, exhaustive `toEqual` + `length === 7`) — guidance #5. **(4)** A host-keyed Groq emission scan would capture `check-ai-key-bundle.mjs` itself — new guidance #5b separates the bundle marker from the scan key. **(5)** The Groq counter's duplicate-or-export choice named explicitly, since every helper it needs is module-private in `quota.ts`. |
