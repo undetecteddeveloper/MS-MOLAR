@@ -54,6 +54,9 @@ const PDF_INPUT: AttemptPdfData = {
   submittedAt: "2026-07-01T00:10:00.000Z",
   correct: 7,
   total: 10,
+  // ADR-0018 (Task B2.3) — bat buoc tren AttemptPdfData. `false` la gia tri
+  // dung o day: khong fixture nao trong file nay co cau tu luan.
+  hasIncompleteEssay: false,
 };
 
 function mockFile(): File {

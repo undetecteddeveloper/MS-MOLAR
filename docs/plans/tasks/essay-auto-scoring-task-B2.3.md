@@ -30,9 +30,10 @@ Metadata:
 The backend Design Doc's Interface Change Matrix gives `AttemptPdfData` exactly one new field, `hasIncompleteEssay: boolean`. The frontend Design Doc gives it **two**: that boolean **and** `essayIncompleteLabel?: string`. This plan lands the **boolean here (B2.3)** and the **optional label in Task F-B3** (frontend, alongside the template line and its English default, matching the pattern at `AttemptPdfTemplate.tsx:31-40`). **That split is a reading, not a stated decision.** *Owner: engineer, before Task F-B3.*
 
 ## Target Files
-- [ ] `SOURCE/lib/pdf/generateAttemptPdf.ts`
-- [ ] `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/page.tsx`
-- [ ] `SOURCE/app/(HM)/history/_components/HistoryRow.tsx`
+- [x] `SOURCE/lib/pdf/generateAttemptPdf.ts`
+- [x] `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/page.tsx`
+- [x] `SOURCE/app/(HM)/history/_components/HistoryRow.tsx`
+- [x] `SOURCE/components/history/ActionButton.test.tsx`, `SOURCE/components/history/HistoryRowMenu.test.tsx`, `SOURCE/lib/pdf/generateAttemptPdf.test.ts` — **three** test files build a literal `AttemptPdfData`, not the two this task file predicted (see the sweep below). Each gained `hasIncompleteEssay: false`, which is correct — none of those fixtures has an essay.
 
 ## Investigation Targets
 - `docs/design/essay-auto-scoring-backend-design.md` (§ Hai vị từ mức-mảng / D-13 — `AttemptPdfData` gains `hasIncompleteEssay: boolean`; both construction sites fill it from their own read path)
@@ -56,22 +57,52 @@ The backend Design Doc's Interface Change Matrix gives `AttemptPdfData` exactly 
 The two PDF export routes are the boundary this task closes. Both read a **published** field from their own read path; neither re-derives `state === "failed" && !retryAvailable`, which exists only in `SOURCE/lib/scoring/essayLifecycle.ts` (EG-BE-036).
 
 ## Investigation Notes
-_(Record here: the repo-wide grep result confirming two construction sites and six pass-through consumers; confirmation that `tsc` named both sites when the field was first made required.)_
+
+**The repo-wide sweep, re-run rather than trusted** — `AttemptPdfData` appears in **10** files:
+
+| Kind | Sites |
+|---|---|
+| Construction (production) | `app/(layer2)/exams/[id]/attempt/[attemptId]/result/page.tsx:56`, `app/(HM)/history/_components/HistoryRow.tsx:23` |
+| Construction (test literals) | `components/history/ActionButton.test.tsx:60`, `components/history/HistoryRowMenu.test.tsx:49`, `lib/pdf/generateAttemptPdf.test.ts:62` |
+| Pass-through only | `app/(layer2)/_components/ResultActions.tsx:16`, `components/history/ActionButton.tsx:45`, `components/history/HistoryRowMenu.tsx:49`, `components/history/usePdfAction.ts:40` |
+| Declaration | `lib/pdf/generateAttemptPdf.ts:11` |
+
+**One correction to this task file's own scope list**: it names "the two test files"; there are **three** files constructing a literal. The four pass-through consumers were confirmed unchanged, exactly as the task requires.
+
+**`tsc` named every site when the field was first made required** — the red phase was run deliberately, adding the required field *before* filling anything:
+
+```
+app/(HM)/history/_components/HistoryRow.tsx(23,9): error TS2741: Property 'hasIncompleteEssay' is missing …
+app/(layer2)/exams/[id]/attempt/[attemptId]/result/page.tsx(56,9): error TS2741: …
+components/history/ActionButton.test.tsx(60,7): error TS2741: …
+components/history/HistoryRowMenu.test.tsx(49,7): error TS2741: …
+lib/pdf/generateAttemptPdf.test.ts(62,7): error TS2741: …
+```
+
+Five sites, no more and no fewer — which is this task's whole proof mechanism, and the reason the field is **required** rather than optional.
+
+**EG-BE-036 source scan, run and green**: `state === "failed" && !retryAvailable` appears as *executable code* in exactly one place, `lib/scoring/essayLifecycle.ts:218`. Every other occurrence in the repo is inside a comment that points back at it. Neither construction site re-derives it; both read a published field.
+
+### Open Item I-3, and a second contradiction found inside this task file
+
+The task's Implementation Content says to "pass it through the function body to the template". Its own **Scope boundary** says `components/pdf/AttemptPdfTemplate.tsx` is Task F-B3's and must stay unchanged, and `AttemptPdfTemplateProps` has no `hasIncompleteEssay` prop today — so forwarding it here would not compile.
+
+**Reading taken**: the field lands on `AttemptPdfData` and both construction sites fill it **now**; the forwarding into the template lands in **F-B3**, together with the prop that receives it, the `<p>` line, and the `essayIncompleteLabel?` default. That is the only reading consistent with the scope boundary and with F-B3's stated ownership. Recorded here alongside I-3, which is the adjacent unresolved split. *Both remain the engineer's to confirm before F-B3.*
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
-- [ ] Read all Investigation Targets and record key observations
-- [ ] **Sweep the adjacent cases** (Change Category: boundary-change): re-run the repo-wide grep for `AttemptPdfData` and confirm the site list is still two constructions + six pass-throughs
-- [ ] Add the **required** field first and observe `tsc` name both construction sites
+- [x] Read all Investigation Targets and record key observations
+- [x] **Sweep the adjacent cases** (Change Category: boundary-change): re-run — the list is two production constructions + **three** test literals + four pass-throughs; see the table above
+- [x] Add the **required** field first and observe `tsc` name both construction sites — done as a real red phase, output recorded verbatim above
 
 ### 2. Green Phase
-- [ ] Fill the field at both construction sites from each read path's already-derived value
-- [ ] Forward it through `generateAttemptPdf`'s body to the template
-- [ ] Run `npx tsc --noEmit` and confirm zero missing sites
+- [x] Fill the field at both construction sites from each read path's already-derived value
+- [ ] Forward it through `generateAttemptPdf`'s body to the template — **deferred to Task F-B3, deliberately**: the template has no prop to receive it, and this task's own scope boundary forbids editing that file. See the note above.
+- [x] Run `npx tsc --noEmit` and confirm zero missing sites
 
 ### 3. Refactor Phase
-- [ ] Confirm **neither** construction site re-derives the RS-6 expression
-- [ ] Confirm the six pass-through consumers were **not** modified
+- [x] Confirm **neither** construction site re-derives the RS-6 expression — by source scan, not by reading the diff
+- [x] Confirm the pass-through consumers were **not** modified — the diff touches 6 files, none of them a pass-through
 
 ## Quality Assurance Mechanisms
 - `npx tsc --noEmit` (strict) — Enforces: **the required field names any site that forgot it — this is the task's primary proof mechanism** — Config: `SOURCE/tsconfig.json` (project-wide)
@@ -85,12 +116,14 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
 
 | # | Command (from `SOURCE/`) | Exit code | Notes |
 |---|---|---|---|
-| 1 | `npx tsc --noEmit` | | **this task's primary gate** — zero missing `hasIncompleteEssay` sites |
-| 2 | `npx eslint --max-warnings 0` | | |
-| 3 | `npx vitest run` | | |
-| 4 | `npm run build` | | |
-| 5 | `npm run test:fixture` | | expected red = TD-030 baseline only (Gate F1): exactly 2 failures, both `subscription.fixture.e2e.test.ts` FE-1(e) `en` + `vi` |
-| 6 | `npm run test:localdb` | | see Open Item I-7 |
+| 1 | `npx tsc --noEmit` | **0** | **this task's primary gate** — zero missing sites. It exited **2** during the deliberate red phase, naming all five |
+| 2 | `npx eslint --max-warnings 0` | **0** | |
+| 3 | `npx vitest run` | **0** | 1863 passed / 10 skipped / 2 todo — unchanged from B2.2, as expected: this task adds a field, not a behaviour |
+| 4 | `npm run build` | **0** | |
+| 5 | `npm run test:fixture` | **1** | **Expected red, TD-030 baseline exactly as Gate F1 names it**: 2 failures, both `subscription.fixture.e2e.test.ts` FE-1 (e) — `locale en` and `locale vi` |
+| 6 | `npm run test:localdb` | **0** | first attempt, 11 passed / 2 todo, no retry needed |
+
+**Known-red window:** `npm run verify:schema` (dev) exits **1** with exactly **one** failing assertion, the character ceiling. Red by design from H7 until B3.3.
 
 **A task file with any exit-code cell left empty is not complete** (Gate E4).
 **Known-red window (Fix I002)**: this commit sits between H7 and B3.3 — if `verify:schema` is run, its character-ceiling assertion is red **by design**; record it as expected.
@@ -112,11 +145,11 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
   - **Primary failure mode**: a consumer quietly re-deriving or defaulting the field, creating a third source of truth. **Boundary**: repo-wide grep + diff review. **State assertion**: N/A. **Mock rationale**: none. **Residual**: none.
 
 ## Completion Criteria
-- [ ] **Implementation Complete** = type + both sites
-- [ ] **Quality Complete** = `tsc` green — **which is the mechanism proving no site was missed**
-- [ ] **Integration Complete** = proven by **INT-2** (Task B2.4) and by **FE2E-3** (Task F-C3)
-- [ ] Both PDF construction sites read a **published** field; **no site re-derives** `state === "failed" && !retryAvailable` (EG-BE-036 source scan green)
-- [ ] Every exit-code cell in the Gate E4 table above is filled
+- [x] **Implementation Complete** = type + both sites
+- [x] **Quality Complete** = `tsc` green — **which is the mechanism proving no site was missed**
+- [ ] **Integration Complete** = proven by **INT-2** (Task B2.4) and by **FE2E-3** (Task F-C3) — INT-2 is the next task
+- [x] Both PDF construction sites read a **published** field; **no site re-derives** `state === "failed" && !retryAvailable` (EG-BE-036 source scan green)
+- [x] Every exit-code cell in the Gate E4 table above is filled
 
 ## Notes
 - Impact scope: Task F-B3 adds the template's `<p>` line and the optional `essayIncompleteLabel?` (I-3); FE2E-3 exercises both doors for one attempt.

@@ -61,6 +61,12 @@ export default async function ResultPage({
     submittedAt: data.submittedAt,
     correct: result.correct,
     total: result.total,
+    // ĐỌC trường đã published của đường đọc này, không suy lại RS-6 tại chỗ
+    // (EG-BE-036). Lối xuất kia (HistoryRow) đọc trường tương ứng của đường đọc
+    // CỦA NÓ, và cả hai trường đều do cùng một `hasIncompleteEssay()` sinh ra —
+    // đó là thứ khiến hai lối không thể sinh ra hai tệp khác nhau cho cùng một
+    // lượt thi (F-06/O-8).
+    hasIncompleteEssay: data.hasIncompleteEssay,
   };
 
   return (

@@ -16,6 +16,21 @@ export interface AttemptPdfData {
   submittedAt: string | null;
   correct: number;
   total: number;
+  /** Có câu tự luận nào đã dừng hẳn ở RS-6 (thất bại VÀ hết lượt) không —
+   *  điều kiện in chú thích PDF (O-8).
+   *
+   *  BẮT BUỘC, và đó là toàn bộ cơ chế của task này: `AttemptPdfData` là chỗ
+   *  HỢP LƯU của cả hai lối xuất PDF, nên một trường bắt buộc ở đây làm hai
+   *  lối trở nên KHÔNG THỂ bất đồng về mặt cấu trúc, và `tsc` gọi tên bất kỳ
+   *  chỗ dựng nào quên nó.
+   *
+   *  Mỗi chỗ dựng ĐỌC trường đã published của đường đọc của chính nó
+   *  (`ExamResult.hasIncompleteEssay`, `MyHistoryEntry.hasIncompleteEssay`) và
+   *  KHÔNG chỗ nào suy lại `state === "failed" && !retryAvailable` — biểu thức
+   *  đó được khai đúng một chỗ, trong `essayLifecycle.ts` (EG-BE-036). Suy lại
+   *  tại chỗ là mở lại đúng khuyết tật F-06: hai tệp PDF khác nhau cho cùng
+   *  một lượt thi. */
+  hasIncompleteEssay: boolean;
   /** Nhãn đã dịch — usePdfAction bơm vào từ `t`. Bỏ trống thì template dùng
    *  bản tiếng Anh mặc định của nó (AttemptPdfTemplate's own defaults). */
   resultTitleLabel?: string;

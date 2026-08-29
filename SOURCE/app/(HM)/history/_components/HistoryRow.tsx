@@ -28,6 +28,9 @@ export function HistoryRow({
     submittedAt: entry.submittedAt,
     correct: entry.correct,
     total: entry.total,
+    // Đối xứng với chỗ dựng kia (result/page.tsx): ĐỌC trường đã published của
+    // `MyHistoryEntry`, không suy lại RS-6 tại chỗ (EG-BE-036).
+    hasIncompleteEssay: entry.hasIncompleteEssay,
   };
 
   return (
