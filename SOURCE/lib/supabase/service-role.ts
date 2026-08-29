@@ -540,3 +540,119 @@ export async function recordPaymentOrder(order: {
   if (error) return { error: { code: error.code, message: error.message } };
   return { row: data as unknown as PaymentOrderRow };
 }
+
+// ---------------------------------------------------------------------------
+// Chấm tự luận — hai thao tác ghi band (ADR-0018 Decision 1, schema.sql khối
+// sau §11). Đây là thao tác thứ MƯỜI HAI và MƯỜI BA của file này.
+//
+// ⚠ TD-029 — ĐỌC TRƯỚC KHI THÊM THAO TÁC THỨ MƯỜI BỐN ⚠
+//
+// Ghi chú này nằm ở ĐÂY, không nằm trong một ADR, vì đây đúng là dòng mà người
+// sắp viết thao tác thứ 14 đang nhìn vào.
+//
+// Kill criterion của ADR-0010 ĐÃ NỔ TRÊN CẢ HAI CHI, và đó là một quyết định
+// đã ghi của kỹ sư chứ không phải một chuyện bị bỏ sót (TECH-DEBT.md TD-029).
+// Hai điều kiện BUỘC phải xét lại ADR-0010 trước khi viết thêm:
+//
+//   1. Thao tác thứ **14** trong file này.
+//   2. Lần mutate-tại-chỗ thứ **BA** của `exam_results`.
+//
+// `record_essay_grade()` là lần thứ hai của điều kiện (2). Lần thứ ba không
+// được phép lặng lẽ đi qua: nó nghĩa là hình dạng "append-only cộng vài ngoại
+// lệ" đã thôi mô tả đúng hệ thống, và ranh giới cần được vẽ lại chứ không
+// phải nới thêm một lần nữa.
+//
+// VÌ SAO CHIA HAI HÀM chứ không một hàm có tham số chế độ: ADR-0011 § Decision
+// đã chốt — một thao tác đặc quyền thứ hai là một HÀM RIÊNG. Claim và settle
+// có hai luật cưỡng chế khác nhau và hai hình dạng trả về khác nhau; gộp lại
+// sau một cờ là cách chắc chắn nhất để một trong hai luật bị bỏ qua.
+//
+// VÌ SAO SÁU THAM SỐ VỊ TRÍ, vượt khuyến nghị 0–2: ADR-0018 Decision 1 chốt
+// chữ ký SQL nguyên văn, và PostgREST bind THEO TÊN. Gói đối số vào một object
+// sẽ thêm một tầng ánh xạ mà KHÔNG thao tác anh em nào trong file này có, ngay
+// tại chỗ mà một khoá lệch là thất bại RUNTIME họ `PGRST202` chứ không phải
+// lỗi kiểu. Tầng ánh xạ đó chính là chỗ lệch sẽ trốn.
+// ---------------------------------------------------------------------------
+
+/** Ba lý do từ chối claim — ĐÓNG, và là ba nhánh khác nhau trong SQL. */
+export type EssayClaimReason = "not_submitted" | "already_graded" | "exhausted";
+
+export interface EssayClaimResult {
+  claimed: boolean;
+  attempts: number;
+  reason: EssayClaimReason | null;
+  error: { code?: string; message: string } | null;
+}
+
+/**
+ * Thao tác 12 — giành một lượt chấm cho một câu tự luận.
+ *
+ * KHÔNG nhận `userId`: `claim_essay_grading_attempt()` suy chủ nhân từ attempt
+ * và đòi `status = 'submitted'` (AC-045). Người gọi không tự khai được mình là
+ * ai — cùng cưỡng chế mà `record_exam_result()` và `record_skill_mastery()`
+ * dùng.
+ *
+ * Trần lượt được tiêu ở THỜI ĐIỂM CLAIM, trước khi nhà cung cấp được liên hệ,
+ * và không bao giờ bị giảm. Luật đó sống trong SQL; hàm này không lặp lại nó.
+ *
+ * KHÔNG BAO GIỜ ném: mọi lối thoát là một giá trị. Người gọi nằm trên đường
+ * `after()`, nơi không có ai bắt hộ.
+ */
+export async function claimEssayGradingAttempt(
+  attemptId: string,
+  questionId: string
+): Promise<EssayClaimResult> {
+  const { data, error } = await serviceRoleClient().rpc("claim_essay_grading_attempt", {
+    p_attempt_id: attemptId,
+    p_question_id: questionId,
+  });
+  if (error) {
+    return { claimed: false, attempts: 0, reason: null, error: { code: error.code, message: error.message } };
+  }
+  // `returns table (...)` ⇒ PostgREST trả về MỘT MẢNG. Hàm SQL luôn trả đúng
+  // một dòng, kể cả ở nhánh từ chối; mảng rỗng nghĩa là có gì đó sai ở tầng
+  // dưới (thường là schema chưa apply), và nó phải thành "không claim được"
+  // chứ không thành một ngoại lệ.
+  const row = Array.isArray(data) ? (data[0] as EssayClaimResult | undefined) : undefined;
+  if (!row) return { claimed: false, attempts: 0, reason: null, error: null };
+  return {
+    claimed: row.claimed,
+    attempts: row.attempts,
+    reason: row.reason ?? null,
+    error: null,
+  };
+}
+
+/**
+ * Thao tác 13 — chốt kết quả chấm cho một câu tự luận.
+ *
+ * `written: false` KHÔNG PHẢI LỖI. Ghi-lần-đầu-thắng là một vị từ
+ * `where … <> 'graded'` trong chính câu UPDATE, nên một bản ghi trùng khớp 0
+ * dòng và hàm SQL trả `false` thay vì raise (ADR-0018 Decision 3). Đó là kết
+ * cục BÌNH THƯỜNG của cuộc đua AC-063 — biến nó thành ngoại lệ ở đây sẽ đẩy
+ * một chuyện thường ngày vào đường lỗi, và xuống hạ nguồn thành một thất bại
+ * mà học sinh nhìn thấy.
+ *
+ * `failed` đi kèm `earned`/`max` NULL, không bao giờ band 0: một câu hỏng
+ * không phải một câu được 0 điểm, và ghi 0 sẽ kéo điểm thật xuống vì một sự cố
+ * hạ tầng.
+ */
+export async function recordEssayGrade(
+  attemptId: string,
+  questionId: string,
+  state: "graded" | "failed",
+  earned: number | null,
+  max: number | null,
+  lowConfidence: boolean
+): Promise<{ written: boolean; error: { code?: string; message: string } | null }> {
+  const { data, error } = await serviceRoleClient().rpc("record_essay_grade", {
+    p_attempt_id: attemptId,
+    p_question_id: questionId,
+    p_state: state,
+    p_earned: earned,
+    p_max: max,
+    p_low_confidence: lowConfidence,
+  });
+  if (error) return { written: false, error: { code: error.code, message: error.message } };
+  return { written: data === true, error: null };
+}

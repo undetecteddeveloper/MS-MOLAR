@@ -36,8 +36,8 @@ These are operations **12 and 13**. ADR-0010's kill criterion has **already fire
 It exceeds the 0–2 parameter recommendation. ADR-0018 Decision 1 fixes the SQL signature verbatim, and wrapping the arguments in an object would misalign the `.rpc()` call from the SQL `p_*` parameter names — adding a mapping layer that **neither sibling operation in this file has**, at a boundary where a silent key mismatch is a runtime `PGRST202`-family failure rather than a type error.
 
 ## Target Files
-- [ ] `SOURCE/lib/supabase/service-role.ts`
-- [ ] `SOURCE/lib/supabase/__tests__/service-role.essay.test.ts` (new)
+- [x] `SOURCE/lib/supabase/service-role.ts`
+- [x] `SOURCE/lib/supabase/__tests__/service-role.essay.test.ts` (new)
 
 ## Investigation Targets
 - `docs/design/essay-auto-scoring-backend-design.md` (§ Agreement Checklist Scope — `service-role.ts`: two new named operations, 11 → 13)
@@ -70,23 +70,46 @@ It exceeds the 0–2 parameter recommendation. ADR-0018 Decision 1 fixes the SQL
 Roundtrip check this task owns: every key in the `.rpc()` argument object matches a `p_*` parameter name in the SQL signature **exactly** — asserted in this task's unit tests against a mocked `serviceRoleClient()`, and proven end-to-end by Task H8.
 
 ## Investigation Notes
-_(Record here: the exact `.rpc()` argument keys used for each operation, copied from the SQL signature; the operation count before and after; where the TD-029 note was placed.)_
+
+**`.rpc()` argument keys, copied from `schema.sql` and then verified mechanically** rather than by eye — the whole risk here is a key drift that `tsc` cannot see:
+
+| SQL function | `schema.sql` parameters | `.rpc()` keys | identical (spelling + order) |
+|---|---|---|---|
+| `claim_essay_grading_attempt` (`:1022-1025`) | `p_attempt_id`, `p_question_id` | same | **yes** |
+| `record_essay_grade` (`:1119-1126`) | `p_attempt_id`, `p_question_id`, `p_state`, `p_earned`, `p_max`, `p_low_confidence` | same | **yes** |
+
+Verified by parsing both files and comparing the extracted lists — output `ALL MATCH`. Doing this by reading was the failure mode to avoid: `p_low_confidence` vs `p_lowconfidence` is invisible at a glance and is a runtime `PGRST202` at H8, not a compile error.
+
+**Return-shape detail found while reading the SQL, which changed the implementation:** `claim_essay_grading_attempt` is `returns table (claimed, attempts, reason)`, so **PostgREST returns an array**, not a scalar — the operation unwraps `data[0]`. `record_essay_grade` is `returns boolean`, a scalar. Treating the first like the second would have produced `claimed: undefined` with no error anywhere.
+
+**Operation count: 11 → 13.** Asserted by an exhaustive `toHaveLength(13)` over exported `function` declarations, not a `toBeGreaterThan` — TD-029's trigger is the **fourteenth**, so the number has to be an exact claim. That case is what goes red the day someone adds operation 14.
+
+**TD-029 note placed** at the top of the new section in `service-role.ts`, immediately above `claimEssayGradingAttempt` — i.e. at the line a person writing operation 14 is looking at, which is why it lives in the file rather than in an ADR. It names **both** revisit triggers (a fourteenth operation; a third in-place mutation of `exam_results`) and states that `record_essay_grade()` is the **second** occurrence of the latter. A test asserts the note mentions TD-029, the number 14, and `exam_results`, so deleting it is red.
+
+**Mutation testing — both proof obligations were checked for the ability to fail:**
+
+| Mutation applied to `service-role.ts` | Result |
+|---|---|
+| `p_low_confidence` → `p_lowconfidence` (the exact `PGRST202` drift this task exists to prevent) | **2 failed** / 16 passed |
+| throw instead of returning `written: false` on a refused duplicate settle (ADR-0018 D3 violation) | **1 failed** / 17 passed |
+
+**ADR-0010 compliance, asserted rather than claimed:** `serviceRoleClient()` is still unexported (asserted both ways — the private declaration matches, and no `export function serviceRoleClient` exists), the file still carries `import "server-only"`, and a scan of the new block confirms neither operation re-implements a rule that lives in SQL (no `ESSAY_MAX_ATTEMPTS`, no `submitted` check, no `>= 3`).
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
-- [ ] Read all Investigation Targets and record key observations
-- [ ] **Sweep the adjacent cases** (Change Category: boundary-change): the sibling operations' `.rpc()` shapes in this file, and both SQL signatures in `schema.sql` — copy the `p_*` names character by character
-- [ ] Write `service-role.essay.test.ts` asserting the argument keys reach the mocked client exactly as named, and that a `false` settle is surfaced as a **value**; observe failure
+- [x] Read all Investigation Targets and record key observations
+- [x] **Sweep the adjacent cases** (Change Category: boundary-change): the sibling operations' `.rpc()` shapes in this file, and both SQL signatures in `schema.sql` — copy the `p_*` names character by character
+- [x] Write `service-role.essay.test.ts` asserting the argument keys reach the mocked client exactly as named, and that a `false` settle is surfaced as a **value**; observe failure
 
 ### 2. Green Phase
-- [ ] Add both operations shaped after `recordSkillMastery()` (`:95-104`)
-- [ ] Add the TD-029 note at the line where a fourteenth operation would be written
-- [ ] Run only the added tests and confirm they pass
+- [x] Add both operations shaped after `recordSkillMastery()` (`:95-104`)
+- [x] Add the TD-029 note at the line where a fourteenth operation would be written
+- [x] Run only the added tests and confirm they pass
 
 ### 3. Refactor Phase
-- [ ] Confirm `serviceRoleClient()` is still private and the file still carries `import "server-only"`
-- [ ] Confirm the file is at **13** operations
-- [ ] Confirm neither operation converts a `false` into a throw
+- [x] Confirm `serviceRoleClient()` is still private and the file still carries `import "server-only"`
+- [x] Confirm the file is at **13** operations
+- [x] Confirm neither operation converts a `false` into a throw
 
 ## Quality Assurance Mechanisms
 - `npx tsc --noEmit` (strict) — Config: `SOURCE/tsconfig.json` (project-wide)
@@ -101,12 +124,14 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
 
 | # | Command (from `SOURCE/`) | Exit code | Notes |
 |---|---|---|---|
-| 1 | `npx tsc --noEmit` | | |
-| 2 | `npx eslint --max-warnings 0` | | |
-| 3 | `npx vitest run` | | |
-| 4 | `npm run build` | | |
-| 5 | `npm run test:fixture` | | expected red = TD-030 baseline only (Gate F1): exactly 2 failures, both `subscription.fixture.e2e.test.ts` FE-1(e) `en` + `vi` |
-| 6 | `npm run test:localdb` | | see Open Item I-7 |
+| 1 | `npx tsc --noEmit` | **0** | Note: a key drift would **not** appear here — that is the point of this task's tests |
+| 2 | `npx eslint --max-warnings 0` | **0** | |
+| 3 | `npx vitest run` | **0** | 1799 passed / 10 skipped / 3 todo. +18 from this task |
+| 4 | `npm run build` | **0** | `server-only` still contained |
+| 5 | `npm run test:fixture` | **1** | **Expected red, TD-030 baseline exactly as Gate F1 names it**: 2 failures, both `subscription.fixture.e2e.test.ts` › FE-1 (e) — `locale en` and `locale vi`. Case names captured |
+| 6 | `npm run test:localdb` | **0** | 11 passed / 2 todo. The real proof of these two operations against Postgres is Task H8 |
+
+**Known-red window recorded:** `npm run verify:schema` (dev) → exit **1**, exactly **1** failing assertion, the character-ceiling gate. Red by design from H7 until B3.3.
 
 **A task file with any exit-code cell left empty is not complete** (Gate E4).
 **Known-red window (Fix I002)**: this commit sits between H7 and B3.3, so if `npm run verify:schema` is run, its character-ceiling assertion is red **by design** — record it as expected. Any **other** red `verify:schema` assertion is a regression.
@@ -130,12 +155,12 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
   - **Primary failure mode**: a wrapper that throws on `false`, turning a routine race into an error path and, downstream, into a student-visible failure. **Boundary**: in-process unit. **State assertion**: N/A. **Mock rationale**: as above. **Residual**: H8 SVC-1(d) proves the SQL side returns `false` rather than raising.
 
 ## Completion Criteria
-- [ ] **Implementation Complete** = two operations + the TD-029 note
-- [ ] **Quality Complete** = six verify gates green (with H7's known-red ceiling assertion recorded as expected)
-- [ ] **Integration Complete** = **Task B1.4 compiles** and its orchestration tests run against these operations
-- [ ] `service-role.ts` is at **13** operations with the TD-029 note in place at that line
-- [ ] Every Binding Decision Compliance Check evaluates to `Y`, with evidence in Investigation Notes
-- [ ] Every exit-code cell in the Gate E4 table above is filled
+- [x] **Implementation Complete** = two operations + the TD-029 note
+- [x] **Quality Complete** = six verify gates green (with H7's known-red ceiling assertion recorded as expected); gate 5 red = TD-030 baseline only
+- [ ] **Integration Complete** = **Task B1.4 compiles** and its orchestration tests run against these operations — *pending B1.4, which is the next task*
+- [x] `service-role.ts` is at **13** operations with the TD-029 note in place at that line
+- [x] Every Binding Decision Compliance Check evaluates to `Y`, with evidence in Investigation Notes
+- [x] Every exit-code cell in the Gate E4 table above is filled
 
 ## Notes
 - Impact scope: B1.4 and, through it, B1.5 and B3.2.
