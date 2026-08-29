@@ -104,8 +104,8 @@ all phases → Final
 | **G0.3** | ✅ **DONE** (2026-08-29) | Gate D — payload measured on both DBs (375 → 3 401 B/row, ≈9.1× on prod-shaped exams). Engineer **ACCEPTED**; Escalation 2 stays closed. **B2.2 unblocked** |
 | **G0.4** | ✅ **DISCHARGED 2026-08-29** | Gate B1: prod and dev both `29931beeb950`. **Gate B2 stays open by construction** — the new literal does not exist until H5 edits `schema.sql` |
 | **G0.5** | ✅ **DISCHARGED 2026-08-29** | Gate F1: TD-030 baseline = exactly 2 failures, both `subscription.fixture.e2e.test.ts` FE-1(e) (`en`, `vi`) |
-| H1…H8 | ⚪ not started | H7 is human-confirmed and touches no source file |
-| B1.1…B1.6 | ⚪ not started | B1.1 has **no commit of its own**; B1.5 is **two commits** |
+| H1…H8 | 🟡 **H1–H7 DONE** (2026-08-29) | H7 applied to dev **and** prod, human-confirmed. **H8 is the one still open** — SVC-1/SVC-2 remain `it.todo`; it needs real Postgres and was outside this session's agreed order |
+| B1.1…B1.6 | 🟡 **ALL SIX DONE** (2026-08-29) | `46bc8af` B1.2 · `bffaad0` B1.3 · `a87ba7d` B1.3b · `046a2e8` B1.4 · `3a34c9c`+`b7208f2` B1.5 (B1.1 folded into commit 1) · `5224a99` B1.6. **Phase not closed**: the manual `L1` dev run is the single outstanding criterion |
 | B2.1…B2.4 | ⚪ not started | B2.2's gate (G0.3 / Gate D) is **now closed** — no longer blocked |
 | B3.1…B3.3 | ⚪ not started | B3.3 **closes H7's known-red window** |
 | B4.1 | ⚪ not started | comments and titles only |

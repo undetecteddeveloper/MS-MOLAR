@@ -807,7 +807,7 @@ graph TD
 
 #### Tasks
 
-- [ ] **Task H1 — `lib/scoring/essayLifecycle.ts` + unit tests (RED first)**
+- [x] **Task H1 — `lib/scoring/essayLifecycle.ts` + unit tests (RED first)**
   - Implementation: create `SOURCE/lib/scoring/essayLifecycle.ts` as a **pure** module (no I/O, no `process.env`, no `server-only`) containing: the six jsonb key literals (`essayState`, `essayEarned`, `essayMax`, `essayLowConfidence`, `essayAttempts`, `essayGradedAt`); the constants `ESSAY_BANDS = [0, 0.25, 0.5, 0.75, 1]`, `ESSAY_MAX_ATTEMPTS = 3`, `ESSAY_MAX_POINTS`, `ESSAY_PENDING_DEADLINE_MS = 600_000`; the types `EssayRenderState`, `EssayView`, `EssaySummary`; and the functions `newEssayEntry()`, `deriveEssayView(entry, createdAt, now)`, `summariseEssays(rows, createdAt, now)`, `isEssayUnresolved(view)`, `isEssayIncomplete(view)`, `hasUnresolvedEssay(rows, createdAt, now)`, `hasIncompleteEssay(rows, createdAt, now)`. Write the tests first and confirm they fail for the right reason.
   - **Contract decisions that are not open**: `isEssayIncomplete(view: EssayView)` keeps the **narrow** signature — it is **not** widened to `| undefined`. `null` means "not applicable", not "not incomplete", and the narrow signature is a deliberate barrier stopping pages from re-deriving instead of reading the published field. `EssayView` carries **no** attempt-count field of any name (MSA-2/AC-044) — the client receives a boolean `retryAvailable`, and the count cannot cross the boundary because there is nothing to carry it.
   - Proof Obligations: EG-BE-023 (three deadline boundary cases at `deadline − 1s`, `deadline`, `deadline + 1s` returning `pending`, `pending`, `failed` — the boundary is **exclusive**, `>`); EG-BE-024 (missing `essayState` key ⇒ `null`, **no** log); EG-BE-025 (unrecognised `essayState` value ⇒ `null` **and** exactly one server-side `console.warn` carrying **only** `questionId` and the strange value — never the student's answer); EG-BE-027 (only `graded` contributes to both earned and max; `pending`, `failed` and ungradeable contribute **0 to both**); EG-BE-034 (`hasUnresolvedEssay(...) === (summariseEssays(...)?.unresolvedCount ?? 0) > 0`, run over the same fixtures in one case); EG-BE-036 (the expression `state === "failed" && !retryAvailable` exists **only** in this file — asserted by a source scan, same technique as the emission scan); RS-0…RS-6 mapped from `deriveEssayView()`'s return value.
@@ -817,7 +817,7 @@ graph TD
   - Dependencies: Task G0.5 (baseline captured before the first commit).
   - Completion: Implementation Complete = module + tests written, all green; Quality Complete = the six verify gates run individually with recorded exit codes; Integration Complete = N/A (no consumer yet — this is the slice that deliberately cannot prove itself).
 
-- [ ] **Task H2 — `lib/billing/budgetDay.ts` + behaviour-preserving move out of `quota.ts`**
+- [x] **Task H2 — `lib/billing/budgetDay.ts` + behaviour-preserving move out of `quota.ts`**
   - Implementation: create `SOURCE/lib/billing/budgetDay.ts` holding the **single** declaration of `BUDGET_TIME_ZONE = "America/Los_Angeles"`, the `PACIFIC_DAY` formatter, `BUDGET_TTL_SECONDS = 26 * 60 * 60`, and `pacificDayKey(prefix, now)` composed from `formatToParts` (not from a locale-formatted string). Then edit `SOURCE/lib/billing/quota.ts`: delete `BUDGET_TTL_SECONDS` (`:132`), `BUDGET_TIME_ZONE` (`:141`) and `PACIFIC_DAY` (`:179-184`), and reduce `budgetKey()` (`:186-191`) to `return pacificDayKey("ai:budget", now);`.
   - **Scope boundary**: `budgetKey()` stays **private**. `quota.ts` gains **no** new export. `QuotaKind`, `PLAN_LIMITS`, `Entitlement`, `budgetCeiling()`, `freeShare()` and every `consumeQuota()` call site are untouched (AC-066). The module knows about **days and TTL only** — it does not know spending ceilings, which env var holds them, or plan shares; those differ between the two providers and stay with the consumers.
   - Proof Obligations: the **existing** `quota` test suite stays green **with not one line edited** — that is the entire proof that the move preserves behaviour, and it is why this task is done before anything new depends on the module: a red run then has exactly one possible cause.
@@ -826,7 +826,7 @@ graph TD
   - Dependencies: none (can run in parallel with H1).
   - Completion: Implementation Complete = module created, `quota.ts` reduced; Quality Complete = six verify gates green, `quota` tests untouched and passing; Integration Complete = `budgetKey()` still returns the identical string for the same input.
 
-- [ ] **Task H3 — `lib/essay/parseGrade.ts` + `lib/essay/prompt.ts` + adversarial fixtures (RED first)**
+- [x] **Task H3 — `lib/essay/parseGrade.ts` + `lib/essay/prompt.ts` + adversarial fixtures (RED first)**
   - Implementation: create both modules as **pure** functions (no env, no DB, no knowledge of which model will receive the prompt).
     - `parseGrade(rawText: string): { ok: true; band: number; lowConfidence: boolean } | { ok: false; reason: "unparseable" | "band_out_of_set" | "confidence_not_boolean" }`. It **never throws** — not on an empty string, not on truncated JSON, not on an array. It is the **only** place in the repo that compares a value against `ESSAY_BANDS`.
     - `buildEssayPrompt(...)`: shared rubric block; a labelled **reference** region carrying `questions.essay_answer` exactly once; a labelled **data** region carrying the student's answer exactly once, placed **after** the instructions, never in an instruction position; an explicit anti-injection sentence stating that any instruction inside the data region is content to be evaluated; and the output shape and closed band set declared **in words** even though `response_format` is set.
@@ -838,7 +838,7 @@ graph TD
   - Dependencies: Task H1 (`ESSAY_BANDS`).
   - Completion: Implementation Complete = both modules + fixtures; Quality Complete = six verify gates green; Integration Complete = N/A until Task B1.4 wires them.
 
-- [ ] **Task H4 — `checkEnv.ts` three variables + `SECRETS` entry with both pins + `ESSAY_GRADER_MODEL` (one commit)**
+- [x] **Task H4 — `checkEnv.ts` three variables + `SECRETS` entry with both pins + `ESSAY_GRADER_MODEL` (one commit)**
   - Implementation:
     - `SOURCE/lib/env/checkEnv.ts`: register `GROQ_API_KEY` (following the `GEMINI_API_KEY` shape at `:77-84`), `GROQ_BUDGET_DAILY_LIMIT` (following `AI_BUDGET_DAILY_LIMIT` at `:217-239`, fail-closed), and `ESSAY_GRADING_ENABLED` at level **`warn`** — not `error` — with the operator-visible consequence spelled out: an environment with grading off is a fully valid environment, and it is the shipping state.
     - `SOURCE/scripts/check-ai-key-bundle.mjs`: add the `SECRETS` entry `{ label: "Groq API key (ADR-0018)", value: read("GROQ_API_KEY"), markers: ["GROQ_API_KEY", "api.groq.com"] }`. **Never** an SDK package name as a marker — there is no SDK.
@@ -851,7 +851,7 @@ graph TD
   - Dependencies: none.
   - Completion: Implementation Complete = four files edited in one commit; Quality Complete = six verify gates **plus** `npm run check:bundle` green; Integration Complete = the guard is in place before anything it guards exists.
 
-- [ ] **Task H5 — DDL authoring: three groups + fingerprint at both pin sites (one commit, nothing applied yet)**
+- [x] **Task H5 — DDL authoring: three groups + fingerprint at both pin sites (one commit, nothing applied yet)**
   - Implementation, in `SOURCE/supabase/schema.sql`:
     - **Group 1 — character ceiling (R11/AC-048(1))**: edit the existing drop/add pair in place at `:472-474` to `check (answer is null or length(answer) <= 4000)`, keeping the explanatory comment and adding the recorded reason (no empirical basis — production has 0 submitted essays; chosen by argument; it **must** equal `LIMITS.MAX_ATTEMPT_ANSWER` and `verify:schema` reads it back from a real DB). The inline `check (answer in ('A','B','C','D'))` at `:124` was already superseded by this pair and is **not** a second coupled site.
     - **Group 2 — `telemetry_log` (R13/AC-055)**: widen the inline `event_type` declaration at `:1383` to include `'essay_grade'`; widen the inline `error_code` declaration at `:1390-1399` with `'groq_unavailable'`, `'invalid_output'`, `'duplicate_write'`; extend the existing `error_code` drop/add pair at `:1818-1821`; and **write a new drop/add pair for `event_type`, which has never had one** — using the real constraint name recorded in Gate C, not the predicted one. Editing only the inline declaration produces the exact TD-005 shape the comment at that site already names: correct in git, absent from every database.
@@ -863,7 +863,7 @@ graph TD
   - Dependencies: Task G0.2 (real constraint names), Task G0.4 (baseline fingerprints), Task H1 (key literals and the attempt cap must be settled before the function bodies are written).
   - Completion: Implementation Complete = all three groups + both fingerprint sites in one commit; Quality Complete = six verify gates green (`verify:schema` will still be red against the databases until H7 — that is expected and must be recorded, not worked around); Integration Complete = deferred to H7.
 
-- [ ] **Task H6 — `verify-schema.ts` assertions, written BEFORE anything is relied on**
+- [x] **Task H6 — `verify-schema.ts` assertions, written BEFORE anything is relied on**
   - Implementation, in `SOURCE/supabase/verify-schema.ts` only:
     - Two grant assertions for the new functions (template: the `record_exam_result` assertions at `:373-388`), distinguishing `42501` from an incidental failure.
     - The **character-ceiling gate** as a two-probe behavioural check discriminating by SQLSTATE (there is **no** CHECK-constraint read path — `schema_foreign_keys()` filters `contype = 'f'` at `:1233`, and adding a `schema_check_constraints()` function would be a **fourth** DDL, which is exactly what TD-005 warns against).
@@ -933,7 +933,7 @@ graph TD
 
 #### Tasks
 
-- [ ] **Task B1.1 — EARLY VERIFICATION POINT: `computeScore()` output-comparison tests — authored RED, landed GREEN inside Task B1.5 commit 1**
+- [x] **Task B1.1 — EARLY VERIFICATION POINT: `computeScore()` output-comparison tests — authored RED, landed GREEN inside Task B1.5 commit 1**
   - **This is not a standalone commit (I006, fixed 2026-08-29).** The cases call `computeScore(questions, answers, { essayGrading: false })`, but `computeScore.ts:93-96` takes **two** parameters — so a test-file-only commit would put verify gates 1 (`tsc`) and 3 (`vitest`) red on a commit that Gate E1 requires green. The plan's headline claim is that verification is not deferred; that claim must not rest on the one task that cannot be committed. **Resolution: author the cases RED, observe the failure, then land them in the same commit as the `computeScore.ts` change — Task B1.5 commit 1 — with the RED observation recorded in that commit's message** (which fixture failed, and that it failed because the third parameter did not yet exist, not for some other reason). RED→GREEN happens inside one commit; the discipline is preserved in the commit message rather than in a broken commit.
   - Implementation: in `SOURCE/lib/scoring/__tests__/computeScore.test.ts`, write the output-comparison cases **before** touching `computeScore.ts`, and confirm they fail for the right reason (the third parameter does not exist yet) **before** staging anything. Extend the existing `essay()` fixture helper with a third parameter whose default is **`undefined`** — not a non-empty string. The short-answer slice was caught by exactly this trap: a non-empty default made an unrelated `topicBreakdown` fixture `scored: true` and broke that block's exact-2-entry assertion. `essay()`'s current shape (`:68-79`) does not set `essayAnswer`, so the existing block at `:131-139` stays green **without edits** — and it must be verified to do so.
   - Proof Obligations (this is the EVP):
@@ -948,7 +948,7 @@ graph TD
   - Dependencies: Task H1.
   - Completion: Implementation Complete = cases written, observed failing for the right reason, and landed green inside B1.5 commit 1 with the RED observation in that commit message; Quality Complete = all six verify gates green **on B1.5 commit 1** (this task has no separate commit to gate); Integration Complete = the EVP's stop condition below was evaluated against a real run, not assumed.
 
-- [ ] **Task B1.2 — `lib/essay/groqClient.ts` + emission-point scan + negative control (one commit)**
+- [x] **Task B1.2 — `lib/essay/groqClient.ts` + emission-point scan + negative control (one commit)**
   - Implementation: create `SOURCE/lib/essay/groqClient.ts` with `import "server-only"` at the top, **one** exported endpoint constant (`GROQ_CHAT_COMPLETIONS_URL = "https://api.groq.com/openai/v1/chat/completions"`), **one** `POST` via plain `fetch`, `GROQ_API_KEY` read from server env, **our own** retry loop, an `AbortController`-based call deadline, and error classification into a **closed union**. No SDK (ADR-0018 Decision 5). Time constants: `GROQ_CALL_DEADLINE_MS = 20_000`, `GROQ_MAX_IN_PASS_RETRIES = 2`, `GROQ_RETRY_MAX_WAIT_MS = 8_000`, honouring the `retry-after` header on 429 — all four chosen by argument, all four owned by **OQ-1** until measured.
   - In the **same commit**, create the chokepoint scan under `SOURCE/lib/essay/__tests__/`, copying the structure of `SOURCE/lib/ugc/__tests__/geminiChokepoint.test.ts:110-178` with **one decisive difference**: the scan keys on the **endpoint-constant identifier or the module import — never the host string**. `api.groq.com` is about to appear in `scripts/check-ai-key-bundle.mjs` (Task H4), that file matches the scan's `SOURCE_FILE` pattern (which deliberately includes `.mjs`) and does not match `TEST_FILE`, and `scripts/` sits inside `OFFLINE_SCRIPT_DIRS` — so a host-keyed scan would classify the bundle guard itself as an emission site and force it into one of two exhaustive `toEqual` lists, turning the repo's strongest AI-safety guard into a list of exceptions. Include the case asserting the **offline-scripts list is empty**, which goes red the moment anyone changes the scan key.
   - Also add the **AC-034 negative control**: the Gemini `EMIT_PATTERN` (`/\.models\.generateContent\s*\(/`) matches **zero** lines inside the Groq module — the existing guard is blind to a second provider, and this is the case that proves the new guard is not blind in the same way. Template: `geminiChokepoint.test.ts:304-335` ("the chokepoint does not swallow anyone else's responsibility").
@@ -959,7 +959,7 @@ graph TD
   - Dependencies: Task H3, Task H4.
   - Completion: Implementation Complete = module + both scan cases; Quality Complete = six verify gates plus `npm run check:bundle` green; Integration Complete = the emission surface is provably one module before anything calls it.
 
-- [ ] **Task B1.3 — `lib/essay/budget.ts` — the Groq daily counter**
+- [x] **Task B1.3 — `lib/essay/budget.ts` — the Groq daily counter**
   - Implementation: create `SOURCE/lib/essay/budget.ts` with `import "server-only"` and `reserveGroqBudget(calls: number, now: Date): Promise<{ ok: true } | { ok: false; reason: "project_budget" | "unavailable" }>`. Exactly **one** `INCRBY` of the worst case, emitted **before** the first request, on `pacificDayKey("groq:budget", now)` from `lib/billing/budgetDay.ts`, with TTL `BUDGET_TTL_SECONDS`. No per-call accumulation. No refund when the pass succeeds first try. Fail closed when the store is unreachable or `GROQ_BUDGET_DAILY_LIMIT` is missing or invalid. `calls` is **required** — no default value.
   - Proof Obligations: EG-BE-019 (the key is `groq:budget:{Pacific day}`; the string `ai:budget:` appears **nowhere** in the essay grading code path — the prefixes differ at the first character, so AC-030 holds by name structure rather than by discipline); EG-BE-020 (exactly one `INCRBY` of `1 + GROQ_MAX_IN_PASS_RETRIES` before the first request, and **no refund** on a first-try success); EG-BE-021 (unreachable store or missing/invalid limit ⇒ refuse to grade, the question settles `failed`, **never** pass unmetered); AC-066 (`QuotaKind`, `PLAN_LIMITS` and every `consumeQuota()` call site are untouched — this counter is the **only** gate).
   - Recorded trade-off, not a defect: over-reservation on first-try successes puts effective daily throughput below the nominal request ceiling. That is `consumeQuota()`'s existing directional bias — over-counting is the safe direction, under-counting is the incident — and it is the only shape under which the counter actually bounds real spend.
@@ -968,7 +968,7 @@ graph TD
   - Dependencies: Task H2.
   - Completion: Implementation Complete = module + tests; Quality Complete = six verify gates green; Integration Complete = N/A until B1.4.
 
-- [ ] **Task B1.3b — `lib/supabase/service-role.ts`: the two privileged operations (operations 12 and 13)**
+- [x] **Task B1.3b — `lib/supabase/service-role.ts`: the two privileged operations (operations 12 and 13)**
   - **Why this is its own task and sits here** (I003, fixed 2026-08-29): `gradeEssays.ts` (Task B1.4) *calls* `claimEssayGradingAttempt()` and `recordEssayGrade()`. If those operations only appear in B1.5 — which depends on B1.4 — then B1.4 cannot compile as a standalone commit and the two tasks form a genuine cycle. Splitting the operations out ahead of B1.4 breaks it: B1.4 then compiles alone.
   - Implementation: in `SOURCE/lib/supabase/service-role.ts`, add `claimEssayGradingAttempt(attemptId, questionId)` and `recordEssayGrade(attemptId, questionId, state, earned, max, lowConfidence)`, shaped after `recordSkillMastery()` (`:95-104`). Operations 11 → **13**. `serviceRoleClient()` stays private; both are exposed as **named operations**, never as a client (ADR-0010).
   - **TD-029 note, written at this exact line in the file**: these are operations **12 and 13**. ADR-0010's kill criterion has already fired on both limbs, and `TECH-DEBT.md:43-90` names the two conditions that force the revisit — a **fourteenth** operation in this file, or a **third** in-place mutation of `exam_results`. This is the line the person about to add operation fourteen will be looking at, which is the whole reason the note goes here rather than in an ADR.
@@ -978,7 +978,7 @@ graph TD
   - Dependencies: Task H7 (the SQL functions must exist on dev before these operations can be exercised against anything real).
   - Completion: Implementation Complete = two operations + the TD-029 note; Quality Complete = six verify gates green (with H7's known-red ceiling assertion recorded); Integration Complete = B1.4 compiles and its orchestration tests run against these operations.
 
-- [ ] **Task B1.4 — `lib/essay/gradeEssays.ts` — pass orchestration in the mandated order**
+- [x] **Task B1.4 — `lib/essay/gradeEssays.ts` — pass orchestration in the mandated order**
   - Implementation: create `SOURCE/lib/essay/gradeEssays.ts` with `import "server-only"`, exporting `gradeEssaysForAttempt(...)`. Per essay question with ground truth, in **this order and no other** (Gate G, AC-072): **claim → reserve budget → call provider → settle**. Concurrency capped at `GROQ_MAX_CONCURRENCY = 2`; wall-clock capped at `ESSAY_PASS_BUDGET_MS = 240_000` (4 minutes), stopping proactively **before** the platform's 300 s fluid-compute ceiling rather than being cut off. Every exit is swallowed and logged.
   - Branch outcomes: claim refused ⇒ telemetry only, **no settle, no provider call**; budget refused or store unreachable ⇒ settle `failed` + telemetry (`project_budget_exhausted` or `server`); 429 with retries left ⇒ retry after backoff **without a second `INCRBY`**; provider error, 429-exhaustion, or `parseGrade()` returning `ok:false` ⇒ settle `failed`; valid output ⇒ settle `graded` with the band, `max = 1`, and the low-confidence flag. An **empty student answer** settles band 0 **without claiming and without calling the provider** (AC-037). A question with no ground truth never enters the target set (AC-038/EG-BE-003).
   - Wall-clock exhaustion is a designed degradation, not an incident: questions not yet claimed keep `essayAttempts: 0` and remain fully retryable; read-time derivation handles their presentation. Record it so nobody reads it as a failure.
@@ -989,7 +989,7 @@ graph TD
   - Note: this is also the home of the top **unselected** integration candidate (I-E, ROI 57 — "gradeEssays orchestration order"). It is covered here at unit level with real ordering assertions; if the engineer later wants it in the integration lane, this and I-D (`retryEssayGrading` refusal matrix, ROI 49) are the two to swap in first.
   - Completion: Implementation Complete = orchestrator + tests; Quality Complete = six verify gates green; Integration Complete = proven end to end by B1.5's manual dev run.
 
-- [ ] **Task B1.5 — GREEN: `computeScore()` options + branch split, then `submitExam()` + `maxDuration` — TWO COMMITS WITH AN EXPLICIT BOUNDARY (I-2 closed 2026-08-29; boundary fixed by I004)**
+- [x] **Task B1.5 — GREEN: `computeScore()` options + branch split, then `submitExam()` + `maxDuration` — TWO COMMITS WITH AN EXPLICIT BOUNDARY (I-2 closed 2026-08-29; boundary fixed by I004)**
   - **Entry condition: Gate A5b ticked.** The `L1` completion evidence below sends real text to `api.groq.com`. Seeded dev attempts only — never a real student attempt.
   - **Deployment rule, to be repeated VERBATIM in BOTH commit messages: neither commit is deployed with `ESSAY_GRADING_ENABLED` on until both have landed.** The Design Doc's one-commit hazard (step 7 emitting `pending` keys with nothing to grade them) cannot occur while the flag is off, and the flag is off in both Vercel scopes until Gate A stage 2 passes.
   - **The boundary is what decides whether commit 1 typechecks, so it is stated rather than left to judgement:**
@@ -1012,7 +1012,7 @@ graph TD
   - Dependencies: Task B1.1 (folded into commit 1), Task B1.4 (commit 2 registers `gradeEssaysForAttempt`), Task H7 (the SQL functions must exist on dev for the `L1` run).
   - Completion: Implementation Complete = both commits landed with the stated boundary; Quality Complete = **each commit independently green on all six verify gates** (with H7's known-red ceiling assertion recorded as expected), and the `computeScore` suite green with zero regressions on commit 1; Integration Complete = **L1** — on a **seeded** dev attempt with the flag on (Gate A5b ticked), submitting three essays produces bands, and `per_question` read back with SQL matches the W1 shape.
 
-- [ ] **Task B1.6 — Convert INT-1: the feature-off submit path**
+- [x] **Task B1.6 — Convert INT-1: the feature-off submit path**
   - Implementation: convert `SOURCE/app/(layer2)/__tests__/essayGrading.int.test.ts` case **INT-1** from `it.todo` to an executing test. Mocked: the Supabase client at the `createClient()` boundary (the sanctioned boundary of `getResult.int.test.ts`/`rating.int.test.ts`), the `service-role.ts` operations, `after()` (replaced by a synchronous invocation — the subject is *what* is registered and *when*, not how Next schedules it), Redis, `redirect()`, and global `fetch` as a **counted** mock. Real: `computeScore()`, `lib/scoring/essayLifecycle.ts`, `lib/scoring/wrongTwice.ts`, the i18n dictionaries.
   - Proof Obligations (from the skeleton, verbatim in intent): (a) with `ESSAY_GRADING_ENABLED` **deleted** from the environment, the `per_question` payload handed to the mocked `recordExamResult` equals an **independently authored** literal — not "whatever `computeScore` returned" — and `Object.keys` of every essay element contains **none** of the six keys; assert on the key **set**, not on `essayState === undefined`. *(Overlap note: `computeScore.test.ts` owns the pure half — the shape the function returns. What this lane adds is that the shape **survives the call site**: `submitExam` passes the option through and persists exactly that payload, which no pure-function test can see.)* (b) zero provider calls, **measured**: the counted `fetch` mock's count is exactly 0, and no `api.groq.com` request is constructed even to be aborted. (c) the `after()` mock records **0** registrations. (d) four env spellings all mean OFF — absent, `""`, `"TRUE"`, `"1"` — each yielding (a)+(b)+(c); a `"true"` with surrounding whitespace means ON and is included as the **one positive control**, so the case cannot pass by the flag read being dead code. (e) ordering with the flag ON: the `after()` mock is called **before** the `redirect()` mock, asserted by comparing `mock.invocationCallOrder` on the two spies — "both were called" is true in the broken ordering too. (f) containment: with the flag ON and the registered callback forced to reject when invoked synchronously, `recordExamResult` and `recordSkillMastery` were still both called and the redirect still happened (EG-BE-033).
   - Files: `SOURCE/app/(layer2)/__tests__/essayGrading.int.test.ts`
@@ -1021,16 +1021,19 @@ graph TD
 
 #### Phase Completion Criteria
 
-- [ ] **Early Verification Point passed**: the two-call `toEqual` comparison is an actual Vitest assertion and is green, and the third call differs at exactly the expected key set
-- [ ] EG-BE-001…004, EG-BE-016, EG-BE-019…022, EG-BE-030, EG-BE-032, EG-BE-033 satisfied
-- [ ] AC-033/AC-034 satisfied: the Groq emission surface is exactly one module, the offline-scripts list is empty, the Gemini pattern matches zero lines in the Groq module
-- [ ] `npm run check:bundle` green; `SECRETS.length === 8`
-- [ ] AC-072 ordering asserted by invocation order, not by call presence
-- [ ] **Gate A5b ticked before any dev `L1` run** — the run below sends real text to `api.groq.com`, so Zero Data Retention must already be enabled (engineer's decision 2026-08-29)
+- [x] **Early Verification Point passed** (B1.5 commit 1, `3a34c9c`): the two-call `toEqual` comparison is an actual Vitest assertion and is green, and the third call differs at exactly the expected key set
+- [x] EG-BE-001…004, EG-BE-016, EG-BE-019…022, EG-BE-030, EG-BE-032, EG-BE-033 satisfied
+- [x] AC-033/AC-034 satisfied (B1.2, `46bc8af`): the Groq emission surface is exactly one module, the offline-scripts list is empty, the Gemini pattern matches zero lines in the Groq module
+- [x] `npm run check:bundle` green; `SECRETS.length === 8` — **re-run at the close of B1.6**, exit 0, "8 bí mật server-only không xuống client"
+- [x] AC-072 ordering asserted by invocation order, not by call presence (B1.4, `046a2e8` — strict pairwise `mock.invocationCallOrder`, because "all four were called" is true in the broken order too)
+- [x] **Gate A5b ticked before any dev `L1` run** — ticked 2026-08-29 (`0f5d48f`)
 - [ ] Manual dev run (**L1**, seeded data only): an attempt with three essays submitted with the flag on produces three bands; `per_question` read back by SQL matches W1; the `questionId` sequence is unchanged
-- [ ] Integration lane test resolution: **1/3** (INT-1 executing; INT-2 and INT-3 remain `it.todo` until Phase B2)
-- [ ] `verify:schema`'s character-ceiling assertion is still red across this phase — expected, inside H7's known-red window, and recorded per commit
-- [ ] `service-role.ts` is at 13 operations with the TD-029 note in place at that line
+  - **OPEN, and deliberately so.** It requires `ESSAY_GRADING_ENABLED=true` in `.env.local` and sends real student-shaped text to `api.groq.com`. A5b permits it against seeded data; spending live provider budget is the engineer's call, not an automated step. This is the one criterion below that keeps Phase B1 from being closed.
+- [x] Integration lane test resolution: **1/3** (B1.6, `5224a99` — INT-1 executing as 11 cases; INT-2 and INT-3 remain `it.todo` until Phase B2)
+- [x] `verify:schema`'s character-ceiling assertion is still red across this phase — expected, inside H7's known-red window, and recorded in every commit message of the phase
+- [x] `service-role.ts` is at 13 operations with the TD-029 note in place at that line (B1.3b, `a87ba7d` — count re-measured at the close of B1.6: 13)
+
+**Phase B1 status: code-complete, not closed.** Every task and every criterion above is discharged except the manual `L1` dev run. **Task H8 (SVC-1/SVC-2 against real Postgres) is also still open** — it is the only place the three properties a mocked client cannot prove are asserted, and it was not part of the execution order agreed for this session.
 
 ---
 
