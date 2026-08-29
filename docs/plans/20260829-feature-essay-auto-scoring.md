@@ -1047,7 +1047,7 @@ graph TD
 
 #### Tasks
 
-- [ ] **Task B2.1 — `getResult()`: `created_at` in the select, plus the three derived fields**
+- [x] **Task B2.1 — `getResult()`: `created_at` in the select, plus the three derived fields**
   - Implementation: in `SOURCE/app/(layer2)/queries.ts` — add `created_at` to `getResult()`'s select string (`:577-579`) **and** to the `ResultRow` type (`:469-475`); it is absent today (D-02). `exam_attempts.submitted_at` is **not** a substitute: AC-026 names `exam_results.created_at` specifically, and the two timestamps differ by however long `record_exam_result()` took. Then, beside where `hasBeenWrongTwice` is attached (`:606-610`), attach `essay?: EssayView` to each `PerQuestionResult` via `deriveEssayView(entry, createdAt, now)`, `essaySummary?: EssaySummary` to the attempt via `summariseEssays(...)`, and `hasIncompleteEssay: boolean` (**required**, always computable, `false` when no key is present — a PDF annotation cannot be decided by an `undefined`).
   - Proof Obligations: EG-BE-023 (deadline boundary, three cases, exclusive `>`); EG-BE-024/025 (missing key ⇒ `null` and no log; unrecognised value ⇒ `null` and exactly one warning carrying only `questionId` and the strange value); EG-BE-026 (`retryAvailable` reaches the client as a **boolean**, and the payload contains **no** attempt count under any name); EG-BE-027 (only `graded` contributes to earned and max); EG-BE-031 (a row written before the feature shipped reads out identically to today, with `essaySummary === undefined` and every `PerQuestionResult.essay === undefined`).
   - Output Comparison, pipeline 2: for a legacy-shaped row mocked at the Supabase client boundary, the **whole** `ExamResult` equals a hand-built literal of the pre-change shape. This is AC-012's sharpest edge — if an old row grows a populated field, "no backfill" broke on the **read** path, which is the harder place to see it.
@@ -1057,7 +1057,7 @@ graph TD
   - Dependencies: Task B1.5.
   - Completion: Implementation Complete = select, type and three attachments; Quality Complete = six verify gates green; Integration Complete = **L1** on dev, the result page's data layer carries correct lifecycle values for a seeded graded attempt.
 
-- [ ] **Task B2.2 — `listMyHistory()`: two required booleans (GATED on Gate D)**
+- [x] **Task B2.2 — `listMyHistory()`: two required booleans (GATED on Gate D)**
   - **Entry gate**: Task G0.3 / Gate D must be closed. Do not start this task without the recorded payload measurement.
   - Implementation: in `SOURCE/app/(HM)/queries.ts` — add `per_question, created_at` to the embedded select (`:64-66`); the function needs **both**, and today it fetches neither. Add both fields to `EmbeddedRow` (`:23-34`). Add **two** required booleans to `MyHistoryEntry` (`:8-18`): `hasUnresolvedEssay` (still-running ⇒ **PDF export block**, AC-058) and `hasIncompleteEssay` (at least one question at RS-6 ⇒ **the PDF annotation condition**, O-8). Derive both through the shared predicates in `essayLifecycle.ts` — never re-derive locally. Raw `per_question` data does **not** cross the component boundary (UI-D11).
   - **Two, not one.** The v1.0 contract said one; D-13 overturned it because RS-6 cannot be derived from a "still unresolved" boolean. With one field, the two PDF exits produce **two different files for one attempt** — the defect O-8 exists to prevent, and the one this feature's own review history already caught once (F-06). Both are **required** and always computable (`false` when no key is present), so no consumer has an `undefined` case to handle.
@@ -1067,7 +1067,7 @@ graph TD
   - Dependencies: Task G0.3 (**hard gate**), Task B2.1.
   - Completion: Implementation Complete = select, two types, two derived fields; Quality Complete = six verify gates green; Integration Complete = proven by INT-2 in Task B2.4.
 
-- [ ] **Task B2.3 — `AttemptPdfData` gains `hasIncompleteEssay` and both construction sites fill it**
+- [x] **Task B2.3 — `AttemptPdfData` gains `hasIncompleteEssay` and both construction sites fill it**
   - Implementation: add `hasIncompleteEssay: boolean` (**required**) to `AttemptPdfData` in `SOURCE/lib/pdf/generateAttemptPdf.ts:11-28`, and pass it through the function body to the template. Fill it at **both** construction sites, each from its own read path's already-derived field: `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/page.tsx:56` reads `ExamResult.hasIncompleteEssay`; `SOURCE/app/(HM)/history/_components/HistoryRow.tsx:23` reads `MyHistoryEntry.hasIncompleteEssay`. **Neither site re-derives the RS-6 expression.**
   - Why the field belongs on this type: `AttemptPdfData` is the confluence of both export routes (verified by repo-wide grep — two construction sites, six pass-through consumers: `ResultActions.tsx:16`, `ActionButton.tsx:45`, `HistoryRowMenu.tsx:49`, `usePdfAction.ts:40`, plus two test files). Putting the field here is what makes the two routes structurally unable to disagree. Making it **required** means `tsc` names any site that forgot it.
   - See **Open Item I-3** on `essayIncompleteLabel?: string` — the frontend DD adds it; the backend DD's contract lists only the boolean. The label lands in Task F-B3.
@@ -1076,7 +1076,7 @@ graph TD
   - Dependencies: Task B2.1, Task B2.2.
   - Completion: Implementation Complete = type + both sites; Quality Complete = `tsc` green (which is the mechanism proving no site was missed); Integration Complete = proven by INT-2 and by FE2E-3.
 
-- [ ] **Task B2.4 — Convert INT-2 and INT-3**
+- [x] **Task B2.4 — Convert INT-2 and INT-3**
   - Implementation: convert the remaining two cases in `SOURCE/app/(layer2)/__tests__/essayGrading.int.test.ts`.
   - **INT-2 — the two PDF exits cannot disagree.** Proof Obligations: (a) for **one** fixture attempt id, drive both `getResult()` and `listMyHistory()` and assert `examResult.hasIncompleteEssay === historyEntry.hasIncompleteEssay` **and** that the shared value equals an independently authored literal `true` — equality alone is not enough, since two paths wrong in the same direction are equal; (b) the fixture contains an RS-6 element specifically (`essayState: "failed"` with `essayAttempts === ESSAY_MAX_ATTEMPTS`, i.e. `retryAvailable` false) **and** an RS-4 element (failed, attempts < 3) that must **not** set `hasIncompleteEssay`, so the case distinguishes "any failure" from "unrecoverable failure"; (c) three negative shapes all yielding `false` on both paths and all `typeof === "boolean"`: all essays graded, no essay questions at all, and a legacy row with no `essay*` key; (d) EG-BE-034's equality run on the same fixtures; (e) query shape on both paths — `getResult()`'s select carries `created_at` and `listMyHistory()`'s embedded select carries **both** `per_question` and `created_at` (a missing column here is the exact mechanism of the primary failure mode and is invisible to any assertion on mapped output alone); (f) the legacy-row Output Comparison for both pipelines.
   - Primary failure mode guarded (INT-2): one read path extended and the other not — most likely `listMyHistory()` gains `per_question` but not `created_at`, so its deadline derivation runs against a missing timestamp and an overdue pending question is "still pending" there while `/result` calls it RS-6. The student then gets a PDF **with** the incomplete-essay line from one button and **without** it from the other, for the same attempt.
@@ -1088,12 +1088,16 @@ graph TD
 
 #### Phase Completion Criteria
 
-- [ ] EG-BE-023…027, EG-BE-031, EG-BE-034, EG-BE-035 satisfied
-- [ ] Output Comparison pipelines 2 and 3 green against hand-built literals (no snapshots)
-- [ ] Gate D closed and the recorded decision reflected in `listMyHistory()`'s select shape
-- [ ] Both PDF construction sites read a **published** field; no site re-derives `state === "failed" && !retryAvailable` (EG-BE-036 source scan green)
-- [ ] Integration lane test resolution: **3/3 achieved (all resolved)**
-- [ ] `tsc` names zero missing `hasIncompleteEssay` sites
+- [x] EG-BE-023…027, EG-BE-031, EG-BE-034, EG-BE-035 satisfied
+- [x] Output Comparison pipelines 2 and 3 green against hand-built literals (no snapshots) — pipeline 2 in B2.1 and again in INT-2(f); pipeline 3 in B2.2 and again in INT-2(f). No `toMatchSnapshot` anywhere in the feature's tests
+- [x] Gate D closed and the recorded decision reflected in `listMyHistory()`'s select shape (B2.2, `05af4a2`)
+- [x] Both PDF construction sites read a **published** field; no site re-derives `state === "failed" && !retryAvailable` (EG-BE-036 source scan green) — the scan was run, not assumed: the expression appears as executable code in exactly one place, `essayLifecycle.ts:218`; every other hit in the repo is a comment pointing back at it
+- [x] Integration lane test resolution: **3/3 achieved (all resolved)** — the default lane now reports **0 todo**, down from 3 at the start of Phase B1
+- [x] `tsc` names zero missing `hasIncompleteEssay` sites — and it named **five** during B2.3's deliberate red phase, which is the mechanism that proof rests on
+
+**Phase B2 status: complete.** Four tasks, four commits (`5ab7a4b`, `05af4a2`, `28ee664`, `02127ac`), every criterion above discharged. Unlike Phase B1, nothing here is left waiting on a manual run: B2.1's own **L1** cell is open, but it is blocked on the *same* decision as B1.5's L1 (there is no seeded **graded** attempt on dev until grading has actually run once), not on anything Phase B2 owns.
+
+**One defect found and fixed inside this phase, worth carrying forward**: `getResult()`'s first draft called the three `essayLifecycle` helpers directly on `row.per_question`. Each helper folds the array itself, so `deriveEssayView()` ran **three times per element** and an unrecognised `essayState` produced **three** `console.warn`s per render where EG-BE-025 promises one. Found by a failing test in B2.1, fixed at the cause (derive once, then filter), and the same shape was applied pre-emptively to `listMyHistory()` in B2.2. The idiom now exists in **two** call sites because `essayLifecycle.ts` belongs to Task H1 and was out of scope — folding it into that module is a candidate for a later cleanup, and INT-2 is what holds the two paths in agreement meanwhile.
 
 ---
 

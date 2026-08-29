@@ -106,7 +106,7 @@ all phases → Final
 | **G0.5** | ✅ **DISCHARGED 2026-08-29** | Gate F1: TD-030 baseline = exactly 2 failures, both `subscription.fixture.e2e.test.ts` FE-1(e) (`en`, `vi`) |
 | H1…H8 | 🟡 **H1–H7 DONE** (2026-08-29) | H7 applied to dev **and** prod, human-confirmed. **H8 is the one still open** — SVC-1/SVC-2 remain `it.todo`; it needs real Postgres and was outside this session's agreed order |
 | B1.1…B1.6 | 🟡 **ALL SIX DONE** (2026-08-29) | `46bc8af` B1.2 · `bffaad0` B1.3 · `a87ba7d` B1.3b · `046a2e8` B1.4 · `3a34c9c`+`b7208f2` B1.5 (B1.1 folded into commit 1) · `5224a99` B1.6. **Phase not closed**: the manual `L1` dev run is the single outstanding criterion |
-| B2.1…B2.4 | ⚪ not started | B2.2's gate (G0.3 / Gate D) is **now closed** — no longer blocked |
+| B2.1…B2.4 | 🟢 **PHASE COMPLETE** (2026-08-29) | `5ab7a4b` B2.1 · `05af4a2` B2.2 · `28ee664` B2.3 · `02127ac` B2.4. Integration lane **3/3**, default lane reports **0 todo**. B2.1's own `L1` cell waits on the same decision as B1.5's |
 | B3.1…B3.3 | ⚪ not started | B3.3 **closes H7's known-red window** |
 | B4.1 | ⚪ not started | comments and titles only |
 | F-A1…F-A3 | ⚪ not started | F-A3 is the frontend Early Verification Point |
