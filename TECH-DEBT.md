@@ -69,10 +69,17 @@ bản rõ nào tồn tại trong transcript, trong file, hay trong đầu ai. Ki
 là mất 15 lượt thi và 1 kết quả thật.
 
 **Dev KHÔNG bị đụng tới.** `signInProbeUser()` trong `verify-schema.ts` vẫn đăng
-nhập được trên dev bằng literal cũ, và đó là chủ ý: `verify:schema` là **DEV
-ONLY** cho tới khi guard prod-safe lên (xem `docs/plans/20260829-feature-essay-
-auto-scoring.md`, Gate B7). Ai "dọn dẹp" nốt tài khoản dev cho đồng bộ sẽ làm
-đỏ toàn bộ cổng schema.
+nhập được trên dev bằng literal cũ, và đó là chủ ý. Ai "dọn dẹp" nốt tài khoản
+dev cho đồng bộ sẽ làm đỏ toàn bộ cổng schema.
+
+**Guard prod-safe ĐÃ LÊN** (commit `be26fb1`): `verify:schema` chọn chế độ theo
+project ref trong `NEXT_PUBLIC_SUPABASE_URL` — không theo tên file env, vì đổi
+tên credential prod thành `.env.local` đúng là thói quen cũ mà comment của
+`loadEnv()` đã ghi lại. Ref ngoài allowlist thì bỏ qua mọi mục cần phiên
+`authenticated` hoặc phát lệnh ghi, và in "PASS PHẦN" kèm số mục bỏ qua. Có test
+hồi quy `lib/schema/__tests__/verifySchemaProdGuard.test.ts` chặn việc thêm ref
+prod vào allowlist. Nên rủi ro "chạy nhầm lane vào prod" đã đóng; phần CÒN MỞ
+của mục này chỉ còn là quyền sở hữu 5 đề.
 
 **Cái sẽ nổ nếu quên.**
 
