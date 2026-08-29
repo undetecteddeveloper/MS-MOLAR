@@ -58,11 +58,31 @@ The two new SQL functions move the schema fingerprint. **Current verified baseli
 
 - [x] B1 — Before applying anything: read `schema_version.fingerprint` on **prod** and on **dev** and record both values here. Prod: **`29931beeb950`** Dev: **`29931beeb950`** *(read-only via Composio, 2026-08-29, same call as Gate C). Both still match the recorded baseline — nothing was hand-applied in the interim, so the TD-005 shape Task G0.4 watches for is absent.*
 - [x] B2 — Compare both against `29931beeb950` **and** against the new literal computed from the edited `schema.sql`. Record the new literal here: **`9979c9deea52`** *(Task H5, commit `2448179`, 2026-08-29. Recomputed **independently** by running `computeSchemaFingerprint()` over the committed `schema.sql`: the pinned constant, the value declared inside the file, and the recomputed value **all three agree**. Both live databases still read `29931beeb950` — that gap is why `verify:schema` is red, and closing it is Gate B3→B5.)*
-- [ ] B3 — Explicit engineer confirmation obtained **before any DDL touches prod**. Confirmed by: `______________` on `________-__-__`
-- [ ] B4 — DDL applied to **dev** (`hynwleaxtbtjzkvpjsug`).
-- [ ] B5 — DDL applied to **prod** (`pebjdlbgbmizgfpuptjl`).
-- [ ] B6 — Verified **by real query**, not by a "success" message, on **both** projects: `select fingerprint from public.schema_version;` returns the new literal; `select proname from pg_proc where proname in ('claim_essay_grading_attempt','record_essay_grade');` returns two rows.
-- [ ] B7 — `npm run verify:schema` green against **dev** and against **prod**, **except the character-ceiling assertion**, which is expected red from Task H7 until Task B3.3 lands (see H7's known-red window). Every other assertion must be green, including both grant assertions and the fingerprint comparison.
+- [x] B3 — Explicit engineer confirmation obtained **before any DDL touches prod**. Confirmed by: **the engineer, in session** (“just do it for the prod too”) on **2026-08-29**. *Dev had already been applied and verified at that point; prod followed only after this confirmation.*
+- [x] B4 — DDL applied to **dev** (`hynwleaxtbtjzkvpjsug`) — **2026-08-29**, via Composio, six statements in dependency order with the fingerprint **last**.
+- [x] B5 — DDL applied to **prod** (`pebjdlbgbmizgfpuptjl`) — **2026-08-29**, same six statements, same order, objects verified by real query **before** the fingerprint was written.
+- [x] B6 — Verified **by real query**, not by a “success” message, on **both** projects. Read back 2026-08-29:
+
+  | | prod `pebjdlbgbmizgfpuptjl` | dev `hynwleaxtbtjzkvpjsug` |
+  |---|---|---|
+  | `schema_version.fingerprint` | **`9979c9deea52`** | **`9979c9deea52`** |
+  | the two functions present | **2** | **2** |
+  | of those, `SECURITY DEFINER` | **0** | **0** |
+  | function ACL | `postgres=X \| service_role=X` | `postgres=X \| service_role=X` |
+  | `attempt_answers_answer_check` | `length(answer) <= 4000` | `length(answer) <= 4000` |
+  | `telemetry_log_event_type_check` | 3 values incl. `essay_grade` | 3 values |
+  | `telemetry_log_error_code_check` | 9 values | 9 values |
+
+  **Why this step earned its keep:** the apply tool reported only `DROP FUNCTION` as the “command” for each multi-statement apply, which on its own would have read as *the create never ran*. Every object was confirmed by querying `pg_proc` / `pg_constraint` directly instead. **No row was lost** — prod counts moved *up* across the window (9→10 results, 217→222 answers, 90→91 telemetry), which is live student traffic, not damage.
+- [~] B7 — **DEV: DONE.** `npm run verify:schema` went **3 FAIL → 1 FAIL**. The fingerprint comparison and **both grant assertions are now green**; the one remaining failure is exactly the expected one: *“TRẦN DB CAO HƠN TRẦN TRONG MÃ … 501 ký tự lọt qua CHECK … trong khi `LIMITS.MAX_ATTEMPT_ANSWER` = 500”*. **That is Fix I002's known-red window opening exactly on schedule** — red from H7 until Task B3.3 raises the constant. Recorded, not “fixed”.
+
+  **PROD: NOT RUN — blocked, and deliberately not worked around.** It requires `SCHEMA_ENV_FILE=.env.local.prod-backup`, i.e. pointing the script at production with a service-role key; the environment's permission classifier refused that command. Everything the script's **read** assertions cover was confirmed instead by direct `pg_proc` / `pg_constraint` queries (see B6). What stays unverified on prod is only the **behavioural probes** — the three-role RPC grant probe and the two ceiling probes — because those issue write attempts. **Owner: engineer.** From `SOURCE/`:
+
+  ```
+  SCHEMA_ENV_FILE=.env.local.prod-backup npm run verify:schema
+  ```
+
+  Expect **exactly one** failure — the same ceiling assertion as dev. Anything else is real and worth stopping for.
 - [ ] B8 — Fingerprint pin moved in the **same commit** at both declaration sites: `SOURCE/supabase/schema.sql:1871` and `SOURCE/lib/schema/schemaFingerprint.ts:41` (D-08).
 
 ### Gate C — OQ-2, the real CHECK constraint name (prerequisite to any DDL)
@@ -850,7 +870,7 @@ graph TD
   - Dependencies: Task H5.
   - Completion: Implementation Complete = assertions written; Quality Complete = six verify gates green; Integration Complete = deferred to H7 (the gates cannot pass against a database that has not received the DDL).
 
-- [ ] **Task H7 — Phase 3.5: apply the DDL to dev and prod (HUMAN-CONFIRMED)**
+- [x] **Task H7 — Phase 3.5: apply the DDL to dev and prod (HUMAN-CONFIRMED)**
   - Discharges: Gate B in full; ADR-0018 Implementation Guidance #9; TD-005.
   - Work, in order and without shortcuts:
     1. Re-read `schema_version.fingerprint` on both projects and compare against Gate B1's recorded values **and** against the new literal from Gate B2.
@@ -1524,9 +1544,13 @@ Recorded rather than resolved by invention. Each needs an engineer's decision; n
   - **G0.3 (Gate D) — DONE.** Payload measured on both databases by serialising the real select shape. Without the two fields ~375 B/row; with them ~3 401 B/row on prod-shaped exams — **≈9.1×**, or ~183 KB → ~1.62 MB extrapolated to the 500-row ceiling. Engineer **ACCEPTED** (D3): 500 is a ceiling three orders of magnitude above today's data (prod has 9 result rows total), reaching it is the documented trigger for **pagination** rather than a bigger number, and the alternative was DDL that would reopen Escalation 2. **Task B2.2 unblocked.**
 
 ### Phase H — Foundation
-- Start: TBD
-- Complete: TBD
+- Start: **2026-08-29**
+- Complete: **2026-08-29 — all 8 tasks landed**
 - Notes:
+  - H1 `cdd6c3e` · H2 `77e13a5` · H3 `cc1ce75` · H4 `52ab793` · H5 `2448179` · H6 `9d27bbb` · H7 applied to both databases 2026-08-29 (engineer-confirmed).
+  - **H2 changed a design contract.** `pacificDayKey(prefix, now)` → `pacificDay(now)` (backend DD v1.7): the original shape would have silently disabled the live `ai:budget:` single-site source guard at `quota.test.ts:868`, and made a trailing-colon prefix an unenforceable contract for the second provider.
+  - **H5 found an EIGHTH telemetry coupled site** — `schemaFingerprint.test.ts`, the only test that reads `schema.sql` — so the TypeScript telemetry literals moved into H5's commit and **Task B3.1 is reduced** to call-site wiring (backend DD v1.9).
+  - **H7's known-red window is now OPEN**: `verify:schema`'s character-ceiling assertion is red on both databases until **Task B3.3** raises `LIMITS.MAX_ATTEMPT_ANSWER` 500 → 4000. Every commit in between must record that expected red, or it becomes indistinguishable from a regression.
 
 ### Phase B1 — Automatic grading path
 - Start: TBD
