@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Version** | 1.6 |
+| **Version** | 1.7 |
 | **Date** | 2026-08-29 |
 | **Status** | Draft — thiết kế backend cho chấm tự luận tự động: hai hàm SQL đặc quyền của ADR-0018, hợp đồng khoá jsonb mới trong `exam_results.per_question`, điểm phát Groq, bộ đếm ngân sách riêng, hàm suy diễn vòng đời đọc-lúc-render, Server Action chấm lại, telemetry, và hai thay đổi schema thủ công. **Toàn bộ bề mặt React/hiển thị nằm ngoài phạm vi** — do `docs/ui-spec/essay-auto-scoring-ui-spec.md` và một frontend Design Doc riêng sở hữu; tài liệu này cung cấp hợp đồng dữ liệu mà chúng tiêu thụ. |
 | **PRD** | `docs/prd/essay-auto-scoring-prd.md` v1.2 (Draft — D1–D13 khoá, W1–W8, C1–C5, AC-001–AC-072) |
@@ -547,7 +547,7 @@ No Ripple Effect:
 | *(chưa có)* | `claimEssayGradingAttempt(attemptId, questionId)` | — | Không | Thao tác mới ở `service-role.ts`, hình dạng chép từ `recordSkillMastery()`. |
 | *(chưa có)* | `recordEssayGrade(attemptId, questionId, state, earned, max, lowConfidence)` | — | Không | Như trên. **Sáu tham số** — vượt khuyến nghị 0–2 của coding-principles, nhưng chữ ký do ADR-0018 Decision 1 chốt nguyên văn và không được diễn đạt lại; gói vào object sẽ làm lời gọi `.rpc()` lệch khỏi tên tham số SQL (`p_*`), tức thêm một phép ánh xạ mà cả hai anh em ở cùng file đều không có. |
 | *(chưa có)* | `retryEssayGrading(attemptId, questionId)` | — | Không | Server Action mới, typed-result theo tiền lệ `explainStep()`. |
-| `budgetKey(now)` (private, `quota.ts:186`) | `budgetKey(now)` gọi `pacificDayKey("ai:budget", now)` | Không (bảo toàn hành vi) | Không | Vẫn private, vẫn cùng chuỗi trả về. Chứng minh: test hiện có của `quota` giữ nguyên xanh **mà không sửa một dòng nào**. |
+| `budgetKey(now)` (private, `quota.ts:186`) | `budgetKey(now)` trả `` `ai:budget:${pacificDay(now)}` `` (sửa ở v1.7) | Không (bảo toàn hành vi) | Không | Vẫn private, vẫn cùng chuỗi trả về. Chứng minh: test hiện có của `quota` giữ nguyên xanh **mà không sửa một dòng nào**. |
 | `TelemetryEventType` = `"adaptive_route" \| "tutor_invoke"` | thêm `\| "essay_grade"` | Không | Không | Mở rộng union; `buildTelemetryPayload()` không đổi. |
 | `TELEMETRY_ERROR_CODES` (6 mã) | thêm `groq_unavailable`, `invalid_output`, `duplicate_write` (9 mã) | Không | Không | Mở rộng tuple; bộ lọc lúc chạy (`telemetry.ts:77-79`) không đổi vì nó đọc chính hằng đó. |
 | `LIMITS.MAX_ATTEMPT_ANSWER = 500` | `= 4000` | Không | Không | Chỉ đổi giá trị. Hai consumer trong `QuestionRenderer` tự di chuyển theo alias (D-04). |
@@ -926,25 +926,51 @@ const PACIFIC_DAY = new Intl.DateTimeFormat("en-US", {
  *  ngắn đủ để khoá hôm qua không sống sang ngày kia. */
 export const BUDGET_TTL_SECONDS = 26 * 60 * 60;
 
-/** `{prefix}:{YYYY-MM-DD}` theo ngày lịch Pacific. Ghép từ `formatToParts`
- *  chứ không nhờ một locale in hộ — cùng lý do đã ghi ở quota.ts:172-178. */
-export function pacificDayKey(prefix: string, now: Date): string {
+/** Ngày lịch Pacific dạng `YYYY-MM-DD`. Ghép từ `formatToParts` chứ không nhờ
+ *  một locale in hộ — cùng lý do đã ghi ở quota.ts:172-178. */
+export function pacificDay(now: Date): string {
   const parts = PACIFIC_DAY.formatToParts(now);
   const part = (type: Intl.DateTimeFormatPartTypes) =>
     parts.find((p) => p.type === type)?.value ?? "";
-  return `${prefix}:${part("year")}-${part("month")}-${part("day")}`;
+  return `${part("year")}-${part("month")}-${part("day")}`;
 }
 ```
+
+> **SỬA Ở v1.7 (2026-08-29, lúc thực thi Task H2).** Bản trước của khối này khai
+> `pacificDayKey(prefix, now)` trả về `{prefix}:{YYYY-MM-DD}`. **Hình dạng đó không
+> cài đặt được** — phát hiện khi chạy H2, không phải suy đoán:
+>
+> 1. **Nó làm chết một cổng canh đang sống.** `quota.test.ts:868` đòi toàn repo có
+>    ĐÚNG MỘT chỗ dựng mẫu khoá `ai:budget:`, dò bằng regex
+>    `` /["'`]ai:budget:/ `` — một dấu nháy **ngay trước** `ai:budget:`. Với
+>    `pacificDayKey("ai:budget", now)`, literal trong nguồn là `"ai:budget"`: dấu
+>    nháy **ĐÓNG** nằm đúng chỗ cổng cần dấu hai chấm, nên cổng khớp **không file
+>    nào**. Nó không chỉ chuyển đỏ — nó **thôi canh**, ngay trong lượt commit có
+>    mục đích làm bất biến đó mạnh hơn. Đo được: `vitest run` đỏ đúng **một** ca
+>    trên 1592, và đó là ca quét nguồn chứ không phải ca hành vi.
+> 2. **Nó dựng một cái bẫy im lặng cho consumer thứ hai.** Prefix phải không kèm
+>    dấu hai chấm cuối, nhưng không gì cưỡng chế được: `"groq:budget:"` cho ra
+>    `groq:budget::2026-02-28`. Một hợp đồng mà dùng sai **không có gì đỏ** chính
+>    là chế độ hỏng mà § MSA-3 tồn tại để chặn.
+>
+> **Mục tiêu của MSA-3 không đổi:** phép suy ra NGÀY theo múi giờ — phần dễ sai,
+> chết im lặng — vẫn chỉ có **một** lời khai dùng chung. Thứ chuyển động là **mẫu
+> khoá ở lại file sở hữu nó**, viết nguyên vẹn: `` `ai:budget:${pacificDay(now)}` ``
+> ở `quota.ts`, `` `groq:budget:${pacificDay(now)}` `` ở `lib/essay/budget.ts`. Phần
+> bị nhân đôi chỉ còn là một phép ghép chuỗi, và hai mẫu khoá **khác nhau ngay ở
+> ký tự đầu**.
 
 `quota.ts` sau khi sửa — xoá `BUDGET_TTL_SECONDS` (:132), `BUDGET_TIME_ZONE` (:141), `PACIFIC_DAY` (:179-184), và rút `budgetKey()` (:186-191) còn:
 
 ```ts
-import { BUDGET_TTL_SECONDS, pacificDayKey } from "./budgetDay";
+import { BUDGET_TTL_SECONDS, pacificDay } from "./budgetDay";
 // …
 function budgetKey(now: Date): string {
-  return pacificDayKey("ai:budget", now);
+  return `ai:budget:${pacificDay(now)}`;
 }
 ```
+
+*(Mẫu khoá ở lại đây có chủ đích — xem khối **SỬA Ở v1.7** ngay trên.)*
 
 **5. Phương án bị loại.**
 
@@ -1278,7 +1304,7 @@ Output:
             không phải số nguyên ≥ 1 ⇒ { ok: false, reason: "unavailable" } ⇒ TỪ CHỐI (AC-031).
             KHÔNG BAO GIỜ cho qua mà không đo đếm.
 Invariants:
-  - Khoá là pacificDayKey("groq:budget", now). Chuỗi "ai:budget" KHÔNG xuất hiện trong file này
+  - Khoá là `` `groq:budget:${pacificDay(now)}` `` (sửa ở v1.7 — xem § MSA-3). Chuỗi "ai:budget" KHÔNG xuất hiện trong file này
     cũng như trong bất kỳ file nào dưới lib/essay/ (AC-030, kiểm được bằng một phép quét).
   - Không đọc Entitlement, không đọc Plan, không gọi budgetCeiling() hay freeShare().
     Trần là MỘT con số cho cả dự án (AC-066) — không có tách suất theo gói ở đây.
@@ -2450,6 +2476,7 @@ Những gì không giải được từ PRD, ADR, UI Spec và mã, ghi thành m�
 
 | Date | Version | Changes | Author |
 |---|---|---|---|
+| 2026-08-29 | 1.7 | **§ MSA-3 đổi hình dạng export: `pacificDayKey(prefix, now)` → `pacificDay(now)`. Phát hiện khi THỰC THI Task H2, không phải suy đoán.** Hình dạng cũ **không cài đặt được** vì hai lý do độc lập. **(1) Nó giết một cổng canh đang sống.** `quota.test.ts:868` đòi toàn repo có ĐÚNG MỘT chỗ dựng `ai:budget:`, dò bằng regex yêu cầu một dấu nháy **ngay trước** chuỗi đó. Với `pacificDayKey("ai:budget", now)` thì literal là `"ai:budget"` — dấu nháy **đóng** nằm đúng chỗ cần dấu hai chấm — nên cổng khớp **không file nào**: nó **thôi canh** chứ không chỉ đỏ, ngay trong lượt commit có mục đích làm bất biến ấy mạnh hơn. Đo được: toàn làn mặc định đỏ đúng **1/1592** ca, và là ca quét nguồn chứ không phải ca hành vi — tức phép chuyển **đã bảo toàn hành vi**, đúng như nghĩa vụ chứng minh của H2 đòi. **(2) Nó dựng bẫy im lặng cho consumer thứ hai**: prefix phải không kèm dấu hai chấm cuối nhưng không gì cưỡng chế được — `"groq:budget:"` cho `groq:budget::2026-02-28`, một khoá sai trông như đúng. **Mục tiêu của MSA-3 KHÔNG đổi**: phép suy NGÀY theo múi giờ — phần dễ sai và chết im lặng — vẫn chỉ có **một** lời khai dùng chung cho cả hai provider. Thứ chuyển động là **mẫu khoá ở lại file sở hữu nó**, viết nguyên vẹn; phần bị nhân đôi chỉ còn là một phép ghép chuỗi, và hai mẫu khoá khác nhau ngay ở **ký tự đầu**. Cập nhật kèm: khối mã § MSA-3, dòng `budgetKey(now)` trong Interface Change Matrix, và dòng khoá của `reserveGroqBudget()`. **Task B1.3 sửa theo** (nó chưa được viết, nên chi phí là một dòng tài liệu). | Design Doc (Claude) |
 | 2026-08-29 | 1.6 | **Đóng OQ-7 theo quyết định của kỹ sư: mục tiêu độ trễ của PRD nới từ ≤ 60 giây lên ≤ 3 phút.** v1.5 phát hiện mục tiêu cũ **không đạt được** (15K token ÷ 8K TPM ⇒ tối thiểu ~1,9 phút) nhưng để ngỏ vì **PRD mới là chủ sở hữu của con số đó**, không phải tài liệu này. Kỹ sư chọn **nới chỉ tiêu** (không ghi nợ, không rời free tier) vì bốn bề mặt hiển thị đã ngụ ý lời hứa đó với học sinh. Cập nhật trong tài liệu này: **ba vị trí** mang chỉ tiêu — § Agreement Checklist (đo hiệu năng), § NFR Performance, và đoạn “hệ quả sắc hơn” ở § D-17 — cộng mục **OQ-7 chuyển sang ĐÃ ĐÓNG** kèm toàn bộ lý do. **Một ràng buộc mới được phát biểu ra:** chỉ tiêu độ trễ phải **nằm dưới `ESSAY_PASS_BUDGET_MS` (4 phút)**, vì một chỉ tiêu cao hơn trần đồng hồ của chính lượt chấm là không thể đạt theo cấu trúc — một quan hệ giữa hai hằng mà trước đây không tài liệu nào viết ra, nên không ai kiểm. **Không hằng số nào của tài liệu này đổi**; ripple polling (18/120 → 30/240 giây, đổi mốc neo sang `ESSAY_PASS_BUDGET_MS`) thuộc UI Spec v1.4 và frontend DD v1.2, landed cùng lượt. | Design Doc (Claude) |
 | 2026-08-29 | 1.5 | **Cỡ lại hằng số dung lượng theo giới hạn Groq ĐO ĐƯỢC trên chính tài khoản của kỹ sư; đóng OQ-4 và OQ-6; mở OQ-7** (§ D-17). **`ESSAY_GRADER_MODEL` = `qwen/qwen3.8-27b`** — rủi ro OQ-6 nêu ra **đã nổ**: `llama-3.3-70b-versatile` **không có** trong danh mục tài khoản. Chọn qwen vì **TPD 2M gấp mười lần** mọi ứng viên còn lại và **TPD là trần ràng buộc trước tiên**; qwen cũng mạnh đa ngữ với tiếng Việt. Loại: `openai/gpt-oss-120b` (lớn hơn, có thể suy luận rubric tốt hơn, nhưng TPD 200K chặn ở ~65 bài/ngày), `groq/compound*` (hệ agentic có tool use — sai hình dạng cho một phán quyết JSON tất định; RPD 250), `allam-2-7b` (hướng Ả Rập, TPM 6K), hai `llama-prompt-guard` (là bộ **phân loại** tiêm chích, không phải bộ chấm). Ghi lại: **kỷ luật hằng-số-hoán-đổi-được là thứ biến sự cố này thành một lượt sửa một dòng** — rủi ro ADR-0006/AC-032 nêu tên đã xảy ra thật và biện pháp giảm nhẹ đã hoạt động. **`GROQ_MAX_CONCURRENCY` 4 → 2**, và lý do được **thay hẳn**: v1.0 cỡ theo "30 RPM"; 30 RPM đúng nhưng **chưa bao giờ là trần ràng buộc — TPM 8K mới là**, và tài liệu chưa từng có con số ấy. Số học nay viết ra để tính lại được: bài 4000 ký tự ≈ 1.200 token, cộng đáp án tham chiếu + đề + rubric ⇒ ~2.500–3.500 token/request ⇒ **8K TPM ÷ ~3K ≈ 2–3 request/phút**, không phải 30; đồng thời 4 bắn ~12K vào trần 8K, **vượt trần ở mọi pass**, và **retry không cứu nổi** một cấu hình vượt trần mỗi lần chạy (F2/AC-065 dựng cho 429 thỉnh thoảng). **`GROQ_BUDGET_DAILY_LIMIT` = 600 request**: TPD 2M ÷ ~3K ≈ 660 **ràng buộc trước** RPD 1K, nên "cho bằng RPD" là cấp phép quá tay; 600 chừa biên dưới cả hai và khiến **lời từ chối của ta nổ trước của nhà cung cấp** — đường `project_budget_exhausted` sạch thay vì bão 429; ~200 bài/ngày ở mức đặt chỗ xấu nhất, ~600 nếu chấm xong lần đầu. **Ripple đã xử (không được nêu trong yêu cầu nhưng sẽ tự mâu thuẫn nếu bỏ qua):** § Trần ký tự căn cứ #3 vốn tính theo **12K TPM của model không tồn tại** — tính lại theo 8K TPM và đồng thời 2; trần **4000 vẫn đứng** (2 × ~3K ≈ 6K < 8K) và lập luận loại 8000 cũng vẫn đứng (≈ 8.4K > 8K); số học trường hợp xấu nhất 13 nhịp → **25 nhịp**. **Ghi nhận, không sửa:** TPM chặn thông lượng ở ~2–3 câu/phút, nên lượt thi 5 câu mất ~2–3 phút trong khi cận polling của UI Spec dừng ở 120 giây — **suy giảm đúng cách** qua `result.essay.pollStopped` + nút làm mới + hạn chờ 10 phút; **chủ sở hữu là UI Spec / Design Doc frontend**, không hằng polling nào bị đụng ở đây. **OQ-7 mới**, hệ quả sắc hơn của cùng phép tính: NFR Performance của PRD đặt **trung vị ≤ 60 s cho ≤ 5 câu**, mà 5 câu ≈ 15K token ÷ 8K TPM ⇒ **tối thiểu ~2 phút** — mục tiêu **không đạt được** trên free tier này, là trần nhà cung cấp chứ không phải khuyết tật cài đặt; chủ sở hữu là kỹ sư/PRD. **Ghi thành follow-up, KHÔNG vào phạm vi:** `meta-llama/llama-prompt-guard-2-86m` (14.4K RPD) là bộ phân loại tiêm chích chuyên dụng, liên quan trực tiếp R9 — kỹ sư quyết định **không** thêm bây giờ vì PRD đã chặn bằng validate nghiêm đầu ra (một cú tiêm chích thành công không dịch được điểm), còn chi phí thì nhân đôi request mỗi bài, tạo điểm phát thứ hai với guard và hạch toán riêng, và mở lại phạm vi đã hoà giải qua năm tài liệu; ghi ở § Future Extensibility kèm điều kiện mở lại. **Trạng thái ước lượng vs đo đạc, nói thẳng:** con số **~3K token/request là một ƯỚC LƯỢNG, không phải phép đo** — cùng tư thế mà tài liệu này đã dùng cho trần 4000 ký tự. Thứ sẽ đo nó: **lượt chấm thật đầu tiên, ghi log số token prompt + completion thực tế**. Nếu con số thật lệch đáng kể thì **cả `GROQ_MAX_CONCURRENCY` lẫn `GROQ_BUDGET_DAILY_LIMIT` phải dịch theo** (OQ-1). | Design Doc (Claude) |
 | 2026-08-29 | 1.4 | **Chuyển `EG-a…EG-e` sang làn chạy được (kỹ sư chốt 2026-08-29).** v1.0 giao năm ca chứng minh SQL cho `SOURCE/supabase/test-rls.ts` § Phần 10 và **chưa từng nhắc** `SOURCE/tests/e2e/service/**`, `vitest.localdb.config.ts` hay `npm run test:localdb` — dù cả ba đã nằm trong cây và comment đầu config mô tả mục đích gần đúng từng chữ mà § Verification Strategy của tài liệu này dùng. Đó là **doc-vs-tree drift**, không phải một lựa chọn thiết kế (§ D-16). Nhà mới: `SOURCE/tests/e2e/service/essay-grade-write.service.e2e.test.ts`, chạy bằng `npm run test:localdb`; **ID và nghĩa vụ giữ nguyên văn**, ánh xạ theo khung test đã có — **SVC-1 = `EG-c` + `EG-d`**, **SVC-2 = `EG-a` + `EG-b` + `EG-e`**. **Lý do:** `test-rls.ts` **không có npm script** (đã kiểm `package.json`) nên chỉ chạy khi gõ tay `npx tsx`, còn `test:localdb` là một trong **sáu** cổng verify trước commit kể từ 2026-08-29, nâng từ bốn theo **TD-030** — mà TD-030 tồn tại đúng vì `npm run test:fixture` bị phát hiện **đỏ trên `main`** mà không cổng nào thấy, vì không có gì tự động chạy nó. Một chứng cứ chạy lại được bằng một câu lệnh **mạnh hơn** một chứng cứ khớp câu chữ tài liệu. Hai hệ quả ghi thành văn: `test-rls.ts` **không nhận bản sao thứ hai** (hai nhà thì trôi lệch, và bản trôi lệch là bản không ai chạy), và **`S-b` (`test-rls.ts:1314-1320`) ở NGUYÊN chỗ cũ** — đã ship, đã chạy, không gom về làn service, ghi ra để một lượt "dọn cho gọn" sau này không gỡ nó đi. **Sửa bức tranh làn test:** repo có **bốn** làn vitest — mặc định (`vitest.config.ts`), `test:integration`, `test:fixture`, `test:localdb` — **cộng** `test-rls.ts` chạy tay; § Quality Assurance Mechanisms trước đây chỉ liệt kê làn mặc định và `test-rls.ts`, nên một người đọc sau này lập kế hoạch kiểm chứng sẽ dựng lại đúng bức tranh thiếu ấy. Ghi cho người đọc sau: **sáu cổng** hiện là `tsc`, `eslint`, `vitest`, `build`, `test:fixture`, `test:localdb`; và `test:fixture` **đang đỏ trên `main`** vì một khuyết tật có sẵn ở `subscription.fixture.e2e.test.ts`, **không liên quan** tính năng này (TD-030). Ghi chú chính xác về phạm vi: `test:localdb` chạy **tại máy dev**, không phải trên CI — config nói rõ *"CI has no database"* — nên nó là cổng **trước commit**, không phải cổng CI. **OQ-1…OQ-6 không đổi.** | Design Doc (Claude) |

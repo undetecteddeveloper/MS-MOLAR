@@ -19,7 +19,7 @@ reserveGroqBudget(calls: number, now: Date):
   Promise<{ ok: true } | { ok: false; reason: "project_budget" | "unavailable" }>
 ```
 
-- Exactly **one** `INCRBY` of the **worst case**, emitted **before the first request**, on `pacificDayKey("groq:budget", now)` from `lib/billing/budgetDay.ts`, with TTL `BUDGET_TTL_SECONDS`.
+- Exactly **one** `INCRBY` of the **worst case**, emitted **before the first request**, on `` `groq:budget:${pacificDay(now)}` `` — the key pattern is composed **inline here**, and only the day comes from `lib/billing/budgetDay.ts` (DD v1.7; the old `pacificDayKey(prefix, now)` shape was retired during Task H2 because it silently disabled the `ai:budget:` single-site source guard and made a trailing-colon prefix an unenforceable contract). `lib/billing/budgetDay.ts`, with TTL `BUDGET_TTL_SECONDS`.
 - **No per-call accumulation. No refund** when the pass succeeds first try.
 - **Fail closed** when the store is unreachable or `GROQ_BUDGET_DAILY_LIMIT` is missing or invalid.
 - `calls` is **required** — no default value.
@@ -36,7 +36,7 @@ Over-reservation on first-try successes puts effective daily throughput below th
 - `docs/design/essay-auto-scoring-backend-design.md` (§ EG-BE-019 / EG-BE-020 / EG-BE-021)
 - `docs/adr/ADR-0018-essay-async-grade-write.md` (§ Decision — Decision 6: the worst case reserved in a single `INCRBY` before the first request, on a Groq-only daily key, never on the Gemini key; fail closed; ordering **claim → reserve → provider → settle**)
 - `docs/adr/ADR-0006-gemini-extraction-protocol.md` (§ Decision — free-tier limits are **per project, not per user**)
-- `SOURCE/lib/billing/budgetDay.ts` (Task H2 — `pacificDayKey()`, `BUDGET_TTL_SECONDS`; **import**, never re-derive)
+- `SOURCE/lib/billing/budgetDay.ts` (Task H2 — `pacificDay()`, `BUDGET_TTL_SECONDS`; **import**, never re-derive)
 - `SOURCE/lib/billing/quota.ts` (`:9-18` the header comment on the split-counter failure mode; `budgetKey()` — private, the Gemini side of the pair)
 - `SOURCE/lib/billing/__tests__/quota.test.ts` (the Redis mock boundary this task reuses)
 - `SOURCE/lib/env/checkEnv.ts` (Task H4 — `GROQ_BUDGET_DAILY_LIMIT`, registered fail-closed)
@@ -53,7 +53,7 @@ Over-reservation on first-try successes puts effective daily throughput below th
 
 | Source | Contract Type | Required Observable Value | Compliance Check |
 |---|---|---|---|
-| backend DD (§ EG-BE-019) | state-lifecycle-negative | "Bộ đếm ngân sách chấm **phải** dùng khoá `groq:budget:{ngày Pacific}`; chuỗi `ai:budget:` **phải không** xuất hiện ở bất kỳ đâu trong đường mã chấm tự luận." | The key is composed by `pacificDayKey("groq:budget", now)`, and a repo scan finds no `ai:budget:` in the essay grading code path |
+| backend DD (§ EG-BE-019) | state-lifecycle-negative | "Bộ đếm ngân sách chấm **phải** dùng khoá `groq:budget:{ngày Pacific}`; chuỗi `ai:budget:` **phải không** xuất hiện ở bất kỳ đâu trong đường mã chấm tự luận." | The key is composed inline as `` `groq:budget:${pacificDay(now)}` `` (DD v1.7), and a repo scan finds no `ai:budget:` in the essay grading code path |
 | backend DD (§ EG-BE-020) | derived-display | "**Khi** pass chấm cho một câu bắt đầu, hệ thống **phải** phát **đúng một** `INCRBY` bằng `1 + GROQ_MAX_IN_PASS_RETRIES` **trước** request đầu tiên, và **phải không** hoàn lại khi pass thành công ngay lần đầu." | Exactly one `INCRBY` with that argument value is emitted before the first request, and no decrement follows a first-try success |
 
 ## Boundary Context (from the work plan's Connection Map)
@@ -62,7 +62,7 @@ Over-reservation on first-try successes puts effective daily throughput below th
 |---|---|
 | Owner (left) | `SOURCE/lib/essay/budget.ts` |
 | Owner (right) | Upstash Redis via `KV_REST_API_URL` / `KV_REST_API_TOKEN` |
-| Serialized format | Key string `groq:budget:{YYYY-MM-DD}` composed by `pacificDayKey("groq:budget", now)` from `lib/billing/budgetDay.ts`; **TTL 26 hours**; one `INCRBY` of `1 + GROQ_MAX_IN_PASS_RETRIES` |
+| Serialized format | Key string `groq:budget:{YYYY-MM-DD}` composed inline as `` `groq:budget:${pacificDay(now)}` `` (DD v1.7) from `lib/billing/budgetDay.ts`; **TTL 26 hours**; one `INCRBY` of `1 + GROQ_MAX_IN_PASS_RETRIES` |
 | Consumer parse rule | The same module reads back the incremented value and compares it against `GROQ_BUDGET_DAILY_LIMIT`; unreachable store or missing/invalid limit ⇒ **refuse** |
 | Expected signal | The literal `ai:budget:` appears **nowhere** in the essay grading code path (prefixes differ at the first character, so a typo cannot turn one key into the other); `quota.ts`'s existing tests stay green with zero edits after the day-key move |
 
@@ -82,7 +82,7 @@ _(Record here: the observed `INCRBY` argument value and TTL in the mock; the thr
 
 ### 3. Refactor Phase
 - [ ] Repo-scan the essay grading code path for `ai:budget:` — it must appear **nowhere**
-- [ ] Confirm the module imports `pacificDayKey` and `BUDGET_TTL_SECONDS` rather than re-deriving either
+- [ ] Confirm the module imports `pacificDay` and `BUDGET_TTL_SECONDS` rather than re-deriving either
 - [ ] Confirm `QuotaKind`, `PLAN_LIMITS` and every `consumeQuota()` call site are untouched (AC-066)
 
 ## Quality Assurance Mechanisms
