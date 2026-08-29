@@ -11,20 +11,22 @@
 // =============================================================================
 // FILE STATUS — read before editing
 // =============================================================================
-// ALL THREE CASES BELOW ARE SKELETONS. Nothing here executes an assertion yet.
-// Each case is `it.todo(...)`, deliberately:
-//   - `SOURCE/vitest.config.ts:19` collects `app/**/*.test.{ts,tsx}`, so this file
-//     IS in the `npm test` CI gate from the moment it is committed. A file with
-//     zero collected tasks makes vitest report "No test suite found in file" and
-//     exit 1 — a red CI caused by the shape of a skeleton, not by any defect.
-//     `it.todo` is collected, reports as todo, and keeps the gate green.
-//   - There are no imports of not-yet-existing modules (`lib/scoring/essayLifecycle`,
-//     `lib/essay/*`, `app/(layer2)/essayActions`), so `npx tsc --noEmit` and
-//     `eslint --max-warnings 0` stay green too. NOTHING in this feature has been
-//     implemented and NO DDL has been applied.
-// The implementing task replaces one `it.todo` with a real `it` + mocks +
-// assertions IN THE SAME COMMIT as the production code it covers (Red -> Green in
-// one task), following the shipped precedent in this directory
+// ALL THREE CASES ARE NOW CONVERTED. This file no longer contains a skeleton:
+//   INT-1 — Task B1.6 (11 executing cases)
+//   INT-2 — Task B2.4 (7 executing cases)
+//   INT-3 — Task B2.4 (5 executing cases)
+// Integration lane resolution for this feature: 3/3. Unresolved `it.todo`: 0.
+//
+// The paragraph that used to stand here said "nothing executes an assertion yet"
+// and explained why every case was `it.todo`. It is kept below in one line rather
+// than deleted, because the REASON still governs anyone adding a case: this file
+// is collected by `SOURCE/vitest.config.ts:19` (`app/**/*.test.{ts,tsx}`), so a
+// file with zero collected tasks makes vitest report "No test suite found in
+// file" and exit 1 — a red CI caused by the shape of a skeleton rather than by a
+// defect. `it.todo` is collected, reports as todo, and keeps the gate green.
+//
+// Each conversion landed IN THE SAME COMMIT as the production code it covers
+// (Red -> Green in one task), following the shipped precedent in this directory
 // (`getResult.int.test.ts`, `submitExam.int.test.ts`, `rating.int.test.ts`).
 //
 // HOW THIS LANE RUNS: `npm test` (from `SOURCE/`). NOT `npm run test:integration`
@@ -90,12 +92,13 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ESSAY_KEYS } from "@/lib/scoring/essayLifecycle";
+import { ESSAY_KEYS, ESSAY_MAX_ATTEMPTS } from "@/lib/scoring/essayLifecycle";
 
 // -----------------------------------------------------------------------------
 // INT-1 test infrastructure — the mock boundary declared in the header, wired.
-// INT-2 and INT-3 further down are still `it.todo`; Task B2.4 converts them and
-// will bring its own fixtures, so nothing here is shaped to be shared yet.
+// INT-2 and INT-3 further down have their OWN harness (`driveBothReadPaths`),
+// added by Task B2.4: they drive the two READ paths, while everything here drives
+// the WRITE path. The two sets deliberately share nothing but the module mocks.
 // -----------------------------------------------------------------------------
 
 const {
@@ -716,8 +719,356 @@ describe("submitExam() — essay grading feature flag (INT-1)", () => {
 //   Time control: `now` must be injected/frozen, never `Date.now()` — the deadline
 //   derivation (ESSAY_PENDING_DEADLINE_MS = 600_000) is time-dependent and a
 //   real clock makes this case a time bomb rather than a test.
+
+// -----------------------------------------------------------------------------
+// INT-2 / INT-3 harness — the two READ paths, driven for one fixture attempt.
+//
+// Both `getResult()` and `listMyHistory()` build their own client through the
+// same mocked `createClient()`, so the two are driven in sequence with the mock
+// re-pointed between them. That is what lets one fixture reach both doors, which
+// is the entire subject of INT-2.
+// -----------------------------------------------------------------------------
+
+const { getResult } = await import("../queries");
+const { listMyHistory } = await import("@/app/(HM)/queries");
+
+/** Frozen. The deadline is 600 000 ms with an exclusive boundary, so a real clock
+ *  would make every lifecycle fixture below a time bomb. */
+const READ_NOW = new Date("2026-08-29T12:00:00.000Z");
+/** One minute old — comfortably inside the deadline, so a `pending` element stays
+ *  `pending` and the cases below are about the STORED state, not about time. */
+const READ_CREATED_AT = "2026-08-29T11:59:00.000Z";
+
+const READ_ATTEMPT_ID = "attempt-read";
+const READ_EXAM = { id: "exam-read", title: "Đề Văn cuối kỳ", subject: "Ngữ văn" };
+const READ_STARTED_AT = "2026-08-29T11:00:00.000Z";
+const READ_SUBMITTED_AT = "2026-08-29T11:58:00.000Z";
+
+/** A stored essay element. Defaults to RS-2 (`pending`, no attempts spent). */
+function essayEl(overrides: Record<string, unknown> = {}) {
+  return {
+    questionId: "q-essay",
+    selected: "Bài làm của học sinh.",
+    isCorrect: false,
+    scored: false,
+    essayState: "pending",
+    essayEarned: null,
+    essayMax: null,
+    essayLowConfidence: false,
+    essayAttempts: 0,
+    ...overrides,
+  };
+}
+
+/** A stored MCQ element, exactly the shape `computeScore()` emits today. */
+function mcqEl(id: string, isCorrect: boolean) {
+  return {
+    questionId: id,
+    selected: isCorrect ? "A" : "B",
+    correct: "A",
+    isCorrect,
+    scored: true,
+  };
+}
+
+interface ReadFixture {
+  perQuestion: unknown[];
+  /** The three stored score columns. `getResult()` reads them straight from the
+   *  row — it does NOT recompute — so a fixture states them explicitly. */
+  triple?: { totalScore: number; correct: number; total: number };
+  /** Extra attempts for the cross-attempt wrong-twice history read. */
+  historyRows?: unknown[];
+  createdAt?: string;
+}
+
+/** Wires the mocked client for `getResult()`: the joined read, the cross-attempt
+ *  wrong-twice read (thenable — it awaits the builder directly), and the answer-key
+ *  RPC. Records every select string so INT-2(e) can assert on query SHAPE. */
+function makeGetResultClient(fx: ReadFixture, selectArgs: string[]) {
+  const triple = fx.triple ?? { totalScore: 5, correct: 1, total: 2 };
+  const rpc = vi.fn(async (fn: string) => {
+    if (fn === "exam_answer_key") return { data: [], error: null };
+    throw new Error(`unexpected rpc: ${fn}`);
+  });
+  const from = vi.fn((table: string) => {
+    if (table !== "exam_results") throw new Error(`unexpected table: ${table}`);
+    const builder: Record<string, unknown> = {
+      select: (arg: string) => {
+        selectArgs.push(arg);
+        return builder;
+      },
+      eq: () => builder,
+      limit: () => builder,
+      maybeSingle: async () => ({
+        data: {
+          total_score: triple.totalScore,
+          correct: triple.correct,
+          total: triple.total,
+          per_question: fx.perQuestion,
+          topic_breakdown: [],
+          overtime_seconds: 0,
+          created_at: fx.createdAt ?? READ_CREATED_AT,
+          exam_attempts: {
+            started_at: READ_STARTED_AT,
+            submitted_at: READ_SUBMITTED_AT,
+            exams_with_difficulty: READ_EXAM,
+          },
+        },
+        error: null,
+      }),
+      // The wrong-twice history read awaits the builder itself. Without this it
+      // resolves to the builder object, degrades to [], and INT-3(c) would pass
+      // for a permanently dead feature.
+      then: (onFulfilled: (value: unknown) => unknown) =>
+        Promise.resolve().then(() =>
+          onFulfilled({
+            data: fx.historyRows ?? [
+              { attempt_id: READ_ATTEMPT_ID, per_question: fx.perQuestion },
+            ],
+            error: null,
+          }),
+        ),
+    };
+    return builder;
+  });
+  return { from, rpc };
+}
+
+/** Wires the mocked client for `listMyHistory()` — one bounded, thenable read. */
+function makeHistoryClient(fx: ReadFixture, selectArgs: string[]) {
+  const triple = fx.triple ?? { totalScore: 5, correct: 1, total: 2 };
+  const from = vi.fn((table: string) => {
+    if (table !== "exam_results") throw new Error(`unexpected table: ${table}`);
+    const builder: Record<string, unknown> = {
+      select: (arg: string) => {
+        selectArgs.push(arg);
+        return builder;
+      },
+      eq: () => builder,
+      limit: () => builder,
+      then: (onFulfilled: (value: unknown) => unknown) =>
+        Promise.resolve().then(() =>
+          onFulfilled({
+            data: [
+              {
+                attempt_id: READ_ATTEMPT_ID,
+                total_score: triple.totalScore,
+                correct: triple.correct,
+                total: triple.total,
+                per_question: fx.perQuestion,
+                created_at: fx.createdAt ?? READ_CREATED_AT,
+                exam_attempts: {
+                  exam_id: READ_EXAM.id,
+                  started_at: READ_STARTED_AT,
+                  submitted_at: READ_SUBMITTED_AT,
+                  exams: { title: READ_EXAM.title, subject: READ_EXAM.subject },
+                },
+              },
+            ],
+            error: null,
+          }),
+        ),
+    };
+    return builder;
+  });
+  return { from };
+}
+
+/** ONE fixture, BOTH doors. Returns each path's output and the select strings it
+ *  issued, so a case can assert on agreement, on values and on query shape. */
+async function driveBothReadPaths(fx: ReadFixture) {
+  const resultSelectArgs: string[] = [];
+  const historySelectArgs: string[] = [];
+
+  createClientMock.mockResolvedValue(makeGetResultClient(fx, resultSelectArgs));
+  const examResult = await getResult(READ_ATTEMPT_ID);
+
+  createClientMock.mockResolvedValue(makeHistoryClient(fx, historySelectArgs));
+  const [historyEntry] = await listMyHistory();
+
+  return { examResult: examResult!, historyEntry, resultSelectArgs, historySelectArgs };
+}
+
 describe("getResult() / listMyHistory() — hasIncompleteEssay agreement (INT-2)", () => {
-  it.todo("derives identical hasIncompleteEssay and hasUnresolvedEssay booleans on both read paths for the same attempt, and returns false (never undefined) for graded, essay-free and legacy rows");
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(READ_NOW);
+    warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    warnSpy.mockRestore();
+    vi.useRealTimers();
+  });
+
+  // The fixture (b) is built around: ONE unrecoverable essay and ONE that can
+  // still be retried. That pairing is what separates "any failure" from
+  // "unrecoverable failure" — an implementation that treats every `failed` as
+  // incomplete passes a fixture containing only the first.
+  const RS6_AND_RS4: unknown[] = [
+    essayEl({ questionId: "q-rs6", essayState: "failed", essayAttempts: ESSAY_MAX_ATTEMPTS }),
+    essayEl({ questionId: "q-rs4", essayState: "failed", essayAttempts: 1 }),
+  ];
+
+  it("(a)+(b): one attempt, both doors — hasIncompleteEssay agrees AND equals an independently authored true; an RS-4 sibling does not cause it", async () => {
+    const { examResult, historyEntry } = await driveBothReadPaths({ perQuestion: RS6_AND_RS4 });
+
+    // Agreement is necessary but NOT sufficient: two paths wrong in the same
+    // direction are equal. So the shared value is also held against a literal
+    // authored from the fixture by hand.
+    expect(examResult.hasIncompleteEssay).toBe(historyEntry.hasIncompleteEssay);
+    expect(examResult.hasIncompleteEssay).toBe(true);
+
+    // …and the RS-4 element is genuinely present and genuinely retryable, so the
+    // `true` above is attributable to q-rs6 alone.
+    const rs4 = examResult.result.perQuestion.find((r) => r.questionId === "q-rs4");
+    expect(rs4?.essay).toEqual({
+      state: "failed",
+      earned: null,
+      max: null,
+      lowConfidence: false,
+      retryAvailable: true,
+    });
+    const rs6 = examResult.result.perQuestion.find((r) => r.questionId === "q-rs6");
+    expect(rs6?.essay?.retryAvailable).toBe(false);
+  });
+
+  it("(b) negative half: an attempt whose only failed essay is RETRYABLE must NOT report hasIncompleteEssay on either path", async () => {
+    // RS-4 alone. If this returned true, the student would get the permanent
+    // "grading incomplete" PDF annotation while a retry was still available.
+    const { examResult, historyEntry } = await driveBothReadPaths({
+      perQuestion: [essayEl({ questionId: "q-rs4", essayState: "failed", essayAttempts: 1 })],
+    });
+
+    expect(examResult.hasIncompleteEssay).toBe(false);
+    expect(historyEntry.hasIncompleteEssay).toBe(false);
+    // Still UNRESOLVED though — the two predicates are structurally exclusive,
+    // and this row is the proof that one boolean could not carry both answers.
+    expect(historyEntry.hasUnresolvedEssay).toBe(true);
+  });
+
+  it.each([
+    [
+      "every essay graded",
+      [essayEl({ essayState: "graded", essayEarned: 1, essayMax: 1, essayAttempts: 1 })],
+    ],
+    ["no essay question at all", [mcqEl("q-mcq", true)]],
+    [
+      "a legacy row carrying no essay* key whatsoever",
+      [{ questionId: "q-essay", selected: "bài làm", isCorrect: false, scored: false }],
+    ],
+  ])(
+    "(c) negative shape — %s ⇒ false on BOTH paths, and a real boolean on both",
+    async (_label, perQuestion) => {
+      const { examResult, historyEntry } = await driveBothReadPaths({
+        perQuestion: perQuestion as unknown[],
+      });
+
+      // `typeof`, not just the value: `undefined` is falsy, so the wrong version
+      // renders correctly today and only surfaces when the PDF pipeline has to
+      // decide an annotation from it.
+      expect(typeof examResult.hasIncompleteEssay).toBe("boolean");
+      expect(typeof historyEntry.hasIncompleteEssay).toBe("boolean");
+      expect(typeof historyEntry.hasUnresolvedEssay).toBe("boolean");
+      expect(examResult.hasIncompleteEssay).toBe(false);
+      expect(historyEntry.hasIncompleteEssay).toBe(false);
+    },
+  );
+
+  it("(d) EG-BE-034: history's hasUnresolvedEssay equals (result's essaySummary.unresolvedCount ?? 0) > 0, across every fixture", async () => {
+    // Deliberately compares ACROSS the two paths rather than recomputing the
+    // right-hand side locally. Two derivations of one truth drifting apart is
+    // defect F-06, and a locally recomputed control would not see it.
+    const fixtures: unknown[][] = [
+      RS6_AND_RS4,
+      [essayEl()],
+      [essayEl({ essayState: "failed", essayAttempts: 1 })],
+      [essayEl({ essayState: "graded", essayEarned: 0.5, essayMax: 1, essayAttempts: 1 })],
+      [mcqEl("q-mcq", true)],
+    ];
+
+    const observed: boolean[] = [];
+    for (const perQuestion of fixtures) {
+      const { examResult, historyEntry } = await driveBothReadPaths({ perQuestion });
+      const fromSummary = (examResult.essaySummary?.unresolvedCount ?? 0) > 0;
+      expect(historyEntry.hasUnresolvedEssay).toBe(fromSummary);
+      observed.push(historyEntry.hasUnresolvedEssay);
+    }
+    // Positive AND negative control: without both, the equality above would hold
+    // for an implementation that answers the same thing every time.
+    expect(observed).toContain(true);
+    expect(observed).toContain(false);
+  });
+
+  it("(e) query shape on BOTH paths — getResult carries created_at, listMyHistory carries per_question AND created_at", async () => {
+    const { resultSelectArgs, historySelectArgs } = await driveBothReadPaths({
+      perQuestion: RS6_AND_RS4,
+    });
+
+    const joinSelect = resultSelectArgs.find((arg) => arg.includes("exam_attempts!inner("));
+    expect(joinSelect).toContain("created_at");
+
+    const historySelect = historySelectArgs[0];
+    expect(historySelect).toContain("per_question");
+    expect(historySelect).toContain("created_at");
+
+    // Why this is asserted on the SELECT STRING and not on mapped output: with
+    // `created_at` missing on one path, both booleans still compute — they just
+    // compute against `undefined`. An overdue pending question is then "still
+    // pending" on that path while the other calls it RS-6, and the student gets
+    // a PDF WITH the incomplete-essay line from one button and WITHOUT it from
+    // the other, for the same attempt. No assertion on mapped output can see it.
+  });
+
+  it("(f) legacy Output Comparison, BOTH pipelines: hand-built literals, no snapshots", async () => {
+    const legacy = [{ questionId: "q-essay", selected: "bài làm", isCorrect: false, scored: false }];
+    const { examResult, historyEntry } = await driveBothReadPaths({
+      perQuestion: legacy,
+      triple: { totalScore: 5, correct: 1, total: 2 },
+    });
+
+    expect(examResult).toEqual({
+      examId: "exam-read",
+      examTitle: "Đề Văn cuối kỳ",
+      subject: "Ngữ văn",
+      result: {
+        totalScore: 5,
+        correct: 1,
+        total: 2,
+        perQuestion: [
+          { questionId: "q-essay", selected: "bài làm", isCorrect: false, scored: false },
+        ],
+        topicBreakdown: [],
+      },
+      questions: {},
+      startedAt: READ_STARTED_AT,
+      submittedAt: READ_SUBMITTED_AT,
+      overtimeSeconds: 0,
+      hasIncompleteEssay: false,
+    });
+    // `toEqual` treats a key holding `undefined` as absent, so the field that
+    // must be undefined is asserted separately.
+    expect(examResult.essaySummary).toBeUndefined();
+    expect(examResult.result.perQuestion[0].essay).toBeUndefined();
+
+    expect([historyEntry]).toEqual([
+      {
+        attemptId: READ_ATTEMPT_ID,
+        examId: "exam-read",
+        examTitle: "Đề Văn cuối kỳ",
+        subject: "Ngữ văn",
+        totalScore: 5,
+        startedAt: READ_STARTED_AT,
+        submittedAt: READ_SUBMITTED_AT,
+        correct: 1,
+        total: 2,
+        hasUnresolvedEssay: false,
+        hasIncompleteEssay: false,
+      },
+    ]);
+  });
 });
 
 // =============================================================================
@@ -800,5 +1151,179 @@ describe("getResult() / listMyHistory() — hasIncompleteEssay agreement (INT-2)
 //   (e) `essayLowConfidence: true` on the graded element changes NO number in
 //       (b) or (d) — same fixture run twice, flag flipped, numeric output toEqual.
 describe("Graded essay stays out of the score triple and Layer 3 (INT-3)", () => {
-  it.todo("keeps scored:false/isCorrect:false on a graded essay element so the score triple, record_skill_mastery's filter input and computeWrongTwiceQuestionIds are all unaffected");
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(READ_NOW);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** 4 MCQ, 3 of them correct, plus one graded essay at band 0.75.
+   *
+   *  Chosen so that counting the essay would move ALL THREE numbers: the triple
+   *  would become 5 / 3.75 / 6.75 instead of 4 / 3 / 7.5. With a fixture where
+   *  the numbers coincide, obligation (b) would prove nothing. */
+  const FOUR_MCQ_AND_A_GRADED_ESSAY: unknown[] = [
+    mcqEl("q1", true),
+    mcqEl("q2", true),
+    mcqEl("q3", true),
+    mcqEl("q4", false),
+    essayEl({
+      questionId: "q-graded",
+      essayState: "graded",
+      essayEarned: 0.75,
+      essayMax: 1,
+      essayAttempts: 1,
+    }),
+  ];
+
+  /** The independently authored triple: 3 correct of 4 SCORED questions ⇒ 7.5.
+   *  Hand-computed from the four MCQs only — the essay is not in it. */
+  const NON_ESSAY_TRIPLE = { totalScore: 7.5, correct: 3, total: 4 };
+
+  it("(a) the graded element keeps scored:false and isCorrect:false, and the `scored` KEY is present", async () => {
+    const { examResult } = await driveBothReadPaths({
+      perQuestion: FOUR_MCQ_AND_A_GRADED_ESSAY,
+      triple: NON_ESSAY_TRIPLE,
+    });
+
+    const graded = examResult.result.perQuestion.find((r) => r.questionId === "q-graded")!;
+    expect(graded.scored).toBe(false);
+    expect(graded.isCorrect).toBe(false);
+    // The KEY, not just the value. A missing `scored` hits SQL's
+    // `coalesce((pq->>'scored')::boolean, true)` default (schema.sql:1354) and
+    // FLIPS the mastery filter, enrolling graded essays into the mastery model.
+    expect("scored" in graded).toBe(true);
+    // HONEST SEAM, stated where it applies: this proves the TypeScript half only.
+    // The SQL predicate itself is proven by recordSkillMastery.int.test.ts and by
+    // the service lane. A mock cannot prove a SQL filter.
+    expect(graded.essay?.state).toBe("graded");
+  });
+
+  it("(b) the score triple equals literals computed from the NON-essay questions only", async () => {
+    const { examResult } = await driveBothReadPaths({
+      perQuestion: FOUR_MCQ_AND_A_GRADED_ESSAY,
+      triple: NON_ESSAY_TRIPLE,
+    });
+
+    // Counting the essay would make these 5 / 3.75 / 6.75 — every one of the
+    // three moves, which is what makes this fixture able to fail.
+    expect(examResult.result.total).toBe(4);
+    expect(examResult.result.correct).toBe(3);
+    expect(examResult.result.totalScore).toBe(7.5);
+    // ScoreCard derives `wrong = total - correct`; the essay silently entering
+    // the denominator would redefine what that number means on a live surface.
+    expect(examResult.result.total - examResult.result.correct).toBe(1);
+  });
+
+  it("(c) the six new keys, arriving through the REAL read path, do not flip the wrong-twice predicate", async () => {
+    // FRAMING — this is what justifies the case existing at all. The plain
+    // `scored: false` exclusion is already covered at unit level by
+    // wrongTwice.test.ts Test 2 (:105-140), on a fixture already named Q-ESSAY,
+    // and restating it here would be duplicate coverage. What is NEW: the element
+    // now ALSO carries the lifecycle keys and arrives through getResult()'s real
+    // history read rather than a hand-built unit fixture.
+    const viewed: unknown[] = [
+      mcqEl("q-wrong-twice", false),
+      essayEl({ questionId: "q-graded", essayState: "graded", essayEarned: 0.75, essayMax: 1 }),
+    ];
+    // The same two questions, wrong again on a SECOND distinct attempt.
+    const historyRows = [
+      { attempt_id: READ_ATTEMPT_ID, per_question: viewed },
+      { attempt_id: "attempt-earlier", per_question: viewed },
+    ];
+
+    const { examResult } = await driveBothReadPaths({
+      perQuestion: viewed,
+      triple: { totalScore: 0, correct: 0, total: 1 },
+      historyRows,
+    });
+
+    const mcq = examResult.result.perQuestion.find((r) => r.questionId === "q-wrong-twice")!;
+    const essay = examResult.result.perQuestion.find((r) => r.questionId === "q-graded")!;
+
+    // Positive control first: without it, this case would pass for a predicate
+    // that returned nothing at all.
+    expect(mcq.hasBeenWrongTwice).toBe(true);
+    // …and the essay stays out, WITH the six keys present on it.
+    expect(essay.hasBeenWrongTwice).toBeUndefined();
+    expect(essay.essay?.state).toBe("graded");
+  });
+
+  it("(d) EG-BE-027 arithmetic in the same attempt as the triple: one graded, one pending, one failed ⇒ earned 0.75, max 1", async () => {
+    const { examResult } = await driveBothReadPaths({
+      perQuestion: [
+        ...FOUR_MCQ_AND_A_GRADED_ESSAY,
+        essayEl({ questionId: "q-pending" }),
+        essayEl({ questionId: "q-failed", essayState: "failed", essayAttempts: ESSAY_MAX_ATTEMPTS }),
+      ],
+      triple: NON_ESSAY_TRIPLE,
+    });
+
+    // max is 1, NOT 3. A failed essay adding 0 to earned and 1 to max is exactly
+    // the silent zero AC-015 forbids — and it looks completely reasonable at the
+    // point someone writes it.
+    expect(examResult.essaySummary).toEqual({
+      earned: 0.75,
+      max: 1,
+      gradedCount: 1,
+      pendingCount: 1,
+      failedCount: 1,
+      unresolvedCount: 1,
+    });
+    // The essay arithmetic and the score triple are separate ledgers; adding the
+    // two extra essays moved neither of the three numbers.
+    expect(examResult.result.total).toBe(4);
+    expect(examResult.result.correct).toBe(3);
+    expect(examResult.result.totalScore).toBe(7.5);
+  });
+
+  it("(e) essayLowConfidence changes NO number — same fixture, flag flipped, numeric output identical", async () => {
+    async function numbersWith(lowConfidence: boolean) {
+      const { examResult } = await driveBothReadPaths({
+        perQuestion: [
+          ...FOUR_MCQ_AND_A_GRADED_ESSAY.slice(0, 4),
+          essayEl({
+            questionId: "q-graded",
+            essayState: "graded",
+            essayEarned: 0.75,
+            essayMax: 1,
+            essayAttempts: 1,
+            essayLowConfidence: lowConfidence,
+          }),
+        ],
+        triple: NON_ESSAY_TRIPLE,
+      });
+      return {
+        totalScore: examResult.result.totalScore,
+        correct: examResult.result.correct,
+        total: examResult.result.total,
+        essaySummary: examResult.essaySummary,
+      };
+    }
+
+    const off = await numbersWith(false);
+    const on = await numbersWith(true);
+
+    // AC-046: the flag is display-only. It must reach the view…
+    expect(on).toEqual(off);
+    const { examResult } = await driveBothReadPaths({
+      perQuestion: [
+        essayEl({
+          questionId: "q-graded",
+          essayState: "graded",
+          essayEarned: 0.75,
+          essayMax: 1,
+          essayAttempts: 1,
+          essayLowConfidence: true,
+        }),
+      ],
+      triple: NON_ESSAY_TRIPLE,
+    });
+    // …which is asserted here so that `on.toEqual(off)` cannot be satisfied by
+    // the flag being dropped on the floor entirely.
+    expect(examResult.result.perQuestion[0].essay?.lowConfidence).toBe(true);
+  });
 });

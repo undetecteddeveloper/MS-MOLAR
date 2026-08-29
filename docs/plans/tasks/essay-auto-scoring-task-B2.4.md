@@ -26,7 +26,7 @@ INT-3 proves only the **TypeScript** half. `record_skill_mastery()`'s own exclus
 The plain `scored: false` exclusion is **already covered at unit level** by `wrongTwice.test.ts` Test 2 (`:105-140`), whose fixture is already named `Q-ESSAY`. **Do not restate it.** What is new — and the only thing justifying (c) here — is that the element now **also** carries the six new keys and arrives through the **real read path** rather than a hand-built unit fixture: the obligation is that the presence of those keys does not flip the predicate. **If that framing is dropped, (c) is duplicate coverage and should be deleted rather than written.**
 
 ## Target Files
-- [ ] `SOURCE/app/(layer2)/__tests__/essayGrading.int.test.ts`
+- [x] `SOURCE/app/(layer2)/__tests__/essayGrading.int.test.ts` — including its **FILE STATUS header**, which still said "ALL THREE CASES BELOW ARE SKELETONS. Nothing here executes an assertion yet." That sentence became false with this commit. It was rewritten rather than deleted: the *reason* it gave still governs anyone adding a case here (a file with zero collected tasks makes vitest exit 1 with "No test suite found in file"), so the reason is kept and the false status is replaced.
 
 ## Investigation Targets
 - `SOURCE/app/(layer2)/__tests__/essayGrading.int.test.ts` (the skeleton's INT-2 and INT-3 annotations — `Primary failure mode` / `Proof obligation`)
@@ -55,22 +55,45 @@ The plain `scored: false` exclusion is **already covered at unit level** by `wro
 | Expected signal | INT-2(e): the **query shape** on both paths — `getResult()`'s select carries `created_at` and `listMyHistory()`'s embedded select carries **both** `per_question` and `created_at`. A missing column here is the exact mechanism of the primary failure mode and is **invisible to any assertion on mapped output alone** |
 
 ## Investigation Notes
-_(Record here: the independently authored literals used in INT-2(a) and INT-3(b); the fixture shapes for RS-6 and RS-4 in INT-2(b); confirmation that INT-3(c) is framed as "the new keys do not flip the predicate", not as a restatement of `wrongTwice.test.ts` Test 2.)_
+
+**The independently authored literal in INT-2(a)** — `true`, authored from the fixture by hand: the attempt holds one `failed` essay with `essayAttempts === ESSAY_MAX_ATTEMPTS` (RS-6, `retryAvailable` false). Agreement alone is asserted **and** the shared value is held against that literal, because two paths wrong in the same direction are equal.
+
+**The independently authored literals in INT-3(b)** — `total: 4`, `correct: 3`, `totalScore: 7.5`, hand-computed from the **four MCQs only**. The fixture is chosen so that counting the essay would move **all three**: 5 / 3.75 / 6.75. With a fixture where the numbers coincide, (b) would prove nothing. A fourth assertion pins `total − correct === 1`, because `ScoreCard` derives `wrong` that way and a leaked essay would silently redefine what that number means on a live surface.
+
+**The fixture shapes for RS-6 and RS-4 in INT-2(b)** — both in **one** attempt: `q-rs6` (`failed`, `essayAttempts: ESSAY_MAX_ATTEMPTS` ⇒ `retryAvailable: false`) and `q-rs4` (`failed`, `essayAttempts: 1` ⇒ `retryAvailable: true`). Their `EssayView`s are asserted individually, so the `true` in (a) is attributable to `q-rs6` alone. A **second** case then runs RS-4 *by itself* and requires `hasIncompleteEssay === false` on both paths while `hasUnresolvedEssay === true` — that is the case that separates "any failure" from "unrecoverable failure", and mutation **Q3** confirms it fires.
+
+**INT-3(c)'s framing, checked against the deduplication note before writing it** — the case asserts that the six lifecycle keys, arriving through the **real read path**, do not flip the wrong-twice predicate. It does **not** restate the plain `scored: false` exclusion, which `wrongTwice.test.ts` Test 2 (`:105-140`, fixture `Q-ESSAY`) already owns. Concretely: the graded essay is fed **twice**, on two distinct attempts, through `getResult()`'s real cross-attempt history read; the assertion is that its `hasBeenWrongTwice` stays `undefined` **while the six keys are present on the element**, alongside a genuinely twice-wrong MCQ as the positive control. Mutation **Q7** confirms the case fires; without the positive control it would also pass for a predicate that returned nothing at all.
+
+**One overlap declared rather than hidden**: EG-BE-027's arithmetic is also asserted in Task B2.1's `getResult` tests. INT-3(d) is not a copy — it runs the arithmetic **in the same attempt as the score triple** and asserts that adding two more essays moved neither ledger. That combination is what B2.1's version cannot see.
+
+### Mutation testing: 7 mutations, 7 caught
+
+| # | Mutation | Caught by |
+|---|---|---|
+| Q1 | `getResult` publishes *unresolved* as `hasIncompleteEssay` — the two doors disagree | INT-2(a), plus (b) and two (c) shapes |
+| Q2 | `listMyHistory` loses `created_at` — one path extended, the other not | INT-2(e), the query-shape case |
+| Q3 | RS-6 collapses to "any failure" | INT-2(b), the negative half |
+| Q4 | summary `max` counts every essay, not only `graded` | INT-3(d) |
+| Q5 | the essay band leaks into the score triple on the read path | INT-3(b) and (d) |
+| Q6 | `lowConfidence` dropped on the way out | INT-3(e)'s positive control |
+| Q7 | wrong-twice gating stops excluding unscored rows | INT-3(c), plus INT-2(f) |
+
+Q1 is the one worth naming: it is the exact shape of defect **F-06** — two derivations of one truth drifting apart — and it is caught because INT-2(a) drives **one** fixture through **both** doors rather than checking each in isolation.
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
-- [ ] Read all Investigation Targets, especially the skeleton's annotations and `wrongTwice.test.ts:105-140`
-- [ ] Author the literals **independently** — never captured from the implementation's output
-- [ ] Write INT-2 (a)–(f) and INT-3 (a)–(e); observe them fail
+- [x] Read all Investigation Targets, especially the skeleton's annotations and `wrongTwice.test.ts:105-140`
+- [x] Author the literals **independently** — never captured from the implementation's output
+- [x] Write INT-2 (a)–(f) and INT-3 (a)–(e); observe them fail — they were **green on first run**, because B2.1/B2.2/B2.3 landed the read paths in the three commits before this one. As in B1.6, the evidence is mutation testing instead: 7 mutations, 7 caught, listed above.
 
 ### 2. Green Phase
-- [ ] Bring both cases green against the real read paths with the Supabase client mocked at its sanctioned boundary
-- [ ] Confirm integration lane resolution is **3/3**
+- [x] Bring both cases green against the real read paths with the Supabase client mocked at its sanctioned boundary — one `driveBothReadPaths()` helper feeds **one** fixture to `getResult()` and then to `listMyHistory()`, re-pointing the shared `createClient()` mock between them. That is what lets a single fixture reach both doors, which is the whole subject of INT-2.
+- [x] Confirm integration lane resolution is **3/3** — 24 executing cases in the file, and the default lane now reports **no `todo` at all** (it reported 2 before this commit)
 
 ### 3. Refactor Phase
-- [ ] Re-read INT-3(c): if it is not framed as "the six new keys arriving through the real read path do not flip the predicate", **delete it** rather than shipping duplicate coverage
-- [ ] Confirm no snapshot is used anywhere
-- [ ] Confirm the added cases still pass
+- [x] Re-read INT-3(c): if it is not framed as "the six new keys arriving through the real read path do not flip the predicate", **delete it** rather than shipping duplicate coverage — re-read and kept; the framing is written into the case itself, above the assertions
+- [x] Confirm no snapshot is used anywhere — `toEqual` against hand-built literals throughout; no `toMatchSnapshot` in the file
+- [x] Confirm the added cases still pass
 
 ## Quality Assurance Mechanisms
 - `npx tsc --noEmit` (strict) — Config: `SOURCE/tsconfig.json` (project-wide)
@@ -84,12 +107,14 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
 
 | # | Command (from `SOURCE/`) | Exit code | Notes |
 |---|---|---|---|
-| 1 | `npx tsc --noEmit` | | |
-| 2 | `npx eslint --max-warnings 0` | | |
-| 3 | `npx vitest run` | | **this task's primary gate** |
-| 4 | `npm run build` | | |
-| 5 | `npm run test:fixture` | | expected red = TD-030 baseline only (Gate F1): exactly 2 failures, both `subscription.fixture.e2e.test.ts` FE-1(e) `en` + `vi` |
-| 6 | `npm run test:localdb` | | see Open Item I-7 |
+| 1 | `npx tsc --noEmit` | **0** | |
+| 2 | `npx eslint --max-warnings 0` | **0** | |
+| 3 | `npx vitest run` | **0** | **primary gate** — 1876 passed / 10 skipped / **0 todo** (+13). The todo count reaching zero is this task's deliverable, not a side effect |
+| 4 | `npm run build` | **0** | |
+| 5 | `npm run test:fixture` | **1** | **Expected red, TD-030 baseline exactly as Gate F1 names it**: 2 failures, both `subscription.fixture.e2e.test.ts` FE-1 (e) — `locale en` and `locale vi` |
+| 6 | `npm run test:localdb` | **0** | first attempt, 11 passed / 2 todo |
+
+**Known-red window:** `npm run verify:schema` (dev) exits **1** with exactly **one** failing assertion, the character ceiling. Red by design from H7 until B3.3.
 
 **A task file with any exit-code cell left empty is not complete** (Gate E4).
 **Known-red window (Fix I002)**: this commit sits between H7 and B3.3 — if `verify:schema` is run, its character-ceiling assertion is red **by design**; record it as expected.
@@ -126,11 +151,11 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
   - **Primary failure mode**: the display-only flag leaking into arithmetic (AC-046). **Boundary**: as above. **State assertion**: N/A. **Mock rationale**: as above. **Residual**: the display half is F-B1's (FE-AC-04).
 
 ## Completion Criteria
-- [ ] **Implementation Complete** = INT-2 and INT-3 executing
-- [ ] **Quality Complete** = `npx vitest run` green
-- [ ] **Integration Complete** = integration lane resolution **3/3**, unresolved `it.todo`: **0**
-- [ ] Every Reference Contract Compliance Check evaluates to `Y`
-- [ ] Every exit-code cell in the Gate E4 table above is filled
+- [x] **Implementation Complete** = INT-2 and INT-3 executing
+- [x] **Quality Complete** = `npx vitest run` green
+- [x] **Integration Complete** = integration lane resolution **3/3**, unresolved `it.todo`: **0** — verified two ways: the lane summary reports no todo, and `grep "it\.todo("` matches nothing in the file (the four remaining textual hits are all inside comments)
+- [x] Every Reference Contract Compliance Check evaluates to `Y` — EG-BE-004 by INT-3(a)'s `"scored" in element`; EG-BE-027 by INT-3(d) under mutation Q4; EG-BE-034 by INT-2(d) with both a positive and a negative control
+- [x] Every exit-code cell in the Gate E4 table above is filled
 
 ## Notes
 - Impact scope: none in production code.
