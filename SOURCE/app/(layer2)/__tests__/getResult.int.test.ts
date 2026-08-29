@@ -137,7 +137,7 @@
 // attempt on it. Obligation (e) counts that trip as the .rpc() rather than as a
 // second .from().
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { fromMock, rpcMock } = vi.hoisted(() => ({ fromMock: vi.fn(), rpcMock: vi.fn() }));
 
@@ -593,5 +593,332 @@ describe("getResult() — additive select extension, byte-identical pre-existing
     expect(result).not.toBeNull();
     expect(result!.submittedAt).toBeNull();
     expect(Object.prototype.hasOwnProperty.call(result!, "submittedAt")).toBe(true);
+  });
+});
+
+// =============================================================================
+// Test 3 — getResult(): created_at in the select, and the three derived essay
+//          fields attached at read time (ADR-0018, Task B2.1)
+// =============================================================================
+// AC: EG-BE-023 (deadline boundary, EXCLUSIVE `>`), EG-BE-024/025 (missing key
+//   is silent; an unrecognised value warns exactly once and never carries the
+//   student's writing), EG-BE-026 (`retryAvailable` is a boolean and no attempt
+//   count crosses to the client), EG-BE-027 (only `graded` contributes to earned
+//   AND max), EG-BE-031/AC-012 (a row written before the feature ships reads out
+//   identically to today).
+// @lane: integration
+// @dependency: SOURCE/app/(layer2)/queries.ts (getResult) + REAL
+//   SOURCE/lib/scoring/essayLifecycle.ts + mocked Supabase client
+// @real-dependency: none — the same sanctioned createClient() boundary as Test 2.
+//
+// WHAT THIS FILE ADDS OVER essayLifecycle's own unit tests, which is the only
+// thing that justifies the cases being here: H1 proves the derivations. This
+// proves the QUERY LAYER feeds them correctly — that `created_at` is actually
+// requested, that the value handed to `deriveEssayView` is `exam_results`'s own
+// timestamp and not the attempt's, and that one frozen `now` is shared by all
+// three attachments. None of that is visible to a pure-function test.
+//
+// TIME IS FROZEN, never read from the real clock: the deadline is 600 000 ms and
+// the boundary is exclusive, so a real clock turns the three cases below into
+// three time bombs — green today, red on an afternoon nobody touched them.
+
+const ESSAY_NOW = new Date("2026-08-29T12:00:00.000Z");
+const DEADLINE_MS = 600_000;
+
+/** created_at values expressed as an offset from the frozen `now`, so the
+ *  relationship each case is about is visible at the call site rather than
+ *  hidden inside two ISO strings the reader has to subtract. */
+function createdAtBefore(ms: number): string {
+  return new Date(ESSAY_NOW.getTime() - ms).toISOString();
+}
+
+const ESSAY_EXAM = { id: "exam-essay", title: "Đề có câu tự luận", subject: "Ngữ văn" };
+const ESSAY_STARTED_AT = "2026-08-29T11:00:00.000Z";
+const ESSAY_SUBMITTED_AT = "2026-08-29T11:50:00.000Z";
+
+/** A stored `per_question` element with no `essay*` key at all — the legacy /
+ *  feature-off shape, byte-identical to what `computeScore()` emits today. */
+const LEGACY_ELEMENT = {
+  questionId: "q-essay",
+  selected: "Bài làm của học sinh, không bao giờ được vào log.",
+  isCorrect: false,
+  scored: false,
+};
+
+function pendingElement(overrides: Record<string, unknown> = {}) {
+  return {
+    ...LEGACY_ELEMENT,
+    essayState: "pending",
+    essayEarned: null,
+    essayMax: null,
+    essayLowConfidence: false,
+    essayAttempts: 0,
+    ...overrides,
+  };
+}
+
+/** Wires the mocked client for getResult()'s two round trips with an essay-shaped
+ *  result row. Deliberately a separate helper from `mockGetResultChain`: this one
+ *  drives `per_question` and `created_at`, which that one does not express, and
+ *  widening the shared helper would make Test 2's fixtures depend on this task. */
+function mockEssayResultChain(perQuestion: unknown[], createdAt: string) {
+  rpcMock.mockImplementation(async (fn: string) => {
+    if (fn === "exam_answer_key") return { data: [], error: null };
+    throw new Error(`unexpected rpc: ${fn}`);
+  });
+
+  const selectArgs: string[] = [];
+
+  fromMock.mockImplementation((table: string) => {
+    if (table !== "exam_results") throw new Error(`unexpected table: ${table}`);
+    const builder: Record<string, unknown> = {
+      select: (arg: string) => {
+        selectArgs.push(arg);
+        return builder;
+      },
+      eq: () => builder,
+      limit: () => builder,
+      maybeSingle: async () => ({
+        data: {
+          total_score: 5,
+          correct: 1,
+          total: 2,
+          per_question: perQuestion,
+          topic_breakdown: [{ topic: "Nghị luận", correct: 1, total: 1 }],
+          overtime_seconds: 0,
+          created_at: createdAt,
+          exam_attempts: {
+            started_at: ESSAY_STARTED_AT,
+            submitted_at: ESSAY_SUBMITTED_AT,
+            exams_with_difficulty: ESSAY_EXAM,
+          },
+        },
+        error: null,
+      }),
+    };
+    return builder;
+  });
+
+  return { selectArgs };
+}
+
+describe("getResult() — created_at in the select and the three derived essay fields (Test 3)", () => {
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    fromMock.mockReset();
+    rpcMock.mockReset();
+    vi.useFakeTimers();
+    vi.setSystemTime(ESSAY_NOW);
+    warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    warnSpy.mockRestore();
+    vi.useRealTimers();
+  });
+
+  it("the joined select requests exam_results.created_at (D-02 — it was absent before this task)", async () => {
+    const { selectArgs } = mockEssayResultChain([pendingElement()], createdAtBefore(0));
+
+    await getResult(ATTEMPT_ID);
+
+    // Located by shape, not by index — two exam_results reads share this recorder.
+    const joinSelectArg = selectArgs.find((arg) => arg.includes("exam_attempts!inner("));
+    expect(joinSelectArg).toBeDefined();
+    expect(joinSelectArg).toContain("created_at");
+    // NOT satisfied by the attempt's timestamps: the deadline is measured from
+    // when the RESULT row was written, and the two differ by however long
+    // record_exam_result() took. A select carrying only submitted_at would pass
+    // any assertion made on the mapped output, because the mock hands back
+    // whatever it is asked for.
+    expect(joinSelectArg).toMatch(/(^|,\s*)created_at(\s*,|,|$)/);
+  });
+
+  it.each([
+    ["599 999 ms — under the deadline", DEADLINE_MS - 1, "pending"],
+    ["exactly 600 000 ms — ON the deadline, still pending (EXCLUSIVE >)", DEADLINE_MS, "pending"],
+    ["600 001 ms — past the deadline", DEADLINE_MS + 1, "failed"],
+  ])(
+    "EG-BE-023 deadline boundary: created_at %s ⇒ state %s",
+    async (_label, age, expected) => {
+      mockEssayResultChain([pendingElement()], createdAtBefore(age as number));
+
+      const result = await getResult(ATTEMPT_ID);
+
+      // The middle case is the one that matters. `>=` instead of `>` flips it and
+      // nothing else in the suite would notice: an attempt read at exactly the
+      // deadline would be told its grading failed while a writer could still be
+      // alive.
+      expect(result!.result.perQuestion[0].essay?.state).toBe(expected);
+    },
+  );
+
+  it("EG-BE-024: an element with no essay key yields essay === undefined and logs NOTHING", async () => {
+    mockEssayResultChain([LEGACY_ELEMENT], createdAtBefore(DEADLINE_MS * 10));
+
+    const result = await getResult(ATTEMPT_ID);
+
+    expect(result!.result.perQuestion[0].essay).toBeUndefined();
+    // A warning per legacy question per render would turn every old result page
+    // into a log flood, and the deadline being long past must not change that.
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it("EG-BE-025: an unrecognised essayState yields undefined, warns EXACTLY once, and the warning never carries the student's writing", async () => {
+    mockEssayResultChain(
+      [pendingElement({ essayState: "in_review" })],
+      createdAtBefore(0),
+    );
+
+    const result = await getResult(ATTEMPT_ID);
+
+    expect(result!.result.perQuestion[0].essay).toBeUndefined();
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+
+    // AC-056: the student's answer is UGC and never reaches a server log. Assert
+    // on the serialised payload rather than on the object's shape — the failure
+    // this guards is prose arriving through some field nobody thought about.
+    const logged = JSON.stringify(warnSpy.mock.calls[0]);
+    expect(logged).toContain("q-essay");
+    expect(logged).toContain("in_review");
+    expect(logged).not.toContain("Bài làm của học sinh");
+  });
+
+  it("EG-BE-025 second half: a mixed row warns once for the bad element and the summary counts only the derivable ones", async () => {
+    // The filtering that keeps the warning count at one must not also drop a
+    // GOOD element from the aggregates. This is the case that separates
+    // "warned once" from "warned once because it stopped looking".
+    mockEssayResultChain(
+      [
+        pendingElement({
+          questionId: "q-graded",
+          essayState: "graded",
+          essayEarned: 0.5,
+          essayMax: 1,
+        }),
+        pendingElement({ questionId: "q-broken", essayState: "in_review" }),
+      ],
+      createdAtBefore(0),
+    );
+
+    const result = await getResult(ATTEMPT_ID);
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(result!.essaySummary).toEqual({
+      earned: 0.5,
+      max: 1,
+      gradedCount: 1,
+      pendingCount: 0,
+      failedCount: 0,
+      unresolvedCount: 0,
+    });
+    expect(result!.result.perQuestion[0].essay?.state).toBe("graded");
+    expect(result!.result.perQuestion[1].essay).toBeUndefined();
+  });
+
+  it("EG-BE-026: the client-facing essay view carries a BOOLEAN retryAvailable and no attempt count under any name", async () => {
+    mockEssayResultChain(
+      [pendingElement({ essayState: "failed", essayAttempts: 1 })],
+      createdAtBefore(0),
+    );
+
+    const result = await getResult(ATTEMPT_ID);
+    const view = result!.result.perQuestion[0].essay!;
+
+    expect(typeof view.retryAvailable).toBe("boolean");
+    expect(view.retryAvailable).toBe(true);
+    // Exhaustive key set, not "essayAttempts is absent": AC-044 forbids the
+    // COUNT reaching the client, and a count renamed on the way out would pass
+    // any assertion that only checks the old name.
+    expect(Object.keys(view).sort()).toEqual([
+      "earned",
+      "lowConfidence",
+      "max",
+      "retryAvailable",
+      "state",
+    ]);
+    expect(JSON.stringify(view)).not.toContain("1");
+  });
+
+  it("EG-BE-027: only a graded essay contributes to earned AND to max; hasIncompleteEssay is true when one essay has stopped at RS-6", async () => {
+    mockEssayResultChain(
+      [
+        pendingElement({
+          questionId: "q-graded",
+          essayState: "graded",
+          essayEarned: 0.75,
+          essayMax: 1,
+          essayAttempts: 1,
+        }),
+        pendingElement({ questionId: "q-pending" }),
+        pendingElement({
+          questionId: "q-exhausted",
+          essayState: "failed",
+          essayAttempts: 3,
+        }),
+      ],
+      createdAtBefore(0),
+    );
+
+    const result = await getResult(ATTEMPT_ID);
+
+    // Independently authored: 1 graded question ⇒ max is 1, NOT 3. A failed essay
+    // adding 0 to earned and 1 to max is the silent zero AC-015 forbids, and it
+    // would look entirely reasonable at the point someone wrote it.
+    expect(result!.essaySummary).toEqual({
+      earned: 0.75,
+      max: 1,
+      gradedCount: 1,
+      pendingCount: 1,
+      failedCount: 1,
+      unresolvedCount: 1,
+    });
+    // RS-6 = failed AND out of retries. q-exhausted is the only one.
+    expect(result!.hasIncompleteEssay).toBe(true);
+  });
+
+  it("EG-BE-031 / AC-012: a legacy row reads out IDENTICALLY to today — the whole ExamResult equals a hand-built pre-change literal", async () => {
+    mockEssayResultChain([LEGACY_ELEMENT], createdAtBefore(DEADLINE_MS * 10));
+
+    const result = await getResult(ATTEMPT_ID);
+
+    // Hand-built from the mocked row above, in the shape getResult() returned
+    // BEFORE this task — plus the one required new field. This is AC-012's
+    // sharpest edge: if an old row grows a populated field, "no backfill" broke
+    // on the READ path, where it is much harder to see than on the write path.
+    expect(result).toEqual({
+      examId: "exam-essay",
+      examTitle: "Đề có câu tự luận",
+      subject: "Ngữ văn",
+      result: {
+        totalScore: 5,
+        correct: 1,
+        total: 2,
+        perQuestion: [
+          {
+            questionId: "q-essay",
+            selected: "Bài làm của học sinh, không bao giờ được vào log.",
+            isCorrect: false,
+            scored: false,
+          },
+        ],
+        topicBreakdown: [{ topic: "Nghị luận", correct: 1, total: 1 }],
+      },
+      questions: {},
+      startedAt: ESSAY_STARTED_AT,
+      submittedAt: ESSAY_SUBMITTED_AT,
+      overtimeSeconds: 0,
+      hasIncompleteEssay: false,
+    });
+
+    // `toEqual` treats a key holding `undefined` as absent, so the two fields
+    // that must be ABSENT-OR-UNDEFINED are asserted on their own rather than
+    // being trusted to the comparison above.
+    expect(result!.essaySummary).toBeUndefined();
+    expect(result!.result.perQuestion.every((r) => r.essay === undefined)).toBe(true);
+    // Required, always computable — a PDF annotation cannot be decided by an
+    // `undefined`, so the type being `boolean` is only half the guarantee.
+    expect(typeof result!.hasIncompleteEssay).toBe("boolean");
   });
 });

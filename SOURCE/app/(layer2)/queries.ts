@@ -18,6 +18,12 @@ import {
   RATING_MIN,
 } from "@/lib/rating";
 import { computeWrongTwiceQuestionIds, type WrongTwiceAttempt } from "@/lib/scoring/wrongTwice";
+import {
+  deriveEssayView,
+  hasIncompleteEssay,
+  summariseEssays,
+  type EssaySummary,
+} from "@/lib/scoring/essayLifecycle";
 import { resolveSignedImageUrl } from "@/lib/ugc/imageUrl";
 import type { Exam } from "@/types/exam";
 import type { Choice, PublicQuestion } from "@/types/question";
@@ -472,6 +478,11 @@ type ResultRow = {
   total: number;
   per_question: ScoreResult["perQuestion"];
   topic_breakdown: ScoreResult["topicBreakdown"];
+  /** Mốc bắt đầu của hạn chờ chấm tự luận (ADR-0018/AC-026). KHÔNG có trong
+   *  select trước ADR-0018 — D-02. `exam_attempts.submitted_at` KHÔNG thay thế
+   *  được: hai mốc lệch nhau đúng bằng thời gian `record_exam_result()` chạy,
+   *  và AC-026 nêu đích danh `exam_results.created_at`. */
+  created_at: string;
 };
 
 /** Nội dung một câu để render màn Chi tiết (post-submit nên kèm được lựa chọn).
@@ -503,6 +514,20 @@ export type ExamResult = {
    * DB tự tính trong record_exam_result() từ started_at + duration_minutes —
    * client không khai được, kể cả khi tắt JS để vô hiệu hoá đồng hồ đếm ngược. */
   overtimeSeconds: number;
+  /** Tổng hợp mức-lượt-thi của các câu tự luận, hoặc `undefined` khi KHÔNG dòng
+   * nào mang khoá vòng đời (dòng cũ / tính năng tắt). `undefined` chứ không phải
+   * một summary toàn số 0 chính là thứ giữ AC-012 đúng trên đường ĐỌC: một dòng
+   * ghi trước khi tính năng ship không mọc thêm trường nào có giá trị. */
+  essaySummary?: EssaySummary;
+  /** Có câu tự luận nào đã dừng hẳn ở RS-6 (thất bại, hết lượt) không — điều
+   * kiện in chú thích PDF (O-8/AC-058).
+   *
+   * BẮT BUỘC, không phải tuỳ chọn, và đó là chỗ hai mục của Design Doc bất đồng
+   * (Open Item I-4): bản kế hoạch theo § Interface Change Matrix. Lý do là một
+   * lý do sản phẩm chứ không phải sở thích kiểu — trường này là ĐẦU VÀO QUYẾT
+   * ĐỊNH của chú thích PDF, nên một ca `undefined` ở đây là một tệp PDF không
+   * quyết được nội dung. Luôn tính được: `false` khi không có khoá nào. */
+  hasIncompleteEssay: boolean;
 };
 
 /** Lịch sử làm bài của CHÍNH user đang đăng nhập, rút gọn còn đúng phần
@@ -577,7 +602,7 @@ export async function getResult(attemptId: string): Promise<ExamResult | null> {
     supabase
       .from("exam_results")
       .select(
-        "total_score, correct, total, per_question, topic_breakdown, overtime_seconds, exam_attempts!inner(started_at, submitted_at, exams_with_difficulty!inner(id, title, subject))"
+        "total_score, correct, total, per_question, topic_breakdown, overtime_seconds, created_at, exam_attempts!inner(started_at, submitted_at, exams_with_difficulty!inner(id, title, subject))"
       )
       .eq("attempt_id", attemptId)
       .eq("exam_attempts.exams_with_difficulty.status", "published")
@@ -603,10 +628,40 @@ export async function getResult(attemptId: string): Promise<ExamResult | null> {
   // caller chứ không nằm trong computeWrongTwiceQuestionIds()). Mọi trường cũ
   // của mỗi dòng giữ nguyên giá trị, chỉ thêm đúng một trường tuỳ chọn.
   const wrongTwiceQuestionIds = computeWrongTwiceQuestionIds(wrongTwiceAttempts);
-  const perQuestion: PerQuestionResult[] = row.per_question.map((r) => ({
+
+  // MỘT `now` cho cả lượt đọc, đọc ĐÚNG MỘT LẦN — không phải một `new Date()`
+  // cho mỗi dòng và một cái nữa cho summary. Hạn chờ là 10 phút và phép suy
+  // diễn dùng biên LOẠI TRỪ, nên hai lần đọc đồng hồ cách nhau một phần triệu
+  // giây vẫn có thể nằm hai bên hạn chờ: khi đó `essaySummary.pendingCount`
+  // đếm một câu mà `perQuestion[i].essay.state` đã gọi là `"failed"`, và trang
+  // kết quả tự mâu thuẫn với chính nó ở một khuyết tật không tái hiện được.
+  const now = new Date();
+  const createdAt = row.created_at;
+
+  // Suy diễn ĐÚNG MỘT LẦN cho mỗi phần tử, và đó KHÔNG phải tối ưu hoá — nó là
+  // một sửa lỗi. `summariseEssays()` và `hasIncompleteEssay()` mỗi hàm tự gấp
+  // lại mảng một lượt, nên gọi thẳng cả ba trên `row.per_question` sẽ chạy
+  // `deriveEssayView()` BA lần trên cùng một phần tử; với một `essayState` không
+  // nhận ra, EG-BE-025 hứa ĐÚNG MỘT `console.warn` còn thực tế nhả ra ba, mỗi
+  // lần render. Một test của Task B2.1 bắt được đúng chuyện đó.
+  const essayViews = row.per_question.map((r) => deriveEssayView(r, createdAt, now));
+
+  // Chỉ những phần tử THỰC SỰ suy ra được view mới đi tiếp vào hai hàm tổng
+  // hợp. Đầu ra không đổi một chút nào: `essayLifecycle` vốn đã bỏ qua mọi phần
+  // tử suy ra `null` (dòng cũ, câu không phải tự luận, giá trị lạ), nên lọc
+  // trước hay lọc trong đều cho cùng tập view — khác nhau duy nhất ở chỗ phần
+  // tử hỏng không bị hỏi lại hai lần nữa.
+  const derivableRows = row.per_question.filter((_, i) => essayViews[i] !== null);
+
+  const perQuestion: PerQuestionResult[] = row.per_question.map((r, i) => ({
     ...r,
     hasBeenWrongTwice:
       r.scored !== false && !r.isCorrect ? wrongTwiceQuestionIds.has(r.questionId) : undefined,
+    // `?? undefined` chứ không giữ `null`: `null` là câu trả lời của
+    // `deriveEssayView()` ("dòng này KHÔNG ÁP DỤNG"), còn hợp đồng đọc phơi ra
+    // ngoài dùng `undefined` cho đúng ca đó — cùng quy ước với
+    // `hasBeenWrongTwice` ngay trên.
+    essay: essayViews[i] ?? undefined,
   }));
 
   const result: ScoreResult = {
@@ -667,5 +722,14 @@ export async function getResult(attemptId: string): Promise<ExamResult | null> {
     submittedAt: attempt.submitted_at,
     // Dòng cũ (trước khi có cột) đọc lên null → coi như trong giờ.
     overtimeSeconds: row.overtime_seconds ?? 0,
+    // Suy từ MẢNG ĐÃ LƯU (`row.per_question`), không phải từ `perQuestion` vừa
+    // gắn thêm trường: hai bên cho cùng kết quả hôm nay, nhưng chỉ mảng đã lưu
+    // mới đúng là thứ `essayLifecycle` nhận hợp đồng — nó đọc khoá jsonb thô.
+    essaySummary: summariseEssays(derivableRows, createdAt, now),
+    // KHÔNG tự suy lại `state === "failed" && !retryAvailable` ở đây: RS-6 được
+    // khai đúng một chỗ trong repo, trong `essayLifecycle.ts` (EG-BE-036). Hai
+    // lối xuất PDF đọc cùng hàm này nên chúng không thể sinh ra hai tệp khác
+    // nhau cho cùng một lượt thi.
+    hasIncompleteEssay: hasIncompleteEssay(derivableRows, createdAt, now),
   };
 }

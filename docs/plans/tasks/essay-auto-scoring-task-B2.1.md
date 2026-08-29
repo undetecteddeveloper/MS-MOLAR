@@ -39,8 +39,10 @@ The backend Design Doc's Agreement Checklist line for `getResult()` names only `
 `now` is **injected and frozen**. `ESSAY_PENDING_DEADLINE_MS` is 600 000; a real clock makes these cases a time bomb.
 
 ## Target Files
-- [ ] `SOURCE/app/(layer2)/queries.ts`
-- [ ] `SOURCE/types/result.ts`
+- [x] `SOURCE/app/(layer2)/queries.ts`
+- [x] `SOURCE/types/result.ts`
+- [x] `SOURCE/app/(layer2)/__tests__/getResult.int.test.ts` — **not in the original list**; the task's own Implementation Steps say "write the tests" and its Operation Verification Method is an Output Comparison, so a test file was always required. It lands in the existing `getResult()` integration file, at the sanctioned `createClient()` boundary, rather than in a new one.
+- [x] `SOURCE/tests/e2e/fixture/subscription.fixture.e2e.test.ts` — **not in the original list, and found by `tsc`, exactly as this task's Quality Assurance section predicted** ("the required `hasIncompleteEssay` names any site that forgot it"). One call site constructs a literal `ExamResult`; it gained `hasIncompleteEssay: false`, which is the correct value there — the fixture has no essay question, so it cannot have an RS-6.
 
 ## Investigation Targets
 - `docs/design/essay-auto-scoring-backend-design.md` (§ Agreement Checklist Scope — `getResult()` adds `created_at` to the select and to `ResultRow`; attaches `essay?`, `essaySummary?`, `hasIncompleteEssay`)
@@ -72,24 +74,53 @@ The backend Design Doc's Agreement Checklist line for `getResult()` names only `
 Roundtrip check this task owns: a legacy row (no essay keys) reads out **identically to today**, with `essaySummary === undefined` and every `PerQuestionResult.essay === undefined`.
 
 ## Investigation Notes
-_(Record here: the confirmed absence of `created_at` in today's select; the hand-built legacy-shape literal used for the Output Comparison; the frozen `now` used in the boundary cases.)_
+
+**The confirmed absence of `created_at` in today's select** — confirmed by reading, not by trusting D-02: the select string was `"total_score, correct, total, per_question, topic_breakdown, overtime_seconds, exam_attempts!inner(started_at, submitted_at, exams_with_difficulty!inner(id, title, subject))"`, and `ResultRow` declared five fields, none of them a timestamp. Both now carry `created_at`. No DDL — the column already exists on `exam_results`.
+
+**The hand-built legacy-shape literal used for the Output Comparison** — the whole `ExamResult` for a row whose single `per_question` element carries no `essay*` key: `{ examId, examTitle, subject, result: { totalScore, correct, total, perQuestion: [the four-key element], topicBreakdown }, questions: {}, startedAt, submittedAt, overtimeSeconds: 0, hasIncompleteEssay: false }`. Two assertions sit **outside** that comparison on purpose: `toEqual` treats a key holding `undefined` as absent, so `essaySummary === undefined` and `every(r => r.essay === undefined)` are asserted separately, plus `typeof hasIncompleteEssay === "boolean"`.
+
+**The frozen `now` used in the boundary cases** — `2026-08-29T12:00:00.000Z`, set through `vi.setSystemTime`, with each `created_at` written as an offset from it (`now − 599 999`, `now − 600 000`, `now − 600 001`) so the relationship each case is about is visible at the call site instead of hidden inside two ISO strings the reader has to subtract.
+
+`getResult()`'s **signature is unchanged** and `now` is **not** a parameter — the backend DD's Interface Change Matrix says "cùng chữ ký". So `now` is read once inside the function and injected into all three derivations; the test freezes the clock rather than passing a value.
+
+### The red phase found a real defect — in this task's own first draft
+
+The EG-BE-025 case failed on the first run: **`expected "warn" to be called 1 times, but got 3 times`**.
+
+The cause was in the call site, not in `essayLifecycle`. `summariseEssays()` and `hasIncompleteEssay()` each fold the array themselves, so calling all three helpers on `row.per_question` runs `deriveEssayView()` **three times per element** — and for an unrecognised `essayState`, EG-BE-025 promises exactly one `console.warn` while the page emitted three, on every render.
+
+Fixed at the cause rather than by relaxing the assertion: each element is derived **once**, and only the elements that actually produced a view are handed to the two aggregate helpers. The output is provably unchanged — `essayLifecycle` already discards every element that derives to `null`, so filtering before the fold and filtering inside it yield the same view list. A second case (`EG-BE-025 second half`) pins that the filtering did not also drop a **good** element from the aggregates, which is what separates "warned once" from "warned once because it stopped looking".
+
+### Mutation testing: 7 mutations, 7 caught
+
+| # | Mutation | Caught by |
+|---|---|---|
+| N1 | deadline boundary becomes inclusive (`>=`) | EG-BE-023, the **middle** case |
+| N2 | `created_at` dropped from the joined select | the select-shape case |
+| N3 | deadline measured from `exam_attempts.submitted_at` | EG-BE-023 boundary cases |
+| N4 | the derive-once fix reverted (three folds again) | both EG-BE-025 cases |
+| N5 | `null` kept instead of `undefined` on the read contract | EG-BE-031, plus two **pre-existing** Test 2 obligations |
+| N6 | `hasIncompleteEssay` hardcoded `false` | EG-BE-027, RS-6 half |
+| N7 | summary `max` counts every essay, not only `graded` | EG-BE-027 arithmetic |
+
+N3 is worth its own line: it is the mutation a mocked client normally cannot catch, because a mock hands back whatever it is asked for. It is caught only because the fixture's `created_at` and `submitted_at` are deliberately **different** timestamps.
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
-- [ ] Read all Investigation Targets and record key observations
-- [ ] **Sweep the adjacent cases** (Change Category: boundary-change): `listMyHistory()`'s select (B2.2) and both PDF construction sites (B2.3) — a column added on one read path and not the other is the primary failure mode INT-2 guards
-- [ ] Write the tests: the three deadline boundary cases, the missing/unrecognised-key cases, the arithmetic case, and the legacy-row Output Comparison against a **hand-built literal**; observe them fail
+- [x] Read all Investigation Targets and record key observations
+- [x] **Sweep the adjacent cases** (Change Category: boundary-change): `listMyHistory()`'s select and both PDF construction sites are **deliberately untouched here** — they are Tasks B2.2 and B2.3, and INT-2 (Task B2.4) is the case that will hold the two read paths against each other. Recorded so the sweep is visibly a decision rather than an omission.
+- [x] Write the tests: the three deadline boundary cases, the missing/unrecognised-key cases, the arithmetic case, and the legacy-row Output Comparison against a **hand-built literal**; observe them fail — **one of them did fail, on a real defect** (see Investigation Notes). The others were green on first run because the implementation landed in the same commit, so they are backed by mutation testing instead.
 
 ### 2. Green Phase
-- [ ] Add `created_at` to the select **and** to `ResultRow`
-- [ ] Attach `essay?`, `essaySummary?` and the **required** `hasIncompleteEssay`
-- [ ] Add `essay?: EssayView` to `PerQuestionResult` and fix the reason at `types/result.ts:14-17`
-- [ ] Run only the added tests and confirm they pass
+- [x] Add `created_at` to the select **and** to `ResultRow`
+- [x] Attach `essay?`, `essaySummary?` and the **required** `hasIncompleteEssay`
+- [x] Add `essay?: EssayView` to `PerQuestionResult` and fix the reason at `types/result.ts:14-17` — the value and behaviour are unchanged; only the *reason* moved from "there is nothing to grade" to "the band is written **outside** `computeScore()` and the row deliberately stays out of the denominator in every lifecycle state"
+- [x] Run only the added tests and confirm they pass — **17 passed** in that file — 7 pre-existing plus 10 new, matching the full lane's +10
 
 ### 3. Refactor Phase
-- [ ] Confirm `now` is injected and frozen in every time-dependent case
-- [ ] Confirm nothing re-derives `state === "failed" && !retryAvailable` locally (EG-BE-036 — it lives only in `essayLifecycle.ts`)
-- [ ] Confirm the added tests still pass
+- [x] Confirm `now` is injected and frozen in every time-dependent case — `vi.setSystemTime` in the block's `beforeEach`, `vi.useRealTimers()` in `afterEach`; no case reads the real clock
+- [x] Confirm nothing re-derives `state === "failed" && !retryAvailable` locally (EG-BE-036 — it lives only in `essayLifecycle.ts`) — `queries.ts` calls `hasIncompleteEssay()` and never restates the predicate; N6 confirms the call is load-bearing
+- [x] Confirm the added tests still pass
 
 ## Quality Assurance Mechanisms
 - `npx tsc --noEmit` (strict) — Enforces: the required `hasIncompleteEssay` names any site that forgot it — Config: `SOURCE/tsconfig.json` (project-wide)
@@ -103,12 +134,21 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
 
 | # | Command (from `SOURCE/`) | Exit code | Notes |
 |---|---|---|---|
-| 1 | `npx tsc --noEmit` | | |
-| 2 | `npx eslint --max-warnings 0` | | |
-| 3 | `npx vitest run` | | |
-| 4 | `npm run build` | | |
-| 5 | `npm run test:fixture` | | expected red = TD-030 baseline only (Gate F1): exactly 2 failures, both `subscription.fixture.e2e.test.ts` FE-1(e) `en` + `vi` |
-| 6 | `npm run test:localdb` | | see Open Item I-7 |
+| 1 | `npx tsc --noEmit` | **0** | first run was **2**, and that was the gate doing its job: it named the one `ExamResult` construction site that had not been given the new required field |
+| 2 | `npx eslint --max-warnings 0` | **0** | |
+| 3 | `npx vitest run` | **0** | 1858 passed / 10 skipped / 2 todo (**+10** from this task). See the network note below — the first attempt exited 1 on a 5 s timeout in `recordSkillMastery.int.test.ts` |
+| 4 | `npm run build` | **0** | |
+| 5 | `npm run test:fixture` | **1** | **Expected red, TD-030 baseline exactly as Gate F1 names it**: 2 failures, both `subscription.fixture.e2e.test.ts` FE-1 (e) — `locale en` and `locale vi`. This task **edits that file**, so the count matching the baseline exactly is the thing worth noting |
+| 6 | `npm run test:localdb` | **0** | on the fourth attempt, with **zero** timeouts. See the network note |
+
+**Known-red window:** `npm run verify:schema` (dev) exits **1** with exactly **one** failing assertion, the character ceiling. Its own first attempt exited 1 with **zero** failing assertions and `❌ Schema verify lỗi: fetch failed` — the network signature again, and the cleanest single piece of evidence for it.
+
+### Network conditions during this task, stated with evidence rather than as an excuse
+
+Two gates went red for infrastructure reasons and were **discriminated, not dismissed**:
+
+- **Gate 3, first attempt** — `recordSkillMastery.int.test.ts` timed out at 5 000 ms on a test that makes a real dev-Postgres round trip. Run alone with the change in the tree: **2 passed**. Re-run of the full lane: **0**, 1858 passed.
+- **Gate 6** — `subscription.service.e2e.test.ts` failed on attempts 1, 2 and 3 and passed on attempt 4. Four independent reasons it is not this change: (i) the three failures were a `TypeError: fetch failed`, a 60 s test timeout and a suite-level hook failure — **three different shapes, zero assertion failures**; (ii) each run failed a **different** case; (iii) the file imports **none** of the four modules this task touches (checked, not assumed); (iv) the same lane exited 0 twice earlier in this session and again on attempt 4 here, with zero timeouts.
 
 **A task file with any exit-code cell left empty is not complete** (Gate E4).
 **Known-red window (Fix I002)**: this commit sits between H7 and B3.3 — if `verify:schema` is run, its character-ceiling assertion is red **by design**; record it as expected.
@@ -132,13 +172,14 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
   - **Primary failure mode**: an old row growing a populated field — "no backfill" broken on the **read** path. **Boundary**: in-process against a hand-built literal of the pre-change shape. **State assertion**: N/A. **Mock rationale**: as above. **Residual**: the `/history` pipeline's equivalent is Task B2.2's.
 
 ## Completion Criteria
-- [ ] **Implementation Complete** = select, type and three attachments
-- [ ] **Quality Complete** = six verify gates green
+- [x] **Implementation Complete** = select, type and three attachments
+- [x] **Quality Complete** = six verify gates green (gate 5 red at the TD-030 baseline, by definition)
 - [ ] **Integration Complete** = **L1** on dev — the result page's data layer carries correct lifecycle values for a seeded graded attempt
-- [ ] Output Comparison pipeline 2 green against a hand-built literal (**no snapshots**)
-- [ ] `types/result.ts:14-17`'s reason corrected — **no value or behaviour change**
-- [ ] Every Reference Contract Compliance Check evaluates to `Y`
-- [ ] Every exit-code cell in the Gate E4 table above is filled
+  - **OPEN, and blocked on the same decision as Task B1.5's L1**: there is no seeded *graded* attempt on dev until grading has actually run once, which needs `ESSAY_GRADING_ENABLED=true` and a real call to `api.groq.com`. Not something to start unasked.
+- [x] Output Comparison pipeline 2 green against a hand-built literal (**no snapshots**)
+- [x] `types/result.ts:14-17`'s reason corrected — **no value or behaviour change**
+- [x] Every Reference Contract Compliance Check evaluates to `Y` — EG-BE-027 by the arithmetic case under mutations N7 and N6; EG-BE-026 by the exhaustive key-set assertion on the returned `EssayView`
+- [x] Every exit-code cell in the Gate E4 table above is filled
 
 ## Notes
 - Impact scope: B2.2 (the sibling read path), B2.3 (the PDF data contract), B2.4 (INT-2/INT-3), B3.2 (the retry action reads through this), F-A1 (the string parameters are wired to `EssaySummary`'s field names), F-A3/F-B1 (the display surfaces).
