@@ -53,12 +53,12 @@ Step 7 alone emits `pending` keys with nothing to grade them — every essay rea
 
 ## Target Files
 **Commit 1**
-- [ ] `SOURCE/lib/scoring/computeScore.ts`
-- [ ] `SOURCE/lib/scoring/__tests__/computeScore.test.ts` (Task B1.1's cases)
+- [x] `SOURCE/lib/scoring/computeScore.ts`
+- [x] `SOURCE/lib/scoring/__tests__/computeScore.test.ts` (Task B1.1's cases)
 
 **Commit 2**
-- [ ] `SOURCE/app/(layer2)/actions.ts`
-- [ ] `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/page.tsx`
+- [x] `SOURCE/app/(layer2)/actions.ts`
+- [x] `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/page.tsx`
 
 ## Investigation Targets
 - `docs/design/essay-auto-scoring-backend-design.md` (§ `computeScore()` changes / D-01 — the third parameter, the branch split, `hasEssayGroundTruth()`, the two comment reasons)
@@ -140,27 +140,46 @@ _(Record here: the RED observation from Task B1.1 (which fixture failed and why)
 
 Each commit must be **independently green**. Record two sets of exit codes.
 
-**Commit 1 — `computeScore.ts` + its test file**
+**Commit 1 — `computeScore.ts` + its test file** (`3a34c9c`)
 
 | # | Command (from `SOURCE/`) | Exit code | Notes |
 |---|---|---|---|
-| 1 | `npx tsc --noEmit` | | |
-| 2 | `npx eslint --max-warnings 0` | | |
-| 3 | `npx vitest run` | | |
-| 4 | `npm run build` | | |
-| 5 | `npm run test:fixture` | | expected red = TD-030 baseline only (Gate F1): exactly 2 failures, both `subscription.fixture.e2e.test.ts` FE-1(e) `en` + `vi` |
-| 6 | `npm run test:localdb` | | see Open Item I-7 |
+| 1 | `npx tsc --noEmit` | **0** | |
+| 2 | `npx eslint --max-warnings 0` | **0** | |
+| 3 | `npx vitest run` | **0** | 1837 passed / 10 skipped / 3 todo. +8 from this commit |
+| 4 | `npm run build` | **0** | |
+| 5 | `npm run test:fixture` | **1** | **Expected red, TD-030 baseline exactly as Gate F1 names it**: 2 failures, both `subscription.fixture.e2e.test.ts` FE-1 (e) — `locale en` and `locale vi` |
+| 6 | `npm run test:localdb` | **0** | 11 passed / 2 todo — second attempt; the first was a network timeout |
 
-**Commit 2 — `actions.ts` + the player route segment**
+**Commit 2 — `actions.ts` + the player route segment** (`<commit 2>`)
 
 | # | Command (from `SOURCE/`) | Exit code | Notes |
 |---|---|---|---|
-| 1 | `npx tsc --noEmit` | | |
-| 2 | `npx eslint --max-warnings 0` | | |
-| 3 | `npx vitest run` | | |
-| 4 | `npm run build` | | |
-| 5 | `npm run test:fixture` | | expected red = TD-030 baseline only (Gate F1): exactly 2 failures, both `subscription.fixture.e2e.test.ts` FE-1(e) `en` + `vi` |
-| 6 | `npm run test:localdb` | | see Open Item I-7 |
+| 1 | `npx tsc --noEmit` | **0** | |
+| 2 | `npx eslint --max-warnings 0` | **0** | |
+| 3 | `npx vitest run` | **0** | 1837 passed / 10 skipped / 3 todo |
+| 4 | `npm run build` | **0** | `maxDuration` accepted as a route-segment export; `server-only` still contained |
+| 5 | `npm run test:fixture` | **1** | Same TD-030 baseline, both case names captured |
+| 6 | `npm run test:localdb` | **0** | 11 passed / 2 todo |
+
+**Known-red window recorded for both commits:** `npm run verify:schema` (dev) exits **1** with exactly **1** failing assertion, the character-ceiling gate. Red by design from H7 until B3.3.
+
+### Red-phase observation for commit 1, recorded as the task requires
+
+With the cases written and the implementation absent: **`Tests 1 failed | 27 passed (28)`**, and the single red case was **EG-BE-001** (flag ON + ground truth ⇒ five keys). The other seven were **green from the start**, which is the correct outcome and worth stating: they pin **today's** behaviour (flag off ⇒ element identical byte-for-byte, no ground truth ⇒ no keys emitted). A suite where everything went red could not tell "not implemented yet" apart from "implemented in the wrong direction" — and the direction that must not move here is the default path every submission already takes.
+
+### Network conditions during this task, stated once with direct evidence
+
+One `verify:schema` run exited 1 with **zero** failing assertions:
+
+```
+[TypeError: fetch failed] ConnectTimeoutError: Connect Timeout Error
+(attempted addresses: 104.18.38.10:443, 172.64.149.246:443, timeout: 10000ms)
+```
+
+An immediate re-run produced the familiar single ceiling assertion. The same degraded connectivity accounts for the other transient reds seen while completing this task — gate 3 once at `recordSkillMastery.int.test.ts` (a 60 s `beforeAll` timeout) and gate 6 once at `subscription.service.e2e.test.ts` (120 s hook + 60 s test).
+
+**One of those was discriminated rather than dismissed**, because it mattered: `recordSkillMastery.int.test.ts` runs through `submitExam()` → `computeScore()`, the exact function commit 1 changes. Run alone with the change in the tree: **2 passed**. Combined with a clean full-lane run immediately after (1837 passed), the change is not implicated.
 
 **A task file with any exit-code cell left empty is not complete** (Gate E4).
 **Known-red window (Fix I002)**: both commits sit between H7 and B3.3 — if `verify:schema` is run, its character-ceiling assertion is red **by design**; record it as expected. Any **other** red `verify:schema` assertion is a regression.
