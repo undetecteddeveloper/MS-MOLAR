@@ -32,8 +32,8 @@ Write the tests **first** and confirm they fail for the right reason.
 `EssaySummary`'s exact field set is stated in no single place: EG-BE-034 pins `unresolvedCount`, while the frontend consumes `pendingCount`, `failedCount`, `gradedCount`, `earned` and `max`. Nothing conflicts — this task exports **all six**. Settle the shape here, since every downstream consumer imports it. *Owner: engineer, at this task.*
 
 ## Target Files
-- [ ] `SOURCE/lib/scoring/essayLifecycle.ts` (new)
-- [ ] `SOURCE/lib/scoring/__tests__/essayLifecycle.test.ts` (new)
+- [x] `SOURCE/lib/scoring/essayLifecycle.ts` (new)
+- [x] `SOURCE/lib/scoring/__tests__/essayLifecycle.test.ts` (new)
 
 ## Investigation Targets
 - `docs/design/essay-auto-scoring-backend-design.md` (§ Agreement Checklist Scope — the `essayLifecycle.ts` line)
@@ -78,23 +78,114 @@ Write the tests **first** and confirm they fail for the right reason.
 | Expected signal | The pin gate fails with a message naming **both** values; SVC-2(c) uses the imported constant, never a typed `3`, so this does not become a third copy |
 
 ## Investigation Notes
-_(Record here: the settled `EssaySummary` field set (I-5); the observed RED failure of each test before implementation; the result of the EG-BE-036 source scan.)_
+
+### Investigation Targets — observations
+
+- **backend DD § Agreement Checklist Scope (`:112`)** — the module is declared *thuần* (pure) and holds the five insert key literals plus `ESSAY_BANDS`, `ESSAY_MAX_ATTEMPTS`, `ESSAY_MAX_POINTS`, `ESSAY_PENDING_DEADLINE_MS` and the seven functions. `§ Implementation Path Mapping :355` adds the placement reason: it sits beside `computeScore.ts`/`wrongTwice.ts` because **both** the write path and the read path import it; `lib/essay/` would drag the read path into a `server-only` directory. No second module for the two array-level predicates (§ D-13).
+- **backend DD § State Transitions and Invariants (`:1397`)** — RS-0…RS-6 ⇄ `deriveEssayView()` return value, row by row: RS-0/RS-1 ⇒ `null` (strange value ⇒ `null` + one `console.warn`); RS-2 `pending` when `now − createdAt ≤ deadline`; RS-3 `graded` with band + `lowConfidence`; RS-4 `failed` with `retryAvailable: true`; RS-5 stored `pending` past the deadline ⇒ `state: "failed"`, `retryAvailable: essayAttempts < 3`; RS-6 `failed` with `essayAttempts >= 3` ⇒ `retryAvailable: false`. Invariant I6: the terminal state is **derived at read time** — no cron, queue or sweeper. Invariant I7: one `deriveEssayView()`, two call sites, both passing `exam_results.created_at`.
+- **backend DD § Field Propagation Map (`:1380`)** — the five insert keys travel verbatim `computeScore()` → `record_exam_result()` → jsonb (`service-role.ts:70` passes `score.perQuestion` unmodified). `essayAttempts` is **dropped at `deriveEssayView()`** — it exists only to compute `retryAvailable`. `created_at` is likewise an input to the derivation and is dropped after use; it never reaches `ExamResult`/`MyHistoryEntry`.
+- **backend DD § Minimal Surface Alternatives — MSA-2 (`:845`)** — option (c) "five flat fields" was rejected precisely because it carries `essayAttempts` across the boundary. The chosen shape is one nested `essay?: EssayView`, and `EssayView` carrying no attempt field is a **structural** property, not a discipline.
+- **backend DD § Hợp đồng khoá jsonb (`:664`)** — the six identifiers and their insert values; `essayGradedAt` deliberately absent at insert because a `null` there would read as "graded, time unknown". `camelCase` because `per_question` is `JSON.stringify`-ed straight from TypeScript with no `snake_case` mapping layer.
+- **ADR-0018 § Decision 2 (`:78`)** — the closed band set is declared **once, in TypeScript**; the SQL functions do not validate the band at all, and that omission is deliberate (a second declaration is the two-clocks failure).
+- **ADR-0018 § Decision 4 (`:94`)** — the cap is consumed at **claim** time, before the provider is contacted, and is never decremented; the initial counter is emitted by `computeScore()` at insert, which is what keeps `record_exam_result()`'s signature unchanged.
+- **ADR-0018 § Implementation Guidance #8** — no background writer for stored `pending`, including "cleanup on next login". If a metric looks wrong, the metric's SQL is what changes.
+- **`SOURCE/lib/scoring/computeScore.ts`** — `isScored()` returns `false` for `essay` at `:41` and stays that way; the branch B1.5 splits is the `.map()` early return at `:99-101`, which returns `{ questionId, selected, isCorrect: false, scored: false }`. That is the object `newEssayEntry()` spreads into, so the five keys must be a plain flat object with no shared reference between questions.
+- **`SOURCE/types/result.ts`** — `PerQuestionResult` is a flat object shared by **every** question type, which is why the `essay` prefix is mandatory rather than decorative. `hasBeenWrongTwice` (`:19-24`) is the precedent this module follows: a field derived **at read time**, never stored, `undefined` when not applicable.
+- **`SOURCE/lib/scoring/__tests__/computeScore.test.ts`** — the `essay()` fixture helper (`:68-79`) builds a `Question`; this task's fixtures build `PerQuestionResult` elements instead (the read side), so no helper is shared. `topicBreakdown` block (`:131-139`) confirms essay rows stay out of the denominator.
+- **`SOURCE/lib/ugc/__tests__/geminiChokepoint.test.ts`** — the "phép quét điểm phát" technique the DD tells EG-BE-036 to copy: `walk()` over `SOURCE/**` skipping `node_modules`/`.next`, `codeLines()` dropping comment lines so a *mention* is not counted as a *site*, and an **exhaustive `toEqual([...])`** rather than `toContain`, so any new file makes the scan red.
+
+### Open Item I-5 — settled `EssaySummary` field set
+
+**All six fields**, exactly as the backend DD § Data Contracts declares them, and no seventh:
+
+```ts
+export interface EssaySummary {
+  earned: number;          // Σ essayEarned over graded elements
+  max: number;             // gradedCount * ESSAY_MAX_POINTS
+  gradedCount: number;     // AC-059 denominator
+  pendingCount: number;    // RS-2
+  failedCount: number;     // RS-4 + RS-5 + RS-6
+  unresolvedCount: number; // RS-2 + RS-4 + RS-5 (PDF gate, AC-058) — NOT RS-6
+}
+```
+
+Nothing conflicts between EG-BE-034 (which pins `unresolvedCount`) and the frontend's five consumers; the DD already names one UI Spec display string per field, so no field exists without a named consumer. Settled here because every downstream consumer imports the type.
+
+### Planned approach — Binding Decisions
+
+- **contract_schema** — `ESSAY_BANDS = [0, 0.25, 0.5, 0.75, 1] as const` is exported from `essayLifecycle.ts` and from nowhere else; a repo grep before implementation found **0** pre-existing declarations anywhere under `SOURCE/`. The module contains no SQL and validates no band value, so this task cannot create a second declaration. ⇒ **Y**
+- **data_flow** — `newEssayEntry()` emits `essayAttempts: 0` as one of exactly five keys, and `ESSAY_MAX_ATTEMPTS = 3` is exported for the claim path (H5/SVC-2c) to import rather than re-type. This task adds no signature change to `record_exam_result()`. ⇒ **Y**
+- **persistence** — `deriveEssayView(entry, createdAt, now)` computes the terminal state from its three arguments only; the module has no import of `server-only`, no Supabase client, no `fetch`, no `process.env` and no write of any kind. There is no sweeper here to add. ⇒ **Y**
+
+### Planned approach — Reference Contracts
+
+- **Hợp đồng khoá jsonb / column-label set** — `newEssayEntry()` returns an object literal with exactly `essayState: "pending"`, `essayEarned: null`, `essayMax: null`, `essayLowConfidence: false`, `essayAttempts: 0`; `essayGradedAt` is declared once in `ESSAY_KEYS` and typed on the stored-entry shape, but is never emitted at insert. ⇒ **Y**
+- **state-lifecycle-negative / `essayGradedAt` absent** — asserted directly with an exhaustive `Object.keys(newEssayEntry()).sort()` equality (not `not.toContain`, which would pass on a typo'd sixth key). ⇒ **Y**
+- **EG-BE-023 / exclusive deadline** — the comparison is written `elapsedMs > ESSAY_PENDING_DEADLINE_MS`, and all three boundary inputs (`deadline − 1s`, `deadline`, `deadline + 1s`) are asserted in one test each with `now` injected. ⇒ **Y**
+- **EG-BE-027 / summing** — `summariseEssays()` adds `view.earned` to `earned` and `ESSAY_MAX_POINTS` to `max` only inside the `state === "graded"` branch; `pending`/`failed`/ungradeable elements pass through no accumulator at all. ⇒ **Y**
+- **EG-BE-034 / equality** — asserted in a single case over the same fixture array used by the summing case, comparing `hasUnresolvedEssay(...)` with `(summariseEssays(...)?.unresolvedCount ?? 0) > 0`, including the empty-array case where the summary is `undefined`. ⇒ **Y**
+- **EG-BE-036 / one derivation site** — `isEssayIncomplete()` destructures its parameter so the body reads literally `state === "failed" && !retryAvailable`, and a `geminiChokepoint`-style exhaustive source scan asserts the matching file list is exactly `["lib/scoring/essayLifecycle.ts"]`. ⇒ **Y**
+- **EG-BE-026 / no attempt count crosses the boundary** — `EssayView` declares `retryAvailable: boolean` and five fields total; the test pins the key set with an exhaustive `Object.keys().sort()` equality **and** scans every key name for `attempt`, so a field named `tries`/`retriesLeft` is caught by the first assertion and one named `essayAttempts` by the second. ⇒ **Y**
+
+### Judgement calls made where the task file left room
+
+1. **Shape of the six key literals.** The task says "the six jsonb key literals" without fixing whether they are six separate exports or one object. Chosen: one frozen `ESSAY_KEYS` object keyed by role (`state`, `earned`, `max`, `lowConfidence`, `attempts`, `gradedAt`), tied to the stored-entry type by `satisfies`, so a renamed field cannot leave a stale literal behind. Six loose exports would have been six import statements at every consumer for no gain.
+2. **`view.earned` / `view.max` on a malformed `graded` element.** The DD's RS-3 row writes `max: 1`, but nothing says whether the view should read the stored `essayMax` or substitute `ESSAY_MAX_POINTS`. Chosen: read the stored value and return `null` when it is not a finite number — inventing a `1` there would be a silent fallback that makes a broken write look healthy. `summariseEssays()` is unaffected because the DD fixes its `max` as `gradedCount * ESSAY_MAX_POINTS` independently.
+3. **`lowConfidence` on non-`graded` states.** The DD spells it `false` for RS-2 and elides it for RS-4/5/6. Chosen: `false` for every non-`graded` state, since `record_essay_grade()` is the only writer of that key and it writes it together with the band.
+4. **`summariseEssays()` on an array whose only essay element carries a *strange* `essayState`.** The DD fixes `undefined` for "no element carries `essayState`" and separately maps a strange value to RS-0. Chosen: the summary is `undefined` when no element yields a view, which makes a strange value behave exactly like a legacy row — the same collapse RS-0 already performs.
+5. **Scope of the two source scans.** Chosen: `codeLines()` + non-test files under `SOURCE/**`, copying `geminiChokepoint.test.ts` verbatim in technique. Test files are excluded on that file's stated reasoning (a test is not on the request path); the failure mode EG-BE-036 names — "a page re-derives RS-6" — lives in shipped code. The RS-6 regex tolerates a receiver prefix (`view.state === "failed" && !view.retryAvailable`) so a consumer cannot dodge the scan by naming a variable.
+
+### Execution evidence
+
+**RED (trước khi có module).** `npx vitest run lib/scoring/__tests__/essayLifecycle.test.ts` ⇒ exit **1**, `Test Files 1 failed (1)`, `Tests no tests`:
+
+```
+Error: Cannot find module '../essayLifecycle' imported from
+  E:/WebApp-project/MS-MOLAR/SOURCE/lib/scoring/__tests__/essayLifecycle.test.ts
+```
+
+Đỏ vì **module chưa tồn tại** — đúng lý do cần đỏ, không phải vì một assertion viết sai.
+
+**GREEN.** Cùng lệnh sau khi tạo module ⇒ exit **0**, `Tests 39 passed (39)`.
+
+**Kiểm ba ca biên có thật sự phân biệt được không (mutation check).** Đổi `>` thành `>=` ở `isPastDeadline()` rồi chạy lại: `Tests 1 failed | 38 passed` — đỏ **đúng một ca**, ca `ĐÚNG BẰNG deadline ⇒ vẫn pending`. Hai ca `deadline − 1s` và `deadline + 1s` vẫn xanh dưới phép đột biến, tức là **một mình chúng không phân biệt được `>` với `>=`** — đây là lý do EG-BE-023 đòi đủ ba ca. Toán tử đã được khôi phục về `>` và bộ test xanh lại 39/39.
+
+**Phép quét EG-BE-036.** Regex chịu tiền tố người nhận, quét mọi file `.ts/.tsx/.js/.mjs` ngoài test dưới `SOURCE/**` (bỏ dòng chú thích): kết quả `["lib/scoring/essayLifecycle.ts"]` — đúng một site. Đẳng thức là `toEqual` vét cạn, nên phép quét cũng đồng thời chứng minh biểu thức **có mặt** trong file này (một cài đặt đánh vần khác đi sẽ làm danh sách rỗng và ca đỏ).
+
+**Phép quét sáu literal khoá.** Sáu vòng lặp riêng, mỗi khoá một phép quét: cả sáu trả `["lib/scoring/essayLifecycle.ts"]`. Không có bản sao gõ tay thứ hai nào trong cây. `ESSAY_BANDS` cũng được KHAI đúng một chỗ.
+
+### Exit-gate re-evaluation (đối chiếu với cài đặt CUỐI, không phải với kế hoạch)
+
+| Check | Kết quả | Bằng chứng |
+|---|---|---|
+| BD contract_schema — `ESSAY_BANDS` khai một chỗ | **Y** | ca `ESSAY_BANDS được KHAI đúng một chỗ`; module không chứa SQL và không validate band |
+| BD data_flow — `essayAttempts: 0` + `ESSAY_MAX_ATTEMPTS` export | **Y** | ca `newEssayEntry()` + ca hằng số; `ESSAY_MAX_ATTEMPTS = 3` exported |
+| BD persistence — suy diễn lúc đọc, không ghi | **Y** | ca `giá trị LƯU vẫn là pending`; ca "module là THUẦN" (không `server-only`/`process.env`/`fetch(`/`createClient`) |
+| RC khoá jsonb — năm khoá insert đúng giá trị | **Y** | `toEqual` vét cạn trên `newEssayEntry()` |
+| RC `essayGradedAt` vắng mặt lúc insert | **Y** | `Object.keys(...).sort()` vét cạn (không dùng `not.toContain`, vốn xanh cả khi khoá thứ sáu vào dưới tên gõ sai) |
+| RC EG-BE-023 — biên loại trừ | **Y** | ba ca biên + mutation check ở trên |
+| RC EG-BE-027 — chỉ `graded` vào cả hai vế | **Y** | `max: 2` (không phải 6) trên fixture bảy phần tử |
+| RC EG-BE-034 — đẳng thức | **Y** | một ca, năm bộ đầu vào gồm cả mảng rỗng và dòng cũ |
+| RC EG-BE-036 — một chỗ suy diễn | **Y** | phép quét ở trên |
+| RC EG-BE-026 — không trường số lượt | **Y** | tập khoá vét cạn + lưới tên `/attempt\|retr(y\|ies)\|remain\|count\|left/i` + `Object.values` không chứa con số lượt |
+
+Không dòng nào còn ở `Unknown`. Không phát sinh sai lệch nào giữa kế hoạch và cài đặt cuối.
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
-- [ ] Read all Investigation Targets and record key observations
-- [ ] Settle the `EssaySummary` field set (Open Item I-5) and record the decision
-- [ ] Write `SOURCE/lib/scoring/__tests__/essayLifecycle.test.ts` covering every Proof Obligation below, with `now` **injected** in every case
-- [ ] Run the tests and confirm they fail **for the right reason** (the module does not exist yet)
+- [x] Read all Investigation Targets and record key observations
+- [x] Settle the `EssaySummary` field set (Open Item I-5) and record the decision
+- [x] Write `SOURCE/lib/scoring/__tests__/essayLifecycle.test.ts` covering every Proof Obligation below, with `now` **injected** in every case
+- [x] Run the tests and confirm they fail **for the right reason** (the module does not exist yet)
 
 ### 2. Green Phase
-- [ ] Create `SOURCE/lib/scoring/essayLifecycle.ts` with the six literals, four constants, three types and seven functions
-- [ ] Run only the added tests and confirm they pass
+- [x] Create `SOURCE/lib/scoring/essayLifecycle.ts` with the six literals, four constants, three types and seven functions
+- [x] Run only the added tests and confirm they pass
 
 ### 3. Refactor Phase
-- [ ] Run a repo scan confirming no second hand-typed copy of any of the six key strings exists
-- [ ] Run the EG-BE-036 source scan (`state === "failed" && !retryAvailable` appears in this file only)
-- [ ] Confirm the added tests still pass
+- [x] Run a repo scan confirming no second hand-typed copy of any of the six key strings exists
+- [x] Run the EG-BE-036 source scan (`state === "failed" && !retryAvailable` appears in this file only)
+- [x] Confirm the added tests still pass
 
 ## Quality Assurance Mechanisms
 - `npx tsc --noEmit` (strict) — Enforces: static types; the exhaustive `EssayRenderState` switch — Config: `SOURCE/tsconfig.json` (project-wide)
@@ -108,12 +199,12 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
 
 | # | Command (from `SOURCE/`) | Exit code | Notes |
 |---|---|---|---|
-| 1 | `npx tsc --noEmit` | | |
-| 2 | `npx eslint --max-warnings 0` | | |
-| 3 | `npx vitest run` | | |
-| 4 | `npm run build` | | |
-| 5 | `npm run test:fixture` | | expected red = TD-030 baseline only (Gate F1): exactly 2 failures, both `subscription.fixture.e2e.test.ts` FE-1(e) `en` + `vi` |
-| 6 | `npm run test:localdb` | | see Open Item I-7 |
+| 1 | `npx tsc --noEmit` | **0** | Chạy riêng, không nối `&&`. |
+| 2 | `npx eslint --max-warnings 0` | **0** | |
+| 3 | `npx vitest run` | **0** | 126 file (124 passed / 2 skipped), 1592 ca — trong đó 39 ca mới của `essayLifecycle.test.ts`. |
+| 4 | `npm run build` | **0** | Bắt được lỗi ranh giới server/client mà `tsc` không thấy; module này không import `server-only` nên không lối đọc nào bị kéo vào cây server. |
+| 5 | `npm run test:fixture` | **1** | expected red = TD-030 baseline only (Gate F1): exactly 2 failures, both `subscription.fixture.e2e.test.ts` FE-1(e) `en` + `vi`. **Đã đối chiếu: đúng 2 ca đó, không ca nào khác** (`2 failed | 75 passed | 3 todo`); cả hai đỏ ở `:3017` trên `aria-describedby`, không liên quan tới `lib/scoring/**`. Không sửa TD-030 trong commit này. |
+| 6 | `npm run test:localdb` | **0** | `11 passed | 2 todo`; hai `todo` là khung cho Task H5/B-service, chưa thuộc task này. |
 
 **A task file with any exit-code cell left empty is not complete** (Gate E4).
 
@@ -149,13 +240,13 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
   - **Primary failure mode**: a second hand-typed copy of a key string somewhere else in the tree. **Boundary to exercise**: in-process unit plus a repo scan for the six literals. **State assertion**: N/A. **Mock boundary rationale**: none. **Residual**: none.
 
 ## Completion Criteria
-- [ ] **Implementation Complete** = module + tests written, all green
-- [ ] **Quality Complete** = the six verify gates run individually with recorded exit codes
-- [ ] **Integration Complete** = N/A (no consumer yet — this is the slice that deliberately cannot prove itself)
-- [ ] Every Reference Contract Compliance Check evaluates to `Y`, with evidence in Investigation Notes
-- [ ] Every Binding Decision Compliance Check evaluates to `Y`, with evidence in Investigation Notes
-- [ ] Open Item I-5 settled and the `EssaySummary` field set recorded
-- [ ] Every exit-code cell in the Gate E4 table above is filled
+- [x] **Implementation Complete** = module + tests written, all green
+- [x] **Quality Complete** = the six verify gates run individually with recorded exit codes
+- [x] **Integration Complete** = N/A (no consumer yet — this is the slice that deliberately cannot prove itself)
+- [x] Every Reference Contract Compliance Check evaluates to `Y`, with evidence in Investigation Notes
+- [x] Every Binding Decision Compliance Check evaluates to `Y`, with evidence in Investigation Notes
+- [x] Open Item I-5 settled and the `EssaySummary` field set recorded
+- [x] Every exit-code cell in the Gate E4 table above is filled
 
 ## Notes
 - Impact scope: every downstream task imports from this module — H5's function bodies, B1.5's `newEssayEntry()` call, B2.1/B2.2's derivations, and the four display surfaces.
