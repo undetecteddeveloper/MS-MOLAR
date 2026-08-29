@@ -40,6 +40,62 @@ còn nơi nào khác giữ lịch sử nợ ngoài chính file này.)*
 >   mở** — cơ chế PHÁT HIỆN lệch (fingerprint `schema_version` + test CI + check
 >   lúc khởi động) vẫn đang chạy và vẫn bắt được drift.
 
+### TD-032 — 5 trong 7 đề trên PROD do tài khoản probe test đứng tên, và tài khoản đó vừa bị ban
+**Từ:** 2026-08-29 (phát hiện khi đóng Gate B7 của feature chấm tự luận)
+**Loại:** dữ liệu production gắn vào một danh tính không phải người thật — nợ
+quyền sở hữu, không phải nợ code
+
+`smithnguyen247+rlstesta@gmail.com` (`07916881-7b4e-4960-bb29-283c84c6d90c`) là
+tài khoản probe của `npm run verify:schema`. Nó **sống trên PROD** với mật khẩu
+là một literal đã commit vào repo (`rls-test-password-123`, xem `MEMORY.md` mục
+1). Đo trên prod ngày 2026-08-29, nó đang đứng tên:
+
+| | số |
+|---|---|
+| `exams.author_id` trỏ vào nó | **5** trên tổng **7** đề của prod |
+| trong đó đã `published` | 4 |
+| `exam_attempts` | 15 |
+| `exam_results` | 1 |
+| `user_skill_mastery` | 3 |
+| `user_profiles` | 1 |
+
+**Đã làm gì ngày 2026-08-29** (engineer chỉ đạo, xác minh bằng truy vấn thật chứ
+không tin thông báo "success"): ban (`banned_until = 2999-01-01`), xoá phiên
+đang mở (1 session, 1 refresh token → còn 0/0), và xoay mật khẩu sang một giá
+trị sinh bằng `gen_random_uuid()` **ngay bên trong câu lệnh SQL** — nên không có
+bản rõ nào tồn tại trong transcript, trong file, hay trong đầu ai. Kiểm lại:
+`crypt('rls-test-password-123', encrypted_password) = encrypted_password` trả
+**false**. **KHÔNG xoá tài khoản** — mọi bảng trên đều `on delete cascade`, xoá
+là mất 15 lượt thi và 1 kết quả thật.
+
+**Dev KHÔNG bị đụng tới.** `signInProbeUser()` trong `verify-schema.ts` vẫn đăng
+nhập được trên dev bằng literal cũ, và đó là chủ ý: `verify:schema` là **DEV
+ONLY** cho tới khi guard prod-safe lên (xem `docs/plans/20260829-feature-essay-
+auto-scoring.md`, Gate B7). Ai "dọn dẹp" nốt tài khoản dev cho đồng bộ sẽ làm
+đỏ toàn bộ cổng schema.
+
+**Cái sẽ nổ nếu quên.**
+
+1. **Một đề trên prod vừa trở thành không ai với tới được.** Trong 5 đề nó đứng
+   tên có **1 đề chưa `published`**, và RLS ở `schema.sql:289` cho đọc theo
+   `status = 'published' or author_id = auth.uid()`. Tác giả duy nhất của đề đó
+   giờ không đăng nhập được nữa, nên **không còn danh tính nào đọc hay sửa được
+   nó**. 4 đề đã publish thì vẫn hiện bình thường — ban chặn đăng nhập, không
+   chạm tới quyền đọc nội dung đã publish.
+2. `exams.author_id` là `on delete set null`. Nếu về sau có ai xoá tài khoản
+   này, 5 đề sẽ **im lặng** rơi về `author_id is null` — hình dạng "nội dung
+   seed" mà `schema.sql:343` đã ghi là không policy tác giả nào khớp. Không có
+   gì đỏ ở đâu cả.
+3. Kho đề prod đọc như thể phần lớn do một địa chỉ `+alias` của test soạn. Bất
+   kỳ tính năng nào sau này hiện tên tác giả (trang đề, UGC, kiểm duyệt) sẽ phơi
+   nó ra người dùng thật.
+
+**Trả nợ nghĩa là gì:** chuyển `author_id` của 5 đề sang một chủ sở hữu thật —
+tài khoản người dùng thật của engineer, hoặc một tài khoản biên tập chuyên
+dụng — rồi kiểm lại đề chưa publish đã có người với tới được. Đây là `update`
+trên dữ liệu prod thật nên cần engineer xác nhận trước, đúng như Pha 3.5 yêu
+cầu.
+
 ### TD-031 — Có sẵn một bộ phân loại prompt-injection chuyên dụng, và ta CỐ Ý chưa dùng
 **Từ:** 2026-08-29 (phát hiện khi đọc danh mục model thật của tài khoản Groq)
 **Loại:** cơ hội phòng thủ đã bỏ qua có chủ đích — ghi lại để lần sau xét R9 thì
