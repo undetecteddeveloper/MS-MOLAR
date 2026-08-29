@@ -79,11 +79,24 @@ The auto-generated CHECK constraint name on `telemetry_log.event_type` is **pred
 
 No task that touches `listMyHistory()` may be scheduled before this measurement exists. The only fallback (an RPC returning the two booleans pre-derived) is **DDL**, which would raise hand-applied schema changes from two to three and reopen exactly the budget that ADR-0018 Escalation 2 was resolved — by accepting degraded telemetry resolution — to preserve. It is a **scope escalation requiring an engineer decision**, not a technical fallback.
 
-- [ ] D1 — On dev, measure the `listMyHistory()` payload at `LIST_ROW_CEILING = 500` rows (`SOURCE/lib/supabase/boundedRead.ts:74`) **without** `per_question, created_at` in the select. Bytes: `____________`
-- [ ] D2 — Same measurement **with** `per_question, created_at` in the select. Bytes: `____________`
-- [ ] D3 — Engineer records the accept/escalate decision here, with the threshold used: `____________________`
-- [ ] D4 — If escalating to an RPC: the engineer explicitly records that Escalation 2 is being reopened and that manual schema changes go from two to three. This is not a detail an implementer may decide.
-- [ ] D5 — Gate D is closed **before** Task B2.2 starts.
+- [x] D1 — On dev, measure the `listMyHistory()` payload at `LIST_ROW_CEILING = 500` rows (`SOURCE/lib/supabase/boundedRead.ts:74`) **without** `per_question, created_at` in the select. Bytes: **353 B/row → ~173 KB at 500 rows (dev)**; **375 B/row → ~183 KB (prod)**. *Measured 2026-08-29, read-only, by serialising the exact select shape — including the `exam_attempts!inner(… exams!inner(title, subject))` embed — with `jsonb_build_object` and taking `octet_length`.*
+- [x] D2 — Same measurement **with** `per_question, created_at` in the select. Bytes: **918 B/row → ~448 KB at 500 rows (dev)**; **3 401 B/row → ~1 661 KB ≈ 1.62 MB (prod)**. Largest single row measured: **5 385 B** (prod).
+
+  | | prod (24.11 questions/exam — the realistic shape) | dev (5.58 questions/exam — small seeded exams) |
+  |---|---|---|
+  | rows available to measure | 9 | 53 |
+  | without the two fields | 375 B/row → **~183 KB** at 500 | 353 B/row → ~173 KB |
+  | with the two fields | 3 401 B/row → **~1 661 KB** at 500 | 918 B/row → ~448 KB |
+  | increase | **≈ 9.1× (+1.45 MB)** | ≈ 2.6× |
+
+  **Two things this measurement is not, stated so nobody over-reads it.** (1) The 500-row figure is an **extrapolation** — neither database holds 500 result rows (dev 53, prod 9), so it is the measured mean row multiplied by the ceiling, not an observed payload. (2) The bytes are **uncompressed**; an RSC payload ships gzip/brotli and this JSON has highly repetitive keys, so the wire cost is plausibly 5–10× smaller — but the client still parses and holds the full amount, which is the cost that matters on a weak device.
+- [x] **D3 — ACCEPT (engineer's decision, 2026-08-29). The two fields go into the select; Task B2.2 proceeds as designed.** Threshold reasoning recorded rather than a bare number, because the bare number (1.62 MB) reads worse than the situation is:
+  - **500 is a ceiling, not a forecast.** `boundedRead.ts`'s own comment puts 500 three orders of magnitude above current data, and prod holds **9 result rows in total across all users**. The realistic payload today is a few tens of KB.
+  - **The ceiling being reached is itself the documented trigger for pagination**, not for a bigger number — `LIST_ROW_CEILING`'s comment says exactly this. A student with 500 graded attempts needs a paginated `/history` regardless of this feature.
+  - **The escalation was more expensive than the problem.** An RPC is **DDL**: hand-applied schema changes go from two to three, and ADR-0018 Escalation 2 — resolved by accepting degraded telemetry resolution specifically to protect that budget — would have to be reopened.
+  - **Re-open condition:** if `/history` ever carries a realistic (not ceiling) payload above ~500 KB, or the row count for a single user approaches the ceiling, revisit — and revisit as **pagination** first, RPC second.
+- [x] D4 — **Not applicable: not escalating.** ADR-0018 Escalation 2 stays **closed**, and manual hand-applied schema changes stay at **two**.
+- [x] **D5 — GATE D CLOSED 2026-08-29.** Task B2.2 is unblocked.
 
 ### Gate E — Six verify gates before every commit
 
@@ -716,7 +729,7 @@ graph TD
   - **Blocks**: Task H5 and therefore Gate B.
   - Completion: Implementation Complete = names recorded; Integration Complete = Task H5's drop/add pairs use the recorded names verbatim.
 
-- [ ] **Task G0.3 — OQ-3 / O-3 / FE-OQ-3: measure the `/history` payload (HUMAN, dev measurement)**
+- [x] **Task G0.3 — OQ-3 / O-3 / FE-OQ-3: measure the `/history` payload (HUMAN, dev measurement)**
   - Discharges: backend OQ-3; UI Spec O-3; frontend FE-OQ-3.
   - Work: complete Gate D items D1–D5 — measure the `listMyHistory()` payload at `LIST_ROW_CEILING = 500` rows with and without `per_question, created_at`, and record the accept/escalate decision.
   - Verification method: two byte figures and a written decision in Gate D.
@@ -745,7 +758,7 @@ graph TD
 
 - [ ] Gate A ticked through A7 **or** explicitly deferred to Phase E with the feature confirmed disabled everywhere
 - [x] Gate C closed (real constraint names recorded for both projects) — **2026-08-29**; both `telemetry_log_event_type_check` and `telemetry_log_error_code_check`, definitions captured, names identical across projects
-- [ ] Gate D closed (payload measured, decision recorded)
+- [x] Gate D closed (payload measured, decision recorded) — **2026-08-29**, measured on both projects, engineer accepted
 - [ ] Gate B1–B2 recorded (baseline fingerprints on both projects) — **B1 done 2026-08-29** (prod and dev both `29931beeb950`, unchanged from baseline). **B2 still open**: the new literal cannot exist until Task H5 edits `schema.sql`
 - [x] Gate F1 recorded (TD-030 red baseline captured, count and case names exact) — **2026-08-29**, exactly 2 failures, both named in Gate F1
 - [ ] Open Items I-1 through I-7 reviewed by the engineer; each either resolved or explicitly accepted as open with an owner
@@ -1457,15 +1470,15 @@ Each is carried to the phase where it must be resolved, with its owner and its e
 |---|---|---|---|---|---|
 | **OQ-1** | backend DD | Four time constants have no measurement behind them — `GROQ_CALL_DEADLINE_MS` (20 s), `GROQ_MAX_CONCURRENCY` (2), `ESSAY_PASS_BUDGET_MS` (4 min), `ESSAY_PENDING_DEADLINE_MS` (10 min). The Singapore→Groq round trip is unmeasured (C4) | engineer | **Phase E, Task E5** (measured during the V1 slice on dev) | p95 above 20 s ⇒ raise the call deadline **and** recompute the pass budget. The read-time deadline **does not move** (AC-061) — it is anchored to the platform ceiling, not to latency |
 | **OQ-2** | backend DD | The real auto-generated CHECK constraint name on `telemetry_log.event_type` — predicted, never verified on a live database | engineer | **Phase 0, Task G0.2 / Gate C** — before any DDL | Different names on the two projects ⇒ the drop/add pair must handle both, **and** that divergence is a TD-005 symptom worth its own register entry |
-| **OQ-3** | backend DD (inherits UI Spec O-3) | Payload cost of adding `per_question` to `listMyHistory()` at `LIST_ROW_CEILING = 500` — unmeasured | engineer | **Phase 0, Task G0.3 / Gate D** — a **hard entry gate**; no task touching `listMyHistory()` may be scheduled before the number exists | Unacceptable payload ⇒ the alternative is an RPC, which is **DDL**: manual schema changes go from two to three, reopening the budget ADR-0018 Escalation 2 was resolved to preserve. A **scope escalation** needing an engineer's decision and an explicit statement that Escalation 2 is being reopened — **not** a technical fallback |
+| **OQ-3 (CLOSED 2026-08-29 — measured, accepted)** | backend DD (inherits UI Spec O-3) | Payload cost of adding `per_question` to `listMyHistory()` at `LIST_ROW_CEILING = 500` — unmeasured | engineer | **Phase 0, Task G0.3 / Gate D** — a **hard entry gate**; no task touching `listMyHistory()` may be scheduled before the number exists | Unacceptable payload ⇒ the alternative is an RPC, which is **DDL**: manual schema changes go from two to three, reopening the budget ADR-0018 Escalation 2 was resolved to preserve. A **scope escalation** needing an engineer's decision and an explicit statement that Escalation 2 is being reopened — **not** a technical fallback |
 | **OQ-4** | backend DD | The operational value of `GROQ_BUDGET_DAILY_LIMIT`. The design fixed the name and the fail-closed behaviour, not the number | engineer | **Phase E, Task E2** — before enabling the flag | A value below one full exam's essay count (50) means a single attempt cannot be fully graded in a day — must be known in advance, not discovered |
 | **OQ-5** | backend DD (D-11) | `upload.essayStored` tells the **exam author** essays are not auto-scored; it becomes false once Gate A passes. Options: leave it, change the string with the enabling deploy, or open a `(layer4)` UI Spec section | engineer | **Phase E, Task E4** — before enabling the flag | Does **not** block ship; it blocks treating the author surface as correct |
 | **OQ-6** | backend DD | `ESSAY_GRADER_MODEL` has never graded a Vietnamese essay. It was chosen for multilingual capability and published limits, not for grading quality | engineer | **Phase E, Task E3** — after Gate A, before enabling on prod | Markedly low agreement with a human grader ⇒ change the constant; AC-032 then requires the **entire** AC-070 run again, dated — not just a string edit |
 | **OQ-7** | backend DD (v1.5) | **CLOSED 2026-08-29 — kept here because four display surfaces depend on it.** The PRD's latency target of median ≤ 60 s for ≤ 5 essays was **unreachable**: TPM 8 000 ÷ ~3 000 tokens/request makes 5 essays ≥ ~1.9 minutes of pure token budget. A provider ceiling, not an implementation defect | engineer (PRD owns the number) | **Closed before Phase 0** — PRD **v1.3** relaxes the target to **≤ 3 minutes**; UI Spec **v1.4** and frontend DD **v1.2** move the poller caps to 30 / 240 s in the same commit | Re-opens if the first real run shows ~3 K tokens/request was materially wrong (it is an **estimate**, not a measurement) — the target then moves again, together with `GROQ_MAX_CONCURRENCY` and `GROQ_BUDGET_DAILY_LIMIT` (OQ-1). New standing constraint: the target must stay **below `ESSAY_PASS_BUDGET_MS`** |
-| **FE-OQ-3** | frontend DD | Same as OQ-3 / O-3, inherited | engineer (backend owns the query) | **Phase 0, Task G0.3 / Gate D** | Identical to OQ-3 |
+| **FE-OQ-3 (CLOSED 2026-08-29 with OQ-3)** | frontend DD | Same as OQ-3 / O-3, inherited | engineer (backend owns the query) | **Phase 0, Task G0.3 / Gate D** | Identical to OQ-3 |
 | **FE-OQ-4** | frontend DD | Does `router.refresh()` actually preserve focus? AB-5 is unverified; all three protections are structural inference and the repo has no direct measurement of the refresh+focus pair | engineer | **Final Phase** (and IV-4 during Phase F-C) | If focus is still lost, add a focus-restore mechanism following `ExplainStepAffordance.tsx:56-77` — **only** if the measurement shows it is needed, not preemptively |
 | **FE-OQ-5** | frontend DD | Two `implicit` standards unconfirmed: `tabular-nums` on numeric elements and `min-h-11` for the action touch target — both observed from shipping code, neither written down as a rule | engineer | **Final Phase** | Blocks nothing. If rejected it is two classes, not a design change — but `tabular-nums` has an independent functional reason (the denominator grows while the student watches), so rejecting it needs a counter-reason |
-| **O-3** | UI Spec | Same as OQ-3, and the UI Spec explicitly makes the payload measurement a **hard Work Plan entry gate** | engineer | **Phase 0, Task G0.3 / Gate D** | Identical to OQ-3 |
+| **O-3 (CLOSED 2026-08-29 with OQ-3)** | UI Spec | Same as OQ-3, and the UI Spec explicitly makes the payload measurement a **hard Work Plan entry gate** | engineer | **Phase 0, Task G0.3 / Gate D** | Identical to OQ-3 |
 | **O-4** | UI Spec | There is no `--success` / `--warning` token, so "Đã chấm" is marked by weight + `--foreground`. If the product wants a real positive colour, that means adding a `--success` token and closing `short-answer-scoring-ui-spec.md` TBD-04 — **not** copying `#4F7942` | engineer / product owner | **Final Phase** (recorded, non-blocking) | Does not block ship. Decide before anyone copies `#4F7942` again — the reason is not only theme purity: `isCorrect` is `false` permanently for an essay, so painting a band with the "correct answer" colour asserts something untrue |
 | **O-6** | UI Spec | **Half closed 2026-08-29 (UI Spec v1.4).** The four polling constants came from the PRD's latency **target**, not from measurement. That target moved (OQ-7 → ≤ 3 min), so the two **caps** moved with it — **18 → 30 refreshes, 120 → 240 s** — and were **re-anchored** to `ESSAY_PASS_BUDGET_MS` instead of to any target. Still open: the two **cadence** constants (5 s × 12 → 10 s), which have no measurement behind them | engineer | **Phase E, Task E5**, together with OQ-1 | The cadence may shift with measured latency; the **caps** now shift only if `ESSAY_PASS_BUDGET_MS` shifts. The read-time deadline remains a **different number** and does not shift with either (AC-061) |
 
@@ -1496,13 +1509,13 @@ Recorded rather than resolved by invention. Each needs an engineer's decision; n
 
 ### Phase 0 — Entry gates
 - Start: **2026-08-29**
-- Complete: **partial** — 3 of 5 tasks discharged
+- Complete: **partial** — 4 of 5 tasks discharged
 - Notes:
   - **G0.2 (Gate C) — DONE.** Read-only `pg_constraint` query on both live projects. `telemetry_log_event_type_check` and `telemetry_log_error_code_check` on **both**; names identical, so there is no TD-005 divergence and the drop/add pair handles one name. The predicted name was **correct** — verifying it was still right, because a wrong guess fails **silently**.
   - **G0.4 (Gate B1) — DONE.** Prod and dev fingerprints both still `29931beeb950`. Gate B2 stays open by construction: the new literal does not exist until Task H5 edits `schema.sql`.
   - **G0.5 (Gate F1) — DONE.** TD-030 baseline is exactly 2 failures, both `subscription.fixture.e2e.test.ts` FE-1(e) (`en`, `vi`). Anything beyond those two belongs to this feature.
   - **G0.1 (Gate A) — BLOCKED on the engineer.** A1 ✅ and A5 ✅ (ZDR on). **A5b is blocked on A2 alone** — the rotated `GROQ_API_KEY` must be placed in `SOURCE/.env.local` by the engineer directly. Until A5b ticks, no task may perform a dev `L1` run.
-  - **G0.3 (Gate D) — NOT STARTED.** Needs a real `listMyHistory()` payload measurement at `LIST_ROW_CEILING = 500` on dev, with and without `per_question, created_at`. It is a **hard entry gate** for Task B2.2, and its escalation path is a scope decision, not a technical fallback.
+  - **G0.3 (Gate D) — DONE.** Payload measured on both databases by serialising the real select shape. Without the two fields ~375 B/row; with them ~3 401 B/row on prod-shaped exams — **≈9.1×**, or ~183 KB → ~1.62 MB extrapolated to the 500-row ceiling. Engineer **ACCEPTED** (D3): 500 is a ceiling three orders of magnitude above today's data (prod has 9 result rows total), reaching it is the documented trigger for **pagination** rather than a bigger number, and the alternative was DDL that would reopen Escalation 2. **Task B2.2 unblocked.**
 
 ### Phase H — Foundation
 - Start: TBD
