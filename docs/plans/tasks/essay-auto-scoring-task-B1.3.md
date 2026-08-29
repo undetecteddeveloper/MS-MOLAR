@@ -28,8 +28,8 @@ reserveGroqBudget(calls: number, now: Date):
 Over-reservation on first-try successes puts effective daily throughput below the nominal request ceiling. That is `consumeQuota()`'s existing directional bias — **over-counting is the safe direction, under-counting is the incident** — and it is the only shape under which the counter actually bounds real spend.
 
 ## Target Files
-- [ ] `SOURCE/lib/essay/budget.ts` (new)
-- [ ] `SOURCE/lib/essay/__tests__/budget.test.ts` (new)
+- [x] `SOURCE/lib/essay/budget.ts` (new)
+- [x] `SOURCE/lib/essay/__tests__/budget.test.ts` (new)
 
 ## Investigation Targets
 - `docs/design/essay-auto-scoring-backend-design.md` (§ Agreement Checklist Scope — the `budget.ts` line: one `INCRBY` on `groq:budget:{Pacific day}`, worst-case reservation, fail-closed)
@@ -69,21 +69,55 @@ Over-reservation on first-try successes puts effective daily throughput below th
 Roundtrip check this task owns: the key this module writes is the key it reads back, composed by the **one** shared declaration — never a second derivation.
 
 ## Investigation Notes
-_(Record here: the observed `INCRBY` argument value and TTL in the mock; the three fail-closed exits and how each was triggered; the repo-scan result for `ai:budget:` in the essay path.)_
+
+**Observed at the mocked Redis boundary** (the boundary `quota.test.ts:100-110` already uses):
+
+- `INCRBY` called **exactly once**, with arguments `("groq:budget:2026-02-28", 3)`. The argument **value** is asserted, not merely that the call happened — a per-call `INCRBY 1` implementation passes a call-count check while reserving less than it may spend, which is precisely the under-count both counters exist to prevent. The `3` is asserted as `GROQ_CALLS_PER_ESSAY` imported from `groqClient.ts`, never as a typed literal.
+- `EXPIRE` called with `("groq:budget:2026-02-28", 93600)` — `BUDGET_TTL_SECONDS`, 26 hours, asserted as `26 * 60 * 60`.
+- **No `DECRBY`** on the under-ceiling path (EG-BE-020's no-refund half).
+- Over ceiling: `DECRBY` with the **same** `calls` value, then `{ ok: false, reason: "project_budget" }`.
+- Boundary is `>` not `>=`: a read-back of exactly `600` against a limit of `600` still returns `{ ok: true }`. A `>=` implementation would refuse the last request the budget paid for.
+
+**Pacific-day key, verified against the trap `budgetDay.ts:20-24` names:** `2026-03-01T05:30:00Z` composes `groq:budget:2026-02-28`, because at 05:30Z the Pacific day is still the previous one. A `toISOString().slice(0,10)` re-derivation would produce `2026-03-01` and split the counter mid-day.
+
+**Three fail-closed exits, each triggered separately:**
+
+| Exit | How it was triggered | Result | Store touched? |
+|---|---|---|---|
+| store unreachable | `redis.incrby` mock rejects | `{ ok: false, reason: "unavailable" }` | attempted, threw |
+| `KV_REST_API_*` missing | `delete process.env.KV_REST_API_URL` | `{ ok: false, reason: "unavailable" }` | **no** |
+| limit missing | `delete process.env.GROQ_BUDGET_DAILY_LIMIT` | `{ ok: false, reason: "unavailable" }` | **no** |
+| limit invalid | `"0"`, `"-5"`, `"abc"`, `"1.5"`, `""`, `"   "` — all six | `{ ok: false, reason: "unavailable" }` | **no** |
+
+`unavailable` and `project_budget` are asserted to be **different** values in one test, because telemetry writes `project_budget_exhausted` for one and not the other.
+
+**Repo scan for `ai:budget:` under `lib/essay/`: `[]`** — appears nowhere. Also added the symmetric single-site gate to mirror `quota.test.ts:868`: the repo has **exactly one** place composing the `groq:budget:` key pattern, and it is `lib/essay/budget.ts`.
+
+**AC-066 preserved, verified rather than asserted:** `git status SOURCE/lib/billing/` is **empty** — `quota.ts`, `QuotaKind`, `PLAN_LIMITS` and every `consumeQuota()` call site are untouched, and `npx vitest run lib/billing/` is **10 files / 208 tests green with zero edits**. That is the H2 behaviour-preservation claim holding.
+
+**Mutation testing — the three assertions that matter were checked for the ability to fail:**
+
+| Mutation applied to `budget.ts` | Result |
+|---|---|
+| `catch` returns `{ ok: true }` (a Redis outage becomes unlimited spend — the incident direction) | **2 failed** / 18 passed |
+| `incrby(key, 1)` instead of `incrby(key, calls)` (per-call accumulation) | **1 failed** / 19 passed |
+| key composed as `ai:budget:` (Groq spend on the Gemini counter) | **6 failed** / 14 passed |
+
+Each was caught, and the module was restored from backup after each.
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
-- [ ] Read all Investigation Targets and record key observations
-- [ ] Write `budget.test.ts` asserting the `INCRBY` **argument value**, the TTL, and **all three** fail-closed exits; observe them fail because the module does not exist
+- [x] Read all Investigation Targets and record key observations
+- [x] Write `budget.test.ts` asserting the `INCRBY` **argument value**, the TTL, and **all three** fail-closed exits; observe them fail because the module does not exist
 
 ### 2. Green Phase
-- [ ] Create `budget.ts`: `server-only`, one `INCRBY` of the worst case before the first request, TTL `BUDGET_TTL_SECONDS`, read-back compared against `GROQ_BUDGET_DAILY_LIMIT`, `calls` required
-- [ ] Run only the added tests and confirm they pass
+- [x] Create `budget.ts`: `server-only`, one `INCRBY` of the worst case before the first request, TTL `BUDGET_TTL_SECONDS`, read-back compared against `GROQ_BUDGET_DAILY_LIMIT`, `calls` required
+- [x] Run only the added tests and confirm they pass
 
 ### 3. Refactor Phase
-- [ ] Repo-scan the essay grading code path for `ai:budget:` — it must appear **nowhere**
-- [ ] Confirm the module imports `pacificDay` and `BUDGET_TTL_SECONDS` rather than re-deriving either
-- [ ] Confirm `QuotaKind`, `PLAN_LIMITS` and every `consumeQuota()` call site are untouched (AC-066)
+- [x] Repo-scan the essay grading code path for `ai:budget:` — it must appear **nowhere**
+- [x] Confirm the module imports `pacificDay` and `BUDGET_TTL_SECONDS` rather than re-deriving either
+- [x] Confirm `QuotaKind`, `PLAN_LIMITS` and every `consumeQuota()` call site are untouched (AC-066)
 
 ## Quality Assurance Mechanisms
 - `npx tsc --noEmit` (strict) — Config: `SOURCE/tsconfig.json` (project-wide)
@@ -98,13 +132,17 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
 
 | # | Command (from `SOURCE/`) | Exit code | Notes |
 |---|---|---|---|
-| 1 | `npx tsc --noEmit` | | |
-| 2 | `npx eslint --max-warnings 0` | | |
-| 3 | `npx vitest run` | | |
-| 4 | `npm run build` | | |
-| 5 | `npm run test:fixture` | | expected red = TD-030 baseline only (Gate F1): exactly 2 failures, both `subscription.fixture.e2e.test.ts` FE-1(e) `en` + `vi` |
-| 6 | `npm run test:localdb` | | see Open Item I-7 |
-| 7 | `npm run check:bundle` | | Gate E2 — this task's files match `SOURCE/lib/essay/**` |
+| 1 | `npx tsc --noEmit` | **0** | |
+| 2 | `npx eslint --max-warnings 0` | **0** | |
+| 3 | `npx vitest run` | **0** | 1781 passed / 10 skipped / 3 todo. +20 from this task. See the run-stability note below |
+| 4 | `npm run build` | **0** | |
+| 5 | `npm run test:fixture` | **1** | **Expected red, TD-030 baseline exactly as Gate F1 names it**: 2 failures, both `subscription.fixture.e2e.test.ts` › FE-1 (e) — `locale en` and `locale vi`. Case names captured |
+| 6 | `npm run test:localdb` | **0** | 11 passed / 2 todo |
+| 7 | `npm run check:bundle` | **0** | |
+
+**Known-red window recorded (Gate E4 requires it at every commit inside it):** `npm run verify:schema` (dev) → exit **1**, exactly **1** failing assertion, the character-ceiling gate. Red by design from H7 until B3.3.
+
+**Run-stability note, recorded because the evidence is incomplete and should not be dressed up.** The first full `npx vitest run` of this task reported **1 failure**, and my command only grepped the summary line, so **the failing case name was not captured** — the same evidence-handling mistake I made earlier in the session. What was then established: **six** subsequent full-lane runs are green at 1781 passed — three plain, plus three under `--sequence.shuffle` with seeds 1, 2, 3. The shuffle runs were chosen deliberately because this task's test file mutates `process.env` (`KV_REST_API_*`, `GROQ_BUDGET_DAILY_LIMIT`), which makes an ordering dependency the plausible mechanism; no seed reproduced it. So the honest conclusion is **"not reproducible across six runs including shuffled ordering"**, not "identified and ruled out". If this lane goes red again, capture the case name first.
 
 **A task file with any exit-code cell left empty is not complete** (Gate E4).
 
@@ -125,11 +163,11 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
   - **Primary failure mode**: grading quietly consuming a student's Gemini quota. **Boundary**: repo diff review. **State assertion**: N/A. **Mock rationale**: none. **Residual**: none.
 
 ## Completion Criteria
-- [ ] **Implementation Complete** = module + tests
-- [ ] **Quality Complete** = six verify gates green (plus `check:bundle`)
-- [ ] **Integration Complete** = N/A until Task B1.4
-- [ ] Every Binding Decision and Reference Contract Compliance Check evaluates to `Y`, with evidence in Investigation Notes
-- [ ] Every exit-code cell in the Gate E4 table above is filled
+- [x] **Implementation Complete** = module + tests
+- [x] **Quality Complete** = six verify gates green (plus `check:bundle`); gate 5 red = TD-030 baseline only
+- [x] **Integration Complete** = N/A until Task B1.4
+- [x] Every Binding Decision and Reference Contract Compliance Check evaluates to `Y`, with evidence in Investigation Notes
+- [x] Every exit-code cell in the Gate E4 table above is filled
 
 ## Notes
 - Impact scope: Task B1.4 calls this **after** the claim and **before** the provider (Gate G ordering); Task B3.2's retry drives the same path.
