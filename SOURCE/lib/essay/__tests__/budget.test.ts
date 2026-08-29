@@ -207,6 +207,8 @@ describe("kỷ luật khoá và phạm vi (AC-030, AC-066)", () => {
     // Đối xứng với cổng canh `ai:budget:` ở quota.test.ts:868, và cùng lý do:
     // mẫu khoá phải được VIẾT NGUYÊN VẸN ở đúng một file, để một chỗ dựng thứ
     // hai không lặng lẽ chia đôi bộ đếm.
+    // Lượt duyệt toàn cây DUY NHẤT của file này — xem ghi chú chi phí ở
+    // groqChokepoint.test.ts.
     const sites = walk(SOURCE_ROOT)
       .filter((f) => codeLines(readFileSync(f, "utf8")).some((l) => /["'`]groq:budget:/.test(l)))
       .map((f) => path.relative(SOURCE_ROOT, f).split(path.sep).join("/"));

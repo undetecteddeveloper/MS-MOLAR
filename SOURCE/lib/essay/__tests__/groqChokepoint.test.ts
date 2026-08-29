@@ -67,16 +67,32 @@ const GEMINI_EMIT_PATTERN = /\.models\.generateContent\s*\(/;
 /** Thư mục chạy TAY bằng `npx tsx`, không nằm trên đường đi của request nào. */
 const OFFLINE_SCRIPT_DIRS = ["supabase", "scripts"];
 
+/** Cây nguồn được duyệt MỘT LẦN cho cả file.
+ *
+ *  Lý do không phải mỹ học: các ca dưới đây từng duyệt lại toàn cây bốn lượt,
+ *  và `geminiChokepoint.test.ts` — vốn cũng duyệt toàn cây — đã timeout ở 5000ms
+ *  trong một lượt chạy đầy đủ khi máy bị nghẽn. Mỗi phép quét thêm vào làn mặc
+ *  định là một lần duyệt cây nữa; ghi nhớ kết quả giữ chi phí ở mức một lần.
+ *  Danh sách file không đổi giữa các ca, nên ghi nhớ không làm yếu ca nào. */
+let sourceFilesCache: string[] | null = null;
+function sourceFiles(): string[] {
+  if (sourceFilesCache === null) sourceFilesCache = walk(SOURCE_ROOT);
+  return sourceFilesCache;
+}
+
+let emitSitesCache: { reachable: string[]; offlineScripts: string[] } | null = null;
 function groqEmitSites(): { reachable: string[]; offlineScripts: string[] } {
+  if (emitSitesCache !== null) return emitSitesCache;
   const reachable: string[] = [];
   const offlineScripts: string[] = [];
-  for (const full of walk(SOURCE_ROOT)) {
+  for (const full of sourceFiles()) {
     if (!codeLines(readFileSync(full, "utf8")).some((l) => EMIT_PATTERN.test(l))) continue;
     const rel = path.relative(SOURCE_ROOT, full).split(path.sep).join("/");
     if (OFFLINE_SCRIPT_DIRS.includes(rel.split("/")[0])) offlineScripts.push(rel);
     else reachable.push(rel);
   }
-  return { reachable: reachable.sort(), offlineScripts: offlineScripts.sort() };
+  emitSitesCache = { reachable: reachable.sort(), offlineScripts: offlineScripts.sort() };
+  return emitSitesCache;
 }
 
 describe("một điểm phát Groq duy nhất (AC-033)", () => {
@@ -135,7 +151,7 @@ describe("kỷ luật khoá và log của module phát (AC-029, AC-056)", () => 
   const groqSource = readFileSync(path.join(SOURCE_ROOT, "lib/essay/groqClient.ts"), "utf8");
 
   it("`GROQ_API_KEY` chỉ được DÙNG bên trong module này", () => {
-    const readers = walk(SOURCE_ROOT)
+    const readers = sourceFiles()
       .filter((full) => codeLines(readFileSync(full, "utf8")).some((l) => /GROQ_API_KEY/.test(l)))
       .map((full) => path.relative(SOURCE_ROOT, full).split(path.sep).join("/"))
       .sort();

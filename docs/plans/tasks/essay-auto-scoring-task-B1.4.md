@@ -37,8 +37,8 @@ Per essay question **with ground truth**, in **this order and no other** (Gate G
 Questions not yet claimed keep `essayAttempts: 0` and remain **fully retryable**; read-time derivation handles their presentation. Record it so nobody reads it as a failure.
 
 ## Target Files
-- [ ] `SOURCE/lib/essay/gradeEssays.ts` (new)
-- [ ] `SOURCE/lib/essay/__tests__/gradeEssays.test.ts` (new)
+- [x] `SOURCE/lib/essay/gradeEssays.ts` (new)
+- [x] `SOURCE/lib/essay/__tests__/gradeEssays.test.ts` (new)
 
 ## Investigation Targets
 - `docs/design/essay-auto-scoring-backend-design.md` (§ Agreement Checklist Scope — `gradeEssays.ts`: pass orchestration, concurrency cap, wall-clock cap)
@@ -79,22 +79,57 @@ Questions not yet claimed keep `essayAttempts: 0` and remain **fully retryable**
 | Expected signal | Chokepoint scan: the emission surface is exactly one module; the Gemini `EMIT_PATTERN` matches zero lines in the Groq module |
 
 ## Investigation Notes
-_(Record here: the invocation-order evidence (`mock.invocationCallOrder` values) for a successful pass; the per-branch assertions for provider calls and budget key state; the exact console payload shape used.)_
+
+**Mock boundaries chosen so the orchestration logic runs real code.** `fetch` and `@upstash/redis` are mocked (true external I/O), and `@/lib/supabase/service-role` is mocked at the module boundary because the other side is Postgres. `budget.ts`, `groqClient.ts`, `parseGrade()` and `prompt.ts` all run **real**. That matters for two obligations in particular: "exactly one `INCRBY` per question per pass" is measured on the real counter code, and "an in-pass 429 retry emits no second `INCRBY`" exercises the real retry loop rather than a stubbed one.
+
+**Ordering evidence (AC-072).** Asserted with strict pairwise `toBeLessThan` on `mock.invocationCallOrder` across four spies - `claim` then `redis.incrby` then `fetch` then `settle`. Three adjacent inequalities pin a linear order; "all four were called" is true in the broken ordering too and therefore proves nothing. A separate case isolates the security-critical pair: with the claim refused, `redis.incrby` is **never** called.
+
+**Per-branch results:**
+
+| Branch | provider requests | `groq:budget:{day}` | settle |
+|---|---|---|---|
+| claim refused (`not_submitted` / `already_graded` / `exhausted`) | **0** | unchanged (no `INCRBY`, no `DECRBY`) | **none** |
+| budget over ceiling | **0** | `INCRBY` then `DECRBY` (net unchanged) | `failed`, band `null` |
+| store unreachable | **0** | untouched | `failed`, band `null` |
+| provider error / 429-exhaustion / invalid output | 1 or 3 | one `INCRBY` | `failed`, band `null` |
+| valid output | 1 | one `INCRBY`, no refund | `graded`, band, `max = ESSAY_MAX_POINTS` |
+| empty answer | **0** | untouched, **and no claim** | `graded`, band **0** |
+
+**No settle on a refused claim** deserves its own line, because the obvious implementation gets it wrong: settling `failed` there would overwrite a real `graded` element on the `already_graded` branch - i.e. delete a student's actual mark because a redundant pass ran.
+
+**Console payload shape:** `console.error("[gradeEssays]", { questionId, code, detail })`. `code` is a closed union of six structured values; `detail` only ever comes from an already-declared union (the claim refusal reason, the provider `kind`, `parseGrade`'s `reason`). The test asserts the serialised log contains **none** of: the student's answer, the reference answer, the question content, or the provider's `err.message` - and does contain the `questionId`, since a log that identifies nothing is useless for diagnosis.
+
+**Design/implementation discrepancy found and resolved.** The Design Doc's `EssayTarget` is `{ questionId, studentAnswer, referenceAnswer }` (backend DD `:1321`), but `buildEssayPrompt()` requires `{ questionContent, referenceAnswer, studentAnswer }` - the triple cannot build a prompt. `EssayTarget` therefore carries a fourth field, `questionContent`. Resolved in the only direction that compiles; flagged here rather than silently absorbed.
+
+**`supabase` kept in `GradePassInput` even though B1.4 never reads it.** The contract declares it and R-05 requires it to be built in `submitExam()` and captured in the closure rather than rebuilt inside the callback. Task B3.1 makes it load-bearing (telemetry must be written through the **student's** client, because `telemetry_insert_own` is `with check (user_id = auth.uid())`). Declaring it now means B1.5 does not have to change the signature later.
+
+**Mutation testing - the four properties with the worst failure modes were checked for the ability to fail:**
+
+| Mutation applied to `gradeEssays.ts` | Result |
+|---|---|
+| reverse claim/reserve - **meter before authorise** (the security defect this ordering exists to prevent) | **7 failed** / 20 passed |
+| settle `failed` on a refused claim (overwrites a real grade) | **3 failed** / 24 passed |
+| settle band **0** instead of `null` on failure (a broken question reads as a zero-scoring one) | **8 failed** / 19 passed |
+| `GROQ_MAX_CONCURRENCY` 2 to 4 (systematically over the 8K TPM ceiling) | **1 failed** / 26 passed |
+
+**A test bug found and fixed, worth recording because it mimics a module defect.** The first green attempt failed `q3` in the isolation case. Cause: `mockResolvedValue(someResponse)` hands **the same `Response` instance** to every call, and a `Response` body can only be read once - so from the second question onward `res.json()` threw and the orchestrator correctly classified it as a provider failure. The module was right; the test was wrong. All `fetch` mocks now return a **fresh** `Response` per call via `mockImplementation`.
+
+**`vi.hoisted` was required** for the service-role mock: `vi.mock` factories are hoisted above the file's `const` declarations, producing `Cannot access 'claim' before initialization`. The sibling `redis` mock escapes this only because a class body is evaluated at `new`, not at factory time.
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
-- [ ] Read all Investigation Targets and record key observations
-- [ ] Write `gradeEssays.test.ts` covering every Proof Obligation, with the ordering asserted by **`mock.invocationCallOrder`**, not by "all four were called"
-- [ ] Observe the failures before the module exists
+- [x] Read all Investigation Targets and record key observations
+- [x] Write `gradeEssays.test.ts` covering every Proof Obligation, with the ordering asserted by **`mock.invocationCallOrder`**, not by "all four were called"
+- [x] Observe the failures before the module exists
 
 ### 2. Green Phase
-- [ ] Implement `gradeEssaysForAttempt(...)`: the four-step order, the concurrency cap, the wall-clock cap, every branch outcome, every exit swallowed and logged
-- [ ] Run only the added tests and confirm they pass
+- [x] Implement `gradeEssaysForAttempt(...)`: the four-step order, the concurrency cap, the wall-clock cap, every branch outcome, every exit swallowed and logged
+- [x] Run only the added tests and confirm they pass
 
 ### 3. Refactor Phase
-- [ ] Confirm no `console.error` can carry the student's answer, the prompt, the raw response or the provider's `err.message`
-- [ ] Confirm no path decrements `essayAttempts` and no path emits a second `INCRBY` on an in-pass retry
-- [ ] Confirm the added tests still pass
+- [x] Confirm no `console.error` can carry the student's answer, the prompt, the raw response or the provider's `err.message`
+- [x] Confirm no path decrements `essayAttempts` and no path emits a second `INCRBY` on an in-pass retry
+- [x] Confirm the added tests still pass
 
 ## Quality Assurance Mechanisms
 - `npx tsc --noEmit` (strict) — Config: `SOURCE/tsconfig.json` (project-wide)
@@ -109,13 +144,23 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
 
 | # | Command (from `SOURCE/`) | Exit code | Notes |
 |---|---|---|---|
-| 1 | `npx tsc --noEmit` | | |
-| 2 | `npx eslint --max-warnings 0` | | |
-| 3 | `npx vitest run` | | |
-| 4 | `npm run build` | | |
-| 5 | `npm run test:fixture` | | expected red = TD-030 baseline only (Gate F1): exactly 2 failures, both `subscription.fixture.e2e.test.ts` FE-1(e) `en` + `vi` |
-| 6 | `npm run test:localdb` | | see Open Item I-7 |
-| 7 | `npm run check:bundle` | | Gate E2 — this task's files match `SOURCE/lib/essay/**` |
+| 1 | `npx tsc --noEmit` | **0** | |
+| 2 | `npx eslint --max-warnings 0` | **0** | |
+| 3 | `npx vitest run` | **0** | 1826 passed / 10 skipped / 3 todo. +27 from this task. Three consecutive clean runs - see the stability note |
+| 4 | `npm run build` | **0** | |
+| 5 | `npm run test:fixture` | **1** | **Expected red, TD-030 baseline exactly as Gate F1 names it**: 2 failures, both `subscription.fixture.e2e.test.ts` FE-1 (e) - `locale en` and `locale vi` |
+| 6 | `npm run test:localdb` | **0** | 11 passed / 2 todo - on the third attempt; see below |
+| 7 | `npm run check:bundle` | **0** | |
+
+**Known-red window recorded:** `npm run verify:schema` (dev) exits **1**, exactly **1** failing assertion, the character-ceiling gate. Red by design from H7 until B3.3.
+
+### Stability notes - recorded because two lanes went red before going green
+
+**Gate 3 red twice, both TIMEOUTS rather than assertion failures**, and this task is partly responsible. The failures were `recordSkillMastery.int.test.ts` (a `beforeAll` hook exceeding 60 s) and `geminiChokepoint.test.ts` (a case exceeding 5 s). The chokepoint one is the informative one: it is a **filesystem scan**, which should not be load-sensitive - and the reason it became so is that this feature's tests added several more full-tree walks to the default lane, `groqChokepoint.test.ts` alone walking the tree four times.
+
+Fixed at the cause rather than by raising a timeout: the tree walk and the emit-site computation in `groqChokepoint.test.ts` are now memoised (the file list cannot change between cases in one run, so nothing is weakened). Measured effect on the full lane - **87.9 s on the failing run, then 49-54 s across three consecutive clean runs**, 1826 passed each time.
+
+**Gate 6 red twice before going green**, both external rather than logical: run 1 `AuthRetryableFetchError: fetch failed` from `GoTrueAdminApi.createUser`, run 2 a 60 s timeout in `subscription.service.e2e.test.ts` SVC-1(d) with the file taking 152 s against a usual ~70 s. Neither touches essay code. Every red seen in this session outside the two known-reds has been a timeout or a transport error against the network-backed dev database - worth stating plainly so a future session does not read this lane's colour as a verdict on the code.
 
 **A task file with any exit-code cell left empty is not complete** (Gate E4).
 **Known-red window (Fix I002)**: this commit sits between H7 and B3.3 — if `verify:schema` is run, its character-ceiling assertion is red **by design**; record it as expected.
@@ -149,11 +194,11 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
   - **Primary failure mode**: per-retry accumulation double-charging the day's budget. **Boundary**: in-process with a counted Redis mock. **State assertion**: exactly one increment per question per pass. **Mock rationale**: Redis at the boundary `quota.test.ts` uses. **Residual**: none.
 
 ## Completion Criteria
-- [ ] **Implementation Complete** = orchestrator + tests
-- [ ] **Quality Complete** = six verify gates green (plus `check:bundle`)
-- [ ] **Integration Complete** = proven end to end by **Task B1.5's manual dev run**
-- [ ] Every Binding Decision and Reference Contract Compliance Check evaluates to `Y`, with evidence in Investigation Notes
-- [ ] Every exit-code cell in the Gate E4 table above is filled
+- [x] **Implementation Complete** = orchestrator + tests
+- [x] **Quality Complete** = six verify gates green (plus `check:bundle`); gate 5 red = TD-030 baseline only
+- [ ] **Integration Complete** = proven end to end by **Task B1.5's manual dev run** - *pending B1.5*
+- [x] Every Binding Decision and Reference Contract Compliance Check evaluates to `Y`, with evidence in Investigation Notes
+- [x] Every exit-code cell in the Gate E4 table above is filled
 
 ## Notes
 - Impact scope: B1.5 commit 2 registers this via `after()`; B3.1 adds this file's telemetry call sites; B3.2 drives the same claim → budget → provider → settle path from the retry action.
