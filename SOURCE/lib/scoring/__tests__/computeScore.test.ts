@@ -228,3 +228,124 @@ describe("computeScore — topicBreakdown", () => {
     ]);
   });
 });
+
+// ═══════════════ Chấm tự luận (ADR-0018) — EG-BE-001…004 ═══════════════════
+//
+// Bốn nghĩa vụ, và cặp (001, 002) là cặp quyết định: một cài đặt LUÔN phát năm
+// khoá sẽ qua được 001 và trượt 002, còn một cài đặt không bao giờ phát sẽ qua
+// 002 và trượt 001. Chỉ hai ca cùng nhau mới ghim được rằng CỜ là thứ quyết
+// định, chứ không phải loại câu.
+//
+// Vì sao 002 nói "y hệt từng byte": đường mặc định là đường mà MỌI lượt nộp
+// bài hôm nay đi qua. Một khoá thừa lọt vào đó là một thay đổi payload âm thầm
+// trên dữ liệu thật, ở một hàm mà `record_exam_result()` lưu nguyên văn.
+
+describe("chấm tự luận — phát khoá vòng đời (ADR-0018)", () => {
+  const essayQuestion: Question = {
+    id: "q-essay",
+    content: "Phân tích nhân vật.",
+    questionType: "essay",
+    essayAnswer: "Đáp án mẫu có thật",
+    topic: "Văn",
+    difficulty: "medium",
+    choices: {},
+    correctAnswer: "A",
+  } as unknown as Question;
+
+  it("EG-BE-002 — cờ TẮT (mặc định): phần tử y hệt hôm nay, KHÔNG khoá essay* nào", () => {
+    const r = computeScore([essayQuestion], { "q-essay": "bài làm" });
+    // Đẳng thức VÉT CẠN trên cả phần tử: `toMatchObject` sẽ bỏ qua đúng thứ ca
+    // này tồn tại để bắt — một khoá thừa lọt vào đường mặc định.
+    expect(r.perQuestion[0]).toEqual({
+      questionId: "q-essay",
+      selected: "bài làm",
+      isCorrect: false,
+      scored: false,
+    });
+  });
+
+  it("EG-BE-002 — gọi KHÔNG truyền options cho kết quả GIỐNG HỆT gọi với essayGrading:false", () => {
+    // Bảo toàn hành vi được chứng minh bằng một phép so hai chiều, không bằng
+    // lời hứa "mặc định là false".
+    const a = computeScore([essayQuestion], { "q-essay": "bài làm" });
+    const b = computeScore([essayQuestion], { "q-essay": "bài làm" }, { essayGrading: false });
+    expect(a).toEqual(b);
+  });
+
+  it("EG-BE-001 — cờ BẬT + có ground truth: đủ năm khoá, cộng scored/isCorrect false", () => {
+    const r = computeScore([essayQuestion], { "q-essay": "bài làm" }, { essayGrading: true });
+    expect(r.perQuestion[0]).toEqual({
+      questionId: "q-essay",
+      selected: "bài làm",
+      isCorrect: false,
+      scored: false,
+      essayState: "pending",
+      essayEarned: null,
+      essayMax: null,
+      essayLowConfidence: false,
+      essayAttempts: 0,
+    });
+  });
+
+  it("EG-BE-004 — câu tự luận KHÔNG vào mẫu số điểm dù đã phát khoá vòng đời", () => {
+    // Phát khoá và tính điểm là hai chuyện độc lập. Nếu phần tử này lọt vào
+    // mẫu số thì mọi học sinh bị chia điểm cho một câu chưa ai chấm.
+    const mcq = {
+      id: "q-mcq",
+      questionType: "mcq",
+      correctAnswer: "A",
+      topic: "Toán",
+    } as unknown as Question;
+    const r = computeScore(
+      [essayQuestion, mcq],
+      { "q-essay": "bài làm", "q-mcq": "A" },
+      { essayGrading: true },
+    );
+    expect(r.total).toBe(1);
+    expect(r.correct).toBe(1);
+  });
+
+  it.each([undefined, null, "", "   ", "\n\t "])(
+    "EG-BE-003 — essayAnswer %o (không có ground truth) ⇒ KHÔNG khoá essay* nào, kể cả khi cờ BẬT",
+    (essayAnswer) => {
+      // Cùng guard ground-truth-presence mà `isScored()` đã áp cho true_false
+      // và short_answer. Không có đáp án mẫu thì không có gì để chấm, nên phát
+      // `pending` ở đây là hứa một thứ sẽ không bao giờ tới.
+      const q = { ...essayQuestion, essayAnswer } as unknown as Question;
+      const r = computeScore([q], { "q-essay": "bài làm" }, { essayGrading: true });
+      expect(r.perQuestion[0]).toEqual({
+        questionId: "q-essay",
+        selected: "bài làm",
+        isCorrect: false,
+        scored: false,
+      });
+    },
+  );
+
+  it("hai câu tự luận trong cùng lượt KHÔNG dùng chung tham chiếu", () => {
+    // `newEssayEntry()` trả object MỚI mỗi lần. Dùng chung một tham chiếu thì
+    // một lượt nắn tại chỗ ở hạ nguồn sẽ đổi luôn phần tử bên cạnh.
+    const q2 = { ...essayQuestion, id: "q-essay-2" } as unknown as Question;
+    const r = computeScore(
+      [essayQuestion, q2],
+      { "q-essay": "a", "q-essay-2": "b" },
+      { essayGrading: true },
+    );
+    expect(r.perQuestion[0]).not.toBe(r.perQuestion[1]);
+  });
+
+  it("cờ BẬT KHÔNG đổi hành vi của các loại câu khác", () => {
+    // `isScored()` giữ nguyên hành vi (AC-013): cờ chỉ mở một nhánh phát khoá
+    // cho essay, nó không phải một công tắc chấm điểm.
+    const sa = {
+      id: "q-sa",
+      questionType: "short_answer",
+      essayAnswer: "42",
+      topic: "Toán",
+    } as unknown as Question;
+    const off = computeScore([sa], { "q-sa": "42" });
+    const on = computeScore([sa], { "q-sa": "42" }, { essayGrading: true });
+    expect(on).toEqual(off);
+    expect(on.perQuestion[0].scored).toBe(true);
+  });
+});

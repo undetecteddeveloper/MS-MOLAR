@@ -21,6 +21,7 @@
 // chấm được.
 
 import { decodeTfAnswer } from "@/lib/ugc/tfCodec";
+import { newEssayEntry } from "./essayLifecycle";
 import type { Question, SubItemId } from "@/types/question";
 import type {
   PerQuestionResult,
@@ -37,8 +38,19 @@ function isScored(q: Question): boolean {
   const type = q.questionType ?? "mcq";
   if (type === "mcq") return true;
   if (type === "true_false") return Object.keys(q.subAnswers ?? {}).length > 0;
-  if (type === "short_answer") return Boolean(q.essayAnswer?.trim());
+  if (type === "short_answer") return hasEssayGroundTruth(q);
   return false;
+}
+
+/** Câu có ĐÁP ÁN MẪU dùng được không.
+ *
+ *  Trích ra thành hàm riêng vì nay có HAI chỗ hỏi cùng câu hỏi đó:
+ *  `isScored()` cho `short_answer`, và nhánh phát khoá vòng đời cho `essay`.
+ *  Hai biểu thức `Boolean(q.essayAnswer?.trim())` viết rời nhau sẽ trôi lệch,
+ *  và chiều trôi nguy hiểm là chiều phát `pending` cho một câu KHÔNG có gì để
+ *  chấm — tức hứa với học sinh một điểm số sẽ không bao giờ tới. */
+function hasEssayGroundTruth(q: Question): boolean {
+  return Boolean(q.essayAnswer?.trim());
 }
 
 /** Chuẩn hoá văn bản để so sánh không phân biệt hoa/thường và khoảng trắng
@@ -90,14 +102,40 @@ function isTrueFalseCorrect(
   );
 }
 
+/** Tuỳ chọn của `computeScore()`.
+ *
+ *  Cờ được TRUYỀN VÀO, không bao giờ đọc bên trong: hàm này thuần (AC-013), và
+ *  một `process.env` ở đây sẽ biến nó thành thứ không kiểm được mà không dựng
+ *  môi trường. Người gọi (`submitExam()`) là chỗ duy nhất đọc biến môi trường. */
+export interface ComputeScoreOptions {
+  /** `true` ⇒ câu `essay` CÓ đáp án mẫu phát ra năm khoá vòng đời. Mặc định
+   *  `false`, tức hành vi y hệt trước ADR-0018. */
+  essayGrading?: boolean;
+}
+
 export function computeScore(
   questions: Question[],
   answers: Record<string, string>,
+  options: ComputeScoreOptions = { essayGrading: false },
 ): ScoreResult {
   const perQuestion: PerQuestionResult[] = questions.map((q) => {
     const selected = answers[q.id];
     if (!isScored(q)) {
-      return { questionId: q.id, selected, isCorrect: false, scored: false };
+      const unscored: PerQuestionResult = {
+        questionId: q.id,
+        selected,
+        isCorrect: false,
+        scored: false,
+      };
+      // Câu tự luận CÓ đáp án mẫu, khi cờ bật, mang thêm năm khoá vòng đời.
+      // Nó vẫn `scored: false` và `isCorrect: false` — và đó là chủ đích, không
+      // phải sót (EG-BE-004): band được ghi NGOÀI hàm này bởi
+      // `record_essay_grade()`, còn dòng thì cố ý ở lại ngoài mẫu số điểm cho
+      // tới khi có ai đó thực sự chấm nó.
+      if (options.essayGrading && (q.questionType ?? "mcq") === "essay" && hasEssayGroundTruth(q)) {
+        return { ...unscored, ...newEssayEntry() };
+      }
+      return unscored;
     }
     if (q.questionType === "true_false") {
       return {
