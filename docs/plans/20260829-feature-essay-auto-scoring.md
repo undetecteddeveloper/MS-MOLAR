@@ -74,15 +74,17 @@ The two new SQL functions move the schema fingerprint. **Current verified baseli
   | `telemetry_log_error_code_check` | 9 values | 9 values |
 
   **Why this step earned its keep:** the apply tool reported only `DROP FUNCTION` as the “command” for each multi-statement apply, which on its own would have read as *the create never ran*. Every object was confirmed by querying `pg_proc` / `pg_constraint` directly instead. **No row was lost** — prod counts moved *up* across the window (9→10 results, 217→222 answers, 90→91 telemetry), which is live student traffic, not damage.
-- [~] B7 — **DEV: DONE.** `npm run verify:schema` went **3 FAIL → 1 FAIL**. The fingerprint comparison and **both grant assertions are now green**; the one remaining failure is exactly the expected one: *“TRẦN DB CAO HƠN TRẦN TRONG MÃ … 501 ký tự lọt qua CHECK … trong khi `LIMITS.MAX_ATTEMPT_ANSWER` = 500”*. **That is Fix I002's known-red window opening exactly on schedule** — red from H7 until Task B3.3 raises the constant. Recorded, not “fixed”.
+- [x] **B7 — CLOSED 2026-08-29. Both databases run, both give the same single expected failure.**
 
-  **PROD: NOT RUN — blocked, and deliberately not worked around.** It requires `SCHEMA_ENV_FILE=.env.local.prod-backup`, i.e. pointing the script at production with a service-role key; the environment's permission classifier refused that command. Everything the script's **read** assertions cover was confirmed instead by direct `pg_proc` / `pg_constraint` queries (see B6). What stays unverified on prod is only the **behavioural probes** — the three-role RPC grant probe and the two ceiling probes — because those issue write attempts. **Owner: engineer.** From `SOURCE/`:
+  **DEV: DONE.** `npm run verify:schema` went **3 FAIL → 1 FAIL**. The fingerprint comparison and **both grant assertions are now green**; the one remaining failure is exactly the expected one: *“TRẦN DB CAO HƠN TRẦN TRONG MÃ … 501 ký tự lọt qua CHECK … trong khi `LIMITS.MAX_ATTEMPT_ANSWER` = 500”*. **That is Fix I002's known-red window opening exactly on schedule** — red from H7 until Task B3.3 raises the constant. Recorded, not “fixed”.
 
-  ```
-  SCHEMA_ENV_FILE=.env.local.prod-backup npm run verify:schema
-  ```
+  **PROD: DONE — run by the engineer on 2026-08-29**, from `SOURCE/`, with `SCHEMA_ENV_FILE=.env.local.prod-backup npm run verify:schema`. (The prior session could not issue that command itself — the environment's permission classifier refused pointing the script at production with a service-role key — so the engineer owned the run. This paragraph replaces the "PROD: NOT RUN, owner: engineer" entry that stood here until the run happened.)
 
-  Expect **exactly one** failure — the same ceiling assertion as dev. Anything else is real and worth stopping for.
+  **Result: exactly one failure, and it is the same ceiling assertion as dev** — *“TRẦN DB CAO HƠN TRẦN TRONG MÃ … `LIMITS.MAX_ATTEMPT_ANSWER` = 500”* against a database ceiling of 4000. Every other assertion is **green on prod**: the fingerprint comparison (`9979c9deea52`), both grant assertions on the two new functions, and the `ESSAY_MAX_ATTEMPTS` pin. Prod and dev therefore fail **identically**, which is the evidence that matters here — an identical single failure on two independently-applied databases is the known-red window, whereas any asymmetry between them would have been a partial apply.
+
+  **What this closed that B6 could not.** B6 confirmed prod by direct `pg_proc` / `pg_constraint` reads, which cover only the script's **read** assertions. The three probes that issue write attempts — the three-role RPC grant probe and the two ceiling probes — were unverified on prod until this run. They are now verified, and Gate B7 is closed on both databases.
+
+  **⚠️ DO NOT RE-RUN `verify:schema` AGAINST PROD.** This run was safe only because the engineer accepted the risk once, knowingly. The script still calls `signInProbeUser()` and still executes its §5 fixture and §9 write probes against whatever `SCHEMA_ENV_FILE` names — it has no notion of a non-dev target. Until the prod-safety guard lands (the task below; the warning comment at `SOURCE/supabase/verify-schema.ts:753-763` has already been overrun **twice**), **`verify:schema` is DEV ONLY** and this recorded result is the prod evidence of record.
 - [ ] B8 — Fingerprint pin moved in the **same commit** at both declaration sites: `SOURCE/supabase/schema.sql:1871` and `SOURCE/lib/schema/schemaFingerprint.ts:41` (D-08).
 
 ### Gate C — OQ-2, the real CHECK constraint name (prerequisite to any DDL)
@@ -909,7 +911,7 @@ graph TD
 - [ ] `parseGrade()` rejects every AC-069 fixture and never throws; the adversarial fixture set is committed
 - [ ] `SECRETS.length === 8` with both pins moved in one commit; `npm run check:bundle` green
 - [ ] Gate B fully closed: fingerprint moved at both sites, DDL live and **verified by real query** on both databases
-- [ ] `npm run verify:schema` green against dev **and** prod for every assertion **except the character-ceiling gate**, including both grant assertions, the fingerprint comparison and the `ESSAY_MAX_ATTEMPTS` pin. The ceiling gate is **expected red** from Task H7 until Task B3.3 (H7's known-red window) — it is not resolvable inside Phase H and must not be resolved by moving `limits.ts` early
+- [x] `npm run verify:schema` green against dev **and** prod for every assertion **except the character-ceiling gate**, including both grant assertions, the fingerprint comparison and the `ESSAY_MAX_ATTEMPTS` pin. The ceiling gate is **expected red** from Task H7 until Task B3.3 (H7's known-red window) — it is not resolvable inside Phase H and must not be resolved by moving `limits.ts` early. **Closed 2026-08-29 by Gate B7**: both databases run, both produce exactly one failure and it is the same ceiling assertion. Prod was run by the engineer; see the prod-safety warning in B7 before ever running it against prod again
 - [ ] The known-red window is **recorded** at each commit inside it (Gate E4 exit-code table), so that expected red stays distinguishable from a regression
 - [ ] R-04 resolved: the ceiling probe's actual SQLSTATE behaviour recorded, and the probe shape adjusted if it was `23503`
 - [ ] Service lane test resolution: **2/2** (SVC-1, SVC-2 executing; unresolved `it.todo` in that file: 0)
