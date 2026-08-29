@@ -88,7 +88,315 @@
 // Where a case below overlaps one of them, the overlap is called out at the
 // obligation itself with the narrower thing this lane adds.
 
-import { describe, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { ESSAY_KEYS } from "@/lib/scoring/essayLifecycle";
+
+// -----------------------------------------------------------------------------
+// INT-1 test infrastructure — the mock boundary declared in the header, wired.
+// INT-2 and INT-3 further down are still `it.todo`; Task B2.4 converts them and
+// will bring its own fixtures, so nothing here is shaped to be shared yet.
+// -----------------------------------------------------------------------------
+
+const {
+  afterMock,
+  redirectMock,
+  createClientMock,
+  recordExamResultMock,
+  recordSkillMasteryMock,
+  guardMock,
+  gradeEssaysForAttemptMock,
+} = vi.hoisted(() => ({
+  afterMock: vi.fn(),
+  redirectMock: vi.fn(),
+  createClientMock: vi.fn(),
+  recordExamResultMock: vi.fn(),
+  recordSkillMasteryMock: vi.fn(),
+  guardMock: vi.fn(),
+  gradeEssaysForAttemptMock: vi.fn(),
+}));
+
+// actions.ts pulls in "server-only" transitively — same stub as
+// getResult.int.test.ts / rating.int.test.ts / submitExam.int.test.ts.
+vi.mock("server-only", () => ({}));
+
+// after() is a spy that RECORDS BUT DOES NOT INVOKE by default. The subject of
+// (c) and (e) is what is registered and when; obligation (f) is the single case
+// that opts into synchronous invocation.
+vi.mock("next/server", () => ({ after: afterMock }));
+
+// redirect() is mocked, but it MUST still throw — see nextRedirectError below.
+vi.mock("next/navigation", () => ({ redirect: redirectMock }));
+
+vi.mock("@/lib/supabase/server", () => ({ createClient: createClientMock }));
+vi.mock("@/lib/supabase/service-role", () => ({
+  recordExamResult: recordExamResultMock,
+  recordSkillMastery: recordSkillMasteryMock,
+}));
+// The Redis boundary: guard() reads the shared Upstash counter.
+vi.mock("@/lib/security/rateLimit", () => ({ guard: guardMock }));
+// The grading pass itself is Task B1.4's subject and has its own unit lane. Here
+// it is a stand-in whose only jobs are to be identifiable as "the thing that was
+// registered" and, in (f), to fail.
+vi.mock("@/lib/essay/gradeEssays", () => ({
+  gradeEssaysForAttempt: gradeEssaysForAttemptMock,
+}));
+
+const { submitExam } = await import("../actions");
+
+const ATTEMPT_ID = "attempt-int1";
+const EXAM_ID = "exam-int1";
+const USER_ID = "11111111-1111-1111-1111-111111111111";
+const RESULT_URL = `/exams/${EXAM_ID}/attempt/${ATTEMPT_ID}/result`;
+
+/** WHY redirect() STILL THROWS even though it is mocked.
+ *
+ *  A no-op redirect spy would silently defeat obligation (e). In Next,
+ *  `redirect()` raises a NEXT_REDIRECT control-flow exception, so every statement
+ *  after it is unreachable — which is exactly why registering the grading pass
+ *  after the redirect means never registering it at all. Mock it as a no-op and
+ *  the broken ordering keeps running to the end of the function, `after()` still
+ *  gets called, and the case that exists to catch that bug passes anyway. So the
+ *  spy reproduces the throw, with the digest shape `submitExam.int.test.ts`
+ *  already recognises. */
+function nextRedirectError(url: string): Error {
+  const err = new Error("NEXT_REDIRECT");
+  (err as Error & { digest: string }).digest = `NEXT_REDIRECT;push;${url};307;`;
+  return err;
+}
+
+/** Swallows exactly the expected NEXT_REDIRECT and re-throws everything else,
+ *  mirroring `submitExam.int.test.ts`'s helper of the same shape. */
+async function callSubmitExam(answers: Record<string, string>) {
+  try {
+    await submitExam(ATTEMPT_ID, answers);
+  } catch (err) {
+    const digest = (err as { digest?: unknown } | null)?.digest;
+    if (typeof digest !== "string" || !digest.startsWith("NEXT_REDIRECT")) throw err;
+  }
+}
+
+// questions rows in DB shape (snake_case), as claim_attempt_answer_key() returns
+// them. Two scored MCQs plus one essay WITH a reference answer — the essay needs
+// ground truth or the lifecycle-key branch never fires and every flag-ON case
+// below would pass vacuously.
+const QUESTION_ROWS = [
+  {
+    id: "q1",
+    content: "2 + 2 = ?",
+    choices: [
+      { id: "A", text: "3" },
+      { id: "B", text: "4" },
+    ],
+    correct_answer: "B",
+    subject: "Toán",
+    grade: 10,
+    topic: "Số học",
+    question_type: "mcq",
+    sub_answers: null,
+    essay_answer: null,
+  },
+  {
+    id: "q2",
+    content: "Diện tích hình vuông cạnh 3 là?",
+    choices: [
+      { id: "A", text: "9" },
+      { id: "B", text: "6" },
+    ],
+    correct_answer: "A",
+    subject: "Toán",
+    grade: 10,
+    topic: "Hình học",
+    question_type: "mcq",
+    sub_answers: null,
+    essay_answer: null,
+  },
+  {
+    id: "q3",
+    content: "Phân tích diễn biến tâm trạng nhân vật.",
+    choices: [],
+    correct_answer: null,
+    subject: "Văn",
+    grade: 11,
+    topic: "Văn học hiện thực",
+    question_type: "essay",
+    sub_answers: null,
+    essay_answer: "Đáp án mẫu: nêu được ba giai đoạn chuyển biến.",
+  },
+];
+
+const QUESTION_IDS = ["q1", "q2", "q3"];
+const ANSWERS = { q1: "B", q2: "C", q3: "Bài làm của học sinh." };
+
+/** INDEPENDENTLY AUTHORED — hand-computed from QUESTION_ROWS and ANSWERS above,
+ *  never captured from computeScore()'s output. q1 right, q2 wrong, so 1 of the
+ *  2 scored questions is correct => 5 on the 10-point scale; the essay sits
+ *  outside the denominator AND outside the topic breakdown, which is why "Văn
+ *  học hiện thực" does not appear here at all. */
+const EXPECTED_SCORE_FLAG_OFF = {
+  totalScore: 5,
+  correct: 1,
+  total: 2,
+  perQuestion: [
+    { questionId: "q1", selected: "B", correct: "B", isCorrect: true, scored: true },
+    { questionId: "q2", selected: "C", correct: "A", isCorrect: false, scored: true },
+    {
+      questionId: "q3",
+      selected: "Bài làm của học sinh.",
+      isCorrect: false,
+      scored: false,
+    },
+  ],
+  topicBreakdown: [
+    { topic: "Số học", correct: 1, total: 1 },
+    { topic: "Hình học", correct: 0, total: 1 },
+  ],
+};
+
+/** The exhaustive key set of the essay element with the flag OFF. `toEqual`
+ *  above cannot carry this obligation on its own: it treats a key present with
+ *  value `undefined` as absent, and `undefined` vs missing is exactly the
+ *  distinction that survives into jsonb. */
+const EXPECTED_ESSAY_KEYS_OFF = ["isCorrect", "questionId", "scored", "selected"];
+
+/** The same element with the flag ON: those four plus the five keys
+ *  `newEssayEntry()` emits. `essayGradedAt` is deliberately NOT here — only
+ *  `record_essay_grade()` ever writes it. */
+const EXPECTED_ESSAY_KEYS_ON = [
+  "essayAttempts",
+  "essayEarned",
+  "essayLowConfidence",
+  "essayMax",
+  "essayState",
+  "isCorrect",
+  "questionId",
+  "scored",
+  "selected",
+];
+
+/** The six jsonb key literals, typed out BY HAND rather than imported, because
+ *  the obligation is "none of these strings appears". Cross-checked against
+ *  ESSAY_KEYS in its own case below, so the list cannot rot silently — and the
+ *  key-set assertions cannot go vacuous if ESSAY_KEYS is ever emptied. */
+const SIX_ESSAY_KEY_LITERALS = [
+  "essayAttempts",
+  "essayEarned",
+  "essayGradedAt",
+  "essayLowConfidence",
+  "essayMax",
+  "essayState",
+];
+
+/** Wires the mocked client for submitExam()'s full happy path: exam_attempts
+ *  (select) -> exams (select) -> claim_attempt_answer_key (rpc) ->
+ *  attempt_answers (upsert). exam_results is deliberately absent — reaching it
+ *  through the student's own client is a 42501 in production, so it must throw
+ *  here rather than meet a friendly mock (submitExam.int.test.ts obligation f). */
+function mockSubmitExamChain() {
+  const attemptAnswersUpsertMock = vi.fn(async () => ({ error: null }));
+
+  const rpcMock = vi.fn(async (fn: string) => {
+    if (fn === "claim_attempt_answer_key") return { data: QUESTION_ROWS, error: null };
+    throw new Error(`unexpected rpc: ${fn}`);
+  });
+
+  const fromMock = vi.fn((table: string) => {
+    if (table === "exam_attempts") {
+      return {
+        select: () => ({
+          eq: () => ({
+            maybeSingle: async () => ({
+              data: {
+                id: ATTEMPT_ID,
+                exam_id: EXAM_ID,
+                status: "in_progress",
+                user_id: USER_ID,
+              },
+              error: null,
+            }),
+          }),
+        }),
+      };
+    }
+    if (table === "exams") {
+      return {
+        select: () => ({
+          eq: () => ({
+            single: async () => ({ data: { question_ids: QUESTION_IDS }, error: null }),
+          }),
+        }),
+      };
+    }
+    if (table === "attempt_answers") return { upsert: attemptAnswersUpsertMock };
+    throw new Error(`unexpected table: ${table}`);
+  });
+
+  createClientMock.mockResolvedValue({ from: fromMock, rpc: rpcMock });
+  return { fromMock, rpcMock, attemptAnswersUpsertMock };
+}
+
+/** The counted fetch boundary of obligation (b).
+ *
+ *  It returns a benign response rather than throwing, deliberately. A throwing
+ *  stub would abort submitExam() at the stray call and fail every case in the
+ *  file with a transport error, so the COUNT — the thing obligation (b) is
+ *  actually about — would never be the assertion that fired. Returning a
+ *  plausible response lets the run continue and lets `toHaveBeenCalledTimes(0)`
+ *  be the discriminator, which is what makes (b) a measurement and not a
+ *  side effect of some other failure. */
+const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
+
+/** process.env is restored by hand rather than through vi.stubEnv, because
+ *  obligation (d)'s first spelling is the variable being ABSENT — a state
+ *  stubEnv expresses only indirectly. */
+const ORIGINAL_FLAG = process.env.ESSAY_GRADING_ENABLED;
+
+function setFlag(value: string | undefined) {
+  if (value === undefined) delete process.env.ESSAY_GRADING_ENABLED;
+  else process.env.ESSAY_GRADING_ENABLED = value;
+}
+
+/** The score object handed to the single recordExamResult() call. */
+function persistedScore() {
+  expect(recordExamResultMock).toHaveBeenCalledTimes(1);
+  return recordExamResultMock.mock.calls[0][1];
+}
+
+/** Obligations (a), (b) and (c) together. They are asserted through one helper
+ *  because (d) has to repeat all three for every env spelling, and four drifting
+ *  copies of them would be worse than one shared function. */
+function expectShippedState() {
+  // (a) — the payload that reaches the write, not merely what computeScore returned
+  expect(persistedScore()).toEqual(EXPECTED_SCORE_FLAG_OFF);
+  const essayEl = persistedScore().perQuestion[2];
+  expect(Object.keys(essayEl).sort()).toEqual(EXPECTED_ESSAY_KEYS_OFF);
+  for (const key of SIX_ESSAY_KEY_LITERALS) {
+    expect(Object.hasOwn(essayEl, key)).toBe(false);
+  }
+  // (b) — zero provider calls, measured
+  expect(fetchMock).toHaveBeenCalledTimes(0);
+  // (c) — no pass registered
+  expect(afterMock).toHaveBeenCalledTimes(0);
+  expect(gradeEssaysForAttemptMock).toHaveBeenCalledTimes(0);
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.stubGlobal("fetch", fetchMock);
+  redirectMock.mockImplementation((url: string) => {
+    throw nextRedirectError(url);
+  });
+  guardMock.mockResolvedValue({ ok: true, retryAfterSeconds: 0 });
+  recordExamResultMock.mockResolvedValue({ error: null });
+  recordSkillMasteryMock.mockResolvedValue({ error: null });
+  gradeEssaysForAttemptMock.mockResolvedValue(undefined);
+  mockSubmitExamChain();
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  setFlag(ORIGINAL_FLAG);
+});
 
 // =============================================================================
 // INT-1 — Feature-off is the SHIPPED state: no keys, no after(), zero Groq
@@ -169,7 +477,163 @@ import { describe, it } from "vitest";
 //   fetch are all external or scheduler I/O. `computeScore()` runs REAL — it is the
 //   subject of (a), and the backend DD names it explicitly as "Không — chạy thật".
 describe("submitExam() — essay grading feature flag (INT-1)", () => {
-  it.todo("emits no essay* keys, registers no grading pass and makes zero provider calls when ESSAY_GRADING_ENABLED is absent, and registers after() before redirect() when it is 'true'");
+  it("obligation (a): with the flag absent, the payload handed to recordExamResult equals an independently authored literal and carries none of the six essay keys", async () => {
+    setFlag(undefined);
+
+    await callSubmitExam(ANSWERS);
+
+    // What this adds over computeScore.test.ts: that the shape SURVIVES the call
+    // site. The pure test proves the function returns it; only this lane can see
+    // that submitExam threads the option through and persists that exact object.
+    expect(persistedScore()).toEqual(EXPECTED_SCORE_FLAG_OFF);
+
+    const essayEl = persistedScore().perQuestion[2];
+    // Key SET, not `essayState === undefined`: a key present with value undefined
+    // passes the value check and still serialises into jsonb as `"essayState": null`.
+    expect(Object.keys(essayEl).sort()).toEqual(EXPECTED_ESSAY_KEYS_OFF);
+    for (const key of SIX_ESSAY_KEY_LITERALS) {
+      expect(Object.hasOwn(essayEl, key)).toBe(false);
+    }
+
+    // The write went through the service-role path, once, for this attempt.
+    expect(recordExamResultMock.mock.calls[0][0]).toBe(ATTEMPT_ID);
+  });
+
+  it("the six hand-written key literals still match ESSAY_KEYS, so the negative assertions above cannot go stale or vacuous", () => {
+    // Without this, obligation (a) has two silent failure modes: a renamed key
+    // (the hand-written list keeps testing a string nothing emits any more) and
+    // an emptied ESSAY_KEYS (nothing to leak, so nothing to catch).
+    expect([...Object.values(ESSAY_KEYS)].sort()).toEqual(SIX_ESSAY_KEY_LITERALS);
+    expect(SIX_ESSAY_KEY_LITERALS).toHaveLength(6);
+  });
+
+  it("obligation (b): zero provider calls, measured — global fetch is called exactly 0 times and no api.groq.com request is constructed", async () => {
+    setFlag(undefined);
+
+    await callSubmitExam(ANSWERS);
+
+    // Measured, not assumed. A request that is built and then aborted is still a
+    // request and still student prose leaving the process, so the count is the
+    // assertion — not "no response was used".
+    expect(fetchMock).toHaveBeenCalledTimes(0);
+    expect(fetchMock.mock.calls).toEqual([]);
+  });
+
+  it("obligation (c): with the flag absent, after() records zero registrations", async () => {
+    setFlag(undefined);
+
+    await callSubmitExam(ANSWERS);
+
+    // A pass registered while the feature is off does nothing visible — it just
+    // keeps the invocation alive past the response, which shows up as cost and
+    // as latency, never as an error.
+    expect(afterMock).toHaveBeenCalledTimes(0);
+    expect(gradeEssaysForAttemptMock).toHaveBeenCalledTimes(0);
+  });
+
+  it.each([
+    ["absent", undefined],
+    ["empty string", ""],
+    ["wrong case TRUE", "TRUE"],
+    ["the string 1", "1"],
+  ])(
+    "obligation (d): ESSAY_GRADING_ENABLED %s means OFF — no essay keys, no registration, no provider call",
+    async (_label, value) => {
+      setFlag(value);
+
+      await callSubmitExam(ANSWERS);
+
+      expectShippedState();
+    },
+  );
+
+  it("obligation (d) POSITIVE CONTROL: a trimmed \"  true  \" means ON, so the flag read cannot be dead code", async () => {
+    // Without this case every spelling above passes for an implementation whose
+    // flag read never executes at all — the whole group would be proving nothing.
+    setFlag("  true  ");
+
+    await callSubmitExam(ANSWERS);
+
+    const essayEl = persistedScore().perQuestion[2];
+    expect(Object.keys(essayEl).sort()).toEqual(EXPECTED_ESSAY_KEYS_ON);
+    expect(essayEl.essayState).toBe("pending");
+    expect(afterMock).toHaveBeenCalledTimes(1);
+
+    // The essay still stays out of the score triple and the topic breakdown even
+    // when the lifecycle keys are emitted (EG-BE-004) — the numbers are the same
+    // literals as the OFF case.
+    expect(persistedScore().totalScore).toBe(EXPECTED_SCORE_FLAG_OFF.totalScore);
+    expect(persistedScore().correct).toBe(EXPECTED_SCORE_FLAG_OFF.correct);
+    expect(persistedScore().total).toBe(EXPECTED_SCORE_FLAG_OFF.total);
+    expect(persistedScore().topicBreakdown).toEqual(EXPECTED_SCORE_FLAG_OFF.topicBreakdown);
+
+    // Registered with the right target set: only the essay that HAS a reference
+    // answer, carrying the student's text and the attempt it belongs to. A pass
+    // registered over the MCQs would burn provider budget on questions the
+    // lifecycle keys were never emitted for.
+    const registered = afterMock.mock.calls[0][0] as () => unknown;
+    registered();
+    expect(gradeEssaysForAttemptMock).toHaveBeenCalledTimes(1);
+    expect(gradeEssaysForAttemptMock.mock.calls[0][0]).toMatchObject({
+      attemptId: ATTEMPT_ID,
+      targets: [
+        {
+          questionId: "q3",
+          questionContent: "Phân tích diễn biến tâm trạng nhân vật.",
+          referenceAnswer: "Đáp án mẫu: nêu được ba giai đoạn chuyển biến.",
+          studentAnswer: "Bài làm của học sinh.",
+        },
+      ],
+    });
+  });
+
+  it("obligation (e): with the flag ON, after() is invoked BEFORE redirect()", async () => {
+    setFlag("true");
+
+    await callSubmitExam(ANSWERS);
+
+    // `mock.invocationCallOrder` and not "both were called": both ARE called in
+    // the broken ordering too, under a redirect that does not throw. Compare the
+    // sequence numbers, which is the only observable that distinguishes them.
+    expect(afterMock).toHaveBeenCalledTimes(1);
+    expect(redirectMock).toHaveBeenCalledTimes(1);
+    expect(afterMock.mock.invocationCallOrder[0]).toBeLessThan(
+      redirectMock.mock.invocationCallOrder[0],
+    );
+    expect(redirectMock).toHaveBeenCalledWith(RESULT_URL);
+  });
+
+  it("obligation (f): a grading pass that rejects leaves the result write, the mastery write and the redirect all intact (EG-BE-033)", async () => {
+    setFlag("true");
+    gradeEssaysForAttemptMock.mockRejectedValue(new Error("groq is down"));
+
+    // Next owns the callback's failure handling; this mock stands in for both
+    // halves of that — it invokes synchronously (so the rejection really does
+    // happen inside submitExam's frame) and it absorbs the rejection the way the
+    // runtime would, instead of letting a test artifact become an unhandled one.
+    let passRejected = false;
+    afterMock.mockImplementation((task: unknown) => {
+      if (typeof task !== "function") return;
+      const result = (task as () => unknown)();
+      if (result instanceof Promise) {
+        result.catch(() => {
+          passRejected = true;
+        });
+      }
+    });
+
+    await callSubmitExam(ANSWERS);
+    // Let the swallowed rejection settle before asserting on it.
+    await Promise.resolve();
+
+    expect(passRejected).toBe(true);
+    // The score-write path is load-bearing (ADR-0011); everything attached to it
+    // is allowed to fail. A provider outage must not cost the student the attempt.
+    expect(recordExamResultMock).toHaveBeenCalledTimes(1);
+    expect(recordSkillMasteryMock).toHaveBeenCalledTimes(1);
+    expect(redirectMock).toHaveBeenCalledTimes(1);
+    expect(redirectMock).toHaveBeenCalledWith(RESULT_URL);
+  });
 });
 
 // =============================================================================
