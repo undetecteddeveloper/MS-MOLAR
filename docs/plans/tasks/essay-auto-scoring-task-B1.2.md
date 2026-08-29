@@ -39,9 +39,9 @@ Include the case asserting the **offline-scripts list is empty**, which goes red
 The Gemini `EMIT_PATTERN` (`/\.models\.generateContent\s*\(/`) matches **zero** lines inside the Groq module — the existing guard is blind to a second provider, and this is the case that proves the new guard is not blind in the same way. Template: `geminiChokepoint.test.ts:304-335` ("the chokepoint does not swallow anyone else's responsibility").
 
 ## Target Files
-- [ ] `SOURCE/lib/essay/groqClient.ts` (new)
-- [ ] `SOURCE/lib/essay/__tests__/groqClient.test.ts` (new)
-- [ ] `SOURCE/lib/essay/__tests__/groqChokepoint.test.ts` (new)
+- [x] `SOURCE/lib/essay/groqClient.ts` (new)
+- [x] `SOURCE/lib/essay/__tests__/groqClient.test.ts` (new)
+- [x] `SOURCE/lib/essay/__tests__/groqChokepoint.test.ts` (new)
 
 ## Investigation Targets
 - `docs/design/essay-auto-scoring-backend-design.md` (§ Agreement Checklist Scope — the `groqClient.ts` line: `server-only`, one endpoint constant, one `fetch` POST, own retry loop, closed error union)
@@ -75,23 +75,49 @@ The Gemini `EMIT_PATTERN` (`/\.models\.generateContent\s*\(/`) matches **zero** 
 Roundtrip check this task owns: the body this client emits is the one `prompt.ts` built, and the text it returns is the one `parseGrade()` is written to validate — the design never depends on `response_format` being honoured (R-06).
 
 ## Investigation Notes
-_(Record here: the exact scan key chosen and why it cannot collide with the bundle marker; the offline-scripts list content (must be empty); `npm run check:bundle` output.)_
+
+**Scan key chosen: `/GROQ_CHAT_COMPLETIONS_URL/`** — the endpoint-constant identifier.
+
+Why it cannot collide with the bundle marker: the two guards key on **structurally different strings**. The bundle guard's markers are `["GROQ_API_KEY", "api.groq.com"]` (`scripts/check-ai-key-bundle.mjs:147`); this scan's key is an identifier that appears nowhere in that file. Verified as an assertion, not an assumption — `groqChokepoint.test.ts` asserts both halves: `check-ai-key-bundle.mjs` **does** contain `api.groq.com` (so the premise is real) and **does not** match the scan key (so the scan cannot classify it). A host-keyed scan would have pulled the bundle guard into the offline-scripts `toEqual`, because `.mjs` matches `SOURCE_FILE`, does not match `TEST_FILE`, and `scripts` is in `OFFLINE_SCRIPT_DIRS` — R-03 exactly.
+
+**Offline-scripts list: `[]`** — empty, as required, and asserted by exhaustive `toEqual`. This is the case that goes red the moment anyone switches the scan key to the host string.
+
+**Emission surface: `["lib/essay/groqClient.ts"]`** — exhaustive `toEqual`, one module.
+
+**AC-034 negative control: passes.** The Gemini `EMIT_PATTERN` (`/\.models\.generateContent\s*\(/`) matches **0** lines in `groqClient.ts`. The symmetric case is asserted too — `lib/ugc/gemini.ts` does not contain the Groq scan key — so the two guards stay independent and neither can make the other's exhaustive list red.
+
+**`npm run check:bundle`: exit 0** — `✅ Server-secret bundle check PASS — 8 bí mật server-only không xuống client.` (`SECRETS.length` is 8, the H4 value.) The three payOS `⚠ Không đọc được giá trị …` lines are pre-existing marker-only-scan warnings, unrelated to this task.
+
+**Two repo conventions found during the Red phase, both corrected rather than worked around:**
+
+1. `groqClient.ts` carries `import "server-only"`, which throws under vitest. The repo idiom is `vi.mock("server-only", () => ({}))` hoisted above the import — used at `quota.test.ts:36`, `budgetDay.test.ts:9`, `geminiChokepoint.test.ts:30`. Adopted.
+2. The "`GROQ_API_KEY` is read only in this module" assertion initially failed: `lib/env/checkEnv.ts:245` also names it. That reader is **legitimate and different in kind** — it asks only *whether the variable is present*, to emit a startup `warn`, and never touches the value. The assertion now pins an exhaustive list of **three** files with the distinction written out: `groqClient.ts` (the only value reader), `checkEnv.ts` (presence only), `check-ai-key-bundle.mjs` (variable name as a marker). A fourth entry appearing is a real signal.
+
+**Mutation testing — the behavioural tests were checked for the ability to fail**, because a retry/classification test that cannot fail is worse than none:
+
+| Mutation applied to `groqClient.ts` | Result |
+|---|---|
+| non-429 failures made retryable | **10 failed** / 19 passed |
+| the `retry-after > GROQ_RETRY_MAX_WAIT_MS` bail-out removed | **1 failed** / 28 passed |
+| one shared `AbortController` across the whole retry chain | **1 failed** / 28 passed |
+
+Each was caught by the assertion written to catch it, and the module was restored from backup after each.
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
-- [ ] Read all Investigation Targets and record key observations
-- [ ] Write `groqChokepoint.test.ts` (exhaustive `toEqual` on the emission surface, the empty offline-scripts case, the AC-034 negative control) and `groqClient.test.ts` (retry loop, error classification, deadline) — observe them fail because the module does not exist
-- [ ] Confirm the chosen scan key does **not** match `scripts/check-ai-key-bundle.mjs`
+- [x] Read all Investigation Targets and record key observations
+- [x] Write `groqChokepoint.test.ts` (exhaustive `toEqual` on the emission surface, the empty offline-scripts case, the AC-034 negative control) and `groqClient.test.ts` (retry loop, error classification, deadline) — observe them fail because the module does not exist
+- [x] Confirm the chosen scan key does **not** match `scripts/check-ai-key-bundle.mjs`
 
 ### 2. Green Phase
-- [ ] Create `groqClient.ts`: `server-only`, one endpoint constant, one `fetch` POST, own retry loop with `retry-after` honoured on 429, `AbortController` deadline, closed error union, the four time constants
-- [ ] Run only the added tests and confirm they pass
-- [ ] Run `npm run check:bundle`
+- [x] Create `groqClient.ts`: `server-only`, one endpoint constant, one `fetch` POST, own retry loop with `retry-after` honoured on 429, `AbortController` deadline, closed error union, the four time constants
+- [x] Run only the added tests and confirm they pass
+- [x] Run `npm run check:bundle`
 
 ### 3. Refactor Phase
-- [ ] Confirm `GROQ_API_KEY` is read **only** inside this module
-- [ ] Confirm no `console` call in this module can carry the student's answer, the prompt, the raw response or the provider's `err.message`
-- [ ] Confirm the added tests still pass
+- [x] Confirm `GROQ_API_KEY` is read **only** inside this module
+- [x] Confirm no `console` call in this module can carry the student's answer, the prompt, the raw response or the provider's `err.message`
+- [x] Confirm the added tests still pass
 
 ## Quality Assurance Mechanisms
 - `npx tsc --noEmit` (strict) — Enforces: the closed error union — Config: `SOURCE/tsconfig.json` (project-wide)
@@ -107,13 +133,15 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
 
 | # | Command (from `SOURCE/`) | Exit code | Notes |
 |---|---|---|---|
-| 1 | `npx tsc --noEmit` | | |
-| 2 | `npx eslint --max-warnings 0` | | |
-| 3 | `npx vitest run` | | |
-| 4 | `npm run build` | | |
-| 5 | `npm run test:fixture` | | expected red = TD-030 baseline only (Gate F1): exactly 2 failures, both `subscription.fixture.e2e.test.ts` FE-1(e) `en` + `vi` |
-| 6 | `npm run test:localdb` | | see Open Item I-7 |
-| 7 | `npm run check:bundle` | | Gate E2 — this task's files match `SOURCE/lib/essay/**` |
+| 1 | `npx tsc --noEmit` | **0** | The closed `GroqFailure` union type-checks; `strict` on |
+| 2 | `npx eslint --max-warnings 0` | **0** | |
+| 3 | `npx vitest run` | **0** | 1761 passed / 10 skipped / 3 todo. +38 from this task (29 client, 9 chokepoint) |
+| 4 | `npm run build` | **0** | `server-only` did not leak into any client tree |
+| 5 | `npm run test:fixture` | **1** | **Expected red, TD-030 baseline EXACTLY as Gate F1 names it**: 2 failures, both `subscription.fixture.e2e.test.ts` › FE-1 (e) — `locale en` and `locale vi`. Case names captured, not inferred from the count |
+| 6 | `npm run test:localdb` | **0** | 11 passed / 2 todo. Run **alone**: chaining it behind `build` + `test:fixture` earlier in the session produced a contention timeout that a clean run refuted |
+| 7 | `npm run check:bundle` | **0** | `SECRETS.length === 8`; `GROQ_API_KEY` and `api.groq.com` absent from the client bundle |
+
+**Also recorded — the known-red window (Gate E4 requires it at every commit inside it):** `npm run verify:schema` (dev) → exit **1**, exactly **1** failing assertion, and it is the character-ceiling gate (`LIMITS.MAX_ATTEMPT_ANSWER` = 500 vs a DB ceiling of 4000). Red **by design** from Task H7 until Task B3.3. Any *other* assertion red would be a regression.
 
 **A task file with any exit-code cell left empty is not complete** (Gate E4).
 
@@ -136,11 +164,11 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
   - **Primary failure mode**: a commit exists in which the property "exactly one emission surface" is false and nothing says so. **Boundary**: the commit itself. **State assertion**: N/A. **Mock rationale**: none. **Residual**: none.
 
 ## Completion Criteria
-- [ ] **Implementation Complete** = module + **both** scan cases in one commit
-- [ ] **Quality Complete** = six verify gates **plus** `npm run check:bundle` green
-- [ ] **Integration Complete** = the emission surface is **provably one module before anything calls it**
-- [ ] Every Binding Decision Compliance Check evaluates to `Y`, with evidence in Investigation Notes
-- [ ] Every exit-code cell in the Gate E4 table above is filled
+- [x] **Implementation Complete** = module + **both** scan cases in one commit
+- [x] **Quality Complete** = six verify gates **plus** `npm run check:bundle` green (gate 5 red = TD-030 baseline only)
+- [x] **Integration Complete** = the emission surface is **provably one module before anything calls it** — B1.4, the only caller, does not exist yet
+- [x] Every Binding Decision Compliance Check evaluates to `Y`, with evidence in Investigation Notes
+- [x] Every exit-code cell in the Gate E4 table above is filled
 
 ## Notes
 - Impact scope: Task B1.4 is the only caller; Task B3.2's retry path drives the same client through `gradeEssays`.
