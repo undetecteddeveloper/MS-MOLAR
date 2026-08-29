@@ -56,7 +56,7 @@ Grading ships **disabled**. `ESSAY_GRADING_ENABLED` absent ⇒ off. No essay tex
 
 The two new SQL functions move the schema fingerprint. **Current verified baseline: `29931beeb950`**, confirmed read-only on 2026-08-29 for **both** Supabase projects — prod `pebjdlbgbmizgfpuptjl` and dev `hynwleaxtbtjzkvpjsug` — applied within 300 ms of each other. Both are in sync.
 
-- [ ] B1 — Before applying anything: read `schema_version.fingerprint` on **prod** and on **dev** and record both values here. Prod: `____________` Dev: `____________`
+- [x] B1 — Before applying anything: read `schema_version.fingerprint` on **prod** and on **dev** and record both values here. Prod: **`29931beeb950`** Dev: **`29931beeb950`** *(read-only via Composio, 2026-08-29, same call as Gate C). Both still match the recorded baseline — nothing was hand-applied in the interim, so the TD-005 shape Task G0.4 watches for is absent.*
 - [ ] B2 — Compare both against `29931beeb950` **and** against the new literal computed from the edited `schema.sql`. Record the new literal here: `____________`
 - [ ] B3 — Explicit engineer confirmation obtained **before any DDL touches prod**. Confirmed by: `______________` on `________-__-__`
 - [ ] B4 — DDL applied to **dev** (`hynwleaxtbtjzkvpjsug`).
@@ -69,11 +69,11 @@ The two new SQL functions move the schema fingerprint. **Current verified baseli
 
 The auto-generated CHECK constraint name on `telemetry_log.event_type` is **predicted, not verified**. If the prediction is wrong, `drop constraint if exists` silently does nothing, `add constraint` either collides or leaves two live CHECKs, and the migration *appears* to succeed while `'essay_grade'` stays rejected — a silent failure, because the telemetry write is best-effort.
 
-- [ ] C1 — Run a read-only query on **prod** against `pg_constraint` for CHECK constraints on `public.telemetry_log`, and record the real name of the `event_type` constraint here: `____________________`
-- [ ] C2 — Same on **dev**. Record: `____________________`
-- [ ] C3 — If the two names differ, that is itself a TD-005 symptom — record it in `TECH-DEBT.md` before proceeding, and write the drop/add pair to handle both names.
-- [ ] C4 — The `error_code` constraint name confirmed too (existing drop/add pair at `schema.sql:1818-1821` names it `telemetry_log_error_code_check`): `____________________`
-- [ ] C5 — Gate C is closed **before** Task H5 writes the DDL and unconditionally before Gate B.
+- [x] C1 — Run a read-only query on **prod** against `pg_constraint` for CHECK constraints on `public.telemetry_log`, and record the real name of the `event_type` constraint here: **`telemetry_log_event_type_check`** *(prod `pebjdlbgbmizgfpuptjl`, read-only via Composio, 2026-08-29). Live definition: `CHECK ((event_type = ANY (ARRAY['adaptive_route'::text, 'tutor_invoke'::text])))` — **two** values, so the new pair must list **three**.*
+- [x] C2 — Same on **dev**. Record: **`telemetry_log_event_type_check`** *(dev `hynwleaxtbtjzkvpjsug`, 2026-08-29). Identical name **and** identical definition to prod.*
+- [x] C3 — If the two names differ, that is itself a TD-005 symptom — record it in `TECH-DEBT.md` before proceeding, and write the drop/add pair to handle both names. **The names do NOT differ.** No TD-005 symptom; the drop/add pair handles **one** name. *(The prediction that motivated Gate C turned out correct — but it was worth verifying: had it been wrong, `drop constraint if exists` would have silently done nothing and the migration would have looked successful while `'essay_grade'` stayed rejected.)*
+- [x] C4 — The `error_code` constraint name confirmed too (existing drop/add pair at `schema.sql:1818-1821` names it `telemetry_log_error_code_check`): **`telemetry_log_error_code_check` on both projects** — matches the pair already in `schema.sql`. Live definition carries the **six** values `gemini_unavailable, rate_limited, server, not_eligible, user_quota_exhausted, project_budget_exhausted`, byte-identical on prod and dev and identical to the inline declaration at `schema.sql:1390-1399`; the new pair must list **nine** (adding `groq_unavailable`, `invalid_output`, `duplicate_write`).
+- [x] **C5 — GATE C CLOSED 2026-08-29.** Both constraint names verified by real read-only query on both live databases, both definitions captured, names identical across projects. Task H5 may now write the DDL using `telemetry_log_event_type_check` and `telemetry_log_error_code_check` verbatim.
 
 ### Gate D — OQ-3 / UI Spec O-3 / FE-OQ-3, the `/history` payload measurement (hard entry gate)
 
@@ -121,7 +121,11 @@ This matters more than ordinary bookkeeping because Fix I002 creates a **known-r
 
 **You did not break it.** Two pre-existing failures live in `SOURCE/tests/e2e/fixture/subscription.fixture.e2e.test.ts` (case FE-1(e), locale `en` and locale `vi`), asserting `aria-describedby` points at the Confirm control's reason box and receiving the Recheck control's reason box instead (`…:3017`). Logged as **TD-030**; unrelated to essay grading.
 
-- [ ] F1 — Before the first commit of this plan, run `npm run test:fixture` on the current tree and record the **exact** failing case names and count here: `____________________`
+- [x] **F1 — BASELINE CAPTURED 2026-08-29.** `npm run test:fixture` on the current tree: **exit code 1**, `Test Files 1 failed | 1 skipped (2)`, `Tests 2 failed | 75 passed | 3 todo (80)`. The **exact** two failing cases, both in `SOURCE/tests/e2e/fixture/subscription.fixture.e2e.test.ts`, both under the describe `FE-1 (e) legalContentReady === false leaves an inert but reachable confirm control`:
+  1. `locale en — aria-disabled, no native disabled, Tab-reachable, no action`
+  2. `locale vi — aria-disabled, no native disabled, Tab-reachable, no action`
+
+  **Nothing else is red in this lane.** Any third failing case is this feature's. Recorded from the run that gated commit `3c66df1`.
 - [ ] F2 — How to tell a new failure from TD-030, in order:
   1. Remove your new/changed fixture file from the tree and re-run the lane. If the same two `subscription.fixture.e2e.test.ts` cases are still red and nothing else is, it is TD-030.
   2. `git checkout main` (stash first — `git status` before any destructive command) and re-run the lane. Two red cases there confirms the baseline.
@@ -704,7 +708,7 @@ graph TD
   - **Blocks**: **Stage 1 blocks every task that performs a dev `L1` grading run** (B1.5, B3.2, F-C2 and the two phase criteria). **Stage 2 blocks Phase E.** Do **not** read this task as "no gate applies before Phase E" — code may be written and merged in the disabled state without any part of Gate A, but the moment a task needs a real band to land on dev, A5b applies.
   - Completion: Implementation Complete = A5b ticked and dated (stage 1), then Gate A fully ticked with a real A6 date (stage 2); Quality Complete = N/A; Integration Complete = `ESSAY_GRADING_ENABLED` verified absent in both Vercel scopes until A6, and set to `true` locally only after A5b and only against seeded attempts.
 
-- [ ] **Task G0.2 — OQ-2: read the real CHECK constraint names (HUMAN, read-only SQL)**
+- [x] **Task G0.2 — OQ-2: read the real CHECK constraint names (HUMAN, read-only SQL)**
   - Discharges: backend OQ-2; risk R-07; prerequisite to all DDL.
   - Work: complete Gate C items C1–C5 — one read-only `pg_constraint` query per project, recording the real `event_type` and `error_code` constraint names for **both** `pebjdlbgbmizgfpuptjl` and `hynwleaxtbtjzkvpjsug`.
   - Verification method: the two (or four) names are written into Gate C. If they differ between projects, a TD-005 symptom is filed in `TECH-DEBT.md` before proceeding.
@@ -721,7 +725,7 @@ graph TD
   - Escalation condition: if the payload is unacceptable, the alternative is an RPC returning both booleans pre-derived — that is **DDL**, raising hand-applied schema changes from two to three and reopening the budget ADR-0018 Escalation 2 was resolved to preserve. It is a scope escalation needing an engineer's decision and an explicit statement that Escalation 2 is being reopened; it is not a fallback an implementer may pick.
   - Completion: Implementation Complete = Gate D closed; Integration Complete = Task B2.2's select shape matches the recorded decision.
 
-- [ ] **Task G0.4 — Phase 3.5 fingerprint baseline confirmation (HUMAN, read-only SQL)**
+- [x] **Task G0.4 — Phase 3.5 fingerprint baseline confirmation (HUMAN, read-only SQL)**
   - Discharges: backend § Schema Changes; ADR-0018 Implementation Guidance #9; TD-005.
   - Work: complete Gate B items B1–B2 — read `schema_version.fingerprint` on both projects, confirm both still read `29931beeb950`, and record them.
   - Verification method: two values written into Gate B1. If either has moved since 2026-08-29, stop and reconcile before authoring DDL — a moved baseline means something else was applied by hand in the interim, which is the TD-005 shape.
@@ -729,7 +733,7 @@ graph TD
   - **Blocks**: Task H5.
   - Completion: Implementation Complete = both values recorded and matching; Integration Complete = Task H5 computes the new literal from the edited `schema.sql` and records it in Gate B2.
 
-- [ ] **Task G0.5 — TD-030 baseline capture**
+- [x] **Task G0.5 — TD-030 baseline capture**
   - Discharges: `TECH-DEBT.md` TD-030; Gate F.
   - Work: run `npm run test:fixture` on the current tree; record the exact failing case names and the failure count in Gate F1; confirm the two failures are the `subscription.fixture.e2e.test.ts` FE-1(e) `en`/`vi` cases and nothing else.
   - Verification method: the recorded baseline is compared against every later run of the lane; anything red **beyond** the recorded two is this feature's.
@@ -740,10 +744,10 @@ graph TD
 #### Phase Completion Criteria
 
 - [ ] Gate A ticked through A7 **or** explicitly deferred to Phase E with the feature confirmed disabled everywhere
-- [ ] Gate C closed (real constraint names recorded for both projects)
+- [x] Gate C closed (real constraint names recorded for both projects) — **2026-08-29**; both `telemetry_log_event_type_check` and `telemetry_log_error_code_check`, definitions captured, names identical across projects
 - [ ] Gate D closed (payload measured, decision recorded)
-- [ ] Gate B1–B2 recorded (baseline fingerprints on both projects)
-- [ ] Gate F1 recorded (TD-030 red baseline captured, count and case names exact)
+- [ ] Gate B1–B2 recorded (baseline fingerprints on both projects) — **B1 done 2026-08-29** (prod and dev both `29931beeb950`, unchanged from baseline). **B2 still open**: the new literal cannot exist until Task H5 edits `schema.sql`
+- [x] Gate F1 recorded (TD-030 red baseline captured, count and case names exact) — **2026-08-29**, exactly 2 failures, both named in Gate F1
 - [ ] Open Items I-1 through I-7 reviewed by the engineer; each either resolved or explicitly accepted as open with an owner
 
 ---
@@ -1491,9 +1495,14 @@ Recorded rather than resolved by invention. Each needs an engineer's decision; n
 ## Progress Tracking
 
 ### Phase 0 — Entry gates
-- Start: TBD
-- Complete: TBD
+- Start: **2026-08-29**
+- Complete: **partial** — 3 of 5 tasks discharged
 - Notes:
+  - **G0.2 (Gate C) — DONE.** Read-only `pg_constraint` query on both live projects. `telemetry_log_event_type_check` and `telemetry_log_error_code_check` on **both**; names identical, so there is no TD-005 divergence and the drop/add pair handles one name. The predicted name was **correct** — verifying it was still right, because a wrong guess fails **silently**.
+  - **G0.4 (Gate B1) — DONE.** Prod and dev fingerprints both still `29931beeb950`. Gate B2 stays open by construction: the new literal does not exist until Task H5 edits `schema.sql`.
+  - **G0.5 (Gate F1) — DONE.** TD-030 baseline is exactly 2 failures, both `subscription.fixture.e2e.test.ts` FE-1(e) (`en`, `vi`). Anything beyond those two belongs to this feature.
+  - **G0.1 (Gate A) — BLOCKED on the engineer.** A1 ✅ and A5 ✅ (ZDR on). **A5b is blocked on A2 alone** — the rotated `GROQ_API_KEY` must be placed in `SOURCE/.env.local` by the engineer directly. Until A5b ticks, no task may perform a dev `L1` run.
+  - **G0.3 (Gate D) — NOT STARTED.** Needs a real `listMyHistory()` payload measurement at `LIST_ROW_CEILING = 500` on dev, with and without `per_question, created_at`. It is a **hard entry gate** for Task B2.2, and its escalation path is a scope decision, not a technical fallback.
 
 ### Phase H — Foundation
 - Start: TBD
