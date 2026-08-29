@@ -124,7 +124,8 @@ describe("schema.sql", () => {
 // ---------------------------------------------------------------------------
 
 /**
- * Sáu literal mà CHECK constraint phải mang sau R13, đúng thứ tự.
+ * Chín literal mà CHECK constraint phải mang sau Essay Auto-Scoring R13, đúng
+ * thứ tự.
  *
  * Chép tay CỐ Ý, cùng lý do `telemetry.test.ts:49` chép tay: đọc kỳ vọng ra từ
  * chính schema.sql (hoặc so hai chỗ SQL với nhau) chỉ chứng minh hai bản sao
@@ -137,6 +138,9 @@ const SCHEMA_TELEMETRY_ERROR_CODES = [
   "not_eligible",
   "user_quota_exhausted",
   "project_budget_exhausted",
+  "groq_unavailable",
+  "invalid_output",
+  "duplicate_write",
 ];
 
 const ERROR_CODE_IN_RE = /error_code\s+in\s*\(([^)]*)\)/gi;
@@ -221,7 +225,12 @@ describe("schema.sql — hai danh sách error_code phải khớp nhau (AC-045)",
     // BẰNG CHỨNG ĐỎ, chạy mọi lần: đây đúng là chế độ hỏng mà ca trên tồn tại
     // để chặn — inline được nới, cặp drop/add thì không. Bản vá chỉ nằm trong
     // bộ nhớ; không mutant nào chạm tới file trên đĩa.
-    const dropped = "'project_budget_exhausted'";
+    //
+    // Mutant là literal CUỐI danh sách, nên `slice` cắt đuôi vẫn đọc được. Kể
+    // từ R13 mã cuối là 'duplicate_write' chứ không còn là
+    // 'project_budget_exhausted' — và mã MỚI NHẤT cũng đúng là mã dễ bị quên
+    // nhất trong một lượt nới thật.
+    const dropped = "'duplicate_write'";
     const cut = schemaSql.lastIndexOf(dropped);
     expect(cut, `Không tìm thấy ${dropped} ở danh sách thứ hai`).toBeGreaterThan(0);
 
@@ -229,7 +238,7 @@ describe("schema.sql — hai danh sách error_code phải khớp nhau (AC-045)",
     const sites = parseErrorCodeSites(perturbed);
 
     expect(sites[0].codes).toEqual(SCHEMA_TELEMETRY_ERROR_CODES);
-    expect(sites[1].codes).toEqual(SCHEMA_TELEMETRY_ERROR_CODES.slice(0, 5));
+    expect(sites[1].codes).toEqual(SCHEMA_TELEMETRY_ERROR_CODES.slice(0, 8));
     expect(sites[1].codes).not.toEqual(sites[0].codes);
   });
 

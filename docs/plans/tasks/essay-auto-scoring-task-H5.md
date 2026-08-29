@@ -55,9 +55,12 @@ Both `language plpgsql`, `volatile`, `set search_path = public, pg_temp`, **`INV
 Compute the new literal and move it at **both** pin sites — `schema.sql:1871` and `SOURCE/lib/schema/schemaFingerprint.ts:41` — **in this same commit** (D-08, Gate B8, Gate H6). Record the new literal in **Gate B2** of the work plan.
 
 ## Target Files
-- [ ] `SOURCE/supabase/schema.sql`
-- [ ] `SOURCE/lib/schema/schemaFingerprint.ts` (`:41`)
-- [ ] `docs/plans/20260829-feature-essay-auto-scoring.md` — Gate B2 (record the new literal)
+- [x] `SOURCE/supabase/schema.sql`
+- [x] `SOURCE/lib/schema/schemaFingerprint.ts` (`:41`)
+- [x] `SOURCE/lib/tutor/telemetry.ts` — **added to scope 2026-08-29 by engineer decision** (Option 1, see § Blocker)
+- [x] `SOURCE/lib/tutor/__tests__/telemetry.test.ts` (`:49`, `:265`) — same
+- [x] `SOURCE/lib/schema/__tests__/schemaFingerprint.test.ts` (`:133`, `:231`) — same; the **eighth** coupled site, absent from D-06 and Gate H5
+- [ ] `docs/plans/20260829-feature-essay-auto-scoring.md` — Gate B2 (record the new literal) — **not written: work plan is out of scope for this run; the engineer is reconciling it. Literal to record: `9979c9deea52`**
 
 ## Investigation Targets
 - `docs/design/essay-auto-scoring-backend-design.md` (§ Schema Changes Nhóm 1 — the ceiling drop/add pair)
@@ -107,25 +110,147 @@ Compute the new literal and move it at **both** pin sites — `schema.sql:1871` 
 Roundtrip checks this task owns: the cap literal written into the claim body equals `ESSAY_MAX_ATTEMPTS`; the fingerprint literal written at `schema.sql:1871` equals the one at `schemaFingerprint.ts:41`.
 
 ## Investigation Notes
-_(Record here: the new fingerprint literal; the exact new `event_type` drop/add pair including the Gate C name; confirmation that the fingerprint block is still the last statement in `schema.sql`; the source-scan result for the five forbidden column names.)_
+
+_Recorded 2026-08-29 at execution time._
+
+### New fingerprint literal — `9979c9deea52`
+
+Computed by the real `computeSchemaFingerprint()` (via the failing `schemaFingerprint.test.ts` `howToFix` message, which is the only local path to it — no `tsx` binary is installed in `SOURCE/node_modules/.bin`). Written at **both** pin sites in the same edit:
+
+- `SOURCE/supabase/schema.sql` (now `:2158`, was `:1871`) — `values (1, '9979c9deea52')`
+- `SOURCE/lib/schema/schemaFingerprint.ts:41` — `export const SCHEMA_FINGERPRINT = "9979c9deea52";`
+
+Confirmed stable: the literal sits inside the `@schema-fingerprint-begin/end` markers, which `computeSchemaFingerprint()` strips, so writing it does not move it. `schemaFingerprint.test.ts`'s three-way assertion (constant ↔ declared ↔ recomputed) is **green** after the move, and `verify:schema` independently prints `✓ schema.sql tự khai đúng vân tay của chính nó (9979c9deea52)`.
+
+Baseline before this task: `29931beeb950` on both databases (Gate B1) — unchanged, because **nothing was applied**.
+
+### The new `event_type` drop/add pair, verbatim as written
+
+Gate C name used verbatim; **not** predicted. Three values, matching the live definition (`adaptive_route`, `tutor_invoke`) plus `essay_grade`:
+
+```sql
+alter table public.telemetry_log
+  drop constraint if exists telemetry_log_event_type_check;
+alter table public.telemetry_log
+  add constraint telemetry_log_event_type_check check (
+    event_type in ('adaptive_route', 'tutor_invoke', 'essay_grade')
+  );
+```
+
+The `error_code` pair was extended in place from 6 to 9 (`groq_unavailable`, `invalid_output`, `duplicate_write` added), under its existing Gate C name `telemetry_log_error_code_check`. Both inline declarations were widened to match.
+
+### Fingerprint block placement
+
+`tail -8 schema.sql` ends with the `@schema-fingerprint-end` marker — the `insert into public.schema_version` block is still the **last** statement in the file. The new §"ESSAY GRADE WRITE" block was inserted after §11b's grant, ~1200 lines above it.
+
+### Source scan of both function bodies (189 lines, `claim_essay_grading_attempt` + `record_essay_grade`)
+
+| Check | Result |
+|---|---|
+| `user_id` **parameter** | **absent** — the only `user_id` occurrences are `a.user_id` (selected from `exam_attempts`) and the local `v_user_id`; every parameter is `p_`-prefixed and none names a user |
+| `total_score`, `correct`, `total`, `topic_breakdown`, `overtime_seconds` | **0 occurrences** of all five (word-boundary grep over the extracted bodies) |
+| `order by ord` | 2 (one per body) |
+| `with ordinality` | 2 (one per body) |
+| `security definer` | 0 — both are INVOKER |
+| `p_earned in (...)` / any band literal | 0. `0.25`/`0.75` appear exactly **once** in the whole file, on comment line `:1011`, which states the set is declared in TypeScript. Comments are stripped by `computeSchemaFingerprint()`, so **no band literal entered the executable SQL** |
+| first-write-wins | `get diagnostics v_rows = row_count; return v_rows = 1;` — a **value**. The `<> 'graded'` predicate is inside the same `update` statement's `where … exists (…)` |
+| retry cap | `if v_attempts >= 3 then … 'exhausted'` in the **claim**, before any budget/provider call. `3` equals `ESSAY_MAX_ATTEMPTS` (`lib/scoring/essayLifecycle.ts:74`). `essayAttempts` is only ever written as `v_attempts + 1` — **no decrement anywhere** |
+
+### Preserved-unchanged confirmation
+
+`git diff` touches no existing statement: the only diff lines mentioning `record_exam_result`/`record_skill_mastery` are new **comments**. `revoke insert, update, delete on public.exam_results from anon, authenticated;` (now `:864`) unchanged; the MASTERY WRITE `scored` filter (now `:1610`) unchanged; `record_exam_result()`'s signature/body/grants unchanged; the `exam_results` column DDL unchanged; `SOURCE/supabase/test-rls.ts` shows clean in `git status`.
+
+### Binding Decisions — evaluated against the final implementation
+
+| # | Axis | Evaluation | Evidence |
+|---|---|---|---|
+| 1 | placement | **Y** | Both functions present as INVOKER; no `essay_grades` table; no TypeScript touched at all |
+| 2 | contract_schema | **Y** | Source scan above — no `user_id` parameter, 0 occurrences of all five column names; `status = 'submitted'` required in both |
+| 3 | data_flow | **Y** | `jsonb_agg(… order by ord)` over `jsonb_array_elements(…) with ordinality`, twice |
+| 4 | contract_schema (band set) | **Y** | 0 band comparisons; the only `0.25`/`0.75` is a comment |
+| 5 | data_flow (first-write-wins) | **Y** | Predicate in the same statement; returns `v_rows = 1`, never raises on duplicate |
+| 6 | data_flow (claim-time cap) | **Y** | Cap consumed in the claim; `3` == `ESSAY_MAX_ATTEMPTS`; no decrement; `record_exam_result()` untouched |
+| 7 | placement (§11 cross-ref) | **Y** | New section sits between §11b's grant and the VIEW RLS banner; §11's banner gained a `⚠ SỬA ĐỔI, ĐỌC KÈM` pointer; grant block is the §11b block with only the signature changed |
+| 8 | dependency_direction | **Y** | Ownership, `submitted`, the cap and first-write-wins are all inside the SQL bodies |
+| 9 | placement (two functions) | **Y** | Two independent functions; neither takes a mode/discriminator parameter |
+
+### Reference Contracts
+
+| Contract | Evaluation | Evidence |
+|---|---|---|
+| state-lifecycle-negative (append-only property that remains) | **Y** | Both grant blocks `revoke all … from public, anon, authenticated` then `grant execute … to service_role`; `schema.sql:864`'s client revoke unchanged |
+
+### Roundtrip checks this task owns
+
+- Cap literal `3` in the claim body == `ESSAY_MAX_ATTEMPTS` (`3`). ✅
+- `schema.sql`'s declared literal == `schemaFingerprint.ts`'s constant == recomputed value (`9979c9deea52`). ✅ Proven by `schemaFingerprint.test.ts`'s three-way assertion passing, and independently by `verify:schema`.
+
+### ⛔ Blocker — RESOLVED by engineer decision (Option 1), recorded in full because the enumeration it corrects is still wrong upstream
+
+**Group 2's `error_code` widening turns three assertions red in `SOURCE/lib/schema/__tests__/schemaFingerprint.test.ts`.** Measured, not predicted: `npx vitest run` = **exit 1**, `3 failed | 1711 passed`, all three in that one file.
+
+| Failing case | Line | Why |
+|---|---|---|
+| `đúng HAI occurrence, đúng hai loại câu lệnh, mỗi bên đúng sáu literal` | `:213` | `toEqual` against `SCHEMA_TELEMETRY_ERROR_CODES` — a hand-copied **six**-literal list at `:133` |
+| `thiếu MỘT literal ở MỘT trong hai chỗ là đủ để ca trên đỏ` | `:231` | same hand-copied list, used as the mutation baseline |
+| `hằng TS và CẢ HAI danh sách SQL trùng khít` | `:256` | `toEqual` against `TELEMETRY_ERROR_CODES` from `lib/tutor/telemetry.ts` — still **six** |
+
+**This is an eighth coupled site that D-06 and Gate H5 do not enumerate.** D-06 lists three TypeScript test pins, all in `telemetry.test.ts` (`:49`, `:265`, `:311`). Those three are **still green** — they compare TypeScript against a hand copy and never read `schema.sql`. The site that actually reads `schema.sql` is `schemaFingerprint.test.ts`, and it is missing from every enumeration in the plan and the Design Doc.
+
+**No additive fix exists inside this task's Target Files.** Extending `SCHEMA_TELEMETRY_ERROR_CODES` to nine would close the first two, but the third compares the SQL lists to `TELEMETRY_ERROR_CODES` in `lib/tutor/telemetry.ts`. That constant is Task **B3.1**'s (work plan `:1074`), and moving it cascades into `telemetry.test.ts:49`, `:265`, `:311`. Weakening the third assertion is not available: its own comment forbids it (*"KHÔNG làm nhẹ thành `toContain`"*), and it is the gate Gate H5 exists to be.
+
+**The plan contradicts itself here.** Gate H5 (`:160`) requires all seven telemetry sites to move *in one commit* "or CI goes red"; the Connection Map (`:497`) names H5's expected signal as the telemetry pins *staying green*; but the work plan assigns the SQL sites to H5 and the TypeScript sites to B3.1, which are separated by all of Phase H. Equivalent engineers would disagree on which side moves, so this is escalated rather than resolved unilaterally.
+
+Options, with costs:
+
+1. **Widen the TypeScript sites in this same commit** (Gate H5 in full): `lib/tutor/telemetry.ts` (`TelemetryEventType`, `TELEMETRY_ERROR_CODES`), `lib/tutor/__tests__/telemetry.test.ts` (`:49`, `:265`, `:311`), and `lib/schema/__tests__/schemaFingerprint.test.ts:133`. Five extra files, all outside this task's Target Files, and it takes B3.1's implementation (whose task file would go stale). Runtime risk is nil — the new literals are inert until `gradeEssays.ts` exists, and H7 applies the DDL before Phase B. **This is the option that satisfies Gate H5 as written.**
+2. **Land Group 2 without the `error_code` widening** (only the inline `event_type` and the new `event_type` pair, neither of which the guard reads). Keeps `vitest` green, but the DDL applied at H7 would lack three error codes, so B3.1 would have to edit `schema.sql` again, move the fingerprint again, and re-apply to both databases — exactly the TD-005 shape this task exists to avoid.
+3. **Land all three groups and accept a documented known-red window** on those three assertions until B3.1, the same way `verify:schema`'s ceiling gate is a blessed known-red from H7→B3.3. Cheapest, but it puts a red lane on the branch for ~12 commits and the plan's own H5 completion criterion says "six verify gates green".
+
+#### Resolution — Option 1, taken 2026-08-29
+
+The engineer approved Option 1 and widened this commit's scope by three files. The deciding evidence was the failing assertion's **own message**: *"Sửa CẢ BA chỗ trong cùng một commit: hai danh sách SQL + lib/tutor/telemetry.ts."* The guard already in the repo instructs the one-commit fix; the work plan's H5/B3.1 split contradicts a rule the codebase was enforcing before this feature existed.
+
+Options 2 and 3 were rejected on the record: Option 3 would leave the **default** vitest lane red for ~12 commits (the exact TD-030 failure mode — a red lane inside which no real regression is distinguishable); Option 2 would mean hand-applying DDL to both live databases **twice** (the TD-005 shape, already fired four times).
+
+What moved, and what deliberately did not:
+
+| Site | Change | Note |
+|---|---|---|
+| `lib/tutor/telemetry.ts:35` | `TELEMETRY_ERROR_CODES` 6 → 9 | order matches both SQL lists exactly |
+| `lib/tutor/telemetry.ts:40` | `TelemetryEventType` += `'essay_grade'` | no exhaustive `switch` anywhere consumes this type — grep-verified, so widening is inert |
+| `lib/tutor/__tests__/telemetry.test.ts:49` | `SCHEMA_ERROR_CODES` 6 → 9 | **still hand-written**; reads nothing |
+| `lib/tutor/__tests__/telemetry.test.ts:265` | `event_type` allowlist += `'essay_grade'` | |
+| `lib/tutor/__tests__/telemetry.test.ts:311` | **unchanged** | per-element equality needed no edit — both sides moved to nine |
+| `lib/schema/__tests__/schemaFingerprint.test.ts:133` | `SCHEMA_TELEMETRY_ERROR_CODES` 6 → 9 | **still hand-written**; reads nothing |
+| `lib/schema/__tests__/schemaFingerprint.test.ts:231` | mutation literal `'project_budget_exhausted'` → `'duplicate_write'`, `.slice(0, 5)` → `.slice(0, 8)` | see below |
+| `:256` assertion | **unchanged, not weakened** | still an exhaustive `toEqual` over both SQL sites against the TypeScript constant; never softened to `toContain` |
+
+The mutation-case edit at `:231` was forced, not optional: that case removes one literal and asserts the second site is a **tail truncation** of the expected list. `'project_budget_exhausted'` is no longer the last literal, so a `.slice()` cut-from-the-end no longer describes the perturbation. Retargeting to the new last literal `'duplicate_write'` keeps the assertion's strength identical — site[0] still holds all nine, site[1] holds eight, and the two still must differ — while also making the mutant the **newest** code, which is the one a real widening is most likely to forget.
+
+**No hand copy was made to read from another.** All three remain independent transcriptions, which is the whole reason they catch a wrong-but-consistent pair.
+
+**Still owed upstream (engineer is reconciling; deliberately not touched here):** D-06 in the backend Design Doc and Gate H5 in the work plan both enumerate **seven** sites and must be amended to name `schemaFingerprint.test.ts` as the eighth. Task B3.1 must be trimmed to the `gradeEssays.ts` call-site wiring it still owns, since its telemetry constant work landed here.
+
+**Re-run after the widening — no ninth coupled site appeared.** `npx vitest run` went from `3 failed | 1711 passed` to `1714 passed`, exit **0**. The fingerprint did **not** move (`9979c9deea52` at both pins, re-confirmed) because `schema.sql` was not touched again.
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
-- [ ] Read all Investigation Targets, including Gate C's two recorded names and Gate B1's baseline fingerprints
-- [ ] **Sweep the adjacent cases** (Change Category: boundary-change / state-change): all four telemetry SQL sites, the ceiling pair, the superseded inline check at `:124`, and both fingerprint pin sites — enumerate them before editing
-- [ ] Confirm the current state of each site so a partially-applied edit is detectable
+- [x] Read all Investigation Targets, including Gate C's two recorded names and Gate B1's baseline fingerprints
+- [x] **Sweep the adjacent cases** (Change Category: boundary-change / state-change): all four telemetry SQL sites, the ceiling pair, the superseded inline check at `:124`, and both fingerprint pin sites — enumerate them before editing
+- [x] Confirm the current state of each site so a partially-applied edit is detectable
 
 ### 2. Green Phase
-- [ ] Group 1: widen the ceiling drop/add pair at `:472-474` to 4000, keeping and extending the comment
-- [ ] Group 2: widen both inline declarations, extend the `error_code` pair, and write the **new** `event_type` pair using `telemetry_log_event_type_check` verbatim
-- [ ] Group 3: add the new section after §11 with both functions, the §11b grant block mirrored verbatim, and the full explanatory comment block; cross-reference it from §11
-- [ ] Compute the new fingerprint and move it at **both** pin sites in this same commit; record it in Gate B2
+- [x] Group 1: widen the ceiling drop/add pair at `:472-474` to 4000, keeping and extending the comment
+- [x] Group 2: widen both inline declarations, extend the `error_code` pair, and write the **new** `event_type` pair using `telemetry_log_event_type_check` verbatim
+- [x] Group 3: add the new section after §11 with both functions, the §11b grant block mirrored verbatim, and the full explanatory comment block; cross-reference it from §11
+- [x] Compute the new fingerprint (`9979c9deea52`) and move it at **both** pin sites — Gate B2 of the work plan left unwritten (scope boundary)
 
 ### 3. Refactor Phase
-- [ ] Source-scan both function bodies: no `user_id` parameter, none of `total_score`, `correct`, `total`, `topic_breakdown`, `overtime_seconds`
-- [ ] Confirm `jsonb_agg(… order by ord)` over `… with ordinality` in both
-- [ ] Confirm the fingerprint block is the **last** statement in `schema.sql`
-- [ ] Confirm `SOURCE/supabase/test-rls.ts` is untouched, and `schema.sql:1354` (MASTERY WRITE), `record_exam_result()` and the `exam_results` column DDL are unchanged
+- [x] Source-scan both function bodies: no `user_id` parameter, none of `total_score`, `correct`, `total`, `topic_breakdown`, `overtime_seconds`
+- [x] Confirm `jsonb_agg(… order by ord)` over `… with ordinality` in both
+- [x] Confirm the fingerprint block is the **last** statement in `schema.sql`
+- [x] Confirm `SOURCE/supabase/test-rls.ts` is untouched, and `schema.sql:1354` (MASTERY WRITE), `record_exam_result()` and the `exam_results` column DDL are unchanged
 
 ## Quality Assurance Mechanisms
 - `npx tsc --noEmit` (strict) — Enforces: the moved fingerprint literal type-checks — Config: `SOURCE/tsconfig.json` (project-wide)
@@ -142,13 +267,13 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
 
 | # | Command (from `SOURCE/`) | Exit code | Notes |
 |---|---|---|---|
-| 1 | `npx tsc --noEmit` | | |
-| 2 | `npx eslint --max-warnings 0` | | |
-| 3 | `npx vitest run` | | |
-| 4 | `npm run build` | | |
-| 5 | `npm run test:fixture` | | expected red = TD-030 baseline only (Gate F1): exactly 2 failures, both `subscription.fixture.e2e.test.ts` FE-1(e) `en` + `vi` |
-| 6 | `npm run test:localdb` | | see Open Item I-7 |
-| 8 | `npm run verify:schema` | | Gate E3 — this task's files match `SOURCE/supabase/**` and `SOURCE/lib/schema/schemaFingerprint.ts`. **Expected red against both databases until Task H7 applies the DDL** — record the exit code rather than working around it |
+| 1 | `npx tsc --noEmit` | **0** | green |
+| 2 | `npx eslint --max-warnings 0` | **0** | green |
+| 3 | `npx vitest run` | **0** | `1714 passed \| 10 skipped \| 3 todo (1727)`, `127 files passed \| 2 skipped`. First run was **1** (`3 failed \| 1711 passed`) — see § Blocker; resolved by the engineer-approved Option 1 scope widening, not by weakening any assertion |
+| 4 | `npm run build` | **0** | green |
+| 5 | `npm run test:fixture` | **1** | **exactly** the TD-030 baseline: `2 failed \| 75 passed \| 3 todo (80)`, both `subscription.fixture.e2e.test.ts` FE-1(e) — `locale en` and `locale vi`. Nothing beyond |
+| 6 | `npm run test:localdb` | **0** | `11 passed \| 2 todo (13)`, `1 file passed \| 1 skipped` |
+| 8 | `npm run verify:schema` | **1** | Against **dev** (`.env.local` → `hynwleaxtbtjzkvpjsug`); read/probe only, **no DDL**. Exactly **one** failing check, and it is the expected one: `✗ DB đang ở bản 29931beeb950, git đang ở 9979c9deea52 — có bản vá trong git CHƯA chạy trên DB này.` Every other check green, including `✓ schema.sql tự khai đúng vân tay của chính nó (9979c9deea52)`. **Not worked around** — the pin was not reverted |
 
 **A task file with any exit-code cell left empty is not complete** (Gate E4).
 
@@ -171,13 +296,13 @@ Authored here, **proven** in H6/H8:
   - **Primary failure mode**: every grading telemetry write is rejected forever, silently, because the write is best-effort. **Boundary to exercise**: the live catalogue — closed by **Gate C being a prerequisite**, and confirmed at H7 step 5 by inserting one `event_type = 'essay_grade'` row on dev and deleting it. **State assertion**: N/A here. **Mock rationale**: none. **Residual**: authored here, confirmed at H7.
 
 ## Completion Criteria
-- [ ] **Implementation Complete** = all three groups + **both** fingerprint sites in one commit
-- [ ] **Quality Complete** = six verify gates green (`verify:schema` will still be red against the databases until H7 — **expected**, and must be **recorded**, not worked around)
+- [x] **Implementation Complete** = all three groups + **both** fingerprint sites + the four telemetry TypeScript sites, in one commit
+- [x] **Quality Complete** = gates 1/2/3/4/6 green; gate 5 red = TD-030 baseline only; `verify:schema` red = the fingerprint comparison only, expected until H7 (`verify:schema` will still be red against the databases until H7 — **expected**, and must be **recorded**, not worked around)
 - [ ] **Integration Complete** = deferred to Task H7
 - [ ] The new fingerprint literal recorded in Gate B2 of the work plan
-- [ ] Every Binding Decision Compliance Check evaluates to `Y`, with evidence in Investigation Notes
-- [ ] Every Reference Contract Compliance Check evaluates to `Y`
-- [ ] Every exit-code cell in the Gate E4 table above is filled
+- [x] Every Binding Decision Compliance Check evaluates to `Y`, with evidence in Investigation Notes
+- [x] Every Reference Contract Compliance Check evaluates to `Y`
+- [x] Every exit-code cell in the Gate E4 table above is filled
 
 ## Notes
 - Impact scope: H6 writes the gates over these objects; H7 applies them to both databases; H8 proves them against real Postgres; B1.3b calls them from TypeScript.

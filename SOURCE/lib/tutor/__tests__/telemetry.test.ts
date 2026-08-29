@@ -46,7 +46,7 @@ const EXPECTED_COLUMNS = [
 /** Chép tay, CỐ Ý không import từ schema hay implementation: đây là bản sao độc
  *  lập của CHECK constraint `telemetry_log_error_code_check`, để test còn chứng
  *  minh được điều gì khi ai đó nới enum ở phía implementation. */
-const SCHEMA_ERROR_CODES = ["gemini_unavailable", "rate_limited", "server", "not_eligible", "user_quota_exhausted", "project_budget_exhausted"];
+const SCHEMA_ERROR_CODES = ["gemini_unavailable", "rate_limited", "server", "not_eligible", "user_quota_exhausted", "project_budget_exhausted", "groq_unavailable", "invalid_output", "duplicate_write"];
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 const QUESTION_ID = "q-derivative-001";
@@ -262,7 +262,7 @@ describe("buildTelemetryPayload — telemetry không bao giờ mang theo đáp �
     const badShapes = built
       .filter(
         ({ payload }) =>
-          !["tutor_invoke", "adaptive_route"].includes(payload.event_type) ||
+          !["tutor_invoke", "adaptive_route", "essay_grade"].includes(payload.event_type) ||
           typeof payload.success !== "boolean" ||
           !(payload.user_id === null || typeof payload.user_id === "string") ||
           !(payload.question_id === null || typeof payload.question_id === "string") ||

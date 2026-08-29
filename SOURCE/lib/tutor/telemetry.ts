@@ -30,14 +30,18 @@
 // "best-effort" thành điểm hỏng thứ hai của luồng học sinh đang chờ, điều backend
 // DD cấm tường minh.
 
-/** Đúng bằng CHECK constraint `telemetry_log_error_code_check` — SÁU mã sau R13,
- *  ĐÚNG THỨ TỰ schema.sql; nguồn DUY NHẤT cho cả kiểu lẫn bộ lọc lúc chạy. */
-export const TELEMETRY_ERROR_CODES = ["gemini_unavailable", "rate_limited", "server", "not_eligible", "user_quota_exhausted", "project_budget_exhausted"] as const;
+/** Đúng bằng CHECK constraint `telemetry_log_error_code_check` — CHÍN mã sau
+ *  Essay Auto-Scoring R13, ĐÚNG THỨ TỰ schema.sql; nguồn DUY NHẤT cho cả kiểu
+ *  lẫn bộ lọc lúc chạy.
+ *
+ *  Ba mã cuối đi kèm CHECK mới và chỉ ghi được sau khi DDL của Task H7 được áp
+ *  lên database; tới lúc đó chưa nhánh nào sinh ra chúng. */
+export const TELEMETRY_ERROR_CODES = ["gemini_unavailable", "rate_limited", "server", "not_eligible", "user_quota_exhausted", "project_budget_exhausted", "groq_unavailable", "invalid_output", "duplicate_write"] as const;
 
 export type TelemetryErrorCode = (typeof TELEMETRY_ERROR_CODES)[number];
 
 /** `public.telemetry_log`: `event_type text not null check (event_type in (...))`. */
-export type TelemetryEventType = "adaptive_route" | "tutor_invoke";
+export type TelemetryEventType = "adaptive_route" | "tutor_invoke" | "essay_grade";
 
 /**
  * Ngữ cảnh (đã thu hẹp) của MỘT lượt gọi cần ghi nhận — đúng bộ dữ liệu vận hành
