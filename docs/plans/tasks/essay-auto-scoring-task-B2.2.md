@@ -45,7 +45,9 @@ In `SOURCE/app/(HM)/queries.ts`:
 The v1.0 contract said one; **D-13 overturned it** because RS-6 cannot be derived from a "still unresolved" boolean. With one field, the two PDF exits produce **two different files for one attempt** — the defect O-8 exists to prevent, and the one this feature's own review history already caught once (**F-06**). Both are **required** and always computable (`false` when no key is present), so no consumer has an `undefined` case to handle.
 
 ## Target Files
-- [ ] `SOURCE/app/(HM)/queries.ts`
+- [x] `SOURCE/app/(HM)/queries.ts`
+- [x] `SOURCE/app/(HM)/__tests__/history.int.test.ts` — the tests the Implementation Steps call for, added to the existing file at the sanctioned `createClient()` boundary. **One pre-existing case also changed**: obligation (d)'s exhaustive `toEqual` on the whole entry now carries the two new booleans. That case failing was the boundary-change guard working, not a nuisance — it is precisely what an exhaustive comparison is for.
+- [x] `SOURCE/lib/history/filterEntries.test.ts` — **found by `tsc`**, exactly as this task's Quality Assurance section predicted ("both booleans are required, so no consumer has an `undefined` case"). Its `entry()` helper builds a literal `MyHistoryEntry`; both booleans are `false` there, which is correct — none of that file's fixtures has an essay.
 
 ## Investigation Targets
 - `docs/plans/20260829-feature-essay-auto-scoring.md` (§ Gate D — the recorded payload measurement and decision this task's select shape must match)
@@ -73,24 +75,49 @@ The v1.0 contract said one; **D-13 overturned it** because RS-6 cannot be derive
 Roundtrip check this task owns: the same attempt yields the **same** `hasIncompleteEssay` here and in `getResult()` — asserted by INT-2(a) in Task B2.4.
 
 ## Investigation Notes
-_(Record here: the Gate D decision this select shape implements, with its byte figures; the hand-built `MyHistoryEntry[]` literal used in the Output Comparison; confirmation that `readBounded` / `LIST_ROW_CEILING` and the `submittedAt` ordering are unchanged.)_
+
+**The Gate D decision this select shape implements** — `per_question, created_at` added to the top-level `exam_results` projection (both are columns of `exam_results`, not of the embed). Gate D priced exactly this shape: **375 B/row without**, **3 401 B/row with** (≈**9.1×**, largest single row 5 385 B), ~183 KB → ~1 661 KB at the 500-row ceiling, **D3 = ACCEPT**, with the ceiling recorded as the trigger for **pagination** rather than for a bigger number. The RPC alternative was **not** reached for: it is DDL, and picking it here would reopen a closed escalation.
+
+**The hand-built `MyHistoryEntry[]` literal used in the Output Comparison** — two legacy rows, all nine pre-existing fields plus the two new booleans as `false`, newest first. The mock is fed the rows **out of order** on purpose, so the ordering assertion cannot be satisfied by the fixture's own arrangement. Backed by an exhaustive `Object.keys(...).sort()` on the first entry, which is the only assertion that catches `per_question` being passed through by a spread someone adds later for convenience (UI-D11) — mutation P6 confirms it fires.
+
+**`readBounded` / `LIST_ROW_CEILING` and the ordering are unchanged** — asserted, not assumed: `LIST_ROW_CEILING` is imported into the test and pinned at **500**, and the recorded `.limit()` argument is **501** (`ceiling + 1`, which is how `readBounded` DETECTS an overflow instead of silently truncating). The `submittedAt`-descending sort is pinned by the ordering case; mutation P5 confirms it fires.
+
+### The same derive-once defect as the sibling read path, avoided here rather than found here
+
+`hasUnresolvedEssay()` and `hasIncompleteEssay()` each fold the array internally, so the naive call site runs `deriveEssayView()` **twice** per element — and for an unrecognised `essayState`, EG-BE-025's "exactly one `console.warn`" becomes two, **per history row, on every render**. Task B2.1 hit this on `getResult()` and it was found by a failing test; here the same shape was applied from the start and pinned by its own case. Mutation P4 confirms the case is load-bearing rather than decorative.
+
+**One drift risk created and recorded rather than hidden**: the derive-once-then-filter idiom now exists in **two** places — `app/(layer2)/queries.ts` and `app/(HM)/queries.ts` — because `essayLifecycle.ts` is Task H1's file and this task's scope boundary says to leave it unchanged. The two paths agreeing is exactly what **INT-2** (Task B2.4) exists to assert, so the risk is covered rather than merely noted; folding the idiom into `essayLifecycle` is a candidate for a later cleanup, not for this commit.
+
+### Mutation testing: 7 mutations, 7 caught
+
+| # | Mutation | Caught by |
+|---|---|---|
+| P1 | `created_at` dropped from the select | the select-shape case |
+| P2 | `per_question` dropped from the select | select shape, plus EG-BE-034's positive control and EG-BE-035 |
+| P3 | the two booleans collapsed into one (D-13 reverted) | EG-BE-035, the RS-6 row |
+| P4 | the derive-once shape reverted | the warn-once case |
+| P5 | the `submittedAt`-descending sort removed | AC-012 pipeline 3, plus a pre-existing Test 1 obligation |
+| P6 | the raw row spread into the entry (`per_question` leaks past UI-D11) | the exhaustive key-set assertion, plus a pre-existing Test 1 obligation |
+| P7 | `hasUnresolvedEssay` hardcoded `false` | EG-BE-034's positive control |
+
+P1 deserves its own note: dropping `created_at` leaves both booleans still computable — they simply compute against `undefined`, and an overdue pending question is then classified as still-pending here while `/result` calls it RS-6. That is INT-2's primary failure mode, and it is invisible to any assertion made on mapped output alone, which is why the case asserts on the **select string**.
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
-- [ ] **Confirm Gate D is closed** and read its recorded decision; if it is not closed, **stop** — this task is gated
-- [ ] Read all Investigation Targets and record key observations
-- [ ] **Sweep the adjacent cases** (Change Category: boundary-change): `getResult()`'s select (must also carry `created_at`), and both PDF construction sites
-- [ ] Write the tests: EG-BE-034's equality, EG-BE-035's real-boolean cases, the ordering non-regression, and the legacy-row Output Comparison; observe failure
+- [x] **Confirm Gate D is closed** and read its recorded decision — closed 2026-08-29, D3 = ACCEPT, figures reproduced in the Investigation Notes above
+- [x] Read all Investigation Targets and record key observations
+- [x] **Sweep the adjacent cases** (Change Category: boundary-change): `getResult()`'s select **does** now carry `created_at` — landed in Task B2.1 (`5ab7a4b`), one commit before this one, so the two read paths never sat in an inconsistent state on this branch. Both PDF construction sites are Task B2.3 and remain untouched.
+- [x] Write the tests: EG-BE-034's equality, EG-BE-035's real-boolean cases, the ordering non-regression, and the legacy-row Output Comparison; observe failure — one **pre-existing** case did fail (obligation (d)'s exhaustive comparison), which is the boundary-change guard doing its job. The new cases were green on first run, so they are backed by mutation testing instead.
 
 ### 2. Green Phase
-- [ ] Add `per_question, created_at` to the embedded select and to `EmbeddedRow`
-- [ ] Add both required booleans to `MyHistoryEntry`, derived through the shared predicates
-- [ ] Run only the added tests and confirm they pass
+- [x] Add `per_question, created_at` to the embedded select and to `EmbeddedRow` — `per_question` typed `PerQuestionResult[] | null`, because the column is nullable and a `null` there must mean "no essays", not a crash
+- [x] Add both required booleans to `MyHistoryEntry`, derived through the shared predicates
+- [x] Run only the added tests and confirm they pass — **12 passed** in that file (7 pre-existing + 5 new)
 
 ### 3. Refactor Phase
-- [ ] Confirm raw `per_question` does **not** cross the component boundary (UI-D11)
-- [ ] Confirm `readBounded` / `LIST_ROW_CEILING = 500` and the `submittedAt` descending ordering are unchanged
-- [ ] Confirm nothing re-derives `state === "failed" && !retryAvailable` locally (EG-BE-036)
+- [x] Confirm raw `per_question` does **not** cross the component boundary (UI-D11) — by an exhaustive key set on the returned entry, not by inspection; P6 confirms it fires
+- [x] Confirm `readBounded` / `LIST_ROW_CEILING = 500` and the `submittedAt` descending ordering are unchanged — both asserted in the test, and `LIST_ROW_CEILING` is imported rather than retyped
+- [x] Confirm nothing re-derives `state === "failed" && !retryAvailable` locally (EG-BE-036) — the file calls `hasIncompleteEssay()` and `hasUnresolvedEssay()` and states neither predicate itself; P3 confirms the two calls are not interchangeable
 
 ## Quality Assurance Mechanisms
 - `npx tsc --noEmit` (strict) — Enforces: both booleans are required, so no consumer has an `undefined` case — Config: `SOURCE/tsconfig.json` (project-wide)
@@ -104,12 +131,14 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
 
 | # | Command (from `SOURCE/`) | Exit code | Notes |
 |---|---|---|---|
-| 1 | `npx tsc --noEmit` | | |
-| 2 | `npx eslint --max-warnings 0` | | |
-| 3 | `npx vitest run` | | |
-| 4 | `npm run build` | | |
-| 5 | `npm run test:fixture` | | expected red = TD-030 baseline only (Gate F1): exactly 2 failures, both `subscription.fixture.e2e.test.ts` FE-1(e) `en` + `vi` |
-| 6 | `npm run test:localdb` | | see Open Item I-7 |
+| 1 | `npx tsc --noEmit` | **0** | first run was **2**, and that was the gate working: it named `lib/history/filterEntries.test.ts` as the one consumer building a literal `MyHistoryEntry` without the new required fields |
+| 2 | `npx eslint --max-warnings 0` | **0** | |
+| 3 | `npx vitest run` | **0** | 1863 passed / 10 skipped / 2 todo (**+5** from this task) |
+| 4 | `npm run build` | **0** | |
+| 5 | `npm run test:fixture` | **1** | **Expected red, TD-030 baseline exactly as Gate F1 names it**: 2 failures, both `subscription.fixture.e2e.test.ts` FE-1 (e) — `locale en` and `locale vi` |
+| 6 | `npm run test:localdb` | **0** | on the second attempt. The first exited 1 with `Unknown Error: TypeError: fetch failed` in `subscription.service.e2e.test.ts` — the same network signature seen throughout this session, in a file that imports none of the modules this task touches. The retry passed 11/11 with **zero** timeouts |
+
+**Known-red window:** `npm run verify:schema` (dev) exits **1** with exactly **one** failing assertion, the character ceiling (`LIMITS.MAX_ATTEMPT_ANSWER = 500` against a DB ceiling of 4000). Red by design from H7 until B3.3.
 
 **A task file with any exit-code cell left empty is not complete** (Gate E4).
 **Known-red window (Fix I002)**: this commit sits between H7 and B3.3 — if `verify:schema` is run, its character-ceiling assertion is red **by design**; record it as expected.
@@ -133,13 +162,13 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
   - **Primary failure mode**: an old attempt growing a populated field on the read path. **Boundary**: in-process against a hand-built literal. **State assertion**: N/A. **Mock rationale**: as above. **Residual**: none.
 
 ## Completion Criteria
-- [ ] **Entry gate**: Gate D closed, and this select shape matches its recorded decision
-- [ ] **Implementation Complete** = select, two types, two derived fields
-- [ ] **Quality Complete** = six verify gates green
-- [ ] **Integration Complete** = proven by **INT-2** in Task B2.4
-- [ ] Output Comparison pipeline 3 green against a hand-built literal (**no snapshots**)
-- [ ] Every Reference Contract Compliance Check evaluates to `Y`
-- [ ] Every exit-code cell in the Gate E4 table above is filled
+- [x] **Entry gate**: Gate D closed, and this select shape matches its recorded decision
+- [x] **Implementation Complete** = select, two types, two derived fields
+- [x] **Quality Complete** = six verify gates green (gate 5 red at the TD-030 baseline, by definition)
+- [ ] **Integration Complete** = proven by **INT-2** in Task B2.4 — **open by design**, and it is the next task
+- [x] Output Comparison pipeline 3 green against a hand-built literal (**no snapshots**)
+- [x] Every Reference Contract Compliance Check evaluates to `Y` — EG-BE-034's equality is asserted over five fixtures with a positive control, and mutation P7 confirms the control fires
+- [x] Every exit-code cell in the Gate E4 table above is filled
 
 ## Notes
 - Impact scope: B2.3 (the PDF data contract reads `MyHistoryEntry.hasIncompleteEssay`), F-B3 (`HistoryRow` reads both booleans), F-C3 (FE2E-3 renders the real `/history` row).
