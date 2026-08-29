@@ -28,7 +28,7 @@ AC-050 asserts the **result** of the ceiling gate, so it can only be satisfied a
 While running the ceiling probe on **dev**, check the returned SQLSTATE is `23514`. If it is `23503`, switch the probe to a real `attempt_id` from the fixture set and clean up by the probe's own marker — the pattern `verify-schema.ts:40-49` already uses. **Record which shape was needed.** The gate is achievable under either outcome; only the probe's shape changes.
 
 ## Target Files
-- [ ] `SOURCE/supabase/verify-schema.ts`
+- [x] `SOURCE/supabase/verify-schema.ts`
 
 ## Investigation Targets
 - `docs/design/essay-auto-scoring-backend-design.md` (§ Cổng trần ký tự / D-05 — the two grant assertions, the behavioural probe, the pin gate)
@@ -62,24 +62,78 @@ While running the ceiling probe on **dev**, check the returned SQLSTATE is `2351
 | `ESSAY_MAX_ATTEMPTS` (TypeScript) → the cap literal inside `claim_essay_grading_attempt()` | **Consumer parse rule**: `verify-schema.ts` regex-extracts the literal from the function body and compares it to the imported constant. **Expected signal**: the pin gate fails with a message **naming both values**; SVC-2(c) uses the imported constant, never a typed `3`, so this does not become a third copy. |
 
 ## Investigation Notes
-_(Record here: **which probe shape was needed** (R-04) — `23514` on the first attempt, or `23503` requiring a real `attempt_id` and marker-based cleanup; the exact regex used by the pin gate and the message it produces.)_
+
+### Investigation Targets — key observations (Step 2)
+- `docs/design/essay-auto-scoring-backend-design.md` § Cổng trần ký tự — gives the P1/P2 table verbatim (P1 = `MAX_ATTEMPT_ANSWER` → expect `23503`; P2 = `+1` → expect `23514`) and the four properties that make the behavioural probe the right mechanism. § Assumed Behaviors line 197 records the CHECK-before-FK order as `Confirmed: No`.
+- `docs/adr/ADR-0018` § Decision 1 — two-parameter signature for `claim_essay_grading_attempt()`, which is *why* the cap literal cannot be passed in and must be pinned. § Amendment to ADR-0010 — "no writer other than `service_role` exists".
+- `SOURCE/supabase/schema.sql` — `schema_foreign_keys()` filters `c.contype = 'f'` (now at `:1489`, doc cites `:1233` — line drift, filter confirmed present and unchanged). **No CHECK-constraint read path exists.** Confirmed by reading the whole function body.
+- `SOURCE/supabase/schema.sql:1085` — `if v_attempts >= 3 then`, the single occurrence of that shape in the file (`grep -c` = 1), so the pin regex is unambiguous.
+- `SOURCE/lib/scoring/essayLifecycle.ts:74` — `ESSAY_MAX_ATTEMPTS = 3`. Only a type-only import (`@/types/result`), so importing it into a `tsx`-run script adds no runtime dependency.
+- `SOURCE/lib/ugc/limits.ts:17` — `MAX_ATTEMPT_ANSWER: 500`, still 500 (moves in B3.3).
+- `SOURCE/supabase/verify-schema.ts:373-388` — the `record_exam_result` grant template: `42501` vs `PGRST202` vs "reached the body", never `error !== null`.
+- `SOURCE/supabase/test-rls.ts` — read only; **not modified**.
+
+### R-04 — VERIFIED on dev (ref `hynwleaxtbtjzkvpjsug`), 2026-08-29
+Standalone probe against `attempt_answers` via service_role, `attempt_id` and `question_id` both non-existent:
+
+| Probe | `length(answer)` | HTTP | SQLSTATE |
+|---|---|---|---|
+| P1 | 500 (`= MAX_ATTEMPT_ANSWER`) | 409 | **`23503`** — passed CHECK, died at the FK |
+| P2 | 501 (`+1`) | 400 | **`23514`** — CHECK fired first |
+| control | 4000 | 400 | `23514` — dev ceiling is still 500 |
+
+`select … where question_id = '__verify_schema_no_such_question__'` returned `[]` after all three: **no row landed**.
+
+**Outcome: `23514` on the first attempt.** CHECK-before-FK holds as assumed, so **the simple probe shape was kept** — a non-existent `attempt_id`, no real `attempt_id` from the fixture set, no marker-based cleanup needed. The Assumed Behaviors entry can move to `Confirmed: Yes` when that doc is next touched (not touched here — out of scope).
+
+### Probe shape decisions
+- The ceiling probes use the **`admin` (service_role)** client, not the student JWT. `answers_insert_own` requires the attempt to belong to the caller, so a fake `attempt_id` would be stopped by RLS before CHECK or the FK could say anything — the probe would lose exactly what it measures. service_role bypasses RLS but not CHECK/FK.
+- A residue check + conditional sweep by the probe's own `question_id` marker is folded into both ceiling assertions (mục 9's discipline: sweep before reporting). It is clean on every branch today because the FK makes a landing structurally impossible; it is measured rather than assumed.
+
+### Pin gate — exact regex and message
+```ts
+const claimCap = /if v_attempts >= (\d+) then/.exec(schemaSql);
+```
+Green message: `Trần lượt chấm khớp: schema.sql nói 3, ESSAY_MAX_ATTEMPTS nói 3`.
+Red message (names **both** values): `TRẦN LƯỢT LỆCH: schema.sql nói <N>, ESSAY_MAX_ATTEMPTS (lib/scoring/essayLifecycle.ts) nói <M> — UI và SQL đang đếm khác nhau`.
+Shape-loss message: `Không tìm thấy trần lượt (…) trong claim_essay_grading_attempt() — schema.sql đã đổi hình dạng, cổng ghim đang KHÔNG ghim gì`.
+
+### Binding Decisions / Reference Contracts — compliance evaluation
+Planned and implemented approach, one sentence per axis:
+- **placement**: the two grant assertions call `claim_essay_grading_attempt` and `record_essay_grade` by name via RPC and assert `service_role`-only EXECUTE; nothing asserts anything about a TypeScript `.update()` call site or an `essay_grades` table, neither of which exists.
+- **dependency_direction**: the assertions observe the SQL-side privilege result (SQLSTATE from a live RPC under three different roles), not a call-site convention in `lib/supabase/service-role.ts`.
+
+| Row | Axis | Evaluation | Rationale |
+|---|---|---|---|
+| ADR-0018 § Decision | placement | **Y** | `assertServiceRoleOnlyFunction()` is invoked for exactly those two function names; no other write path is asserted or introduced |
+| ADR-0010 § Decision | dependency_direction | **Y** | The check is three live RPC calls under `authenticated` / `anon` / `service_role`; it reads no TypeScript call site |
+| ADR-0018 § Amendment to ADR-0010 | state-lifecycle-negative | **Y** | Each assertion fails with a message naming the offending role and its SQLSTATE if the function is executable by `public`, `anon` or `authenticated` — `revoke … from public` is covered because Supabase's default privileges reach `anon`/`authenticated` through `public`, and both are probed by name |
+
+No row evaluated `N` or `Unknown` at either the pre-implementation check or the Exit Gate.
+
+### Boundary Context — roundtrip evidence
+- `LIMITS.MAX_ATTEMPT_ANSWER` → `attempt_answers_answer_check`: the value the producer (TypeScript) emits is fed as a real `answer` of that exact length to the consumer (Postgres) and the consumer's verdict is read back as a SQLSTATE. Both directions of drift have their own assertion and their own message. Green today (both sides 500); goes red from H7 to B3.3 by design.
+- `ESSAY_MAX_ATTEMPTS` → the cap literal in `claim_essay_grading_attempt()`: regex-extracted from `schema.sql` and compared to the imported constant. Green today (3 = 3).
+
+### No fourth DDL object
+`git diff --stat` shows exactly one file changed: `SOURCE/supabase/verify-schema.ts`. `schema.sql` untouched; no `schema_check_constraints()` was added (TD-005).
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
-- [ ] Read all Investigation Targets and record key observations
-- [ ] Confirm there is genuinely no CHECK-constraint read path (`schema_foreign_keys()` filters `contype = 'f'` at `:1233`) — the probe is behavioural because of this, not by preference
-- [ ] Write the three assertion groups and observe them fail against the current dev database (the DDL is not applied yet — that is H7)
+- [x] Read all Investigation Targets and record key observations
+- [x] Confirm there is genuinely no CHECK-constraint read path (`schema_foreign_keys()` filters `contype = 'f'` at `:1233`) — the probe is behavioural because of this, not by preference
+- [x] Write the three assertion groups and observe them fail against the current dev database (the DDL is not applied yet — that is H7)
 
 ### 2. Green Phase
-- [ ] Two grant assertions, following `:373-388`, distinguishing `42501` from an incidental failure
-- [ ] The two-probe ceiling gate discriminating by SQLSTATE
-- [ ] The `ESSAY_MAX_ATTEMPTS` pin gate, failing with a message naming **both** values
-- [ ] Run `npm run verify:schema` against dev; record which assertions pass and which are waiting on H7
+- [x] Two grant assertions, following `:373-388`, distinguishing `42501` from an incidental failure
+- [x] The two-probe ceiling gate discriminating by SQLSTATE
+- [x] The `ESSAY_MAX_ATTEMPTS` pin gate, failing with a message naming **both** values
+- [x] Run `npm run verify:schema` against dev; record which assertions pass and which are waiting on H7
 
 ### 3. Refactor Phase
-- [ ] Run the ceiling probe on **dev** and record the returned SQLSTATE (R-04); if `23503`, switch to a real `attempt_id` and clean by the probe's own marker
-- [ ] Confirm `SOURCE/supabase/test-rls.ts` is **untouched**
-- [ ] Confirm no fourth DDL object was added to support the gate
+- [x] Run the ceiling probe on **dev** and record the returned SQLSTATE (R-04); if `23503`, switch to a real `attempt_id` and clean by the probe's own marker
+- [x] Confirm `SOURCE/supabase/test-rls.ts` is **untouched**
+- [x] Confirm no fourth DDL object was added to support the gate
 
 ## Quality Assurance Mechanisms
 - `npx tsc --noEmit` (strict) — Config: `SOURCE/tsconfig.json` (project-wide)
@@ -94,13 +148,13 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
 
 | # | Command (from `SOURCE/`) | Exit code | Notes |
 |---|---|---|---|
-| 1 | `npx tsc --noEmit` | | |
-| 2 | `npx eslint --max-warnings 0` | | |
-| 3 | `npx vitest run` | | |
-| 4 | `npm run build` | | |
-| 5 | `npm run test:fixture` | | expected red = TD-030 baseline only (Gate F1): exactly 2 failures, both `subscription.fixture.e2e.test.ts` FE-1(e) `en` + `vi` |
-| 6 | `npm run test:localdb` | | see Open Item I-7 |
-| 8 | `npm run verify:schema` | | Gate E3 — this task's file matches `SOURCE/supabase/**`. Cannot pass against a database that has not received the DDL; that is Task H7 |
+| 1 | `npx tsc --noEmit` | **0** | clean |
+| 2 | `npx eslint --max-warnings 0` | **0** | clean |
+| 3 | `npx vitest run` | **0** | 127 files passed / 2 skipped; 1714 tests passed |
+| 4 | `npm run build` | **0** | clean |
+| 5 | `npm run test:fixture` | **1** | expected red = TD-030 baseline only (Gate F1): exactly 2 failures, both `subscription.fixture.e2e.test.ts` FE-1(e) `en` + `vi`. **Confirmed exactly those 2, unchanged by this commit** |
+| 6 | `npm run test:localdb` | **0** | 11 passed / 2 todo; see Open Item I-7 |
+| 8 | `npm run verify:schema` | **1** | Gate E3 — run against **dev** (`hynwleaxtbtjzkvpjsug`, ref confirmed before running). **3 failing checks: (i)** the fingerprint (`DB 29931beeb950` vs `git 9979c9deea52`) — pre-existing since H5, **not** reverted; **(ii)+(iii)** the two new grant assertions, `PGRST202` = both functions absent. All three are the H7 window, exactly as this task file specifies. The ceiling gate and the pin gate are **GREEN** |
 
 **A task file with any exit-code cell left empty is not complete** (Gate E4).
 
@@ -123,12 +177,12 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
   - **State assertion**: N/A. **Mock boundary rationale**: none. **Residual**: proves the two agree; SVC-2(c) additionally asserts the test itself imports the constant rather than typing `3`.
 
 ## Completion Criteria
-- [ ] **Implementation Complete** = assertions written
+- [x] **Implementation Complete** = assertions written
 - [ ] **Quality Complete** = six verify gates green
 - [ ] **Integration Complete** = deferred to Task H7 (the gates cannot pass against a database that has not received the DDL)
-- [ ] R-04 recorded: the ceiling probe's actual SQLSTATE behaviour, and the probe shape adjusted if it was `23503`
-- [ ] Every Binding Decision and Reference Contract Compliance Check evaluates to `Y`, with evidence in Investigation Notes
-- [ ] Every exit-code cell in the Gate E4 table above is filled
+- [x] R-04 recorded: the ceiling probe's actual SQLSTATE behaviour, and the probe shape adjusted if it was `23503`
+- [x] Every Binding Decision and Reference Contract Compliance Check evaluates to `Y`, with evidence in Investigation Notes
+- [x] Every exit-code cell in the Gate E4 table above is filled
 
 ## Notes
 - Impact scope: H7 runs these gates against both databases; B3.3's completion evidence is the ceiling assertion turning **green**.

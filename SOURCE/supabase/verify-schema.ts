@@ -21,6 +21,11 @@
 //      record_payment_settlement, mỗi đối tượng một lệnh bị TỪ CHỐI (ADR-0013/
 //      ADR-0014, AC-033). Trước mục này, ba đối tượng đó không được cổng nào
 //      quan sát ngoài vân tay (7) — mà vân tay chỉ nói file khớp file.
+//  10. Chấm tự luận (ADR-0018)             <- hai hàm ghi band chỉ service_role;
+//      TRẦN KÝ TỰ của attempt_answers.answer đọc lại từ DB THẬT bằng probe hành
+//      vi phân biệt bằng SQLSTATE; và trần LƯỢT chấm ghim literal SQL vào
+//      ESSAY_MAX_ATTEMPTS. Mục này là chỗ DUY NHẤT trong repo khẳng định điều
+//      gì về trần ký tự đang thật sự nằm trên database.
 //
 // (1)–(6) soi từng mảnh cụ thể, và chỉ bắt được đúng những thứ đã từng hỏng.
 // (7) soi phần còn lại: gộp toàn bộ file thành một vân tay, nên một bản vá nằm
@@ -60,6 +65,8 @@ import { resolve } from "node:path";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { fkKey, resolveForeignKeys } from "../lib/schema/parseForeignKeys";
 import { SUBJECTS, normalizeSubject } from "../lib/ugc/subjects";
+import { LIMITS } from "../lib/ugc/limits";
+import { ESSAY_MAX_ATTEMPTS } from "../lib/scoring/essayLifecycle";
 import {
   SCHEMA_FINGERPRINT,
   computeSchemaFingerprint,
@@ -159,6 +166,54 @@ function describeSweep(sweep: { error: { code?: string; message?: string } | nul
   return sweep.error
     ? `QUÉT HỎNG (${sweep.error.code ?? sweep.error.message ?? "?"}) — RÁC CÒN NGUYÊN, phải xoá tay`
     : "đã quét sạch bằng service_role";
+}
+
+/** Mã lỗi của một lượt gọi, viết cho người đọc log. `null` = KHÔNG có lỗi, và
+ *  đó là một kết cục khác hẳn "lỗi không rõ mã" — gộp hai cái thành `"?"` là
+ *  đúng cách làm một thông điệp FAIL không dùng được. */
+function describeCode(code: string | null): string {
+  return code ?? "không có lỗi";
+}
+
+/**
+ * Một hàm CHỈ service_role gọi được: `revoke ... from public, anon, authenticated`
+ * cộng `grant execute ... to service_role` (khuôn của `record_exam_result` ở
+ * mục 4). Khẳng định CẢ BA vai trong MỘT check, vì "chỉ service_role" là một
+ * mệnh đề về cả ba — hai vế từ chối mà không có vế cho phép thì một hàm bị
+ * revoke SẠCH khỏi mọi role cũng xanh, và đường ghi band sẽ chết ở production
+ * với đúng thông điệp mà cổng này vừa nói là ổn.
+ *
+ * "service_role gọi được" được đo bằng ĐI TỚI ĐƯỢC THÂN HÀM, không bằng
+ * `error === null`: `record_essay_grade()` cố ý `raise ... using errcode =
+ * 'check_violation'` (23514) khi attempt không tồn tại, nên một khẳng định
+ * "không có lỗi" sẽ đỏ trên một hàm hoàn toàn lành. Chỉ 42501 (chưa `grant`) và
+ * PGRST202 (hàm chưa có mặt) mới là "không gọi được".
+ */
+async function assertServiceRoleOnlyFunction(
+  fn: string,
+  args: Record<string, unknown>,
+  clients: { authed: SupabaseClient; anon: SupabaseClient; admin: SupabaseClient }
+): Promise<void> {
+  const authed = (await clients.authed.rpc(fn, args)).error?.code ?? null;
+  const anon = (await clients.anon.rpc(fn, args)).error?.code ?? null;
+  const admin = (await clients.admin.rpc(fn, args)).error?.code ?? null;
+
+  const serviceReaches = admin !== "42501" && admin !== "PGRST202";
+  const wrong: string[] = [];
+  if (authed !== "42501") wrong.push(`authenticated VẪN gọi được (mã ${describeCode(authed)})`);
+  if (anon !== "42501") wrong.push(`anon VẪN gọi được (mã ${describeCode(anon)})`);
+  if (!serviceReaches) wrong.push(`service_role KHÔNG gọi được (mã ${describeCode(admin)})`);
+
+  const allMissing = authed === "PGRST202" && anon === "PGRST202" && admin === "PGRST202";
+
+  assert(
+    wrong.length === 0,
+    wrong.length === 0
+      ? `${fn}: EXECUTE chỉ service_role — anon 42501, authenticated 42501, service_role đi tới thân hàm`
+      : allMissing
+        ? `${fn} chưa tồn tại trên DB này (PGRST202) — apply khối ESSAY ASYNC GRADE WRITE của schema.sql. Chừng nào chưa apply, KHÔNG có gì trên database này cưỡng chế "chỉ service_role ghi được band"`
+        : `${fn} SAI quyền EXECUTE: ${wrong.join("; ")} — mong đợi 42501 / 42501 / gọi được. Thiếu \`revoke all on function … from public, anon, authenticated\` hoặc \`grant execute … to service_role\` (ADR-0018 Decision 1)`
+  );
 }
 
 // --- Parse schema.sql (nguồn chân lý) --------------------------------------
@@ -817,9 +872,150 @@ async function main() {
         : `authenticated VẪN gọi được record_payment_settlement (chạy tới thân hàm, mã ${psRpc.error?.code ?? "không có lỗi"}) — thiếu \`revoke all on function … from public, anon, authenticated\``
   );
 
+  // ==========================================================================
+  // 10. CHẤM TỰ LUẬN (ADR-0018; backend Design Doc § Cổng trần ký tự / § Cổng
+  //     ghim trần lượt; PRD AC-048 mục (5) + AC-050)
+  //
+  // Ba khẳng định, và mỗi cái đóng một khoảng hở khác nhau:
+  //
+  //   (a) HAI HÀM GHI BAND chỉ service_role. ADR-0018 § Amendment to ADR-0010
+  //       giữ nguyên tính chất append-only: KHÔNG client nào ghi được vào
+  //       exam_results bằng bất kỳ đường nào, và KHÔNG writer nào ngoài
+  //       service_role tồn tại. Hai hàm mới là hai writer mới — nếu chúng gọi
+  //       được bằng JWT học sinh thì lời hứa đó gãy ở đúng chỗ nó vừa được
+  //       nhắc lại.
+  //
+  //   (b) TRẦN KÝ TỰ, đọc lại từ DB THẬT. Đây là mục 10 tồn tại vì lý do gì:
+  //       trước nó, `verify:schema` không khẳng định GÌ về trần — thứ duy nhất
+  //       quan sát được `attempt_answers_answer_check` là vân tay toàn file ở
+  //       mục 7, mà vân tay chỉ nói file-trong-git khớp file-đã-paste. Trần
+  //       trong mã cao hơn trần trong DB nghĩa là Postgres từ chối NGUYÊN LƯỢT
+  //       nộp bài của một học sinh; trần thấp hơn nghĩa là cắt oan bài làm
+  //       thật. Cả hai chiều đều im lặng ở tsc, vitest và next build.
+  //
+  //   (c) TRẦN LƯỢT chấm lại — cặp lời-khai-đôi DUY NHẤT mà thiết kế không xoá
+  //       được (ADR-0018 Decision 1 chốt chữ ký hai tham số, nên trần không
+  //       truyền vào được). Ghim thay vì hy vọng.
+  // ==========================================================================
+  console.log("\nChấm tự luận (ADR-0018) — hai hàm ghi band, trần ký tự, trần lượt:");
+
+  // (a) — payload trỏ vào một attempt KHÔNG TỒN TẠI, nên kể cả khi EXECUTE hở,
+  //     cả hai hàm đều là no-op: claim_essay_grading_attempt() thoát sớm ở
+  //     nhánh 'not_submitted' TRƯỚC lệnh update, và record_essay_grade() raise
+  //     check_violation ở cùng chỗ. Không lượt chấm của ai bị tiêu, không dòng
+  //     exam_results của ai bị đụng.
+  const NO_SUCH_QUESTION = "__verify_schema_no_such_question__";
+  const essayClients = { authed: probe, anon: anonClient, admin };
+
+  await assertServiceRoleOnlyFunction(
+    "claim_essay_grading_attempt",
+    { p_attempt_id: NO_SUCH_ATTEMPT, p_question_id: NO_SUCH_QUESTION },
+    essayClients
+  );
+
+  await assertServiceRoleOnlyFunction(
+    "record_essay_grade",
+    {
+      p_attempt_id: NO_SUCH_ATTEMPT,
+      p_question_id: NO_SUCH_QUESTION,
+      p_state: "failed",
+      p_earned: null,
+      p_max: null,
+      p_low_confidence: false,
+    },
+    essayClients
+  );
+
+  // (b) — PROBE HÀNH VI, phân biệt bằng SQLSTATE. Không có đường đọc CHECK
+  //     constraint nào từ DB: schema_foreign_keys() — hàm đọc catalog DUY NHẤT
+  //     — lọc `c.contype = 'f'`, tức chỉ khoá ngoại. Thêm một
+  //     schema_check_constraints() sẽ là đối tượng DDL thứ tư trong một lần áp
+  //     tay, đúng thứ TD-005 vừa cảnh báo, cho đúng MỘT consumer. Nên cổng này
+  //     hỏi TÁC DỤNG của trần chứ không đọc văn bản của nó.
+  //
+  //     Hai ràng buộc cùng bảo vệ dòng probe và chúng nổ ở HAI GIAI ĐOẠN khác
+  //     nhau của câu lệnh: CHECK được đánh giá lúc dựng dòng, khoá ngoại là
+  //     trigger AFTER chạy cuối câu lệnh. Nên mã lỗi nói cho ta biết cái nào
+  //     nổ trước, và đó chính là phép đo trần.
+  //
+  //     R-04 ĐÃ XÁC MINH trên dev 2026-08-29 (giả định này trước đó
+  //     `Confirmed: No`): 501 ký tự trả `23514`, 500 ký tự trả `23503`. Thứ tự
+  //     CHECK-trước-FK đúng như giả định, nên probe giữ hình dạng đơn giản —
+  //     attempt_id KHÔNG TỒN TẠI — và KHÔNG cần tới attempt thật + dọn theo
+  //     marker.
+  //
+  //     Dùng service_role chứ không dùng JWT học sinh, có chủ đích: policy
+  //     `answers_insert_own` đòi attempt thuộc về người gọi, nên một attempt_id
+  //     giả sẽ chết ở RLS trước khi CHECK hay khoá ngoại kịp nói gì — probe mất
+  //     đúng thứ nó đi đo. service_role vượt RLS nhưng KHÔNG vượt CHECK/FK.
+  const CEILING = LIMITS.MAX_ATTEMPT_ANSWER;
+  async function ceilingProbe(length: number): Promise<string | null> {
+    const { error } = await admin.from("attempt_answers").insert({
+      attempt_id: NO_SUCH_ATTEMPT,
+      question_id: NO_SUCH_QUESTION,
+      answer: "x".repeat(length),
+    });
+    return error?.code ?? null;
+  }
+
+  const atCeiling = await ceilingProbe(CEILING);
+  const overCeiling = await ceilingProbe(CEILING + 1);
+
+  // Cả hai probe được THIẾT KẾ để bị từ chối, nên nhánh sạch là nhánh duy nhất
+  // đúng. Hậu kiểm rồi mới báo — cùng kỷ luật mục 9: nếu một dòng lọt vào thì
+  // đó là một ô trả lời giả nằm trong bảng bài làm, và lượt chạy phát hiện DB
+  // hỏng không được phép là lượt để lại nó. Marker là question_id của chính
+  // probe, một giá trị không thể trùng dữ liệu thật.
+  const ceilingResidue = await admin
+    .from("attempt_answers")
+    .select("id")
+    .eq("question_id", NO_SUCH_QUESTION);
+  const ceilingClean = !ceilingResidue.error && (ceilingResidue.data?.length ?? 0) === 0;
+  const ceilingSweep = ceilingClean
+    ? null
+    : await admin.from("attempt_answers").delete().eq("question_id", NO_SUCH_QUESTION);
+  const residueNote = `dòng lọt vào: ${ceilingResidue.error ? `hậu kiểm lỗi ${ceilingResidue.error.code}` : (ceilingResidue.data?.length ?? "?")}; rác: ${describeSweep(ceilingSweep)}`;
+
+  assert(
+    atCeiling === "23503" && ceilingClean,
+    atCeiling === "23503" && ceilingClean
+      ? `Bài làm dài đúng trần (${CEILING} ký tự) QUA được CHECK trên DB thật (chết ở khoá ngoại, 23503) — trần DB KHÔNG thấp hơn LIMITS.MAX_ATTEMPT_ANSWER`
+      : atCeiling === "23514"
+        ? `TRẦN DB THẤP HƠN TRẦN TRONG MÃ: ${CEILING} ký tự bị attempt_answers_answer_check từ chối (23514) trong khi LIMITS.MAX_ATTEMPT_ANSWER = ${CEILING}. Postgres sẽ từ chối NGUYÊN LƯỢT NỘP BÀI của học sinh viết dài — apply lại trần trong schema.sql (${residueNote})`
+        : `Probe trần ký tự trả mã BẤT NGỜ ${describeCode(atCeiling)} (mong đợi 23503) — cổng không đo được gì; ${residueNote}`
+  );
+
+  assert(
+    overCeiling === "23514" && ceilingClean,
+    overCeiling === "23514" && ceilingClean
+      ? `Bài làm quá trần một ký tự (${CEILING + 1}) bị attempt_answers_answer_check TỪ CHỐI (23514) — trần DB đúng bằng LIMITS.MAX_ATTEMPT_ANSWER = ${CEILING}`
+      : overCeiling === "23503"
+        ? `TRẦN DB CAO HƠN TRẦN TRONG MÃ (hoặc CHECK vắng mặt): ${CEILING + 1} ký tự lọt qua CHECK và chỉ chết ở khoá ngoại (23503), trong khi LIMITS.MAX_ATTEMPT_ANSWER = ${CEILING}. Mã đang cắt bài làm sớm hơn DB cần — nâng LIMITS.MAX_ATTEMPT_ANSWER cho khớp (${residueNote})`
+        : `Probe trần ký tự trả mã BẤT NGỜ ${describeCode(overCeiling)} (mong đợi 23514) — cổng không đo được gì; ${residueNote}`
+  );
+
+  // (c) — Trần lượt chấm khai ở HAI chỗ và không xoá được cái nào: TypeScript
+  //     cần nó để suy `retryAvailable`, SQL cần nó để cưỡng chế. Ghim chúng vào
+  //     nhau ở đây, vì một lượt lệch KHÔNG lộ ra ở tsc, ở vitest hay ở bất kỳ
+  //     cổng nào khác: SQL sẽ từ chối lượt thứ N trong khi UI vẫn hiện nút
+  //     "Chấm lại", và học sinh bấm vào một nút chắc chắn hỏng.
+  //
+  //     Đọc từ schema.sql chứ không từ DB, cùng lối parseGrantedColumns(): đây
+  //     là một lệch giữa hai FILE trong repo, phát hiện được mà không cần hỏi
+  //     database nào.
+  const claimCap = /if v_attempts >= (\d+) then/.exec(schemaSql);
+  assert(
+    claimCap !== null && Number(claimCap[1]) === ESSAY_MAX_ATTEMPTS,
+    claimCap === null
+      ? "Không tìm thấy trần lượt (`if v_attempts >= N then`) trong claim_essay_grading_attempt() — schema.sql đã đổi hình dạng, cổng ghim đang KHÔNG ghim gì"
+      : Number(claimCap[1]) === ESSAY_MAX_ATTEMPTS
+        ? `Trần lượt chấm khớp: schema.sql nói ${claimCap[1]}, ESSAY_MAX_ATTEMPTS nói ${ESSAY_MAX_ATTEMPTS}`
+        : `TRẦN LƯỢT LỆCH: schema.sql nói ${claimCap[1]}, ESSAY_MAX_ATTEMPTS (lib/scoring/essayLifecycle.ts) nói ${ESSAY_MAX_ATTEMPTS} — UI và SQL đang đếm khác nhau`
+  );
+
   console.log(
     failures === 0
-      ? "\n✅ Schema verify: DB khớp schema.sql §10 + §11 + §12 + khoá ngoại (§15/§16) + phiên bản (§17) + subject canonical (TD-016) + khối SUBSCRIPTION chỉ-đọc (ADR-0013/0014)."
+      ? "\n✅ Schema verify: DB khớp schema.sql §10 + §11 + §12 + khoá ngoại (§15/§16) + phiên bản (§17) + subject canonical (TD-016) + khối SUBSCRIPTION chỉ-đọc (ADR-0013/0014) + chấm tự luận (ADR-0018: grant, trần ký tự, trần lượt)."
       : `\n❌ Schema verify: ${failures} check FAIL — DB và schema.sql đang lệch nhau.`
   );
   process.exit(failures === 0 ? 0 : 1);
