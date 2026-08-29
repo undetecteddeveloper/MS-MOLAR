@@ -2,13 +2,13 @@
 
 | | |
 |---|---|
-| **Version** | 1.1 |
+| **Version** | 1.2 |
 | **Date** | 2026-08-29 |
-| **Status** | Draft — hiện thực hoá lát cắt hiển thị mà `docs/ui-spec/essay-auto-scoring-ui-spec.md` **v1.2** đặc tả, tiêu thụ các hợp đồng do `docs/design/essay-auto-scoring-backend-design.md` **v1.2** chốt. |
-| **PRD** | `docs/prd/essay-auto-scoring-prd.md` v1.2 (AC-001–AC-072) |
-| **ADR** | `docs/adr/ADR-0018-essay-async-grade-write.md` (Proposed, Decision 1–6, Amendment to ADR-0010, cả hai Escalation đã giải) |
-| **UI Spec** | `docs/ui-spec/essay-auto-scoring-ui-spec.md` **v1.2** (bảng đầu file của tài liệu đó còn ghi "1.0" — bản ghi có thẩm quyền là § Update History, dòng `2026-08-29 | 1.2`) — nguồn chuẩn của cấu trúc component, máy trạng thái render RS-0…RS-6, 29 chuỗi hiển thị, hằng polling và yêu cầu a11y. Tài liệu này **kế thừa nguyên vẹn** 13 quyết định UI-D1…UI-D13 và **không mở lại** cái nào. |
-| **Backend Design** | `docs/design/essay-auto-scoring-backend-design.md` **v1.2** — nguồn chuẩn của năm khoá jsonb, `EssayView`, `EssaySummary`, hạn chờ suy-lúc-đọc và chữ ký Server Action. Tài liệu này **tiêu thụ**, không thiết kế lại. |
+| **Status** | Draft — hiện thực hoá lát cắt hiển thị mà `docs/ui-spec/essay-auto-scoring-ui-spec.md` **v1.4** đặc tả, tiêu thụ các hợp đồng do `docs/design/essay-auto-scoring-backend-design.md` **v1.5** chốt. |
+| **PRD** | `docs/prd/essay-auto-scoring-prd.md` **v1.3** (AC-001–AC-072; v1.3 đóng OQ-7 — mục tiêu độ trễ ≤ 60 giây → **≤ 3 phút**) |
+| **ADR** | `docs/adr/ADR-0018-essay-async-grade-write.md` (**Accepted** 2026-08-29, Decision 1–6, Amendment to ADR-0010, cả hai Escalation đã giải) |
+| **UI Spec** | `docs/ui-spec/essay-auto-scoring-ui-spec.md` **v1.4** — nguồn chuẩn của cấu trúc component, máy trạng thái render RS-0…RS-6, 29 chuỗi hiển thị, hằng polling và yêu cầu a11y. Tài liệu này **kế thừa nguyên vẹn** 13 quyết định UI-D1…UI-D13 và **không mở lại** cái nào. |
+| **Backend Design** | `docs/design/essay-auto-scoring-backend-design.md` **v1.5** — nguồn chuẩn của năm khoá jsonb, `EssayView`, `EssaySummary`, hạn chờ suy-lúc-đọc và chữ ký Server Action. Tài liệu này **tiêu thụ**, không thiết kế lại. |
 | **Tiền lệ về cấu trúc** | `docs/design/short-answer-scoring-frontend-design.md` (cùng bài toán, lát cắt hiển thị), `docs/design/history-frontend-design.md` (bề mặt `/history`, `ActionButton`, đường ống PDF) |
 | **Nhánh** | `design/adr-0018-essay-async-grade-write` |
 | **Kiểm lại mã trong phiên viết** | **Mọi** số dòng trích trong tài liệu này được đọc lại từ file thật trong phiên viết — kể cả những số đã có ở UI Spec và ở backend Design Doc. Bốn trường hợp lệch được ghi ở § Fact Disposition Table. |
@@ -67,7 +67,7 @@ main_constraints:
   - "KHÔNG BAO GIỜ khai thuộc tính `disabled` gốc, ở mọi trạng thái, trên mọi control của tính năng này (UI-D5, ba tiền lệ đã ship)."
   - "Chỉ token từ SOURCE/app/globals.css. Không hex cứng, không box-shadow, không gradient. KHÔNG token mới nào được thêm."
   - "Client KHÔNG BAO GIỜ nhận, tính, hay suy ra một con số lượt chấm còn lại — EssayView không có trường nào mang nó (UI-D9/AC-044)."
-  - "Cận polling (18 lượt / 120 giây) KHÔNG PHẢI hạn chờ đọc-lúc-render (10 phút) và không được suy ra từ nhau (AC-061)."
+  - "Cận polling (**30 lượt / 240 giây**, UI Spec v1.4) KHÔNG PHẢI hạn chờ đọc-lúc-render (10 phút) và không được suy ra từ nhau (AC-061)."
   - "Toàn bộ 29 chuỗi là hằng i18n do ứng dụng sở hữu, khai ở CẢ HAI en.ts và vi.ts. Không một chuỗi nào do model sinh ra (AC-044/AC-047)."
 biggest_risks:
   - "Một nhánh render vô tình đọc `r.scored === false` hoặc `r.isCorrect` sẽ in 'Chưa chấm tự động' cạnh một con điểm (AC-053) và không có test nào hiện có bắt được — giảm nhẹ bằng CẤU TRÚC PROPS (§ Hard Rule) chứ không bằng kỷ luật."
@@ -236,7 +236,7 @@ Backend sắp bắt đầu ghi band tự luận vào `exam_results.per_question`
 #### Non-Functional Requirements
 
 - **NFR-1 (a11y)** — WCAG 2.1 AA; mọi trạng thái truyền đạt bằng **chữ**, màu chỉ là kênh phụ (AC-047); thay đổi không do người dùng gây ra được đọc lên qua vùng `polite` (AC-023); tiêu điểm không bị cướp/mất qua lượt tự làm mới.
-- **NFR-2 (hiệu năng)** — Mỗi lượt `router.refresh()` là một RSC payload đầy đủ của trang kết quả; tổng số lượt bị chặn trần cứng ở **18**, tổng thời gian ở **120 giây**, và tick khi tab ẩn **không tiêu ngân sách**.
+- **NFR-2 (hiệu năng)** — Mỗi lượt `router.refresh()` là một RSC payload đầy đủ của trang kết quả; tổng số lượt bị chặn trần cứng ở **30**, tổng thời gian ở **240 giây**, và tick khi tab ẩn **không tiêu ngân sách**.
 - **NFR-3 (theme)** — 0 token mới, 0 hex cứng ngoài `AttemptPdfTemplate` (nơi ADR-0009 bắt buộc), 0 box-shadow, 0 gradient.
 - **NFR-4 (bundle)** — Không thêm phụ thuộc npm nào. Hai component client mới là mã thuần React + `next/navigation`.
 
@@ -268,8 +268,8 @@ Mỗi tiêu chí dưới đây là một điều kiện **quan sát được tr�
 - **FE-AC-14** — KHI **không** phần tử nào của lượt thi mang khoá `essayState`, trang kết quả **PHẢI KHÔNG** chèn node mới nào: không `EssayScoreLine`, không poller đang chạy, không đổi `ScoreCard`. *(AC-012)*
 - **FE-AC-15** — KHI mọi câu tự luận ở `failed`/exhausted và **không** câu nào ở `graded`, `EssayScoreLine` **PHẢI** hiện `—` chứ **PHẢI KHÔNG** hiện `0 / 0 điểm`. *(AC-015)*
 - **FE-AC-16** — KHI số câu chưa giải quyết **giảm** giữa hai lượt render, vùng `aria-live="polite"` của poller **PHẢI** nhận đúng một câu; KHI số đó **không** giảm, vùng đó **PHẢI** rỗng. *(AC-023)*
-- **FE-AC-17** — KHI poller chạm **18 lượt làm mới** hoặc **120 giây** trong lúc còn câu ở `pending`, nó **PHẢI** ngừng lên lịch và **PHẢI** hiện câu `result.essay.pollStopped` cộng một `<button>` "Cập nhật"; bấm nút đó **PHẢI** gọi `router.refresh()` một lần và nạp lại cả hai ngân sách. *(AC-021/061)*
-- **FE-AC-18** — KHI một tick xảy ra lúc `document.visibilityState === "hidden"`, poller **PHẢI KHÔNG** gọi `router.refresh()` và **PHẢI KHÔNG** tiêu một lượt trong ngân sách 18; đồng hồ 120 giây **PHẢI** vẫn chạy.
+- **FE-AC-17** — KHI poller chạm **30 lượt làm mới** hoặc **240 giây** trong lúc còn câu ở `pending`, nó **PHẢI** ngừng lên lịch và **PHẢI** hiện câu `result.essay.pollStopped` cộng một `<button>` "Cập nhật"; bấm nút đó **PHẢI** gọi `router.refresh()` một lần và nạp lại cả hai ngân sách. *(AC-021/061)*
+- **FE-AC-18** — KHI một tick xảy ra lúc `document.visibilityState === "hidden"`, poller **PHẢI KHÔNG** gọi `router.refresh()` và **PHẢI KHÔNG** tiêu một lượt trong ngân sách **30**; đồng hồ **240** giây **PHẢI** vẫn chạy.
 - **FE-AC-19** — KHI tệp PDF được xuất cho một lượt thi có ≥1 câu ở RS-6, tệp **PHẢI** chứa chuỗi `result.essay.pdfIncomplete`; KHI không có câu nào ở RS-6, tệp **PHẢI KHÔNG** chứa chuỗi đó. *(O-8)*
 - **FE-AC-20** — KHI cờ AC-067 **tắt**, chân trang ô nhập tự luận **PHẢI** giữ nguyên văn `player.essayNotScored`; KHI **bật**, nó **PHẢI** là `player.essayScored`. *(AC-051/067)*
 - **FE-AC-21** — Ở **mọi** trạng thái của tính năng, **PHẢI KHÔNG** có phần tử nào trong cây tự luận mang thuộc tính `disabled`, và **PHẢI KHÔNG** có chuỗi hiển thị nào chứa một con số lượt chấm còn lại. *(UI-D5, UI-D9/AC-044)*
@@ -456,7 +456,7 @@ Gate này áp cho sáu phần tử mang bề mặt bảo trì mà lát cắt fro
 
 - `EssayView`, `EssaySummary`, năm khoá jsonb, `retryAvailable` là boolean, và chữ ký `retryEssayGrading()` — **đầu vào** của tài liệu này (backend Design Doc § MSA-1/MSA-2 đã chạy gate cho chúng), không phải lựa chọn của nó.
 - `useState` cục bộ của `EssayRegradeControl` (một `phase`) và của `EssayGradingPoller` (bốn con số đếm) — state **không sống qua reload**, không rời khỏi component, không có observer bên ngoài. Out of scope theo đúng định nghĩa của gate.
-- Hằng polling (5s×12 → 10s×6, 18 lượt, 120 giây) — UI Spec chốt bằng số, và chúng là **giá trị**, không phải bề mặt.
+- Hằng polling (5s×12 → 10s×**18**, **30** lượt, **240** giây — UI Spec v1.4) — UI Spec chốt bằng số, và chúng là **giá trị**, không phải bề mặt.
 
 ---
 
@@ -750,7 +750,7 @@ Ba chỗ này **không** phải ba lượt đọc thừa của một quyết đ�
 |---|---|
 | Một nhánh render đọc `scored`/`isCorrect` | Kiểu props hẹp (MSA-F6) — lỗi biên dịch, không phải review |
 | Diff lọt sang nhánh có-chấm hoặc `ScoreCard` | Lát V2 chạm **một** khối `if (notScored)` và không mở `ScoreCard.tsx` lần nào; § Change Impact Map liệt kê `ScoreCard` ở mục *No Ripple Effect* để verifier có khẳng định đối chiếu |
-| Poller chạy sai và đốt 18 lượt RSC vô ích | Lát V4 tách riêng, kiểm bằng fake timer **trước** khi nối vào trang thật |
+| Poller chạy sai và đốt 30 lượt RSC vô ích | Lát V4 tách riêng, kiểm bằng fake timer **trước** khi nối vào trang thật |
 | 15 lượt render trong hai file test đỏ | Lát V3 làm **một lần** cả prop lẫn test, trong cùng commit |
 | Câu chữ ship sai giai đoạn | FE-OQ-2 phải đóng **trước** khi lát V5 lên lịch |
 
@@ -955,7 +955,7 @@ sequenceDiagram
 
     Note over POLL: pendingCount > 0 ⇒ lên lịch tick
 
-    loop tối đa 18 lượt HOẶC 120 giây
+    loop tối đa 30 lượt HOẶC 240 giây
         POLL->>POLL: setTimeout(5000 hoặc 10000)
         alt tab ẩn
             POLL->>POLL: BỎ QUA — không refresh, KHÔNG tiêu ngân sách
@@ -1286,13 +1286,17 @@ Invariants:
 
 | Hằng | Giá trị | Lý do (UI Spec) |
 |---|---|---|
-| `ESSAY_POLL_FAST_INTERVAL_MS` | `5_000` | 12 tick đầu phủ 60 giây — đúng cửa sổ mà PRD đặt mục tiêu (trung vị ≤ 60s cho ≤5 câu). Bên trong cửa sổ đó kết quả **thực sự được kỳ vọng**, nên nhịp dày là nhịp có giá trị |
+| `ESSAY_POLL_FAST_INTERVAL_MS` | `5_000` | 12 tick đầu phủ 60 giây. **Không** vì 60 giây là mục tiêu độ trễ (mục tiêu đã là **≤ 3 phút**, PRD v1.3 / OQ-7) mà vì câu **đầu tiên** vẫn đáp xuống sớm: ở `GROQ_MAX_CONCURRENCY = 2`, hai bài đầu đi ngay trong burst đầu. Nhịp dày mua độ nạp của **kết quả đầu tiên** |
 | `ESSAY_POLL_FAST_TICKS` | `12` | 12 × 5s = 60s |
-| `ESSAY_POLL_SLOW_INTERVAL_MS` | `10_000` | Qua 60 giây là vùng đuôi phân phối; giữ nhịp dày ở đây là bắt **thiết bị yếu nhất** trả tiền cho một xác suất đang giảm |
-| `ESSAY_POLL_MAX_REFRESHES` | `18` | 12 nhanh + 6 chậm. Trần **số lượt** — mỗi lượt là một RSC payload **đầy đủ** của trang kết quả |
-| `ESSAY_POLL_MAX_ELAPSED_MS` | `120_000` | Trần **thời gian**, khai **độc lập** với trần số lượt. Hai trần vì một lượt `router.refresh()` chậm làm hai đại lượng lệch nhau; cái nào chạm trước thì dừng |
+| `ESSAY_POLL_SLOW_INTERVAL_MS` | `10_000` | Qua 60 giây, các band còn lại đáp xuống **rải theo trần TPM 8K** chứ không dồn cục; giữ nhịp dày là bắt **thiết bị yếu nhất** trả tiền cho những lượt refresh hầu hết không thấy gì mới |
+| `ESSAY_POLL_MAX_REFRESHES` | `30` | 12 nhanh + **18** chậm (UI Spec v1.4; trước là `18` = 12 + 6). Trần **số lượt** — mỗi lượt là một RSC payload **đầy đủ** của trang kết quả, nên giá là **30 payload thay vì 18** trên thiết bị yếu nhất |
+| `ESSAY_POLL_MAX_ELAPSED_MS` | `240_000` | Trần **thời gian**, khai **độc lập** với trần số lượt. Hai trần vì một lượt `router.refresh()` chậm làm hai đại lượng lệch nhau; cái nào chạm trước thì dừng. **Bằng `ESSAY_PASS_BUDGET_MS`** — xem đoạn ngay dưới |
 
-**Hai con số này KHÔNG PHẢI hạn chờ đọc-lúc-render, và không được suy ra từ nó (AC-061).** Chúng là **giới hạn tài nguyên phía client**: chúng bó số lượt RSC mà **một tab đang mở** được phép sinh ra. Hạn chờ (`ESSAY_PENDING_DEADLINE_MS = 600_000`, backend sở hữu) là **quy tắc trình bày phía server** áp cho **mọi** lượt đọc — kể cả một lượt mở trang nguội nhiều ngày sau khi không có poller nào chạy, và nó neo vào **trần thời lượng của nền tảng** chứ không vào độ trễ chấm. Đổi một cái **không** kéo theo đổi cái kia; hai con số ở trên hợp lệ ngay cả khi hạn chờ ngắn hơn 120 giây hoặc dài hơn nhiều lần.
+**Hai con số này KHÔNG PHẢI hạn chờ đọc-lúc-render, và không được suy ra từ nó (AC-061).** Chúng là **giới hạn tài nguyên phía client**: chúng bó số lượt RSC mà **một tab đang mở** được phép sinh ra. Hạn chờ (`ESSAY_PENDING_DEADLINE_MS = 600_000`, backend sở hữu) là **quy tắc trình bày phía server** áp cho **mọi** lượt đọc — kể cả một lượt mở trang nguội nhiều ngày sau khi không có poller nào chạy, và nó neo vào **trần thời lượng của nền tảng** chứ không vào độ trễ chấm. Đổi một cái **không** kéo theo đổi cái kia; hai con số ở trên hợp lệ ngay cả khi hạn chờ ngắn hơn 240 giây hoặc dài hơn nhiều lần.
+
+**Mốc neo của `ESSAY_POLL_MAX_ELAPSED_MS` (UI Spec v1.4).** 240 000 ms **không** suy từ mục tiêu độ trễ của PRD — đó chính là sai lầm của bản trước, khi 120 000 được lấy từ mục tiêu “≤ 60 giây” nhân đôi, rồi mục tiêu ấy đổi (OQ-7 → ≤ 3 phút) và trần ở lại sau. Nó bằng **`ESSAY_PASS_BUDGET_MS` = 240 000**, trần đồng hồ của chính lượt chấm ở backend: sau mốc đó, **không band nào còn có thể đáp xuống từ pass đó**, nên mọi lượt refresh sau đó là chắc chắn vô ích. Đây là một mệnh đề **kiểm được** về người viết, không phải một ước lượng về độ trễ.
+
+**Lệch nhỏ giữa hai đồng hồ, ghi ra chứ không giấu:** `startedAtRef` đặt lúc **poller mount**, còn đồng hồ của pass chạy từ lúc **submit**. Trang kết quả mount sau submit vài giây (redirect + một lượt RSC), nên poller dừng **muộn hơn** pass vài giây — đúng chiều an toàn, vì nó không bao giờ dừng **trước** khi người viết xong việc. **Không** được viết mã suy một trong hai con số này ra từ con số kia; chúng trùng giá trị, không trùng ý nghĩa.
 
 **Vì sao chained `setTimeout` chứ không `setInterval`.** `ExamTimer.tsx:1-5` đã ghi lý do và nó áp nguyên vào đây: `setInterval` **dồn tick** khi tab chạy nền, nên khi quay lại tab, hàng loạt `router.refresh()` bắn liên tiếp — đúng thứ đắt nhất với người dùng mục tiêu (Android tầm trung, mạng chập chờn). Chained `setTimeout` chỉ hẹn giờ **sau khi** tick trước đã xử lý xong.
 
@@ -1308,7 +1312,7 @@ stateDiagram-v2
     Dormant --> Dormant: KHÔNG lên lịch gì.<br/>Chỉ giữ vùng aria-live có mặt (F-05)
 
     Sleeping --> Firing: setTimeout đáo hạn
-    Firing --> Stopped: elapsed > 120_000
+    Firing --> Stopped: elapsed > 240_000
     Firing --> Sleeping: tab ẩn ⇒ BỎ QUA<br/>(không refresh, KHÔNG tiêu ngân sách)
     Firing --> Stopped: refreshes >= 18
     Firing --> Refreshing: tab hiện ∧ còn cả hai ngân sách
@@ -1670,7 +1674,7 @@ Toàn bộ state phía client của lát cắt này, và **vòng đời** của 
 | `EssayGradingPoller` | `tick` | `number` | `0` | Tăng mỗi lần `setTimeout` đáo hạn | Điều khiển vòng lặp chained `setTimeout` (khuôn `ExamTimer.tsx:34-38`) |
 | `EssayGradingPoller` | `refreshes` | `number` | `0` | Tăng **chỉ khi** thật sự refresh; reset khi bấm "Cập nhật" | Ngân sách **của tab này**, không của server |
 | `EssayGradingPoller` | `stopped` | `boolean` | `false` | Bật khi chạm một trong hai trần; tắt khi bấm "Cập nhật" | như trên |
-| `EssayGradingPoller` | `startedAtRef` | `useRef<number>` | `Date.now()` lúc mount | Đặt lại khi bấm "Cập nhật" | Đồng hồ 120 giây; ref chứ không state vì đọc nó **không** cần render lại |
+| `EssayGradingPoller` | `startedAtRef` | `useRef<number>` | `Date.now()` lúc mount | Đặt lại khi bấm "Cập nhật" | Đồng hồ 240 giây; ref chứ không state vì đọc nó **không** cần render lại |
 | `EssayGradingPoller` | `prevPending` + `announcement` | `number` + `string` | props ban đầu / `""` | Cập nhật **lúc render** khi `pendingCount` đổi | Pattern "adjust state during render" (`HistoryRowMenu.tsx:119-134`), **không** effect |
 | `usePdfAction` | `phase`, `busyRef` | không đổi | không đổi | không đổi | Đã có từ trước |
 
@@ -2022,7 +2026,7 @@ Indirect Impact:
   - Payload của lượt đọc /history — mỗi hàng mang thêm HAI boolean (mảng per_question thô DỪNG ở tầng truy vấn). Chi phí truy vấn chưa đo → FE-OQ-3.
   - Bundle client của route /result và /result/detail — thêm hai module "use client" nhỏ (poller + regrade control). Không thêm phụ thuộc npm nào.
   - Tệp PDF — thêm tối đa MỘT dòng chữ, chỉ khi có ≥1 câu ở RS-6.
-  - Số lượt RSC request tới máy chủ — tăng tối đa 18 lượt mỗi tab mỗi lượt thi CÓ câu pending, trần cứng 120 giây.
+  - Số lượt RSC request tới máy chủ — tăng tối đa **30** lượt mỗi tab mỗi lượt thi CÓ câu pending, trần cứng **240** giây.
 No Ripple Effect:
   - SOURCE/app/(layer2)/_components/ScoreCard.tsx — 0 DIFF. /10, Đúng, Sai, Thời gian giữ nguyên cơ sở tính (UI-D3, AC-057).
   - Nhánh CÓ-chấm của result/detail/page.tsx (:130-238) — 0 diff ⇒ deferral TBD-02 còn hiệu lực (F-07).
@@ -2316,7 +2320,7 @@ Những phương án ở **mức lát cắt**, khác với các phương án ở
 | **R-F5** | Lời hứa "0 byte JS khi tính năng tắt" **không đúng** với import tĩnh, và repo không có công cụ để chứng minh hay bác bỏ (AB-10) | Thấp | Phát biểu lại thành ba mệnh đề **kiểm được** (F-09): không mount, không timer, không refresh. Kích thước thật của hai module client là mã React thuần, không phụ thuộc mới |
 | **R-F6** | `HistoryRowMenu.test.tsx` đỏ vì flake chứ không vì defect, và bị đọc nhầm theo cả hai hướng | Thấp | Quy trình ghi thành văn (F-11): **chạy lại đơn luồng** rồi mới kết luận. Không mặc định "flaky", không mặc định "defect" |
 | **R-F7** | 28 khoá i18n sửa ở `vi.ts` mà quên `en.ts` (hoặc ngược lại) | Thấp | `npx tsc --noEmit` là cổng: `Dictionary` sinh từ `en.ts`, thiếu khoá ở `vi.ts` là lỗi biên dịch (AB-12). Thứ tự sửa được ghi rõ (§ i18n) |
-| **R-F8** | Poller đốt 18 lượt RSC đầy đủ trên mạng chậm mà không giải quyết được gì | Thấp | Hai trần độc lập; bỏ tick khi tab ẩn **không tiêu ngân sách**; nhịp hai pha; và khi dừng thì có một nút thủ công thay vì im lặng |
+| **R-F8** | Poller đốt 30 lượt RSC đầy đủ trên mạng chậm mà không giải quyết được gì | Thấp | Hai trần độc lập; bỏ tick khi tab ẩn **không tiêu ngân sách**; nhịp hai pha; và khi dừng thì có một nút thủ công thay vì im lặng |
 | **R-F9** | Hai lối xuất PDF đọc hai nguồn khác nhau cho "có câu RS-6" ⇒ cùng một lượt thi ra hai tệp khác nhau | **Đã đóng** | Backend v1.1 đặt `hasIncompleteEssay` **cùng một tên** trên `ExamResult`, `MyHistoryEntry` và `AttemptPdfData` — kiểu hợp lưu của cả hai lối xuất; **EG-BE-035** ghim đẳng thức giữa hai bề mặt, **EG-BE-036** ghim rằng RS-6 chỉ khai một chỗ. Phần còn lại thuộc frontend là **không tự suy lại** (bản v1.0 đã vi phạm ở một chỗ và đã sửa — § AttemptPdfTemplate) |
 | **R-F10** | Câu chữ chân trang player ship sai giai đoạn (hứa một việc chưa chạy) | **Đã đóng** | **FE-OQ-2 đóng 2026-08-29**: phương án hai khoá + cờ đọc phía server, **đúng bất kể thứ tự commit**. Phương án một khoá (đúng-nếu-thứ-tự-giữ) đã bị loại. Rủi ro còn lại là một lượt hiện thực quên nối prop — bắt bằng ca RTL "cờ tắt ⇒ chuỗi cũ" ở § QuestionRenderer |
 
@@ -2332,7 +2336,7 @@ Những phương án ở **mức lát cắt**, khác với các phương án ở
 | AC-016 | `graded` không bao giờ bật/tắt gợi ý gia sư | `EssayReviewBlock` **không nhận** `hasBeenWrongTwice` ⇒ mount `ExplainStepAffordance` là lỗi biên dịch | `npx tsc --noEmit`; MSA-F6 |
 | AC-018 | Câu không có ground truth: không chấm, giữ `scored:false` | RS-1 = nhánh chung, không phân biệt với RS-0 | FE-AC-13 |
 | AC-020 | Poll khi còn ≥1 câu `pending`, dừng khi hết | `EssayGradingPoller` | P-1, P-6 |
-| AC-021 | Poller có cận riêng: số lần **và** thời lượng | `EssayGradingPoller` — 18 lượt / 120 giây, **độc lập** | P-3, P-5; FE-AC-17 |
+| AC-021 | Poller có cận riêng: số lần **và** thời lượng | `EssayGradingPoller` — **30 lượt / 240 giây**, **độc lập** | P-3, P-5; FE-AC-17 |
 | AC-022 | Không realtime, không bảng mới | Chỉ `router.refresh()` | § Alternative Solutions; rà diff |
 | AC-023 | Band đáp xuống được đọc lên; tiêu điểm không bị cướp/mất | Vùng `polite` rỗng-rồi-chèn; không control nào bị gỡ | FE-AC-16; ba ca `aria-live`; **R-F3** ở E2E |
 | AC-024 | Lỗi provider/gate/output không hợp lệ → "chấm thất bại" | `EssayReviewBlock` RS-4 | FE-AC-06 |
@@ -2426,4 +2430,5 @@ Không tra cứu ngoài trong phiên này. Lát cắt này **không** giới thi
 | Date | Version | Changes | Author |
 |---|---|---|---|
 | 2026-08-29 | 1.1 | **Lượt đối soát sau khi thượng nguồn đổi** (UI Spec v1.2, backend Design Doc v1.1 + v1.2). Không thiết kế lại phần nào; bốn chỗ đã lệch khỏi hợp đồng mới được sửa, cộng bốn chỗ làm rõ. **(1) Tên trường trên `AttemptPdfData` đổi từ `essayIncomplete` sang `hasIncompleteEssay`** — tên của backend thắng, vì nó nhất quán với `hasUnresolvedEssay` trên **cùng** kiểu và vì lý do tồn tại của cái tên là **cùng một tên trên cả ba kiểu** (`ExamResult`, `MyHistoryEntry`, `AttemptPdfData`), thứ khiến hai lối xuất PDF không thể bất đồng; một tên thứ hai đánh bại cơ chế đó tại đúng cái biên nó bảo vệ. Cả hai tài liệu khai trường này **bắt buộc** trên cùng kiểu ở `generateAttemptPdf.ts:11`, nên hai tên là một lỗi `tsc` chờ sẵn. Đây là **cùng lớp lỗi** mà tài liệu này đã bắt ở thượng nguồn với F-04. **(2) Bỏ phép suy lại ở trang kết quả.** v1.0 viết `result.perQuestion.some((r) => isEssayIncomplete(r.essay))`; nay đọc `ExamResult.hasIncompleteEssay`. Hai lý do cấu trúc: biểu thức cũ **không type-check** (`isEssayIncomplete(view: EssayView)` vs `PerQuestionResult.essay: EssayView | undefined`), và nó làm **EG-BE-035 không assert được** vì `ExamResult` khi ấy không mang trường để đối chiếu. Quy tắc *biểu thức* thì không đổi và không vi phạm EG-BE-036. **(3) FE-OQ-1 đóng** (backend v1.1) — gỡ khỏi `unknowns`, `biggest_risks`, § Open Questions, R-F9, F-06, và **bỏ cổng chặn lát V3**, để một Work Plan dựng từ tài liệu này không chặn một lát vào một câu hỏi đã có lời đáp. **(4) FE-OQ-2 đóng xong ở ba chỗ còn sót** — MSA-F2 bước 5 (phương án (b) vào danh sách bị loại kèm lý do), § Open Questions, và dòng AC-051 của bảng diễn đạt lại. **(5) Thêm dòng diễn đạt lại AC thứ tư: AC-011 / AC-057 → UI-D3** (khối riêng dưới `ScoreCard`, `ScoreCard` 0 diff), theo quyết định của kỹ sư ghi lại **thành một diễn đạt lại có cờ thay vì sửa PRD**. **(6) Ba ID acceptance criteria mượn nhầm PRD được gán nguồn**: `history-prd` AC-007 / AC-009 / AC-010 (AC-010 là phát hiện thêm ngoài phạm vi lượt rà). Trong **essay** PRD, AC-007 và AC-009 mang nghĩa khác hẳn; một lượt viện dẫn AC-007 của **đúng** essay PRD (band-0-âm-thầm) được đánh dấu tại chỗ. Bảng AC Traceability **không** bị thổi phồng: nó vốn không liệt kê essay AC-007/AC-009, vì cả hai không có bề mặt frontend. **(7) FE-OQ-3**: nói rõ chọn RPC là một **lượt leo thang phạm vi** — nâng số thay đổi schema áp tay từ hai lên ba, mở lại chính ngân sách mà ADR-0018 Escalation 2 được giải để giữ. **(8) Đếm lại**: bảy trạng thái render (RS-0…RS-6), không phải sáu, ở năm chỗ; sáu chuỗi có tham số, không phải ba. Thêm § Contract deltas since v1.0 ở đầu tài liệu. Ghi chú: bảng đầu file của UI Spec còn ghi "Version 1.0" trong khi § Update History của chính nó ghi 1.2 — tài liệu này theo bản ghi có thẩm quyền và nêu sự lệch ra. | Design Doc (Claude) |
+| 2026-08-29 | 1.2 | **Hai trần poller dịch theo OQ-7 (UI Spec v1.4), và header được sửa cho khớp thượng nguồn thật.** `ESSAY_POLL_MAX_REFRESHES` **18 → 30**, `ESSAY_POLL_MAX_ELAPSED_MS` **120_000 → 240_000**, cập nhật đồng loạt **mười một vị trí** trong tài liệu này: NFR-2, FE-AC-17, FE-AC-18, bảng hằng số (bốn dòng), sơ đồ sequence, sơ đồ trạng thái (`elapsed > 240_000`), bảng ref, mục chi phí RSC, R-F8, và dòng AC-021 trong bảng AC Traceability. **Lý do nằm ở thượng nguồn, không ở đây**: PRD v1.3 nới mục tiêu độ trễ lên ≤ 3 phút vì trần TPM 8K khiến một lượt 5 câu mất tối thiểu ~2 phút, nên trần 120 giây cũ sẽ bắt học sinh nhìn `pollStopped` trên một lượt chạy bình thường. **Thêm một đoạn về MỐC NEO** ngay dưới bảng hằng số: 240 000 **không** suy từ mục tiêu độ trễ mới — đó chính là cách 120 000 trở nên sai — mà bằng `ESSAY_PASS_BUDGET_MS`, trần đồng hồ của chính lượt chấm, nên poller dừng đúng lúc người viết dừng; kèm **lệch nhỏ được ghi ra** (`startedAtRef` đặt lúc mount, đồng hồ pass chạy từ submit ⇒ poller dừng muộn hơn vài giây, đúng chiều an toàn) và lệnh cấm suy một con số ra từ con số kia — chúng **trùng giá trị, không trùng ý nghĩa**. **AC-061 không đổi.** **Header sửa trình trạng đã trôi**: UI Spec v1.2 → **v1.4**, backend DD v1.2 → **v1.5**, PRD v1.2 → **v1.3**, ADR-0018 `Proposed` → **`Accepted`** — bốn trích dẫn này đã cũ từ trước phiên này và đã được work plan điểm mặt trong Final Phase. |
 | 2026-08-28 | 1.0 | Bản đầu. Viết dựa trên UI Spec v1.1, backend Design Doc v1.0, PRD v1.2, ADR-0018, và một lượt kiểm mã độc lập trong phiên viết. **Thay toàn bộ chỗ giữ của UI Spec bằng literal của backend** (`essayState`, `essayEarned`, `essayMax`, `essayLowConfidence`, `essayAttempts`) và ghi rõ rằng **frontend không đọc thẳng khoá nào trong số đó** — nó chỉ đọc `EssayView` (F-01). **Mười một khác biệt được định đoạt** (F-01…F-11), trong đó bốn cái là phát hiện mới của phiên này: `button.tsx` khai biến thể tên **`shape`** chứ không `variant` (F-02); `QuestionRenderer.test.tsx` có **hai** coupled site mà cả AC-048 lẫn backend D-04 đều không nêu (F-03); điều kiện mount poller của UI Spec (`pendingCount > 0`) **phá AC-023** vì nó gỡ vùng `aria-live` đúng lượt render cần đọc (F-05); và điều kiện in dòng PDF của O-8 **không tính được** ở `/history` với hợp đồng backend hiện tại (F-06 → FE-OQ-1). Cộng hai khác biệt về tên và về phân loại: `hasUnresolvedEssay` (backend) vs `essayUnresolved` (UI Spec) — theo backend (F-04); và RS-5 **không luôn** có nút hoạt động vì `essayAttempts` đạt được 3 với một dòng còn lưu `pending` (F-08). **Sáu gate Minimal Surface** (MSA-F1…F6), trong đó MSA-F6 là chỗ **The Hard Rule được cưỡng chế bằng kiểu**: `EssayReviewBlock` cố ý **không nhận** `PerQuestionResult`, nên một nhánh đọc `scored`/`isCorrect` **không biên dịch được** thay vì chỉ bị cấm bằng lời. **Sửa hai khoá i18n tự phát minh** thành hai khoá tái dùng đã có ở cả hai ngôn ngữ (`profile.error.sessionExpired`, `profile.error.generic`), giữ bảng đúng **29 chuỗi / 28 khoá mới** như UI Spec chốt. **Phát biểu lại lời hứa "0 byte JS"** của UI Spec thành ba mệnh đề kiểm được, vì một import tĩnh nằm trong bundle route bất kể có mount hay không và repo không có công cụ đo bundle theo route (F-09, AB-10). **Chốt kỹ thuật render test** bằng bằng chứng đã ghi trong repo: hai Server Component có con async **phải** dùng `renderServerTree()`, vì `render(await …)` trả cây **rỗng** và assertion phủ định sẽ pass trên hư không (AB-2 → R-F2), kèm quy tắc "mỗi ca phải có ≥1 assertion dương". Năm câu hỏi mở (FE-OQ-1…FE-OQ-5) ghi kèm đầu vào cần, người chịu trách nhiệm và điều kiện leo thang; **FE-OQ-1 chặn lát V3**, **FE-OQ-2 chặn lát V6**, ba mục còn lại không chặn. | Design Doc (Claude) |

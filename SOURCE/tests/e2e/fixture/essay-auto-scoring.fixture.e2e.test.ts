@@ -149,7 +149,7 @@ import { describe, it } from "vitest";
 // @real-dependency: none
 // Primary failure mode: `EssayGradingPoller` is mounted unconditionally (or on a
 //   predicate that is true for `undefined`), so every legacy result page in
-//   production starts a `router.refresh()` loop that re-renders the page 18 times
+//   production starts a `router.refresh()` loop that re-renders the page 30 times
 //   for no reason — invisible on screen, expensive in RSC requests, and reported by
 //   nobody because nothing looks wrong. The second mode: `EssayScoreLine` returns
 //   an empty fragment rather than `null`, inserting a node into the `gap-5` column
