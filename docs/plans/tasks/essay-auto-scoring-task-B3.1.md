@@ -1,4 +1,16 @@
-# Task B3.1 — Telemetry: one event type, three error codes, all seven coupled sites
+# Task B3.1 — Telemetry call sites in `gradeEssays.ts` (the literals already landed in H5)
+
+> ## ⚠️ SCOPE REDUCED 2026-08-29 — read this before doing anything
+>
+> **The telemetry LITERALS are already committed.** They moved into **Task H5** (commit `2448179`) — `TelemetryEventType += 'essay_grade'`, `TELEMETRY_ERROR_CODES` 6 → 9 (`groq_unavailable`, `invalid_output`, `duplicate_write`), and the pins in `telemetry.test.ts` (`:49`, `:265`) and `schemaFingerprint.test.ts` (`:133`).
+>
+> **Why they moved forward.** An **eighth** coupled site exists that no enumeration named: `SOURCE/lib/schema/__tests__/schemaFingerprint.test.ts` is the only test that actually **reads** `schema.sql` and parses its `error_code` lists, so widening the SQL lists 6 → 9 turned three of its assertions red **inside H5**. Its own failure message reads *"Sửa CẢ BA chỗ trong cùng một commit: hai danh sách SQL + `lib/tutor/telemetry.ts`"* — a guard shipped before this feature was already enforcing the one-commit rule, which this plan's H5/B3.1 split contradicted.
+>
+> **What this task still owns:** wiring the telemetry **call sites** in `gradeEssays.ts`. Nothing else.
+>
+> **Do NOT re-add the literals.** They are present and pinned. Re-adding produces a duplicate union member or a doubled array entry, and the exhaustive `toEqual` pins will go red.
+>
+> Backend Design Doc **v1.9** (§ D-06, now **eight** sites) and the work plan's **Gate H5** both record this.
 
 Plan mapping: `docs/plans/20260829-feature-essay-auto-scoring.md` — **Phase B3 (Retry, Telemetry and the Ceiling Ripple, vertical slice V3), Task B3.1**
 Layer: **backend** (`SOURCE/lib/tutor/**`, `SOURCE/lib/essay/**`)
@@ -6,8 +18,8 @@ Layer: **backend** (`SOURCE/lib/tutor/**`, `SOURCE/lib/essay/**`)
 Metadata:
 - Dependencies: **Task H7** (the widened CHECKs must be live, or every grading telemetry write fails **silently**), **Task B1.4** (this task edits `gradeEssays.ts`, which B1.4 creates).
 - Blocks: **Tasks B3.2, B3.3**.
-- Provides: `'essay_grade'` plus three error codes, consistent across all seven coupled sites, and this feature's telemetry call sites in `gradeEssays.ts`.
-- Size: Small (3 files)
+- Provides: this feature's telemetry **call sites** in `gradeEssays.ts`. *(The `'essay_grade'` event type and the three error codes are already live — landed in Task H5, commit `2448179`.)*
+- Size: **Very small (1 file)** — reduced from 3; two of the three landed in H5.
 - Verification level: **L2**; a real `essay_grade` row was already accepted on dev during H7 step 5.
 
 ## Change Category
