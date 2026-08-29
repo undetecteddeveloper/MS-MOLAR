@@ -39,13 +39,13 @@ Grading ships **disabled**. `ESSAY_GRADING_ENABLED` absent ⇒ off. No essay tex
 
 **Engineer's decision, 2026-08-29: Zero Data Retention must be on before ANY Groq request — dev included.** The gate is therefore in two stages, because several implementation tasks need a real `L1` run on dev and every one of those sends text to `api.groq.com`. Staging the gate is what makes those tasks executable *without* making "it's only dev" a reason to skip ZDR.
 
-- [ ] A1 — A Groq account exists and the organisation is the one that will own production traffic.
-- [ ] A2 — `GROQ_API_KEY` present in `SOURCE/.env.local`.
+- [x] A1 — A Groq account exists and the organisation is the one that will own production traffic. **Confirmed 2026-08-29** (engineer; account's model catalogue and rate limits read from `console.groq.com/settings/limits`).
+- [ ] A2 — `GROQ_API_KEY` present in `SOURCE/.env.local`. *(Engineer is placing the key directly in the file rather than routing it through the assistant — the first key was pasted into a session transcript on 2026-08-29 and was rotated for that reason. The file is gitignored and untracked — verified via `git check-ignore`.)*
 - [ ] A3 — `GROQ_API_KEY` present in Vercel **Production** scope.
 - [ ] A4 — `GROQ_API_KEY` present in Vercel **Preview** scope.
-- [ ] A5 — Zero Data Retention **enabled** in Groq Data Controls (`https://console.groq.com/settings/data-controls`).
+- [x] A5 — Zero Data Retention **enabled** in Groq Data Controls (`https://console.groq.com/settings/data-controls`). **Engineer confirmed enabled 2026-08-29.**
 - [ ] **A5b — STAGE 1 GATE: A1, A2 and A5 are the precondition for ANY Groq request, including dev `L1` runs with seeded data.** No task in this plan may set `ESSAY_GRADING_ENABLED=true` anywhere — not even in a local `SOURCE/.env.local` — until A1, A2 and A5 are ticked. A local dev `true` is permitted **only** after A5b **and only against seeded attempts**; never against a real student attempt, on any environment. A3, A4, A6 and A7 remain the precondition for Phase E and for production traffic (stage 2).
-  - Date A5b ticked: `________-__-__`
+  - Date A5b ticked: `__________` — **BLOCKED ON A2 ONLY.** A1 ✅ and A5 ✅ as of 2026-08-29; A5b ticks the moment the rotated key is in `SOURCE/.env.local`. Until then, no `L1` dev run may be attempted.
 - [ ] A6 — **Dated console check recorded here.** Provider default (no training, no inference-request storage) is *not* ZDR: provider docs state input/output may be logged temporarily for reliability/abuse work, retained up to 30 days. The users are minors.
   - Date of console check: `________-__-__`
   - Checked by (engineer): `____________________`
