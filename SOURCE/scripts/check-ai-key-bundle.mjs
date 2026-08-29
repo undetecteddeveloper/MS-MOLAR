@@ -21,6 +21,9 @@
 //      rate-limit và cache entitlement; lộ ra client là bỏ được mọi hạn mức.
 //      Trước đây nó là bí mật server-only DUY NHẤT không có marker nào — được
 //      thêm cùng lượt với payOS (quét cạnh của plan Task 4.1).
+//   6) GROQ_API_KEY (ADR-0018) — lib/essay/groqClient.ts, điểm phát Groq DUY
+//      NHẤT. Mục này được thêm TRƯỚC module mà nó canh: guard sẵn sàng trước
+//      thứ nó canh thì không có cửa sổ nào key đi trước lưới.
 //
 // Cơ chế: quét .next-build/static (mọi thứ ship xuống browser) tìm giá trị thật
 // của từng key (đọc từ env/.env.local nếu có) + các marker chỉ xuất hiện khi
@@ -67,9 +70,9 @@ const read = (name) => process.env[name] ?? envLocal[name];
 // ĐƯỢC EXPORT để `lib/security/checkAiKeyBundleSecrets.test.ts` ghim nguyên văn
 // nhãn + marker. Trên CI, `markers` là TOÀN BỘ tấm lưới: bước "Check bundle"
 // của .github/workflows/ci.yml không có khối `env:` nào (bốn giá trị giả chỉ
-// thuộc phạm vi bước Build) và `.env.local` không tồn tại ở đó, nên cả bảy
-// `value` là `undefined`, cả bảy dòng cảnh báo được in, và nhánh so-khớp-GIÁ-TRỊ
-// chạy 0 trên 7 lần. Không cấu hình nào của workflow này làm nó chạy hữu ích
+// thuộc phạm vi bước Build) và `.env.local` không tồn tại ở đó, nên cả TÁM
+// `value` là `undefined`, cả TÁM dòng cảnh báo được in, và nhánh so-khớp-GIÁ-TRỊ
+// chạy 0 trên 8 lần. Không cấu hình nào của workflow này làm nó chạy hữu ích
 // được, vì thứ nó sẽ quét chính là mấy chuỗi placeholder mà build vừa nướng vào.
 export const SECRETS = [
   {
@@ -125,6 +128,23 @@ export const SECRETS = [
     label: "Upstash Redis token",
     value: read("KV_REST_API_TOKEN"),
     markers: ["KV_REST_API_TOKEN", "KV_REST_API_URL"],
+  },
+  {
+    label: "Groq API key (ADR-0018)",
+    value: read("GROQ_API_KEY"),
+    // "api.groq.com" chơi đúng vai của "generativelanguage.googleapis.com" ở
+    // mục AI key và "api-merchant.payos.vn" ở mục payOS: host này CHỈ được viết
+    // ra trong lib/essay/groqClient.ts, module có `import "server-only"`. Marker
+    // theo host bắt được ca TỆ HƠN tên biến env — nguyên một module adapter bị
+    // kéo xuống client, mà tên biến env thì bundler có thể tree-shake mất.
+    // KHÔNG dùng tên gói SDK làm marker: không có SDK (ADR-0018 Decision 5).
+    //
+    // Chuỗi host này là marker của GUARD, và nó phải KHÁC chuỗi mà phép quét bề
+    // mặt phát dùng làm khoá (ADR-0018 Implementation Guidance #5b): chính tệp
+    // này chứa "api.groq.com", nên một phép quét khoá theo host sẽ xếp cổng
+    // bundle vào diện điểm phát và biến guard mạnh nhất repo thành danh sách
+    // ngoại lệ. Phép quét đó keys theo ĐỊNH DANH hằng endpoint / lượt import.
+    markers: ["GROQ_API_KEY", "api.groq.com"],
   },
 ];
 
