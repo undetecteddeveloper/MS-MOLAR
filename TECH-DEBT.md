@@ -40,6 +40,67 @@ còn nơi nào khác giữ lịch sử nợ ngoài chính file này.)*
 >   mở** — cơ chế PHÁT HIỆN lệch (fingerprint `schema_version` + test CI + check
 >   lúc khởi động) vẫn đang chạy và vẫn bắt được drift.
 
+### TD-030 — `npm run test:fixture` ĐANG ĐỎ trên `main`, và cổng pre-commit không đủ sức thấy
+**Từ:** 2026-08-29 (phát hiện tình cờ khi chạy các làn test lúc thêm khung
+test cho tính năng chấm tự luận)
+**Loại:** quy trình + một lỗi thật — món nợ không phải là hai ca đỏ, mà là
+việc chúng đỏ mà KHÔNG AI BIẾT
+
+**Lỗi thật:**
+
+```
+FAIL tests/e2e/fixture/subscription.fixture.e2e.test.ts
+     FE-1 (e) `legalContentReady === false` leaves an inert but reachable confirm control
+       × locale en — aria-disabled, no native disabled, Tab-reachable, no action
+       × locale vi — aria-disabled, no native disabled, Tab-reachable, no action
+
+     AssertionError: expected 'recheck-1755518400001-reason'
+                     to be   'confirm-1755518400001-legal'
+     tại tests/e2e/fixture/subscription.fixture.e2e.test.ts:3017
+```
+
+Test lấy một `button` rồi khẳng định `aria-describedby` của nó trỏ tới ô lý do
+của nút **Xác nhận**; thứ nó nhận được là ô lý do của nút **Kiểm tra lại**.
+Tức bộ chọn đang bắt nhầm phần tử — hoặc màn hình giờ có hai nút
+`aria-disabled` mà bộ chọn không phân biệt được, hoặc nút Xác nhận đã mất
+`aria-describedby` của nó. **Chưa điều tra nguyên nhân** — mục này chỉ ghi nợ.
+
+**Đã chứng minh là lỗi CÓ SẴN, không phải do nhánh essay:** bỏ file test mới ra
+khỏi cây thì hai ca đó vẫn đỏ y nguyên; `git checkout main` rồi chạy lại làn đó
+cũng đỏ đúng hai ca ấy.
+
+**Phần đáng ghi thành nợ — vì sao không ai thấy.** Cổng verify mà quy trình
+project ghi ra là BỐN: `npx tsc --noEmit`, `npx eslint --max-warnings 0`,
+`npx vitest run`, `npm run build`. Nhưng `npx vitest run` chỉ chạy config mặc
+định, mà config mặc định chỉ gom `lib/**`, `components/**`, `app/**`
+(`vitest.config.ts:19`). Repo có **bốn** làn vitest, không phải một:
+
+| Làn | Config | Gom gì | Trong cổng verify? |
+|---|---|---|---|
+| mặc định | `vitest.config.ts` | `lib/`, `components/`, `app/` | **Có** |
+| integration | `vitest.integration.config.ts` | `tests/integration/**` | Không |
+| fixture | `vitest.fixture.config.ts` | `tests/e2e/fixture/**` | **Không** ← chỗ đỏ |
+| localdb | `vitest.localdb.config.ts` | `tests/e2e/service/**` | Không |
+
+Nên một làn có thể đỏ trên `main` bao lâu cũng được mà mọi commit vẫn "qua đủ
+bốn cổng". Đúng như thế đã xảy ra.
+
+**Cái sẽ nổ nếu quên:** hai ca đang đỏ kiểm đúng cái **pattern `aria-disabled`**
+mà cả repo dựa vào (`ActionButton.tsx`, `ExplainStepAffordance.tsx`,
+`RecheckOrderControl.tsx`) — và là pattern mà UI-D5 của tính năng chấm tự luận
+sắp dựng thêm lên. Xây tiếp trên một pattern có test hồi quy đang đỏ nghĩa là
+lần hỏng tiếp theo sẽ không có gì bắt được.
+
+**Đã trả một nửa ngay (2026-08-29):** cổng verify nâng từ **bốn lên sáu** —
+thêm `npm run test:fixture` và `npm run test:localdb` — ghi trong
+`.claude/MEMORY.md`. Chi phí đo thật: fixture ~5 giây, localdb ~31 giây, nhỏ so
+với `npm run build`. Nửa còn nợ là **sửa hai ca đỏ**.
+
+**Verify khi trả:** `npm run test:fixture` trả exit code 0 trên `main`, và bản
+sửa phải nói rõ nút Xác nhận lấy lại `aria-describedby` đúng, hay bộ chọn của
+test được siết lại — hai nguyên nhân đó đòi hai bản vá khác nhau, và đoán nhầm
+thì test xanh trở lại mà lỗi a11y thật vẫn còn.
+
 ### TD-029 — Kill criterion của ADR-0010 đã NỔ, và ta cố ý đi tiếp
 **Từ:** 2026-08-28 (phát hiện khi soạn ADR-0018; engineer chọn "đi tiếp + mở
 một dòng nợ" khi được hỏi thẳng)

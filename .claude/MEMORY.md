@@ -31,9 +31,32 @@ Mọi nợ kỹ thuật còn mở trong đó đã chuyển vào `TECH-DEBT.md`; 
 
 1. **Code**: nghiên cứu các thông tin liên quan đến mission hoặc task --> khởi động `dev-workflows-fullstack` với `/recipe-fullstack-implement` (hoặc skills `recipe-plan` / `recipe-implement` / `recipe-fullstack-build` / `recipe-front-*` / `recipe-review`; agent chuyên biệt như `quality-fixer`, `code-reviewer`. Chỉ inovke đối với mission - các task lớn).
 2. **UI audit**: Thực hiện workflow kiểm tra UI theo `E:\StemWeb_project\MS-MOLAR\.claude\skills\ui-audit\ui-interaction-audit.skill` - Lưu ý: sử dụng Playwright CLI (thay vì bản MCP server như trong skill)
-3. **Cổng verify** — chạy đủ 4, trong `SOURCE/`, TRƯỚC khi commit:
-   `npx tsc --noEmit` · `npx eslint --max-warnings 0` · `npx vitest run` · `npm run build`
+3. **Cổng verify** — chạy đủ **6**, trong `SOURCE/`, TRƯỚC khi commit:
+   `npx tsc --noEmit` · `npx eslint --max-warnings 0` · `npx vitest run` ·
+   `npm run build` · `npm run test:fixture` · `npm run test:localdb`
    `next build` bắt lỗi ranh giới server/client mà `tsc` không thấy — đừng bỏ.
+
+   ⚠️ **Vì sao là 6 chứ không phải 4 (nâng 2026-08-29, TD-030).** `npx vitest run`
+   chỉ chạy config MẶC ĐỊNH, và config đó chỉ gom `lib/**`, `components/**`,
+   `app/**` (`vitest.config.ts:19`). Repo có **bốn** làn vitest:
+
+   | Làn | Lệnh | Gom gì |
+   |---|---|---|
+   | mặc định | `npx vitest run` | `lib/`, `components/`, `app/` |
+   | fixture | `npm run test:fixture` | `tests/e2e/fixture/**` (~5 giây) |
+   | localdb | `npm run test:localdb` | `tests/e2e/service/**` (~31 giây) |
+   | integration | `npm run test:integration` | `tests/integration/**` (cần credential — chạy khi đụng tới) |
+
+   Bỏ ba làn sau nghĩa là một làn có thể **đỏ trên `main` bao lâu cũng được** mà
+   mọi commit vẫn "qua đủ cổng". Đúng thế đã xảy ra: `test:fixture` đang đỏ 2 ca
+   trên `main` khi phát hiện (TD-030), và hai ca đó kiểm đúng pattern
+   `aria-disabled` mà cả repo dựa vào.
+
+   **Kiểm bằng exit code THẬT, không suy từ chuỗi `&&`.** Đã có lần một lượt chạy
+   nền cho kết quả vitest chập chờn mà lần chạy sạch bác bỏ — khi một làn đỏ, hãy
+   xác định nó đỏ vì thay đổi của mình hay đã đỏ sẵn: bỏ file mới ra chạy lại, và
+   `git checkout main` chạy lại. Hai chiều đó phân biệt được lỗi mình gây ra với
+   lỗi mình vừa phát hiện.
 4. **Commit + push**: branch trước, không commit thẳng `main` trừ khi engineer bảo thế.
    ⚠️ Cây làm việc thường có sẵn thay đổi CHƯA COMMIT của engineer. Trước mọi `git checkout -- <file>` / `git restore`, đối chiếu `git status` đầu phiên xem file đó đã bẩn từ trước chưa — revert nhầm là xoá việc của họ, không hoàn lại được.
 5. **Deploy**: **tự làm bằng `vercel` qua `composio MCP`** (đã cài + đăng nhập + link sẵn), chạy trong `SOURCE/`:
