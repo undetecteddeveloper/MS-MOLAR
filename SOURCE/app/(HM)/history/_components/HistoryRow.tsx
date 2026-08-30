@@ -9,17 +9,20 @@
 // once per row from the entry's own already-loaded fields — no extra fetch
 // (AC-009).
 import type { MyHistoryEntry } from "@/app/(HM)/queries";
+import { EssayLifecycleBadge } from "@/components/essay/EssayLifecycleBadge";
 import { HistoryRowMenu } from "@/components/history/HistoryRowMenu";
+import { getTranslate } from "@/lib/i18n/server";
 import { formatCompletionTime, formatSubmittedDate } from "@/lib/history/format";
 import type { AttemptPdfData } from "@/lib/pdf/generateAttemptPdf";
 
-export function HistoryRow({
+export async function HistoryRow({
   entry,
   examineeName,
 }: {
   entry: MyHistoryEntry;
   examineeName: string;
 }) {
+  const t = await getTranslate();
   const pdfInput: AttemptPdfData = {
     subject: entry.subject,
     examTitle: entry.examTitle,
@@ -41,15 +44,29 @@ export function HistoryRow({
           {entry.totalScore.toFixed(1)}/10 · {formatSubmittedDate(entry.submittedAt)} ·{" "}
           {formatCompletionTime(entry.startedAt, entry.submittedAt)}
         </p>
+        {/* Huy hiệu ở CUỐI dòng meta, KHÔNG cạnh điểm. `{score}/10 · {ngày} ·
+            {thời lượng}` là MỘT đơn vị đọc; chèn một huy hiệu vào giữa chuỗi ấy
+            làm vỡ nó. Ở cuối, nó đọc ra là một chú thích cho CẢ DÒNG — đúng thứ
+            nó là.
+
+            Con số `{totalScore}/10` KHÔNG DI CHUYỂN (AC-057 + D5): huy hiệu
+            chính là thứ nói rằng con số ấy chưa phải con số cuối. */}
+        {entry.hasUnresolvedEssay && (
+          <p className="mt-1">
+            <EssayLifecycleBadge state="pending" />
+          </p>
+        )}
       </div>
 
       <div className="flex shrink-0 items-center justify-end">
-        {/* Giá trị THẬT được tính ở Task F-B3, nơi `hasUnresolvedEssay` của
-            `MyHistoryEntry` được nối vào đây. Truyền `null` ở commit này là một
-            bước TRUNG GIAN có chủ đích, không phải một quyết định: cổng ở cửa
-            `/result` đã đóng, và cửa này đóng ngay ở task kế tiếp. */}
+        {/* CỬA THỨ HAI của cổng AC-058 (UI-D4), nay đã đóng. `/history` là nơi
+            học sinh quay lại sau vài ngày, tức nơi một lượt xuất PDF DỄ XẢY RA
+            NHẤT — nên chặn ở `/result` mà mở ở đây là không chặn gì cả.
+
+            `hasUnresolvedEssay` ĐỌC từ trường đã published của đường đọc này,
+            KHÔNG suy lại tại chỗ (EG-BE-036). */}
         <HistoryRowMenu
-          blockedReason={null}
+          blockedReason={entry.hasUnresolvedEssay ? t("result.essay.pdfBlocked") : null}
           pdfInput={pdfInput}
           resultHref={`/exams/${entry.examId}/attempt/${entry.attemptId}/result`}
           examTitle={entry.examTitle}

@@ -78,6 +78,7 @@ export function usePdfAction(
         submittedLabel: t("history.pdfSubmittedLabel"),
         correctLabel: t("history.pdfCorrectLabel"),
         wrongLabel: t("history.pdfWrongLabel"),
+        essayIncompleteLabel: t("result.essay.pdfIncomplete"),
         totalQuestionsLabel: t("history.pdfTotalQuestions", { total: pdfInput.total }),
       });
       if (action === "save") {

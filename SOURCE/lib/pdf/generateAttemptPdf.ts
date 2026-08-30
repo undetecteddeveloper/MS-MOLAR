@@ -40,6 +40,7 @@ export interface AttemptPdfData {
   correctLabel?: string;
   wrongLabel?: string;
   totalQuestionsLabel?: string;
+  essayIncompleteLabel?: string;
 }
 
 export async function generateAttemptPdfFile(data: AttemptPdfData): Promise<File> {
@@ -78,6 +79,11 @@ export async function generateAttemptPdfFile(data: AttemptPdfData): Promise<File
           correctLabel: data.correctLabel,
           wrongLabel: data.wrongLabel,
           totalQuestionsLabel: data.totalQuestionsLabel,
+          // Chuyển tiếp CẢ HAI. Boolean đáp xuống từ đường đọc (Task B2.3),
+          // nhãn đáp xuống từ `usePdfAction` — nên hai lối xuất PDF sinh ra
+          // CÙNG một tệp cho cùng một lượt thi (D-13).
+          hasIncompleteEssay: data.hasIncompleteEssay,
+          essayIncompleteLabel: data.essayIncompleteLabel,
         }),
       );
     });

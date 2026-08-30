@@ -197,6 +197,10 @@ export function HistoryRowMenu({
             style={panelStyle}
             className="border-border bg-card animate-in fade-in zoom-in-95 z-50 w-56 overflow-y-auto rounded-md border p-1 shadow-sm duration-150 ease-out"
           >
+            {/* CẢ HAI mục PDF nhận `blockedReason`. Nối một mục mà quên mục
+                kia là sai lầm dễ xảy ra nhất ở lát này, VÀ MỖI CỬA TRÔNG VẪN
+                ĐÚNG KHI KIỂM RIÊNG — "Lưu" và "Chia sẻ" sinh ra CÙNG một tệp,
+                nên chặn một nửa là không chặn gì cả. */}
             <MenuAction
               label={t("common.save")}
               busyLabel={t("common.saving")}
@@ -204,6 +208,7 @@ export function HistoryRowMenu({
               icon={Download}
               phase={save.phase}
               onClick={save.run}
+              blockedReason={blockedReason}
             />
             <MenuAction
               label={t("common.share")}
@@ -213,7 +218,12 @@ export function HistoryRowMenu({
               phase={share.phase}
               onClick={share.run}
               fallbackText={t("history.downloadedNoShare")}
+              blockedReason={blockedReason}
             />
+            {/* "Xem chi tiết" KHÔNG BAO GIỜ bị chặn, và đó là một quyết định:
+                chặn nó là khoá học sinh khỏi đúng cái nút chấm lại sẽ GỠ được
+                cái chặn kia. Cửa duy nhất ra khỏi trạng thái bị chặn đi qua
+                đây. */}
             <Link
               role="menuitem"
               href={resultHref}
@@ -238,6 +248,7 @@ function MenuAction({
   phase,
   onClick,
   fallbackText,
+  blockedReason,
 }: {
   label: string;
   busyLabel: string;
@@ -246,15 +257,22 @@ function MenuAction({
   phase: "idle" | "busy" | "error" | "fallback-confirmed";
   onClick: () => void;
   fallbackText?: string;
+  /** Lý do KHÔNG bấm được, hoặc `null`. Chỉ hai mục PDF truyền vào. */
+  blockedReason?: string | null;
 }) {
   const busy = phase === "busy";
+  const blocked = blockedReason != null;
   return (
     <div>
       <button
         type="button"
         role="menuitem"
         onClick={onClick}
-        aria-disabled={busy ? "true" : "false"}
+        // KHÔNG BAO GIỜ `disabled` gốc (UI-D5): mục vẫn tới được bằng bàn phím
+        // và LÝ DO vẫn đọc được. Bản thân `usePdfAction` đã chặn lượt chạy từ
+        // trước chốt bận, nên một lượt bấm ở đây là no-op và menu KHÔNG tự
+        // đóng — menu chỉ đóng khi xuất THÀNH CÔNG.
+        aria-disabled={blocked || busy ? "true" : "false"}
         aria-busy={busy}
         className="hover:bg-accent flex w-full items-center gap-2 rounded-[4px] px-3 py-2 text-left text-sm text-foreground transition-colors"
       >
@@ -265,6 +283,9 @@ function MenuAction({
         )}
         {busy ? busyLabel : label}
       </button>
+      {blocked && (
+        <p className="text-muted-foreground px-3 pb-1 text-xs">{blockedReason}</p>
+      )}
       {phase === "error" && (
         <p role="alert" className="text-brand px-3 pb-1 text-xs">
           {errorText}

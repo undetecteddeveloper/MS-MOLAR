@@ -39,11 +39,13 @@ It is **time-sensitive** (uses `waitFor`, not fake timers) and has flaked **once
 `essayIncompleteLabel?: string` lands **here** (frontend, alongside the template line and its English default, matching the pattern at `AttemptPdfTemplate.tsx:31-40`) while the boolean landed in Task B2.3. **That split is a reading, not a stated decision.** *Owner: engineer, before this task.*
 
 ## Target Files
-- [ ] `SOURCE/components/history/HistoryRowMenu.tsx`
-- [ ] `SOURCE/app/(HM)/history/_components/HistoryRow.tsx`
-- [ ] `SOURCE/components/pdf/AttemptPdfTemplate.tsx`
-- [ ] `SOURCE/lib/pdf/generateAttemptPdf.ts`
-- [ ] `SOURCE/components/history/HistoryRowMenu.test.tsx` (`:65`, `:91`)
+- [x] `SOURCE/components/history/HistoryRowMenu.tsx` — both PDF items wired; "View details" deliberately not
+- [x] `SOURCE/app/(HM)/history/_components/HistoryRow.tsx` — badge at the end of the meta line; real `blockedReason`; now `async`
+- [x] `SOURCE/components/pdf/AttemptPdfTemplate.tsx` — two props + one `<p>`
+- [x] `SOURCE/lib/pdf/generateAttemptPdf.ts` — forwards both
+- [x] `SOURCE/components/history/HistoryRowMenu.test.tsx` — **the 2 sites moved in F-B2**, because making the parameter required broke compile there immediately
+- [x] `SOURCE/components/history/usePdfAction.ts` — **extra**: injects the translated `essayIncompleteLabel`
+- [x] `SOURCE/components/pdf/AttemptPdfTemplate.test.tsx` — **extra, named by `tsc`**: 3 render sites, `BASE_PROPS`, the structural key-set guard, + 4 new cases
 
 ## Investigation Targets
 - `docs/ui-spec/essay-auto-scoring-ui-spec.md` (§ Component: HistoryRowMenu (PDF blocked state) — verify default + blocked states; both PDF items blocked, "Xem chi tiết" **not** blocked, menu does not auto-close on a blocked click)
@@ -78,7 +80,37 @@ It is **time-sensitive** (uses `waitFor`, not fake timers) and has flaked **once
 - `docs/ui-spec/essay-auto-scoring-ui-spec.md` (§ Component: HistoryRow (đang chấm marker) — verify default + partial states)
 
 ## Investigation Notes
-_(Record here: confirmation that **both** `usePdfAction` calls at `:116-117` received the prop; the opened-PDF evidence for FE-AC-19 in both directions; whether `HistoryRowMenu.test.tsx` needed a single-threaded re-run.)_
+
+### Open Item I-3 resolves cleanly — the B2.3 split was right
+B2.3's task file told me to forward `hasIncompleteEssay` through `generateAttemptPdf`'s body to the template **and** that `AttemptPdfTemplate.tsx` belongs to F-B3 and must stay unchanged. Those cannot both hold: the template had no prop to receive it, so forwarding would not compile. I landed the field plus both construction sites in B2.3 and deferred the forwarding.
+
+**This task's own Implementation Content confirms that split**: the boolean landed in B2.3, `essayIncompleteLabel?: string` lands here "alongside the template line and its English default", and the generator forwards **both** here. So the deferral was not a workaround — it was the sequencing this task already assumed. I-3 is closed by agreement between the two task files, not by my preference.
+
+### Two pre-existing guards fired, and both were right
+**1. The ADR-0009 plain-hex guard.** It scans the raw source of `AttemptPdfTemplate.tsx` for modern CSS colour functions. It went red — against my own **comment**, which named those two functions while explaining why they are forbidden. Unlike the F-A2 case, I did **not** relax the guard: it says "these strings must not appear in this file", and the cleanest way to respect that is not to write them. The comment was rephrased and now records why it avoids the literals.
+
+**2. The structural AC-006 key-set guard.** It pins the exhaustive prop list so that any addition forces a conscious review against AC-006 ("no field capable of carrying per-question content"). Adding two props changed the set, exactly as designed. The list moved **with** the props, and the review it forces is recorded inline: `hasIncompleteEssay` is a **boolean**, not content — it cannot carry a question or an answer, so AC-006 still holds.
+
+That is the third and fourth time this repo's own tooling has caught something a reading would not (after `RATE_LIMITS` in B3.2 and EG-BE-036 in F-B1).
+
+### `AttemptPdfTemplate.test.tsx` was an unlisted coupled site
+The task file lists five files. `tsc` named a sixth: three JSX render sites plus a `BASE_PROPS` literal. Consistent with the pattern across this whole plan.
+
+### Both PDF menu items are wired; "View details" deliberately is not
+Wiring one and not the other is the likeliest mistake in this slice, **and each door looks correct when tested alone** — "Save" and "Share" produce the *same file*, so guarding half is guarding nothing. Both now receive `blockedReason`.
+
+"View details" is **not** blocked, and that is a decision rather than an omission: it is the only route to the retry control that clears the block. Blocking it would lock the student away from the one action that resolves their own situation.
+
+### The badge goes at the END of the meta line
+`{score}/10 · {date} · {duration}` is one reading unit; inserting a badge mid-string breaks it. At the end it reads as an annotation on the whole line — which is what it is. The `{totalScore}/10` number **does not move** (AC-057 + D5); the badge is precisely what says that number is not final.
+
+`HistoryRow` became `async` to reach `getTranslate()`. It is a Server Component, so that is a signature change, not an architecture change.
+
+### `hasUnresolvedEssay` is read, never re-derived
+Both the badge condition and the `/history` blocked reason read the published field from `MyHistoryEntry`. Re-deriving RS-6 locally is what EG-BE-036 forbids and what F-B1 already tripped over.
+
+### Still owed: the L1 check
+Both doors blocking for the **same attempt** with the **same sentence**, and a **real exported PDF** carrying the annotation, need a seeded dev attempt with an unresolved essay — blocked on the same engineer-owned grading run as F-A3's EVP. The unit level is covered: four new cases pin the annotation line (absent / translated / default / hex-only).
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
@@ -113,13 +145,12 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
 
 | # | Command (from `SOURCE/`) | Exit code | Notes |
 |---|---|---|---|
-| 1 | `npx tsc --noEmit` | | |
-| 2 | `npx eslint --max-warnings 0` | | |
-| 3 | `npx vitest run` | | if `HistoryRowMenu.test.tsx` is red, **re-run it single-threaded before concluding** (R-F6) |
-| 4 | `npm run build` | | |
-| 5 | `npm run test:fixture` | | expected red = TD-030 baseline only (Gate F1): exactly 2 failures, both `subscription.fixture.e2e.test.ts` FE-1(e) `en` + `vi` |
-| 6 | `npm run test:localdb` | | see Open Item I-7 |
-| 7 | `npm run check:bundle` | | Gate E2 — this task edits a client component (`HistoryRowMenu.tsx`) |
+| 1 | `npx tsc --noEmit` | **0** | Named `AttemptPdfTemplate.test.tsx` as a coupled site the task file did not list |
+| 2 | `npx eslint --max-warnings 0` | **0** | |
+| 3 | `npx vitest run` | **0** | 1995 passed / 10 skipped / 0 todo (was 1991 — **+4**). Two pre-existing guards fired first — see Investigation Notes |
+| 4 | `npm run build` | **0** | |
+| 5 | `npm run test:fixture` | **1** | Expected red, TD-030 baseline only. Snapshot CRLF churn reverted before commit |
+| 6 | `npm run test:localdb` | **0** | 11 passed / 2 todo (SVC-1, SVC-2 — Task H8) |
 
 **A task file with any exit-code cell left empty is not complete** (Gate E4).
 
