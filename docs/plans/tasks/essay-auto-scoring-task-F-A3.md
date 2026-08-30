@@ -45,9 +45,9 @@ No new prop, no changed render line. `result.totalScore.toFixed(1)` + `/10`, `Đ
 **`SOURCE/lib/test/renderServerTree.tsx` does not exist** — import from the existing path. This slice is the helper's **second** consumer; **Rule of Three is not met, so do not extract it.** The forced-revisit condition is a **third** consumer, at which point it moves to `SOURCE/lib/test/renderServerTree.tsx` (a name without a `.test.tsx` suffix, so `vitest.config.ts:20` does not collect it).
 
 ## Target Files
-- [ ] `SOURCE/app/(layer2)/_components/EssayScoreLine.tsx` (new)
-- [ ] `SOURCE/app/(layer2)/_components/__tests__/EssayScoreLine.test.tsx` (new)
-- [ ] `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/page.tsx`
+- [x] `SOURCE/app/(layer2)/_components/EssayScoreLine.tsx` (new)
+- [x] `SOURCE/app/(layer2)/_components/__tests__/EssayScoreLine.test.tsx` (new) — 10 cases
+- [x] `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/page.tsx` — import + insertion only
 
 ## Investigation Targets
 - `docs/ui-spec/essay-auto-scoring-ui-spec.md` (§ Component: EssayScoreLine — verify not-rendered + default + loading + partial + empty states; **no separate error state**)
@@ -82,22 +82,58 @@ No new prop, no changed render line. `result.totalScore.toFixed(1)` + `/10`, `Đ
 - `docs/ui-spec/essay-auto-scoring-ui-spec.md` (§ Component: ScoreCard (unchanged — explicit non-change) — verify all states render as today)
 
 ## Investigation Notes
-_(Record here: the before/after `ScoreCard` screenshots; the `renderServerTree()` result confirming a non-empty tree; the positive assertion added to every case.)_
+
+### `essaySummary` lives on `ExamResult`, not on `ScoreResult` — `tsc` caught the wiring
+The first insertion wired `result.essaySummary` and `tsc` exited **2**: `Property 'essaySummary' does not exist on type 'ScoreResult'`. The page destructures `const { examTitle, subject, result } = data`, and `result` is the **score** object; `essaySummary` hangs off the `getResult()` return (`ExamResult`, `queries.ts:521`). Corrected to `data.essaySummary`.
+
+Worth recording because the two names are close enough to look right in review: `result` is what the student scored, `data` is everything the page read. The essay summary is not part of the score — it is deliberately **beside** it, which is the same distinction the separate labelled line exists to make.
+
+### `renderServerTree()` was mandatory here, and the not-rendered case proves it
+This component has an async child (`EssayLifecycleBadge`), so `render(await …)` would return an empty tree and every negative assertion would pass against nothing. The not-rendered case is the one that would have been silently vacuous, so it carries its positive control **inline**: it renders a populated summary through the *same* helper and asserts a node exists, then asserts `innerHTML === ""` for `undefined`. Without that pairing, "no node" and "the helper is broken" are indistinguishable.
+
+### `ScoreCard.tsx` is a 0-diff zone — verified, not assumed
+`git diff --stat` and `git status` on that file are both **empty**. Its three rendered values are untouched, so the `wrong = total − correct` derivation stays valid (AC-057).
+
+### Insertion position verified by line order
+`ScoreCard` at `:88`, `EssayScoreLine` at `:106`, the overtime block at `:111`. The component carries **no margin of its own** and is not wrapped in an extra `div` — vertical rhythm belongs to the page's `gap-5` (FE-AC-01).
+
+### Branch order is a correctness decision, not a formatting one
+`pending` wins over `failed`. While any question is still being scored, both `earned` and the denominator are **unsettled**, so saying "{k} questions could not be scored" is a conclusion drawn on a run that has not finished. Mutation **M5** (inverting that order) is killed.
+
+### Mutation testing — the tests were green on the first run
+The component was written before its tests, so no Red was observed for `EssayScoreLine` itself. Six mutants, **all six killed**:
+
+| # | Mutation | Result |
+|---|---|---|
+| M1 | return an empty wrapper `<div>` instead of `null` (breaks FE-AC-14) | **Killed** |
+| M2 | render `0 / 0` instead of `—` (breaks FE-AC-15) | **Killed** |
+| M3 | denominator counts `gradedCount + failedCount` instead of `gradedCount` (breaks AC-059) | **Killed** |
+| M4 | drop `tabular-nums` | **Killed** |
+| M5 | `failed` branch placed before `pending` | **Killed** |
+| M6 | remove the link to Details | **Killed** |
+
+M3 is the one worth naming: it is the exact defect the Reference Contract calls out — a denominator that claims the score was computed over more essays than were actually scored.
+
+### `—` versus `0 / 0`, held by two cases
+`0 / 0` reads as *"you scored zero"* on precisely the writing the student just did — reproducing the defect this whole feature exists to end. Asserted in both the empty row and the loading-with-nothing-scored row, and pinned by M2.
+
+### Still owed: the L1 dev check
+Everything above is L2. The **Early Verification Point** — opening a seeded attempt on dev and comparing `ScoreCard` before/after to the pixel — has **not** been performed; it needs a seeded dev attempt with a graded essay, which depends on the L1 grading run that is still awaiting the engineer. The automated half of the `ScoreCard` claim (FE2E-1(f)) lands in Task F-C3.
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
-- [ ] Read all Investigation Targets and record key observations
-- [ ] Write one case per matrix row through **`renderServerTree()`**, each with at least one **positive** assertion, plus the `ScoreCard` 0-diff assertion and the `tabular-nums` assertion; observe failure
+- [x] Read all Investigation Targets and recorded key observations
+- [~] Tests were written **after** the component, so no Red was observed for `EssayScoreLine`. **Mutation testing substitutes** — six mutants, all killed (table above). A real Red *was* observed on the page wiring: `tsc` exit 2 on `result.essaySummary`
 
 ### 2. Green Phase
-- [ ] Create `EssayScoreLine.tsx` with the five matrix rows, returning `null` in the not-rendered case
-- [ ] Insert it between `ScoreCard` (`:86`) and the overtime block (`:92`) with **no margin of its own**
-- [ ] Run only the added tests and confirm they pass
+- [x] `EssayScoreLine.tsx` created with all five matrix rows; `null` in the not-rendered case
+- [x] Inserted between `ScoreCard` (`:88`) and the overtime block (`:111`), no margin of its own, no extra wrapper
+- [x] `10 passed (10)`, exit **0**
 
 ### 3. Refactor Phase
-- [ ] Confirm `git diff` on `ScoreCard.tsx` is **empty**
-- [ ] Confirm no hard-coded hex, no new token, no shadow, no gradient
-- [ ] Perform the **EVP** checks below on dev
+- [x] `git diff` on `ScoreCard.tsx` is **empty**
+- [x] No hard-coded hex, no new token, no shadow, no gradient — asserted by a comment-stripped source scan
+- [ ] **EVP on dev NOT performed** — needs a seeded attempt carrying a graded essay, which depends on the L1 grading run still awaiting the engineer
 
 ## Quality Assurance Mechanisms
 - `npx tsc --noEmit` (strict) — Config: `SOURCE/tsconfig.json` (project-wide)
@@ -112,12 +148,12 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
 
 | # | Command (from `SOURCE/`) | Exit code | Notes |
 |---|---|---|---|
-| 1 | `npx tsc --noEmit` | | |
-| 2 | `npx eslint --max-warnings 0` | | |
-| 3 | `npx vitest run` | | |
-| 4 | `npm run build` | | |
-| 5 | `npm run test:fixture` | | expected red = TD-030 baseline only (Gate F1): exactly 2 failures, both `subscription.fixture.e2e.test.ts` FE-1(e) `en` + `vi` |
-| 6 | `npm run test:localdb` | | see Open Item I-7 |
+| 1 | `npx tsc --noEmit` | **0** | Was **2** first: `Property 'essaySummary' does not exist on type 'ScoreResult'` — see Investigation Notes |
+| 2 | `npx eslint --max-warnings 0` | **0** | |
+| 3 | `npx vitest run` | **0** | 1971 passed / 10 skipped / 0 todo (was 1961 — **+10**), 46.6 s |
+| 4 | `npm run build` | **0** | |
+| 5 | `npm run test:fixture` | **1** | Expected red, TD-030 baseline only. Snapshot CRLF churn reverted before commit |
+| 6 | `npm run test:localdb` | **0** | 11 passed / 2 todo (SVC-1, SVC-2 — Task H8) |
 
 **A task file with any exit-code cell left empty is not complete** (Gate E4).
 
@@ -145,12 +181,12 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
   - **Primary failure mode**: the line **jumping on every `router.refresh()`** as the denominator grows while the student watches (W7) — a functional defect, not an aesthetic one. **Boundary**: RTL class assertion. **State assertion**: N/A. **Mock rationale**: none. **Residual**: FE-OQ-5 asks the engineer to confirm the implicit `tabular-nums` standard; rejecting it needs a counter-reason.
 
 ## Completion Criteria
-- [ ] **Implementation Complete** = component + insertion
-- [ ] **Quality Complete** = six verify gates green, test passing via **`renderServerTree()`**
-- [ ] **Integration Complete** = **L1** on dev, plus the `ScoreCard` **pixel** comparison
-- [ ] Every case carries at least one **positive** assertion
-- [ ] Every Reference Contract and Binding Decision Compliance Check evaluates to `Y`
-- [ ] Every exit-code cell in the Gate E4 table above is filled
+- [x] **Implementation Complete** = component + insertion
+- [x] **Quality Complete** = six gates run separately; five at 0, `test:fixture` at the TD-030 baseline; tests pass via `renderServerTree()`
+- [ ] **Integration Complete** = **NOT MET.** The L1 dev check and the `ScoreCard` pixel comparison both need a seeded graded attempt on dev — blocked on the same engineer-owned grading run
+- [x] Every case carries at least one positive assertion
+- [x] Reference Contracts and the Binding Decision all evaluate to `Y`: empty state renders `—` and never `0 / 0`; the denominator binds to `gradedCount`; `ScoreCard.tsx` has zero diff; the essay score sits on a separate labelled line
+- [x] Every exit-code cell in the Gate E4 table above is filled
 
 ## Notes
 - Impact scope: F-B1 (the detail surface), F-B2 (the PDF guard), F-C2 (the poller mounts on this page).

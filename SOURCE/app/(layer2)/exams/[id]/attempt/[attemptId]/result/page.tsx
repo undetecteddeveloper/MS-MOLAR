@@ -17,6 +17,7 @@ import { getCurrentUserProfile } from "@/lib/auth/getCurrentUser";
 import { getMyRating } from "@/app/(layer2)/actions";
 import { getResult } from "@/app/(layer2)/queries";
 import { ScoreCard } from "@/app/(layer2)/_components/ScoreCard";
+import { EssayScoreLine } from "@/app/(layer2)/_components/EssayScoreLine";
 import { ResultActions } from "@/app/(layer2)/_components/ResultActions";
 import { mapFromMyRating } from "@/lib/rating";
 import { formatCompletionTime, formatOvertime } from "@/lib/history/format";
@@ -90,6 +91,22 @@ export default async function ResultPage({
             completionTimeLabel={completionTimeLabel}
           />
         </div>
+
+        {/* Điểm tự luận — DÒNG RIÊNG CÓ NHÃN, đặt giữa ScoreCard và khối quá
+            giờ (ADR-0018 § Amendment to ADR-0010, FE-AC-01).
+
+            Vì sao không gộp vào ScoreCard: `exam_results` không còn bất biến
+            sau insert, nên một band có thể đáp xuống trong lúc học sinh đang
+            nhìn trang. Gộp con số đang-đổi ấy vào ô điểm lớn làm chính con số
+            học sinh tin tưởng nhất tự nhảy. ScoreCard là VÙNG 0-DIFF.
+
+            Component tự trả `null` khi không câu nào mang khoá vòng đời, nên
+            với một dòng cũ KHÔNG node nào vào cây (AC-012 đúng từng byte).
+            Không bọc thêm div: nhịp dọc thuộc về `gap-5` của trang. */}
+        <EssayScoreLine
+          summary={data.essaySummary}
+          detailHref={`/exams/${id}/attempt/${attemptId}/result/detail`}
+        />
 
         {/* Quá giờ (Security review #6). DB tự tính overtime_seconds trong
             record_exam_result() từ started_at + duration_minutes, nên nhãn này
