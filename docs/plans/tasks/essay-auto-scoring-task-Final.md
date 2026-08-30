@@ -17,20 +17,53 @@ Cross-cutting verification against **both Design Docs, the UI Spec, the PRD and 
 
 ## Checklist — the tasks of this phase
 
-### 1. Acceptance criteria sweep
-- [ ] EG-BE-001…036 all satisfied
-- [ ] FE-AC-01…21 and FE-NFR-01…03 all satisfied
-- [ ] PRD AC-001…AC-072 reconciled against both Design Docs' AC Traceability tables
-- [ ] Note the **four** PRD ACs the backend DD deliberately does **not** satisfy (AC-020…AC-023 poller, AC-028 real `<button>`, AC-047 display string, AC-053 render branch) and confirm each is **discharged on the frontend side**, so nobody hunts for them in the wrong document
+### 1. Acceptance criteria sweep — done 2026-08-30
 
-### 2. Four deliberate AC restatements confirmed as intentional, not drift
-- [ ] **AC-058/AC-064** — never a native `disabled`; focusable + `aria-disabled` + exposed reason + synchronous early return (UI-D5)
-- [ ] **AC-051** — the old key is **kept** and a new one added, selected by the flag (UI-D8)
-- [ ] **AC-058 scope** — the guard lands in `usePdfAction`, covering `/history` as well as `ResultActions.tsx` (UI-D4)
-- [ ] **AC-011/AC-057** — a separate labelled line beside `ScoreCard`, with `ScoreCard` at 0 diff (UI-D3)
+**Result: all 72 PRD ACs traced and satisfied, and all 36 EG-BE criteria satisfied; one frontend criterion, FE-AC-12, is NOT satisfied.** FE-AC-12 is the **only** entry in the FE-AC list carrying no `(AC-xxx)` back-reference — it is a robustness criterion the frontend Design Doc invented for itself, so **no PRD AC fails**, and equally **no PRD-level sweep would ever have found it**. The gap is recorded below rather than fixed, because this phase adds no feature code.
+
+- [x] **EG-BE-001…036 all satisfied.** 32 of the 36 carry their ID as a literal tag in source or test, so the mapping is mechanical rather than asserted. The **four that carry no tag** were each checked directly, because an untagged criterion is exactly the one a sweep skips:
+  - **EG-BE-018** (adversarial fixtures, real provider) — `adversarialAnswers.ts` holds **7** committed fixtures against a required floor of 5, across **7 distinct techniques**, in **both** languages, and including **both** a zero-width and a bidi variant. The real-provider half is Task **E3**: 7 × 2 = 14 calls, **7/7 EQUAL, 0 RAISED**. Two clean baselines are themselves 0.5 and one is 0, so there was genuine headroom for an injection to lift a band; none did. This is the controlled comparison the AC asks for, not a ceiling check.
+  - **EG-BE-019** (budget key) — `groq:budget:${pacificDay(now)}` is built at `lib/essay/budget.ts:69`. The string `ai:budget:` appears **nowhere** in `lib/essay/**`; its only construction site is `lib/billing/quota.ts:176`, the Gemini path. The two prefixes differ at the **first** character, which is what makes a mistaken key impossible to typo into.
+  - **EG-BE-028** (character ceiling) — carried by `npm run verify:schema`, recorded green in section 6 including the ceiling assertion (4000 passes, 4001 rejected by `attempt_answers_answer_check`).
+  - **EG-BE-030** (non-essay regression) — carried by the existing `computeScore.test.ts` fixtures plus EG-BE-002's byte-identical assertion; the default lane is green at **2026 passed / 10 skipped**, unchanged across this feature.
+- [ ] **FE-AC-01…21: 20 satisfied, FE-AC-12 NOT satisfied. FE-NFR-01…03: structurally satisfied; the visual half is engineer-owned.**
+  - **The FE-AC ID space is shared with other features** — `subscription` and `billing` also number their criteria `FE-AC-nn`, and a grep for `FE-AC-10` returns hits in `RecheckOrderControl`, `OrderList` and `PaymentConfirm` that have nothing to do with essays. **Tag-grep alone is not evidence here**, so each essay criterion was matched to a named test instead.
+  - Evidence by criterion: FE-AC-01 `result/page.tsx:97`; 02, 14, 15 `EssayScoreLine.test.tsx:64/48/141`; 03, 13 `detail/page.tsx:141/152` + FE2E-4; 04 `EssayReviewBlock.test.tsx:90`; 05, 16 FE2E-2; 06, 07, 09 `EssayRegradeControl.test.tsx:46/174/107`; 08, 21 `EssayRegradeControl.test.tsx:161/190`; 10, 11 FE2E-3; 17, 18 `EssayGradingPoller.test.tsx:117/128/151/159` and `:89/101`; 19 `AttemptPdfTemplate.test.tsx:118/126/135`; 20 `QuestionRenderer.test.tsx:193/203/210`.
+  - **FE-NFR-01** — the `grid-cols-3` block is at `result/page.tsx:152-176` and holds exactly three cells (`ResultActions` → Save + Share, plus the Return `Link`). Blocking is passed as the `blockedReason` **prop**, so the blocked state cannot add a fourth cell; the invariant is structural, not visual. **FE-NFR-02** — `HistoryRow.tsx:61` is the single in-flow node in the right column, and the badge sits at `:56` inside the left meta column. **FE-NFR-03** — `EssayLifecycleBadge.test.tsx` asserts zero hex literals and specifically refuses to borrow `#4F7942`, so no new pair exists to re-measure.
+
+#### The one gap: FE-AC-12 is unsatisfied, and no test would have caught it
+
+FE-AC-12 requires that **when a `router.refresh()` throws, the poller logs and still schedules the next tick, with nothing surfacing to the student.** `EssayGradingPoller.tsx:107-109` is:
+
+```
+refreshes.current += 1;
+router.refresh();
+schedule();
+```
+
+There is **no `try`/`catch`** at either call site (`:109` in the tick, `:166` in the manual "Cập nhật" button), no log, and **no test anywhere** asserts the behaviour — the file contains no `mockRejected`, no `mockImplementation` that throws, and no `catch`. A synchronous throw from `router.refresh()` skips `schedule()`, and the poller **stops permanently and silently**: `stopped` is never set, so the student gets neither the self-updating page nor the `pollStopped` message with its manual refresh button. It is the one failure mode where the feature's own fallback is also removed.
+
+**Not fixed here, deliberately.** This phase's scope boundary is "**No file under `SOURCE/`**", and a two-line `try`/`catch` in a client component with a new test is feature code that belongs in its own task and its own commit. Recorded so it is not lost between phases.
+
+- [x] **PRD AC-001…AC-072 reconciled against both Design Docs' AC Traceability tables — measured, not eyeballed.** The PRD declares **exactly 72** ACs with **no gaps** in `001..072`. The backend DD's table carries a row for **all 72**; the frontend DD's table carries **36**, and all 36 are a **subset** of the backend's rows. **Union = 72/72: no PRD AC is orphaned in either document**, and none exists in the frontend table without a backend counterpart.
+- [x] **The four the backend DD deliberately does not satisfy are each discharged on the frontend side** — checked in code, not only in the frontend DD's table:
+  - **AC-020…AC-023** (poller) — `EssayGradingPoller.tsx`, with `ESSAY_POLL_MAX_REFRESHES = 30` and `ESSAY_POLL_MAX_ELAPSED_MS = 240_000` (`:49`, `:51`) matching FE-AC-17 exactly, and the two ceilings tested independently. **AC-023's own defect is guarded in the mount condition**: the poller mounts on `essaySummary !== undefined`, not `pendingCount > 0`, so the `aria-live` region survives the render that resolves the final essay.
+  - **AC-028** (a real `<button>`) — `EssayRegradeControl.tsx:111` renders `<Button>`, which resolves to a native `<button>`; the tests reach it by `getByRole("button")` at `:48`, `:63`, `:81`, `:101`.
+  - **AC-047** (display string) — the low-confidence state is carried by an i18n constant and asserted **as text**; `EssayLifecycleBadge.test.tsx:95` further asserts the information survives a black-and-white print, i.e. it is not conveyed by colour.
+  - **AC-053** (render branch) — `detail/page.tsx:152` branches on `!r.essay`, **not** on `scored`. The comment there records why: `r.scored === false` is permanently true for essays in **all seven** render states, so it distinguishes nothing. **A real L1 run caught exactly that defect** — a card reading "Đã chấm · 1/1 điểm" directly under "chưa chấm tự động" — and FE2E-4 now pins it.
+
+**One citation moved.** The frontend DD cites the grid as `result/page.tsx:104-116`; it is now `:152-176`. Feature edits above it moved it. Logged for section 16's line-number pass.
+
+### 2. Four deliberate AC restatements confirmed as intentional, not drift — done 2026-08-30
+
+All four confirmed **intentional**: each carries a decision owner (engineer), a **date** (2026-08-29), and a recorded counter-reason, and in each case **the code matches the restatement rather than the literal PRD wording**. That combination is what separates a deliberate restatement from drift — drift has code on one side and nothing written on the other.
+
+- [x] **AC-058/AC-064** — never a native `disabled`; focusable + `aria-disabled` + exposed reason + synchronous early return (UI-D5). `EssayRegradeControl.tsx:116` sets `aria-disabled` and never `disabled`; `FE-AC-21`'s test (`:190`) asserts the absence across **every** state, and `:161` asserts the synchronous early return spends no action call and raises no busy phase. The reason recorded upstream is that the repo has fixed this exact defect **twice** and **three current files ban the attribute in writing** (AB-9).
+- [x] **AC-051** — the old key is **kept** and a new one added, selected by the flag (UI-D8). `QuestionRenderer.tsx:223` reads `t(essayGradingEnabled ? "player.essayScored" : "player.essayNotScored")`, and **both** keys are present in `en.ts` and `vi.ts`. The reason holds independently of commit order, which is precisely why it was chosen over the single-key option.
+- [x] **AC-058 scope** — the guard lands in `usePdfAction`, covering `/history` as well as `ResultActions.tsx` (UI-D4). Both doors read the same reason string: `result/page.tsx:166` and `HistoryRow.tsx:69`, and FE2E-3 exercises **both** in one test.
+- [x] **AC-011/AC-057** — a separate labelled line beside `ScoreCard`, with `ScoreCard` at 0 diff (UI-D3). `EssayScoreLine` is its own component rendered below `ScoreCard`, and `ScoreCard.tsx`'s diff across the whole feature is **empty** (section 3). Reading "combining" literally would have redefined `total`, which `ScoreCard.tsx:19` uses to derive `wrong` — silently breaking the "Sai" cell.
 
 All four are engineer decisions recorded as flagged restatements **instead of** editing a reviewed PRD; **a later PRD↔code comparison must read them as deliberate.**
-
 ### 3. Regression review of everything asserted as unchanged
 
 **Mechanical sweep run 2026-08-30 against `main..HEAD`.** This is the part of the Final phase that is checkable without the engineer-owned external work, and the task explicitly invites agent assistance for it. Result: **every claim below holds.**
