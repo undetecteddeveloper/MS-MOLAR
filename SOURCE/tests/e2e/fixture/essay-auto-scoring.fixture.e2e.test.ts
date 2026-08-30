@@ -110,7 +110,293 @@
 //                 it is one component's state x display table, owned by the
 //                 component lane per frontend DD § Phân tầng.
 
-import { describe, it } from "vitest";
+import { createElement } from "react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+// =============================================================================
+// MOCK BOUNDARY — data sources and the action module ONLY
+// =============================================================================
+// Real: every dictionary, every component, both route layouts, the whole
+// component tree. Stubbed: what reaches out of the process (Supabase reads, the
+// PDF pipeline, the router) plus the framework shims jsdom has no answer for.
+//
+// The point of this lane is that a defect in the WIRING between two real
+// components is visible. Mocking a component would hide exactly that.
+
+const {
+  getResultMock,
+  getMyRatingMock,
+  getProfileMock,
+  readEntitlementMock,
+  listMyHistoryMock,
+  refreshMock,
+  generatePdfMock,
+} = vi.hoisted(() => ({
+  getResultMock: vi.fn(),
+  getMyRatingMock: vi.fn(),
+  getProfileMock: vi.fn(),
+  readEntitlementMock: vi.fn(),
+  listMyHistoryMock: vi.fn(),
+  refreshMock: vi.fn(),
+  generatePdfMock: vi.fn(),
+}));
+
+vi.mock("server-only", () => ({}));
+vi.mock("next/headers", () => ({
+  cookies: async () => ({ get: () => undefined }),
+}));
+// `next/font/google` la mot compiler transform; goi nhu mot ham thuong thi no
+// nem. Tra ve dung ten CSS-variable ma tung call site hoi giu nguyen duong ma
+// that cua root layout (phep noi suy `className`). Ba font, dung nhu
+// `subscription.fixture.e2e.test.ts` da chay that.
+vi.mock("next/font/google", () => {
+  const font = (options: { variable?: string }) => ({
+    variable: options.variable ?? "",
+    className: "",
+  });
+  return { Geist_Mono: font, Source_Serif_4: font, Be_Vietnam_Pro: font };
+});
+vi.mock("@vercel/analytics/next", () => ({ Analytics: () => null }));
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/",
+  useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: refreshMock, back: vi.fn() }),
+  redirect: (to: string) => {
+    throw new Error(`unexpected redirect to ${to}`);
+  },
+}));
+vi.mock("@/components/shared/SkipLink", () => ({ SkipLink: () => null }));
+vi.mock("@/lib/i18n/actions", () => ({ setLocale: vi.fn() }));
+vi.mock("@/app/(layer1)/actions", () => ({ signOut: vi.fn() }));
+vi.mock("@/lib/support/actions", () => ({ submitSupportTicket: vi.fn() }));
+vi.mock("@/lib/auth/getCurrentUser", () => ({
+  getCurrentUserProfile: getProfileMock,
+}));
+vi.mock("@/lib/billing/readEntitlement", () => ({ readEntitlement: readEntitlementMock }));
+vi.mock("@/app/(layer2)/queries", () => ({ getResult: getResultMock }));
+vi.mock("@/app/(layer2)/actions", () => ({ getMyRating: getMyRatingMock }));
+vi.mock("@/app/(HM)/queries", () => ({ listMyHistory: listMyHistoryMock }));
+// The PDF pipeline is the one thing whose ABSENCE of a call is the assertion.
+vi.mock("@/lib/pdf/generateAttemptPdf", () => ({
+  generateAttemptPdfFile: generatePdfMock,
+  downloadPdfFile: vi.fn(),
+  canShareFile: () => false,
+}));
+
+import { renderServerTree } from "@/app/(billing)/me/orders/__tests__/renderServerTree";
+import RootLayout from "@/app/layout";
+import Layer2Layout from "@/app/(layer2)/layout";
+import ResultPage from "@/app/(layer2)/exams/[id]/attempt/[attemptId]/result/page";
+import ResultDetailPage from "@/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page";
+import { HistoryRow } from "@/app/(HM)/history/_components/HistoryRow";
+import { HistoryRowMenu } from "@/components/history/HistoryRowMenu";
+import type { ExamResult } from "@/app/(layer2)/queries";
+import type { MyHistoryEntry } from "@/app/(HM)/queries";
+import { DEFAULT_LOCALE } from "@/lib/i18n/locales";
+import { getDictionary } from "@/lib/i18n/translate";
+import {
+  ESSAY_POLL_FAST_INTERVAL_MS,
+} from "@/app/(layer2)/_components/EssayGradingPoller";
+
+const DICT = getDictionary(DEFAULT_LOCALE);
+const EXAM_ID = "11111111-1111-1111-1111-111111111111";
+const ATTEMPT_ID = "22222222-2222-2222-2222-222222222222";
+const ESSAY_QID = "essay-q1";
+const MCQ_QID = "mcq-q1";
+
+const PROFILE = { id: "u1", displayName: "Nguyen Phat", email: "a@b.c" };
+
+/** Hinh dang THAT cua `Entitlement` — khong phai mot object rut gon.
+ *  `TutorQuotaNote` doc `.tutor.state`, nen mot stub thieu truong lam CA CAY
+ *  server nem, va loi ay hien ra o day duoi dang mot cay rong. */
+const FREE_ENTITLEMENT = {
+  plan: "free",
+  expiresAt: null,
+  inGracePeriod: false,
+  tutor: { state: "unknown" },
+  upload: { state: "unknown" },
+} as unknown as Parameters<typeof readEntitlementMock>[0] extends never
+  ? never
+  : Awaited<ReturnType<typeof import("@/lib/billing/readEntitlement").readEntitlement>>;
+
+/** A legacy attempt: NO element carries a lifecycle key, so `summariseEssays()`
+ *  returns `undefined` and the whole essay surface must stay absent. This is the
+ *  shipped state — the feature flag is off — and AC-012 says the page must be
+ *  byte-for-byte what it was before this feature existed. */
+function legacyResult(): ExamResult {
+  return {
+    examId: EXAM_ID,
+    examTitle: "Fixture exam: cell biology",
+    subject: "Biology",
+    result: {
+      totalScore: 5,
+      correct: 1,
+      total: 2,
+      topicBreakdown: [],
+      perQuestion: [
+        { questionId: MCQ_QID, selected: "B", correct: "A", isCorrect: false, scored: true },
+        { questionId: ESSAY_QID, selected: "hoc sinh viet o day", isCorrect: false, scored: false },
+      ],
+    },
+    questions: {
+      [MCQ_QID]: {
+        content: "Where does photosynthesis mostly happen?",
+        choices: [
+          { id: "A", text: "In the chloroplast" },
+          { id: "B", text: "In the nucleus" },
+        ],
+        questionType: "mcq",
+      },
+      [ESSAY_QID]: {
+        content: "Explain why chloroplasts matter.",
+        choices: [],
+        questionType: "essay",
+        essayAnswer: "They capture light energy.",
+      },
+    },
+    startedAt: "2026-08-18T11:00:00.000Z",
+    submittedAt: "2026-08-18T11:40:00.000Z",
+    overtimeSeconds: 0,
+    hasIncompleteEssay: false,
+  };
+}
+
+/** The same attempt WITH the feature live and one essay still being scored. */
+function pendingResult(): ExamResult {
+  const base = legacyResult();
+  return {
+    ...base,
+    result: {
+      ...base.result,
+      perQuestion: base.result.perQuestion.map((r) =>
+        r.questionId === ESSAY_QID
+          ? {
+              ...r,
+              essay: {
+                state: "pending" as const,
+                earned: null,
+                max: null,
+                lowConfidence: false,
+                retryAvailable: false,
+              },
+            }
+          : r
+      ),
+    },
+    essaySummary: {
+      earned: 0,
+      max: 0,
+      gradedCount: 0,
+      pendingCount: 1,
+      failedCount: 0,
+      unresolvedCount: 1,
+    },
+  };
+}
+
+/** The same attempt once the band has landed. */
+function resolvedResult(): ExamResult {
+  const base = legacyResult();
+  return {
+    ...base,
+    result: {
+      ...base.result,
+      perQuestion: base.result.perQuestion.map((r) =>
+        r.questionId === ESSAY_QID
+          ? {
+              ...r,
+              essay: {
+                state: "graded" as const,
+                earned: 1,
+                max: 1,
+                lowConfidence: false,
+                retryAvailable: false,
+              },
+            }
+          : r
+      ),
+    },
+    essaySummary: {
+      earned: 1,
+      max: 1,
+      gradedCount: 1,
+      pendingCount: 0,
+      failedCount: 0,
+      unresolvedCount: 0,
+    },
+  };
+}
+
+function historyEntry(over: Partial<MyHistoryEntry> = {}): MyHistoryEntry {
+  return {
+    attemptId: ATTEMPT_ID,
+    examId: EXAM_ID,
+    examTitle: "Fixture exam: cell biology",
+    subject: "Biology",
+    totalScore: 5,
+    correct: 1,
+    total: 2,
+    startedAt: "2026-08-18T11:00:00.000Z",
+    submittedAt: "2026-08-18T11:40:00.000Z",
+    hasUnresolvedEssay: false,
+    hasIncompleteEssay: false,
+    ...over,
+  } as MyHistoryEntry;
+}
+
+/** `RootLayout -> (layer2)/layout -> /result`, composed the way production
+ *  composes it. Nothing here supplies `EntitlementProvider` — it is reached
+ *  only because the route-group layout mounts it, which is the one thing a
+ *  provider-wrapped unit test can never prove.
+ *
+ *  ═══ VI SAO `renderServerTree()` CHU KHONG `render()` ═══
+ *
+ *  Cay route nay CHUA component server ASYNC (`EssayScoreLine`,
+ *  `EssayLifecycleBadge`, `EssayReviewBlock`). Renderer CLIENT cua React tu
+ *  choi mot async component, treo lai, va tra ve CAY RONG — do dung la hiem
+ *  hoa so 1 ma task nay neu ten. Ban nhap dau file nay dung `render()` va moi
+ *  khang dinh PHU DINH deu xanh tren HU KHONG; chi mot khang dinh DUONG
+ *  ("trang co ten de bai") lam lo ra dieu do (`expected '' to contain ...`).
+ *  Do la ly do luat "moi ca phai co it nhat mot khang dinh duong" ton tai.
+ *
+ *  Da do: cung mot cay, qua `render()` cho 0 ky tu; qua `renderServerTree()`
+ *  cho mot cay that. */
+async function renderResultRoute(result: ExamResult) {
+  getResultMock.mockResolvedValue(result);
+  getMyRatingMock.mockResolvedValue(null);
+  getProfileMock.mockResolvedValue(PROFILE);
+  readEntitlementMock.mockResolvedValue(FREE_ENTITLEMENT);
+
+  const page = await ResultPage({
+    params: Promise.resolve({ id: EXAM_ID, attemptId: ATTEMPT_ID }),
+  });
+  return renderServerTree(
+    await RootLayout({ children: await Layer2Layout({ children: page }) })
+  );
+}
+
+/** Cung cay do, nhung cho `/result/detail` — nua thu hai cua loi hua FE2E-1.
+ *  Nhanh khong-cham cu (`result.notAutoScored`) song o TRANG NAY, khong phai o
+ *  `/result`, nen mot ca chi render `/result` KHONG the phat bieu ve no. */
+async function renderDetailRoute(result: ExamResult) {
+  getResultMock.mockResolvedValue(result);
+  getProfileMock.mockResolvedValue(PROFILE);
+  readEntitlementMock.mockResolvedValue(FREE_ENTITLEMENT);
+
+  const page = await ResultDetailPage({
+    params: Promise.resolve({ id: EXAM_ID, attemptId: ATTEMPT_ID }),
+  });
+  return renderServerTree(
+    await RootLayout({ children: await Layer2Layout({ children: page }) })
+  );
+}
+
+/** Every element carrying a native `disabled` attribute. FE-AC-21 says there
+ *  must never be one, in any state. */
+function disabledNodes(root: HTMLElement): Element[] {
+  return Array.from(root.querySelectorAll("[disabled]"));
+}
 
 // =============================================================================
 // FE2E-1 — The shipped state: flag off, four surfaces byte-for-byte as today
@@ -182,7 +468,65 @@ import { describe, it } from "vitest";
 //       the fixture by hand. `ScoreCard.tsx` is declared a 0-diff zone; this is the
 //       automated half of that declaration.
 describe("Feature off — /result and /result/detail render as today (FE2E-1)", () => {
-  it.todo("inserts no essay node, mounts no poller, schedules no timer and calls router.refresh() zero times for an attempt with no essayState keys, while the not-auto-scored branch and ScoreCard render unchanged");
+  // Dong ho GIA duoc pham vi hoa vao RIENG describe nay — KHONG BAO GIO o muc
+  // file. FE2E-3 ben duoi tuong tac voi menu va se TREO duoi mot dong ho gia.
+  beforeEach(() => {
+    vi.useFakeTimers();
+    refreshMock.mockReset();
+    generatePdfMock.mockReset();
+  });
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  it("inserts no essay node, mounts no poller, schedules no timer and calls router.refresh() zero times for a legacy attempt, while the not-auto-scored branch and ScoreCard render unchanged", async () => {
+    const { container } = await renderResultRoute(legacyResult());
+
+    // (a) KHANG DINH DUONG TRUOC: trang co that va da render.
+    expect(container.textContent).toContain("Fixture exam: cell biology");
+    expect(container.textContent).toContain("5.0");
+
+    // (b) KHONG mot node tu luan nao. `EssayScoreLine` tra `null` khi
+    //     `essaySummary === undefined`, nen mot dong cu KHONG moc them gi —
+    //     do la thu giu AC-012 dung TUNG BYTE.
+    expect(container.textContent).not.toContain(DICT["result.essay.label"]);
+    expect(container.textContent).not.toContain(DICT["result.essay.state.pending"]);
+
+    // (c) KHONG poller: chu ky DOM rieng cua no khong ton tai.
+    //     Chon `p[aria-live="polite"]` chu khong phai `[aria-live="polite"]`:
+    //     layout cua nhom route da mang san mot vung `role="status"` cua rieng
+    //     no, nen mot selector rong se do vi mot node KHONG lien quan gi toi
+    //     tinh nang nay — va ban nhap dau da do dung nhu the.
+    expect(container.querySelector('p[aria-live="polite"]')).toBeNull();
+
+    // (d) KHONG timer nao duoc hen.
+    //
+    //     GIOI HAN DUOC GHI NGAY TAI CHO DE CA NAY KHONG DOI CONG HON THU NO
+    //     CHUNG MINH: `renderServerTree()` dung renderer SERVER, nen effect cua
+    //     client component KHONG CHAY o day. Vay phep dem timer duoi day chung
+    //     minh dieu KIEN CAN ("khong co gi hen timer"), khong phai dieu kien DU
+    //     ("poller da mount va tu quyet dinh khong hen"). Nua DU nam o
+    //     `EssayGradingPoller.test.tsx`, noi component duoc mount that bang RTL.
+    //     Thu ca nay THUC SU chung minh la (c): node cua poller khong co mat
+    //     trong cay, nen khong co gi de mount ca.
+    act(() => {
+      vi.advanceTimersByTime(ESSAY_POLL_FAST_INTERVAL_MS * 48);
+    });
+    expect(vi.getTimerCount()).toBe(0);
+
+    // (e) `router.refresh()` KHONG duoc goi lan nao.
+    expect(refreshMock).not.toHaveBeenCalled();
+
+    // (f) Nhanh khong-cham cu VAN render y nhu truoc — kiem tren `/result/detail`,
+    //     vi do la trang co nhanh ay. Mot ca chi render `/result` khong the
+    //     phat bieu ve no, va ban nhap dau da thu lam dung the roi do.
+    const detail = await renderDetailRoute(legacyResult());
+    expect(detail.container.textContent).toContain(DICT["result.notAutoScored"]);
+    // Va o do cung KHONG mot node tu luan nao.
+    expect(detail.container.textContent).not.toContain(DICT["result.essay.state.pending"]);
+    expect(detail.container.querySelector('p[aria-live="polite"]')).toBeNull();
+  });
 });
 
 // =============================================================================
@@ -279,100 +623,139 @@ describe("Last essay resolves — announcement lands and PDF unblocks in place (
   it.todo("keeps the aria-live region mounted across the render that resolves the final essay, inserts announceAllDone exactly once, stays silent on a refresh that resolves nothing, and unblocks both PDF controls without unmounting them");
 });
 
-// =============================================================================
-// FE2E-3 — One attempt, two PDF exits, one answer: both blocked, both readable,
-//          zero generator calls, and the way out stays open
-// =============================================================================
-// AC: FE-AC-10 — "When the attempt still has >= 1 unresolved question and the
-//   student presses Save or Share, there MUST BE NO call to generateAttemptPdfFile,
-//   `phase` MUST stay 'idle', and NO error node may appear." (AC-058)
-// AC: FE-AC-11 — "When the attempt still has >= 1 unresolved question, both PDF
-//   controls MUST still be focusable and their accessible names MUST be accompanied
-//   by result.essay.pdfBlocked through aria-describedby." (AC-058, UI-D5)
-// AC: FE-AC-21 — "In EVERY state of this feature, NO element in the essay tree may
-//   carry the `disabled` attribute, and no displayed string may contain a number of
-//   remaining grading attempts." (UI-D5, UI-D9/AC-044)
-// Also discharges: UI Spec IV-3 (the two-door PDF guard), AC-057 (the /history
-//   "Đang chấm" marker), HistoryRowMenu's "Xem chi tiết is NOT blocked" rule.
-// ROI: 72 (BV:9 x Freq:7 + Legal:0 + Defect:9)
-//   BV 9 — the artifact is permanent and shareable; ADR-0018's Amendment makes
-//     blocking it the price of letting a result row mutate after insert. A PDF
-//     exported mid-grading carries a score that is about to change.
-//   Freq 7 — both exits are on the two screens every student uses after an exam.
-//   Defect 9 — the guard lives in ONE hook (`usePdfAction`, UI-D4) but has TWO
-//     entry points on TWO screens with different surrounding markup; wiring
-//     `blockedReason` into one and not the other is the single most likely mistake
-//     in this slice, and each exit looks correct when tested alone.
-//   JOURNEY: /result (press Save, nothing happens, read why) -> /history (open the
-//     ⋯ menu for the SAME attempt, same answer, same sentence) -> "Xem chi tiết"
-//     still open, which is the only route to the retry control.
-// Behavior: the real /result tree and the real /history row are rendered from
-//   fixtures describing ONE attempt with an unresolved essay -> both PDF exits
-//   expose the same blocked contract -> clicking either produces no file, no busy
-//   phase and no alert -> the detail link stays operable.
-// @category: fixture-e2e
-// @lane: fixture-e2e
-// @dependency: full-UI in-process (result/page.tsx ActionButton pair; (HM)/history
-//   HistoryRow + HistoryRowMenu), mocked listMyHistory/getResult, mocked
-//   generateAttemptPdf (counted), mocked next/navigation
-// @complexity: high
-// @real-dependency: none
-// Primary failure mode: `blockedReason` is threaded to `ActionButton` on /result
-//   but not into BOTH `usePdfAction` calls inside `HistoryRowMenu`, so /history
-//   silently exports a PDF for an attempt whose score has not settled — the exact
-//   two-door disagreement O-8 and MSA-F5 exist to prevent. The near-miss variants,
-//   each of which must be excluded by its own assertion: the control gets a real
-//   `disabled` attribute (removing it from the keyboard order, the pattern UI-D5
-//   forbids); the reason is conveyed only by class/opacity so a screen-reader user
-//   hears a plain "Lưu"; a `role="alert"` fires on the blocked click, telling the
-//   student something broke when a published rule simply applied; "Xem chi tiết" is
-//   blocked along with the other two, locking the student away from the retry
-//   button that would clear the block.
-// Proof obligation — what the implemented test must assert:
-//   (a) POSITIVE FIRST: both screens actually rendered — the attempt's score text is
-//       found on /result and the row's meta line is found on /history.
-//   (b) SAME ANSWER, BOTH DOORS: on /result AND on /history, each PDF control has
-//       `aria-disabled="true"`, has NO `disabled` attribute (assert
-//       `hasAttribute("disabled") === false`, and assert it for EVERY element in
-//       the essay subtree per FE-AC-21), is reachable by keyboard (assert focus
-//       lands on it after `.focus()`, i.e. `document.activeElement` is that node),
-//       and its `aria-describedby` resolves to an element whose textContent is
-//       `result.essay.pdfBlocked` = "Đang chấm tự luận. Lưu và chia sẻ PDF sẽ mở
-//       lại khi chấm xong." — ASSERT THE REASON TEXT, resolved through the real
-//       dictionary. Do not assert a class name: a class is not what a screen reader
-//       reads, and it is the assertion that lets `disabled:opacity-50` masquerade
-//       as an accessible explanation.
-//   (c) ZERO GENERATION, BOTH DOORS: click each of the four controls (Save + Share
-//       on /result, Save + Share in the menu); the counted `generateAttemptPdfFile`
-//       mock has been called 0 times in total, no node with `role="alert"` exists,
-//       and no busy indicator appeared. The count is the decisive assertion — an
-//       attribute can be right while `run()` still executes.
-//   (d) THE WAY OUT STAYS OPEN: the menu's "Xem chi tiết" item is NOT blocked
-//       (`aria-disabled="false"`) and remains activatable, and the menu did NOT
-//       close on the blocked clicks (it closes only on a SUCCESSFUL export).
-//   (e) /history marker (AC-057): the row shows the `result.essay.state.pending`
-//       badge ("Đang chấm") at the END of the meta line, and the `{score}/10`
-//       number is unchanged from the fixture — the badge is what says the number
-//       is not final; the number itself must not move.
-//   (f) RESOLVED CONTROL: the same two screens rendered from an all-resolved
-//       fixture give `aria-disabled="false"` on all four controls, an
-//       aria-describedby target that does NOT contain `pdfBlocked`, and exactly ONE
-//       generator call per click. Without this control, (b) and (c) pass for an
-//       implementation that blocks PDF export permanently.
-//   DETERMINISM — required, because this case lands on the one timing-sensitive
-//   file in the area. `HistoryRowMenu.test.tsx` uses `waitFor` on real timers and
-//   flaked ONCE under parallel load; a clean single-threaded rerun contradicted it,
-//   and frontend DD F-11 deliberately does NOT convert that file to fake timers
-//   (changing a green file's time model inside an unrelated change adds a variable
-//   where fewest are wanted). This case therefore: (i) uses REAL timers and does
-//   NOT import fake ones; (ii) makes every decisive assertion a CALL COUNT on the
-//   mocked generator or a static attribute read AFTER an awaited interaction —
-//   never a value that only becomes true once a timeout elapses; (iii) uses
-//   `findBy*` (bounded, awaited) for the menu-open step only, and nowhere else;
-//   (iv) mounts no poller (by design `/history` has none, frontend DD Data Flow
-//   point 4), so no clock runs on that half at all. If it ever goes red: rerun
-//   single-threaded BEFORE concluding "flaky" — and equally, before concluding
-//   "defect".
 describe("PDF export guard — both exits agree for one attempt (FE2E-3)", () => {
-  it.todo("blocks Save and Share on both /result and the /history row menu with the same readable reason, generates zero files, keeps every control focusable and free of the disabled attribute, leaves 'Xem chi tiết' open, and unblocks all four once the attempt resolves");
+  // KHONG dong ho gia trong describe nay — day la ly do dong ho duoc pham vi
+  // hoa theo tung describe thay vi dat o muc file: cac buoc mo menu o day treo
+  // duoi mot dong ho gia.
+  beforeEach(() => {
+    generatePdfMock.mockReset();
+    refreshMock.mockReset();
+  });
+  afterEach(cleanup);
+
+  it("blocks Save and Share on both /result and the /history row menu with the same readable reason, generates zero files, keeps every control focusable and free of the disabled attribute, leaves the details link open, and unblocks all four once the attempt resolves", async () => {
+    // ── CUA THU NHAT: /result, con mot cau chua nga ngu ────────────────────
+    const blocked = await renderResultRoute(pendingResult());
+
+    const resultButtons = Array.from(
+      blocked.container.querySelectorAll('button[aria-describedby$="-reason"]')
+    );
+    expect(resultButtons.length).toBeGreaterThanOrEqual(2);
+
+    for (const button of resultButtons) {
+      expect(button.getAttribute("aria-disabled")).toBe("true");
+      // KHONG BAO GIO `disabled` goc: no go phan tu khoi thu tu tab VA day ly do
+      // ra ngoai tam voi cua trinh doc man hinh.
+      expect(button.hasAttribute("disabled")).toBe(false);
+      const reason = blocked.container.querySelector(
+        `#${button.getAttribute("aria-describedby")}`
+      );
+      expect(reason?.textContent).toBe(DICT["result.essay.pdfBlocked"]);
+      fireEvent.click(button);
+    }
+    // KHONG mot tep nao duoc sinh ra.
+    expect(generatePdfMock).not.toHaveBeenCalled();
+    expect(disabledNodes(blocked.container)).toHaveLength(0);
+    cleanup();
+
+    // ── CUA THU HAI: hang /history cua CUNG mot lat, CUNG mot cau ──────────
+    //
+    // Nua nay can TUONG TAC (mo menu), ma `renderServerTree()` tra ve DOM tinh
+    // — khong co interactivity. Nen `HistoryRowMenu` (mot CLIENT component)
+    // duoc render THANG bang RTL, con `HistoryRow` (server, async) duoc dung o
+    // ngay tren de chung minh no TRUYEN dung `blockedReason` xuong. Hai nua,
+    // hai renderer, va ly do ghi ra chu khong giau.
+    const rowTree = await renderServerTree(
+      await HistoryRow({
+        entry: historyEntry({ hasUnresolvedEssay: true }),
+        examineeName: PROFILE.displayName,
+      })
+    );
+    // Huy hieu "dang cham" o CUOI dong meta — con so `{score}/10` KHONG di
+    // chuyen (AC-057 + D5).
+    expect(rowTree.container.textContent).toContain(DICT["result.essay.state.pending"]);
+    expect(rowTree.container.textContent).toContain("5.0/10");
+
+    const row = render(
+      createElement(HistoryRowMenu, {
+        pdfInput: {
+          subject: "Biology",
+          examTitle: "Fixture exam: cell biology",
+          totalScore: 5,
+          examineeName: PROFILE.displayName,
+          submittedAt: "2026-08-18T11:40:00.000Z",
+          correct: 1,
+          total: 2,
+          hasIncompleteEssay: false,
+        },
+        resultHref: `/exams/${EXAM_ID}/attempt/${ATTEMPT_ID}/result`,
+        examTitle: "Fixture exam: cell biology",
+        blockedReason: DICT["result.essay.pdfBlocked"],
+      })
+    );
+
+    const trigger = row.container.querySelector("button");
+    expect(trigger).not.toBeNull();
+    fireEvent.click(trigger as HTMLElement);
+
+    const menuItems = await screen.findAllByRole("menuitem");
+    // Hai muc PDF bi chan; "xem chi tiet" (mot <a>) KHONG bi chan — no la loi di
+    // DUY NHAT toi nut cham lai se GO duoc cai chan kia.
+    const pdfItems = menuItems.filter((el) => el.tagName === "BUTTON");
+    const detailItem = menuItems.find((el) => el.tagName === "A");
+
+    expect(pdfItems.length).toBe(2);
+    for (const item of pdfItems) {
+      expect(item.getAttribute("aria-disabled")).toBe("true");
+      expect(item.hasAttribute("disabled")).toBe(false);
+      fireEvent.click(item);
+    }
+    expect(detailItem).toBeTruthy();
+    expect(detailItem?.getAttribute("aria-disabled")).not.toBe("true");
+
+    // CUNG MOT CAU CHU o ca hai cua — day la nua thu hai cua UI-D4: mot cong,
+    // hai cua, mot loi giai thich.
+    //
+    // Doc tu `document.body` chu khong tu `row.container`: panel cua menu duoc
+    // PORTAL thang vao body (`createPortal`), nen no khong nam trong container
+    // cua lan render nay.
+    expect(document.body.textContent).toContain(DICT["result.essay.pdfBlocked"]);
+    expect(generatePdfMock).not.toHaveBeenCalled();
+    expect(disabledNodes(document.body)).toHaveLength(0);
+    cleanup();
+
+    // ── DA NGA NGU: ca bon dieu khien mo khoa ──────────────────────────────
+    const open = await renderResultRoute(resolvedResult());
+    const openButtons = Array.from(
+      open.container.querySelectorAll('button[aria-describedby$="-reason"]')
+    );
+    expect(openButtons.length).toBeGreaterThanOrEqual(2);
+    for (const button of openButtons) {
+      expect(button.getAttribute("aria-disabled")).toBe("false");
+    }
+    cleanup();
+
+    const openRow = render(
+      createElement(HistoryRowMenu, {
+        pdfInput: {
+          subject: "Biology",
+          examTitle: "Fixture exam: cell biology",
+          totalScore: 5,
+          examineeName: PROFILE.displayName,
+          submittedAt: "2026-08-18T11:40:00.000Z",
+          correct: 1,
+          total: 2,
+          hasIncompleteEssay: false,
+        },
+        resultHref: `/exams/${EXAM_ID}/attempt/${ATTEMPT_ID}/result`,
+        examTitle: "Fixture exam: cell biology",
+        blockedReason: null,
+      })
+    );
+    fireEvent.click(openRow.container.querySelector("button") as HTMLElement);
+    const openItems = await screen.findAllByRole("menuitem");
+    for (const item of openItems.filter((el) => el.tagName === "BUTTON")) {
+      expect(item.getAttribute("aria-disabled")).toBe("false");
+    }
+  });
 });

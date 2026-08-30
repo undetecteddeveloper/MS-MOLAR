@@ -72,7 +72,30 @@ This task and F-C4 rewrite the **same file** and share the fake-clock hazard. **
 - `docs/ui-spec/essay-auto-scoring-ui-spec.md` (§ Component: usePdfAction (PDF export guard) — verify the blocked state on both doors)
 
 ## Investigation Notes
-_(Record here: the per-`describe` clock setup as written, and the confirmation that there is **no** file-level `vi.useFakeTimers()`; the independently authored ScoreCard literal used in FE2E-1(f); the fixture lane's post-change result.)_
+
+### Hazard 1 was not theoretical — it fired in this task
+The first draft used `render()`. The route tree now contains **async server components** (`EssayScoreLine`, `EssayLifecycleBadge`, `EssayReviewBlock`), so React's **client** renderer refuses them, suspends, and returns an **empty tree**. Every negative assertion passed against nothing.
+
+The only thing that exposed it was a **positive** assertion — "the page carries the exam title" — failing as `expected '' to contain ...`. That is exactly why the standing rule exists, and this is the run where it paid. Switched to `renderServerTree()`: the same tree yields **0** characters through `render()` and a real tree through `renderServerTree()`.
+
+Measured, not assumed: a staged probe showed `RootLayout` alone rendering 712 characters with a plain string child, and **0** once the async page was the child.
+
+### The per-`describe` fake clock is this task's deliverable
+FE2E-1 needs a fake clock for its timer count; FE2E-3 opens a menu and **hangs** under one. Each describe owns its own `beforeEach`/`afterEach`; there is **no file-level clock**. F-C4 adds a describe into that structure rather than introducing it.
+
+### FE2E-1 covers both pages, and the first draft did not
+`result.notAutoScored` lives on **`/result/detail`**, not `/result`, so a case rendering only `/result` cannot speak about it. A second render of the detail route was added.
+
+### A limit recorded at the assertion, so the case cannot over-claim
+`renderServerTree()` uses the **server** renderer, so client effects never run. The timer count therefore proves the **necessary** condition ("nothing scheduled a timer"), not the **sufficient** one ("the poller mounted and chose not to"). The sufficient half lives in `EssayGradingPoller.test.tsx`, where the component is really mounted. What this case actually proves is that the poller's DOM signature is **absent**.
+
+### FE2E-3 uses two renderers, deliberately
+The `/result` door and the `/history` row (server, async) go through `renderServerTree()`. The half that needs **interaction** — opening the menu and pressing — renders `HistoryRowMenu` (a client component) directly through RTL, because `renderServerTree()` returns static DOM.
+
+### Three corrections worth recording
+- `[aria-live="polite"]` matched a `role="status"` region the route-group layout already ships. Narrowed to `p[aria-live="polite"]` — the poller's own signature.
+- The menu panel is **portaled to `document.body`**, so it is not inside the render container. Assertions read from `document.body`.
+- `TutorQuotaNote` reads `entitlement.tutor.state`; a shortened `{plan, status}` stub made the **whole server tree throw**, and that surfaced here as an empty tree rather than an error message. The stub now uses the real `Entitlement` shape.
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
@@ -102,12 +125,12 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
 
 | # | Command (from `SOURCE/`) | Exit code | Notes |
 |---|---|---|---|
-| 1 | `npx tsc --noEmit` | | |
-| 2 | `npx eslint --max-warnings 0` | | |
-| 3 | `npx vitest run` | | |
-| 4 | `npm run build` | | |
-| 5 | `npm run test:fixture` | | **this task's primary gate** — expected red = TD-030 baseline only (Gate F1): exactly 2 failures, both `subscription.fixture.e2e.test.ts` FE-1(e) `en` + `vi`. **Anything red beyond those two is this feature's** |
-| 6 | `npm run test:localdb` | | see Open Item I-7 |
+| 1 | `npx tsc --noEmit` | **0** | |
+| 2 | `npx eslint --max-warnings 0` | **0** | |
+| 3 | `npx vitest run` | **0** | 2022 passed / 10 skipped / 0 todo — unchanged; this task adds no default-lane cases |
+| 4 | `npm run build` | **0** | |
+| 5 | `npm run test:fixture` | **1** | **TD-030 baseline only.** This file: **2 executing, 1 todo** (FE2E-2 belongs to F-C4). Gate F3 respected — `vitest.fixture.config.ts`'s exclude list was **not** extended |
+| 6 | `npm run test:localdb` | **0** | 11 passed / 2 todo (SVC-1, SVC-2 — Task H8) |
 
 **A task file with any exit-code cell left empty is not complete** (Gate E4).
 
