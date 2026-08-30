@@ -40,6 +40,29 @@ Set the variable to anything other than `"true"` (or delete it) and redeploy. Co
 ### The one asymmetry, and it is not a bug
 An attempt submitted **while enabled** whose pass is cut off before finishing leaves questions `pending` **forever**, and the read-time deadline presents them as "Chấm thất bại" with an **unusable** retry button. That is correct behaviour under W6 (no background writer cleans it), and it is one more reason turning the flag off is **a deliberate decision rather than a hurried config edit**.
 
+## Execution log — 2026-08-30
+
+### Done
+- **Merged to `main`.** PR #1 (`https://github.com/undetecteddeveloper/MS-MOLAR/pull/1`), 74 commits, 144 files, merge commit **`e0f4faf`**. Merged with the head SHA pinned, so a drifted head would have failed loudly rather than merging something unreviewed.
+- **Production deploy `dpl_5YDSEvfBCZcVamCbz5GpMUyu5xSD` reached `READY`**, target `production`, region `sin1`, aliased to `ms-molar.vercel.app`.
+- **Verified `main` actually carries the feature**, rather than assuming the merge did what it said: `player.essayScored` and `upload.essayScored` are both present in `en.ts`, `QuestionRenderer.tsx` references `essayGradingEnabled` three times, and `origin/main..branch` is **0 commits**.
+- The engineer had set `ESSAY_GRADING_ENABLED` and `GROQ_BUDGET_DAILY_LIMIT` in the **Production** scope before this deploy, so this build carries both.
+
+### Why the earlier attempt appeared to do nothing
+The engineer set both variables and redeployed **before** the merge. That deploy built `main`, which at the time did not contain the feature at all — its `en.ts` had only `player.essayNotScored` and its `QuestionRenderer` had no flag prop. **Setting the variables changed nothing because there was no code reading them.** Worth recording as the shape of the design working: production was *structurally* incapable of grading, not merely configured not to.
+
+### BLOCKED — the enabled state is NOT yet confirmed
+Steps 3 (three read sites flipped), 4 (one real attempt end to end) and 5 (kill-switch rehearsal) are **not done**, and must not be recorded as done.
+
+The attempt to verify the footnote on production failed at sign-in: the test account `smithnguyen247+rlstesta@gmail.com` returns **"User is banned"** on the production project. It exists on dev, where the whole `L1` run was performed, but is not usable on prod. No other account was tried — the two real accounts are the engineer's own and are explicitly not to be touched.
+
+**So what is proven is that the CODE is deployed, not that the FLAG took effect.** Those are different claims and the difference is exactly the one E6 exists to check.
+
+**To finish, the engineer needs to either** un-ban the test account on the production Supabase project, or perform steps 3-5 personally with an account they control. The tell for step 3 is the player footnote reading *"Essay — auto-scored after you submit."*; if it still reads the old sentence, the variable is not reaching the build, and the thing to check is that `ESSAY_GRADING_ENABLED` is exactly lowercase `true` with no trailing space — `"TRUE"` and `"1"` both read as **off** with an identical symptom.
+
+### Carried into this task from E5, still undecided
+TPM 8 000 puts a 50-essay exam at ~5.5 minutes against `ESSAY_PASS_BUDGET_MS` of 4 minutes, so one full essay exam cannot finish in a single pass on the `on_demand` tier. The lifecycle handles it correctly (unresolved becomes retryable, never a wrong band), but the feature is now **live for real students** with that property in place.
+
 ## Target Files
 - [ ] Vercel **Production** environment: `ESSAY_GRADING_ENABLED` (engineer-owned; no tracked file)
 - [ ] `docs/plans/20260829-feature-essay-auto-scoring.md` — Phase E progress notes and the kill-switch confirmation
