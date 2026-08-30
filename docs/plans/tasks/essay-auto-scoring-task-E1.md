@@ -31,7 +31,7 @@ The design makes the gate the **default state** rather than a promise: with `ESS
 - **A7** — until A6 carries a real date, `ESSAY_GRADING_ENABLED` is **absent in both Vercel scopes** and Phase E is not started.
 
 ## Target Files
-- [ ] `docs/plans/20260829-feature-essay-auto-scoring.md` — Gate A items A2–A7 and their date/name/evidence slots
+- [x] `docs/plans/20260829-feature-essay-auto-scoring.md` — Gate A items A2–A7 and their date/name/evidence slots. **A3, A4 recorded 2026-08-30 (`4a51c66`); A6, A7 recorded 2026-08-30. Gate A is fully closed: zero unticked items remain.**
 
 ## Investigation Targets
 - `docs/plans/20260829-feature-essay-auto-scoring.md` (§ Gate A — AC-067 Zero Data Retention)
@@ -41,15 +41,32 @@ The design makes the gate the **default state** rather than a promise: with `ESS
 - `docs/design/essay-auto-scoring-backend-design.md` (§ Risks — R-12)
 
 ## Investigation Notes
-_(Record here: the A6 console-check date, the engineer's name and the evidence location; confirmation that `ESSAY_GRADING_ENABLED` was absent in both Vercel scopes until this point.)_
+
+### Gate A closed 2026-08-30 — stage 2 discharged
+- **A6 console check**: date **2026-08-30**, by **undetecteddeveloper** (`smithnguyen247@gmail.com`), evidence = a screenshot of `console.groq.com/settings/data-controls` shown in the session transcript for session `ca31f4cc-9218-40e0-9449-e1849155de64`. A durable copy outside the transcript is still worth saving; a transcript is session-scoped and this gate gets re-audited.
+- **A3 / A4**: the engineer placed `GROQ_API_KEY` in **both** Vercel scopes in one dashboard visit on 2026-08-30. The key never passed through the assistant — the same precaution A2 records, after the first key was pasted into a transcript and had to be rotated.
+- **A7**: `ESSAY_GRADING_ENABLED` was **absent in both Vercel scopes for the entire period up to this point**, and is **still absent as of 2026-08-30**. Closing A7 is permission for E6 to run; it is not the enabling.
+
+### The console reading that would have gone wrong if summarised
+The Data Controls page shows **two** switches, and only the first governs:
+- **Global ZDR — ENABLED**, self-labelled *"Enabled - API specific settings are overriden"*.
+- **Inference APIs ZDR — displays OFF and greyed out.** This is **not** a gap: it is greyed *because* the global switch overrides it, exactly as that switch's own label says.
+
+Recorded in Gate A verbatim rather than compressed to "ZDR is on", because the compressed version is the one that fails an audit: the next person to open that page sees an apparently-off inference toggle and concludes the gate was ticked without looking.
+
+### The gate's premise, confirmed from the provider's own console
+The page states: *"Starting October 15, 2025, Groq may store inputs and outputs for up to 30 days, strictly for purposes of maintaining system reliability and compliance."* Until now the plan cited that 30-day window **from provider documentation**. It is now corroborated **in the account's own console** — the default posture is confirmed to be the unacceptable one, and ZDR the opt-out from it.
+
+### No redeploy was triggered, deliberately
+Vercel offered one when the variable was added. It buys nothing yet: a new environment variable reaches a running deployment only at the next build, but while `ESSAY_GRADING_ENABLED` is absent **nothing reads `GROQ_API_KEY`** — `computeScore()` emits no essay keys and `after()` is never registered. The redeploy that matters is the one **after E6**, which must carry both variables. Recorded against A4 so a later reader does not treat it as a missed step.
 
 ## Implementation Steps
-- [ ] Confirm A1 and A5 still hold in the Groq console
-- [ ] Confirm A2 (key in `SOURCE/.env.local`) — ticks A5b if not already ticked
-- [ ] Add `GROQ_API_KEY` to the Vercel **Production** scope (A3)
-- [ ] Add `GROQ_API_KEY` to the Vercel **Preview** scope (A4)
-- [ ] Perform the console check; record the **date**, the **name** and the **evidence location** in A6
-- [ ] Confirm `ESSAY_GRADING_ENABLED` is absent in both Vercel scopes and record that against A7
+- [x] Confirm A1 and A5 still hold in the Groq console — re-confirmed 2026-08-30 by the same console check that discharges A6
+- [x] Confirm A2 (key in `SOURCE/.env.local`) — already ticked 2026-08-29 (A5b stage 1)
+- [x] Add `GROQ_API_KEY` to the Vercel **Production** scope (A3) — 2026-08-30
+- [x] Add `GROQ_API_KEY` to the Vercel **Preview** scope (A4) — 2026-08-30
+- [x] Perform the console check; record the **date**, the **name** and the **evidence location** in A6 — 2026-08-30
+- [x] Confirm `ESSAY_GRADING_ENABLED` is absent in both Vercel scopes and record that against A7 — confirmed absent 2026-08-30
 
 ## Quality Assurance Mechanisms
 None automated — nothing in the repository can check any of it. That is precisely why Gate A is a gate with a named owner.
@@ -60,12 +77,14 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
 
 | # | Command (from `SOURCE/`) | Exit code | Notes |
 |---|---|---|---|
-| 1 | `npx tsc --noEmit` | | |
-| 2 | `npx eslint --max-warnings 0` | | |
-| 3 | `npx vitest run` | | |
-| 4 | `npm run build` | | |
-| 5 | `npm run test:fixture` | | expected red = TD-030 baseline only (Gate F1): exactly 2 failures, both `subscription.fixture.e2e.test.ts` FE-1(e) `en` + `vi` |
-| 6 | `npm run test:localdb` | | see Open Item I-7 |
+| 1 | `npx tsc --noEmit` | **0** | |
+| 2 | `npx eslint --max-warnings 0` | **0** | |
+| 3 | `npx vitest run` | **0** | 2025 passed / 10 skipped / 0 todo — **unchanged**, as a documentation-only commit must be |
+| 4 | `npm run build` | **0** | |
+| 5 | `npm run test:fixture` | **1** | expected red = TD-030 baseline only (Gate F1): exactly 2 failures, both `subscription.fixture.e2e.test.ts` FE-1(e) `en` + `vi`. **Verified by name, not by count** — the two failing cases are `locale en` and `locale vi` under *"FE-1 (e) `legalContentReady === false` leaves an inert but reachable confirm control"*, 78 passed |
+| 6 | `npm run test:localdb` | **0** | 16 passed, 0 todo — see Open Item I-7 |
+
+All six run **separately**, each exit code read directly. This task changes no source file, and all six were still run per Open Item I-7 option (a) — the point of the rule is that a documentation commit is exactly where "it can't have broken anything" goes unchecked.
 
 **A task file with any exit-code cell left empty is not complete** (Gate E4). This task changes no source file; the commit recording the gate evidence still runs all six, per Open Item I-7 option (a).
 

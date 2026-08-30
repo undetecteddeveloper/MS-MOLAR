@@ -99,22 +99,22 @@ all phases → Final
 
 | Task | Status | Note |
 |---|---|---|
-| **G0.1** | 🔴 **BLOCKED on the engineer** | A1 ✅ and A5 ✅ (ZDR on). **A5b blocked on A2 alone** — the rotated `GROQ_API_KEY` must be placed in `SOURCE/.env.local`. Until A5b ticks, **no task may perform a dev `L1` run** |
+| **G0.1** | ✅ **DISCHARGED 2026-08-29** | Gate A **stage 1**: A1 ✅, A2 ✅ (rotated key in `SOURCE/.env.local`, engineer-confirmed), A5 ✅ (ZDR on) ⇒ **A5b ticked 2026-08-29**. Dev `L1` runs permitted **against seeded attempts only**. Stage 2 is Task E1 |
 | **G0.2** | ✅ **DISCHARGED 2026-08-29** | Gate C **CLOSED**: `telemetry_log_event_type_check` + `telemetry_log_error_code_check`, identical on both projects. Task H5 uses them verbatim |
 | **G0.3** | ✅ **DONE** (2026-08-29) | Gate D — payload measured on both DBs (375 → 3 401 B/row, ≈9.1× on prod-shaped exams). Engineer **ACCEPTED**; Escalation 2 stays closed. **B2.2 unblocked** |
 | **G0.4** | ✅ **DISCHARGED 2026-08-29** | Gate B1: prod and dev both `29931beeb950`. **Gate B2 stays open by construction** — the new literal does not exist until H5 edits `schema.sql` |
 | **G0.5** | ✅ **DISCHARGED 2026-08-29** | Gate F1: TD-030 baseline = exactly 2 failures, both `subscription.fixture.e2e.test.ts` FE-1(e) (`en`, `vi`) |
-| H1…H8 | 🟡 **H1–H7 DONE** (2026-08-29) | H7 applied to dev **and** prod, human-confirmed. **H8 is the one still open** — SVC-1/SVC-2 remain `it.todo`; it needs real Postgres and was outside this session's agreed order |
+| H1…H8 | 🟢 **PHASE COMPLETE** (H8 on 2026-08-30) | H7 applied to dev **and** prod, human-confirmed. **H8 `64fb9da`** — SVC-1/SVC-2 became **5 executing cases** against real Postgres; service lane **16 passed, 0 todo** (was 11 passed / 2 todo). Order independence **measured** (shuffle seeds 11/29/77, plus each case alone), not assumed |
 | B1.1…B1.6 | 🟡 **ALL SIX DONE** (2026-08-29) | `46bc8af` B1.2 · `bffaad0` B1.3 · `a87ba7d` B1.3b · `046a2e8` B1.4 · `3a34c9c`+`b7208f2` B1.5 (B1.1 folded into commit 1) · `5224a99` B1.6. **Phase not closed**: the manual `L1` dev run is the single outstanding criterion |
 | B2.1…B2.4 | 🟢 **PHASE COMPLETE** (2026-08-29) | `5ab7a4b` B2.1 · `05af4a2` B2.2 · `28ee664` B2.3 · `02127ac` B2.4. Integration lane **3/3**, default lane reports **0 todo**. B2.1's own `L1` cell waits on the same decision as B1.5's |
-| B3.1…B3.3 | ⚪ not started | B3.3 **closes H7's known-red window** |
-| B4.1 | ⚪ not started | comments and titles only |
-| F-A1…F-A3 | ⚪ not started | F-A3 is the frontend Early Verification Point |
-| F-B1…F-B3 | ⚪ not started | 15 coupled test render sites split 13 (F-B2) + 2 (F-B3) |
-| F-C1…F-C4 | ⚪ not started | F-C3 **before** F-C4 — same file, shared fake-clock harness |
-| F-D1 | ⚪ not started | resolves Open Item I-6 |
-| E1…E6 | ⚪ not started | human-owned; E1 gates the rest of the phase |
-| Final | ⚪ not started | verification + document updates; **no feature code** |
+| B3.1…B3.3 | 🟡 **ALL THREE DONE** (2026-08-30) | `466e792` B3.1 · `3a6a87e` B3.2 · `9ca6d34` B3.3 (+`48d49f9` prod-gate correction). B3.3 **closed H7's known-red window**: dev `verify:schema` green since. **Note recorded in B3.3**: the prod ceiling probes are **skipped on prod by design** (non-dev), so "green on both databases" was never achievable — the constraint was confirmed instead via `pg_get_constraintdef`, the script's own recommended fallback. B3.1/B3.2 `L1` cells wait on the dev run |
+| B4.1 | ✅ **DONE** (2026-08-30) | `8424c81` — comments and titles only. Split turned out to be **9+1+1**, not 9+2: B1.5's two D-09 sites were never corrected (verified against `3a34c9c`) |
+| F-A1…F-A3 | 🟡 **ALL THREE DONE** (2026-08-30) | `f61cfcc` F-A1 (28 new keys, `en` then `vi`) · `3fd08bd` F-A2 · `95f123a` F-A3. F-A3 is the frontend Early Verification Point — its **EVP** cell waits on the dev run |
+| F-B1…F-B3 | 🟡 **ALL THREE DONE** (2026-08-30) | `3ef6a19` F-B1 · `f78a9d1` F-B2 · `f0d2112` F-B3. **The 13+2 split does not compile** — all 15 render sites had to move in one commit. F-B1: the **EG-BE-036 guard fired for real** on an inline re-derivation of RS-6. F-B3's `L1` half waits on the dev run |
+| F-C1…F-C4 | 🟡 **ALL FOUR DONE** (2026-08-30) | `ebbe007` F-C1 · `a5b0bda` F-C2 · `e4ed445` F-C3 · `cb3b495` F-C4. F-C3 before F-C4 as required. **F-C3 is where the AB-2/AB-3 empty-tree hazard fired for real**: `render()` returned 0 characters because the tree now has async server children, and only a *positive* assertion exposed it. Fixture lane **3/3, 0 todo**. F-C1/F-C2 `L1` halves wait on the dev run |
+| F-D1 | ✅ **DONE** (2026-08-30) | `ab47f07` — resolves Open Item I-6. Two keys, not one |
+| E1…E6 | 🟡 **E1 DONE 2026-08-30; E2–E6 human-owned** | **Gate A fully closed** — A3/A4 (`4a51c66`) and A6/A7 recorded 2026-08-30; zero unticked items remain. E2, E3, E5 need real provider traffic; **E4** is a product decision (`upload.essayStored`, OQ-5); **E6** is the only task that may add `ESSAY_GRADING_ENABLED`, and it comes last |
+| Final | 🟡 **Section 3 DONE** (`d136aa7`) | Mechanical regression sweep of every "unchanged" promise: **all hold**. `ScoreCard.tsx` 0 diff, `wrongTwice.ts` not one byte, `buildTelemetryPayload()` body unchanged. `quota.ts` *did* change but is a **pure extraction** — `ai:budget:` key is byte-identical. Sections 1, 2, 4+ depend on Phase E and manual dev passes |
 
 ### Interface Change Impact Analysis
 
