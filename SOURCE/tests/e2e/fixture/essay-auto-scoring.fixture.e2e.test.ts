@@ -191,6 +191,8 @@ import ResultPage from "@/app/(layer2)/exams/[id]/attempt/[attemptId]/result/pag
 import ResultDetailPage from "@/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page";
 import { HistoryRow } from "@/app/(HM)/history/_components/HistoryRow";
 import { HistoryRowMenu } from "@/components/history/HistoryRowMenu";
+import { ResultActions } from "@/app/(layer2)/_components/ResultActions";
+import { EssayGradingPoller } from "@/app/(layer2)/_components/EssayGradingPoller";
 import type { ExamResult } from "@/app/(layer2)/queries";
 import type { MyHistoryEntry } from "@/app/(HM)/queries";
 import { DEFAULT_LOCALE } from "@/lib/i18n/locales";
@@ -620,7 +622,119 @@ describe("Feature off — /result and /result/detail render as today (FE2E-1)", 
 //   (`waitFor` + fake timers is the standing hang in this repo), all clock movement
 //   through `vi.advanceTimersByTime` inside `act()`.
 describe("Last essay resolves — announcement lands and PDF unblocks in place (FE2E-2)", () => {
-  it.todo("keeps the aria-live region mounted across the render that resolves the final essay, inserts announceAllDone exactly once, stays silent on a refresh that resolves nothing, and unblocks both PDF controls without unmounting them");
+  // Dong ho GIA, pham vi hoa vao RIENG describe nay — cau truc do do Task F-C3
+  // dung san, va task nay THEM mot describe vao do chu khong phai gioi thieu no.
+  // Mot dong ho gia o muc FILE se lam FE2E-3 (mo menu) TREO.
+  beforeEach(() => {
+    vi.useFakeTimers();
+    refreshMock.mockReset();
+    generatePdfMock.mockReset();
+  });
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  it("keeps the aria-live region mounted across the render that resolves the final essay, inserts announceAllDone exactly once, stays silent on a refresh that resolves nothing, and unblocks both PDF controls without unmounting them", async () => {
+    // ═══ GIOI HAN GHI NGAY TAI CHO, DE TEN CA NAY KHONG DOI CONG HON ═══
+    //
+    // jsdom KHONG co `router.refresh()` that: mot lan refresh that se lam may
+    // chu render lai va tra ve cay moi. O day lan refresh duoc DEM (mock), con
+    // viec "band da dap xuong" duoc MO HINH HOA bang cach re-render voi fixture
+    // da nga ngu. Do cung la cach TAT DINH duy nhat de cham vao dung buoc
+    // chuyen tiep ay.
+    //
+    // Vay ca nay chung minh dieu kien CAN — khong co gi bi unmount qua buoc
+    // chuyen tiep — chu KHONG chung minh dieu kien DU (focus that su song sot
+    // trong mot trinh duyet that). Nua DU nam o luot kiem tay bang trinh duyet
+    // (FE-OQ-4 / IV-4 / R-F3).
+
+    // ── (a) Poller CHAY THAT: mot nhip, mot luot refresh ───────────────────
+    const poller = render(
+      createElement(EssayGradingPoller, { pendingCount: 1, gradedCount: 0 })
+    );
+    const liveRegion = poller.container.querySelector('p[aria-live="polite"]');
+    expect(liveRegion).not.toBeNull();
+    // RONG o luot render dau — mot vung da mang san chu co the khong duoc doc len.
+    expect(liveRegion?.textContent).toBe("");
+
+    act(() => {
+      vi.advanceTimersByTime(ESSAY_POLL_FAST_INTERVAL_MS);
+    });
+    expect(refreshMock).toHaveBeenCalledTimes(1);
+
+    // ── (b) Mot luot refresh KHONG giai quyet duoc gi thi IM LANG ──────────
+    act(() => {
+      poller.rerender(
+        createElement(EssayGradingPoller, { pendingCount: 1, gradedCount: 0 })
+      );
+    });
+    expect(
+      poller.container.querySelector('p[aria-live="polite"]')?.textContent
+    ).toBe("");
+
+    // ── (c) Cau CUOI nga ngu: vung VAN o trong cay, va cau bao duoc CHEN ───
+    act(() => {
+      poller.rerender(
+        createElement(EssayGradingPoller, { pendingCount: 0, gradedCount: 1 })
+      );
+    });
+
+    const afterResolve = poller.container.querySelector('p[aria-live="polite"]');
+    // KHONG BI UNMOUNT — day la ca ma dieu kien mount `pendingCount > 0` se pha:
+    // vung roi khoi DOM TRONG CUNG commit ma cau nay le ra duoc chen vao.
+    expect(afterResolve).not.toBeNull();
+    expect(afterResolve).toBe(liveRegion);
+    expect(afterResolve?.textContent).toBe(DICT["result.essay.announceAllDone"]);
+
+    // DUNG MOT lan: dem so node mang cau ay tren toan bo cay.
+    const announcements = Array.from(
+      poller.container.querySelectorAll("p")
+    ).filter((el) => el.textContent === DICT["result.essay.announceAllDone"]);
+    expect(announcements).toHaveLength(1);
+    cleanup();
+
+    // ── (d) Ca HAI dieu khien PDF mo khoa, va KHONG cai nao bi unmount ─────
+    const pdfInput = {
+      subject: "Biology",
+      examTitle: "Fixture exam: cell biology",
+      totalScore: 5,
+      examineeName: PROFILE.displayName,
+      submittedAt: "2026-08-18T11:40:00.000Z",
+      correct: 1,
+      total: 2,
+      hasIncompleteEssay: false,
+    };
+
+    const actions = render(
+      createElement(ResultActions, {
+        pdfInput,
+        blockedReason: DICT["result.essay.pdfBlocked"],
+      })
+    );
+    const blockedButtons = Array.from(actions.container.querySelectorAll("button"));
+    expect(blockedButtons).toHaveLength(2);
+    for (const b of blockedButtons) {
+      expect(b.getAttribute("aria-disabled")).toBe("true");
+      expect(b.hasAttribute("disabled")).toBe(false);
+    }
+
+    act(() => {
+      actions.rerender(createElement(ResultActions, { pdfInput, blockedReason: null }));
+    });
+
+    const openButtons = Array.from(actions.container.querySelectorAll("button"));
+    expect(openButtons).toHaveLength(2);
+    for (const [i, b] of openButtons.entries()) {
+      expect(b.getAttribute("aria-disabled")).toBe("false");
+      expect(b.hasAttribute("disabled")).toBe(false);
+      // DIEU KIEN CAN cua "khong bi unmount": cung mot node DOM truoc va sau.
+      expect(b).toBe(blockedButtons[i]);
+    }
+    // Va gio bam duoc that.
+    fireEvent.click(openButtons[0]);
+    expect(generatePdfMock).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("PDF export guard — both exits agree for one attempt (FE2E-3)", () => {

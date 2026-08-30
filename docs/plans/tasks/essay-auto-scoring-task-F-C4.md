@@ -45,7 +45,22 @@ jsdom has **no real `router.refresh()`** and **no painted focus ring**, so (f) p
 - `docs/ui-spec/essay-auto-scoring-ui-spec.md` (§ Component: EssayGradingPoller — verify default (polling) + resolved states)
 
 ## Investigation Notes
-_(Record here: the node reference captured before the refresh and the identity comparison after; the exact `textContent` observed at each step; confirmation that the fake clock is scoped to this describe only.)_
+
+### Fixture lane resolution: 3/3, unresolved `it.todo`: 0
+`essay-auto-scoring.fixture.e2e.test.ts` now reports **3 executing cases and no todo**. The lane's only remaining red is the recorded TD-030 baseline in `subscription.fixture.e2e.test.ts`.
+
+### The limit is stated at the assertion, and the case name does not claim past it
+jsdom has no real `router.refresh()`. Here the refresh is **counted** (a mock) and the band's arrival is **modelled** by re-rendering with the resolved fixture — which the task file already identifies as the only deterministic way to hit the transition. So the case proves the **necessary** condition (nothing was unmounted across the transition) and **not** the sufficient one (focus actually survived in a browser). The sufficient half stays with the manual browser pass (FE-OQ-4 / IV-4 / R-F3).
+
+"Nothing was unmounted" is asserted concretely rather than described: the `aria-live` element and both PDF buttons are compared by **node identity** (`toBe`) before and after the transition, not merely by presence.
+
+### The three-step journey, and what each step rules out
+1. One fast interval on the fake clock ⇒ exactly **one** `router.refresh()`. The live region starts **empty** (AB-7).
+2. A refresh that resolves **nothing** leaves the region **empty** — announcing on every tick is the AC-023 defect seen from the other side, a screen reader interrupting at every poll.
+3. The render that resolves the **last** essay inserts `announceAllDone` **exactly once**, into the **same** region node. This is the case that a `pendingCount > 0` mount condition would break: the region would leave the DOM in the same commit the sentence was to be inserted.
+
+### Commit hygiene: F-C3 and F-C4 were split back apart
+Both tasks rewrite the same file and I completed them in one sitting before committing. Rather than collapse them into one commit, the file was reverted to its F-C3 state (FE2E-2 back to `it.todo`), F-C3 was committed and verified on its own, and F-C4 was then re-applied on top. One task, one commit — including the intermediate state actually being green.
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
@@ -76,12 +91,12 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
 
 | # | Command (from `SOURCE/`) | Exit code | Notes |
 |---|---|---|---|
-| 1 | `npx tsc --noEmit` | | |
-| 2 | `npx eslint --max-warnings 0` | | |
-| 3 | `npx vitest run` | | |
-| 4 | `npm run build` | | |
-| 5 | `npm run test:fixture` | | **this task's primary gate** — expected red = TD-030 baseline only (Gate F1): exactly 2 failures, both `subscription.fixture.e2e.test.ts` FE-1(e) `en` + `vi` |
-| 6 | `npm run test:localdb` | | see Open Item I-7 |
+| 1 | `npx tsc --noEmit` | **0** | |
+| 2 | `npx eslint --max-warnings 0` | **0** | |
+| 3 | `npx vitest run` | **0** | 2022 passed / 10 skipped / 0 todo |
+| 4 | `npm run build` | **0** | |
+| 5 | `npm run test:fixture` | **1** | **TD-030 baseline only.** This file: **3 executing, 0 todo** — fixture lane resolution **3/3** |
+| 6 | `npm run test:localdb` | **0** | 11 passed / 2 todo (SVC-1, SVC-2 — Task H8) |
 
 **A task file with any exit-code cell left empty is not complete** (Gate E4).
 
