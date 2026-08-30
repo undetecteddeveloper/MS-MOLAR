@@ -41,8 +41,11 @@ A `threw` exception reuses `profile.error.generic` — the same truth told to th
 The control stays in the tree, stays focusable, and carries `aria-disabled="true"` with `aria-describedby` pointing at `result.essay.retryExhausted`. `min-h-11` touch target (see FE-OQ-5).
 
 ## Target Files
-- [ ] `SOURCE/app/(layer2)/_components/EssayRegradeControl.tsx` (new)
-- [ ] `SOURCE/app/(layer2)/_components/__tests__/EssayRegradeControl.test.tsx` (new)
+- [x] `SOURCE/app/(layer2)/_components/EssayRegradeControl.tsx` (new)
+- [x] `SOURCE/app/(layer2)/_components/__tests__/EssayRegradeControl.test.tsx` (new) — 16 cases
+- [x] `SOURCE/app/(layer2)/_components/EssayReviewBlock.tsx` — **extra**: the control slots in at RS-4/5/6 (F-B1 recorded this as F-C1's work)
+- [x] `SOURCE/app/(layer2)/_components/__tests__/EssayReviewBlock.test.tsx` — **extra, named by `tsc`**: two new props + a router stub
+- [x] `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` — **extra**: passes `attemptId`/`questionId` down
 
 ## Investigation Targets
 - `docs/ui-spec/essay-auto-scoring-ui-spec.md` (§ Component: EssayRegradeControl — verify Idle + Busy + Done-refused (all five reasons) + Done-success + Threw + Exhausted states)
@@ -68,7 +71,35 @@ The control stays in the tree, stays focusable, and carries `aria-disabled="true
 - `docs/ui-spec/essay-auto-scoring-ui-spec.md` (§ Component: EssayRegradeControl — verify Idle + Busy + Done-refused + Done-success + Threw + Exhausted states)
 
 ## Investigation Notes
-_(Record here: the five refusal strings resolved from the real dictionary and the confirmation that no two share a string; the counted `refresh` calls per case; the `console.error` payload's key set.)_
+
+### `REFUSAL_KEY` is a `Record`, and that is the point
+A `switch` with a `default` lets a sixth reason fall silently into another reason's sentence — telling a student something untrue about their own situation. As a `Record<RetryRefusal, MessageKey>`, adding a reason is a **compile error right here**. Five entries, five sentences, and a case asserts all five are **distinct**: if two collapsed, the per-reason cases would all still pass while the student could no longer tell which situation they were in.
+
+Two keys are **reused**, not duplicated (`not_found` → `profile.error.sessionExpired`, `server` → `profile.error.generic`), per the convention at `en.ts:5-6`.
+
+### The `threw` branch reuses `server`'s sentence — the only exception to one-reason-one-sentence
+A thrown exception and a `server` refusal are **one truth arriving by two routes**, told to the same person. Giving them separate strings would create a second sentence to drift from the first. Recorded because it looks like a shortcut and is not.
+
+### Two ordering rules, both asserted rather than assumed
+1. `if (exhausted) return` sits **above** the busy latch. At RS-6 there is nothing to send, so a press must produce **no action call, no busy phase, no outcome node** — all three asserted in one case.
+2. `busyRef` is a **synchronous ref**, checked before any `setState` and before any `await`. A state-based latch reads the *previous* render's value, so a second click in the same tick gets through. Asserted by firing two clicks and expecting exactly one call.
+
+### `router.refresh()`, never a local state patch
+The server decides the band (first-write-wins). A local patch would let `EssayScoreLine` above say one thing while the question card below says another — on the same screen, about the same attempt. Asserted directly.
+
+### The alert node appears on outcome; it is not a pre-inserted live region
+`role="alert"` with **no** `aria-live`, inserted when the outcome arrives. This is a user-initiated action — the exact opposite of the poller's `polite` region, where what changes is something the student did not press. Idle and success states assert **no** alert node exists.
+
+### Never a native `disabled`, including at RS-6
+Asserted three ways: `hasAttribute("disabled") === false`, `aria-disabled === "true"`, and the button **still takes focus** (`document.activeElement`). Plus a subtree `querySelector("[disabled]")` returning null in both states (FE-AC-21). The reason is reachable through `aria-describedby`.
+
+### One test-harness correction, and one in the block that hosts it
+`vi.mock` factories are hoisted above `const` declarations, so the first draft failed with `Cannot access 'retryMock' before initialization`. Fixed with `vi.hoisted`, the same shape `gradeEssays.test.ts` uses.
+
+Slotting the control into `EssayReviewBlock` then broke that block's tests: the client child calls `useRouter()`, which throws `invariant expected app router to be mounted` inside a bare `renderToReadableStream`. Stubbed with the one-method shape `OrderRow.test.tsx` already runs — **the control itself stays real**, only the router is stubbed.
+
+### Still owed: the L1 check
+Pressing retry on a seeded `failed` question on dev and receiving a band reaches `api.groq.com` through `retryEssayGrading()`. It needs the same engineer-owned grading run as F-A3 and F-B3. Every state is covered at unit level, including all five refusal reasons.
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
@@ -100,13 +131,12 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
 
 | # | Command (from `SOURCE/`) | Exit code | Notes |
 |---|---|---|---|
-| 1 | `npx tsc --noEmit` | | |
-| 2 | `npx eslint --max-warnings 0` | | |
-| 3 | `npx vitest run` | | |
-| 4 | `npm run build` | | |
-| 5 | `npm run test:fixture` | | expected red = TD-030 baseline only (Gate F1): exactly 2 failures, both `subscription.fixture.e2e.test.ts` FE-1(e) `en` + `vi` |
-| 6 | `npm run test:localdb` | | see Open Item I-7 |
-| 7 | `npm run check:bundle` | | Gate E2 — this task adds a `"use client"` component |
+| 1 | `npx tsc --noEmit` | **0** | The `Record<RetryRefusal, MessageKey>` is the gate: a sixth reason is a compile error here |
+| 2 | `npx eslint --max-warnings 0` | **0** | |
+| 3 | `npx vitest run` | **0** | 2011 passed / 10 skipped / 0 todo (was 1995 — **+16**) |
+| 4 | `npm run build` | **0** | |
+| 5 | `npm run test:fixture` | **1** | Expected red, TD-030 baseline only. Snapshot CRLF churn reverted before commit |
+| 6 | `npm run test:localdb` | **0** | 11 passed / 2 todo (SVC-1, SVC-2 — Task H8) |
 
 **A task file with any exit-code cell left empty is not complete** (Gate E4).
 

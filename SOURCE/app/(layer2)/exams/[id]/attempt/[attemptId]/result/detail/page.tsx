@@ -153,6 +153,8 @@ export default async function ResultDetailPage({
                       view={r.essay}
                       studentAnswer={r.selected ?? ""}
                       modelAnswer={q?.essayAnswer ?? ""}
+                      attemptId={attemptId}
+                      questionId={r.questionId}
                     />
                   ) : (
                     <div className="flex flex-col gap-1 text-sm">

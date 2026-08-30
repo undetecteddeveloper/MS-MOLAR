@@ -35,6 +35,7 @@
 // sinh mà không diễn giải gì.
 
 import { EssayLifecycleBadge } from "@/components/essay/EssayLifecycleBadge";
+import { EssayRegradeControl } from "./EssayRegradeControl";
 import { getTranslate } from "@/lib/i18n/server";
 import { isEssayIncomplete, type EssayView } from "@/lib/scoring/essayLifecycle";
 
@@ -68,11 +69,18 @@ export async function EssayReviewBlock({
   view,
   studentAnswer,
   modelAnswer,
+  attemptId,
+  questionId,
 }: {
   /** Trạng thái ĐÃ SUY RA. Đây là thứ DUY NHẤT được rẽ nhánh. */
   view: EssayView;
   studentAnswer: string;
   modelAnswer: string;
+  /** Hai định danh mà nút chấm lại cần. Chúng KHÔNG phải trạng thái và không
+   *  được rẽ nhánh theo — thêm chúng không mở lại đường đọc `scored`/
+   *  `isCorrect` mà LUẬT CỨNG ở đầu file đóng lại. */
+  attemptId: string;
+  questionId: string;
 }) {
   const t = await getTranslate();
 
@@ -131,6 +139,18 @@ export async function EssayReviewBlock({
             // học sinh không gây ra. Câu này nói đúng cơ học thay vì hứa một số.
             <p className="text-muted-foreground">{t("result.essay.attemptsNote")}</p>
           )}
+
+          {/* Nút chấm lại có mặt ở CẢ BA trạng thái thất bại, KỂ CẢ RS-6. Ở
+              RS-6 nó `aria-disabled` nhưng VẪN nằm trong cây và VẪN focus được
+              — gỡ nó đi sẽ lấy mất của người dùng bàn phím cả cái nút LẪN câu
+              giải thích vì sao nó không bấm được (AC-064). */}
+          <div className="pt-1">
+            <EssayRegradeControl
+              attemptId={attemptId}
+              questionId={questionId}
+              exhausted={exhausted}
+            />
+          </div>
         </div>
       )}
 

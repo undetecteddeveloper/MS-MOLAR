@@ -9,6 +9,12 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined }) }));
+// `EssayRegradeControl` (con CLIENT của khối này) goi `useRouter()`, thu nay
+// nem "invariant expected app router to be mounted" ngoai mot cay app-router
+// that — khong co provider nao trong mot `renderToReadableStream` tran. Stub
+// bang dung hinh dang mot-phuong-thuc ma `OrderRow.test.tsx` da chay that.
+// BAN THAN control la THAT: chi router bi stub.
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }) }));
 
 import { renderServerTree } from "@/app/(billing)/me/orders/__tests__/renderServerTree";
 import { EssayReviewBlock } from "../EssayReviewBlock";
@@ -33,7 +39,13 @@ function view(over: Partial<EssayView> = {}): EssayView {
 
 function render(v: EssayView, studentAnswer = STUDENT, modelAnswer = MODEL) {
   return renderServerTree(
-    <EssayReviewBlock view={v} studentAnswer={studentAnswer} modelAnswer={modelAnswer} />
+    <EssayReviewBlock
+      view={v}
+      studentAnswer={studentAnswer}
+      modelAnswer={modelAnswer}
+      attemptId="a1"
+      questionId="q1"
+    />
   );
 }
 
