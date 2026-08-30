@@ -379,6 +379,7 @@ export const en = {
   "upload.shortAnswerStored": "Short answer — stored, not auto-scored yet.",
   "upload.modelAnswer": "Model answer",
   "upload.essayStored": "Essay — stored, not auto-scored yet.",
+  "upload.essayScored": "Essay — auto-scored after the student submits.",
   "upload.questionText": "Question text",
   "upload.deleting": "Deleting…",
   "upload.dragDrop": "Drag & drop, or click to upload",

@@ -313,6 +313,7 @@ export const vi: Dictionary = {
   "upload.shortAnswerStored": "Trả lời ngắn — đã lưu, chưa chấm tự động.",
   "upload.modelAnswer": "Đáp án mẫu",
   "upload.essayStored": "Tự luận — đã lưu, chưa chấm tự động.",
+  "upload.essayScored": "Tự luận — chấm tự động sau khi học sinh nộp bài.",
   "upload.questionText": "Nội dung câu hỏi",
   "upload.deleting": "Đang xoá…",
   "upload.dragDrop": "Kéo thả vào đây, hoặc nhấp để chọn file",

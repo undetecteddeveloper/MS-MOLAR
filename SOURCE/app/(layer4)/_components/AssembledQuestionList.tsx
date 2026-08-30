@@ -21,6 +21,8 @@ interface AssembledQuestionListProps {
   ) => void;
   /** Nội dung server render sẵn, tra theo `reviewNodeKey` (TD-027). Chỉ đi qua đây. */
   nodes?: ReviewNodes;
+  /** Cờ chấm tự luận — chỉ đi ngang qua đây xuống `QuestionEditor` (Task E4). */
+  essayGradingEnabled?: boolean;
 }
 
 export function AssembledQuestionList({
@@ -29,6 +31,7 @@ export function AssembledQuestionList({
   errors,
   onChangeQuestion,
   nodes,
+  essayGradingEnabled = false,
 }: AssembledQuestionListProps) {
   const t = useT();
   // Khoá lỗi composite — khớp validateAssembledExam (partNumber null = đề 1 phần).
@@ -49,6 +52,7 @@ export function AssembledQuestionList({
             hasError={errorKeys.has(`${q.part}:${q.number}`)}
             onChange={(patch) => onChangeQuestion(q.part, q.number, patch)}
             nodes={nodes?.[reviewNodeKey(q.part, q.number)]}
+            essayGradingEnabled={essayGradingEnabled}
           />
         ))}
       </ul>
@@ -76,6 +80,7 @@ export function AssembledQuestionList({
                   hasError={errorKeys.has(`${q.part}:${q.number}`)}
                   onChange={(patch) => onChangeQuestion(q.part, q.number, patch)}
                   nodes={nodes?.[reviewNodeKey(q.part, q.number)]}
+                  essayGradingEnabled={essayGradingEnabled}
                 />
               ))}
           </ul>

@@ -1446,7 +1446,7 @@ graph TD
   - Escalation condition: markedly low agreement with a human grader ⇒ change the constant — and AC-032 then requires the **whole** AC-070 run again, dated, not just a string edit.
   - This run is **adopted but is not a merge gate** (it needs a real key, spends budget, and is non-deterministic). Nightly or on demand, and **mandatory** on every model change.
 
-- [ ] **Task E4 — OQ-5: decide what happens to `upload.essayStored`**
+- [x] **Task E4 — OQ-5: decide what happens to `upload.essayStored`** — **DECIDED 2026-08-30: option (b), implemented as two keys selected by the flag** (mirroring AC-051/UI-D8), because a single rewritten string is false in the other direction whenever the flag is off — and the flag has an off path (E6's kill switch, and Preview). D6 is not reversed; option (c) stays unopened.
   - Owner: **engineer**, before enabling the flag. That string (`vi.ts:271`, `en.ts:334`, rendered at `app/(layer4)/_components/QuestionEditor.tsx:15`) tells the **exam author** that essays are "chưa chấm tự động". It becomes **false** the moment Gate A passes.
   - Out of scope by boundary — D6 keeps the author surface unchanged and the UI Spec's four screens exclude `(layer4)` — but it is not allowed to stay silent. Choose: (a) leave it and accept one false sentence on the author screen; (b) change the string in the same deploy as the flag (an i18n-only change, no structural impact); (c) open a UI Spec section for `(layer4)`.
   - Escalation condition: does **not** block ship; it blocks **treating the author surface as correct**.

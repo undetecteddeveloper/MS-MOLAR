@@ -26,7 +26,23 @@ That string (`vi.ts:271`, `en.ts:334`, rendered at `app/(layer4)/_components/Que
 Does **not** block ship; it blocks **treating the author surface as correct**.
 
 ### Decision recorded here
-`____________________`
+**Decision 2026-08-30 by the engineer: option (b) — but implemented as TWO KEYS SELECTED BY THE FLAG, not as a rewritten string.**
+
+The task's literal (b) ("change the string in the same deploy as the flag") would be false in the **other** direction whenever the flag is off — and this flag **has** an off path: E6 keeps a kill switch, and Preview need not carry the same variable as Production. A single string always has one state in which it lies.
+
+So the decision mirrors what the player surface already does for the same problem (AC-051 / UI-D8, Task F-D1): keep `upload.essayStored` **verbatim** for the flag-off state and add `upload.essayScored` for flag-on, selected by the flag.
+
+**Implementation (5 files + 1 test):**
+- `lib/i18n/dictionaries/en.ts` — new key `upload.essayScored`; `en.ts` first, because `Dictionary` is derived from it (AB-12)
+- `lib/i18n/dictionaries/vi.ts` — the same key
+- `app/(layer4)/_components/QuestionEditor.tsx` — new prop `essayGradingEnabled?: boolean`, **default `false`** (fail-closed, like all three existing flag reads: a call site that forgets the prop shows something merely stale rather than promising a feature that may be off), and the ternary at the footnote
+- `app/(layer4)/_components/AssembledQuestionList.tsx` — passes it through at **both** render sites. Missing one would leave multi-part exams showing the wrong sentence, which is exactly the kind of defect that only appears on multi-part exams
+- `app/(layer4)/_components/ReviewScreen.tsx` — passes it through
+- `app/(layer4)/me/exams/[id]/page.tsx` — the **only** place that reads `process.env`, because it is the only server component in this chain; the other three are `"use client"`. Read rule identical to the other three sites (AC-013): only a trimmed `"true"` is on
+
+**Test**: one case in `QuestionEditor.test.tsx` covering absent / `false` / `true`, asserting the expected string is present **and** the other absent. It was **proven red against an inverted ternary**, not merely green as written — a case that checks only one branch passes happily with the two keys swapped.
+
+**Scope note:** this does *not* reverse D6. The author surface gains no new screen, no UI Spec section and no structural change — one sentence now tracks a flag that already exists. Option (c) remains unopened.
 
 ## Target Files
 - [ ] `docs/plans/20260829-feature-essay-auto-scoring.md` — Task E4's decision slot
