@@ -40,6 +40,20 @@ interface QuestionRendererProps {
   onSelectAnswer: (value: string) => void;
   flagged: boolean;
   onToggleFlag: () => void;
+  /** Cờ AC-067, đã được ĐỌC Ở SERVER rồi truyền xuống — chỗ đọc 3/3, và là
+   *  cổng CÂU CHỮ (hai chỗ kia là cổng HÀNH VI: `submitExam()` và
+   *  `retryEssayGrading()`). Cả ba đọc MỘT biến nên chúng lật cùng lúc trong
+   *  một lượt deploy.
+   *
+   *  KHÔNG BAO GIỜ `NEXT_PUBLIC_*` (UI-D7): một bản sao thứ hai của cùng một sự
+   *  thật ở hai phía biên rồi sẽ lệch, và phía CLIENT là phía nói dối học sinh.
+   *
+   *  TUỲ CHỌN, mặc định `false`, và tính tuỳ-chọn ấy GÁNH VIỆC chứ không phải
+   *  cho gọn: một prop BẮT BUỘC sẽ làm mọi chỗ dựng hiện có đỏ ở `tsc` và buộc
+   *  phải sửa `ExamPlayer.test.tsx`. Vì nó tuỳ chọn, `QuestionRenderer.test.tsx`
+   *  — vốn dựng component mà KHÔNG truyền nó — nhận `false`, in
+   *  `player.essayNotScored`, và chuỗi đã ghim ở đó ở nguyên XANH. */
+  essayGradingEnabled?: boolean;
 }
 
 export function QuestionRenderer({
@@ -50,6 +64,7 @@ export function QuestionRenderer({
   onSelectAnswer,
   flagged,
   onToggleFlag,
+  essayGradingEnabled = false,
 }: QuestionRendererProps) {
   const t = useT();
   const type = question.questionType ?? "mcq";
@@ -176,8 +191,16 @@ export function QuestionRenderer({
             dòng chữ "làm ra giấy", nên với đề toàn tự luận như Toán 8 thì màn
             làm bài KHÔNG có chỗ nào để trả lời: người dùng đọc đó là mất field.
             Bản MVP cũ giả định mọi đề đều trắc nghiệm.)
-            Vẫn KHÔNG chấm tự động (computeScore không bao giờ chấm essay) —
-            chữ dưới ô nói đúng điều đó thay vì hứa hẹn.
+            Chân trang chọn giữa HAI khoá theo cờ AC-067 (UI-D8). Câu cũ
+            (`player.essayNotScored`) được GIỮ NGUYÊN VĂN chứ không xoá, vì
+            AC-067 tạo ra một khoảng thời gian CÓ THẬT trong đó nó vẫn ĐÚNG:
+            tính năng ship ở trạng thái TẮT, bài làm được lưu, và không được
+            chấm tự động. Xoá nó trong cùng commit là buộc phải ship một câu
+            SAI suốt khoảng ấy.
+            Lý do cũ ở đây ("computeScore không bao giờ chấm essay") nay chỉ
+            đúng một nửa: `computeScore()` vẫn không chấm, nhưng band ĐƯỢC ghi
+            bởi đường bất đồng bộ sau khi nộp — nên câu chữ phải do CỜ chọn,
+            không do một sự thật cố định.
             maxLength = TRẦN THẬT của DB: attempt_answers.answer CHECK
             length <= 500. Cắt ở client + đếm ký tự còn lại để người làm bài
             thấy giới hạn TRƯỚC khi gõ hụt, thay vì bị Postgres từ chối nguyên
@@ -196,7 +219,9 @@ export function QuestionRenderer({
               className="border-border bg-card text-foreground focus:border-ring min-h-32 w-full flex-1 resize-y rounded-md border px-3 py-2 text-sm leading-relaxed outline-none"
             />
             <div className="text-muted-foreground flex items-center justify-between gap-3 text-xs">
-              <span className="italic">{t("player.essayNotScored")}</span>
+              <span className="italic">
+                {t(essayGradingEnabled ? "player.essayScored" : "player.essayNotScored")}
+              </span>
               <span className="shrink-0 tabular-nums">
                 {t("player.charsLeft", {
                   remaining: MAX_ATTEMPT_ANSWER - (selectedAnswer?.length ?? 0),

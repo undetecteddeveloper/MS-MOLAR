@@ -75,7 +75,15 @@ const ESSAY_QUESTION: PublicQuestion = {
   questionType: "essay",
 };
 
-function renderQuestion(question: PublicQuestion, onSelectAnswer = vi.fn()) {
+function renderQuestion(
+  question: PublicQuestion,
+  onSelectAnswer = vi.fn(),
+  // Tham so THU BA, tuy chon, va co y de o cuoi: moi cho goi san co giu nguyen
+  // chu ky cu va vi the van nhan `essayGradingEnabled === undefined` — tuc mac
+  // dinh `false` cua component. Do la nua co hoc giu cho chuoi da ghim o ca
+  // AC-009 phia tren o nguyen xanh (Open Item I-6 / backend D-14).
+  options: { essayGradingEnabled?: boolean } = {}
+) {
   return render(
     <QuestionRenderer
       index={1}
@@ -85,6 +93,7 @@ function renderQuestion(question: PublicQuestion, onSelectAnswer = vi.fn()) {
       onSelectAnswer={onSelectAnswer}
       flagged={false}
       onToggleFlag={vi.fn()}
+      essayGradingEnabled={options.essayGradingEnabled}
     />
   );
 }
@@ -154,5 +163,67 @@ describe("QuestionRenderer — footnote copy (AC-008/AC-009)", () => {
 
     fireEvent.change(input as HTMLInputElement, { target: { value: "1260" } });
     expect(onSelectAnswer).toHaveBeenCalledWith("1260");
+  });
+});
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CHÂN TRANG Ô TỰ LUẬN DO CỜ CHỌN (AC-051 / AC-067 / UI-D8) — Task F-D1
+//
+// HAI khoá, không phải một khoá bị thay. Câu cũ được GIỮ NGUYÊN VĂN vì AC-067
+// tạo ra một khoảng thời gian CÓ THẬT trong đó nó vẫn ĐÚNG: tính năng ship ở
+// trạng thái TẮT, bài làm được lưu, và không được chấm tự động. Xoá nó trong
+// cùng commit là buộc phải ship một câu SAI suốt khoảng ấy.
+//
+// ═══ OPEN ITEM I-6, GIẢI Ở ĐÂY THAY VÌ ĐỂ MỞ ═══
+//
+// Frontend DD nói `:112` và `:119` "phải đổi cùng nhau"; backend D-14 nói
+// `:112` ở nguyên XANH cho tới khi có một test chạm nhánh BẬT. D-14 đúng, và
+// lý do là HÌNH DẠNG PROP đã ship: `essayGradingEnabled` là TUỲ CHỌN, mặc định
+// `false`. Mọi ca sẵn có dựng component mà không truyền nó ⇒ nhận `false` ⇒ in
+// `player.essayNotScored` ⇒ chuỗi ghim ở đó không nhúc nhích.
+//
+// NHƯNG: ca ĐẦU TIÊN chạm nhánh BẬT nằm ngay dưới đây, nên kể từ commit này
+// hai chỗ ấy ĐÃ ghép cặp — đúng như D-14 báo trước. Điều kiện làm nó vỡ cũng
+// ghi luôn: nếu prop thành BẮT BUỘC, hoặc mặc định đổi thành `true`, thì `:112`
+// đỏ NGAY và ghép cặp sớm hơn kế hoạch.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("QuestionRenderer — chân trang tự luận do cờ AC-067 chọn", () => {
+  it("cờ TẮT (mặc định, không truyền prop) ⇒ câu CŨ, nguyên văn", () => {
+    const { container } = renderQuestion(ESSAY_QUESTION);
+
+    // Đây chính là hành vi giữ cho chuỗi đã ghim ở ca AC-009 phía trên xanh.
+    expect(container.textContent).toContain(
+      "Essay — your working is saved with the attempt, not auto-scored yet."
+    );
+    expect(container.textContent).not.toContain("auto-scored after you submit");
+  });
+
+  it("cờ BẬT ⇒ câu MỚI, và câu cũ biến mất", () => {
+    const { container } = renderQuestion(ESSAY_QUESTION, undefined, { essayGradingEnabled: true });
+
+    expect(container.textContent).toContain("Essay — auto-scored after you submit.");
+    expect(container.textContent).not.toContain("not auto-scored yet");
+  });
+
+  it("cờ KHÔNG đụng tới ô nhập, chỗ giữ chỗ hay bộ đếm ký tự (AC-052)", () => {
+    // Hai lan render doc lap, doc tu container RIENG cua tung lan — file nay
+    // khong bat `cleanup` tu dong, nen so sanh qua container thay vi qua
+    // `screen` la cach tranh hai cay chong len nhau.
+    const off = renderQuestion(ESSAY_QUESTION);
+    const offTextarea = off.container.querySelector("textarea");
+    const offPlaceholder = offTextarea?.getAttribute("placeholder");
+    const offMaxLength = offTextarea?.maxLength;
+
+    const on = renderQuestion(ESSAY_QUESTION, undefined, { essayGradingEnabled: true });
+    const onTextarea = on.container.querySelector("textarea");
+
+    // Cờ chọn MỘT câu chữ. Nó không được phép chạm vào bất cứ thứ gì khác của
+    // ô nhập — ô nhập là thứ học sinh đang gõ bài vào.
+    expect(onTextarea).not.toBeNull();
+    expect(onTextarea?.getAttribute("placeholder")).toBe(offPlaceholder);
+    expect(onTextarea?.maxLength).toBe(offMaxLength);
+    expect(onTextarea?.maxLength).toBe(4000);
   });
 });

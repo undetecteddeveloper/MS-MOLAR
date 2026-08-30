@@ -39,6 +39,22 @@ export default async function ExamPlayerPage({
       // giữ 126 KB br của RichText khỏi bundle màn làm bài.
       questionNodes={renderQuestionNodes(data.questions)}
       parts={data.exam.parts}
+      // CHO DOC CO 3/3 — va la cho duy nhat trong ba cho la mot CONG CAU CHU.
+      // Hai cho kia la cong HANH VI: `submitExam()` quyet dinh co phat khoa
+      // vong doi va co dang ky `after()` khong; `retryEssayGrading()` quyet
+      // dinh mot luot cham lai co voi toi provider duoc khong. Cho nay khong
+      // cham gi toi viec cham — no chi chon giua HAI khoa i18n.
+      //
+      // Ca ba doc MOT bien nen chung lat cung luc trong mot luot deploy.
+      //
+      // KHONG BAO GIO `NEXT_PUBLIC_*` (UI-D7): mot ban sao thu hai cua cung
+      // mot su that o hai phia bien roi se lech, va phia CLIENT la phia noi
+      // doi hoc sinh. Co duoc DOC O SERVER roi truyen xuong duoi dang mot
+      // boolean da chot.
+      //
+      // Quy tac doc fail-closed, giong het hai cho kia: CHI chuoi `"true"` da
+      // trim moi la bat; moi gia tri khac, ke ca vang mat, la tat.
+      essayGradingEnabled={process.env.ESSAY_GRADING_ENABLED?.trim() === "true"}
     />
   );
 }

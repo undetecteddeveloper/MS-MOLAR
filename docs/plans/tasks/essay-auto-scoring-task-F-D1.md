@@ -33,10 +33,10 @@ A **required** prop would make every existing construction site fail `tsc` and w
 The frontend DD's Implementation Path Mapping says `:112` and `:119` "must both change together", while backend **D-14** says `:112` stays green until a test exercises the enabled branch. **D-14's analysis is the one confirmed against the shipped prop shape** (optional, default `false`) — but **resolve this explicitly before writing the commit**, and **if a new case is added here that exercises the enabled branch, `:112` becomes coupled at that moment.** If the prop were ever made **required**, or its default changed to `true`, `:112` goes red immediately and becomes coupled earlier than planned. *Owner: engineer, at this task.*
 
 ## Target Files
-- [ ] `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/page.tsx`
-- [ ] `SOURCE/app/(layer2)/_components/ExamPlayer.tsx`
-- [ ] `SOURCE/app/(layer2)/_components/QuestionRenderer.tsx`
-- [ ] `SOURCE/app/(layer2)/_components/__tests__/QuestionRenderer.test.tsx` (the **new** RTL case only)
+- [x] `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/page.tsx` — read site 3 of 3 (the copy gate)
+- [x] `SOURCE/app/(layer2)/_components/ExamPlayer.tsx` — accepts and forwards unchanged
+- [x] `SOURCE/app/(layer2)/_components/QuestionRenderer.tsx` — optional prop + flag-selected key + the corrected reason
+- [x] `SOURCE/app/(layer2)/_components/__tests__/QuestionRenderer.test.tsx` — 3 new cases + a trailing optional helper parameter
 
 ## Investigation Targets
 - `docs/ui-spec/essay-auto-scoring-ui-spec.md` (§ Component: QuestionRenderer (essay branch) — verify default-with-flag-on and default-with-flag-off states)
@@ -71,7 +71,31 @@ Roundtrip check this task owns: the boolean the segment reads is the boolean the
 - `docs/ui-spec/essay-auto-scoring-ui-spec.md` (§ Component: QuestionRenderer (essay branch) — verify default-with-flag-on + default-with-flag-off states)
 
 ## Investigation Notes
-_(Record here: the **I-6 decision** — whether `:112` moves in this commit, and on what basis; confirmation that `ExamPlayer.test.tsx` is green **without edits**; the `L1` toggle result on dev.)_
+
+### Open Item I-6 — resolved here, with the coupling moment named
+The frontend DD says the footnote pin and the `maxLength` pin "must both change together"; backend **D-14** says the footnote pin stays green until a test exercises the **enabled** branch. **D-14 is right**, and the reason is the shipped prop shape: `essayGradingEnabled` is **optional, default `false`**, so every pre-existing construction site receives `false`, renders `player.essayNotScored`, and its pinned string does not move. That is exactly why the footnote pin was **not** part of Task B3.3.
+
+**But the coupling begins now.** The first case that exercises the enabled branch is the one added in this commit, so from here the two are coupled — precisely as D-14 predicted. The breaking condition is recorded next to the test: if the prop is ever made **required**, or its default flipped to `true`, the footnote pin goes red immediately and the coupling arrives earlier than planned.
+
+### The optional prop earns its keep; it is not a convenience
+A **required** prop would fail `tsc` at every existing construction site and force `ExamPlayer.test.tsx` to change — pulling an unrelated file into this commit and turning a copy change into a mechanical sweep. Optional keeps the blast radius to the three files that actually carry the decision.
+
+The test helper gained a **third, optional, trailing** parameter for the same reason: every existing caller keeps its old signature and therefore keeps receiving `undefined`.
+
+### Read site 3 of 3, and it is the only one that is a copy gate
+`submitExam()` and `retryEssayGrading()` are **behaviour** gates — they decide whether lifecycle keys are emitted and whether a retry can reach the provider. This one decides **only** which of two i18n keys is printed. All three read **one** variable, so they flip together in a single deploy.
+
+**Never `NEXT_PUBLIC_*`** (UI-D7): a second copy of one truth on both sides of a boundary drifts, and the client side is the side that lies to the student. The flag is read on the server and crosses as a settled boolean. The read rule is fail-closed and identical at all three sites: only the trimmed string `"true"` is on.
+
+### Two keys, not one replaced
+AC-051 reads as though the old string disappears. It must not: AC-067 creates a real interval in which the old sentence is **true** — the feature ships disabled, the work is saved, and it is not auto-scored. Deleting it in the same commit would force shipping a **false** sentence for that whole interval. The old string is kept **verbatim** and selected by the flag (UI-D8).
+
+### AC-052 asserted, not assumed
+A dedicated case renders both flag states and compares the `<textarea>`'s `placeholder` and `maxLength` across them. The flag selects **one sentence** and touches nothing else in the input the student is typing into. It also re-confirms the ceiling is now **4000** (B3.3), read through the alias — no second literal.
+
+### One correction
+The first draft of the AC-052 case called `cleanup()`, which this file does not import (it deliberately has no auto-cleanup). Rewritten to read from each render's own `container` instead of `screen`, which is the right shape for a file without cleanup anyway.
+
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
@@ -104,13 +128,12 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
 
 | # | Command (from `SOURCE/`) | Exit code | Notes |
 |---|---|---|---|
-| 1 | `npx tsc --noEmit` | | |
-| 2 | `npx eslint --max-warnings 0` | | |
-| 3 | `npx vitest run` | | |
-| 4 | `npm run build` | | |
-| 5 | `npm run test:fixture` | | expected red = TD-030 baseline only (Gate F1): exactly 2 failures, both `subscription.fixture.e2e.test.ts` FE-1(e) `en` + `vi` |
-| 6 | `npm run test:localdb` | | see Open Item I-7 |
-| 7 | `npm run check:bundle` | | Gate E2 — this task edits client components (`ExamPlayer.tsx`, `QuestionRenderer.tsx`) |
+| 1 | `npx tsc --noEmit` | **0** | |
+| 2 | `npx eslint --max-warnings 0` | **0** | |
+| 3 | `npx vitest run` | **0** | 2025 passed / 10 skipped / 0 todo (was 2022 — **+3**) |
+| 4 | `npm run build` | **0** | |
+| 5 | `npm run test:fixture` | **1** | TD-030 baseline only; the essay fixture file stays 3/3 with 0 todo |
+| 6 | `npm run test:localdb` | **0** | 11 passed / 2 todo (SVC-1, SVC-2 — Task H8) |
 
 **A task file with any exit-code cell left empty is not complete** (Gate E4).
 
