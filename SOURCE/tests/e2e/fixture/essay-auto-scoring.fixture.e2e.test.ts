@@ -873,3 +873,64 @@ describe("PDF export guard — both exits agree for one attempt (FE2E-3)", () =>
     }
   });
 });
+
+// =============================================================================
+// FE2E-4 — A graded card does NOT print "not auto-scored" above its own band
+// =============================================================================
+// AC: FE-AC-03 — "When an essay question is `graded`, that question's card on the
+//   detail page MUST show EssayLifecycleBadge reading 'Da cham', the score
+//   `{band} / 1 diem`, the student's answer and the model answer; and MUST NOT
+//   show the string `result.notAutoScored`." (AC-053)
+// AC: FE-AC-13 — the counterpart that must NOT regress: an element with no
+//   lifecycle key still renders the label, byte-for-byte as before (AC-012/018).
+//
+// WHY THIS CASE EXISTS, AND WHY IT DID NOT BEFORE.
+//   The frontend DD predicted this defect in as many words: `r.scored === false`
+//   is PERMANENTLY true for an essay in all seven render states (RS-0..RS-6), so
+//   a branch keyed on it "still runs and still renders something -- it just
+//   prints the `result.notAutoScored` label next to a score that was just
+//   graded", and it closed with "no crash, no warning, and no existing test
+//   catches it". That last clause was exactly right. FE2E-1(f) renders
+//   `/result/detail`, but only ever with `legacyResult()` -- the one fixture for
+//   which the label is CORRECT. No case rendered the detail route with a graded
+//   essay, so the contradiction had no test that could see it.
+//
+//   It was found by the L1 dev run on 2026-08-30, on a real graded attempt: the
+//   card read "Not auto-scored" in its header and "Scored - 1 / 1 point" three
+//   lines below. Unit tests could not have found it either -- EssayReviewBlock's
+//   own tests render the block in isolation, and the label lives in the PAGE
+//   that wraps it. Only the composed route shows both at once.
+//
+// ROI: 90 (BV:10 x Freq:9 + Legal:0 + Defect:0 -- defect already realised)
+//   BV 10 -- the card contradicts itself about the single fact the student came
+//     to the page for: whether this answer was scored.
+//   Freq 9 -- every graded essay card, every attempt, for every student.
+// @lane: fixture-e2e
+// @dependency: full-UI in-process (RootLayout -> (layer2) layout ->
+//   result/detail/page.tsx), mocked backend (getResult stub)
+// @complexity: low
+// @real-dependency: none
+describe("A graded essay card does not also claim to be unscored (FE2E-4)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("omits result.notAutoScored on a graded card while still showing the band, and keeps printing it on a card with no lifecycle key", async () => {
+    // --- The graded card: band present, contradiction absent.
+    const graded = await renderDetailRoute(resolvedResult());
+
+    // Positive assertion FIRST. This tree contains async server components, so a
+    // silently empty render would make every negative assertion below pass
+    // against nothing -- the AB-2/AB-3 hazard this file already documents.
+    expect(graded.container.textContent).toContain(DICT["result.essay.state.graded"]);
+
+    // The defect itself.
+    expect(graded.container.textContent).not.toContain(DICT["result.notAutoScored"]);
+
+    // --- The counterpart, in the SAME case so neither can be fixed by breaking
+    //     the other: no lifecycle key => the label is still correct, and stays.
+    const legacy = await renderDetailRoute(legacyResult());
+    expect(legacy.container.textContent).toContain(DICT["result.notAutoScored"]);
+    expect(legacy.container.textContent).not.toContain(DICT["result.essay.state.graded"]);
+  });
+});

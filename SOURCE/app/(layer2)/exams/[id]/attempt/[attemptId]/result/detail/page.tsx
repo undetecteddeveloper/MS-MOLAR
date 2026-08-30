@@ -135,9 +135,27 @@ export default async function ResultDetailPage({
                 <li key={r.questionId} className="border-border flex flex-col gap-4 border-t pt-6">
                   <div className="flex items-baseline justify-between gap-3">
                     <span className="eyebrow">{t("upload.questionLabel", { number: i + 1 })}</span>
-                    <span className="text-muted-foreground text-xs font-medium">
-                      {t("result.notAutoScored")}
-                    </span>
+                    {/* Nhãn này CHỈ đúng khi câu thật sự không được chấm tự
+                        động — tức `r.essay` VẮNG MẶT (RS-0/RS-1, và mọi câu
+                        true_false). Nó KHÔNG được phép in cạnh một con điểm
+                        vừa chấm xong: đó đúng là điều AC-053 cấm và FE-AC-03
+                        đòi ("PHẢI KHÔNG hiện chuỗi `result.notAutoScored`").
+
+                        Điều kiện phải là `r.essay`, KHÔNG phải `notScored`:
+                        `r.scored === false` đúng vĩnh viễn với tự luận ở CẢ
+                        BẢY trạng thái render nên nó không phân biệt được gì —
+                        đúng cái bẫy frontend DD § "r.scored === false" đã dự
+                        báo, kèm nhận định rằng không test hiện có nào bắt
+                        được. Một lượt chạy L1 thật bắt được: thẻ hiện "Đã
+                        chấm · 1/1 điểm" NGAY DƯỚI chữ "chưa chấm tự động".
+
+                        Giữ nguyên nhãn khi khoá vắng mặt là yêu cầu FE-AC-13
+                        (thẻ cũ render byte-for-byte như trước). */}
+                    {!r.essay && (
+                      <span className="text-muted-foreground text-xs font-medium">
+                        {t("result.notAutoScored")}
+                      </span>
+                    )}
                   </div>
                   {q && (
                     <RichText

@@ -29,7 +29,13 @@ If the value ever drops **below the essay count of one full exam (50)**, a singl
 **~3K tokens/request is an estimate, not a measurement** (backend DD v1.5 states this explicitly). The first real grading run must log **actual** prompt + completion token counts; if the real figure differs materially, **both `GROQ_BUDGET_DAILY_LIMIT` and `GROQ_MAX_CONCURRENCY` move with it** (OQ-1, Task E5).
 
 ### Slot to fill
-Confirmed value and the date it was re-checked against the console: `____________________`
+Confirmed value and the date it was re-checked against the console: **`GROQ_BUDGET_DAILY_LIMIT = 600`, re-checked 2026-08-30 by the engineer.**
+
+**Console figures read for `qwen/qwen3.8-27b` on 2026-08-30: TPD = 2M, RPD = 1K — both unchanged from 2026-08-29.** The arithmetic therefore still holds exactly as D-17 recorded it: 2M ÷ ~3K ≈ **660 requests/day**, which binds **before** RPD 1 000. Setting the limit to RPD would over-permit — the token ceiling would be reached at ~660 while the request counter still read healthy. **600** clears both ceilings, so *our* refusal fires before the provider's: a clean `project_budget_exhausted` instead of a 429 storm.
+
+Clear of the escalation condition by more than an order of magnitude: 600 ≫ 50, the essay count of one full exam, so a single attempt can still be graded within one day.
+
+**Still an estimate, and still the thing to watch:** ~3K tokens/request is not a measurement. Task E5's ten real gradings settle it, and if the real figure differs materially then **both** `GROQ_BUDGET_DAILY_LIMIT` and `GROQ_MAX_CONCURRENCY` move with it (OQ-1).
 
 ## Target Files
 - [ ] `docs/plans/20260829-feature-essay-auto-scoring.md` — Task E2's confirmed-value slot
@@ -44,12 +50,19 @@ Confirmed value and the date it was re-checked against the console: `___________
 - `SOURCE/lib/ai/models.ts` (Task H4 — `ESSAY_GRADER_MODEL = "qwen/qwen3.8-27b"`, whose TPD/RPD limits this arithmetic uses)
 
 ## Investigation Notes
-_(Record here: the console's current TPD / RPD / TPM figures for the account and model; the confirmed value; the date of the re-check.)_
+
+### Re-check 2026-08-30 — the value stands
+Console figures for `qwen/qwen3.8-27b`, read by the engineer at `console.groq.com/settings/limits`: **TPD 2M, RPD 1K**. Both **unchanged** since 2026-08-29, so D-17's arithmetic is re-derived rather than re-guessed and lands on the same number: 2M ÷ ~3K ≈ 660 binds before RPD 1 000; **600** clears both.
+
+### The step this task carries that is easy to read past
+The last implementation step is not documentation — it is **setting `GROQ_BUDGET_DAILY_LIMIT` in the environment**, and the dev `L1` run cannot grade a single essay without it. `dailyLimit()` in `lib/essay/budget.ts` returns `null` for an absent variable, and `reserveGroqBudget()` turns `null` into **`{ ok: false, reason: "unavailable" }`** — a **refusal**, not "unlimited" (AC-031, the same fail-closed shape `AI_BUDGET_DAILY_LIMIT` uses).
+
+Verified absent from `SOURCE/.env.local` on 2026-08-30 while preparing the `L1` run. Left in that state, every essay would have settled `failed` with a budget refusal and **zero Groq calls** — a symptom that reads exactly like a provider or orchestrator defect, which is how a missing variable costs an afternoon of debugging the wrong layer. `checkEnv.ts` does announce it at startup, at `warn`, which is why the announcement is worth reading rather than scrolling past.
 
 ## Implementation Steps
-- [ ] Read the account's current limits in the Groq console for `ESSAY_GRADER_MODEL`
-- [ ] Recompute `TPD ÷ tokens-per-request` and confirm it still binds before RPD
-- [ ] Confirm **600** still leaves headroom under **both** ceilings; if not, record the new value and the arithmetic
+- [x] Read the account's current limits in the Groq console for `ESSAY_GRADER_MODEL` — 2026-08-30: TPD 2M, RPD 1K
+- [x] Recompute `TPD ÷ tokens-per-request` and confirm it still binds before RPD — 660 < 1 000, still binds
+- [x] Confirm **600** still leaves headroom under **both** ceilings; if not, record the new value and the arithmetic — confirmed, value unchanged
 - [ ] Confirm the value is **not below 50** (one full exam's essay count)
 - [ ] Record the confirmed value and the date in the work plan; set `GROQ_BUDGET_DAILY_LIMIT` in the environment
 

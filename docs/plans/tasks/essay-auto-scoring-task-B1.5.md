@@ -128,7 +128,7 @@ _(Record here: the RED observation from Task B1.1 (which fixture failed and why)
 ### 4. Refactor Phase
 - [ ] Confirm `computeScore()` is still pure — no I/O, no `process.env`, no async (AC-013)
 - [ ] Confirm `service-role.ts` is in **neither** commit
-- [ ] Perform the `L1` dev run (Gate A5b ticked, seeded attempts only) and read `per_question` back with SQL
+- [x] Perform the `L1` dev run (Gate A5b ticked, seeded attempts only) and read `per_question` back with SQL — **DONE 2026-08-30**, attempt `d9008d0a-6421-40ad-8624-f1c45d84a8c1` on dev `hynwleaxtbtjzkvpjsug`. See § Investigation Notes.
 
 ## Quality Assurance Mechanisms
 - `npx tsc --noEmit` (strict) — Config: `SOURCE/tsconfig.json` (project-wide)
@@ -210,7 +210,7 @@ An immediate re-run produced the familiar single ceiling assertion. The same deg
 ## Completion Criteria
 - [ ] **Implementation Complete** = both commits landed with the stated boundary
 - [ ] **Quality Complete** = **each commit independently green on all six verify gates** (with H7's known-red ceiling assertion recorded as expected), and the `computeScore` suite green with **zero regressions** on commit 1
-- [ ] **Integration Complete** = **L1** — on a **seeded** dev attempt with the flag on (Gate A5b ticked), submitting three essays produces bands, and `per_question` read back with SQL matches the W1 shape
+- [x] **Integration Complete** = **L1** — on a **seeded** dev attempt with the flag on (Gate A5b ticked), submitting three essays produces bands, and `per_question` read back with SQL matches the W1 shape. **SATISFIED 2026-08-30.** Three essays, three DISTINCT bands (1.0 / 0.5 / 0.0), `essayAttempts: 1` on each (every one graded on the first pass, no retry), `essayLowConfidence: false`, `essayGradedAt` set. Every essay element carries exactly the ten W1 keys; the two MCQ elements keep their old five-key shape untouched (AC-012, no backfill), and the jsonb array order matches `question_ids`.
 - [ ] The deployment rule appears **verbatim in both commit messages**
 - [ ] Commit 1's message records the **RED observation** from Task B1.1
 - [ ] Every Binding Decision and Reference Contract Compliance Check evaluates to `Y`

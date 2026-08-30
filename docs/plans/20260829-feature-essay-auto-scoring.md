@@ -58,6 +58,25 @@ Grading ships **disabled**. `ESSAY_GRADING_ENABLED` absent ⇒ off. No essay tex
 - [x] A7 — Until A6 carries a real date, `ESSAY_GRADING_ENABLED` is **absent in both Vercel scopes** (Production and Preview), and Phase E is not started. A local dev `true` is governed by **A5b**, not by this item — it is permitted after A5b, against seeded data only.
   - **A6 now carries a real date (2026-08-30), so this item's condition is discharged: Phase E may start.** Note what that does and does not license — A7 lifting is *permission for Task E6 to run*, not the enabling itself. `ESSAY_GRADING_ENABLED` remains **absent in both Vercel scopes as of 2026-08-30**; E6 is the only task that may add it, and E2-E5 come first.
 
+### Dev `L1` run — 2026-08-30, and the defect it found
+
+**Attempt `d9008d0a-6421-40ad-8624-f1c45d84a8c1`**, dev project `hynwleaxtbtjzkvpjsug`, seeded exam `l1seed-exam-tuluan` (three gradable essays + two existing MCQs), test account `smithnguyen247+rlstesta@gmail.com`. **Seeded attempt only, never a real student attempt** (A5b). First live Groq traffic of the project.
+
+**The pipeline works end to end.** Three essays, three **distinct** bands — 1.0 for a full answer, 0.5 for a partial one, 0.0 for a wrong one — so the grader discriminated rather than pattern-matching a single value. `essayAttempts: 1` on all three (each graded on the first pass), `essayLowConfidence: false`, `essayGradedAt` set. `per_question` read back with SQL: every essay element carries exactly the ten W1 keys, the two MCQ elements keep their old five-key shape **untouched** (AC-012), and array order matches `question_ids`. `telemetry_log` gained exactly **three** `essay_grade` rows, `success: true`, `error_code: null`, carrying the **student's own** `user_id` — which is the identity `telemetry_insert_own` demands, so the closure-captured client (R-05) is doing what it was written for.
+
+**The UI behaved as specified, unprompted.** Pending: `ScoreCard` **5.0/10** counting only the MCQs, essay line `—` (not `0 / 0`), both PDF controls blocked with the reason exposed. After the bands landed the poller updated the page **with no reload**: `1.5 / 3 points`, "Based on 3 essay questions already scored", the live region announced completion once, and Save/Share unblocked in place. **`ScoreCard` never changed** — its 0-diff promise held against a live score movement, which is the thing no unit test can assert. The player footnote read `player.essayScored` and the answer box offered **4000** characters (B3.3's raised ceiling).
+
+**Latency, as the first real input to E5 (3 of the 10 samples):** submission ~09:16:42Z, bands written at 09:16:44.98 / 45.65 / 47.08Z — a **~2.5–5 s** round trip at `GROQ_MAX_CONCURRENCY = 2`. Comfortably inside `GROQ_CALL_DEADLINE_MS` (20 s); **E5 still owes seven more samples and a p95** before any constant moves.
+
+#### The defect only a real run could surface
+On `/result/detail`, every graded essay card printed **`result.notAutoScored` ("Not auto-scored") in its header, three lines above its own "✓ Scored · 1 / 1 point"** — a card contradicting itself about the one fact the student opened it for.
+
+The frontend DD **predicted this in as many words**: `r.scored === false` is permanently true for an essay in all seven render states, so a branch keyed on it "still runs and still renders something — it just prints the `result.notAutoScored` label next to a score that was just graded", closing with **"no crash, no warning, and no existing test catches it."** That last clause was exactly right, and for a precise reason: FE2E-1(f) *does* render `/result/detail`, but only ever with `legacyResult()` — the single fixture for which the label is **correct**. No case rendered that route with a graded essay. `EssayReviewBlock`'s own unit tests could not see it either, because the label lives in the **page** that wraps the block, not in the block.
+
+**Fix**: the label is now gated on `!r.essay` — present exactly for RS-0/RS-1 and `true_false` (FE-AC-13, byte-for-byte as before), absent for every lifecycle state (FE-AC-03/AC-053). Regression: **FE2E-4**, which was **confirmed to fail without the fix** rather than merely passing with it — its failure output contains the contradiction in one string, `Question 2` · `Not auto-scored` · `✓Scored` · `1 / 1 point`.
+
+This is the argument for the `L1` gate, made concrete: the feature was green on 2025 unit tests, 3 fixture-e2e cases and 16 service-lane cases, and still shipped a self-contradicting card on its main surface.
+
 ### Gate B — Phase 3.5, production DDL
 
 The two new SQL functions move the schema fingerprint. **Current verified baseline: `29931beeb950`**, confirmed read-only on 2026-08-29 for **both** Supabase projects — prod `pebjdlbgbmizgfpuptjl` and dev `hynwleaxtbtjzkvpjsug` — applied within 300 ms of each other. Both are in sync.
@@ -1407,16 +1426,17 @@ graph TD
 
 #### Tasks
 
-- [ ] **Task E1 — Close Gate A (ZDR) with a dated console check**
+- [x] **Task E1 — Close Gate A (ZDR) with a dated console check** — **DONE 2026-08-30** (`4a51c66`, `a191771`). Gate A has zero unticked items; see § Gate A above for A6's recorded console reading, including why both switches on the Data Controls page are written down rather than summarised.
   - Owner: **engineer**. Complete Gate A items A1–A7. Nothing below may start until A6 carries a real date.
   - Why it is a gate and not a recommendation: the provider's **default** posture (no training on input/output, inference requests not stored) is **not** Zero Data Retention. The provider's own documentation states input and output **may be logged temporarily** during reliability troubleshooting or abuse investigation, retained for up to **30 days**. For this data — a minor's own writing, produced during an exam — a 30-day third-party retention window is not an acceptable default. The design makes the gate the **default state** rather than a promise: with `ESSAY_GRADING_ENABLED` absent, `computeScore()` emits no keys and `after()` is never registered, so **zero Groq requests is unavoidable rather than remembered**.
 
-- [ ] **Task E2 — OQ-4: confirm `GROQ_BUDGET_DAILY_LIMIT` against the account's real limits**
+- [x] **Task E2 — OQ-4: confirm `GROQ_BUDGET_DAILY_LIMIT` against the account's real limits** — **CONFIRMED 2026-08-30**
   - Owner: **engineer**, before enabling the flag. **OQ-4 was CLOSED on 2026-08-29 (backend DD v1.5, § D-17): `GROQ_BUDGET_DAILY_LIMIT = 600` requests.** This task is no longer a decision — it is a confirmation that the closed value still matches the account when the flag is actually turned on.
   - The arithmetic behind 600, recorded so a later reader can recompute it rather than re-guess it: `qwen/qwen3.8-27b` carries **TPD 2M**, and one request is **~3K tokens**, so **2M ÷ ~3K ≈ 660 requests/day** — which **binds before** the RPD limit of 1 000. Setting the limit equal to RPD would therefore over-permit. 600 leaves headroom under **both** ceilings, which makes **our** refusal fire before the provider's: a clean `project_budget_exhausted` path instead of a 429 storm. At the worst-case reservation of 3 per question that is **~200 essays/day**; ~600 when each grades on the first pass.
   - Escalation condition: unchanged — if the value ever drops **below the essay count of one full exam** (50), a single attempt cannot be fully graded in one day, and that must be known in advance rather than discovered afterwards. 600 clears this by an order of magnitude.
   - **The estimate that this number rests on:** ~3K tokens/request is an **estimate, not a measurement** (backend DD v1.5 states this explicitly). The first real grading run must log **actual** prompt + completion token counts; if the real figure differs materially, **both** `GROQ_BUDGET_DAILY_LIMIT` and `GROQ_MAX_CONCURRENCY` move with it (OQ-1, Task E5).
-  - Confirmed value and the date it was re-checked against the console: `____________________`
+  - Confirmed value and the date it was re-checked against the console: **`GROQ_BUDGET_DAILY_LIMIT = 600`, re-checked 2026-08-30 by the engineer. Console figures for `qwen/qwen3.8-27b`: TPD 2M, RPD 1K — both unchanged from 2026-08-29**, so the arithmetic above re-derives to the same number (660 binds before 1 000; 600 clears both). Clear of the escalation condition by more than an order of magnitude (600 ≫ 50).
+  - **The step in this task that is not documentation:** setting `GROQ_BUDGET_DAILY_LIMIT` in the environment. It was found **absent from `SOURCE/.env.local`** on 2026-08-30 while preparing the dev `L1` run. `dailyLimit()` returns `null` for an absent variable and `reserveGroqBudget()` turns that into `{ ok: false, reason: "unavailable" }` — a **refusal**, not "unlimited" (AC-031). Left unset, every essay settles `failed` on a budget refusal with **zero Groq calls**, and that symptom reads exactly like a provider or orchestrator defect. `checkEnv.ts` announces it at startup at `warn`, which is the announcement worth not scrolling past.
 
 - [ ] **Task E3 — OQ-6 + AC-070: first real-provider evaluation of `ESSAY_GRADER_MODEL`**
   - Owner: **engineer**, **after** Gate A and **before** enabling on prod.
