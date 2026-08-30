@@ -37,8 +37,8 @@ Label typography: `text-xs font-medium`.
 `render(await EssayLifecycleBadge({ state }))` is **valid here** (AB-3, probed on React 19 / RTL 16 / vitest 4 / jsdom) because this component has **no async child**.
 
 ## Target Files
-- [ ] `SOURCE/components/essay/EssayLifecycleBadge.tsx` (new)
-- [ ] `SOURCE/components/essay/__tests__/EssayLifecycleBadge.test.tsx` (new)
+- [x] `SOURCE/components/essay/EssayLifecycleBadge.tsx` (new) — async Server Component
+- [x] `SOURCE/components/essay/__tests__/EssayLifecycleBadge.test.tsx` (new) — 11 cases
 
 ## Investigation Targets
 - `docs/ui-spec/essay-auto-scoring-ui-spec.md` (§ Component: EssayLifecycleBadge — verify pending + graded + failed states)
@@ -60,21 +60,42 @@ Label typography: `text-xs font-medium`.
 - `docs/ui-spec/essay-auto-scoring-ui-spec.md` (§ Component: EssayLifecycleBadge — verify pending + graded + failed states)
 
 ## Investigation Notes
-_(Record here: the exact strings resolved from the real dictionary; confirmation that no hard-coded hex appears in the file; confirmation that `render(await …)` produced a non-empty tree (AB-3).)_
+
+### AB-3 confirmed: `render(await ...)` gave a NON-EMPTY tree
+Every rendering case asserts `container.textContent` contains a real string, so an empty tree fails rather than passing vacuously. That is the standing rule applied literally — including in the two cases whose *purpose* is negative (`[disabled]` absent, colour-independence), each of which carries a positive assertion alongside.
+
+This component has **no async child**, which is exactly why the technique is valid here. F-A3 does have one (this badge), so it must use `renderServerTree()`.
+
+### Expected strings come from the dictionary the component actually resolves
+The first attempt hard-coded the Vietnamese strings and went red: `expected '◌Scoring' to contain 'Đang chấm'` — `DEFAULT_LOCALE` is **`en`**, not `vi`. Fixed by deriving them through `getDictionary(DEFAULT_LOCALE)` rather than picking a language. That is better than swapping in the English literals: hard-coding *either* language makes this test red the day someone changes the default locale, for a reason having nothing to do with the badge.
+
+The three states resolve to three **distinct** strings — asserted directly, because if two collapsed to one string a student could not tell "being scored" from "scoring failed", and every per-state case would still pass.
+
+### The source scan had to strip comments, and that is not a loophole
+The three Theme-Token cases scan the component's source for hex, shadows, gradients and `?? CONFIG.default`. They went red on the first run — against the component's **own comments**, which explain *why* `#4F7942` is not borrowed and *why* there is no `?? default`. A raw scan punishes recording the reason. The scan now strips block and line comments first, so the reason stays in the file **and** the guard still measures the code. Same shape as the B4.1 citation problem.
+
+### `#4F7942` is absent for three independent reasons, all recorded in the file
+It is a hard-coded hex (theme hard rule); it is currently TBD-04 in another spec and this feature does not duplicate a debt; and its **meaning is wrong** — a band is not a correctness verdict, `isCorrect` is `false` permanently (W1), so painting it "correct" asserts something untrue on screen.
+
+### UI-D13 is enforced earlier here than in the precedent
+`OrderStatusBadge` needs a fifth `UNRECOGNISED` appearance because its prop is typed `string` (deliberately — the value crosses a database boundary). This badge does not: `deriveEssayView()` already returns `null` for an unrecognised `essayState`, so an unknown value never reaches the component, and `Record<EssayRenderState, Appearance>` is exhaustive so `tsc` guards the rest. **No `??`, no `as`** — asserted by the source scan.
+
+### O-4 stays open and non-blocking
+There is no `--success` token, so "Scored" is marked by `font-medium` + full-strength `--foreground` — the same solution `OrderStatusBadge.paid` used for the same problem. A real positive colour means adding a token and closing TBD-04: engineer/product, not this task.
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
-- [ ] Read all Investigation Targets and record key observations
-- [ ] Write one case per lifecycle state asserting the exact string from the **real** dictionary, plus the a11y and no-hex assertions; observe failure
+- [x] Read all Investigation Targets and recorded key observations
+- [x] Tests written first; observed red three times, each for a different real reason: module absent, then `document is not defined` (missing `// @vitest-environment jsdom`), then the locale mistake above
 
 ### 2. Green Phase
-- [ ] Create the component: pill `<span>`, `aria-hidden` glyph, text as the accessible name, tokens only, `text-xs font-medium`
-- [ ] Run only the added tests and confirm they pass
+- [x] Component created: pill `<span>`, `aria-hidden` glyph, text as the accessible name, semantic token classes only, `text-xs font-medium`
+- [x] `11 passed (11)`, exit **0**
 
 ### 3. Refactor Phase
-- [ ] Confirm there is **no** `CONFIG[x] ?? CONFIG.default` and **no** `as`
-- [ ] Confirm `#4F7942` appears nowhere
-- [ ] Confirm every case carries at least one **positive** assertion
+- [x] No `?? CONFIG.default`, no `as` — asserted by the comment-stripped source scan
+- [x] `#4F7942` appears nowhere in the code
+- [x] Every case carries at least one positive assertion, including both negative-purpose cases
 
 ## Quality Assurance Mechanisms
 - `npx tsc --noEmit` (strict) — Enforces: the exhaustive `EssayRenderState` switch — Config: `SOURCE/tsconfig.json` (project-wide)
@@ -88,12 +109,12 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
 
 | # | Command (from `SOURCE/`) | Exit code | Notes |
 |---|---|---|---|
-| 1 | `npx tsc --noEmit` | | |
-| 2 | `npx eslint --max-warnings 0` | | |
-| 3 | `npx vitest run` | | |
-| 4 | `npm run build` | | |
-| 5 | `npm run test:fixture` | | expected red = TD-030 baseline only (Gate F1): exactly 2 failures, both `subscription.fixture.e2e.test.ts` FE-1(e) `en` + `vi` |
-| 6 | `npm run test:localdb` | | see Open Item I-7 |
+| 1 | `npx tsc --noEmit` | **0** | The exhaustive `Record<EssayRenderState, Appearance>` is the gate: a new lifecycle state without an appearance is a compile error |
+| 2 | `npx eslint --max-warnings 0` | **0** | |
+| 3 | `npx vitest run` | **0** | 1961 passed / 10 skipped / 0 todo (was 1950 — **+11**), 46.9 s |
+| 4 | `npm run build` | **0** | |
+| 5 | `npm run test:fixture` | **1** | Expected red, TD-030 baseline only. Snapshot CRLF churn reverted before commit |
+| 6 | `npm run test:localdb` | **0** | 11 passed / 2 todo (SVC-1, SVC-2 — Task H8) |
 
 **A task file with any exit-code cell left empty is not complete** (Gate E4).
 
@@ -116,12 +137,12 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
   - **Primary failure mode**: borrowing the "correct answer" fern, which asserts something **untrue** — a band is not a correctness verdict and `isCorrect` is `false` permanently (W1). **Boundary**: a source scan of the file. **State assertion**: N/A. **Mock rationale**: none. **Residual**: O-4 stays open (non-blocking) — if the product wants a real positive colour, that is a `--success` token plus TBD-04, not a copied hex.
 
 ## Completion Criteria
-- [ ] **Implementation Complete** = component + three-state test
-- [ ] **Quality Complete** = six verify gates green
-- [ ] **Integration Complete** = N/A until Task F-A3
-- [ ] Every case carries at least one **positive** assertion
-- [ ] Every Reference Contract Compliance Check evaluates to `Y`
-- [ ] Every exit-code cell in the Gate E4 table above is filled
+- [x] **Implementation Complete** = component + three-state test (11 cases)
+- [x] **Quality Complete** = six gates run separately; five at 0, `test:fixture` at the TD-030 baseline
+- [x] **Integration Complete** = N/A until Task F-A3
+- [x] Every case carries at least one positive assertion
+- [x] Reference Contract = `Y`: the badge renders the three lifecycle strings resolved from the real dictionary, and they are distinct
+- [x] Every exit-code cell filled
 
 ## Notes
 - Impact scope: F-A3 (`EssayScoreLine`'s loading state), F-B1 (`EssayReviewBlock`'s RS-2…RS-6), F-B3 (`HistoryRow`'s meta-line badge).
