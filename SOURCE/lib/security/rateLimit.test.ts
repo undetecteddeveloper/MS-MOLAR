@@ -18,6 +18,8 @@ import { __resetRateLimitForTests, checkRateLimit, guard, RATE_LIMITS } from "./
 // Bảng giá mỗi thao tác sống cạnh điểm phát Gemini — file này TIÊU THỤ nó, và
 // cố ý không giữ một bản sao (backend DD `:1080`, AC-020).
 import { GEMINI_CALLS_PER_OPERATION } from "@/lib/ugc/gemini";
+// Cung ky luat: so nhan cua Groq doc TU CHINH diem phat, khong go lai o day.
+import { GROQ_CALLS_PER_ESSAY } from "@/lib/essay/groqClient";
 
 beforeEach(() => {
   __resetRateLimitForTests();
@@ -140,6 +142,16 @@ describe("guard", () => {
     "changePassword",
     "uploadAvatar",
   ];
+  // NHOM THU TU (2026-08-30, ADR-0018). Cung ho "tieu han ngach ben thu ba" voi
+  // SUPPLIER_CAPPED_ACTIONS, nhung o mot NHA CUNG CAP KHAC — Groq, khong phai
+  // Gemini — nen no khong nhap duoc vao danh sach ay: hai bat bien cua nhom do
+  // do bang han ngach ngay cua Gemini (20) va bang GEMINI_REQUESTS_PER_CALL.
+  // Nhet mot action tieu Groq vao do se do mot con so Groq bang mot tran
+  // Gemini, tuc lam CA HAI bat bien cung noi doi, va no se "xanh" trong khi
+  // khong ai con dang do dieu gi that.
+  const GROQ_CAPPED_ACTIONS = [
+    "retryEssayGrading",
+  ] as const satisfies readonly (keyof typeof RATE_LIMITS)[];
 
   /** Trần free tier của Gemini: 20 request/NGÀY cho CẢ project (rateLimit.ts). */
   const SUPPLIER_DAILY_QUOTA = 20;
@@ -151,6 +163,7 @@ describe("guard", () => {
       ...DB_COST_ACTIONS,
       ...SUPPLIER_CAPPED_ACTIONS,
       ...ABUSE_CAPPED_ACTIONS,
+      ...GROQ_CAPPED_ACTIONS,
     ].sort();
     expect(classified).toEqual(Object.keys(RATE_LIMITS).sort());
   });
@@ -210,6 +223,31 @@ describe("guard", () => {
     explainStep: GEMINI_CALLS_PER_OPERATION.tutor,
     uploadExam: GEMINI_CALLS_PER_OPERATION.uploadAutomatic,
   };
+
+  // Tran ngan sach Groq cua DU AN den tu bien moi truong
+  // (GROQ_BUDGET_DAILY_LIMIT), nen KHONG co hang bien dich nao de so sanh nhu
+  // SUPPLIER_DAILY_QUOTA cua Gemini. Thu ghim duoc, va dang ghim, la HINH DANG:
+  // cua so trung DON VI cua bo dem, va worst case cua MOT tai khoan bi chan tren
+  // — doc qua GROQ_CALLS_PER_ESSAY chu khong go lai so 3, dung bai hoc TD-019.
+  const GROQ_REQUESTS_PER_ACCOUNT_PER_DAY = 30;
+
+  it("keeps the Groq-capped window on the counter's day unit", () => {
+    // `groq:budget:{day}` tinh theo NGAY. Ha cua so xuong theo gio se bo han
+    // tran ngay ma no ton tai de dat — cung lap luan comment explainStep viet.
+    for (const action of GROQ_CAPPED_ACTIONS) {
+      expect(RATE_LIMITS[action].windowMs).toBe(ONE_DAY_MS);
+    }
+  });
+
+  it("keeps ONE account's worst-case daily Groq requests bounded", () => {
+    // Doc theo SO REQUEST GROQ, khong theo so lan bam nut — dung bai hoc TD-019:
+    // kiem "10 lan bam" khong noi len dieu gi khi moi lan bam tieu 3 request.
+    const worstCase = GROQ_CAPPED_ACTIONS.reduce(
+      (sum, action) => sum + RATE_LIMITS[action].limit * GROQ_CALLS_PER_ESSAY,
+      0,
+    );
+    expect(worstCase).toBeLessThanOrEqual(GROQ_REQUESTS_PER_ACCOUNT_PER_DAY);
+  });
 
   it("keeps ONE account's whole daily Gemini budget under the project quota", () => {
     const worstCasePerUser = SUPPLIER_CAPPED_ACTIONS.reduce(

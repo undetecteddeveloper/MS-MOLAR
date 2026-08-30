@@ -17,6 +17,26 @@ import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 import { ExplainStepAffordance } from "@/components/tutor/ExplainStepAffordance";
 import { TutorQuotaNote } from "@/components/billing/TutorQuotaNote";
 
+/** Route segment cua `retryEssayGrading()` (ADR-0018) — VA cua
+ *  `explainStep()`, ca hai Server Action deu duoc goi tu trang nay.
+ *
+ *  PHAI khai O DAY, khong khai duoc trong file `"use server"`: `maxDuration` la
+ *  cau hinh ROUTE SEGMENT (`layout.tsx | page.tsx | route.ts`), va mot file
+ *  `"use server"` khong phai route segment — no chi duoc export ham async.
+ *  Tai lieu Next.js 16 kem trong repo noi thang dieu do
+ *  (`node_modules/next/dist/docs/.../route-segment-config/maxDuration.md`), va
+ *  `tutorActions.ts:16-31` da ghi lai ca lap luan lan ket luan.
+ *
+ *  300 chu khong phai mot con so vua khit: no bang MAC DINH cua fluid compute,
+ *  bang dung hai route segment khac trong repo dang dung
+ *  (`.../attempt/[attemptId]/page.tsx:18`, `(layer4)/upload/page.tsx:18`), va
+ *  nam tren ca hai thu trang nay can — worst case mot luot cham lai la
+ *  3 x GROQ_CALL_DEADLINE_MS + hai lan cho backoff ~76 s, con `explainStep()`
+ *  can >= 30 s (dung con so `tutorActions.ts:28-31` da neu ten trang nay de doi).
+ *  Khai tuong minh o day de mot lan ha "Default Max Duration" trong dashboard
+ *  khong am tham cat ca hai. */
+export const maxDuration = 300;
+
 export default async function ResultDetailPage({
   params,
 }: {

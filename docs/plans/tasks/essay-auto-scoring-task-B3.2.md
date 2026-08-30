@@ -41,9 +41,11 @@ Using the `event_type` and the three `error_code` literals that **Task B3.1** al
 Add `export const maxDuration` to `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` — the route segment for this action. **Do not touch that file's scored branch (`:133` onward)**; TBD-02's deferral stays in force.
 
 ## Target Files
-- [ ] `SOURCE/app/(layer2)/essayActions.ts` (new)
-- [ ] `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx`
-- [ ] `SOURCE/app/(layer2)/__tests__/essayActions.test.ts` (new)
+- [x] `SOURCE/app/(layer2)/essayActions.ts` (new)
+- [x] `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` — `export const maxDuration = 300`
+- [x] `SOURCE/app/(layer2)/__tests__/essayActions.test.ts` (new) — 41 cases
+- [x] `SOURCE/lib/security/rateLimit.ts` — **extra, forced**: `guard()` cannot be called without a `RATE_LIMITS` key
+- [x] `SOURCE/lib/security/rateLimit.test.ts` — **extra, forced**: the classification guard goes red until the new action is categorised
 
 ## Investigation Targets
 - `docs/design/essay-auto-scoring-backend-design.md` (§ Agreement Checklist Scope — `essayActions.ts`: `retryEssayGrading(attemptId, questionId)`, typed result, no throw, no redirect, authorise before meter)
@@ -76,23 +78,74 @@ Add `export const maxDuration` to `SOURCE/app/(layer2)/exams/[id]/attempt/[attem
 | Expected signal | All three read sites read **one** variable and flip together in a single deploy |
 
 ## Investigation Notes
-_(Record here: the five refusal cases and the evidence that each produced zero provider requests and an unchanged budget key; the `digest`-only console payload; the `L1` dev run's outcome.)_
+
+### Two contradictions inside this task file, resolved against the Design Doc and the downstream consumer
+
+**1. `already_graded` is not a refusal reason.** The Proof Obligation for AC-063 says a retry on an already-graded question is "a no-op returning `already_graded`". It cannot be: `RetryRefusal` is a closed five-member union (`not_found | not_failed | exhausted | budget | server`, Design Doc `:1366`) while `already_graded` is a **`ClaimReason`** (`:1393`) — a different union on the SQL side. The Design Doc and **Task F-C1** agree on the resolution: F-C1's `REFUSAL_KEY` maps `not_failed` to `result.essay.retryAlreadyGraded` *"because under AC-063 a retry on a graded question is a normal outcome, not an error"*. So `already_graded` maps to `not_failed`, declared in a `Record` (adding a SQL reason is then a compile error, not a silent fall-through into another reason's sentence). Mutation **M8** pins it.
+
+**2. "Size: Small (3 files)" is wrong — it is 5.** `guard()` takes `action: keyof typeof RATE_LIMITS`, so the Design Doc's mandatory step 1 is **unreachable** without a new `RATE_LIMITS` entry. That is `rateLimit.ts` **and** `rateLimit.test.ts`. This is the **fifth** consecutive task needing files beyond its list (B2.1, B2.2, B2.3, B3.1, B3.2) — at this point it is a property of these task files, not an accident.
+
+### The new rate-limit entry needed a FOURTH category, not a fourth row
+`rateLimit.test.ts` carries a guard that fired exactly as designed the moment the entry was added: `classifies every configured action into exactly one category` went red (1 failed / 13 passed), because its lists are enumerated explicitly and compared against `Object.keys(RATE_LIMITS)`.
+
+`retryEssayGrading` could **not** join `SUPPLIER_CAPPED_ACTIONS`: both invariants on that list are denominated in **Gemini** — `limit <= SUPPLIER_DAILY_QUOTA` (20) and a `GEMINI_REQUESTS_PER_CALL` record. Retry spends **Groq**. Filing it there would measure a Groq number against a Gemini ceiling and make *both* invariants lie while staying green. Hence a fourth list, `GROQ_CAPPED_ACTIONS`, pinning the two things that can honestly be pinned:
+
+- `windowMs === ONE_DAY_MS` — the counter beneath it is `groq:budget:{day}`, so the unit must match (the rule `RATE_LIMITS.explainStep` already wrote out).
+- one account's worst case read **in Groq requests** — `limit * GROQ_CALLS_PER_ESSAY`, imported from the emitter rather than retyping `3` (the TD-019 lesson).
+
+`10/day` because SQL already caps 3 attempts **per question**; this ceiling guards against an automation loop, not against the student. Worst case is 30 Groq requests/account/day, a small fraction of any sane `GROQ_BUDGET_DAILY_LIMIT` — which `budget.ts` enforces independently and fail-closed.
+
+### Why the action does not call `gradeEssaysForAttempt()`
+The orchestrator runs **many** questions under a concurrency cap and a wall-clock cap, **swallows every outcome**, and returns `void`. Retry needs the opposite: **one** question and a **typed outcome** to hand back to the screen. The architecture diagram settles it independently — `Retry[...] --> CL` points straight at the claim node, the same node the automatic pass uses. What is shared is the four primitives (claim, budget, provider, settle) in the same order; the **order itself** is pinned by `mock.invocationCallOrder` at **both** entry points, because inverting it at either one opens the same hole.
+
+### Order note: step 1 runs after step 2's read, and that is the Design Doc's own reference
+The contract numbers the rate limit as step 1 but cites `actions.ts:75` — where `submitExam()` reads the attempt **first** and takes the key from the RLS-filtered row, with the reason written out at that line. Accepting `userId` from the client instead would let one user drain another's bucket: a targeted denial of service. Same order here, same reason.
+
+### `rate_limited` has no seat in the five-member union
+A `guard()` refusal maps to `server` — the only member meaning "refused for a reason outside the other four". Mapping it to `budget` would tell the student the **project** budget is gone when what they actually hit is their own bucket. Telemetry still records it precisely as `rate_limited`, so the two remain distinguishable in SQL even though the UI shows one sentence. Recorded as a small deliberate gap in the contract rather than papered over.
+
+### Refusals settle nothing, and that is deliberate
+Every failure path after the claim returns **without** a `recordEssayGrade(..., "failed", ...)`. The automatic pass settles `failed` because its question was `pending`; here step 3 has already **required** the question to be `failed`, so another write would only push `essayGradedAt` forward without changing anything the student sees.
+
+### Accepted cost, carried over verbatim
+A retry refused at **step 5** (budget) still consumes one of the three attempts, because D4 spends the attempt at claim and AC-072 requires claim before metering. Not reorderable — reordering opens exactly the hole AC-072 exists to close. UI-D9 already anticipated this by not displaying the attempt count.
+
+### Mutation testing — the required evidence, since all 41 cases were green on the first run
+The action was written before its tests, so no Red was ever observed for this file. Nine mutants, **all nine killed**:
+
+| # | Mutation | Result |
+|---|---|---|
+| M1 | reserve budget **before** the claim (invert AC-072) | **Killed** — 5 failed |
+| M2 | remove the feature-flag gate | **Killed** — 5 failed |
+| M3 | drop the `retryAvailable` (exhausted) check | **Killed** — 2 failed |
+| M4 | log the whole `err` instead of `digest` | **Killed** — 1 failed |
+| M5 | settle band 0 on invalid output (break AC-007) | **Killed** — 1 failed |
+| M6 | ignore the rate-limit result | **Killed** — 1 failed |
+| M7 | counter-store failure reported as `budget` | **Killed** — 1 failed |
+| M8 | `already_graded` mapped to `server` instead of `not_failed` | **Killed** — 1 failed |
+| M9 | drop the `status === "submitted"` check | **Killed** — 1 failed |
+
+### EG-BE-022 — every refusal measured on the counter itself
+`budget.ts` and `groqClient` run **real code**; only `fetch` and `@upstash/redis` are mocked. Every refusal case asserts `fetch` uncalled **and** `incrby`/`decrby` uncalled through a shared `expectNothingSpent()` — so "the budget key is unchanged" is a measurement on the counter, not a claim about it.
+
+### Still open: the L1 dev run
+Everything above is L2. **Integration Complete for this task is NOT met** — it needs the seeded dev run (Gate A5b), which spends live Groq budget and is the engineer's call. It is the same run that still gates B1.5 and B2.1.
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
-- [ ] Read all Investigation Targets and record key observations
-- [ ] Write `essayActions.test.ts` covering the five refusal cases and the success path, with counted provider and budget mocks; observe failure
+- [x] Read all Investigation Targets and record key observations
+- [~] Tests were written **after** the action, so no Red was observed for `essayActions.ts`. **Mutation testing substitutes**, per standing practice — nine mutants, all killed (table above). A genuine Red *was* observed on `rateLimit.test.ts`: adding the entry turned the classification case red (1 failed / 13 passed) before the fourth category existed
 
 ### 2. Green Phase
-- [ ] Create `essayActions.ts`: `"use server"`, typed result, **no throw, no redirect**, authorise **before** meter (twice — student's client, then SQL), the five-reason refusal union, the flag check, `digest`-only logging
-- [ ] Wire this file's telemetry call sites using B3.1's literals
-- [ ] Add `export const maxDuration` to the result-detail route segment
-- [ ] Run only the added tests and confirm they pass
+- [x] `essayActions.ts` created with all of it: typed result, no throw, no redirect, authorise before meter (student's client, then SQL), the five-reason union, the flag check, `digest`-only logging
+- [x] Telemetry wired with B3.1's literals — `not_eligible` for every authorisation refusal (the code B3.1 deliberately did **not** write on the automatic path), plus the shared codes for budget/provider/parse/settle outcomes
+- [x] `export const maxDuration = 300` on the result-detail segment
+- [x] `41 passed (41)`, exit **0**
 
 ### 3. Refactor Phase
-- [ ] Confirm the scored branch of `result/detail/page.tsx` (`:133` onward) is **untouched**
-- [ ] Confirm no path throws and no path redirects
-- [ ] Confirm the flag check returns `reason: "server"` when off
+- [x] Scored branch of `result/detail/page.tsx` **untouched** — the only edit is the `maxDuration` export near the imports; TBD-02's deferral stays in force
+- [x] No path throws, no path redirects — the whole body sits in one `try`, and a test drives `createClient()` itself into rejection to prove the outer net
+- [x] Flag off returns `reason: "server"` **and never constructs a client** (asserted); mutation M2 pins it
 
 ## Quality Assurance Mechanisms
 - `npx tsc --noEmit` (strict) — Enforces: the closed refusal union — Config: `SOURCE/tsconfig.json` (project-wide)
@@ -106,12 +159,15 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
 
 | # | Command (from `SOURCE/`) | Exit code | Notes |
 |---|---|---|---|
-| 1 | `npx tsc --noEmit` | | |
-| 2 | `npx eslint --max-warnings 0` | | |
-| 3 | `npx vitest run` | | |
-| 4 | `npm run build` | | |
-| 5 | `npm run test:fixture` | | expected red = TD-030 baseline only (Gate F1): exactly 2 failures, both `subscription.fixture.e2e.test.ts` FE-1(e) `en` + `vi` |
-| 6 | `npm run test:localdb` | | see Open Item I-7 |
+| 1 | `npx tsc --noEmit` | **0** | |
+| 2 | `npx eslint --max-warnings 0` | **0** | |
+| 3 | `npx vitest run` | **0** | 135 files passed / 1 skipped; **1945 passed, 10 skipped, 0 todo** (was 1902 — **+43**: 41 new `essayActions.test.ts` cases + 2 new rate-limit invariants), 45.7 s |
+| 4 | `npm run build` | **0** | Confirms the `"use server"` boundary and the new route-segment `maxDuration` |
+| 5 | `npm run test:fixture` | **1** | **Expected red, TD-030 baseline ONLY**: exactly 2 failures, both `subscription.fixture.e2e.test.ts > FE-1 (e) ... > locale en` and `locale vi`, named individually from the run. CRLF churn on `RichText.regression.test.tsx.snap` reverted before commit |
+| 6 | `npm run test:localdb` | **0** | 11 passed / 2 todo (SVC-1, SVC-2 — **Task H8**, still open) |
+| 7 | `npm run check:bundle` | **0** | Run although not listed: this task adds a file importing `groqClient`/`budget`, both on the `GROQ_API_KEY` path |
+
+`npm run verify:schema` was **not run** — this task touches no schema and no `LIMITS` constant. Its character-ceiling assertion stays red by design in the H7 to B3.3 window (Fix I002).
 
 **A task file with any exit-code cell left empty is not complete** (Gate E4).
 **Known-red window (Fix I002)**: this commit sits between H7 and B3.3 — if `verify:schema` is run, its character-ceiling assertion is red **by design**; record it as expected. Any **other** red `verify:schema` assertion is a regression.
@@ -137,12 +193,12 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
   - **Primary failure mode**: a Postgres error message echoing the student's answer back through the Server Action boundary — and `Error#message` is non-enumerable, so the leak does **not** show under `JSON.stringify`; it shows only at a real console, i.e. late. **Boundary**: in-process with a spied `console.error`, asserting the payload's key set. **State assertion**: N/A. **Mock rationale**: `console.error` spied. **Residual**: none.
 
 ## Completion Criteria
-- [ ] **Entry condition**: Gate A5b ticked before the dev `L1` run
-- [ ] **Implementation Complete** = action + segment config + **this file's** telemetry call sites
-- [ ] **Quality Complete** = six verify gates green (with H7's known-red ceiling assertion recorded as expected)
-- [ ] **Integration Complete** = **L1** on a **seeded** dev attempt — pressing retry on a `failed` question yields a band; a refusal returns exactly one specific reason
-- [ ] Every Binding Decision Compliance Check evaluates to `Y`, with evidence in Investigation Notes
-- [ ] Every exit-code cell in the Gate E4 table above is filled
+- [x] **Entry condition**: Gate A5b ticked. **No Groq request was made by this commit** — every test mocks `fetch`
+- [x] **Implementation Complete** = action + segment config + this file's telemetry call sites (+ the two forced rate-limit files)
+- [x] **Quality Complete** = seven gates run **separately with real exit codes**; six at 0, `test:fixture` at 1 with the TD-030 pair named individually
+- [ ] **Integration Complete** = **NOT MET.** Needs the seeded dev `L1` run, which spends live Groq budget and is the engineer's call. Same run that gates B1.5 and B2.1
+- [x] Every Binding Decision Compliance Check evaluates to `Y` — the action authorises before metering, proven by `mock.invocationCallOrder` and by mutation M1
+- [x] Every exit-code cell in the Gate E4 table above is filled
 
 ## Notes
 - Impact scope: Task F-C1's `EssayRegradeControl` maps this action's five refusal reasons through `REFUSAL_KEY`.
