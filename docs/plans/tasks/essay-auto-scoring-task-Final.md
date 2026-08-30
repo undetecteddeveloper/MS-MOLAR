@@ -32,16 +32,21 @@ Cross-cutting verification against **both Design Docs, the UI Spec, the PRD and 
 All four are engineer decisions recorded as flagged restatements **instead of** editing a reviewed PRD; **a later PRD↔code comparison must read them as deliberate.**
 
 ### 3. Regression review of everything asserted as unchanged
-- [ ] `isScored()` behaviour
-- [ ] `SOURCE/lib/scoring/wrongTwice.ts` (**not one byte**)
-- [ ] the MASTERY WRITE filter at `schema.sql:1354`
-- [ ] `record_exam_result()`'s signature, body and grants
-- [ ] the `exam_results` column DDL
-- [ ] `QuotaKind`, `PLAN_LIMITS`, `Entitlement`, `budgetCeiling()`, `freeShare()` and **every** `consumeQuota()` call site
-- [ ] `TutorPromptInput.questionType`'s closed union
-- [ ] `PublicQuestion`'s `Omit`
-- [ ] `buildTelemetryPayload()`'s body and its exhaustive six-column test
-- [ ] **`ScoreCard.tsx` — 0 diff; any diff is a regression**
+
+**Mechanical sweep run 2026-08-30 against `main..HEAD`.** This is the part of the Final phase that is checkable without the engineer-owned external work, and the task explicitly invites agent assistance for it. Result: **every claim below holds.**
+
+- [x] `isScored()` behaviour — the function body is unchanged; only its **docblock reason** moved (B4.1), and the default lane stayed byte-identical at 1950 passed across that commit
+- [x] `SOURCE/lib/scoring/wrongTwice.ts` — **not one byte**: `git diff main..HEAD` on that path is empty
+- [x] the MASTERY WRITE filter at `schema.sql:1354` — untouched
+- [x] `record_exam_result()`'s signature, body and grants — untouched
+- [x] the `exam_results` column DDL — untouched (this feature adds **no column**; the bands live inside the existing `per_question` jsonb)
+- [x] `QuotaKind`, `PLAN_LIMITS`, `Entitlement`, `budgetCeiling()`, `freeShare()` and every `consumeQuota()` call site — **none appear in the diff**. `lib/billing/quota.ts` *did* change, and the sweep checked what: it is a pure **extraction** — the Pacific-day key logic moved to `budgetDay.ts` and is now imported, with `ai:budget:${pacificDay(now)}` producing a **byte-identical** key. That extraction exists so the Groq counter could reuse the day logic without copying it
+- [x] `TutorPromptInput.questionType`'s closed union — still `"mcq" | "true_false" | "short_answer"`; the `@ts-expect-error` fixture still fails to compile, which `tsc` proves on every commit
+- [x] `PublicQuestion`'s `Omit` — `types/question.ts` is unchanged
+- [x] `buildTelemetryPayload()`'s body and its exhaustive six-column test — the **only** non-comment lines in `telemetry.ts`'s diff are the two literal-set widenings from H5 (`TELEMETRY_ERROR_CODES` 6→9, `TelemetryEventType` +`essay_grade`). The function body and its test are untouched, and a new test asserts the **written** payload's key set is exactly those six columns
+- [x] **`ScoreCard.tsx` — 0 diff**, confirmed by `git diff --stat main..HEAD` returning empty
+
+**Not yet done in this phase:** everything in sections 1, 2 and 4 onward that depends on Phase E or on a manual pass over seeded dev data. Those are blocked on the engineer-owned items listed at the end of this file.
 - [ ] the scored branch of `result/detail/page.tsx`
 - [ ] `ExamPlayer.test.tsx`
 - [ ] `RichText`
@@ -255,3 +260,22 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
 - Impact scope: verification and documents only. **No feature code changes in this phase.**
 - Scope boundary — preserve unchanged: everything in item 3's list, most sharply **`SOURCE/app/(layer2)/_components/ScoreCard.tsx` (0 diff)** and **`SOURCE/lib/scoring/wrongTwice.ts` (not one byte)**.
 - **Merging everything in this plan leaves the feature disabled in production.** Grading real student writing begins only after Phase E, and Phase E begins only after Gate A6 carries a real date.
+
+---
+
+## Status at 2026-08-30 — what is done and what is blocked
+
+**Done and committed:** Phases H (including H8), B1, B2, B3, B4, F-A, F-B, F-C, F-D. The mechanical regression sweep in section 3 above.
+
+**Blocked, and each on something only the engineer can do:**
+
+| Item | Why it cannot proceed |
+|---|---|
+| The seeded dev **L1** run | Needs `ESSAY_GRADING_ENABLED=true` and spends live Groq budget. It is the outstanding Integration Complete evidence for **B1.5, B2.1, B3.1, B3.2**, the **EVP** for F-A3, and the L1 halves of F-B3, F-C1 and F-C2 |
+| **E1** (Gate A / ZDR) | A dated check in the Groq console |
+| **E2** (OQ-4) | The account's real rate/budget limits |
+| **E3** (OQ-6 / AC-070) | A real-provider model evaluation |
+| **E4** (OQ-5) | A product decision about `upload.essayStored` — three options, owner engineer/product |
+| **E5** (OQ-1 / O-6) | 10 real gradings, to confirm or move four time constants |
+| **E6** | Enabling the flag on prod |
+| Final sections 1, 2, 4+ | Depend on E and on manual passes over seeded dev data |
