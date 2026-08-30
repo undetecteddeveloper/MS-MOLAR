@@ -51,7 +51,31 @@ An attempt submitted **while enabled** whose pass is cut off before finishing le
 ### Why the earlier attempt appeared to do nothing
 The engineer set both variables and redeployed **before** the merge. That deploy built `main`, which at the time did not contain the feature at all — its `en.ts` had only `player.essayNotScored` and its `QuestionRenderer` had no flag prop. **Setting the variables changed nothing because there was no code reading them.** Worth recording as the shape of the design working: production was *structurally* incapable of grading, not merely configured not to.
 
-### BLOCKED — the enabled state is NOT yet confirmed
+### Steps 3 and 4 — CONFIRMED 2026-08-30
+
+**Step 3 (three read sites flipped): confirmed by the engineer** on the live site after the merge deploy — the player footnote reads the flag-on string. The earlier appearance of "nothing happened" was the pre-merge deploy, explained below.
+
+**Step 4 (one real attempt end to end): confirmed by READ-ONLY QUERY against production**, not by report — the distinction matters, because "it looks like it's working" and "a band was written correctly" are different claims:
+
+| probe (prod `pebjdlbgbmizgfpuptjl`) | result |
+|---|---|
+| `telemetry_log` rows with `event_type = 'essay_grade'` | **2**, `success` on both, **0** failed |
+| latest grade | 2026-08-30 12:44:54 UTC |
+| `exam_results` rows carrying essay lifecycle keys | **1** |
+
+Both essay elements settled **`graded`** — terminal, so both contribute to earned and max (EG-BE-027).
+
+**An apparent anomaly that turned out to be the design working.** The two elements carry a *different number of keys* — 10 and 9 — and different attempt counts:
+
+- `…-p2q1`: 10 keys, `essayAttempts: 1`, `selected` present (5 chars). A real answer, one provider call, band 0.
+- `…-p2q2`: **9 keys**, **`essayAttempts: 0`**, **`selected` absent**.
+
+The missing key is `selected`, and its absence means the question was **skipped**. `essayAttempts: 0` is then exactly right: the empty-answer path settles band 0 **with no claim and no provider call** (Task B1.4), so no attempt is consumed. Nothing is malformed — a skipped question has always lacked `selected`, and that is not essay-specific. Recorded because a future reader running this same probe will see 9-vs-10 and needs to know it is not drift in the W1 shape.
+
+### Step 5 — NOT done
+The kill-switch rehearsal has not been performed. It is the one part of E6 still open, and it is the part that proves turning the feature **off** is safe — specifically that **already-graded attempts keep rendering their bands**, because the flag gates emitting *new* keys, not reading *old* ones.
+
+### Superseded — the block that stopped the first attempt
 Steps 3 (three read sites flipped), 4 (one real attempt end to end) and 5 (kill-switch rehearsal) are **not done**, and must not be recorded as done.
 
 The attempt to verify the footnote on production failed at sign-in: the test account `smithnguyen247+rlstesta@gmail.com` returns **"User is banned"** on the production project. It exists on dev, where the whole `L1` run was performed, but is not usable on prod. No other account was tried — the two real accounts are the engineer's own and are explicitly not to be touched.
