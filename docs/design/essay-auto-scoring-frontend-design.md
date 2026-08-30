@@ -7,13 +7,15 @@
 | **Status** | Draft — hiện thực hoá lát cắt hiển thị mà `docs/ui-spec/essay-auto-scoring-ui-spec.md` **v1.3** đặc tả, tiêu thụ các hợp đồng do `docs/design/essay-auto-scoring-backend-design.md` **v1.9** chốt. |
 | **PRD** | `docs/prd/essay-auto-scoring-prd.md` **v1.2** (AC-001–AC-072; OQ-7 đóng — mục tiêu độ trễ ≤ 60 giây → **≤ 3 phút**) |
 | **ADR** | `docs/adr/ADR-0018-essay-async-grade-write.md` (**Accepted** 2026-08-29, Decision 1–6, Amendment to ADR-0010, cả hai Escalation đã giải) |
-| **UI Spec** | `docs/ui-spec/essay-auto-scoring-ui-spec.md` **v1.3** — nguồn chuẩn của cấu trúc component, máy trạng thái render RS-0…RS-6, 29 chuỗi hiển thị, hằng polling và yêu cầu a11y. Tài liệu này **kế thừa nguyên vẹn** 13 quyết định UI-D1…UI-D13 và **không mở lại** cái nào. |
+| **UI Spec** | `docs/ui-spec/essay-auto-scoring-ui-spec.md` **v1.5** — nguồn chuẩn của cấu trúc component, máy trạng thái render RS-0…RS-6, 29 chuỗi hiển thị, hằng polling và yêu cầu a11y. Tài liệu này **kế thừa nguyên vẹn** 13 quyết định UI-D1…UI-D13 và **không mở lại** cái nào. |
 | **Backend Design** | `docs/design/essay-auto-scoring-backend-design.md` **v1.9** — nguồn chuẩn của năm khoá jsonb, `EssayView`, `EssaySummary`, hạn chờ suy-lúc-đọc và chữ ký Server Action. Tài liệu này **tiêu thụ**, không thiết kế lại. |
 
 > **Sửa citation 2026-08-30 (Final §16).** Bốn số hiệu ở bảng trên đều SAI so với file thật, và sai theo **hai chiều khác nhau** — nên không thể chữa bằng một phép "cộng thêm một":
 > - UI Spec: ghi **v1.4**, thật là **v1.3** → trích một phiên bản KHÔNG TỒN TẠI.
 > - Backend DD: ghi **v1.5**, thật là **v1.9** → trễ **bốn** bản.
 > - PRD: ghi **v1.3**, thật là **v1.2** → lại trích quá lên.
+>
+> **Đính chính chính ghi chú này, 2026-08-30 (cùng lượt Final §16).** Dòng "UI Spec: thật là v1.3" ở trên đọc **bảng header** của UI Spec, và bảng header ấy **tự nó đã tụt lại**: § Update History của UI Spec đã mang một hàng **1.4** từ 2026-08-29. Bản ghi có thẩm quyền là Update History, không phải bảng header — đúng quy ước mà v1.1 của chính tài liệu này đã tuyên bố. UI Spec nay là **v1.5** (đóng O-3 và O-6), và bảng trên đã được cập nhật. Bài học giữ lại: **đọc header là chưa đủ; phải đối chiếu header với Update History của cùng file**, vì hai chỗ ấy lệch nhau được.
 >
 > Đáng ghi hơn: chính checklist của Final §16 mô tả lỗi này SAI — nó nói tài liệu đang trích "UI Spec v1.2 và backend v1.2, trong khi bản hiện tại là UI Spec v1.3 và backend v1.4". Cả bốn con số ấy đều không khớp thực tế. Làm theo nguyên văn checklist sẽ tạo ra một bản "sửa" mới cũng sai. Số hiệu ở đây được lấy bằng cách ĐỌC header của từng file, không lấy từ checklist.
 
@@ -2397,6 +2399,12 @@ Những gì không giải được từ UI Spec, backend Design Doc, PRD, ADR v�
   *Quyết định:* **phương án (a) — hai khoá i18n, cộng một cờ server-only truyền xuống bằng prop tuỳ chọn (mặc định `false`).** Đúng mặc định của tài liệu này và của UI Spec; UI Spec v1.3 ghi cùng quyết định và đóng O-5.
   *Lý do được ghi cùng quyết định:* (b) — một khoá, với Work Plan ràng buộc commit đổi chữ chỉ đáp xuống **sau** cổng AC-067 — nhỏ hơn ở **mọi** cột đo được (0 prop, 0 biên, 0 khoá thừa), **nhưng** nó giao tính đúng đắn của câu chữ cho **thứ tự commit**. Với một kỹ sư, không staging (C-F6), thứ tự ấy không đáng đặt cược: nếu nó trượt, màn làm bài hứa chấm tự động trong khi cỗ máy chấm không chạy — đúng khuyết tật R12 tồn tại để chấm dứt. (a) đúng **bất kể** thứ tự commit.
   *Hệ quả đã đáp xuống thiết kế:* § MSA-F2 bước 4 và bước 5 (phương án (b) nằm trong danh sách bị loại), § QuestionRenderer, và ba chỗ đọc cờ mà backend v1.2 liệt kê (§ Contract deltas).
+
+> **Trạng thái chốt sổ 2026-08-30 (Final §16).** **FE-OQ-3 ĐÓNG** — phép đo Gate D đã có (375 → 3 401 B/dòng, **≈9,1×**, ~1 661 KB ở trần 500 dòng, dòng lớn nhất 5 385 B), **kỹ sư quyết định ACCEPT**, và phương án RPC **không** được chọn — nên **ADR-0018 Escalation 2 vẫn đóng** và số thay đổi schema áp tay **không** bị nâng từ hai lên ba. Đây đúng là điều mục này yêu cầu: không ai được chọn RPC mà không có số đo, và số đo đã dẫn tới quyết định ngược lại.
+>
+> **FE-OQ-4 và FE-OQ-5 CÒN MỞ, chủ sở hữu: kỹ sư** — cả hai cần một **trình duyệt thật**, thứ mà không lượt quét tĩnh nào thay thế được:
+> - **FE-OQ-4** cần đặt tiêu điểm lên nút "Chấm lại", để một `router.refresh()` đáp xuống, rồi đọc `document.activeElement`. **jsdom không trả lời được câu này** — ca RTL chỉ chứng minh điều kiện **cần** (không control nào bị unmount). Chỉ thêm cơ chế cứu focus theo lối `ExplainStepAffordance.tsx:56-77` **nếu** phép đo cho thấy cần.
+> - **FE-OQ-5** cần kỹ sư xác nhận hoặc bác hai standard `implicit`. Dù chiều nào thì đó là **hai class, không phải một thay đổi thiết kế** — nhưng `tabular-nums` có một **lý do chức năng độc lập** đã được ghim bằng test (`EssayScoreLine.test.tsx:155`, "tabular-nums là CHỨC NĂNG, không phải thẩm mỹ"): mẫu số lớn dần trong lúc học sinh đang nhìn, nên chữ số không đều làm dòng nhảy ở mỗi lượt refresh. Bác nó cần một lý do đối lại.
 
 - **FE-OQ-3 — Chi phí payload của `per_question` trong `listMyHistory()`** *(thừa kế UI Spec O-3 → backend OQ-3)*.
   *Vấn đề:* `readBounded` chặn ở `LIST_ROW_CEILING = 500` (`lib/supabase/boundedRead.ts:74`), nhưng trần đó **chưa được đo** với `per_question` trong select. Đây là chi phí mà UI-D11 chấp nhận, không giảm nhẹ.

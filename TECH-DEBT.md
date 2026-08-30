@@ -228,6 +228,15 @@ Vế thứ hai còn khớp gần như nguyên văn: Server Action bấm chấm l
 ADR-0018 sẽ đưa con số lên **13** (`claimEssayGradingAttempt`,
 `recordEssayGrade`).
 
+**XÁC NHẬN 2026-08-30 (Final §16): con số ĐÃ là 13, và hai điều kiện xét lại
+dưới đây vẫn phát biểu đúng.** `grep -c "^export async function"` trên
+`SOURCE/lib/supabase/service-role.ts` trả về **13** — đúng bằng con số mục này
+dự báo, nên operation 12 và 13 đã đáp xuống và không có operation thứ 14 nào
+lẻn vào cùng lượt. Hai trigger giữ nguyên hiệu lực và giữ nguyên câu chữ: một
+operation **thứ 14**, HOẶC một đề xuất mutate `exam_results` tại chỗ lần **thứ
+ba** (ADR-0018 đã dùng hết lần thứ nhất và thứ hai — claim và settle). Đo lại
+bằng chính lệnh `grep` trên, không bằng trí nhớ.
+
 **Vì sao chấp nhận đi tiếp thay vì xét lại ngay:** thứ làm nổ ngưỡng là
 payments + support, nên chặn tính năng chấm tự luận lại KHÔNG sửa được cái đã
 nổ — nó chỉ hoãn một tính năng đã đi được 2/7 chặng tài liệu, để đổi lấy một
@@ -350,6 +359,31 @@ nhưng đổi DNS và thêm một tầng vào đường đi.
 **Từ:** trước 2026-08-03 (nợ cũ, ghi lại cho rõ)
 **Loại:** vận hành
 **Trạng thái:** **đã trả PHẦN PHÁT HIỆN (2026-08-07)** — phần QUẢN LÝ vẫn nguyên
+
+**Cập nhật 2026-08-30 (Final §16) — ADR-0018 thêm BA nhóm DDL, đã áp và đã
+kiểm trên CẢ HAI database.** Ghi ra vì con số "hai thay đổi schema áp tay" xuất
+hiện ở nhiều tài liệu thượng nguồn và nó **đếm thiếu một**:
+
+1. **Hai hàm SQL mới** — `claim_essay_grading_attempt()`, `record_essay_grade()`.
+2. **Cặp CHECK trên `telemetry_log`** — `telemetry_log_event_type_check`
+   (2 → 3 giá trị, thêm `essay_grade`) và `telemetry_log_error_code_check`
+   (6 → 9 giá trị). Mỗi cái là một cặp drop/add.
+3. **Trần ký tự `attempt_answers_answer_check`** — 500 → 4000 (R11). Đây là
+   nhóm **thứ ba** mà câu "hai thay đổi" bỏ quên.
+
+Cả ba đi cùng một lượt apply **sáu câu lệnh theo thứ tự phụ thuộc, vân tay
+CUỐI CÙNG**, lên dev rồi prod ngày 2026-08-29, sau xác nhận của kỹ sư. Vân tay
+đi `29931beeb950` → **`9979c9deea52`** và được **đọc lại bằng truy vấn thật**
+trên cả hai project (Gate B6), không phải tin theo thông báo "success" — bước
+này đáng giá đúng như TD-005 dự báo: công cụ apply chỉ báo `DROP FUNCTION` là
+"command" cho mỗi lượt nhiều câu lệnh, đọc trần trụi sẽ tưởng lệnh create
+không chạy. **Không dòng dữ liệu nào mất** — số đếm trên prod đi LÊN trong cửa
+sổ ấy (9→10 kết quả, 217→222 câu trả lời, 90→91 telemetry), tức lưu lượng học
+sinh thật.
+
+**Cái TD-005 vẫn chưa được trả:** không có gì ngăn lượt apply tay TIẾP THEO
+quên một nhóm. Lượt này đúng vì có Gate B1–B7 viết sẵn thành checklist có người
+tick, không phải vì quy trình đã đổi.
 
 > **Cập nhật 2026-08-07 — nợ này đã nổ thật, lần thứ ba.** Bản vá cascade
 > 2026-08-04 (bug xoá đề) chỉ được áp lên **prod**. Trên **dev**,
