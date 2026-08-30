@@ -19,19 +19,19 @@ Cross-cutting verification against **both Design Docs, the UI Spec, the PRD and 
 
 ### 1. Acceptance criteria sweep — done 2026-08-30
 
-**Result: all 72 PRD ACs traced and satisfied, and all 36 EG-BE criteria satisfied; one frontend criterion, FE-AC-12, is NOT satisfied.** FE-AC-12 is the **only** entry in the FE-AC list carrying no `(AC-xxx)` back-reference — it is a robustness criterion the frontend Design Doc invented for itself, so **no PRD AC fails**, and equally **no PRD-level sweep would ever have found it**. The gap is recorded below rather than fixed, because this phase adds no feature code.
+**Result: all 72 PRD ACs traced and satisfied, and all 36 EG-BE criteria satisfied; one frontend criterion, FE-AC-12, was NOT satisfied — and has since been FIXED in its own commit (see below).** FE-AC-12 is the **only** entry in the FE-AC list carrying no `(AC-xxx)` back-reference — it is a robustness criterion the frontend Design Doc invented for itself, so **no PRD AC fails**, and equally **no PRD-level sweep would ever have found it**. The sweep recorded it rather than fixing it, because this phase adds no feature code; the fix followed as a separate task.
 
 - [x] **EG-BE-001…036 all satisfied.** 32 of the 36 carry their ID as a literal tag in source or test, so the mapping is mechanical rather than asserted. The **four that carry no tag** were each checked directly, because an untagged criterion is exactly the one a sweep skips:
   - **EG-BE-018** (adversarial fixtures, real provider) — `adversarialAnswers.ts` holds **7** committed fixtures against a required floor of 5, across **7 distinct techniques**, in **both** languages, and including **both** a zero-width and a bidi variant. The real-provider half is Task **E3**: 7 × 2 = 14 calls, **7/7 EQUAL, 0 RAISED**. Two clean baselines are themselves 0.5 and one is 0, so there was genuine headroom for an injection to lift a band; none did. This is the controlled comparison the AC asks for, not a ceiling check.
   - **EG-BE-019** (budget key) — `groq:budget:${pacificDay(now)}` is built at `lib/essay/budget.ts:69`. The string `ai:budget:` appears **nowhere** in `lib/essay/**`; its only construction site is `lib/billing/quota.ts:176`, the Gemini path. The two prefixes differ at the **first** character, which is what makes a mistaken key impossible to typo into.
   - **EG-BE-028** (character ceiling) — carried by `npm run verify:schema`, recorded green in section 6 including the ceiling assertion (4000 passes, 4001 rejected by `attempt_answers_answer_check`).
   - **EG-BE-030** (non-essay regression) — carried by the existing `computeScore.test.ts` fixtures plus EG-BE-002's byte-identical assertion; the default lane is green at **2026 passed / 10 skipped**, unchanged across this feature.
-- [ ] **FE-AC-01…21: 20 satisfied, FE-AC-12 NOT satisfied. FE-NFR-01…03: structurally satisfied; the visual half is engineer-owned.**
+- [x] **FE-AC-01…21: 20 satisfied at sweep time; FE-AC-12 was the exception and is now fixed. FE-NFR-01…03: structurally satisfied; the visual half is engineer-owned.**
   - **The FE-AC ID space is shared with other features** — `subscription` and `billing` also number their criteria `FE-AC-nn`, and a grep for `FE-AC-10` returns hits in `RecheckOrderControl`, `OrderList` and `PaymentConfirm` that have nothing to do with essays. **Tag-grep alone is not evidence here**, so each essay criterion was matched to a named test instead.
   - Evidence by criterion: FE-AC-01 `result/page.tsx:97`; 02, 14, 15 `EssayScoreLine.test.tsx:64/48/141`; 03, 13 `detail/page.tsx:141/152` + FE2E-4; 04 `EssayReviewBlock.test.tsx:90`; 05, 16 FE2E-2; 06, 07, 09 `EssayRegradeControl.test.tsx:46/174/107`; 08, 21 `EssayRegradeControl.test.tsx:161/190`; 10, 11 FE2E-3; 17, 18 `EssayGradingPoller.test.tsx:117/128/151/159` and `:89/101`; 19 `AttemptPdfTemplate.test.tsx:118/126/135`; 20 `QuestionRenderer.test.tsx:193/203/210`.
   - **FE-NFR-01** — the `grid-cols-3` block is at `result/page.tsx:152-176` and holds exactly three cells (`ResultActions` → Save + Share, plus the Return `Link`). Blocking is passed as the `blockedReason` **prop**, so the blocked state cannot add a fourth cell; the invariant is structural, not visual. **FE-NFR-02** — `HistoryRow.tsx:61` is the single in-flow node in the right column, and the badge sits at `:56` inside the left meta column. **FE-NFR-03** — `EssayLifecycleBadge.test.tsx` asserts zero hex literals and specifically refuses to borrow `#4F7942`, so no new pair exists to re-measure.
 
-#### The one gap: FE-AC-12 is unsatisfied, and no test would have caught it
+#### The one gap: FE-AC-12 was unsatisfied, and no test would have caught it
 
 FE-AC-12 requires that **when a `router.refresh()` throws, the poller logs and still schedules the next tick, with nothing surfacing to the student.** `EssayGradingPoller.tsx:107-109` is:
 
@@ -43,7 +43,17 @@ schedule();
 
 There is **no `try`/`catch`** at either call site (`:109` in the tick, `:166` in the manual "Cập nhật" button), no log, and **no test anywhere** asserts the behaviour — the file contains no `mockRejected`, no `mockImplementation` that throws, and no `catch`. A synchronous throw from `router.refresh()` skips `schedule()`, and the poller **stops permanently and silently**: `stopped` is never set, so the student gets neither the self-updating page nor the `pollStopped` message with its manual refresh button. It is the one failure mode where the feature's own fallback is also removed.
 
-**Not fixed here, deliberately.** This phase's scope boundary is "**No file under `SOURCE/`**", and a two-line `try`/`catch` in a client component with a new test is feature code that belongs in its own task and its own commit. Recorded so it is not lost between phases.
+**FIXED 2026-08-30, in its own commit after this phase closed** — the Final phase itself added no file under `SOURCE/`, and this fix is a separate task, as the boundary requires.
+
+`router.refresh()` is now wrapped at **both** call sites, with **`schedule()` deliberately outside the `try`** — that placement is the whole point, and a guard that puts `schedule()` *inside* the `try` looks correct while reintroducing the identical defect. A throwing tick still **consumes a budget slot**, so a persistently throwing refresh reaches the 30-cap and degrades down the path that already exists — `pollStopped` plus the manual button — rather than spinning every 5–10 seconds forever on the weakest device. Logging follows the rule `EssayRegradeControl:96-102` established: **`digest` only, never the error**, because a server-boundary message can echo the student's own writing back and `Error#message` is not enumerable, so such a leak does not show under `JSON.stringify`.
+
+**Five cases added, and proven by mutation rather than by being green** — they were written after the fix, so passing on the first run proves nothing on its own. Three mutations, each killed:
+
+| Mutation | Result |
+|---|---|
+| **M1** — revert the component to the pre-fix state | **5 failed / 11 passed** — every new case dies, every pre-existing case survives, so the cases are specific to this defect rather than merely noisy. The manual-button case threw an *uncaught* error into React's dispatch, confirming that second call site was genuinely unguarded |
+| **M2** — log the raw `err` instead of `digest` | **1 failed** — exactly the digest-only case, so the security assertion is load-bearing |
+| **M3** — move `schedule()` **inside** the `try` | **2 failed** — the survival case and the cap-degradation case. This is the mutation that matters: it is what a careless fix looks like |
 
 - [x] **PRD AC-001…AC-072 reconciled against both Design Docs' AC Traceability tables — measured, not eyeballed.** The PRD declares **exactly 72** ACs with **no gaps** in `001..072`. The backend DD's table carries a row for **all 72**; the frontend DD's table carries **36**, and all 36 are a **subset** of the backend's rows. **Union = 72/72: no PRD AC is orphaned in either document**, and none exists in the frontend table without a backend counterpart.
 - [x] **The four the backend DD deliberately does not satisfy are each discharged on the frontend side** — checked in code, not only in the frontend DD's table:

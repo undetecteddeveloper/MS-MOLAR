@@ -210,3 +210,125 @@ describe("vùng aria-live (AC-023)", () => {
     expect(live?.textContent).toBe(DICT["result.essay.announceAllDone"]);
   });
 });
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FE-AC-12 — cho tới 2026-08-30 đây là tiêu chí DUY NHẤT của tính năng không
+// được thoả, và KHÔNG test nào bắt được: `router.refresh()` được gọi TRẦN,
+// `schedule()` đứng ngay sau nó, nên một cú ném ĐỒNG BỘ nhảy qua `schedule()`
+// và poller chết vĩnh viễn mà `stopped` không bao giờ được đặt — học sinh mất
+// CẢ trang tự cập nhật LẪN nút làm mới thủ công.
+//
+// Nó cũng là muc DUY NHẤT trong danh sách FE-AC không mang back-reference
+// `(AC-xxx)`, tức không lượt đối chiếu nào ở mức PRD chạm tới được. Bốn ca
+// dưới đây là lưới chặn thay cho điều đó.
+// ═══════════════════════════════════════════════════════════════════════════
+
+function spyOnConsoleError() {
+  return vi.spyOn(console, "error").mockImplementation(() => {});
+}
+
+describe("FE-AC-12 — một `router.refresh()` NÉM không được giết chuỗi poll", () => {
+  let errorSpy: ReturnType<typeof spyOnConsoleError>;
+
+  beforeEach(() => {
+    errorSpy = spyOnConsoleError();
+  });
+  afterEach(() => {
+    errorSpy.mockRestore();
+  });
+
+  it("ném ở một nhịp ⇒ GHI LOG và VẪN hẹn nhịp kế tiếp", () => {
+    refreshMock.mockImplementationOnce(() => {
+      throw new Error("boom");
+    });
+    render(<EssayGradingPoller pendingCount={2} gradedCount={0} />);
+
+    tick(ESSAY_POLL_FAST_INTERVAL_MS);
+    expect(refreshMock).toHaveBeenCalledTimes(1);
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+
+    // ĐÂY là khẳng định của FE-AC-12, và là ca giết bản CŨ: trước bản vá con
+    // số này đứng yên ở 1 vĩnh viễn, vì cú ném đã nhảy qua `schedule()`.
+    tick(ESSAY_POLL_FAST_INTERVAL_MS);
+    expect(refreshMock).toHaveBeenCalledTimes(2);
+    tick(ESSAY_POLL_FAST_INTERVAL_MS);
+    expect(refreshMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("KHÔNG gì hiện ra cho học sinh", () => {
+    refreshMock.mockImplementationOnce(() => {
+      throw new Error("boom");
+    });
+    const { container } = render(<EssayGradingPoller pendingCount={2} gradedCount={0} />);
+    tick(ESSAY_POLL_FAST_INTERVAL_MS);
+
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByText(DICT["result.essay.pollStopped"])).toBeNull();
+    expect(container.textContent).not.toContain("boom");
+  });
+
+  it("log mang DUY NHẤT `digest` — không thông điệp lỗi", () => {
+    const leaky = Object.assign(new Error("bai lam cua hoc sinh co the vong lai o day"), {
+      digest: "abc123",
+    });
+    refreshMock.mockImplementationOnce(() => {
+      throw leaky;
+    });
+    render(<EssayGradingPoller pendingCount={2} gradedCount={0} />);
+    tick(ESSAY_POLL_FAST_INTERVAL_MS);
+
+    expect(errorSpy).toHaveBeenCalledWith("[EssayGradingPoller] router.refresh() threw", {
+      digest: "abc123",
+    });
+
+    // Khẳng định PHỦ ĐỊNH, và nó cần cách kiểm riêng: `Error#message` KHÔNG
+    // enumerable, nên một lượt rò kiểu này KHÔNG lộ ra dưới `JSON.stringify`.
+    // Quét cả dạng chuỗi hoá lẫn từng đối số thô.
+    expect(JSON.stringify(errorSpy.mock.calls)).not.toContain("bai lam cua hoc sinh");
+    for (const call of errorSpy.mock.calls) {
+      for (const arg of call) {
+        expect(String(arg)).not.toContain("bai lam cua hoc sinh");
+      }
+    }
+  });
+
+  it("ném LIÊN TỤC ⇒ chạm trần rồi xuống thang thành nút thủ công, KHÔNG quay vô hạn", () => {
+    refreshMock.mockImplementation(() => {
+      throw new Error("boom");
+    });
+    render(<EssayGradingPoller pendingCount={2} gradedCount={0} />);
+
+    fastTicks(ESSAY_POLL_FAST_TICKS);
+    for (let i = 0; i < ESSAY_POLL_MAX_REFRESHES; i += 1) tick(ESSAY_POLL_SLOW_INTERVAL_MS);
+
+    // Lượt hỏng VẪN tiêu một suất trong trần 30 — cố ý. Không tiêu thì chuỗi
+    // này quay mãi mỗi 5–10 giây trên đúng thiết bị yếu nhất, và cái giá của
+    // bản vá sẽ là một vòng lặp vô hạn thay cho một lượt chết im lặng.
+    expect(refreshMock.mock.calls.length).toBeLessThanOrEqual(ESSAY_POLL_MAX_REFRESHES);
+    expect(screen.getByText(DICT["result.essay.pollStopped"])).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: DICT["result.essay.pollRefresh"] }).tagName
+    ).toBe("BUTTON");
+  });
+
+  it("nút 'Cập nhật' ném ⇒ ghi log, không vỡ, và ngân sách VẪN được nạp lại", () => {
+    render(<EssayGradingPoller pendingCount={2} gradedCount={0} />);
+    fastTicks(ESSAY_POLL_FAST_TICKS);
+    for (let i = 0; i < ESSAY_POLL_MAX_REFRESHES; i += 1) tick(ESSAY_POLL_SLOW_INTERVAL_MS);
+    const before = refreshMock.mock.calls.length;
+
+    refreshMock.mockImplementationOnce(() => {
+      throw new Error("boom");
+    });
+    fireEvent.click(screen.getByRole("button", { name: DICT["result.essay.pollRefresh"] }));
+
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+
+    // `resetBudgets()` chạy TRƯỚC lượt refresh, nên chuỗi khởi động lại kể cả
+    // khi chính cú bấm ấy ném — nút không tự biến mình thành một cú bấm chết.
+    expect(screen.queryByText(DICT["result.essay.pollStopped"])).toBeNull();
+    fastTicks(2);
+    expect(refreshMock.mock.calls.length).toBe(before + 3);
+  });
+});

@@ -50,6 +50,22 @@ export const ESSAY_POLL_MAX_REFRESHES = 30;
 /** Trần thứ hai: đồng hồ treo tường, neo vào `ESSAY_PASS_BUDGET_MS`. Xem đầu file. */
 export const ESSAY_POLL_MAX_ELAPSED_MS = 240_000;
 
+/** FE-AC-12 — CHỈ `digest`, không bao giờ `err`.
+ *
+ *  Cùng quy tắc mà `EssayRegradeControl:96-102` đã dựng: thông điệp lỗi băng
+ *  qua biên máy chủ có thể vọng lại chính bài làm của học sinh, và
+ *  `Error#message` KHÔNG enumerable nên một lượt rò kiểu đó không lộ ra dưới
+ *  `JSON.stringify` — nó chỉ lộ ra ở console thật, tức là muộn.
+ *
+ *  Và KHÔNG trả về gì để render: một lượt refresh hỏng là chuyện hạ tầng, không
+ *  phải thứ học sinh làm được gì với nó. Hiện nó ra chỉ đổi một lỗi vô hình
+ *  thành một lỗi đáng sợ. */
+function logRefreshThrew(err: unknown) {
+  console.error("[EssayGradingPoller] router.refresh() threw", {
+    digest: (err as { digest?: string } | null)?.digest,
+  });
+}
+
 export function EssayGradingPoller({
   pendingCount,
   gradedCount,
@@ -106,7 +122,28 @@ export function EssayGradingPoller({
         }
 
         refreshes.current += 1;
-        router.refresh();
+
+        // ═══ FE-AC-12 — MỘT CÚ NÉM KHÔNG ĐƯỢC PHÉP GIẾT CHUỖI POLL ═══
+        //
+        // `schedule()` nằm NGOÀI `try`, và đó là toàn bộ điểm của khối này:
+        // trước đây `router.refresh()` gọi trần, nên một cú ném ĐỒNG BỘ nhảy
+        // thẳng qua `schedule()` và poller CHẾT VĨNH VIỄN VÀ IM LẶNG —
+        // `stopped` không bao giờ được đặt, nên học sinh mất CẢ trang tự cập
+        // nhật LẪN câu `pollStopped` kèm nút làm mới thủ công. Đó là ca duy
+        // nhất mà cơ chế dự phòng của chính tính năng cũng bị gỡ mất, tức là
+        // ca tệ nhất chứ không phải ca hiếm nhất.
+        //
+        // Lượt hỏng VẪN TIÊU một suất trong trần 30 — cố ý. Không tiêu thì một
+        // `router.refresh()` ném liên tục quay vô hạn, mỗi 5–10 giây, trên
+        // đúng thiết bị yếu nhất. Tiêu suất nghĩa là 30 cú ném liên tiếp chạm
+        // trần và poller dừng ĐÚNG ĐƯỜNG đã có sẵn: `pollStopped` cộng một nút
+        // thủ công. Xuống thang thành thứ học sinh bấm được, không phải thành
+        // im lặng.
+        try {
+          router.refresh();
+        } catch (err) {
+          logRefreshThrew(err);
+        }
         schedule();
       }, interval);
     }
@@ -162,8 +199,17 @@ export function EssayGradingPoller({
             variant="outline"
             className="min-h-11"
             onClick={() => {
+              // `resetBudgets()` chạy TRƯỚC, nên chuỗi poll khởi động lại kể cả
+              // khi chính lượt refresh này ném — nút không tự biến mình thành
+              // một cú bấm chết. Không `schedule()` ở đây: việc đó thuộc về
+              // effect, thứ mà `setStopped(false)` bên trong `resetBudgets()`
+              // vừa đánh thức (FE-AC-12).
               resetBudgets();
-              router.refresh();
+              try {
+                router.refresh();
+              } catch (err) {
+                logRefreshThrew(err);
+              }
             }}
           >
             {t("result.essay.pollRefresh")}
