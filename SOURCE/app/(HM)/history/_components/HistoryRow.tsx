@@ -44,7 +44,12 @@ export function HistoryRow({
       </div>
 
       <div className="flex shrink-0 items-center justify-end">
+        {/* Giá trị THẬT được tính ở Task F-B3, nơi `hasUnresolvedEssay` của
+            `MyHistoryEntry` được nối vào đây. Truyền `null` ở commit này là một
+            bước TRUNG GIAN có chủ đích, không phải một quyết định: cổng ở cửa
+            `/result` đã đóng, và cửa này đóng ngay ở task kế tiếp. */}
         <HistoryRowMenu
+          blockedReason={null}
           pdfInput={pdfInput}
           resultHref={`/exams/${entry.examId}/attempt/${entry.attemptId}/result`}
           examTitle={entry.examTitle}

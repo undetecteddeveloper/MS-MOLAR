@@ -31,10 +31,14 @@ The repo has fixed this exact bug **twice** (`ExplainStepAffordance.tsx:11-14` n
 This **widens AC-058's stated scope**, which names only `ResultActions.tsx`, to `/history` as well — **deliberately**, because `/history` is where a student returns days later and therefore where a PDF is **most** likely to be exported.
 
 ## Target Files
-- [ ] `SOURCE/components/history/usePdfAction.ts`
-- [ ] `SOURCE/components/history/ActionButton.tsx`
-- [ ] `SOURCE/app/(layer2)/_components/ResultActions.tsx`
-- [ ] `SOURCE/components/history/ActionButton.test.tsx` (13 render sites)
+- [x] `SOURCE/components/history/usePdfAction.ts` — required 3rd parameter + early return above the busy latch
+- [x] `SOURCE/components/history/ActionButton.tsx` — required prop threaded to `aria-disabled`, the `sr-only` reason and the tooltip
+- [x] `SOURCE/app/(layer2)/_components/ResultActions.tsx` — threaded to **both** buttons
+- [x] `SOURCE/components/history/ActionButton.test.tsx` — 13 render sites + 4 new blocked-state cases
+- [x] `SOURCE/components/history/HistoryRowMenu.tsx` — **extra, forced by `tsc`**: two `usePdfAction` calls
+- [x] `SOURCE/components/history/HistoryRowMenu.test.tsx` — **extra, forced**: the 2 sites the task file assigned to F-B3
+- [x] `SOURCE/app/(HM)/history/_components/HistoryRow.tsx` — **extra, forced**: passes `null` for one commit; F-B3 wires the real value
+- [x] `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/page.tsx` — **extra**: the `/result` door's blocked reason
 
 ## Investigation Targets
 - `docs/ui-spec/essay-auto-scoring-ui-spec.md` (§ Component: usePdfAction (PDF export guard) — verify idle-open + blocked + busy + error states)
@@ -65,7 +69,36 @@ This **widens AC-058's stated scope**, which names only `ResultActions.tsx`, to 
 - `docs/ui-spec/essay-auto-scoring-ui-spec.md` (§ Component: ActionButton (PDF blocked state) — verify default + blocked + busy + error states)
 
 ## Investigation Notes
-_(Record here: the 13 render sites' locations and that all moved in this commit; confirmation that the early return precedes the `busyRef` latch; the `hasAttribute("disabled")` sweep result.)_
+
+### All 15 coupled sites had to move in this commit, not 13 + 2
+The task file splits them: 13 `ActionButton.test.tsx` sites here, 2 `HistoryRowMenu.test.tsx` sites in F-B3. **That split does not compile.** Making the parameter required breaks every uncovered call site immediately, and `tsc` named them:
+
+```
+HistoryRowMenu.tsx(116,16): Expected 3 arguments, but got 2.
+HistoryRowMenu.test.tsx(68,6): Property 'blockedReason' is missing
+```
+
+A commit that does not typecheck is not a commit, so all **15** moved here — which is what Gate H7's own count of 15 implies anyway. Confirmed by regex: 13 sites in `ActionButton.test.tsx`, 2 in `HistoryRowMenu.test.tsx`, all now carrying `blockedReason={null}`.
+
+`HistoryRow.tsx` also had to gain the prop to keep the tree compiling. It passes `null` **for one commit only**, with the reason recorded inline: the `/result` door is closed now, and F-B3 closes the `/history` door by wiring `hasUnresolvedEssay` in. The placeholder is a sequencing step, not a decision.
+
+### The required parameter is the design, not a strictness preference
+An optional `blockedReason` would make every **future** call site default to *not blocked* — so the silent failure mode becomes "exported a PDF missing the essay marks", which is precisely what this gate exists to prevent. Required means `tsc` forces every call site to answer the question. That is why it caught the two sites above instead of letting them ship unguarded.
+
+### The early return sits above the busy latch, and the order is the requirement
+Placed after `busyRef`, a blocked press would still flash through the "generating" phase before stopping — the interface claiming it started work it never started. Above the latch, a blocked press produces **no busy phase and no error node**. Asserted directly (`aria-busy` stays `"false"`, `generateAttemptPdfFile` uncalled).
+
+### Never a native `disabled`, and the test says why
+The repo has fixed this exact bug **twice**. `disabled` removes the element from the tab order **and** puts the reason out of a screen-reader user's reach — the two things AC-058 actually wants. The blocked state is `aria-disabled="true"` on a still-focusable button, with the reason reachable through `aria-describedby`. Three cases pin it, including a subtree-wide `querySelector("[disabled]")` returning null.
+
+### One test-query correction worth recording
+The first draft queried `getByRole("button", { name: "Save" })` and failed: the `sr-only` reason span is a **descendant of the button** (a deliberate layout decision documented as D2 in that file), so its text joins the accessible **name**. The busy state already behaves this way — the blocked state matches the component's established shape rather than introducing a new one. Queries relaxed to a regex; the component was not changed to suit the test.
+
+### The fourth case exists so the other three are not vacuous
+`blockedReason={null}` must still call `generateAttemptPdfFile` exactly once. Without it, a component that blocked *everything* would pass all three blocked-state assertions.
+
+### Which count blocks, and which deliberately does not
+The `/result` door blocks on `unresolvedCount > 0` — RS-2 + RS-4 + RS-5. It **excludes RS-6**: exhausted is the terminal state, so blocking there would lock a student out of their own result permanently over a failure they did not cause (O-8). RS-6 is handled by a printed note *inside* the file instead.
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
@@ -98,13 +131,12 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
 
 | # | Command (from `SOURCE/`) | Exit code | Notes |
 |---|---|---|---|
-| 1 | `npx tsc --noEmit` | | |
-| 2 | `npx eslint --max-warnings 0` | | |
-| 3 | `npx vitest run` | | |
-| 4 | `npm run build` | | |
-| 5 | `npm run test:fixture` | | expected red = TD-030 baseline only (Gate F1): exactly 2 failures, both `subscription.fixture.e2e.test.ts` FE-1(e) `en` + `vi` |
-| 6 | `npm run test:localdb` | | see Open Item I-7 |
-| 7 | `npm run check:bundle` | | Gate E2 — this task edits client components (`usePdfAction.ts`, `ActionButton.tsx`) |
+| 1 | `npx tsc --noEmit` | **0** | The required-parameter change is the gate: it named every uncovered call site, including two the task file assigned to F-B3 |
+| 2 | `npx eslint --max-warnings 0` | **0** | |
+| 3 | `npx vitest run` | **0** | 1991 passed / 10 skipped / 0 todo (was 1987 — **+4** blocked-state cases) |
+| 4 | `npm run build` | **0** | |
+| 5 | `npm run test:fixture` | **1** | Expected red, TD-030 baseline only. Snapshot CRLF churn reverted before commit |
+| 6 | `npm run test:localdb` | **0** | 11 passed / 2 todo (SVC-1, SVC-2 — Task H8) |
 
 **A task file with any exit-code cell left empty is not complete** (Gate E4).
 

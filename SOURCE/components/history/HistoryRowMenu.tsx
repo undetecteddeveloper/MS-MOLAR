@@ -50,6 +50,12 @@ export interface HistoryRowMenuProps {
   resultHref: string;
   /** Accessible name suffix ("More actions for <examTitle>") — disambiguates N triggers on one page. */
   examTitle: string;
+  /** Lý do KHÔNG xuất được PDF, hoặc `null`. BẮT BUỘC — xem `usePdfAction`.
+   *
+   *  CỬA THỨ HAI của cổng AC-058 (UI-D4). `/history` là nơi học sinh quay lại
+   *  sau vài ngày, tức nơi một lượt xuất PDF dễ xảy ra nhất; chặn ở `/result`
+   *  mà mở ở đây là không chặn gì cả. */
+  blockedReason: string | null;
 }
 
 /** Trần chiều cao "muốn có" của panel — 3 mục + có thể thêm 1 dòng lỗi/fallback.
@@ -108,13 +114,18 @@ function usePanelPosition(open: boolean, triggerRef: React.RefObject<HTMLButtonE
   return style;
 }
 
-export function HistoryRowMenu({ pdfInput, resultHref, examTitle }: HistoryRowMenuProps) {
+export function HistoryRowMenu({
+  pdfInput,
+  resultHref,
+  examTitle,
+  blockedReason,
+}: HistoryRowMenuProps) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelStyle = usePanelPosition(open, triggerRef);
-  const save = usePdfAction("save", pdfInput);
-  const share = usePdfAction("share", pdfInput);
+  const save = usePdfAction("save", pdfInput, blockedReason);
+  const share = usePdfAction("share", pdfInput, blockedReason);
 
   // Auto-close once Save/Share completes successfully (phase settles back to
   // idle) — error and fallback-confirmed stay open so the user can read the

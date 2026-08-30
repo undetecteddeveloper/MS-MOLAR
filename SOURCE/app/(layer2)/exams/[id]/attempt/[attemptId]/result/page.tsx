@@ -128,7 +128,20 @@ export default async function ResultPage({
           className="preload-fade grid grid-cols-3 gap-3"
           style={{ "--preload-order": 2 } as React.CSSProperties}
         >
-          <ResultActions pdfInput={pdfInput} />
+          {/* CỬA THỨ NHẤT của cổng chặn PDF (AC-058). Chặn khi còn câu tự
+              luận CHƯA NGÃ NGŨ — `unresolvedCount` đếm RS-2 + RS-4 + RS-5 và
+              CỐ Ý không đếm RS-6: hết lượt là trạng thái CUỐI, nên chặn ở đó
+              là chặn VĨNH VIỄN một học sinh khỏi chính kết quả của mình vì một
+              sự cố không do họ gây ra (O-8). Ca RS-6 được xử bằng một dòng chú
+              thích IN TRONG tệp, không bằng một cánh cửa khoá. */}
+          <ResultActions
+            pdfInput={pdfInput}
+            blockedReason={
+              (data.essaySummary?.unresolvedCount ?? 0) > 0
+                ? t("result.essay.pdfBlocked")
+                : null
+            }
+          />
           {/* Return → ExamBrowser (S#26 — đổi từ Home→"/" cũ). */}
           <Link
             href="/exams"
