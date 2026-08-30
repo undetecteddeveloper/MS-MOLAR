@@ -41,9 +41,11 @@ It is created in **Task B3.2**, which depends on this task; wiring it from here 
 ADR-0018 Escalation 2 requires this **in prose**: `telemetry_log` has no `attempt_id`, and grading attempts are keyed `(attempt_id, question_id)`. A duplicate-write rejection is therefore attributable to **`(user, question, day)` and not to a specific attempt** — two rejections on the same question by the same student on the same day are indistinguishable. Recorded rather than hidden, because the failure mode is a future session reading a rejection count and inferring a per-attempt rate from it. Affordable because a refused duplicate is a **rare diagnostic signal, not a metric anyone counts** — it fires only in the AC-063 race.
 
 ## Target Files
-- [ ] `SOURCE/lib/tutor/telemetry.ts`
-- [ ] `SOURCE/lib/tutor/__tests__/telemetry.test.ts`
-- [ ] `SOURCE/lib/essay/gradeEssays.ts`
+- [x] `SOURCE/lib/tutor/telemetry.ts` — **comments only**; the literals were already present from H5. Two stale reasons fixed (see Investigation Notes)
+- [x] `SOURCE/lib/tutor/__tests__/telemetry.test.ts` — **unchanged**: all three pins already updated in H5 and already green
+- [x] `SOURCE/lib/essay/gradeEssays.ts` — the telemetry call sites (this task's actual scope)
+- [x] `SOURCE/lib/essay/__tests__/gradeEssays.test.ts` — **extra**: 26 new cases for the branch→code mapping, the write path and the best-effort guarantee
+- [x] `SOURCE/app/(layer2)/actions.ts` — **extra, named by `tsc`**: passes `attempt.user_id` into the new required `GradePassInput.userId`. Reason in Investigation Notes
 
 ## Investigation Targets
 - `docs/design/essay-auto-scoring-backend-design.md` (§ Agreement Checklist Scope — `telemetry.ts`: `TelemetryEventType` gains `'essay_grade'`; `TELEMETRY_ERROR_CODES` gains three codes)
@@ -73,24 +75,66 @@ ADR-0018 Escalation 2 requires this **in prose**: `telemetry_log` has no `attemp
 Roundtrip check this task owns: every literal the TypeScript constant admits is a literal the live CHECK accepts — on **both** databases.
 
 ## Investigation Notes
-_(Record here: the before/after of all three test pins; confirmation that `buildTelemetryPayload()`'s body and its `EXPECTED_COLUMNS` test are unchanged; the error-code mapping used for each `gradeEssays.ts` branch.)_
+
+### The three test pins were already updated — verified by reading, not by trusting the note
+`telemetry.ts` already carried `'essay_grade'` in `TelemetryEventType` and all nine `TELEMETRY_ERROR_CODES`; `telemetry.test.ts` already carried all three pins. **Nothing was re-added** — doing so would have produced a duplicate union member and a doubled array entry, turning the exhaustive `toEqual` pins red. `buildTelemetryPayload()`'s body is untouched: still exactly six named column assignments, and `telemetry_log` gained no column (Escalation 2).
+
+### Error-code mapping actually implemented (from § Error Handling + § Logging, not from the handoff note)
+
+| `gradeEssays.ts` branch | `success` | `error_code` |
+|---|---|---|
+| blank answer, settle `graded` accepted | `true` | `null` |
+| settle `graded` accepted | `true` | `null` |
+| settle returns `written: false` (AC-063 race) | `false` | `duplicate_write` |
+| **blank answer, settle returns `written: false`** | `false` | `duplicate_write` |
+| budget refused `project_budget` | `false` | `project_budget_exhausted` |
+| budget refused `unavailable` | `false` | `server` |
+| provider `kind: rate_limited` | `false` | `rate_limited` |
+| provider `kind: provider` / `timeout` / `transport` | `false` | `groq_unavailable` |
+| `parseGrade()` returns `ok: false` | `false` | `invalid_output` |
+| unexpected exception | `false` | `server` |
+| **claim refused** | *(no telemetry row at all)* | — |
+
+**One deviation from the handoff note, taken from the Design Doc.** The note listed the blank-answer branch as unconditionally `success true, no code`. The Design Doc defines `success` as *"`true` khi và chỉ khi settle được `graded`"*, and the blank branch calls the **same** `recordEssayGrade(… 'graded' …)` through the **same** first-write-wins predicate, so it can return `written: false` in the same AC-063 race — the pre-existing code already had an explicit `if (!blank.written)` log for it. Treating that as `success: true` would write a success row for a pass that wrote nothing. The uniform rule is implemented and pinned by its own test case.
+
+`success` is **derived** from `errorCode === null` rather than passed as a second parameter — the two can only ever agree, and two independent parameters is where they would drift.
+
+### `actions.ts` is a fourth file the Target Files list did not name
+Telemetry needs `user_id`, and the Design Doc requires it come from the `exam_attempts` row **already read through RLS**, not a fresh `auth.getUser()`. So `GradePassInput` gains `userId: string` and `submitExam()` passes `attempt.user_id`. `submitExam()` had **already** read that column and already carried the written-out reason for preferring it over `auth.getUser()` (its own rate-limit key) — so this reuses an existing argument rather than introducing one. `npx tsc --noEmit` named the file. This is the **fourth** consecutive task needing one file beyond its list (B2.1, B2.2, B2.3, B3.1).
+
+### Two stale comments in `telemetry.ts` — the reason fixed, not the value
+1. `questionId`'s `"Chỉ có ở 'tutor_invoke'"` became false the moment `essay_grade` writes one. Restated by **criterion** ("event types that work on one specific question") so a future event type does not require re-editing the line.
+2. The module header's "DÙNG CHUNG" rule named exactly **two** writers by name; there are now three. Restated as a criterion for the same reason — this is the comment whose whole job is to stop a fourth writer from hand-rolling an insert.
+
+### Mutation testing — five mutants, and one found a real hole in a test
+Nine of the 26 new cases passed during the Red phase (they assert *absence*, and nothing wrote telemetry yet), so mutation testing is the evidence for those.
+
+| # | Mutation | Result |
+|---|---|---|
+| M1 | claim-refused branch emits a `not_eligible` row | **Killed** — 3 failed |
+| M2 | `log(… error.message)` instead of `error.code` | **Killed** — 1 failed (the AC-056 leak case) |
+| M3 | `recordGradeTelemetry` rethrows instead of swallowing | **SURVIVED**, then killed — see below |
+| M4 | extra field added to the `buildTelemetryPayload()` argument | **Survived, correctly** — the builder assigns six named columns and drops unknown keys; that *is* the barrier, and M5 is the mutation that actually tests it |
+| M5 | payload spread *around* the builder to smuggle a 7th column | **Killed** — 2 failed |
+
+**M3 is the one worth recording.** The best-effort test as first written (`mockRejectedValueOnce`, **two** targets) could not fail, for two compounding reasons: two targets with `GROQ_MAX_CONCURRENCY = 2` gives each question its **own worker**, so one worker dying is invisible; and a one-shot rejection is absorbed by the second telemetry call inside `gradeOne`'s own `catch`. The test was rewritten to **four** targets with a **persistent** rejection, which exposes the real consequence: an escaping observability write kills its worker's `for(;;)` loop and the remaining questions in that worker's queue are **never graded** — a telemetry fault turning into lost marks. M3 then failed. The reasoning is recorded in the test body.
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
-- [ ] Read all Investigation Targets and record key observations
-- [ ] **Sweep the adjacent cases** (Change Category: boundary-change): enumerate all seven sites and confirm the two SQL ones already landed in H5/H7
-- [ ] Update the three test pins **first** and observe the suite go red (6 ≠ 9; the allowlist missing `'essay_grade'`)
+- [x] Read all Investigation Targets and record key observations
+- [x] **Sweep the adjacent cases** (Change Category: boundary-change): all seven sites enumerated; the two SQL sites and the three TypeScript sites confirmed already landed in H5/H7 by **reading the files**
+- [x] Test pins already updated in H5 — nothing re-added. Red was produced instead by the **new call-site tests**: `18 failed / 35 passed`, exit **1**
 
 ### 2. Green Phase
-- [ ] Add `'essay_grade'` to `TelemetryEventType` and the three codes to `TELEMETRY_ERROR_CODES`
-- [ ] Wire the telemetry call sites in **`gradeEssays.ts` only**, through the **student's** client
-- [ ] Run only the affected tests and confirm they pass
+- [x] **Not re-added** — already live from H5 (re-adding would double the array and redden the exhaustive pins)
+- [x] Telemetry call sites wired in `gradeEssays.ts`, through the **student's** client; `GradePassInput` gained `userId`
+- [x] `53 passed (53)`, exit **0**
 
 ### 3. Refactor Phase
-- [ ] Confirm `buildTelemetryPayload()`'s body still assigns exactly six columns and its exhaustive test keeps its shape
-- [ ] Confirm `telemetry_log` gained **no** column
-- [ ] Confirm the resolution limit is recorded **both** in the work plan and in a code comment: `(user, question, day)`, **not** per attempt
-- [ ] Confirm `essayActions.ts` was **not** touched
+- [x] `buildTelemetryPayload()` body untouched — six named assignments; its exhaustive test unchanged and green. A new test asserts the **written** payload's key set is exactly those six
+- [x] `telemetry_log` gained **no** column
+- [x] Resolution limit recorded in the work plan (line 298) **and** in the `recordGradeTelemetry()` doc comment: `(user_id, question_id, day)`, **not** per attempt
+- [x] `essayActions.ts` **not** touched — it does not exist yet; Task B3.2 creates it
 
 ## Quality Assurance Mechanisms
 - `npx tsc --noEmit` (strict) — Enforces: the telemetry `satisfies` table — Config: `SOURCE/tsconfig.json` (project-wide)
@@ -106,13 +150,15 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
 
 | # | Command (from `SOURCE/`) | Exit code | Notes |
 |---|---|---|---|
-| 1 | `npx tsc --noEmit` | | |
-| 2 | `npx eslint --max-warnings 0` | | |
-| 3 | `npx vitest run` | | |
-| 4 | `npm run build` | | |
-| 5 | `npm run test:fixture` | | expected red = TD-030 baseline only (Gate F1): exactly 2 failures, both `subscription.fixture.e2e.test.ts` FE-1(e) `en` + `vi` |
-| 6 | `npm run test:localdb` | | see Open Item I-7 |
-| 7 | `npm run check:bundle` | | Gate E2 — this task edits `SOURCE/lib/essay/gradeEssays.ts` |
+| 1 | `npx tsc --noEmit` | **0** | Named the missing `userId` at the `actions.ts` call site — the **fourth** consecutive task whose Target Files list was one file short (after B2.1, B2.2, B2.3) |
+| 2 | `npx eslint --max-warnings 0` | **0** | |
+| 3 | `npx vitest run` | **0** | 134 files passed / 1 skipped; **1902 passed, 10 skipped, 0 todo** (was 1876 — **+26** net: 27 new cases in `gradeEssays.test.ts`, one pre-existing case rewritten in place), 46.4 s |
+| 4 | `npm run build` | **0** | |
+| 5 | `npm run test:fixture` | **1** | **Expected red, TD-030 baseline ONLY**: exactly 2 failures, both `subscription.fixture.e2e.test.ts > FE-1 (e) … > locale en` and `locale vi`. Named individually from the run, not inferred from the count. Neither file imports anything this task touched. Left CRLF churn on `RichText.regression.test.tsx.snap` (content-identical, `git diff --numstat` empty) — reverted before commit |
+| 6 | `npm run test:localdb` | **0** | 11 passed / 2 todo (SVC-1, SVC-2 — **Task H8**, still open) |
+| 7 | `npm run check:bundle` | **0** | 8 server-only secrets confirmed absent from the client bundle |
+
+`npm run verify:schema` was **not run** for this task — it touches no schema and no `LIMITS` constant. Its character-ceiling assertion remains red by design in the H7 → B3.3 window (Fix I002).
 
 **A task file with any exit-code cell left empty is not complete** (Gate E4).
 **Known-red window (Fix I002)**: this commit sits between H7 and B3.3 — if `verify:schema` is run, its character-ceiling assertion is red **by design**; record it as expected.
@@ -136,11 +182,11 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
   - **Primary failure mode**: a future session reading a rejection count and inferring a per-attempt rate from it. **Boundary**: documentation — recorded in the work plan **and** in a code comment. **State assertion**: N/A. **Mock rationale**: none. **Residual**: the limit is accepted, not removed; `telemetry_log` gains no column (Escalation 2).
 
 ## Completion Criteria
-- [ ] **Implementation Complete** = seven sites consistent
-- [ ] **Quality Complete** = six verify gates green (plus `check:bundle`)
-- [ ] **Integration Complete** = a real `event_type = 'essay_grade'` row is accepted on dev (verified in **H7 step 5**)
-- [ ] The telemetry resolution limit is stated in **this plan and in the code comment** — `(user, question, day)`, **not** per attempt
-- [ ] Every exit-code cell in the Gate E4 table above is filled
+- [x] **Implementation Complete** = seven sites consistent (two SQL + two TypeScript from H5/H7, three test pins already green, call sites landed here)
+- [x] **Quality Complete** = all seven gates run **separately with real exit codes**; six at 0, `test:fixture` at 1 with the TD-030 baseline pair named individually
+- [x] **Integration Complete** = a real `event_type = 'essay_grade'` row was accepted on dev in **H7 step 5**. *(This is inherited evidence, not a fresh run: no live grading pass has yet written a row through this code — that is the still-open L1 dev run, which also gates B1.5 and B2.1.)*
+- [x] The telemetry resolution limit is stated in the work plan **and** in the code comment — `(user_id, question_id, day)`, **not** per attempt
+- [x] Every exit-code cell in the Gate E4 table above is filled
 
 ## Notes
 - Impact scope: Task B3.2 uses these codes for `essayActions.ts`'s own call sites (I007).

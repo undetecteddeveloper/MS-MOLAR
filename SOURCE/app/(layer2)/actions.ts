@@ -224,7 +224,13 @@ export async function submitExam(
         studentAnswer: answers[q.id] ?? "",
       }));
     if (targets.length > 0) {
-      after(() => gradeEssaysForAttempt({ attemptId, targets, supabase }));
+      // `attempt.user_id` chứ không phải một `auth.getUser()` mới: dòng attempt
+      // đã qua RLS nên giá trị này ĐÚNG BẰNG `auth.uid()`, và telemetry của pass
+      // chấm phải mang đúng danh tính đó để `telemetry_insert_own`
+      // (`with check (user_id = auth.uid())`) không từ chối thẳng. Cùng lập luận
+      // khoá rate-limit ở đầu hàm đã dùng, và không tốn thêm round-trip nào.
+      const userId = attempt.user_id as string;
+      after(() => gradeEssaysForAttempt({ attemptId, userId, targets, supabase }));
     }
   }
 

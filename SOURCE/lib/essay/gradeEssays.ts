@@ -37,6 +37,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { ESSAY_GRADER_MODEL } from "@/lib/ai/models";
 import { ESSAY_MAX_POINTS } from "@/lib/scoring/essayLifecycle";
 import { claimEssayGradingAttempt, recordEssayGrade } from "@/lib/supabase/service-role";
+import { buildTelemetryPayload, type TelemetryErrorCode } from "@/lib/tutor/telemetry";
 import { reserveGroqBudget } from "./budget";
 import { GROQ_CALLS_PER_ESSAY, groqChatCompletion } from "./groqClient";
 import { parseGrade } from "./parseGrade";
@@ -77,6 +78,14 @@ export interface EssayTarget {
 
 export interface GradePassInput {
   attemptId: string;
+  /** `auth.uid()` của học sinh, lấy từ dòng `exam_attempts` mà `submitExam()`
+   *  ĐÃ đọc qua RLS — KHÔNG từ một `auth.getUser()` mới.
+   *
+   *  RLS đã lọc dòng ấy về đúng người gọi, nên giá trị này bằng `auth.uid()`
+   *  theo định nghĩa; gọi lại `auth.getUser()` bên trong `after()` chỉ tốn một
+   *  round-trip mạng để ra cùng một chuỗi. Đây đúng là lập luận `submitExam()`
+   *  đã viết sẵn cho khoá rate-limit của chính nó (`actions.ts`). */
+  userId: string;
   targets: EssayTarget[];
   /** Client của CHÍNH HỌC SINH, đã dựng ở `submitExam()` TRƯỚC khi `after()`
    *  được đăng ký và bắt vào closure — KHÔNG dựng lại bên trong callback
@@ -96,6 +105,7 @@ type LogCode =
   | "invalid_output"
   | "settle_refused"
   | "settle_error"
+  | "telemetry_refused"
   | "unexpected";
 
 function log(questionId: string, code: LogCode, detail?: string) {
@@ -106,6 +116,68 @@ function log(questionId: string, code: LogCode, detail?: string) {
   console.error("[gradeEssays]", { questionId, code, detail });
 }
 
+/** Ngữ cảnh dùng chung cho mọi câu của MỘT pass. Gộp lại thành một tham số vì
+ *  cả ba đi cùng nhau xuống tận `recordGradeTelemetry()`. */
+interface PassContext {
+  attemptId: string;
+  userId: string;
+  supabase: SupabaseClient;
+}
+
+/**
+ * Ghi MỘT dòng `telemetry_log` cho MỘT lượt chấm (AC-054).
+ *
+ * ═══ GIỚI HẠN PHÂN GIẢI — ĐỌC TRƯỚC KHI ĐẾM BẤT CỨ THỨ GÌ TỪ BẢNG NÀY ═══
+ *
+ * `telemetry_log` KHÔNG có cột `attempt_id`, và tính năng này CỐ Ý không thêm
+ * (ADR-0018 Escalation 2 — giữ ngân sách hai-thay-đổi-schema của PRD, dưới cái
+ * bóng của TD-005 đã nổ bốn lần). Hệ quả, nói thẳng để không ai phải suy ra:
+ *
+ *   Một dòng ở đây chỉ quy được về `(user_id, question_id, NGÀY)` — KHÔNG quy
+ *   được về một lượt thi cụ thể. Hai lượt `duplicate_write` trên CÙNG một câu,
+ *   của CÙNG một học sinh, trong CÙNG một ngày là KHÔNG PHÂN BIỆT ĐƯỢC, dù
+ *   chúng thuộc hai lượt thi khác nhau.
+ *
+ * Chế độ hỏng cần chặn: một phiên làm việc sau này đếm `duplicate_write` rồi
+ * suy ra một tỉ lệ TRÊN MỖI LƯỢT THI. Con số đó không tồn tại và không tái dựng
+ * được từ dữ liệu này. Ai cần nó phải THÊM CỘT — một thay đổi schema thủ công
+ * thứ ba dưới TD-005, tức một quyết định phải nêu ra, không phải một tiện tay.
+ *
+ * ═══ BEST-EFFORT TUYỆT ĐỐI ═══
+ *
+ * Nuốt cả `error` trả về lẫn exception ném ra — hai đường hỏng khác nhau, phải
+ * chặn cả hai. Một lượt ghi QUAN SÁT không bao giờ được trở thành điểm hỏng thứ
+ * hai của đường chấm; điểm của học sinh đã nằm trong `exam_results` từ trước.
+ *
+ * Chỉ `error.code`/`err.name` được ra console: thông điệp lỗi Postgres đi qua
+ * đây có thể VỌNG LẠI nội dung dòng bị từ chối — tức bài làm (AC-056).
+ */
+async function recordGradeTelemetry(
+  ctx: PassContext,
+  questionId: string,
+  errorCode: TelemetryErrorCode | null
+): Promise<void> {
+  try {
+    // `success` được SUY từ `errorCode` chứ không nhận làm tham số thứ hai:
+    // định nghĩa là "settle được `graded`", và mọi nhánh settle được `graded`
+    // đều không có mã. Hai tham số độc lập chỉ tạo chỗ cho chúng trôi khỏi nhau.
+    const { error } = await ctx.supabase.from("telemetry_log").insert(
+      buildTelemetryPayload({
+        eventType: "essay_grade",
+        userId: ctx.userId,
+        questionId,
+        // Tính năng này không đụng kỹ năng (D7).
+        skillNodeId: null,
+        success: errorCode === null,
+        errorCode,
+      })
+    );
+    if (error) log(questionId, "telemetry_refused", error.code);
+  } catch (err) {
+    log(questionId, "telemetry_refused", (err as Error)?.name);
+  }
+}
+
 /**
  * Chấm MỘT câu, theo đúng thứ tự bất biến.
  *
@@ -113,7 +185,8 @@ function log(questionId: string, code: LogCode, detail?: string) {
  * lượt của hàm này song song và một câu hỏng không được phép kéo theo câu khác
  * (AC-035).
  */
-async function gradeOne(attemptId: string, t: EssayTarget): Promise<void> {
+async function gradeOne(ctx: PassContext, t: EssayTarget): Promise<void> {
+  const { attemptId } = ctx;
   try {
     // ── Bài làm RỖNG: band 0 NGAY, không claim, không đặt chỗ, không provider.
     //    (AC-037) Không claim là nửa quan trọng: một ô trống không có gì để
@@ -122,6 +195,11 @@ async function gradeOne(attemptId: string, t: EssayTarget): Promise<void> {
     if (t.studentAnswer.trim() === "") {
       const blank = await recordEssayGrade(attemptId, t.questionId, "graded", 0, ESSAY_MAX_POINTS, false);
       if (!blank.written) log(t.questionId, "settle_refused", "blank");
+      // Ô trống settle được `graded` là một THÀNH CÔNG, không phải một thất bại
+      // — đếm nó thành `success: false` sẽ thổi phồng mọi tỉ lệ hỏng đọc từ
+      // bảng này bằng đúng số ô học sinh bỏ trống. Nhánh này KHÔNG được miễn
+      // trừ khỏi `duplicate_write`: nó đi qua CÙNG vị từ ghi-lần-đầu-thắng.
+      await recordGradeTelemetry(ctx, t.questionId, blank.written ? null : "duplicate_write");
       return;
     }
 
@@ -132,6 +210,12 @@ async function gradeOne(attemptId: string, t: EssayTarget): Promise<void> {
       // KHÔNG settle. Ở nhánh `already_graded`, một settle sẽ ghi đè `graded`
       // bằng `failed` — tức xoá điểm thật của học sinh vì một lượt chạy thừa.
       log(t.questionId, "claim_refused", claimed.reason ?? claimed.error?.code ?? "unknown");
+      // KHÔNG telemetry ở đường TỰ ĐỘNG, và đó là một quyết định, không phải
+      // một chỗ sót. Không claim được thì không có gì được đặt chỗ, không có gì
+      // được gọi, không có gì được ghi — đây chưa từng là một lượt chấm để mà
+      // đếm, và một dòng ở đây chỉ thổi phồng mẫu số của mọi tỉ lệ đọc từ bảng
+      // này. Mã `not_eligible` thuộc về entry point CHẤM LẠI (Task B3.2), nơi
+      // một con người vừa bấm nút và xứng đáng có một câu trả lời.
       return;
     }
 
@@ -142,6 +226,15 @@ async function gradeOne(attemptId: string, t: EssayTarget): Promise<void> {
     if (!reserved.ok) {
       log(t.questionId, "budget_refused", reserved.reason);
       await settleFailed(attemptId, t.questionId);
+      // HAI lý do từ chối của CÙNG một cổng, và tách chúng ra là toàn bộ giá
+      // trị của dòng log này: `project_budget` = "đã tiêu hết tiền hôm nay"
+      // (chờ tới mai), `unavailable` = "counter store đang hỏng" (gọi người
+      // trực, AC-031). Gộp thành một mã thì không truy vấn nào tách lại được.
+      await recordGradeTelemetry(
+        ctx,
+        t.questionId,
+        reserved.reason === "project_budget" ? "project_budget_exhausted" : "server"
+      );
       return;
     }
 
@@ -158,6 +251,16 @@ async function gradeOne(attemptId: string, t: EssayTarget): Promise<void> {
     if (!res.ok) {
       log(t.questionId, "provider_failed", res.kind);
       await settleFailed(attemptId, t.questionId);
+      // `rate_limited` là mã TÁI DÙNG ("đã chạm trần nhịp"), `groq_unavailable`
+      // là mã MỚI ("Groq hỏng") — hai kết luận vận hành khác hẳn nhau. Và cả
+      // hai đều KHÔNG được gộp vào `gemini_unavailable`: metric #7 của PRD đọc
+      // theo mã Gemini để chứng minh hai provider tách ngân sách, nên gộp sẽ
+      // phá đúng phép đo tồn tại vì lý do đó.
+      await recordGradeTelemetry(
+        ctx,
+        t.questionId,
+        res.kind === "rate_limited" ? "rate_limited" : "groq_unavailable"
+      );
       return;
     }
 
@@ -168,6 +271,9 @@ async function gradeOne(attemptId: string, t: EssayTarget): Promise<void> {
     if (!parsed.ok) {
       log(t.questionId, "invalid_output", parsed.reason);
       await settleFailed(attemptId, t.questionId);
+      // Tín hiệu DUY NHẤT phân biệt "tấn công / model trôi" với "provider hỏng"
+      // (R-a/AC-042). Gộp vào `server` là giấu đúng cái phải nhìn.
+      await recordGradeTelemetry(ctx, t.questionId, "invalid_output");
       return;
     }
 
@@ -182,10 +288,16 @@ async function gradeOne(attemptId: string, t: EssayTarget): Promise<void> {
     // `written: false` KHÔNG phải lỗi — ghi-lần-đầu-thắng đã từ chối một bản
     // trùng, đúng kết cục bình thường của cuộc đua AC-063.
     if (!done.written) log(t.questionId, "settle_refused", done.error?.code ?? "duplicate");
+    // `written: false` ⇒ `duplicate_write`, và `success: false` ở đó KHÔNG có
+    // nghĩa "có sự cố": nó có nghĩa lượt NÀY không ghi được band nào, vì cuộc
+    // đua AC-063 đã được phân xử đúng như thiết kế. Không mã sẵn có nào mang
+    // được nghĩa đó, nên nó là một trong ba mã mới.
+    await recordGradeTelemetry(ctx, t.questionId, done.written ? null : "duplicate_write");
   } catch {
     // Không log đối tượng lỗi: `err.message` có thể mang văn bản của nhà cung
     // cấp, và qua đó mang bài làm của học sinh.
     log(t.questionId, "unexpected");
+    await recordGradeTelemetry(ctx, t.questionId, "server");
   }
 }
 
@@ -210,7 +322,8 @@ async function settleFailed(attemptId: string, questionId: string): Promise<void
  * sau không đọc nó thành một thất bại cần "sửa".
  */
 export async function gradeEssaysForAttempt(input: GradePassInput): Promise<void> {
-  const { attemptId, targets } = input;
+  const { attemptId, userId, targets, supabase } = input;
+  const ctx: PassContext = { attemptId, userId, supabase };
   const startedAt = Date.now();
   let next = 0;
 
@@ -223,7 +336,7 @@ export async function gradeEssaysForAttempt(input: GradePassInput): Promise<void
       const index = next;
       next += 1;
       if (index >= targets.length) return;
-      await gradeOne(attemptId, targets[index]);
+      await gradeOne(ctx, targets[index]);
     }
   }
 
