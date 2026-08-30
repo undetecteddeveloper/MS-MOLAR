@@ -20,6 +20,7 @@ import { PageContainer } from "@/components/layout/PageContainer";
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 import { ExplainStepAffordance } from "@/components/tutor/ExplainStepAffordance";
 import { TutorQuotaNote } from "@/components/billing/TutorQuotaNote";
+import { EssayReviewBlock } from "@/app/(layer2)/_components/EssayReviewBlock";
 
 /** Route segment cua `retryEssayGrading()` (ADR-0018) — VA cua
  *  `explainStep()`, ca hai Server Action deu duoc goi tu trang nay.
@@ -138,16 +139,35 @@ export default async function ResultDetailPage({
                       ))}
                     </ul>
                   )}
-                  <div className="flex flex-col gap-1 text-sm">
-                    <p className="text-muted-foreground">
-                      {t("result.yourAnswerLabel")}{" "}
-                      <span className="text-foreground">{studentInput || t("result.skipped")}</span>
-                    </p>
-                    <p className="text-muted-foreground">
-                      {t("result.storedAnswerLabel")}{" "}
-                      <span className="text-[#4F7942]">{storedAnswer || "—"}</span>
-                    </p>
-                  </div>
+                  {/* NHÁNH CON TỰ LUẬN (UI-D1). Nó nằm BÊN TRONG nhánh
+                      `notScored` chứ không đứng cạnh, vì dưới W1 một câu tự
+                      luận LUÔN rơi vào đây ở cả ba trạng thái vòng đời —
+                      `scored` và `isCorrect` đều `false` vĩnh viễn.
+
+                      Điều kiện là `r.essay` CÓ MẶT, tức `deriveEssayView()` đã
+                      nhận ra khoá vòng đời. Khoá vắng mặt hoặc giá trị lạ đều
+                      trả `undefined` và rơi xuống nhánh không-chấm chung bên
+                      dưới, KHÔNG ĐỔI MỘT CHỮ (RS-0/RS-1, UI-D13). */}
+                  {r.essay ? (
+                    <EssayReviewBlock
+                      view={r.essay}
+                      studentAnswer={r.selected ?? ""}
+                      modelAnswer={q?.essayAnswer ?? ""}
+                    />
+                  ) : (
+                    <div className="flex flex-col gap-1 text-sm">
+                      <p className="text-muted-foreground">
+                        {t("result.yourAnswerLabel")}{" "}
+                        <span className="text-foreground">
+                          {studentInput || t("result.skipped")}
+                        </span>
+                      </p>
+                      <p className="text-muted-foreground">
+                        {t("result.storedAnswerLabel")}{" "}
+                        <span className="text-[#4F7942]">{storedAnswer || "—"}</span>
+                      </p>
+                    </div>
+                  )}
                 </li>
               );
             }

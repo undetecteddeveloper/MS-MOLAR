@@ -44,9 +44,9 @@ Presented **before** a band exists, it invites the student to self-grade and the
 `renderServerTree()` (async child).
 
 ## Target Files
-- [ ] `SOURCE/app/(layer2)/_components/EssayReviewBlock.tsx` (new)
-- [ ] `SOURCE/app/(layer2)/_components/__tests__/EssayReviewBlock.test.tsx` (new)
-- [ ] `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx`
+- [x] `SOURCE/app/(layer2)/_components/EssayReviewBlock.tsx` (new)
+- [x] `SOURCE/app/(layer2)/_components/__tests__/EssayReviewBlock.test.tsx` (new) — 16 cases
+- [x] `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` — import + the essay sub-branch only (two hunks)
 
 ## Investigation Targets
 - `docs/ui-spec/essay-auto-scoring-ui-spec.md` (§ Component: EssayReviewBlock — verify RS-0/RS-1 + RS-2 + RS-3 (+ low-confidence variant) + RS-4 + RS-5 + RS-6 states)
@@ -78,7 +78,40 @@ Presented **before** a band exists, it invites the student to self-grade and the
 - `docs/ui-spec/essay-auto-scoring-ui-spec.md` (§ Component: EssayReviewBlock — verify RS-0/RS-1 + RS-2 + RS-3 + RS-4 + RS-5 + RS-6 states)
 
 ## Investigation Notes
-_(Record here: the word-for-word comparison of RS-4 and RS-5; confirmation that the props type carries neither `scored` nor `isCorrect`; confirmation that the scored branch's diff is empty.)_
+
+### A repo guard caught a real defect I introduced: EG-BE-036
+The first draft computed RS-6 inline:
+
+```ts
+const exhausted = view.state === "failed" && !view.retryAvailable;
+```
+
+`npx vitest run` went red on a source scan I had not read — `essayLifecycle.test.ts`'s *"EG-BE-036: the RS-6 expression appears only in essayLifecycle.ts"*, which listed `EssayReviewBlock.tsx` as a second site.
+
+The guard is right and the draft was wrong. RS-6 is the **terminal** state; two declarations of it are two places to drift, and drifting there means telling a student who still has attempts that they have none, or the reverse. Fixed by calling `isEssayIncomplete(view)` — the single declaration. The reason is recorded in the component so the next person does not re-derive it.
+
+This is the second time this feature's own tooling has caught something a reading would not: the `RATE_LIMITS` classification guard in B3.2 was the first.
+
+### The Hard Rule is enforced by the prop type, not by discipline
+`EssayReviewBlock`'s props are `{ view, studentAnswer, modelAnswer }`. They do **not** carry `scored`, `isCorrect`, or `hasBeenWrongTwice`, so branching on them — or mounting `ExplainStepAffordance` (AC-016) — is a **compile error** rather than a review comment. All three are `false`/absent for an essay in all seven render states, so they distinguish nothing while sitting in the same object the render code holds.
+
+### Band comes from a five-entry lookup, never a formatter (UI-D12)
+The band set is closed and has five members, so a lookup makes rendering a **sixth** value structurally impossible. A formatter renders `0.3` as tidily as `0.25` — it **hides** exactly the defect W3 says SQL will not catch. Pinned by five per-value cases.
+
+### RS-2 withholds the model answer, and the reason is not security
+`getResult()` is already permitted to return the model answer after submission, and AC-043 constrains the in-progress path, not the review screen. The reason is the reading experience: showing the model answer **before** a band exists invites the student to self-grade and then be contradicted seconds later by the number that lands. Two cases pin it — one positive (the student's own answer is shown), one negative (the model answer is not).
+
+### Student prose is a text node, asserted not assumed
+A case renders `**not bold**` with a newline and asserts no `<strong>` element exists and the literal asterisks survive. Routing student-authored text through `RichText` would open a markdown/KaTeX surface nobody is missing today (ADR-0002 read in reverse).
+
+### RS-0/RS-1 fall through completely unchanged
+The sub-branch's condition is `r.essay` being **present**. An absent lifecycle key and an unrecognised value both make `deriveEssayView()` return `undefined`, so both land on the shared not-scored markup with **not one character changed** (UI-D13).
+
+### The scored branch is untouched — verified by hunk count
+`git diff -U0` on the page shows exactly **two** hunks: the import, and the `notScored` answer block. Nothing at or after the scored branch moved; TBD-02's deferral holds.
+
+### The retry control is not here
+RS-4/RS-5/RS-6 render every sentence but no button — `EssayRegradeControl` is created in **Task F-C1** and slots into this block there. Recorded so the missing control reads as sequencing, not omission.
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
@@ -108,12 +141,12 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
 
 | # | Command (from `SOURCE/`) | Exit code | Notes |
 |---|---|---|---|
-| 1 | `npx tsc --noEmit` | | |
-| 2 | `npx eslint --max-warnings 0` | | |
-| 3 | `npx vitest run` | | |
-| 4 | `npm run build` | | |
-| 5 | `npm run test:fixture` | | expected red = TD-030 baseline only (Gate F1): exactly 2 failures, both `subscription.fixture.e2e.test.ts` FE-1(e) `en` + `vi` |
-| 6 | `npm run test:localdb` | | see Open Item I-7 |
+| 1 | `npx tsc --noEmit` | **0** | |
+| 2 | `npx eslint --max-warnings 0` | **0** | |
+| 3 | `npx vitest run` | **0** | 1987 passed / 10 skipped / 0 todo (was 1971 — **+16**). Was **1** first: a repo guard fired — see Investigation Notes |
+| 4 | `npm run build` | **0** | |
+| 5 | `npm run test:fixture` | **1** | Expected red, TD-030 baseline only. Snapshot CRLF churn reverted before commit |
+| 6 | `npm run test:localdb` | **0** | 11 passed / 2 todo (SVC-1, SVC-2 — Task H8) |
 
 **A task file with any exit-code cell left empty is not complete** (Gate E4).
 
