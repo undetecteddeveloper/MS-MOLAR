@@ -201,15 +201,31 @@ Four reasons this is read as environmental rather than as a regression, and all 
 **First: this checklist's version numbers are wrong, and following them literally would have produced a new error.** Item 16 asserts the frontend DD "cites the UI Spec as **v1.2** and the backend Design Doc as **v1.2** while the current versions are UI Spec **v1.3** and backend **v1.4**". Read from the file headers, **all four numbers are wrong**: the backend DD is **v1.9**, and the frontend DD's stale citations had already been corrected on 2026-08-30 in a note in its own header. Versions were taken by **reading each file's header**, never from this checklist.
 
 **Second: reading the header is not enough either — and that error had already propagated.** The UI Spec's header table said **Version 1.3** while its own § Update History had carried a **1.4** row since 2026-08-29. The header was behind the authoritative record. The frontend DD's correction note read that stale header and concluded "UI Spec is really v1.3", so **a correction inherited the very defect it was written to fix**. Both are now fixed: the UI Spec header is **v1.5** (this update), and the frontend DD's note carries an amendment saying so. The durable lesson, written into both files: **a version must be cross-checked between a document's header and its own Update History**, because those two places drift apart.
-### 17. Do not delete this work plan without explicit user approval — and note that it is TRACKED, not ignored
-- [ ] `git ls-files docs/plans/` lists this file alongside ten others; work plans in this repository are **under version control**. That changes what deletion costs: **every filled gate slot in this document is versioned evidence** — the Gate A5b and A6 dates and the engineer's name, the Gate B fingerprints for both projects and the confirmation line, the Gate C constraint names read from each database, the Gate D payload measurements, the Gate F TD-030 baseline, and the Phase E records (budget limit, AC-070 result, OQ-1 latency figures). **Several of those exist nowhere else** — they are read-only observations of external systems at a point in time, **not derivable from the code**. Deleting the plan destroys them. If the file is removed at the end, the gate evidence must first be **moved somewhere durable** (the project's progress store, or an appendix in the backend Design Doc), and **that move is itself a task, not an afterthought.**
+### 17. Do not delete this work plan without explicit user approval — and note that it is TRACKED, not ignored — confirmed 2026-08-30
 
-### 18. Quality Assurance (the plan's own final block)
-- [ ] Quality check (staged)
-- [ ] All tests pass (default, fixture and localdb lanes — fixture red **only** at the TD-030 baseline)
-- [ ] Static check pass
-- [ ] Lint check pass
-- [ ] Build success
+- [x] **Confirmed by measurement, and the checklist's own count is low.** `git ls-files docs/plans/` lists **14** plan files outside `tasks/`, so this plan sits alongside **13** others, not ten. `git check-ignore` returns nothing for the task file, and `git ls-files --error-unmatch` confirms **this file itself is tracked** — work plans here are under version control, not ignored scratch.
+- [x] **What that makes deletion cost, restated now that the slots are actually full.** Every filled gate slot is versioned evidence, and after Phase E the set is larger than when this item was written: the Gate A5b/A6 dates and the engineer's name; the Gate B fingerprints for **both** projects (`29931beeb950` → `9979c9deea52`) with the confirmation line and the prod read-back; the Gate C constraint names read from **each** live database; the Gate D payload measurements (375 → 3 401 B/row); the Gate F TD-030 baseline; and the Phase E records — the budget limit, the AC-070 result (**7/7 EQUAL, 4/4 matched**), and the OQ-1 latency and token figures (**p50 671 ms / p95 1 289 ms**, **873 tokens/request**, n = 18).
+- [x] **Several of these exist nowhere else, and that is now demonstrable rather than asserted.** They are read-only observations of external systems at a point in time — a Groq account's measured limits, a production database's constraint definitions on a given day, a provider's token counts — and **none is derivable from the code**. The E6 kill-switch A-B-A record is the sharpest example: it is a sequence of observations of production at four timestamps, and no re-run reproduces it, because production has moved since.
+- [x] **Retention rule acknowledged: do not delete without explicit user approval.** If the file is ever removed, the gate evidence must be **moved somewhere durable first** — the project's progress store, or an appendix in the backend Design Doc — and **that move is a task, not an afterthought.** Note that the progress store already holds a partial copy: the 2026-08-30 Notion entry carries the E5 token measurement and its consequences, which is a start on that migration, **not a completion of it**.
+
+### 18. Quality Assurance (the plan's own final block) — done 2026-08-30
+
+Every gate below was run **separately, with a real exit code**, at commit `6f85bb3`. No file under `SOURCE/` has changed since, so these results stand for the documentation commits that follow it.
+
+| Check | Command | Result |
+|---|---|---|
+| Quality check (staged) | — | **PASS** — the three documentation commits stage `docs/` and `TECH-DEBT.md` only; `git diff --cached --name-only \| grep -c "^SOURCE/"` returns **0** on each |
+| Static check | `npx tsc --noEmit` | **exit 0** |
+| Lint check | `npx eslint --max-warnings 0` | **exit 0** |
+| Tests — default lane | `npx vitest run` | **exit 0** — **2026 passed / 10 skipped / 0 todo**, byte-identical to the baseline recorded in section 5 |
+| Tests — fixture lane | `npm run test:fixture` | **exit 1** — TD-030 baseline **only**, matched **by name**: `subscription.fixture.e2e.test.ts` → FE-1 (e) → `locale en` and `locale vi`. **79 passed. No third case**, which is the assertion that matters: a third would be this feature's |
+| Tests — localdb lane | `npm run test:localdb` | **exit 1 — environmental, not a regression** (see below) |
+| Build | `npm run build` | **exit 0** |
+| Bundle guard | `npm run check:bundle` | **exit 0** — "8 server-only secrets do not reach the client" |
+
+**The localdb lane is still red, and the honest record is that it is red.** 4 failed / 5 passed / 7 skipped in **228.71 s** against ~55 s when healthy. It is read as environmental on the same four grounds section 5 established, all of which hold again: every failure is a **timeout or `fetch failed`**, not an assertion; the failing set **moves between runs**; the failures are in `subscription.service.e2e.test.ts`, which **this feature never touches**; and the duration is **4× the healthy figure on identical code**. **Not re-run until green** — repeating a flaky gate and recording only the passing number is exactly how TD-030 stayed hidden.
+
+**One operational note that affects gate 4's honesty.** `next dev` was running when this session started, and building while it runs corrupts the dev server's `.next`. The dev server was **stopped before the build**, so the exit 0 above is a real measurement rather than a number read off a poisoned tree. **The dev server is currently stopped** and needs `npm run dev` to resume.
 
 ## Target Files
 - [ ] `TECH-DEBT.md`
