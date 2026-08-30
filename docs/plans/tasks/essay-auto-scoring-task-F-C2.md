@@ -67,10 +67,10 @@ The UI Spec's "0 bytes of JS when the feature is off" is **withdrawn** — the r
 - **No `waitFor` anywhere in this describe** — `waitFor` plus fake timers is the standing hang in this repo.
 
 ## Target Files
-- [ ] `SOURCE/app/(layer2)/_components/EssayGradingPoller.tsx` (new)
-- [ ] `SOURCE/app/(layer2)/_components/__tests__/EssayGradingPoller.test.tsx` (new)
-- [ ] `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/page.tsx` (mount point)
-- [ ] `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` (mount point)
+- [x] `SOURCE/app/(layer2)/_components/EssayGradingPoller.tsx` (new)
+- [x] `SOURCE/app/(layer2)/_components/__tests__/EssayGradingPoller.test.tsx` (new) — 11 cases
+- [x] `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/page.tsx` (mount point)
+- [x] `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` (mount point)
 
 ## Investigation Targets
 - `docs/ui-spec/essay-auto-scoring-ui-spec.md` (§ Component: EssayGradingPoller — verify default (polling) + stopped-at-cap + hidden-tab + resolved + not-mounted states)
@@ -94,7 +94,41 @@ The UI Spec's "0 bytes of JS when the feature is off" is **withdrawn** — the r
 - `docs/ui-spec/essay-auto-scoring-ui-spec.md` (§ Component: EssayGradingPoller — verify default + stopped-at-cap + hidden-tab + resolved + not-mounted states)
 
 ## Investigation Notes
-_(Record here: the refresh counts observed in P-1…P-6; confirmation that no `waitFor` appears in the describe; confirmation that no bare `18` or `120000` literal exists in either file.)_
+
+### Three real failures before green, each a different rule
+**1. The `aria-live` region was NOT empty on first render.** The first draft announced from a mount effect, so the region entered the DOM already carrying text — precisely what AB-7 says may never be announced. Caught by the dedicated case (`expected '0 essay questions scored. 2 still bei…' to be ''`).
+
+**2. `eslint` found two React-rules violations**, both real:
+- `Date.now()` inside `useRef(...)` runs **during render** — an impure call whose result drifts whenever the component happens to re-render (`react-hooks/purity`). The clock now starts in the first effect, which is also the anchor the file documents (mount).
+- `setAnnouncement` synchronously inside an effect body causes cascading renders (`react-hooks/set-state-in-effect`).
+
+Both were fixed by moving the announcement to React's **adjust-state-during-render** pattern — the one `HistoryRowMenu` already names in its own comment. That fixes the lint error and problem 1 at the same time: on the first render it only *records* the counts and announces nothing, so the region stays empty.
+
+**3. A source-scan guard fired**: the six jsonb key literals may be typed only in `essayLifecycle.ts`, and my mount comment used one of them in prose. Same shape as F-B1's EG-BE-036 and F-B3's ADR-0009 scan. Rephrased the comment rather than widening the guard, and recorded why the name is avoided.
+
+That is now the fifth and sixth time this repo's own tooling has caught something a reading would not.
+
+### The mount condition is `essaySummary !== undefined`, and the alternative is a real defect
+`pendingCount > 0` — what the UI Spec first published — **causes** the AC-023 defect: on the render that resolves the last essay, the component unmounts and its `aria-live` region leaves the DOM **in the same commit** the completion sentence would have been inserted, so it is never announced. A sighted user notices nothing, so nobody reports it. A dedicated case drives exactly that transition (`pending 1 → 0`) and asserts the sentence is present.
+
+The feature-off conclusion is unchanged, which is why the old predicate looked harmless.
+
+### `setTimeout` chained, never `setInterval`
+`setInterval` **coalesces** ticks while the tab is backgrounded, so returning fires a **burst** of `router.refresh()` — the most expensive possible behaviour on a mid-range Android with an unstable network. Asserted: hidden for 5 ticks then visible for 2 gives exactly **2** refreshes, not 7.
+
+### Two caps, and the second one's anchor is the interesting part
+`ESSAY_POLL_MAX_ELAPSED_MS` is **not** derived from a latency target. It equals `ESSAY_PASS_BUDGET_MS`: past that moment no band can still land **from that pass**, so every further refresh is *certainly* useless. That is a checkable proposition about the writer, not an estimate about latency — and it is what keeps the stopped state an exception rather than the default outcome. One recorded offset: the poller's clock starts at mount, the pass's at submit, so the poller stops a few seconds later — the safe direction.
+
+A hidden tab costs **no refresh budget but the wall clock keeps running**, asserted by a case that stays hidden past the cap and ends stopped with **zero** refreshes.
+
+### The manual refresh button reloads BOTH budgets
+Without that, the second press would stop immediately and the button would be useless after one use. Asserted by pressing it and then confirming polling resumes.
+
+### All six values are named constants
+The test file imports them rather than retyping numbers, so the component and its tests cannot drift. The two cadence constants remain owned by O-6 / OQ-1 until measured (Task E5).
+
+### Still owed: the L1 check
+A real band landing on dev while the page is open needs the engineer-owned grading run.
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
@@ -125,13 +159,14 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
 
 | # | Command (from `SOURCE/`) | Exit code | Notes |
 |---|---|---|---|
-| 1 | `npx tsc --noEmit` | | |
-| 2 | `npx eslint --max-warnings 0` | | `react-hooks/refs` and `react-hooks/set-state-in-effect` bite the poller |
-| 3 | `npx vitest run` | | |
-| 4 | `npm run build` | | |
-| 5 | `npm run test:fixture` | | expected red = TD-030 baseline only (Gate F1): exactly 2 failures, both `subscription.fixture.e2e.test.ts` FE-1(e) `en` + `vi` |
-| 6 | `npm run test:localdb` | | see Open Item I-7 |
-| 7 | `npm run check:bundle` | | Gate E2 — this task adds a `"use client"` component |
+| 1 | `npx tsc --noEmit` | **0** | |
+| 2 | `npx eslint --max-warnings 0` | **0** | Was **1** first, with two real React-rules errors — see Investigation Notes |
+| 3 | `npx vitest run` | **0** | 2022 passed / 10 skipped / 0 todo (was 2011 — **+11**). Was **1** first: a source-scan guard fired |
+| 4 | `npm run build` | **0** | |
+| 5 | `npm run test:fixture` | **1** | Expected red, TD-030 baseline only. Snapshot CRLF churn reverted before commit |
+| 6 | `npm run test:localdb` | **0** | 11 passed / 2 todo (SVC-1, SVC-2 — Task H8) |
+
+**Environment note**: partway through this task the Bash tool lost its view of `SOURCE/node_modules` (it reported the directory empty; `npx` then failed with `Cannot find package 'jsdom'`). PowerShell listed **704** packages in the same directory, so nothing was actually deleted — it was a stale view in one shell. The remaining gates were run from PowerShell. Recorded because the first symptom looks exactly like a wiped dependency tree, and reinstalling on that assumption would have been the wrong move.
 
 **A task file with any exit-code cell left empty is not complete** (Gate E4).
 

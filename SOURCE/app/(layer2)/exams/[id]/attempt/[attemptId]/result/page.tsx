@@ -18,6 +18,7 @@ import { getMyRating } from "@/app/(layer2)/actions";
 import { getResult } from "@/app/(layer2)/queries";
 import { ScoreCard } from "@/app/(layer2)/_components/ScoreCard";
 import { EssayScoreLine } from "@/app/(layer2)/_components/EssayScoreLine";
+import { EssayGradingPoller } from "@/app/(layer2)/_components/EssayGradingPoller";
 import { ResultActions } from "@/app/(layer2)/_components/ResultActions";
 import { mapFromMyRating } from "@/lib/rating";
 import { formatCompletionTime, formatOvertime } from "@/lib/history/format";
@@ -107,6 +108,30 @@ export default async function ResultPage({
           summary={data.essaySummary}
           detailHref={`/exams/${id}/attempt/${attemptId}/result/detail`}
         />
+
+        {/* Bộ poll — mount khi `essaySummary !== undefined`, KHÔNG phải khi
+            `pendingCount > 0`.
+
+            Điều kiện `pendingCount > 0` là thứ UI Spec công bố lần đầu, và nó
+            GÂY RA khuyết tật AC-023: ở đúng lượt render giải quyết câu tự luận
+            cuối cùng, component sẽ unmount và vùng `aria-live` của nó rời khỏi
+            DOM TRONG CÙNG commit mà câu "đã chấm xong toàn bộ" lẽ ra được chèn
+            vào — nên lời thông báo ấy không bao giờ được đọc lên. Người dùng
+            nhìn thấy không nhận ra điều gì, nên không ai báo lỗi.
+
+            Kết luận cho trạng thái tính năng TẮT không đổi — đó là lý do vị từ
+            cũ trông vô hại: không phần tử nào mang khoá vòng đời thì
+            `summariseEssays()` trả `undefined`, nên poller vẫn không mount.
+
+            (Tên khoá jsonb CỐ Ý không gõ ra ở đây: một rào chắn trong
+            `essayLifecycle.test.ts` giữ cho sáu literal ấy chỉ được gõ ở đúng
+            một file, và bản nháp đầu của comment này đã làm nó đỏ.) */}
+        {data.essaySummary !== undefined && (
+          <EssayGradingPoller
+            pendingCount={data.essaySummary.pendingCount}
+            gradedCount={data.essaySummary.gradedCount}
+          />
+        )}
 
         {/* Quá giờ (Security review #6). DB tự tính overtime_seconds trong
             record_exam_result() từ started_at + duration_minutes, nên nhãn này

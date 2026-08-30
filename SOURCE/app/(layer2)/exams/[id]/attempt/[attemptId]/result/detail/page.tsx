@@ -21,6 +21,7 @@ import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 import { ExplainStepAffordance } from "@/components/tutor/ExplainStepAffordance";
 import { TutorQuotaNote } from "@/components/billing/TutorQuotaNote";
 import { EssayReviewBlock } from "@/app/(layer2)/_components/EssayReviewBlock";
+import { EssayGradingPoller } from "@/app/(layer2)/_components/EssayGradingPoller";
 
 /** Route segment cua `retryEssayGrading()` (ADR-0018) — VA cua
  *  `explainStep()`, ca hai Server Action deu duoc goi tu trang nay.
@@ -88,6 +89,30 @@ export default async function ResultDetailPage({
             {t("common.correct").toLowerCase()}
           </p>
         </header>
+
+        {/* Bộ poll — mount khi `essaySummary !== undefined`, KHÔNG phải khi
+            `pendingCount > 0`.
+
+            Điều kiện `pendingCount > 0` là thứ UI Spec công bố lần đầu, và nó
+            GÂY RA khuyết tật AC-023: ở đúng lượt render giải quyết câu tự luận
+            cuối cùng, component sẽ unmount và vùng `aria-live` của nó rời khỏi
+            DOM TRONG CÙNG commit mà câu "đã chấm xong toàn bộ" lẽ ra được chèn
+            vào — nên lời thông báo ấy không bao giờ được đọc lên. Người dùng
+            nhìn thấy không nhận ra điều gì, nên không ai báo lỗi.
+
+            Kết luận cho trạng thái tính năng TẮT không đổi — đó là lý do vị từ
+            cũ trông vô hại: không phần tử nào mang khoá vòng đời thì
+            `summariseEssays()` trả `undefined`, nên poller vẫn không mount.
+
+            (Tên khoá jsonb CỐ Ý không gõ ra ở đây: một rào chắn trong
+            `essayLifecycle.test.ts` giữ cho sáu literal ấy chỉ được gõ ở đúng
+            một file, và bản nháp đầu của comment này đã làm nó đỏ.) */}
+        {data.essaySummary !== undefined && (
+          <EssayGradingPoller
+            pendingCount={data.essaySummary.pendingCount}
+            gradedCount={data.essaySummary.gradedCount}
+          />
+        )}
 
         <ol
           className="preload-fade mt-8 flex flex-col gap-8"
