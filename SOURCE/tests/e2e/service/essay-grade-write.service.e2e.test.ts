@@ -92,7 +92,23 @@
 // `subscription.service.e2e.test.ts` was once written from assumption and was wrong
 // in the most dangerous direction — it read as a guarantee.
 
-import { describe, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  adminClient,
+  EG_PREFIX,
+  HAS_LIVE_DB,
+  readPerQuestion,
+  setUp,
+  tearDown,
+  type EssayFixture,
+} from "./essayGradeWriteFixtures";
+// KHONG BAO GIO go `3` thanh mot literal o day: tran luot la mot hop dong giua
+// SQL va TypeScript, va `verify:schema` ghim hai ben khop nhau. Go lai so la
+// tao mot loi khai THU BA.
+import { ESSAY_MAX_ATTEMPTS } from "@/lib/scoring/essayLifecycle";
+
+const admin: SupabaseClient = HAS_LIVE_DB ? adminClient() : (undefined as never);
 
 // =============================================================================
 // SVC-1 — RESERVED SLOT. The settle write: array order survives, and the second
@@ -183,9 +199,117 @@ import { describe, it } from "vitest";
 //       nor any of the five forbidden column names. Cheap, and it is the only
 //       assertion that keeps a later "just add a user_id param" from compiling
 //       past review.
-describe("record_essay_grade() on real Postgres — array order and first-write-wins (SVC-1)", () => {
-  it.todo("preserves the full questionId sequence when grading the second of three essays, restricts the write to one element and one column, and refuses a duplicate settle by returning false with the first band intact");
-});
+describe.skipIf(!HAS_LIVE_DB)(
+  "record_essay_grade() on real Postgres — array order and first-write-wins (SVC-1)",
+  () => {
+    let fx: EssayFixture;
+
+    beforeAll(async () => {
+      fx = await setUp(admin, "svc1", 3);
+    });
+    afterAll(async () => {
+      await tearDown(admin, fx);
+    });
+
+    it("preserves the full questionId sequence when grading the second of three essays, restricts the write to one element and one column, and refuses a duplicate settle by returning false with the first band intact", async () => {
+      const before = await readPerQuestion(admin, fx.attemptId);
+      expect(before.map((r) => r.questionId)).toEqual(fx.questionIds);
+
+      // ── (a) Cham cau THU HAI trong ba ─────────────────────────────────
+      const { data: settled, error } = await admin.rpc("record_essay_grade", {
+        p_attempt_id: fx.attemptId,
+        p_question_id: fx.questionIds[1],
+        p_state: "graded",
+        p_earned: 0.75,
+        p_max: 1,
+        p_low_confidence: false,
+      });
+      expect(error).toBeNull();
+      // `returns table (...)` ⇒ PostgREST tra ve MOT MANG.
+      expect(Array.isArray(settled) ? settled[0].written : settled).toBe(true);
+
+      const after = await readPerQuestion(admin, fx.attemptId);
+
+      // ── (b) THU TU MANG giu nguyen. Day la mot trong ba tinh chat ma mot
+      //        client bi mock KHONG the chung minh: ham SQL dung
+      //        `jsonb_agg(... order by ord)` tren
+      //        `jsonb_array_elements(...) with ordinality`, va neu ai do bo
+      //        menh de `order by` thi Postgres duoc phep tra ve thu tu khac —
+      //        cau hoi cua hoc sinh se doi cho tren man hinh.
+      expect(after.map((r) => r.questionId)).toEqual(fx.questionIds);
+      expect(after).toHaveLength(3);
+
+      // ── (c) DUNG MOT phan tu bi doi, va trong phan tu do dung nhom khoa
+      //        `essay*`. Hai phan tu kia phai GIONG TUNG BYTE.
+      expect(after[0]).toEqual(before[0]);
+      expect(after[2]).toEqual(before[2]);
+
+      const target = after[1];
+      expect(target.essayState).toBe("graded");
+      expect(Number(target.essayEarned)).toBe(0.75);
+      expect(Number(target.essayMax)).toBe(1);
+      expect(target.essayLowConfidence).toBe(false);
+      expect(target.essayGradedAt).toBeTruthy();
+      // Cac truong KHONG thuoc nhom vong doi cua chinh phan tu ay khong duoc
+      // dung toi: ham chi duoc ghi cot `per_question`, mot phan tu, nhom khoa.
+      expect(target.selected).toBe(before[1].selected);
+      expect(target.isCorrect).toBe(before[1].isCorrect);
+      expect(target.scored).toBe(before[1].scored);
+
+      // ── (d) GHI TRUNG BI TU CHOI — la mot GIA TRI TRA VE, khong phai mot
+      //        exception (ADR-0018 Decision 3). Vi tu `<> 'graded'` khop ZERO
+      //        dong, va band DAU TIEN o nguyen.
+      const { data: dup, error: dupErr } = await admin.rpc("record_essay_grade", {
+        p_attempt_id: fx.attemptId,
+        p_question_id: fx.questionIds[1],
+        p_state: "graded",
+        p_earned: 0.25,
+        p_max: 1,
+        p_low_confidence: true,
+      });
+      expect(dupErr).toBeNull();
+      expect(Array.isArray(dup) ? dup[0].written : dup).toBe(false);
+
+      const afterDup = await readPerQuestion(admin, fx.attemptId);
+      // Band cu THANG. Neu vi tu bi bo, gia tri o day se la 0.25 — tuc mot
+      // luot chay thua vua ghi de diem that cua hoc sinh.
+      expect(Number(afterDup[1].essayEarned)).toBe(0.75);
+      expect(afterDup[1].essayLowConfidence).toBe(false);
+      expect(afterDup.map((r) => r.questionId)).toEqual(fx.questionIds);
+    });
+
+    it("`failed` KHONG hap thu: mot cau `failed` van settle duoc thanh `graded` (EG-BE-007)", async () => {
+      // `graded` la trang thai HAP THU, `failed` thi KHONG — day dung la thu
+      // lam cho nut "cham lai" co nghia. Mot vi tu viet nham thanh
+      // `essayState = 'pending'` se lam ca nay do.
+      const qid = fx.questionIds[2];
+      const failed = await admin.rpc("record_essay_grade", {
+        p_attempt_id: fx.attemptId,
+        p_question_id: qid,
+        p_state: "failed",
+        p_earned: null,
+        p_max: null,
+        p_low_confidence: false,
+      });
+      expect(Array.isArray(failed.data) ? failed.data[0].written : failed.data).toBe(true);
+
+      const regraded = await admin.rpc("record_essay_grade", {
+        p_attempt_id: fx.attemptId,
+        p_question_id: qid,
+        p_state: "graded",
+        p_earned: 1,
+        p_max: 1,
+        p_low_confidence: false,
+      });
+      expect(Array.isArray(regraded.data) ? regraded.data[0].written : regraded.data).toBe(true);
+
+      const rows = await readPerQuestion(admin, fx.attemptId);
+      const row = rows.find((r) => r.questionId === qid);
+      expect(row?.essayState).toBe("graded");
+      expect(Number(row?.essayEarned)).toBe(1);
+    });
+  }
+);
 
 // =============================================================================
 // SVC-2 — The retry cap is spent at CLAIM time: three claims that never settle
@@ -287,6 +411,114 @@ describe("record_essay_grade() on real Postgres — array order and first-write-
 //       caller-supplied identity).
 //       Note the direct-UPDATE half of EG-BE-013 is ALREADY covered by the shipped
 //       `S-b` case (`test-rls.ts:1314-1320`); do not duplicate it here.
-describe("claim_essay_grading_attempt() on real Postgres — claim-time cap and grants (SVC-2)", () => {
-  it.todo("spends one of three attempts per claim even when no settle ever follows, refuses the fourth with reason 'exhausted' without incrementing, distinguishes already_graded and not_submitted, and returns 42501 to a student JWT on both functions");
-});
+describe.skipIf(!HAS_LIVE_DB)(
+  "claim_essay_grading_attempt() on real Postgres — claim-time cap and grants (SVC-2)",
+  () => {
+    let fx: EssayFixture;
+
+    beforeAll(async () => {
+      fx = await setUp(admin, "svc2", 3);
+    });
+    afterAll(async () => {
+      await tearDown(admin, fx);
+    });
+
+    it("spends one of three attempts per claim even when no settle ever follows, and refuses the fourth with reason 'exhausted' without incrementing", async () => {
+      const qid = fx.questionIds[0];
+
+      // ── (a) BA luot claim, KHONG luot settle nao ────────────────────────
+      //     Day la nua quan trong cua D4: luot duoc tieu luc CLAIM, khong phai
+      //     luc settle. Mot invocation bi nen tang cat giua chung van tieu mot
+      //     luot — va do la ly do UI-D9 quyet dinh KHONG hien so luot con lai.
+      for (let i = 1; i <= ESSAY_MAX_ATTEMPTS; i += 1) {
+        const { data, error } = await admin.rpc("claim_essay_grading_attempt", {
+          p_attempt_id: fx.attemptId,
+          p_question_id: qid,
+        });
+        expect(error).toBeNull();
+        const row = Array.isArray(data) ? data[0] : data;
+        expect(row.claimed).toBe(true);
+        expect(row.attempts).toBe(i);
+      }
+
+      const afterThree = await readPerQuestion(admin, fx.attemptId);
+      const spent = afterThree.find((r) => r.questionId === qid);
+      expect(spent?.essayAttempts).toBe(ESSAY_MAX_ATTEMPTS);
+      // Trang thai KHONG doi: claim chi tang bo dem, no khong ghi band.
+      expect(spent?.essayState).toBe("pending");
+
+      // ── (b) Luot THU TU bi tu choi, va bo dem KHONG tang them ───────────
+      const { data: fourth, error: fourthErr } = await admin.rpc(
+        "claim_essay_grading_attempt",
+        { p_attempt_id: fx.attemptId, p_question_id: qid }
+      );
+      expect(fourthErr).toBeNull();
+      const refused = Array.isArray(fourth) ? fourth[0] : fourth;
+      expect(refused.claimed).toBe(false);
+      expect(refused.reason).toBe("exhausted");
+
+      const afterFour = await readPerQuestion(admin, fx.attemptId);
+      // Neu bo dem van tang o luot bi tu choi, tran se troi xa dan sau moi lan
+      // bam — mot hoc sinh khong bao gio duoc thu du ba lan.
+      expect(afterFour.find((r) => r.questionId === qid)?.essayAttempts).toBe(
+        ESSAY_MAX_ATTEMPTS
+      );
+    });
+
+    it("phan biet `already_graded` voi `no_element`", async () => {
+      const qid = fx.questionIds[1];
+      await admin.rpc("record_essay_grade", {
+        p_attempt_id: fx.attemptId,
+        p_question_id: qid,
+        p_state: "graded",
+        p_earned: 1,
+        p_max: 1,
+        p_low_confidence: false,
+      });
+
+      const { data: graded } = await admin.rpc("claim_essay_grading_attempt", {
+        p_attempt_id: fx.attemptId,
+        p_question_id: qid,
+      });
+      const gradedRow = Array.isArray(graded) ? graded[0] : graded;
+      expect(gradedRow.claimed).toBe(false);
+      // AC-063: mot cau da co band KHONG duoc claim lai — neu duoc, mot luot
+      // chay thua se ghi de diem that.
+      expect(gradedRow.reason).toBe("already_graded");
+
+      const { data: missing } = await admin.rpc("claim_essay_grading_attempt", {
+        p_attempt_id: fx.attemptId,
+        p_question_id: `${EG_PREFIX}svc2-khong-ton-tai`,
+      });
+      const missingRow = Array.isArray(missing) ? missing[0] : missing;
+      expect(missingRow.claimed).toBe(false);
+      expect(missingRow.reason).toBe("no_element");
+    });
+
+    it("tra 42501 cho JWT hoc sinh tren CA HAI ham — EXECUTE chi service_role", async () => {
+      // Day la tinh chat thu ba ma mot client bi mock khong the chung minh:
+      // GRANT that tren database that. Mot ban `revoke` chi go khoi `public`
+      // se de ca hai ham VAN goi duoc bang JWT hoc sinh, va khong test mock nao
+      // nhin thay dieu do.
+      const claim = await fx.studentClient.rpc("claim_essay_grading_attempt", {
+        p_attempt_id: fx.attemptId,
+        p_question_id: fx.questionIds[0],
+      });
+      expect(claim.error?.code).toBe("42501");
+
+      const settle = await fx.studentClient.rpc("record_essay_grade", {
+        p_attempt_id: fx.attemptId,
+        p_question_id: fx.questionIds[0],
+        p_state: "graded",
+        p_earned: 1,
+        p_max: 1,
+        p_low_confidence: false,
+      });
+      expect(settle.error?.code).toBe("42501");
+
+      // Va KHONG dong nao bi doi boi hai luot goi bi tu choi ay.
+      const rows = await readPerQuestion(admin, fx.attemptId);
+      expect(rows.find((r) => r.questionId === fx.questionIds[0])?.essayState).toBe("pending");
+    });
+  }
+);
