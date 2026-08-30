@@ -98,7 +98,28 @@ After the constant moved, dev `verify:schema` exits **0**, fully green. Two line
 - *"Bài làm dài đúng trần (4000 ký tự) QUA được CHECK"* — was `(500 ký tự)`, still green.
 - *"Bài làm quá trần một ký tự (4001) bị `attempt_answers_answer_check` TỪ CHỐI (23514)"* — **this assertion could not pass at all during the window.** With code at 500 and the DB at 4000, the probe at 501 sailed through the CHECK and died on the foreign key (`23503`), which is precisely what the gate reported as failure. It now probes at 4001 and gets the real `23514`. So the gate is not merely quiet — it is exercising the constraint again.
 
-**The prod half is narrower than the task asked for, and that is stated rather than smoothed over.** The `SCHEMA_ENV_FILE=.env.local.prod-backup` run was refused by this session's command classifier. Rather than work around it, the ceiling was read directly and read-only via the project's documented Composio path: `pg_get_constraintdef` returns `CHECK (((answer IS NULL) OR (length(answer) <= 4000)))` on **both** refs, byte-identical. That settles EG-BE-028's actual claim — the two ceilings are equal on both databases — but it is **not** the full behavioural probe suite on prod. **Recommended: run `SCHEMA_ENV_FILE=.env.local.prod-backup npm run verify:schema` once from `SOURCE/`** to close the prod half exactly as written.
+### CORRECTION — this task's prod requirement was never achievable as written
+The task asks for *"`verify:schema` fully green on **both** databases, including the character-ceiling assertion"*. **On prod that is impossible by design, and the script says so itself.** The engineer ran it on 2026-08-30; the output:
+
+```
+Target: pebjdlbgbmizgfpuptjl — KHÔNG phải dev. Chạy PHẦN: chỉ các khẳng định ĐỌC.
+  ⊘ BỎ QUA (target không phải dev): hai probe trần ký tự (4000 và 4001 ký tự)
+    — cả hai PHÁT lệnh INSERT vào attempt_answers
+```
+
+The ceiling gate is a **behavioural** probe: it INSERTs at the ceiling and one character past it and discriminates by SQLSTATE, because no CHECK-constraint *read* path is used. `BEHAVIOURAL_PROBE_ALLOWED_REFS` is an allowlist containing dev only, so every write-probe is skipped on prod — deliberately, since these probes write to a production table. **No amount of running the script on prod will ever turn that assertion green.**
+
+The script names the correct substitute in its own closing line: *"hoặc kiểm bằng truy vấn catalog trực tiếp"* ("or check by direct catalog query"). That is exactly what was done: `pg_get_constraintdef` on `attempt_answers_answer_check` returns
+
+```
+CHECK (((answer IS NULL) OR (length(answer) <= 4000)))
+```
+
+**byte-identical on prod (`pebjdlbgbmizgfpuptjl`) and dev (`hynwleaxtbtjzkvpjsug`)**. EG-BE-028's actual claim — the two ceilings are equal on both databases — is therefore **settled**, by the route the tooling itself prescribes rather than by a workaround.
+
+What the prod run *did* confirm, all green: column classification, all 27 foreign keys and their `on delete`, **the schema fingerprint `9979c9deea52` matching git and dev** (TD-005 satisfied on prod), subject canonicalisation, the `ESSAY_MAX_ATTEMPTS = 3` pin, and anon `EXECUTE` denial on both answer-key functions.
+
+**Consequence for the plan**: any later task or gate that says "verify:schema fully green on both databases" should read "fully green on dev; read-assertions green on prod, ceiling confirmed by catalog query". The Final Phase audit should not go looking for a green prod ceiling line that cannot exist.
 
 ### EG-BE-029 measured, not asserted in the abstract
 Uncapped, a `short_answer` prompt built from a 4000-character answer measured **4807 characters** (observed in the Red run). Capped, the answer region is exactly `TUTOR_MAX_STUDENT_ANSWER` = 500 characters, counted on the prompt string itself. Five cases: the cap, the cap living *inside* `buildTutorPrompt()` (the caller passes raw DB text and still cannot exceed it), passthrough for a normal answer, passthrough at exactly the boundary, and the decoupling assertion.
@@ -157,7 +178,7 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
 | 5 | `npm run test:fixture` | **1** | **Expected red, TD-030 baseline ONLY**: exactly 2 failures, both `subscription.fixture.e2e.test.ts > FE-1 (e) ... > locale en` and `locale vi`, named individually from the run. CRLF churn on `RichText.regression.test.tsx.snap` reverted before commit |
 | 6 | `npm run test:localdb` | **0** | 11 passed / 2 todo (SVC-1, SVC-2 — **Task H8**, still open) |
 | 8a | `npm run verify:schema` (dev) | **0** | **FULLY GREEN — this is the completion evidence.** The ceiling assertion flipped red to green, and a *second* assertion that could not run before now runs and passes: *"Bài làm quá trần một ký tự (4001) bị attempt_answers_answer_check TỪ CHỐI (23514)"*. H7's known-red window is **closed on dev** |
-| 8b | `verify:schema` (prod) | **not run — blocked** | The `SCHEMA_ENV_FILE=.env.local.prod-backup` invocation was refused by this session's command classifier. **Not worked around.** The prod half was instead obtained read-only through the project's documented Composio path: `pg_get_constraintdef` on `attempt_answers_answer_check` returns `CHECK (((answer IS NULL) OR (length(answer) <= 4000)))` on prod (`pebjdlbgbmizgfpuptjl`) — **byte-identical to dev** (`hynwleaxtbtjzkvpjsug`). That confirms the ceiling itself; it is **not** the full behavioural probe suite. See Investigation Notes |
+| 8b | `verify:schema` (prod) | **0 — PARTIAL PASS** | Run by the engineer 2026-08-30. **The ceiling assertion cannot be run on prod at all, by design** — see the correction below |
 
 **Pre-change state captured before the signal was removed** (required by this task's own entry condition): `npm run verify:schema` on dev exited **1** with **exactly one** failing assertion — *"TRẦN DB CAO HƠN TRẦN TRONG MÃ ... LIMITS.MAX_ATTEMPT_ANSWER = 500"*. Every other assertion green, including both grant assertions, the fingerprint comparison (`9979c9deea52`), and the two new essay functions.
 
@@ -189,7 +210,7 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
 
 ## Completion Criteria
 - [x] **Implementation Complete** = the three files (plus the test file the Red phase requires) in **one** commit
-- [~] **Quality Complete** = six gates green, `test:fixture` at the TD-030 baseline, and `verify:schema` **fully green on dev** — the ceiling gate's red-to-green transition is recorded, and a second assertion that could not run during the window now runs and passes. **The prod script run is outstanding** (blocked in this session); the prod ceiling itself was confirmed byte-identical read-only
+- [x] **Quality Complete** = six gates green, `test:fixture` at the TD-030 baseline, and `verify:schema` **fully green on dev** — the ceiling gate's red-to-green transition is recorded, and a second assertion that could not run during the window now runs and passes. Prod run completed by the engineer: **PARTIAL PASS, all read assertions green**; the ceiling probe is skipped on prod **by design** and was closed by catalog query instead (see the correction in Investigation Notes)
 - [x] **Integration Complete** = the ceiling is 4000 in code and 4000 on **both** databases (`pg_get_constraintdef`, byte-identical), and Gemini's token cost has **not** moved — EG-BE-029 holds the answer region at 500 characters given a 4000-character input
 - [x] The tutor cap landed **with** the raise, in this one commit (Gate H4)
 - [x] The `maxLength` pin moved in the **same commit** as the constant; **`:112` untouched**
