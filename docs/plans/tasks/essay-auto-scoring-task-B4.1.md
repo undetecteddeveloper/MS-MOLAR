@@ -48,11 +48,12 @@ Correct the reason text at:
 `upload.essayStored` (`vi.ts:271`, `en.ts:334`), which tells the **exam author** essays are not auto-scored and becomes false once Gate A passes — see **OQ-5**, carried into **Phase E, Task E4**.
 
 ## Target Files
-- [ ] `SOURCE/lib/scoring/__tests__/computeScore.test.ts` (`:4`, `:131`)
-- [ ] `SOURCE/lib/tutor/__tests__/prompt.test.ts` (`:238`, `:251`)
-- [ ] `SOURCE/lib/scoring/__tests__/wrongTwice.test.ts` (`:112`, `:132`)
-- [ ] `SOURCE/app/(layer2)/tutorActions.ts` (`:269-272`)
-- [ ] `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` (`:6`)
+- [x] `SOURCE/lib/scoring/__tests__/computeScore.test.ts` (header + describe title)
+- [x] `SOURCE/lib/tutor/__tests__/prompt.test.ts` (the Test 3 intent block + the `@ts-expect-error` reason)
+- [x] `SOURCE/lib/scoring/__tests__/wrongTwice.test.ts` (the Behavior block + the `Q-ESSAY` fixture comment)
+- [x] `SOURCE/app/(layer2)/tutorActions.ts` (the essay-exclusion branch comment)
+- [x] `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` (file header)
+- [x] `SOURCE/lib/scoring/computeScore.ts` — **extra, reassigned**: the two sites this file credits to B1.5 were never actually corrected (see Investigation Notes)
 
 ## Investigation Targets
 - `docs/design/essay-auto-scoring-backend-design.md` (§ D-09 — eleven comments/test titles asserting the old rule; **fix the reason, never the value or the behaviour**)
@@ -64,21 +65,51 @@ Correct the reason text at:
 - `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` (`:6`; the **scored branch at `:133` onward is untouched**)
 
 ## Investigation Notes
-_(Record here: the corrected wording used, matched against B1.5's `computeScore.ts` comments; confirmation that `git diff` shows only comment/title lines; confirmation that `types/result.ts` and `computeScore.test.ts:93` were not touched.)_
+
+### The D-09 accounting had a hole: B1.5's two sites were never corrected
+This task file says the two `computeScore.ts` sites were corrected by **Task B1.5** and instructs "match their new wording". They were **not**. Verified by reading the file and by `git show 3a34c9c`: B1.5 added correct new reasoning *inside the function body* ("Nó vẫn `scored: false` ... và đó là chủ đích"), but left both assigned sites intact —
+
+- `computeScore.ts:17-18` still read *"essay vẫn 'stored, not auto-scored' (không có UI nhập cho player, không có gì để chấm)"*
+- `computeScore.ts:35-36` still read *"essay không bao giờ chấm"*
+
+Both are now false, and the second is the more misleading: it reads as a claim about the world when it is only a claim about this function.
+
+**Corrected here, and the reassignment is recorded rather than left silent.** Three reasons this is the right place rather than a follow-up ticket: (a) they are the same class of edit as the other seven — reason-only, zero behaviour; (b) this task's own Refactor step orders a repo scan for *"any remaining assertion that an essay is 'never auto-scored' in code this feature makes false"*, and that scan lands squarely on them; (c) the Completion Criterion "all eleven D-09 sites carry the corrected reason" is untickable while two still carry the old one. So the split is **9 here + 1 (B3.3) + 1 (B2.1) = 11**, not 7 + 2 + 1 + 1.
+
+### The corrected reason, stated once and reused
+The old rule was *"an essay is never scored"*. The new truth has two halves, and different sites need different halves:
+
+- **In the scoring path** (`computeScore.ts`, `computeScore.test.ts`): the band is written **outside** `computeScore()` by the async path via `record_essay_grade()`; the row deliberately stays `scored: false` so the question stays out of the score denominator until something actually grades it. `scored: false` now means *"not scored **here**, **yet**"* — not *"never"*.
+- **In the tutor path** (`prompt.test.ts`, `tutorActions.ts`, `wrongTwice.test.ts`): essays are still excluded, but **not** because they go ungraded. Wrong-twice eligibility is computed from `isCorrect`, a **binary** predicate. An essay has no `isCorrect` — it has a continuous band — so "wrong twice" is not statable for it. This matters: the old reason would have been *repealed* by ADR-0018, which invites a future maintainer to widen the union. The new reason survives it.
+
+### The diff is comments plus exactly one title
+`git diff -U0` filtered to non-comment lines returns **exactly one** line across all of `SOURCE/`: the `describe` title at `computeScore.test.ts`, which is site 2 on this task's own list ("describe title"). The describe's grouping is unchanged — same block, same `it`s, same assertions.
+
+Old: `computeScore — essay vẫn KHÔNG auto-scored (SA-BE-010)`
+New: `computeScore — essay KHÔNG được chấm Ở ĐÂY, band tới từ đường bất đồng bộ (SA-BE-010)`
+
+### Repo scan came back clean
+Scanning for `essay không bao giờ chấm` / `never scored` / `essay vẫn KHÔNG auto-scored` / `essay/ungraded` returns only the **corrections themselves**, which quote the old wording in order to mark it false ("the old text read X — after ADR-0018 that is false"). Those are citations, not assertions. No site still asserts the repealed rule.
+
+### Out of scope, confirmed untouched by `git status`
+- `SOURCE/types/result.ts` — Task B2.1's site (I015). Clean.
+- `computeScore.test.ts`'s D-12 date debt — `2026-07-21` still present at both the header and the `true_false` describe. Untouched, still owed by the short-answer slice.
+- `upload.essayStored` in `vi.ts` / `en.ts` — OQ-5, Phase E Task E4. Both dictionaries clean.
+- The scored branch of `result/detail/page.tsx` — only the file header changed; TBD-02's deferral holds.
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
-- [ ] Read all Investigation Targets, including the wording B1.5 already used at `computeScore.ts:17-18` and `:35`
-- [ ] Record the current test-suite result as a baseline — every test green **before** the change
+- [x] Read all Investigation Targets. **B1.5 had no new wording to match** — its two sites still carried the old rule; verified by reading the file and `git show 3a34c9c`
+- [x] Baseline recorded: **1950 passed / 10 skipped / 0 todo** on this exact tree before the change
 
 ### 2. Green Phase
-- [ ] Correct the reason at each of the seven sites, matching B1.5's wording
-- [ ] Re-run the suite; every test that was green stays green **without being edited**
+- [x] Reason corrected at all **nine** sites (the seven owned + B1.5's two orphans), using the two-halved reason recorded in Investigation Notes
+- [x] Suite re-run: **1950 passed / 10 skipped** — identical to baseline, nothing edited to keep it green
 
 ### 3. Refactor Phase
-- [ ] Repo-scan for any remaining assertion that an essay is "never auto-scored" **in code this feature makes false**
-- [ ] Confirm `git diff` contains **no** value or behaviour change
-- [ ] Confirm `types/result.ts` (B2.1) and `computeScore.test.ts:93` (D-12) were **not** touched
+- [x] Repo scan clean — remaining hits are the corrections quoting the old wording to mark it false
+- [x] `git diff -U0` minus comment lines yields **exactly one** line repo-wide: the authorised `describe` title
+- [x] `types/result.ts`, the D-12 date, and both i18n dictionaries confirmed untouched via `git status`
 
 ## Quality Assurance Mechanisms
 - `npx tsc --noEmit` (strict) — Config: `SOURCE/tsconfig.json` (project-wide)
@@ -92,12 +123,14 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
 
 | # | Command (from `SOURCE/`) | Exit code | Notes |
 |---|---|---|---|
-| 1 | `npx tsc --noEmit` | | |
-| 2 | `npx eslint --max-warnings 0` | | |
-| 3 | `npx vitest run` | | |
-| 4 | `npm run build` | | |
-| 5 | `npm run test:fixture` | | expected red = TD-030 baseline only (Gate F1): exactly 2 failures, both `subscription.fixture.e2e.test.ts` FE-1(e) `en` + `vi` |
-| 6 | `npm run test:localdb` | | see Open Item I-7 |
+| 1 | `npx tsc --noEmit` | **0** | |
+| 2 | `npx eslint --max-warnings 0` | **0** | |
+| 3 | `npx vitest run` | **0** | **1950 passed / 10 skipped / 0 todo — byte-identical to the pre-change baseline.** That equality *is* the proof obligation for a reason-only task: not one test was edited, and not one changed result |
+| 4 | `npm run build` | **0** | |
+| 5 | `npm run test:fixture` | **1** | **Expected red, TD-030 baseline ONLY**: 2 failures, both `subscription.fixture.e2e.test.ts > FE-1 (e) ... > locale en` and `locale vi`. CRLF churn on `RichText.regression.test.tsx.snap` reverted before commit |
+| 6 | `npm run test:localdb` | **0** | 11 passed / 2 todo (SVC-1, SVC-2 — **Task H8**, still open) |
+
+**Baseline**: the same lane reported **1950 passed / 10 skipped** on this exact tree immediately before the change (recorded at B3.3's Gate 3). No lane moved.
 
 **A task file with any exit-code cell left empty is not complete** (Gate E4).
 
@@ -116,11 +149,11 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
   - **Residual**: proves nothing broke. It does **not** cover `upload.essayStored` (OQ-5, Phase E Task E4) or `computeScore.test.ts:93`'s D-12 date debt, both explicitly out of scope.
 
 ## Completion Criteria
-- [ ] **Implementation Complete** = seven reasons corrected, **zero** values or behaviours changed
-- [ ] **Quality Complete** = six verify gates green (a behaviour change here would show as a test failure)
-- [ ] **Integration Complete** = N/A
-- [ ] All eleven D-09 sites carry the corrected reason across the four owning tasks (2 B1.5 + 1 B3.3 + 1 B2.1 + 7 here)
-- [ ] Every exit-code cell in the Gate E4 table above is filled
+- [x] **Implementation Complete** = nine reasons corrected (seven owned + two reassigned), **zero** values or behaviours changed
+- [x] **Quality Complete** = six gates run separately with real exit codes; five at 0, `test:fixture` at the TD-030 baseline
+- [x] **Integration Complete** = N/A
+- [x] All eleven D-09 sites carry the corrected reason — **but the split is 9 + 1 + 1, not 2 + 1 + 1 + 7**, because B1.5 never corrected its two
+- [x] Every exit-code cell in the Gate E4 table above is filled
 
 ## Notes
 - Impact scope: documentation only.

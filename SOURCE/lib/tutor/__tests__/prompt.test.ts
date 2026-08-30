@@ -226,9 +226,13 @@ describe("buildTutorPrompt — chỉ dẫn Socratic tiếng Việt, không nêu 
 // Test 3 — essay's exclusion from TutorPromptInput.questionType is structural
 // (type-level proof obligation, not a runtime assertion)
 // =============================================================================
-// No standalone AC — backend DD's own stated design intent: "essay excluded —
-//   never scored, never wrong-twice-eligible" (TutorPromptInput.questionType
-//   comment, backend DD § Data Contracts).
+// No standalone AC — backend DD's own stated design intent: "essay excluded from
+//   TutorPromptInput.questionType" (backend DD § Data Contracts). The ORIGINAL
+//   wording of that intent read "never scored, never wrong-twice-eligible"; after
+//   ADR-0018 the first half is false — essays ARE auto-scored, they carry a band.
+//   The exclusion stands on the SECOND half alone, and that half is the load-
+//   bearing one: wrong-twice eligibility is computed from `isCorrect`, a BINARY
+//   predicate an essay has no value for. A band is not a right/wrong answer.
 // ROI: 45 (BV:6 x Freq:4 + Legal:0 + Defect:9) — a maintainability/regression
 //   guard rather than a user-facing behavior proof.
 // @category: edge-case
@@ -249,8 +253,10 @@ describe("TutorPromptInput.questionType — loại trừ 'essay' ở mức kiể
   it("chỉ nhận mcq/true_false/short_answer; 'essay' bị chặn lúc biên dịch, không phải lúc chạy", () => {
     const accepted: TutorPromptInput["questionType"][] = ["mcq", "true_false", "short_answer"];
 
-    // @ts-expect-error — "essay" nằm ngoài union của TutorPromptInput.questionType
-    // (essay không bao giờ được chấm nên không bao giờ "sai hai lần"). Dòng này
+    // @ts-expect-error — "essay" nằm ngoài union của TutorPromptInput.questionType.
+    // Lý do KHÔNG còn là "essay không bao giờ được chấm" (ADR-0018 làm câu đó
+    // sai); lý do là "sai hai lần" đọc `isCorrect`, một vị từ NHỊ PHÂN mà câu tự
+    // luận không có — nó có một band liên tục. Dòng này
     // PHẢI báo lỗi biên dịch; nếu ai đó nới union để nhận "essay", chính directive
     // này thành "unused" và `tsc --noEmit` gãy — buộc phải xem lại có chủ đích.
     const essayType: TutorPromptInput["questionType"] = "essay";

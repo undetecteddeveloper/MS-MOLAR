@@ -14,8 +14,11 @@
 // chuỗi số có nhiều hơn một dấu phân cách — vd nhóm hàng nghìn "1.234.567" —
 // là mơ hồ nên fallback so văn bản, không đoán số); thiếu/rỗng essayAnswer →
 // fallback scored:false, cùng quy tắc ground-truth-presence với true_false.
-// essay vẫn "stored, not auto-scored" (không có UI nhập cho player, không có
-// gì để chấm). Câu không chấm vẫn có mặt trong perQuestion (scored: false,
+// essay: hàm này KHÔNG chấm nó, và điều đó KHÔNG còn có nghĩa "không ai chấm".
+// Band do đường bất đồng bộ của ADR-0018 ghi, ngoài hàm này, qua
+// `record_essay_grade()`. Dòng CỐ Ý ở lại `scored: false` để nó không vào mẫu
+// số điểm cho tới khi có ai đó thực sự chấm nó. Câu không chấm vẫn có mặt
+// trong perQuestion (scored: false,
 // giữ input của user để màn Chi tiết hiển thị) nhưng KHÔNG vào mẫu số điểm
 // lẫn topic breakdown — tránh đề trộn 22 câu bị chia điểm /22 dù chỉ 12 câu
 // chấm được.
@@ -33,7 +36,11 @@ import type {
  *  subAnswers ground truth (rỗng = AI extraction fail, không chấm);
  *  short_answer chỉ khi có essayAnswer ground truth không rỗng/toàn khoảng
  *  trắng (cùng lý do — AI extraction fail hoặc row cũ chưa có ground truth);
- *  essay không bao giờ chấm. */
+ *  essay LUÔN trả `false` ở đây — nhưng đọc kỹ nghĩa: nó nói "hàm NÀY không
+ *  chấm câu này", không nói "câu này không bao giờ được chấm". Từ ADR-0018,
+ *  band được ghi bởi đường bất đồng bộ sau khi nộp bài, ngoài `computeScore()`.
+ *  Giữ `false` là chủ đích: nó giữ câu ngoài mẫu số điểm cho tới lúc có band
+ *  thật, thay vì hứa trước một điểm số chưa tồn tại. */
 function isScored(q: Question): boolean {
   const type = q.questionType ?? "mcq";
   if (type === "mcq") return true;

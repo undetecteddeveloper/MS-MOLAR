@@ -3,8 +3,12 @@
 // Server Component: đọc getResult(); chưa nộp / không thuộc user → redirect trang đề.
 // Hiển thị mỗi câu: nội dung (markdown+LaTeX) + 4 lựa chọn, tô đáp án đúng (brand) và
 // đáp án user chọn sai (destructive). Visual nhất quán L2 "tờ giấy trắng / focused".
-// v2.1 (Task D3): câu KHÔNG chấm (true_false/short_answer/essay) hiển thị input
-// của user + đáp án lưu trữ, nhãn "Not auto-scored" — không tô đúng/sai.
+// v2.1 (Task D3): câu KHÔNG chấm (true_false/short_answer thiếu ground truth)
+// hiển thị input của user + đáp án lưu trữ, nhãn "Not auto-scored" — không tô
+// đúng/sai. essay ĐÃ RỜI nhóm đó kể từ ADR-0018: nó được chấm tự động và mang
+// một band, chỉ là band tới muộn hơn, từ đường bất đồng bộ sau khi nộp. Câu chữ
+// và bề mặt của nhánh tự luận thuộc Phase F; chỗ này chỉ ghi lại rằng lý do cũ
+// ("essay không bao giờ chấm") không còn đúng.
 
 import Link from "next/link";
 import { getTranslate } from "@/lib/i18n/server";

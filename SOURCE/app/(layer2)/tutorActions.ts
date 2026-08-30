@@ -267,8 +267,11 @@ export async function explainStep(attemptId: string, questionId: string): Promis
     choices: LabelledOptionRow[] | null;
   } | null;
   // Câu đã biến mất (bị xoá sau khi học sinh làm) hoặc là câu tự luận: không có
-  // gì để kèm chứ không phải ta hỏng — essay không bao giờ được chấm nên không
-  // bao giờ "sai hai lần", nhánh này chỉ là lưới, và cũng là chỗ thu hẹp kiểu
+  // gì để kèm chứ không phải ta hỏng. Lý do loại trừ essay đã ĐỔI kể từ
+  // ADR-0018 — nó KHÔNG còn là "essay không bao giờ được chấm", vì tự luận nay
+  // được chấm và mang một band. Lý do đúng: "sai hai lần" đọc `isCorrect`, một
+  // vị từ NHỊ PHÂN mà một band không trả lời được, nên câu tự luận không bao giờ
+  // đủ điều kiện gọi gia sư. Nhánh này chỉ là lưới, và cũng là chỗ thu hẹp kiểu
   // cho TutorPromptInput (vốn loại trừ essay ngay từ kiểu).
   const questionType = questionRow?.question_type ?? "mcq";
   if (

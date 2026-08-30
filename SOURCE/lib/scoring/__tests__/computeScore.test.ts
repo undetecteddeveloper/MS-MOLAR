@@ -1,7 +1,9 @@
 // computeScore — unit tests. v2.1 (ADR-0005): mcq chấm điểm. true_false chấm
 // lại (2026-07-21, xem computeScore.ts) khi có subAnswers; thiếu subAnswers →
 // fallback scored:false (không phạt oan user vì thiếu ground truth).
-// short_answer/essay vẫn "stored, not auto-scored".
+// short_answer vẫn "stored, not auto-scored". essay thì KHÁC kể từ ADR-0018:
+// nó ĐƯỢC chấm, chỉ là không phải ở đây — band do đường bất đồng bộ ghi sau khi
+// nộp, còn `computeScore()` cố ý để dòng ở `scored: false`.
 
 import { describe, expect, it } from "vitest";
 import { computeScore } from "../computeScore";
@@ -128,7 +130,11 @@ describe("computeScore — true_false (2026-07-21 re-enable)", () => {
   });
 });
 
-describe("computeScore — essay vẫn KHÔNG auto-scored (SA-BE-010)", () => {
+// Tiêu đề cũ đọc là "essay vẫn KHÔNG auto-scored" — sau ADR-0018 câu đó SAI.
+// Hành vi được kiểm thì KHÔNG đổi một chút nào: `computeScore()` vẫn trả
+// `scored: false` và vẫn để câu ngoài mẫu số. Cái đổi là LÝ DO — band tới từ
+// nơi khác, muộn hơn, chứ không phải không bao giờ tới.
+describe("computeScore — essay KHÔNG được chấm Ở ĐÂY, band tới từ đường bất đồng bộ (SA-BE-010)", () => {
   it("scored:false vô điều kiện, không vào mẫu số dù có input", () => {
     const questions = [mcq("q1", "A"), essay("q2")];
     const answers = { q1: "A", q2: "bài luận tự do" };
