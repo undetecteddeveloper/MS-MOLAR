@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import type { Metadata, Viewport } from "next";
 import { Geist_Mono, Source_Serif_4, Be_Vietnam_Pro } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { RouteLoadingOverlay } from "@/components/layout/RouteLoadingOverlay";
 import { I18nProvider } from "@/lib/i18n/client";
 import { getLocale } from "@/lib/i18n/server";
@@ -134,6 +135,7 @@ export default async function RootLayout({
           </Suspense>
         </I18nProvider>
         <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
