@@ -13,11 +13,29 @@
 import { ActionButton } from "@/components/history/ActionButton";
 import type { AttemptPdfData } from "@/lib/pdf/generateAttemptPdf";
 
-export function ResultActions({ pdfInput }: { pdfInput: AttemptPdfData }) {
+export function ResultActions({
+  pdfInput,
+  blockedReason,
+}: {
+  pdfInput: AttemptPdfData;
+  /** Truyền xuống CẢ HAI nút. Chặn một nút mà mở nút kia là không chặn gì cả —
+   *  "Lưu" và "Chia sẻ" sinh ra CÙNG một tệp. */
+  blockedReason: string | null;
+}) {
   return (
     <>
-      <ActionButton action="save" idPrefix="result" pdfInput={pdfInput} />
-      <ActionButton action="share" idPrefix="result" pdfInput={pdfInput} />
+      <ActionButton
+        action="save"
+        idPrefix="result"
+        pdfInput={pdfInput}
+        blockedReason={blockedReason}
+      />
+      <ActionButton
+        action="share"
+        idPrefix="result"
+        pdfInput={pdfInput}
+        blockedReason={blockedReason}
+      />
     </>
   );
 }

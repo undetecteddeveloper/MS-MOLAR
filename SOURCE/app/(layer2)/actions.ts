@@ -3,8 +3,10 @@
 // chấm điểm server-side một lần. Xem BACK-END-ARCHITECTURE-MAP.md Mục 4.2.
 "use server";
 
+import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { gradeEssaysForAttempt } from "@/lib/essay/gradeEssays";
 import { recordExamResult, recordSkillMastery } from "@/lib/supabase/service-role";
 import { guard } from "@/lib/security/rateLimit";
 import { isValidPartScore } from "@/lib/rating";
@@ -151,7 +153,13 @@ export async function submitExam(
   if (ansErr) throw ansErr;
 
   // 5. Chấm điểm server-side (tracer code computeScore — M1.6).
-  const score = computeScore(questions, answers);
+  //
+  // Cờ chấm tự luận đọc Ở ĐÂY và truyền VÀO — `computeScore()` thuần và không
+  // bao giờ tự đọc `process.env` (AC-013). Quy tắc đọc là fail-closed và giống
+  // hệt ở cả ba chỗ đọc cờ: CHỈ chuỗi `"true"` đã trim mới là bật; mọi giá trị
+  // khác, kể cả vắng mặt, là tắt. Tính năng ship ở trạng thái vắng mặt.
+  const essayGrading = process.env.ESSAY_GRADING_ENABLED?.trim() === "true";
+  const score = computeScore(questions, answers, { essayGrading });
 
   // 6. Lưu kết quả. KHÔNG ghi bằng `supabase` (JWT của học sinh) được nữa:
   // role `authenticated` đã mất hẳn INSERT trên exam_results (Security review
@@ -187,6 +195,43 @@ export async function submitExam(
     }
   } catch (err) {
     console.error("[submitExam] recordSkillMastery", err);
+  }
+
+  // 8. Pass chấm tự luận — ĐĂNG KÝ TRƯỚC `redirect()`, và thứ tự đó là bắt
+  // buộc chứ không phải sở thích: `redirect()` ném một control-flow exception,
+  // nên mọi dòng SAU nó không bao giờ chạy. Đăng ký `after()` phía sau
+  // `redirect()` nghĩa là KHÔNG BAO GIỜ đăng ký — và chế độ hỏng ấy vô hình
+  // trong lúc cờ còn tắt, rồi lặng lẽ không chấm gì cả vào đúng ngày cờ được
+  // bật. Tiền lệ và luật thành văn: `lib/support/actions.ts:122-127`.
+  //
+  // `supabase` được BẮT VÀO CLOSURE ở đây, chứ không dựng lại bên trong
+  // callback (R-05): instance này mang JWT của học sinh, và đường telemetry
+  // cần đúng danh tính đó — policy `telemetry_insert_own` là
+  // `with check (user_id = auth.uid())`, nên một lượt ghi bằng service_role
+  // với `user_id` null bị từ chối thẳng.
+  //
+  // Chỉ câu `essay` CÓ đáp án mẫu mới vào tập mục tiêu (AC-038/EG-BE-003) —
+  // cùng guard ground-truth-presence mà `computeScore()` vừa dùng để quyết
+  // định có phát khoá vòng đời hay không. Hai bên lệch nhau nghĩa là một câu
+  // mang `pending` mà pass không bao giờ chạm tới, hoặc ngược lại.
+  if (essayGrading) {
+    const targets = questions
+      .filter((q) => (q.questionType ?? "mcq") === "essay" && Boolean(q.essayAnswer?.trim()))
+      .map((q) => ({
+        questionId: q.id,
+        questionContent: q.content,
+        referenceAnswer: q.essayAnswer ?? "",
+        studentAnswer: answers[q.id] ?? "",
+      }));
+    if (targets.length > 0) {
+      // `attempt.user_id` chứ không phải một `auth.getUser()` mới: dòng attempt
+      // đã qua RLS nên giá trị này ĐÚNG BẰNG `auth.uid()`, và telemetry của pass
+      // chấm phải mang đúng danh tính đó để `telemetry_insert_own`
+      // (`with check (user_id = auth.uid())`) không từ chối thẳng. Cùng lập luận
+      // khoá rate-limit ở đầu hàm đã dùng, và không tốn thêm round-trip nào.
+      const userId = attempt.user_id as string;
+      after(() => gradeEssaysForAttempt({ attemptId, userId, targets, supabase }));
+    }
   }
 
   redirect(`/exams/${examId}/attempt/${attemptId}/result`);

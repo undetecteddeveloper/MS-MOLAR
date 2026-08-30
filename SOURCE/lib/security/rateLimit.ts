@@ -211,6 +211,26 @@ export const RATE_LIMITS = {
   // không phải một câu trả lời về credential. 10/giờ đủ cho người thử vài tấm
   // rồi đổi ý, và vẫn chặn vòng lặp bơm file.
   uploadAvatar: { limit: 10, windowMs: 60 * 60 * 1000 },
+  // Cham lai tu luan (ADR-0018 / AC-072). CUNG HO tieu-han-ngach-ben-thu-ba voi
+  // explainStep/uploadExam, nhung o mot NHA CUNG CAP KHAC: no tieu ngan sach
+  // GROQ, khong phai Gemini. Do la ly do no khong the nhap vao
+  // SUPPLIER_CAPPED_ACTIONS cua rateLimit.test.ts — danh sach ay bi rang buoc
+  // vao han ngach ngay cua Gemini (20) va vao bang GEMINI_REQUESTS_PER_CALL.
+  // Xep no vao do se do mot con so Groq bang mot tran Gemini, tuc lam ca hai
+  // bat bien cung noi doi.
+  //
+  // CUA SO THEO NGAY, khong theo gio: bo dem chan tren no la
+  // `groq:budget:{day}` — dung luat khop don vi ma comment cua explainStep dat
+  // ra (han ngach ben kia tinh theo NGAY thi cua so phai theo NGAY, neu khong
+  // thi tran ngay khong con duoc dat).
+  //
+  // Vi sao 10: SQL da chan cung 3 luot moi CAU (ESSAY_MAX_ATTEMPTS), nen tran
+  // nay khong phai tang bao ve chinh — no canh VONG LAP TU DONG. 10 lan bam
+  // trong mot ngay la rong rai cho mot hoc sinh that (ho phai co it nhat 4 cau
+  // tu luan hong moi cham toi), va worst case cua MOT tai khoan la
+  // 10 * GROQ_CALLS_PER_ESSAY = 30 request Groq/ngay — mot phan nho cua
+  // GROQ_BUDGET_DAILY_LIMIT, thu ma budget.ts cuong che doc lap va fail-closed.
+  retryEssayGrading: { limit: 10, windowMs: 24 * 60 * 60 * 1000 },
 } as const;
 
 /** Cửa sổ dài nhất đang cấu hình — mốc "chắc chắn hết hiệu lực" của `pruneOldest`. */

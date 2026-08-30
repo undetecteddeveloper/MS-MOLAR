@@ -195,6 +195,7 @@ export const en = {
   "player.tfNotScored": "True/False — stored, not auto-scored yet.",
   "player.shortAnswerScored": "Short answer — auto-scored after you submit.",
   "player.essayNotScored": "Essay — your working is saved with the attempt, not auto-scored yet.",
+  "player.essayScored": "Essay — auto-scored after you submit.",
   "player.essayPlaceholder": "Write your working here…",
   "player.charsLeft": "{remaining} characters left",
   "player.leaveTitle": "Leave this exam?",
@@ -223,6 +224,52 @@ export const en = {
   "result.yourChoice": "Your choice",
   "result.editRating": "Edit your rating",
   "result.rateThisExam": "Rate this exam",
+
+  // --- Chấm tự luận (ADR-0018) — 28 khoá mới ------------------------------
+  // Mọi chuỗi ở đây là HẰNG DO ỨNG DỤNG SỞ HỮU. KHÔNG chuỗi nào do model sinh
+  // ra, và không có chỗ nào cho một chuỗi như thế: `EssayView` không mang
+  // trường văn xuôi nào (AC-044/AC-047).
+  //
+  // BA CHUỖI CỐ Ý KHÔNG TỒN TẠI, ghi ra để không ai tưởng là sót:
+  //   1. Không câu nào nói số lượt chấm lại CÒN LẠI (UI-D9) — con số đó tụt vì
+  //      những lý do học sinh không gây ra, nên hiển thị nó là hứa sai.
+  //   2. Không câu riêng cho "kẹt pending" (UI-D6) — nó dùng `failedBody`.
+  //   3. Không câu nào giải thích VÌ SAO band là band đó — một đầu ra thứ hai
+  //      do model viết là một bề mặt tiêm chích thứ hai (R9).
+  "result.essay.label": "Essay",
+  "result.essay.points": "{earned} / {max} points",
+  "result.essay.denominator": "Based on {n} essay questions already scored.",
+  "result.essay.stillGrading":
+    "{k} questions still being scored — your essay score will update automatically.",
+  "result.essay.someFailed": "{k} questions could not be scored — open Details to try again.",
+  "result.essay.noneGraded": "No essay questions have been scored yet. Open Details to try again.",
+  "result.essay.state.pending": "Scoring",
+  "result.essay.state.graded": "Scored",
+  "result.essay.state.failed": "Scoring failed",
+  "result.essay.band": "{band} / 1 point",
+  "result.essay.lowConfidence": "Worth checking",
+  "result.essay.lowConfidenceHelp":
+    "The automatic scorer was not confident about this one. Compare it with the model answer.",
+  "result.essay.pendingBody": "Your working is being scored. The score will appear right here.",
+  "result.essay.failedBody": "Automatic scoring did not finish for this question.",
+  "result.essay.attemptsNote":
+    "Each question can only be scored again a limited number of times; an attempt interrupted part-way still counts as used.",
+  "result.essay.retry": "Score again",
+  "result.essay.retryBusy": "Scoring again…",
+  "result.essay.retryBusyReason": "Sending your request to score again, please wait.",
+  "result.essay.retryExhausted":
+    "This question has used all its scoring attempts. It will not be scored again automatically.",
+  "result.essay.retryBudgetOut":
+    "Automatic scoring has reached today's limit. Please try again tomorrow.",
+  "result.essay.retryAlreadyGraded": "This question already has a score.",
+  "result.essay.pdfBlocked":
+    "Essay scoring in progress. Saving and sharing the PDF will unlock when it finishes.",
+  "result.essay.pdfIncomplete":
+    "This exam has essay questions that were not scored automatically. The score in this file does not include the essay part.",
+  "result.essay.pollStopped": "This page has stopped updating automatically.",
+  "result.essay.pollRefresh": "Refresh",
+  "result.essay.announceProgress": "{done} essay questions scored. {pending} still being scored.",
+  "result.essay.announceAllDone": "All essay questions have been scored.",
 
   // --- Chấm độ khó --------------------------------------------------------
   "rating.rate": "Rate →",
@@ -332,6 +379,7 @@ export const en = {
   "upload.shortAnswerStored": "Short answer — stored, not auto-scored yet.",
   "upload.modelAnswer": "Model answer",
   "upload.essayStored": "Essay — stored, not auto-scored yet.",
+  "upload.essayScored": "Essay — auto-scored after the student submits.",
   "upload.questionText": "Question text",
   "upload.deleting": "Deleting…",
   "upload.dragDrop": "Drag & drop, or click to upload",

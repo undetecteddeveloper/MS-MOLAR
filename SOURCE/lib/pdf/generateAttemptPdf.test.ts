@@ -67,6 +67,9 @@ const SAMPLE_DATA: AttemptPdfData = {
   submittedAt: "2026-07-15T09:12:34.000Z",
   correct: 8,
   total: 10,
+  // ADR-0018 (Task B2.3) — bat buoc tren AttemptPdfData. `false` la gia tri
+  // dung o day: khong fixture nao trong file nay co cau tu luan.
+  hasIncompleteEssay: false,
 };
 
 describe("generateAttemptPdf — dynamic-import boundary (Binding Decision: placement)", () => {

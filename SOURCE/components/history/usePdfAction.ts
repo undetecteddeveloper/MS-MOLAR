@@ -37,12 +37,32 @@ async function attemptShare(file: File): Promise<"shared" | "fallback"> {
   }
 }
 
-export function usePdfAction(action: "save" | "share", pdfInput: AttemptPdfData) {
+/** Cổng chặn xuất PDF (ADR-0018 / AC-058).
+ *
+ *  `blockedReason` BẮT BUỘC, không có mặc định. Một tham số tuỳ chọn ở đây
+ *  nghĩa là mỗi call site MỚI mặc định KHÔNG bị chặn, tức chế độ hỏng im lặng
+ *  là "cho xuất một tệp thiếu điểm" — đúng thứ cổng này sinh ra để chặn. Bắt
+ *  buộc thì `tsc` đòi mọi call site phải TRẢ LỜI câu hỏi đó.
+ *
+ *  MỘT HOOK, HAI CỬA (UI-D4). Điều này NỚI phạm vi AC-058 — vốn chỉ nêu tên
+ *  `ResultActions.tsx` — sang cả `/history`, một cách CÓ CHỦ Ý: `/history` là
+ *  nơi học sinh quay lại sau vài ngày, tức nơi một lượt xuất PDF DỄ XẢY RA
+ *  NHẤT. Chặn ở một cửa mà mở ở cửa kia là không chặn gì cả. */
+export function usePdfAction(
+  action: "save" | "share",
+  pdfInput: AttemptPdfData,
+  blockedReason: string | null,
+) {
   const t = useT();
   const [phase, setPhase] = useState<PdfActionPhase>("idle");
   const busyRef = useRef(false); // synchronous guard — aria-disabled does not block the click event (D4/AC-010)
 
   async function run() {
+    // CHẶN TRƯỚC CHỐT BẬN, và thứ tự ấy là yêu cầu chứ không phải sở thích:
+    // đặt sau `busyRef` thì một lượt bấm bị chặn vẫn nhấp qua pha "đang tạo"
+    // rồi mới dừng, tức giao diện nói dối rằng nó đã bắt đầu làm gì đó. Ở đây
+    // một lượt bấm bị chặn KHÔNG sinh pha bận và KHÔNG sinh node lỗi nào.
+    if (blockedReason !== null) return;
     if (busyRef.current) return; // AC-010
     busyRef.current = true;
     setPhase("busy");
@@ -58,6 +78,7 @@ export function usePdfAction(action: "save" | "share", pdfInput: AttemptPdfData)
         submittedLabel: t("history.pdfSubmittedLabel"),
         correctLabel: t("history.pdfCorrectLabel"),
         wrongLabel: t("history.pdfWrongLabel"),
+        essayIncompleteLabel: t("result.essay.pdfIncomplete"),
         totalQuestionsLabel: t("history.pdfTotalQuestions", { total: pdfInput.total }),
       });
       if (action === "save") {

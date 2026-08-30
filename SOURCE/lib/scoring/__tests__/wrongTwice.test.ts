@@ -109,9 +109,14 @@ describe("computeWrongTwiceQuestionIds — cross-attempt >=2-distinct-attempts t
 //   convention exactly (undefined = scored)."
 // ROI: 60 (BV:7 x Freq:7 + Legal:0 + Defect:8)
 // Behavior: a perQuestion row with scored: false and isCorrect: false, wrong on 2
-//   attempts, is NOT counted (essay/ungraded rows never contribute to wrong-twice
-//   eligibility). A parallel row with scored omitted entirely (undefined) and
-//   isCorrect: false, wrong on 2 attempts, IS counted.
+//   attempts, is NOT counted. A parallel row with scored omitted entirely
+//   (undefined) and isCorrect: false, wrong on 2 attempts, IS counted.
+//   Why essay rows land on the excluded side, stated precisely because ADR-0018
+//   changed the reason and not the outcome: an essay row is `scored: false` — the
+//   band is written by the async path, outside computeScore(), and the row stays
+//   out of the score denominator. It is still never wrong-twice-eligible, but
+//   because `isCorrect` is a BINARY predicate a band cannot answer, NOT because
+//   essays go ungraded.
 // @category: edge-case
 // @lane: unit
 // @dependency: none
@@ -129,7 +134,7 @@ describe("computeWrongTwiceQuestionIds — cross-attempt >=2-distinct-attempts t
 describe("computeWrongTwiceQuestionIds — scored:false exclusion and scored:undefined inclusion (Test 2)", () => {
   // Two questions, identical in every respect except the `scored` field, both
   // wrong on the SAME 2 distinct attempts:
-  //   Q-ESSAY  — scored: false          (essay/ungraded: never eligible)
+  //   Q-ESSAY  — scored: false          (never eligible: no binary isCorrect)
   //   Q-LEGACY — `scored` omitted       (row cũ trước v2.1: undefined = scored)
   const PARALLEL_SCORED_FIXTURES: WrongTwiceAttempt[] = [
     {

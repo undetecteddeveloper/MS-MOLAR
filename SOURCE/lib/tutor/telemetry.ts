@@ -2,10 +2,12 @@
 // không import gì (cùng nhà với prompt.ts, computeScore.ts, wrongTwice.ts).
 // Dựng đúng object insert cho `public.telemetry_log` (schema.sql, khối "TELEMETRY LOG").
 //
-// DÙNG CHUNG, KHÔNG SAO CHÉP: cả `explainStep()` (event_type 'tutor_invoke') lẫn
-// `getSkillRecommendation()` (event_type 'adaptive_route') phải đi qua hàm này
-// thay vì tự ghép object insert tại chỗ — có hai lối ghi vào cùng một bảng thì
-// rào chắn dưới đây chỉ còn bảo vệ được một nửa.
+// DÙNG CHUNG, KHÔNG SAO CHÉP: MỌI lối ghi vào `telemetry_log` phải đi qua hàm
+// này thay vì tự ghép object insert tại chỗ — hiện là ba, `explainStep()`
+// ('tutor_invoke'), `getSkillRecommendation()` ('adaptive_route') và
+// `gradeEssaysForAttempt()` ('essay_grade'). Quy tắc nêu theo TIÊU CHÍ chứ
+// không theo danh sách vì đây là chỗ nó hay bị phá: một lối ghi thứ N tự ghép
+// object tại chỗ khiến rào chắn dưới đây chỉ còn bảo vệ được (N-1)/N bảng.
 //
 // RÀO CHẮN (PRD Success Criteria #13, AC-013): answer-key material KHÔNG BAO GIỜ
 // được lọt vào telemetry_log. Con đường rò thật sự KHÔNG phải là một cột tên
@@ -30,14 +32,18 @@
 // "best-effort" thành điểm hỏng thứ hai của luồng học sinh đang chờ, điều backend
 // DD cấm tường minh.
 
-/** Đúng bằng CHECK constraint `telemetry_log_error_code_check` — SÁU mã sau R13,
- *  ĐÚNG THỨ TỰ schema.sql; nguồn DUY NHẤT cho cả kiểu lẫn bộ lọc lúc chạy. */
-export const TELEMETRY_ERROR_CODES = ["gemini_unavailable", "rate_limited", "server", "not_eligible", "user_quota_exhausted", "project_budget_exhausted"] as const;
+/** Đúng bằng CHECK constraint `telemetry_log_error_code_check` — CHÍN mã sau
+ *  Essay Auto-Scoring R13, ĐÚNG THỨ TỰ schema.sql; nguồn DUY NHẤT cho cả kiểu
+ *  lẫn bộ lọc lúc chạy.
+ *
+ *  Ba mã cuối đi kèm CHECK mới và chỉ ghi được sau khi DDL của Task H7 được áp
+ *  lên database; tới lúc đó chưa nhánh nào sinh ra chúng. */
+export const TELEMETRY_ERROR_CODES = ["gemini_unavailable", "rate_limited", "server", "not_eligible", "user_quota_exhausted", "project_budget_exhausted", "groq_unavailable", "invalid_output", "duplicate_write"] as const;
 
 export type TelemetryErrorCode = (typeof TELEMETRY_ERROR_CODES)[number];
 
 /** `public.telemetry_log`: `event_type text not null check (event_type in (...))`. */
-export type TelemetryEventType = "adaptive_route" | "tutor_invoke";
+export type TelemetryEventType = "adaptive_route" | "tutor_invoke" | "essay_grade";
 
 /**
  * Ngữ cảnh (đã thu hẹp) của MỘT lượt gọi cần ghi nhận — đúng bộ dữ liệu vận hành
@@ -48,7 +54,12 @@ export interface TelemetryEvent {
   /** `null` khi không xác định được người dùng; `telemetry_log.user_id` cho phép
    *  NULL (`on delete set null` — mất danh tính chấp nhận được, mất dòng thì không). */
   userId: string | null;
-  /** Chỉ có ở 'tutor_invoke'. */
+  /** Có ở các event_type làm việc trên MỘT câu hỏi cụ thể: 'tutor_invoke' và
+   *  'essay_grade'. Vắng ở 'adaptive_route', vốn định tuyến theo KỸ NĂNG chứ
+   *  không theo câu — nên nó không có câu nào để ghi.
+   *
+   *  Nêu theo TIÊU CHÍ chứ không theo danh sách: một event_type mới gắn với một
+   *  câu hỏi sẽ mang trường này, và không cần ai sửa lại dòng ghi chú. */
   questionId?: string | null;
   /** Chỉ có ở 'adaptive_route'; null khi không gợi ý được kỹ năng nào. */
   skillNodeId?: string | null;

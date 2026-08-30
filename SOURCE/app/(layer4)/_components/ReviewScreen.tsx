@@ -51,6 +51,8 @@ interface ReviewScreenProps {
    * thứ hai song song với `exam` thì chỉ có thể lệch pha.
    */
   nodes?: ReviewNodes;
+  /** Cờ chấm tự luận — đọc ở server (page), chỉ đi ngang qua đây (Task E4). */
+  essayGradingEnabled?: boolean;
 }
 
 /** State → SaveExamPatch. v2.2: subject/grade gửi kèm khi CHƯA publish (server
@@ -109,6 +111,7 @@ export function ReviewScreen({
   initialExam,
   srcAuto,
   nodes,
+  essayGradingEnabled = false,
 }: ReviewScreenProps) {
   const t = useT();
   const [exam, setExam] = useState<AssembledExam>(initialExam);
@@ -268,6 +271,7 @@ export function ReviewScreen({
         errors={errors}
         onChangeQuestion={onChangeQuestion}
         nodes={nodes}
+        essayGradingEnabled={essayGradingEnabled}
       />
 
       <PublishBar

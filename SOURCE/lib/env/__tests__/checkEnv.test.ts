@@ -36,6 +36,14 @@ function goodEnv(over: Env = {}): Env {
     // 0.5 ở đây KHÔNG ghim cách mã hoá — xem ca "0.5 và 50 đều im lặng" bên dưới.
     AI_BUDGET_FREE_SHARE: "0.5",
     AI_BUDGET_DAILY_LIMIT: "20",
+    // Chấm tự luận qua Groq (ADR-0018) — cùng lý do như GEMINI_PAID_TIER_ENABLED
+    // ở trên: cả ba đều có nhánh warn khi vắng, nên cả ba phải có mặt trong bộ
+    // "không còn gì để báo". `ESSAY_GRADING_ENABLED: "true"` ở đây KHÔNG nói
+    // rằng bật là trạng thái mặc định — trạng thái ship là TẮT; nó chỉ là giá
+    // trị duy nhất khiến checkEnv im lặng, đúng như "1" ở dòng Premium.
+    GROQ_API_KEY: "groq-key",
+    GROQ_BUDGET_DAILY_LIMIT: "600",
+    ESSAY_GRADING_ENABLED: "true",
     ...over,
   };
 }
@@ -228,6 +236,82 @@ describe("checkEnv", () => {
       expect(levelOf(goodEnv({ AI_BUDGET_DAILY_LIMIT: raw }), "AI_BUDGET_DAILY_LIMIT")).toBe("warn");
     }
   );
+
+  // --- Chấm tự luận qua Groq (ADR-0018) -------------------------------------
+
+  it("GROQ_API_KEY thiếu là warn, KHÔNG phải error — theo tiền lệ GEMINI_API_KEY", () => {
+    // Cùng lập luận như GEMINI_API_KEY: một deploy thiếu khoá chấm tự luận mà
+    // làm sập trang chủ là đổi một hỏng hóc cục bộ lấy một sự cố toàn site.
+    // Quan trọng hơn ở thời điểm này: khoá CHƯA được đặt (cổng ZDR chưa mở),
+    // nên `error` sẽ biến trạng thái ship hợp lệ thành một báo động thường trực.
+    expect(levelOf(goodEnv({ GROQ_API_KEY: "" }), "GROQ_API_KEY")).toBe("warn");
+  });
+
+  it("GROQ_API_KEY thiếu HẲN cũng bị bắt, không chỉ chuỗi rỗng", () => {
+    const env = goodEnv();
+    delete env.GROQ_API_KEY;
+    expect(names(env)).toContain("GROQ_API_KEY");
+  });
+
+  it("GROQ_BUDGET_DAILY_LIMIT thiếu → fail-closed: impact nói TỪ CHỐI, không phải không giới hạn", () => {
+    // AC-031: trần chi thiếu KHÔNG được đọc thành trần vô hạn. Đây là bản sao
+    // có chủ ý của khuôn AI_BUDGET_DAILY_LIMIT, nhưng là trần RIÊNG của Groq
+    // (AC-030) — dùng chung một trần cho hai nhà cung cấp thì một ngày chấm
+    // nặng đúng là thứ tắt gia sư Gemini đi.
+    const p = checkEnv(goodEnv({ GROQ_BUDGET_DAILY_LIMIT: "" })).find(
+      (x) => x.name === "GROQ_BUDGET_DAILY_LIMIT"
+    );
+    expect(p?.level).toBe("warn");
+    expect(p?.impact).toContain("TỪ CHỐI");
+  });
+
+  it("GROQ_BUDGET_DAILY_LIMIT thiếu HẲN cũng bị bắt", () => {
+    const env = goodEnv();
+    delete env.GROQ_BUDGET_DAILY_LIMIT;
+    expect(names(env)).toContain("GROQ_BUDGET_DAILY_LIMIT");
+  });
+
+  it.each(["600", "1", "5000"])("GROQ_BUDGET_DAILY_LIMIT = %j im lặng", (raw) => {
+    expect(checkEnv(goodEnv({ GROQ_BUDGET_DAILY_LIMIT: raw }))).toEqual([]);
+  });
+
+  it.each(["0", "-1", "600.5", "sáu trăm", "600 request", "unlimited", "Infinity"])(
+    "GROQ_BUDGET_DAILY_LIMIT = %j bị bắt — số nguyên dương hoặc không có gì cả",
+    (raw) => {
+      expect(levelOf(goodEnv({ GROQ_BUDGET_DAILY_LIMIT: raw }), "GROQ_BUDGET_DAILY_LIMIT")).toBe(
+        "warn"
+      );
+    }
+  );
+
+  it("ESSAY_GRADING_ENABLED chưa đặt là warn, KHÔNG phải error — đó là trạng thái SHIP", () => {
+    // AC-067: một môi trường không bật chấm tự luận là môi trường HOÀN TOÀN
+    // HỢP LỆ, nên `error` ở đây sẽ nói dối người vận hành. Nhưng nó vẫn phải
+    // NÓI, vì hình dạng hỏng là "bật ở máy, hụt trên production".
+    const env = goodEnv();
+    delete env.ESSAY_GRADING_ENABLED;
+    const p = checkEnv(env).find((x) => x.name === "ESSAY_GRADING_ENABLED");
+    expect(p?.level).toBe("warn");
+    expect(p?.impact).toContain("chưa chấm tự động");
+  });
+
+  it.each(["1", "TRUE", "True", "yes", "on", "false"])(
+    "ESSAY_GRADING_ENABLED = %j bị bắt — CHỈ \"true\" chữ thường mới bật",
+    (raw) => {
+      // Cái bẫy riêng của biến này: GEMINI_PAID_TIER_ENABLED trong cùng file
+      // nhận CẢ "1" lẫn "true", nên "1" là thứ một người vận hành gõ theo trí
+      // nhớ — và ở đây nó bị đọc là TẮT, triệu chứng giống hệt ca chưa đặt.
+      const p = checkEnv(goodEnv({ ESSAY_GRADING_ENABLED: raw })).find(
+        (x) => x.name === "ESSAY_GRADING_ENABLED"
+      );
+      expect(p?.level).toBe("warn");
+      expect(p?.impact).toContain("không phải giá trị bật");
+    }
+  );
+
+  it("ESSAY_GRADING_ENABLED = \"true\" có khoảng trắng thừa vẫn bật — giá trị được trim", () => {
+    expect(checkEnv(goodEnv({ ESSAY_GRADING_ENABLED: "  true  " }))).toEqual([]);
+  });
 
   it("NEXT_PUBLIC_SITE_URL bỏ trống là hợp lệ (siteUrl.ts tự suy ra)", () => {
     expect(checkEnv(goodEnv({ NEXT_PUBLIC_SITE_URL: "" }))).toEqual([]);

@@ -14,13 +14,17 @@
 // chuỗi số có nhiều hơn một dấu phân cách — vd nhóm hàng nghìn "1.234.567" —
 // là mơ hồ nên fallback so văn bản, không đoán số); thiếu/rỗng essayAnswer →
 // fallback scored:false, cùng quy tắc ground-truth-presence với true_false.
-// essay vẫn "stored, not auto-scored" (không có UI nhập cho player, không có
-// gì để chấm). Câu không chấm vẫn có mặt trong perQuestion (scored: false,
+// essay: hàm này KHÔNG chấm nó, và điều đó KHÔNG còn có nghĩa "không ai chấm".
+// Band do đường bất đồng bộ của ADR-0018 ghi, ngoài hàm này, qua
+// `record_essay_grade()`. Dòng CỐ Ý ở lại `scored: false` để nó không vào mẫu
+// số điểm cho tới khi có ai đó thực sự chấm nó. Câu không chấm vẫn có mặt
+// trong perQuestion (scored: false,
 // giữ input của user để màn Chi tiết hiển thị) nhưng KHÔNG vào mẫu số điểm
 // lẫn topic breakdown — tránh đề trộn 22 câu bị chia điểm /22 dù chỉ 12 câu
 // chấm được.
 
 import { decodeTfAnswer } from "@/lib/ugc/tfCodec";
+import { newEssayEntry } from "./essayLifecycle";
 import type { Question, SubItemId } from "@/types/question";
 import type {
   PerQuestionResult,
@@ -32,13 +36,28 @@ import type {
  *  subAnswers ground truth (rỗng = AI extraction fail, không chấm);
  *  short_answer chỉ khi có essayAnswer ground truth không rỗng/toàn khoảng
  *  trắng (cùng lý do — AI extraction fail hoặc row cũ chưa có ground truth);
- *  essay không bao giờ chấm. */
+ *  essay LUÔN trả `false` ở đây — nhưng đọc kỹ nghĩa: nó nói "hàm NÀY không
+ *  chấm câu này", không nói "câu này không bao giờ được chấm". Từ ADR-0018,
+ *  band được ghi bởi đường bất đồng bộ sau khi nộp bài, ngoài `computeScore()`.
+ *  Giữ `false` là chủ đích: nó giữ câu ngoài mẫu số điểm cho tới lúc có band
+ *  thật, thay vì hứa trước một điểm số chưa tồn tại. */
 function isScored(q: Question): boolean {
   const type = q.questionType ?? "mcq";
   if (type === "mcq") return true;
   if (type === "true_false") return Object.keys(q.subAnswers ?? {}).length > 0;
-  if (type === "short_answer") return Boolean(q.essayAnswer?.trim());
+  if (type === "short_answer") return hasEssayGroundTruth(q);
   return false;
+}
+
+/** Câu có ĐÁP ÁN MẪU dùng được không.
+ *
+ *  Trích ra thành hàm riêng vì nay có HAI chỗ hỏi cùng câu hỏi đó:
+ *  `isScored()` cho `short_answer`, và nhánh phát khoá vòng đời cho `essay`.
+ *  Hai biểu thức `Boolean(q.essayAnswer?.trim())` viết rời nhau sẽ trôi lệch,
+ *  và chiều trôi nguy hiểm là chiều phát `pending` cho một câu KHÔNG có gì để
+ *  chấm — tức hứa với học sinh một điểm số sẽ không bao giờ tới. */
+function hasEssayGroundTruth(q: Question): boolean {
+  return Boolean(q.essayAnswer?.trim());
 }
 
 /** Chuẩn hoá văn bản để so sánh không phân biệt hoa/thường và khoảng trắng
@@ -90,14 +109,40 @@ function isTrueFalseCorrect(
   );
 }
 
+/** Tuỳ chọn của `computeScore()`.
+ *
+ *  Cờ được TRUYỀN VÀO, không bao giờ đọc bên trong: hàm này thuần (AC-013), và
+ *  một `process.env` ở đây sẽ biến nó thành thứ không kiểm được mà không dựng
+ *  môi trường. Người gọi (`submitExam()`) là chỗ duy nhất đọc biến môi trường. */
+export interface ComputeScoreOptions {
+  /** `true` ⇒ câu `essay` CÓ đáp án mẫu phát ra năm khoá vòng đời. Mặc định
+   *  `false`, tức hành vi y hệt trước ADR-0018. */
+  essayGrading?: boolean;
+}
+
 export function computeScore(
   questions: Question[],
   answers: Record<string, string>,
+  options: ComputeScoreOptions = { essayGrading: false },
 ): ScoreResult {
   const perQuestion: PerQuestionResult[] = questions.map((q) => {
     const selected = answers[q.id];
     if (!isScored(q)) {
-      return { questionId: q.id, selected, isCorrect: false, scored: false };
+      const unscored: PerQuestionResult = {
+        questionId: q.id,
+        selected,
+        isCorrect: false,
+        scored: false,
+      };
+      // Câu tự luận CÓ đáp án mẫu, khi cờ bật, mang thêm năm khoá vòng đời.
+      // Nó vẫn `scored: false` và `isCorrect: false` — và đó là chủ đích, không
+      // phải sót (EG-BE-004): band được ghi NGOÀI hàm này bởi
+      // `record_essay_grade()`, còn dòng thì cố ý ở lại ngoài mẫu số điểm cho
+      // tới khi có ai đó thực sự chấm nó.
+      if (options.essayGrading && (q.questionType ?? "mcq") === "essay" && hasEssayGroundTruth(q)) {
+        return { ...unscored, ...newEssayEntry() };
+      }
+      return unscored;
     }
     if (q.questionType === "true_false") {
       return {

@@ -19,6 +19,33 @@
 // bất biến của backend DD là "TutorPromptInput has no field named or shaped like
 // an answer-key field" — thêm trường như thế là tự phá bất biến đó.
 
+/** Trần ký tự của BÀI LÀM khi nó đi vào prompt Gemini.
+ *
+ *  KHAI RIÊNG, VÀ CỐ Ý KHÔNG import `LIMITS.MAX_ATTEMPT_ANSWER`. Hai con số
+ *  này trả lời hai câu hỏi khác nhau, của hai người chủ khác nhau:
+ *
+ *    · `LIMITS.MAX_ATTEMPT_ANSWER` = HỌC SINH ĐƯỢC VIẾT BAO NHIÊU. Nó phải
+ *      khớp CHECK trên Postgres, và Task B3.3 vừa nâng nó 500 → 4000 để chứa
+ *      một bài tự luận.
+ *    · `TUTOR_MAX_STUDENT_ANSWER` = BAO NHIÊU TOKEN ĐƯỢC GỬI CHO GEMINI, trên
+ *      một KHOÁ NGÂN SÁCH KHÁC (`ai:budget:` — không phải `groq:budget:`).
+ *
+ *  Chúng tình cờ bằng nhau cho tới hôm nay. Cho file này import hằng kia sẽ
+ *  biến MỌI lần nâng trần DB về sau thành một lần nâng hoá đơn Gemini mà không
+ *  ai quyết định — nâng 8× ở lần này. `prompt.test.ts` ghim đúng SỰ TÁCH RỜI
+ *  ấy, chứ không ghim một giá trị.
+ *
+ *  PHÉP CẮT ĐƯỢC CƯỠNG CHẾ TRONG `buildTutorPrompt()`, KHÔNG PHẢI Ở CALL SITE:
+ *  một phép cắt ở call site là một phép cắt mà call site THỨ HAI sẽ quên.
+ *
+ *  Đường ripple đi qua `short_answer` chứ không qua `essay`: union
+ *  `questionType` loại trừ essay ở mức kiểu, nên bài tự luận không tới được
+ *  gia sư. Nhưng ô short_answer chỉ bị chặn ở `LIMITS.MAX_SHORT_ANSWER = 100`
+ *  phía CLIENT, và một phép chặn ở client KHÔNG phải một phép chặn ở server —
+ *  `submitExam` cắt bằng `MAX_ATTEMPT_ANSWER` (`actions.ts:146`), nên một
+ *  request tự soạn lưu được 4000 ký tự và chúng đi thẳng vào đây. */
+export const TUTOR_MAX_STUDENT_ANSWER = 500;
+
 /** Một lựa chọn/ý con để hiển thị cho model: chỉ NHÃN + NỘI DUNG, không có
  *  thông tin đúng/sai nào. */
 interface LabelledOption {
@@ -33,7 +60,20 @@ interface LabelledOption {
 export interface TutorPromptInput {
   /** Đề bài, nguyên văn (có thể chứa LaTeX $...$). */
   questionContent: string;
-  /** essay bị loại: không bao giờ được chấm nên không bao giờ "sai hai lần". */
+  /** essay bị loại — union này ĐÓNG, và `tsc` là cổng cưỡng chế (AC-071).
+   *
+   *  LÝ DO ĐÃ ĐỔI kể từ Essay Auto-Scoring (ADR-0018), giá trị thì KHÔNG. Câu
+   *  cũ ở đây viết "không bao giờ được chấm" — điều đó nay SAI: câu tự luận
+   *  được chấm tự động và mang một band.
+   *
+   *  Lý do đúng là về PHÉP SO SÁNH, không về việc có chấm hay không: gia sư
+   *  chỉ mở cho câu "sai hai lần", mà `wrongTwice` đọc `isCorrect` — một vị từ
+   *  NHỊ PHÂN. Câu tự luận không có `isCorrect`; nó có một band liên tục cùng
+   *  một trạng thái vòng đời, nên "sai hai lần" không phát biểu được cho nó.
+   *
+   *  Và nới union ra để nhận "essay" không chỉ sai về khái niệm — nó lùa văn
+   *  xuôi của học sinh vào prompt Gemini, tức một nhà cung cấp thứ hai, trên
+   *  một khoá ngân sách thứ hai, cho một bài đã được Groq chấm rồi. */
   questionType: "mcq" | "true_false" | "short_answer";
   /** Chỉ có ở mcq — bốn phương án A–D, KHÔNG đánh dấu phương án nào đúng. */
   choices?: LabelledOption[];
@@ -102,7 +142,10 @@ export function buildTutorPrompt(input: TutorPromptInput): string {
     `Nội dung câu hỏi:\n${input.questionContent}`,
     formatOptions("Các phương án:", input.choices),
     formatOptions("Các ý cần xét:", input.subItems),
-    `Bài làm của học sinh (${STUDENT_ANSWER_HINTS[input.questionType]}):\n${input.studentAnswer}`,
+    // Phép cắt nằm ở ĐÂY, trong hàm, chứ không ở người gọi — xem
+    // `TUTOR_MAX_STUDENT_ANSWER`. `slice()` trên một chuỗi ngắn hơn trần trả về
+    // chính nó, nên bài làm thật hôm nay đi qua không suy suyển một ký tự.
+    `Bài làm của học sinh (${STUDENT_ANSWER_HINTS[input.questionType]}):\n${input.studentAnswer.slice(0, TUTOR_MAX_STUDENT_ANSWER)}`,
   ];
   return sections.filter((section) => section !== "").join("\n\n");
 }

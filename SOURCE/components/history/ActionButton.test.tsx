@@ -65,6 +65,9 @@ const PDF_INPUT: AttemptPdfData = {
   submittedAt: "2026-07-01T00:10:00.000Z",
   correct: 8,
   total: 10,
+  // ADR-0018 (Task B2.3) — bat buoc tren AttemptPdfData. `false` la gia tri
+  // dung o day: khong fixture nao trong file nay co cau tu luan.
+  hasIncompleteEssay: false,
 };
 
 function mockFile(): File {
@@ -102,7 +105,7 @@ describe("ActionButton", () => {
         })
     );
 
-    const { container } = render(<ActionButton action="save" pdfInput={PDF_INPUT} idPrefix="a" />);
+    const { container } = render(<ActionButton action="save" pdfInput={PDF_INPUT} idPrefix="a" blockedReason={null} />);
     const button = within(container).getByRole("button", { name: "Save" });
 
     fireEvent.click(button); // idle -> busy (busyRef true, synchronously, before the promise settles)
@@ -124,7 +127,7 @@ describe("ActionButton", () => {
     const shareMock = vi.mocked(navigator.share);
     shareMock.mockResolvedValue(undefined);
 
-    const { container } = render(<ActionButton action="share" pdfInput={PDF_INPUT} idPrefix="b" />);
+    const { container } = render(<ActionButton action="share" pdfInput={PDF_INPUT} idPrefix="b" blockedReason={null} />);
     const button = within(container).getByRole("button", { name: "Share" });
 
     fireEvent.click(button);
@@ -146,7 +149,7 @@ describe("ActionButton", () => {
     mockCanShare.mockReturnValue(false);
 
     const { container, rerender } = render(
-      <ActionButton action="share" pdfInput={PDF_INPUT} idPrefix="c" />
+      <ActionButton action="share" pdfInput={PDF_INPUT} idPrefix="c" blockedReason={null} />
     );
     const button = within(container).getByRole("button", { name: "Share" });
 
@@ -160,7 +163,7 @@ describe("ActionButton", () => {
     expect(status.getAttribute("aria-live")).toBe("polite");
 
     // Persists through a no-op re-render (no auto-dismiss timer, D1).
-    rerender(<ActionButton action="share" pdfInput={PDF_INPUT} idPrefix="c" />);
+    rerender(<ActionButton action="share" pdfInput={PDF_INPUT} idPrefix="c" blockedReason={null} />);
     expect(within(container).getByRole("status")).not.toBeNull();
 
     // Clears only on the next Save/Share activation on this same instance.
@@ -176,7 +179,7 @@ describe("ActionButton", () => {
     const shareMock = vi.mocked(navigator.share);
     shareMock.mockRejectedValue(new DOMException("User cancelled the share", "AbortError"));
 
-    const { container } = render(<ActionButton action="share" pdfInput={PDF_INPUT} idPrefix="d" />);
+    const { container } = render(<ActionButton action="share" pdfInput={PDF_INPUT} idPrefix="d" blockedReason={null} />);
     const button = within(container).getByRole("button", { name: "Share" });
 
     fireEvent.click(button);
@@ -190,7 +193,7 @@ describe("ActionButton", () => {
   it("(e) AC-018: a non-AbortError rejection sets error phase with role=alert; a follow-up click retries and succeeds", async () => {
     mockGenerate.mockRejectedValueOnce(new Error("network blip"));
 
-    const { container } = render(<ActionButton action="save" pdfInput={PDF_INPUT} idPrefix="e" />);
+    const { container } = render(<ActionButton action="save" pdfInput={PDF_INPUT} idPrefix="e" blockedReason={null} />);
     const button = within(container).getByRole("button", { name: "Save" });
 
     fireEvent.click(button);
@@ -214,7 +217,7 @@ describe("ActionButton", () => {
     // Idle.
     {
       const { container } = render(
-        <ActionButton action="save" pdfInput={PDF_INPUT} idPrefix="f-idle" />
+        <ActionButton action="save" pdfInput={PDF_INPUT} idPrefix="f-idle" blockedReason={null} />
       );
       const flowChildren = inFlowChildren(container);
       expect(flowChildren).toHaveLength(1);
@@ -231,7 +234,7 @@ describe("ActionButton", () => {
           })
       );
       const { container } = render(
-        <ActionButton action="save" pdfInput={PDF_INPUT} idPrefix="f-busy" />
+        <ActionButton action="save" pdfInput={PDF_INPUT} idPrefix="f-busy" blockedReason={null} />
       );
       const button = within(container).getByRole("button", { name: "Save" });
       fireEvent.click(button);
@@ -249,7 +252,7 @@ describe("ActionButton", () => {
     {
       mockGenerate.mockRejectedValueOnce(new Error("boom"));
       const { container } = render(
-        <ActionButton action="save" pdfInput={PDF_INPUT} idPrefix="f-error" />
+        <ActionButton action="save" pdfInput={PDF_INPUT} idPrefix="f-error" blockedReason={null} />
       );
       const button = within(container).getByRole("button", { name: "Save" });
       fireEvent.click(button);
@@ -265,7 +268,7 @@ describe("ActionButton", () => {
       mockGenerate.mockResolvedValue(mockFile());
       mockCanShare.mockReturnValue(false);
       const { container } = render(
-        <ActionButton action="share" pdfInput={PDF_INPUT} idPrefix="f-fallback" />
+        <ActionButton action="share" pdfInput={PDF_INPUT} idPrefix="f-fallback" blockedReason={null} />
       );
       const button = within(container).getByRole("button", { name: "Share" });
       fireEvent.click(button);
@@ -287,7 +290,7 @@ describe("ActionButton", () => {
       mockCanShare.mockReturnValue(true);
       vi.mocked(navigator.share).mockResolvedValue(undefined);
       const shareRender = render(
-        <ActionButton action="share" pdfInput={PDF_INPUT} idPrefix="g-share" />
+        <ActionButton action="share" pdfInput={PDF_INPUT} idPrefix="g-share" blockedReason={null} />
       );
       const shareButton = within(shareRender.container).getByRole("button", { name: "Share" });
       fireEvent.click(shareButton);
@@ -296,14 +299,14 @@ describe("ActionButton", () => {
       // canShareFile-false fallback branch.
       mockCanShare.mockReturnValue(false);
       const fallbackRender = render(
-        <ActionButton action="share" pdfInput={PDF_INPUT} idPrefix="g-fallback" />
+        <ActionButton action="share" pdfInput={PDF_INPUT} idPrefix="g-fallback" blockedReason={null} />
       );
       fireEvent.click(within(fallbackRender.container).getByRole("button", { name: "Share" }));
       await within(fallbackRender.container).findByRole("status");
 
       // Save branch.
       const saveRender = render(
-        <ActionButton action="save" pdfInput={PDF_INPUT} idPrefix="g-save" />
+        <ActionButton action="save" pdfInput={PDF_INPUT} idPrefix="g-save" blockedReason={null} />
       );
       const saveButton = within(saveRender.container).getByRole("button", { name: "Save" });
       fireEvent.click(saveButton);
@@ -361,5 +364,74 @@ describe("ActionButton", () => {
       "@/components/history/HistoryRowMenu"
     );
     expect(historyRowSource.includes("ActionButton")).toBe(false);
+  });
+});
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CỔNG CHẶN XUẤT PDF (ADR-0018 / AC-058 / UI-D5) — Task F-B2
+//
+// Thứ được kiểm ở đây KHÔNG phải "nút có bị mờ đi không" mà là BA tính chất
+// mà một `disabled` gốc sẽ phá cả ba: nút vẫn TỚI ĐƯỢC bằng bàn phím, LÝ DO
+// vẫn ĐỌC ĐƯỢC bằng trình đọc màn hình, và một lượt bấm bị chặn KHÔNG sinh pha
+// bận nào. Repo đã sửa đúng lỗi `disabled` này HAI LẦN.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("ActionButton — trạng thái BỊ CHẶN (AC-058)", () => {
+  const REASON = "Đang chấm tự luận. Lưu và chia sẻ PDF sẽ mở lại khi chấm xong.";
+
+  it("bị chặn ⇒ KHÔNG gọi generateAttemptPdfFile, và KHÔNG pha bận nào", () => {
+    const { container } = render(
+      <ActionButton action="save" pdfInput={PDF_INPUT} idPrefix="blk1" blockedReason={REASON} />
+    );
+    const button = within(container).getByRole("button", { name: /Save/ });
+
+    fireEvent.click(button);
+
+    // Chặn nằm TRƯỚC chốt bận, nên không có lượt tạo tệp nào VÀ giao diện
+    // không nhấp qua "đang tạo" rồi mới dừng.
+    expect(mockGenerate).not.toHaveBeenCalled();
+    expect(button.getAttribute("aria-busy")).toBe("false");
+    // Khẳng định dương: nút vẫn ở đó và vẫn đọc được tên.
+    expect(button.textContent).toContain("Save");
+  });
+
+  it("KHÔNG BAO GIỜ thuộc tính `disabled` gốc — nút vẫn tới được bằng bàn phím", () => {
+    const { container } = render(
+      <ActionButton action="share" pdfInput={PDF_INPUT} idPrefix="blk2" blockedReason={REASON} />
+    );
+    const button = within(container).getByRole("button", { name: /Share/ });
+
+    // `disabled` gỡ phần tử khỏi thứ tự tab VÀ đẩy lý do ra ngoài tầm với của
+    // trình đọc màn hình — đúng hai thứ AC-058 muốn có.
+    expect(button.hasAttribute("disabled")).toBe(false);
+    expect(button.getAttribute("aria-disabled")).toBe("true");
+    expect(container.querySelector("[disabled]")).toBeNull();
+  });
+
+  it("LÝ DO đọc được qua aria-describedby, không phải chỉ một nút mờ đi", () => {
+    const { container } = render(
+      <ActionButton action="save" pdfInput={PDF_INPUT} idPrefix="blk3" blockedReason={REASON} />
+    );
+    const button = within(container).getByRole("button", { name: /Save/ });
+
+    const reasonId = button.getAttribute("aria-describedby");
+    expect(reasonId).toBeTruthy();
+    const reason = container.querySelector(`#${reasonId}`);
+    expect(reason?.textContent).toBe(REASON);
+  });
+
+  it("`blockedReason` null ⇒ hành vi y như trước, có gọi tạo tệp", () => {
+    // Nửa còn lại của cổng: nó phải MỞ khi không có gì để chặn, nếu không thì
+    // ba ca trên xanh một cách vô nghĩa.
+    const { container } = render(
+      <ActionButton action="save" pdfInput={PDF_INPUT} idPrefix="blk4" blockedReason={null} />
+    );
+    const button = within(container).getByRole("button", { name: /Save/ });
+
+    fireEvent.click(button);
+
+    expect(mockGenerate).toHaveBeenCalledTimes(1);
+    expect(button.hasAttribute("disabled")).toBe(false);
   });
 });

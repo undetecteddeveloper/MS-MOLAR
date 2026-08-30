@@ -19,6 +19,7 @@ import "server-only";
 
 import { Redis } from "@upstash/redis";
 import { createClient } from "@/lib/supabase/server";
+import { BUDGET_TTL_SECONDS, pacificDay } from "./budgetDay";
 import type { Entitlement, Plan } from "./types";
 
 /** Hai loại thao tác có hạn mức. Khai ở đây vì `PLAN_LIMITS` và `quotaKey()`
@@ -126,19 +127,11 @@ export type ConsumeResult =
   | { ok: true }
   | { ok: false; reason: "user_quota" | "project_budget" | "unavailable" };
 
-/** Khoá ngân sách sống 26 giờ: dài hơn một ngày Pacific (24h, hoặc 23/25 vào
- *  hai ngày đổi giờ) đủ để không khoá nào bị xoá khi ngày còn đang chạy, và
- *  ngắn đủ để khoá hôm qua không sống sang ngày kia. */
-const BUDGET_TTL_SECONDS = 26 * 60 * 60;
-
 /** Khoá kỳ sống thêm một ngày sau khi kỳ kết thúc. Dôi ra chứ không khít, vì
  *  TTL được đặt theo đồng hồ của tiến trình còn khoá thì thuộc về một kỳ đã
  *  được neo từ trước: cắt khít sẽ xoá bộ đếm của một người vẫn đang trong kỳ
  *  chỉ vì hai đồng hồ lệch nhau vài giây. */
 const QUOTA_TTL_SLACK_MS = 24 * 60 * 60 * 1000;
-
-/** Ngày lịch của ngân sách, theo múi giờ nhà cung cấp reset hạn mức (D6/R7). */
-const BUDGET_TIME_ZONE = "America/Los_Angeles";
 
 /**
  * Suất ngân sách ngày mà lưu lượng gói FREE được phép tiêu (PRD AC-023).
@@ -169,25 +162,18 @@ const BUDGET_TIME_ZONE = "America/Los_Angeles";
  */
 const FREE_SHARE_DEFAULT = 0.5;
 
-/** Ngày lịch Pacific dạng `YYYY-MM-DD`.
+/** Khoá ngân sách ngày của Gemini. Phép suy NGÀY sống ở `./budgetDay` — một
+ *  lời khai duy nhất, dùng chung với bộ đếm ngân sách của nhà cung cấp thứ hai
+ *  (backend DD § MSA-3).
  *
- *  Ghép từ `formatToParts` chứ không nhờ một locale in hộ: cùng một locale có
- *  thể đổi cách in giữa hai bản ICU, và một khoá đếm đổi hình dạng theo phiên
- *  bản Node là một ngân sách bị chia đôi giữa hai runtime. Cũng không dùng
- *  `toISOString().slice(0, 10)`: đó là ngày UTC, và tại 05:30Z ngày Pacific đã
- *  là ngày HÔM TRƯỚC. */
-const PACIFIC_DAY = new Intl.DateTimeFormat("en-US", {
-  timeZone: BUDGET_TIME_ZONE,
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-});
-
+ *  MẪU KHOÁ thì ở LẠI đây, viết nguyên vẹn. Hai lý do: cổng canh
+ *  `quota.test.ts:868` quét VĂN BẢN NGUỒN tìm `ai:budget:` đứng ngay sau một
+ *  dấu nháy, nên đẩy chuỗi này sang tham số của một hàm dựng khoá sẽ khiến
+ *  cổng khớp KHÔNG file nào — tức THÔI CANH chứ không chỉ đỏ; và một
+ *  `pacificDayKey(prefix, now)` sẽ đòi prefix không kèm dấu hai chấm cuối mà
+ *  không cưỡng chế được, tức một cái bẫy im lặng cho consumer thứ hai. */
 function budgetKey(now: Date): string {
-  const parts = PACIFIC_DAY.formatToParts(now);
-  const part = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((p) => p.type === type)?.value ?? "";
-  return `ai:budget:${part("year")}-${part("month")}-${part("day")}`;
+  return `ai:budget:${pacificDay(now)}`;
 }
 
 /**

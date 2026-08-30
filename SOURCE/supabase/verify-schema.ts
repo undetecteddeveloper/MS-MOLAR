@@ -21,6 +21,11 @@
 //      record_payment_settlement, mỗi đối tượng một lệnh bị TỪ CHỐI (ADR-0013/
 //      ADR-0014, AC-033). Trước mục này, ba đối tượng đó không được cổng nào
 //      quan sát ngoài vân tay (7) — mà vân tay chỉ nói file khớp file.
+//  10. Chấm tự luận (ADR-0018)             <- hai hàm ghi band chỉ service_role;
+//      TRẦN KÝ TỰ của attempt_answers.answer đọc lại từ DB THẬT bằng probe hành
+//      vi phân biệt bằng SQLSTATE; và trần LƯỢT chấm ghim literal SQL vào
+//      ESSAY_MAX_ATTEMPTS. Mục này là chỗ DUY NHẤT trong repo khẳng định điều
+//      gì về trần ký tự đang thật sự nằm trên database.
 //
 // (1)–(6) soi từng mảnh cụ thể, và chỉ bắt được đúng những thứ đã từng hỏng.
 // (7) soi phần còn lại: gộp toàn bộ file thành một vân tay, nên một bản vá nằm
@@ -48,9 +53,21 @@
 // probe bằng id không tồn tại nên không khoá attempt của ai, không settle đơn
 // của ai.
 //
-// NGOẠI LỆ DUY NHẤT, và là lý do lane này CHƯA được chĩa vào production:
-// `signInProbeUser()` tạo-hoặc-đặt-lại-password tài khoản probe, nên tài khoản
-// đó TỒN TẠI LẠI sau khi script chạy xong. Xem cảnh báo ở đầu mục 9.
+// NGOẠI LỆ DUY NHẤT là `signInProbeUser()`: nó tạo-hoặc-đặt-lại-password tài
+// khoản probe, nên tài khoản đó TỒN TẠI LẠI sau khi script chạy xong, với một
+// password nằm sẵn trong source đã commit.
+//
+// VÌ THẾ SCRIPT CÓ HAI CHẾ ĐỘ, chọn theo project ref đọc từ
+// `NEXT_PUBLIC_SUPABASE_URL` chứ không theo tên file env:
+//
+//   • ref nằm trong `BEHAVIOURAL_PROBE_ALLOWED_REFS` (dev) → chạy ĐỦ.
+//   • mọi ref khác (prod, staging, project lạ) → chạy PHẦN: `signInProbeUser()`
+//     KHÔNG được gọi, và mọi mục cần một phiên `authenticated` hoặc phát ra một
+//     lệnh ghi đều bị BỎ QUA có in ra (mục 2, 3, 4, 5, 9, 10a, 10b). Còn lại là
+//     các khẳng định thuần đọc: phân loại cột, khoá ngoại (§15/§16), vân tay
+//     (§17), subject canonical, ghim trần lượt, và probe EXECUTE bằng anon key.
+//     Tổng kết cuối in "PASS PHẦN" kèm số mục bỏ qua — một lượt chạy phần không
+//     bao giờ được đọc nhầm thành một lượt chạy đủ.
 //
 // Cách chạy:  cd SOURCE && npx tsx supabase/verify-schema.ts
 // Chạy khi:   sau mỗi lần apply schema.sql, và trước khi deploy code đụng §10.
@@ -60,6 +77,8 @@ import { resolve } from "node:path";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { fkKey, resolveForeignKeys } from "../lib/schema/parseForeignKeys";
 import { SUBJECTS, normalizeSubject } from "../lib/ugc/subjects";
+import { LIMITS } from "../lib/ugc/limits";
+import { ESSAY_MAX_ATTEMPTS } from "../lib/scoring/essayLifecycle";
 import {
   SCHEMA_FINGERPRINT,
   computeSchemaFingerprint,
@@ -118,13 +137,48 @@ function loadEnv(): Record<string, string> {
 const PROBE_EMAIL = "smithnguyen247+rlstesta@gmail.com";
 const PROBE_PASSWORD = "rls-test-password-123";
 
+/**
+ * Project ref của các database mà lane HÀNH VI được phép chĩa vào.
+ *
+ * CỔNG NÀY KHOÁ THEO DATABASE THẬT, KHÔNG KHOÁ THEO TÊN FILE — và đó là toàn bộ
+ * lý do nó tồn tại. Cách hiển nhiên hơn là "`SCHEMA_ENV_FILE` khác `.env.local`
+ * thì coi là prod", nhưng chính comment của `loadEnv()` ở trên đã ghi lại thói
+ * quen cũ: **kiểm prod bằng cách đổi tên file credential prod thành
+ * `.env.local`**. Một cổng đọc tên file sẽ mở toang trước đúng thao tác đó, và
+ * mở một cách IM LẶNG. Ref thì nằm trong `NEXT_PUBLIC_SUPABASE_URL`, tức trong
+ * chính thứ quyết định câu lệnh chạy ở đâu — đổi tên file không đổi được nó.
+ *
+ * Danh sách là ALLOWLIST, tức mặc định ĐÓNG: một ref lạ (prod, một project mới,
+ * một bản sao staging) đi vào nhánh chỉ-đọc. Sai theo hướng bỏ sót phép đo thì
+ * chỉ mất thông tin; sai theo hướng ngược lại thì ghi vào database thật.
+ */
+const BEHAVIOURAL_PROBE_ALLOWED_REFS = new Set(["hynwleaxtbtjzkvpjsug"]);
+
+/** Ref của project từ `NEXT_PUBLIC_SUPABASE_URL` (`https://<ref>.supabase.co`). */
+function projectRefOf(url: string): string | null {
+  return /^https?:\/\/([a-z0-9-]+)\.supabase\.(co|in)/i.exec(url.trim())?.[1] ?? null;
+}
+
 let failures = 0;
+let skipped = 0;
 function assert(cond: boolean, msg: string) {
   if (cond) console.log(`  ✓ ${msg}`);
   else {
     console.error(`  ✗ ${msg}`);
     failures += 1;
   }
+}
+
+/**
+ * Một phép đo KHÔNG chạy vì target không phải dev.
+ *
+ * Đếm riêng, không gộp vào `failures` và tuyệt đối không im lặng: một mục bị bỏ
+ * qua mà in ra như thể đã xanh chính là cách một lượt chạy PHẦN được đọc thành
+ * một lượt chạy ĐỦ. Tổng kết cuối file nói thẳng con số này.
+ */
+function skip(msg: string) {
+  console.log(`  ⊘ BỎ QUA (target không phải dev): ${msg}`);
+  skipped += 1;
 }
 
 /** Lỗi trả về có thuộc hạng QUYỀN hay không — bản chép NGUYÊN VẸN vị từ ở
@@ -159,6 +213,54 @@ function describeSweep(sweep: { error: { code?: string; message?: string } | nul
   return sweep.error
     ? `QUÉT HỎNG (${sweep.error.code ?? sweep.error.message ?? "?"}) — RÁC CÒN NGUYÊN, phải xoá tay`
     : "đã quét sạch bằng service_role";
+}
+
+/** Mã lỗi của một lượt gọi, viết cho người đọc log. `null` = KHÔNG có lỗi, và
+ *  đó là một kết cục khác hẳn "lỗi không rõ mã" — gộp hai cái thành `"?"` là
+ *  đúng cách làm một thông điệp FAIL không dùng được. */
+function describeCode(code: string | null): string {
+  return code ?? "không có lỗi";
+}
+
+/**
+ * Một hàm CHỈ service_role gọi được: `revoke ... from public, anon, authenticated`
+ * cộng `grant execute ... to service_role` (khuôn của `record_exam_result` ở
+ * mục 4). Khẳng định CẢ BA vai trong MỘT check, vì "chỉ service_role" là một
+ * mệnh đề về cả ba — hai vế từ chối mà không có vế cho phép thì một hàm bị
+ * revoke SẠCH khỏi mọi role cũng xanh, và đường ghi band sẽ chết ở production
+ * với đúng thông điệp mà cổng này vừa nói là ổn.
+ *
+ * "service_role gọi được" được đo bằng ĐI TỚI ĐƯỢC THÂN HÀM, không bằng
+ * `error === null`: `record_essay_grade()` cố ý `raise ... using errcode =
+ * 'check_violation'` (23514) khi attempt không tồn tại, nên một khẳng định
+ * "không có lỗi" sẽ đỏ trên một hàm hoàn toàn lành. Chỉ 42501 (chưa `grant`) và
+ * PGRST202 (hàm chưa có mặt) mới là "không gọi được".
+ */
+async function assertServiceRoleOnlyFunction(
+  fn: string,
+  args: Record<string, unknown>,
+  clients: { authed: SupabaseClient; anon: SupabaseClient; admin: SupabaseClient }
+): Promise<void> {
+  const authed = (await clients.authed.rpc(fn, args)).error?.code ?? null;
+  const anon = (await clients.anon.rpc(fn, args)).error?.code ?? null;
+  const admin = (await clients.admin.rpc(fn, args)).error?.code ?? null;
+
+  const serviceReaches = admin !== "42501" && admin !== "PGRST202";
+  const wrong: string[] = [];
+  if (authed !== "42501") wrong.push(`authenticated VẪN gọi được (mã ${describeCode(authed)})`);
+  if (anon !== "42501") wrong.push(`anon VẪN gọi được (mã ${describeCode(anon)})`);
+  if (!serviceReaches) wrong.push(`service_role KHÔNG gọi được (mã ${describeCode(admin)})`);
+
+  const allMissing = authed === "PGRST202" && anon === "PGRST202" && admin === "PGRST202";
+
+  assert(
+    wrong.length === 0,
+    wrong.length === 0
+      ? `${fn}: EXECUTE chỉ service_role — anon 42501, authenticated 42501, service_role đi tới thân hàm`
+      : allMissing
+        ? `${fn} chưa tồn tại trên DB này (PGRST202) — apply khối ESSAY ASYNC GRADE WRITE của schema.sql. Chừng nào chưa apply, KHÔNG có gì trên database này cưỡng chế "chỉ service_role ghi được band"`
+        : `${fn} SAI quyền EXECUTE: ${wrong.join("; ")} — mong đợi 42501 / 42501 / gọi được. Thiếu \`revoke all on function … from public, anon, authenticated\` hoặc \`grant execute … to service_role\` (ADR-0018 Decision 1)`
+  );
 }
 
 // --- Parse schema.sql (nguồn chân lý) --------------------------------------
@@ -250,12 +352,36 @@ async function main() {
   if (!url || !anon || !service)
     throw new Error("Thiếu URL / ANON_KEY / SERVICE_ROLE_KEY trong .env.local");
 
+  // Phân loại target TRƯỚC khi mở bất kỳ phiên nào. `signInProbeUser()` là thứ
+  // ĐẦU TIÊN phải bị chặn, không phải thứ cuối: nó TẠO-hoặc-ĐẶT-LẠI password
+  // của `PROBE_EMAIL`, nên chỉ cần gọi nó một lần trên prod là auth tenant thật
+  // có lại một tài khoản đã xác thực với password ai đọc repo cũng biết — kể cả
+  // khi script chết ngay câu lệnh sau đó.
+  const ref = projectRefOf(url);
+  const behavioural = ref !== null && BEHAVIOURAL_PROBE_ALLOWED_REFS.has(ref);
+
+  const admin = createClient(url, service, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const anonClient = createClient(url, anon, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const NO_SUCH_ATTEMPT = "00000000-0000-0000-0000-000000000000";
+
   const schemaSql = readFileSync(resolve(__dirname, "schema.sql"), "utf8");
   const granted = parseGrantedColumns(schemaSql);
   const answerKeyOut = parseAnswerKeyColumns(schemaSql);
   const actual = await fetchActualColumns(url, service);
-  const probe = await signInProbeUser(url, anon, service);
+  const probe = behavioural ? await signInProbeUser(url, anon, service) : null;
 
+  console.log(
+    behavioural
+      ? `\nTarget: ${ref} — DEV. Chạy ĐỦ: cả khẳng định đọc lẫn probe hành vi.`
+      : `\nTarget: ${ref ?? "KHÔNG PHÂN GIẢI ĐƯỢC REF"} — KHÔNG phải dev. Chạy PHẦN: chỉ các khẳng định ĐỌC.\n` +
+          `        Bỏ qua mọi thứ cần một phiên \`authenticated\` (mục 2, 3, 4, 5, 9, 10a) và mọi probe có GHI\n` +
+          `        (fixture đề nháp ở mục 5, ba lệnh ghi ở mục 9, hai probe trần ký tự ở mục 10b).\n` +
+          `        \`signInProbeUser()\` KHÔNG được gọi — xem BEHAVIOURAL_PROBE_ALLOWED_REFS.`
+  );
   console.log(`\nschema.sql: ${granted.length} cột an toàn, exam_answer_key trả ${answerKeyOut.length} cột`);
   console.log(`DB thật:    public.questions có ${actual.length} cột\n`);
 
@@ -293,6 +419,8 @@ async function main() {
   // ==========================================================================
   console.log("\nProbe quyền cột bằng JWT `authenticated` thật:");
 
+  if (!probe) skip("probe quyền cột — cần một phiên `authenticated`");
+  else {
   const denied: string[] = [];
   const readable: string[] = [];
   for (const col of actual) {
@@ -315,12 +443,15 @@ async function main() {
       ? "Cột an toàn vẫn đọc được bình thường (REVOKE không khoá nhầm)"
       : `Cột đáng lẽ đọc được nhưng bị chặn: ${brokenSafe.join(", ")} — app sẽ lỗi 42501`
   );
+  }
 
   // ==========================================================================
   // 3. Hai hàm SECURITY DEFINER đã có mặt và gọi được (TD-005)
   // ==========================================================================
   console.log("\nProbe RPC (id không tồn tại — không đụng dữ liệu ai):");
 
+  if (!probe) skip("probe RPC đáp án — cần một phiên `authenticated`");
+  else {
   const ak = await probe.rpc("exam_answer_key", { p_exam_id: "__verify_schema_no_such_exam__" });
   assert(
     !ak.error && Array.isArray(ak.data),
@@ -338,14 +469,15 @@ async function main() {
       ? `claim_attempt_answer_key không gọi được: ${ck.error.code ?? ""} ${ck.error.message} — apply schema.sql §10b`
       : "claim_attempt_answer_key tồn tại và authenticated gọi được"
   );
+  }
 
   // ==========================================================================
   // 4. §11 — client không ghi được điểm (Critical #2)
   // ==========================================================================
   console.log("\nProbe quyền ghi exam_results (attempt_id không tồn tại — không ghi được gì):");
 
-  const NO_SUCH_ATTEMPT = "00000000-0000-0000-0000-000000000000";
-
+  if (!probe) skip("ba probe ghi bằng JWT học sinh — cần một phiên `authenticated`");
+  else {
   // Mã lỗi là thứ phải soi, không phải "có lỗi hay không": attempt_id giả sẽ
   // làm insert hỏng vì FK (23503) NGAY CẢ KHI quyền INSERT vẫn còn. Chỉ 42501
   // (permission denied) mới chứng minh client đã mất quyền ghi.
@@ -402,15 +534,17 @@ async function main() {
         ? "change_support_ticket_status chưa tồn tại — apply schema.sql (Schema & DB Enforcement §4)"
         : `authenticated VẪN gọi được change_support_ticket_status (chạy tới thân hàm, mã ${csts.error?.code ?? "không có lỗi"}) — thiếu \`revoke ... from anon, authenticated\``
   );
+  }
 
   // §10 — hai hàm đáp án chỉ dành cho user đã đăng nhập. anon gọi được thì hiện
   // KHÔNG lộ gì (auth.uid() null → 0 dòng), nhưng đó là may chứ không phải thiết
   // kế: bề mặt tấn công thừa, và mọi thay đổi tương lai trong 2 hàm đó sẽ mặc
   // định phơi ra cho người chưa đăng nhập.
+  //
+  // KHỐI NÀY CHẠY TRÊN MỌI TARGET, kể cả prod: anon key là public theo thiết kế
+  // (nó đi vào bundle của browser), không có phiên nào được tạo, và cả hai lệnh
+  // là RPC đọc với id không tồn tại. Không có gì để bỏ qua ở đây.
   console.log("\nProbe EXECUTE bằng anon key (chưa đăng nhập):");
-  const anonClient = createClient(url, anon, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
   for (const [fn, args] of [
     ["exam_answer_key", { p_exam_id: "__verify_schema_no_such_exam__" }],
     ["claim_attempt_answer_key", { p_attempt_id: NO_SUCH_ATTEMPT }],
@@ -429,9 +563,8 @@ async function main() {
   // ==========================================================================
   console.log("\nProbe view exams_with_difficulty (fixture draft tạm, tự dọn):");
 
-  const admin = createClient(url, service, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+  if (!probe) skip("fixture đề nháp + probe view — cần một phiên `authenticated`, và fixture là một lệnh GHI");
+  else {
   const PROBE_EXAM = "__verify_schema_draft_probe__";
   // Đề nháp KHÔNG tác giả: không user nào khớp nhánh author của
   // exams_select_visible, nên cả anon lẫn user thường đều phải thấy 0 dòng.
@@ -488,6 +621,7 @@ async function main() {
     }
   } finally {
     await admin.from("exams").delete().eq("id", PROBE_EXAM);
+  }
   }
 
   // ==========================================================================
@@ -695,17 +829,25 @@ async function main() {
   // Ba lệnh dưới đây là BA ĐỐI TƯỢNG DDL, mỗi đối tượng một lệnh — cùng cách
   // chia mà `test-rls.ts` Phần 9 dùng (PO-* / SB-* / PS-*).
   //
-  // ⚠ KHÔNG CHĨA LANE NÀY VÀO PRODUCTION, chừng nào nhánh tạo-hoặc-đặt-lại
-  // password trong `signInProbeUser()` chưa được chặn. Lý do rất cụ thể:
+  // ⚠ MỤC NÀY CHỈ CHẠY TRÊN DEV, VÀ NAY ĐIỀU ĐÓ ĐƯỢC MÃ CƯỠNG CHẾ chứ không
+  // còn là một lời dặn trong comment. Guard nằm ở `BEHAVIOURAL_PROBE_ALLOWED_REFS`
+  // + `if (!probe)` ngay dưới đây; `signInProbeUser()` không được gọi khi target
+  // không nằm trong allowlist.
+  //
+  // Lý do guard phải tồn tại, giữ nguyên vì nó vẫn là lý do:
   // `PROBE_EMAIL`/`PROBE_PASSWORD` là hằng nằm trong source ĐÃ COMMIT, và
   // `signInProbeUser()` không chỉ đăng nhập — nó TẠO tài khoản đó (hoặc đặt lại
   // password và `email_confirm` nếu đã có). Chạy trên prod nghĩa là tự tay cấp
   // cho auth tenant production một tài khoản ĐÃ XÁC THỰC với password ai đọc
   // repo cũng biết, và tài khoản đó ở lại sau khi script thoát. Việc "cả ba
   // lệnh đều bị từ chối" nói lên chất lượng của DDL, KHÔNG phải giấy phép chạy
-  // trên prod — hai chuyện đó độc lập, và đây là chuyện chưa được quyết
-  // (plan Task 5.8 / register: gate B trên prod bị chặn bởi đúng quyết định
-  // này). Cho tới lúc đó: chỉ DEV.
+  // trên prod — hai chuyện đó độc lập.
+  //
+  // LỊCH SỬ, để lần thứ tư đừng lặp lại: cảnh báo này từng là comment thuần và
+  // ĐÃ BỊ VƯỢT MẶT HAI LẦN. Lần thứ hai (2026-08-29, đóng Gate B7) lane thật sự
+  // chạy trên prod, và tài khoản probe được tìm thấy đang SỐNG trên production
+  // với đúng password literal ở trên — phải ban, thu hồi phiên và xoay password
+  // để dọn (TD-032). Một comment không chặn được gì; danh sách ref thì có.
   //
   // KHÔNG lệnh nào được phép GHI: cả ba phải bị từ chối ở tầng quyền. Hai payload đầu dùng
   // giá trị mốc riêng của verify-schema (khác hẳn bộ của test-rls.ts) và mỗi
@@ -725,6 +867,8 @@ async function main() {
   // ==========================================================================
   console.log("\nProbe quyền ghi khối SUBSCRIPTION (ADR-0013/0014 — mọi lệnh phải bị TỪ CHỐI):");
 
+  if (!probe) skip("ba probe ghi khối SUBSCRIPTION — cần một phiên `authenticated`, và cả ba đều PHÁT lệnh ghi");
+  else {
   const probeUserId = (await probe.auth.getUser()).data.user?.id ?? null;
   assert(
     probeUserId !== null,
@@ -816,12 +960,190 @@ async function main() {
         ? "record_payment_settlement chưa tồn tại (PGRST202) — apply khối SUBSCRIPTION của schema.sql; đường DUY NHẤT gia hạn entitlement đang KHÔNG có mặt trên DB này"
         : `authenticated VẪN gọi được record_payment_settlement (chạy tới thân hàm, mã ${psRpc.error?.code ?? "không có lỗi"}) — thiếu \`revoke all on function … from public, anon, authenticated\``
   );
+  }
 
-  console.log(
-    failures === 0
-      ? "\n✅ Schema verify: DB khớp schema.sql §10 + §11 + §12 + khoá ngoại (§15/§16) + phiên bản (§17) + subject canonical (TD-016) + khối SUBSCRIPTION chỉ-đọc (ADR-0013/0014)."
-      : `\n❌ Schema verify: ${failures} check FAIL — DB và schema.sql đang lệch nhau.`
+  // ==========================================================================
+  // 10. CHẤM TỰ LUẬN (ADR-0018; backend Design Doc § Cổng trần ký tự / § Cổng
+  //     ghim trần lượt; PRD AC-048 mục (5) + AC-050)
+  //
+  // Ba khẳng định, và mỗi cái đóng một khoảng hở khác nhau:
+  //
+  //   (a) HAI HÀM GHI BAND chỉ service_role. ADR-0018 § Amendment to ADR-0010
+  //       giữ nguyên tính chất append-only: KHÔNG client nào ghi được vào
+  //       exam_results bằng bất kỳ đường nào, và KHÔNG writer nào ngoài
+  //       service_role tồn tại. Hai hàm mới là hai writer mới — nếu chúng gọi
+  //       được bằng JWT học sinh thì lời hứa đó gãy ở đúng chỗ nó vừa được
+  //       nhắc lại.
+  //
+  //   (b) TRẦN KÝ TỰ, đọc lại từ DB THẬT. Đây là mục 10 tồn tại vì lý do gì:
+  //       trước nó, `verify:schema` không khẳng định GÌ về trần — thứ duy nhất
+  //       quan sát được `attempt_answers_answer_check` là vân tay toàn file ở
+  //       mục 7, mà vân tay chỉ nói file-trong-git khớp file-đã-paste. Trần
+  //       trong mã cao hơn trần trong DB nghĩa là Postgres từ chối NGUYÊN LƯỢT
+  //       nộp bài của một học sinh; trần thấp hơn nghĩa là cắt oan bài làm
+  //       thật. Cả hai chiều đều im lặng ở tsc, vitest và next build.
+  //
+  //   (c) TRẦN LƯỢT chấm lại — cặp lời-khai-đôi DUY NHẤT mà thiết kế không xoá
+  //       được (ADR-0018 Decision 1 chốt chữ ký hai tham số, nên trần không
+  //       truyền vào được). Ghim thay vì hy vọng.
+  // ==========================================================================
+  console.log("\nChấm tự luận (ADR-0018) — hai hàm ghi band, trần ký tự, trần lượt:");
+
+  // (a) — payload trỏ vào một attempt KHÔNG TỒN TẠI, nên kể cả khi EXECUTE hở,
+  //     cả hai hàm đều là no-op: claim_essay_grading_attempt() thoát sớm ở
+  //     nhánh 'not_submitted' TRƯỚC lệnh update, và record_essay_grade() raise
+  //     check_violation ở cùng chỗ. Không lượt chấm của ai bị tiêu, không dòng
+  //     exam_results của ai bị đụng.
+  const NO_SUCH_QUESTION = "__verify_schema_no_such_question__";
+
+  if (!probe)
+    skip(
+      "hai probe grant (claim_essay_grading_attempt, record_essay_grade) — cần cả ba vai, và vai `authenticated` cần một phiên"
+    );
+  else {
+  const essayClients = { authed: probe, anon: anonClient, admin };
+
+  await assertServiceRoleOnlyFunction(
+    "claim_essay_grading_attempt",
+    { p_attempt_id: NO_SUCH_ATTEMPT, p_question_id: NO_SUCH_QUESTION },
+    essayClients
   );
+
+  await assertServiceRoleOnlyFunction(
+    "record_essay_grade",
+    {
+      p_attempt_id: NO_SUCH_ATTEMPT,
+      p_question_id: NO_SUCH_QUESTION,
+      p_state: "failed",
+      p_earned: null,
+      p_max: null,
+      p_low_confidence: false,
+    },
+    essayClients
+  );
+  }
+
+  // (b) — PROBE HÀNH VI, phân biệt bằng SQLSTATE. Không có đường đọc CHECK
+  //     constraint nào từ DB: schema_foreign_keys() — hàm đọc catalog DUY NHẤT
+  //     — lọc `c.contype = 'f'`, tức chỉ khoá ngoại. Thêm một
+  //     schema_check_constraints() sẽ là đối tượng DDL thứ tư trong một lần áp
+  //     tay, đúng thứ TD-005 vừa cảnh báo, cho đúng MỘT consumer. Nên cổng này
+  //     hỏi TÁC DỤNG của trần chứ không đọc văn bản của nó.
+  //
+  //     Hai ràng buộc cùng bảo vệ dòng probe và chúng nổ ở HAI GIAI ĐOẠN khác
+  //     nhau của câu lệnh: CHECK được đánh giá lúc dựng dòng, khoá ngoại là
+  //     trigger AFTER chạy cuối câu lệnh. Nên mã lỗi nói cho ta biết cái nào
+  //     nổ trước, và đó chính là phép đo trần.
+  //
+  //     R-04 ĐÃ XÁC MINH trên dev 2026-08-29 (giả định này trước đó
+  //     `Confirmed: No`): 501 ký tự trả `23514`, 500 ký tự trả `23503`. Thứ tự
+  //     CHECK-trước-FK đúng như giả định, nên probe giữ hình dạng đơn giản —
+  //     attempt_id KHÔNG TỒN TẠI — và KHÔNG cần tới attempt thật + dọn theo
+  //     marker.
+  //
+  //     Dùng service_role chứ không dùng JWT học sinh, có chủ đích: policy
+  //     `answers_insert_own` đòi attempt thuộc về người gọi, nên một attempt_id
+  //     giả sẽ chết ở RLS trước khi CHECK hay khoá ngoại kịp nói gì — probe mất
+  //     đúng thứ nó đi đo. service_role vượt RLS nhưng KHÔNG vượt CHECK/FK.
+  //
+  //     HAI PROBE NÀY LÀ LỆNH GHI, nên chúng nằm sau guard cùng mọi probe hành
+  //     vi khác. Chúng được thiết kế để bị từ chối và có quét rác theo marker,
+  //     nhưng "được thiết kế để bị từ chối" chính là mệnh đề mà cổng này tồn tại
+  //     để KIỂM CHỨNG — không được phép vừa là giả định vừa là kết luận trên một
+  //     database thật.
+  const CEILING = LIMITS.MAX_ATTEMPT_ANSWER;
+  if (!probe)
+    skip(
+      `hai probe trần ký tự (${CEILING} và ${CEILING + 1} ký tự) — cả hai PHÁT lệnh INSERT vào attempt_answers`
+    );
+  else {
+  async function ceilingProbe(length: number): Promise<string | null> {
+    const { error } = await admin.from("attempt_answers").insert({
+      attempt_id: NO_SUCH_ATTEMPT,
+      question_id: NO_SUCH_QUESTION,
+      answer: "x".repeat(length),
+    });
+    return error?.code ?? null;
+  }
+
+  const atCeiling = await ceilingProbe(CEILING);
+  const overCeiling = await ceilingProbe(CEILING + 1);
+
+  // Cả hai probe được THIẾT KẾ để bị từ chối, nên nhánh sạch là nhánh duy nhất
+  // đúng. Hậu kiểm rồi mới báo — cùng kỷ luật mục 9: nếu một dòng lọt vào thì
+  // đó là một ô trả lời giả nằm trong bảng bài làm, và lượt chạy phát hiện DB
+  // hỏng không được phép là lượt để lại nó. Marker là question_id của chính
+  // probe, một giá trị không thể trùng dữ liệu thật.
+  const ceilingResidue = await admin
+    .from("attempt_answers")
+    .select("id")
+    .eq("question_id", NO_SUCH_QUESTION);
+  const ceilingClean = !ceilingResidue.error && (ceilingResidue.data?.length ?? 0) === 0;
+  const ceilingSweep = ceilingClean
+    ? null
+    : await admin.from("attempt_answers").delete().eq("question_id", NO_SUCH_QUESTION);
+  const residueNote = `dòng lọt vào: ${ceilingResidue.error ? `hậu kiểm lỗi ${ceilingResidue.error.code}` : (ceilingResidue.data?.length ?? "?")}; rác: ${describeSweep(ceilingSweep)}`;
+
+  assert(
+    atCeiling === "23503" && ceilingClean,
+    atCeiling === "23503" && ceilingClean
+      ? `Bài làm dài đúng trần (${CEILING} ký tự) QUA được CHECK trên DB thật (chết ở khoá ngoại, 23503) — trần DB KHÔNG thấp hơn LIMITS.MAX_ATTEMPT_ANSWER`
+      : atCeiling === "23514"
+        ? `TRẦN DB THẤP HƠN TRẦN TRONG MÃ: ${CEILING} ký tự bị attempt_answers_answer_check từ chối (23514) trong khi LIMITS.MAX_ATTEMPT_ANSWER = ${CEILING}. Postgres sẽ từ chối NGUYÊN LƯỢT NỘP BÀI của học sinh viết dài — apply lại trần trong schema.sql (${residueNote})`
+        : `Probe trần ký tự trả mã BẤT NGỜ ${describeCode(atCeiling)} (mong đợi 23503) — cổng không đo được gì; ${residueNote}`
+  );
+
+  assert(
+    overCeiling === "23514" && ceilingClean,
+    overCeiling === "23514" && ceilingClean
+      ? `Bài làm quá trần một ký tự (${CEILING + 1}) bị attempt_answers_answer_check TỪ CHỐI (23514) — trần DB đúng bằng LIMITS.MAX_ATTEMPT_ANSWER = ${CEILING}`
+      : overCeiling === "23503"
+        ? `TRẦN DB CAO HƠN TRẦN TRONG MÃ (hoặc CHECK vắng mặt): ${CEILING + 1} ký tự lọt qua CHECK và chỉ chết ở khoá ngoại (23503), trong khi LIMITS.MAX_ATTEMPT_ANSWER = ${CEILING}. Mã đang cắt bài làm sớm hơn DB cần — nâng LIMITS.MAX_ATTEMPT_ANSWER cho khớp (${residueNote})`
+        : `Probe trần ký tự trả mã BẤT NGỜ ${describeCode(overCeiling)} (mong đợi 23514) — cổng không đo được gì; ${residueNote}`
+  );
+  }
+
+  // (c) — Trần lượt chấm khai ở HAI chỗ và không xoá được cái nào: TypeScript
+  //     cần nó để suy `retryAvailable`, SQL cần nó để cưỡng chế. Ghim chúng vào
+  //     nhau ở đây, vì một lượt lệch KHÔNG lộ ra ở tsc, ở vitest hay ở bất kỳ
+  //     cổng nào khác: SQL sẽ từ chối lượt thứ N trong khi UI vẫn hiện nút
+  //     "Chấm lại", và học sinh bấm vào một nút chắc chắn hỏng.
+  //
+  //     Đọc từ schema.sql chứ không từ DB, cùng lối parseGrantedColumns(): đây
+  //     là một lệch giữa hai FILE trong repo, phát hiện được mà không cần hỏi
+  //     database nào.
+  const claimCap = /if v_attempts >= (\d+) then/.exec(schemaSql);
+  assert(
+    claimCap !== null && Number(claimCap[1]) === ESSAY_MAX_ATTEMPTS,
+    claimCap === null
+      ? "Không tìm thấy trần lượt (`if v_attempts >= N then`) trong claim_essay_grading_attempt() — schema.sql đã đổi hình dạng, cổng ghim đang KHÔNG ghim gì"
+      : Number(claimCap[1]) === ESSAY_MAX_ATTEMPTS
+        ? `Trần lượt chấm khớp: schema.sql nói ${claimCap[1]}, ESSAY_MAX_ATTEMPTS nói ${ESSAY_MAX_ATTEMPTS}`
+        : `TRẦN LƯỢT LỆCH: schema.sql nói ${claimCap[1]}, ESSAY_MAX_ATTEMPTS (lib/scoring/essayLifecycle.ts) nói ${ESSAY_MAX_ATTEMPTS} — UI và SQL đang đếm khác nhau`
+  );
+
+  // Một lượt chạy PHẦN không bao giờ được in ra câu của một lượt chạy ĐỦ. Đó là
+  // cả điểm của việc đếm `skipped` tách khỏi `failures`: người đọc log — hoặc
+  // người dán log vào một work plan làm bằng chứng — phải thấy ngay rằng cái
+  // xanh này xanh trên BAO NHIÊU phép đo, chứ không chỉ thấy dấu ✅.
+  if (failures === 0 && skipped === 0) {
+    console.log(
+      "\n✅ Schema verify: DB khớp schema.sql §10 + §11 + §12 + khoá ngoại (§15/§16) + phiên bản (§17) + subject canonical (TD-016) + khối SUBSCRIPTION chỉ-đọc (ADR-0013/0014) + chấm tự luận (ADR-0018: grant, trần ký tự, trần lượt)."
+    );
+  } else if (failures === 0) {
+    console.log(
+      `\n⚠️  Schema verify: PASS PHẦN — ${skipped} mục BỎ QUA vì target \`${ref ?? "?"}\` không phải dev.\n` +
+        "   Mọi khẳng định ĐỌC đều xanh (phân loại cột, khoá ngoại, vân tay schema, subject canonical, ghim trần lượt,\n" +
+        "   EXECUTE bằng anon key). KHÔNG có probe hành vi nào chạy, nên lượt này KHÔNG nói gì về grant thật,\n" +
+        "   trần ký tự thật, hay việc client có ghi được vào exam_results/payment_orders/subscriptions hay không.\n" +
+        "   Muốn phủ những thứ đó thì chạy trên dev, hoặc kiểm bằng truy vấn catalog trực tiếp."
+    );
+  } else {
+    console.error(
+      `\n❌ Schema verify: ${failures} check FAIL — DB và schema.sql đang lệch nhau.` +
+        (skipped > 0 ? ` (thêm ${skipped} mục BỎ QUA vì target \`${ref ?? "?"}\` không phải dev)` : "")
+    );
+  }
   process.exit(failures === 0 ? 0 : 1);
 }
 

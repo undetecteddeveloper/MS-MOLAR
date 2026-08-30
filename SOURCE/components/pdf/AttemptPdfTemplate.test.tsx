@@ -27,11 +27,14 @@ const BASE_PROPS: AttemptPdfTemplateProps = {
   submittedTimeLabel: "09:00",
   correct: 8,
   total: 10,
+  // Mặc định KHÔNG có câu tự luận dở dang — ca in dòng chú thích bật cờ này
+  // lên tại chỗ, nên nền của mọi ca cũ giữ nguyên hành vi trước tính năng.
+  hasIncompleteEssay: false,
 };
 
 describe("AttemptPdfTemplate", () => {
   it("renders with all required fields", () => {
-    const { container } = render(<AttemptPdfTemplate {...BASE_PROPS} />);
+    const { container } = render(<AttemptPdfTemplate {...BASE_PROPS} hasIncompleteEssay={false} />);
 
     expect(container.textContent).toContain("Math");
     expect(container.textContent).toContain("Mock Exam #3");
@@ -46,12 +49,12 @@ describe("AttemptPdfTemplate", () => {
   });
 
   it("formats totalScore internally via toFixed(1), not pre-formatted by the caller", () => {
-    const { container } = render(<AttemptPdfTemplate {...BASE_PROPS} totalScore={10} />);
+    const { container } = render(<AttemptPdfTemplate {...BASE_PROPS} totalScore={10} hasIncompleteEssay={false} />);
     expect(container.textContent).toContain("10.0");
   });
 
   it("plain-hex/rgb guard (ADR-0009): rendered inline styles never resolve through oklch()/color-mix(), and the source has zero className attributes", () => {
-    const { container } = render(<AttemptPdfTemplate {...BASE_PROPS} />);
+    const { container } = render(<AttemptPdfTemplate {...BASE_PROPS} hasIncompleteEssay={false} />);
 
     // Real-render inline-style output — no mock boundary (per Proof Obligations).
     const renderedHtml = container.innerHTML;
@@ -82,6 +85,11 @@ describe("AttemptPdfTemplate", () => {
         "correct",
         "examTitle",
         "examineeName",
+        // Task F-B3 (O-8): một BOOLEAN, không phải nội dung. Nó nói "có ít nhất
+        // một câu tự luận dừng hẳn ở RS-6", và không mang nổi một câu hỏi hay
+        // một câu trả lời nào — nên AC-006 vẫn đứng: template này vẫn không có
+        // trường nào chứa được nội dung từng câu.
+        "hasIncompleteEssay",
         "subject",
         "submittedDateLabel",
         "submittedTimeLabel",
@@ -93,5 +101,51 @@ describe("AttemptPdfTemplate", () => {
 
   it("never mounts components/ui/button.tsx (ADR-0009 — confirmed-unsafe color-mix hover state)", () => {
     expect(SOURCE_TEXT).not.toMatch(/import\s+.*Button.*from/);
+  });
+});
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DÒNG CHÚ THÍCH TỰ LUẬN CHƯA HOÀN TẤT (O-8 / AC-058) — Task F-B3
+//
+// O-8 đã LOẠI cả hai phương án cực đoan: chặn xuất ở RS-6 là chặn VĨNH VIỄN
+// một học sinh khỏi kết quả của chính mình vì một sự cố không do họ gây ra;
+// còn xuất mà không chú thích thì tệp TRÔNG NHƯ một kết quả đầy đủ và không
+// có gì trên đó nói ngược lại. Nên: xuất được, kèm một dòng in TRONG tệp.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("AttemptPdfTemplate — chú thích tự luận chưa hoàn tất", () => {
+  it("hasIncompleteEssay=false ⇒ KHÔNG in dòng nào (hành vi cũ giữ nguyên)", () => {
+    const { container } = render(<AttemptPdfTemplate {...BASE_PROPS} />);
+
+    expect(container.textContent).not.toContain("essay");
+    // Khẳng định dương: tệp vẫn có nội dung bình thường.
+    expect(container.textContent).toContain("Mock Exam #3");
+  });
+
+  it("hasIncompleteEssay=true ⇒ in nhãn đã dịch được truyền vào", () => {
+    const LABEL = "Đề này có câu tự luận không được chấm tự động.";
+    const { container } = render(
+      <AttemptPdfTemplate {...BASE_PROPS} hasIncompleteEssay essayIncompleteLabel={LABEL} />
+    );
+
+    expect(container.textContent).toContain(LABEL);
+  });
+
+  it("hasIncompleteEssay=true không có nhãn ⇒ dùng bản tiếng Anh mặc định", () => {
+    // Cùng khuôn với mọi nhãn khác của template: tệp không bao giờ im lặng bỏ
+    // dòng ấy chỉ vì người gọi quên truyền chữ.
+    const { container } = render(<AttemptPdfTemplate {...BASE_PROPS} hasIncompleteEssay />);
+
+    expect(container.textContent).toContain("not scored automatically");
+  });
+
+  it("dòng mới dùng hex literal, KHÔNG token — ràng buộc cứng của ADR-0009", () => {
+    // Chỉ khẳng định điều mà ca này SỞ HỮU: dòng mới dùng đúng giá trị hex đã
+    // có sẵn trong file, không mang màu mới. Việc "không hàm màu hiện đại nào
+    // lọt vào" đã có một rào chắn RIÊNG ở trên trong chính file này — nhân bản
+    // nó ở đây chỉ tạo một lời khai thứ hai để trôi lệch.
+    expect(SOURCE_TEXT).toContain("#605a52");
+    expect(SOURCE_TEXT).not.toMatch(/className=/);
   });
 });

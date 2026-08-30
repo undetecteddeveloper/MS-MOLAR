@@ -612,6 +612,10 @@ const FIXTURE_RESULT: ExamResult = {
   startedAt: "2026-08-18T11:00:00.000Z",
   submittedAt: "2026-08-18T11:40:00.000Z",
   overtimeSeconds: 0,
+  // ADR-0018 — bat buoc tren `ExamResult`, va `false` la gia tri dung o day:
+  // fixture nay khong co cau tu luan nao, nen khong the co RS-6. `tsc` la thu
+  // tim ra dong nay, dung nhu Task B2.1 du doan.
+  hasIncompleteEssay: false,
 };
 
 // =============================================================================

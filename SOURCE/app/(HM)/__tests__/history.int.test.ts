@@ -137,7 +137,10 @@
 //   - Obligation (g): `await expect(listMyHistory()).rejects.toBeTruthy()` when
 //     the mocked response carries a non-null `error`.
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { LIST_ROW_CEILING } from "@/lib/supabase/boundedRead";
+import { summariseEssays } from "@/lib/scoring/essayLifecycle";
 
 const { fromMock } = vi.hoisted(() => ({ fromMock: vi.fn() }));
 
@@ -305,6 +308,12 @@ describe("listMyHistory — scope predicates, ordering, field completeness, exam
         totalScore: 8.5,
         startedAt: "2026-07-01T10:00:00.000Z",
         submittedAt: "2026-07-01T10:20:00.000Z",
+        // ADR-0018 (Task B2.2) — hai boolean BAT BUOC, additive. `false` la gia
+        // tri dung cho ROW_A: fixture cua Test 1 khong mang `per_question`, nen
+        // khong dong nao co khoa vong doi. Chinh khang dinh VET CAN nay la thu
+        // bat duoc thay doi — dung viec no phai lam voi mot boundary-change.
+        hasUnresolvedEssay: false,
+        hasIncompleteEssay: false,
       },
     ]);
   });
@@ -339,5 +348,322 @@ describe("listMyHistory — scope predicates, ordering, field completeness, exam
     mockJoin({ data: null, error: { code: "500", message: "infra failure" } });
 
     await expect(listMyHistory()).rejects.toBeTruthy();
+  });
+});
+
+// =============================================================================
+// Test 2 — listMyHistory(): per_question + created_at in the select, and the
+//          TWO required essay booleans (ADR-0018, Task B2.2)
+// =============================================================================
+// AC: EG-BE-034 (`hasUnresolvedEssay(...) === (summariseEssays(...)?.unresolvedCount ?? 0) > 0`),
+//   EG-BE-035 (both booleans are REAL booleans, never `undefined` — including an
+//   attempt with no essays and a legacy row), D-13/O-8/F-06 (TWO fields, not one),
+//   AC-012 (Output Comparison pipeline 3).
+// @lane: integration
+// @dependency: SOURCE/app/(HM)/queries.ts (listMyHistory) + REAL
+//   SOURCE/lib/scoring/essayLifecycle.ts + mocked Supabase client
+// @real-dependency: none — the same sanctioned createClient() boundary as Test 1.
+//
+// Gate D is what makes this select shape legitimate rather than a judgement call:
+// measured at 375 B/row without `per_question, created_at` and 3 401 B/row with
+// them (≈9.1×, largest single row 5 385 B), engineer decision D3 = ACCEPT, with
+// the 500-row ceiling recorded as the trigger for PAGINATION rather than for a
+// bigger number. The RPC alternative was considered and REJECTED — choosing it
+// here would be DDL, reopening a closed escalation.
+//
+// TIME IS FROZEN for the same reason as in getResult.int.test.ts: the deadline is
+// 600 000 ms with an exclusive boundary, and a real clock makes these cases green
+// today and red on an afternoon nobody touched them.
+
+const HISTORY_NOW = new Date("2026-08-29T12:00:00.000Z");
+const HISTORY_CREATED_AT = "2026-08-29T11:59:00.000Z"; // one minute old — inside the deadline
+
+/** A stored `per_question` element with no `essay*` key — the legacy shape. */
+const HISTORY_LEGACY_ELEMENT = {
+  questionId: "q-mcq",
+  selected: "A",
+  correct: "A",
+  isCorrect: true,
+  scored: true,
+};
+
+function historyEssayElement(overrides: Record<string, unknown> = {}) {
+  return {
+    questionId: "q-essay",
+    selected: "Bài làm của học sinh.",
+    isCorrect: false,
+    scored: false,
+    essayState: "pending",
+    essayEarned: null,
+    essayMax: null,
+    essayLowConfidence: false,
+    essayAttempts: 0,
+    ...overrides,
+  };
+}
+
+/** One joined row in PostgREST's embedded shape, now carrying the two columns
+ *  Gate D authorised. Deliberately separate from Test 1's `joinedRow`: that
+ *  helper predates this task and Test 1's fixtures must not start depending on
+ *  essay data to keep passing. */
+function joinedEssayRow(o: {
+  attemptId: string;
+  submittedAt: string;
+  perQuestion: unknown[] | null;
+  createdAt?: string;
+}) {
+  return {
+    attempt_id: o.attemptId,
+    total_score: 7,
+    correct: 3,
+    total: 4,
+    per_question: o.perQuestion,
+    created_at: o.createdAt ?? HISTORY_CREATED_AT,
+    exam_attempts: {
+      exam_id: "exam-9",
+      started_at: "2026-08-29T11:00:00.000Z",
+      submitted_at: o.submittedAt,
+      exams: { title: "Đề Văn giữa kỳ", subject: "Ngữ văn" },
+    },
+  };
+}
+
+describe("listMyHistory — per_question + created_at in the select and the two required essay booleans (Test 2)", () => {
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    fromMock.mockReset();
+    vi.useFakeTimers();
+    vi.setSystemTime(HISTORY_NOW);
+    warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    warnSpy.mockRestore();
+    vi.useRealTimers();
+  });
+
+  function mockRows(rows: unknown[]) {
+    const joinBuilder = createQueryBuilder({ data: rows, error: null });
+    fromMock.mockImplementation((table: string) => {
+      if (table === "exam_results") return joinBuilder.builder;
+      throw new Error(`unexpected table: ${table}`);
+    });
+    return joinBuilder;
+  }
+
+  it("the select carries BOTH per_question and created_at — the shape Gate D priced and accepted", async () => {
+    const { calls } = mockRows([
+      joinedEssayRow({ attemptId: "a", submittedAt: "2026-08-29T11:50:00.000Z", perQuestion: [] }),
+    ]);
+
+    await listMyHistory();
+
+    const selectArg = calls.find((c) => c.method === "select")?.args[0] as string;
+    expect(selectArg).toContain("per_question");
+    // `created_at` is the half most likely to be forgotten, because the booleans
+    // still compute without it — they just compute against `undefined`, and an
+    // overdue pending question is then classified as still-pending here while
+    // /result calls it RS-6. That is INT-2's primary failure mode, and it is
+    // INVISIBLE to any assertion made on mapped output alone.
+    expect(selectArg).toContain("created_at");
+    // The pre-existing projection is untouched — this is additive.
+    expect(selectArg).toContain("attempt_id, total_score, correct, total");
+    expect(selectArg).toContain("exam_attempts!inner(");
+  });
+
+  it("EG-BE-035: both booleans are REAL booleans in all four shapes — RS-6, essay-free, legacy, and a null per_question", async () => {
+    mockRows([
+      // RS-6: failed AND out of retries ⇒ incomplete, and NOT unresolved.
+      joinedEssayRow({
+        attemptId: "a-rs6",
+        submittedAt: "2026-08-29T11:54:00.000Z",
+        perQuestion: [historyEssayElement({ essayState: "failed", essayAttempts: 3 })],
+      }),
+      // No essay question at all.
+      joinedEssayRow({
+        attemptId: "a-no-essay",
+        submittedAt: "2026-08-29T11:53:00.000Z",
+        perQuestion: [HISTORY_LEGACY_ELEMENT],
+      }),
+      // Legacy: an essay-looking row from before the feature shipped — the
+      // element is there, the lifecycle keys are not.
+      joinedEssayRow({
+        attemptId: "a-legacy",
+        submittedAt: "2026-08-29T11:52:00.000Z",
+        perQuestion: [{ questionId: "q-essay", selected: "bài làm", isCorrect: false, scored: false }],
+      }),
+      // A row whose per_question column is null outright.
+      joinedEssayRow({
+        attemptId: "a-null",
+        submittedAt: "2026-08-29T11:51:00.000Z",
+        perQuestion: null,
+      }),
+    ]);
+
+    const entries = await listMyHistory();
+
+    // `typeof === "boolean"` on EVERY entry, not just "the values look right":
+    // `undefined` is falsy, so a bug in this direction renders correctly today
+    // and surfaces the first time anything does a strict comparison — or, worse,
+    // the first time the PDF pipeline has to decide an annotation from it.
+    for (const entry of entries) {
+      expect(typeof entry.hasUnresolvedEssay).toBe("boolean");
+      expect(typeof entry.hasIncompleteEssay).toBe("boolean");
+    }
+
+    const byId = Object.fromEntries(entries.map((e) => [e.attemptId, e]));
+    // D-13 / O-8 / F-06: the two fields are STRUCTURALLY exclusive — `unresolved`
+    // requires retries left, `incomplete` requires them exhausted. This row is
+    // the proof that one boolean could not have carried both answers.
+    expect(byId["a-rs6"].hasIncompleteEssay).toBe(true);
+    expect(byId["a-rs6"].hasUnresolvedEssay).toBe(false);
+    for (const id of ["a-no-essay", "a-legacy", "a-null"]) {
+      expect(byId[id].hasIncompleteEssay).toBe(false);
+      expect(byId[id].hasUnresolvedEssay).toBe(false);
+    }
+  });
+
+  it("EG-BE-034: hasUnresolvedEssay equals (summariseEssays(...)?.unresolvedCount ?? 0) > 0 on the same fixtures", async () => {
+    // Two derivations of one truth, held against each other. This is the pin that
+    // stops them drifting — the shape of defect F-06, which this feature's own
+    // review history already caught once.
+    const fixtures: Array<{ id: string; perQuestion: unknown[] }> = [
+      { id: "f-pending", perQuestion: [historyEssayElement()] },
+      {
+        id: "f-retryable",
+        perQuestion: [historyEssayElement({ essayState: "failed", essayAttempts: 1 })],
+      },
+      {
+        id: "f-exhausted",
+        perQuestion: [historyEssayElement({ essayState: "failed", essayAttempts: 3 })],
+      },
+      {
+        id: "f-graded",
+        perQuestion: [
+          historyEssayElement({ essayState: "graded", essayEarned: 1, essayMax: 1 }),
+        ],
+      },
+      { id: "f-none", perQuestion: [HISTORY_LEGACY_ELEMENT] },
+    ];
+
+    mockRows(
+      fixtures.map((f, i) =>
+        joinedEssayRow({
+          attemptId: f.id,
+          submittedAt: `2026-08-29T11:${50 - i}:00.000Z`,
+          perQuestion: f.perQuestion,
+        }),
+      ),
+    );
+
+    const entries = await listMyHistory();
+    const byId = Object.fromEntries(entries.map((e) => [e.attemptId, e]));
+
+    for (const f of fixtures) {
+      const expected =
+        (summariseEssays(
+          f.perQuestion as Parameters<typeof summariseEssays>[0],
+          HISTORY_CREATED_AT,
+          HISTORY_NOW,
+        )?.unresolvedCount ?? 0) > 0;
+      expect(byId[f.id].hasUnresolvedEssay).toBe(expected);
+    }
+    // A positive control: at least one fixture must be `true`, or the loop above
+    // would pass for an implementation that returns `false` unconditionally.
+    expect(entries.some((e) => e.hasUnresolvedEssay)).toBe(true);
+  });
+
+  it("AC-012 pipeline 3: legacy rows produce a hand-built MyHistoryEntry[] literal, in unchanged submittedAt-descending order", async () => {
+    // Deliberately fed OUT of order so the ordering assertion is not satisfied by
+    // the mock's own arrangement.
+    mockRows([
+      joinedEssayRow({
+        attemptId: "older",
+        submittedAt: "2026-08-29T10:00:00.000Z",
+        perQuestion: [HISTORY_LEGACY_ELEMENT],
+      }),
+      joinedEssayRow({
+        attemptId: "newer",
+        submittedAt: "2026-08-29T11:30:00.000Z",
+        perQuestion: [HISTORY_LEGACY_ELEMENT],
+      }),
+    ]);
+
+    const entries = await listMyHistory();
+
+    // The whole array against a literal authored by hand: all nine pre-existing
+    // fields, plus the two new booleans as `false`, newest first.
+    expect(entries).toEqual([
+      {
+        attemptId: "newer",
+        examId: "exam-9",
+        examTitle: "Đề Văn giữa kỳ",
+        subject: "Ngữ văn",
+        totalScore: 7,
+        startedAt: "2026-08-29T11:00:00.000Z",
+        submittedAt: "2026-08-29T11:30:00.000Z",
+        correct: 3,
+        total: 4,
+        hasUnresolvedEssay: false,
+        hasIncompleteEssay: false,
+      },
+      {
+        attemptId: "older",
+        examId: "exam-9",
+        examTitle: "Đề Văn giữa kỳ",
+        subject: "Ngữ văn",
+        totalScore: 7,
+        startedAt: "2026-08-29T11:00:00.000Z",
+        submittedAt: "2026-08-29T10:00:00.000Z",
+        correct: 3,
+        total: 4,
+        hasUnresolvedEssay: false,
+        hasIncompleteEssay: false,
+      },
+    ]);
+
+    // UI-D11: the raw jsonb stops at this function. An exhaustive key set is the
+    // only assertion that catches `per_question` being passed through by a
+    // spread someone added later for convenience.
+    expect(Object.keys(entries[0]).sort()).toEqual([
+      "attemptId",
+      "correct",
+      "examId",
+      "examTitle",
+      "hasIncompleteEssay",
+      "hasUnresolvedEssay",
+      "startedAt",
+      "subject",
+      "submittedAt",
+      "total",
+      "totalScore",
+    ]);
+  });
+
+  it("the row ceiling is unchanged at 500, and an unrecognised essayState warns ONCE per element, not once per predicate", async () => {
+    const { calls } = mockRows([
+      joinedEssayRow({
+        attemptId: "a-broken",
+        submittedAt: "2026-08-29T11:40:00.000Z",
+        perQuestion: [historyEssayElement({ essayState: "in_review" })],
+      }),
+    ]);
+
+    const entries = await listMyHistory();
+
+    // Scope boundary: this task must not move the ceiling. `readBounded` asks for
+    // ceiling + 1 so it can DETECT the overflow rather than silently truncate.
+    expect(LIST_ROW_CEILING).toBe(500);
+    const limitArg = calls.find((c) => c.method === "limit")?.args[0];
+    expect(limitArg).toBe(LIST_ROW_CEILING + 1);
+
+    // Both predicates fold the array themselves, so the naive call site would
+    // derive this element twice and warn twice — per row, on every /history
+    // render. Same defect the sibling read path had, same fix.
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(warnSpy.mock.calls[0])).not.toContain("Bài làm của học sinh");
+    expect(entries[0].hasUnresolvedEssay).toBe(false);
+    expect(entries[0].hasIncompleteEssay).toBe(false);
   });
 });

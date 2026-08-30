@@ -17,6 +17,8 @@ import { getCurrentUserProfile } from "@/lib/auth/getCurrentUser";
 import { getMyRating } from "@/app/(layer2)/actions";
 import { getResult } from "@/app/(layer2)/queries";
 import { ScoreCard } from "@/app/(layer2)/_components/ScoreCard";
+import { EssayScoreLine } from "@/app/(layer2)/_components/EssayScoreLine";
+import { EssayGradingPoller } from "@/app/(layer2)/_components/EssayGradingPoller";
 import { ResultActions } from "@/app/(layer2)/_components/ResultActions";
 import { mapFromMyRating } from "@/lib/rating";
 import { formatCompletionTime, formatOvertime } from "@/lib/history/format";
@@ -61,6 +63,12 @@ export default async function ResultPage({
     submittedAt: data.submittedAt,
     correct: result.correct,
     total: result.total,
+    // ĐỌC trường đã published của đường đọc này, không suy lại RS-6 tại chỗ
+    // (EG-BE-036). Lối xuất kia (HistoryRow) đọc trường tương ứng của đường đọc
+    // CỦA NÓ, và cả hai trường đều do cùng một `hasIncompleteEssay()` sinh ra —
+    // đó là thứ khiến hai lối không thể sinh ra hai tệp khác nhau cho cùng một
+    // lượt thi (F-06/O-8).
+    hasIncompleteEssay: data.hasIncompleteEssay,
   };
 
   return (
@@ -85,6 +93,46 @@ export default async function ResultPage({
           />
         </div>
 
+        {/* Điểm tự luận — DÒNG RIÊNG CÓ NHÃN, đặt giữa ScoreCard và khối quá
+            giờ (ADR-0018 § Amendment to ADR-0010, FE-AC-01).
+
+            Vì sao không gộp vào ScoreCard: `exam_results` không còn bất biến
+            sau insert, nên một band có thể đáp xuống trong lúc học sinh đang
+            nhìn trang. Gộp con số đang-đổi ấy vào ô điểm lớn làm chính con số
+            học sinh tin tưởng nhất tự nhảy. ScoreCard là VÙNG 0-DIFF.
+
+            Component tự trả `null` khi không câu nào mang khoá vòng đời, nên
+            với một dòng cũ KHÔNG node nào vào cây (AC-012 đúng từng byte).
+            Không bọc thêm div: nhịp dọc thuộc về `gap-5` của trang. */}
+        <EssayScoreLine
+          summary={data.essaySummary}
+          detailHref={`/exams/${id}/attempt/${attemptId}/result/detail`}
+        />
+
+        {/* Bộ poll — mount khi `essaySummary !== undefined`, KHÔNG phải khi
+            `pendingCount > 0`.
+
+            Điều kiện `pendingCount > 0` là thứ UI Spec công bố lần đầu, và nó
+            GÂY RA khuyết tật AC-023: ở đúng lượt render giải quyết câu tự luận
+            cuối cùng, component sẽ unmount và vùng `aria-live` của nó rời khỏi
+            DOM TRONG CÙNG commit mà câu "đã chấm xong toàn bộ" lẽ ra được chèn
+            vào — nên lời thông báo ấy không bao giờ được đọc lên. Người dùng
+            nhìn thấy không nhận ra điều gì, nên không ai báo lỗi.
+
+            Kết luận cho trạng thái tính năng TẮT không đổi — đó là lý do vị từ
+            cũ trông vô hại: không phần tử nào mang khoá vòng đời thì
+            `summariseEssays()` trả `undefined`, nên poller vẫn không mount.
+
+            (Tên khoá jsonb CỐ Ý không gõ ra ở đây: một rào chắn trong
+            `essayLifecycle.test.ts` giữ cho sáu literal ấy chỉ được gõ ở đúng
+            một file, và bản nháp đầu của comment này đã làm nó đỏ.) */}
+        {data.essaySummary !== undefined && (
+          <EssayGradingPoller
+            pendingCount={data.essaySummary.pendingCount}
+            gradedCount={data.essaySummary.gradedCount}
+          />
+        )}
+
         {/* Quá giờ (Security review #6). DB tự tính overtime_seconds trong
             record_exam_result() từ started_at + duration_minutes, nên nhãn này
             không nói dối được kể cả khi người làm tắt JS để vô hiệu hoá đồng hồ.
@@ -105,7 +153,20 @@ export default async function ResultPage({
           className="preload-fade grid grid-cols-3 gap-3"
           style={{ "--preload-order": 2 } as React.CSSProperties}
         >
-          <ResultActions pdfInput={pdfInput} />
+          {/* CỬA THỨ NHẤT của cổng chặn PDF (AC-058). Chặn khi còn câu tự
+              luận CHƯA NGÃ NGŨ — `unresolvedCount` đếm RS-2 + RS-4 + RS-5 và
+              CỐ Ý không đếm RS-6: hết lượt là trạng thái CUỐI, nên chặn ở đó
+              là chặn VĨNH VIỄN một học sinh khỏi chính kết quả của mình vì một
+              sự cố không do họ gây ra (O-8). Ca RS-6 được xử bằng một dòng chú
+              thích IN TRONG tệp, không bằng một cánh cửa khoá. */}
+          <ResultActions
+            pdfInput={pdfInput}
+            blockedReason={
+              (data.essaySummary?.unresolvedCount ?? 0) > 0
+                ? t("result.essay.pdfBlocked")
+                : null
+            }
+          />
           {/* Return → ExamBrowser (S#26 — đổi từ Home→"/" cũ). */}
           <Link
             href="/exams"

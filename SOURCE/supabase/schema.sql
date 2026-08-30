@@ -469,9 +469,16 @@ alter table public.exams add column if not exists parts jsonb;
 -- còn nhập Đ/S từng ý (true_false, mã hoá "a:Đ,b:S,...") và giá trị ngắn
 -- (short_answer). Nới thành text tự do có giới hạn độ dài; tính đúng/sai của
 -- mcq do computeScore server-side quyết định, CHECK cũ không phải tầng bảo vệ.
+--
+-- 500 -> 4000 (Essay Auto-Scoring R11/D11): một bài tự luận có rubric không
+-- viết nổi trong 500 ký tự. Con số 4000 KHÔNG có cơ sở thực nghiệm — production
+-- có 0 bài tự luận đã nộp — nên nó được chọn bằng lập luận và ghi ở
+-- docs/design/essay-auto-scoring-backend-design.md § Trần ký tự. Nó PHẢI bằng
+-- LIMITS.MAX_ATTEMPT_ANSWER (lib/ugc/limits.ts:17); npm run verify:schema đọc
+-- lại trần này từ DB THẬT và đỏ nếu hai bên lệch.
 alter table public.attempt_answers drop constraint if exists attempt_answers_answer_check;
 alter table public.attempt_answers add constraint attempt_answers_answer_check
-  check (answer is null or length(answer) <= 500);
+  check (answer is null or length(answer) <= 4000);
 
 -- ----------------------------------------------------------------------------
 -- 9. BACKFILL — CUỐI CÙNG: seed cũ (không tác giả) → published
@@ -837,6 +844,14 @@ grant select (
 --
 -- Ghi điểm nay chỉ đi qua record_exam_result() và CHỈ service_role gọi được
 -- (SOURCE/lib/supabase/service-role.ts, server-only).
+--
+-- ⚠ SỬA ĐỔI, ĐỌC KÈM: khối "ESSAY GRADE WRITE" NGAY SAU §11b (ADR-0018) là
+-- NGOẠI LỆ ĐẦU TIÊN của cách đọc mạnh "dòng exam_results không bao giờ đổi sau
+-- khi insert". Điều §11 tuyên bố ở trên vẫn nguyên vẹn — KHÔNG client nào ghi
+-- được vào exam_results bằng bất kỳ đường nào, và không writer nào ngoài
+-- service_role tồn tại — nhưng band tự luận được ghi ĐÈ TẠI CHỖ vào đúng một
+-- phần tử của per_question, bởi hai hàm đặc quyền nữa. Đọc khối đó trước khi
+-- kết luận bất cứ điều gì về tính bất biến của một dòng kết quả.
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
@@ -951,6 +966,247 @@ $$;
 revoke all on function public.record_exam_result(uuid, numeric, int, int, jsonb, jsonb)
   from public, anon, authenticated;
 grant execute on function public.record_exam_result(uuid, numeric, int, int, jsonb, jsonb)
+  to service_role;
+
+-- ============================================================================
+-- ESSAY GRADE WRITE (Essay Auto-Scoring, ADR-0018, PRD C1/W2/W4)
+--
+-- ĐÂY LÀ NGOẠI LỆ ĐẦU TIÊN của tính chất "exam_results không đổi sau khi
+-- insert" mà §11 dựng lên. §11 vẫn đúng ở dạng nó tuyên bố — KHÔNG client nào
+-- ghi được vào exam_results bằng bất kỳ đường nào, và không writer nào ngoài
+-- service_role tồn tại. Cái không còn đúng là cách đọc mạnh hơn, không thành
+-- văn: "dòng không bao giờ đổi sau khi insert". Ba bề mặt phải tôn trọng điều
+-- đó (ADR-0018 § Amendment to ADR-0010): xuất PDF bị chặn khi còn câu chưa
+-- giải quyết, ScoreCard/history hiện dấu "đang chấm" thay vì một con số sắp
+-- đổi, và bất kỳ lượt cache dòng kết quả nào trong tương lai phải khoá theo
+-- một thứ dịch chuyển khi band đáp xuống (hôm nay CHƯA có cache nào).
+--
+-- HAI hàm chứ không một, và claim CHẠY TRƯỚC settle: một pass bị cắt ngang
+-- KHÔNG ghi gì cả (after() chết cùng invocation, không cron, không queue), nên
+-- một bộ đếm tăng lúc GHI sẽ không bao giờ đếm được lượt bị bỏ dở — và trần 3
+-- lượt của AC-064 sẽ hỏng đúng ở tình huống nó tồn tại để xử: một học sinh
+-- nhìn "đang chấm" đứng im và bấm chấm lại. Vậy nên lượt bị TIÊU LÚC CLAIM.
+--
+-- CẢ HAI đều KHÔNG PHẢI SECURITY DEFINER, cùng lý do với record_exam_result()
+-- (§11b): service_role vốn đã bypass RLS và còn nguyên quyền UPDATE (§11a chỉ
+-- thu hồi của anon/authenticated), nên INVOKER chạy đúng. Giữ INVOKER nghĩa là
+-- phải hỏng CẢ HAI chỗ mới thủng: ai đó vừa `grant execute ... to
+-- authenticated`, vừa `grant update on exam_results to authenticated`.
+--
+-- CẢ HAI đều KHÔNG nhận user_id: quyền sở hữu suy ra từ attempt bên trong SQL,
+-- nên một call site sai vẫn không dịch nổi điểm của học sinh khác.
+--
+-- UPDATE bó vào ĐÚNG cột per_question và ĐÚNG một phần tử. total_score,
+-- correct, total, topic_breakdown, overtime_seconds KHÔNG xuất hiện ở bất kỳ
+-- đâu trong hai thân hàm dưới đây — đó là thứ giữ AC-009 và W8 đúng BẰNG CẤU
+-- TRÚC chứ không bằng kỷ luật: không câu lệnh nào trong repo dịch nổi bộ ba
+-- điểm cũ sau khi nó đã được insert.
+--
+-- `order by ord` trong jsonb_agg là BẮT BUỘC, không phải trang trí: per_question
+-- là một MẢNG mà thứ tự chính là thứ tự câu trong đề, và mọi bề mặt kết quả
+-- render theo thứ tự đó. Thiếu `order by`, Postgres được phép trả về một mảng
+-- xếp khác, và toàn bộ đề bị xáo trộn NGAY LẦN ĐẦU một câu tự luận được chấm —
+-- một khuyết tật mà mọi test kiểu "band đã đáp xuống chưa" đều xanh.
+--
+-- KHÔNG hàm nào kiểm giá trị band. Tập đóng {0, 0.25, 0.5, 0.75, 1} được khai
+-- MỘT LẦN, trong TypeScript (lib/scoring/essayLifecycle.ts), và một mệnh đề
+-- `p_earned in (...)` ở đây sẽ là lời khai thứ hai của cùng một luật sản phẩm —
+-- đúng bài toán hai-đồng-hồ mà §11 đã từ chối khi nó không chép computeScore
+-- sang SQL. Cái SQL cưỡng chế là những thứ KHÔNG có bản sao TypeScript: quyền
+-- sở hữu, 'submitted', sự tồn tại của phần tử, tính hợp lệ của chuyển trạng
+-- thái, trần lượt, và thứ tự mảng. Mỗi cái là một sự thật về DÒNG, không phải
+-- về ĐIỂM.
+-- ============================================================================
+
+drop function if exists public.claim_essay_grading_attempt(uuid, text);
+create function public.claim_essay_grading_attempt(
+  p_attempt_id  uuid,
+  p_question_id text
+)
+returns table (claimed boolean, attempts int, reason text)
+language plpgsql
+volatile
+set search_path = public, pg_temp
+as $$
+declare
+  v_user_id  uuid;
+  v_element  jsonb;
+  v_state    text;
+  v_attempts int;
+begin
+  -- Cùng cưỡng chế với record_exam_result()/record_skill_mastery(): chủ nhân
+  -- suy ra từ attempt, và attempt phải đã đóng. Người gọi không tự khai được.
+  select a.user_id into v_user_id
+    from public.exam_attempts a
+   where a.id = p_attempt_id
+     and a.status = 'submitted';
+
+  if v_user_id is null then
+    return query select false, 0, 'not_submitted'::text;
+    return;
+  end if;
+
+  -- Phần tử phải TỒN TẠI và phải MANG khoá vòng đời. Thiếu khoá nghĩa là câu
+  -- này không phải câu tự luận chấm được (row cũ, thiếu ground truth, hoặc
+  -- tính năng đang tắt lúc nộp) — một lượt claim ở đó là một lời gọi sai.
+  select pq into v_element
+    from public.exam_results r,
+         lateral jsonb_array_elements(r.per_question) pq
+   where r.attempt_id = p_attempt_id
+     and pq->>'questionId' = p_question_id
+     and pq ? 'essayState'
+   limit 1;
+
+  if v_element is null then
+    return query select false, 0, 'no_element'::text;
+    return;
+  end if;
+
+  v_state    := v_element->>'essayState';
+  v_attempts := coalesce((v_element->>'essayAttempts')::int, 0);
+
+  -- 'graded' hấp thụ: kiểm TRƯỚC trần lượt, vì một câu đã có band là no-op bất
+  -- kể còn bao nhiêu lượt (AC-063), và người gọi cần phân biệt được hai ca đó.
+  if v_state = 'graded' then
+    return query select false, v_attempts, 'already_graded'::text;
+    return;
+  end if;
+
+  if v_state not in ('pending', 'failed') then
+    return query select false, v_attempts, 'bad_state'::text;
+    return;
+  end if;
+
+  -- Trần lượt (AC-064). Con số 3 khai ở TypeScript
+  -- (ESSAY_MAX_ATTEMPTS, lib/scoring/essayLifecycle.ts) và literal ở đây bị
+  -- GHIM VÀO NÓ bởi npm run verify:schema — chữ ký hai tham số mà ADR-0018
+  -- chốt không cho truyền trần vào, nên cặp lời-khai-đôi này không xoá được và
+  -- được ghim bằng một cổng thay vì bằng hy vọng.
+  if v_attempts >= 3 then
+    return query select false, v_attempts, 'exhausted'::text;
+    return;
+  end if;
+
+  update public.exam_results r
+     set per_question = (
+       select jsonb_agg(
+                case
+                  when e->>'questionId' = p_question_id and e ? 'essayState'
+                  then e || jsonb_build_object('essayAttempts', v_attempts + 1)
+                  else e
+                end
+                order by ord
+              )
+         from jsonb_array_elements(r.per_question) with ordinality as t(e, ord)
+     )
+   where r.attempt_id = p_attempt_id;
+
+  return query select true, v_attempts + 1, 'ok'::text;
+end;
+$$;
+
+-- Revoke ĐÍCH DANH anon + authenticated, không chỉ PUBLIC — xem ghi chú dài ở
+-- cuối §10b về default privileges của Supabase. Thiếu dòng này thì học sinh vẫn
+-- GỌI được hàm (chỉ chết ở UPDATE bên trong nhờ §11a), tức lớp phòng thủ thứ
+-- hai coi như không có.
+revoke all on function public.claim_essay_grading_attempt(uuid, text)
+  from public, anon, authenticated;
+grant execute on function public.claim_essay_grading_attempt(uuid, text)
+  to service_role;
+
+
+drop function if exists public.record_essay_grade(uuid, text, text, numeric, numeric, boolean);
+create function public.record_essay_grade(
+  p_attempt_id     uuid,
+  p_question_id    text,
+  p_state          text,
+  p_earned         numeric,
+  p_max            numeric,
+  p_low_confidence boolean
+)
+returns boolean
+language plpgsql
+volatile
+set search_path = public, pg_temp
+as $$
+declare
+  v_user_id uuid;
+  v_rows    int;
+begin
+  -- Chuyển trạng thái hợp lệ là một sự thật về DÒNG, nên nó được cưỡng chế ở
+  -- đây. Giá trị BAND thì không — xem khối chú thích đầu mục.
+  if p_state not in ('graded', 'failed') then
+    raise exception 'record_essay_grade: p_state % không hợp lệ', p_state
+      using errcode = 'check_violation';
+  end if;
+
+  select a.user_id into v_user_id
+    from public.exam_attempts a
+   where a.id = p_attempt_id
+     and a.status = 'submitted';
+
+  if v_user_id is null then
+    raise exception 'record_essay_grade: attempt % không tồn tại hoặc chưa submitted', p_attempt_id
+      using errcode = 'check_violation';
+  end if;
+
+  -- GHI-LẦN-ĐẦU-THẮNG là một vị từ trong CHÍNH câu lệnh này, không phải một
+  -- lượt đọc-rồi-ghi ở TypeScript: một lượt chấm lại đua với pass gốc (đúng ca
+  -- AC-063 mô tả) sẽ lọt qua cửa sổ giữa lượt đọc và lượt ghi. Tiền lệ trong
+  -- repo là change_support_ticket_status(), dựng vì đúng lý do đó.
+  --
+  -- 'failed' KHÔNG được vị từ bảo vệ: một câu failed PHẢI trở thành graded được
+  -- khi chấm lại. Chuyển hợp lệ: pending → graded|failed, failed → graded|failed.
+  -- 'graded' là hấp thụ.
+  --
+  -- Trùng ⇒ 0 dòng ⇒ trả false. Đây là một GIÁ TRỊ TRẢ VỀ, không phải exception:
+  -- một lượt ghi trùng bị từ chối là kết cục BÌNH THƯỜNG của cuộc đua, và nó
+  -- KHÔNG BAO GIỜ được hiện ra cho học sinh (AC-062) — nó đi vào telemetry.
+  --
+  -- essayGradedAt lấy từ now() của DB, KHÔNG nhận từ tham số — cùng lý do
+  -- record_exam_result() tự tính overtime_seconds (§11b): người gọi không được
+  -- phép tự khai một dấu thời gian.
+  update public.exam_results r
+     set per_question = (
+       select jsonb_agg(
+                case
+                  when e->>'questionId' = p_question_id and e ? 'essayState'
+                  then e || jsonb_build_object(
+                         'essayState',         p_state,
+                         'essayEarned',        case when p_state = 'graded'
+                                                    then to_jsonb(p_earned)
+                                                    else 'null'::jsonb end,
+                         'essayMax',           case when p_state = 'graded'
+                                                    then to_jsonb(p_max)
+                                                    else 'null'::jsonb end,
+                         'essayLowConfidence', case when p_state = 'graded'
+                                                    then to_jsonb(coalesce(p_low_confidence, false))
+                                                    else to_jsonb(false) end,
+                         'essayGradedAt',      to_jsonb(now())
+                       )
+                  else e
+                end
+                order by ord
+              )
+         from jsonb_array_elements(r.per_question) with ordinality as t(e, ord)
+     )
+   where r.attempt_id = p_attempt_id
+     and exists (
+       select 1
+         from jsonb_array_elements(r.per_question) e
+        where e->>'questionId' = p_question_id
+          and e ? 'essayState'
+          and e->>'essayState' <> 'graded'
+     );
+
+  get diagnostics v_rows = row_count;
+  return v_rows = 1;
+end;
+$$;
+
+revoke all on function public.record_essay_grade(uuid, text, text, numeric, numeric, boolean)
+  from public, anon, authenticated;
+grant execute on function public.record_essay_grade(uuid, text, text, numeric, numeric, boolean)
   to service_role;
 
 -- ============================================================================
@@ -1380,7 +1636,10 @@ create table if not exists public.telemetry_log (
   -- `set null`: nhật ký vận hành không nên biến mất theo tài khoản (tiền lệ
   -- §16b, TD-012) — mất DANH TÍNH chấp nhận được, mất DÒNG thì không.
   user_id       uuid references auth.users(id) on delete set null,
-  event_type    text not null check (event_type in ('adaptive_route', 'tutor_invoke')),
+  -- 'essay_grade' mới ở Essay Auto-Scoring R13 — xem cặp drop/add MỚI ở cuối
+  -- file: cột này chưa từng có cặp drop/add, nên sửa MỖI ở đây chỉ đúng cho
+  -- một lần provision MỚI (đúng hình dạng TD-005 trên dev/prod đã tồn tại).
+  event_type    text not null check (event_type in ('adaptive_route', 'tutor_invoke', 'essay_grade')),
   question_id   text references public.questions(id) on delete set null,
   skill_node_id text references public.skill_nodes(id) on delete set null,
   success       boolean not null,
@@ -1394,7 +1653,9 @@ create table if not exists public.telemetry_log (
       -- sửa TẠI CHỖ ở đây là để một lần provision MỚI đúng; cặp drop/add
       -- dưới đó là để dev/prod (đã tồn tại, nên `create table if not
       -- exists` là no-op) cũng đúng. Thiếu một trong hai = hình dạng TD-005.
-      'user_quota_exhausted', 'project_budget_exhausted'
+      'user_quota_exhausted', 'project_budget_exhausted',
+      -- Mới ở Essay Auto-Scoring R13 — xem cặp drop/add ở cuối file.
+      'groq_unavailable', 'invalid_output', 'duplicate_write'
     )
   ),
   created_at    timestamptz not null default now()
@@ -1825,8 +2086,34 @@ alter table public.telemetry_log
       -- consumeQuota(), để giá trị trong log và nhánh sinh ra nó không thể bị
       -- ánh xạ nhầm.
       'user_quota_exhausted',      -- AC-014/AC-015/AC-018/AC-053: hạn mức gói của CHÍNH người dùng
-      'project_budget_exhausted'   -- AC-022/AC-023: ngân sách ngày toàn dự án của R7
+      'project_budget_exhausted',  -- AC-022/AC-023: ngân sách ngày toàn dự án của R7
+      -- Ba mã mới ở Essay Auto-Scoring R13/AC-055. Tái dùng bốn mã sẵn có ở
+      -- đâu tái dùng được (rate_limited, project_budget_exhausted, server,
+      -- not_eligible); chỉ thêm khi mã cũ KHÔNG phân biệt được điều gì.
+      'groq_unavailable',          -- nhà cung cấp Groq không tới được / lỗi phía họ
+      'invalid_output',            -- parseGrade từ chối output của model (AC-006/AC-041)
+      'duplicate_write'            -- AC-062: settle thứ hai khớp 0 dòng — bình thường, không bao giờ hiện cho học sinh
     )
+  );
+
+-- ----------------------------------------------------------------------------
+-- MỚI (Essay Auto-Scoring R13/AC-055): event_type CHƯA TỪNG có cặp drop/add.
+--
+-- Thiếu khối này thì 'essay_grade' đúng trong git và bị CHECK từ chối trên cả
+-- dev lẫn prod — mọi lượt ghi telemetry của việc chấm hỏng, IM LẶNG, vì lượt
+-- ghi ấy là best-effort và không ai nhìn thấy nó thất bại.
+--
+-- Tên `telemetry_log_event_type_check` KHÔNG phải tên dự đoán: nó được đọc ra
+-- bằng truy vấn chỉ-đọc trên CẢ HAI project ngày 2026-08-29 (Gate C của
+-- docs/plans/20260829-feature-essay-auto-scoring.md) và giống nhau ở hai bên.
+-- Điều này quan trọng vì `drop constraint if exists` với tên SAI là một no-op
+-- IM LẶNG: migration báo thành công trong khi CHECK cũ vẫn đứng đó từ chối.
+-- ----------------------------------------------------------------------------
+alter table public.telemetry_log
+  drop constraint if exists telemetry_log_event_type_check;
+alter table public.telemetry_log
+  add constraint telemetry_log_event_type_check check (
+    event_type in ('adaptive_route', 'tutor_invoke', 'essay_grade')
   );
 
 -- ----------------------------------------------------------------------------
@@ -1868,7 +2155,7 @@ revoke all on public.schema_version from anon, authenticated;
 -- nó — xem lib/schema/schemaFingerprint.ts).
 -- @schema-fingerprint-begin
 insert into public.schema_version (id, fingerprint)
-values (1, '29931beeb950')
+values (1, '9979c9deea52')
 on conflict (id) do update
   set fingerprint = excluded.fingerprint,
       applied_at  = now();

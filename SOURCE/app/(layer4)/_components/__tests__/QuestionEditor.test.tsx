@@ -162,3 +162,62 @@ describe("QuestionEditor — node server sẵn có so với chuỗi vừa bị s
     });
   });
 });
+
+// =============================================================================
+// Task E4 / OQ-5 — the author-facing essay footnote follows the flag
+// =============================================================================
+// The old string ("stored, not auto-scored yet") tells the EXAM AUTHOR that
+// essays are not graded. It becomes false the moment the flag is on. Decision
+// (b) keeps BOTH strings and selects by the flag, mirroring what AC-051/UI-D8
+// already do for the player footnote -- because a single rewritten string is
+// simply false in the other direction whenever the flag is off, and the flag
+// HAS an off path: E6 keeps a kill switch, and preview need not carry the same
+// variable as production.
+//
+// Both directions live in ONE case so neither can be fixed by breaking the
+// other -- an inverted ternary passes a test that only ever checks one branch.
+describe("Task E4 — essay footnote follows ESSAY_GRADING_ENABLED", () => {
+  const ESSAY: AssembledQuestion = {
+    part: 1,
+    number: 1,
+    type: "essay",
+    stem: "Nêu định nghĩa hàm số bậc nhất.",
+    essayAnswer: "Dạng y = ax + b với a khác 0.",
+  } as AssembledQuestion;
+
+  const OFF = "stored, not auto-scored yet";
+  const ON = "auto-scored after the student submits";
+
+  it("shows the not-scored string when the flag is absent, the scored string when it is on, and never both", () => {
+    // Default (prop omitted) must be the OFF text: fail-closed, so a call site
+    // that forgets the prop shows something merely stale rather than promising
+    // the author a feature that may be switched off.
+    const fallback = render(
+      <QuestionEditor question={ESSAY} onChange={vi.fn()} hasError={false} />,
+    );
+    expect(fallback.container.textContent).toContain(OFF);
+    expect(fallback.container.textContent).not.toContain(ON);
+
+    const off = render(
+      <QuestionEditor
+        question={ESSAY}
+        onChange={vi.fn()}
+        hasError={false}
+        essayGradingEnabled={false}
+      />,
+    );
+    expect(off.container.textContent).toContain(OFF);
+    expect(off.container.textContent).not.toContain(ON);
+
+    const on = render(
+      <QuestionEditor
+        question={ESSAY}
+        onChange={vi.fn()}
+        hasError={false}
+        essayGradingEnabled
+      />,
+    );
+    expect(on.container.textContent).toContain(ON);
+    expect(on.container.textContent).not.toContain(OFF);
+  });
+});

@@ -38,6 +38,10 @@ interface ExamPlayerProps {
   questionNodes: QuestionNodes[];
   /** Tiêu đề các PHẦN (đề chuẩn 2025, v2.1) — hiện nhãn phần của câu hiện tại. */
   parts?: { number: number; title: string }[];
+  /** Chuyển tiếp NGUYÊN VẸN xuống `QuestionRenderer`. Tuỳ chọn, mặc định
+   *  `false` — xem lý do đầy đủ ở `QuestionRendererProps`. State, handler và
+   *  bố cục của player KHÔNG đổi gì. */
+  essayGradingEnabled?: boolean;
 }
 
 export function ExamPlayer({
@@ -47,6 +51,7 @@ export function ExamPlayer({
   questions,
   questionNodes,
   parts,
+  essayGradingEnabled,
 }: ExamPlayerProps) {
   const t = useT();
   const { current, answers, flags, selectAnswer, toggleFlag, goto, next, prev } = useExamPlayer(
@@ -265,6 +270,7 @@ export function ExamPlayer({
             <QuestionRenderer
               index={current + 1}
               question={question}
+              essayGradingEnabled={essayGradingEnabled}
               nodes={questionNodes[current]}
               selectedAnswer={answers[question.id]}
               onSelectAnswer={(value) => {

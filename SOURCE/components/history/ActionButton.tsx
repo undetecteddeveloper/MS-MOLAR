@@ -45,11 +45,18 @@ export interface ActionButtonProps {
   pdfInput: AttemptPdfData;
   /** Unique per rendered instance — keeps the sr-only reason span's id unique across N HistoryRow instances. */
   idPrefix: string;
+  /** Lý do KHÔNG xuất được, hoặc `null` khi xuất được (ADR-0018/AC-058).
+   *
+   *  BẮT BUỘC. Xem `usePdfAction` — một prop tuỳ chọn ở đây làm mọi call site
+   *  mới mặc định KHÔNG bị chặn, và chế độ hỏng im lặng là để lọt một tệp PDF
+   *  thiếu phần điểm tự luận. */
+  blockedReason: string | null;
 }
 
-export function ActionButton({ action, pdfInput, idPrefix }: ActionButtonProps) {
+export function ActionButton({ action, pdfInput, idPrefix, blockedReason }: ActionButtonProps) {
   const t = useT();
-  const { phase, run } = usePdfAction(action, pdfInput);
+  const { phase, run } = usePdfAction(action, pdfInput, blockedReason);
+  const blocked = blockedReason !== null;
   const reasonId = `${idPrefix}-${action}-reason`;
   const Icon = ICON[action];
   const label = t(LABEL_KEY[action]);
@@ -59,7 +66,12 @@ export function ActionButton({ action, pdfInput, idPrefix }: ActionButtonProps) 
       <TooltipTrigger
         type="button"
         onClick={run}
-        aria-disabled={phase === "busy" ? "true" : "false"}
+        // KHÔNG BAO GIỜ thuộc tính `disabled` gốc, ở BẤT KỲ trạng thái nào
+        // (UI-D5). Repo đã sửa đúng lỗi này HAI LẦN. `disabled` gỡ phần tử khỏi
+        // thứ tự tab VÀ đẩy LÝ DO ra ngoài tầm với của trình đọc màn hình — đúng
+        // hai thứ AC-058 muốn có. Idiom: focus được + `aria-disabled` (chuỗi) +
+        // `aria-describedby` trỏ tới ô `sr-only` mang lý do.
+        aria-disabled={blocked || phase === "busy" ? "true" : "false"}
         aria-busy={phase === "busy"}
         aria-describedby={reasonId}
         // `relative` is required — it anchors every absolutely-positioned descendant below (error/status text,
@@ -93,10 +105,12 @@ export function ActionButton({ action, pdfInput, idPrefix }: ActionButtonProps) 
         {/* Descendant of the button (not a Tooltip-level sibling, see D2 above) — aria-describedby resolves it
             by id regardless of DOM containment, so this move has no a11y-semantics effect, only a layout one. */}
         <span id={reasonId} className="sr-only">
-          {phase === "busy" ? t("history.generatingPdf") : ""}
+          {/* Lý do BỊ CHẶN thắng lý do BẬN: khi đang bị chặn thì không có lượt
+              tạo tệp nào để mà bận. */}
+          {blocked ? blockedReason : phase === "busy" ? t("history.generatingPdf") : ""}
         </span>
       </TooltipTrigger>
-      <TooltipContent>{label}</TooltipContent>
+      <TooltipContent>{blocked ? blockedReason : label}</TooltipContent>
     </Tooltip>
   );
 }

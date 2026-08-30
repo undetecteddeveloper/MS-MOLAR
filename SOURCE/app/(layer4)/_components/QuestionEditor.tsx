@@ -119,6 +119,13 @@ interface QuestionEditorProps {
   hasError: boolean;
   /** Nội dung server render sẵn cho CHÍNH câu này (TD-027). Vắng = render ở client. */
   nodes?: ReviewQuestionNodes;
+  /** Cờ chấm tự luận, ĐỌC Ở SERVER rồi truyền xuống — component này không bao
+   *  giờ tự đọc `process.env` (nó là client, và ở đó biến ấy không tồn tại).
+   *
+   *  MẶC ĐỊNH `false` chứ không phải `true`: fail-closed, giống hệt ba chỗ đọc
+   *  cờ kia. Một call site quên truyền prop sẽ hiện câu chữ CŨ — đúng, chỉ là
+   *  cũ — thay vì hứa với tác giả một tính năng có thể đang tắt. */
+  essayGradingEnabled?: boolean;
 }
 
 export function QuestionEditor({
@@ -126,6 +133,7 @@ export function QuestionEditor({
   onChange,
   hasError,
   nodes,
+  essayGradingEnabled = false,
 }: QuestionEditorProps) {
   const t = useT();
   const [editing, setEditing] = useState(false);
@@ -386,7 +394,21 @@ export function QuestionEditor({
               {empty}
             </p>
           )}
-          <p className="mt-1 text-xs italic text-muted-foreground">{t("upload.essayStored")}</p>
+          {/* OQ-5 / Task E4, quyết định (b) — HAI KHOÁ CHỌN THEO CỜ, không phải
+              một khoá viết lại.
+
+              Chuỗi cũ ("đã lưu, chưa chấm tự động") nói với TÁC GIẢ ĐỀ rằng
+              tự luận không được chấm. Nó thành SAI đúng lúc cờ bật. Nhưng chỉ
+              viết đè lên nó thì sai theo chiều NGƯỢC LẠI mỗi khi cờ tắt — và
+              cờ này CÓ đường tắt: E6 giữ một kill switch, còn preview thì
+              không nhất thiết mang cùng biến với production.
+
+              Nên giữ cả hai và chọn theo cờ, đúng khuôn `player.essayScored` /
+              `player.essayNotScored` mà AC-051 / UI-D8 đã dựng cho màn làm bài
+              (Task F-D1). Một khoá thì luôn có một trạng thái nó nói dối. */}
+          <p className="mt-1 text-xs italic text-muted-foreground">
+            {t(essayGradingEnabled ? "upload.essayScored" : "upload.essayStored")}
+          </p>
         </div>
       )}
     </li>

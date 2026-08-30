@@ -54,6 +54,9 @@ const PDF_INPUT: AttemptPdfData = {
   submittedAt: "2026-07-01T00:10:00.000Z",
   correct: 7,
   total: 10,
+  // ADR-0018 (Task B2.3) — bat buoc tren AttemptPdfData. `false` la gia tri
+  // dung o day: khong fixture nao trong file nay co cau tu luan.
+  hasIncompleteEssay: false,
 };
 
 function mockFile(): File {
@@ -65,7 +68,7 @@ function renderMenu() {
     <HistoryRowMenu
       pdfInput={PDF_INPUT}
       resultHref="/exams/exam-1/attempt/attempt-1/result"
-      examTitle={PDF_INPUT.examTitle}
+      examTitle={PDF_INPUT.examTitle} blockedReason={null}
     />
   );
 }
@@ -91,7 +94,7 @@ describe("HistoryRowMenu", () => {
       <HistoryRowMenu
         pdfInput={PDF_INPUT}
         resultHref="/x"
-        examTitle="Đề Vật Lý 10"
+        examTitle="Đề Vật Lý 10" blockedReason={null}
       />
     );
     const trigger = within(container).getByRole("button", {

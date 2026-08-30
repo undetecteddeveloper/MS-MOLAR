@@ -13,6 +13,11 @@ function entry(overrides: Partial<MyHistoryEntry>): MyHistoryEntry {
     submittedAt: "2026-07-10T00:10:00.000Z",
     correct: 8,
     total: 10,
+    // ADR-0018 — hai boolean BAT BUOC tren MyHistoryEntry. `false` la gia tri
+    // dung o day: khong fixture nao trong file nay co cau tu luan. `tsc` tim ra
+    // dong nay, dung nhu muc Quality Assurance cua Task B2.2 du doan.
+    hasUnresolvedEssay: false,
+    hasIncompleteEssay: false,
     ...overrides,
   };
 }

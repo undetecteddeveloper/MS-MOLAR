@@ -238,6 +238,65 @@ export function checkEnv(env: Readonly<Record<string, string | undefined>>): Env
     });
   }
 
+  // --- Chấm tự luận tự động qua Groq (ADR-0018) -----------------------------
+  // Ba biến, và chúng KHÔNG cùng một hình dạng hỏng — đó là điểm chính của khối
+  // này. Cả ba đăng ký ở mức `warn`: một môi trường chưa bật chấm tự luận là
+  // môi trường HOÀN TOÀN HỢP LỆ, và nó đúng là trạng thái tính năng này ship.
+  if (!get("GROQ_API_KEY")) {
+    // Cùng khuôn GEMINI_API_KEY (:77-84): thiếu thì một mảng chức năng tắt chứ
+    // app vẫn phục vụ mọi thứ khác, nên không được phép làm sập cả tiến trình.
+    problems.push({
+      level: "warn",
+      name: "GROQ_API_KEY",
+      impact:
+        "không gọi được Groq — nếu chấm tự luận đang bật thì mọi câu tự luận hỏng ở bước gọi provider, học sinh thấy nút chấm lại thay vì điểm",
+    });
+  }
+
+  const groqBudget = get("GROQ_BUDGET_DAILY_LIMIT");
+  if (!groqBudget) {
+    // Fail-closed, y hệt AI_BUDGET_DAILY_LIMIT (:217-239) và vì cùng một lý do:
+    // một TRẦN CHI bị thiếu không được phép đọc thành trần vô hạn. Trần này là
+    // của Groq chứ không dùng chung với Gemini (AC-030) — một trần cho hai nhà
+    // cung cấp thì một ngày chấm nặng đúng là thứ tắt gia sư đi.
+    problems.push({
+      level: "warn",
+      name: "GROQ_BUDGET_DAILY_LIMIT",
+      impact:
+        "chưa có trần chi Groq ngày → mọi lượt chấm tự luận bị TỪ CHỐI (fail-closed, cố ý — thiếu trần KHÔNG có nghĩa là không giới hạn)",
+    });
+  } else if (!Number.isInteger(Number(groqBudget)) || Number(groqBudget) < 1) {
+    problems.push({
+      level: "warn",
+      name: "GROQ_BUDGET_DAILY_LIMIT",
+      impact: `"${groqBudget}" không phải số nguyên dương — trần chi Groq ngày không dùng được, mọi lượt chấm tự luận bị TỪ CHỐI`,
+    });
+  }
+
+  // Quy tắc đọc ở MỌI chỗ đọc: "true" (đã trim) bật; mọi giá trị khác, kể cả
+  // vắng mặt, TẮT. Mức `warn` chứ không `error` là cố ý (AC-067).
+  const essayGrading = get("ESSAY_GRADING_ENABLED");
+  if (!essayGrading) {
+    problems.push({
+      level: "warn",
+      name: "ESSAY_GRADING_ENABLED",
+      impact:
+        "chưa bật chấm tự luận → mọi câu tự luận vẫn hiện 'chưa chấm tự động', đúng như trước tính năng này (môi trường hợp lệ — đây là trạng thái ship)",
+    });
+  } else if (essayGrading !== "true") {
+    // Cái bẫy riêng của biến này, và là lý do nhánh thứ hai tồn tại: ngay TRONG
+    // file này, GEMINI_PAID_TIER_ENABLED nhận CẢ "1" lẫn "true". Người vận hành
+    // gõ `ESSAY_GRADING_ENABLED=1` theo trí nhớ từ biến kia sẽ được đọc là TẮT,
+    // và triệu chứng giống hệt ca chưa-đặt-biến. Đúng kiểu hỏng im lặng TD-009
+    // sinh ra checkEnv để chặn. "TRUE" viết hoa cũng rơi vào đây: phép so khớp
+    // ở các chỗ đọc là NGUYÊN VĂN, không hạ chữ thường.
+    problems.push({
+      level: "warn",
+      name: "ESSAY_GRADING_ENABLED",
+      impact: `"${essayGrading}" không phải giá trị bật — CHỈ "true" (chữ thường) mới bật; chấm tự luận hiện vẫn TẮT`,
+    });
+  }
+
   const siteUrl = get("NEXT_PUBLIC_SITE_URL");
   if (siteUrl && !isParseableHttpUrl(siteUrl)) {
     problems.push({

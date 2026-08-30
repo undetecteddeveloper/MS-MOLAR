@@ -35,3 +35,21 @@ export const QUESTION_MODEL = "gemini-3.5-flash";
 /** Model đọc file đáp án (rẻ hơn). Dùng chung cho batch gắn thẻ kỹ năng —
  *  phân loại hàng loạt, cùng hạng chi phí/độ khó với việc đọc file đáp án. */
 export const ANSWER_MODEL = "gemini-3.1-flash-lite";
+
+// Model chấm tự luận (Groq, ADR-0018). Đặt Ở ĐÂY chứ KHÔNG trong
+// lib/essay/groqClient.ts vì đúng lý do file này tồn tại: groqClient.ts có
+// `import "server-only"`, nên một script chạy bằng tsx không đọc được hằng nằm
+// trong đó và sẽ viết cứng tên model của riêng nó — đúng sự cố đã ghi ở :9-13,
+// lặp lại nguyên xi với một nhà cung cấp khác.
+//
+// VÌ SAO qwen/qwen3.8-27b (kỹ sư đo trên chính tài khoản sẽ dùng, 2026-08-29):
+// TPD 2M của nó GẤP MƯỜI LẦN mọi ứng viên còn lại trong danh mục tài khoản, và
+// TPD là trần ràng buộc trước tiên ở đây (GROQ_BUDGET_DAILY_LIMIT suy ra từ nó).
+// Lựa chọn ban đầu "llama-3.3-70b-versatile" KHÔNG có trong danh mục tài khoản
+// dù ba nguồn bên thứ ba nói ngược lại: danh mục free tier là chuyện THEO TỪNG
+// TÀI KHOẢN, chỉ phép đo trên chính tài khoản sẽ dùng mới là bằng chứng.
+//
+// ĐỔI GIÁ TRỊ NÀY BẮT BUỘC CHẠY LẠI AC-070 (đánh giá đối kháng với provider
+// thật) và ghi lại kết quả CÓ NGÀY THÁNG trước khi thay đổi ship — bằng chứng
+// chống tiêm chích là THEO TỪNG MODEL, không kế thừa qua một lượt đổi model.
+export const ESSAY_GRADER_MODEL = "qwen/qwen3.8-27b";
