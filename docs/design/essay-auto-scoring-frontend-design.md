@@ -4,11 +4,19 @@
 |---|---|
 | **Version** | 1.2 |
 | **Date** | 2026-08-29 |
-| **Status** | Draft — hiện thực hoá lát cắt hiển thị mà `docs/ui-spec/essay-auto-scoring-ui-spec.md` **v1.4** đặc tả, tiêu thụ các hợp đồng do `docs/design/essay-auto-scoring-backend-design.md` **v1.5** chốt. |
-| **PRD** | `docs/prd/essay-auto-scoring-prd.md` **v1.3** (AC-001–AC-072; v1.3 đóng OQ-7 — mục tiêu độ trễ ≤ 60 giây → **≤ 3 phút**) |
+| **Status** | Draft — hiện thực hoá lát cắt hiển thị mà `docs/ui-spec/essay-auto-scoring-ui-spec.md` **v1.3** đặc tả, tiêu thụ các hợp đồng do `docs/design/essay-auto-scoring-backend-design.md` **v1.9** chốt. |
+| **PRD** | `docs/prd/essay-auto-scoring-prd.md` **v1.2** (AC-001–AC-072; OQ-7 đóng — mục tiêu độ trễ ≤ 60 giây → **≤ 3 phút**) |
 | **ADR** | `docs/adr/ADR-0018-essay-async-grade-write.md` (**Accepted** 2026-08-29, Decision 1–6, Amendment to ADR-0010, cả hai Escalation đã giải) |
-| **UI Spec** | `docs/ui-spec/essay-auto-scoring-ui-spec.md` **v1.4** — nguồn chuẩn của cấu trúc component, máy trạng thái render RS-0…RS-6, 29 chuỗi hiển thị, hằng polling và yêu cầu a11y. Tài liệu này **kế thừa nguyên vẹn** 13 quyết định UI-D1…UI-D13 và **không mở lại** cái nào. |
-| **Backend Design** | `docs/design/essay-auto-scoring-backend-design.md` **v1.5** — nguồn chuẩn của năm khoá jsonb, `EssayView`, `EssaySummary`, hạn chờ suy-lúc-đọc và chữ ký Server Action. Tài liệu này **tiêu thụ**, không thiết kế lại. |
+| **UI Spec** | `docs/ui-spec/essay-auto-scoring-ui-spec.md` **v1.3** — nguồn chuẩn của cấu trúc component, máy trạng thái render RS-0…RS-6, 29 chuỗi hiển thị, hằng polling và yêu cầu a11y. Tài liệu này **kế thừa nguyên vẹn** 13 quyết định UI-D1…UI-D13 và **không mở lại** cái nào. |
+| **Backend Design** | `docs/design/essay-auto-scoring-backend-design.md` **v1.9** — nguồn chuẩn của năm khoá jsonb, `EssayView`, `EssaySummary`, hạn chờ suy-lúc-đọc và chữ ký Server Action. Tài liệu này **tiêu thụ**, không thiết kế lại. |
+
+> **Sửa citation 2026-08-30 (Final §16).** Bốn số hiệu ở bảng trên đều SAI so với file thật, và sai theo **hai chiều khác nhau** — nên không thể chữa bằng một phép "cộng thêm một":
+> - UI Spec: ghi **v1.4**, thật là **v1.3** → trích một phiên bản KHÔNG TỒN TẠI.
+> - Backend DD: ghi **v1.5**, thật là **v1.9** → trễ **bốn** bản.
+> - PRD: ghi **v1.3**, thật là **v1.2** → lại trích quá lên.
+>
+> Đáng ghi hơn: chính checklist của Final §16 mô tả lỗi này SAI — nó nói tài liệu đang trích "UI Spec v1.2 và backend v1.2, trong khi bản hiện tại là UI Spec v1.3 và backend v1.4". Cả bốn con số ấy đều không khớp thực tế. Làm theo nguyên văn checklist sẽ tạo ra một bản "sửa" mới cũng sai. Số hiệu ở đây được lấy bằng cách ĐỌC header của từng file, không lấy từ checklist.
+
 | **Tiền lệ về cấu trúc** | `docs/design/short-answer-scoring-frontend-design.md` (cùng bài toán, lát cắt hiển thị), `docs/design/history-frontend-design.md` (bề mặt `/history`, `ActionButton`, đường ống PDF) |
 | **Nhánh** | `design/adr-0018-essay-async-grade-write` |
 | **Kiểm lại mã trong phiên viết** | **Mọi** số dòng trích trong tài liệu này được đọc lại từ file thật trong phiên viết — kể cả những số đã có ở UI Spec và ở backend Design Doc. Bốn trường hợp lệch được ghi ở § Fact Disposition Table. |

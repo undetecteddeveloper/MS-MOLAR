@@ -72,7 +72,42 @@ Both essay elements settled **`graded`** — terminal, so both contribute to ear
 
 The missing key is `selected`, and its absence means the question was **skipped**. `essayAttempts: 0` is then exactly right: the empty-answer path settles band 0 **with no claim and no provider call** (Task B1.4), so no attempt is consumed. Nothing is malformed — a skipped question has always lacked `selected`, and that is not essay-specific. Recorded because a future reader running this same probe will see 9-vs-10 and needs to know it is not drift in the W1 shape.
 
-### Step 5 — NOT done
+### Step 5 — DONE 2026-08-30. Kill switch rehearsed and verified in both directions
+
+**The write side was demonstrated three times, as a clean A-B-A** — which is stronger than the task asked for, because a single off-observation cannot distinguish "the switch works" from "the deploy is broken":
+
+| time (UTC) | flag | essay keys emitted on a new submission |
+|---|---|---|
+| 12:44 | **on** | 2 |
+| 12:59 | **off** | **0** |
+| 13:36 | **on** | 6 |
+| 13:42 | **off** | **0** |
+
+`telemetry_log` moved 2 -> 8 across the 13:36 run and gained **nothing** afterwards. So `computeScore()` stops emitting keys and `after()` stops registering the pass — twice, with a working on-state in between.
+
+**The read side — the half that actually matters — was confirmed by the engineer**: opening the already-graded attempt `56907df6` (six graded essays) **with the flag off**, the bands are still on screen. Turning the feature off does not take a student's score away.
+
+That completes the property this rehearsal exists to establish: **the flag gates emitting NEW keys, never reading OLD ones.** The structural reason is recorded above — `ESSAY_GRADING_ENABLED` appears at four sites, all write-or-announce, and **zero** times in `queries.ts`, `essayLifecycle.ts`, `EssayScoreLine` or `EssayReviewBlock`.
+
+#### Two observations from the production data, neither a defect
+1. **Telemetry overcounts provider work.** Of the six essays graded at 13:36, **five had `essayAttempts: 0` and no `selected` key** — skipped questions, settled to band 0 by the empty-answer path with **no provider call** (Task B1.4). Only one consumed an attempt. But **six** `essay_grade` telemetry rows were written, because telemetry is recorded at every branch including that settle. Correct by design, and worth knowing before anyone builds a spend dashboard on that table: it counts *lifecycle events*, not *Groq requests*, and the gap is however many blanks students leave.
+2. **Every essay graded on production so far has scored 0** — eight across two attempts. Six were blank and one was 5 characters, one 13; all of those *should* be 0, so this is not evidence of a broken grader, and Task E3's 4/4 agreement against human-expected bands is the real reassurance. But production has still never displayed a **non-zero** band, so the first substantial student answer is worth watching rather than assuming.
+
+#### Live state at the time of writing
+The rehearsal left `ESSAY_GRADING_ENABLED` **not equal to `true` on production**, i.e. grading is currently **off**. Restoring it to a trimmed lowercase `true` and redeploying is the final action of this task.
+
+### Superseded — the earlier NOT-done note
+
+The engineer set `ESSAY_GRADING_ENABLED` to a non-`true` value and reports **no issue appeared**. That is necessary but not sufficient: "nothing broke" is the easy half. The half this rehearsal exists for is **already-graded attempts keep rendering their bands**, and an absence of errors does not demonstrate it.
+
+**Two halves confirmed without eyes on a screen:**
+
+1. **The stored bands survived**, measured read-only against prod while the flag was off: both essay elements still present, both still `graded`, `essayMax` summing to 2. Switching off deleted nothing — which is the property that makes the switch safe to use in an incident.
+2. **No read path is flag-gated, structurally.** `ESSAY_GRADING_ENABLED` appears at exactly **four** sites, and every one is a write-or-announce path: `submitExam()` (emitting keys), `retryEssayGrading()` (the action itself), the player footnote, and the author footnote. It appears **zero** times in `app/(layer2)/queries.ts`, `lib/scoring/essayLifecycle.ts`, `EssayScoreLine.tsx` or `EssayReviewBlock.tsx`. Reading an old key therefore cannot depend on the flag — this is the structural reason turning it off cannot erase a student's score.
+
+**Still outstanding:** a human opening the already-graded production attempt **with the flag off** and confirming the band is on screen. The two facts above make it near-certain; the rehearsal's entire purpose is to replace "near-certain, deduced" with "seen". Left open rather than ticked.
+
+### Superseded — the earlier NOT-done note
 The kill-switch rehearsal has not been performed. It is the one part of E6 still open, and it is the part that proves turning the feature **off** is safe — specifically that **already-graded attempts keep rendering their bands**, because the flag gates emitting *new* keys, not reading *old* ones.
 
 ### Superseded — the block that stopped the first attempt

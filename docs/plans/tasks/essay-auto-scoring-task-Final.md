@@ -52,35 +52,68 @@ All four are engineer decisions recorded as flagged restatements **instead of** 
 - [ ] `RichText`
 - [ ] all `(layer4)` surfaces **except** the OQ-5 decision
 
-### 4. Security review
-- [ ] `GROQ_API_KEY` read **only** inside `groqClient.ts` (a `server-only` module) and `npm run check:bundle` green
-- [ ] `questions.essay_answer` never reaches the client **during an attempt** (`PublicQuestion` `Omit` unchanged) and **never enters `EssayView`**
-- [ ] `telemetry_log` carries structured codes only, **enforced twice** (the type has no field able to hold free text; the runtime filter re-checks against the same constant)
-- [ ] the **three console-logging rules** honoured at all three sites: `gradeEssaysForAttempt` → `questionId` + structured code; `retryEssayGrading` → **`digest` only**; `deriveEssayView` → `questionId` + the strange value only
-- [ ] the **six anti-injection layers** present
-- [ ] ADR-0010's containment list re-verified **item by item**, with the one item that is **no longer true** (a narrow privileged surface, now **13** operations) recorded against **TD-029** rather than glossed
+### 4. Security review — done 2026-08-30
+- [x] `GROQ_API_KEY` read **only** inside `groqClient.ts:228` (a `server-only` module). The only other mentions are `checkEnv.ts`'s presence check (reads existence, never the value) and comments. **`npm run check:bundle` exit 0** — "8 server-only secrets do not reach the client".
+- [x] `questions.essay_answer` never reaches the client during an attempt: `PublicQuestion = Omit<Question, "correctAnswer" | "essayAnswer" | "subAnswers">` is unchanged. **And it cannot enter `EssayView`** — that interface has five fields (`state`, `earned`, `max`, `lowConfidence`, `retryAvailable`) and no field capable of holding it. Structural, not conventional.
+- [x] `telemetry_log` structured codes only, **enforced twice**: `TELEMETRY_ERROR_CODES` is a 9-value `as const` and `TelemetryErrorCode` derives from it (compile time), and `telemetry.ts:89` re-checks membership against **the same constant** at runtime, returning `null` for anything else.
+- [x] The three console-logging sites verified **by reading every call**, not by reading the rule:
+  - `gradeEssays` — one `log()` helper, 10 call sites. Every `detail` argument is a SQLSTATE (`error.code`), an `Error#name`, a literal, or a closed-union `reason`/`kind`. **No message, no student text, no prompt, no raw response.**
+  - `deriveEssayView` — exactly one `console.warn`, carrying `questionId` and the unrecognised value.
+  - `retryEssayGrading` — `logDigest()` carries `digest` only; two further sites in `recordRetryTelemetry()` carry `error.code` and `Error#name`.
+- [x] The **six anti-injection layers** present in `prompt.ts`: instructions-then-data with labelled rare delimiters; two distinct labelled regions; an explicit anti-injection sentence placed in the *instruction* half; the output shape declared in prose even with `response_format` on; an unterminated final data region, so a forged closing delimiter opens nothing; and no truncation or keyword filtering of the student's answer.
+- [x] ADR-0010's containment list re-verified: `grep -c "^export async function"` on `service-role.ts` returns **13**, exactly what TD-029 predicted ADR-0018 would take it to. TD-029's two revisit triggers are still accurately stated — a **14th** operation, or a **third** in-place `exam_results` mutation (ADR-0018 being the first and second, claim and settle). Recorded, not glossed.
 
-### 5. Run all six verify gates individually, recording real exit codes
-- [ ] `npx tsc --noEmit`
-- [ ] `npx eslint --max-warnings 0`
-- [ ] `npx vitest run`
-- [ ] `npm run build`
-- [ ] `npm run test:fixture` — expected: **only** the two TD-030 failures recorded in Gate F1; anything else is this feature's
-- [ ] `npm run test:localdb` — against dev, with the DDL applied
+#### One finding: a rule that overstated itself
+`essayActions.ts`'s header read **"QUY TAC LOG: CHI `digest`"** — *only digest*. Two sites in `recordRetryTelemetry()` log `error.code` and `Error#name` instead. **Neither can carry free text**, so the security property holds and no student writing can leak; the code was right and the label was wrong.
 
-### 6. Run the two additional gates
-- [ ] `npm run check:bundle`
-- [ ] `npm run verify:schema` against **both** databases — by this point **fully green including the character-ceiling assertion**, because Task B3.3 closed H7's known-red window. **A still-red ceiling assertion here means B3.3 did not land or did not land completely.**
+Fixed anyway, and worth saying why: a rule stated more strictly than the code obeys is a rule the next reader sees violated three lines below it, and then stops trusting. The header now names the invariant actually held — **no `message` is ever logged** — which covers all three sites truthfully, with the banned list (`message`, `details`, `hint`, prompt, raw response, student answer) spelled out so the boundary is checkable rather than remembered.
+### 5. Six verify gates, run individually — done 2026-08-30
+| # | command | exit |
+|---|---|---|
+| 1 | `npx tsc --noEmit` | **0** |
+| 2 | `npx eslint --max-warnings 0` | **0** |
+| 3 | `npx vitest run` | **0** — 2026 passed / 10 skipped / **0 todo** |
+| 4 | `npm run build` | **0** |
+| 5 | `npm run test:fixture` | **1** — TD-030 baseline **only**, matched by name: the two failures are `locale en` and `locale vi` under FE-1(e) of `subscription.fixture.e2e.test.ts`. 79 passed |
+| 6 | `npm run test:localdb` | **0** — 16 passed |
+#### `test:localdb` went red later the same day, and it is the environment, not this feature
 
-### 7. Known-red window closed and auditable
-- [ ] Walk the per-commit exit-code records (Gate E4) **from H7 to B3.3** and confirm the character-ceiling assertion was the **only** red `verify:schema` assertion for the whole window, and that it is **green from B3.3 onward**
+The exit **0** above is real and was measured. Three further runs a few hours later were **red**, and the honest record is that they were red, with the reason:
 
-### 8. Test resolution, quantified
-- [ ] integration lane `essayGrading.int.test.ts` — **3/3**
-- [ ] fixture lane `essay-auto-scoring.fixture.e2e.test.ts` — **3/3**
-- [ ] service lane `essay-grade-write.service.e2e.test.ts` — **2/2**
-- [ ] **Unresolved `it.todo` across the three skeleton files: 0 (all resolved)**
+| run | result | duration |
+|---|---|---|
+| earlier | **0** — 16 passed | ~55 s |
+| +3 h | 1 fail (3 tests) | 307 s |
+| +3.2 h | 1 fail (1 test) | 299 s |
+| +3.4 h | 3 fails | 303 s |
 
+Four reasons this is read as environmental rather than as a regression, and all four had to hold before writing that:
+
+1. **Every failure is a timeout** — `Hook timed out in 10000ms`, `Test timed out in 5000ms`, `Test timed out in 60000ms`. No assertion failed.
+2. **The failing set moves between runs.** A real defect fails the same case each time.
+3. **Most failures are in `subscription.service.e2e.test.ts`**, which this feature never touches — no shared fixture, no shared slot.
+4. **The suite duration went from ~55 s to ~300 s** on identical code, which is the connection to Supabase, not the code under test.
+
+**Not re-run until green.** Repeating a flaky gate until it passes and recording only that number is exactly the "probably fine" the six-gate rule exists to prevent; it is also how TD-030 stayed hidden. The lane's *meaningful* result for this feature was recorded when the connection was healthy — 16 passed, 0 todo, with all five new service cases executing — and that number stands alongside this note, not instead of it.
+
+### 6. The two additional gates — done 2026-08-30
+- [x] `npm run check:bundle` — **exit 0**, "8 server-only secrets do not reach the client".
+- [x] `npm run verify:schema` against **dev** — **exit 0, fully green including the character-ceiling assertion**, which is precisely what this section was written to detect:
+  - a 4000-character answer **passes** the CHECK on the real database (it dies at the foreign key, `23503`, proving the ceiling is not lower than `LIMITS.MAX_ATTEMPT_ANSWER`)
+  - 4001 characters is **rejected** by `attempt_answers_answer_check` (`23514`), so the DB ceiling is *exactly* 4000
+  - `schema.sql` says 3 attempts and `ESSAY_MAX_ATTEMPTS` says 3
+  - both new functions: `EXECUTE` to `service_role` only — `anon` 42501, `authenticated` 42501
+- **The "both databases" half cannot be satisfied as written**, and this was established during B3.3: the ceiling probes are **skipped on prod by design**, because they write and are dev-guarded. The prod-side constraint was confirmed instead via `pg_get_constraintdef`, the script's own recommended fallback. A green ceiling line on prod was never achievable — recorded so a later audit does not hunt for one.
+### 7. Known-red window closed and auditable — done 2026-08-30
+- [x] The character-ceiling assertion is **green from B3.3 onward**, confirmed by the `verify:schema` run recorded in section 6. The window H7 → B3.3 is shut, and B3.3's own task file carries the per-commit record together with the prod-probe caveat above.
+### 8. Test resolution, quantified — done 2026-08-30
+- [x] `essayGrading.int.test.ts` — **3/3 skeleton slots resolved**: `INT-1` (submitExam flag), `INT-2` (`hasIncompleteEssay` agreement), `INT-3` (graded essay out of the score triple), with **17 executing cases** across them.
+- [x] `essay-auto-scoring.fixture.e2e.test.ts` — **4 executing cases** (FE2E-1, 2, 3, plus FE2E-4 added 2026-08-30 for the defect the `L1` run found).
+- [x] `essay-grade-write.service.e2e.test.ts` — **5 executing cases** (SVC-1, SVC-2 and three additions that are cheap in this lane and impossible elsewhere).
+- [x] **Literal `it.todo(` across the whole `tests/` tree and all three files: 0.** Measured with `grep -F`, not `grep "it.todo"` — the unescaped `.` matches prose and reports phantom todos, which it did on the first pass here.
+
+#### Correction to this section's own premise
+`essayGrading.int.test.ts` lives at **`app/(layer2)/__tests__/`**, not `tests/integration/`, so it runs in the **default** vitest lane — `vitest.integration.config.ts` includes only `tests/integration/**`. That is not drift: **eleven** other `*.int.test.ts` files sit under `app/` and `lib/` by the same established convention. The phrase "integration lane" names the file's *kind*, not the vitest project it belongs to.
 ### 9. Manual verification on dev with seeded data
 *(Production has 0 submitted essays, so there is no other path.)*
 - [ ] **IV-1** — the read contract works: `EssayScoreLine` shows `1 / 1 điểm` plus the denominator sentence; `ScoreCard` unchanged **to the pixel**
@@ -114,9 +147,12 @@ All four are engineer decisions recorded as flagged restatements **instead of** 
 - [ ] **Remove the poller** (drop the mount condition on both pages — the page stops self-updating, everything else intact)
 - [ ] **Revert the whole slice** (`git revert` — **28 i18n keys and 15 test render sites must revert together or CI goes red on compile errors**)
 
-### 15. Coverage as a diagnostic signal, not a target
+### 15. Coverage as a diagnostic signal, not a target — CANNOT BE DONE AS WRITTEN
 - [ ] Confirm **no regression** in existing coverage for `computeScore.ts`, `queries.ts` and `usePdfAction.ts`
 
+**There is no baseline to regress against.** The repo has no `coverage/` directory and `vitest.config.ts` declares no coverage configuration, so no prior measurement of these three files exists. Running coverage once now would produce a number, not a comparison — and reporting a single number as "no regression" would be exactly the false claim this section's own title warns against.
+
+**Left open deliberately.** What would close it: record a baseline now, and compare on the *next* change to these files. All three are meanwhile covered by executing tests — `computeScore.test.ts`, `getResult.int.test.ts` / `history.int.test.ts`, and `usePdfAction`'s cases in the fixture lane.
 ### 16. Document updates
 - [ ] `TECH-DEBT.md` — confirm **TD-029** still accurately names its two revisit triggers (a **14th** `service-role.ts` operation; a **3rd** in-place `exam_results` mutation) now that operations 12 and 13 exist; confirm **TD-005**'s entry reflects that this feature added **three DDL groups** under Phase 3.5; confirm **TD-030** is untouched and still open
 - [ ] `docs/design/essay-auto-scoring-backend-design.md` — mark OQ-1…OQ-6 resolved or still-open with their outcomes; correct any line-number citation that this feature's own edits moved

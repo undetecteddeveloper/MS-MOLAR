@@ -36,12 +36,25 @@
 // chính thứ tự ấy được ghim lại bằng `mock.invocationCallOrder` ở CẢ HAI lối
 // vào, vì đảo nó ở lối nào cũng mở ra cùng một lỗ hổng.
 //
-// ═══ QUY TẮC LOG: CHỈ `digest` (AC-056) ═══
+// ═══ QUY TẮC LOG: KHÔNG BAO GIỜ MỘT THÔNG ĐIỆP (AC-056) ═══
 //
 // Đúng pattern `RecheckOrderControl.tsx:181-184`. Cấm log `err` nguyên vẹn:
 // thông điệp lỗi Postgres đi qua biên này CÓ THỂ vọng lại nội dung bài làm, và
 // `Error#message` KHÔNG enumerable nên một lượt rò kiểu đó không lộ ra dưới
 // `JSON.stringify` — nó chỉ lộ ra ở console thật, tức là muộn.
+//
+// Cái được phép log là ba thứ, và cả ba đều KHÔNG THỂ mang văn bản tự do:
+// `digest` (`logDigest()`), một SQLSTATE (`error.code`), và tên lớp lỗi
+// (`Error#name`). Cái bị cấm là `message`, `details`, `hint`, prompt, response
+// thô, và bài làm.
+//
+// *(Sửa nhãn 2026-08-30, Final §4.) Tiêu đề cũ ghi "CHỈ `digest`", nhưng hai
+// chỗ log ở `recordRetryTelemetry()` ghi `error.code` và `Error#name` — cả hai
+// đều an toàn, nên đây là bản mô tả sai chứ không phải mã sai. Vẫn phải sửa:
+// một quy tắc nói quá lên là quy tắc người sau đọc rồi thấy mã vi phạm ngay
+// dòng dưới, và từ đó thôi tin cả quy tắc. Cách phát biểu mới nêu đúng cái bất
+// biến đang thực sự được giữ — không có THÔNG ĐIỆP nào bị log — và nó bao đúng
+// cả ba chỗ.*
 
 "use server";
 
