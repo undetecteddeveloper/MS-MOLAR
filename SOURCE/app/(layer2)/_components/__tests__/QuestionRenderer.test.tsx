@@ -113,10 +113,14 @@ describe("QuestionRenderer — footnote copy (AC-008/AC-009)", () => {
     ).toBeTruthy();
 
     // Ô nhập phải TỒN TẠI (đây là thứ bug prod làm mất) và bị chặn đúng ở trần
-    // của DB — attempt_answers.answer CHECK length <= 500.
+    // của DB — attempt_answers.answer CHECK length <= 4000 (nâng 500 → 4000 ở
+    // Task H7/B3.3, R11/D11: một bài tự luận có rubric không viết nổi trong 500
+    // ký tự). Con số này DI CHUYỂN CÙNG `LIMITS.MAX_ATTEMPT_ANSWER`:
+    // `QuestionRenderer.tsx:23` alias hằng đó, và cả `maxLength` lẫn phép tính
+    // `charsLeft` đều đọc alias — nên không có literal thứ hai nào để trôi lệch.
     const textarea = container.querySelector("textarea");
     expect(textarea).not.toBeNull();
-    expect(textarea?.maxLength).toBe(500);
+    expect(textarea?.maxLength).toBe(4000);
     // Nhãn phải trỏ đúng ô nhập (a11y) — id do questionType + question.id sinh ra.
     expect(textarea?.id).toBe(`essay-${ESSAY_QUESTION.id}`);
     expect(container.querySelector(`label[for="essay-${ESSAY_QUESTION.id}"]`)).not.toBeNull();

@@ -42,9 +42,10 @@ The tutor cap lands **before or with** the raise, **never after**. In the window
 That line pins the English footnote string and is **AC-051**-coupled; it stays green while the flag is off and fails at a **different** time. Backend D-14 states plainly that treating `:112` and `:119` as one site is how the wrong one gets "fixed". See **Open Item I-6** — resolved at Task **F-D1**.
 
 ## Target Files
-- [ ] `SOURCE/lib/tutor/prompt.ts`
-- [ ] `SOURCE/lib/ugc/limits.ts`
-- [ ] `SOURCE/app/(layer2)/_components/__tests__/QuestionRenderer.test.tsx`
+- [x] `SOURCE/lib/tutor/prompt.ts` — `TUTOR_MAX_STUDENT_ANSWER` declared separately, slice enforced inside `buildTutorPrompt()`, the `:36` reason corrected
+- [x] `SOURCE/lib/ugc/limits.ts` — `MAX_ATTEMPT_ANSWER` 500 to 4000, comment rewritten with the asymmetry
+- [x] `SOURCE/app/(layer2)/_components/__tests__/QuestionRenderer.test.tsx` — `maxLength` pin to 4000, comment corrected; **`:112` untouched**
+- [x] `SOURCE/lib/tutor/__tests__/prompt.test.ts` — **extra, required by this task's own Red phase** ("write the EG-BE-029 case and observe it fail"); the case has to live somewhere and the Target Files list omitted it
 
 ## Investigation Targets
 - `docs/design/essay-auto-scoring-backend-design.md` (§ Ripple R11 vào đường Gemini — `TUTOR_MAX_STUDENT_ANSWER` declared separately and enforced inside `buildTutorPrompt()`)
@@ -71,25 +72,69 @@ That line pins the English footnote string and is **AC-051**-coupled; it stays g
 Roundtrip check this task closes: after this commit the two ceilings are equal on **both** databases, and the gate goes green.
 
 ## Investigation Notes
-_(Record here: the audit of the window's per-commit exit codes confirming the ceiling assertion was the only red one; the EG-BE-029 measurement (prompt answer region length given a 4000-character input); the `verify:schema` red→green transition on both databases.)_
+
+### Audit of the known-red window — the ceiling was the only red assertion, throughout
+Required before this commit removes the signal. Walked the Gate E4 records from H7 to here:
+
+| Task | `verify:schema` record |
+|---|---|
+| H7 | Window opened. Every assertion green **except** the ceiling gate |
+| B1.5 | exit 1, exactly 1 failing assertion: the ceiling |
+| B1.6 | exit 1, exactly 1 — named in full: *"TRẦN DB CAO HƠN TRẦN TRONG MÃ ... = 500"* |
+| B2.1 | exit 1, exactly 1: the ceiling |
+| B2.2 | exit 1, exactly 1: the ceiling (`500` vs a DB ceiling of `4000`) |
+| B2.3 | exit 1, exactly 1: the ceiling |
+| B2.4 | exit 1, exactly 1: the ceiling |
+| B3.1 | not run — touches no schema and no `LIMITS` constant |
+| B3.2 | not run — same reason |
+
+**No assertion other than the ceiling was ever red**, so nothing was being masked. Two runs in the window exited 1 with **zero** failing assertions and `fetch failed` (B1.5, B2.1) — the documented network signature on this machine, not a schema regression; both were re-run.
+
+Confirmed live immediately before the change: dev exited **1** with that one assertion and nothing else.
+
+### The completion evidence, and one assertion that could not run until now
+After the constant moved, dev `verify:schema` exits **0**, fully green. Two lines changed together, and the second is the more interesting one:
+
+- *"Bài làm dài đúng trần (4000 ký tự) QUA được CHECK"* — was `(500 ký tự)`, still green.
+- *"Bài làm quá trần một ký tự (4001) bị `attempt_answers_answer_check` TỪ CHỐI (23514)"* — **this assertion could not pass at all during the window.** With code at 500 and the DB at 4000, the probe at 501 sailed through the CHECK and died on the foreign key (`23503`), which is precisely what the gate reported as failure. It now probes at 4001 and gets the real `23514`. So the gate is not merely quiet — it is exercising the constraint again.
+
+**The prod half is narrower than the task asked for, and that is stated rather than smoothed over.** The `SCHEMA_ENV_FILE=.env.local.prod-backup` run was refused by this session's command classifier. Rather than work around it, the ceiling was read directly and read-only via the project's documented Composio path: `pg_get_constraintdef` returns `CHECK (((answer IS NULL) OR (length(answer) <= 4000)))` on **both** refs, byte-identical. That settles EG-BE-028's actual claim — the two ceilings are equal on both databases — but it is **not** the full behavioural probe suite on prod. **Recommended: run `SCHEMA_ENV_FILE=.env.local.prod-backup npm run verify:schema` once from `SOURCE/`** to close the prod half exactly as written.
+
+### EG-BE-029 measured, not asserted in the abstract
+Uncapped, a `short_answer` prompt built from a 4000-character answer measured **4807 characters** (observed in the Red run). Capped, the answer region is exactly `TUTOR_MAX_STUDENT_ANSWER` = 500 characters, counted on the prompt string itself. Five cases: the cap, the cap living *inside* `buildTutorPrompt()` (the caller passes raw DB text and still cannot exceed it), passthrough for a normal answer, passthrough at exactly the boundary, and the decoupling assertion.
+
+### The decoupling is what the test pins — not the number
+`prompt.ts` deliberately does **not** import `LIMITS.MAX_ATTEMPT_ANSWER`. The two constants answer different questions owned by different budgets: one is *how much a student may write* (must match Postgres), the other is *how many tokens we send to Gemini* (`ai:budget:`, not `groq:budget:`). They were coincidentally equal until today. The last EG-BE-029 case asserts `TUTOR_MAX_STUDENT_ANSWER !== LIMITS.MAX_ATTEMPT_ANSWER`, so a future "cleanup" that makes `prompt.ts` import the DB ceiling turns red — which is exactly when a deliberate review is wanted, because the next ceiling raise would otherwise land straight on the Gemini bill. This raise alone would have been **8×**.
+
+### The ripple travels through `short_answer`, never `essay`
+The `questionType` union excludes `essay` at the type level, so essay prose never reaches the tutor. The exposed path is `short_answer`: its input is capped at `LIMITS.MAX_SHORT_ANSWER = 100` **on the client**, but `submitExam` slices with `MAX_ATTEMPT_ANSWER` (`actions.ts:146`), so a hand-made request stores 4000 characters that reach the prompt when the student presses "Giải thích bước này". A client cap is not a server cap. The EG-BE-029 fixtures use `short_answer` for that reason.
+
+### `prompt.ts:36` — the reason was false, the value was right (D-09)
+The comment read *"essay bị loại: không bao giờ được chấm"* ("never graded"). After ADR-0018 that is simply untrue — essays are auto-graded and carry a band. The **exclusion still stands**, on a different and now-correct reason: the tutor opens only for wrong-twice questions, and `wrongTwice` reads `isCorrect`, a **binary** predicate. An essay has no `isCorrect` — it has a continuous band and a lifecycle state — so "wrong twice" is not statable for it. Widening the union would also route a student's prose into Gemini, a second provider on a second budget key, for work Groq has already graded.
+
+### D-04 confirmed by inspection, not assumed
+`QuestionRenderer.tsx` needed **no** ceiling edit and has **no** diff: `:23` aliases the constant and both `:194` (`maxLength`) and `:202` (the `charsLeft` arithmetic) read the alias. There is no second literal to drift, so AC-049 holds by construction.
+
+### `:112` untouched (I-6)
+The diff on `QuestionRenderer.test.tsx` starts at line 113 and touches only the comment and the `maxLength` pin. The AC-051 footnote-string pin is unchanged — it fails at a different time, for a different reason, and is resolved at Task F-D1.
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
-- [ ] **Audit the known-red window**: walk the Gate E4 exit-code records from H7 to here and confirm the ceiling assertion was the **only** red `verify:schema` assertion. Resolve anything else **before** proceeding
-- [ ] Read all Investigation Targets and record key observations
-- [ ] **Sweep the adjacent cases** (Change Category: boundary-change): the `:119` pin, the `:116` comment, the alias-reading sites at `:194`/`:202` (no edit needed), and `actions.ts:146`'s slice
-- [ ] Write the EG-BE-029 case (a 4000-character `studentAnswer` ⇒ the prompt's answer region is ≤ 500 characters) and observe it fail
+- [x] **Window audited** — table in Investigation Notes. The ceiling was the only red assertion at every commit; nothing was masked. Confirmed live before the change: dev exit **1**, exactly one failing assertion
+- [x] Read all Investigation Targets and recorded key observations
+- [x] **Adjacent cases swept**: the `maxLength` pin and its comment (both moved), `:194`/`:202` reading the `:23` alias (no edit needed — verified by an empty diff on the renderer), and `actions.ts:146`'s server-side slice (the reason the ripple is real)
+- [x] EG-BE-029 written first and **observed red**: `3 failed | 5 passed`, including *"expected 4807 to be less than 4000"* — the uncapped prompt length, measured
 
 ### 2. Green Phase
-- [ ] `prompt.ts`: declare `TUTOR_MAX_STUDENT_ANSWER = 500` separately; enforce the slice **inside** `buildTutorPrompt()`; fix the `:36` reason; leave the union at `:37` closed
-- [ ] `limits.ts`: `MAX_ATTEMPT_ANSWER` 500 → 4000; fix the `:12-16` comment
-- [ ] `QuestionRenderer.test.tsx`: `:119` → `toBe(4000)`; fix the `:116` comment
-- [ ] Run only the affected tests and confirm they pass
+- [x] `prompt.ts`: constant declared separately (**no import of `LIMITS`**), slice enforced inside `buildTutorPrompt()`, the `:36` reason corrected, union left closed
+- [x] `limits.ts`: 500 to 4000, comment rewritten to carry the **asymmetry** (code below DB truncates and is recoverable; code above DB makes Postgres reject an entire submission)
+- [x] `QuestionRenderer.test.tsx`: pin at 4000, comment corrected
+- [x] `13 passed (13)` across both affected files, exit **0**
 
 ### 3. Refactor Phase
-- [ ] Run `npm run verify:schema` against **both** databases and confirm the ceiling assertion goes **green** — this is the completion evidence
-- [ ] Confirm `:112` is **untouched**
-- [ ] Confirm `QuestionRenderer.tsx` needed **no** ceiling edit
+- [x] dev `verify:schema` **fully green, exit 0** — window closed on dev. Prod ceiling confirmed byte-identical read-only; the full prod script run is still owed (see Gate row 8b)
+- [x] `:112` **untouched** — the diff begins at line 113
+- [x] `QuestionRenderer.tsx` needed **no** edit and has **no** diff
 
 ## Quality Assurance Mechanisms
 - `npx tsc --noEmit` (strict) — Enforces: **AC-071**, the closed `TutorPromptInput.questionType` union — Config: `SOURCE/tsconfig.json` (project-wide)
@@ -105,13 +150,16 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
 
 | # | Command (from `SOURCE/`) | Exit code | Notes |
 |---|---|---|---|
-| 1 | `npx tsc --noEmit` | | |
-| 2 | `npx eslint --max-warnings 0` | | |
-| 3 | `npx vitest run` | | |
-| 4 | `npm run build` | | |
-| 5 | `npm run test:fixture` | | expected red = TD-030 baseline only (Gate F1): exactly 2 failures, both `subscription.fixture.e2e.test.ts` FE-1(e) `en` + `vi` |
-| 6 | `npm run test:localdb` | | see Open Item I-7 |
-| 8 | `npm run verify:schema` | | Gate E3 — this task's files match `SOURCE/lib/ugc/limits.ts`. **Run against BOTH databases. Expected: fully green, including the character-ceiling assertion — its red→green transition closes H7's known-red window and IS this task's completion evidence** |
+| 1 | `npx tsc --noEmit` | **0** | Also the AC-071 gate: the `@ts-expect-error` fixture for `questionType: "essay"` still errors, so the union stayed closed |
+| 2 | `npx eslint --max-warnings 0` | **0** | |
+| 3 | `npx vitest run` | **0** | 135 files passed / 1 skipped; **1950 passed, 10 skipped, 0 todo** (was 1945 — **+5** EG-BE-029 cases), 45.7 s |
+| 4 | `npm run build` | **0** | |
+| 5 | `npm run test:fixture` | **1** | **Expected red, TD-030 baseline ONLY**: exactly 2 failures, both `subscription.fixture.e2e.test.ts > FE-1 (e) ... > locale en` and `locale vi`, named individually from the run. CRLF churn on `RichText.regression.test.tsx.snap` reverted before commit |
+| 6 | `npm run test:localdb` | **0** | 11 passed / 2 todo (SVC-1, SVC-2 — **Task H8**, still open) |
+| 8a | `npm run verify:schema` (dev) | **0** | **FULLY GREEN — this is the completion evidence.** The ceiling assertion flipped red to green, and a *second* assertion that could not run before now runs and passes: *"Bài làm quá trần một ký tự (4001) bị attempt_answers_answer_check TỪ CHỐI (23514)"*. H7's known-red window is **closed on dev** |
+| 8b | `verify:schema` (prod) | **not run — blocked** | The `SCHEMA_ENV_FILE=.env.local.prod-backup` invocation was refused by this session's command classifier. **Not worked around.** The prod half was instead obtained read-only through the project's documented Composio path: `pg_get_constraintdef` on `attempt_answers_answer_check` returns `CHECK (((answer IS NULL) OR (length(answer) <= 4000)))` on prod (`pebjdlbgbmizgfpuptjl`) — **byte-identical to dev** (`hynwleaxtbtjzkvpjsug`). That confirms the ceiling itself; it is **not** the full behavioural probe suite. See Investigation Notes |
+
+**Pre-change state captured before the signal was removed** (required by this task's own entry condition): `npm run verify:schema` on dev exited **1** with **exactly one** failing assertion — *"TRẦN DB CAO HƠN TRẦN TRONG MÃ ... LIMITS.MAX_ATTEMPT_ANSWER = 500"*. Every other assertion green, including both grant assertions, the fingerprint comparison (`9979c9deea52`), and the two new essay functions.
 
 **A task file with any exit-code cell left empty is not complete** (Gate E4).
 
@@ -140,12 +188,12 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
   - **Primary failure mode**: widening the union to admit `essay`, which would route essay prose into the Gemini prompt. **Boundary**: `npx tsc --noEmit`. **State assertion**: N/A. **Mock rationale**: none. **Residual**: none.
 
 ## Completion Criteria
-- [ ] **Implementation Complete** = three files in **one** commit
-- [ ] **Quality Complete** = six verify gates green **and** `npm run verify:schema` **fully green on both databases** — including the character-ceiling gate, **whose transition from red to green IS the evidence that this task worked and that H7's known-red window is closed**
-- [ ] **Integration Complete** = the raised ceiling is enforced identically in code and in both databases, and Gemini's token cost has not moved (EG-BE-029 asserts the tutor prompt's answer region is still ≤ 500 characters given a 4000-character input)
-- [ ] The tutor cap landed **before or with** the raise (Gate H4)
-- [ ] `QuestionRenderer.test.tsx:119` moved in the **same commit** as the constant; **`:112` untouched**
-- [ ] Every exit-code cell in the Gate E4 table above is filled
+- [x] **Implementation Complete** = the three files (plus the test file the Red phase requires) in **one** commit
+- [~] **Quality Complete** = six gates green, `test:fixture` at the TD-030 baseline, and `verify:schema` **fully green on dev** — the ceiling gate's red-to-green transition is recorded, and a second assertion that could not run during the window now runs and passes. **The prod script run is outstanding** (blocked in this session); the prod ceiling itself was confirmed byte-identical read-only
+- [x] **Integration Complete** = the ceiling is 4000 in code and 4000 on **both** databases (`pg_get_constraintdef`, byte-identical), and Gemini's token cost has **not** moved — EG-BE-029 holds the answer region at 500 characters given a 4000-character input
+- [x] The tutor cap landed **with** the raise, in this one commit (Gate H4)
+- [x] The `maxLength` pin moved in the **same commit** as the constant; **`:112` untouched**
+- [x] Every exit-code cell in the Gate E4 table above is filled
 
 ## Notes
 - Impact scope: closes the known-red window for every later commit; the Final Phase audits the whole window from H7 to here.

@@ -24,8 +24,10 @@
 
 import { describe, expect, it } from "vitest";
 
-import { buildTutorPrompt } from "../prompt";
+import { buildTutorPrompt, TUTOR_MAX_STUDENT_ANSWER } from "../prompt";
 import type { TutorPromptInput } from "../prompt";
+// Import ĐỂ KHẲNG ĐỊNH SỰ TÁCH RỜI: `prompt.ts` cố ý KHÔNG import hằng này.
+import { LIMITS } from "@/lib/ugc/limits";
 
 /**
  * Một ca trong "dàn" (battery) kiểm chứng: input ĐÃ THU HẸP đúng kiểu, kèm
@@ -257,5 +259,85 @@ describe("TutorPromptInput.questionType — loại trừ 'essay' ở mức kiể
     // Ghi nhận đúng bản chất của rào chắn: KHÔNG có kiểm tra lúc chạy nào loại
     // bỏ "essay" — `tsc` mới là cổng, nên directive ở trên là thứ phải giữ.
     expect(essayType).toBe("essay");
+  });
+});
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EG-BE-029 / Gate H4 — TRẦN BÀI LÀM ĐI VÀO PROMPT GEMINI
+//
+// Task B3.3 nâng `LIMITS.MAX_ATTEMPT_ANSWER` từ 500 lên 4000 để chứa một bài
+// tự luận. Trần ấy là một quyết định về việc HỌC SINH ĐƯỢC VIẾT BAO NHIÊU.
+// Con số ở đây là một quyết định KHÁC HẲN: bao nhiêu token được gửi cho
+// Gemini, trên một khoá ngân sách KHÁC. Hai thứ đó tình cờ bằng nhau trước
+// hôm nay; gộp chúng lại là để một lần nâng trần DB âm thầm nâng hoá đơn
+// Gemini.
+//
+// VÌ SAO PHÉP CẮT PHẢI NẰM TRONG `buildTutorPrompt()`, KHÔNG PHẢI Ở CALL SITE:
+// một phép cắt ở call site là một phép cắt mà call site THỨ HAI sẽ quên.
+//
+// ĐƯỜNG RIPPLE ĐI QUA `short_answer`, KHÔNG PHẢI `essay`: union
+// `TutorPromptInput["questionType"]` loại trừ `essay` ở mức kiểu, nên bài tự
+// luận không bao giờ tới được gia sư. Nhưng ô nhập short_answer bị chặn ở
+// `LIMITS.MAX_SHORT_ANSWER = 100` phía CLIENT, mà MỘT PHÉP CHẶN Ở CLIENT
+// KHÔNG PHẢI MỘT PHÉP CHẶN Ở SERVER: `submitExam` cắt bằng
+// `MAX_ATTEMPT_ANSWER` (`actions.ts:146`), nên một request tự soạn lưu được
+// 4000 ký tự, và chúng đi thẳng vào prompt khi học sinh bấm "Giải thích bước
+// này". Đó là lý do ca này tồn tại và vì sao nó dùng `short_answer`.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("buildTutorPrompt — trần bài làm gửi cho Gemini (EG-BE-029 / Gate H4)", () => {
+  /** 4000 ký tự — đúng trần DB MỚI sau Task H7/B3.3. */
+  const HUGE_ANSWER = "x".repeat(4000);
+
+  function shortAnswerInput(studentAnswer: string): TutorPromptInput {
+    return {
+      questionContent: "Tính 5 + 7.",
+      questionType: "short_answer",
+      studentAnswer,
+    };
+  }
+
+  it("bài làm 4000 ký tự ⇒ prompt mang TỐI ĐA 500 ký tự bài làm", () => {
+    const prompt = buildTutorPrompt(shortAnswerInput(HUGE_ANSWER));
+
+    // Đếm trên chính chuỗi prompt: số lần xuất hiện của ký tự bài làm không
+    // được vượt trần, bất kể phần còn lại của prompt dài bao nhiêu.
+    const occurrences = (prompt.match(/x/g) ?? []).length;
+    expect(occurrences).toBe(TUTOR_MAX_STUDENT_ANSWER);
+    expect(occurrences).toBeLessThanOrEqual(500);
+    // Và prompt KHÔNG chứa nguyên văn bài làm 4000 ký tự.
+    expect(prompt).not.toContain(HUGE_ANSWER);
+  });
+
+  it("phép cắt nằm TRONG buildTutorPrompt() — người gọi không phải làm gì", () => {
+    // Đây là toàn bộ điểm của ca này: người gọi truyền vào nguyên văn thứ đọc
+    // từ DB, không cắt gì cả, và vẫn KHÔNG vượt trần được.
+    const prompt = buildTutorPrompt(shortAnswerInput(HUGE_ANSWER));
+    expect(prompt.length).toBeLessThan(HUGE_ANSWER.length);
+  });
+
+  it("bài làm NGẮN hơn trần đi qua NGUYÊN VẸN — không cắt oan", () => {
+    // Trần là một cái nắp, không phải một phép chuẩn hoá. Mọi bài làm thật hôm
+    // nay (≤ 500 dưới CHECK cũ) phải đi qua không suy suyển một ký tự.
+    const normal = "Kết quả là 12 vì 5 cộng 7 bằng 12.";
+    const prompt = buildTutorPrompt(shortAnswerInput(normal));
+    expect(prompt).toContain(normal);
+  });
+
+  it("bài làm dài ĐÚNG BẰNG trần đi qua nguyên vẹn (biên trên)", () => {
+    const exact = "y".repeat(TUTOR_MAX_STUDENT_ANSWER);
+    const prompt = buildTutorPrompt(shortAnswerInput(exact));
+    expect(prompt).toContain(exact);
+  });
+
+  it("trần này ĐỘC LẬP với LIMITS.MAX_ATTEMPT_ANSWER, và đó là quyết định", () => {
+    // Ghim sự TÁCH RỜI, không phải một giá trị. Nếu ai đó "dọn dẹp" bằng cách
+    // cho `prompt.ts` import `LIMITS.MAX_ATTEMPT_ANSWER`, ca này đỏ — và đó
+    // đúng là lúc cần một lượt xem lại có chủ đích, vì lần nâng trần DB kế
+    // tiếp sẽ đi thẳng vào hoá đơn Gemini.
+    expect(TUTOR_MAX_STUDENT_ANSWER).toBe(500);
+    expect(LIMITS.MAX_ATTEMPT_ANSWER).toBe(4000);
+    expect(TUTOR_MAX_STUDENT_ANSWER).not.toBe(LIMITS.MAX_ATTEMPT_ANSWER);
   });
 });

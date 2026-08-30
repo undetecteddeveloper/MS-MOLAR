@@ -12,9 +12,20 @@ export const LIMITS = {
   // Trần cho BÀI LÀM của người thi (attempt_answers.answer), KHÁC với
   // MAX_ESSAY_ANSWER ở dưới — cái đó là đáp án mẫu của tác giả đề, lưu ở
   // questions.essay_answer. Giá trị này PHẢI khớp CHECK trong
-  // supabase/schema.sql: `length(answer) <= 500`. Lệch xuống thì cắt oan bài
-  // làm; lệch lên thì Postgres từ chối nguyên lượt nộp bài lúc submit.
-  MAX_ATTEMPT_ANSWER: 500,
+  // supabase/schema.sql: `length(answer) <= 4000`.
+  //
+  // 500 → 4000 (Essay Auto-Scoring R11/D11): một bài tự luận có rubric không
+  // viết nổi trong 500 ký tự. Con số 4000 KHÔNG có cơ sở thực nghiệm —
+  // production có 0 bài tự luận đã nộp — nên nó được chọn bằng lập luận, ghi ở
+  // docs/design/essay-auto-scoring-backend-design.md § Trần ký tự.
+  //
+  // HAI HƯỚNG LỆCH KHÔNG ĐỐI XỨNG, và đó là lý do trần DB được nâng TRƯỚC
+  // (Task H7) rồi mới tới hằng này (Task B3.3):
+  //   · mã THẤP hơn DB  ⇒ cắt oan bài làm — mất một phần, còn cứu được.
+  //   · mã CAO hơn DB   ⇒ Postgres từ chối NGUYÊN lượt nộp bài — học sinh mất
+  //     cả bài thi. Không bao giờ được để cửa sổ nằm ở phía này.
+  // `npm run verify:schema` đọc lại trần này từ DB THẬT và đỏ nếu hai bên lệch.
+  MAX_ATTEMPT_ANSWER: 4000,
   MAX_TITLE: 200,
   MAX_STEM: 2000,
   MAX_CHOICE: 500,
