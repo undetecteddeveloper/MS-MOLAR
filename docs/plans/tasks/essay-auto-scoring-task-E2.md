@@ -35,7 +35,7 @@ Confirmed value and the date it was re-checked against the console: **`GROQ_BUDG
 
 Clear of the escalation condition by more than an order of magnitude: 600 ≫ 50, the essay count of one full exam, so a single attempt can still be graded within one day.
 
-**Still an estimate, and still the thing to watch:** ~3K tokens/request is not a measurement. Task E5's ten real gradings settle it, and if the real figure differs materially then **both** `GROQ_BUDGET_DAILY_LIMIT` and `GROQ_MAX_CONCURRENCY` move with it (OQ-1).
+**~~Still an estimate~~ — SETTLED THE SAME DAY.** Task E5 measured it at **873 tokens/request**, 3.4× below the ~3 000 assumed here. See § AMENDED below: the value 600 survives, the reasoning behind it does not, and a ceiling nobody wrote down (TPM 8 000) is the one that actually binds.
 
 ## Target Files
 - [ ] `docs/plans/20260829-feature-essay-auto-scoring.md` — Task E2's confirmed-value slot
@@ -59,12 +59,20 @@ The last implementation step is not documentation — it is **setting `GROQ_BUDG
 
 Verified absent from `SOURCE/.env.local` on 2026-08-30 while preparing the `L1` run. Left in that state, every essay would have settled `failed` with a budget refusal and **zero Groq calls** — a symptom that reads exactly like a provider or orchestrator defect, which is how a missing variable costs an afternoon of debugging the wrong layer. `checkEnv.ts` does announce it at startup, at `warn`, which is why the announcement is worth reading rather than scrolling past.
 
+### AMENDED SAME DAY by Task E5's measurement — the number stands, the reasoning does not
+E5 measured the real token cost at **873 tokens/request**, not the ~3 000 this task's arithmetic assumes. Two consequences, both recorded rather than left to a later reader to rediscover:
+
+1. **Which daily ceiling binds is INVERTED.** TPD 2 000 000 ÷ 873 ≈ **2 290 requests/day**, so **RPD 1 000 binds first**, not TPD. The conclusion `GROQ_BUDGET_DAILY_LIMIT = 600` is unaffected — it still clears both — but anyone recomputing from the arithmetic above would watch the wrong limit.
+2. **A third ceiling exists and is not written anywhere in this plan: TPM 8 000.** It was discovered by being hit — E3's first attempt died on it. At 873 tokens/request that is ≈ **9.2 requests/minute**, and it is what actually binds a burst. See Task E5 for the consequence for a 50-essay exam against `ESSAY_PASS_BUDGET_MS`.
+
+This is what the task meant by "the first real grading run must log **actual** prompt + completion token counts". It did, and the estimate was off by 3.4×.
+
 ## Implementation Steps
 - [x] Read the account's current limits in the Groq console for `ESSAY_GRADER_MODEL` — 2026-08-30: TPD 2M, RPD 1K
 - [x] Recompute `TPD ÷ tokens-per-request` and confirm it still binds before RPD — 660 < 1 000, still binds
 - [x] Confirm **600** still leaves headroom under **both** ceilings; if not, record the new value and the arithmetic — confirmed, value unchanged
-- [ ] Confirm the value is **not below 50** (one full exam's essay count)
-- [ ] Record the confirmed value and the date in the work plan; set `GROQ_BUDGET_DAILY_LIMIT` in the environment
+- [x] Confirm the value is **not below 50** (one full exam's essay count) — 600 clears it by more than an order of magnitude. **But see E5**: the per-DAY ceiling was never what stopped a 50-essay exam; **TPM 8 000** is, and it puts one full exam at ~5.5 minutes against a 4-minute pass budget.
+- [x] Record the confirmed value and the date in the work plan; set `GROQ_BUDGET_DAILY_LIMIT` in the environment — recorded 2026-08-30; the engineer set `GROQ_BUDGET_DAILY_LIMIT=600` in `SOURCE/.env.local` the same day. **Not yet set in either Vercel scope** — that belongs with E6, in the deploy that flips the flag, and E6 must not ship without it or grading fails closed in production.
 
 ## Quality Assurance Mechanisms
 - `npm run check:bundle` — Enforces: no key or host reaches the client bundle — Config: `SOURCE/scripts/check-ai-key-bundle.mjs` (context only; this task changes no code)

@@ -28,7 +28,34 @@ Against the measured latency. **The two caps were already re-anchored on 2026-08
 Note again that **the polling bound and the read-time deadline are different numbers and neither is derived from the other**.
 
 ### Slot to fill
-Recorded p50 / p95: `____________ / ____________`
+**Recorded p50 / p95 (2026-08-30, n = 18 real gradings): `671 ms` / `1 289 ms`.** Min 503 ms, p90 1 276 ms, max 1 289 ms. A separate 3-sample set from the same day's `L1` dev run, measured end-to-end through `submitExam()` rather than at the HTTP boundary, sat at ~2.5–5 s — the difference is the orchestrator, the claim and the DB write, not the provider.
+
+**Escalation condition NOT met**: p95 is 1.3 s against `GROQ_CALL_DEADLINE_MS` of 20 s — a 15× margin. **No time constant moves.** `ESSAY_PASS_BUDGET_MS`, `GROQ_MAX_CONCURRENCY` and `ESSAY_PENDING_DEADLINE_MS` all stand on latency grounds, and `ESSAY_PENDING_DEADLINE_MS` would not have moved anyway — it is anchored to twice the platform duration ceiling (AC-061), not to a latency estimate. The two polling constants (30 refreshes / 240 000 ms) are anchored to `ESSAY_PASS_BUDGET_MS`, which did not move, so O-6 stays closed.
+
+### OQ-1's real question answered: the token estimate was 3.4× too high
+The plan said plainly that ~3K tokens/request was **an estimate, not a measurement**, and that the first real run must log actual counts. Measured over the same 18 gradings:
+
+| | prompt | completion | total |
+|---|---|---|---|
+| average | **852** | **22** | **873** |
+| min / p50 / max (total) | | | 814 / 874 / 922 |
+
+**873, not ~3 000.** The completion is tiny because the response is one small JSON object — which the estimate appears not to have accounted for.
+
+### This inverts which ceiling binds — the conclusion survives, the reasoning does not
+D-17 and Task E2 both argue: TPD 2M ÷ ~3K ≈ 660 requests/day, so **TPD binds before RPD 1 000**. With the measured figure:
+
+- TPD 2 000 000 ÷ 873 ≈ **2 290 requests/day**
+- RPD is **1 000**
+
+So **RPD binds first, not TPD** — the reverse of what is recorded. `GROQ_BUDGET_DAILY_LIMIT = 600` remains correct and still clears both ceilings, so nothing has to change today; but it is now correct **for a different reason**, and a later reader recomputing from the recorded arithmetic would reach a wrong conclusion about which limit to watch. Recorded here rather than silently left standing.
+
+### The ceiling nobody wrote down: TPM 8 000
+The first E3 attempt died on **HTTP 429 for tokens-per-minute, limit 8 000** on the `on_demand` tier. **TPM appears in neither D-17, Task E2, nor the backend DD** — every recorded argument is about per-day ceilings. At the measured 873 tokens/request that is **≈ 9.2 requests per minute**, and it is the ceiling that actually binds a burst.
+
+**Consequence worth deciding before enabling on prod (E6).** The escalation condition in E2 names **50** as one full exam's essay count. Fifty essays ≈ 43 650 tokens ⇒ **≈ 5.5 minutes** at TPM 8 000, against `ESSAY_PASS_BUDGET_MS` of **240 000 ms = 4 minutes**. A single full essay exam therefore **cannot finish inside one pass** on this tier: the tail settles unresolved and the student is shown retry controls. `GROQ_MAX_CONCURRENCY = 2` does not help — TPM, not parallelism, is the binding constraint. Worst case is worse still, since a retried question spends up to `GROQ_CALLS_PER_ESSAY = 3`.
+
+Nothing here is broken: the lifecycle handles it exactly as designed (unresolved ⇒ `failed`/retryable, never a wrong band). But "a 50-essay exam needs more than one pass" is a **product fact that should be known before E6, not discovered by a student**. Options: raise the account tier, or accept multi-pass grading for large essay exams and confirm the retry affordance carries it.
 
 ## Target Files
 - [ ] `docs/plans/20260829-feature-essay-auto-scoring.md` — Task E5's p50/p95 slot
