@@ -38,8 +38,10 @@ Reusing them keeps the inventory at exactly **29 keys, 28 new**.
 `createTranslate()` (`translate.ts:25-28`) leaves an unmatched `{name}` **on screen verbatim**, which makes a wiring mistake **visible** rather than silent — no extra mechanism needed.
 
 ## Target Files
-- [ ] `SOURCE/lib/i18n/dictionaries/en.ts`
-- [ ] `SOURCE/lib/i18n/dictionaries/vi.ts`
+- [x] `SOURCE/lib/i18n/dictionaries/en.ts` — 28 keys, added **first** (source of the `Dictionary` type)
+- [x] `SOURCE/lib/i18n/dictionaries/vi.ts` — the same 28 keys
+
+*(Exactly two files changed; `git status` shows nothing else.)*
 
 ## Investigation Targets
 - `docs/design/essay-auto-scoring-frontend-design.md` (§ Agreement Checklist Scope — 29 display strings, 28 new + `player.essayNotScored` kept verbatim)
@@ -62,22 +64,63 @@ Reusing them keeps the inventory at exactly **29 keys, 28 new**.
 - `docs/ui-spec/essay-auto-scoring-ui-spec.md` (§ Copy Inventory) — the 29-string inventory this task lands.
 
 ## Investigation Notes
-_(Record here: the final key list with the 28 new names; confirmation that `player.essayNotScored` is byte-identical; the `tsc` result proving coverage in both dictionaries.)_
+
+### The Red phase produced a real failure, and it named the mechanism exactly
+The task asks for a scratch run adding the keys to `vi.ts` **first**, to confirm the `Dictionary` derivation direction. Done, and `tsc` exited **2**:
+
+```
+lib/i18n/dictionaries/vi.ts(140,3): error TS2353: Object literal may only specify
+known properties, and '"player.essayScored"' does not exist in type 'Dictionary'.
+```
+
+That is AB-12 stated by the compiler: `MessageKey = keyof typeof en` and `Dictionary = Record<MessageKey, string>`, so `en.ts` is the source of the key set and a key living only in `vi.ts` is an **excess property**, not a missing translation. The scratch was reverted (`git checkout -- vi.ts`) before the real edit.
+
+Worth noting which direction each failure mode takes: a key in `en.ts` but missing from `vi.ts` fails as a **missing property** (the Vietnamese dictionary no longer satisfies `Dictionary`); a key only in `vi.ts` fails as an **excess property**. Both are compile errors, which is the whole point — neither can reach a user as a raw key name.
+
+### Inventory: 28 new + 1 kept = 29, and the count is a decision
+27 `result.essay.*` keys plus `player.essayScored` = **28 new**, verified by `grep -c` in both dictionaries. `player.essayNotScored` is the 29th and is **not new**.
+
+The inventory is 29 rather than 31 because two refusal reasons **reuse** existing keys rather than duplicating them, per the convention written at `en.ts:5-6`:
+- `not_found` → `profile.error.sessionExpired`
+- `server` → `profile.error.generic`
+
+Confirmed by `grep -c`: each appears **exactly once** in each dictionary — reused, not duplicated.
+
+### English wording follows the repo's existing vocabulary, not a fresh one
+The Vietnamese is verbatim from the UI Spec's Copy Inventory. For English there was a real choice — "marking" reads more naturally for essay work, but the repo has already settled on the **"auto-scored"** family (`player.tfNotScored`, `player.shortAnswerScored`, `result.notAutoScored`, `upload.storedNotScored`). Mixing "marked" into essay strings would give one product two vocabularies for one idea, so the new strings say *scored* throughout: `Scoring` / `Scored` / `Scoring failed`, `Score again`.
+
+`player.essayScored` is deliberately the exact parallel of the sibling that already exists:
+- `player.shortAnswerScored`: "Short answer — auto-scored after you submit."
+- `player.essayScored`: "Essay — auto-scored after you submit."
+
+### Three strings deliberately absent, carried into the dictionary as a comment
+The UI Spec names three strings that must **not** exist, and the reason each is absent is now recorded at the insertion point in both files, not only in the spec:
+1. No string states the **remaining** retry count (UI-D9) — that number drops for reasons the student did not cause, so showing it is a false promise.
+2. No separate string for "stuck pending" (UI-D6) — it reuses `failedBody`.
+3. No string explains **why** a band is what it is — a second model-written output is a second injection surface (R9).
+
+### Parameter wiring recorded where it can be checked later
+Six parameterised strings. The one worth naming is `result.essay.denominator`: `{n}` is `EssaySummary.gradedCount` — the number of essays **already scored** — **not** the exam's total essay count. Wiring it to the total would make the sentence claim the score was computed over more essays than were actually scored (AC-059). The consumers land in F-A3 and F-C2; `createTranslate()` renders an unmatched `{name}` **verbatim on screen**, so a wiring mistake shows up rather than failing silently — that is the mechanism, and no second one was added.
+
+### Scope boundaries verified by diff, not by intent
+- `player.essayNotScored` — **byte-identical**; `git diff` produces no line touching it. It is selected against `player.essayScored` by the AC-067 flag in Task F-D1, and it stays **true** while the feature ships disabled (UI-D8).
+- `upload.essayStored` (`vi.ts`, `en.ts`) — untouched; OQ-5, Phase E Task E4.
+- `profile.error.sessionExpired`, `profile.error.generic` — reused, single occurrence each.
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
-- [ ] Read all Investigation Targets, especially the UI Spec's Copy Inventory and the `EssaySummary` field names from B2.1
-- [ ] Add the keys to `vi.ts` **first** in a scratch run and observe `tsc` fail — this confirms the `Dictionary` derivation direction (AB-12); then revert and do it in the correct order
+- [x] Read all Investigation Targets, including the UI Spec Copy Inventory (29 rows) and the `EssaySummary` field names
+- [x] Scratch run done: `vi.ts` first ⇒ `tsc` exit **2**, `TS2353 ... '"player.essayScored"' does not exist in type 'Dictionary'`. Reverted with `git checkout -- vi.ts` before the real edit
 
 ### 2. Green Phase
-- [ ] Add the 28 keys to `en.ts` **first**
-- [ ] Add the same 28 keys to `vi.ts`
-- [ ] Run `npx tsc --noEmit` — this is the coverage gate
+- [x] 28 keys added to `en.ts` first
+- [x] The same 28 added to `vi.ts`
+- [x] `npx tsc --noEmit` exit **0** — coverage proven across both dictionaries
 
 ### 3. Refactor Phase
-- [ ] Confirm `player.essayNotScored` is **untouched and byte-identical**
-- [ ] Confirm `not_found` and `server` reuse the existing `profile.error.*` keys rather than duplicating them
-- [ ] Confirm `upload.essayStored` was **not** touched (OQ-5, Phase E Task E4)
+- [x] `player.essayNotScored` byte-identical — no diff line mentions it
+- [x] `profile.error.sessionExpired` and `profile.error.generic` appear **exactly once** in each dictionary — reused, not duplicated
+- [x] `upload.essayStored` untouched in both dictionaries
 
 ## Quality Assurance Mechanisms
 - `npx tsc --noEmit` (strict) — Enforces: **i18n key coverage across both dictionaries (AB-12) — this is the coverage gate for this task** — Config: `SOURCE/tsconfig.json` (project-wide)
@@ -91,12 +134,14 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
 
 | # | Command (from `SOURCE/`) | Exit code | Notes |
 |---|---|---|---|
-| 1 | `npx tsc --noEmit` | | **this task's coverage gate** |
-| 2 | `npx eslint --max-warnings 0` | | |
-| 3 | `npx vitest run` | | |
-| 4 | `npm run build` | | |
-| 5 | `npm run test:fixture` | | expected red = TD-030 baseline only (Gate F1): exactly 2 failures, both `subscription.fixture.e2e.test.ts` FE-1(e) `en` + `vi` |
-| 6 | `npm run test:localdb` | | see Open Item I-7 |
+| 1 | `npx tsc --noEmit` | **0** | **The coverage gate.** It was **2** during the Red phase, with the exact message that proves AB-12 — see Investigation Notes |
+| 2 | `npx eslint --max-warnings 0` | **0** | |
+| 3 | `npx vitest run` | **0** | 1950 passed / 10 skipped / 0 todo — unchanged; no consumer exists yet, so no test result should move, and none did |
+| 4 | `npm run build` | **0** | |
+| 5 | `npm run test:fixture` | **1** | **Expected red, TD-030 baseline ONLY**: 2 failures, both `subscription.fixture.e2e.test.ts > FE-1 (e) ... > locale en` and `locale vi`. CRLF churn on `RichText.regression.test.tsx.snap` reverted before commit |
+| 6 | `npm run test:localdb` | **0** | 11 passed / 2 todo (SVC-1, SVC-2 — **Task H8**, still open) |
+
+`npm run verify:schema` not run — no schema and no `LIMITS` constant touched.
 
 **A task file with any exit-code cell left empty is not complete** (Gate E4).
 
@@ -115,11 +160,11 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
   - **Primary failure mode**: the denominator naming the wrong quantity, so the sentence claims the score is computed over more essays than were graded. **Boundary**: the consuming components (F-A3, F-C2). **State assertion**: N/A. **Mock rationale**: none. **Residual**: an unmatched `{name}` renders **verbatim on screen** (`translate.ts:25-28`), which makes a wiring mistake visible rather than silent — that is the mechanism, and no extra one is added.
 
 ## Completion Criteria
-- [ ] **Implementation Complete** = 28 keys in **both** dictionaries; `player.essayNotScored` untouched
-- [ ] **Quality Complete** = `npx tsc --noEmit` green (this is the coverage gate)
-- [ ] **Integration Complete** = N/A until consumers exist
-- [ ] Every Reference Contract Compliance Check evaluates to `Y`
-- [ ] Every exit-code cell in the Gate E4 table above is filled
+- [x] **Implementation Complete** = 28 keys in both dictionaries (27 `result.essay.*` + `player.essayScored`, counted by `grep -c`); `player.essayNotScored` untouched
+- [x] **Quality Complete** = `npx tsc --noEmit` exit **0**
+- [x] **Integration Complete** = N/A until consumers exist (F-A2, F-A3)
+- [x] Every Reference Contract Compliance Check = `Y`: `denominator`'s `{n}` is documented as `gradedCount` not the exam essay total; the three new refusal keys exist in both dictionaries and the two reused keys are not duplicated
+- [x] Every exit-code cell in the Gate E4 table above is filled
 
 ## Notes
 - Impact scope: every frontend surface in Phases F-A…F-D reads these keys.

@@ -137,6 +137,7 @@ export const vi: Dictionary = {
   "player.tfNotScored": "Đúng/Sai — đã lưu, chưa chấm tự động.",
   "player.shortAnswerScored": "Trả lời ngắn — chấm tự động sau khi bạn nộp bài.",
   "player.essayNotScored": "Tự luận — bài làm được lưu cùng lượt thi, chưa chấm tự động.",
+  "player.essayScored": "Tự luận — chấm tự động sau khi bạn nộp bài.",
   "player.essayPlaceholder": "Trình bày bài làm của bạn ở đây…",
   "player.charsLeft": "Còn {remaining} ký tự",
   "player.leaveTitle": "Rời khỏi đề này?",
@@ -165,6 +166,49 @@ export const vi: Dictionary = {
   "result.yourChoice": "Bạn chọn",
   "result.editRating": "Sửa điểm chấm của bạn",
   "result.rateThisExam": "Chấm độ khó đề này",
+
+  // --- Chấm tự luận (ADR-0018) — 28 khoá mới ------------------------------
+  // Mọi chuỗi ở đây là HẰNG DO ỨNG DỤNG SỞ HỮU. KHÔNG chuỗi nào do model sinh
+  // ra, và không có chỗ nào cho một chuỗi như thế: `EssayView` không mang
+  // trường văn xuôi nào (AC-044/AC-047).
+  //
+  // BA CHUỖI CỐ Ý KHÔNG TỒN TẠI, ghi ra để không ai tưởng là sót:
+  //   1. Không câu nào nói số lượt chấm lại CÒN LẠI (UI-D9) — con số đó tụt vì
+  //      những lý do học sinh không gây ra, nên hiển thị nó là hứa sai.
+  //   2. Không câu riêng cho "kẹt pending" (UI-D6) — nó dùng `failedBody`.
+  //   3. Không câu nào giải thích VÌ SAO band là band đó — một đầu ra thứ hai
+  //      do model viết là một bề mặt tiêm chích thứ hai (R9).
+  "result.essay.label": "Tự luận",
+  "result.essay.points": "{earned} / {max} điểm",
+  "result.essay.denominator": "Tính trên {n} câu tự luận đã chấm xong.",
+  "result.essay.stillGrading": "Còn {k} câu đang chấm — điểm tự luận sẽ tự cập nhật.",
+  "result.essay.someFailed": "{k} câu chấm thất bại — mở Chi tiết để chấm lại.",
+  "result.essay.noneGraded": "Chưa có câu tự luận nào chấm xong. Mở Chi tiết để chấm lại.",
+  "result.essay.state.pending": "Đang chấm",
+  "result.essay.state.graded": "Đã chấm",
+  "result.essay.state.failed": "Chấm thất bại",
+  "result.essay.band": "{band} / 1 điểm",
+  "result.essay.lowConfidence": "Cần xem lại",
+  "result.essay.lowConfidenceHelp":
+    "Máy chấm không chắc chắn ở câu này. Bạn nên đối chiếu với đáp án mẫu.",
+  "result.essay.pendingBody": "Bài làm của bạn đang được chấm. Điểm sẽ hiện ngay tại đây.",
+  "result.essay.failedBody": "Lượt chấm tự động cho câu này không hoàn tất.",
+  "result.essay.attemptsNote":
+    "Mỗi câu chỉ được chấm lại một số lần; một lượt bị gián đoạn giữa chừng vẫn tính là đã dùng.",
+  "result.essay.retry": "Chấm lại",
+  "result.essay.retryBusy": "Đang chấm lại…",
+  "result.essay.retryBusyReason": "Đang gửi yêu cầu chấm lại, vui lòng đợi.",
+  "result.essay.retryExhausted": "Câu này đã dùng hết lượt chấm. Hệ thống sẽ không tự chấm lại.",
+  "result.essay.retryBudgetOut":
+    "Hôm nay hệ thống đã dùng hết lượt chấm tự động. Bạn thử lại vào ngày mai.",
+  "result.essay.retryAlreadyGraded": "Câu này đã có điểm rồi.",
+  "result.essay.pdfBlocked": "Đang chấm tự luận. Lưu và chia sẻ PDF sẽ mở lại khi chấm xong.",
+  "result.essay.pdfIncomplete":
+    "Đề này có câu tự luận không được chấm tự động. Điểm trong tệp chưa bao gồm phần tự luận.",
+  "result.essay.pollStopped": "Trang đã ngừng tự cập nhật.",
+  "result.essay.pollRefresh": "Cập nhật",
+  "result.essay.announceProgress": "Đã chấm xong {done} câu tự luận. Còn {pending} câu đang chấm.",
+  "result.essay.announceAllDone": "Đã chấm xong toàn bộ câu tự luận.",
 
   // --- Chấm độ khó --------------------------------------------------------
   "rating.rate": "Chấm →",
