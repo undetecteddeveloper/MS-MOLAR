@@ -10,15 +10,24 @@
 // phân biệt được các đề hôm nay. Chi tiết + điều kiện bật lại từng tầng: PRD
 // mục "Release partition".
 //
-// ⚠ TIỀN ĐỀ Ở ĐOẠN TRÊN ĐÃ HẾT HẠN — ĐỌC TD-028 TRƯỚC KHI TIN NÓ (2026-08-27) ⚠
-// Câu "3 đề published đều là Toán" đúng vào 2026-08-16 và KHÔNG còn đúng nữa.
-// Đo lại prod 2026-08-27: 6 đề published, 4 MÔN (Toán 3, Hoá 1, Sinh 1, Lý 1),
-// 4 lớp (8/10/11/12). Tức lý do DUY NHẤT để bỏ tín hiệu môn đã biến mất, và
-// hàm này nay xếp hạng mà không biết gì về môn — học sinh yếu một môn không
-// được đẩy đề môn đó lên, và vì `band` là khoá cứng thì đề họ ĐÃ làm (kể cả
-// làm điểm thấp) còn bị đẩy xuống DƯỚI mọi đề chưa làm của môn khác.
-// Đây là hành vi ĐÚNG theo PRD AC-019/D5, không phải bug — nhưng nó dựa trên
-// một quan sát về kho đề đã cũ 11 ngày. TD-028 ghi đủ số đo và ba hướng sửa.
+// ⚠ TIỀN ĐỀ Ở ĐOẠN TRÊN ĐÃ HẾT HẠN, VÀ ĐÃ ĐƯỢC XỬ LÝ (TD-028, trả 2026-08-31) ⚠
+// Câu "3 đề published đều là Toán" đúng vào 2026-08-16 và hết đúng từ lâu: đo
+// lại prod 2026-08-27 ra 6 đề published, 4 MÔN (Toán 3, Hoá 1, Sinh 1, Lý 1),
+// 4 lớp (8/10/11/12). Lý do DUY NHẤT để bỏ tín hiệu môn — rằng nó là hằng số —
+// đã biến mất, nên tín hiệu môn quay lại dưới dạng số hạng thứ BA của affinity:
+// ĐIỂM YẾU THEO MÔN, `1 − điểm_trung_bình_môn / 10`, xem
+// EXAM_RANK_SUBJECT_WEAKNESS_WEIGHT để biết vì sao trọng số là 0.5.
+//
+// Hai điều TD-028 nêu mà bản này CỐ Ý không làm, ghi ra để lần sau không ai đọc
+// nhầm là sót:
+//   · `band` KHÔNG đổi. Đề đã nộp vẫn nằm dưới MỌI đề chưa làm, kể cả khi điểm
+//     rất thấp. Đó là PRD AC-019/D5 phát biểu thành khoá cứng — đổi nó là đổi
+//     một tiêu chí nghiệm thu, không phải chỉnh một trọng số. Hệ quả cần nói
+//     thẳng: "đề môn yếu lên đầu trang" ở đây nghĩa là lên đầu băng CHƯA LÀM,
+//     tức đúng phần trên cùng của trang 1 mà người dùng nhìn thấy.
+//   · Tầng "độ khó cộng đồng" vẫn tắt. Nó bị cắt vì 0 đề đạt `rating_count >= 3`
+//     (2026-08-16), và điều kiện bật lại là một số đo trên prod, không phải một
+//     dòng mã ở đây.
 //
 // Hàm THUẦN, cùng quy ước với recommendNextSkill() (route.ts:5-8): mọi state
 // được tiêm vào, KHÔNG đọc Date.now(), KHÔNG đọc biến module, KHÔNG I/O, sort
@@ -29,6 +38,18 @@ export interface RankExamCandidate {
   id: string;
   /** `exams.grade` — `int not null` (schema.sql:76), nên không có nhánh null. */
   grade: number;
+  /**
+   * `exams.subject` — `text not null` (schema.sql:83), nên không có nhánh null.
+   *
+   * So sánh NGUYÊN VĂN, không chuẩn hoá ở đây: giá trị canonical được cưỡng chế
+   * ở đường GHI (`validateExamMeta`/`normalizeMeta` → `normalizeSubject`) và
+   * được canh bởi `verify:schema` mục 8, tức TD-016 đã đóng cả hai đầu. Nếu một
+   * chuỗi ngoài `SUBJECTS` vẫn lọt vào, nó chỉ tự thành một nhóm riêng — thứ tự
+   * hơi lệch, KHÔNG có đề nào bị mất và không có gì ném lỗi. Nhập một
+   * `normalizeSubject()` vào đây thì đổi lại là phá tính THUẦN mà đầu file vừa
+   * hứa (hàm sẽ đọc một bảng module).
+   */
+  subject: string;
   /** `exams.created_at` ISO — `timestamptz not null` (schema.sql:81). */
   createdAt: string;
 }
@@ -38,6 +59,14 @@ export interface RankAttempt {
   examId: string;
   /** Lớp của đề đã làm (embed `exams!inner(grade)`) — nguồn của tín hiệu lớp. */
   grade: number;
+  /**
+   * Môn của đề đã làm (cùng embed) — nguồn của tín hiệu điểm yếu theo môn.
+   *
+   * `null` khi embed không giao được môn. KHÔNG suy ra môn từ bất cứ đâu và
+   * cũng không loại lượt này khỏi tín hiệu LỚP: một trường thiếu chỉ được phép
+   * làm câm đúng tín hiệu của nó (cùng quy ước `totalScore` ngay dưới).
+   */
+  subject: string | null;
   /** ISO. Dùng để chọn lượt ĐẠI DIỆN khi một đề bị làm nhiều lần. */
   submittedAt: string | null;
   /**
@@ -54,6 +83,8 @@ export interface RankExamsWeights {
   gradeMatch: number;
   /** EXAM_RANK_RECENCY_WEIGHT. */
   recency: number;
+  /** EXAM_RANK_SUBJECT_WEAKNESS_WEIGHT. */
+  subjectWeakness: number;
 }
 
 export interface RankExamsInput {
@@ -66,6 +97,16 @@ export interface RankExamsInput {
 /** Băng xếp hạng: 0 = chưa từng làm, 1 = đã nộp (bị đẩy xuống, KHÔNG bị loại). */
 const BAND_NEVER_TAKEN = 0;
 const BAND_SUBMITTED = 1;
+
+/**
+ * Thang điểm của `exam_results.total_score` (`numeric(4,2)`, thang 10).
+ *
+ * Ở ĐÂY chứ không ở `constants.ts` có chủ ý: `constants.ts` giữ những con số
+ * CHỈNH ĐƯỢC — trọng số, ngưỡng — còn đây là một SỰ THẬT của schema. Đặt nhầm
+ * chỗ thì lần sau ai đó sẽ chỉnh nó như chỉnh một trọng số, và làm thế là nói
+ * dối về thang điểm chứ không phải điều chỉnh thuật toán.
+ */
+const SCORE_MAX = 10;
 
 /**
  * Trả về id các đề theo thứ tự đã xếp hạng cho MỘT người dùng.
@@ -90,7 +131,8 @@ const BAND_SUBMITTED = 1;
  *                   Ở băng chưa làm mọi giá trị đều null nên khoá này trơ.
  *                   null xuống cuối băng: không có điểm thì KHÔNG suy ra là làm
  *                   dở — cùng quy ước "NULLS LAST" của route.ts:97-98.
- *   3. affinity   — điểm có trọng số, CAO hơn lên trước (xem affinityOf).
+ *   3. affinity   — điểm có trọng số, CAO hơn lên trước (xem affinityOf). Ba
+ *                   số hạng: khớp LỚP, ĐIỂM YẾU THEO MÔN, và MỚI-CŨ.
  *   4. id         — khoá thứ tư là thứ bảo đảm tất định TUYỆT ĐỐI: thiếu nó,
  *                   hai đề trùng cả ba khoá trên sẽ phụ thuộc vào tính ổn định
  *                   của Array.prototype.sort (PRD AC-013).
@@ -127,21 +169,47 @@ export function rankExamIds(input: RankExamsInput): string[] {
   const gradeShareOf = (grade: number): number | null =>
     gradeShareByGrade === null ? null : (gradeShareByGrade.get(grade) ?? 0);
 
+  // --- Tín hiệu điểm yếu theo môn (TD-028) ---------------------------------
+  // Điểm trung bình của học sinh Ở TỪNG MÔN, đảo lại thành "độ yếu" ∈ [0, 1].
+  //
+  // TÍNH TRÊN LƯỢT ĐẠI DIỆN, không phải trên mọi lượt: một đề làm lại năm lần
+  // sẽ đè bẹp trung bình môn nếu đếm cả năm, và "đại diện = lượt nộp gần nhất"
+  // là định nghĩa hàm này ĐÃ chốt ngay phía trên cho `priorScore`. Dùng lại nó
+  // ở đây giữ cho hai tín hiệu không thể nói hai điều khác nhau về cùng một
+  // lượt làm bài.
+  //
+  // CHỈ LƯỢT CÓ ĐIỂM mới được tính. Một lượt đã nộp mà không có dòng kết quả là
+  // chuyện xảy ra thật (xem `totalScore`), và đọc nó thành 0 điểm là biến một
+  // sự cố ghi dữ liệu thành một lời khẳng định "em này yếu môn đó".
+  const subjectWeaknessBySubject = buildSubjectWeakness(representativeByExam.values());
+
+  const subjectWeaknessOf = (subject: string): number | null =>
+    subjectWeaknessBySubject === null ? null : (subjectWeaknessBySubject.get(subject) ?? 0);
+
   // --- Tín hiệu mới-cũ -----------------------------------------------------
   // Chuẩn hoá min-max TRONG chính tập ứng viên, KHÔNG so với "bây giờ": hàm này
   // không được đọc đồng hồ (PRD AC-014), và "mới" vốn là một khái niệm tương
   // đối trong danh sách đang xem chứ không phải một khoảng cách tuyệt đối.
   const recencyNormOf = buildRecencyNormalizer(candidates);
 
-  // affinity ∈ [0, gradeMatch + recency]. Lớp ĐÈ mới-cũ: hai đề chỉ bị mới-cũ
-  // đảo chỗ khi tỉ trọng lớp của chúng chênh nhau DƯỚI
-  // (recency / gradeMatch) — với giá trị đang ship là 0.25. Nói cách khác một
-  // đề mới tinh SAI lớp không bao giờ vượt được một đề cũ ĐÚNG lớp, nhưng khi
-  // học sinh chia đôi thời gian cho hai lớp thì "mới hơn" được quyền quyết định.
+  // affinity ∈ [0, gradeMatch + subjectWeakness + recency]. Thứ bậc giữa ba số
+  // hạng là một HỆ QUẢ SỐ HỌC của ba trọng số, không phải một quy tắc rời được
+  // viết ở đâu đó — và với giá trị đang ship (1 / 0.5 / 0.25) nó ra hai câu
+  // kiểm chứng được, cả hai đều có test ghim:
+  //
+  //   · LỚP đè MÔN. Với học sinh chỉ làm bài ở một lớp, affinity tối đa của một
+  //     đề SAI lớp là 0 + 0.5 + 0.25 = 0.75 < 1.0 = affinity tối thiểu của một
+  //     đề ĐÚNG lớp. Yếu Sinh không kéo được đề Sinh lớp 8 lên đầu danh sách
+  //     của học sinh lớp 12.
+  //   · MÔN đè MỚI-CŨ, nhưng chỉ khi điểm yếu là thật. Số hạng môn tối đa 0.5
+  //     vượt số hạng mới-cũ tối đa 0.25; một môn chỉ hơi yếu (số hạng < 0.25)
+  //     thì nhường cho "mới hơn".
   const affinityOf = (candidate: RankExamCandidate): number => {
     const share = gradeShareOf(candidate.grade);
     const gradeTerm = share === null ? 0 : weights.gradeMatch * share;
-    return gradeTerm + weights.recency * recencyNormOf(candidate);
+    const weakness = subjectWeaknessOf(candidate.subject);
+    const subjectTerm = weakness === null ? 0 : weights.subjectWeakness * weakness;
+    return gradeTerm + subjectTerm + weights.recency * recencyNormOf(candidate);
   };
 
   const bandOf = (candidate: RankExamCandidate): number =>
@@ -203,6 +271,52 @@ function buildGradeShares(attempts: readonly RankAttempt[]): Map<number, number>
     shares.set(grade, count / attempts.length);
   }
   return shares;
+}
+
+/**
+ * Độ YẾU theo môn ∈ [0, 1] (1 = yếu nhất), hoặc **null khi học sinh chưa có
+ * lượt ĐẠI DIỆN nào CÓ ĐIỂM** — cùng ranh giới "chưa biết ≠ biết là 0" mà
+ * `buildGradeShares` đã đặt, và cùng lý do: mặc định một học sinh mới thành
+ * "yếu mọi môn" là kiểu sai-mà-tự-tin đắt nhất mà project này từng trả giá.
+ *
+ * Bên trong một môn ĐÃ CÓ điểm, phép tính là trung bình cộng các lượt đại diện
+ * có điểm, đảo lại quanh thang điểm. Trung bình cộng chứ không phải min hay
+ * lượt gần nhất: min biến MỘT lần thi hỏng thành một lời tuyên bố vĩnh viễn về
+ * cả môn, còn "gần nhất" thì một môn học sinh làm từ lâu sẽ nói theo một buổi
+ * duy nhất. Trung bình là thứ duy nhất trong ba cái mà mỗi lượt mới đều dịch
+ * chuyển được, theo đúng chiều và theo đúng cỡ.
+ *
+ * Điểm ngoài thang (dữ liệu hỏng, hoặc thang điểm đổi mà chỗ này chưa đổi
+ * theo) bị KẸP về [0, 1] chứ không được phép sinh ra một số hạng âm — một số
+ * hạng âm sẽ đẩy đề xuống dưới cả những đề không có tín hiệu gì, tức là biến
+ * một dòng dữ liệu lạ thành một thay đổi thứ tự không ai giải thích được.
+ */
+function buildSubjectWeakness(
+  representatives: Iterable<RankAttempt>
+): Map<string, number> | null {
+  const sums = new Map<string, { total: number; count: number }>();
+  for (const attempt of representatives) {
+    if (attempt.subject === null || attempt.totalScore === null) continue;
+    if (!Number.isFinite(attempt.totalScore)) continue;
+    const bucket = sums.get(attempt.subject) ?? { total: 0, count: 0 };
+    bucket.total += attempt.totalScore;
+    bucket.count += 1;
+    sums.set(attempt.subject, bucket);
+  }
+  if (sums.size === 0) return null;
+
+  const weakness = new Map<string, number>();
+  for (const [subject, { total, count }] of sums) {
+    const mean = total / count;
+    weakness.set(subject, clamp01(1 - mean / SCORE_MAX));
+  }
+  return weakness;
+}
+
+function clamp01(value: number): number {
+  if (value < 0) return 0;
+  if (value > 1) return 1;
+  return value;
 }
 
 /**

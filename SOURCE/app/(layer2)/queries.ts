@@ -6,6 +6,7 @@ import "server-only";
 import {
   EXAM_RANK_GRADE_MATCH_WEIGHT,
   EXAM_RANK_RECENCY_WEIGHT,
+  EXAM_RANK_SUBJECT_WEAKNESS_WEIGHT,
 } from "@/lib/adaptive/constants";
 import { rankExamIds } from "@/lib/adaptive/rankExams";
 import { createClient } from "@/lib/supabase/server";
@@ -279,12 +280,31 @@ type AttemptRow = {
   // MỘT cột `exam_id -> exams`, và chính chiều many-to-one đó là thứ PostgREST
   // dùng để quyết to-one. Vẫn khai CẢ HAI hình dạng: chi phí bằng 0, còn thứ
   // được bảo vệ là một giả định về thư viện bên thứ ba có thể đổi khi nâng cấp.
-  exams: { grade: number } | { grade: number }[] | null;
+  exams: EmbeddedExamFacets | EmbeddedExamFacets[] | null;
 };
 
+/** Các facet của đề mà bộ xếp hạng cần, lấy kèm qua embed to-one. */
+type EmbeddedExamFacets = { grade: number; subject: string };
+
+function embeddedExam(row: AttemptRow): EmbeddedExamFacets | undefined {
+  return Array.isArray(row.exams) ? row.exams[0] : (row.exams ?? undefined);
+}
+
 function gradeOfAttempt(row: AttemptRow): number | null {
-  const embedded = Array.isArray(row.exams) ? row.exams[0] : row.exams;
+  const embedded = embeddedExam(row);
   return typeof embedded?.grade === "number" ? embedded.grade : null;
+}
+
+/**
+ * Môn của đề đã làm, hoặc null khi embed không giao được nó (TD-028).
+ *
+ * TÁCH KHỎI `gradeOfAttempt` chứ không gộp thành một guard: một embed thiếu MÔN
+ * chỉ được phép làm câm tín hiệu môn. Gộp lại thì lượt ấy rơi khỏi cả tín hiệu
+ * LỚP — tức một trường thiếu đi sửa thứ tự theo một trục nó không liên quan.
+ */
+function subjectOfAttempt(row: AttemptRow): string | null {
+  const embedded = embeddedExam(row);
+  return typeof embedded?.subject === "string" ? embedded.subject : null;
 }
 
 export interface RankedExamList {
@@ -342,7 +362,7 @@ export async function listExamsRanked(
       "listExamsRanked.attempts",
       supabase
         .from("exam_attempts")
-        .select("id, exam_id, submitted_at, exams!inner(grade)")
+        .select("id, exam_id, submitted_at, exams!inner(grade, subject)")
         .eq("status", "submitted")
     ) as Promise<AttemptRow[]>,
     readBounded(
@@ -371,6 +391,7 @@ export async function listExamsRanked(
       {
         examId: row.exam_id,
         grade,
+        subject: subjectOfAttempt(row),
         submittedAt: row.submitted_at,
         totalScore: scoreByAttempt.get(row.id) ?? null,
       },
@@ -386,12 +407,14 @@ export async function listExamsRanked(
     candidates: rows.map((row) => ({
       id: row.id,
       grade: row.grade,
+      subject: row.subject,
       createdAt: row.created_at,
     })),
     attempts,
     weights: {
       gradeMatch: EXAM_RANK_GRADE_MATCH_WEIGHT,
       recency: EXAM_RANK_RECENCY_WEIGHT,
+      subjectWeakness: EXAM_RANK_SUBJECT_WEAKNESS_WEIGHT,
     },
   });
 

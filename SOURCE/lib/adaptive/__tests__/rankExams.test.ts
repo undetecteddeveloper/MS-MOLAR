@@ -9,30 +9,51 @@
 //
 // Khoá sắp xếp đang test (rankExams.ts):
 //   [ band ASC, priorScore ASC NULLS LAST, affinity DESC, id ASC ]
-//   affinity = gradeMatch * tỉ_trọng_lớp + recency * mới_cũ_chuẩn_hoá
+//   affinity = gradeMatch * tỉ_trọng_lớp
+//            + subjectWeakness * độ_yếu_môn
+//            + recency * mới_cũ_chuẩn_hoá
+//
+// Số hạng ĐỘ YẾU MÔN thêm ở TD-028 (2026-08-31) — Test 7 và Test 8 ở cuối file
+// là phần ghim của nó. Mọi ca có TRƯỚC đó dùng MỘT môn duy nhất cho cả đề lẫn
+// lượt làm, nên số hạng mới bằng nhau ở mọi ứng viên và KHÔNG đổi được thứ tự
+// nào: đó là lý do các kỳ vọng cũ đứng nguyên, không phải may mắn.
 
 import { describe, expect, it } from "vitest";
 
-import { EXAM_RANK_GRADE_MATCH_WEIGHT, EXAM_RANK_RECENCY_WEIGHT } from "../constants";
+import {
+  EXAM_RANK_GRADE_MATCH_WEIGHT,
+  EXAM_RANK_RECENCY_WEIGHT,
+  EXAM_RANK_SUBJECT_WEAKNESS_WEIGHT,
+} from "../constants";
 import { rankExamIds, type RankAttempt, type RankExamCandidate } from "../rankExams";
 
 const WEIGHTS = {
   gradeMatch: EXAM_RANK_GRADE_MATCH_WEIGHT,
   recency: EXAM_RANK_RECENCY_WEIGHT,
+  subjectWeakness: EXAM_RANK_SUBJECT_WEAKNESS_WEIGHT,
 };
 
+/** Môn mặc định của mọi fixture cũ — xem khối đầu file. */
+const DEFAULT_SUBJECT = "Math";
+
 /** Đề: mặc định lớp 12, mốc thời gian tăng dần theo tham số cho dễ đọc. */
-function exam(id: string, grade = 12, createdAt = "2026-01-01T00:00:00.000Z"): RankExamCandidate {
-  return { id, grade, createdAt };
+function exam(
+  id: string,
+  grade = 12,
+  createdAt = "2026-01-01T00:00:00.000Z",
+  subject = DEFAULT_SUBJECT
+): RankExamCandidate {
+  return { id, grade, subject, createdAt };
 }
 
 function attempt(
   examId: string,
   grade: number,
   submittedAt: string | null,
-  totalScore: number | null
+  totalScore: number | null,
+  subject: string | null = DEFAULT_SUBJECT
 ): RankAttempt {
-  return { examId, grade, submittedAt, totalScore };
+  return { examId, grade, subject, submittedAt, totalScore };
 }
 
 // =============================================================================
@@ -345,5 +366,264 @@ describe("Test 6 — tất định tuyệt đối", () => {
     const order = rankExamIds(input);
     expect([...order].sort()).toEqual(["bad", "good"]);
     expect(rankExamIds(input)).toEqual(order);
+  });
+});
+// =============================================================================
+// Test 7 — TD-028: môn học sinh YẾU được đẩy lên đầu băng chưa-làm
+// =============================================================================
+// Primary failure mode: tín hiệu môn được nối vào nhưng ĐẶT SAI DẤU — "yếu" bị
+//   đọc thành "giỏi", nên hệ thống chăm chỉ gợi ý đúng những môn học sinh đã
+//   vững. Kiểu hỏng này KHÔNG hiện ra ở đâu cả: danh sách vẫn đủ đề, vẫn tất
+//   định, chỉ vô duyên — đúng thứ TD-028 mô tả là "không có cách nào phát hiện
+//   bằng số liệu".
+describe("Test 7 — TD-028: điểm yếu theo môn xếp trước, trong CÙNG một lớp", () => {
+  it("đề của môn điểm thấp đứng trên đề của môn điểm cao, khi mọi thứ khác bằng nhau", () => {
+    const order = rankExamIds({
+      candidates: [
+        exam("bio-fresh", 12, "2026-01-01T00:00:00.000Z", "Biology"),
+        exam("math-fresh", 12, "2026-01-01T00:00:00.000Z", "Math"),
+      ],
+      // Cùng lớp, cùng số lượt: chỉ ĐIỂM phân biệt hai môn. Toán 9/10 (yếu 0.1),
+      // Sinh 2/10 (yếu 0.8).
+      attempts: [
+        attempt("math-done", 12, "2026-02-01T00:00:00.000Z", 9, "Math"),
+        attempt("bio-done", 12, "2026-02-02T00:00:00.000Z", 2, "Biology"),
+      ],
+      weights: WEIGHTS,
+    });
+
+    expect(order).toEqual(["bio-fresh", "math-fresh"]);
+  });
+
+  it("ĐỐI CHỨNG ĐẢO DẤU: đảo hai điểm số thì đảo luôn thứ tự — không phải id, không phải thứ tự mảng", () => {
+    // Cùng đúng hai ứng viên, cùng thứ tự mảng, cùng id. Chỉ hai con số điểm
+    // đổi chỗ cho nhau. Nếu kỳ vọng ở ca trên được thoả bởi tie-break id
+    // ("bio-fresh" < "math-fresh") thì ca này cũng ra hệt như thế và hỏng.
+    const order = rankExamIds({
+      candidates: [
+        exam("bio-fresh", 12, "2026-01-01T00:00:00.000Z", "Biology"),
+        exam("math-fresh", 12, "2026-01-01T00:00:00.000Z", "Math"),
+      ],
+      attempts: [
+        attempt("math-done", 12, "2026-02-01T00:00:00.000Z", 2, "Math"),
+        attempt("bio-done", 12, "2026-02-02T00:00:00.000Z", 9, "Biology"),
+      ],
+      weights: WEIGHTS,
+    });
+
+    expect(order).toEqual(["math-fresh", "bio-fresh"]);
+  });
+
+  it("MÔN CHƯA THỬ BAO GIỜ không được coi là yếu — nó xếp như một môn đã vững", () => {
+    // "Không biết" khác "yếu". Một môn không có dòng điểm nào nhận số hạng 0, y
+    // như một môn 10/10. Nhánh ngược lại — coi môn chưa thử là yếu tuyệt đối —
+    // biến bộ xếp hạng thành một máy đẩy nội dung lạ lên đầu.
+    const order = rankExamIds({
+      candidates: [
+        exam("chem-fresh", 12, "2026-01-01T00:00:00.000Z", "Chemistry"),
+        exam("bio-fresh", 12, "2026-01-01T00:00:00.000Z", "Biology"),
+      ],
+      attempts: [attempt("bio-done", 12, "2026-02-01T00:00:00.000Z", 3, "Biology")],
+      weights: WEIGHTS,
+    });
+
+    expect(order).toEqual(["bio-fresh", "chem-fresh"]);
+  });
+
+  it("COLD START: chưa có điểm nào thì tín hiệu môn CÂM, thứ tự vẫn là AC-022 (mới-cũ rồi id)", () => {
+    const order = rankExamIds({
+      candidates: [
+        exam("old-bio", 12, "2026-01-01T00:00:00.000Z", "Biology"),
+        exam("new-math", 12, "2026-06-01T00:00:00.000Z", "Math"),
+      ],
+      attempts: [],
+      weights: WEIGHTS,
+    });
+
+    expect(order).toEqual(["new-math", "old-bio"]);
+  });
+
+  it("LƯỢT ĐÃ NỘP MÀ KHÔNG CÓ ĐIỂM không bị đọc thành 0 điểm", () => {
+    // `record_exam_result()` hỏng SAU khi lượt làm đã commit là chuyện xảy ra
+    // thật (PRD AC-038). Đọc lượt ấy thành 0 điểm là biến một sự cố ghi dữ liệu
+    // thành lời khẳng định "em này yếu Sinh". Ở đây Sinh chỉ có lượt KHÔNG
+    // điểm, Toán có 2/10 — nên Toán mới là môn yếu, và đề Toán phải lên trước.
+    const order = rankExamIds({
+      candidates: [
+        exam("bio-fresh", 12, "2026-01-01T00:00:00.000Z", "Biology"),
+        exam("math-fresh", 12, "2026-01-01T00:00:00.000Z", "Math"),
+      ],
+      attempts: [
+        attempt("bio-done", 12, "2026-02-01T00:00:00.000Z", null, "Biology"),
+        attempt("math-done", 12, "2026-02-02T00:00:00.000Z", 2, "Math"),
+      ],
+      weights: WEIGHTS,
+    });
+
+    expect(order).toEqual(["math-fresh", "bio-fresh"]);
+  });
+
+  it("MÔN THIẾU trên một lượt chỉ làm câm tín hiệu MÔN, không làm câm tín hiệu LỚP", () => {
+    // Lượt duy nhất của học sinh không giao được môn (embed lệch hình dạng),
+    // nhưng LỚP của nó thì có. Tỉ trọng lớp phải vẫn chạy: đề lớp 9 lên trước
+    // đề lớp 12, dù đề lớp 12 mới hơn.
+    const order = rankExamIds({
+      candidates: [
+        exam("g12-new", 12, "2026-06-01T00:00:00.000Z", "Math"),
+        exam("g9-old", 9, "2026-01-01T00:00:00.000Z", "Math"),
+      ],
+      attempts: [attempt("done", 9, "2026-02-01T00:00:00.000Z", 3, null)],
+      weights: WEIGHTS,
+    });
+
+    expect(order).toEqual(["g9-old", "g12-new"]);
+  });
+
+  it("MỘT ĐỀ LÀM LẠI NĂM LẦN không đè bẹp trung bình của môn", () => {
+    // Trung bình tính trên lượt ĐẠI DIỆN (nộp gần nhất mỗi đề), đúng định nghĩa
+    // `priorScore` đã dùng. Ở đây Toán có MỘT đề bị làm lại 5 lần với điểm rất
+    // thấp ở các lượt cũ nhưng 10/10 ở lượt gần nhất; Sinh có một đề 4/10.
+    // Đếm cả 5 lượt thì Toán thành môn yếu nhất và đề Toán sẽ leo lên đầu.
+    const order = rankExamIds({
+      candidates: [
+        exam("bio-fresh", 12, "2026-01-01T00:00:00.000Z", "Biology"),
+        exam("math-fresh", 12, "2026-01-01T00:00:00.000Z", "Math"),
+      ],
+      attempts: [
+        attempt("math-done", 12, "2026-02-01T00:00:00.000Z", 0, "Math"),
+        attempt("math-done", 12, "2026-02-02T00:00:00.000Z", 1, "Math"),
+        attempt("math-done", 12, "2026-02-03T00:00:00.000Z", 0, "Math"),
+        attempt("math-done", 12, "2026-02-04T00:00:00.000Z", 2, "Math"),
+        attempt("math-done", 12, "2026-02-05T00:00:00.000Z", 10, "Math"),
+        attempt("bio-done", 12, "2026-02-06T00:00:00.000Z", 4, "Biology"),
+      ],
+      weights: WEIGHTS,
+    });
+
+    expect(order).toEqual(["bio-fresh", "math-fresh"]);
+  });
+});
+
+// =============================================================================
+// Test 8 — TD-028: hai tính chất số học mà trọng số 0.5 được CHỌN để có
+// =============================================================================
+// Primary failure mode: ai đó chỉnh EXAM_RANK_SUBJECT_WEAKNESS_WEIGHT theo cảm
+//   giác ("cho nó mạnh hơn tí"), và hai tính chất dưới đây im lặng mất hiệu
+//   lực. Chúng là lý do con số là 0.5 chứ không phải một số khác, nên chúng
+//   phải hỏng ồn ào khi con số đổi — các ca dưới ghim CHÍNH hằng số đang ship,
+//   không phải một bộ trọng số bịa riêng cho test.
+describe("Test 8 — trật tự giữa ba số hạng của affinity", () => {
+  it("LỚP ĐÈ MÔN: đề SAI lớp của môn yếu nhất vẫn đứng dưới đề ĐÚNG lớp của môn đã vững", () => {
+    // Học sinh chỉ làm bài lớp 12 nên tỉ trọng lớp là 1.0 / 0. Cận trên của đề
+    // sai lớp là 0 + 0.5 + 0.25 = 0.75; cận dưới của đề đúng lớp là 1.0. Đẩy
+    // nội dung sai lớp lên đầu tệ hơn hẳn việc gợi ý một môn đã vững.
+    const order = rankExamIds({
+      candidates: [
+        // sai lớp, môn yếu tuyệt đối, VÀ mới nhất — mọi tín hiệu mềm ủng hộ nó
+        exam("g8-bio-new", 8, "2026-06-01T00:00:00.000Z", "Biology"),
+        // đúng lớp, môn đã vững, và cũ nhất
+        exam("g12-math-old", 12, "2020-01-01T00:00:00.000Z", "Math"),
+      ],
+      attempts: [
+        attempt("bio-done", 12, "2026-02-01T00:00:00.000Z", 0, "Biology"),
+        attempt("math-done", 12, "2026-02-02T00:00:00.000Z", 10, "Math"),
+      ],
+      weights: WEIGHTS,
+    });
+
+    expect(order).toEqual(["g12-math-old", "g8-bio-new"]);
+  });
+
+  it("MÔN ĐÈ MỚI-CŨ khi điểm yếu là THẬT: môn 0 điểm thắng lợi thế mới nhất", () => {
+    const order = rankExamIds({
+      candidates: [
+        exam("bio-oldest", 12, "2020-01-01T00:00:00.000Z", "Biology"),
+        exam("math-newest", 12, "2026-06-01T00:00:00.000Z", "Math"),
+      ],
+      attempts: [
+        attempt("bio-done", 12, "2026-02-01T00:00:00.000Z", 0, "Biology"),
+        attempt("math-done", 12, "2026-02-02T00:00:00.000Z", 10, "Math"),
+      ],
+      weights: WEIGHTS,
+    });
+
+    expect(order).toEqual(["bio-oldest", "math-newest"]);
+  });
+
+  it("MỚI-CŨ ĐÈ MÔN khi điểm yếu chỉ hơi hơi: chênh 0.4 điểm không lật được đề mới nhất", () => {
+    // Sinh 8.0/10 (số hạng 0.5 × 0.2 = 0.10), Toán 8.4/10 (0.5 × 0.16 = 0.08).
+    // Chênh 0.02 nhỏ hơn 0.25 của mới-cũ nên đề mới hơn thắng. Đây là nửa còn
+    // lại của tính chất: tín hiệu môn KHÔNG được phép là một khoá cứng trá hình.
+    const order = rankExamIds({
+      candidates: [
+        exam("bio-oldest", 12, "2020-01-01T00:00:00.000Z", "Biology"),
+        exam("math-newest", 12, "2026-06-01T00:00:00.000Z", "Math"),
+      ],
+      attempts: [
+        attempt("bio-done", 12, "2026-02-01T00:00:00.000Z", 8, "Biology"),
+        attempt("math-done", 12, "2026-02-02T00:00:00.000Z", 8.4, "Math"),
+      ],
+      weights: WEIGHTS,
+    });
+
+    expect(order).toEqual(["math-newest", "bio-oldest"]);
+  });
+
+  it("BĂNG VẪN LÀ KHOÁ CỨNG: đề ĐÃ LÀM của môn yếu nhất vẫn nằm dưới MỌI đề chưa làm", () => {
+    // TD-028 kê việc xét lại `band` như một việc RIÊNG và bản này cố ý không
+    // làm. Ca này ghim quyết định đó, nên một lần "cải tiến" âm thầm cho phép
+    // đề đã làm vượt lên sẽ hỏng ở đây chứ không hỏng ở màn hình người dùng.
+    const order = rankExamIds({
+      candidates: [
+        exam("bio-done", 12, "2026-06-01T00:00:00.000Z", "Biology"),
+        exam("math-fresh", 8, "2020-01-01T00:00:00.000Z", "Math"),
+      ],
+      attempts: [
+        attempt("bio-done", 12, "2026-02-01T00:00:00.000Z", 0, "Biology"),
+        attempt("math-done", 12, "2026-02-02T00:00:00.000Z", 10, "Math"),
+      ],
+      weights: WEIGHTS,
+    });
+
+    expect(order).toEqual(["math-fresh", "bio-done"]);
+  });
+
+  it("ĐIỂM NGOÀI THANG bị kẹp, không sinh ra số hạng âm", () => {
+    // Một dòng `total_score` lớn hơn 10 (dữ liệu hỏng, hoặc thang điểm đổi mà
+    // chỗ này chưa đổi theo) cho `1 − mean/10` âm. Không kẹp thì môn ấy tụt
+    // xuống DƯỚI cả môn không có tín hiệu gì — một dòng lạ đổi thứ tự theo cách
+    // không ai giải thích được. Kẹp về 0 nghĩa là nó xếp ngang một môn đã vững,
+    // tức ngang với "chưa thử".
+    const order = rankExamIds({
+      candidates: [
+        exam("bad-fresh", 12, "2026-01-01T00:00:00.000Z", "Bad"),
+        exam("chem-fresh", 12, "2026-01-01T00:00:00.000Z", "Chemistry"),
+      ],
+      attempts: [attempt("bad-done", 12, "2026-02-01T00:00:00.000Z", 99, "Bad")],
+      weights: WEIGHTS,
+    });
+
+    // Cả hai số hạng môn bằng 0 nên mọi khoá bằng nhau, tie-break id tăng dần.
+    expect(order).toEqual(["bad-fresh", "chem-fresh"]);
+  });
+
+  it("BẤT BIẾN ĐẾM VÀO = ĐẾM RA giữ nguyên với tín hiệu mới (AC-021)", () => {
+    const candidates = [
+      exam("a", 12, "2026-01-01T00:00:00.000Z", "Math"),
+      exam("b", 9, "2026-02-01T00:00:00.000Z", "Biology"),
+      exam("c", 12, "2026-03-01T00:00:00.000Z", "Chemistry"),
+      exam("d", 11, "2026-04-01T00:00:00.000Z", "Physics"),
+    ];
+    const order = rankExamIds({
+      candidates,
+      attempts: [
+        attempt("b", 9, "2026-05-01T00:00:00.000Z", 1, "Biology"),
+        attempt("z", 12, "2026-05-02T00:00:00.000Z", 7, "Math"),
+      ],
+      weights: WEIGHTS,
+    });
+
+    expect(order).toHaveLength(candidates.length);
+    expect([...order].sort()).toEqual(["a", "b", "c", "d"]);
   });
 });
