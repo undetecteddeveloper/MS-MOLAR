@@ -2117,6 +2117,103 @@ alter table public.telemetry_log
   );
 
 -- ----------------------------------------------------------------------------
+-- 18. Tác giả bị BAN thì đề của họ rời khỏi catalog (TECH-DEBT TD-032).
+--
+--     VÌ SAO CÓ PHẦN NÀY. Ban một tài khoản trên Supabase (`banned_until`) chặn
+--     ĐĂNG NHẬP và không chạm gì tới quyền ĐỌC nội dung đã published. Đo được
+--     2026-08-29: tài khoản probe của `verify:schema` bị ban, và cả 4 đề
+--     published của nó vẫn hiện bình thường trên prod. Tức "cấm cửa tác giả" và
+--     "gỡ nội dung của tác giả" là hai việc, và trước khối này chỉ có việc thứ
+--     nhất tồn tại.
+--
+--     KHÔNG DÙNG 'removed' CHO VIỆC NÀY, có chủ ý. §14 đã có một trạng thái gỡ
+--     thủ công, từng đề một, có nhật ký (`exam_moderation_log`). Nó trả lời câu
+--     "đề này có vấn đề". Ban trả lời câu "NGƯỜI này có vấn đề" — một vị từ về
+--     tác giả, đúng một chỗ, và nó phải TỰ ĐẢO NGƯỢC khi lệnh ban hết hạn hoặc
+--     được gỡ. Viết nó thành N lần `update exams set status='removed'` là chép
+--     một trạng thái sang một bảng khác rồi phải nhớ chép ngược lại — và "phải
+--     nhớ" chính là hình dạng của mọi món nợ trong sổ này.
+--
+--     BAN CÓ HẠN ĐƯỢC TÔN TRỌNG: `banned_until > now()`. Supabase ghi lệnh ban
+--     vĩnh viễn bằng một mốc rất xa (dự án này dùng 2999-01-01), nên một vị từ
+--     `is not null` đơn thuần sẽ giữ đề bị ẩn mãi sau khi lệnh ban đã hết hạn.
+--
+--     TÁC GIẢ VẪN THẤY ĐỀ CỦA CHÍNH MÌNH (`author_id = auth.uid()` ở vế sau).
+--     Điều đó KHÔNG mâu thuẫn với lệnh ban: người bị ban không đăng nhập được
+--     nên không có `auth.uid()` nào để khớp. Vế ấy giữ nguyên cho đúng một
+--     trường hợp — lệnh ban hết hạn — và khi đó tác giả lấy lại đề của mình mà
+--     không cần ai chạy lệnh gì.
+--
+--     `author_id is null` (nội dung seed) KHÔNG bị ảnh hưởng: `is_author_banned(null)`
+--     trả false, nên seed vẫn hiện. Đây là hành vi phải giữ, không phải hệ quả
+--     tình cờ — §5 đã ghi rằng seed cố ý không khớp policy tác giả nào.
+-- ----------------------------------------------------------------------------
+
+-- 18a. Vị từ. SECURITY DEFINER vì `authenticated` không có (và không nên có)
+--      quyền đọc `auth.users`; biểu thức của một RLS policy chạy dưới quyền
+--      NGƯỜI GỌI, nên không có đường nào đọc `banned_until` từ trong policy mà
+--      không đi qua một hàm definer.
+--
+--      ⚠ BỀ MẶT LỘ RA, ghi thẳng thay vì giấu: hàm này cấp EXECUTE cho
+--      `authenticated`, nên bất kỳ người dùng đã đăng nhập nào cũng hỏi được
+--      "uuid này có đang bị ban không". Chấp nhận vì hai lý do đo được:
+--      (1) nó đòi một uuid mà người hỏi PHẢI CÓ SẴN, và (2) `exams.author_id`
+--      vốn đã đọc được qua PostgREST bằng anon key cho mọi đề published, nên
+--      tập uuid có thể hỏi vốn đã nằm trong tay client từ trước. Thứ thêm vào
+--      là một boolean về trạng thái kiểm duyệt, không phải một danh sách.
+--      Nếu về sau điều đó thành vấn đề, cách chữa là chuyển vị từ vào một cột
+--      đã materialize trên `user_profiles` — KHÔNG phải bỏ grant, vì bỏ grant
+--      thì policy chết chứ không phải kín hơn.
+--
+--      `stable`: trong một câu lệnh, kết quả không đổi — planner được phép gọi
+--      một lần cho mỗi `author_id` phân biệt thay vì một lần cho mỗi dòng.
+create or replace function public.is_author_banned(p_author_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, auth, pg_temp
+as $$
+  select exists (
+    select 1
+      from auth.users u
+     where u.id = p_author_id
+       and u.banned_until is not null
+       and u.banned_until > now()
+  );
+$$;
+
+revoke all on function public.is_author_banned(uuid) from public;
+grant execute on function public.is_author_banned(uuid) to anon, authenticated, service_role;
+
+-- 18b. Policy đọc `exams` — cùng hình dạng với §4, thêm đúng một vế.
+--      Chép lại NGUYÊN policy thay vì "sửa" nó: Postgres không có
+--      `alter policy ... add`, và `drop`+`create` trong cùng một lượt là cách
+--      duy nhất giữ file idempotent.
+drop policy if exists "exams_select_visible" on public.exams;
+create policy "exams_select_visible" on public.exams
+  for select to authenticated using (
+    (status = 'published' and not public.is_author_banned(author_id))
+    or author_id = auth.uid()
+  );
+
+-- 18c. `questions` đi theo `exams`, nếu không thì nội dung câu hỏi của một tác
+--      giả bị ban vẫn đọc được qua `/rest/v1/questions` trong khi đề đã biến
+--      mất — một lỗ hổng hình dạng §10, và im lặng y như thế.
+drop policy if exists "questions_select_visible" on public.questions;
+create policy "questions_select_visible" on public.questions
+  for select to authenticated using (
+    exists (
+      select 1 from public.exams e
+      where questions.id = any(e.question_ids)
+        and (
+          (e.status = 'published' and not public.is_author_banned(e.author_id))
+          or e.author_id = auth.uid()
+        )
+    )
+  );
+
+-- ----------------------------------------------------------------------------
 -- 17. Phiên bản schema — DB tự khai nó đang chạy bản nào (2026-08-07).
 --
 --     Vì sao có phần này (TECH-DEBT TD-005): file này được paste TAY vào SQL
@@ -2155,7 +2252,7 @@ revoke all on public.schema_version from anon, authenticated;
 -- nó — xem lib/schema/schemaFingerprint.ts).
 -- @schema-fingerprint-begin
 insert into public.schema_version (id, fingerprint)
-values (1, '9979c9deea52')
+values (1, '0abf8131aa2a')
 on conflict (id) do update
   set fingerprint = excluded.fingerprint,
       applied_at  = now();
