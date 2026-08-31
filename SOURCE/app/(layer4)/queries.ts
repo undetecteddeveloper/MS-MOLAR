@@ -84,34 +84,60 @@ export type MyExamDetail = {
  */
 export async function getMyExam(id: string): Promise<MyExamDetail | null> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
 
-  const { data: examRow, error: examErr } = await supabase
-    .from("exams")
-    .select(
-      "id, title, subject, grade, duration_minutes, school, school_year, semester, status, question_ids, parts"
-    )
-    .eq("id", id)
-    .eq("author_id", user.id)
-    .maybeSingle();
-  if (examErr) throw examErr;
-  if (!examRow) return null;
+  // Chuỗi BUỘC phải tuần tự: query exams cần `user.id` cho .eq("author_id").
+  const examChain = (async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return null;
 
-  const questionIds = (examRow.question_ids as string[]) ?? [];
+    const { data, error } = await supabase
+      .from("exams")
+      .select(
+        "id, title, subject, grade, duration_minutes, school, school_year, semester, status, question_ids, parts"
+      )
+      .eq("id", id)
+      .eq("author_id", user.id)
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  })();
+
   // Màn review là surface CỦA TÁC GIẢ nên được xem đáp án (khác player, nơi
   // correct_answer/sub_answers/essay_answer KHÔNG BAO GIỜ được select). Từ
   // Security review 2026-08-03 #1, 3 cột đó bị REVOKE khỏi role `authenticated`
   // (RLS lọc dòng chứ không lọc cột) → đọc qua exam_answer_key(), nhánh "tác
   // giả" của nó (schema.sql §10a) tái kiểm tra author_id ở tầng DB, độc lập với
   // .eq("author_id", user.id) trên query exams phía trên.
-  const { data: qData, error: qErr } = await supabase.rpc("exam_answer_key", {
-    p_exam_id: id,
-  });
+  //
+  // SONG SONG với chuỗi trên, KHÔNG nối đuôi sau nó (perf audit 2026-08-31):
+  // RPC chỉ nhận `p_exam_id` — đối số của chính hàm này — nên nó không cần một
+  // byte nào từ kết quả query exams. Trước đây nó vẫn nằm sau, tức trả giá một
+  // RTT thừa trên MỌI lượt mở /me/exams/[id]. Đo trên bản build production, 10
+  // cặp render tách biệt (mỗi biến thể một render riêng — để chung một render
+  // thì fetch memoization của Next làm GET thứ hai gần như miễn phí và số đo
+  // vô nghĩa): median 460ms → 210ms (−54%), min 314ms → 183ms. Đúng một RTT.
+  //
+  // ĐÁNH ĐỔI, có chủ ý: ở nhánh trả null (đề không tồn tại, hoặc không phải của
+  // mình) RPC vẫn đã bắn đi thay vì được bỏ qua như trước. KHÔNG rò rỉ gì —
+  // nhánh "tác giả" của exam_answer_key tự tái kiểm tra author_id ở tầng DB
+  // (chính là lý do nêu ở đoạn trên), nên người không phải tác giả nhận tập
+  // rỗng chứ không phải đáp án. Giá phải trả là một query thừa trên nhánh HIẾM,
+  // đổi lấy một RTT tiết kiệm trên nhánh THƯỜNG.
+  const [examRow, { data: qData, error: qErr }] = await Promise.all([
+    examChain,
+    supabase.rpc("exam_answer_key", { p_exam_id: id }),
+  ]);
+  // Thứ tự hai lượt kiểm tra này GIỮ NGUYÊN hành vi quan sát được của bản cũ:
+  // khi không có examRow, bản cũ return null mà chưa từng chạm tới RPC, nên
+  // `qErr` (nếu có) không bao giờ được ném. Đảo hai dòng này là biến một lượt
+  // đọc "đề không phải của mình" từ `null` thành một cú throw.
+  if (!examRow) return null;
   if (qErr) throw qErr;
   const qRows = (qData ?? []) as Array<Record<string, unknown>>;
+
+  const questionIds = (examRow.question_ids as string[]) ?? [];
 
   const exam = assembledFromRows(
     {

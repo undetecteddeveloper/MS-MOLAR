@@ -223,21 +223,41 @@ async function listMyExams(supabase: SupabaseClient, authorId: string) {
   return data;
 }
 
+// Perf audit 2026-08-31: bản chép này ĐÃ TRÔI so với nguồn theo đúng kiểu khối
+// cảnh báo ở đầu file mô tả, và trôi theo hướng LÀM ĐẸP SỐ ĐO. Nó nhận sẵn
+// `authorId` như một đối số, trong khi getMyExam() thật tự gọi
+// `supabase.auth.getUser()` — script vì thế đo 2 RTT còn production trả 3, và
+// báo về 451ms cho một đường thực tế tốn ~820ms.
+//
+// Nay chép lại đúng hình dạng nguồn, KÈM lượt getUser() đó. Lưu ý khi đọc số:
+// trong production, layout của route-group đã gọi getCurrentUserProfile() trước
+// đó nên lượt getUser() ở đây rơi trúng fetch memoization của Next và gần như
+// miễn phí — script này chạy NGOÀI Next nên không có lớp đó và sẽ tính đủ tiền
+// một RTT. Số của script là CẬN TRÊN, không phải con số người dùng thật trả.
 async function getMyExam(supabase: SupabaseClient, id: string, authorId: string) {
-  const { data: examRow, error: examErr } = await supabase
-    .from("exams")
-    .select(
-      "id, title, subject, grade, duration_minutes, school, school_year, semester, status, question_ids, parts"
-    )
-    .eq("id", id)
-    .eq("author_id", authorId)
-    .maybeSingle();
-  if (examErr) throw examErr;
-  if (!examRow) return null;
+  // Chuỗi buộc tuần tự: query exams cần user.id cho .eq("author_id").
+  const examChain = (async () => {
+    await supabase.auth.getUser();
+    const { data, error } = await supabase
+      .from("exams")
+      .select(
+        "id, title, subject, grade, duration_minutes, school, school_year, semester, status, question_ids, parts"
+      )
+      .eq("id", id)
+      .eq("author_id", authorId)
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  })();
   // RPC, không phải .from("questions") — xem ghi chú ở getResult() phía trên.
-  const { data: qRows, error: qErr } = await supabase.rpc("exam_answer_key", {
-    p_exam_id: id,
-  });
+  // Chạy SONG SONG với chuỗi trên: nó chỉ cần `id`, không cần kết quả query
+  // exams (perf audit 2026-08-31 — cắt đúng một RTT, đo được 460ms → 210ms
+  // median trên bản build production).
+  const [examRow, { data: qRows, error: qErr }] = await Promise.all([
+    examChain,
+    supabase.rpc("exam_answer_key", { p_exam_id: id }),
+  ]);
+  if (!examRow) return null;
   if (qErr) throw qErr;
   return { examRow, questionCount: ((qRows ?? []) as unknown[]).length };
 }
