@@ -88,11 +88,29 @@ không phải checklist item có ai tick).
    Lệch = prod đang tụt lại, bất kể code đã deploy hay chưa.
 2. Nếu lệch: xác nhận với engineer trước khi apply DDL lên prod (dữ liệu thật,
    không tự quyết một mình) — kiểm trước `drop table`/`truncate`/`delete`/
-   `update` nào chạm dữ liệu hiện có, apply qua `SUPABASE_APPLY_A_MIGRATION`
-   (file lớn thì tách theo ranh giới câu lệnh, tôn trọng khối `$$...$$`), rồi
-   hậu kiểm bằng truy vấn thật (đếm bảng, thử insert/select qua phiên user
-   thật) — đừng tin mỗi thông báo "success".
-3. Không đợi "trước khi launch" như một lời hứa mơ hồ — kiểm ngay khi
+   `update` nào chạm dữ liệu hiện có, rồi hậu kiểm bằng truy vấn thật (đếm
+   bảng, thử insert/select qua phiên user thật) — đừng tin mỗi thông báo
+   "success".
+3. **MỖI LƯỢT APPLY ĐÚNG MỘT CÂU LỆNH.** Chạy `npm run schema:plan` trước để
+   lấy danh sách có SỐ (`scripts/schema-plan.ts` cắt `schema.sql` theo ranh
+   giới câu lệnh, tôn trọng `$$...$$`, chuỗi và comment) rồi apply từng câu
+   theo đúng thứ tự đó.
+
+   ⚠️ **Vì sao là quy tắc chứ không phải lời khuyên (đo 2026-08-31, hai lần
+   trong một phiên):** gửi nhiều câu lệnh trong MỘT chuỗi thì công cụ apply
+   chạy câu ĐẦU, bỏ phần còn lại, và trả về `successful: true` kèm tên của
+   đúng câu đầu ấy — `revoke ...; grant ...;` → `"command": "REVOKE"`;
+   `drop policy ...; create policy ...;` → `"command": "DROP POLICY"`. Lượt
+   apply TRÔNG NHƯ đã xong. Hệ quả lần đó: một RLS policy vừa tạo ra đã gọi
+   tới một hàm mà `authenticated` không có quyền chạy, và không có gì đỏ ở
+   đâu cả.
+
+   Hậu kiểm phải đọc CATALOG, không đọc `information_schema`: quyền trên hàm
+   đọc ở `pg_proc.proacl`, policy đọc ở `pg_policies`.
+   `information_schema.routine_privileges` trả RỖNG dưới
+   `supabase_read_only_user` và trông y hệt "grant chưa có" — một dương tính
+   giả theo chiều ngược lại.
+4. Không đợi "trước khi launch" như một lời hứa mơ hồ — kiểm ngay khi
    `schema.sql` đổi trong cùng phiên đó, cho MỌI project Supabase đang connect
    (dev lẫn prod), không chỉ project đang test.
 
