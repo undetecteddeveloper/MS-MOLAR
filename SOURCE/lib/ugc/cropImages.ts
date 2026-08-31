@@ -118,6 +118,25 @@ export async function cropImagesLenient(
       // ~41.9KB (77077 - 2×17566). Trình duyệt nhận đủ byte, đúng content-type,
       // nên KHÔNG có lỗi mạng nào để đọc — chỉ hiện icon ảnh vỡ.
       //
+      // PHẠM VI THẬT, xác định 2026-08-31 sau khi quét cả bucket (12 ảnh,
+      // 7 đề) và đối chiếu từng đề trên prod — GHI Ở ĐÂY vì nó SỬA LẠI cách
+      // đọc đoạn trên: chỉ ĐÚNG MỘT lượt upload hỏng, đề
+      // `ugc-1dcb6d3e...` ngày 06/08. Các đề 09/08 (4 ảnh) và 17/08 (3 ảnh)
+      // đều mở được bình thường; một ảnh 17/08 đã được tải về và kiểm magic
+      // number `89 50 4e 47` sạch, 0 ký tự U+FFFD.
+      //
+      // Deps được GHIM y hệt nhau suốt khoảng đó (`@supabase/supabase-js`
+      // 2.107.0, `sharp` 0.35.3 trong package-lock, không đổi từ 04/08 tới
+      // 18/08), nên thứ kích hoạt KHÔNG phải một lần nâng cấp thư viện, và
+      // truy từ repo thì không ra. Nói cách khác đây là một sự cố MỘT LẦN,
+      // không tất định — không phải lỗi nổ ở mọi lượt upload.
+      //
+      // Vá vẫn giữ, và chính tính không tất định đó là lý do: một đường ghi
+      // nhị phân mà tính toàn vẹn thay đổi vì lý do không xác định được thì
+      // không nên nằm trên nhánh mong manh. Nhánh Blob/FormData là đường
+      // storage-js bảo toàn byte, và cũng là đường hai chỗ upload còn lại của
+      // repo vốn đã đi (chúng truyền `File`).
+      //
       // Vì sao lỗi này sống sót lâu: `up.error` KHÔNG BAO GIỜ nổ (upload thành
       // công thật, chỉ là sai nội dung), `png.length` log ra đúng kích thước
       // TRƯỚC khi hỏng, và mọi cổng verify đều mù với nội dung một object
