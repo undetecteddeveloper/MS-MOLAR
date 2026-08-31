@@ -67,6 +67,18 @@ async function cropOne(file: FileRef, box: BoundingBox): Promise<Buffer> {
   return image.extract(px).png().toBuffer();
 }
 
+/** Buffer PNG -> Blob để storage-js đi nhánh FormData (giữ nguyên byte).
+ *  Tách thành hàm riêng để chỗ gọi đọc được ý định, và để test ghim được đúng
+ *  hình dạng body mà upload nhận. */
+function pngBlob(png: Buffer): Blob {
+  // `new Uint8Array(png)` chứ không phải `[png]`: kiểu của Buffer là
+  // `Buffer<ArrayBufferLike>`, mà `ArrayBufferLike` gồm cả SharedArrayBuffer —
+  // không thoả `BlobPart`, nên `tsc` đỏ. Bản sao này tạo một view nền
+  // ArrayBuffer thật; nó SAO CHÉP byte chứ không diễn giải lại, nên không đưa
+  // vào đúng cái lớp chuyển đổi mà bản vá này tồn tại để loại bỏ.
+  return new Blob([new Uint8Array(png)], { type: "image/png" });
+}
+
 /**
  * Bản lenient (Task 4.1): LUÔN trả về map các hình crop THÀNH CÔNG (khoá
  * composite `part:number` — ADR-0005) + lỗi IMAGE_CROP_FAILED cho từng hình
@@ -90,7 +102,29 @@ export async function cropImagesLenient(
     try {
       const png = await cropOne(questionFile, q.imageBox);
       const path = `${examId}/p${q.part}q${q.number}.png`;
-      const up = await supabase.storage.from(BUCKET).upload(path, png, {
+      // BỌC Blob, KHÔNG truyền thẳng Buffer — và đây là một sửa lỗi HỎNG DỮ
+      // LIỆU, không phải khẩu vị code.
+      //
+      // storage-js chỉ đi nhánh FormData khi body `instanceof Blob`; một Buffer
+      // rơi xuống nhánh "gán thẳng vào body của fetch", và ở đó nó bị ép thành
+      // CHUỖI UTF-8 rồi mã hoá lại. Mọi byte >= 0x80 không hợp lệ UTF-8 trở
+      // thành U+FFFD (`ef bf bd`) — PNG hỏng vĩnh viễn ngay lúc upload.
+      //
+      // ĐO TRÊN PROD, không phải suy đoán (2026-08-31): tải
+      // `exam-images/ugc-1dcb6d3e.../p1q9.png` về thấy HTTP 200,
+      // `Content-Type: image/png`, 77.077 byte, nhưng magic number là
+      // `ef bf bd 50 4e 47` thay vì `89 50 4e 47` — byte 0x89 đã bị thay bằng
+      // U+FFFD. Đếm được 17.566 lần U+FFFD trong file; suy ngược ra ảnh gốc
+      // ~41.9KB (77077 - 2×17566). Trình duyệt nhận đủ byte, đúng content-type,
+      // nên KHÔNG có lỗi mạng nào để đọc — chỉ hiện icon ảnh vỡ.
+      //
+      // Vì sao lỗi này sống sót lâu: `up.error` KHÔNG BAO GIỜ nổ (upload thành
+      // công thật, chỉ là sai nội dung), `png.length` log ra đúng kích thước
+      // TRƯỚC khi hỏng, và mọi cổng verify đều mù với nội dung một object
+      // Storage. Hai đường upload khác của repo (avatar `(layer1)/actions.ts`,
+      // ảnh chụp màn hình `support/actions.ts`) không dính vì chúng truyền
+      // `File` — vốn đã là Blob.
+      const up = await supabase.storage.from(BUCKET).upload(path, pngBlob(png), {
         contentType: "image/png",
         upsert: true,
       });
