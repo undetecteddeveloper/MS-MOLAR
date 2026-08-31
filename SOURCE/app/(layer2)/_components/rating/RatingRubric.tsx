@@ -155,15 +155,20 @@ export function RatingRubric({ examId, initialScores }: RatingRubricProps) {
 
   return (
     <div className="border-border bg-card rounded-xl border p-6 sm:p-8">
-      <div className="flex items-baseline justify-end gap-4">
-        <span id={headingId} className="eyebrow text-muted-foreground">
-          {t("rating.partOf", { part: activeIndex + 1, total: PART_IDS.length })}
-        </span>
-      </div>
+      {/* MỘT hàng đầu, không phải hai. Trước đây "N/3" đứng riêng một hàng
+          canh phải, rồi nhãn phần ("PART III · SHORT ANSWER") mở một hàng thứ
+          hai bên dưới — hai dòng chữ nhỏ chồng nhau nói cùng một chuyện ("bạn
+          đang ở phần nào"), ăn hai nấc chiều cao ở đầu một thẻ vốn đã phải
+          chứa cả thang sao lẫn khối tổng kết. Gộp lại: TÊN phần bên trái, VỊ
+          TRÍ trong chuỗi phần bên phải, cùng một baseline.
 
+          Hàng này nằm TRONG khối animate (`key={activePart}`) chứ không ở
+          ngoài như "N/3" cũ: cả hai nửa đều đổi khi sang phần khác, nên để nửa
+          bên phải đứng ngoài sẽ cho một hàng chữ đổi giật trong khi nửa còn
+          lại trượt vào — chính kiểu lệch mà hiệu ứng trượt sinh ra để tránh. */}
       <div
         key={activePart}
-        className={`motion-safe:animate-in motion-safe:fade-in mt-3 motion-safe:duration-300 motion-safe:ease-out ${
+        className={`motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300 motion-safe:ease-out ${
           direction === 1 ? "motion-safe:slide-in-from-right-3" : "motion-safe:slide-in-from-left-3"
         }`}
         role="group"
@@ -171,10 +176,13 @@ export function RatingRubric({ examId, initialScores }: RatingRubricProps) {
       >
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
           <p className="eyebrow">{t(labelKeys.eyebrow)}</p>
-          <p className="text-brand font-serif text-lg tabular-nums transition-colors duration-200">
-            {score ?? "—"}
-            <span className="text-muted-foreground font-sans text-sm">/{RATING_MAX}</span>
-          </p>
+          {/* Con số "N/5" ĐÃ BỎ: thang sao ngay bên dưới vừa là chỗ nhập vừa là
+              chỗ đọc lại — số sao sáng LÀ điểm — nên con số chỉ lặp lại cùng
+              một dữ kiện bằng một ký hiệu khác, ở ngay cạnh. Điểm tổng vẫn in
+              thành số ở khối "Overall" phía dưới, nơi không có sao nào để đọc. */}
+          <span id={headingId} className="eyebrow text-muted-foreground">
+            {t("rating.partOf", { part: activeIndex + 1, total: PART_IDS.length })}
+          </span>
         </div>
         <div className="mt-4">
           <span id={scaleLabelId} className="sr-only">
