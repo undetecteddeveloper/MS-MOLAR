@@ -18,22 +18,23 @@ còn nơi nào khác giữ lịch sử nợ ngoài chính file này.)*
 
 ## Đang mở
 
-> **2026-08-31 — phiên trả nợ diện rộng.** TD-013, TD-028, TD-030, TD-031 và
-> TD-032 đã CHUYỂN xuống "Đã trả". Phần "Đang mở" nay còn ĐÚNG HAI mục, và cả
-> hai còn mở vì một lý do KHÔNG phải là công sức viết mã — một cái thiếu credential,
-> một cái đã quyết định là chấp nhận trả giá.
+> **2026-08-31 — phiên trả nợ diện rộng.** TD-005, TD-013, TD-028, TD-030,
+> TD-031 và TD-032 đã CHUYỂN xuống "Đã trả". Phần "Đang mở" nay còn **ĐÚNG MỘT
+> mục**, và nó mở vì một lý do KHÔNG phải là công sức viết mã: một quyết định đã
+> có, và cái giá của nó đã được chấp nhận.
 >
-> - **TD-005** — bị chặn bởi một CREDENTIAL (DB password của cả hai project).
->   Engineer đã được hỏi thẳng một lần (2026-08-27) và chọn "để mở". Phiên
->   2026-08-31 KHÔNG hỏi lại, mà trả phần trả được mà không cần credential —
->   xem khối cập nhật trong mục.
+> *(TD-005 mở suốt từ trước 2026-08-03 vì thiếu DB password. Engineer cấp
+> credential ngày 2026-08-31 và nó đóng trong cùng phiên — thứ chặn nó chưa bao
+> giờ là công sức, nên khi rào chắn được gỡ thì nó đi rất nhanh. Đáng ghi:
+> một nợ "để mở" 4 tuần có thể chỉ đang chờ đúng một thứ mà không ai hỏi lại.)*
+>
 > - **TD-029** — QUYẾT ĐỊNH KIẾN TRÚC nay ĐÃ CÓ: engineer chọn đường **(c)** —
 >   giữ `service_role`, không thêm identity thứ hai — ngày 2026-08-31, ghi trong
 >   **ADR-0019**. Mục vẫn ở đây vì (c) CỐ Ý không giảm một quyền nào, mà quyền
 >   chính là món nợ. Đổi lại, ranh giới GHI được ghim thành cổng CI.
 >
-> Đừng đọc hai mục này như việc bị bỏ quên. Mỗi mục ghi rõ phần nào đã trả,
-> phần nào còn, và cái gì phải xảy ra để phần còn lại được động tới.
+> Đừng đọc mục này như việc bị bỏ quên. Nó ghi rõ phần nào đã trả, phần nào
+> còn, và cái gì phải xảy ra để phần còn lại được động tới.
 
 ### TD-029 — Kill criterion của ADR-0010 đã NỔ, và ta cố ý đi tiếp
 **Từ:** 2026-08-28 (phát hiện khi soạn ADR-0018; engineer chọn "đi tiếp + mở
@@ -184,15 +185,33 @@ không còn là thước đo duy nhất — bản trả nợ phải chỉ ra đ�
 KHÔNG còn cần `service_role` nữa, và `test-rls.ts` phải có ca chứng minh
 identity mới không làm được thứ `service_role` làm được.
 
-### TD-005 — `schema.sql` áp bằng tay, không có migration tool
-**Từ:** trước 2026-08-03 (nợ cũ, ghi lại cho rõ)
-**Loại:** vận hành
-**Trạng thái:** **đã trả PHẦN PHÁT HIỆN (2026-08-07), PHẦN ĐƠN VỊ APPLY
-(2026-08-31) và PHẦN CÔNG CỤ MIGRATION — trên DEV (2026-08-31)**; prod còn một
-lượt dọn sổ ghi, xem khối ngay dưới
 
-> **CẬP NHẬT 2026-08-31 (b) — SUPABASE CLI MIGRATIONS ĐÃ VÀO. DEV XONG, PROD CÒN
-> MỘT LƯỢT DỌN SỔ.**
+---
+
+## Đã trả
+
+### ~~TD-005 — `schema.sql` áp bằng tay, không có migration tool~~
+**Trả:** 2026-08-31 — Supabase CLI migrations đã vào, trên **CẢ HAI** database.
+**Từ:** trước 2026-08-03 (nợ cũ). Nổ thật **4 lần** trước khi được trả.
+**Verify:** đọc lại `supabase_migrations.schema_migrations` bằng truy vấn thật
+trên cả dev lẫn prod — mỗi bên đúng **1 dòng**, `baseline_0abf8131aa2a`, 264
+statements, khớp nhau. `db push --dry-run` → `Remote database is up to date` ở
+cả hai. KHÔNG tin theo thông báo "Finished" của CLI: chính mục này ghi lại việc
+một công cụ apply báo `successful: true` cho một lượt chạy mới xong một nửa.
+
+> **CÒN LẠI SAU KHI TRẢ — đọc trước khi tin rằng mọi thứ đã kín.**
+>
+> - **Không có rollback.** Supabase migrations không có down-migration. Đi
+>   ngược một bản vá vẫn là viết một migration mới bằng tay.
+> - **Cổng chống trôi là CÚ PHÁP, không phải NGỮ NGHĨA.** Nó không chứng minh
+>   "baseline + mọi migration = schema.sql" theo nghĩa SQL — muốn thế phải dựng
+>   shadow database rồi `supabase db diff`, cần Docker, máy này không có.
+> - **Baseline không phải bản ghi trung thực về quá khứ.** 264 câu lệnh trong
+>   dòng ghi sổ do `migration repair` chép từ file vào; CLI chưa từng *chạy*
+>   chúng — schema đã có sẵn từ các lượt paste tay. Đúng như thế trên cả hai
+>   database. Đó là điểm khởi đầu được khai báo, không phải lịch sử.
+
+> **CẬP NHẬT 2026-08-31 (b) — SUPABASE CLI MIGRATIONS ĐÃ VÀO, CẢ HAI DATABASE.**
 >
 > Credential đã có, nên phần mà mục này gọi là "trả nợ thật" đã làm được.
 >
@@ -232,9 +251,11 @@ lượt dọn sổ ghi, xem khối ngay dưới
 > hai tập gần như RỜI NHAU. Đó là bằng chứng thêm cho chính mục này: không ai
 > biết database nào đã chạy gì, kể cả bảng ghi sổ.
 >
-> **CÒN LẠI TRÊN PROD** (schema đã đúng — `schema_version` = `0abf8131aa2a`,
-> đọc bằng truy vấn thật; chỉ bảng ghi sổ là sai): xoá 15 dòng rác rồi đánh dấu
-> baseline. Ghi lại đây để hoàn tác được — `schema_f525e3_part01/p01..p08_final`
+> **PROD — ĐÃ DỌN.** Schema prod vốn đã đúng (`schema_version` =
+> `0abf8131aa2a`, đọc bằng truy vấn thật); chỉ bảng ghi sổ là sai. Đã
+> `migration repair --status reverted` 15 dòng rồi `--status applied` baseline,
+> và đọc lại bằng truy vấn thật: đúng 1 dòng, khớp dev từng cột. 15 version bị
+> xoá, ghi lại đây để hoàn tác được — `schema_f525e3_part01/p01..p08_final`
 > (20260815043016, ...043143, ...043214, ...043246, ...043317, ...043350,
 > ...043420, 20260815085648, ...085715), `profile_avatar_schema_chunk_1..5_of_5`
 > (20260817123118, ...123756, ...123852, ...123958, ...124055),
@@ -243,8 +264,9 @@ lượt dọn sổ ghi, xem khối ngay dưới
 > *(Đo được, không phải đoán: rút chuỗi SQL khỏi binary CLI v2.116.0 cho thấy
 > nó chỉ chạy `SELECT version FROM supabase_migrations.schema_migrations ORDER
 > BY version` — cột `name` và `statements` là GHI-mà-không-bao-giờ-ĐỌC. Nên một
-> dòng baseline thiếu `statements` không ảnh hưởng vận hành; nó chỉ là vết
-> audit. Ghi ra vì câu hỏi này đã được đặt và đáng có câu trả lời đo được.)*
+> dòng baseline thiếu `statements` sẽ không ảnh hưởng vận hành — nó chỉ là vết
+> audit. Cuối cùng đã đi đường CLI nên cột ấy có đủ 264 câu ở cả hai bên, và câu
+> hỏi thành ra không cần dùng tới; giữ lại vì lần sau nó sẽ được hỏi lại.)*
 
 > **CẬP NHẬT 2026-08-31 — CHẾ ĐỘ HỎNG NÀY VỪA ĐƯỢC QUAN SÁT TRỰC TIẾP, HAI LẦN
 > TRONG MỘT PHIÊN, VÀ NÓ TỆ HƠN "QUÊN MỘT NHÓM".**
@@ -404,8 +426,6 @@ tới. Đã sửa (§2 nhường quyền sở hữu constraint cho §8c), nhưng
 một lần chạy lại toàn file trên DB có dữ liệu đại diện, mới phát hiện được.
 
 ---
-
-## Đã trả
 
 ### ~~TD-032 — 5 trong 7 đề trên PROD do tài khoản probe test đứng tên~~
 **Trả:** 2026-08-31 — chuyển quyền sở hữu + dựng cơ chế ẩn đề của tác giả bị ban.
