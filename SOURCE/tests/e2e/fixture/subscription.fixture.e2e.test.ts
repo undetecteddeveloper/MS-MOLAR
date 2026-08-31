@@ -2178,6 +2178,7 @@ describe("FE-3 (g) the rate-limited refusal is distinct from every other outcome
 import CheckoutPage from "@/app/(billing)/pricing/checkout/page";
 import PricingPage from "@/app/(billing)/pricing/page";
 import type { CheckoutOrder } from "@/lib/billing/checkoutOrder";
+import { en } from "@/lib/i18n/dictionaries/en";
 import type { CreateOrderError } from "@/lib/billing/orderActions";
 import {
   FIXTURE_AMOUNT_VND,
@@ -3001,60 +3002,141 @@ describe("FE-1 (d) the transfer block is not coupled to the QR", () => {
 });
 
 // =============================================================================
-// (e) the legal gate is CLOSED: inert, focusable, and nothing happens
+// (e) the legal gate on the SHIPPED route: OPEN, and it delegates to C-10
 // =============================================================================
+// WHY THIS ITEM NO LONGER READS `legalContentReady === false`, and why the old
+// reading was WRONG rather than merely out of date (TD-030).
+//
+// Item (e) was written on 2026-08-20 (`f83efa6`) against a route whose legal
+// gate was SHUT: `page.tsx` derives `legalContentReady` from the PRESENCE of
+// `billing.terms.body` and `billing.refund.body` in `en.ts`, and on that day
+// neither key existed. On 2026-08-21 `b3b81eb` landed both bodies — BU-1 met,
+// TBD-02 closed — so from that commit onward the shipped route takes C-15's
+// OPEN branch and mounts C-10 with `variant="primary"`. The closed branch
+// became unreachable FROM THIS ROUTE, and the item has been red ever since,
+// unseen, because the fixture lane was not one of the verify gates back then.
+//
+// TD-030 named two candidate causes — a confirm control that had lost its
+// `aria-describedby`, or a selector that cannot tell two `aria-disabled`
+// buttons apart. MEASURED, IT IS NEITHER, and either patch would have turned
+// this item green while leaving it asserting a fiction: there is exactly ONE
+// confirm-labelled control on the screen, it carries its `aria-describedby`
+// intact, and the id it carries is C-10's because C-10 is what the open gate
+// mounts. Nothing is broken; the premise expired.
+//
+// THE CLOSED BRANCH IS NOT LEFT UNTESTED. It lives at the level where it is
+// still reachable —
+// `app/(billing)/pricing/checkout/__tests__/PaymentConfirm.test.tsx` renders
+// C-15 with an explicit `legalContentReady={false}` and pins the inert,
+// focusable, reasoned control there, including that its sentence is the LEGAL
+// one and not C-10's "this order is closed". A route-level case cannot pin a
+// branch the route does not take without stubbing the dictionary the route
+// reads, and a case built on that stub asserts the stub, not the product.
+//
+// SO WHAT (e) PINS NOW: the state the route IS in, both halves of it. The gate
+// is open, and the control the open gate mounts is the one that performs the
+// real action. Pinning the gate STATE here is the half that earns its keep:
+// delete either legal body from `en.ts` and this item goes red loudly, instead
+// of the checkout screen quietly going inert in production.
 
-describe("FE-1 (e) `legalContentReady === false` leaves an inert but reachable confirm control", () => {
-  it.each(LOCALES)("locale %s — aria-disabled, no native disabled, Tab-reachable, no action", async (locale) => {
+/** The two keys — and only these two — that `page.tsx` gates C-15 on. Written
+ *  out here rather than imported because they are a PRIVATE const of the route
+ *  module: exporting them to satisfy a test would widen the route's surface,
+ *  and duplicating them is safe in the one direction that matters, since a
+ *  drift between the two lists fails the precondition below rather than
+ *  hiding. */
+const LEGAL_BODY_KEYS = ["billing.terms.body", "billing.refund.body"] as const;
+
+describe("FE-1 (e) the legal gate is OPEN, so the confirm control is C-10 doing the real work", () => {
+  it("PRECONDITION: the gate is open, read the way `page.tsx` itself reads it", () => {
+    // KEY PRESENCE, not a rendered string: `page.tsx` gates on `key in en`, so
+    // that is the predicate this precondition has to mirror or it is measuring
+    // a different thing. The non-empty check is a SECOND, weaker claim kept
+    // beside it because a key present with an empty body would open the gate on
+    // legal pages that say nothing — the shape TBD-02 exists to forbid.
+    expect(LEGAL_BODY_KEYS.every((key) => key in en)).toBe(true);
+    for (const key of LEGAL_BODY_KEYS) {
+      expect(en[key].trim().length).toBeGreaterThan(0);
+    }
+  });
+
+  it.each(LOCALES)(
+    "locale %s — ONE confirm control, it is C-10, no native disabled, Tab-reachable",
+    async (locale) => {
+      const { container } = await renderCheckoutRoute({
+        locale,
+        order: String(FIXTURE_ORDER_PENDING.orderCode),
+      });
+      const main = mainOf(container);
+      const button = confirmButton(container, locale);
+      const orderCode = FIXTURE_ORDER_PENDING.orderCode;
+
+      // IT IS C-10, not C-15's shut stand-in under the same label. Both render
+      // the SAME string (`billing.confirm.action`), so the label cannot tell
+      // them apart; `aria-describedby` can, and the ABSENCE of the shut
+      // control's own reason node is the other half of the same statement.
+      expect(button.getAttribute("aria-describedby")).toBe(`recheck-${orderCode}-reason`);
+      expect(
+        main.querySelectorAll(`button[aria-describedby="confirm-${orderCode}-legal"]`)
+      ).toHaveLength(0);
+      expect(main.querySelector(`#confirm-${orderCode}-legal`)).toBeNull();
+
+      // AND THE SHUT SENTENCE IS NOWHERE ON THE SCREEN. A live order told that
+      // the legal pages are unpublished is the exact regression the two
+      // separate strings exist to prevent, and it would survive every
+      // attribute check above.
+      expect(main.textContent ?? "").not.toContain(LEGAL_PENDING_REASON[locale]);
+
+      // OPEN GATE, LIVE ORDER ⇒ ACTIVATABLE, announced as such. `pending` is
+      // not a terminal status, so C-10's own `aria-disabled` reads "false" —
+      // the string, per the repo-wide convention, not a removed attribute.
+      expect(button.getAttribute("aria-disabled")).toBe("false");
+
+      // NEVER NATIVE `disabled`, in EITHER branch of the gate. This is the
+      // repo-wide `aria-disabled` pattern (ActionButton, ExplainStepAffordance,
+      // RecheckOrderControl) and the reason this item is worth keeping at route
+      // level at all: a native `disabled` here drops the control out of the tab
+      // order, which is where the person who needs to read the reason cannot
+      // reach it.
+      expect(button.hasAttribute("disabled")).toBe(false);
+      expect(button.disabled).toBe(false);
+
+      // TAB-REACHABLE.
+      const tabindex = button.getAttribute("tabindex");
+      expect(tabindex === null || Number(tabindex) >= 0).toBe(true);
+      button.focus();
+      expect(container.ownerDocument.activeElement).toBe(button);
+    }
+  );
+
+  it("POSITIVE CONTROL: activating it reaches the real re-check action, exactly once", async () => {
+    // Without this, every assertion above is satisfied by a control that is
+    // mounted, correctly described, correctly announced — and wired to nothing.
+    // "The gate is open" is a claim about REACHING THE ACTION, so the action
+    // has to be counted. The stub is installed here rather than inherited: a
+    // `mockClear()` keeps an implementation set by an earlier case, and a
+    // positive control that depends on file order is not a control.
+    recheckOrderMock.mockImplementation((orderCode: number) =>
+      stubs.simulateRecheckOrder(orderCode)
+    );
     const { container } = await renderCheckoutRoute({
-      locale,
+      locale: "en",
       order: String(FIXTURE_ORDER_PENDING.orderCode),
     });
     const main = mainOf(container);
-    const button = confirmButton(container, locale);
-    const orderCode = FIXTURE_ORDER_PENDING.orderCode;
+    const button = confirmButton(container, "en");
+    expect(alertsInside(main)).toHaveLength(0);
 
-    // IT IS THE GATED CONTROL, not C-10 under the same label. Both render the
-    // SAME string (`billing.confirm.action`), so the label cannot tell them
-    // apart; `aria-describedby` can, and the absence of C-10's own control on a
-    // payable screen is the other half of the same statement.
-    expect(button.getAttribute("aria-describedby")).toBe(`confirm-${orderCode}-legal`);
-    expect(main.querySelectorAll(`button[aria-describedby="recheck-${orderCode}-reason"]`)).toHaveLength(0);
-
-    // ANNOUNCED, NOT REMOVED — both readings, because the attribute and the
-    // property are set by different mistakes and either drops the control out of
-    // the tab order, which is precisely where the person who needs to READ the
-    // reason cannot reach it.
-    expect(button.getAttribute("aria-disabled")).toBe("true");
-    expect(button.hasAttribute("disabled")).toBe(false);
-    expect(button.disabled).toBe(false);
-
-    // TAB-REACHABLE.
-    const tabindex = button.getAttribute("tabindex");
-    expect(tabindex === null || Number(tabindex) >= 0).toBe(true);
-    button.focus();
-    expect(container.ownerDocument.activeElement).toBe(button);
-
-    // THE REASON IS THE LEGAL ONE, and it is VISIBLE — not `sr-only`. A sighted
-    // user looking at a control that does nothing needs the sentence too.
-    const reason = main.querySelector(`#confirm-${orderCode}-legal`);
-    if (!reason) throw new Error("FE-1: the legal-gate reason node is missing");
-    expect(reason.textContent).toBe(LEGAL_PENDING_REASON[locale]);
-    expect(reason.getAttribute("class") ?? "").not.toContain("sr-only");
-
-    // ACTIVATION DOES NOTHING. `aria-disabled` only announces — it does not stop
-    // a DOM click — so the inertness has to be measured, not inferred from the
-    // attribute that claims it.
-    const before = main.innerHTML;
     await act(async () => {
       button.click();
-      button.click();
     });
-    expect(pushMock).not.toHaveBeenCalled();
-    expect(stubs.createOrderCallCount).toBe(0);
-    expect(recheckOrderMock).not.toHaveBeenCalled();
-    expect(alertsInside(main)).toHaveLength(0);
-    expect(main.innerHTML).toBe(before);
+
+    expect(recheckOrderMock).toHaveBeenCalledTimes(1);
+    expect(recheckOrderMock).toHaveBeenCalledWith(FIXTURE_ORDER_PENDING.orderCode);
+    // The outcome is ANNOUNCED — `role="alert"` inserted after the fact, idiom
+    // 1. A call that reaches the action and says nothing is the failure mode
+    // C-10's whole comment header is about.
+    expect(alertsInside(main)).toHaveLength(1);
   });
 });
 
