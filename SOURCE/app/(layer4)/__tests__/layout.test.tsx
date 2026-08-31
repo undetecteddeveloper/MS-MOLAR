@@ -103,15 +103,19 @@ const EXPECTED_PROBE = [
   `known:${UPLOAD_USED}/${PREMIUM_UPLOAD_LIMIT}@${EXPECTED_RESETS_AT}`,
 ].join("|");
 
-/** billing.quota.remaining + billing.quota.resetsAt (en) với used/limit ở trên.
+/** billing.quota.remaining (en) với used/limit ở trên.
  *
- *  Vế "Resets on …" CÓ MẶT dù mount KHÔNG truyền prop nào: theo UI Spec v1.4
- *  (UI-D17, sửa bởi plan Task 0.3) TutorQuotaNote tự format `tutor.resetsAt`
- *  LẤY TỪ CONTEXT. Ngày được ghi BẰNG CHỮ THẬT chứ không gọi lại
- *  formatDate(EXPECTED_RESETS_AT, …): một vế phải suy từ bộ format sẽ lệch
- *  CÙNG CHIỀU với chính bộ format đó, tức không chứng minh được gì.
- *  24/08/2026 = 2026-08-24T06:30:00.000Z đọc theo Asia/Ho_Chi_Minh. */
-const EXPECTED_NOTE = `${TUTOR_USED}/${PREMIUM_TUTOR_LIMIT} tutor hints used this period. Resets on 24/08/2026.`;
+ *  KHÔNG có vế "Resets on …", và đó là hành vi ĐÚNG chứ không phải thiếu sót:
+ *  TutorQuotaNote chỉ in ngày đặt lại khi đã HẾT lượt (`isQuotaExhausted`), còn
+ *  fixture ở đây là 11/500 — còn nguyên lượt. Xem TutorQuotaNote.test.tsx cho
+ *  cặp ca đối chứng còn-lượt / hết-lượt.
+ *
+ *  Việc bỏ vế ngày KHÔNG làm yếu file này: `resetsAt` đi tới context vẫn được
+ *  khẳng định đầy đủ, và mạnh hơn, ở `EXPECTED_PROBE` (`@${EXPECTED_RESETS_AT}`,
+ *  so khớp mốc ISO chính xác thay vì một chuỗi ngày đã format). Vai trò còn lại
+ *  của ca dùng hằng này là chứng minh một component ĐÃ SHIP nhận được giá trị
+ *  thật — bộ đếm `11/500` (không thể ra từ FREE_FALLBACK) đủ cho điều đó. */
+const EXPECTED_NOTE = `${TUTOR_USED}/${PREMIUM_TUTOR_LIMIT} tutor hints used this period.`;
 
 // ───────────────────────── Nguồn dữ liệu bị stub ─────────────────────────────
 

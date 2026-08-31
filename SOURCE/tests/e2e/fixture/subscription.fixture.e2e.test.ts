@@ -530,10 +530,17 @@ const UTC_DATE = FIXTURE_RESETS_AT_UTC_DATE.split("-").reverse().join("/"); // 1
  *  — an expectation rebuilt from `t(key, values)` drifts with the dictionary and
  *  with the formatter at once, so it can never fail. The "fixture preconditions"
  *  block below ties these literals back to the fixture's own numbers and date. */
+//
+//  `known` carries NO date, and that asymmetry with `exhausted` IS the
+//  contract: the reset date only answers a question the user is actually
+//  asking once the hints have run out, so `TutorQuotaNote` gates it behind
+//  `isQuotaExhausted(tutor)`. 12/500 is not exhausted; 500/500 is. Every case
+//  below that needs a rendered date therefore renders the EXHAUSTED fixture —
+//  the known fixture can no longer discriminate a date at all.
 const NOTE = {
   known: {
-    en: "12/500 tutor hints used this period. Resets on 16/09/2026.",
-    vi: "Đã dùng 12/500 lượt gia sư trong kỳ này. Đặt lại vào 16/09/2026.",
+    en: "12/500 tutor hints used this period.",
+    vi: "Đã dùng 12/500 lượt gia sư trong kỳ này.",
   },
   exhausted: {
     en: "500/500 tutor hints used this period. Resets on 16/09/2026.",
@@ -792,7 +799,12 @@ describe("FE-2 preconditions", () => {
 
     for (const locale of LOCALES) {
       expect(NOTE.known[locale]).toContain(`${known.used}/${known.limit}`);
-      expect(NOTE.known[locale]).toContain(ICT_DATE);
+      // The date belongs to the exhausted literal ALONE. Asserted as an
+      // inequality on both sides, not just a `toContain` on one: a `known`
+      // literal that quietly regained its date would otherwise make (a)'s
+      // "no date while hints remain" claim vacuous, since (a) compares against
+      // this very literal.
+      expect(NOTE.known[locale]).not.toContain(ICT_DATE);
       expect(NOTE.exhausted[locale]).toContain(`${exhausted.used}/${exhausted.limit}`);
       expect(NOTE.exhausted[locale]).toContain(ICT_DATE);
     }
@@ -841,13 +853,35 @@ describe("FE-2 (a) the note renders beside both ExplainStepAffordance call sites
       // it sits after the affordance inside the same question, not somewhere
       // else on the page that happens to be inside the same <li>.
       expect(item.lastElementChild).toBe(note);
-      // BOTH values, asserted separately — a note that kept the counters and
-      // lost the date is the exact silent failure UI-D17 names.
+      // The counters, and — while hints REMAIN — no reset date. Both asserted
+      // separately from the whole-string equality below: each names one half of
+      // the contract, so a failure says which half broke rather than just
+      // "the string changed".
       expect(note.textContent).toContain("12/500");
-      expect(note.textContent).toContain(ICT_DATE);
+      expect(note.textContent).not.toContain(ICT_DATE);
       expect(note.textContent).toBe(expected);
     }
   });
+
+  it.each(LOCALES)(
+    "locale %s — the SAME two call sites gain the reset date once the hints run out",
+    async (locale) => {
+      // The other half of (a), and the positive control for the negative
+      // assertion above: with `resetsAt` unchanged between the two fixtures,
+      // the date's absence at 12/500 can only be the exhaustion gate, not a
+      // date that never reaches the component at all. Without this case, a
+      // `TutorQuotaNote` that dropped the date unconditionally stays green.
+      const { container } = await renderRoute(FIXTURE_ENTITLEMENT_EXHAUSTED, locale);
+      const items = questionItems(container);
+      const notes = notesIn(container, NOTE.exhausted[locale]);
+      expect(notes).toHaveLength(items.length);
+
+      for (const note of notes) {
+        expect(note.textContent).toContain("500/500");
+        expect(note.textContent).toContain(ICT_DATE);
+      }
+    }
+  );
 });
 
 // =============================================================================
@@ -856,8 +890,12 @@ describe("FE-2 (a) the note renders beside both ExplainStepAffordance call sites
 
 describe("FE-2 (b) the reset date is the Asia/Ho_Chi_Minh calendar day", () => {
   it.each(LOCALES)("locale %s — the ICT day, and never the UTC day one earlier", async (locale) => {
-    const { container } = await renderRoute(FIXTURE_ENTITLEMENT_KNOWN, locale);
-    const notes = notesIn(container, NOTE.known[locale]);
+    // EXHAUSTED, not known: the reset date is now printed only once the hints
+    // have run out, so the known fixture renders no date for this case to read.
+    // Nothing else about the claim changes — both fixtures carry the very same
+    // `resetsAt` (asserted in the preconditions block).
+    const { container } = await renderRoute(FIXTURE_ENTITLEMENT_EXHAUSTED, locale);
+    const notes = notesIn(container, NOTE.exhausted[locale]);
     expect(notes).toHaveLength(2);
 
     for (const note of notes) {
@@ -878,9 +916,14 @@ describe("FE-2 (b) the reset date is the Asia/Ho_Chi_Minh calendar day", () => {
 
 describe("FE-2 (c) no prop is passed at the mount site", () => {
   it("the note the PAGE renders is byte-identical to <TutorQuotaNote /> with no props", async () => {
-    const fromPage = await renderRoute(FIXTURE_ENTITLEMENT_KNOWN, "en");
-    const pageNotes = notesIn(fromPage.container, NOTE.known.en);
+    // EXHAUSTED, because the prohibition this case enforces is about a DATE
+    // prop, and only the exhausted state renders a date. Compared against the
+    // known state the two mounts would agree on a string that contains no
+    // formatted date at all — true, and no longer evidence of anything.
+    const fromPage = await renderRoute(FIXTURE_ENTITLEMENT_EXHAUSTED, "en");
+    const pageNotes = notesIn(fromPage.container, NOTE.exhausted.en);
     expect(pageNotes).toHaveLength(2);
+    expect(pageNotes[0].textContent).toContain(ICT_DATE);
     const pageHtml = pageNotes[0].outerHTML;
     cleanup();
 
@@ -889,11 +932,11 @@ describe("FE-2 (c) no prop is passed at the mount site", () => {
     // of the `formattedResetDate` prohibition: if the page were feeding the
     // component anything, these two would differ.
     const bare = await renderRoute(
-      FIXTURE_ENTITLEMENT_KNOWN,
+      FIXTURE_ENTITLEMENT_EXHAUSTED,
       "en",
       createElement(TutorQuotaNote)
     );
-    const bareNotes = notesIn(bare.container, NOTE.known.en);
+    const bareNotes = notesIn(bare.container, NOTE.exhausted.en);
     expect(bareNotes).toHaveLength(1);
     expect(bareNotes[0].outerHTML).toBe(pageHtml);
   });

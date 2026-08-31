@@ -29,6 +29,7 @@
 // trống — cái thiếu khi đó là EntitlementProvider ở layout, không phải prop.
 
 import { useEntitlement } from "@/lib/billing/entitlement";
+import { isQuotaExhausted } from "@/lib/billing/types";
 import { formatDate } from "@/lib/format/datetime";
 import { useLocale, useT } from "@/lib/i18n/client";
 
@@ -42,13 +43,27 @@ export function TutorQuotaNote() {
   // biết, người dùng chỉ đơn giản là không tin bảng số nữa.
   if (tutor.state !== "known") return null;
 
-  // Không còn ternary quanh ngày: trong biến thể `known` thì `resetsAt` luôn
-  // tồn tại theo kiểu, và `formatDate` đã có hợp đồng lỗi riêng ("—" cho giá
-  // trị không đọc được, không bao giờ ném).
+  // NGÀY ĐẶT LẠI CHỈ IN KHI ĐÃ HẾT LƯỢT. Trước đây nó in ở MỌI lượt render của
+  // nhánh `known`, kể cả khi người dùng mới tiêu 1/5 — lúc đó ngày đặt lại
+  // không trả lời câu hỏi nào người dùng đang có: còn lượt thì kỳ hạn mức là
+  // thông tin thừa, và nó làm câu thông báo dài gấp đôi ở một chỗ nằm ngay dưới
+  // MỖI câu hỏi của màn Chi tiết. Chỉ khi hết lượt thì "bao giờ có lại" mới trở
+  // thành thứ duy nhất người dùng cần biết.
+  //
+  // Điều kiện đi qua `isQuotaExhausted()` chứ không viết lại `used >= limit` tại
+  // chỗ: `lib/billing/types.ts:74` tự khai là chỗ DUY NHẤT trả lời câu hỏi ấy,
+  // và một bản sao ở đây là con đường ngắn nhất tới việc note nói "hết lượt"
+  // trong khi nút gia sư vẫn bấm được (hoặc ngược lại).
+  //
+  // `resetsAt` luôn tồn tại theo kiểu trong biến thể `known`, và `formatDate` đã
+  // có hợp đồng lỗi riêng ("—" cho giá trị không đọc được, không bao giờ ném).
+  const exhausted = isQuotaExhausted(tutor);
+
   return (
     <p className="text-muted-foreground text-sm">
       {t("billing.quota.remaining", { used: tutor.used, limit: tutor.limit })}
-      {` ${t("billing.quota.resetsAt", { date: formatDate(tutor.resetsAt, locale) })}`}
+      {exhausted &&
+        ` ${t("billing.quota.resetsAt", { date: formatDate(tutor.resetsAt, locale) })}`}
     </p>
   );
 }

@@ -45,6 +45,10 @@ const OTHER_RESETS_AT = "2026-06-14T03:00:00Z";
 const OTHER_RESETS_AT_ICT = "14/06/2026";
 
 const KNOWN: Quota = { state: "known", used: 3, limit: 5, resetsAt: RESETS_AT };
+// CÒN LƯỢT (3/5) so với HẾT LƯỢT (5/5) là trục phân biệt mới của component:
+// ngày đặt lại chỉ in ở vế thứ hai. Hai fixture dùng CHUNG một `resetsAt` để
+// mọi khác biệt quan sát được giữa chúng chỉ có thể đến từ bộ đếm.
+const EXHAUSTED: Quota = { state: "known", used: 5, limit: 5, resetsAt: RESETS_AT };
 const UNKNOWN: Quota = { state: "unknown" };
 
 function entitlementWith(tutor: Quota): Entitlement {
@@ -135,29 +139,61 @@ describe('nhánh `unknown` ⇒ null (TutorQuotaNote.tsx:30 — KHÔNG đổi ở
   });
 });
 
-describe("nhánh `known` — số lượt còn lại VÀ ngày đặt lại, tự format từ context", () => {
+describe("nhánh `known` — bộ đếm LUÔN in; ngày đặt lại CHỈ khi đã hết lượt", () => {
   it.each<[Locale, string]>([
-    ["en", "3/5 tutor hints used this period. Resets on 01/03/2026."],
-    ["vi", "Đã dùng 3/5 lượt gia sư trong kỳ này. Đặt lại vào 01/03/2026."],
-  ])("locale %s in ra đúng câu đã duyệt, kèm ngày", (locale, expected) => {
+    ["en", "3/5 tutor hints used this period."],
+    ["vi", "Đã dùng 3/5 lượt gia sư trong kỳ này."],
+  ])("locale %s, CÒN lượt: in đúng câu đã duyệt, KHÔNG kèm ngày", (locale, expected) => {
     // So với CHUỖI CỐ ĐỊNH chứ không tra lại từ điển: một khẳng định kiểu
     // `text === t(key, {...})` lệch cùng chiều với mọi thay đổi của từ điển và
     // của bộ format, nên nó không chứng minh được gì (tiền lệ
     // OrderStatusBadge.test.tsx:99-106).
+    //
+    // `toBe` trên TOÀN BỘ chuỗi, chứ không phải `not.toContain(ngày)`: chỉ nó
+    // mới bắt được cả mẩu câu ngày còn sót LẪN khoảng trắng thừa ở cuối — hai
+    // thứ một phép `contain` phủ định đều cho qua.
     expect(readNote(renderHost(KNOWN, locale)).text).toBe(expected);
   });
 
-  it.each<Locale>(["en", "vi"])("locale %s: ngày đặt lại CÓ MẶT, không chỉ mỗi bộ đếm", (locale) => {
-    // Bắt riêng kiểu hỏng "nhánh known render thiếu ngày" — kiểu hỏng mà UI-D17
-    // gọi là im lặng: bộ đếm vẫn đúng, chỉ ngày biến mất, mãi mãi, cho mọi người.
-    expect(readNote(renderHost(KNOWN, locale)).text).toContain(RESETS_AT_ICT);
+  it.each<[Locale, string]>([
+    ["en", "5/5 tutor hints used this period. Resets on 01/03/2026."],
+    ["vi", "Đã dùng 5/5 lượt gia sư trong kỳ này. Đặt lại vào 01/03/2026."],
+  ])("locale %s, HẾT lượt: in đúng câu đã duyệt, KÈM ngày", (locale, expected) => {
+    expect(readNote(renderHost(EXHAUSTED, locale)).text).toBe(expected);
+  });
+
+  it.each<Locale>(["en", "vi"])(
+    "locale %s: cùng một `resetsAt`, ngày CHỈ xuất hiện ở vế hết lượt",
+    (locale) => {
+      // Case đối chứng, và là chốt chặn thật của thay đổi này: hai lần render
+      // chỉ khác nhau ở `used`, nên sự có/không của ngày không thể do gì khác.
+      // Thiếu nó, một component in ngày cho MỌI người vẫn xanh nếu ai đó lỡ tay
+      // sửa fixture `KNOWN` thành 5/5.
+      const stillHas = readNote(renderHost(KNOWN, locale)).text;
+      cleanup();
+      const ranOut = readNote(renderHost(EXHAUSTED, locale)).text;
+      expect(stillHas).not.toContain(RESETS_AT_ICT);
+      expect(ranOut).toContain(RESETS_AT_ICT);
+    }
+  );
+
+  it("hết lượt tính bằng `used >= limit`, không phải `used === limit`", () => {
+    // `isQuotaExhausted()` (lib/billing/types.ts:74) dùng `>=`. Một dòng đếm
+    // VƯỢT trần (lượt bị trừ hai lần, hoặc `limit` bị hạ giữa kỳ) vẫn PHẢI là
+    // hết lượt — nếu không thì đúng những người không còn lượt nào lại là
+    // những người không được biết bao giờ có lại.
+    const text = readNote(
+      renderHost({ state: "known", used: 7, limit: 5, resetsAt: RESETS_AT }, "en")
+    ).text;
+    expect(text).toContain("7/5");
+    expect(text).toContain(RESETS_AT_ICT);
   });
 
   it("ngày đến TỪ `tutor.resetsAt`, không phải một chuỗi hardcode", () => {
-    const first = readNote(renderHost(KNOWN, "en")).text;
+    const first = readNote(renderHost(EXHAUSTED, "en")).text;
     cleanup();
     const second = readNote(
-      renderHost({ state: "known", used: 1, limit: 5, resetsAt: OTHER_RESETS_AT }, "en")
+      renderHost({ state: "known", used: 5, limit: 5, resetsAt: OTHER_RESETS_AT }, "en")
     ).text;
     expect(first).toContain(RESETS_AT_ICT);
     expect(second).toContain(OTHER_RESETS_AT_ICT);
@@ -177,7 +213,7 @@ describe("nhánh `known` — số lượt còn lại VÀ ngày đặt lại, t�
     // case này vẫn xanh kể cả khi bộ format không ghim múi giờ. Việc ghim là
     // hợp đồng của `lib/format/datetime.ts` (plan Task 2.3) và được test ở đó;
     // ở đây nó là chốt biên, không phải bằng chứng của việc ghim.
-    const text = readNote(renderHost(KNOWN, "en")).text;
+    const text = readNote(renderHost(EXHAUSTED, "en")).text;
     expect(text).toContain(RESETS_AT_ICT);
     expect(text).not.toContain(RESETS_AT_UTC);
   });
