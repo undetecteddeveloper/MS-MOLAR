@@ -461,9 +461,23 @@ export async function extractAndAssemble(formData: FormData): Promise<UgcActionF
     [questionPath, qRef],
     [answerPath, aRef],
   ] as const) {
+    // BỌC Blob — CÙNG một lỗi hỏng dữ liệu đã đo được ở `cropImages.ts`
+    // (commit 3263419): body không phải Blob thì storage-js gán thẳng nó vào
+    // fetch, và ở đó byte nhị phân bị ép qua chuỗi. PNG cắt ra (một Buffer) về
+    // prod với mọi byte >= 0x80 thành U+FFFD; `ref.bytes` ở đây là Uint8Array
+    // thuần nên nếu bị ép thì kiểu hỏng còn KHÁC nữa (`String(u8)` cho ra
+    // "137,80,78,..."), nhưng cả hai đều là file không mở được.
+    //
+    // Đây KHÔNG phải vá phòng xa: hai file gốc trong `exam-uploads` là nguồn
+    // DUY NHẤT để cắt lại hình khi cần sửa dữ liệu. Nếu chúng cũng hỏng thì
+    // mọi đề đã upload không còn đường phục hồi nào ngoài việc người dùng nộp
+    // lại file từ máy họ.
     const up = await supabase.storage
       .from(UPLOADS_BUCKET)
-      .upload(path, ref.bytes, { contentType: ref.mediaType, upsert: true });
+      .upload(path, new Blob([new Uint8Array(ref.bytes)], { type: ref.mediaType }), {
+        contentType: ref.mediaType,
+        upsert: true,
+      });
     if (up.error) {
       console.error("[extractAndAssemble] upload:", up.error.message);
       log.fail(4, "upload", up.error.message, stageT);
