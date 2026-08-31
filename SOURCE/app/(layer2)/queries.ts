@@ -519,6 +519,13 @@ export type ResultQuestion = {
   subItems?: { id: "a" | "b" | "c" | "d"; text: string }[];
   subAnswers?: Partial<Record<"a" | "b" | "c" | "d", boolean>>;
   essayAnswer?: string;
+  /** Hình thân câu, ĐÃ ký (signed URL) — `undefined` khi câu không có hình
+   *  hoặc không ký được. Bucket exam-images PRIVATE nên URL lưu trong DB
+   *  KHÔNG render được trực tiếp: `<img>` không gửi được header auth, ảnh về
+   *  400 và trình duyệt chỉ hiện icon vỡ. Đây là lý do trường này tồn tại
+   *  riêng thay vì để trang tự đọc `image_url` — cùng hợp đồng với
+   *  `PublicQuestion.imageUrl` mà `getExamForPlayer()` đã trả cho màn làm bài. */
+  imageUrl?: string;
 };
 
 export type ExamResult = {
@@ -713,27 +720,44 @@ export async function getResult(attemptId: string): Promise<ExamResult | null> {
   });
   if (qErr) throw qErr;
   const questions: Record<string, ResultQuestion> = {};
-  for (const q of (qs ?? []) as Array<{
-    id: string;
-    content: string;
-    choices: Choice[];
-    question_type: ResultQuestion["questionType"] | null;
-    sub_answers: ResultQuestion["subAnswers"] | null;
-    essay_answer: string | null;
-  }>) {
-    const questionType = q.question_type ?? "mcq";
-    questions[q.id] = {
-      content: q.content,
-      choices: questionType === "true_false" ? [] : q.choices,
-      questionType,
-      subItems:
-        questionType === "true_false"
-          ? (q.choices as unknown as ResultQuestion["subItems"])
-          : undefined,
-      subAnswers: q.sub_answers ?? undefined,
-      essayAnswer: q.essay_answer ?? undefined,
-    };
-  }
+  // `image_url` VỐN ĐÃ nằm trong RETURNS TABLE của `exam_answer_key()`
+  // (schema.sql §10a) — chỗ này trước đây chỉ đơn giản không đọc nó, nên màn
+  // Chi tiết là màn DUY NHẤT của vòng làm bài không có hình: cùng một câu hỏi
+  // có hình lúc làm bài (getExamForPlayer) rồi mất hình lúc dò lại.
+  //
+  // Ký song song (Promise.all) chứ không nối đuôi trong `for...of`: mỗi
+  // `createSignedUrl` là một round-trip tới Storage, và một đề 40 câu có hình
+  // sẽ cộng dồn 40 lần chờ vào TTFB của trang. Đúng khuôn `getExamForPlayer()`
+  // (queries.ts:465) đã dùng cho màn làm bài.
+  await Promise.all(
+    ((qs ?? []) as Array<{
+      id: string;
+      content: string;
+      choices: Choice[];
+      question_type: ResultQuestion["questionType"] | null;
+      sub_answers: ResultQuestion["subAnswers"] | null;
+      essay_answer: string | null;
+      image_url: string | null;
+    }>).map(async (q) => {
+      const questionType = q.question_type ?? "mcq";
+      questions[q.id] = {
+        content: q.content,
+        choices: questionType === "true_false" ? [] : q.choices,
+        questionType,
+        subItems:
+          questionType === "true_false"
+            ? (q.choices as unknown as ResultQuestion["subItems"])
+            : undefined,
+        subAnswers: q.sub_answers ?? undefined,
+        essayAnswer: q.essay_answer ?? undefined,
+        // Ký bằng client PHIÊN USER, không phải service role: policy
+        // `exam_images_select` (schema.sql §8) mới là tầng cưỡng chế, và nó
+        // cho đọc hình của đề `published` — đúng điều kiện của màn này
+        // (getResult đã lọc `status = 'published'` ở vòng 1).
+        imageUrl: await resolveSignedImageUrl(supabase, q.image_url),
+      };
+    })
+  );
 
   return {
     examId: exam.id,

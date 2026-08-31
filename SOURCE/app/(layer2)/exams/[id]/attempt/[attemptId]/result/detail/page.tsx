@@ -18,6 +18,7 @@ import { decodeTfAnswer, formatSubAnswers } from "@/lib/ugc/tfCodec";
 import { RichText } from "@/components/shared/RichText";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
+import { QuestionFigure } from "@/components/shared/QuestionFigure";
 import { ExplainStepAffordance } from "@/components/tutor/ExplainStepAffordance";
 import { TutorQuotaNote } from "@/components/billing/TutorQuotaNote";
 import { EssayReviewBlock } from "@/app/(layer2)/_components/EssayReviewBlock";
@@ -163,6 +164,17 @@ export default async function ResultDetailPage({
                       className="text-foreground font-serif text-lg leading-relaxed"
                     />
                   )}
+                  {/* Hình thân câu — cùng vị trí (ngay dưới đề bài) và cùng
+                      khuôn `max-h-80 w-auto` như màn làm bài
+                      (QuestionRenderer.tsx:97), để câu hỏi trông giống hệt lúc
+                      dò lại và lúc làm. `url` đã là signed URL do getResult()
+                      ký; QuestionFigure vẫn tự fail-closed theo allowlist
+                      origin nên một URL lạ chỉ render KHÔNG GÌ CẢ. */}
+                  <QuestionFigure
+                    url={q?.imageUrl}
+                    questionNumber={i + 1}
+                    className="max-h-80 w-auto"
+                  />
                   {q?.questionType === "true_false" && (
                     <ul className="flex flex-col gap-2">
                       {q.subItems?.map((s) => (
@@ -243,6 +255,16 @@ export default async function ResultDetailPage({
                     className="text-foreground font-serif text-lg leading-relaxed"
                   />
                 )}
+
+                {/* Hình thân câu — xem chú thích ở nhánh KHÔNG chấm bên trên.
+                    Phải có ở CẢ HAI nhánh: `notScored` chia đôi trang theo
+                    việc câu có chấm được hay không, chứ không theo việc câu có
+                    hình hay không — một câu mcq có đồ thị đi xuống nhánh này. */}
+                <QuestionFigure
+                  url={q?.imageUrl}
+                  questionNumber={i + 1}
+                  className="max-h-80 w-auto"
+                />
 
                 {/* Engine 1 (AC-023/024): gia sư "Giải thích bước này" mount ở
                     CUỐI cả hai nhánh CÓ CHẤM (short_answer và mcq), ngay trước
