@@ -1,5 +1,10 @@
-import type { NextRequest } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
+import {
+  checkAnonRateLimit,
+  clientIpFrom,
+  isAnonymousRequest,
+} from "@/lib/security/anonRateLimit";
 import { buildCsp, createNonce, supabaseOriginFromEnv } from "@/lib/security/csp";
 
 // GĐ 2 M2.4: refresh Supabase session mỗi request + chặn route chưa auth.
@@ -18,7 +23,27 @@ import { buildCsp, createNonce, supabaseOriginFromEnv } from "@/lib/security/csp
 //
 // Nonce phải là MỘT-LẦN-MỘT-REQUEST. Dùng lại giữa các request là biến nonce
 // thành một hằng số công khai, tức là không còn tác dụng gì.
+// TD-013: trần theo IP cho lưu lượng CHƯA ĐĂNG NHẬP, đặt ở đây vì đây là chỗ
+// SỚM NHẤT trong ứng dụng mà một request bị từ chối được — trước khi có lượt
+// render route nào, trước mọi lượt đọc Postgres xuyên vùng. Nó KHÔNG cứu được
+// lượt invocation đầu tiên; xem khối cảnh báo ở đầu `anonRateLimit.ts` để biết
+// nó mua được gì và KHÔNG mua được gì.
 export async function proxy(request: NextRequest) {
+  if (isAnonymousRequest(request.cookies.getAll().map((cookie) => cookie.name))) {
+    const decision = await checkAnonRateLimit(clientIpFrom(request.headers));
+    if (!decision.ok) {
+      // Text thuần, không render gì cả: trả về một trang HTML ở đây sẽ tự tay
+      // làm đúng việc mà trần này sinh ra để chặn.
+      return new NextResponse("Too Many Requests", {
+        status: 429,
+        headers: {
+          "retry-after": String(decision.retryAfterSeconds),
+          "content-type": "text/plain; charset=utf-8",
+        },
+      });
+    }
+  }
+
   const nonce = createNonce();
   const csp = buildCsp({
     nonce,
