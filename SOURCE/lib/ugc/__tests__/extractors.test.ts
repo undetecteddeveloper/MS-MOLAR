@@ -18,7 +18,8 @@ vi.mock("@google/genai", () => ({
 
 process.env.GEMINI_API_KEY = "test-key-not-real";
 
-import { extractQuestions, mapQuestionsPayload, repairTrueFalseStem } from "../extractQuestions";
+import { extractQuestions, mapQuestionsPayload } from "../extractQuestions";
+import { repairTrueFalseStem } from "../tfShape";
 import { extractAnswers, mapAnswersPayload } from "../extractAnswers";
 import { LIMITS } from "../limits";
 import { FATAL_CALL_DEADLINE_MS } from "../gemini";

@@ -26,6 +26,8 @@ import {
   type EssaySummary,
 } from "@/lib/scoring/essayLifecycle";
 import { resolveSignedImageUrl } from "@/lib/ugc/imageUrl";
+import { repairTrueFalseStem } from "@/lib/ugc/tfShape";
+import type { SubItemId } from "@/lib/ugc/types";
 import type { Exam } from "@/types/exam";
 import type { Choice, PublicQuestion } from "@/types/question";
 import type { PerQuestionResult, ScoreResult } from "@/types/result";
@@ -473,14 +475,27 @@ export async function getExamForPlayer(
     rows.map(async (r) => {
       const questionType =
         (r.question_type as "mcq" | "essay" | "true_false" | "short_answer" | null) ?? "mcq";
+      // SHIM CHO ROW CŨ (2026-09-02) — câu Đúng/Sai lưu TRƯỚC bản vá
+      // `repairTrueFalseStem` có `choices` rỗng và câu phán xét kẹt trong
+      // `content`. Đây là đường đọc mà việc KHÔNG vá tốn nhiều nhất: học sinh
+      // mở bài ra và thấy một câu hỏi không có gì để bấm. Cùng một hàm với màn
+      // duyệt, cố ý — hai đường đọc dựng hai cấu trúc khác nhau cho cùng một
+      // row là đúng thứ shim này sinh ra để tránh.
+      const shaped = repairTrueFalseStem(
+        questionType,
+        r.content,
+        questionType === "true_false"
+          ? (r.choices as unknown as { id: SubItemId; text: string }[])
+          : undefined
+      );
       byId.set(r.id, {
         id: r.id,
-        content: r.content,
+        content: shaped.stem,
         // true_false: cột choices chứa các ý a–d → map sang subItems.
         choices: questionType === "true_false" ? [] : r.choices,
         subItems:
           questionType === "true_false"
-            ? (r.choices as unknown as PublicQuestion["subItems"])
+            ? (shaped.subItems as unknown as PublicQuestion["subItems"])
             : undefined,
         subject: r.subject,
         grade: r.grade,

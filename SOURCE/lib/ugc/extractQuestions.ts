@@ -13,6 +13,9 @@
 
 import { makeUgcError } from "./errorCopy";
 import { LIMITS } from "./limits";
+// Vá hình dạng câu Đúng/Sai. Ở `tfShape.ts` chứ không ở file này vì đường ĐỌC
+// (fromRows, player) cũng phải vá row cũ, mà file này là server-only.
+import { repairTrueFalseStem } from "./tfShape";
 import {
   FATAL_CALL_DEADLINE_MS,
   generateContent,
@@ -212,55 +215,6 @@ function parseBox(raw: unknown): BoundingBox | null {
   const [ymin, xmin, ymax, xmax] = nums;
   if (ymin >= ymax || xmin >= xmax) return null;
   return { page: b.page, box2d: [ymin, xmin, ymax, xmax] };
-}
-
-/**
- * Vá câu Đúng/Sai mà model để CÂU PHÁN XÉT trong thân câu thay vì trong ý a–d.
- *
- * Prompt đã cấm thẳng điều này ("the statements ALWAYS go in subItems, never in
- * the stem") và model vẫn làm — đo trên prod 2026-09-02: đề "ĐỀ THI HỌC KÌ 2 –
- * ĐỀ SỐ 1" có 5 câu true_false với `subItems` rỗng và câu phán xét nằm trong
- * `stem`. Hậu quả không phải một lỗi nhỏ: câu không có ý nào thì màn làm bài
- * KHÔNG render được gì để bấm, `validateAssembledExam` bắt `WRONG_SUB_ITEM_COUNT`
- * và cả ĐỀ không đăng được. Hai đề Tiếng Anh duy nhất trong prod đều đang ở
- * trạng thái `failed` vì đúng chuyện này.
- *
- * Hình dạng model thực sự trả về tách được sạch, vì nó luôn để lời dẫn và câu
- * phán xét ở HAI ĐOẠN:
- *
- *   "Listen to part of a news report ... Decide whether the following
- *    statement is True or False.
- *                                        <- dòng trống
- *    The UN report says that harmful effects of greenhouse gases can be
- *    eliminated."
- *
- * Nên phép vá là: đoạn CUỐI thành ý "a", phần còn lại ở lại làm lời dẫn.
- *
- * CHỈ vá khi thân câu có từ hai đoạn trở lên. Thân câu một đoạn thì không có
- * cách nào tách lời dẫn khỏi câu phán xét, và đẩy cả thân câu xuống ý "a" sẽ để
- * lại một `stem` rỗng — thứ `validateAssembledExam` bắt là `EMPTY_STEM`, tức
- * đổi một lỗi lấy một lỗi khác. Ca đó cứ để lỗi nổi lên ở màn duyệt, nơi tác
- * giả sửa được bằng tay.
- */
-export function repairTrueFalseStem(
-  type: QuestionType,
-  stem: string,
-  subItems: { id: SubItemId; text: string }[] | undefined
-): { stem: string; subItems: { id: SubItemId; text: string }[] | undefined } {
-  if (type !== "true_false") return { stem, subItems };
-  if (subItems && subItems.length > 0) return { stem, subItems };
-
-  const paragraphs = stem
-    .split(/\n[ \t]*\n+/)
-    .map((p) => p.trim())
-    .filter((p) => p !== "");
-  if (paragraphs.length < 2) return { stem, subItems };
-
-  const statement = paragraphs[paragraphs.length - 1];
-  const leadIn = paragraphs.slice(0, -1).join("\n\n");
-  if (statement.length > LIMITS.MAX_CHOICE) return { stem, subItems };
-
-  return { stem: leadIn, subItems: [{ id: "a", text: statement }] };
 }
 
 /** Validate + map JSON đã parse → parts + questions; null nếu sai contract. */

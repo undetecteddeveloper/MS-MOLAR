@@ -172,3 +172,75 @@ describe("assembledFromRows — A1 ngữ liệu dùng chung", () => {
     expect(exam.passages).toEqual([]);
   });
 });
+
+// --- SHIM CHO ROW CŨ: câu Đúng/Sai một mệnh đề (2026-09-02) ----------------
+//
+// Dữ liệu dưới đây CHÉP NGUYÊN từ prod (đề `ugc-92850818…`, câu 21 phần
+// Listening) chứ không bịa: `choices` rỗng, câu phán xét kẹt trong `content`
+// sau một dòng trống. Đó là hình dạng mọi câu true_false bóc tách TRƯỚC bản vá
+// đang nằm trong DB, và nó không tự biến mất — row chỉ được ghi lại khi tác giả
+// bấm lưu. Ghim ở đây để bản vá không bị gỡ nhầm khi ai đó dọn `fromRows`.
+describe("assembledFromRows — vá câu Đúng/Sai một mệnh đề của đề Tiếng Anh", () => {
+  const PROD_STEM =
+    "Listen to part of a news report on United Nation\u2019s determination to control global warming. " +
+    "Decide whether the following statement is True or False.\n\n" +
+    "The UN report says that harmful effects of greenhouse gases can be eliminated.";
+
+  const examRow = {
+    title: "ĐỀ THI HỌC KÌ 2 – ĐỀ SỐ 1",
+    subject: "English",
+    grade: 12,
+    duration_minutes: 60,
+    school: null,
+    school_year: null,
+    semester: null,
+    question_ids: ["ugc-x-p1q21"],
+  };
+
+  const row = (overrides: Record<string, unknown> = {}) => ({
+    id: "ugc-x-p1q21",
+    content: PROD_STEM,
+    choices: [],
+    correct_answer: null,
+    sub_answers: null,
+    essay_answer: null,
+    image_url: null,
+    passage_id: null,
+    question_type: "true_false",
+    part_number: 1,
+    topic: "English",
+    ...overrides,
+  });
+
+  it("tách câu phán xét khỏi thân câu thành ĐÚNG MỘT ý a", () => {
+    const q = assembledFromRows(examRow, [row()]).questions[0];
+    expect(q.subItems).toEqual([
+      { id: "a", text: "The UN report says that harmful effects of greenhouse gases can be eliminated." },
+    ]);
+    // Lời dẫn ở lại thân câu — học sinh vẫn đọc được yêu cầu của phần thi.
+    expect(q.stem).toContain("Decide whether the following statement is True or False.");
+    expect(q.stem).not.toContain("The UN report says");
+  });
+
+  it("KHÔNG đụng tới câu PHẦN II thật đã có đủ 4 ý", () => {
+    const subItems = [
+      { id: "a", text: "ý a" },
+      { id: "b", text: "ý b" },
+      { id: "c", text: "ý c" },
+      { id: "d", text: "ý d" },
+    ];
+    const q = assembledFromRows(examRow, [
+      row({ content: "lời dẫn\n\nđoạn nữa", choices: subItems }),
+    ]).questions[0];
+    expect(q.subItems).toEqual(subItems);
+    expect(q.stem).toBe("lời dẫn\n\nđoạn nữa");
+  });
+
+  it("thân câu một đoạn thì để nguyên — lỗi phải nổi lên ở màn duyệt", () => {
+    const q = assembledFromRows(examRow, [
+      row({ content: "chỉ có một đoạn duy nhất" }),
+    ]).questions[0];
+    expect(q.stem).toBe("chỉ có một đoạn duy nhất");
+    expect(q.subItems).toEqual([]);
+  });
+});

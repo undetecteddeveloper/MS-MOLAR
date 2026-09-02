@@ -2,6 +2,7 @@
 // Dùng chung bởi (layer4)/actions.ts (publish/save re-validate) và
 // (layer4)/queries.ts (getMyExam cho màn review S-03). Thuần — test được.
 
+import { repairTrueFalseStem } from "./tfShape";
 import type {
   AssembledExam,
   AssembledQuestion,
@@ -66,17 +67,24 @@ export function assembledFromRows(
       // part_number của DB là nguồn chân lý; id chỉ là fallback (row v2.0 cũ
       // chưa có cột thì default 1 từ schema).
       const part = typeof row.part_number === "number" ? row.part_number : identity.part;
+      // SHIM CHO ROW CŨ (2026-09-02) — câu Đúng/Sai bóc tách TRƯỚC bản vá
+      // `repairTrueFalseStem` nằm trong DB với `choices` rỗng và câu phán xét
+      // kẹt trong `content`. Không vá ở đây thì màn duyệt hiện một câu không có
+      // ý nào, mời tác giả điền đủ bốn ý cho một đề chỉ có một mệnh đề.
+      // Hàm này KHÔNG đụng tới câu đã có ý — câu PHẦN II 4 ý đi qua nguyên vẹn.
+      const shaped = repairTrueFalseStem(
+        type,
+        row.content as string,
+        type === "true_false" ? (row.choices as { id: SubItemId; text: string }[]) : undefined
+      );
       return {
         part,
         number: identity.number,
         type,
-        stem: row.content as string,
+        stem: shaped.stem,
         // Cột `choices` jsonb chứa lựa chọn A–D (mcq) HOẶC các ý a–d (true_false).
         choices: type === "mcq" ? (row.choices as { id: ChoiceId; text: string }[]) : undefined,
-        subItems:
-          type === "true_false"
-            ? (row.choices as { id: SubItemId; text: string }[])
-            : undefined,
+        subItems: type === "true_false" ? shaped.subItems : undefined,
         correctAnswer: (row.correct_answer as ChoiceId | null) ?? undefined,
         subAnswers: (row.sub_answers as SubAnswers | null) ?? undefined,
         essayAnswer: (row.essay_answer as string | null) ?? undefined,
