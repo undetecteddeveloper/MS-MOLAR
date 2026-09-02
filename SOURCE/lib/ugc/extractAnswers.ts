@@ -98,7 +98,11 @@ Structure rules:
 
 Answer forms:
 - PHẦN I style — a letter per question: type "mcq" with the letter A/B/C/D exactly as the key states.
-- PHẦN II style — a Đúng/Sai (Đ/S, true/false) grid with sub-items a) b) c) d) per question: type "true_false" with values = the list of {id, value} where value is true for Đúng/Đ and false for Sai/S, exactly as printed in the grid for each sub-item.
+- PHẦN II style — a true/false verdict per sub-item: type "true_false" with values = the list of {id, value}, exactly as printed for each sub-item. This is usually a grid of sub-items a) b) c) d), but a question judging a SINGLE statement has one entry with id "a" — use "true_false" for it too, never "short_answer" and never "mcq".
+- The verdict token is written in whatever script the paper uses, and ALL of these forms mean the same two values:
+    value = true  <- "Đ", "Đúng", "D", "T", "True", "Y", "Yes", "✓"
+    value = false <- "S", "Sai", "F", "False", "N", "No", "✗"
+  English-language papers (môn Tiếng Anh) normally write T and F, so a key line reading "Câu 21: T" or "3. F" is a "true_false" answer with one sub-item "a" — NOT a short_answer whose value happens to be the letter T. Never skip a question because its verdict is written with an English letter.
 - PHẦN III style — a short value/number per question (e.g. "1260", "1,04", "96,5"): type "short_answer" with the value transcribed verbatim as a string.
 - Free-form/model answers: type "essay" with the answer text verbatim.
 

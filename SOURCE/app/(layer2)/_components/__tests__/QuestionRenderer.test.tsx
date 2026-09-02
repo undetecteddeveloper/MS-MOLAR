@@ -90,6 +90,7 @@ function renderQuestion(
       question={question}
       nodes={renderQuestionNodes([question])[0]}
       selectedAnswer={undefined}
+      answers={{}}
       onSelectAnswer={onSelectAnswer}
       flagged={false}
       onToggleFlag={vi.fn()}

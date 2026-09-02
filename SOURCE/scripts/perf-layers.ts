@@ -123,8 +123,9 @@ function printReport() {
 // ADR-0015 nới cột này cho tín hiệu mới-cũ. Đây đúng là kiểu trôi lệch mà header
 // file này cảnh báo — benchmark mà không sửa theo thì đang đo một truy vấn
 // không còn tồn tại.
+// 2026-09-01: thêm `passages` (A1, ngữ liệu dùng chung) — cùng lý do.
 const EXAM_COLUMNS =
-  "id, title, question_ids, duration_minutes, subject, grade, school, school_year, semester, author_display_name, parts, rating_count, avg_overall, created_at";
+  "id, title, question_ids, duration_minutes, subject, grade, school, school_year, semester, author_display_name, parts, passages, rating_count, avg_overall, created_at";
 
 async function listExams(supabase: SupabaseClient) {
   const { data, error } = await supabase

@@ -25,6 +25,7 @@
 
 import { decodeTfAnswer } from "@/lib/ugc/tfCodec";
 import { newEssayEntry } from "./essayLifecycle";
+import { maxPointsOf, trueFalseCreditRatio } from "./questionPoints";
 import type { Question, SubItemId } from "@/types/question";
 import type {
   PerQuestionResult,
@@ -96,17 +97,24 @@ function isShortAnswerCorrect(
   return normalizeShortAnswerText(expected) === normalizeShortAnswerText(submitted);
 }
 
-/** Nhị phân CẢ CÂU: mọi ý trong subAnswers phải khớp đúng lựa chọn của user
- *  (tfCodec "a:Đ,b:S" — decodeTfAnswer, cùng codec AnswerChoice dùng để mã
- *  hoá lúc làm bài). Bỏ trống một ý hoặc cả câu → mismatch → sai, không skip. */
-function isTrueFalseCorrect(
+/** ĐẾM số ý đúng của một câu true_false (tfCodec "a:Đ,b:S" — decodeTfAnswer,
+ *  cùng codec AnswerChoice dùng để mã hoá lúc làm bài). Bỏ trống một ý → ý đó
+ *  sai, không phải bỏ qua.
+ *
+ *  B2 đổi từ vị từ nhị phân sang phép ĐẾM, và đó là toàn bộ sửa chữa: bản cũ
+ *  dùng `.every()` nên đúng 3/4 ý được ZERO điểm trong khi quy chế cho 0.5đ.
+ *  Vị từ "đúng cả câu" vẫn còn — nó là `correct === total` — nhưng nay chỉ dùng
+ *  cho `isCorrect`, tức cho Ô ĐẾM và cho mastery, không còn cho ĐIỂM. */
+function countTrueFalseCorrect(
   subAnswers: Partial<Record<SubItemId, boolean>>,
   answer: string | undefined,
-): boolean {
+): { correct: number; total: number } {
   const selected = decodeTfAnswer(answer);
-  return (Object.keys(subAnswers) as SubItemId[]).every(
-    (id) => selected[id] === subAnswers[id],
-  );
+  const ids = Object.keys(subAnswers) as SubItemId[];
+  return {
+    correct: ids.filter((id) => selected[id] === subAnswers[id]).length,
+    total: ids.length,
+  };
 }
 
 /** Tuỳ chọn của `computeScore()`.
@@ -127,6 +135,9 @@ export function computeScore(
 ): ScoreResult {
   const perQuestion: PerQuestionResult[] = questions.map((q) => {
     const selected = answers[q.id];
+    // Điểm tối đa của câu — giải MỘT LẦN, dùng cho cả nhánh chấm lẫn nhánh
+    // không chấm (câu tự luận chưa chấm vẫn phải có mặt trong MẪU SỐ).
+    const maxPoints = maxPointsOf(q);
     if (!isScored(q)) {
       const unscored: PerQuestionResult = {
         questionId: q.id,
@@ -140,42 +151,75 @@ export function computeScore(
       // `record_essay_grade()`, còn dòng thì cố ý ở lại ngoài mẫu số điểm cho
       // tới khi có ai đó thực sự chấm nó.
       if (options.essayGrading && (q.questionType ?? "mcq") === "essay" && hasEssayGroundTruth(q)) {
-        return { ...unscored, ...newEssayEntry() };
+        // B3 — câu tự luận vào MẪU SỐ ngay từ lúc nộp, với earnedPoints = 0.
+        //
+        // Đây là mấu chốt của B3, và nó KHÔNG mâu thuẫn với `scored: false`:
+        // hai trường trả lời hai câu hỏi khác nhau. `scored` nói "dòng này có
+        // vào Ô ĐẾM đúng/sai, vào mastery, vào wrongTwice không" — câu trả lời
+        // vẫn là KHÔNG (một `scored: true` ở đây sẽ làm `record_skill_mastery()`
+        // bắt đầu nuôi mô hình bằng câu tự luận, đúng khuyết tật mà
+        // types/result.ts đã cảnh báo). `maxPoints` nói "câu này chiếm bao nhiêu
+        // trong thang 10 của đề" — câu trả lời là CÓ, ngay lập tức, vì đề đã in
+        // sẵn nó đáng mấy điểm dù chưa ai chấm.
+        //
+        // Trước B3 câu tự luận đứng ngoài mẫu số, nên một lượt thi toàn tự luận
+        // ra `total_score = 0.00` và một đề Văn hỗn hợp ra 10.0/10 trên bài
+        // đáng 4.75/10. `record_essay_grade()` cộng earnedPoints vào sau.
+        return { ...unscored, ...newEssayEntry(), earnedPoints: 0, maxPoints };
       }
+      // Câu không chấm được và cũng KHÔNG có ai sẽ chấm (thiếu ground truth,
+      // hoặc cờ tự luận tắt): đứng ngoài cả tử lẫn mẫu. Đưa vào mẫu số nghĩa là
+      // trừ điểm học sinh vì đề trích xuất hỏng.
       return unscored;
     }
     if (q.questionType === "true_false") {
+      const tf = countTrueFalseCorrect(q.subAnswers ?? {}, selected);
       return {
         questionId: q.id,
         selected,
-        isCorrect: isTrueFalseCorrect(q.subAnswers ?? {}, selected),
+        // "Đúng" ở Ô ĐẾM vẫn là ĐÚNG CẢ CÂU — đúng 3/4 ý được điểm thành phần
+        // nhưng KHÔNG được tính là một câu đúng. Giữ vậy để `correct`/`total`
+        // của ScoreCard không đổi nghĩa (AC-057), và để mastery không ghi nhận
+        // một kỹ năng chưa nắm vững là đã nắm.
+        isCorrect: tf.total > 0 && tf.correct === tf.total,
         scored: true,
+        earnedPoints: trueFalseCreditRatio(tf.correct, tf.total) * maxPoints,
+        maxPoints,
       };
     }
     if (q.questionType === "short_answer") {
+      const isCorrect = isShortAnswerCorrect(q.essayAnswer ?? "", selected);
       return {
         questionId: q.id,
         selected,
-        isCorrect: isShortAnswerCorrect(q.essayAnswer ?? "", selected),
+        isCorrect,
         scored: true,
+        earnedPoints: isCorrect ? maxPoints : 0,
+        maxPoints,
       };
     }
+    const isCorrect = selected === q.correctAnswer;
     return {
       questionId: q.id,
       selected,
       correct: q.correctAnswer,
-      isCorrect: selected === q.correctAnswer,
+      isCorrect,
       scored: true,
+      earnedPoints: isCorrect ? maxPoints : 0,
+      maxPoints,
     };
   });
 
+  // Ô ĐẾM — Ý NGHĨA KHÔNG ĐỔI so với trước B1/B2/B3, và đó là điều kiện để
+  // ScoreCard giữ được phép suy `sai = tổng − đúng` (AC-057). Chúng đếm CÂU
+  // CHẤM TỰ ĐỘNG, không đọc `points`, không đếm câu tự luận.
   const scored = perQuestion.filter((r) => r.scored !== false);
   const total = scored.length;
   const correct = scored.filter((r) => r.isCorrect).length;
 
-  // Thang 10. total=0 → 0 để tránh chia cho 0 (đề toàn câu không chấm).
-  const totalScore =
-    total === 0 ? 0 : Math.round((correct / total) * 10 * 100) / 100;
+  // ĐIỂM — kênh riêng, có trọng số, và là kênh DUY NHẤT câu tự luận đi vào.
+  const points = sumPoints(perQuestion);
+  const totalScore = scoreFromPoints(points.earnedPoints, points.maxPoints);
 
   // Gom theo chủ đề — CHỈ câu được chấm, giữ thứ tự chủ đề xuất hiện lần đầu.
   const topicOrder: string[] = [];
@@ -197,4 +241,38 @@ export function computeScore(
   });
 
   return { totalScore, correct, total, perQuestion, topicBreakdown };
+}
+
+/** Cộng dồn hai vế điểm trên một mảng `per_question`.
+ *
+ *  Dòng KHÔNG mang `maxPoints` bị bỏ qua hoàn toàn — đó là dòng cũ (ghi trước
+ *  B1) hoặc câu không ai chấm được. Bỏ qua chứ không mặc định 1: gán mẫu số 1
+ *  cho một dòng cũ sẽ làm điểm của lượt thi cũ tụt xuống mà không ai đụng vào
+ *  nó, còn `scoreFromPoints()` đã có nhánh mẫu-số-0 lo ca "cả mảng đều cũ". */
+export function sumPoints(rows: PerQuestionResult[]): {
+  earnedPoints: number;
+  maxPoints: number;
+} {
+  let earned = 0;
+  let max = 0;
+  for (const row of rows) {
+    if (typeof row.maxPoints !== "number" || !Number.isFinite(row.maxPoints)) continue;
+    max += row.maxPoints;
+    earned +=
+      typeof row.earnedPoints === "number" && Number.isFinite(row.earnedPoints)
+        ? row.earnedPoints
+        : 0;
+  }
+  return { earnedPoints: earned, maxPoints: max };
+}
+
+/** Quy hai vế điểm về thang 10, làm tròn 2 chữ số.
+ *
+ *  Mẫu số 0 → 0, KHÔNG phải NaN: đề toàn câu không chấm được là chuyện có thật
+ *  (trích xuất hỏng hết), và một NaN ở đây đi thẳng vào cột `total_score` rồi
+ *  ra biểu đồ lịch sử. Đây cũng là nhánh giữ nguyên hành vi cũ cho lượt thi
+ *  không có dòng nào mang `maxPoints`. */
+export function scoreFromPoints(earnedPoints: number, maxPoints: number): number {
+  if (maxPoints <= 0) return 0;
+  return Math.round((earnedPoints / maxPoints) * 10 * 100) / 100;
 }

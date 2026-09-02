@@ -481,6 +481,65 @@ alter table public.attempt_answers add constraint attempt_answers_answer_check
   check (answer is null or length(answer) <= 4000);
 
 -- ----------------------------------------------------------------------------
+-- 8d. UGC — NGỮ LIỆU DÙNG CHUNG (A1, 2026-09-01).
+--   Đề Tiếng Anh/Ngữ văn gắn MỘT bài đọc cho một NHÓM câu ("Read the following
+--   passage and mark the letter... Questions 34-40"). Trước bản này pipeline
+--   không có chỗ đựng thứ đó, nên bài đọc bị CHÉP LẶP vào content của từng
+--   câu: 7 câu = 7 bản y hệt trong DB, 7 lần hiện cho học sinh, 7 lần AI phải
+--   xuất lại cùng một đoạn văn — và đó là nguyên nhân thật của 7 lỗi
+--   STEM_TOO_LONG ở đề Tiếng Anh 40 câu.
+--
+--   - exams.passages: [{"id":text,"title":text|null,"text":text}] | null.
+--     jsonb TRÊN exams chứ không phải bảng riêng, ĐÚNG khuôn exams.parts ngay
+--     trên: ngữ liệu thuộc về đúng một đề, không bao giờ dùng lại giữa các đề
+--     và không bao giờ được truy vấn độc lập. Một bảng riêng ở đây chỉ thêm
+--     khoá ngoại, thêm policy RLS và thêm một nhánh cascade phải canh, mà
+--     không mở ra truy vấn nào ta thật sự cần.
+--   - questions.passage_id: trỏ tới phần tử `id` trong mảng trên; null = câu
+--     tự chứa (đại đa số câu của 8 môn còn lại).
+--
+--   KHÔNG khoá ngoại và KHÔNG CHECK tham chiếu: đích nằm trong jsonb nên
+--   Postgres không cưỡng chế được, y hệt cách part_number không có FK sang
+--   exams.parts. Tính toàn vẹn do tầng app giữ (validateAssembledExam báo
+--   PASSAGE_MISSING), và hướng lệch được chọn có chủ đích — một passage_id mồ
+--   côi làm câu hỏi mất phần ngữ liệu, KHÔNG làm hỏng lượt thi.
+--
+--   Row cũ tự đúng: cả hai cột nullable, mặc định null (cùng lối lập luận với
+--   part_number/sub_answers/exams.parts ở §8c) — không cần backfill.
+-- ----------------------------------------------------------------------------
+alter table public.exams add column if not exists passages jsonb;
+alter table public.questions add column if not exists passage_id text;
+
+-- ----------------------------------------------------------------------------
+-- 8e. LUẬT CHẤM ĐIỂM KHỚP ĐỀ NGUYÊN BẢN (B1 + B2 + B3, 2026-09-01).
+--
+--   Trước bản này điểm tính bằng tỉ lệ `đúng/tổng × 10` — MỌI câu cân bằng
+--   nhau, và câu tự luận đứng ngoài mẫu số. Ba hệ quả sai, đã đo:
+--     · đề Ngữ văn thật là 3đ Đọc hiểu + 7đ Làm văn, nhưng bài NLVH 5 điểm bị
+--       đếm ngang bài NLXH 2 điểm;
+--     · PHẦN II chấm nhị phân cả câu, nên đúng 3/4 ý được 0 thay vì 0.5đ;
+--     · một lượt thi toàn tự luận ra `total_score = 0.00`, và một đề Văn hỗn
+--       hợp hiện 10.0/10 trên bài đáng 4.75/10.
+--
+--   - questions.points: điểm câu này đáng. MẶC ĐỊNH 1, và đó là điều kiện để
+--     KHÔNG phải backfill bảng này: với đề thuần trắc nghiệm, tổng có trọng số
+--     Σ(đúng×1)/Σ(1)×10 rút gọn về đúng công thức cũ, nên số cũ và số mới trùng
+--     khít. CHECK > 0 vì một câu 0 điểm biến mất khỏi mẫu số trong im lặng.
+--     Con số và lý do khai ở lib/scoring/questionPoints.ts.
+--
+--   - exam_results.total_score_legacy: ảnh chụp `total_score` theo luật CŨ, ghi
+--     đúng một lần bởi script backfill TRƯỚC khi nó ghi đè. Nullable, row mới
+--     để null — nó không phải một cột song song của total_score, nó là ĐƯỜNG
+--     LUI. Backfill là thao tác một chiều trên điểm của học sinh thật; không có
+--     cột này thì một ca biên tính sai là không có đường về.
+-- ----------------------------------------------------------------------------
+alter table public.questions add column if not exists points numeric not null default 1;
+alter table public.questions drop constraint if exists questions_points_check;
+alter table public.questions add constraint questions_points_check check (points > 0);
+
+alter table public.exam_results add column if not exists total_score_legacy numeric;
+
+-- ----------------------------------------------------------------------------
 -- 9. BACKFILL — CUỐI CÙNG: seed cũ (không tác giả) → published
 -- ----------------------------------------------------------------------------
 update public.exams
@@ -583,6 +642,27 @@ create policy "ratings_select_own" on public.exam_difficulty_ratings
 -- SOURCE/lib/rating (TS, RATING_THRESHOLD) — giữ đồng bộ bằng test (không có
 -- hằng số vật lý chung băng qua ranh giới SQL/TS). Số '3' dưới đây là bản sao
 -- SQL của RATING_THRESHOLD.
+--
+-- ⚠ DROP TRƯỚC, KHÔNG PHẢI `create or replace` MỘT MÌNH — và đây là lỗi đã gây
+-- sập dev thật (2026-09-01, PostgreSQL 42703 trên mọi trang đọc danh sách đề).
+--
+-- `select e.*` được BUNG RA VÀ ĐÓNG BĂNG lúc view được tạo. Thêm một cột vào
+-- `exams` sau đó KHÔNG làm view mọc thêm cột; view cứ giữ danh sách cũ, và mọi
+-- truy vấn xin cột mới qua view đều 42703 "column does not exist" — trong khi
+-- `\d exams` cho thấy cột nằm ngay đó. Đúng vết này: §8d thêm `exams.passages`,
+-- app đọc `passages` qua view, mọi trang /exams, chi tiết đề và lịch sử chết.
+--
+-- `create or replace view` KHÔNG cứu được: nó chỉ cho phép THÊM cột vào CUỐI
+-- danh sách. Cột mới của `e.*` chèn vào TRƯỚC rating_count/avg_overall, nên
+-- Postgres đọc ra là "đổi tên cột thứ 18 từ rating_count thành passages" và từ
+-- chối với 42P16. Drop rồi tạo lại là cách DUY NHẤT, và để nó ở đây khiến
+-- schema.sql chạy lại được trên một DB cũ bất kỳ thay vì gãy giữa chừng.
+--
+-- An toàn khi drop: không object nào phụ thuộc view này (đã soi pg_depend trên
+-- dev — 0 dependent), và quyền đọc của anon/authenticated đến từ
+-- `alter default privileges` sẵn có của Supabase nên view mới tự có lại (§10b
+-- giải thích cùng cơ chế đó cho function).
+drop view if exists public.exams_with_difficulty;
 create or replace view public.exams_with_difficulty as
 select
   e.*,
@@ -693,7 +773,12 @@ returns table (
   part_number    int,
   image_url      text,
   sub_answers    jsonb,
-  essay_answer   text
+  essay_answer   text,
+  -- A1: màn review của tác giả VÀ màn Chi tiết sau khi nộp đều dựng lại câu
+  -- hỏi từ hàm này, nên khoá ngữ liệu phải đi kèm — thiếu nó thì bài đọc chung
+  -- biến mất ở đúng hai surface cần đọc lại đề.
+  passage_id     text,
+  points         numeric
 )
 language sql
 stable
@@ -702,7 +787,8 @@ set search_path = public, pg_temp
 as $$
   select q.id, q.content, q.choices, q.correct_answer,
          q.subject, q.grade, q.topic, q.question_type,
-         q.part_number, q.image_url, q.sub_answers, q.essay_answer
+         q.part_number, q.image_url, q.sub_answers, q.essay_answer,
+         q.passage_id, q.points
     from public.exams e
     join public.questions q on q.id = any(e.question_ids)
    where e.id = p_exam_id
@@ -759,7 +845,16 @@ returns table (
   part_number    int,
   image_url      text,
   sub_answers    jsonb,
-  essay_answer   text
+  essay_answer   text,
+  -- ⚠ HAI CỘT NÀY PHẢI KHỚP `exam_answer_key()` TỪNG CỘT MỘT ⚠
+  -- Thân hàm uỷ quyền bằng `return query select * from public.exam_answer_key(…)`,
+  -- nên lệch một cột là Postgres từ chối hàm LÚC CHẠY ("structure of query does
+  -- not match function result type") — và đây là đường DUY NHẤT `submitExam()`
+  -- lấy đáp án để chấm, tức cả tính năng nộp bài chết. Không cổng nào của repo
+  -- bắt được lỗi này: tsc/vitest không đọc SQL, verify:schema chỉ soi danh sách
+  -- cột được GRANT. Thêm cột vào 10a thì thêm luôn ở đây.
+  passage_id     text,
+  points         numeric
 )
 language plpgsql
 volatile
@@ -810,7 +905,7 @@ grant execute on function public.exam_answer_key(text)          to authenticated
 grant execute on function public.claim_attempt_answer_key(uuid) to authenticated;
 
 -- ----------------------------------------------------------------------------
--- 10c. Thu hồi SELECT mức BẢNG rồi cấp lại đúng 9 cột an toàn.
+-- 10c. Thu hồi SELECT mức BẢNG rồi cấp lại đúng danh sách cột an toàn.
 --      Bắt buộc theo thứ tự này: quyền mức bảng phủ mọi cột, nên chỉ
 --      `revoke select (correct_answer, ...)` là KHÔNG có tác dụng.
 --      `anon` giữ nguyên 9 cột an toàn (RLS `to authenticated` vẫn cho 0 dòng)
@@ -819,8 +914,17 @@ grant execute on function public.claim_attempt_answer_key(uuid) to authenticated
 --      mình, RLS questions_*_author giới hạn phạm vi (ghi không đọc được).
 -- ----------------------------------------------------------------------------
 revoke select on public.questions from anon, authenticated;
+-- `passage_id` (A1) nằm trong nhóm an toàn: nó là KHOÁ TRA ngữ liệu dùng chung,
+-- không phải nội dung đáp án — player phải đọc được nó mới biết câu này thuộc
+-- bài đọc nào trong exams.passages.
+--
+-- ⚠ ĐỪNG viết chú thích BÊN TRONG cặp ngoặc dưới đây: verify-schema.ts lấy danh
+-- sách cột bằng một regex rồi split theo dấu phẩy và KHÔNG bóc comment, nên mỗi
+-- dòng `--` lọt vào trong ngoặc sẽ bị đọc thành một tên cột và cổng đỏ với
+-- "GRANT nhắc tới cột không tồn tại".
 grant select (
-  id, content, choices, subject, grade, topic, question_type, part_number, image_url, skill_node_id
+  id, content, choices, subject, grade, topic, question_type, part_number, image_url, skill_node_id,
+  passage_id, points
 ) on public.questions to anon, authenticated;
 
 -- ============================================================================
@@ -1182,7 +1286,27 @@ begin
                          'essayLowConfidence', case when p_state = 'graded'
                                                     then to_jsonb(coalesce(p_low_confidence, false))
                                                     else to_jsonb(false) end,
-                         'essayGradedAt',      to_jsonb(now())
+                         'essayGradedAt',      to_jsonb(now()),
+                         -- B3 — TỬ SỐ ĐIỂM của dòng này.
+                         --
+                         -- `essayEarned` là BAND (thang 0..1, thứ EssayScoreLine
+                         -- hiển thị); `earnedPoints` là điểm THẬT của câu trong
+                         -- thang của đề. Hai thứ khác nhau khi câu tự luận không
+                         -- đáng đúng 1 điểm — bài NLVH 5 điểm với band 0.25 được
+                         -- 1.25 điểm, không phải 0.25.
+                         --
+                         -- Nhân với `maxPoints` ĐÃ LƯU SẴN trên chính phần tử
+                         -- (do computeScore() ghi lúc nộp) chứ không đọc lại
+                         -- questions.points: tác giả sửa điểm câu SAU khi học
+                         -- sinh nộp thì lượt thi đó vẫn phải được chấm theo đề
+                         -- lúc họ làm. 'failed' ⇒ 0, không phải null: nó vẫn
+                         -- chiếm chỗ trong mẫu số.
+                         'earnedPoints',       case when p_state = 'graded'
+                                                    then to_jsonb(
+                                                           coalesce(p_earned, 0)
+                                                           * coalesce((e->>'maxPoints')::numeric, 0)
+                                                         )
+                                                    else to_jsonb(0) end
                        )
                   else e
                 end
@@ -1200,6 +1324,51 @@ begin
      );
 
   get diagnostics v_rows = row_count;
+
+  -- B3 — TÍNH LẠI `total_score` sau khi band đã vào `per_question`.
+  --
+  -- Trước bản này hàm chỉ đụng `per_question` và KHÔNG BAO GIỜ đụng
+  -- `total_score` — đó chính là mấu chốt khiến điểm tự luận không bao giờ vào ô
+  -- điểm lớn, dù nó vẫn được chấm.
+  --
+  -- ĐÂY KHÔNG PHẢI CHÉP LUẬT CHẤM ĐIỂM SANG SQL, và sự phân biệt đó là điều
+  -- kiện để không tái phạm "hai chiếc đồng hồ" mà ADR-0010 đã từ chối: mọi QUY
+  -- TẮC (đúng/sai, thang bậc PHẦN II, trọng số từng câu) đã được TypeScript
+  -- quyết định và đóng băng thành `earnedPoints`/`maxPoints` trên từng phần tử.
+  -- Câu lệnh dưới đây chỉ CỘNG hai cột số đã có sẵn rồi quy về thang 10 — nó
+  -- không biết mcq khác true_false ở chỗ nào, và nó không cần biết.
+  --
+  -- Mẫu số 0 ⇒ giữ nguyên `total_score` cũ thay vì ghi 0: mẫu số rỗng nghĩa là
+  -- lượt thi này không có dòng nào mang `maxPoints` (dòng ghi trước B1), và ghi
+  -- 0 đè lên điểm thật của một lượt thi cũ là làm hỏng dữ liệu.
+  -- CÂU TỰ LUẬN CHƯA `graded` ĐỨNG NGOÀI CẢ TỬ LẪN MẪU — AC-015.
+  --
+  -- Điều kiện lọc `not (e ? 'essayState') or e->>'essayState' = 'graded'` đọc
+  -- là: "câu thường thì luôn tính; câu tự luận chỉ tính khi đã có band".
+  --
+  -- Vì sao KHÔNG để một câu `failed` cộng 0 vào tử và trọng số của nó vào mẫu:
+  -- đó đúng là "con số 0 im lặng" mà AC-015 cấm, và `summariseEssays()` đã áp
+  -- cùng quy tắc cho dòng hiển thị. Chấm hỏng là hỏng của HỆ THỐNG, không phải
+  -- của học sinh — trừ điểm họ vì Groq trả 429 là bịa ra một bài làm kém.
+  --
+  -- `maxPoints` trên phần tử KHÔNG bị xoá khi failed, chỉ bị BỎ QUA lúc cộng.
+  -- Đó là chủ đích: một lượt chấm lại thành công sau đó cần trọng số gốc để
+  -- nhân band, và một `maxPoints` đã bị ghi 0 sẽ làm mọi lượt chấm lại ra 0.
+  update public.exam_results r
+     set total_score = round(sums.earned / sums.max * 10, 2)
+    from (
+      select
+        coalesce(sum(coalesce((e->>'earnedPoints')::numeric, 0)), 0) as earned,
+        coalesce(sum((e->>'maxPoints')::numeric), 0)                 as max
+        from public.exam_results r2,
+             jsonb_array_elements(r2.per_question) e
+       where r2.attempt_id = p_attempt_id
+         and e ? 'maxPoints'
+         and (not (e ? 'essayState') or e->>'essayState' = 'graded')
+    ) sums
+   where r.attempt_id = p_attempt_id
+     and sums.max > 0;
+
   return v_rows = 1;
 end;
 $$;
@@ -1279,12 +1448,18 @@ revoke all on function public.exam_rating_aggregate() from public;
 grant execute on function public.exam_rating_aggregate() to anon, authenticated, service_role;
 
 -- ----------------------------------------------------------------------------
--- 12b. View chạy bằng quyền NGƯỜI GỌI. Danh sách cột giữ NGUYÊN (e.* +
---      rating_count + avg_overall, cùng thứ tự, cùng kiểu) — bắt buộc, vì
---      `create or replace view` không cho đổi shape, và vì PostgREST embed
---      xuyên view này trong getResult() (exam_attempts → exams_with_difficulty).
+-- 12b. View chạy bằng quyền NGƯỜI GỌI. HÌNH DẠNG giữ nguyên (e.* + rating_count
+--      + avg_overall, cùng thứ tự, cùng kiểu) vì PostgREST embed xuyên view này
+--      trong getResult() (exam_attempts → exams_with_difficulty).
 --      Ngưỡng N=3 vẫn là bản sao SQL của RATING_THRESHOLD (SOURCE/lib/rating).
 -- ----------------------------------------------------------------------------
+-- Drop trước vì đúng lý do đã ghi ở khối tạo view lần đầu (§8b/9): `e.*` đóng
+-- băng lúc tạo, nên trên một DB đã có view từ trước khi `exams` mọc thêm cột thì
+-- `create or replace` gãy 42P16, còn bỏ qua drop thì view thiếu cột và mọi truy
+-- vấn xin cột mới chết 42703. Đây là chỗ THỨ HAI, không phải chỗ thừa: file này
+-- tạo view hai lần (lần đầu không security_invoker), và cả hai lần đều phải
+-- chịu cùng một ràng buộc.
+drop view if exists public.exams_with_difficulty;
 create or replace view public.exams_with_difficulty
 with (security_invoker = true) as
 select
@@ -2252,7 +2427,7 @@ revoke all on public.schema_version from anon, authenticated;
 -- nó — xem lib/schema/schemaFingerprint.ts).
 -- @schema-fingerprint-begin
 insert into public.schema_version (id, fingerprint)
-values (1, '0abf8131aa2a')
+values (1, 'a667c85693bc')
 on conflict (id) do update
   set fingerprint = excluded.fingerprint,
       applied_at  = now();

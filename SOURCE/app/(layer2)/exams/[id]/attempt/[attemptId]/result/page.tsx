@@ -90,6 +90,11 @@ export default async function ResultPage({
             examTitle={examTitle}
             result={result}
             completionTimeLabel={completionTimeLabel}
+            // G1 — còn câu tự luận chưa ngã ngũ ⇒ ô lớn hoãn hiện con số.
+            // Dùng CHÍNH `unresolvedCount` mà EssayGradingPoller đọc để quyết
+            // định còn poll hay không, nên hai thứ không thể lệch pha: lượt
+            // refresh cuối cùng của poller cũng là lượt gỡ chữ "đang chấm…".
+            pending={(data.essaySummary?.unresolvedCount ?? 0) > 0}
           />
         </div>
 

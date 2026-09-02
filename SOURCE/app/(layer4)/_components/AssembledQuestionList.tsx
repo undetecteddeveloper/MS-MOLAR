@@ -21,6 +21,10 @@ interface AssembledQuestionListProps {
   ) => void;
   /** Nội dung server render sẵn, tra theo `reviewNodeKey` (TD-027). Chỉ đi qua đây. */
   nodes?: ReviewNodes;
+  /** Môn của đề — chỉ đi ngang qua đây xuống `QuestionEditor`, nơi nó chốt
+   *  trần độ dài theo môn (A6/A7). Nguồn là `exam.meta.subject` LIVE của
+   *  ReviewScreen, không phải `q.topic`. */
+  subject?: string;
   /** Cờ chấm tự luận — chỉ đi ngang qua đây xuống `QuestionEditor` (Task E4). */
   essayGradingEnabled?: boolean;
 }
@@ -31,6 +35,7 @@ export function AssembledQuestionList({
   errors,
   onChangeQuestion,
   nodes,
+  subject,
   essayGradingEnabled = false,
 }: AssembledQuestionListProps) {
   const t = useT();
@@ -52,6 +57,7 @@ export function AssembledQuestionList({
             hasError={errorKeys.has(`${q.part}:${q.number}`)}
             onChange={(patch) => onChangeQuestion(q.part, q.number, patch)}
             nodes={nodes?.[reviewNodeKey(q.part, q.number)]}
+            subject={subject}
             essayGradingEnabled={essayGradingEnabled}
           />
         ))}
@@ -80,6 +86,7 @@ export function AssembledQuestionList({
                   hasError={errorKeys.has(`${q.part}:${q.number}`)}
                   onChange={(patch) => onChangeQuestion(q.part, q.number, patch)}
                   nodes={nodes?.[reviewNodeKey(q.part, q.number)]}
+                  subject={subject}
                   essayGradingEnabled={essayGradingEnabled}
                 />
               ))}

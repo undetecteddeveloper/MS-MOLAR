@@ -30,6 +30,22 @@ export type BoundingBox = {
  * exams.parts để hiển thị nhóm. Đề không chia phần → mảng rỗng. */
 export type ExtractedPart = { number: number; title: string };
 
+/** NGỮ LIỆU DÙNG CHUNG (A1) — bài đọc/đoạn trích mà một NHÓM câu cùng tham
+ * chiếu ("Read the following passage... Questions 34-40"). Persist vào
+ * exams.passages; đề không có ngữ liệu → mảng rỗng.
+ *
+ * Đây là thứ phá vỡ giả định gốc "một câu hỏi = một đơn vị tự chứa" một cách
+ * CÓ KIỂM SOÁT: câu vẫn tự chứa phần HỎI của nó, chỉ phần ĐỌC là dùng chung.
+ * Nhờ vậy bài đọc được lưu MỘT bản thay vì chép vào stem của từng câu. */
+export type ExtractedPassage = {
+  /** Khoá CỤC BỘ trong một đề (do AI đặt, vd "p1"). Không phải id toàn cục —
+   * nó chỉ có nghĩa bên trong exams.passages của chính đề đó. */
+  id: string;
+  /** Tiêu đề in trên đề, nếu có ("Read the following passage..."). */
+  title?: string;
+  text: string;
+};
+
 /** Một câu hỏi do AI đọc từ file đề. KHÔNG bao giờ chứa đáp án đúng (ADR-0004).
  * Danh tính = (part, number) — số câu đánh lại từ 1 theo từng phần (ADR-0005). */
 export type ExtractedQuestion = {
@@ -43,6 +59,12 @@ export type ExtractedQuestion = {
   choices?: { id: ChoiceId; text: string }[];
   /** Chỉ true_false — các ý a–d (chuẩn 4 ý). */
   subItems?: { id: SubItemId; text: string }[];
+  /** A1 — trỏ tới `id` của một phần tử trong `passages` nếu câu này dùng ngữ
+   * liệu chung. Vắng = câu tự chứa (đại đa số câu). */
+  passageId?: string;
+  /** B1 — điểm câu này đáng, đọc từ chữ in trên đề ("(2,0 điểm)"). null/vắng =
+   * đề không ghi ⇒ dùng mặc định. Model bị CẤM suy đoán con số này. */
+  points?: number;
   /** Có mặt nếu câu hỏi kèm hình. */
   imageBox?: BoundingBox;
 };
@@ -79,10 +101,18 @@ export type UgcErrorCode =
   // v2.1 (ADR-0005):
   | "WRONG_SUB_ITEM_COUNT"
   | "SHORT_ANSWER_TOO_LONG"
+  // A1 — ngữ liệu dùng chung:
+  | "EMPTY_PASSAGE"
+  | "PASSAGE_TOO_LONG"
+  | "PASSAGE_MISSING"
   // v2.2 (ADR-0007) — metadata gate ở publish, không phải upload:
   | "META_INCOMPLETE"
   | "META_INVALID"
-  | "META_EXTRACTION_FAILED";
+  | "META_EXTRACTION_FAILED"
+  // B1 — biểu điểm, gate ở publish theo đúng tiền lệ META_* (xem
+  // validatePointsForPublish): thiếu điểm KHÔNG phải "đề bóc tách hỏng".
+  | "POINTS_MISSING"
+  | "POINTS_TOTAL_MISMATCH";
 
 /** Lỗi typed cho ExtractionErrorPanel — message đã bake sẵn từ errorCopy. */
 export type UgcError = {
@@ -115,12 +145,30 @@ export type UgcErrorParams = {
   subItemCount?: number;
   /** EMPTY_CHOICE / CHOICE_TOO_LONG: nhãn lựa chọn (A–D). */
   choiceLabel?: string;
+  /** STEM_TOO_LONG / ESSAY_ANSWER_TOO_LONG: trần THỰC SỰ đã áp cho câu này.
+   *  Bắt buộc kể từ khi trần nới theo môn (A6/A7): copy KHÔNG được đọc thẳng
+   *  LIMITS.MAX_STEM nữa, vì với đề Anh/Văn con số đó không phải con số đã
+   *  chặn họ — và một thông báo lỗi nói sai ngưỡng thì tác giả cắt bao nhiêu
+   *  cũng không hết lỗi. */
+  max?: number;
+  /** Trần ở trên có phải do MÔN quyết định không. `false`/vắng = môn chưa xác
+   *  định (sentinel ""), khi đó copy không nhắc tới "môn đã chọn" vì chưa có
+   *  môn nào được chọn. */
+  subjectScoped?: boolean;
   /** ANSWER_COUNT_MISMATCH: số đáp án / số câu hỏi / số không khớp. */
   answerCount?: number;
   questionCount?: number;
   unmatchedCount?: number;
+  /** EMPTY_PASSAGE / PASSAGE_TOO_LONG: vị trí ngữ liệu trong đề (1-based) —
+   *  ngữ liệu không có "số câu" nên nhãn lỗi đếm theo thứ tự xuất hiện. */
+  passageIndex?: number;
   /** META_INCOMPLETE / META_INVALID: field metadata bị lỗi (v2.2, ADR-0007). */
   field?: MetaFieldName;
+  /** POINTS_TOTAL_MISMATCH: tổng điểm ĐANG có của đề, và tổng đề PHẢI có.
+   *  `total` giữ nguyên tổng thô (có thể là 9.999999999999998) — làm tròn là
+   *  việc của copy, không phải của validator. */
+  total?: number;
+  expected?: number;
 };
 
 export type Result<T> = { ok: true; value: T } | { ok: false; errors: UgcError[] };
@@ -190,6 +238,10 @@ export type AssembledQuestion = {
   essayAnswer?: string;
   /** URL Storage của hình đã crop (nếu câu có figure). */
   imageUrl?: string;
+  /** A1 — khoá ngữ liệu dùng chung; persist vào questions.passage_id. */
+  passageId?: string;
+  /** B1 — điểm câu này đáng; persist vào questions.points. Vắng = mặc định. */
+  points?: number;
   /** Mặc định = subject của đề (ADR-0004, product-owner confirmed). */
   topic: string;
 };
@@ -198,6 +250,8 @@ export type AssembledExam = {
   meta: ExamMeta;
   /** Tiêu đề các phần in trên đề (rỗng = đề 1 phần) — persist vào exams.parts. */
   parts: ExtractedPart[];
+  /** A1 — ngữ liệu dùng chung (rỗng = đề không có bài đọc chung). */
+  passages: ExtractedPassage[];
   questions: AssembledQuestion[];
 };
 
@@ -236,11 +290,19 @@ export type SaveQuestionPatch = {
   essayAnswer?: string | null;
   /** null = gỡ hình khỏi câu. */
   imageUrl?: string | null;
+  /** A1 — null = gỡ câu khỏi ngữ liệu chung. */
+  passageId?: string | null;
+  /** B1 — điểm câu này đáng; null = trả về mặc định. */
+  points?: number | null;
 };
 
 export type SaveExamPatch = {
   meta?: SaveExamMetaPatch;
   questions?: SaveQuestionPatch[];
+  /** A1 — ngữ liệu dùng chung, gửi NGUYÊN MẢNG (không patch từng phần tử).
+   *  Mảng nhỏ (≤ MAX_PASSAGES) và luôn được sửa như một khối ở màn review, nên
+   *  một giao thức patch theo id chỉ thêm chỗ để hai bên lệch nhau. */
+  passages?: ExtractedPassage[];
 };
 
 /** Lỗi discriminated của các server action (Design Doc §Data Contracts). */

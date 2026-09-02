@@ -241,9 +241,31 @@ const EXPECTED_SCORE_FLAG_OFF = {
   correct: 1,
   total: 2,
   perQuestion: [
-    { questionId: "q1", selected: "B", correct: "B", isCorrect: true, scored: true },
-    { questionId: "q2", selected: "C", correct: "A", isCorrect: false, scored: true },
+    // B1 — `earnedPoints`/`maxPoints` là KÊNH ĐIỂM có trọng số. Ở đây cả hai
+    // câu đều dùng trọng số mặc định 1, nên `totalScore` vẫn đúng bằng 5 như
+    // trước B1: với đề cân bằng, tổng có trọng số rút gọn về công thức cũ.
     {
+      questionId: "q1",
+      selected: "B",
+      correct: "B",
+      isCorrect: true,
+      scored: true,
+      earnedPoints: 1,
+      maxPoints: 1,
+    },
+    {
+      questionId: "q2",
+      selected: "C",
+      correct: "A",
+      isCorrect: false,
+      scored: true,
+      earnedPoints: 0,
+      maxPoints: 1,
+    },
+    {
+      // Cờ TẮT ⇒ không ai sẽ chấm câu này ⇒ nó đứng ngoài CẢ tử lẫn mẫu, tức
+      // KHÔNG mang `maxPoints`. Đưa nó vào mẫu số khi không có người chấm là
+      // trừ điểm học sinh vĩnh viễn.
       questionId: "q3",
       selected: "Bài làm của học sinh.",
       isCorrect: false,
@@ -266,12 +288,19 @@ const EXPECTED_ESSAY_KEYS_OFF = ["isCorrect", "questionId", "scored", "selected"
  *  `newEssayEntry()` emits. `essayGradedAt` is deliberately NOT here — only
  *  `record_essay_grade()` ever writes it. */
 const EXPECTED_ESSAY_KEYS_ON = [
+  // B3 — hai khoá của KÊNH ĐIỂM. Câu tự luận nay có mặt trong MẪU SỐ ngay từ
+  // lúc nộp (`maxPoints`) với 0 điểm đã được (`earnedPoints`);
+  // `record_essay_grade()` cộng tử số vào khi band đáp xuống. Chúng KHÁC
+  // `essayEarned`/`essayMax` ngay trên: cặp kia là BAND (thang 0..1) để hiển
+  // thị, cặp này là điểm thật trong thang của đề.
+  "earnedPoints",
   "essayAttempts",
   "essayEarned",
   "essayLowConfidence",
   "essayMax",
   "essayState",
   "isCorrect",
+  "maxPoints",
   "questionId",
   "scored",
   "selected",
@@ -562,13 +591,29 @@ describe("submitExam() — essay grading feature flag (INT-1)", () => {
     expect(essayEl.essayState).toBe("pending");
     expect(afterMock).toHaveBeenCalledTimes(1);
 
-    // The essay still stays out of the score triple and the topic breakdown even
-    // when the lifecycle keys are emitted (EG-BE-004) — the numbers are the same
-    // literals as the OFF case.
-    expect(persistedScore().totalScore).toBe(EXPECTED_SCORE_FLAG_OFF.totalScore);
+    // SCOPE CHANGED BY B3 (2026-09-01). This block used to assert the score was
+    // byte-identical with the flag ON and OFF, on EG-BE-004's original reading
+    // that "emitting lifecycle keys and scoring are independent".
+    //
+    // B3 deliberately breaks HALF of that, and the half it breaks is the bug:
+    // an essay that someone is actually going to grade now occupies its share of
+    // the paper's marks from the moment of submission. Two auto-scored questions
+    // (1 correct) plus one essay worth 1 mark, not yet graded, is 1/3 of the
+    // paper — 3.33, not 5.0. Leaving it at 5.0 is precisely how a Literature
+    // attempt showed 10.0/10 on a paper worth 4.75/10.
+    //
+    // The half that MUST still hold is the COUNT triple: `correct`/`total` keep
+    // counting auto-scored questions only, so `wrong = total − correct` on
+    // ScoreCard stays derivable (AC-057) and mastery is never fed by an essay.
+    expect(persistedScore().totalScore).toBe(3.33);
     expect(persistedScore().correct).toBe(EXPECTED_SCORE_FLAG_OFF.correct);
     expect(persistedScore().total).toBe(EXPECTED_SCORE_FLAG_OFF.total);
     expect(persistedScore().topicBreakdown).toEqual(EXPECTED_SCORE_FLAG_OFF.topicBreakdown);
+
+    // …and the essay is in the DENOMINATOR with a zero numerator, which is the
+    // shape `record_essay_grade()` later adds the band into.
+    expect(essayEl.maxPoints).toBe(1);
+    expect(essayEl.earnedPoints).toBe(0);
 
     // Registered with the right target set: only the essay that HAS a reference
     // answer, carrying the student's text and the attempt it belongs to. A pass

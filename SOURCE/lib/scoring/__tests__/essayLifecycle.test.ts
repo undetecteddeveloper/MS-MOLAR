@@ -391,6 +391,77 @@ const MIXED_ROWS: StoredElement[] = [
   legacyElement("legacy"),
 ];
 
+// ═══════ 7b. AC-059 (sửa lại ở B1) — hai vế điểm là THANG CỦA ĐỀ ════════════
+//
+// Trước B1, dòng tự luận in tổng BAND trên `số câu đã chấm × 1`. Với đề CÓ
+// TRỌNG SỐ điều đó nói sai: một bài NLVH 5 điểm được band 0.25 hiện "0.25 / 1
+// điểm" trong khi nó đóng góp 1.25 điểm vào ô điểm lớn ngay bên trên. Bộ này
+// canh cả nhánh mới lẫn nhánh lui về, vì nhánh lui về mới là thứ giữ AC-012.
+
+/** Phần tử tự luận ĐÃ CHẤM, có kèm KÊNH ĐIỂM của B1. */
+function weightedGradedElement(
+  questionId: string,
+  band: number,
+  maxPoints: number,
+): StoredElement {
+  return {
+    ...gradedElement(questionId, band),
+    earnedPoints: band * maxPoints,
+    maxPoints,
+  } as StoredElement;
+}
+
+describe("summariseEssays() — AC-059: thang điểm của ĐỀ, không phải thang band", () => {
+  it("đề Văn có trọng số: cộng theo điểm thật, không theo band", () => {
+    // NLXH 2 điểm band 0.5 ⇒ 1.0đ; NLVH 5 điểm band 0.25 ⇒ 1.25đ.
+    // Thang band cũ sẽ cho "0.75 / 2 điểm" — sai cả hai vế.
+    const rows: StoredElement[] = [
+      weightedGradedElement("nlxh", 0.5, 2),
+      weightedGradedElement("nlvh", 0.25, 5),
+    ];
+    const summary = summariseEssays(rows, CREATED_AT, FRESH);
+    expect(summary?.earned).toBeCloseTo(2.25, 10);
+    expect(summary?.max).toBe(7);
+    expect(summary?.gradedCount).toBe(2);
+  });
+
+  it("dòng CŨ (không mang maxPoints) vẫn đọc ra thang band — AC-012", () => {
+    // Đây là nhánh giữ cho một lượt thi ghi TRƯỚC B1 không đổi một con số nào.
+    const summary = summariseEssays(
+      [gradedElement("g1", 0.5), gradedElement("g2", 1)],
+      CREATED_AT,
+      FRESH,
+    );
+    expect(summary?.earned).toBe(1.5);
+    expect(summary?.max).toBe(2);
+  });
+
+  it("trộn dòng cũ và dòng mới: mỗi dòng tính theo thang của CHÍNH nó", () => {
+    // Ca này chỉ xảy ra nếu backfill chạy dở, nhưng nó phải cộng được chứ không
+    // được ném hay trả NaN.
+    const summary = summariseEssays(
+      [gradedElement("cu", 0.5), weightedGradedElement("moi", 0.5, 4)],
+      CREATED_AT,
+      FRESH,
+    );
+    expect(summary?.earned).toBe(2.5); // 0.5 (band) + 2.0 (0.5 × 4)
+    expect(summary?.max).toBe(5); // 1 (band) + 4
+  });
+
+  it("câu CHƯA graded không vào mẫu số dù mang maxPoints — AC-015", () => {
+    // `record_essay_grade()` áp cùng quy tắc lúc tính lại `total_score`. Ba chỗ
+    // (SQL, script backfill, dòng hiển thị này) phải nói một chuyện.
+    const rows: StoredElement[] = [
+      weightedGradedElement("g", 1, 3),
+      { ...pendingElement("p"), earnedPoints: 0, maxPoints: 5 } as StoredElement,
+      { ...failedElement("f", 1), earnedPoints: 0, maxPoints: 2 } as StoredElement,
+    ];
+    const summary = summariseEssays(rows, CREATED_AT, FRESH);
+    expect(summary?.earned).toBe(3);
+    expect(summary?.max).toBe(3);
+  });
+});
+
 describe("summariseEssays() — chỉ graded vào earned VÀ max (EG-BE-027)", () => {
   it("cộng dồn đúng trên fixture trộn, ở mốc CHƯA quá hạn", () => {
     expect(summariseEssays(MIXED_ROWS, CREATED_AT, FRESH)).toEqual({

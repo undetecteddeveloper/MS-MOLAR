@@ -37,7 +37,7 @@ export default async function ExamPlayerPage({
       questions={data.questions}
       // TD-023: markdown + LaTeX render Ở ĐÂY (server), không ở ExamPlayer —
       // giữ 126 KB br của RichText khỏi bundle màn làm bài.
-      questionNodes={renderQuestionNodes(data.questions)}
+      questionNodes={renderQuestionNodes(data.questions, data.exam.passages)}
       parts={data.exam.parts}
       // CHO DOC CO 3/3 — va la cho duy nhat trong ba cho la mot CONG CAU CHU.
       // Hai cho kia la cong HANH VI: `submitExam()` quyet dinh co phat khoa

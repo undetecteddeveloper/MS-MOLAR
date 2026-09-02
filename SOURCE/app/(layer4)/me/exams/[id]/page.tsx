@@ -39,7 +39,7 @@ export default async function ReviewExamPage({
         srcAuto={src === "auto"}
         // TD-027: markdown + LaTeX render Ở ĐÂY (server), không ở QuestionEditor
         // — giữ 126.3 KB br của RichText khỏi lượt tải đầu của màn sửa đề.
-        nodes={renderReviewNodes(detail.exam.questions)}
+        nodes={renderReviewNodes(detail.exam.questions, detail.exam.passages)}
         // Task E4 / OQ-5. Đọc cờ Ở ĐÂY vì đây là server component; cả ba
         // component bên dưới đều `"use client"` và ở đó `process.env` không
         // tồn tại. Quy tắc đọc giống HỆT ba chỗ đọc cờ kia (AC-013): CHỈ chuỗi

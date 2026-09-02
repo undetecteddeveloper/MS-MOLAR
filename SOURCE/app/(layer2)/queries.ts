@@ -50,6 +50,7 @@ type ExamRow = {
   semester: string | null;
   author_display_name: string | null;
   parts: { number: number; title: string }[] | null;
+  passages: { id: string; title?: string; text: string }[] | null;
   /** Rating System (ADR-0008): từ view exams_with_difficulty, không phải bảng exams. */
   rating_count: number;
   avg_overall: number | null;
@@ -69,7 +70,7 @@ type ExamRow = {
 // (:122-123) và hai bản trôi lệch trong im lặng — sửa ở đây thì sửa luôn ở đó,
 // đúng như header của chính file benchmark đó đã ghi.
 const EXAM_COLUMNS =
-  "id, title, question_ids, duration_minutes, subject, grade, school, school_year, semester, author_display_name, parts, rating_count, avg_overall, created_at";
+  "id, title, question_ids, duration_minutes, subject, grade, school, school_year, semester, author_display_name, parts, passages, rating_count, avg_overall, created_at";
 
 function toExam(row: ExamRow): Exam {
   return {
@@ -84,6 +85,7 @@ function toExam(row: ExamRow): Exam {
     semester: row.semester ?? undefined,
     authorDisplayName: row.author_display_name ?? undefined,
     parts: row.parts ?? undefined,
+    passages: row.passages ?? undefined,
     communityDifficulty: communityDifficultyFrom(row.avg_overall, row.rating_count),
   };
 }
@@ -446,7 +448,9 @@ export async function getExamForPlayer(
   // với true_false chứa các Ý a–d — nội dung, an toàn để render).
   const { data, error } = await supabase
     .from("questions")
-    .select("id, content, choices, subject, grade, topic, question_type, part_number, image_url")
+    .select(
+      "id, content, choices, subject, grade, topic, question_type, part_number, image_url, passage_id"
+    )
     .in("id", exam.questionIds);
   if (error) throw error;
 
@@ -460,6 +464,7 @@ export async function getExamForPlayer(
     question_type: string | null;
     part_number: number | null;
     image_url: string | null;
+    passage_id: string | null;
   }>;
 
   // Đổi image_url đã lưu → signed URL (bucket private) để player render được.
@@ -482,6 +487,7 @@ export async function getExamForPlayer(
         topic: r.topic,
         questionType,
         partNumber: r.part_number ?? 1,
+        passageId: r.passage_id ?? undefined,
         imageUrl: await resolveSignedImageUrl(supabase, r.image_url),
       });
     })
@@ -526,6 +532,12 @@ export type ResultQuestion = {
    *  riêng thay vì để trang tự đọc `image_url` — cùng hợp đồng với
    *  `PublicQuestion.imageUrl` mà `getExamForPlayer()` đã trả cho màn làm bài. */
   imageUrl?: string;
+  /** NGỮ LIỆU DÙNG CHUNG (A1) — nội dung bài đọc mà câu này tham chiếu, đã
+   *  GIẢI SẴN từ `exam.passages`. Trang Chi tiết nhận chuỗi chứ không nhận
+   *  khoá: nó dò lại từng câu một, và bắt nó tự tra một bảng thứ hai chỉ để
+   *  hiện đúng đoạn văn là mời gọi cái bug "câu này mất bài đọc". */
+  passageText?: string;
+  passageTitle?: string;
 };
 
 export type ExamResult = {
@@ -621,8 +633,11 @@ export async function getResult(attemptId: string): Promise<ExamResult | null> {
   // không published → `!inner` loại cả dòng → maybeSingle() trả null.
   // `.eq(...exams_with_difficulty.status,'published')` giữ đúng quy ước visibility
   // của getExam() (RLS lọc, VÀ thêm filter published tường minh chồng lên).
-  // Chỉ lấy id/title của đề vì đó là tất cả những gì hàm này dùng — cố ý KHÔNG
-  // kéo cả EXAM_COLUMNS để không ngụ ý rằng có sẵn nguyên contract `Exam`.
+  // Chỉ lấy id/title/subject/passages của đề vì đó là tất cả những gì hàm này
+  // dùng — cố ý KHÔNG kéo cả EXAM_COLUMNS để không ngụ ý rằng có sẵn nguyên
+  // contract `Exam`. (`passages` vào danh sách từ A1: màn Chi tiết phải hiện
+  // lại bài đọc, nếu không thì học sinh dò lại một câu đọc hiểu mà không có
+  // đoạn văn — không cách nào hiểu vì sao mình sai.)
   //
   // Song song (KHÔNG nối đuôi) với vòng 1: lịch sử làm bài cho cờ
   // hasBeenWrongTwice. Hai query không phụ thuộc nhau — cái sau chỉ cần user
@@ -632,7 +647,7 @@ export async function getResult(attemptId: string): Promise<ExamResult | null> {
     supabase
       .from("exam_results")
       .select(
-        "total_score, correct, total, per_question, topic_breakdown, overtime_seconds, created_at, exam_attempts!inner(started_at, submitted_at, exams_with_difficulty!inner(id, title, subject))"
+        "total_score, correct, total, per_question, topic_breakdown, overtime_seconds, created_at, exam_attempts!inner(started_at, submitted_at, exams_with_difficulty!inner(id, title, subject, passages))"
       )
       .eq("attempt_id", attemptId)
       .eq("exam_attempts.exams_with_difficulty.status", "published")
@@ -647,7 +662,12 @@ export async function getResult(attemptId: string): Promise<ExamResult | null> {
     exam_attempts: {
       started_at: string;
       submitted_at: string | null;
-      exams_with_difficulty: { id: string; title: string; subject: string };
+      exams_with_difficulty: {
+        id: string;
+        title: string;
+        subject: string;
+        passages: { id: string; title?: string; text: string }[] | null;
+      };
     };
   };
   const attempt = row.exam_attempts;
@@ -738,10 +758,16 @@ export async function getResult(attemptId: string): Promise<ExamResult | null> {
       sub_answers: ResultQuestion["subAnswers"] | null;
       essay_answer: string | null;
       image_url: string | null;
+      passage_id: string | null;
     }>).map(async (q) => {
       const questionType = q.question_type ?? "mcq";
+      const passage = q.passage_id
+        ? (exam.passages ?? []).find((pg) => pg.id === q.passage_id)
+        : undefined;
       questions[q.id] = {
         content: q.content,
+        passageText: passage?.text,
+        passageTitle: passage?.title,
         choices: questionType === "true_false" ? [] : q.choices,
         questionType,
         subItems:

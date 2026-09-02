@@ -31,6 +31,12 @@ export interface Exam {
    */
   parts?: { number: number; title: string }[];
   /**
+   * NGỮ LIỆU DÙNG CHUNG (A1) — bài đọc/đoạn trích mà một nhóm câu cùng tham
+   * chiếu. Câu trỏ về đây qua `Question.passageId`. undefined/null = đề không
+   * có bài đọc chung (đúng với 8/10 môn).
+   */
+  passages?: { id: string; title?: string; text: string }[];
+  /**
    * Độ khó do cộng đồng đánh giá (Rating System, ADR-0008) — derived on read
    * từ view `exams_with_difficulty`, KHÔNG lưu trên bảng `exams`. `toExam`
    * (queries.ts) luôn gán giá trị này — `null` khi đề có < `RATING_THRESHOLD`

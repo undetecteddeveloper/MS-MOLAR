@@ -114,3 +114,61 @@ describe("imagePathFromUrl", () => {
     expect(imagePathFromUrl("not-a-url")).toBeNull();
   });
 });
+
+describe("assembledFromRows — A1 ngữ liệu dùng chung", () => {
+  const base = {
+    title: "Đề Tiếng Anh",
+    subject: "English",
+    grade: 12,
+    duration_minutes: 60,
+    school: null,
+    school_year: null,
+    semester: null,
+    question_ids: ["e-p1q34", "e-p1q35"],
+  };
+
+  function qRow(id: string, passageId: string | null) {
+    return {
+      id,
+      content: "What does the word 'it' refer to?",
+      choices: [
+        { id: "A", text: "a" },
+        { id: "B", text: "b" },
+        { id: "C", text: "c" },
+        { id: "D", text: "d" },
+      ],
+      correct_answer: "A",
+      essay_answer: null,
+      image_url: null,
+      question_type: "mcq",
+      topic: "English",
+      passage_id: passageId,
+    };
+  }
+
+  it("dựng lại passages + passageId từ row DB", () => {
+    const passages = [{ id: "p1", title: "Read the passage.", text: "Long reading text." }];
+    const exam = assembledFromRows({ ...base, passages }, [
+      qRow("e-p1q34", "p1"),
+      qRow("e-p1q35", "p1"),
+    ]);
+    expect(exam.passages).toEqual(passages);
+    expect(exam.questions.map((q) => q.passageId)).toEqual(["p1", "p1"]);
+  });
+
+  it("row CŨ (cột null, chưa từng có ngữ liệu) → passages rỗng, passageId undefined", () => {
+    // Bất biến của §8d: hai cột nullable ⇒ đề cũ tự đúng, không cần backfill.
+    // `null` phải thành `undefined`/`[]`, KHÔNG được rò `null` vào AssembledExam.
+    const exam = assembledFromRows({ ...base, passages: null }, [
+      qRow("e-p1q34", null),
+      qRow("e-p1q35", null),
+    ]);
+    expect(exam.passages).toEqual([]);
+    expect(exam.questions.every((q) => q.passageId === undefined)).toBe(true);
+  });
+
+  it("cột passages VẮNG HẲN (row trước khi migration chạy) cũng an toàn", () => {
+    const exam = assembledFromRows(base, [qRow("e-p1q34", null), qRow("e-p1q35", null)]);
+    expect(exam.passages).toEqual([]);
+  });
+});

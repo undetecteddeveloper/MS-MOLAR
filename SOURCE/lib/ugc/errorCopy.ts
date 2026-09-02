@@ -32,6 +32,13 @@ function label(n: number | null, part: number | undefined): string {
   return part != null ? `Phần ${part} Câu ${n}` : `Câu ${n}`;
 }
 
+/** Điểm cho người đọc: bỏ đuôi nhị phân, bỏ số 0 thừa ("8.5", không "8.50",
+ *  cũng không "9.999999999999998"). Hai chữ số thập phân là đủ — bậc nhỏ nhất
+ *  của biểu điểm là 0.1 và tác giả không gõ được gì mịn hơn 0.01. */
+function formatPoints(n: number): string {
+  return String(Math.round(n * 100) / 100);
+}
+
 function message(
   code: UgcErrorCode,
   n: number | null,
@@ -44,7 +51,7 @@ function message(
     case "TOO_MANY_QUESTIONS":
       return `Too many questions — an exam can have at most ${LIMITS.MAX_QUESTIONS}.`;
     case "WRONG_CHOICE_COUNT":
-      return `${q} — ${p.choiceCount ?? 0} choices were read; an MCQ needs exactly 4 (A–D). Edit below or re-upload.`;
+      return `${q} — ${p.choiceCount ?? 0} choices were read; an MCQ needs ${LIMITS.MIN_CHOICES}–${LIMITS.MAX_CHOICES} options labelled from A in order. Edit below or re-upload.`;
     case "EMPTY_STEM":
       return `${q} — the question text is empty; add it below.`;
     case "EMPTY_CHOICE":
@@ -62,15 +69,23 @@ function message(
     case "TOO_MANY_PAGES":
       return `That file has too many pages (max ${LIMITS.MAX_PDF_PAGES}).`;
     case "STEM_TOO_LONG":
-      return `${q} — the question text is too long (max ${LIMITS.MAX_STEM} characters).`;
+      return `${q} — the question text is too long (max ${p.max ?? LIMITS.MAX_STEM} characters${p.subjectScoped ? " for the selected subject" : ""}).`;
     case "CHOICE_TOO_LONG":
       return `${q} — choice ${p.choiceLabel ?? "?"} is too long (max ${LIMITS.MAX_CHOICE} characters).`;
     case "ESSAY_ANSWER_TOO_LONG":
-      return `${q} — the model answer is too long (max ${LIMITS.MAX_ESSAY_ANSWER} characters).`;
+      return `${q} — the model answer is too long (max ${p.max ?? LIMITS.MAX_ESSAY_ANSWER} characters${p.subjectScoped ? " for the selected subject" : ""}).`;
     case "WRONG_SUB_ITEM_COUNT":
       return `${q} — ${p.subItemCount ?? 0} sub-items were read; a true/false question needs ${LIMITS.MIN_SUB_ITEMS}–${LIMITS.MAX_SUB_ITEMS} items (a–d). Edit below or re-upload.`;
     case "SHORT_ANSWER_TOO_LONG":
       return `${q} — the expected answer is too long (max ${LIMITS.MAX_SHORT_ANSWER} characters).`;
+    // A1 — ngữ liệu dùng chung. Nhãn đếm theo thứ tự xuất hiện ("Passage 2"):
+    // ngữ liệu không thuộc về câu nào nên không mượn được nhãn "Câu N".
+    case "EMPTY_PASSAGE":
+      return `Passage ${p.passageIndex ?? 1} — the shared reading text is empty; add it below.`;
+    case "PASSAGE_TOO_LONG":
+      return `Passage ${p.passageIndex ?? 1} — the shared reading text is too long (max ${p.max ?? LIMITS.MAX_PASSAGE} characters).`;
+    case "PASSAGE_MISSING":
+      return `${q} — this question refers to a shared reading text that isn't in the exam. Re-upload, or detach it below.`;
     // v2.2 (ADR-0007) — lỗi metadata: sort TRÊN lỗi từng câu, link tới khối
     // metadata (không tới card câu).
     case "META_INCOMPLETE":
@@ -81,6 +96,12 @@ function message(
     }
     case "META_EXTRACTION_FAILED":
       return "Exam details — we couldn't read the exam details from your file. Fill them in above.";
+    // B1 — biểu điểm. Lỗi tổng phải NÓI RA con số hiện tại: "chưa đủ 10" bắt
+    // tác giả tự cộng 40 ô để biết mình thiếu bao nhiêu.
+    case "POINTS_MISSING":
+      return `${q} — no points set for this question. Enter them below before publishing.`;
+    case "POINTS_TOTAL_MISMATCH":
+      return `Exam points — the questions add up to ${formatPoints(p.total ?? 0)}/${p.expected ?? LIMITS.EXAM_TOTAL_POINTS}. Adjust them so the exam totals ${p.expected ?? LIMITS.EXAM_TOTAL_POINTS}.`;
   }
 }
 
@@ -139,7 +160,12 @@ export function formatUgcError(t: Translate, e: UgcError): string {
     case "TOO_MANY_QUESTIONS":
       return t("ugcError.tooManyQuestions", { max: LIMITS.MAX_QUESTIONS });
     case "WRONG_CHOICE_COUNT":
-      return t("ugcError.wrongChoiceCount", { q, count: p.choiceCount ?? 0 });
+      return t("ugcError.wrongChoiceCount", {
+        q,
+        count: p.choiceCount ?? 0,
+        min: LIMITS.MIN_CHOICES,
+        max: LIMITS.MAX_CHOICES,
+      });
     case "EMPTY_STEM":
       return t("ugcError.emptyStem", { q });
     case "EMPTY_CHOICE":
@@ -162,16 +188,24 @@ export function formatUgcError(t: Translate, e: UgcError): string {
       });
     case "TOO_MANY_PAGES":
       return t("ugcError.tooManyPages", { max: LIMITS.MAX_PDF_PAGES });
-    case "STEM_TOO_LONG":
-      return t("ugcError.stemTooLong", { q, max: LIMITS.MAX_STEM });
+    case "STEM_TOO_LONG": {
+      const max = p.max ?? LIMITS.MAX_STEM;
+      return p.subjectScoped
+        ? t("ugcError.stemTooLongForSubject", { q, max })
+        : t("ugcError.stemTooLong", { q, max });
+    }
     case "CHOICE_TOO_LONG":
       return t("ugcError.choiceTooLong", {
         q,
         choice: p.choiceLabel ?? "?",
         max: LIMITS.MAX_CHOICE,
       });
-    case "ESSAY_ANSWER_TOO_LONG":
-      return t("ugcError.essayAnswerTooLong", { q, max: LIMITS.MAX_ESSAY_ANSWER });
+    case "ESSAY_ANSWER_TOO_LONG": {
+      const max = p.max ?? LIMITS.MAX_ESSAY_ANSWER;
+      return p.subjectScoped
+        ? t("ugcError.essayAnswerTooLongForSubject", { q, max })
+        : t("ugcError.essayAnswerTooLong", { q, max });
+    }
     case "WRONG_SUB_ITEM_COUNT":
       return t("ugcError.wrongSubItemCount", {
         q,
@@ -181,6 +215,15 @@ export function formatUgcError(t: Translate, e: UgcError): string {
       });
     case "SHORT_ANSWER_TOO_LONG":
       return t("ugcError.shortAnswerTooLong", { q, max: LIMITS.MAX_SHORT_ANSWER });
+    case "EMPTY_PASSAGE":
+      return t("ugcError.emptyPassage", { index: p.passageIndex ?? 1 });
+    case "PASSAGE_TOO_LONG":
+      return t("ugcError.passageTooLong", {
+        index: p.passageIndex ?? 1,
+        max: p.max ?? LIMITS.MAX_PASSAGE,
+      });
+    case "PASSAGE_MISSING":
+      return t("ugcError.passageMissing", { q });
     case "META_INCOMPLETE":
       return t("ugcError.metaIncomplete", { field: fieldLabel ?? t("ugcError.fieldRequired") });
     case "META_INVALID": {
@@ -204,5 +247,12 @@ export function formatUgcError(t: Translate, e: UgcError): string {
     }
     case "META_EXTRACTION_FAILED":
       return t("ugcError.metaExtractionFailed");
+    case "POINTS_MISSING":
+      return t("ugcError.pointsMissing", { q });
+    case "POINTS_TOTAL_MISMATCH":
+      return t("ugcError.pointsTotalMismatch", {
+        total: formatPoints(p.total ?? 0),
+        expected: p.expected ?? LIMITS.EXAM_TOTAL_POINTS,
+      });
   }
 }

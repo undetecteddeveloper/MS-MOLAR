@@ -18,8 +18,9 @@ vi.mock("@google/genai", () => ({
 
 process.env.GEMINI_API_KEY = "test-key-not-real";
 
-import { extractQuestions, mapQuestionsPayload } from "../extractQuestions";
+import { extractQuestions, mapQuestionsPayload, repairTrueFalseStem } from "../extractQuestions";
 import { extractAnswers, mapAnswersPayload } from "../extractAnswers";
+import { LIMITS } from "../limits";
 import { FATAL_CALL_DEADLINE_MS } from "../gemini";
 import type { FileRef } from "../fileRef";
 
@@ -77,6 +78,9 @@ describe("extractQuestions — mapping từ structured output", () => {
     if (!result.ok) return;
     expect(result.value).toEqual({
       parts: [],
+      // A1: response không khai `passages` ⇒ mảng rỗng, KHÔNG phải lỗi contract.
+      // "Đề không có bài đọc chung" là trạng thái đúng của 8/10 môn.
+      passages: [],
       questions: [
         {
           part: 1,
@@ -90,6 +94,7 @@ describe("extractQuestions — mapping từ structured output", () => {
             { id: "D", text: "4" },
           ],
           subItems: undefined,
+          passageId: undefined,
           imageBox: undefined,
         },
         {
@@ -99,6 +104,7 @@ describe("extractQuestions — mapping từ structured output", () => {
           stem: "Chứng minh bất đẳng thức.",
           choices: undefined,
           subItems: undefined,
+          passageId: undefined,
           imageBox: { page: 1, box2d: [200, 100, 450, 600] },
         },
       ],
@@ -303,5 +309,68 @@ describe("mapper thuần (không qua SDK)", () => {
   it("mapAnswersPayload từ chối entry sai type", () => {
     expect(mapAnswersPayload({ answers: [{ part: 1, number: 1, type: "mcq" }] })).toBeNull();
     expect(mapAnswersPayload({ answers: [{ part: 1, number: 1.5, type: "essay", text: "x" }] })).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Vá câu Đúng/Sai mà model để câu phán xét trong thân câu (2026-09-02).
+//
+// Đo trên prod: đề "ĐỀ THI HỌC KÌ 2 – ĐỀ SỐ 1" có 5 câu true_false với subItems
+// rỗng, và cả đề đứng ở trạng thái `failed` vì WRONG_SUB_ITEM_COUNT — tức lỗi
+// này một mình nó chặn nguyên một đề Tiếng Anh khỏi lên sàn.
+// ---------------------------------------------------------------------------
+describe("repairTrueFalseStem — câu phán xét bị để nhầm trong thân câu", () => {
+  // Nguyên văn hình dạng model trả về trên prod.
+  const PROD_STEM =
+    "Listen to part of a news report on United Nation’s determination to control global warming. Decide whether the following statement is True or False.\n\nThe UN report says that harmful effects of greenhouse gases can be eliminated.";
+
+  it("đoạn cuối thành ý a, lời dẫn ở lại thân câu", () => {
+    const out = repairTrueFalseStem("true_false", PROD_STEM, undefined);
+    expect(out.subItems).toEqual([
+      {
+        id: "a",
+        text: "The UN report says that harmful effects of greenhouse gases can be eliminated.",
+      },
+    ]);
+    expect(out.stem).toBe(
+      "Listen to part of a news report on United Nation’s determination to control global warming. Decide whether the following statement is True or False."
+    );
+  });
+
+  it("đi qua nguyên đường mapping thật, không chỉ gọi hàm rời", () => {
+    const mapped = mapQuestionsPayload({
+      parts: [],
+      passages: [],
+      questions: [
+        { part: 1, number: 21, type: "true_false", stem: PROD_STEM, subItems: [] },
+      ],
+    });
+    expect(mapped?.questions[0].subItems).toHaveLength(1);
+    expect(mapped?.questions[0].stem).not.toContain("The UN report says");
+  });
+
+  it("KHÔNG đụng vào câu đã có ý đầy đủ", () => {
+    const subItems = [{ id: "a" as const, text: "ý a" }, { id: "b" as const, text: "ý b" }];
+    const out = repairTrueFalseStem("true_false", "lời dẫn\n\nkhông phải ý", subItems);
+    expect(out.subItems).toBe(subItems);
+    expect(out.stem).toBe("lời dẫn\n\nkhông phải ý");
+  });
+
+  it("KHÔNG đụng vào loại câu khác", () => {
+    const out = repairTrueFalseStem("essay", "đoạn một\n\nđoạn hai", undefined);
+    expect(out.subItems).toBeUndefined();
+    expect(out.stem).toBe("đoạn một\n\nđoạn hai");
+  });
+
+  it("KHÔNG vá thân câu một đoạn — sẽ đổi một lỗi lấy lỗi EMPTY_STEM", () => {
+    const out = repairTrueFalseStem("true_false", "chỉ có một đoạn duy nhất", undefined);
+    expect(out.subItems).toBeUndefined();
+    expect(out.stem).toBe("chỉ có một đoạn duy nhất");
+  });
+
+  it("KHÔNG vá khi đoạn cuối dài quá trần một ý", () => {
+    const long = "lời dẫn\n\n" + "x".repeat(LIMITS.MAX_CHOICE + 1);
+    const out = repairTrueFalseStem("true_false", long, undefined);
+    expect(out.subItems).toBeUndefined();
   });
 });

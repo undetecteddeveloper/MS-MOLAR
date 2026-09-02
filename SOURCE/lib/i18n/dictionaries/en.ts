@@ -189,6 +189,7 @@ export const en = {
   "player.secondsRemaining": "{count} seconds remaining",
   "player.submit": "Submit",
   "player.submitting": "Submitting…",
+  "player.sharedPassage": "Reading passage for this group of questions",
   "player.chooseAnswer": "Choose an answer",
   "player.yourAnswer": "Your answer",
   "player.answeredCount": "{done}/{total} done",
@@ -211,6 +212,7 @@ export const en = {
 
   // --- Kết quả ------------------------------------------------------------
   "result.title": "Result",
+  "result.scorePending": "Marking your written answers…",
   "result.time": "Time",
   "result.submittedAfterTime": "Submitted after time.",
   "result.overtimeBody":
@@ -370,6 +372,14 @@ export const en = {
   "upload.deleteTitle": "Delete this exam?",
   "upload.rightClickHint": "Right-click to open actions",
   "upload.publishedNotice": "This exam is published. Edits are saved live and stay complete.",
+  "upload.sharedPassage": "Shared reading passage",
+  "upload.sharedPassages": "Shared reading passages",
+  "upload.sharedPassagesHint":
+    "Each passage is stored once and shown to students on every question that uses it. Editing it here updates all of them.",
+  "upload.passageLabel": "Passage {index}",
+  "upload.pointsLabel": "Marks for this question",
+  "upload.pointsSuffix": "marks",
+  "upload.pointsValue": "{points} marks",
   "upload.examDetails": "Exam details",
   "upload.fixedAfterPublish": "Subject and grade are fixed after publishing.",
   "upload.removeImage": "Remove image",
@@ -566,7 +576,12 @@ export const en = {
     "No questions were recognized in the question file. Re-upload a clearer file.",
   "ugcError.tooManyQuestions": "Too many questions — an exam can have at most {max}.",
   "ugcError.wrongChoiceCount":
-    "{q} — {count} choices were read; an MCQ needs exactly 4 (A–D). Edit below or re-upload.",
+    "{q} — {count} choices were read; an MCQ needs {min}–{max} options labelled from A in order. Edit below or re-upload.",
+  "ugcError.emptyPassage": "Passage {index} — the shared reading text is empty; add it below.",
+  "ugcError.passageTooLong":
+    "Passage {index} — the shared reading text is too long (max {max} characters).",
+  "ugcError.passageMissing":
+    "{q} — this question refers to a shared reading text that isn't in the exam. Re-upload, or detach it below.",
   "ugcError.emptyStem": "{q} — the question text is empty; add it below.",
   "ugcError.emptyChoice": "{q} — choice {choice} is empty.",
   "ugcError.answerCountMismatch":
@@ -579,8 +594,12 @@ export const en = {
   "ugcError.fileTooLarge": "That file is too large (max {mb} MB).",
   "ugcError.tooManyPages": "That file has too many pages (max {max}).",
   "ugcError.stemTooLong": "{q} — the question text is too long (max {max} characters).",
+  "ugcError.stemTooLongForSubject":
+    "{q} — the question text is too long (max {max} characters for the selected subject).",
   "ugcError.choiceTooLong": "{q} — choice {choice} is too long (max {max} characters).",
   "ugcError.essayAnswerTooLong": "{q} — the model answer is too long (max {max} characters).",
+  "ugcError.essayAnswerTooLongForSubject":
+    "{q} — the model answer is too long (max {max} characters for the selected subject).",
   "ugcError.wrongSubItemCount":
     "{q} — {count} sub-items were read; a true/false question needs {min}–{max} items (a–d). Edit below or re-upload.",
   "ugcError.shortAnswerTooLong": "{q} — the expected answer is too long (max {max} characters).",
@@ -590,6 +609,9 @@ export const en = {
     "Exam details — {field} is out of range ({range}). Correct it above.",
   "ugcError.metaExtractionFailed":
     "Exam details — we couldn't read the exam details from your file. Fill them in above.",
+  "ugcError.pointsMissing": "{q} — no points set for this question. Enter them below before publishing.",
+  "ugcError.pointsTotalMismatch":
+    "Exam points — the questions add up to {total}/{expected}. Adjust them so the exam totals {expected}.",
   "ugcError.durationRange": "{min}–{max} minutes",
   "ugcError.fieldTitle": "the title",
   "ugcError.fieldSubject": "the subject",

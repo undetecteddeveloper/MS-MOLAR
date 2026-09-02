@@ -12,9 +12,10 @@ import {
   parseSemester,
   titleFromFilename,
   validateMetaForPublish,
+  validatePointsForPublish,
 } from "../normalizeMeta";
 import { normalizeSubject } from "../subjects";
-import type { ExamMeta, ExtractedMeta } from "../types";
+import type { AssembledExam, AssembledQuestion, ExamMeta, ExtractedMeta, QuestionType } from "../types";
 
 const NULL_META: ExtractedMeta = {
   title: null,
@@ -256,5 +257,121 @@ describe("validateMetaForPublish — gate publish (Gate F contract)", () => {
     expect(err.message).toContain("Exam details");
     expect(err.message).toContain("subject");
     expect(err.questionNumber).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// B1 — gate biểu điểm. Hợp đồng: chặn ở PUBLISH, không ở assembly (đề chưa
+// nhập điểm ≠ đề bóc tách hỏng), và lỗi phải nói ra CON SỐ để tác giả khỏi
+// phải tự cộng lại cả đề.
+// ---------------------------------------------------------------------------
+
+const POINTS_META: ExamMeta = {
+  title: "Đề kiểm tra",
+  subject: "Math",
+  grade: 12,
+  durationMinutes: 90,
+};
+
+/** Đề 1 phần với biểu điểm cho sẵn — `null` = câu chưa có điểm. */
+function examWithPoints(
+  points: (number | null)[],
+  type: QuestionType = "mcq",
+  parts: { number: number; title: string }[] = []
+): AssembledExam {
+  const questions: AssembledQuestion[] = points.map((p, i) => ({
+    part: 1,
+    number: i + 1,
+    type,
+    stem: `Câu ${i + 1}`,
+    ...(type === "mcq" && {
+      choices: [
+        { id: "A" as const, text: "a" },
+        { id: "B" as const, text: "b" },
+      ],
+      correctAnswer: "A" as const,
+    }),
+    ...(type === "essay" && { essayAnswer: "đáp án mẫu" }),
+    ...(p !== null && { points: p }),
+    topic: POINTS_META.subject,
+  }));
+  return { meta: POINTS_META, parts, passages: [], questions };
+}
+
+describe("validatePointsForPublish — gate biểu điểm (B1)", () => {
+  it("tổng đúng 10 → không lỗi", () => {
+    expect(validatePointsForPublish(examWithPoints(Array(40).fill(0.25)))).toEqual([]);
+    expect(validatePointsForPublish(examWithPoints([2, 3, 5]))).toEqual([]);
+  });
+
+  it("tổng THIẾU → POINTS_TOTAL_MISMATCH, message in ra số hiện tại", () => {
+    const errors = validatePointsForPublish(examWithPoints([4, 4.5]));
+    expect(errors.map((e) => e.code)).toEqual(["POINTS_TOTAL_MISMATCH"]);
+    expect(errors[0].params.total).toBeCloseTo(8.5, 10);
+    expect(errors[0].params.expected).toBe(LIMITS.EXAM_TOTAL_POINTS);
+    // Con số phải nằm TRONG câu chữ — đây là cả lý do lỗi này tồn tại.
+    expect(errors[0].message).toContain("8.5");
+    expect(errors[0].message).toContain("10");
+    expect(errors[0].questionNumber).toBeNull();
+  });
+
+  it("tổng THỪA → cùng một lỗi, cùng con số thật", () => {
+    const errors = validatePointsForPublish(examWithPoints([6, 6]));
+    expect(errors.map((e) => e.code)).toEqual(["POINTS_TOTAL_MISMATCH"]);
+    expect(errors[0].message).toContain("12");
+  });
+
+  it("lệch TRONG epsilon → tha; lệch gấp đôi epsilon → chặn", () => {
+    expect(validatePointsForPublish(examWithPoints([5, 5.005]))).toEqual([]); // +0.005
+    expect(validatePointsForPublish(examWithPoints([5, 5.02])).map((e) => e.code)).toEqual([
+      "POINTS_TOTAL_MISMATCH",
+    ]); // +0.02
+  });
+
+  it("sai số dấu phẩy động của bậc 0.1 KHÔNG bị coi là lệch", () => {
+    // 17 câu 0.1đ + một câu 8.3đ cộng lại ra 10.000000000000002 — chính là ca
+    // mà một phép so `=== 10` sẽ chặn oan một biểu điểm hoàn toàn đúng. Đây là
+    // lý do tồn tại của POINTS_EPSILON, nên nó phải có test riêng.
+    const tenths = Array<number>(17).fill(0.1).concat([8.3]);
+    expect(tenths.reduce((a, b) => a + b, 0)).not.toBe(LIMITS.EXAM_TOTAL_POINTS);
+    expect(validatePointsForPublish(examWithPoints(tenths))).toEqual([]);
+  });
+
+  it("thiếu điểm MỘT câu → chỉ POINTS_MISSING của đúng câu đó, KHÔNG kèm lỗi tổng", () => {
+    // Cộng câu trống thành 0 rồi báo "7/10" là dựng ra một con số không có
+    // thật, và bắt tác giả sửa hai lỗi vốn chỉ là một.
+    const errors = validatePointsForPublish(examWithPoints([3, null, 4]));
+    expect(errors.map((e) => [e.code, e.questionNumber])).toEqual([["POINTS_MISSING", 2]]);
+    expect(errors[0].message).toContain("Câu 2");
+  });
+
+  it("points = 0 hoặc âm cũng là THIẾU (CHECK > 0 của cột, maxPointsOf cũng loại)", () => {
+    expect(validatePointsForPublish(examWithPoints([0, 10])).map((e) => e.code)).toEqual([
+      "POINTS_MISSING",
+    ]);
+    expect(validatePointsForPublish(examWithPoints([-1, 11])).map((e) => e.code)).toEqual([
+      "POINTS_MISSING",
+    ]);
+  });
+
+  it("đề chỉ toàn TỰ LUẬN vẫn qua cổng như mọi đề khác (3đ + 7đ)", () => {
+    // Đây là ca mà luật cũ `đúng/tổng×10` bỏ rơi hoàn toàn — biểu điểm là thứ
+    // DUY NHẤT nói được bài NLVH đáng 7 điểm còn đọc hiểu đáng 3.
+    expect(validatePointsForPublish(examWithPoints([3, 7], "essay"))).toEqual([]);
+    expect(
+      validatePointsForPublish(examWithPoints([3, 6], "essay")).map((e) => e.code)
+    ).toEqual(["POINTS_TOTAL_MISMATCH"]);
+  });
+
+  it("đề NHIỀU PHẦN: nhãn câu mang số phần, khớp anchor của ErrorPanel", () => {
+    const exam = examWithPoints([1, null], "mcq", [{ number: 1, title: "PHẦN I" }]);
+    const [err] = validatePointsForPublish(exam);
+    expect(err.code).toBe("POINTS_MISSING");
+    expect(err.partNumber).toBe(1);
+    expect(err.message).toContain("Phần 1 Câu 2");
+  });
+
+  it("đề RỖNG im lặng — NO_QUESTIONS_FOUND của validateAssembledExam nói hộ", () => {
+    expect(validatePointsForPublish({ ...examWithPoints([]), questions: [] })).toEqual([]);
   });
 });

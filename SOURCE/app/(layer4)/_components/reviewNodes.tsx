@@ -32,10 +32,16 @@
 // mọi chỗ đều dùng node của server. Xem ghi chú bất biến ở QuestionEditor.
 
 import { RichText } from "@/components/shared/RichText";
-import type { AssembledQuestion, ChoiceId, SubItemId } from "@/lib/ugc/types";
+import type {
+  AssembledQuestion,
+  ChoiceId,
+  ExtractedPassage,
+  SubItemId,
+} from "@/lib/ugc/types";
 import {
   answerPresentation,
   CHOICE_CLASS,
+  PASSAGE_CLASS,
   reviewNodeKey,
   STEM_CLASS,
   SUB_ITEM_CLASS,
@@ -59,8 +65,18 @@ function rendered(source: string, className: string, inline: boolean): RenderedT
  * "chưa có đáp án" là trạng thái QuestionEditor hiển thị bằng placeholder
  * riêng, khác hẳn "đáp án là chuỗi rỗng".
  */
-export function renderReviewNodes(questions: AssembledQuestion[]): ReviewNodes {
+export function renderReviewNodes(
+  questions: AssembledQuestion[],
+  passages: ExtractedPassage[] = [],
+): ReviewNodes {
   const table: ReviewNodes = {};
+
+  // Một lần cho mỗi ngữ liệu, dùng lại cho mọi câu trỏ vào nó — cùng khoản
+  // tiết kiệm như ở màn làm bài.
+  const passageById = new Map<string, { rendered: RenderedText; title?: string }>();
+  for (const p of passages) {
+    passageById.set(p.id, { rendered: rendered(p.text, PASSAGE_CLASS, false), title: p.title });
+  }
 
   for (const q of questions) {
     const choices: Partial<Record<ChoiceId, RenderedText>> = {};
@@ -82,6 +98,12 @@ export function renderReviewNodes(questions: AssembledQuestion[]): ReviewNodes {
     if (q.essayAnswer) {
       const { className, inline } = answerPresentation(q.type);
       entry.answer = rendered(q.essayAnswer, className, inline);
+    }
+
+    const passage = q.passageId ? passageById.get(q.passageId) : undefined;
+    if (passage) {
+      entry.passage = passage.rendered;
+      entry.passageTitle = passage.title;
     }
 
     table[reviewNodeKey(q.part, q.number)] = entry;

@@ -179,6 +179,7 @@ describe("validateAssembledExam — dùng lại cho publish gate (AC-013/016)", 
         durationMinutes: 45,
       },
       parts: [],
+    passages: [],
       questions: [
         {
           part: 1,
@@ -203,6 +204,7 @@ describe("validateAssembledExam — dùng lại cho publish gate (AC-013/016)", 
     const exam: AssembledExam = {
       meta: { title: "Đề", subject: "Toán", grade: 10, durationMinutes: 45 },
       parts: [],
+    passages: [],
       questions: [
         {
           part: 1,

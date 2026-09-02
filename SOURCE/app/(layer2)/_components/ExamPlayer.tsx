@@ -273,6 +273,10 @@ export function ExamPlayer({
               essayGradingEnabled={essayGradingEnabled}
               nodes={questionNodes[current]}
               selectedAnswer={answers[question.id]}
+              /* CẢ bảng đáp án, không chỉ câu hiện tại: chỗ trống của bài đọc
+                 dùng chung thuộc về nhiều câu khác nhau nhưng hiện cùng lúc
+                 trên màn của mỗi câu trong nhóm. Xem `QuestionRendererProps`. */
+              answers={answers}
               onSelectAnswer={(value) => {
                 selectAnswer(question.id, value);
                 // Tự chuyển câu CHỈ với mcq (chọn 1 lần là xong); true_false/

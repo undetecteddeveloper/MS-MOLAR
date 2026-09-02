@@ -25,6 +25,7 @@ import type {
   BoundingBox,
   ChoiceId,
   ExtractedPart,
+  ExtractedPassage,
   ExtractedQuestion,
   QuestionType,
   Result,
@@ -37,6 +38,7 @@ import { recordUsage } from "./quotaTracker";
 /** Output của extractor #1 — parts (rỗng nếu đề không chia phần) + câu hỏi. */
 export type ExtractedQuestionFile = {
   parts: ExtractedPart[];
+  passages: ExtractedPassage[];
   questions: ExtractedQuestion[];
 };
 
@@ -57,6 +59,19 @@ const QUESTIONS_SCHEMA = {
         additionalProperties: false,
       },
     },
+    passages: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          title: { anyOf: [{ type: "string" }, { type: "null" }] },
+          text: { type: "string" },
+        },
+        required: ["id", "title", "text"],
+        additionalProperties: false,
+      },
+    },
     questions: {
       type: "array",
       items: {
@@ -64,6 +79,8 @@ const QUESTIONS_SCHEMA = {
         properties: {
           part: { type: "integer" },
           number: { type: "integer" },
+          passageId: { anyOf: [{ type: "string" }, { type: "null" }] },
+          points: { anyOf: [{ type: "number" }, { type: "null" }] },
           type: {
             type: "string",
             enum: ["mcq", "essay", "true_false", "short_answer"],
@@ -128,7 +145,7 @@ const QUESTIONS_SCHEMA = {
       },
     },
   },
-  required: ["parts", "questions"],
+  required: ["parts", "passages", "questions"],
   additionalProperties: false,
 } as const;
 
@@ -137,16 +154,33 @@ const PROMPT = `Read the attached exam question file (Vietnamese secondary-schoo
 Structure rules:
 - Vietnamese national-format exams (from 2025) have PARTS with headers like "PHẦN I.", "PHẦN II.", "PHẦN III." — question numbers RESTART from 1 in each part. If the file has part headers, return each part's number and its printed title in "parts", and set each question's "part" to the part it belongs to, with "number" as printed WITHIN that part. If the file has no part headers, return "parts": [] and part = 1 for every question.
 - Classify each question:
-  - "mcq": multiple choice with exactly 4 options A–D (typical of PHẦN I).
-  - "true_false": a question with sub-items a) b) c) d) that are each answered Đúng/Sai (typical of PHẦN II). Transcribe the sub-items into "subItems" (choices = null).
+  - "mcq": multiple choice. Usually 4 options A–D (typical of PHẦN I), but transcribe however many are actually printed — ${LIMITS.MIN_CHOICES} to ${LIMITS.MAX_CHOICES}. An English-paper item offering only "True / False / Not Given" is an "mcq" with 3 options. Label the options A, B, C, D in printed order with no gaps.
+  - "true_false": a block whose sub-items are each answered Đúng/Sai independently (typical of PHẦN II, which prints ${LIMITS.MAX_SUB_ITEMS} sub-items a)–d)). Transcribe the sub-items into "subItems" (choices = null). IMPORTANT: the statements to be judged ALWAYS go in "subItems", never in the stem — the stem holds only the shared lead-in, and may be an empty string if there is none. An English-paper item that asks to judge ONE statement as True or False is still "true_false", with exactly ONE sub-item "a"; do NOT put that statement in the stem and leave subItems empty.
+    A "true_false" question with an EMPTY subItems array is always wrong and makes the whole exam unusable — the student is shown nothing to answer. Worked example, for an item printed as "Listen to part of a news report... Decide whether the following statement is True or False. / The UN report says that harmful effects of greenhouse gases can be eliminated.":
+      CORRECT -> stem: "Listen to part of a news report... Decide whether the following statement is True or False.", subItems: [{"id": "a", "text": "The UN report says that harmful effects of greenhouse gases can be eliminated."}]
+      WRONG   -> stem: the instruction AND the statement together, subItems: []
   - "short_answer": answered by writing a short value/number (typical of PHẦN III). choices = null, subItems = null.
   - "essay": free-form written answer. choices = null, subItems = null.
+
+Marks per question:
+- Vietnamese exams often print what a question is worth, e.g. "(2,0 điểm)", "Câu 1 (0,5 điểm)", or a part header like "PHẦN II (3,0 điểm)" covering several questions.
+- Set "points" to that number when it is PRINTED for that question. Use a dot as the decimal separator: "2,0 điểm" -> 2.0.
+- If a mark is printed for a whole PART and not per question, divide it evenly across that part's questions ONLY when the part header states no other split; otherwise leave null.
+- If no mark is printed anywhere for a question, set points = null. NEVER guess or invent a mark — a wrong mark changes a student's score.
+
+Shared reading texts (IMPORTANT — this is where most transcription waste comes from):
+- Exams in English and Literature often print ONE reading passage / extract that a RUN OF QUESTIONS all refer to ("Read the following passage and mark the letter... Questions 34 to 40").
+- Transcribe that text ONCE into "passages" with a short id you choose ("p1", "p2", ...), and set "passageId" on every question that uses it. Put the printed lead-in line in "title" (or null).
+- NEVER copy the passage into the stem of each question. The stem holds ONLY that question's own text. Repeating a passage across questions is the single most expensive mistake you can make here.
+- A question that stands on its own has passageId = null. If the exam has no shared reading text at all, return "passages": [].
+- GAP-FILL passages (English papers: "indicate the correct word that best fits each of the numbered blanks from 34 to 40") print the blanks INSIDE the passage. Transcribe every blank as the question number in round brackets followed by a space and four underscores, exactly: "(34) ____". Keep the blanks in the passage text and in reading order; the stem of such a question stays empty or holds only its own lead-in. The app fills these blanks in with the student's chosen option while they work, so a blank written any other way silently stops working.
+- At most ${LIMITS.MAX_PASSAGES} passages.
 
 Transcription rules:
 - Transcribe the stem verbatim, including math as LaTeX ($...$) where the source shows formulas. Do NOT include the "Câu N" prefix, the choices, or the sub-items in the stem.
 - Only $...$ / $$...$$ math is rendered. For a data table in the stem, write a GitHub-flavoured markdown table (a "| cell | cell |" row per line, a "| --- | --- |" separator after the header). NEVER emit a LaTeX environment such as \\begin{tabular} outside math — it renders as raw source text.
-- For mcq, transcribe exactly the choices printed for options A, B, C, D.
-- For true_false, transcribe each sub-item a)–d) text into subItems.
+- For mcq, transcribe exactly the options printed, in printed order, labelled from A with no gaps.
+- For true_false, transcribe each judged statement into subItems, labelling them from "a" in printed order.
 - NEVER mark, guess, or indicate a correct answer anywhere. Transcribe only.
 - At most ${LIMITS.MAX_QUESTIONS} questions total.
 
@@ -180,11 +214,65 @@ function parseBox(raw: unknown): BoundingBox | null {
   return { page: b.page, box2d: [ymin, xmin, ymax, xmax] };
 }
 
+/**
+ * Vá câu Đúng/Sai mà model để CÂU PHÁN XÉT trong thân câu thay vì trong ý a–d.
+ *
+ * Prompt đã cấm thẳng điều này ("the statements ALWAYS go in subItems, never in
+ * the stem") và model vẫn làm — đo trên prod 2026-09-02: đề "ĐỀ THI HỌC KÌ 2 –
+ * ĐỀ SỐ 1" có 5 câu true_false với `subItems` rỗng và câu phán xét nằm trong
+ * `stem`. Hậu quả không phải một lỗi nhỏ: câu không có ý nào thì màn làm bài
+ * KHÔNG render được gì để bấm, `validateAssembledExam` bắt `WRONG_SUB_ITEM_COUNT`
+ * và cả ĐỀ không đăng được. Hai đề Tiếng Anh duy nhất trong prod đều đang ở
+ * trạng thái `failed` vì đúng chuyện này.
+ *
+ * Hình dạng model thực sự trả về tách được sạch, vì nó luôn để lời dẫn và câu
+ * phán xét ở HAI ĐOẠN:
+ *
+ *   "Listen to part of a news report ... Decide whether the following
+ *    statement is True or False.
+ *                                        <- dòng trống
+ *    The UN report says that harmful effects of greenhouse gases can be
+ *    eliminated."
+ *
+ * Nên phép vá là: đoạn CUỐI thành ý "a", phần còn lại ở lại làm lời dẫn.
+ *
+ * CHỈ vá khi thân câu có từ hai đoạn trở lên. Thân câu một đoạn thì không có
+ * cách nào tách lời dẫn khỏi câu phán xét, và đẩy cả thân câu xuống ý "a" sẽ để
+ * lại một `stem` rỗng — thứ `validateAssembledExam` bắt là `EMPTY_STEM`, tức
+ * đổi một lỗi lấy một lỗi khác. Ca đó cứ để lỗi nổi lên ở màn duyệt, nơi tác
+ * giả sửa được bằng tay.
+ */
+export function repairTrueFalseStem(
+  type: QuestionType,
+  stem: string,
+  subItems: { id: SubItemId; text: string }[] | undefined
+): { stem: string; subItems: { id: SubItemId; text: string }[] | undefined } {
+  if (type !== "true_false") return { stem, subItems };
+  if (subItems && subItems.length > 0) return { stem, subItems };
+
+  const paragraphs = stem
+    .split(/\n[ \t]*\n+/)
+    .map((p) => p.trim())
+    .filter((p) => p !== "");
+  if (paragraphs.length < 2) return { stem, subItems };
+
+  const statement = paragraphs[paragraphs.length - 1];
+  const leadIn = paragraphs.slice(0, -1).join("\n\n");
+  if (statement.length > LIMITS.MAX_CHOICE) return { stem, subItems };
+
+  return { stem: leadIn, subItems: [{ id: "a", text: statement }] };
+}
+
 /** Validate + map JSON đã parse → parts + questions; null nếu sai contract. */
 export function mapQuestionsPayload(payload: unknown): ExtractedQuestionFile | null {
   if (typeof payload !== "object" || payload === null) return null;
-  const obj = payload as { parts?: unknown; questions?: unknown };
+  const obj = payload as { parts?: unknown; passages?: unknown; questions?: unknown };
   if (!Array.isArray(obj.questions) || !Array.isArray(obj.parts)) return null;
+  // `passages` là bổ sung A1: chấp nhận VẮNG (undefined) → coi như đề không có
+  // ngữ liệu. Bắt buộc nó sẽ làm mọi fixture/response cũ hỏng ngay, mà "không
+  // có bài đọc chung" là trạng thái đúng của 8/10 môn.
+  const rawPassages = obj.passages === undefined ? [] : obj.passages;
+  if (!Array.isArray(rawPassages)) return null;
 
   const parts: ExtractedPart[] = [];
   for (const raw of obj.parts) {
@@ -195,6 +283,24 @@ export function mapQuestionsPayload(payload: unknown): ExtractedQuestionFile | n
     parts.push({ number: p.number, title: p.title });
   }
   if (parts.length > LIMITS.MAX_PARTS) return null;
+
+  const passages: ExtractedPassage[] = [];
+  const seenPassageIds = new Set<string>();
+  for (const raw of rawPassages) {
+    if (typeof raw !== "object" || raw === null) return null;
+    const pg = raw as Record<string, unknown>;
+    if (typeof pg.id !== "string" || pg.id === "" || typeof pg.text !== "string") return null;
+    // Khoá trùng = mọi câu trỏ vào khoá đó nhận một đoạn văn tuỳ tiện. Từ chối
+    // nguyên payload thay vì chọn bừa một bản.
+    if (seenPassageIds.has(pg.id)) return null;
+    seenPassageIds.add(pg.id);
+    passages.push({
+      id: pg.id,
+      ...(typeof pg.title === "string" && pg.title !== "" && { title: pg.title }),
+      text: pg.text,
+    });
+  }
+  if (passages.length > LIMITS.MAX_PASSAGES) return null;
 
   const out: ExtractedQuestion[] = [];
   for (const raw of obj.questions) {
@@ -233,6 +339,20 @@ export function mapQuestionsPayload(payload: unknown): ExtractedQuestionFile | n
       }
     }
 
+    // Khoá trỏ vào ngữ liệu KHÔNG được validate tham chiếu ở đây — đó là việc
+    // của validateAssembledExam (PASSAGE_MISSING), nơi tác giả sửa được. Ở
+    // tầng này chỉ ép KIỂU; từ chối nguyên payload vì một khoá mồ côi sẽ vứt
+    // cả đề vì một lỗi vặt.
+    const passageId = typeof q.passageId === "string" && q.passageId !== "" ? q.passageId : undefined;
+
+    // B1 — chỉ nhận số DƯƠNG HỮU HẠN. Model được dặn trả null khi đề không in
+    // điểm, nhưng 0/âm/NaN vẫn lọt được qua JSON schema `type: number`, và một
+    // câu 0 điểm sẽ biến mất khỏi mẫu số trong im lặng.
+    const points =
+      typeof q.points === "number" && Number.isFinite(q.points) && q.points > 0
+        ? q.points
+        : undefined;
+
     let imageBox: BoundingBox | undefined;
     if (q.imageBox != null) {
       const parsed = parseBox(q.imageBox);
@@ -240,17 +360,21 @@ export function mapQuestionsPayload(payload: unknown): ExtractedQuestionFile | n
       imageBox = parsed;
     }
 
+    const repaired = repairTrueFalseStem(q.type, q.stem, subItems);
+
     out.push({
       part: q.part,
       number: q.number,
       type: q.type,
-      stem: q.stem,
+      stem: repaired.stem,
       choices,
-      subItems,
+      subItems: repaired.subItems,
+      passageId,
+      points,
       imageBox,
     });
   }
-  return { parts, questions: out };
+  return { parts, passages, questions: out };
 }
 
 /** File đề → parts + ExtractedQuestion[] (một call Gemini multimodal, server-only). */

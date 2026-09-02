@@ -4,13 +4,14 @@
 //   mỗi error code trả literal code + questionNumber; boundary tại limit.
 
 import { describe, expect, it } from "vitest";
-import { assembleExam } from "../assembleExam";
+import { assembleExam, assembleExamLenient } from "../assembleExam";
 import { LIMITS } from "../limits";
 import type {
   ChoiceId,
   ExamMeta,
   ExtractedAnswer,
   ExtractedQuestion,
+  SubItemId,
 } from "../types";
 
 const META: ExamMeta = {
@@ -117,8 +118,35 @@ describe("assembleExam — error codes (literal code + questionNumber)", () => {
     expect(errorTuples(result)).toEqual([["TOO_MANY_QUESTIONS", null]]);
   });
 
-  it("WRONG_CHOICE_COUNT khi mcq không có đúng 4 lựa chọn A–D", () => {
-    const bad = mcq(2, { choices: mcq(2).choices!.slice(0, 3) });
+  it("A3: mcq 2–4 lựa chọn nhãn liền từ A đều hợp lệ (True/False/Not Given)", () => {
+    for (const n of [2, 3, 4]) {
+      const q = mcq(1, { choices: mcq(1).choices!.slice(0, n) });
+      const result = assembleExam([q], [mcqAnswer(1, "A")], new Map(), META);
+      expect(result.ok).toBe(true);
+    }
+  });
+
+  it("WRONG_CHOICE_COUNT khi ít hơn MIN_CHOICES lựa chọn", () => {
+    const bad = mcq(2, { choices: mcq(2).choices!.slice(0, 1) });
+    const result = assembleExam(
+      [mcq(1), bad],
+      [mcqAnswer(1, "A"), mcqAnswer(2, "A")],
+      new Map(),
+      META,
+    );
+    expect(errorTuples(result)).toContainEqual(["WRONG_CHOICE_COUNT", 2]);
+  });
+
+  it("WRONG_CHOICE_COUNT khi nhãn NHẢY CÓC (A, B, D) — dấu hiệu AI đọc sót", () => {
+    // Đúng số lượng nhưng không phải tiền tố liền. Nếu lọt, màn làm bài sẽ hiện
+    // "A B D" trước mặt học sinh và không tầng nào bắt lại được.
+    const bad = mcq(2, {
+      choices: [
+        { id: "A", text: "1" },
+        { id: "B", text: "2" },
+        { id: "D", text: "4" },
+      ],
+    });
     const result = assembleExam(
       [mcq(1), bad],
       [mcqAnswer(1, "A"), mcqAnswer(2, "A")],
@@ -413,8 +441,24 @@ describe("v2.1 — validate true_false (AC-031)", () => {
     });
   });
 
-  it("WRONG_SUB_ITEM_COUNT khi ít hơn MIN_SUB_ITEMS ý", () => {
-    const bad = { ...tf(2, 1), subItems: tf(2, 1).subItems!.slice(0, 1) };
+  it("A2: TF MỘT ý duy nhất là hợp lệ (khối True/False đơn của đề Tiếng Anh)", () => {
+    const single = { ...tf(2, 1), subItems: tf(2, 1).subItems!.slice(0, 1) };
+    const result = assembleExam(
+      [single],
+      [tfAnswer([{ id: "a", value: true }])],
+      new Map(),
+      META,
+      PARTS_2025,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.questions[0].subAnswers).toEqual({ a: true });
+  });
+
+  it("WRONG_SUB_ITEM_COUNT khi KHÔNG có ý nào — đúng ca AI nhét mệnh đề vào stem", () => {
+    // Trần dưới nới xuống 1 chứ không xuống 0: subItems rỗng nghĩa là mệnh đề
+    // cần chấm đang nằm ở stem, và ở đó thì không có gì để chấm Đ/S.
+    const bad = { ...tf(2, 1), subItems: [] };
     const result = assembleExam([bad], [tfAnswer([...fullValues])], new Map(), META, PARTS_2025);
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -516,5 +560,302 @@ describe("v2.1 — validate short_answer (AC-032)", () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.errors.some((e) => e.code === "ANSWER_MISSING")).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// A6/A7 — trần độ dài NỚI THEO MÔN.
+//
+// Bộ này canh đúng thứ dễ trôi nhất: bốn nhánh của maxStemFor phải khớp với
+// những gì validateAssembledExam thật sự áp, VÀ con số trong lỗi phải là con số
+// đã chặn — chứ không phải hằng mặc định. Một lỗi nói "tối đa 2000" cho đề Anh
+// (trần thật 8000) sẽ khiến tác giả cắt bài đọc xuống 2000 ký tự một cách vô
+// ích, nên `max` trong params được assert đích danh chứ không chỉ assert code.
+// ---------------------------------------------------------------------------
+
+/** META của một môn bất kỳ, giữ nguyên các field còn lại. */
+function metaFor(subject: string): ExamMeta {
+  return { ...META, subject };
+}
+
+function stemCase(subject: string, length: number) {
+  return assembleExam(
+    [mcq(1, { stem: "x".repeat(length) })],
+    [mcqAnswer(1, "A")],
+    new Map(),
+    metaFor(subject),
+  );
+}
+
+describe("A7 — trần stem theo môn", () => {
+  it("môn KHÔNG có override giữ nguyên trần mặc định (không hồi quy đề cũ)", () => {
+    expect(stemCase("Math", LIMITS.MAX_STEM).ok).toBe(true);
+    expect(errorTuples(stemCase("Math", LIMITS.MAX_STEM + 1))).toContainEqual([
+      "STEM_TOO_LONG",
+      1,
+    ]);
+  });
+
+  it("English nới tới MAX_STEM_BY_SUBJECT, biên +1 vẫn chặn", () => {
+    const max = LIMITS.MAX_STEM_BY_SUBJECT.English;
+    // Chính con số từng làm hỏng đề Anh 40 câu: dài hơn trần mặc định NHƯNG
+    // nằm trong trần của môn ⇒ phải sạch lỗi, không phải chỉ "ít lỗi hơn".
+    expect(stemCase("English", LIMITS.MAX_STEM + 1).ok).toBe(true);
+    expect(stemCase("English", max).ok).toBe(true);
+    expect(errorTuples(stemCase("English", max + 1))).toContainEqual(["STEM_TOO_LONG", 1]);
+  });
+
+  it("nhận cả tên môn THÔ chưa canonical — row cũ không bị bỏ rơi", () => {
+    // exams.subject có row mang chuỗi thô (TD-016). Tra thẳng bảng override sẽ
+    // trả trần mặc định cho đúng những đề cần nới, nên phải qua normalizeSubject.
+    expect(stemCase("Tiếng Anh", LIMITS.MAX_STEM + 1).ok).toBe(true);
+    expect(stemCase("Ngữ văn", LIMITS.MAX_STEM + 1).ok).toBe(true);
+  });
+
+  it("môn CHƯA XÁC ĐỊNH (sentinel \"\") dùng trần RỘNG NHẤT", () => {
+    // Chế độ Automatic khi AI không đọc ra môn (ADR-0007). Chặt tay ở đây sinh
+    // ra lỗi mà tác giả không sửa được bằng cách sửa câu. Không lọt gì vào
+    // catalog: cổng publish vẫn chặn cứng subject === "".
+    const widest = Math.max(
+      LIMITS.MAX_STEM,
+      ...Object.values(LIMITS.MAX_STEM_BY_SUBJECT),
+    );
+    expect(stemCase("", widest).ok).toBe(true);
+    expect(errorTuples(stemCase("", widest + 1))).toContainEqual(["STEM_TOO_LONG", 1]);
+  });
+
+  it("môn không tra được (chuỗi lạ, không rỗng) dùng trần MẶC ĐỊNH", () => {
+    // Khác hẳn nhánh sentinel: tác giả đã khai MỘT thứ gì đó, ta không có cớ nới.
+    expect(errorTuples(stemCase("Hán Nôm", LIMITS.MAX_STEM + 1))).toContainEqual([
+      "STEM_TOO_LONG",
+      1,
+    ]);
+  });
+
+  it("lỗi mang đúng trần ĐÃ ÁP, không phải hằng mặc định", () => {
+    const result = stemCase("English", LIMITS.MAX_STEM_BY_SUBJECT.English + 1);
+    if (result.ok) throw new Error("expected errors");
+    const err = result.errors.find((e) => e.code === "STEM_TOO_LONG");
+    expect(err?.params.max).toBe(LIMITS.MAX_STEM_BY_SUBJECT.English);
+    expect(err?.params.subjectScoped).toBe(true);
+    expect(err?.message).toContain(String(LIMITS.MAX_STEM_BY_SUBJECT.English));
+  });
+
+  it("môn chưa xác định KHÔNG nhắc tới \"môn đã chọn\"", () => {
+    const widest = Math.max(
+      LIMITS.MAX_STEM,
+      ...Object.values(LIMITS.MAX_STEM_BY_SUBJECT),
+    );
+    const result = stemCase("", widest + 1);
+    if (result.ok) throw new Error("expected errors");
+    const err = result.errors.find((e) => e.code === "STEM_TOO_LONG");
+    expect(err?.params.subjectScoped).toBe(false);
+  });
+});
+
+describe("A6 — trần đáp án mẫu theo môn", () => {
+  const essay: ExtractedQuestion = {
+    part: 1,
+    number: 1,
+    type: "essay",
+    stem: "Phân tích nhân vật.",
+  };
+
+  function essayCase(subject: string, length: number) {
+    return assembleExam(
+      [essay],
+      [{ part: 1, number: 1, type: "essay", text: "z".repeat(length) }],
+      new Map(),
+      metaFor(subject),
+    );
+  }
+
+  it("Literature nới tới MAX_ESSAY_ANSWER_BY_SUBJECT, biên +1 vẫn chặn", () => {
+    const max = LIMITS.MAX_ESSAY_ANSWER_BY_SUBJECT.Literature;
+    expect(essayCase("Literature", max).ok).toBe(true);
+    expect(errorTuples(essayCase("Literature", max + 1))).toContainEqual([
+      "ESSAY_ANSWER_TOO_LONG",
+      1,
+    ]);
+  });
+
+  it("English KHÔNG được nới ở đây — đề Anh dài ở stem, không ở đáp án mẫu", () => {
+    expect(errorTuples(essayCase("English", LIMITS.MAX_ESSAY_ANSWER + 1))).toContainEqual([
+      "ESSAY_ANSWER_TOO_LONG",
+      1,
+    ]);
+  });
+
+  it("môn không override giữ nguyên trần mặc định", () => {
+    expect(essayCase("Math", LIMITS.MAX_ESSAY_ANSWER).ok).toBe(true);
+    expect(errorTuples(essayCase("Math", LIMITS.MAX_ESSAY_ANSWER + 1))).toContainEqual([
+      "ESSAY_ANSWER_TOO_LONG",
+      1,
+    ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// A1 — NGỮ LIỆU DÙNG CHUNG.
+//
+// Điều bộ này thật sự canh: bài đọc đi qua assembler MỘT bản và ở nguyên MỘT
+// bản, còn khoá tham chiếu thì không bao giờ mồ côi trong im lặng. Trước A1,
+// đúng kịch bản dưới đây (7 câu một bài đọc) tạo ra 7 bản chép trong stem và 7
+// lỗi STEM_TOO_LONG.
+// ---------------------------------------------------------------------------
+
+describe("A1 — ngữ liệu dùng chung", () => {
+  const READING = "Reading passage. ".repeat(200); // ~3400 ký tự, vượt MAX_STEM
+  const PASSAGES = [{ id: "p1", title: "Read the following passage.", text: READING }];
+
+  /** 7 câu liên tiếp cùng trỏ vào một bài đọc — đúng hình dạng đề đã gây lỗi. */
+  function readingGroup() {
+    return [34, 35, 36, 37, 38, 39, 40].map((n) => mcq(n, { passageId: "p1" }));
+  }
+
+  it("bài đọc dài hơn MAX_STEM vẫn sạch lỗi khi nằm ở passages, không ở stem", () => {
+    const questions = readingGroup();
+    const answers = questions.map((q) => mcqAnswer(q.number, "A"));
+    const result = assembleExam(questions, answers, new Map(), META, [], PASSAGES);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // MỘT bản duy nhất, dù 7 câu cùng dùng.
+    expect(result.value.passages).toHaveLength(1);
+    expect(result.value.passages[0].text).toBe(READING);
+    // Không câu nào mang bản chép của đoạn văn trong stem.
+    for (const q of result.value.questions) {
+      expect(q.stem).not.toContain(READING);
+      expect(q.passageId).toBe("p1");
+    }
+  });
+
+  it("PASSAGE_MISSING khi câu trỏ vào ngữ liệu không có trong đề", () => {
+    const q = mcq(1, { passageId: "khong-ton-tai" });
+    const result = assembleExam([q], [mcqAnswer(1, "A")], new Map(), META, [], PASSAGES);
+    expect(errorTuples(result)).toContainEqual(["PASSAGE_MISSING", 1]);
+  });
+
+  it("câu KHÔNG khai passageId thì không bị PASSAGE_MISSING", () => {
+    // Đại đa số câu của 8 môn còn lại đi đường này — nó phải hoàn toàn im lặng.
+    const result = assembleExam([mcq(1)], [mcqAnswer(1, "A")], new Map(), META, [], PASSAGES);
+    expect(result.ok).toBe(true);
+  });
+
+  it("EMPTY_PASSAGE và PASSAGE_TOO_LONG bắt theo VỊ TRÍ ngữ liệu, không theo số câu", () => {
+    const empty = assembleExam([mcq(1)], [mcqAnswer(1, "A")], new Map(), META, [], [
+      { id: "p1", text: "   " },
+    ]);
+    if (empty.ok) throw new Error("expected errors");
+    const e1 = empty.errors.find((e) => e.code === "EMPTY_PASSAGE");
+    expect(e1?.questionNumber).toBeNull();
+    expect(e1?.params.passageIndex).toBe(1);
+
+    const long = assembleExam([mcq(1)], [mcqAnswer(1, "A")], new Map(), META, [], [
+      { id: "p1", text: "x" },
+      { id: "p2", text: "y".repeat(LIMITS.MAX_PASSAGE + 1) },
+    ]);
+    if (long.ok) throw new Error("expected errors");
+    const e2 = long.errors.find((e) => e.code === "PASSAGE_TOO_LONG");
+    expect(e2?.params.passageIndex).toBe(2);
+    expect(e2?.params.max).toBe(LIMITS.MAX_PASSAGE);
+  });
+
+  it("đề không có ngữ liệu → passages rỗng, không lỗi (mặc định của 8/10 môn)", () => {
+    const result = assembleExam([mcq(1)], [mcqAnswer(1, "A")], new Map(), META);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.passages).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Đáp án Đúng/Sai viết bằng chữ cái TIẾNG ANH (2026-09-02).
+//
+// Bảng đáp án đề Tiếng Anh ghi "Câu 21: T" / "3. F". Extractor không có hình
+// dạng `true_false` nào để xếp chúng vào nên hạ xuống `short_answer`, và nhánh
+// "đáp án phải đúng loại" của join coi đó như KHÔNG CÓ đáp án — `subAnswers`
+// rỗng, `isScored()` trả false, câu hiện "chưa chấm tự động" vĩnh viễn.
+// ---------------------------------------------------------------------------
+describe("assembleExam — đáp án Đ/S viết bằng T/F (đề Tiếng Anh)", () => {
+  function tf(number: number, ids: SubItemId[]): ExtractedQuestion {
+    return {
+      part: 1,
+      number,
+      type: "true_false",
+      stem: `Câu ${number}`,
+      subItems: ids.map((id) => ({ id, text: `ý ${id}` })),
+    };
+  }
+
+  // Dùng bản LENIENT: các ca "KHÔNG vớt" bên dưới cố ý để câu KHÔNG có đáp án,
+  // nên bản strict trả `ANSWER_MISSING` và không cho nhìn vào `subAnswers` —
+  // đúng thứ cần khẳng định là rỗng. Lenient dựng đề trong mọi ca nên cùng một
+  // phép đo chạy được cho cả nhánh vớt được lẫn nhánh từ chối.
+  function subAnswersOf(
+    questions: ExtractedQuestion[],
+    answers: ExtractedAnswer[],
+    number: number
+  ) {
+    const { exam } = assembleExamLenient(questions, answers, new Map(), META);
+    return exam.questions.find((q) => q.number === number)?.subAnswers;
+  }
+
+  it('"T" cho câu một ý → chấm được (đây chính là ca đã hỏng)', () => {
+    const answers: ExtractedAnswer[] = [
+      { part: 1, number: 1, type: "short_answer", value: "T" },
+    ];
+    expect(subAnswersOf([tf(1, ["a"])], answers, 1)).toEqual({ a: true });
+  });
+
+  it('"F" cho câu một ý', () => {
+    const answers: ExtractedAnswer[] = [
+      { part: 1, number: 1, type: "short_answer", value: "F" },
+    ];
+    expect(subAnswersOf([tf(1, ["a"])], answers, 1)).toEqual({ a: false });
+  });
+
+  it('"TFTT" cho câu bốn ý', () => {
+    const answers: ExtractedAnswer[] = [
+      { part: 1, number: 1, type: "short_answer", value: "TFTT" },
+    ];
+    expect(subAnswersOf([tf(1, ["a", "b", "c", "d"])], answers, 1)).toEqual({
+      a: true,
+      b: false,
+      c: true,
+      d: true,
+    });
+  });
+
+  it("đáp án ĐÚNG DẠNG vẫn được ưu tiên, không đi qua đường vớt", () => {
+    const answers: ExtractedAnswer[] = [
+      {
+        part: 1,
+        number: 1,
+        type: "true_false",
+        values: [{ id: "a", value: false }],
+      },
+    ];
+    expect(subAnswersOf([tf(1, ["a"])], answers, 1)).toEqual({ a: false });
+  });
+
+  it("KHÔNG vớt khi số ý đọc được ít hơn số ý của câu", () => {
+    // Mấu chốt: `countTrueFalseCorrect()` lấy mẫu số từ `Object.keys(subAnswers)`.
+    // Nhận một dòng "T" cho câu bốn ý sẽ chấm cả câu trên đúng ý a — học sinh
+    // đúng 1/4 được trọn điểm. Thà để "chưa chấm".
+    const answers: ExtractedAnswer[] = [
+      { part: 1, number: 1, type: "short_answer", value: "T" },
+    ];
+    expect(subAnswersOf([tf(1, ["a", "b", "c", "d"])], answers, 1)).toBeUndefined();
+  });
+
+  it("KHÔNG vớt từ đáp án dạng mcq — chữ cái A–D là dấu hiệu khớp nhầm câu", () => {
+    expect(subAnswersOf([tf(1, ["a"])], [mcqAnswer(1, "A")], 1)).toBeUndefined();
+  });
+
+  it("KHÔNG vớt từ giá trị không phải phán quyết", () => {
+    const answers: ExtractedAnswer[] = [
+      { part: 1, number: 1, type: "short_answer", value: "1260" },
+    ];
+    expect(subAnswersOf([tf(1, ["a"])], answers, 1)).toBeUndefined();
   });
 });

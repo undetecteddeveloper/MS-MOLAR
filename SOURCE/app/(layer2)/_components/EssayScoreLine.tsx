@@ -23,6 +23,15 @@
 // thi toàn tự luận hiện `total_score = 0.00`). `—` nói "chưa có gì để cộng",
 // không nói "cộng vào thành không".
 //
+// ═══ HAI VẾ ĐIỂM Ở ĐÂY LÀ THANG CỦA ĐỀ, KHÔNG PHẢI THANG BAND (B1/AC-059) ═══
+//
+// Trước B1 dòng này in tổng BAND trên `số câu đã chấm × 1`. Với đề cân bằng thì
+// đúng; với đề có trọng số thì nó nói sai — bài NLVH 5 điểm band 0.25 hiện
+// "0.25 / 1 điểm" trong khi thật sự đóng góp 1.25 điểm vào ô lớn ngay bên trên.
+// Hai con số cạnh nhau trên cùng một trang mà không đối chiếu được với nhau là
+// tệ hơn một con số thiếu. Nay `summariseEssays()` cộng chính `earnedPoints`/
+// `maxPoints` mà `total_score` được tính từ, nên hai chỗ không thể lệch.
+//
 // ═══ `tabular-nums` LÀ CHỨC NĂNG, KHÔNG PHẢI THẨM MỸ ═══
 //
 // Mẫu số LỚN LÊN TRONG LÚC HỌC SINH ĐANG NHÌN (W7): mỗi band đáp xuống làm
@@ -60,7 +69,10 @@ export async function EssayScoreLine({
   const hasScore = gradedCount > 0;
 
   const score = hasScore
-    ? t("result.essay.points", { earned: formatPoints(earned), max: String(max) })
+    // `formatPoints` cho CẢ HAI vế: từ B1 mẫu số là điểm thật của đề (7, 5.5…),
+    // không còn là một phép đếm số câu, nên `String(max)` sẽ in ra "5.5" thô
+    // hoặc "7" tuỳ may rủi của dấu phẩy động.
+    ? t("result.essay.points", { earned: formatPoints(earned), max: formatPoints(max) })
     : "—";
 
   // Thứ tự nhánh có ý nghĩa: `pending` THẮNG mọi thứ khác, vì khi còn câu đang

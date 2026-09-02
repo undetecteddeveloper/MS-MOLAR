@@ -25,7 +25,7 @@ import { useState, type ReactNode } from "react";
 import { QuestionFigure } from "@/components/shared/QuestionFigure";
 import { useT } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n/translate";
-import { LIMITS } from "@/lib/ugc/limits";
+import { LIMITS, maxEssayAnswerFor, maxStemFor } from "@/lib/ugc/limits";
 import type { AssembledQuestion, ChoiceId, SubItemId } from "@/lib/ugc/types";
 import {
   answerPresentation,
@@ -119,6 +119,20 @@ interface QuestionEditorProps {
   hasError: boolean;
   /** Nội dung server render sẵn cho CHÍNH câu này (TD-027). Vắng = render ở client. */
   nodes?: ReviewQuestionNodes;
+  /** MÔN của đề, dắt từ ReviewScreen xuống để chốt trần độ dài (A6/A7).
+   *
+   *  KHÔNG dùng `question.topic` dù nó cũng mang tên môn: `topic` là BẢN CHỤP
+   *  lúc assemble và chỉ được cascade lại ở server khi lưu, nên nó KHÔNG theo
+   *  kịp dropdown môn mà tác giả vừa đổi ngay trên màn này. Lấy topic ở đây =
+   *  textarea cắt theo môn CŨ trong khi panel lỗi đã chấm theo môn MỚI, và hai
+   *  con số lệch nhau là thứ tác giả không thể nào lý giải được.
+   *
+   *  Vắng prop → `maxStemFor(undefined)` trả trần RỘNG NHẤT, cùng nhánh
+   *  "chưa biết môn" với sentinel "". Cố ý fail-OPEN, ngược với
+   *  `essayGradingEnabled` ngay dưới: ở đây chặt tay nghĩa là textarea NUỐT
+   *  phím của tác giả giữa chừng một đoạn văn hợp lệ, còn nới tay chỉ dẫn tới
+   *  một lỗi hiện rõ trong panel — mà cổng publish thì vẫn chặn thật. */
+  subject?: string;
   /** Cờ chấm tự luận, ĐỌC Ở SERVER rồi truyền xuống — component này không bao
    *  giờ tự đọc `process.env` (nó là client, và ở đó biến ấy không tồn tại).
    *
@@ -133,12 +147,42 @@ export function QuestionEditor({
   onChange,
   hasError,
   nodes,
+  subject,
   essayGradingEnabled = false,
 }: QuestionEditorProps) {
   const t = useT();
   const [editing, setEditing] = useState(false);
   const q = question;
   const empty = <span className="text-brand">{t("upload.emptyPlaceholder")}</span>;
+  // Cùng nguồn trần với validateAssembledExam — nếu hai bên lệch, tác giả gõ
+  // tới trần của textarea rồi vẫn thấy lỗi "quá dài" mà không gõ thêm được.
+  const maxStem = maxStemFor(subject);
+  const maxEssayAnswer = maxEssayAnswerFor(subject);
+
+  // A2/A3 — số ô hiện ra là số ý/lựa chọn CÓ THẬT, cộng đúng MỘT ô trống để
+  // thêm tiếp. Trước đây chế độ sửa luôn vẽ đủ 4 ô bất kể đề có mấy: câu
+  // True/False một mệnh đề hiện ra kèm 3 ô thừa, và tác giả không có cách nào
+  // hiểu 3 ô đó là "không cần điền" hay "đề đọc sót".
+  //
+  // Ô trống không tự sinh ra dữ liệu — chỉ khi tác giả GÕ vào nó thì phần tử
+  // mới xuất hiện, và xoá trắng thì phần tử biến mất (xem onChange bên dưới).
+  // Nhờ vậy "4 ô trống" không còn biến thành 4 ý rỗng rồi đẻ ra 4 EMPTY_CHOICE.
+  const slots = <T extends string>(all: readonly T[], present: readonly T[], max: number): T[] => {
+    const used = all.filter((id) => present.includes(id));
+    if (!editing || used.length >= max) return used;
+    const free = all.find((id) => !used.includes(id));
+    return free ? all.filter((id) => used.includes(id) || id === free) : used;
+  };
+  const choiceSlots = slots(
+    CHOICE_IDS,
+    (q.choices ?? []).map((c) => c.id),
+    LIMITS.MAX_CHOICES,
+  );
+  const subItemSlots = slots(
+    SUB_ITEM_IDS,
+    (q.subItems ?? []).map((si) => si.id),
+    LIMITS.MAX_SUB_ITEMS,
+  );
 
   return (
     <li
@@ -150,6 +194,47 @@ export function QuestionEditor({
       <div className="flex items-center justify-between gap-3">
         <span className="eyebrow">{t("upload.questionLabel", { number: q.number })}</span>
         <div className="flex items-center gap-3">
+          {/* B1 — ĐIỂM của câu. Ở hàng tiêu đề chứ không nằm dưới cùng: nó là
+              thuộc tính của cả câu, ngang hàng với loại câu, và tác giả soát
+              biểu điểm bằng cách lướt dọc mép phải chứ không mở từng thẻ.
+
+              Chế độ XEM chỉ in khi đề có khai điểm — đề thuần trắc nghiệm cân
+              bằng thì một dòng "1 điểm" trên cả 40 thẻ là nhiễu thuần tuý.
+              Chế độ SỬA luôn hiện ô, kể cả khi trống, vì đó là lúc tác giả cần
+              biết rằng ô ấy TỒN TẠI để mà điền. */}
+          {editing ? (
+            <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                // `any`, KHÔNG phải "0.25": thang bậc PHẦN II có bậc 0.1, và
+                // với step="0.25" trình duyệt coi 0.1 là giá trị không hợp lệ
+                // (Firefox tô đỏ ô) trong khi cổng publish lại chấp nhận nó —
+                // hai nơi nói ngược nhau về cùng một con số.
+                step="any"
+                value={q.points ?? ""}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw === "") return onChange({ points: undefined });
+                  const n = Number(raw);
+                  // Số không hợp lệ ⇒ GIỮ NGUYÊN giá trị cũ, không ghi
+                  // `undefined`: gõ dở "0." không được phép xoá mất điểm câu.
+                  if (!Number.isFinite(n) || n <= 0) return;
+                  onChange({ points: n });
+                }}
+                aria-label={t("upload.pointsLabel")}
+                className="w-16 rounded-[4px] border border-border bg-card px-2 py-1 text-right text-xs text-foreground outline-none focus:border-brand"
+              />
+              {t("upload.pointsSuffix")}
+            </label>
+          ) : (
+            q.points !== undefined && (
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {t("upload.pointsValue", { points: String(q.points) })}
+              </span>
+            )
+          )}
           <span className="text-xs text-muted-foreground">{t(TYPE_LABEL_KEY[q.type])}</span>
           <button
             type="button"
@@ -167,12 +252,26 @@ export function QuestionEditor({
         </div>
       </div>
 
+      {/* NGỮ LIỆU DÙNG CHUNG (A1) — chỉ ĐỌC ở đây, có chủ đích: nó thuộc về
+          NHÓM câu chứ không của riêng câu này, nên một ô sửa trên mỗi card sẽ
+          là N ô cùng ghi vào một chỗ. Sửa nội dung bài đọc nằm ở khối riêng
+          trên đầu màn review (PassageEditor). Ở đây tác giả chỉ cần thấy câu
+          hỏi này gắn với bài đọc nào. */}
+      {nodes?.passage && (
+        <details className="border-border bg-card mt-3 rounded-[4px] border p-3">
+          <summary className="text-muted-foreground cursor-pointer text-xs">
+            {nodes.passageTitle ?? t("upload.sharedPassage")}
+          </summary>
+          <div className="mt-2 max-h-60 overflow-y-auto">{nodes.passage.node}</div>
+        </details>
+      )}
+
       {/* Stem */}
       {editing ? (
         <textarea
           value={q.stem}
           onChange={(e) => onChange({ stem: e.target.value })}
-          maxLength={LIMITS.MAX_STEM}
+          maxLength={maxStem}
           rows={3}
           className="mt-3 w-full resize-y rounded-[4px] border border-border bg-card p-3 text-sm text-foreground outline-none focus:border-brand"
           placeholder={t("upload.questionText")}
@@ -204,7 +303,7 @@ export function QuestionEditor({
       {/* MCQ: lựa chọn + đáp án đúng */}
       {q.type === "mcq" && (
         <div className="mt-4 flex flex-col gap-2">
-          {CHOICE_IDS.map((cid) => {
+          {choiceSlots.map((cid) => {
             const choice = q.choices?.find((c) => c.id === cid);
             const isCorrect = q.correctAnswer === cid;
             return (
@@ -226,13 +325,16 @@ export function QuestionEditor({
                   <input
                     value={choice?.text ?? ""}
                     onChange={(e) => {
+                      const text = e.target.value;
                       const others = (q.choices ?? []).filter(
                         (c) => c.id !== cid,
                       );
-                      const next = [
-                        ...others,
-                        { id: cid, text: e.target.value },
-                      ].sort(
+                      // Xoá trắng = GỠ lựa chọn, không phải giữ một lựa chọn
+                      // rỗng: giữ lại sẽ đẻ ra EMPTY_CHOICE cho đúng cái ô mà
+                      // tác giả vừa cố ý dọn đi.
+                      const next = (
+                        text === "" ? others : [...others, { id: cid, text }]
+                      ).sort(
                         (a, b) =>
                           CHOICE_IDS.indexOf(a.id) - CHOICE_IDS.indexOf(b.id),
                       );
@@ -269,10 +371,11 @@ export function QuestionEditor({
         </div>
       )}
 
-      {/* true_false (v2.1): 4 ý a–d, mỗi ý toggle Đ/S theo file đáp án */}
+      {/* true_false (v2.1): các ý a–d, mỗi ý toggle Đ/S theo file đáp án.
+          A2: số ý là số ý CÓ THẬT (1–4), không còn cứng 4. */}
       {q.type === "true_false" && (
         <div className="mt-4 flex flex-col gap-2">
-          {SUB_ITEM_IDS.map((sid) => {
+          {subItemSlots.map((sid) => {
             const item = q.subItems?.find((s) => s.id === sid);
             if (!item && !editing) return null;
             const answer = q.subAnswers?.[sid];
@@ -285,8 +388,12 @@ export function QuestionEditor({
                   <input
                     value={item?.text ?? ""}
                     onChange={(e) => {
+                      const text = e.target.value;
                       const others = (q.subItems ?? []).filter((s) => s.id !== sid);
-                      const next = [...others, { id: sid, text: e.target.value }].sort(
+                      // Xoá trắng = GỠ ý (cùng lý do với lựa chọn mcq ở trên).
+                      const next = (
+                        text === "" ? others : [...others, { id: sid, text }]
+                      ).sort(
                         (a, b) => SUB_ITEM_IDS.indexOf(a.id) - SUB_ITEM_IDS.indexOf(b.id),
                       );
                       onChange({ subItems: next });
@@ -379,7 +486,7 @@ export function QuestionEditor({
             <textarea
               value={q.essayAnswer ?? ""}
               onChange={(e) => onChange({ essayAnswer: e.target.value })}
-              maxLength={LIMITS.MAX_ESSAY_ANSWER}
+              maxLength={maxEssayAnswer}
               rows={4}
               className="mt-1 w-full resize-y rounded-[4px] border border-border bg-card p-3 text-sm text-foreground outline-none focus:border-brand"
             />

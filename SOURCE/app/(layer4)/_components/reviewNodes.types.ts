@@ -38,6 +38,11 @@ export const SUB_ITEM_CLASS = "flex-1 text-sm text-foreground";
 export const SHORT_ANSWER_CLASS =
   "mt-1 block rounded-[4px] border border-border bg-card px-3 py-1.5 text-sm text-foreground";
 
+/** Ngữ liệu dùng chung (A1) ở màn review — chỉ ĐỌC, nên không cần khung input.
+ *  Cao tối đa rồi cuộn, cùng lý do với màn làm bài: một bài đọc 400 từ để nở
+ *  tự do sẽ đẩy chính câu hỏi mà tác giả đang soát ra khỏi màn hình. */
+export const PASSAGE_CLASS = "text-foreground text-sm leading-relaxed";
+
 /** essay: đáp án mẫu — nhiều dòng, khối thật. */
 export const ESSAY_ANSWER_CLASS =
   "mt-1 rounded-[4px] border border-border bg-card p-3 text-sm text-foreground";
@@ -83,6 +88,10 @@ export interface ReviewQuestionNodes {
   subItems: Partial<Record<SubItemId, RenderedText>>;
   /** `essayAnswer` — đáp án mẫu (essay) hoặc giá trị mong đợi (short_answer). */
   answer?: RenderedText;
+  /** NGỮ LIỆU DÙNG CHUNG (A1) đã render. Vắng = câu tự chứa. */
+  passage?: RenderedText;
+  /** Tiêu đề in trên đề của ngữ liệu. */
+  passageTitle?: string;
 }
 
 /**

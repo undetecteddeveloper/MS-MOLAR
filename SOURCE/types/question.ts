@@ -36,6 +36,18 @@ export interface Question {
   questionType?: "mcq" | "essay" | "true_false" | "short_answer";
   /** Phần chứa câu hỏi (UGC v2.1 — đề chuẩn 2025 nhiều phần). Không set = 1. */
   partNumber?: number;
+  /**
+   * ĐIỂM của câu này trong thang điểm của đề (B1). Không set = 1.
+   *
+   * Vì sao tồn tại: trước B1 điểm tính bằng tỉ lệ `đúng/tổng × 10`, tức MỌI câu
+   * cân bằng nhau. Đề Ngữ văn thật là 3đ Đọc hiểu + 7đ Làm văn, và bài NLVH 5
+   * điểm bị đếm ngang bài NLXH 2 điểm.
+   *
+   * Mặc định 1 làm đề thuần trắc nghiệm rút gọn về đúng công thức cũ — xem
+   * `DEFAULT_QUESTION_POINTS` (lib/scoring/questionPoints.ts), nơi khai con số
+   * và lý do.
+   */
+  points?: number;
   /** Các ý a–d của câu true_false (UGC v2.1) — nội dung, KHÔNG có đáp án. */
   subItems?: SubItem[];
   /**
@@ -45,6 +57,12 @@ export interface Question {
   subAnswers?: Partial<Record<SubItemId, boolean>>;
   /** URL hình thân câu (UGC v2.0) — render qua QuestionFigure. */
   imageUrl?: string;
+  /**
+   * NGỮ LIỆU DÙNG CHUNG (A1) — trỏ tới `Exam.passages[].id`. undefined = câu
+   * tự chứa. AN TOÀN để lộ ra `PublicQuestion`: nó là khoá tra nội dung hiển
+   * thị, không phải đáp án — player CẦN nó để biết hiện bài đọc nào.
+   */
+  passageId?: string;
   /**
    * Đáp án mẫu cho câu tự luận / giá trị mong đợi của short_answer (UGC
    * v2.0/v2.1, cùng cột DB) — CHỈ dùng server-side, KHÔNG lộ ra

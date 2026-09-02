@@ -31,6 +31,21 @@ export interface PerQuestionResult {
    * luận sẽ bắt đầu nuôi mô hình mastery, và `computeWrongTwiceQuestionIds()`
    * sẽ bắt đầu trả về id câu tự luận. */
   scored?: boolean;
+  /** ĐIỂM ĐÃ ĐƯỢC của dòng này (B1/B2/B3) — kênh chấm điểm CÓ TRỌNG SỐ, tách
+   * hẳn khỏi `scored`/`isCorrect` vốn là kênh ĐẾM.
+   *
+   * Hai kênh trả lời hai câu hỏi khác nhau, và trộn chúng là cách chắc chắn để
+   * hỏng một trong hai: `scored` quyết định dòng có vào ô Đúng/Sai, vào mastery
+   * và vào wrongTwice hay không; `earnedPoints`/`maxPoints` quyết định dòng
+   * chiếm bao nhiêu trong thang 10. Câu tự luận là ca làm lộ ra sự khác biệt —
+   * nó `scored: false` (không vào ô đếm, không nuôi mastery) NHƯNG có
+   * `maxPoints` > 0 ngay từ lúc nộp, vì đề đã in sẵn nó đáng mấy điểm.
+   *
+   * `undefined` ở dòng ghi TRƯỚC B1 và ở câu không ai chấm được. `sumPoints()`
+   * bỏ qua hẳn những dòng đó thay vì mặc định 1 — xem lý do tại đó. */
+  earnedPoints?: number;
+  /** Mẫu số điểm của dòng này — `Question.points` đã chuẩn hoá. Xem trên. */
+  maxPoints?: number;
   /** Câu này đã bị chấm SAI trên >= 2 lượt làm bài khác nhau của cùng user
    * (Engine 1, UI Spec D1). KHÔNG lưu trong DB — computeScore() không bao giờ
    * đặt trường này; getResult() tính lúc đọc qua computeWrongTwiceQuestionIds().
@@ -54,10 +69,24 @@ export interface TopicResult {
 }
 
 export interface ScoreResult {
-  /** Điểm thang 10 (chuẩn THPT VN), làm tròn 2 chữ số. */
+  /** Điểm thang 10 (chuẩn THPT VN), làm tròn 2 chữ số.
+   *
+   * Từ B1/B2/B3 nó là `earnedPoints / maxPoints × 10` — CÓ TRỌNG SỐ và có kể cả
+   * câu tự luận. KHÔNG còn suy được từ `correct`/`total` bên dưới, và đó là chủ
+   * đích: hai cặp số ấy đếm câu chấm tự động, còn con số này đo điểm của đề. */
   totalScore: number;
+  /** Số câu CHẤM TỰ ĐỘNG làm đúng. Ý nghĩa KHÔNG đổi qua B1/B2/B3 — đó là điều
+   * kiện để `ScoreCard` giữ phép suy `sai = tổng − đúng` (AC-057). Câu
+   * true_false đúng 3/4 ý được điểm thành phần nhưng KHÔNG cộng vào đây. */
   correct: number;
+  /** Số câu CHẤM TỰ ĐỘNG. Không đếm câu tự luận. Xem `correct`. */
   total: number;
+  // KHÔNG có `earnedPoints`/`maxPoints` ở MỨC LƯỢT THI, và sự vắng mặt đó là
+  // một quyết định: AC-012 buộc một dòng ghi TRƯỚC tính năng chấm tự luận phải
+  // đọc ra y hệt hôm nay ("the whole ExamResult equals a hand-built pre-change
+  // literal"). Thêm hai trường suy diễn vào đây làm MỌI dòng cũ mọc thêm hai
+  // khoá — không đổi con số nào hiển thị, nhưng vẫn phá đúng cái cổng ấy.
+  // Cần hai vế điểm thì gọi `sumPoints(perQuestion)` (lib/scoring/computeScore).
   perQuestion: PerQuestionResult[];
   topicBreakdown: TopicResult[];
 }

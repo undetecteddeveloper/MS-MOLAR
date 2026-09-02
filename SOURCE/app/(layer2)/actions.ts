@@ -131,6 +131,16 @@ export async function submitExam(
         questionType: (r.question_type as Question["questionType"]) ?? "mcq",
         subAnswers: (r.sub_answers as Question["subAnswers"]) ?? undefined,
         essayAnswer: (r.essay_answer as string | null) ?? undefined,
+        // B1 — trọng số câu, đọc từ `claim_attempt_answer_key()`. Cột là
+        // `numeric` nên driver có thể trả về CHUỖI ("2.00"), không phải số:
+        // chuẩn hoá ngay tại biên. Bỏ dòng này thì mọi đề chấm như nhau và cả
+        // B1 im lặng không có tác dụng gì.
+        points:
+          typeof r.points === "number"
+            ? r.points
+            : typeof r.points === "string" && r.points.trim() !== "" && Number.isFinite(Number(r.points))
+              ? Number(r.points)
+              : undefined,
       } satisfies Question,
     ])
   );

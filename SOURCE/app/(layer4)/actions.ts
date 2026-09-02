@@ -37,6 +37,7 @@ import { LIMITS } from "@/lib/ugc/limits";
 import {
   normalizeMeta,
   validateMetaForPublish,
+  validatePointsForPublish,
   type TypedMeta,
 } from "@/lib/ugc/normalizeMeta";
 import { getPdfPageCount } from "@/lib/ugc/pdf";
@@ -546,7 +547,7 @@ export async function extractAndAssemble(formData: FormData): Promise<UgcActionF
     const extracted: ExtractedMeta | null = mResult?.ok ? mResult.value : null;
     meta = normalizeMeta(extracted, typed, questionFileName);
   }
-  const { parts, questions: extractedQuestions } = qResult.value;
+  const { parts, passages, questions: extractedQuestions } = qResult.value;
   // Nhãn lỗi "Phần P Câu N" chỉ với đề nhiều phần (ADR-0005).
   const multiPart = parts.length > 0 || extractedQuestions.some((q) => q.part !== 1);
 
@@ -576,7 +577,8 @@ export async function extractAndAssemble(formData: FormData): Promise<UgcActionF
     aResult.value,
     images,
     meta,
-    parts
+    parts,
+    passages
   );
   const assemblyErrors = [...joinErrors, ...validateAssembledExam(exam), ...cropErrors];
   if (assemblyErrors.length > 0) {
@@ -605,6 +607,8 @@ export async function extractAndAssemble(formData: FormData): Promise<UgcActionF
       question_file_path: questionPath,
       answer_file_path: answerPath,
       parts: exam.parts.length > 0 ? exam.parts : null,
+      // A1: null khi đề không có ngữ liệu chung — cùng quy ước với `parts`.
+      passages: exam.passages.length > 0 ? exam.passages : null,
       // v2.2 (Automatic): chốt metadata sau normalizeMeta — row insert ở stage
       // 3 mới chỉ mang giá trị tạm/sentinel. Manual: ghi lại chính giá trị cũ
       // (no-op về nội dung).
@@ -638,6 +642,10 @@ export async function extractAndAssemble(formData: FormData): Promise<UgcActionF
     sub_answers: q.subAnswers ?? null,
     image_url: q.imageUrl ?? null,
     essay_answer: q.essayAnswer ?? null,
+    passage_id: q.passageId ?? null,
+    // B1 — đề không in điểm ⇒ để DB áp `default 1`. Ghi thẳng 1 ở đây cũng ra
+    // cùng con số, nhưng nó biến "không biết" thành "biết là 1" trong dữ liệu.
+    ...(q.points !== undefined && { points: q.points }),
   }));
   const { error: qInsErr } = await supabase.from("questions").insert(rows);
   if (qInsErr) {
@@ -684,7 +692,7 @@ export async function saveExam(
   const { data: examRow } = await supabase
     .from("exams")
     .select(
-      "id, title, subject, grade, duration_minutes, school, school_year, semester, status, question_ids, parts"
+      "id, title, subject, grade, duration_minutes, school, school_year, semester, status, question_ids, parts, passages"
     )
     .eq("id", examId)
     .eq("author_id", user.id)
@@ -836,8 +844,22 @@ export async function saveExam(
       sub_answers: p.subAnswers !== undefined ? p.subAnswers : r.sub_answers,
       essay_answer: p.essayAnswer !== undefined ? p.essayAnswer : r.essay_answer,
       image_url: p.imageUrl !== undefined ? p.imageUrl : r.image_url,
+      passage_id: p.passageId !== undefined ? p.passageId : r.passage_id,
+      points: p.points !== undefined ? (p.points ?? undefined) : r.points,
     };
   });
+
+  // A1 — ngữ liệu dùng chung: patch thay NGUYÊN mảng, vắng patch = giữ bản DB.
+  // Trần số phần tử ép Ở ĐÂY chứ không chỉ ở màn review: `patch` tới từ client
+  // và không có gì buộc nó phải đến từ UI của mình. Nội dung (rỗng / quá dài /
+  // khoá mồ côi) đã có validateAssembledExam bắt ngay dưới, nên chỗ này chỉ
+  // cần chặn thứ mà validate không nhìn thấy — số lượng.
+  const storedPassages =
+    (examRow.passages as { id: string; title?: string; text: string }[] | null) ?? null;
+  if (patch.passages && patch.passages.length > LIMITS.MAX_PASSAGES) {
+    return failure("validation", "Too many shared reading passages.");
+  }
+  const nextPassages = patch.passages ?? storedPassages;
 
   const assembled = assembledFromRows(
     {
@@ -850,6 +872,7 @@ export async function saveExam(
       semester: nextMeta.semester ?? null,
       question_ids: questionIds,
       parts: (examRow.parts as { number: number; title: string }[] | null) ?? null,
+      passages: nextPassages,
     },
     patched
   );
@@ -860,6 +883,20 @@ export async function saveExam(
     return failure("validation", "A published exam must stay complete. Fix these before saving:", {
       errors: validationErrors,
     });
+  }
+
+  // Ghi ngữ liệu — ĐỘC LẬP với `patch.meta`: tác giả sửa bài đọc mà không đụng
+  // tới metadata là đường đi thường gặp nhất, và nhét nó vào nhánh `patch.meta`
+  // sẽ làm mọi lượt sửa như thế im lặng không lưu gì.
+  if (patch.passages) {
+    const { error } = await supabase
+      .from("exams")
+      .update({ passages: patch.passages.length > 0 ? patch.passages : null })
+      .eq("id", examId);
+    if (error) {
+      console.error("[saveExam] update passages:", error.message);
+      return failure("server", "Could not save the shared reading passages. Try again.");
+    }
   }
 
   // Ghi metadata (giá trị đã validate trong nextMeta).
@@ -922,6 +959,9 @@ export async function saveExam(
         ...(p.subAnswers !== undefined && { sub_answers: p.subAnswers }),
         ...(p.essayAnswer !== undefined && { essay_answer: p.essayAnswer }),
         ...(p.imageUrl !== undefined && { image_url: p.imageUrl }),
+        ...(p.passageId !== undefined && { passage_id: p.passageId }),
+        // `null` = tác giả xoá trắng ô điểm ⇒ trả câu về mặc định của DB.
+        ...(p.points !== undefined && { points: p.points ?? 1 }),
       })
       .eq("id", targetId);
     if (error) {
@@ -952,7 +992,7 @@ export async function publishExam(examId: string): Promise<{ error?: UgcActionFa
   const { data: examRow } = await supabase
     .from("exams")
     .select(
-      "id, title, subject, grade, duration_minutes, school, school_year, semester, status, question_ids, parts"
+      "id, title, subject, grade, duration_minutes, school, school_year, semester, status, question_ids, parts, passages"
     )
     .eq("id", examId)
     .eq("author_id", user.id)
@@ -991,12 +1031,24 @@ export async function publishExam(examId: string): Promise<{ error?: UgcActionFa
       semester: examRow.semester as string | null,
       question_ids: questionIds,
       parts: (examRow.parts as { number: number; title: string }[] | null) ?? null,
+      passages:
+        (examRow.passages as { id: string; title?: string; text: string }[] | null) ?? null,
     },
     qRows ?? []
   );
   // v2.2 (AC-038): metadata sentinel/ngoài khoảng chặn publish — sort TRƯỚC
   // lỗi từng câu (gate toàn đề).
-  const errors = [...validateMetaForPublish(assembled.meta), ...validateAssembledExam(assembled)];
+  //
+  // B1: biểu điểm cũng chỉ chặn Ở ĐÂY, không ở validateAssembledExam — đề chưa
+  // nhập điểm không phải đề bóc tách hỏng, và saveExam đọc validateAssembledExam
+  // để tính status nên mọi thứ nhét vào đó sẽ thành nhãn 'failed'. Đây là gate
+  // THẬT: nút Publish của client không biết luật này (cố ý — màn review không
+  // hiện tổng điểm chạy), nên tác giả gặp nó đúng lúc bấm Publish.
+  const errors = [
+    ...validateMetaForPublish(assembled.meta),
+    ...validatePointsForPublish(assembled),
+    ...validateAssembledExam(assembled),
+  ];
   if (errors.length > 0) {
     return failure("validation", "Fix these issues before publishing:", {
       errors,

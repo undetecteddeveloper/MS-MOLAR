@@ -10,10 +10,11 @@
 //     là thấy (ADR-0007 kill criterion: fabrication là hard fail).
 //   - Kết quả trả về không bao giờ vi phạm CHECK của schema hay limits.ts.
 
+import { isMultiPart } from "./assembleExam";
 import { makeUgcError } from "./errorCopy";
 import { LIMITS } from "./limits";
 import { normalizeSubject } from "./subjects";
-import type { ExamMeta, ExtractedMeta, UgcError } from "./types";
+import type { AssembledExam, ExamMeta, ExtractedMeta, UgcError } from "./types";
 
 /** Giá trị tác giả đã gõ ở S-01 (đã parse, chỉ field có thật). */
 export type TypedMeta = Partial<ExamMeta>;
@@ -168,5 +169,60 @@ export function validateMetaForPublish(meta: ExamMeta): UgcError[] {
     errors.push(makeUgcError("META_INVALID", null, { field: "schoolYear" }));
   }
 
+  return errors;
+}
+
+/**
+ * Gate publish B1 — BIỂU ĐIỂM. Nằm cạnh validateMetaForPublish vì nó cùng họ
+ * với hàm đó, và cùng họ theo đúng nghĩa quan trọng: nó là điều kiện để đề LÊN
+ * SÓNG, không phải điều kiện để đề được coi là bóc tách thành công.
+ *
+ * Vì thế nó KHÔNG nằm trong validateAssembledExam, dù đọc câu hỏi: saveExam
+ * dùng hàm đó để tính lại status, nên mọi lỗi lọt vào đấy đều dán nhãn 'failed'
+ * — nghĩa là "file của bạn hỏng". Một đề bóc tách hoàn hảo mà tác giả chưa kịp
+ * gõ điểm không hỏng chỗ nào; nó chỉ chưa xong. Tiền lệ đã có: ADR-0007 đặt
+ * gate metadata đúng ở vị trí này, vì đúng lý do này.
+ *
+ * Hai luật:
+ *   · mọi câu phải có `points` xác định và > 0 → POINTS_MISSING (theo TỪNG câu,
+ *     có nhãn "Phần P Câu N" để tác giả bấm thẳng tới thẻ, không phải tự dò);
+ *   · tổng toàn đề = EXAM_TOTAL_POINTS ± POINTS_EPSILON → POINTS_TOTAL_MISMATCH
+ *     (cấp đề, kèm CON SỐ hiện tại).
+ *
+ * Thiếu điểm thì KHÔNG báo kèm lệch tổng: cộng câu trống thành 0 rồi kêu "8.5/10"
+ * là dựng ra một con số không có thật, và bắt tác giả sửa hai lỗi vốn chỉ là
+ * một. Điền đủ điểm xong, lượt validate sau mới nói được tổng thật.
+ */
+export function validatePointsForPublish(exam: AssembledExam): UgcError[] {
+  // Đề rỗng đã có NO_QUESTIONS_FOUND của validateAssembledExam nói hộ; thêm
+  // "tổng 0/10" vào đó chỉ là tiếng ồn trên một đề chưa có gì để chấm.
+  if (exam.questions.length === 0) return [];
+
+  const errors: UgcError[] = [];
+  const multiPart = isMultiPart(exam.parts, exam.questions);
+
+  let total = 0;
+  for (const q of exam.questions) {
+    // Cùng phép thử với maxPointsOf() ở tầng chấm — chỉ khác kết luận: ở đó
+    // giá trị hỏng rơi về mặc định để lượt thi cũ vẫn chấm được, ở đây nó chặn
+    // publish để đề MỚI không bao giờ cần tới cái mặc định ấy.
+    if (typeof q.points !== "number" || !Number.isFinite(q.points) || q.points <= 0) {
+      errors.push(
+        makeUgcError("POINTS_MISSING", q.number, multiPart ? { partNumber: q.part } : {})
+      );
+      continue;
+    }
+    total += q.points;
+  }
+  if (errors.length > 0) return errors;
+
+  if (Math.abs(total - LIMITS.EXAM_TOTAL_POINTS) > LIMITS.POINTS_EPSILON) {
+    errors.push(
+      makeUgcError("POINTS_TOTAL_MISMATCH", null, {
+        total,
+        expected: LIMITS.EXAM_TOTAL_POINTS,
+      })
+    );
+  }
   return errors;
 }

@@ -95,7 +95,7 @@ export async function getMyExam(id: string): Promise<MyExamDetail | null> {
     const { data, error } = await supabase
       .from("exams")
       .select(
-        "id, title, subject, grade, duration_minutes, school, school_year, semester, status, question_ids, parts"
+        "id, title, subject, grade, duration_minutes, school, school_year, semester, status, question_ids, parts, passages"
       )
       .eq("id", id)
       .eq("author_id", user.id)
@@ -150,6 +150,8 @@ export async function getMyExam(id: string): Promise<MyExamDetail | null> {
       semester: examRow.semester as string | null,
       question_ids: questionIds,
       parts: (examRow.parts as { number: number; title: string }[] | null) ?? null,
+      passages:
+        (examRow.passages as { id: string; title?: string; text: string }[] | null) ?? null,
     },
     qRows
   );

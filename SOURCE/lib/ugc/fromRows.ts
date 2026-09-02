@@ -7,6 +7,7 @@ import type {
   AssembledQuestion,
   ChoiceId,
   ExtractedPart,
+  ExtractedPassage,
   QuestionType,
   SubAnswers,
   SubItemId,
@@ -24,6 +25,8 @@ export type DbExamMetaRow = {
   question_ids: string[];
   /** v2.1 (ADR-0005): [{number,title}] | null — đề 1 phần = null. */
   parts?: ExtractedPart[] | null;
+  /** A1: [{id,title,text}] | null — đề không có ngữ liệu chung = null. */
+  passages?: ExtractedPassage[] | null;
 };
 
 /** Danh tính (part, number) từ id row — chấp nhận CẢ 2 dạng:
@@ -78,6 +81,8 @@ export function assembledFromRows(
         subAnswers: (row.sub_answers as SubAnswers | null) ?? undefined,
         essayAnswer: (row.essay_answer as string | null) ?? undefined,
         imageUrl: (row.image_url as string | null) ?? undefined,
+        passageId: (row.passage_id as string | null) ?? undefined,
+        points: typeof row.points === "number" ? row.points : undefined,
         topic: row.topic as string,
       };
     });
@@ -92,6 +97,7 @@ export function assembledFromRows(
       semester: (examRow.semester as "HK1" | "HK2" | null) ?? undefined,
     },
     parts: examRow.parts ?? [],
+    passages: examRow.passages ?? [],
     questions,
   };
 }

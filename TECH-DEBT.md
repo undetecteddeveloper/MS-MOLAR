@@ -69,6 +69,21 @@ ra để bảo "dừng lại mà xét lại" thì đã bị vượt qua
 > cùng ngày. Chọn được đường không có nghĩa là đã giảm quyền: đường được chọn
 > là (c), tức là cố ý KHÔNG giảm.)*
 
+> **TRIGGER THỨ HAI ĐÃ NỔ — 2026-09-01.** Mục này khai hai điều kiện buộc xét
+> lại: operation thứ 14 của `service-role.ts`, HOẶC **lần mutate tại chỗ thứ 3
+> trên `exam_results`**. Điều kiện thứ hai vừa nổ: `record_essay_grade()` nay
+> update thêm `total_score` (B3 — trước đó nó chỉ đụng `per_question`), thành
+> lần mutate thứ 3 sau `record_exam_result()` insert và `record_essay_grade()`
+> ghi band.
+>
+> Ghi vào đây thay vì nuốt im lặng, đúng như chính mục này dặn. Lưu ý sắc thái:
+> lần mutate này KHÔNG chép luật chấm điểm sang SQL — mọi quy tắc (đúng/sai,
+> thang bậc PHẦN II, trọng số câu) do TypeScript quyết định rồi đóng băng thành
+> `earnedPoints`/`maxPoints` trên từng phần tử; câu lệnh SQL chỉ CỘNG hai trường
+> số rồi chia. Nên phản đối "hai chiếc đồng hồ" của ADR-0010 không áp vào đây.
+> Cái nổ là NGƯỠNG ĐẾM, không phải nguyên tắc. Chi tiết: ADR-0018 § Amendment
+> 2026-09-01.
+
 > **QUYẾT ĐỊNH 2026-08-31 — ENGINEER CHỌN ĐƯỜNG (c). Xem `docs/adr/ADR-0019-continuing-with-service-role.md`.**
 >
 > Lý do engineer nêu: không đủ thời gian, và không muốn thêm dependency mà sau

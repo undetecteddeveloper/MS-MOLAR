@@ -103,9 +103,20 @@ export interface EssayView {
 /** Tổng hợp mức-lượt-thi. Sáu trường, mỗi trường có một chuỗi hiển thị của UI
  *  Spec dùng đích danh — không trường nào tồn tại mà không có consumer. */
 export interface EssaySummary {
-  /** Tổng band của các câu `graded`. */
+  /** Điểm tự luận ĐÃ ĐƯỢC, TRONG THANG ĐIỂM CỦA ĐỀ (AC-059, sửa lại ở B1).
+   *
+   *  TRƯỚC B1 đây là tổng BAND (thang 0..1 mỗi câu), và mẫu số là `số câu đã
+   *  chấm × 1`. Với đề cân bằng thì hai cách đọc trùng nhau, nên khác biệt
+   *  không lộ ra. Với đề CÓ TRỌNG SỐ thì nó lộ ra ngay và nói sai: bài NLVH 5
+   *  điểm được band 0.25 hiện ra "0.25 / 1 điểm" trong khi nó thật sự đóng góp
+   *  1.25 điểm vào ô điểm lớn — hai con số cạnh nhau trên cùng một trang mà
+   *  không đối chiếu được với nhau.
+   *
+   *  Nay cộng `earnedPoints`/`maxPoints` của chính các phần tử đã chấm, tức
+   *  CÙNG hai trường mà `total_score` được tính từ. Dòng tự luận và ô điểm lớn
+   *  vì thế không thể lệch nhau. */
   earned: number;
-  /** `gradedCount * ESSAY_MAX_POINTS` — mẫu số mà AC-059 buộc nói rõ nó đếm gì. */
+  /** Mẫu số tương ứng — tổng `maxPoints` của các câu `graded`. Xem trên. */
   max: number;
   gradedCount: number;
   /** RS-2 — prop của EssayGradingPoller. */
@@ -228,18 +239,22 @@ export function isEssayUnresolved({ state, retryAvailable }: EssayView): boolean
 
 /** Suy view cho cả mảng, bỏ các phần tử không áp dụng (dòng cũ, câu không chấm
  *  được, giá trị lạ). Một chỗ gấp mảng duy nhất, dùng chung cho ba hàm dưới —
- *  ba phép gấp riêng là ba cơ hội để chúng trôi lệch nhau. */
+ *  ba phép gấp riêng là ba cơ hội để chúng trôi lệch nhau.
+ *
+ *  Giữ kèm PHẦN TỬ GỐC bên cạnh view: `summariseEssays()` cần đọc
+ *  `earnedPoints`/`maxPoints` trên chính phần tử ấy (AC-059), và tra lại bằng
+ *  `questionId` sau khi đã gấp là mời gọi lỗi ghép sai dòng. */
 function deriveEssayViews(
   rows: PerQuestionResult[],
   createdAt: string,
   now: Date,
-): EssayView[] {
-  const views: EssayView[] = [];
+): Array<{ row: PerQuestionResult; view: EssayView }> {
+  const out: Array<{ row: PerQuestionResult; view: EssayView }> = [];
   for (const row of rows) {
     const view = deriveEssayView(row, createdAt, now);
-    if (view !== null) views.push(view);
+    if (view !== null) out.push({ row, view });
   }
-  return views;
+  return out;
 }
 
 /** Tổng hợp mức-lượt-thi, hoặc `undefined` khi không phần tử nào mang khoá vòng
@@ -254,18 +269,39 @@ export function summariseEssays(
   createdAt: string,
   now: Date,
 ): EssaySummary | undefined {
-  const views = deriveEssayViews(rows, createdAt, now);
-  if (views.length === 0) return undefined;
+  const pairs = deriveEssayViews(rows, createdAt, now);
+  if (pairs.length === 0) return undefined;
 
-  const graded = views.filter((view) => view.state === "graded");
+  const graded = pairs.filter(({ view }) => view.state === "graded");
+
+  // AC-059 — hai vế điểm trong THANG CỦA ĐỀ, cộng từ chính hai trường mà
+  // `total_score` được tính từ.
+  //
+  // Nhánh lui về thang BAND khi phần tử không mang `maxPoints`: đó là dòng ghi
+  // TRƯỚC B1, và nó phải đọc ra y hệt hôm qua (AC-012). Với đề cân bằng hai
+  // nhánh cho cùng con số, nên chuyển đổi không nhìn thấy được ở đề trắc nghiệm.
+  let earned = 0;
+  let max = 0;
+  for (const { row, view } of graded) {
+    if (typeof row.maxPoints === "number" && Number.isFinite(row.maxPoints)) {
+      max += row.maxPoints;
+      earned +=
+        typeof row.earnedPoints === "number" && Number.isFinite(row.earnedPoints)
+          ? row.earnedPoints
+          : 0;
+    } else {
+      max += ESSAY_MAX_POINTS;
+      earned += view.earned ?? 0;
+    }
+  }
 
   return {
-    earned: graded.reduce((sum, view) => sum + (view.earned ?? 0), 0),
-    max: graded.length * ESSAY_MAX_POINTS,
+    earned,
+    max,
     gradedCount: graded.length,
-    pendingCount: views.filter((view) => view.state === "pending").length,
-    failedCount: views.filter((view) => view.state === "failed").length,
-    unresolvedCount: views.filter(isEssayUnresolved).length,
+    pendingCount: pairs.filter(({ view }) => view.state === "pending").length,
+    failedCount: pairs.filter(({ view }) => view.state === "failed").length,
+    unresolvedCount: pairs.filter(({ view }) => isEssayUnresolved(view)).length,
   };
 }
 
@@ -280,7 +316,7 @@ export function hasUnresolvedEssay(
   createdAt: string,
   now: Date,
 ): boolean {
-  return deriveEssayViews(rows, createdAt, now).some(isEssayUnresolved);
+  return deriveEssayViews(rows, createdAt, now).some(({ view }) => isEssayUnresolved(view));
 }
 
 /** Có câu tự luận nào đã dừng hẳn ở RS-6 không — điều kiện in chú thích
@@ -292,5 +328,5 @@ export function hasIncompleteEssay(
   createdAt: string,
   now: Date,
 ): boolean {
-  return deriveEssayViews(rows, createdAt, now).some(isEssayIncomplete);
+  return deriveEssayViews(rows, createdAt, now).some(({ view }) => isEssayIncomplete(view));
 }

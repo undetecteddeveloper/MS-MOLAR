@@ -158,6 +158,22 @@ export default async function ResultDetailPage({
                       </span>
                     )}
                   </div>
+{/* NGỮ LIỆU DÙNG CHUNG (A1) — cùng vị trí (TRÊN đề bài) và cùng
+                      khuôn cuộn như màn làm bài, để câu hỏi trông giống hệt
+                      lúc dò lại và lúc làm. Phải có ở CẢ HAI nhánh của trang
+                      này vì `notScored` chia đôi theo việc câu có chấm được
+                      hay không, không theo việc câu có bài đọc hay không. */}
+                  {q?.passageText && (
+                    <section className="border-border bg-card max-h-[260px] overflow-y-auto rounded-lg border p-4">
+                      {q.passageTitle && (
+                        <p className="text-muted-foreground mb-2 text-xs">{q.passageTitle}</p>
+                      )}
+                      <RichText
+                        text={q.passageText}
+                        className="text-foreground font-serif text-base leading-[1.75]"
+                      />
+                    </section>
+                  )}
                   {q && (
                     <RichText
                       text={q.content}
@@ -249,6 +265,22 @@ export default async function ResultDetailPage({
                   <span className={`text-xs font-medium ${status.cls}`}>{status.label}</span>
                 </div>
 
+{/* NGỮ LIỆU DÙNG CHUNG (A1) — cùng vị trí (TRÊN đề bài) và cùng
+                    khuôn cuộn như màn làm bài, để câu hỏi trông giống hệt
+                    lúc dò lại và lúc làm. Phải có ở CẢ HAI nhánh của trang
+                    này vì `notScored` chia đôi theo việc câu có chấm được
+                    hay không, không theo việc câu có bài đọc hay không. */}
+                {q?.passageText && (
+                  <section className="border-border bg-card max-h-[260px] overflow-y-auto rounded-lg border p-4">
+                    {q.passageTitle && (
+                      <p className="text-muted-foreground mb-2 text-xs">{q.passageTitle}</p>
+                    )}
+                    <RichText
+                      text={q.passageText}
+                      className="text-foreground font-serif text-base leading-[1.75]"
+                    />
+                  </section>
+                )}
                 {q && (
                   <RichText
                     text={q.content}

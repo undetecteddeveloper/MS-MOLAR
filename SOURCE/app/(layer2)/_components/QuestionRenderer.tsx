@@ -7,14 +7,23 @@
 // segmented Đ/S; input mã hoá tfCodec thành 1 chuỗi) và short_answer (ô nhập
 // ngắn). Cả hai "Not auto-scored yet" (product decision — chấm điểm là feature
 // riêng); KHÔNG đáp án nào có mặt ở client (PublicQuestion đã Omit).
+// 2026-09-02: bài đọc dùng chung không còn là một khối chữ chết — chỗ trống
+// trong nó ĐƯỢC ĐIỀN bằng lựa chọn học sinh vừa chọn, và chỗ trống của câu
+// đang làm được tô. Bố cục KHÔNG đổi (bài đọc vẫn nằm trong thẻ câu, vẫn cao
+// tối đa 260px); thứ đổi là bài đọc nay đi xuống dưới dạng CÁC MẨU
+// (`PassageNodes`) thay vì một node duy nhất, để client ghép chữ vào giữa.
+// Lưu ý bảo mật KHÔNG đổi theo: chữ điền vào là nội dung LỰA CHỌN của chính
+// học sinh (`PublicQuestion.choices`), không phải đáp án đúng — `correctAnswer`
+// vẫn không có mặt ở phía này.
 
 "use client";
+import { Fragment } from "react";
 import { useT } from "@/lib/i18n/client";
 
 import type { ChoiceId, PublicQuestion, SubItemId } from "@/types/question";
 import { LIMITS } from "@/lib/ugc/limits";
 import { decodeTfAnswer, encodeTfAnswer } from "@/lib/ugc/tfCodec";
-import type { QuestionNodes } from "./questionNodes.types";
+import type { PassageChunkNode, QuestionNodes } from "./questionNodes.types";
 import { QuestionFigure } from "@/components/shared/QuestionFigure";
 import { AnswerChoice } from "./AnswerChoice";
 import { FlagButton } from "./FlagButton";
@@ -37,6 +46,20 @@ interface QuestionRendererProps {
   nodes: QuestionNodes;
   /** Input hiện tại của câu này (string — xem useExamPlayer), undefined nếu chưa. */
   selectedAnswer?: string;
+  /**
+   * Input của TOÀN BỘ đề (questionId → giá trị), để điền chỗ trống trong bài
+   * đọc dùng chung.
+   *
+   * Vì sao không đủ với `selectedAnswer`: một bài đọc điền khuyết có 7 chỗ
+   * trống thuộc 7 CÂU KHÁC NHAU, và cả bảy đều hiện trên màn hình của mỗi câu
+   * trong nhóm. Đứng ở câu 34 mà chỉ biết đáp án câu 34 thì sáu chỗ còn lại
+   * vĩnh viễn trống, kể cả khi học sinh đã làm xong chúng.
+   *
+   * BẮT BUỘC, không tuỳ chọn: chỉ có một chỗ gọi (`ExamPlayer`), nên `tsc` bắt
+   * được ngay nếu quên — khác hẳn `essayGradingEnabled`, vốn tuỳ chọn để giữ
+   * một chuỗi đã ghim trong test ở nguyên trạng.
+   */
+  answers: Record<string, string>;
   onSelectAnswer: (value: string) => void;
   flagged: boolean;
   onToggleFlag: () => void;
@@ -61,6 +84,7 @@ export function QuestionRenderer({
   question,
   nodes,
   selectedAnswer,
+  answers,
   onSelectAnswer,
   flagged,
   onToggleFlag,
@@ -75,6 +99,44 @@ export function QuestionRenderer({
         <span className="eyebrow">{t("upload.questionLabel", { number: index })}</span>
         <FlagButton flagged={flagged} onToggle={onToggleFlag} />
       </div>
+
+      {/* NGỮ LIỆU DÙNG CHUNG (A1) — bài đọc mà cả nhóm câu cùng tham chiếu.
+          TRÊN thân câu hỏi vì đó là thứ tự đọc thật: đọc bài rồi mới trả lời.
+
+          Cao TỐI ĐA 260px rồi tự cuộn, không cao theo nội dung. Một bài đọc
+          400 từ để nở tự do sẽ đẩy câu hỏi VÀ toàn bộ khu vực trả lời xuống
+          dưới màn hình — trên điện thoại thì học sinh phải cuộn đi cuộn lại
+          giữa bài đọc và bốn lựa chọn cho từng câu một. Khung riêng có nền
+          `bg-card` cũng nói rõ "phần này dùng chung, không phải đề bài của
+          riêng câu này". */}
+      {nodes.passage && (
+        <section
+          aria-label={nodes.passageTitle ?? t("player.sharedPassage")}
+          className="border-border bg-card max-h-[260px] overflow-y-auto rounded-lg border p-4"
+        >
+          {nodes.passageTitle && (
+            <p className="text-muted-foreground mb-2 text-xs">{nodes.passageTitle}</p>
+          )}
+          <div className={`rich-text flex flex-col gap-3 ${nodes.passage.className}`}>
+            {nodes.passage.paragraphs.map((paragraph, pi) => (
+              <p key={pi}>
+                {paragraph.map((chunk, ci) =>
+                  chunk.kind === "text" ? (
+                    <Fragment key={ci}>{chunk.node}</Fragment>
+                  ) : (
+                    <PassageBlank
+                      key={ci}
+                      chunk={chunk}
+                      filled={fillOf(chunk, answers)}
+                      current={chunk.questionId !== null && chunk.questionId === question.id}
+                    />
+                  )
+                )}
+              </p>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Nội dung câu hỏi — `font-serif` + một nấc cỡ chữ so với trước.
           Serif KHÔNG phải trang trí: DESIGN.md xếp serif cho "tiêu đề & nội
@@ -232,5 +294,58 @@ export function QuestionRenderer({
         )}
       </div>
     </div>
+  );
+}
+
+/** Chữ sẽ hiện trong chỗ trống, hoặc undefined nếu câu ấy chưa được trả lời. */
+function fillOf(
+  chunk: Extract<PassageChunkNode, { kind: "blank" }>,
+  answers: Record<string, string>
+): string | undefined {
+  if (!chunk.questionId) return undefined;
+  const selected = answers[chunk.questionId];
+  if (!selected) return undefined;
+  return chunk.options[selected as ChoiceId];
+}
+
+/**
+ * Một chỗ trống trong bài đọc.
+ *
+ * Ba trạng thái, phân biệt bằng VIỀN + NỀN chứ không bằng màu chữ: chỗ trống
+ * nằm giữa dòng văn serif 16px, nên đổi màu chữ ở cỡ ấy vừa khó thấy vừa phá
+ * nhịp đọc của cả câu.
+ *   - đang làm  → viền đỏ son + nền đỏ nhạt (cùng accent với lựa chọn đã chọn)
+ *   - đã điền   → viền vàng đồng, chữ đầy đủ tương phản
+ *   - còn trống → viền ngà, nền khối, dãy gạch mờ
+ *
+ * `align-baseline` + `items-baseline`: khối inline-flex mặc định canh theo đáy
+ * hộp, nên không có hai dòng này thì mỗi chỗ trống đội dòng chữ quanh nó lên
+ * vài pixel và cả đoạn văn gợn sóng.
+ */
+function PassageBlank({
+  chunk,
+  filled,
+  current,
+}: {
+  chunk: Extract<PassageChunkNode, { kind: "blank" }>;
+  filled: string | undefined;
+  current: boolean;
+}) {
+  const tone = current
+    ? "border-brand bg-brand/10 text-foreground"
+    : filled
+      ? "border-ring bg-card text-foreground"
+      : "border-border bg-muted text-muted-foreground";
+  return (
+    <span
+      className={`mx-0.5 inline-flex items-baseline gap-1.5 rounded-[5px] border px-1.5 align-baseline transition-colors ${tone}`}
+    >
+      {chunk.label !== null && (
+        <span className="font-mono text-[11px] tabular-nums">({chunk.label})</span>
+      )}
+      <span className={filled ? "font-serif" : "font-sans text-sm tracking-[0.14em]"}>
+        {filled ?? "____"}
+      </span>
+    </span>
   );
 }

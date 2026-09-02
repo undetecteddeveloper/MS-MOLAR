@@ -131,6 +131,7 @@ export const vi: Dictionary = {
   "player.secondsRemaining": "Còn {count} giây",
   "player.submit": "Nộp bài",
   "player.submitting": "Đang nộp…",
+  "player.sharedPassage": "Bài đọc dùng chung cho nhóm câu này",
   "player.chooseAnswer": "Chọn một đáp án",
   "player.yourAnswer": "Câu trả lời của bạn",
   "player.answeredCount": "Đã làm {done}/{total}",
@@ -153,6 +154,7 @@ export const vi: Dictionary = {
 
   // --- Kết quả ------------------------------------------------------------
   "result.title": "Kết quả",
+  "result.scorePending": "Đang chấm phần tự luận…",
   "result.time": "Thời gian",
   "result.submittedAfterTime": "Nộp sau giờ.",
   "result.overtimeBody":
@@ -304,6 +306,14 @@ export const vi: Dictionary = {
   "upload.rightClickHint": "Nhấp chuột phải để mở menu thao tác",
   "upload.publishedNotice":
     "Đề này đã xuất bản. Mọi chỉnh sửa lưu trực tiếp và luôn giữ đề đầy đủ.",
+  "upload.sharedPassage": "Bài đọc dùng chung",
+  "upload.sharedPassages": "Bài đọc dùng chung",
+  "upload.sharedPassagesHint":
+    "Mỗi bài đọc chỉ lưu một lần và hiện ở mọi câu dùng nó. Sửa ở đây là sửa cho tất cả các câu đó.",
+  "upload.passageLabel": "Ngữ liệu {index}",
+  "upload.pointsLabel": "Điểm của câu này",
+  "upload.pointsSuffix": "điểm",
+  "upload.pointsValue": "{points} điểm",
   "upload.examDetails": "Thông tin đề",
   "upload.fixedAfterPublish": "Môn và khối lớp không đổi được sau khi xuất bản.",
   "upload.removeImage": "Bỏ ảnh",
@@ -491,7 +501,12 @@ export const vi: Dictionary = {
     "Không nhận ra câu hỏi nào trong file đề. Bạn tải lên file rõ nét hơn nhé.",
   "ugcError.tooManyQuestions": "Quá nhiều câu — một đề chỉ được tối đa {max} câu.",
   "ugcError.wrongChoiceCount":
-    "{q} — đọc được {count} lựa chọn; câu trắc nghiệm cần đúng 4 (A–D). Bạn sửa bên dưới hoặc tải lại file.",
+    "{q} — đọc được {count} lựa chọn; câu trắc nghiệm cần {min}–{max} lựa chọn, đánh nhãn từ A liền mạch. Bạn sửa bên dưới hoặc tải lại file.",
+  "ugcError.emptyPassage": "Ngữ liệu {index} — phần bài đọc chung đang trống; bạn bổ sung bên dưới nhé.",
+  "ugcError.passageTooLong":
+    "Ngữ liệu {index} — phần bài đọc chung quá dài (tối đa {max} ký tự).",
+  "ugcError.passageMissing":
+    "{q} — câu này trỏ tới một bài đọc chung không có trong đề. Bạn tải lại file, hoặc gỡ liên kết bên dưới.",
   "ugcError.emptyStem": "{q} — phần đề bài đang trống; bạn bổ sung bên dưới nhé.",
   "ugcError.emptyChoice": "{q} — lựa chọn {choice} đang trống.",
   "ugcError.answerCountMismatch":
@@ -503,8 +518,12 @@ export const vi: Dictionary = {
   "ugcError.fileTooLarge": "File này quá nặng (tối đa {mb} MB).",
   "ugcError.tooManyPages": "File này quá nhiều trang (tối đa {max}).",
   "ugcError.stemTooLong": "{q} — đề bài quá dài (tối đa {max} ký tự).",
+  "ugcError.stemTooLongForSubject":
+    "{q} — đề bài quá dài (tối đa {max} ký tự cho môn đã chọn).",
   "ugcError.choiceTooLong": "{q} — lựa chọn {choice} quá dài (tối đa {max} ký tự).",
   "ugcError.essayAnswerTooLong": "{q} — đáp án mẫu quá dài (tối đa {max} ký tự).",
+  "ugcError.essayAnswerTooLongForSubject":
+    "{q} — đáp án mẫu quá dài (tối đa {max} ký tự cho môn đã chọn).",
   "ugcError.wrongSubItemCount":
     "{q} — đọc được {count} ý; câu Đúng/Sai cần {min}–{max} ý (a–d). Bạn sửa bên dưới hoặc tải lại file.",
   "ugcError.shortAnswerTooLong": "{q} — đáp án mong đợi quá dài (tối đa {max} ký tự).",
@@ -514,6 +533,9 @@ export const vi: Dictionary = {
     "Thông tin đề — {field} nằm ngoài khoảng cho phép ({range}). Bạn sửa lại ở trên.",
   "ugcError.metaExtractionFailed":
     "Thông tin đề — chúng tôi không đọc được thông tin đề từ file của bạn. Bạn tự điền ở trên nhé.",
+  "ugcError.pointsMissing": "{q} — chưa có điểm. Bạn nhập điểm cho câu này bên dưới trước khi đăng nhé.",
+  "ugcError.pointsTotalMismatch":
+    "Biểu điểm — tổng điểm các câu đang là {total}/{expected}. Bạn chỉnh lại cho đủ {expected} điểm nhé.",
   "ugcError.durationRange": "{min}–{max} phút",
   "ugcError.fieldTitle": "tiêu đề",
   "ugcError.fieldSubject": "môn học",

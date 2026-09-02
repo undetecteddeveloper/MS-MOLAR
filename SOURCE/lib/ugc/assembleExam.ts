@@ -20,7 +20,8 @@
 // bao giờ được persist.
 
 import { makeUgcError } from "./errorCopy";
-import { LIMITS } from "./limits";
+import { LIMITS, maxEssayAnswerFor, maxStemFor } from "./limits";
+import { parseTfVerdictSequence } from "./tfVerdict";
 import type {
   AssembledExam,
   AssembledQuestion,
@@ -28,6 +29,7 @@ import type {
   ExamMeta,
   ExtractedAnswer,
   ExtractedPart,
+  ExtractedPassage,
   ExtractedQuestion,
   Result,
   SubAnswers,
@@ -43,16 +45,71 @@ export function qKey(part: number, number: number): string {
   return `${part}:${number}`;
 }
 
-/** Đúng 4 lựa chọn, id là đúng tập {A,B,C,D} (không trùng, không thiếu). */
+/**
+ * Vớt lại đáp án Đúng/Sai mà extractor đã xếp NHẦM LOẠI (2026-09-02).
+ *
+ * Câu true_false của đề TIẾNG ANH có bảng đáp án viết "Câu 21: T" / "3. F".
+ * Model không thấy T/F trong hình dạng `true_false` nào nó biết, nên nó hạ
+ * xuống dạng gần nhất — thường là `short_answer` với value "T" — và nhánh
+ * "đúng loại" ngay bên dưới coi đó như KHÔNG CÓ đáp án. Từ đó `subAnswers`
+ * rỗng, `isScored()` trả false, và câu hiện "chưa chấm tự động" suốt đời.
+ *
+ * Ba điều kiện dưới đây là chỗ phân biệt "vớt lại" với "đoán bừa":
+ *
+ *   1. Chỉ nhận `short_answer`/`essay` — hai dạng mang VĂN BẢN TỰ DO. Không
+ *      đụng `mcq`: một chữ cái A–D cho câu Đ/S là dấu hiệu file đáp án khớp
+ *      nhầm câu, không phải dấu hiệu viết khác ngôn ngữ.
+ *   2. Đọc được TRỌN VẸN (`parseTfVerdictSequence` trả null nếu sót một mẩu).
+ *   3. Tập ý đọc ra phải TRÙNG KHÍT tập ý câu hỏi thật sự có.
+ *
+ * Điều kiện 3 gánh phần nặng nhất và nó không hiển nhiên: `countTrueFalseCorrect()`
+ * lấy MẪU SỐ từ `Object.keys(subAnswers)`, chứ không từ số ý của câu. Nhận một
+ * dòng "T" cho câu bốn ý sẽ chấm cả câu trên đúng một ý a — học sinh đúng 1/4
+ * được trọn điểm, đúng 0/4 mà ý a trúng cũng được trọn điểm. Thà để câu ở
+ * "chưa chấm" còn hơn cho một con điểm dựng trên một phần tư dữ kiện.
+ */
+export function coerceTrueFalseAnswer(
+  answer: ExtractedAnswer | undefined,
+  subItems: { id: SubItemId }[] | undefined | null
+): SubAnswers | undefined {
+  if (!answer) return undefined;
+  if (answer.type !== "short_answer" && answer.type !== "essay") return undefined;
+
+  const raw = answer.type === "short_answer" ? answer.value : answer.text;
+  const parsed = parseTfVerdictSequence(raw);
+  if (!parsed) return undefined;
+
+  const expected = new Set((subItems ?? []).map((s) => s.id));
+  const got = Object.keys(parsed) as SubItemId[];
+  if (expected.size === 0 || got.length !== expected.size) return undefined;
+  if (got.some((id) => !expected.has(id))) return undefined;
+
+  return parsed;
+}
+
+/** A3 — 2 tới 4 lựa chọn, nhãn là TIỀN TỐ LIỀN của A–D: {A,B}, {A,B,C},
+ *  {A,B,C,D}. Đủ để đựng True/False/Not Given (3 lựa chọn) của đề Tiếng Anh.
+ *
+ *  "Tiền tố liền" chứ không phải "tập con bất kỳ" — {A,C} bị từ chối. Lý do
+ *  không phải sạch sẽ hình thức: nhãn đi thẳng vào correct_answer và vào nút
+ *  bấm của màn làm bài, nên một đề nhảy cóc B sẽ hiện ra "A C D" trước mặt học
+ *  sinh và không có gì ở tầng dưới bắt lại được. Đề nhảy cóc gần như luôn là
+ *  AI đọc SÓT một lựa chọn, và đó đúng là thứ WRONG_CHOICE_COUNT phải bắt. */
 function hasValidChoiceSet(
   choices: AssembledQuestion["choices"]
 ): choices is NonNullable<AssembledQuestion["choices"]> {
-  if (!choices || choices.length !== 4) return false;
+  if (!choices) return false;
+  const n = choices.length;
+  if (n < LIMITS.MIN_CHOICES || n > LIMITS.MAX_CHOICES) return false;
   const ids = new Set(choices.map((c) => c.id));
-  return CHOICE_IDS.every((id) => ids.has(id));
+  if (ids.size !== n) return false;
+  return CHOICE_IDS.slice(0, n).every((id) => ids.has(id));
 }
 
-/** 2–4 ý, id thuộc {a,b,c,d}, không trùng. */
+/** A2 — MIN_SUB_ITEMS..MAX_SUB_ITEMS ý, id thuộc {a,b,c,d}, không trùng.
+ *  Trần dưới nay là 1: khối một-mệnh-đề của đề Tiếng Anh là hợp lệ. Không ép
+ *  tiền tố liền như hasValidChoiceSet — nhãn ý con không đi vào correct_answer,
+ *  và subAnswers tra theo id nên một tập thưa vẫn chấm đúng. */
 function hasValidSubItemSet(
   subItems: AssembledQuestion["subItems"]
 ): subItems is NonNullable<AssembledQuestion["subItems"]> {
@@ -63,8 +120,11 @@ function hasValidSubItemSet(
   return ids.size === subItems.length && subItems.every((s) => SUB_ITEM_IDS.includes(s.id));
 }
 
-/** Đề có chia phần không — quyết định nhãn lỗi "Phần P Câu N" vs "Câu N". */
-function isMultiPart(parts: ExtractedPart[], questions: { part: number }[]): boolean {
+/** Đề có chia phần không — quyết định nhãn lỗi "Phần P Câu N" vs "Câu N".
+ *  Export để gate biểu điểm (validatePointsForPublish) đánh nhãn câu GIỐNG HỆT
+ *  các lỗi khác trong cùng một bảng lỗi — hai cách gọi tên câu trong một danh
+ *  sách là hai cách bắt tác giả dò lại. */
+export function isMultiPart(parts: ExtractedPart[], questions: { part: number }[]): boolean {
   return parts.length > 0 || questions.some((q) => q.part !== 1);
 }
 
@@ -78,7 +138,8 @@ export function assembleExamLenient(
   answers: ExtractedAnswer[],
   images: Map<string, string>,
   meta: ExamMeta,
-  parts: ExtractedPart[] = []
+  parts: ExtractedPart[] = [],
+  passages: ExtractedPassage[] = []
 ): { exam: AssembledExam; joinErrors: UgcError[] } {
   const joinErrors: UgcError[] = [];
 
@@ -114,6 +175,8 @@ export function assembleExamLenient(
       if (answer && answer.type === "true_false" && answer.values.length > 0) {
         subAnswers = {};
         for (const v of answer.values) subAnswers[v.id] = v.value;
+      } else {
+        subAnswers = coerceTrueFalseAnswer(answer, q.subItems);
       }
     } else if (q.type === "short_answer") {
       if (answer && answer.type === "short_answer" && answer.value.trim().length > 0) {
@@ -136,11 +199,20 @@ export function assembleExamLenient(
       subAnswers,
       essayAnswer,
       imageUrl: images.get(qKey(q.part, q.number)),
+      // A1: mang NGUYÊN khoá AI đặt, kể cả khoá mồ côi. Lọc ở đây sẽ làm
+      // PASSAGE_MISSING không bao giờ báo được, và một câu lặng lẽ mất bài đọc
+      // là đúng thứ tác giả cần nhìn thấy ở màn review.
+      passageId: q.passageId,
+      // B1 — mang nguyên; `undefined` nghĩa là "đề không in điểm", và mặc định
+      // được áp ở TẦNG CHẤM (maxPointsOf) chứ không ở đây. Nhét 1 vào lúc này
+      // sẽ xoá mất sự khác biệt giữa "đề ghi 1 điểm" và "đề không ghi gì", thứ
+      // mà màn review cần để biết có nên nhắc tác giả nhập hay không.
+      points: q.points,
       topic: meta.subject, // ADR-0004: topic mặc định = môn học
     });
   }
 
-  return { exam: { meta, parts, questions: assembled }, joinErrors };
+  return { exam: { meta, parts, passages, questions: assembled }, joinErrors };
 }
 
 /**
@@ -160,14 +232,50 @@ export function validateAssembledExam(exam: AssembledExam): UgcError[] {
   // Đề 1 phần giữ nhãn "Câu N" như v2.0; đề nhiều phần → "Phần P Câu N".
   const multiPart = isMultiPart(exam.parts, exam.questions);
 
+  // Trần độ dài NỚI THEO MÔN (A6/A7) — giải một lần cho cả đề, không giải lại
+  // trong vòng lặp: mọi câu của một đề dùng chung một môn.
+  //
+  // Nguồn là exam.meta.subject chứ KHÔNG phải q.topic, dù hai thứ này bằng nhau
+  // lúc assemble (topic := meta.subject). Lý do: ở màn review tác giả đổi được
+  // dropdown môn, ReviewScreen cập nhật meta.subject rồi gọi thẳng hàm này để
+  // validate lại — nhưng topic của từng câu là BẢN CHỤP lúc assemble và chỉ
+  // được cascade lại ở server khi lưu. Đọc topic ở đây tức là chấm đề bằng môn
+  // CŨ, và sai lệch đó chỉ lộ ra đúng lúc tác giả vừa sửa môn cho đúng.
+  // A1 — ngữ liệu dùng chung: kiểm nội dung, rồi kiểm THAM CHIẾU. Postgres
+  // không cưỡng chế được khoá trỏ vào jsonb (§8d), nên đây là tầng duy nhất.
+  const passageIds = new Set<string>();
+  exam.passages.forEach((psg, i) => {
+    const passageIndex = i + 1;
+    if (psg.text.trim().length === 0) {
+      errors.push(makeUgcError("EMPTY_PASSAGE", null, { passageIndex }));
+    } else if (psg.text.length > LIMITS.MAX_PASSAGE) {
+      errors.push(
+        makeUgcError("PASSAGE_TOO_LONG", null, { passageIndex, max: LIMITS.MAX_PASSAGE }),
+      );
+    }
+    passageIds.add(psg.id);
+  });
+
+  const maxStem = maxStemFor(exam.meta.subject);
+  const maxEssayAnswer = maxEssayAnswerFor(exam.meta.subject);
+  // Trần có phải do MÔN quyết định không — quyết định câu chữ của lỗi. Môn chưa
+  // biết (sentinel "") thì không có "môn đã chọn" nào để nhắc tới.
+  const subjectScoped = exam.meta.subject.trim() !== "";
+
   for (const q of exam.questions) {
     const n = q.number;
     const partNumber = multiPart ? q.part : undefined;
 
     if (q.stem.trim().length === 0) {
       errors.push(makeUgcError("EMPTY_STEM", n, { partNumber }));
-    } else if (q.stem.length > LIMITS.MAX_STEM) {
-      errors.push(makeUgcError("STEM_TOO_LONG", n, { partNumber }));
+    } else if (q.stem.length > maxStem) {
+      errors.push(makeUgcError("STEM_TOO_LONG", n, { partNumber, max: maxStem, subjectScoped }));
+    }
+
+    // Khoá mồ côi: câu khai dùng ngữ liệu nhưng ngữ liệu ấy không có trong đề.
+    // Gần như luôn là AI đặt khoá ở câu mà quên xuất đoạn văn tương ứng.
+    if (q.passageId !== undefined && !passageIds.has(q.passageId)) {
+      errors.push(makeUgcError("PASSAGE_MISSING", n, { partNumber }));
     }
 
     if (q.type === "mcq") {
@@ -213,8 +321,14 @@ export function validateAssembledExam(exam: AssembledExam): UgcError[] {
     } else {
       if (!q.essayAnswer || q.essayAnswer.trim().length === 0) {
         errors.push(makeUgcError("ANSWER_MISSING", n, { partNumber }));
-      } else if (q.essayAnswer.length > LIMITS.MAX_ESSAY_ANSWER) {
-        errors.push(makeUgcError("ESSAY_ANSWER_TOO_LONG", n, { partNumber }));
+      } else if (q.essayAnswer.length > maxEssayAnswer) {
+        errors.push(
+          makeUgcError("ESSAY_ANSWER_TOO_LONG", n, {
+            partNumber,
+            max: maxEssayAnswer,
+            subjectScoped,
+          }),
+        );
       }
     }
   }
@@ -228,7 +342,8 @@ export function assembleExam(
   answers: ExtractedAnswer[],
   images: Map<string, string>,
   meta: ExamMeta,
-  parts: ExtractedPart[] = []
+  parts: ExtractedPart[] = [],
+  passages: ExtractedPassage[] = []
 ): Result<AssembledExam> {
   // Lỗi cấp toàn file trả về MỘT MÌNH (khớp copy hướng dẫn re-upload).
   if (questions.length < LIMITS.MIN_QUESTIONS) {
@@ -238,7 +353,14 @@ export function assembleExam(
     return { ok: false, errors: [makeUgcError("TOO_MANY_QUESTIONS", null)] };
   }
 
-  const { exam, joinErrors } = assembleExamLenient(questions, answers, images, meta, parts);
+  const { exam, joinErrors } = assembleExamLenient(
+    questions,
+    answers,
+    images,
+    meta,
+    parts,
+    passages
+  );
   const errors = [...joinErrors, ...validateAssembledExam(exam)];
 
   if (errors.length > 0) return { ok: false, errors };
