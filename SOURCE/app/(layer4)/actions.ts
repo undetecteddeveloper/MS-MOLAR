@@ -643,9 +643,23 @@ export async function extractAndAssemble(formData: FormData): Promise<UgcActionF
     image_url: q.imageUrl ?? null,
     essay_answer: q.essayAnswer ?? null,
     passage_id: q.passageId ?? null,
-    // B1 — đề không in điểm ⇒ để DB áp `default 1`. Ghi thẳng 1 ở đây cũng ra
-    // cùng con số, nhưng nó biến "không biết" thành "biết là 1" trong dữ liệu.
-    ...(q.points !== undefined && { points: q.points }),
+    // B1 — đề không in điểm ⇒ ghi NULL, nghĩa là "không biết". Ghi thẳng 1 ở
+    // đây cũng ra cùng con số, nhưng nó biến "không biết" thành "biết là 1"
+    // trong dữ liệu, và màn review sẽ không còn gì để nhắc tác giả nhập.
+    //
+    // KHOÁ PHẢI CÓ Ở MỌI ROW, kể cả khi không biết — đây là chỗ đề Ngữ văn
+    // 10 (2026-09-02) làm hỏng cả lượt upload. PostgREST gom một mảng row
+    // thành MỘT câu INSERT với danh sách cột chung; row nào thiếu khoá thì cột
+    // ấy nhận NULL chứ KHÔNG rơi về default của DB. Trước bản này khoá được
+    // spread có điều kiện, nên:
+    //   · đề mà MỌI câu đều không in điểm → cột vắng mặt → default 1 áp;
+    //   · đề mà MỌI câu đều in điểm → chạy đúng;
+    //   · đề TRỘN hai loại (Ngữ văn: Đọc hiểu không in, Viết in 2,0 + 4,0) →
+    //     câu không in điểm nhận NULL vào cột `not null` → 23502, và TOÀN BỘ
+    //     lượt upload bị huỷ với "Could not save the questions."
+    // Gửi khoá ở mọi row khiến ba ca trên hợp thành một, và `points` nay
+    // nullable (§8e) để NULL mang đúng nghĩa "chưa biết".
+    points: q.points ?? null,
   }));
   const { error: qInsErr } = await supabase.from("questions").insert(rows);
   if (qInsErr) {
@@ -960,8 +974,12 @@ export async function saveExam(
         ...(p.essayAnswer !== undefined && { essay_answer: p.essayAnswer }),
         ...(p.imageUrl !== undefined && { image_url: p.imageUrl }),
         ...(p.passageId !== undefined && { passage_id: p.passageId }),
-        // `null` = tác giả xoá trắng ô điểm ⇒ trả câu về mặc định của DB.
-        ...(p.points !== undefined && { points: p.points ?? 1 }),
+        // `null` = tác giả XOÁ TRẮNG ô điểm ⇒ ghi NULL, tức "chưa biết".
+        // Trước bản này chỗ đây ghi 1, và 1 là một con số HỢP LỆ: validate
+        // in-memory (dòng ~848) đọc null nên báo POINTS_MISSING và đặt đề về
+        // 'failed', nhưng DB đã giữ 1, nên tải lại trang thì ô điểm hiện 1 và
+        // lỗi biến mất — tác giả không có cách nào xoá được một con điểm sai.
+        ...(p.points !== undefined && { points: p.points ?? null }),
       })
       .eq("id", targetId);
     if (error) {

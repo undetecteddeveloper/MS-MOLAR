@@ -47,9 +47,17 @@ left join public.exam_rating_aggregate() agg on agg.exam_id = e.id;
 
 alter view public.exams_with_difficulty set (security_invoker = true);
 
--- §17 — ghi lại vân tay để `verify:schema` và instrumentation.ts thôi báo lệch.
-insert into public.schema_version (id, fingerprint)
-values (1, 'a667c85693bc')
-on conflict (id) do update
-  set fingerprint = excluded.fingerprint,
-      applied_at  = now();
+-- §17 — vân tay ĐÃ ĐƯỢC GỠ KHỎI FILE NÀY ngày 2026-09-02, khi migration
+-- 20260902000000_points_nullable_* đưa schema.sql sang vân tay 92e1574f1013.
+--
+-- Lý do là một ràng buộc của cổng, không phải một đổi ý về thiết kế:
+-- `migrationsMatchSchema.test.ts` đòi MỌI câu lệnh của MỌI migration sau
+-- baseline phải có mặt trong schema.sql, mà schema.sql chỉ chứa ĐÚNG MỘT câu
+-- ghi vân tay — vân tay HIỆN TẠI. Nên chỉ migration MỚI NHẤT giữ được câu ấy;
+-- ở mọi file cũ hơn nó thành một lời khai về quá khứ mà cổng đọc thành lệch.
+-- Tiền lệ đã có: 20260901000000_* cũng đổi vân tay và cũng không mang câu này.
+--
+-- Gỡ nó KHÔNG đổi gì trên database: cả dev lẫn prod đã áp file này xong từ
+-- 2026-09-02 02:09, và một DB dựng lại từ đầu vẫn được đóng dấu đúng bởi
+-- migration cuối cùng trong dãy. Câu ghi vân tay nay nằm ở
+-- supabase/migrations/20260902000000_points_nullable_92e1574f1013.sql.

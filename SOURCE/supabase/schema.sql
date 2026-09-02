@@ -537,6 +537,36 @@ alter table public.questions add column if not exists points numeric not null de
 alter table public.questions drop constraint if exists questions_points_check;
 alter table public.questions add constraint questions_points_check check (points > 0);
 
+-- ----------------------------------------------------------------------------
+-- 8e-bis. `points` NULLABLE — "đề không in điểm" phải nói được (2026-09-02).
+--
+--   `not null default 1` ở trên đúng cho việc nó được viết ra: row CŨ tự đúng,
+--   không backfill. Nhưng nó không để lại chỗ nào cho "chưa biết", trong khi
+--   CẢ HAI đầu đọc đã sẵn sàng cho null từ B1: `fromRows` quy giá trị không
+--   phải số về undefined, và `maxPointsOf` quy về DEFAULT_QUESTION_POINTS. Chỉ
+--   riêng cột là chưa.
+--
+--   Cái giá của khoảng trống đó, đo trên đề thật: đề Ngữ văn 10 cuối kì II
+--   (THPT Nguyễn Quốc Trinh) in điểm ở phần Viết (2,0 + 4,0) và KHÔNG in ở 5
+--   câu Đọc hiểu. PostgREST gom mảng row thành một INSERT có danh sách cột
+--   chung, nên 5 câu kia nhận NULL vào cột `not null` → 23502 → cả lượt upload
+--   hỏng với "Could not save the questions". Đề TRỘN hai loại là ca thường gặp
+--   của mọi đề tự luận, không phải ca biên.
+--
+--   DROP NOT NULL, GIỮ DEFAULT 1. Giữ default là điều kiện để bản vá này không
+--   chạm vào ai khác: mọi chỗ insert mà KHÔNG khai cột (seed.ts, fixture test)
+--   vẫn nhận 1 y như trước; chỉ khoá khai TƯỜNG MINH null mới ra null. Row đã
+--   tồn tại không đổi một giá trị nào — AC-012 (lượt thi cũ chấm lại ra đúng số
+--   cũ) giữ nguyên.
+--
+--   `questions_points_check` không cần sửa: trong Postgres, CHECK trả NULL là
+--   THOẢ, nên `points > 0` vẫn chặn 0 và số âm mà vẫn cho null đi qua.
+--
+--   Đề PUBLISHED không bao giờ mang null: validatePointsForPublish bắt mọi câu
+--   phải có điểm > 0 và tổng đủ 10 trước khi cho publish.
+-- ----------------------------------------------------------------------------
+alter table public.questions alter column points drop not null;
+
 alter table public.exam_results add column if not exists total_score_legacy numeric;
 
 -- ----------------------------------------------------------------------------
@@ -2427,7 +2457,7 @@ revoke all on public.schema_version from anon, authenticated;
 -- nó — xem lib/schema/schemaFingerprint.ts).
 -- @schema-fingerprint-begin
 insert into public.schema_version (id, fingerprint)
-values (1, 'a667c85693bc')
+values (1, '92e1574f1013')
 on conflict (id) do update
   set fingerprint = excluded.fingerprint,
       applied_at  = now();
