@@ -41,6 +41,7 @@ import { StatusBadge } from "./StatusBadge";
 import { ExtractionErrorPanel } from "./ExtractionErrorPanel";
 import { AssembledQuestionList } from "./AssembledQuestionList";
 import { MetadataFields, type ExamMetaFormValue } from "./MetadataFields";
+import { PointsPanel, type PointsAssignment } from "./PointsPanel";
 import { PublishBar } from "./PublishBar";
 import type { ReviewNodes } from "./reviewNodes.types";
 
@@ -90,6 +91,7 @@ function toPatch(examId: string, exam: AssembledExam, isPublished: boolean): Sav
       points: q.points ?? null,
     })),
     passages: exam.passages,
+    parts: exam.parts,
   };
 }
 
@@ -178,6 +180,51 @@ export function ReviewScreen({
     setExam((prev) => ({
       ...prev,
       passages: prev.passages.map((p) => (p.id === id ? { ...p, text } : p)),
+    }));
+  }
+
+  /** Sửa tiêu đề MỘT phần. Chuỗi rỗng ⇒ GỠ khai báo chứ không lưu tiêu đề rỗng:
+   *  "không khai" và "khai một chuỗi rỗng" phải là cùng một trạng thái, nếu
+   *  không thì heading hiện nhãn mặc định trong khi DB vẫn mang một entry, và
+   *  cổng validate của saveExam từ chối tiêu đề rỗng.
+   *
+   *  ⚠ Đề KHÔNG chia phần mà tác giả đặt tiêu đề cho nhóm duy nhất của nó ⇒
+   *  `parts` từ rỗng thành một phần tử, tức đề đó trở thành "nhiều phần" theo
+   *  `isMultiPart`. Hệ quả CÓ CHỦ Ý và cần biết: màn làm bài cũng in tiêu đề đó
+   *  (ExamPlayer.tsx:100 đọc cùng mảng), và nhãn lỗi đổi từ "Câu 5" thành
+   *  "Phần 1 Câu 5". Cả hai đều là điều tác giả vừa yêu cầu khi họ gõ đúng cái
+   *  tiêu đề in trên đề gốc vào đấy. */
+  function onChangePartTitle(part: number, title: string) {
+    setDirty(true);
+    setPublishErrors([]);
+    setExam((prev) => {
+      const trimmed = title.trim();
+      const rest = prev.parts.filter((p) => p.number !== part);
+      const parts =
+        trimmed === ""
+          ? rest
+          : [...rest, { number: part, title: trimmed }].sort((a, b) => a.number - b.number);
+      return { ...prev, parts };
+    });
+  }
+
+  /** Panel gán điểm — ghi nhiều câu trong MỘT lượt `setExam`.
+   *
+   *  Một lượt chứ không phải N lượt `onChangeQuestion`: mỗi lượt đọc `prev` của
+   *  lượt trước, nên một vòng lặp gọi N lần vẫn ĐÚNG, nhưng nó dựng N bản sao
+   *  mảng câu hỏi cho một thao tác logic duy nhất, và làm cho "áp biểu điểm"
+   *  không còn là một bước undo được bằng một lần Ctrl+Z ở tầng nào cả. */
+  function onApplyPoints(assignments: PointsAssignment[]) {
+    if (assignments.length === 0) return;
+    setDirty(true);
+    setPublishErrors([]);
+    const byKey = new Map(assignments.map((a) => [`${a.part}:${a.number}`, a.points]));
+    setExam((prev) => ({
+      ...prev,
+      questions: prev.questions.map((q) => {
+        const points = byKey.get(`${q.part}:${q.number}`);
+        return points === undefined ? q : { ...q, points };
+      }),
     }));
   }
 
@@ -342,10 +389,24 @@ export function ReviewScreen({
         parts={exam.parts}
         errors={shownErrors}
         onChangeQuestion={onChangeQuestion}
+        onChangePartTitle={onChangePartTitle}
         nodes={nodes}
         subject={exam.meta.subject}
         essayGradingEnabled={essayGradingEnabled}
+        disabled={saving || publishing}
       />
+
+      {/* Panel gán điểm — chỉ dựng khi đề CÓ câu: trên một đề rỗng nó không có
+          phạm vi nào để chọn, và một panel với dropdown trống là một câu hỏi
+          không trả lời được đặt cạnh lỗi NO_QUESTIONS_FOUND. */}
+      {exam.questions.length > 0 && (
+        <PointsPanel
+          questions={exam.questions}
+          parts={exam.parts}
+          onApply={onApplyPoints}
+          disabled={saving || publishing}
+        />
+      )}
 
       <PublishBar
         isPublished={isPublished}

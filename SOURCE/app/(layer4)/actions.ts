@@ -831,6 +831,38 @@ export async function saveExam(
   }
   const nextPassages = patch.passages ?? storedPassages;
 
+  // Tiêu đề phần — patch thay NGUYÊN mảng, vắng patch = giữ bản DB. Validate ở
+  // đây và KHÔNG ở validateAssembledExam: hàm đó quyết định status
+  // 'review'/'failed', tức "file của bạn bóc tách được hay hỏng", và một tiêu
+  // đề phần gõ hụt không nói gì về file gốc cả (cùng lối lập luận với gate
+  // metadata ADR-0007 và gate biểu điểm B1).
+  const storedParts = (examRow.parts as { number: number; title: string }[] | null) ?? null;
+  if (patch.parts) {
+    if (patch.parts.length > LIMITS.MAX_PARTS) {
+      return failure("validation", "Too many parts.");
+    }
+    const seen = new Set<number>();
+    for (const p of patch.parts) {
+      if (!Number.isInteger(p.number) || p.number < 1 || p.number > LIMITS.MAX_PARTS) {
+        return failure("validation", "A part number is out of range.");
+      }
+      // Hai entry cùng `number` là thứ validateAssembledExam không nhìn thấy
+      // (nó đọc câu hỏi, không đọc mảng này) nhưng lại làm heading ở màn sửa đề
+      // đổi nghĩa tuỳ thứ tự mảng — bảng tra `titleByPart` giữ entry cuối.
+      if (seen.has(p.number)) {
+        return failure("validation", "Two parts share the same number.");
+      }
+      seen.add(p.number);
+      if (typeof p.title !== "string" || p.title.trim().length === 0) {
+        return failure("validation", "A part title cannot be empty.");
+      }
+      if (p.title.length > LIMITS.MAX_PART_TITLE) {
+        return failure("validation", "A part title is too long.");
+      }
+    }
+  }
+  const nextParts = patch.parts ?? storedParts;
+
   const assembled = assembledFromRows(
     {
       title: nextMeta.title,
@@ -841,7 +873,7 @@ export async function saveExam(
       school_year: nextMeta.schoolYear ?? null,
       semester: nextMeta.semester ?? null,
       question_ids: questionIds,
-      parts: (examRow.parts as { number: number; title: string }[] | null) ?? null,
+      parts: nextParts,
       passages: nextPassages,
     },
     patched
@@ -866,6 +898,22 @@ export async function saveExam(
     if (error) {
       console.error("[saveExam] update passages:", error.message);
       return failure("server", "Could not save the shared reading passages. Try again.");
+    }
+  }
+
+  // Ghi tiêu đề phần — ĐỘC LẬP với `patch.meta`, y hệt `passages` ngay trên và
+  // vì đúng lý do đó: sửa mỗi cái heading là đường đi thường gặp nhất.
+  // `[]` → null: mảng rỗng và null cùng nghĩa "đề không chia phần", và giữ MỘT
+  // cách biểu diễn trong DB thì mọi chỗ đọc (`fromRows`, `assembledFromRows`)
+  // không phải xử hai trường hợp.
+  if (patch.parts) {
+    const { error } = await supabase
+      .from("exams")
+      .update({ parts: patch.parts.length > 0 ? patch.parts : null })
+      .eq("id", examId);
+    if (error) {
+      console.error("[saveExam] update parts:", error.message);
+      return failure("server", "Could not save the part headings. Try again.");
     }
   }
 

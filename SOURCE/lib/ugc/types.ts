@@ -303,6 +303,16 @@ export type SaveExamPatch = {
    *  Mảng nhỏ (≤ MAX_PASSAGES) và luôn được sửa như một khối ở màn review, nên
    *  một giao thức patch theo id chỉ thêm chỗ để hai bên lệch nhau. */
   passages?: ExtractedPassage[];
+  /** Tiêu đề các phần in trên đề. Gửi NGUYÊN MẢNG, cùng lý do với `passages`.
+   *
+   *  Trước 2026-09-03 mảng này chỉ được ghi ĐÚNG MỘT LẦN lúc extract, nên khi
+   *  AI đọc sai tiêu đề phần thì đề mang cái sai đó tới lúc publish và không ai
+   *  sửa được. Heading ở màn sửa đề là thứ neo cấu trúc đề gốc, nên nó phải sửa
+   *  được như mọi nội dung khác của đề.
+   *
+   *  Mảng RỖNG là một giá trị hợp lệ và có nghĩa: "đề này không chia phần" —
+   *  khác hẳn với vắng mặt (giữ nguyên bản DB). */
+  parts?: ExtractedPart[];
 };
 
 /** Lỗi discriminated của các server action (Design Doc §Data Contracts). */

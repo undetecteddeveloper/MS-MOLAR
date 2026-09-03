@@ -57,6 +57,12 @@ export const LIMITS = {
   // nên nó không bao giờ tha một biểu điểm sai thật.
   POINTS_EPSILON: 0.01,
   MAX_TITLE: 200,
+  // Trần tiêu đề MỘT PHẦN của đề ("PHẦN II. VIẾT", "I. PHẦN ĐỌC HIỂU"). Tách
+  // khỏi MAX_TITLE dù trùng số: hai thứ này bị ép bởi hai chỗ khác nhau — tiêu
+  // đề đề là cột `exams.title` có CHECK riêng, còn tiêu đề phần nằm trong jsonb
+  // `exams.parts` và chỉ có tầng app giữ (§8d). Buộc chúng bằng nhau bằng cách
+  // dùng chung hằng sẽ khiến một lần nới MAX_TITLE âm thầm nới cả cái này.
+  MAX_PART_TITLE: 200,
   // A1 — ngữ liệu dùng chung. Rộng tay hơn MAX_STEM RẤT NHIỀU và đó là cả điểm
   // của A1: bài đọc nay lưu ĐÚNG MỘT BẢN cho cả nhóm câu, nên chi phí của một
   // đoạn dài không còn nhân với số câu. 12000 ký tự ≈ một bài đọc 2000 từ, dài
