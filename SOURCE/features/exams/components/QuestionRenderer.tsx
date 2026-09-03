@@ -139,7 +139,7 @@ export function QuestionRenderer({
       )}
 
       {/* Nội dung câu hỏi — `font-serif` + một nấc cỡ chữ so với trước.
-          Serif KHÔNG phải trang trí: DESIGN.md xếp serif cho "tiêu đề & nội
+          Serif KHÔNG phải trang trí: globals.css xếp serif cho "tiêu đề & nội
           dung đọc", và màn xem lại bài (result/detail) VỐN ĐÃ render thân câu
           hỏi bằng `font-serif text-lg` — player mới là chỗ lệch chuẩn. Cho hai
           màn cùng một khuôn mặt chữ nghĩa là cùng một câu hỏi trông giống nhau

@@ -21,7 +21,7 @@ const markDataUri = `data:image/png;base64,${readFileSync(
   join(process.cwd(), "public/images/brand-mark.png"),
 ).toString("base64")}`;
 
-// Theme "Mực & Sơn mài" (DESIGN.md) — giữ đúng token của globals.css.
+// Theme "Mực & Sơn mài" (globals.css) — giữ đúng token của globals.css.
 const INK = "#1B1512";
 const IVORY = "#EDE1C8";
 const VERMILION = "#A62C2B";
@@ -40,7 +40,7 @@ export default function OpengraphImage() {
           padding: "0 88px",
           background: IVORY,
           // Hairline đỏ son quanh mép — phẳng, không đổ bóng, đúng tinh thần
-          // "flat + hairline" của DESIGN.md.
+          // "flat + hairline" của globals.css.
           borderTop: `18px solid ${VERMILION}`,
           borderBottom: `18px solid ${VERMILION}`,
         }}

@@ -51,7 +51,7 @@ export async function ExamCard({ exam, eligibility }: ExamCardProps) {
       />
 
       {/* hover shadow (S#26): engineer yêu cầu đích danh — exception quy tắc
-          "không đổ bóng" DESIGN.md cho riêng ExamCard; tông ấm đen sơn mài
+          "không đổ bóng" globals.css cho riêng ExamCard; tông ấm đen sơn mài
           thay đen lạnh. (Lift `-translate-y-0.5` đã chuyển lên <li>, xem
           comment ở đó — border-color/box-shadow ở lại đây vì không tạo
           stacking context, an toàn.) */}

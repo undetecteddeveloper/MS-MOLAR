@@ -2,7 +2,7 @@
 
 // LeaveExamDialog — modal cảnh báo rời trang làm bài (S#28 Q3, Layer 2).
 // Theme Mực & Sơn mài: card nền background + viền hairline, KHÔNG đổ bóng
-// (DESIGN.md Elevation & Depth) — phân lớp bằng scrim đen sơn mài mờ.
+// (globals.css Elevation & Depth) — phân lớp bằng scrim đen sơn mài mờ.
 // Nút chính "Leave" đỏ son (hành động rời = hành động chính user đang muốn);
 // "Cancel" outline phụ. Esc hoặc click scrim = Cancel.
 

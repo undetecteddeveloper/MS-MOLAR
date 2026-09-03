@@ -9,7 +9,7 @@ import { getLocale } from "@/lib/i18n/server";
 import { SITE_URL } from "@/lib/siteUrl";
 import "./globals.css";
 
-// Font theo DESIGN.md ("Mực & Sơn mài") — đồng bộ TOÀN site (S#17):
+// Font theo globals.css ("Mực & Sơn mài") — đồng bộ TOÀN site (S#17):
 // Source Serif 4 cho display/h1/h2/quote (--font-serif/--font-heading),
 // Be Vietnam Pro cho body/label-caps (--font-sans). Geist Mono giữ cho
 // --font-mono (timer MM:SS, nhãn chữ cái A/B/C/D). Merriweather + Geist Sans

@@ -1,6 +1,6 @@
 // Logic Layer 2 — Writes / Server Actions (GĐ 2 M2.6).
 // Persist attempt theo Q2=A (batch on submit): submitExam ghi toàn bộ answers +
-// chấm điểm server-side một lần. Xem BACK-END-ARCHITECTURE-MAP.md Mục 4.2.
+// chấm điểm server-side một lần. Xem ARCHITECTURE.md (gốc repo).
 "use server";
 
 import { after } from "next/server";

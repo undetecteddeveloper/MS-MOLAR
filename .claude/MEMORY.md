@@ -18,7 +18,7 @@ Ba pha, chạy theo thứ tự. Pha 2 tồn tại để pha 1 của phiên SAU t
 
 1. **Tool**: xác nhận thứ sắp dùng còn sống, đừng giả định. 
    - `composio` MCP: Dùng Composio MCP (`COMPOSIO_SEARCH_TOOLS` → `COMPOSIO_MULTI_EXECUTE_TOOL`, toolkit `notion`, `supabase`, `vercel`, `google drive` đã connected). Composio CLI không được hỗ trợ trên Window. Bỏ qua thay vì cố cài.
-2. **Việc dang dở**: đọc Notion database **MS-MOLAR** (`3b378ba6-ae12-803c-8500-c572b6fc745f`) — lọc row khác trạng thái "Hoàn tất". Kèm `docs/TECH-DEBT.md` + `docs/plans/` + git commited list.
+2. **Việc dang dở**: đọc Notion database **MS-MOLAR** (`3b378ba6-ae12-803c-8500-c572b6fc745f`) — lọc row khác trạng thái "Hoàn tất". Kèm `TECH-DEBT.md` + `docs/plans/` + git commited list.
 3. Chỉ tiếp tục việc cũ khi engineer yêu cầu; mặc định hỏi trước khi tự nối tiếp.
 
 ### Pha 2 — Notion (ghi nhận)
@@ -64,7 +64,9 @@ Mọi nợ kỹ thuật còn mở trong đó đã chuyển vào `TECH-DEBT.md`; 
    - Production: `vercel --prod`, hoặc promote bản preview đã duyệt.
    - Mặc định đi preview trước với thay đổi diện rộng (theme, i18n, auth); chỉ vào thẳng prod khi engineer bảo.
    - Push `main` cũng kích hoạt build prod tự động — coi chừng deploy hai lần.
-   - Có skill `vercel:deploy` và `vercel:status`. Env/Supabase prod: `docs/DEPLOYMENT.md`.
+   - Có skill `vercel:deploy` và `vercel:status`. Danh sách biến môi trường:
+     `SOURCE/.env.example`; giá trị thật đặt ở Vercel → Settings → Environment
+     Variables (Preview trỏ Supabase **dev**, Production trỏ **prod**).
 6. **Đóng vòng**: cập nhật lại row Notion (trạng thái + kết quả verify + link deploy + việc còn lại).
 
 ### Pha 3.5 — Kiểm DB prod TRƯỚC khi launch (TD-005, đã nổ 4 lần)
@@ -116,38 +118,16 @@ không phải checklist item có ai tick).
 
 ## 3. Theme — "Mực & Sơn mài" (Ink & Lacquer)
 
-Bản sắc: biên tập cổ điển (kiểu New York Times) kết hợp bảng màu sơn mài truyền thống Việt Nam.
+**Toàn bộ quy tắc theme nay nằm ở `PROJECT_OVERVIEW.md` §2** (chuyển tới đó
+2026-09-03, cùng đợt xoá các trích dẫn tới `DESIGN.md` — file đã bị xoá có chủ
+đích 2026-08-06, đừng khôi phục). Mục này rút thành con trỏ thay vì giữ bản thứ
+hai: repo này đã trả giá nhiều lần cho hai nguồn chân lý nói khác nhau.
 
-> `DESIGN.md` ở root repo **đã bị xoá có chủ đích (2026-08-06)** — đừng đi tìm, và đừng khôi phục. Mục này cùng `SOURCE/app/globals.css` nay là nguồn tham chiếu duy nhất cho theme; khi hai chỗ lệch nhau thì **`globals.css` thắng** (xem cảnh báo cuối mục).
+Ba điều cần nhớ mà không cần mở file:
 
-**Màu:**
-- primary (Đỏ son) `#A62C2B` · on-primary (Ngà) `#EDE1C8` · primary-hover `#8F2523`
-- background (Ngà) `#EDE1C8` · foreground (Đen sơn mài, warm black) `#1B1512`
-- surface `#1B1512` · on-surface `#EDE1C8`
-- accent (Vàng đồng) `#B8863B` · on-accent `#1B1512`
-- muted (Xám khói) `#6B655C` · on-muted `#EDE1C8`
-- border `#D8C9A8`
-
-**Typography:** Serif (Source Serif 4) chỉ dùng cho `display`/`h1`/`h2`/`quote`; Sans (Be Vietnam Pro) cho phần còn lại (body, label-caps, UI, nav) — vì hỗ trợ đầy đủ dấu tiếng Việt. Line-height serif lớn 1.15–1.3; sans body 1.6–1.7.
-
-**Layout:** max-width 720px cho khối text dài; spacing theo scale (xs 4px … xl 40px); tối đa 1 `rule-divider`/section.
-
-**Elevation:** Không box-shadow, không gradient — chỉ dùng màu nền/surface + border mỏng để phân lớp. Muốn "nổi" thì dùng border 2px màu accent, không dùng shadow.
-
-**Shapes:** Bo góc nhẹ — `rounded.sm` 4px (button/input), `rounded.md` 8px (card). Không dùng hình pill.
-
-**Quy tắc cứng:**
-- Đỏ son (primary) không phủ khối text lớn hay nền lớn — chỉ dùng cho accent/vùng nhỏ/banner/tag.
-- Không bao giờ dùng chữ trắng tinh (#FFFFFF) trên nền primary — dùng on-primary (Ngà).
-- Không bao giờ dùng đen tuyền (#000000) — foreground/surface dùng warm black `#1B1512`.
-- Vàng đồng (accent) không dùng cho khối lớn hay text dài — chỉ dùng cho divider/border/icon/hover underline.
-- Không trộn serif vào button, label, navigation.
-- Không dùng text primary-trên-surface (hoặc ngược lại) nhỏ hơn 24px — thiếu tương phản.
-
-**⚠️ Giá trị đã hiệu chỉnh theo WCAG (2026-08-06)** — bảng màu trên là bản sắc thiết kế, nhưng vài giá trị KHÔNG đạt ngưỡng tương phản nên code dùng biến thể khác. Lấy `SOURCE/app/globals.css` làm nguồn chuẩn cho token, đừng chép hex từ bảng trên vào code:
-
-- `--ring` (focus) `#8a6222`, KHÔNG phải `#B8863B` (chỉ 2.49:1, cần 3:1).
-- `--input` (viền ô nhập) `#877748`, KHÔNG phải `#D8C9A8` (1.26:1). `--border` vẫn `#D8C9A8` — kẻ trang trí thì không chịu ngưỡng.
-- `--muted-foreground` `#605a52`, KHÔNG phải `#6B655C` (4.45:1, hụt 4.5:1).
-- `--brand-on-dark` `#e86b5c` — dùng THAY đỏ son khi đặt trên nền đen sơn mài (nav/sidebar). Đỏ son `#A62C2B` trên `#1B1512` chỉ 2.44:1, đúng như quy tắc "<24px" ở trên đã cảnh báo. Nền ngà vẫn dùng `#A62C2B`.
-- Dùng token (`text-[color:var(--muted-foreground)]`), đừng hardcode hex — đợt sửa này phải đi gỡ 29 chỗ hardcode vì chúng vượt mặt token.
+1. **Nguồn giá trị token là `SOURCE/app/globals.css`** — khi nó lệch với văn xuôi
+   trong `PROJECT_OVERVIEW.md` §2 thì `globals.css` thắng.
+2. **Không hardcode hex.** Dùng token (`text-[color:var(--muted-foreground)]`).
+   Vài giá trị trong bảng bản sắc KHÔNG đạt WCAG nên code cố ý dùng biến thể khác
+   (`--ring`, `--input`, `--muted-foreground`, `--brand-on-dark`).
+3. **Phẳng:** không box-shadow, không gradient, không pill; serif chỉ cho tiêu đề.

@@ -3,8 +3,8 @@
 # Vercel build mỗi lần push vào `main` nhưng KHÔNG chạy test/lint — build xanh
 # không có nghĩa là code đúng. Workflow này lấp đúng khoảng đó.
 #
-# App nằm ở thư mục con `SOURCE/`, không phải repo root (xem docs/DEPLOYMENT.md
-# § 2.1) — nên mọi job đều đặt working-directory.
+# App nằm ở thư mục con `SOURCE/`, không phải repo root (xem ARCHITECTURE.md)
+# — nên mọi job đều đặt working-directory.
 
 name: CI
 

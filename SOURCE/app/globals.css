@@ -67,7 +67,7 @@
 }
 
 :root {
-  /* Theme "Mực & Sơn mài" (DESIGN.md) = ROOT — MỘT theme đồng bộ cho MỌI UI
+  /* Theme "Mực & Sơn mài" = ROOT — MỘT theme đồng bộ cho MỌI UI
      Layer (S#17, thay dark root cũ). Nền ngà (trang giấy cũ), chữ đen sơn mài
      (đen ấm), đỏ son cho hành động chính, vàng đồng cho kẻ/viền/focus. Không
      đổ bóng/gradient — phân lớp bằng màu nền + hairline border. */
@@ -75,13 +75,13 @@
   --foreground: #1b1512;
   --card: #ede1c8;
   --card-foreground: #1b1512;
-  /* Accent hành động duy nhất — đỏ son (DESIGN.md primary). */
+  /* Accent hành động duy nhất — đỏ son (primary). */
   --brand: #a62c2b;
   --brand-foreground: #ede1c8;
   /* Đỏ son làm sáng — CHỈ dùng khi đặt trên nền đen sơn mài (navbar, sidebar).
      Đỏ son gốc #a62c2b trên #1b1512 chỉ đạt 2.44:1, dưới cả ngưỡng 4.5:1 của
      WCAG 1.4.3 lẫn quy tắc "không đặt đỏ son trên đen ở cỡ < 24px" mà chính
-     DESIGN.md đặt ra. Biến thể này đạt 5.75:1. Trên nền ngà vẫn dùng --brand. */
+     chính theme đặt ra. Biến thể này đạt 5.75:1. Trên nền ngà vẫn dùng --brand. */
   --brand-on-dark: #e86b5c;
   --popover: #ede1c8;
   --popover-foreground: #1b1512;
@@ -281,7 +281,7 @@
     @apply font-serif;
     text-wrap: balance;
   }
-  /* Nhãn nhỏ dạng small-caps tracked — label-caps DESIGN.md (Be Vietnam Pro). */
+  /* Nhãn nhỏ dạng small-caps tracked — label-caps (Be Vietnam Pro). */
   .eyebrow {
     @apply font-sans text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground;
   }
@@ -340,7 +340,7 @@
    nơi NGOÀI scope. "Chỉ đổi theme, không đổi thiết kế."
    ============================================================ */
 :root {
-  /* Navbar (SiteHeader) — đen sơn mài "đảo ngược" trên nền ngà (DESIGN.md
+  /* Navbar (SiteHeader) — đen sơn mài "đảo ngược" trên nền ngà (token
      surface), đồng bộ với sidebar homepage. Một navbar cho mọi layer (S#17 —
      đã xóa .theme-l2 navy + .theme-ebp block xanh vì mâu thuẫn theme mới). */
   --nav-bg: rgb(27 21 18 / 0.97);

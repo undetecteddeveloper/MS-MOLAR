@@ -6,7 +6,7 @@
 --     (để dành Post-MVP Layer 4).
 -- Cách dùng: paste toàn bộ file này vào Supabase SQL Editor → Run.
 -- Idempotent: chạy lại nhiều lần không lỗi.
--- Tham chiếu BACK-END-ARCHITECTURE-MAP.md Mục 3, 4, 8.
+-- Tham chiếu ARCHITECTURE.md (gốc repo).
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------

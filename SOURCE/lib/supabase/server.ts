@@ -1,6 +1,6 @@
 // Supabase server client (Logic L1/L2 — dùng trong Server Actions & Server Components).
 // Đọc/ghi cookie session theo cơ chế của @supabase/ssr.
-// Xem BACK-END-ARCHITECTURE-MAP.md Mục 8.1 & 9.2.
+// Xem ARCHITECTURE.md (gốc repo).
 
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
@@ -8,7 +8,7 @@ import { SESSION_COOKIE_OPTIONS } from "./cookieOptions";
 
 /**
  * Tạo Supabase client phía server từ cookie request.
- * RLS tự inject auth.uid() vào mọi query (xem BACK-END map Mục 8.1).
+ * RLS tự inject auth.uid() vào mọi query (xem ARCHITECTURE.md (gốc repo)).
  */
 export async function createClient() {
   const cookieStore = await cookies();

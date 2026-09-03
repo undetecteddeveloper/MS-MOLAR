@@ -335,7 +335,7 @@ export function formatEnvReport(problems: EnvProblem[]): string {
     ...(warns.length > 0 ? ["", "  (không chặn app chạy:)", ...warns.map(line)] : []),
     "",
     "  Danh sách đầy đủ + cách lấy giá trị: SOURCE/.env.example",
-    "  Trên Vercel: Settings → Environment Variables (docs/DEPLOYMENT.md § 2.2)",
+    "  Trên Vercel: Settings → Environment Variables",
     "═".repeat(78),
     "",
   ].join("\n");

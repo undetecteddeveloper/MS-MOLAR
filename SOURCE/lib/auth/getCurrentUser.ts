@@ -1,5 +1,5 @@
 // Logic Layer 1 — getCurrentUser helper (GĐ 2 M2.4).
-// Dùng trong Server Component để biết user hiện tại. Xem BACK-END map Mục 3.2 & 8.1.
+// Dùng trong Server Component để biết user hiện tại. Xem ARCHITECTURE.md (gốc repo).
 //
 // GỘP LƯỢT GỌI BẰNG `React.cache()` (đo 2026-09-03, refactor A1).
 //

@@ -6,7 +6,7 @@ import type { MessageKey } from "@/lib/i18n/translate";
 import { SidebarProfile } from "@/features/auth/components/SidebarProfile";
 
 // HomeSidebar — vertical nav for the homepage (Layer 1 — Entry), Hyperspace
-// template layout. "Ink & Lacquer" theme (DESIGN.md): lacquer-black #1B1512
+// template layout. "Ink & Lacquer" theme (globals.css): lacquer-black #1B1512
 // surface, ivory #EDE1C8 text. All nav rows share the same muted hairline
 // divider (active is signalled only by brighter text). Real nav LINKS.
 // Server component (SidebarProfile là client con).
@@ -64,7 +64,7 @@ export async function HomeSidebar({
                 // Màu dùng --brand-on-dark chứ không phải --brand: sidebar là nền
                 // đen sơn mài, mà đỏ son gốc #A62C2B trên #1B1512 chỉ đạt 2.44:1
                 // — hụt 4.5:1 cho chữ 12px (WCAG 1.4.3) và 3:1 cho viền chỉ báo
-                // trạng thái active (WCAG 1.4.11). Chính DESIGN.md cũng cấm đặt đỏ
+                // trạng thái active (WCAG 1.4.11). Chính globals.css cũng cấm đặt đỏ
                 // son trên đen sơn mài ở cỡ nhỏ hơn 24px.
                 "block border-b-2 py-2.5 text-right font-sans text-xs font-medium tracking-[0.2em] uppercase transition-colors active:border-[color:var(--brand-on-dark)] active:text-[color:var(--brand-on-dark)] lg:py-3.5",
                 isActive

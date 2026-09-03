@@ -193,7 +193,7 @@ describe("schema.sql", () => {
         `Đúng loại lỗi đã làm tác giả không xoá được đề (2026-08-04).\n` +
         `Viết rõ hành vi mong muốn, kể cả khi nó đúng bằng mặc định:\n` +
         `  ... references <bảng> (<cột>) on delete cascade | set null | no action\n` +
-        `Chi tiết: schema.sql §16, docs/TECH-DEBT.md TD-011.\n` +
+        `Chi tiết: schema.sql §16, TECH-DEBT.md TD-011.\n` +
         `Đang thiếu:`
     ).toEqual([]);
   });

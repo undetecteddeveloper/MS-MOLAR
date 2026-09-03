@@ -3,7 +3,9 @@
 Sổ ghi nợ kỹ thuật — CHỈ dùng để ghi nhận nợ, không phải nơi thiết kế giải pháp.
 Mỗi mục: nó là gì, tại sao chấp nhận, và cái gì sẽ nổ nếu quên.
 
-Không ghi vào đây: lỗi bảo mật đang mở (thuộc `docs/security-review-*.md`), cảnh
+Không ghi vào đây: lỗi bảo mật đang mở — nó thuộc một ADR có ngày tháng và tiêu
+chí khai tử (tiền lệ: ADR-0010/ADR-0011 sinh ra từ đợt review 2026-08-03; các
+file `docs/security-review-*.md` không còn trong repo, đừng dẫn chiếu tới), cảnh
 báo đã tự viết trong header của chính file code, và những lệch pha không có
 đường nào chạm tới được trong thực tế. Ghi mục mới lên ĐẦU phần "Đang mở"; khi
 trả nợ thì CHUYỂN mục đó xuống "Đã trả" (không xoá — bối cảnh của một món nợ đã
@@ -1511,7 +1513,7 @@ trong Postgres, nhưng nay nó kêu to thay vì im lặng.
 Phát hiện lần đầu 2026-08-02 khi `security-reviewer` rà một feature khác (auto-
 chấm `short_answer`) và thấy `essay_answer` lộ được qua REST API cùng nhóm với
 `correct_answer`/`sub_answers` đã hở từ MVP; nâng lên Critical #1 trong
-`docs/security-review-2026-08-03.md`.
+đợt security review 2026-08-03 (tài liệu đó không còn trong repo; mục còn mở nằm ở `TECH-DEBT.md`).
 **Đã vá 2026-08-03** — `schema.sql` §10 (quyền cột + 2 hàm SECURITY DEFINER),
 gate hồi quy R-v…R-z2 trong `SOURCE/supabase/test-rls.ts`.
 
@@ -1520,7 +1522,7 @@ gate hồi quy R-v…R-z2 trong `SOURCE/supabase/test-rls.ts`.
 ## Đã loại khỏi sổ (không phải nợ)
 
 - **Chuỗi "claim → bịa điểm" phụ thuộc Critical #2** — không phải nợ kỹ thuật mà
-  là một lỗi bảo mật đang mở, đã theo dõi ở `docs/security-review-2026-08-03.md`
+  là một lỗi bảo mật đang mở, đã theo dõi ở đợt security review 2026-08-03 (tài liệu đó không còn trong repo; mục còn mở nằm ở `TECH-DEBT.md`)
   mục Critical #2 (ghi chú về tương tác đã chuyển sang đó). Hai chỗ theo dõi cùng
   một việc thì chỗ nào cũng sẽ bị bỏ quên.
 - **`getResult` lấy đáp án theo đề thay vì theo `per_question`** — không có

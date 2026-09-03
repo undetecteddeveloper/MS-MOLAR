@@ -1,6 +1,6 @@
 // Logic Layer 1 — Auth Server Actions (GĐ 2 M2.4; S#23 hoàn thiện auth module:
 // signup hardening + OAuth Google/Facebook + password reset).
-// Xem BACK-END-ARCHITECTURE-MAP.md Mục 3.2 & 9.1.
+// Xem ARCHITECTURE.md (gốc repo).
 "use server";
 
 import { headers } from "next/headers";
@@ -66,7 +66,7 @@ export async function signUp(
  * (route handler đổi code lấy session). Code verifier nằm trong cookie do
  * @supabase/ssr tự quản lý.
  * ⚠️ Chỉ hoạt động khi engineer đã bật provider + dán credentials trong
- * Supabase Dashboard (xem `docs/DEPLOYMENT.md` § 3.2 OAuth providers).
+ * Supabase Dashboard → Authentication → Providers.
  */
 export async function signInWithOAuth(
   _prev: AuthState,

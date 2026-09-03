@@ -17,7 +17,7 @@
 | **Repo** | `github.com/undetecteddeveloper/TrangNguyenDigi.git` |
 | **Giao tiếp agent ↔ engineer** | Tiếng Việt |
 | **Solo hay team** | Solo (1 engineer) |
-| **Tài liệu liên quan** | `DESIGN.md` (design token), `TECH-DEBT.md`, `docs/DEPLOYMENT.md`. Tiến độ từng phiên: Notion (xem `.claude/MEMORY.md`) |
+| **Tài liệu liên quan** | `ARCHITECTURE.md` (code ở đâu), §2 dưới đây (design token), `TECH-DEBT.md`, `docs/adr/`. Tiến độ từng phiên: Notion (xem `.claude/MEMORY.md`) |
 
 ---
 
@@ -33,13 +33,59 @@
 
 ---
 
-## 2. Design System
+## 2. Design System — theme "Mực & Sơn mài" (Ink & Lacquer)
 
-Nguồn thiết kế duy nhất là **`DESIGN.md`** (root repo) — theme "Mực & Sơn mài"
-(Ink & Lacquer): biên tập cổ điển kiểu New York Times kết hợp bảng màu sơn mài
-truyền thống Việt Nam, phẳng (không 3D, không box-shadow/gradient). Coi
-`DESIGN.md` là authoritative cho mọi màu sắc/typography/spacing/component token
-— file này không lặp lại nội dung đó.
+Bản sắc: biên tập cổ điển (kiểu New York Times) kết hợp bảng màu sơn mài truyền
+thống Việt Nam. Phẳng — không 3D, không box-shadow, không gradient.
+
+> **Nguồn giá trị là `SOURCE/app/globals.css`.** Mục này là quy tắc và lý do;
+> khi hai bên lệch nhau thì `globals.css` thắng (xem cảnh báo WCAG cuối mục).
+> File `DESIGN.md` — nơi từng giữ vai trò này — **đã bị xoá có chủ đích
+> 2026-08-06**; đừng đi tìm và đừng khôi phục. Tài liệu trong `docs/` trỏ về
+> "PROJECT_OVERVIEW.md §2" là trỏ về đây.
+
+**Màu:**
+- primary (Đỏ son) `#A62C2B` · on-primary (Ngà) `#EDE1C8` · primary-hover `#8F2523`
+- background (Ngà) `#EDE1C8` · foreground (Đen sơn mài, warm black) `#1B1512`
+- surface `#1B1512` · on-surface `#EDE1C8`
+- accent (Vàng đồng) `#B8863B` · on-accent `#1B1512`
+- muted (Xám khói) `#6B655C` · on-muted `#EDE1C8`
+- border `#D8C9A8`
+
+**Typography:** Serif (Source Serif 4) chỉ cho `display`/`h1`/`h2`/`quote`; Sans
+(Be Vietnam Pro) cho phần còn lại (body, label-caps, UI, nav) — vì hỗ trợ đầy đủ
+dấu tiếng Việt. Line-height serif 1.15–1.3; sans body 1.6–1.7.
+
+**Layout:** max-width 720px cho khối text dài; spacing theo scale (xs 4px … xl
+40px); tối đa 1 `rule-divider` mỗi section.
+
+**Elevation & Depth:** Không box-shadow, không gradient — phân lớp bằng màu
+nền/surface + border mỏng. Muốn "nổi" thì border 2px màu accent, không dùng shadow.
+
+**Shapes:** Bo góc nhẹ — 4px (button/input), 8px (card). Không dùng hình pill.
+
+**Quy tắc cứng:**
+- Đỏ son (primary) không phủ khối text lớn hay nền lớn — chỉ accent/vùng nhỏ/banner/tag.
+- Không bao giờ dùng chữ trắng tinh (`#FFFFFF`) trên nền primary — dùng on-primary (Ngà).
+- Không bao giờ dùng đen tuyền (`#000000`) — foreground/surface dùng warm black `#1B1512`.
+- Vàng đồng (accent) không dùng cho khối lớn hay text dài — chỉ divider/border/icon/hover underline.
+- Không trộn serif vào button, label, navigation.
+- Không dùng text primary-trên-surface (hoặc ngược lại) nhỏ hơn 24px — thiếu tương phản.
+
+**⚠ Giá trị đã hiệu chỉnh theo WCAG (2026-08-06).** Bảng màu trên là bản sắc
+thiết kế, nhưng vài giá trị KHÔNG đạt ngưỡng tương phản nên code dùng biến thể
+khác. Lấy `SOURCE/app/globals.css` làm nguồn chuẩn cho token, đừng chép hex từ
+bảng trên vào code:
+
+- `--ring` (focus) `#8a6222`, KHÔNG phải `#B8863B` (chỉ 2.49:1, cần 3:1).
+- `--input` (viền ô nhập) `#877748`, KHÔNG phải `#D8C9A8` (1.26:1). `--border` vẫn
+  `#D8C9A8` — kẻ trang trí không chịu ngưỡng.
+- `--muted-foreground` `#605a52`, KHÔNG phải `#6B655C` (4.45:1, hụt 4.5:1).
+- `--brand-on-dark` `#e86b5c` — dùng THAY đỏ son khi đặt trên nền đen sơn mài
+  (nav/sidebar). Đỏ son `#A62C2B` trên `#1B1512` chỉ 2.44:1, đúng như quy tắc
+  "<24px" ở trên đã cảnh báo. Nền ngà vẫn dùng `#A62C2B`.
+- Dùng token (`text-[color:var(--muted-foreground)]`), đừng hardcode hex — đợt sửa
+  này đã phải đi gỡ 29 chỗ hardcode vì chúng vượt mặt token.
 
 ---
 
@@ -73,11 +119,11 @@ truyền thống Việt Nam, phẳng (không 3D, không box-shadow/gradient). Co
 |---|---|---|
 | Frontend | Next.js 16 (App Router) + TypeScript + React 19 | SSR/ISR giảm latency; App Router map tự nhiên vào route group theo layer; TypeScript bắt lỗi compile-time khi solo dev không có reviewer |
 | Styling | Tailwind CSS v4 | Utility-first, không CSS thừa trong production build |
-| Component primitives | base-ui + `class-variance-authority` (`SOURCE/components/ui/`) | Unstyled, accessible, dễ áp token của `DESIGN.md` |
+| Component primitives | base-ui + `class-variance-authority` (`SOURCE/components/ui/`) | Unstyled, accessible, dễ áp token của §2 |
 | Backend & DB | Supabase (PostgreSQL + Auth + Storage) | RLS ở tầng DB (không thể bypass qua API), Auth built-in, PostgreSQL đủ mạnh cho dữ liệu đề thi nhiều quan hệ |
 | UGC extraction | Google Gemini API | Trích câu hỏi/đáp án từ PDF đề thi upload lên |
 | PDF export | jsPDF + html2canvas | Xem ADR-0009 (lý do không dùng `@react-pdf/renderer`) |
-| Deployment | Vercel, region `sin1` (Singapore) | Gần Supabase prod và người dùng VN — xem `docs/DEPLOYMENT.md` §2.2b |
+| Deployment | Vercel, region `sin1` (Singapore) | Gần Supabase prod (`ap-south-1`) và người dùng VN. Region khai trong `SOURCE/vercel.json` |
 | Testing | Vitest (unit/component) | Xem §6 |
 
 ---
@@ -95,7 +141,6 @@ MS-MOLAR/
 │   └── supabase/            # schema.sql, seed.ts, test-rls.ts, verify-schema.ts
 ├── docs/                    # PRD, ADR, Design Doc, UI Spec, work plan theo từng feature
 ├── SCREENSHOT/              # Ảnh tham chiếu thiết kế + screenshot tạm (Playwright MCP)
-├── DESIGN.md                # Design token — nguồn duy nhất, xem §2
 ├── TECH-DEBT.md             # Sổ ghi nợ kỹ thuật
 ├── ARCHITECTURE.md          # Cái gì để đâu, vì sao, thêm màn hình mới thì tạo file ở đâu
 └── PROJECT_OVERVIEW.md      # File này
@@ -134,7 +179,7 @@ Theo Conventional Commits:
 
 ### Branching
 
-Việc nhỏ: push thẳng `main`. Feature lớn: nhánh riêng (vd `feat/rating-system`) rồi merge vào `main` — Vercel tự tạo Preview deploy cho mỗi feature branch (trỏ Supabase project **dev**, xem `docs/DEPLOYMENT.md`).
+Việc nhỏ: push thẳng `main`. Feature lớn: nhánh riêng (vd `feat/rating-system`) rồi merge vào `main` — Vercel tự tạo Preview deploy cho mỗi feature branch (trỏ Supabase project **dev**; Production trỏ **prod**).
 
 ---
 
@@ -148,7 +193,7 @@ Việc nhỏ: push thẳng `main`. Feature lớn: nhánh riêng (vd `feat/rating
 - Supabase RLS bắt buộc trên mọi table chứa dữ liệu user
 - Không lưu sensitive data (điểm, lịch sử) ở localStorage
 - Input validation ở cả client (TypeScript types) và server (Supabase policies)
-- Chi tiết đầy đủ + trạng thái từng mục: `docs/security-review-2026-08-03.md`, `docs/TECH-DEBT.md`
+- Chi tiết đầy đủ + trạng thái từng mục: `TECH-DEBT.md` (đợt security review 2026-08-03 đã sinh ra ADR-0010/ADR-0011; tài liệu review không còn trong repo)
 
 ### Accessibility
 - Toàn bộ interactive element có keyboard navigation
@@ -164,10 +209,10 @@ Việc nhỏ: push thẳng `main`. Feature lớn: nhánh riêng (vd `feat/rating
 
 | Rủi ro | Mức độ | Biện pháp |
 |---|---|---|
-| Layer 1 quá tối giản → user mới không biết làm gì | Trung bình | Hint text nhỏ; không phá vỡ thẩm mỹ biên tập của `DESIGN.md` |
+| Layer 1 quá tối giản → user mới không biết làm gì | Trung bình | Hint text nhỏ; không phá vỡ thẩm mỹ biên tập của §2 |
 | Feedback loop sai hướng (user học sai → hệ thống học theo) | Thấp (Layer 3) | Ground Truth layer cứng cho đề chính thức Bộ GD&ĐT — không bị kéo xuống bởi report |
 | Mất personalization/lịch sử của user | Thấp | Lưu trên Supabase (không phải localStorage) |
-| Nợ kỹ thuật đang mở có thể nổ khi chạm tới | Xem `docs/TECH-DEBT.md` | Theo dõi + đánh giá lại định kỳ, không để mục cũ tự tin sai |
+| Nợ kỹ thuật đang mở có thể nổ khi chạm tới | Xem `TECH-DEBT.md` | Theo dõi + đánh giá lại định kỳ, không để mục cũ tự tin sai |
 
 ---
 
@@ -179,8 +224,8 @@ Ghi lại các quyết định kỹ thuật quan trọng để tránh revisit kh
 |---|---|---|
 | — | Next.js (App Router) thay vì React thuần | SSR/ISR giảm latency, SEO tốt hơn |
 | — | Supabase thay vì Firebase | PostgreSQL + RLS mạnh hơn cho dữ liệu đề thi phức tạp; bảo mật tốt hơn |
-| — | shadcn-style primitives (base-ui + cva) thay vì MUI/Antd | Unstyled, dễ customize theo token riêng của `DESIGN.md` |
+| — | shadcn-style primitives (base-ui + cva) thay vì MUI/Antd | Unstyled, dễ customize theo token riêng của §2 |
 | 2026-07-27 | History (lịch sử làm bài) tách thành layer riêng `(HM)` thay vì gộp vào Layer 3 (Reflection) | Layer 3 dở dang cho Analytics; tách để triển khai độc lập |
-| **2026-08-06** | **Bỏ hẳn tầm nhìn ban đầu: homepage 3D (Three.js scene bàn gỗ + máy Mac, GSAP transition, "Spatial Memory" visual-language-per-layer)** | Không bao giờ được implement — `package.json` không có `three`/`gsap`; `(layer1)` thực tế là trang đăng nhập phẳng. Theme thật đang dùng là "Mực & Sơn mài" (`DESIGN.md`), editorial/phẳng, ưu tiên tốc độ tải trên Android tầm trung hơn hiệu ứng 3D. Tài liệu cũ mô tả 3D đã bị xoá khỏi file này ở lần rà soát 2026-08-06 để tránh gây hiểu nhầm cho agent đọc sau. |
+| **2026-08-06** | **Bỏ hẳn tầm nhìn ban đầu: homepage 3D (Three.js scene bàn gỗ + máy Mac, GSAP transition, "Spatial Memory" visual-language-per-layer)** | Không bao giờ được implement — `package.json` không có `three`/`gsap`; `(layer1)` thực tế là trang đăng nhập phẳng. Theme thật đang dùng là "Mực & Sơn mài" (§2), editorial/phẳng, ưu tiên tốc độ tải trên Android tầm trung hơn hiệu ứng 3D. Tài liệu cũ mô tả 3D đã bị xoá khỏi file này ở lần rà soát 2026-08-06 để tránh gây hiểu nhầm cho agent đọc sau. |
 
 > Agent: Khi engineer ra quyết định kỹ thuật mới trong quá trình làm việc, thêm vào bảng này và ghi ngày.

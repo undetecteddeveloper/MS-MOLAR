@@ -13,7 +13,7 @@ import { buildHomeJsonLd, serializeJsonLd } from "@/lib/seo/jsonLd";
 
 // Homepage (Layer 1 — Entry). Bố cục theo template Hyperspace (HTML5 UP):
 // sidebar nav dọc bên trái + content area bên phải. Theme "Mực & Sơn mài"
-// (DESIGN.md): sidebar đen sơn mài #1B1512 · content nền ngà #EDE1C8.
+// (globals.css): sidebar đen sơn mài #1B1512 · content nền ngà #EDE1C8.
 //
 // S#17: content area có HAI trạng thái — hero và form auth — swap bằng
 // transition ngay trong trang (không tách page /login riêng). URL sync qua
@@ -116,7 +116,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ a
 
 // Hoa văn đường kẻ hình học mờ trên nền content area (tái hiện texture của
 // template). Hairline phẳng (không gradient/bóng), màu đen sơn mài opacity
-// thấp — đúng tinh thần "flat + hairline" của DESIGN.md. vector-effect giữ nét
+// thấp — đúng tinh thần "flat + hairline" của globals.css. vector-effect giữ nét
 // 1px dù SVG bị kéo giãn không đồng đều (preserveAspectRatio=none).
 //
 // Trôi chậm (2026-08-09, engineer yêu cầu làm "lưới không gian" sau tiêu đề

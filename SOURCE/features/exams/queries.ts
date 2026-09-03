@@ -1,6 +1,6 @@
 // Logic Layer 2 — Reads (GĐ 2 M2.5/M2.6). Server-only: dùng Supabase server client.
 // Gọi từ Server Component. Thay getFakeExams/getFakeExam/getFakeQuestions của GĐ 1.
-// Xem BACK-END-ARCHITECTURE-MAP.md Mục 4.2.
+// Xem ARCHITECTURE.md (gốc repo).
 import "server-only";
 
 import {

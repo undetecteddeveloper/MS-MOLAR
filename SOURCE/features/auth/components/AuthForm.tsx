@@ -1,6 +1,6 @@
 // UI Layer 1 — Card đăng nhập / đăng ký (GĐ 3 Polish, S#15; restyle S#17).
 // Bố cục theo TEMPLATE/homepage/signup_login_page_form.jpe (panel tab trái +
-// form phải). Theme "Mực & Sơn mài" (DESIGN.md): panel tab đen sơn mài #1B1512,
+// form phải). Theme "Mực & Sơn mài" (globals.css): panel tab đen sơn mài #1B1512,
 // form nền ngà #EDE1C8, nút đỏ son #A62C2B, focus underline vàng đồng #B8863B.
 // Không đổ bóng, bo góc 4px (quy tắc Elevation & Shapes). Nằm trong content
 // area của homepage (HomeStage) — không còn page /login riêng.
@@ -11,7 +11,7 @@
 //  - Hiển thị `state.info` (vd signup cần xác nhận email) — tông trung tính,
 //    khác error đỏ son.
 // S#24: panel trái đổi từ watermark logo → chữ cái serif phóng to trang trí
-// (tinh thần drop-cap DESIGN.md); password field có toggle hiện/ẩn.
+// (tinh thần drop-cap globals.css); password field có toggle hiện/ẩn.
 // S#25: thân form (reset view ⇄ sign-in/sign-up) bọc trong AutoHeightPanel —
 // card giãn/nở mượt khi số field thay đổi giữa 2 tab, thay vì nhảy khựng.
 "use client";
@@ -47,7 +47,7 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
       <div className="relative flex overflow-hidden bg-[#1B1512] p-6 sm:w-2/5 sm:flex-col sm:justify-center sm:p-8">
         {/* Nền: chữ cái Latinh serif phóng to trang trí (S#24, thay watermark
             logo cũ) — "M"/"S" khớp MS-MOLAR, tông đỏ son mờ (tinh thần
-            drop-cap DESIGN.md: font display, color primary). Tĩnh — S#26 bỏ
+            drop-cap globals.css: font display, color primary). Tĩnh — S#26 bỏ
             transition remount theo tab (engineer yêu cầu). */}
         <div
           aria-hidden
@@ -207,7 +207,7 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
                   >
                     {t("auth.forgotPassword")}
                   </button>
-                  {/* button-primary DESIGN.md: nền đỏ son, chữ ngà, label-caps, bo 4px. */}
+                  {/* button-primary globals.css: nền đỏ son, chữ ngà, label-caps, bo 4px. */}
                   <button
                     type="submit"
                     disabled={pending}

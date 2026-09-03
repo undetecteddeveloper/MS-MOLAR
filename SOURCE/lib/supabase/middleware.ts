@@ -1,6 +1,6 @@
 // Supabase middleware helper — refresh session mỗi request và bảo vệ route.
 // Được gọi từ proxy.ts (Next.js 16 convention thay middleware.ts).
-// Xem BACK-END-ARCHITECTURE-MAP.md Mục 8.1.
+// Xem ARCHITECTURE.md (gốc repo).
 
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";

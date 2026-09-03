@@ -14,7 +14,7 @@ import { PageContainer } from "@/components/layout/PageContainer";
 // 300s là trần cứng của Vercel với fluid compute (bật mặc định, Hobby lẫn Pro).
 // Khai tường minh vì mặc định của platform thấp hơn nhiều và có thể đổi theo
 // cấu hình project — im lặng cắt giữa chừng thì đề đã upload sẽ mất trắng.
-// docs/DEPLOYMENT.md § "Đã biết trước" ghi việc này là nợ; đây là chỗ trả.
+// Trước đây trần này để mặc định và việc đó được ghi là nợ; đây là chỗ trả.
 export const maxDuration = 300;
 
 export default async function UploadPage() {

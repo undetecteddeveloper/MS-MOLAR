@@ -2,7 +2,7 @@
 // GĐ 2 (M2.6): startAttempt() Server Action tạo attempt trong DB rồi redirect.
 // (Trước đây GĐ 1 sinh attemptId client-side bằng crypto.randomUUID.)
 // GĐ 3 M3.2: style brand, full-width trên mobile, auto trên desktop.
-// S#17: button-primary theo DESIGN.md — nền đỏ son, chữ ngà, bo 4px, hover đậm
+// S#17: button-primary theo globals.css — nền đỏ son, chữ ngà, bo 4px, hover đậm
 // hơn (#8F2523); bỏ glow shadow (quy tắc "không đổ bóng").
 //
 // Chỉ báo chờ (2026-08-28): RouteLoadingOverlay bắt điều hướng bằng cách nghe
