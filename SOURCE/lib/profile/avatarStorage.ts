@@ -1,5 +1,5 @@
 // Danh tính của object ảnh đại diện trong Storage — dùng chung giữa ĐƯỜNG GHI
-// (changeAvatar, app/(layer1)/actions.ts) và ĐƯỜNG ĐỌC (getCurrentUserProfile,
+// (changeAvatar, features/auth/actions.ts) và ĐƯỜNG ĐỌC (getCurrentUserProfile,
 // lib/auth/getCurrentUser.ts).
 //
 // Vì sao là hằng số dùng chung chứ không phải một const nội bộ mỗi file như

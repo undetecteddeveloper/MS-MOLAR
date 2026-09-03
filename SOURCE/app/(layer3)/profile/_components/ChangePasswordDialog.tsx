@@ -29,7 +29,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { changePassword, type AuthState } from "@/app/(layer1)/actions";
+import { changePassword, type AuthState } from "@/features/auth/actions";
 import { useT } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n/translate";
 import { profileMessage, resolveActionError, type ProfileMessage } from "./errorMessages";

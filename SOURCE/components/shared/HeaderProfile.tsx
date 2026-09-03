@@ -16,7 +16,7 @@
 // đường đi; việc sửa nằm ở /profile, cách đây đúng một cú bấm.
 import Link from "next/link";
 import { useState } from "react";
-import { signOut } from "@/app/(layer1)/actions";
+import { signOut } from "@/features/auth/actions";
 import { useT } from "@/lib/i18n/client";
 import { Avatar } from "@/components/shared/Avatar";
 

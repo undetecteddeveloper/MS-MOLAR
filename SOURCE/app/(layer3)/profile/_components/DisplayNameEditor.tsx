@@ -14,7 +14,7 @@
 
 import { useActionState, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { updateProfile, type AuthState } from "@/app/(layer1)/actions";
+import { updateProfile, type AuthState } from "@/features/auth/actions";
 import { useT } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n/translate";
 import { DISPLAY_NAME_MAX, filterDisplayNameInput } from "@/lib/profile/displayName";

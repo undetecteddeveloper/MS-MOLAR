@@ -3,7 +3,7 @@ import { LanguageToggle } from "@/components/shared/LanguageToggle";
 import { getTranslate } from "@/lib/i18n/server";
 import { GUEST_NAV_ITEMS, NAV_ITEMS, navPrefetch } from "@/lib/nav/items";
 import type { MessageKey } from "@/lib/i18n/translate";
-import { SidebarProfile } from "./SidebarProfile";
+import { SidebarProfile } from "@/features/auth/components/SidebarProfile";
 
 // HomeSidebar — vertical nav for the homepage (Layer 1 — Entry), Hyperspace
 // template layout. "Ink & Lacquer" theme (DESIGN.md): lacquer-black #1B1512

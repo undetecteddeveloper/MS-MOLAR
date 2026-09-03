@@ -9,7 +9,7 @@ import { useT } from "@/lib/i18n/client";
 // S#24: mỗi field có toggle hiện/ẩn mật khẩu RIÊNG (New/Confirm độc lập nhau).
 
 import { useActionState, useState } from "react";
-import { updatePassword, type AuthState } from "@/app/(layer1)/actions";
+import { updatePassword, type AuthState } from "@/features/auth/actions";
 import { PASSWORD_MIN_LENGTH } from "@/lib/auth/passwordPolicy";
 
 export function ResetPasswordForm() {

@@ -12,7 +12,7 @@
 
 import { useRef } from "react";
 import { useFormStatus } from "react-dom";
-import { signOut } from "@/app/(layer1)/actions";
+import { signOut } from "@/features/auth/actions";
 import { useT } from "@/lib/i18n/client";
 import { cn } from "@/lib/utils";
 import { outlineButtonCls } from "./styles";

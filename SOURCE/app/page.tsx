@@ -1,8 +1,8 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { AboutPrompt } from "@/app/(layer1)/_components/AboutPrompt";
-import { HomeSidebar } from "@/app/(layer1)/_components/HomeSidebar";
-import { HomeStage, type AuthMode } from "@/app/(layer1)/_components/HomeStage";
+import { AboutPrompt } from "@/features/auth/components/AboutPrompt";
+import { HomeSidebar } from "@/features/auth/components/HomeSidebar";
+import { HomeStage, type AuthMode } from "@/features/auth/components/HomeStage";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { SkipLink } from "@/components/shared/SkipLink";

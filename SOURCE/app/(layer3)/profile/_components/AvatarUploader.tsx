@@ -28,7 +28,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { changeAvatar, type AuthState } from "@/app/(layer1)/actions";
+import { changeAvatar, type AuthState } from "@/features/auth/actions";
 import { useT } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n/translate";
 import { checkAvatarFile } from "@/lib/profile/validateAvatar";

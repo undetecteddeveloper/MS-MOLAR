@@ -10,9 +10,9 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/app/(layer1)/actions", () => ({ changePassword: vi.fn() }));
+vi.mock("@/features/auth/actions", () => ({ changePassword: vi.fn() }));
 
-import { changePassword } from "@/app/(layer1)/actions";
+import { changePassword } from "@/features/auth/actions";
 import { PASSWORD_MIN_LENGTH } from "@/lib/auth/passwordPolicy";
 import { ChangePasswordDialog } from "../_components/ChangePasswordDialog";
 

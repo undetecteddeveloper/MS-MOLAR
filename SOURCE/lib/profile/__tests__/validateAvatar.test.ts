@@ -6,7 +6,7 @@
 //   "avatar rejection matrix: 6/6")
 //
 // The Server Action half (nothing reaches Storage when this refuses) is proven
-// in app/(layer1)/__tests__/profileActions.int.test.ts; this file proves only
+// in features/auth/__tests__/profileActions.int.test.ts; this file proves only
 // the decision itself.
 
 import { describe, expect, it } from "vitest";

@@ -6,7 +6,7 @@
 import { redirect } from "next/navigation";
 import { getTranslate } from "@/lib/i18n/server";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
-import { ResetPasswordForm } from "@/app/(layer1)/_components/ResetPasswordForm";
+import { ResetPasswordForm } from "@/features/auth/components/ResetPasswordForm";
 
 export default async function ResetPasswordPage() {
   const t = await getTranslate();

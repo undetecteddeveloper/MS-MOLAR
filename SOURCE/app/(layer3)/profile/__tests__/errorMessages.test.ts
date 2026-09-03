@@ -6,7 +6,7 @@
 // CỨNG chứ không phải khoá i18n —
 //   - `validatePassword` (lib/auth/passwordPolicy.ts): cố ý, theo UI-D10, để
 //     không tồn tại hai bản chính sách mật khẩu;
-//   - `updateProfile` (app/(layer1)/actions.ts): sẵn có, và PRD khoá nó ở dạng
+//   - `updateProfile` (features/auth/actions.ts): sẵn có, và PRD khoá nó ở dạng
 //     "dùng lại, không viết lại" (AC-046).
 // Client dịch chúng bằng cách so khớp NGUYÊN VĂN. Sửa một câu ở nguồn mà quên
 // bản đồ thì không có lỗi nào nổ ra: mọi người dùng Việt lặng lẽ tụt xuống câu
@@ -22,7 +22,7 @@ vi.mock("@/lib/security/rateLimit", () => ({
   guard: vi.fn(async () => ({ ok: true, retryAfterSeconds: 0 })),
 }));
 
-import { updateProfile } from "@/app/(layer1)/actions";
+import { updateProfile } from "@/features/auth/actions";
 import {
   PASSWORD_MAX_BYTES,
   PASSWORD_MIN_LENGTH,

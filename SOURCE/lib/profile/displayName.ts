@@ -1,9 +1,9 @@
 // /profile — the display-name rule, in one place.
 //
 // The client-side filter below existed twice verbatim, in
-// components/shared/HeaderProfile.tsx and app/(layer1)/_components/
+// components/shared/HeaderProfile.tsx and features/auth/components/
 // SidebarProfile.tsx, and /profile would have been the third copy. The server
-// rules in updateProfile (app/(layer1)/actions.ts) were a fourth statement of
+// rules in updateProfile (features/auth/actions.ts) were a fourth statement of
 // the same two constants, written as inline literals — so a change to the
 // length cap had four places to miss.
 //

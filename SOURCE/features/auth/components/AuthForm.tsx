@@ -17,7 +17,7 @@
 "use client";
 
 import { useActionState, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import { requestPasswordReset, signIn, signInWithOAuth, signUp, type AuthState } from "../actions";
+import { requestPasswordReset, signIn, signInWithOAuth, signUp, type AuthState } from "@/features/auth/actions";
 import { useT } from "@/lib/i18n/client";
 import { PASSWORD_MIN_LENGTH } from "@/lib/auth/passwordPolicy";
 

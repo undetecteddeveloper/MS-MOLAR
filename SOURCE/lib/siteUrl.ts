@@ -1,7 +1,7 @@
 // Origin công khai của site, dùng cho những chỗ BẮT BUỘC phải là URL tuyệt đối:
 // `metadataBase` (Open Graph / canonical), `robots.txt`, `sitemap.xml`.
 //
-// KHÔNG dùng cho auth redirect — `app/(layer1)/actions.ts` cố ý lấy origin từ
+// KHÔNG dùng cho auth redirect — `features/auth/actions.ts` cố ý lấy origin từ
 // request header để cùng một build chạy đúng trên cả preview lẫn production.
 // Ở đây thì ngược lại: metadata phải trỏ về domain CHÍNH THỨC, nếu không link
 // chia sẻ từ một preview deploy sẽ chết khi preview đó bị xoá.

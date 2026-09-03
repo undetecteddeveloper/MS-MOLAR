@@ -55,7 +55,7 @@ vi.mock("next/navigation", () => ({ usePathname: () => "/upload" }));
 vi.mock("@/components/shared/SkipLink", () => ({ SkipLink: () => null }));
 vi.mock("@/lib/support/actions", () => ({ submitSupportTicket: vi.fn() }));
 vi.mock("@/lib/i18n/actions", () => ({ setLocale: vi.fn() }));
-vi.mock("@/app/(layer1)/actions", () => ({ signOut: vi.fn() }));
+vi.mock("@/features/auth/actions", () => ({ signOut: vi.fn() }));
 
 import Layer4Layout from "../layout";
 import { TutorQuotaNote } from "@/components/billing/TutorQuotaNote";

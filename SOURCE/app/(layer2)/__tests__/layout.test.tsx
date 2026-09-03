@@ -70,7 +70,7 @@ vi.mock("next/navigation", () => ({ usePathname: () => "/exams" }));
 vi.mock("@/components/shared/SkipLink", () => ({ SkipLink: () => null }));
 vi.mock("@/lib/support/actions", () => ({ submitSupportTicket: vi.fn() }));
 vi.mock("@/lib/i18n/actions", () => ({ setLocale: vi.fn() }));
-vi.mock("@/app/(layer1)/actions", () => ({ signOut: vi.fn() }));
+vi.mock("@/features/auth/actions", () => ({ signOut: vi.fn() }));
 
 import Layer2Layout from "../layout";
 import { TutorQuotaNote } from "@/components/billing/TutorQuotaNote";
@@ -453,7 +453,11 @@ describe("Binding decision ADR-0013 — một phép tính quyền lợi, KHÔNG 
     // gọi phát ra trong lượt render layout với `children` do test cấp.
     const files = walk(path.join(sourceRoot, "app"))
       .concat(walk(path.join(sourceRoot, "components")))
-      .concat(walk(path.join(sourceRoot, "lib")));
+      .concat(walk(path.join(sourceRoot, "lib")))
+      // features/ (B2, 2026-09-03): queries/actions/components của từng tính
+      // năng chuyển ra đây; bỏ sót là một đường đọc thứ hai đặt trong feature
+      // trở nên vô hình y như trường hợp lib/ ở trên.
+      .concat(walk(path.join(sourceRoot, "features")));
 
     for (const full of files) {
       const source = readFileSync(full, "utf8");

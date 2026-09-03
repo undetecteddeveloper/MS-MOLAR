@@ -140,7 +140,7 @@ export async function cropImagesLenient(
       // Vì sao lỗi này sống sót lâu: `up.error` KHÔNG BAO GIỜ nổ (upload thành
       // công thật, chỉ là sai nội dung), `png.length` log ra đúng kích thước
       // TRƯỚC khi hỏng, và mọi cổng verify đều mù với nội dung một object
-      // Storage. Hai đường upload khác của repo (avatar `(layer1)/actions.ts`,
+      // Storage. Hai đường upload khác của repo (avatar `features/auth/actions.ts`,
       // ảnh chụp màn hình `support/actions.ts`) không dính vì chúng truyền
       // `File` — vốn đã là Blob.
       const up = await supabase.storage.from(BUCKET).upload(path, pngBlob(png), {

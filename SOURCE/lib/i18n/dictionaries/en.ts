@@ -880,7 +880,7 @@ export const en = {
   // Server Action trả về KHOÁ, không trả câu chữ của Supabase: thông điệp của
   // nhà cung cấp trên đường mật khẩu là một oracle (updateUser trả nguyên văn
   // "New password should be different from the old password"). Đây là chỗ khác
-  // biệt có chủ đích so với sáu chỗ còn lại trong app/(layer1)/actions.ts, nơi
+  // biệt có chủ đích so với sáu chỗ còn lại trong features/auth/actions.ts, nơi
   // error.message vẫn được trả thẳng.
   //
   // NGOẠI LỆ: bốn câu của validatePassword vẫn về nguyên văn tiếng Anh và được

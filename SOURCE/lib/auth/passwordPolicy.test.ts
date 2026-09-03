@@ -80,8 +80,8 @@ describe("cổng chống trôi lệch: sàn độ dài chỉ có MỘT nguồn",
 
   it("không form nào viết số cứng vào minLength — phải lấy từ hằng số chung", () => {
     for (const path of [
-      "app/(layer1)/_components/AuthForm.tsx",
-      "app/(layer1)/_components/ResetPasswordForm.tsx",
+      "features/auth/components/AuthForm.tsx",
+      "features/auth/components/ResetPasswordForm.tsx",
     ]) {
       expect(read(path), `${path} viết số cứng vào minLength`).not.toMatch(
         /minLength=\{\s*\d/
@@ -104,7 +104,7 @@ describe("cổng chống trôi lệch: sàn độ dài chỉ có MỘT nguồn",
     // Chính sách chỉ áp cho mật khẩu MỚI (xem đầu passwordPolicy.ts). Một
     // `minLength` vô điều kiện ở form đăng nhập sẽ khoá cửa đúng nhóm người
     // đang dùng sản phẩm, và trình duyệt chặn trước khi có bất kỳ câu lỗi nào.
-    const source = read("app/(layer1)/_components/AuthForm.tsx");
+    const source = read("features/auth/components/AuthForm.tsx");
     expect(source).toMatch(/minLength=\{\s*isSignup\s*\?/);
   });
 });

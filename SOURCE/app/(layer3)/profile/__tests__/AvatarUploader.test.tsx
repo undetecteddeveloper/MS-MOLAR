@@ -16,11 +16,11 @@ import { useRef, useState } from "react";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/app/(layer1)/actions", () => ({ changeAvatar: vi.fn() }));
+vi.mock("@/features/auth/actions", () => ({ changeAvatar: vi.fn() }));
 const refresh = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
 
-import { changeAvatar } from "@/app/(layer1)/actions";
+import { changeAvatar } from "@/features/auth/actions";
 import { AVATAR_LIMITS } from "@/lib/profile/limits";
 import { AvatarUploader } from "../_components/AvatarUploader";
 

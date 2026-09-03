@@ -10,8 +10,8 @@
 // chốt vòng sửa 1) — hero trượt ra trái, form trượt vào từ phải.
 import Link from "next/link";
 import { useT } from "@/lib/i18n/client";
-import { AuthForm } from "./AuthForm";
-import { HomeCarousel } from "./HomeCarousel";
+import { AuthForm } from "@/features/auth/components/AuthForm";
+import { HomeCarousel } from "@/features/auth/components/HomeCarousel";
 
 export type AuthMode = "signin" | "signup" | null;
 

@@ -66,7 +66,7 @@ export const PASSWORD_POLICY_KEYS: Record<string, MessageKey> = {
     "profile.password.errorTooCommon",
 };
 
-/** NĂM câu của updateProfile (app/(layer1)/actions.ts:167-195) → khoá. Câu thứ
+/** NĂM câu của updateProfile (features/auth/actions.ts:167-195) → khoá. Câu thứ
  *  năm (rate limit) mang một con số nên đi bằng regex, ngay bên dưới. */
 const DISPLAY_NAME_KEYS: Record<string, MessageKey> = {
   "Display name must not be empty": "profile.name.errorEmpty",

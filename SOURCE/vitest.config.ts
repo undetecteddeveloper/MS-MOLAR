@@ -16,6 +16,14 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["lib/**/*.test.{ts,tsx}", "components/**/*.test.{ts,tsx}", "app/**/*.test.{ts,tsx}"],
+    include: [
+      "lib/**/*.test.{ts,tsx}",
+      "components/**/*.test.{ts,tsx}",
+      "app/**/*.test.{ts,tsx}",
+      // features/**: queries/actions/components của từng tính năng nay nằm
+      // ngoài app/ (B2, 2026-09-03). Thiếu dòng này thì các test đi theo chúng
+      // âm thầm ngừng chạy — cùng kiểu hỏng mà khối comment trên mô tả.
+      "features/**/*.test.{ts,tsx}",
+    ],
   },
 });

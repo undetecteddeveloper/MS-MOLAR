@@ -8,11 +8,11 @@ import { useRef, useState } from "react";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/app/(layer1)/actions", () => ({ updateProfile: vi.fn() }));
+vi.mock("@/features/auth/actions", () => ({ updateProfile: vi.fn() }));
 const refresh = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
 
-import { updateProfile } from "@/app/(layer1)/actions";
+import { updateProfile } from "@/features/auth/actions";
 import { DisplayNameEditor } from "../_components/DisplayNameEditor";
 
 const updateProfileMock = vi.mocked(updateProfile);

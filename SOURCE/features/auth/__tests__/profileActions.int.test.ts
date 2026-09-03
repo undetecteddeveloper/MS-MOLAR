@@ -32,7 +32,7 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { guard } from "@/lib/security/rateLimit";
 import { AVATAR_LIMITS } from "@/lib/profile/limits";
-import { changeAvatar, changePassword } from "@/app/(layer1)/actions";
+import { changeAvatar, changePassword } from "@/features/auth/actions";
 
 const createClientMock = vi.mocked(createClient);
 const createSupabaseClientMock = vi.mocked(createSupabaseClient);
