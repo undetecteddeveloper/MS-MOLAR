@@ -2,7 +2,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { moderateExamAction, type ModerationState } from "./actions";
+import { moderateExamAction, type ModerationState } from "@/features/admin/actions";
 import { useT } from "@/lib/i18n/client";
 import type { ModeratableExam } from "@/lib/supabase/service-role";
 

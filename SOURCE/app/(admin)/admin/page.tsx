@@ -14,7 +14,7 @@ import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { hasAdminsConfigured, isAdminUserId } from "@/lib/auth/admin";
 import { getTranslate } from "@/lib/i18n/server";
 import { listReportedExams } from "@/lib/supabase/service-role";
-import { ModerationRow } from "./ModerationRow";
+import { ModerationRow } from "@/features/admin/components/ModerationRow";
 import { PageContainer } from "@/components/layout/PageContainer";
 
 export const dynamic = "force-dynamic";

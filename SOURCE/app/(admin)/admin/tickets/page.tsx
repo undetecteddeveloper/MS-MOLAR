@@ -10,7 +10,7 @@ import { isAdminUserId } from "@/lib/auth/admin";
 import { getTranslate } from "@/lib/i18n/server";
 import { listSupportTickets } from "@/lib/supabase/service-role";
 import { PageContainer } from "@/components/layout/PageContainer";
-import { TicketQueueList } from "./TicketQueueList";
+import { TicketQueueList } from "@/features/admin/components/tickets/TicketQueueList";
 
 export const dynamic = "force-dynamic";
 

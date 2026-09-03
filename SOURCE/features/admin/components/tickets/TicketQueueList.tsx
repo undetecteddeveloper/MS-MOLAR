@@ -5,7 +5,7 @@
 
 import { useT } from "@/lib/i18n/client";
 import type { TicketWithNotes } from "@/lib/supabase/service-role";
-import { TicketQueueRow } from "./TicketQueueRow";
+import { TicketQueueRow } from "@/features/admin/components/tickets/TicketQueueRow";
 
 export function TicketQueueList({ tickets }: { tickets: TicketWithNotes[] }) {
   const t = useT();

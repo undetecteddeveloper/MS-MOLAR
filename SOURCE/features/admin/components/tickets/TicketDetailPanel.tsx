@@ -10,8 +10,8 @@
 
 import type { TicketWithNotes } from "@/lib/supabase/service-role";
 import { useT } from "@/lib/i18n/client";
-import { TicketStatusControl } from "./TicketStatusControl";
-import { InternalNotesPanel } from "./InternalNotesPanel";
+import { TicketStatusControl } from "@/features/admin/components/tickets/TicketStatusControl";
+import { InternalNotesPanel } from "@/features/admin/components/tickets/InternalNotesPanel";
 
 export function TicketDetailPanel({ ticket }: { ticket: TicketWithNotes }) {
   const t = useT();

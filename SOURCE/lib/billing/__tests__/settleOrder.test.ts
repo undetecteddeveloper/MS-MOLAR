@@ -21,7 +21,7 @@
 //      service-role`: mock cả module đi thì hình dạng lời gọi RPC (tên hàm SQL,
 //      danh sách tham số) không còn gì kiểm, mà đó chính là chỗ ADR-0014
 //      Decision 3 nói "không tham số nào mang user_id". Tiền lệ:
-//      `(admin)/admin/tickets/__tests__/actions.int.test.ts` Group 1.
+//      `features/admin/__tests__/ticketActions.int.test.ts` Group 1.
 //   Logic nhánh của `settleOrder()` để THẬT — nó là thứ đang được kiểm.
 //
 // SỐ LIỆU KỲ VỌNG GÕ TAY. Không giá trị kỳ vọng nào dưới đây được dựng bằng

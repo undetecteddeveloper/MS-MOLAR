@@ -6,10 +6,10 @@
 
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { TicketStatusControl } from "@/app/(admin)/admin/tickets/TicketStatusControl";
-import { changeTicketStatusAction } from "@/app/(admin)/admin/tickets/actions";
+import { TicketStatusControl } from "@/features/admin/components/tickets/TicketStatusControl";
+import { changeTicketStatusAction } from "@/features/admin/ticketActions";
 
-vi.mock("@/app/(admin)/admin/tickets/actions", () => ({
+vi.mock("@/features/admin/ticketActions", () => ({
   changeTicketStatusAction: vi.fn(async () => ({ info: "ok" })),
 }));
 const changeTicketStatusActionMock = vi.mocked(changeTicketStatusAction);

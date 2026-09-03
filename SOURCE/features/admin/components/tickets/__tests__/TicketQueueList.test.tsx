@@ -2,10 +2,10 @@
 
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { TicketQueueList } from "@/app/(admin)/admin/tickets/TicketQueueList";
+import { TicketQueueList } from "@/features/admin/components/tickets/TicketQueueList";
 import type { TicketWithNotes } from "@/lib/supabase/service-role";
 
-vi.mock("@/app/(admin)/admin/tickets/actions", () => ({
+vi.mock("@/features/admin/ticketActions", () => ({
   changeTicketStatusAction: vi.fn(),
   addTicketNoteAction: vi.fn(),
 }));

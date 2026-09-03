@@ -2,7 +2,7 @@
 
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { TicketStatusBadge } from "@/app/(admin)/admin/tickets/TicketStatusBadge";
+import { TicketStatusBadge } from "@/features/admin/components/tickets/TicketStatusBadge";
 import type { TicketStatus } from "@/lib/support/types";
 
 afterEach(cleanup);

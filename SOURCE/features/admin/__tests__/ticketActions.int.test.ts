@@ -93,7 +93,7 @@ describe("Group 2 — independent admin re-authorization (AC-021/AC-024), no ema
     // revalidatePath() requires a real Next.js static-generation store on
     // the success path — not present under vitest.
     vi.doMock("next/cache", () => ({ revalidatePath: vi.fn() }));
-    return import("@/app/(admin)/admin/tickets/actions");
+    return import("@/features/admin/ticketActions");
   }
 
   it("(a) non-admin session calling changeTicketStatusAction resolves to a refusal; changeSupportTicketStatus never invoked", async () => {
@@ -201,7 +201,7 @@ describe("Group 2b — changeTicketStatusAction rejects an out-of-range status b
       getTranslate: vi.fn(async () => (key: string) => key),
     }));
 
-    const { changeTicketStatusAction } = await import("@/app/(admin)/admin/tickets/actions");
+    const { changeTicketStatusAction } = await import("@/features/admin/ticketActions");
     // @ts-expect-error deliberately out-of-range at the call boundary, mirroring a bypassed client
     const result = await changeTicketStatusAction("ticket-1", "archived");
 

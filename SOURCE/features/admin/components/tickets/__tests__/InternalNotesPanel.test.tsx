@@ -5,10 +5,10 @@
 
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { InternalNotesPanel } from "@/app/(admin)/admin/tickets/InternalNotesPanel";
-import { addTicketNoteAction } from "@/app/(admin)/admin/tickets/actions";
+import { InternalNotesPanel } from "@/features/admin/components/tickets/InternalNotesPanel";
+import { addTicketNoteAction } from "@/features/admin/ticketActions";
 
-vi.mock("@/app/(admin)/admin/tickets/actions", () => ({
+vi.mock("@/features/admin/ticketActions", () => ({
   addTicketNoteAction: vi.fn(async () => ({ info: "ok" })),
 }));
 const addTicketNoteActionMock = vi.mocked(addTicketNoteAction);

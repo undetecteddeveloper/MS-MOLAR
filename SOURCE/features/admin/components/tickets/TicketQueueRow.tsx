@@ -10,9 +10,9 @@ import { useT } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n/translate";
 import type { TicketWithNotes } from "@/lib/supabase/service-role";
 import type { TicketIntent } from "@/lib/support/types";
-import { TicketStatusBadge } from "./TicketStatusBadge";
-import { NotificationFailureFlag } from "./NotificationFailureFlag";
-import { TicketDetailPanel } from "./TicketDetailPanel";
+import { TicketStatusBadge } from "@/features/admin/components/tickets/TicketStatusBadge";
+import { NotificationFailureFlag } from "@/features/admin/components/tickets/NotificationFailureFlag";
+import { TicketDetailPanel } from "@/features/admin/components/tickets/TicketDetailPanel";
 
 const INTENT_LABEL_KEY: Record<TicketIntent, MessageKey> = {
   bug: "support.intent.bug",

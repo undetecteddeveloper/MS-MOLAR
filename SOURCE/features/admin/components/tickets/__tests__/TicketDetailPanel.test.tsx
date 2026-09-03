@@ -6,14 +6,14 @@
 
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { TicketDetailPanel } from "@/app/(admin)/admin/tickets/TicketDetailPanel";
+import { TicketDetailPanel } from "@/features/admin/components/tickets/TicketDetailPanel";
 import type { TicketWithNotes } from "@/lib/supabase/service-role";
 
 // TicketStatusControl/InternalNotesPanel import Server Actions from "./actions"
 // (a "use server" module transitively pulling in server-only deps) — mocked
 // away, matching this repo's established boundary for component tests whose
 // concern is rendering, not the action's own behavior (task-06/09 precedent).
-vi.mock("@/app/(admin)/admin/tickets/actions", () => ({
+vi.mock("@/features/admin/ticketActions", () => ({
   changeTicketStatusAction: vi.fn(),
   addTicketNoteAction: vi.fn(),
 }));

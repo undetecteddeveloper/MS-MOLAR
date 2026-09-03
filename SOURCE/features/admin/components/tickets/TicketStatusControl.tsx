@@ -6,7 +6,7 @@
 // bắc cầu hai hình dạng đó (frontend DD Fact Disposition Table).
 
 import { useActionState } from "react";
-import { changeTicketStatusAction } from "./actions";
+import { changeTicketStatusAction } from "@/features/admin/ticketActions";
 import type { TicketActionState, TicketStatus } from "@/lib/support/types";
 import { useT } from "@/lib/i18n/client";
 

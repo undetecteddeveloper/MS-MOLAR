@@ -6,7 +6,7 @@
 // (prevState, formData), cùng mẫu với statusFormAction.
 
 import { useActionState } from "react";
-import { addTicketNoteAction } from "./actions";
+import { addTicketNoteAction } from "@/features/admin/ticketActions";
 import type { TicketActionState } from "@/lib/support/types";
 import { useT } from "@/lib/i18n/client";
 
