@@ -22,7 +22,7 @@ export default function Error({
   const alertRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    console.error("(layer3)/profile render failed", { digest: error.digest });
+    console.error("(analytics)/profile render failed", { digest: error.digest });
     alertRef.current?.focus();
   }, [error]);
 

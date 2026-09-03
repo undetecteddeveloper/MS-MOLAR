@@ -32,8 +32,8 @@ import { changeAvatar, type AuthState } from "@/features/auth/actions";
 import { useT } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n/translate";
 import { checkAvatarFile } from "@/lib/profile/validateAvatar";
-import { profileMessage, resolveActionError, type ProfileMessage } from "./errorMessages";
-import { actionRowCls, fieldErrorCls, outlineButtonCls } from "./styles";
+import { profileMessage, resolveActionError, type ProfileMessage } from "@/features/profile/components/errorMessages";
+import { actionRowCls, fieldErrorCls, outlineButtonCls } from "@/features/profile/components/styles";
 
 /** Chặn trên quay-mãi-không-dừng (AC-067) — cùng con số với hộp thoại mật khẩu. */
 const UPLOAD_TIMEOUT_MS = 20000;

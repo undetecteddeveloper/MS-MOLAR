@@ -5,7 +5,7 @@
 //
 // Client component vì nó đọc `useEntitlement()`, và provider nằm PHÍA TRÊN nó ở
 // `(billing)/layout.tsx` — đó cũng là lý do route `/me/orders` được xếp vào
-// nhóm `(billing)` chứ không phải `(layer3)` nơi `/me/dashboard` đang ở
+// nhóm `(billing)` chứ không phải `(analytics)` nơi `/me/dashboard` đang ở
 // (UI-D11). Đặt nhầm nhóm thì `useEntitlement()` rơi về `FREE_FALLBACK`: biên
 // dịch trót lọt, render trót lọt, smoke test trót lọt, và MỌI người dùng
 // Premium lặng lẽ thấy bảng tóm tắt của người dùng Free.

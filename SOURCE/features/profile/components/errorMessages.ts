@@ -13,7 +13,7 @@
 //                            (sẵn có, bị PRD AC-046 khoá ở dạng dùng-lại).
 //
 // Dạng 3 được so khớp NGUYÊN VĂN, và sự mong manh đó được chuyển thành một cổng
-// build: app/(layer3)/profile/__tests__/errorMessages.test.ts gọi CHÍNH hai hàm
+// build: features/profile/__tests__/errorMessages.test.ts gọi CHÍNH hai hàm
 // nguồn rồi đòi mỗi câu chúng sinh ra phải có mục trong bản đồ dưới đây.
 //
 // Mặc định của MỌI nhánh không khớp là `profile.error.generic` — không bao giờ

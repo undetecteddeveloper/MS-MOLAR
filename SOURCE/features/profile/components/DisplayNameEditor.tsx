@@ -18,14 +18,14 @@ import { updateProfile, type AuthState } from "@/features/auth/actions";
 import { useT } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n/translate";
 import { DISPLAY_NAME_MAX, filterDisplayNameInput } from "@/lib/profile/displayName";
-import { resolveDisplayNameError, type ProfileMessage } from "./errorMessages";
+import { resolveDisplayNameError, type ProfileMessage } from "@/features/profile/components/errorMessages";
 import {
   actionRowCls,
   fieldErrorCls,
   fieldHintCls,
   fieldInputCls,
   outlineButtonCls,
-} from "./styles";
+} from "@/features/profile/components/styles";
 
 const INPUT_ID = "profile-display-name";
 const HINT_ID = "profile-display-name-hint";

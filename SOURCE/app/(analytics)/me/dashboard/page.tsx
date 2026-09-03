@@ -1,4 +1,4 @@
-// (layer3)/me/dashboard — /me/dashboard, the existing "Analytics" nav item's
+// (analytics)/me/dashboard — /me/dashboard, the existing "Analytics" nav item's
 // target (SiteHeader.tsx/HomeSidebar.tsx already point here; route groups are
 // pathless, so no nav change was needed once this page exists — docs/design/
 // analytics-layer3-design.md § Route & nav). Page-level auth guard mirrors
@@ -8,9 +8,9 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { getTranslate } from "@/lib/i18n/server";
-import { getAnalyticsByRange, getSkillRecommendation } from "@/app/(layer3)/queries";
-import { AnalyticsDashboard } from "@/app/(layer3)/_components/AnalyticsDashboard";
-import { SkillRecommendationCard } from "@/app/(layer3)/_components/SkillRecommendationCard";
+import { getAnalyticsByRange, getSkillRecommendation } from "@/features/analytics/queries";
+import { AnalyticsDashboard } from "@/features/analytics/components/AnalyticsDashboard";
+import { SkillRecommendationCard } from "@/features/analytics/components/SkillRecommendationCard";
 import { PageContainer } from "@/components/layout/PageContainer";
 
 export default async function DashboardPage() {

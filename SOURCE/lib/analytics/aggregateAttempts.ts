@@ -1,6 +1,6 @@
 // aggregateAttemptsByRange — reducer thuần (không I/O) cho Analytics (Layer 3)
 // thật, theo docs/design/analytics-layer3-data-logic-design.md § Aggregation
-// Algorithm. Đặt ngoài app/(layer3)/ vì vitest.config.ts's include glob không
+// Algorithm. Đặt ngoài app/(analytics)/ vì vitest.config.ts's include glob không
 // quét app/** — reducer cần import được thẳng trong test (xem doc's Domain
 // constraint). queries.ts (server-only) chỉ gọi hàm này, không tự làm reduce.
 import { SUBJECT_ORDER, type Subject, type SubjectStats, type TimeRange } from "@/lib/fake-data/analytics";

@@ -9,7 +9,7 @@
 // `/?auth=signin` — dialog đăng nhập trên trang chủ — KHÔNG phải `/login`, một
 // route không tồn tại trong repo này.
 //
-// Route nằm dưới `(billing)` chứ không phải `(layer3)` nơi `/me/dashboard` đang
+// Route nằm dưới `(billing)` chứ không phải `(analytics)` nơi `/me/dashboard` đang
 // ở: `(billing)/layout.tsx` là chỗ DUY NHẤT trong repo mount
 // `EntitlementProvider`, và `useEntitlement()` ngoài provider trả `FREE_FALLBACK`
 // — không ném, không cảnh báo, không phân biệt được với một người dùng Free

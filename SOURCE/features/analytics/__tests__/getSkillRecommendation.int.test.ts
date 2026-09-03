@@ -30,7 +30,7 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(async () => ({ from: fromMock, auth: { getUser: getUserMock } })),
 }));
 
-const { getSkillRecommendation } = await import("../queries");
+const { getSkillRecommendation } = await import("@/features/analytics/queries");
 
 const USER_ID = "user-1";
 

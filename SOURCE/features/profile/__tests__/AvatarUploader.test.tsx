@@ -22,7 +22,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
 
 import { changeAvatar } from "@/features/auth/actions";
 import { AVATAR_LIMITS } from "@/lib/profile/limits";
-import { AvatarUploader } from "../_components/AvatarUploader";
+import { AvatarUploader } from "@/features/profile/components/AvatarUploader";
 
 const changeAvatarMock = vi.mocked(changeAvatar);
 

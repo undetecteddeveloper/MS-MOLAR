@@ -905,7 +905,7 @@ export const en = {
   // Bốn khoá `profile.password.errorTooShort|TooLong|OnlySpaces|TooCommon` là
   // bản dịch của bốn câu validatePassword trả về NGUYÊN VĂN tiếng Anh (UI-D10).
   // Chúng được nối với nhau bằng đối chiếu literal ở
-  // app/(layer3)/profile/_components/errorMessages.ts, và một test canh literal
+  // features/profile/components/errorMessages.ts, và một test canh literal
   // đó khớp đúng đầu ra thật của lib/auth/passwordPolicy.ts — sửa câu chữ bên
   // đó mà quên bên này thì FAIL BUILD, không phải âm thầm rơi về câu chung.
   "profile.tab.info": "Info",

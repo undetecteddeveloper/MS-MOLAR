@@ -26,7 +26,7 @@ function banner() {
   console.log("Layers:");
   console.log("  (auth) Auth            — login, reset-password");
   console.log("  (exams) Exam taking     — browse, attempt, submit, result");
-  console.log("  (layer3) —               — chưa có route (reserved)");
+  console.log("  (analytics) —               — chưa có route (reserved)");
   console.log("  (layer4) UGC upload      — upload, review, publish, my-exams");
   console.log("");
   console.log(line());

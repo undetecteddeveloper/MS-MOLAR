@@ -14,7 +14,7 @@
 // hai bảng nói khác nhau về cùng một hạn mức.
 //
 // `PlanSummary` không nhận props: nó đọc `useEntitlement()`. Điều đó chỉ đúng
-// khi có `EntitlementProvider` phía trên — đã thêm vào (layer3)/layout.tsx
+// khi có `EntitlementProvider` phía trên — đã thêm vào (analytics)/layout.tsx
 // cùng thay đổi này. Thiếu nó thì hook trả `FREE_FALLBACK` và người Premium
 // thấy hạn mức Free trong im lặng.
 
@@ -23,7 +23,7 @@ import { Tabs, TabsIndicator, TabsList, TabsPanel, TabsTab } from "@/components/
 import { PlanSummary } from "@/app/(billing)/me/orders/_components/PlanSummary";
 import { useT } from "@/lib/i18n/client";
 import type { CurrentUserProfile } from "@/lib/auth/getCurrentUser";
-import { ProfileCard } from "./ProfileCard";
+import { ProfileCard } from "@/features/profile/components/ProfileCard";
 
 export function ProfileTabs({ user }: { user: CurrentUserProfile }) {
   const t = useT();

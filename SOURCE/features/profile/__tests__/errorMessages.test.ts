@@ -33,7 +33,7 @@ import {
   PASSWORD_POLICY_KEYS,
   resolveActionError,
   resolveDisplayNameError,
-} from "../_components/errorMessages";
+} from "@/features/profile/components/errorMessages";
 
 /** Bốn đầu vào, mỗi cái kích đúng một nhánh của validatePassword. */
 const POLICY_SAMPLES = {

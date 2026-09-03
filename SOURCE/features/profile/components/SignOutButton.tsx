@@ -15,7 +15,7 @@ import { useFormStatus } from "react-dom";
 import { signOut } from "@/features/auth/actions";
 import { useT } from "@/lib/i18n/client";
 import { cn } from "@/lib/utils";
-import { outlineButtonCls } from "./styles";
+import { outlineButtonCls } from "@/features/profile/components/styles";
 
 export function SignOutButton() {
   return (

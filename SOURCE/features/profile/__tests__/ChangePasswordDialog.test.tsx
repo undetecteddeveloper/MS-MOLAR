@@ -14,7 +14,7 @@ vi.mock("@/features/auth/actions", () => ({ changePassword: vi.fn() }));
 
 import { changePassword } from "@/features/auth/actions";
 import { PASSWORD_MIN_LENGTH } from "@/lib/auth/passwordPolicy";
-import { ChangePasswordDialog } from "../_components/ChangePasswordDialog";
+import { ChangePasswordDialog } from "@/features/profile/components/ChangePasswordDialog";
 
 const changePasswordMock = vi.mocked(changePassword);
 

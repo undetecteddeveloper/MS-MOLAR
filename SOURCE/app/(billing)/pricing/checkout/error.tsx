@@ -6,7 +6,7 @@
 // trên lớp bọc `tabIndex={-1}`, và "Làm lại" nối THẲNG vào `reset()` để chạy
 // lại chính lượt render server vừa hỏng.
 //
-// BA ĐIỂM LẤY TỪ `(layer3)/profile/error.tsx` CHỨ KHÔNG TỪ FILE GỐC (frontend
+// BA ĐIỂM LẤY TỪ `(analytics)/profile/error.tsx` CHỨ KHÔNG TỪ FILE GỐC (frontend
 // DD § "Route boundary files"):
 //
 //   1. CHỈ GHI LOG `error.digest`. File gốc ghi cả object `error`, và ở đây thì

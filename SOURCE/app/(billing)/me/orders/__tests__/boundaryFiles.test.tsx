@@ -3,7 +3,7 @@
 // `me/orders/{loading,error}.tsx` — plan Task 3.6, FE-I9 / UI-D18.
 // Origin pattern: `(HM)/history/{loading,error}.tsx`, with the three
 // corrections the frontend DD's "Route boundary files" table takes from
-// `(layer3)/profile/`: `error.digest` ONLY in the log, `min-h-11` on the retry
+// `(analytics)/profile/`: `error.digest` ONLY in the log, `min-h-11` on the retry
 // control, and `common.tryAgain` as its label.
 //
 // The container assertion is deliberately CROSS-FILE: the skeleton's and the

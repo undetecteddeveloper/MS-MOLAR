@@ -1,6 +1,6 @@
 // AppShell — khung dùng chung cho MỌI route group đã đăng nhập (B1, 2026-09-03).
 //
-// Trước đây năm layout — (exams), (layer3), (layer4), (billing), (HM) — chép
+// Trước đây năm layout — (exams), (analytics), (layer4), (billing), (HM) — chép
 // nhau TỪNG KÝ TỰ trừ tên hàm ((HM) thiếu EntitlementProvider). Một chỗ sửa
 // thành năm chỗ sửa, và hai khối comment giải thích "vì sao" cũng bị nhân năm.
 // Nay mỗi layout còn vài dòng gọi vào đây; phần "vì sao" sống ở một nơi.
@@ -52,7 +52,7 @@ export async function AppShell({ children, entitlement = true }: AppShellProps) 
   // group là anh em chứ không lồng nhau, nên đúng một layout phân giải mỗi
   // request và đúng một lượt đọc được phát ra; một lượt gọi thứ hai không sai
   // về kết quả, chỉ là một round-trip thừa nằm sau mỗi lần render. Repo đã có
-  // sẵn tiền lệ trôi đúng kiểu này (`(layer3)/profile/page.tsx:37` gọi lại
+  // sẵn tiền lệ trôi đúng kiểu này (`(analytics)/profile/page.tsx:37` gọi lại
   // `getCurrentUserProfile()` ngay dưới layout đã gọi nó), nên nó được viết ra
   // thay vì trông chờ vào thói quen. Không `React.cache()` cho entitlement: kết
   // luận "một lượt đọc mỗi request" suy ra từ cách Next phân giải route group,

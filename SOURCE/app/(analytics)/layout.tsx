@@ -1,4 +1,4 @@
-// Layout route group (layer3) — khung chung cho Analytics. Theme dùng thẳng
+// Layout route group (analytics) — khung chung cho Analytics. Theme dùng thẳng
 // root "Mực & Sơn mài" (globals.css), SiteHeader dùng chung với Layer 2/4
 // (xem comment trong SiteHeader.tsx).
 //
@@ -8,7 +8,7 @@
 import { AppShell } from "@/components/layout/AppShell";
 
 export default async function Layer3Layout({ children }: { children: React.ReactNode }) {
-  // VÌ SAO (layer3) CẦN EntitlementProvider, dù trước đây không: /profile nay có
+  // VÌ SAO (analytics) CẦN EntitlementProvider, dù trước đây không: /profile nay có
   // tab Usage render `PlanSummary` (C-11), và `useEntitlement()` NGOÀI provider
   // trả `FREE_FALLBACK` — tức một người Premium sẽ thấy hạn mức của gói Free,
   // im lặng, không lỗi, không log. Đó đúng là kiểu hỏng mà `TutorQuotaNote`

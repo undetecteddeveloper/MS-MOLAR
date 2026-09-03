@@ -358,9 +358,9 @@ describe("Binding decision ADR-0013 — một phép tính quyền lợi, KHÔNG 
    *  Mọi file ĐƯỜNG RENDER khác dưới app/, components/ VÀ lib/ chỉ được đọc
    *  context qua `useEntitlement()`. */
   const RENDER_PATH_ALLOWED = [
-    // B1 (2026-09-03): bốn layout (billing)/(exams)/(layer3)/(layer4) từng
+    // B1 (2026-09-03): bốn layout (billing)/(exams)/(analytics)/(layer4) từng
     // đứng ở đây, mỗi cái gọi readEntitlement() một lần; nay chúng uỷ quyền cho
-    // MỘT khung dùng chung và chỉ khung ấy gọi. (layer3) gia nhập từ khi
+    // MỘT khung dùng chung và chỉ khung ấy gọi. (analytics) gia nhập từ khi
     // /profile có tab Usage: tab đó render `PlanSummary` (C-11), và một layout
     // KHÔNG mount provider thì `useEntitlement()` trả `FREE_FALLBACK` — người
     // Premium thấy hạn mức Free, im lặng. (HM) là layout duy nhất cố ý KHÔNG

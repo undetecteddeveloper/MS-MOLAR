@@ -13,7 +13,7 @@ const refresh = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
 
 import { updateProfile } from "@/features/auth/actions";
-import { DisplayNameEditor } from "../_components/DisplayNameEditor";
+import { DisplayNameEditor } from "@/features/profile/components/DisplayNameEditor";
 
 const updateProfileMock = vi.mocked(updateProfile);
 

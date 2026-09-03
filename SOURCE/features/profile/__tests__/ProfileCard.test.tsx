@@ -16,7 +16,7 @@ vi.mock("@/features/auth/actions", () => ({
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 
 import { AVATAR_LIMITS } from "@/lib/profile/limits";
-import { ProfileCard } from "../_components/ProfileCard";
+import { ProfileCard } from "@/features/profile/components/ProfileCard";
 
 const USER = {
   id: "u1",

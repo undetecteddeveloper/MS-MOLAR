@@ -9,7 +9,7 @@
 // xem data-logic design doc § Naming-smell follow-up, path này bị 3 file import
 // nên rename sẽ lan diff không cần thiết), file KHÔNG còn chứa dữ liệu giả lập
 // nào — chỉ types/constants/helpers thuần. Dữ liệu thật đến từ
-// (layer3)/queries.ts (getAnalyticsByRange, đọc Supabase RLS-scoped) qua
+// features/analytics/queries.ts (getAnalyticsByRange, đọc Supabase RLS-scoped) qua
 // lib/analytics/aggregateAttempts.ts (reducer thuần, có test riêng).
 
 export const SUBJECT_ORDER = [

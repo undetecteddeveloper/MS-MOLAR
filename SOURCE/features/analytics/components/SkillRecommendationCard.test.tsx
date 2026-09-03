@@ -43,7 +43,7 @@ vi.mock("next/headers", () => ({
   cookies: async () => ({ get: () => undefined }),
 }));
 
-import { SkillRecommendationCard } from "./SkillRecommendationCard";
+import { SkillRecommendationCard } from "@/features/analytics/components/SkillRecommendationCard";
 
 // Expected copy authored here independently of the dictionary file, so a silent
 // edit to en.ts fails these tests instead of being re-derived into agreement.
@@ -74,7 +74,7 @@ describe("SkillRecommendationCard", () => {
   //   (no `open` attribute) containing a <summary>.
   // @category: core-functionality
   // @lane: integration
-  // @dependency: SOURCE/app/(layer3)/_components/SkillRecommendationCard.tsx +
+  // @dependency: SOURCE/features/analytics/components/SkillRecommendationCard.tsx +
   //   real getTranslate() + real BentoCell
   // @complexity: medium
   // @real-dependency: none beyond getTranslate()'s own next/headers call

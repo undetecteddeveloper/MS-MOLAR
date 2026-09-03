@@ -32,14 +32,14 @@ import { createPortal } from "react-dom";
 import { changePassword, type AuthState } from "@/features/auth/actions";
 import { useT } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n/translate";
-import { profileMessage, resolveActionError, type ProfileMessage } from "./errorMessages";
+import { profileMessage, resolveActionError, type ProfileMessage } from "@/features/profile/components/errorMessages";
 import {
   actionRowCls,
   fieldHintCls,
   fieldInputCls,
   outlineButtonCls,
   pillButtonCls,
-} from "./styles";
+} from "@/features/profile/components/styles";
 
 /** Chặn trên quay-mãi-không-dừng (AC-067). Cùng con số với SupportWidgetDialog. */
 const SUBMIT_TIMEOUT_MS = 20000;

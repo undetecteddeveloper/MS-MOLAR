@@ -1,7 +1,7 @@
 // /profile — trang quản lý tài khoản (PRD R1..R9, UI Spec S-01).
 //
 // Khung (SkipLink, SiteHeader, #main-content, .pb-bottom-nav, BottomNav,
-// SupportWidget) do app/(layer3)/layout.tsx cấp. Trang này KHÔNG khai lại
+// SupportWidget) do app/(analytics)/layout.tsx cấp. Trang này KHÔNG khai lại
 // `#main-content` và KHÔNG khai lại SkipLink (PRD D2, AC-003) — khai lần hai
 // sinh hai phần tử cùng id, và đích nhảy của phím tắt bỏ qua điều hướng trở
 // thành thứ phụ thuộc vào phần tử nào đứng trước trong DOM.
@@ -15,7 +15,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUserProfile } from "@/lib/auth/getCurrentUser";
 import { getTranslate } from "@/lib/i18n/server";
 import { PageContainer } from "@/components/layout/PageContainer";
-import { ProfileTabs } from "./_components/ProfileTabs";
+import { ProfileTabs } from "@/features/profile/components/ProfileTabs";
 
 // KHÔNG khai `alternates.canonical` — khác /terms và /about một cách có chủ ý.
 // Hai trang kia cần được index nên phải sửa lại mặc định `canonical: "/"` của

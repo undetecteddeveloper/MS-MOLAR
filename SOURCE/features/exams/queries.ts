@@ -348,7 +348,7 @@ export interface RankedExamList {
  *
  * Không đọc danh tính ở đâu cả: mọi lượt đọc đều được RLS giới hạn về đúng
  * người gọi, và quy ước của repo là KHÔNG thêm predicate `user_id` bằng tay
- * (xem (layer3)/queries.ts:90-99).
+ * (xem features/analytics/queries.ts:90-99).
  */
 export async function listExamsRanked(
   filters?: ExamFilters,

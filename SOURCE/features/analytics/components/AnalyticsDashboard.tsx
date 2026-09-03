@@ -19,9 +19,9 @@ import type { MessageKey } from "@/lib/i18n/translate";
 // 0-session set). Tab nav + the range filterSlot remain interactive so the
 // user can switch to a populated range without a reload.
 import { useState } from "react";
-import { BarChartCard } from "./BarChartCard";
-import { DonutChartCard } from "./DonutChartCard";
-import { WeakTopicsCard } from "./WeakTopicsCard";
+import { BarChartCard } from "@/features/analytics/components/BarChartCard";
+import { DonutChartCard } from "@/features/analytics/components/DonutChartCard";
+import { WeakTopicsCard } from "@/features/analytics/components/WeakTopicsCard";
 import type { TopicWeakness } from "@/lib/analytics/weakTopics";
 import {
   DEFAULT_RANGE,

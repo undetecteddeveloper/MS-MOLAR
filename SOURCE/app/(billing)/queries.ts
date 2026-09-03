@@ -1,6 +1,6 @@
 // Route group (billing) — hai lệnh ĐỌC của màn "đơn của tôi" (S-05) và màn
 // thanh toán (S-06). Server-only, theo đúng bốn module queries.ts đã ship
-// ((HM), (exams), (layer3), (layer4)): mapping snake_case → camelCase xảy ra
+// ((HM), (exams), (analytics), (layer4)): mapping snake_case → camelCase xảy ra
 // MỘT lần, ở tầng query, nên không component nào nhìn thấy tên cột CSDL.
 // Frontend DD § Data-Fetching Plan; backend DD § "One mapper, not two" (I010)
 // và Escalation E-02 (CL-01).

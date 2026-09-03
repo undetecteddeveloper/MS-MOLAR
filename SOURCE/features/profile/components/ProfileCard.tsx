@@ -13,13 +13,13 @@ import type { MessageKey } from "@/lib/i18n/translate";
 import { AVATAR_LIMITS } from "@/lib/profile/limits";
 import { Avatar } from "@/components/shared/Avatar";
 import { SuccessToast } from "@/components/ui/SuccessToast";
-import { AvatarUploader } from "./AvatarUploader";
-import { ChangePasswordDialog } from "./ChangePasswordDialog";
-import { DisplayNameEditor } from "./DisplayNameEditor";
-import { PasswordRow } from "./PasswordRow";
-import { SignOutButton } from "./SignOutButton";
-import { profileMessage, type ProfileMessage } from "./errorMessages";
-import { outlineFilePickerCls } from "./styles";
+import { AvatarUploader } from "@/features/profile/components/AvatarUploader";
+import { ChangePasswordDialog } from "@/features/profile/components/ChangePasswordDialog";
+import { DisplayNameEditor } from "@/features/profile/components/DisplayNameEditor";
+import { PasswordRow } from "@/features/profile/components/PasswordRow";
+import { SignOutButton } from "@/features/profile/components/SignOutButton";
+import { profileMessage, type ProfileMessage } from "@/features/profile/components/errorMessages";
+import { outlineFilePickerCls } from "@/features/profile/components/styles";
 
 /** Nút mở và khối sửa nằm ở hai chỗ khác nhau trong cây, nên `aria-controls`
  *  là thứ duy nhất nối chúng lại cho trình đọc màn hình. */

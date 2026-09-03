@@ -41,7 +41,7 @@ export type MyHistoryEntry = {
 
 /** Shape PostgREST trả về cho embed lồng exam_results → exam_attempts → exams.
  *  Cả hai FK đều many-to-one nên mỗi embed là OBJECT, không phải mảng (giống
- *  EmbeddedRow của (layer3)/queries.ts). */
+ *  EmbeddedRow của features/analytics/queries.ts). */
 type EmbeddedRow = {
   attempt_id: string;
   total_score: number;
@@ -67,7 +67,7 @@ export async function listMyHistory(): Promise<MyHistoryEntry[]> {
 
   // MỘT round-trip cho cả 3 tầng dữ liệu (trước đây 3 query nối đuôi ≈ 3×RTT —
   // đo được ~463ms, sau khi gộp còn ~161ms). Dùng đúng pattern embedded join mà
-  // (layer3)/queries.ts's getAnalyticsByRange() đã dựng sẵn cho cùng chuỗi quan
+  // features/analytics/queries.ts's getAnalyticsByRange() đã dựng sẵn cho cùng chuỗi quan
   // hệ này. Ba ràng buộc nghiệp vụ cũ được giữ nguyên, chỉ chuyển từ JS sang DB:
   //  - Bắt đầu TỪ exam_results ⇒ chỉ attempt đã chấm mới vào danh sách; không tin
   //    exam_attempts.status một mình (Assumed Behavior #1 / AC-001).

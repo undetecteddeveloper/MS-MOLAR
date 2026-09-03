@@ -10,8 +10,8 @@
 // một <input> — nó là text node, nên không có `value` nào cho devtools đọc.
 
 import { useT } from "@/lib/i18n/client";
-import { ProfileRow } from "./ProfileRow";
-import { outlineButtonCls } from "./styles";
+import { ProfileRow } from "@/features/profile/components/ProfileRow";
+import { outlineButtonCls } from "@/features/profile/components/styles";
 
 /**
  * ĐÚNG 8 ký tự U+2022 BULLET. Hằng số cấp module, nằm NGOÀI đường i18n (PRD
