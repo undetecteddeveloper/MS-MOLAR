@@ -1,6 +1,34 @@
 // Logic Layer 1 — getCurrentUser helper (GĐ 2 M2.4).
 // Dùng trong Server Component để biết user hiện tại. Xem BACK-END map Mục 3.2 & 8.1.
+//
+// GỘP LƯỢT GỌI BẰNG `React.cache()` (đo 2026-09-03, refactor A1).
+//
+// Trước đây mỗi lượt tải trang hỏi Supabase "bạn là ai?" NHIỀU LẦN: layout của
+// route group gọi `getCurrentUserProfile()`, rồi page gọi lại chính nó (vd
+// /profile, .../result) hoặc gọi `getCurrentUser()` (vd /exams, /me/exams).
+// Đo trên bản production bằng bộ đếm fetch ở tiến trình render: MỖI trang 2 lượt
+// `GET /auth/v1/user` + 2 lượt `GET /rest/v1/user_profiles`, và với /profile
+// thêm một lượt ký signed URL avatar cho mỗi lần gọi. Mỗi lượt là một
+// round-trip sang Supabase, nằm trong TTFB của trang.
+//
+// `cache()` memo hoá theo TỪNG LƯỢT REQUEST trong cùng một lượt render RSC —
+// layout và page nằm chung một cây, nên lượt gọi thứ hai trả lại kết quả của
+// lượt đầu, không đi mạng. Đây đúng khuôn "Data Access Layer" trong tài liệu
+// Next (node_modules/next/dist/docs/01-app/02-guides/authentication.md, mục
+// "Creating a Data Access Layer"). Cả `getCurrentUserProfile()` (kéo theo
+// `resolveAvatarUrl()` bên trong nó) lẫn `getCurrentUser()` đều được bọc, và
+// `getCurrentUserProfile()` dùng lại `getCurrentUser()` nên hai hàm chia nhau
+// ĐÚNG MỘT lượt `auth.getUser()` mỗi request.
+//
+// KHÔNG gộp được lượt `getUser()` trong `lib/supabase/middleware.ts`
+// (proxy.ts): nó chạy TRƯỚC lượt render, trong sandbox riêng, và comment ở đó
+// nói rõ nó phải được gọi để refresh token. Nên số lượt tối thiểu mỗi trang là
+// 1 (proxy) + 1 (render), không phải 0 + 1.
+//
+// Ngoài React render (vd vitest không có `react-server` condition), `cache()`
+// chỉ gọi thẳng hàm bên trong — không memo, không đổi hành vi test.
 
+import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -9,7 +37,7 @@ import {
 } from "@/lib/profile/avatarStorage";
 
 /** Trả về user đang đăng nhập (từ cookie session), hoặc null nếu chưa đăng nhập. */
-export async function getCurrentUser() {
+export const getCurrentUser = cache(async () => {
   const supabase = await createClient();
   try {
     const {
@@ -22,7 +50,7 @@ export async function getCurrentUser() {
     console.warn("[getCurrentUser] Supabase auth không kết nối được:", err);
     return null;
   }
-}
+});
 
 export type CurrentUserProfile = {
   id: string;
@@ -37,46 +65,49 @@ export type CurrentUserProfile = {
 
 /** Giống getCurrentUser() nhưng kèm display_name từ user_profiles — dùng cho
  * navbar (HeaderProfile/SidebarProfile) hiển thị tên + biết trạng thái đăng nhập. */
-export async function getCurrentUserProfile(): Promise<CurrentUserProfile | null> {
-  const supabase = await createClient();
-  try {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+export const getCurrentUserProfile = cache(
+  async (): Promise<CurrentUserProfile | null> => {
+    // Dùng lại getCurrentUser() (đã cache) thay vì gọi auth.getUser() lần nữa:
+    // một page gọi getCurrentUser() dưới một layout gọi getCurrentUserProfile()
+    // (hoặc ngược lại) vẫn chỉ tốn một lượt auth cho cả request.
+    const user = await getCurrentUser();
     if (!user) return null;
 
-    const { data: profile, error: profileError } = await supabase
-      .from("user_profiles")
-      .select("display_name, avatar_url")
-      .eq("id", user.id)
-      .single();
+    const supabase = await createClient();
+    try {
+      const { data: profile, error: profileError } = await supabase
+        .from("user_profiles")
+        .select("display_name, avatar_url")
+        .eq("id", user.id)
+        .single();
 
-    // Trước đây lỗi ở đây bị vứt đi, và điều đó vô hại chừng nào truy vấn chỉ
-    // đọc `display_name` — cột đã tồn tại từ lâu. Từ khi thêm `avatar_url` thì
-    // KHÔNG còn vô hại: schema.sql được apply bằng TAY (TD-005, không có
-    // migration tool), nên có một cửa sổ giữa lúc code lên production và lúc
-    // DDL được chạy, trong đó truy vấn này hỏng vì thiếu cột. Hệ quả: profile
-    // = null → tên hiển thị tụt về email của chính người dùng trên navbar,
-    // sidebar và /profile — sai ở TOÀN SITE mà không một dòng log nào.
-    // Chỉ log MÃ lỗi PostgREST, không log `profile` (dữ liệu người dùng).
-    if (profileError) {
-      console.warn("[getCurrentUserProfile] đọc user_profiles hỏng:", profileError.code);
+      // Trước đây lỗi ở đây bị vứt đi, và điều đó vô hại chừng nào truy vấn chỉ
+      // đọc `display_name` — cột đã tồn tại từ lâu. Từ khi thêm `avatar_url` thì
+      // KHÔNG còn vô hại: schema.sql được apply bằng TAY (TD-005, không có
+      // migration tool), nên có một cửa sổ giữa lúc code lên production và lúc
+      // DDL được chạy, trong đó truy vấn này hỏng vì thiếu cột. Hệ quả: profile
+      // = null → tên hiển thị tụt về email của chính người dùng trên navbar,
+      // sidebar và /profile — sai ở TOÀN SITE mà không một dòng log nào.
+      // Chỉ log MÃ lỗi PostgREST, không log `profile` (dữ liệu người dùng).
+      if (profileError) {
+        console.warn("[getCurrentUserProfile] đọc user_profiles hỏng:", profileError.code);
+      }
+
+      return {
+        id: user.id,
+        email: user.email ?? "",
+        displayName: profile?.display_name || user.email || "Người dùng",
+        avatarUrl: await resolveAvatarUrl(supabase, profile?.avatar_url),
+      };
+    } catch (err) {
+      console.warn(
+        "[getCurrentUserProfile] Supabase auth không kết nối được:",
+        err,
+      );
+      return null;
     }
-
-    return {
-      id: user.id,
-      email: user.email ?? "",
-      displayName: profile?.display_name || user.email || "Người dùng",
-      avatarUrl: await resolveAvatarUrl(supabase, profile?.avatar_url),
-    };
-  } catch (err) {
-    console.warn(
-      "[getCurrentUserProfile] Supabase auth không kết nối được:",
-      err,
-    );
-    return null;
-  }
-}
+  },
+);
 
 /**
  * Path object trong bucket private `avatars` → signed URL cho <img>.
@@ -90,7 +121,9 @@ export async function getCurrentUserProfile(): Promise<CurrentUserProfile | null
  * route-group + app/page.tsx, tức gần như mọi lần render trang đã đăng nhập.
  * ADR-0016 chấp nhận chi phí đó CÓ ĐIỀU KIỆN — phải đo trước khi coi là xong, và
  * nếu nó kéo lùi đường header thì lối thoát là Option C (ảnh chỉ hiện ở /profile),
- * KHÔNG BAO GIỜ là mở public bucket.
+ * KHÔNG BAO GIỜ là mở public bucket. Từ 2026-09-03, `cache()` bọc ngoài
+ * getCurrentUserProfile() nên lượt ký này chạy TỐI ĐA MỘT LẦN mỗi request, kể
+ * cả khi page gọi lại hàm ngay dưới layout.
  */
 async function resolveAvatarUrl(
   supabase: SupabaseClient,

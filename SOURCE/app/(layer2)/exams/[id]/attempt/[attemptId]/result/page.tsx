@@ -49,6 +49,8 @@ export default async function ResultPage({
   // Lấy lại profile (displayName cho PDF) — layer2/layout.tsx đã gọi
   // getCurrentUserProfile() một lần cho cả cây, gọi lại ở page là tiền lệ đã
   // có sẵn trong repo (profile/page.tsx:37), không phải cách mới.
+  // Từ 2026-09-03 `React.cache()` trong lib/auth/getCurrentUser.ts gộp lượt gọi
+  // này với lượt của layout trong cùng request — không thêm round-trip nào.
   const user = await getCurrentUserProfile();
 
   // Task 12: computed once here (no extra round trip, AC-009) and passed

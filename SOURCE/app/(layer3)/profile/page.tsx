@@ -34,6 +34,8 @@ export default async function ProfilePage() {
   // lớp. Dùng getCurrentUserProfile chứ không phải getCurrentUser: nó trả `null`
   // ở đúng cùng điều kiện (không có phiên), nên chốt vẫn y hệt, mà không phải
   // trả giá thêm một vòng auth chỉ để hỏi lại thứ vừa hỏi xong.
+  // (Từ 2026-09-03 điều đó đúng theo nghĩa đen: `React.cache()` trong
+  // getCurrentUser.ts trả lại kết quả layout vừa lấy, không đi mạng lần hai.)
   const user = await getCurrentUserProfile();
   if (!user) redirect("/?auth=signin");
 
