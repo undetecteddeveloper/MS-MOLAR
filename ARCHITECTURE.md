@@ -15,7 +15,7 @@ Repo này chọn cách **"`app/` chỉ chứa trang, mọi code khác nằm ngo�
 | Thư mục (trong `SOURCE/`) | Chứa gì | KHÔNG chứa gì |
 |---|---|---|
 | `app/` | `page.tsx`, `layout.tsx`, `loading.tsx`, `error.tsx`, `route.ts`, metadata (`sitemap.ts`, `robots.ts`, `opengraph-image.tsx`), `globals.css` | queries, actions, component riêng của tính năng |
-| `features/<tên>/` | Toàn bộ code của MỘT tính năng: `queries.ts` (đọc), `actions.ts` (ghi, `"use server"`), `components/`, `__tests__/` | Trang. Code của tính năng khác (§4) |
+| `features/<tên>/` | Toàn bộ code của MỘT tính năng: `queries.ts` (đọc), `actions.ts` (ghi, `"use server"`), `components/`, `__tests__/`. Khi một trong hai phình to thì nó tách thành THƯ MỤC cùng tên với `index.ts` làm mặt tiền, hoặc thành nhiều module mà `actions.ts` re-export — đường import ngoài không đổi (§6) | Trang. Code của tính năng khác (§4) |
 | `components/` | UI dùng chung giữa ≥2 tính năng: `ui/` (primitive shadcn/base-ui), `layout/` (AppShell, SiteHeader, BottomNav), `shared/`, cùng vài nhóm theo chủ đề (`billing/`, `tutor/`, `essay/`, `support/`) | Component chỉ một tính năng dùng — cái đó ở `features/<tên>/components/` |
 | `lib/` | Logic thuần và hạ tầng không có UI: Supabase client, security, i18n, scoring, ugc, schema, billing… | JSX (trừ `lib/i18n/client.tsx`, `lib/billing/entitlement.tsx` — provider mỏng) |
 | `types/` | Kiểu dữ liệu dùng chung (`exam.ts`, `question.ts`) | |
@@ -57,10 +57,13 @@ Ví dụ: màn "Bảng xếp hạng" ở `/leaderboard`, thuộc tính năng exa
 1. **Trang**: `app/(exams)/leaderboard/page.tsx` — chỉ gọi vào tính năng, không
    truy vấn Supabase trực tiếp, không chứa component dài. Nếu là nhóm route
    mới: thêm `app/(tên)/layout.tsx` gọi `AppShell` như các nhóm khác.
-2. **Đọc dữ liệu**: hàm mới trong `features/exams/queries.ts` (server-only,
-   dùng `createClient()` của `lib/supabase/server.ts`; RLS là tầng authorization).
+2. **Đọc dữ liệu**: hàm mới trong `features/exams/queries` — ở đây nó đã là một
+   THƯ MỤC (§5), nên đặt hàm vào file của màn hình phù hợp rồi re-export ở
+   `index.ts`. Server-only, dùng `createClient()` của `lib/supabase/server.ts`;
+   RLS là tầng authorization.
 3. **Ghi dữ liệu**: hàm mới trong `features/exams/actions.ts` (file đã có
-   `"use server"` ở dòng đầu — giữ nguyên). Ghi đặc quyền → xem
+   `"use server"` ở dòng đầu — giữ nguyên). Ở `features/authoring` thì
+   `actions.ts` là mặt tiền: đặt hàm vào module vòng đời phù hợp rồi re-export (§5). Ghi đặc quyền → xem
    `lib/supabase/service-role.ts` và ADR-0019 trước: file đó có cổng CI đếm số
    hàm, KHÔNG thêm hàm vào đó nếu chưa đọc TD-029.
 4. **Component**: `features/exams/components/LeaderboardTable.tsx`. Client
@@ -105,7 +108,37 @@ Chiều ngược — `lib/` hoặc `components/` import `features/` — hiện c
 → exams, `lib/history/filterEntries.ts` → kiểu của history). Chưa bị luật chặn;
 đừng thêm chỗ mới.
 
-## 5. Những chỗ CẤM CHẠM (đã đo, sửa vào là hồi quy)
+## 5. Khi một file phình to
+
+Hai file đã vượt ngưỡng và đã tách (2026-09-03); cả hai giữ nguyên đường import
+cũ, nên đây là khuôn cho lần sau:
+
+**`features/exams/queries`** — 835 dòng gộp truy vấn của năm màn hình, nay là
+một thư mục:
+
+| File | Chứa gì |
+|---|---|
+| `rows.ts` | `ExamRow`, `EXAM_COLUMNS`, `toExam` — mapper dùng chung |
+| `catalogue.ts` | `/exams`, `/exams/[id]`: lọc, sắp xếp, facet, tập đề đã nộp |
+| `ranking.ts` | Xếp hạng cá nhân hoá (ADR-0015) |
+| `player.ts` | Màn làm bài. **Không bao giờ select đáp án** |
+| `result.ts` | Kết quả + màn Chi tiết. Nơi duy nhất đọc đáp án, qua RPC `exam_answer_key()` |
+| `index.ts` | Mặt tiền — re-export |
+
+**`features/authoring`** — `actions.ts` 1.190 dòng (một hàm 476 dòng, một hàm
+354 dòng), nay chia theo vòng đời của một đề: `uploadActions.ts` (tạo đề từ 2
+PDF) · `editActions.ts` (sửa field) · `lifecycleActions.ts` (publish/xoá/báo
+cáo) · `internals.ts` (helper) · `actions.ts` (mặt tiền, re-export).
+
+Hai luật khi tách:
+
+1. **Helper phải ra một module KHÔNG `"use server"`.** Trong module Server
+   Action, mọi export phải là async function — một hằng số hay một hàm đồng bộ
+   sẽ không build được.
+2. **Cắt theo dòng, đừng viết lại.** Các khối chú thích "vì sao" là thứ đắt
+   nhất trong repo này; mỗi khối ghi lại một lần đã đo hoặc một lỗi đã gặp.
+
+## 6. Những chỗ CẤM CHẠM (đã đo, sửa vào là hồi quy)
 
 - `features/exams/components/questionNodes.tsx` và
   `features/authoring/components/reviewNodes.tsx` render markdown + LaTeX Ở
@@ -118,7 +151,7 @@ Chiều ngược — `lib/` hoặc `components/` import `features/` — hiện c
 - `lib/i18n` dùng cookie, không tiền tố `/vi/` (comment đầu `lib/i18n/server.ts`).
 - Bốn làn vitest (§6) không gộp — lý do ở đầu mỗi `vitest.*.config.ts`.
 
-## 6. Cổng kiểm tra trước mỗi commit (chạy trong `SOURCE/`)
+## 7. Cổng kiểm tra trước mỗi commit (chạy trong `SOURCE/`)
 
 ```
 npx tsc --noEmit
@@ -133,9 +166,14 @@ Sau khi ĐỔI TÊN hoặc DI CHUYỂN route: chạy `npm run build` TRƯỚC `t
 `tsconfig.json` gom cả `.next-build/types/` do build sinh ra; type validator cũ
 còn trỏ đường dẫn cũ sẽ làm `tsc` đỏ oan cho tới khi build lại.
 
-## 7. Tài liệu liên quan
+## 8. Tài liệu liên quan
 
 - `PROJECT_OVERVIEW.md` — stack, quy ước commit, bảng nhóm route.
 - `TECH-DEBT.md` — nợ đang mở (TD-029 service_role, TD-033 từ điển i18n).
 - `docs/adr/` — mỗi quyết định có ngày và lý do; ADR thắng file này khi mâu thuẫn.
+- `BACK-END-ARCHITECTURE-MAP.md` (bản đồ backend cũ) và `DESIGN.md` **không còn
+  tồn tại**. File này thay cái thứ nhất; `PROJECT_OVERVIEW.md` §2 thay cái thứ hai.
+  Tài liệu trong `docs/` đã được cập nhật theo tên nhóm route mới ngày 2026-09-03;
+  16 đường dẫn còn trỏ vào file không tồn tại là tên component từng lên kế hoạch
+  mà chưa bao giờ được dựng — hồ sơ lịch sử, cố ý không sửa.
 - `.claude/MEMORY.md` — quy trình 3 pha, tài khoản test, Notion ghi tiến độ.
