@@ -6,7 +6,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { readBounded } from "@/lib/supabase/boundedRead";
 import { assembledFromRows } from "@/lib/ugc/fromRows";
-import { resolveSignedImageUrl } from "@/lib/ugc/imageUrl";
+import { resolveSignedImageUrls } from "@/lib/ugc/imageUrl";
 import type { AssembledExam } from "@/lib/ugc/types";
 
 /** Một dòng trong danh sách "My exams" (S-02). */
@@ -157,13 +157,15 @@ export async function getMyExam(id: string): Promise<MyExamDetail | null> {
   );
 
   // Đổi image_url đã lưu → signed URL để <img> đọc được từ bucket private.
-  await Promise.all(
-    exam.questions.map(async (q) => {
-      if (q.imageUrl) {
-        q.imageUrl = await resolveSignedImageUrl(supabase, q.imageUrl);
-      }
-    })
+  // Một lượt Storage cho cả đề thay vì N lượt song song (A3, xem
+  // resolveSignedImageUrls). Ký hỏng → undefined, y như trước.
+  const signedImages = await resolveSignedImageUrls(
+    supabase,
+    exam.questions.map((q) => q.imageUrl)
   );
+  for (const q of exam.questions) {
+    if (q.imageUrl) q.imageUrl = signedImages.get(q.imageUrl);
+  }
 
   return { id: examRow.id as string, status: examRow.status as string, exam };
 }

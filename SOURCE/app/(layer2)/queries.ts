@@ -25,7 +25,7 @@ import {
   summariseEssays,
   type EssaySummary,
 } from "@/lib/scoring/essayLifecycle";
-import { resolveSignedImageUrl } from "@/lib/ugc/imageUrl";
+import { resolveSignedImageUrls } from "@/lib/ugc/imageUrl";
 import { repairTrueFalseStem } from "@/lib/ugc/tfShape";
 import type { SubItemId } from "@/lib/ugc/types";
 import type { Exam } from "@/types/exam";
@@ -470,43 +470,49 @@ export async function getExamForPlayer(
   }>;
 
   // Đổi image_url đã lưu → signed URL (bucket private) để player render được.
-  const byId = new Map<string, PublicQuestion>();
-  await Promise.all(
-    rows.map(async (r) => {
-      const questionType =
-        (r.question_type as "mcq" | "essay" | "true_false" | "short_answer" | null) ?? "mcq";
-      // SHIM CHO ROW CŨ (2026-09-02) — câu Đúng/Sai lưu TRƯỚC bản vá
-      // `repairTrueFalseStem` có `choices` rỗng và câu phán xét kẹt trong
-      // `content`. Đây là đường đọc mà việc KHÔNG vá tốn nhiều nhất: học sinh
-      // mở bài ra và thấy một câu hỏi không có gì để bấm. Cùng một hàm với màn
-      // duyệt, cố ý — hai đường đọc dựng hai cấu trúc khác nhau cho cùng một
-      // row là đúng thứ shim này sinh ra để tránh.
-      const shaped = repairTrueFalseStem(
-        questionType,
-        r.content,
-        questionType === "true_false"
-          ? (r.choices as unknown as { id: SubItemId; text: string }[])
-          : undefined
-      );
-      byId.set(r.id, {
-        id: r.id,
-        content: shaped.stem,
-        // true_false: cột choices chứa các ý a–d → map sang subItems.
-        choices: questionType === "true_false" ? [] : r.choices,
-        subItems:
-          questionType === "true_false"
-            ? (shaped.subItems as unknown as PublicQuestion["subItems"])
-            : undefined,
-        subject: r.subject,
-        grade: r.grade,
-        topic: r.topic,
-        questionType,
-        partNumber: r.part_number ?? 1,
-        passageId: r.passage_id ?? undefined,
-        imageUrl: await resolveSignedImageUrl(supabase, r.image_url),
-      });
-    })
+  // MỘT lượt gọi Storage cho cả đề (`createSignedUrls`) thay vì N lượt song
+  // song — đo 2026-09-03 trên dev: một lượt lô ≈ 216 ms, một lượt đơn ≈ 409 ms;
+  // đề 40 câu có hình trước đây là 40 request (A3). Mục nào ký hỏng thì
+  // `get()` trả undefined, y như bản ký từng ảnh.
+  const signedImages = await resolveSignedImageUrls(
+    supabase,
+    rows.map((r) => r.image_url)
   );
+  const byId = new Map<string, PublicQuestion>();
+  rows.forEach((r) => {
+    const questionType =
+      (r.question_type as "mcq" | "essay" | "true_false" | "short_answer" | null) ?? "mcq";
+    // SHIM CHO ROW CŨ (2026-09-02) — câu Đúng/Sai lưu TRƯỚC bản vá
+    // `repairTrueFalseStem` có `choices` rỗng và câu phán xét kẹt trong
+    // `content`. Đây là đường đọc mà việc KHÔNG vá tốn nhiều nhất: học sinh
+    // mở bài ra và thấy một câu hỏi không có gì để bấm. Cùng một hàm với màn
+    // duyệt, cố ý — hai đường đọc dựng hai cấu trúc khác nhau cho cùng một
+    // row là đúng thứ shim này sinh ra để tránh.
+    const shaped = repairTrueFalseStem(
+      questionType,
+      r.content,
+      questionType === "true_false"
+        ? (r.choices as unknown as { id: SubItemId; text: string }[])
+        : undefined
+    );
+    byId.set(r.id, {
+      id: r.id,
+      content: shaped.stem,
+      // true_false: cột choices chứa các ý a–d → map sang subItems.
+      choices: questionType === "true_false" ? [] : r.choices,
+      subItems:
+        questionType === "true_false"
+          ? (shaped.subItems as unknown as PublicQuestion["subItems"])
+          : undefined,
+      subject: r.subject,
+      grade: r.grade,
+      topic: r.topic,
+      questionType,
+      partNumber: r.part_number ?? 1,
+      passageId: r.passage_id ?? undefined,
+      imageUrl: r.image_url ? signedImages.get(r.image_url) : undefined,
+    });
+  });
   const questions = exam.questionIds
     .map((qid) => byId.get(qid))
     .filter((q): q is PublicQuestion => q !== undefined);
@@ -764,41 +770,47 @@ export async function getResult(attemptId: string): Promise<ExamResult | null> {
   // `createSignedUrl` là một round-trip tới Storage, và một đề 40 câu có hình
   // sẽ cộng dồn 40 lần chờ vào TTFB của trang. Đúng khuôn `getExamForPlayer()`
   // (queries.ts:465) đã dùng cho màn làm bài.
-  await Promise.all(
-    ((qs ?? []) as Array<{
-      id: string;
-      content: string;
-      choices: Choice[];
-      question_type: ResultQuestion["questionType"] | null;
-      sub_answers: ResultQuestion["subAnswers"] | null;
-      essay_answer: string | null;
-      image_url: string | null;
-      passage_id: string | null;
-    }>).map(async (q) => {
-      const questionType = q.question_type ?? "mcq";
-      const passage = q.passage_id
-        ? (exam.passages ?? []).find((pg) => pg.id === q.passage_id)
-        : undefined;
-      questions[q.id] = {
-        content: q.content,
-        passageText: passage?.text,
-        passageTitle: passage?.title,
-        choices: questionType === "true_false" ? [] : q.choices,
-        questionType,
-        subItems:
-          questionType === "true_false"
-            ? (q.choices as unknown as ResultQuestion["subItems"])
-            : undefined,
-        subAnswers: q.sub_answers ?? undefined,
-        essayAnswer: q.essay_answer ?? undefined,
-        // Ký bằng client PHIÊN USER, không phải service role: policy
-        // `exam_images_select` (schema.sql §8) mới là tầng cưỡng chế, và nó
-        // cho đọc hình của đề `published` — đúng điều kiện của màn này
-        // (getResult đã lọc `status = 'published'` ở vòng 1).
-        imageUrl: await resolveSignedImageUrl(supabase, q.image_url),
-      };
-    })
+  //
+  // Từ 2026-09-03 (A3): vẫn một lần chờ, nhưng là MỘT request — ký cả lô bằng
+  // `resolveSignedImageUrls()` rồi tra Map, thay vì N request chạy song song.
+  const answerRows = (qs ?? []) as Array<{
+    id: string;
+    content: string;
+    choices: Choice[];
+    question_type: ResultQuestion["questionType"] | null;
+    sub_answers: ResultQuestion["subAnswers"] | null;
+    essay_answer: string | null;
+    image_url: string | null;
+    passage_id: string | null;
+  }>;
+  const signedImages = await resolveSignedImageUrls(
+    supabase,
+    answerRows.map((q) => q.image_url)
   );
+  answerRows.forEach((q) => {
+    const questionType = q.question_type ?? "mcq";
+    const passage = q.passage_id
+      ? (exam.passages ?? []).find((pg) => pg.id === q.passage_id)
+      : undefined;
+    questions[q.id] = {
+      content: q.content,
+      passageText: passage?.text,
+      passageTitle: passage?.title,
+      choices: questionType === "true_false" ? [] : q.choices,
+      questionType,
+      subItems:
+        questionType === "true_false"
+          ? (q.choices as unknown as ResultQuestion["subItems"])
+          : undefined,
+      subAnswers: q.sub_answers ?? undefined,
+      essayAnswer: q.essay_answer ?? undefined,
+      // Ký bằng client PHIÊN USER, không phải service role: policy
+      // `exam_images_select` (schema.sql §8) mới là tầng cưỡng chế, và nó
+      // cho đọc hình của đề `published` — đúng điều kiện của màn này
+      // (getResult đã lọc `status = 'published'` ở vòng 1).
+      imageUrl: q.image_url ? signedImages.get(q.image_url) : undefined,
+    };
+  });
 
   return {
     examId: exam.id,
