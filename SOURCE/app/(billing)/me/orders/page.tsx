@@ -22,13 +22,13 @@
 // thứ tự bằng SQL, đúng một lần.
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { listMyOrders } from "@/app/(billing)/queries";
+import { listMyOrders } from "@/features/billing/queries";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { getTranslate } from "@/lib/i18n/server";
-import { OrderList } from "./_components/OrderList";
-import { PlanSummary } from "./_components/PlanSummary";
+import { OrderList } from "@/features/billing/components/orders/OrderList";
+import { PlanSummary } from "@/features/billing/components/orders/PlanSummary";
 
 export const metadata: Metadata = { title: "Your orders" };
 

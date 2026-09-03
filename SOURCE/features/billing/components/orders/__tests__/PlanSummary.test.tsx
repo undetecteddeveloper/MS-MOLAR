@@ -28,7 +28,7 @@
 
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { PlanSummary } from "../_components/PlanSummary";
+import { PlanSummary } from "@/features/billing/components/orders/PlanSummary";
 import { EntitlementProvider } from "@/lib/billing/entitlement";
 import type { Entitlement } from "@/lib/billing/types";
 import { I18nProvider } from "@/lib/i18n/client";

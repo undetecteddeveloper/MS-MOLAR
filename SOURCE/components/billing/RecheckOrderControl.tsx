@@ -43,7 +43,7 @@
 // nào: một đơn `paid` phải mount, phải focus được, phải mang `aria-disabled`
 // CHUỖI "true" kèm một LÝ DO, và handler của nó phải VỀ SỚM. `status` để kiểu
 // `string` chứ không phải union bốn literal — cùng lý do `MyOrderRow.status`
-// (`(billing)/queries.ts`) và C-09 để `string`: ràng buộc CHECK của CSDL đổi
+// (`features/billing/queries.ts`) và C-09 để `string`: ràng buộc CHECK của CSDL đổi
 // được mà không một dòng TypeScript nào đổi theo, nên nhánh "không nhận ra"
 // phải là một GIÁ TRỊ CHẠY ĐƯỢC, không phải một lỗi biên dịch không bao giờ
 // xảy ra.

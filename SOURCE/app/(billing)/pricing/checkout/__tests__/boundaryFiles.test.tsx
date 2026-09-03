@@ -35,7 +35,7 @@ const { getMyOrderMock, getCurrentUserMock, cookieGetMock } = vi.hoisted(() => (
 
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: cookieGetMock }) }));
 vi.mock("@/lib/auth/getCurrentUser", () => ({ getCurrentUser: getCurrentUserMock }));
-vi.mock("@/app/(billing)/queries", () => ({ getMyOrder: getMyOrderMock }));
+vi.mock("@/features/billing/queries", () => ({ getMyOrder: getMyOrderMock }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn(), notFound: vi.fn() }));
 
 import { renderServerTree } from "@/app/(billing)/me/orders/__tests__/renderServerTree";

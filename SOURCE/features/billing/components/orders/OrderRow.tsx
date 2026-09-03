@@ -38,7 +38,7 @@
 // đếm ngược không bao giờ được khởi động lại" (backend DD § createOrder()). Một
 // đơn dùng lại có thể chỉ còn 4 phút; tính lại từ `created_at` sẽ hứa 30.
 import Link from "next/link";
-import type { MyOrderRow } from "@/app/(billing)/queries";
+import type { MyOrderRow } from "@/features/billing/queries";
 import { OrderStatusBadge } from "@/components/billing/OrderStatusBadge";
 import { RecheckOrderControl } from "@/components/billing/RecheckOrderControl";
 import { formatDateTime } from "@/lib/format/datetime";

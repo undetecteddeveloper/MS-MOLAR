@@ -28,7 +28,7 @@
 // `lib/billing/checkoutOrder.ts` since backend-task-17 shipped it,
 // `RecheckOutcome` — which subsumes `SettleResult` — from
 // `lib/billing/orderActions.ts` since backend-task-18 shipped it, and
-// `MyOrderRow` from `app/(billing)/queries.ts` since backend-task-19 shipped it,
+// `MyOrderRow` from `features/billing/queries.ts` since backend-task-19 shipped it,
 // so a change to any of the five breaks this file at compile time.
 // NO SHAPE BELOW IS TRANSCRIBED ANY MORE, and that is the point of this
 // paragraph rather than a boast: while `MyOrderRow` was still copied from the
@@ -60,7 +60,7 @@
 // Nothing remains on that list. A tsc error in THIS file is now the failure mode
 // for drift on every contract it stands for.
 
-import type { MyOrderRow } from "@/app/(billing)/queries";
+import type { MyOrderRow } from "@/features/billing/queries";
 import type { CheckoutOrder } from "@/lib/billing/checkoutOrder";
 import type { RecheckOutcome } from "@/lib/billing/orderActions";
 import { FREE_FALLBACK, type Entitlement } from "@/lib/billing/types";
@@ -341,7 +341,7 @@ export function fixtureOrderByCode(orderCode: number): CheckoutOrder | null {
  *
  *  The declared `MyOrderRow` return type is the COMPILE-TIME LINK to the shipped
  *  contract (backend-task-19): every row fixture is built here, so a field added
- *  to, removed from or renamed in `app/(billing)/queries.ts` turns this file red
+ *  to, removed from or renamed in `features/billing/queries.ts` turns this file red
  *  instead of drifting in silence. */
 export function toFixtureOrderRow(
   order: CheckoutOrder,

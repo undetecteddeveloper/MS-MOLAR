@@ -36,7 +36,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 import { renderServerTree } from "@/app/(billing)/me/orders/__tests__/renderServerTree";
 import type { CheckoutOrder } from "@/lib/billing/checkoutOrder";
 import { en } from "@/lib/i18n/dictionaries/en";
-import { isPayable, PaymentPanel } from "../_components/PaymentPanel";
+import { isPayable, PaymentPanel } from "@/features/billing/components/checkout/PaymentPanel";
 
 // All eight fields carry DIFFERENT values; the four text fields are four
 // distinguishable strings, so a swap between any two of them is visible.

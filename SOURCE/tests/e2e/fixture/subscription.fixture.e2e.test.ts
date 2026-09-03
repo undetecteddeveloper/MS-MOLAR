@@ -1274,7 +1274,7 @@ const { listMyOrdersMock, getCurrentUserMock, recheckOrderMock, createOrderMock,
     getMyOrderMock: vi.fn(),
   }));
 
-vi.mock("@/app/(billing)/queries", () => ({
+vi.mock("@/features/billing/queries", () => ({
   listMyOrders: listMyOrdersMock,
   getMyOrder: getMyOrderMock,
 }));
@@ -1285,7 +1285,7 @@ vi.mock("@/lib/billing/orderActions", () => ({
 
 import BillingLayout from "@/app/(billing)/layout";
 import MyOrdersPage from "@/app/(billing)/me/orders/page";
-import type { MyOrderRow } from "@/app/(billing)/queries";
+import type { MyOrderRow } from "@/features/billing/queries";
 import type { RecheckOutcome } from "@/lib/billing/orderActions";
 import {
   createSubscriptionActionStubs,
@@ -3069,7 +3069,7 @@ describe("FE-1 (d) the transfer block is not coupled to the QR", () => {
 //
 // THE CLOSED BRANCH IS NOT LEFT UNTESTED. It lives at the level where it is
 // still reachable —
-// `app/(billing)/pricing/checkout/__tests__/PaymentConfirm.test.tsx` renders
+// `features/billing/components/checkout/__tests__/PaymentConfirm.test.tsx` renders
 // C-15 with an explicit `legalContentReady={false}` and pins the inert,
 // focusable, reasoned control there, including that its sentence is the LEGAL
 // one and not C-10's "this order is closed". A route-level case cannot pin a

@@ -62,17 +62,17 @@ const { getCurrentUserMock, getMyOrderMock, cookieGetMock } = vi.hoisted(() => (
 vi.mock("server-only", () => ({}));
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: cookieGetMock }) }));
 vi.mock("@/lib/auth/getCurrentUser", () => ({ getCurrentUser: getCurrentUserMock }));
-vi.mock("@/app/(billing)/queries", () => ({ getMyOrder: getMyOrderMock }));
+vi.mock("@/features/billing/queries", () => ({ getMyOrder: getMyOrderMock }));
 
 import { recheckOrder } from "@/lib/billing/orderActions";
 import { en } from "@/lib/i18n/dictionaries/en";
 import { LegalContentPending } from "@/components/billing/LegalDocument";
 import { isPaidTierEnabled } from "@/lib/billing/paidTier";
-import { renderServerTree } from "../../../me/orders/__tests__/renderServerTree";
-import RefundPolicyPage from "../../../refund-policy/page";
-import TermsPage from "../../../terms/page";
-import CheckoutPage from "../page";
-import { PaymentConfirm } from "../_components/PaymentConfirm";
+import { renderServerTree } from "@/app/(billing)/me/orders/__tests__/renderServerTree";
+import RefundPolicyPage from "@/app/(billing)/refund-policy/page";
+import TermsPage from "@/app/(billing)/terms/page";
+import CheckoutPage from "@/app/(billing)/pricing/checkout/page";
+import { PaymentConfirm } from "@/features/billing/components/checkout/PaymentConfirm";
 
 const mockRecheck = vi.mocked(recheckOrder);
 const ORDER_CODE = 3100000000002;
@@ -226,10 +226,10 @@ describe("C-15 PaymentConfirm — R-9: the two locks stay independent", () => {
   it("names the release flag nowhere in C-15 or in the page that computes the predicate", () => {
     const files = {
       confirm: readFileSync(
-        join(import.meta.dirname, "..", "_components", "PaymentConfirm.tsx"),
+        join(import.meta.dirname, "..", "PaymentConfirm.tsx"),
         "utf8"
       ),
-      page: readFileSync(join(import.meta.dirname, "..", "page.tsx"), "utf8"),
+      page: readFileSync(join(import.meta.dirname, "..", "..", "..", "..", "..", "app", "(billing)", "pricing", "checkout", "page.tsx"), "utf8"),
     };
 
     expect(files.confirm).toContain("export function PaymentConfirm");

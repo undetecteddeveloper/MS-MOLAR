@@ -43,8 +43,8 @@ import { RecheckOrderControl } from "@/components/billing/RecheckOrderControl";
 import type { CheckoutOrder } from "@/lib/billing/checkoutOrder";
 import { formatDateTime } from "@/lib/format/datetime";
 import { getLocale, getTranslate } from "@/lib/i18n/server";
-import { TransferDetails } from "./TransferDetails";
-import { VietQrCode } from "./VietQrCode";
+import { TransferDetails } from "@/features/billing/components/checkout/TransferDetails";
+import { VietQrCode } from "@/features/billing/components/checkout/VietQrCode";
 
 /**
  * Đơn này có được phép nhận tiền không?

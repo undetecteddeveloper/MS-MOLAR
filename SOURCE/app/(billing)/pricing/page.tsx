@@ -14,8 +14,8 @@ import { PageContainer } from "@/components/layout/PageContainer";
 import { LegalLinks } from "@/components/billing/LegalLinks";
 import { isPaidTierEnabled } from "@/lib/billing/paidTier";
 import { getTranslate } from "@/lib/i18n/server";
-import { PlanComparison } from "./_components/PlanComparison";
-import { PurchaseCta } from "./_components/PurchaseCta";
+import { PlanComparison } from "@/features/billing/components/pricing/PlanComparison";
+import { PurchaseCta } from "@/features/billing/components/pricing/PurchaseCta";
 
 export const dynamic = "force-dynamic";
 

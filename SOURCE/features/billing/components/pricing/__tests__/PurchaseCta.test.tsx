@@ -32,7 +32,7 @@
 
 import { act, cleanup, render, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { PurchaseCta } from "../PurchaseCta";
+import { PurchaseCta } from "@/features/billing/components/pricing/PurchaseCta";
 import type { CheckoutOrder } from "@/lib/billing/checkoutOrder";
 import type { CreateOrderError, CreateOrderOutcome } from "@/lib/billing/orderActions";
 import { I18nProvider } from "@/lib/i18n/client";

@@ -38,7 +38,7 @@ vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined })
 
 import { renderServerTree } from "@/app/(billing)/me/orders/__tests__/renderServerTree";
 import { en } from "@/lib/i18n/dictionaries/en";
-import { QrSvg, VietQrCode, type QrMatrix } from "../_components/VietQrCode";
+import { QrSvg, VietQrCode, type QrMatrix } from "@/features/billing/components/checkout/VietQrCode";
 
 // A VietQR/EMVCo payload prefix — a STRING, never a URL (UI Spec C-12).
 const PAYLOAD = "00020101021238QRPAYLOAD5802VN630412AB";
@@ -92,7 +92,7 @@ describe("C-12 VietQrCode — the absent-encoder state (BU-2 / ADR-0018 open)", 
   // ==========================================================================
   it("names no provider origin, no <img> and no fetch", () => {
     const src = readFileSync(
-      join(import.meta.dirname, "..", "_components", "VietQrCode.tsx"),
+      join(import.meta.dirname, "..", "VietQrCode.tsx"),
       "utf8"
     );
     const code = src

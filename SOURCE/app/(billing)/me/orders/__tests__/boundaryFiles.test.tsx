@@ -31,7 +31,7 @@ const { listMyOrdersMock, getCurrentUserMock, cookieGetMock } = vi.hoisted(() =>
 
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: cookieGetMock }) }));
 vi.mock("@/lib/auth/getCurrentUser", () => ({ getCurrentUser: getCurrentUserMock }));
-vi.mock("@/app/(billing)/queries", () => ({ listMyOrders: listMyOrdersMock }));
+vi.mock("@/features/billing/queries", () => ({ listMyOrders: listMyOrdersMock }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 
 import MyOrdersPage from "../page";

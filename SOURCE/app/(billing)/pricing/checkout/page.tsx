@@ -37,15 +37,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getMyOrder } from "@/app/(billing)/queries";
+import { getMyOrder } from "@/features/billing/queries";
 import { LegalLinks } from "@/components/billing/LegalLinks";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { en } from "@/lib/i18n/dictionaries/en";
 import { getTranslate } from "@/lib/i18n/server";
-import { PaymentConfirm } from "./_components/PaymentConfirm";
-import { isPayable, PaymentPanel } from "./_components/PaymentPanel";
+import { PaymentConfirm } from "@/features/billing/components/checkout/PaymentConfirm";
+import { isPayable, PaymentPanel } from "@/features/billing/components/checkout/PaymentPanel";
 
 export const metadata: Metadata = { title: "Checkout" };
 

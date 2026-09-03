@@ -43,8 +43,8 @@ vi.mock("next/headers", () => ({ cookies: async () => ({ get: cookieGetMock }) }
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 
 import { I18nProvider } from "@/lib/i18n/client";
-import { OrderRow } from "../_components/OrderRow";
-import { renderServerTree } from "./renderServerTree";
+import { OrderRow } from "@/features/billing/components/orders/OrderRow";
+import { renderServerTree } from "@/app/(billing)/me/orders/__tests__/renderServerTree";
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
 

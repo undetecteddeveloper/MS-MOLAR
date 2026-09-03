@@ -1,6 +1,6 @@
 // ĐÚNG MỘT mapping snake_case → `CheckoutOrder` trong repo này. Cả hai bên sản
 // xuất đều import từ đây: đường đọc-lại của `createOrder()` và `getMyOrder()`
-// trong `app/(billing)/queries.ts`. Một mapping THỨ HAI chính là lỗi mà file
+// trong `features/billing/queries.ts`. Một mapping THỨ HAI chính là lỗi mà file
 // này tồn tại để chặn, không phải một tiện lợi.
 // Backend DD § "One mapper, not two" (I010), Escalation E-02.
 //

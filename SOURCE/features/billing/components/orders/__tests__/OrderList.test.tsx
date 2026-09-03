@@ -31,8 +31,8 @@ vi.mock("next/headers", () => ({ cookies: async () => ({ get: cookieGetMock }) }
 // (ProfileCard.test.tsx, DisplayNameEditor.test.tsx); C-10 itself is REAL.
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 
-import { OrderList } from "../_components/OrderList";
-import { renderServerTree } from "./renderServerTree";
+import { OrderList } from "@/features/billing/components/orders/OrderList";
+import { renderServerTree } from "@/app/(billing)/me/orders/__tests__/renderServerTree";
 
 // Copy authored here from the UI Spec's intent, independently of en.ts, so a
 // silent dictionary edit fails this test instead of being re-derived into

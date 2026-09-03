@@ -20,7 +20,7 @@
 
 import Link from "next/link";
 import { Tabs, TabsIndicator, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs";
-import { PlanSummary } from "@/app/(billing)/me/orders/_components/PlanSummary";
+import { PlanSummary } from "@/features/billing/components/orders/PlanSummary";
 import { useT } from "@/lib/i18n/client";
 import type { CurrentUserProfile } from "@/lib/auth/getCurrentUser";
 import { ProfileCard } from "@/features/profile/components/ProfileCard";

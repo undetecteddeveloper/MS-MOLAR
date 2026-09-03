@@ -28,7 +28,7 @@ vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined })
 
 import { renderServerTree } from "@/app/(billing)/me/orders/__tests__/renderServerTree";
 import { en } from "@/lib/i18n/dictionaries/en";
-import { TransferDetails } from "../_components/TransferDetails";
+import { TransferDetails } from "@/features/billing/components/checkout/TransferDetails";
 
 // The same four values the S-06 fixtures use elsewhere: four distinguishable
 // strings, one number.
@@ -171,7 +171,7 @@ describe("C-14 TransferDetails — the four pairs, in the fixed order", () => {
   // ==========================================================================
   it("introduces no clipboard affordance", () => {
     const src = readFileSync(
-      join(import.meta.dirname, "..", "_components", "TransferDetails.tsx"),
+      join(import.meta.dirname, "..", "TransferDetails.tsx"),
       "utf8"
     );
     expect(src).toContain("export async function TransferDetails");

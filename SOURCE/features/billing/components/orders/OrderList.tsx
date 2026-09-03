@@ -19,9 +19,9 @@
 // trạng thái có sẵn lúc mount, mà một alert lúc mount thì ngắt lời trình đọc
 // màn hình để thông báo... không có gì thay đổi cả.
 import Link from "next/link";
-import type { MyOrderRow } from "@/app/(billing)/queries";
+import type { MyOrderRow } from "@/features/billing/queries";
 import { getTranslate } from "@/lib/i18n/server";
-import { OrderRow } from "./OrderRow";
+import { OrderRow } from "@/features/billing/components/orders/OrderRow";
 
 export async function OrderList({ orders }: { orders: MyOrderRow[] }) {
   const t = await getTranslate();

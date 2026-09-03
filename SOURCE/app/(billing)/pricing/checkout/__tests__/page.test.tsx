@@ -43,7 +43,7 @@ const { getMyOrderMock, getCurrentUserMock, redirectMock, notFoundMock, cookieGe
 
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: cookieGetMock }) }));
 vi.mock("@/lib/auth/getCurrentUser", () => ({ getCurrentUser: getCurrentUserMock }));
-vi.mock("@/app/(billing)/queries", () => ({ getMyOrder: getMyOrderMock }));
+vi.mock("@/features/billing/queries", () => ({ getMyOrder: getMyOrderMock }));
 
 // C-10 (mounted by C-08 in the roundtrip case) calls `useRouter()`, which
 // throws outside a real app-router tree. Same one-method stub the shipped
@@ -55,7 +55,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 import type { CheckoutOrder } from "@/lib/billing/checkoutOrder";
-import { OrderRow } from "@/app/(billing)/me/orders/_components/OrderRow";
+import { OrderRow } from "@/features/billing/components/orders/OrderRow";
 import { renderServerTree } from "@/app/(billing)/me/orders/__tests__/renderServerTree";
 import CheckoutPage from "../page";
 

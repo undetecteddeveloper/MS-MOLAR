@@ -27,7 +27,7 @@ const { getMyOrderMock, getCurrentUserMock, redirectMock, cookieGetMock } = vi.h
 
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: cookieGetMock }) }));
 vi.mock("@/lib/auth/getCurrentUser", () => ({ getCurrentUser: getCurrentUserMock }));
-vi.mock("@/app/(billing)/queries", () => ({ getMyOrder: getMyOrderMock }));
+vi.mock("@/features/billing/queries", () => ({ getMyOrder: getMyOrderMock }));
 vi.mock("next/navigation", () => ({
   redirect: redirectMock,
   notFound: vi.fn(),

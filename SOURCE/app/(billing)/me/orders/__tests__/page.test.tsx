@@ -35,7 +35,7 @@ const { listMyOrdersMock, getCurrentUserMock, redirectMock, cookieGetMock } = vi
 
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: cookieGetMock }) }));
 vi.mock("@/lib/auth/getCurrentUser", () => ({ getCurrentUser: getCurrentUserMock }));
-vi.mock("@/app/(billing)/queries", () => ({ listMyOrders: listMyOrdersMock }));
+vi.mock("@/features/billing/queries", () => ({ listMyOrders: listMyOrdersMock }));
 
 // C-10 (mounted by C-08, one per row) calls `useRouter()`, which throws
 // "invariant expected app router to be mounted" outside a real app-router tree.

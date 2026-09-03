@@ -135,7 +135,7 @@
 // =============================================================================
 // Source: backend DD I010 (Test Boundaries `toCheckoutOrder()` row, :1139) and
 //   Third verification point item "I010 — the two mappings agree" (:1218).
-//   Escalation E-02 records that `app/(billing)/queries.ts` keeps its location,
+//   Escalation E-02 records that `features/billing/queries.ts` keeps its location,
 //   signature and `import "server-only"`; only its mapping step becomes
 //   `toCheckoutOrder(row)`.
 // AC touched (supply half): AC-028 (PRD :290 — account number, amount and
@@ -150,7 +150,7 @@
 // @category: integration
 // @lane: integration
 // @dependency: lib/billing/checkoutOrder.ts (toCheckoutOrder),
-//   createOrder(), app/(billing)/queries.ts (getMyOrder),
+//   createOrder(), features/billing/queries.ts (getMyOrder),
 //   Supabase request-scoped client, payment_orders
 // @complexity: medium
 // Mock boundary (backend DD Test Boundaries, `toCheckoutOrder()` row):
@@ -198,7 +198,7 @@
 //       stored as offered, never recomputed (frontend DD Risk R-11).
 //   (f) Exactly one exported mapper exists: `toCheckoutOrder` is imported from
 //       `SOURCE/lib/billing/checkoutOrder.ts` by both paths, and
-//       `app/(billing)/queries.ts` declares no inline camelCase mapping of its
+//       `features/billing/queries.ts` declares no inline camelCase mapping of its
 //       own for this row.
 //
 //
@@ -1400,7 +1400,7 @@ describe(
 // query builder giả, và nó dùng chung đúng một tài khoản fixture + một lượt
 // dọn dẹp với INT-2 thay vì mở thêm một tài khoản thứ ba.
 
-const { getMyOrder, listMyOrders } = await import("@/app/(billing)/queries");
+const { getMyOrder, listMyOrders } = await import("@/features/billing/queries");
 
 const INT2_EMAIL = "smithnguyen247+mapperint@gmail.com";
 const INT2_PASSWORD = "mapper-int-password-123";
@@ -1469,9 +1469,9 @@ const INT2_SEEDED_ROWS = [
   },
 ] as const;
 
-const INT2_QUERIES_PATH = resolve(__dirname, "../../app/(billing)/queries.ts");
+const INT2_QUERIES_PATH = resolve(__dirname, "../../features/billing/queries.ts");
 
-/** Nguồn của `app/(billing)/queries.ts` đã BÓC chú thích.
+/** Nguồn của `features/billing/queries.ts` đã BÓC chú thích.
  *
  *  Nghĩa vụ (f) và ca (h) nói về CODE, không về văn xuôi: một dòng chú thích
  *  giải thích vì sao KHÔNG được viết `qrPayload:` ở đây mà lại làm chính phép
@@ -1662,7 +1662,7 @@ describe(
     // ---------------------------------------------------------------------
     // (f) ĐÚNG MỘT mapper tồn tại
     // ---------------------------------------------------------------------
-    it("(f) `app/(billing)/queries.ts` nhập và gọi `toCheckoutOrder()`, và KHÔNG tự khai một mapping camelCase nào cho dòng này", async () => {
+    it("(f) `features/billing/queries.ts` nhập và gọi `toCheckoutOrder()`, và KHÔNG tự khai một mapping camelCase nào cho dòng này", async () => {
       const code = int2QueriesCode();
 
       expect(code).toContain('from "@/lib/billing/checkoutOrder"');
