@@ -28,6 +28,9 @@ còn nơi nào khác giữ lịch sử nợ ngoài chính file này.)*
 > giờ là công sức, nên khi rào chắn được gỡ thì nó đi rất nhanh. Đáng ghi:
 > một nợ "để mở" 4 tuần có thể chỉ đang chờ đúng một thứ mà không ai hỏi lại.)*
 >
+> - **TD-033** (2026-09-03) — mở thêm một mục: bundle client nạp cả hai từ
+>   điển i18n; đã đo, cố ý chưa sửa vì hai cách sửa đều đụng quyết định/ràng
+>   buộc đã có. Phần "Đang mở" nay là HAI mục.
 > - **TD-029** — QUYẾT ĐỊNH KIẾN TRÚC nay ĐÃ CÓ: engineer chọn đường **(c)** —
 >   giữ `service_role`, không thêm identity thứ hai — ngày 2026-08-31, ghi trong
 >   **ADR-0019**. Mục vẫn ở đây vì (c) CỐ Ý không giảm một quyền nào, mà quyền
@@ -200,6 +203,45 @@ không còn là thước đo duy nhất — bản trả nợ phải chỉ ra đ�
 KHÔNG còn cần `service_role` nữa, và `test-rls.ts` phải có ca chứng minh
 identity mới không làm được thứ `service_role` làm được.
 
+
+### TD-033 — Bundle client nạp CẢ HAI từ điển i18n, người dùng chỉ đọc một
+**Từ:** 2026-09-03 (phát hiện khi refactor hiệu năng A4; đo, rồi CỐ Ý không sửa)
+**Loại:** hiệu năng — kích thước bundle đầu của MỌI trang
+
+**Đo được (bản production `next build`, 2026-09-03):** `lib/i18n/translate.ts`
+import tĩnh cả `dictionaries/en.ts` lẫn `dictionaries/vi.ts`, và
+`lib/i18n/client.tsx` (`"use client"`, `I18nProvider` ở root layout) kéo nó
+vào bundle client. Kết quả là một chunk dùng chung
+`.next-build/static/chunks/3ojgx9ydjm12-.js` = **97.243 byte thô / 30.031 byte
+gzip** chứa đồng thời chuỗi "Đăng nhập" và "Sign in". Gzip riêng từng file
+nguồn: `en.ts` 22,8 KB, `vi.ts` 17,7 KB — tức mỗi người dùng tải thừa khoảng
+**12–15 KB gzip, MỘT LẦN** (chunk dùng chung, trình duyệt cache được), không
+phải mỗi trang.
+
+**Vì sao chưa sửa — hai cách sửa đều đụng một quyết định hoặc một ràng buộc đã
+có, và khoản tiết kiệm không đủ lớn để phá chúng:**
+
+1. *Gửi từ điển của ngôn ngữ đang chọn từ server xuống qua prop* — bị chính
+   `lib/i18n/client.tsx` bác từ đầu, có lý do ghi tại chỗ: nó "gửi đúng MỘT
+   chuỗi `locale` qua ranh giới server→client thay vì serialize cả bảng vài trăm
+   chuỗi vào payload RSC của mọi trang". Cách này đổi 12 KB gzip tải MỘT LẦN
+   lấy ~60 KB thô nhét vào payload RSC của MỖI lượt điều hướng — lỗ.
+2. *Tách mỗi từ điển thành một chunk nạp trễ* (`next/dynamic` một provider
+   riêng cho từng ngôn ngữ, hoặc `import()` + `use()`). Ràng buộc của A4 là
+   "đổi ngôn ngữ không được nháy trang hay mất chữ": đổi ngôn ngữ đi qua server
+   action + `router.refresh()`, payload RSC mới trỏ tới provider của ngôn ngữ
+   kia, và trong lúc chunk đó chưa về thì `next/dynamic` render `loading` —
+   tức là đúng khoảnh khắc "mất chữ" mà ràng buộc cấm. Muốn không mất chữ thì
+   phải giữ provider cũ sống cho tới khi chunk mới sẵn sàng — thêm state, thêm
+   một đường suy luận về thứ tự hydrate, cho 12 KB.
+
+**Điều kiện lấy lại:** từ điển lớn thêm đáng kể (vd thêm ngôn ngữ thứ ba, hoặc
+một trong hai file vượt ~40 KB gzip), HOẶC Next có cơ chế preload chunk cho
+`import()` dữ liệu trong lúc `router.refresh()` mà không rơi về fallback.
+
+**Verify khi trả:** `grep -l "Sign in" .next-build/static/chunks/*.js | xargs
+grep -l "Đăng nhập"` trả về RỖNG, và bấm nút đổi ngôn ngữ trên `/exams` ghi hình
+không có khung nào thiếu chữ.
 
 ---
 
