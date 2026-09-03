@@ -50,7 +50,7 @@ Phase 5 Task 19 (keyboard pass) found and fixed a **real defect in this phase's 
 ## Verification Commands
 
 ```
-cd SOURCE && npx vitest run components/tutor "app/(layer3)/_components"
+cd SOURCE && npx vitest run components/tutor "app/(analytics)/_components"
 cd SOURCE && npx tsc --noEmit
 cd SOURCE && npx eslint --max-warnings 0 .
 cd SOURCE && npm run build

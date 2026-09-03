@@ -39,7 +39,7 @@ Metadata:
 
 ## Target Files
 - [x] `SOURCE/components/billing/RecheckOrderControl.tsx` (new)
-- [x] `SOURCE/app/(billing)/me/orders/_components/PlanSummary.tsx` (new — C-11; place beside the S-05 components per the route-group convention)
+- [x] `SOURCE/features/billing/components/orders/PlanSummary.tsx` (new — C-11; place beside the S-05 components per the route-group convention)
 - [x] `SOURCE/lib/i18n/dictionaries/en.ts`, `SOURCE/lib/i18n/dictionaries/vi.ts` (the seven recheck keys + the remaining S-05 keys)
 
 ## Investigation Targets

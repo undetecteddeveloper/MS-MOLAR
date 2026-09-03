@@ -174,7 +174,7 @@ lane. `.mcp.json` was not consulted for a project ref (it points at production,
 Credentials convention followed (eleven existing `*.int.test.ts` precedents): read
 `.env.local` manually into `process.env`, compute `HAS_LIVE_DB`, gate the suite with
 `describe.skipIf(!HAS_LIVE_DB)` and a loud `console.warn`.
-`app/(layer2)/__tests__/recordSkillMastery.int.test.ts` is the closest precedent (real
+`features/exams/__tests__/recordSkillMastery.int.test.ts` is the closest precedent (real
 Postgres, real signed-in session, `vi.mock("server-only")`, and a
 `vi.mock("@/lib/supabase/server")` whose `createClient` returns a **real** authenticated
 client rather than a fake) and is the one INT-3 follows.
@@ -308,7 +308,7 @@ unit roundtrip case, the second half is INT-3 (e).
    specifies, so it was left alone rather than invented. If it is wanted, it
    belongs to whoever owns AC-049/AC-054, not to this task.
 2. **`{ error: "unauthenticated" }` rather than `redirect()`.** `requireUser()`
-   in `app/(layer4)/actions.ts` is a private helper of that route group and
+   in `features/authoring/actions.ts` is a private helper of that route group and
    redirects; `lib/support/actions.ts` — the only other lib-level Server Action —
    deliberately returns a value instead, because a redirect destroys the state of
    the screen the user is standing on and crosses the action boundary as an

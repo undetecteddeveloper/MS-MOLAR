@@ -12,7 +12,7 @@ Review screen understands parts and the 2 new types (Design Doc §v2.1 UI delta)
 - Live validation (`validateAssembledExam`) already covers new types via A3 — wire, don't re-implement.
 
 ## Files
-Edited: `app/(layer4)/_components/{AssembledQuestionList,QuestionEditor,ExtractionErrorPanel,ReviewScreen}.tsx`.
+Edited: `features/authoring/components/{AssembledQuestionList,QuestionEditor,ExtractionErrorPanel,ReviewScreen}.tsx`.
 
 ## Verification / Acceptance
 Manual on the 2025 fixture draft: 3 part sections; TF editor toggles persist through Save; short-answer edits persist; error links jump to the right question. Old single-part exam renders unchanged. `tsc`/eslint clean; a11y: toggles are real buttons with pressed state, keyboard operable, part headings are real headings.

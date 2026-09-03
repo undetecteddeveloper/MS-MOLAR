@@ -5,13 +5,13 @@
 Accepted — 2026-08-08. Resolves PRD Undetermined Item U2 (`docs/prd/engine1-adaptive-ai-prd.md`, R3/AC-011). Direct precedent: ADR-0010 (Score Write Trust Boundary) — this ADR follows its reasoning shape and, where it diverges, states why.
 
 - PRD: `docs/prd/engine1-adaptive-ai-prd.md` — R3 ("Mastery is written on real `submitExam`, not simulated" — D6), AC-011, Security NFR ("The mastery write path must respect the §11 trust boundary"), Risk R-d.
-- Precedent: `docs/adr/ADR-0010-score-write-trust-boundary.md` — closes Critical #2 of `docs/security-review-2026-08-03.md`.
+- Precedent: `docs/adr/ADR-0010-score-write-trust-boundary.md` — closes Critical #2 of the 2026-08-03 security review (that document is no longer in the repo; its still-open items are tracked in `TECH-DEBT.md`).
 - Schema: `SOURCE/supabase/schema.sql` §18 (new — "MASTERY WRITE", this ADR). Sibling of §11 ("SCORE WRITE LOCKDOWN").
 - Full mechanism detail, DDL, and integration point: `docs/design/engine1-adaptive-ai-backend-design.md` §"Architectural Decision — Mastery Write Trust Boundary (U2)" and §"Mastery Write Integration into submitExam".
 
 ## Context
 
-`submitExam()` (`SOURCE/app/(layer2)/actions.ts:54-165`) runs against Postgres using the student's own JWT (the anon key + the student's session, via `SOURCE/lib/supabase/server.ts`) — at the database level, this Server Action and the student's own devtools are the same principal. ADR-0010 already established this exact fact for the score write and closed it: `results_insert_own`'s naive `user_id = auth.uid()` check let a student POST any score they liked, so score writes were moved behind `record_exam_result()`, callable only by `service_role`.
+`submitExam()` (`SOURCE/features/exams/actions.ts:54-165`) runs against Postgres using the student's own JWT (the anon key + the student's session, via `SOURCE/lib/supabase/server.ts`) — at the database level, this Server Action and the student's own devtools are the same principal. ADR-0010 already established this exact fact for the score write and closed it: `results_insert_own`'s naive `user_id = auth.uid()` check let a student POST any score they liked, so score writes were moved behind `record_exam_result()`, callable only by `service_role`.
 
 Engine 1's per-user skill mastery (`user_skill_mastery`, PRD scope diagram) is derived from the identical trusted input — `computeScore()`'s `perQuestion[].isCorrect`/`scored` — and reaches the database through the identical untrusted transport (`submitExam`, student's own JWT). Left unprotected, a mastery write reachable from that identity is exactly as forgeable as the pre-ADR-0010 score write: a student could inflate their own mastery rows directly via `PATCH /rest/v1/user_skill_mastery`, corrupting both their own adaptive routing (R5) and, if mastery data ever feeds a shared/aggregate signal in a later phase, other surfaces. PRD Risk R-d names this directly: "The mastery write path re-opens the §11 trust boundary."
 
@@ -48,7 +48,7 @@ Where this ADR's problem shape **differs** from ADR-0010's: the PRD's own Reliab
 
 3. **Selected — separate INVOKER function (`record_skill_mastery`), `service_role`-only, called as a second, independent, best-effort step from `submitExam()` after the score write succeeds.**
    - Pros: Mirrors ADR-0010's proven mechanism exactly (two independent misconfigurations required to reopen the hole); satisfies the PRD's explicit Reliability NFR by construction (failure is caught in TS between the two RPC calls, not inside a shared SQL transaction); keeps `record_exam_result()`'s existing, already-audited logic untouched.
-   - Cons: Score and mastery are no longer strictly atomic — a request that crashes between the two calls (extremely narrow window: after `recordExamResult()` returns, before `recordSkillMastery()` is awaited) leaves a submitted, scored attempt with no mastery update. Accepted: `submitExam()`'s existing idempotency guard (`attempt.status === 'submitted'` short-circuit, `SOURCE/app/(layer2)/actions.ts:82-84`) means the attempt is never re-scored on a retry, so this narrow gap is not self-healing — see Design Doc Risks and Mitigation for the accepted-risk statement.
+   - Cons: Score and mastery are no longer strictly atomic — a request that crashes between the two calls (extremely narrow window: after `recordExamResult()` returns, before `recordSkillMastery()` is awaited) leaves a submitted, scored attempt with no mastery update. Accepted: `submitExam()`'s existing idempotency guard (`attempt.status === 'submitted'` short-circuit, `SOURCE/features/exams/actions.ts:82-84`) means the attempt is never re-scored on a retry, so this narrow gap is not self-healing — see Design Doc Risks and Mitigation for the accepted-risk statement.
 
 ## Consequences
 
@@ -69,7 +69,7 @@ Where this ADR's problem shape **differs** from ADR-0010's: the PRD's own Reliab
 
 ## Architecture Impact
 
-- **Components that change**: `SOURCE/supabase/schema.sql` (new table `user_skill_mastery`, new function `record_skill_mastery`), `SOURCE/lib/supabase/service-role.ts` (new export `recordSkillMastery()`), `SOURCE/app/(layer2)/actions.ts` (`submitExam()` gains a second, non-throwing post-score-write step).
+- **Components that change**: `SOURCE/supabase/schema.sql` (new table `user_skill_mastery`, new function `record_skill_mastery`), `SOURCE/lib/supabase/service-role.ts` (new export `recordSkillMastery()`), `SOURCE/features/exams/actions.ts` (`submitExam()` gains a second, non-throwing post-score-write step).
 - **New dependencies introduced**: none (no new library; reuses the existing `@supabase/supabase-js` service-role client already instantiated by `serviceRoleClient()`).
 - **Architectural constraints added**: any future privileged write of this shape (derive identity from a submitted attempt, best-effort relative to some other write) should default to this same INVOKER + `service_role`-only + derived-identity pattern unless a documented reason justifies `SECURITY DEFINER`.
 - **Architectural constraints removed**: none.

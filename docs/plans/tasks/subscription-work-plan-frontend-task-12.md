@@ -1,7 +1,7 @@
 # Task: Wire `PurchaseCta` handler (`:37-39`) to `createOrder()` + navigation
 
 Plan mapping: `docs/plans/subscription-work-plan.md` — **Phase 4, plan Task 4.4**
-Layer: **frontend** (`SOURCE/app/(billing)/pricing/_components/PurchaseCta.tsx`)
+Layer: **frontend** (`SOURCE/features/billing/components/pricing/PurchaseCta.tsx`)
 
 Metadata:
 - Dependencies: frontend-task-10 (the S-06 route the navigation lands on), backend-task-18 (`createOrder()`)
@@ -20,11 +20,11 @@ On failure, the button returns to activatable and a `role="alert"` paragraph **a
 **The prop, the `aria-disabled` string at `:29`, the `!canPurchase` early return at `:36` and the `reasonId` binding at `:32` are untouched.**
 
 ## Target Files
-- [x] `SOURCE/app/(billing)/pricing/_components/PurchaseCta.tsx` (handler body only)
-- [x] `SOURCE/app/(billing)/pricing/_components/__tests__/PurchaseCta.test.tsx` (added cases)
+- [x] `SOURCE/features/billing/components/pricing/PurchaseCta.tsx` (handler body only)
+- [x] `SOURCE/features/billing/components/pricing/__tests__/PurchaseCta.test.tsx` (added cases)
 
 ## Investigation Targets
-- `SOURCE/app/(billing)/pricing/_components/PurchaseCta.tsx` (`:29` the `aria-disabled` string, `:32` the `reasonId` binding, `:36` the `!canPurchase` early return, `:37-39` the empty handler branch — **only the branch body changes**)
+- `SOURCE/features/billing/components/pricing/PurchaseCta.tsx` (`:29` the `aria-disabled` string, `:32` the `reasonId` binding, `:36` the `!canPurchase` early return, `:37-39` the empty handler branch — **only the branch body changes**)
 - `SOURCE/lib/billing/orderActions.ts` (plan Task 3.4 — `createOrder()` return shape)
 - `SOURCE/app/(billing)/pricing/checkout/page.tsx` (plan Task 4.2 — the `?order=` consumer this navigation must satisfy)
 - `SOURCE/components/billing/RecheckOrderControl.tsx` (plan Task 3.7 — the `busyRef` + `role="alert"` idioms to mirror)
@@ -35,7 +35,7 @@ On failure, the button returns to activatable and a `role="alert"` paragraph **a
 ## Boundary Context (from the plan Connection Map)
 
 **Boundary — S-05 / `PurchaseCta` → S-06 (order identifier across a navigation).**
-- Owners: `SOURCE/app/(billing)/me/orders/_components/OrderRow.tsx`, `SOURCE/app/(billing)/pricing/_components/PurchaseCta.tsx` ↔ `SOURCE/app/(billing)/pricing/checkout/page.tsx`.
+- Owners: `SOURCE/features/billing/components/orders/OrderRow.tsx`, `SOURCE/features/billing/components/pricing/PurchaseCta.tsx` ↔ `SOURCE/app/(billing)/pricing/checkout/page.tsx`.
 - **Serialized Format**: URL query string `?order={digits}` on `/pricing/checkout` — a decimal digit string, no grouping, no sign.
 - **Consumer Parse Rule**: accept **only** a string matching `/^\d+$/` whose `Number()` is a positive safe integer. **Never `parseInt`.** Anything else ⇒ C-13 Empty state.
 - **Expected Signal**: navigation lands on `/pricing/checkout?order={the same orderCode createOrder() returned}` and S-06 renders that order transfer block.

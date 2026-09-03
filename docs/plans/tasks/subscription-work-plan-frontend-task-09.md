@@ -28,7 +28,7 @@ Assert:
 - `SOURCE/tests/e2e/fixture/subscription.fixture.e2e.test.ts` (**FE-3** `Proof obligation:` / `Primary failure mode:` annotation block)
 - `SOURCE/tests/e2e/fixture/subscriptionFixtureData.ts` (plan Task 0.7 — order fixtures and the counted `recheckOrder` stub)
 - `SOURCE/components/billing/RecheckOrderControl.tsx` (plan Task 3.7 — the control under test)
-- `SOURCE/app/(billing)/me/orders/_components/PlanSummary.tsx` (plan Task 3.7 — C-11, whose values must be byte-identical before and after)
+- `SOURCE/features/billing/components/orders/PlanSummary.tsx` (plan Task 3.7 — C-11, whose values must be byte-identical before and after)
 - `SOURCE/components/billing/OrderStatusBadge.tsx` (plan Task 2.3)
 - `SOURCE/lib/i18n/dictionaries/en.ts`, `SOURCE/lib/i18n/dictionaries/vi.ts` (the fixed expected sentences)
 - `docs/ui-spec/subscription-ui-spec.md` (§ Component: `RecheckOrderControl` — C-10 — verify default (idle) + loading (busy) + error + partial (terminal status) states and all seven rendered outcomes)
@@ -58,7 +58,7 @@ Assert:
 - **Primary failure mode**: asserting that the alert appeared without asserting that nothing was granted — "no wrong grant" is only proven by a before/after comparison, not by the absence of an error.
 - **Boundary to exercise**: the rendered S-05 route with the action module stubbed.
 - **State assertion**: alert node **absent before, present after**; every entitlement-derived C-11 value **byte-identical before and after**; badge word unchanged; `document.activeElement` still the activated control.
-- **Mock boundary rationale**: the dictionaries, the components and the route composition are real; **six module doubles** reach the rendered S-05 tree, not one — `@/lib/billing/orderActions` (the sanctioned boundary, counted), `@/app/(billing)/queries` (`listMyOrders`), `@/lib/auth/getCurrentUser`, `@/lib/billing/readEntitlement`, `next/navigation` (`usePathname` / `useSearchParams` / `redirect` / `useRouter().refresh`, the last of which is a **counted** stub because it is a real seam under C-10's handler) and `@/components/shared/SkipLink` (stubbed to `null`; async Server Component). The list is kept in the test file's mock-boundary paragraph, which is the copy that must stay in step with the code.
+- **Mock boundary rationale**: the dictionaries, the components and the route composition are real; **six module doubles** reach the rendered S-05 tree, not one — `@/lib/billing/orderActions` (the sanctioned boundary, counted), `@/features/billing/queries` (`listMyOrders`), `@/lib/auth/getCurrentUser`, `@/lib/billing/readEntitlement`, `next/navigation` (`usePathname` / `useSearchParams` / `redirect` / `useRouter().refresh`, the last of which is a **counted** stub because it is a real seam under C-10's handler) and `@/components/shared/SkipLink` (stubbed to `null`; async Server Component). The list is kept in the test file's mock-boundary paragraph, which is the copy that must stay in step with the code.
 - **Residual**: whether the alert **survives the server re-render** in a real browser (R-1 / A5) is discharged by the manual pass (plan Task 6.5, item iii).
 
 ## Completion Criteria

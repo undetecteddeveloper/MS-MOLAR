@@ -6,7 +6,7 @@
 In `SiteHeader` and `HomeSidebar`, change `{label:"Import",href:"/admin/import"}` → `{label:"Upload",href:"/upload"}` for all users. **Do not add any admin "Review" item** (admin removed). Add "My exams" → `/me/exams` to `HeaderProfile`/`SidebarProfile` (between Edit and Sign out) (UI Spec D7).
 
 ## Files
-`SOURCE/app/(layer2)/_components/SiteHeader.tsx`, `SOURCE/app/(layer1)/_components/HomeSidebar.tsx`, `SOURCE/components/shared/HeaderProfile.tsx`, `SOURCE/app/(layer1)/_components/SidebarProfile.tsx` (edits).
+`SOURCE/components/layout/SiteHeader.tsx`, `SOURCE/features/auth/components/HomeSidebar.tsx`, `SOURCE/components/shared/HeaderProfile.tsx`, `SOURCE/features/auth/components/SidebarProfile.tsx` (edits).
 
 ## ACs / metrics
 AC-001. UI Spec §SiteHeader (nav extension), D7.

@@ -15,7 +15,7 @@ Metadata:
 - **`SOURCE/components/billing/OrderStatusBadge.tsx`** (C-09) — structure copied from `StatusBadge.tsx:55-64`, **neither of its two defects**: **no hex literals**, **no silent `?? CONFIG.processing` fallback**.
   **C-09 five branches are defined against the schema permitted set, which is exactly `('pending', 'paid', 'expired', 'cancelled')`** — four recognised branches plus the unrecognised one. **There is no `refunded` status**; anything outside those four takes the **unrecognised** branch and is **never coerced** into one of them.
 - Add the **S-05 `billing.*` keys to both dictionaries**.
-- **Do not edit `SOURCE/app/(layer4)/_components/StatusBadge.tsx`** (TBD-09).
+- **Do not edit `SOURCE/features/authoring/components/StatusBadge.tsx`** (TBD-09).
 
 ## Target Files
 - [x] `SOURCE/lib/format/datetime.ts` (new)
@@ -24,11 +24,11 @@ Metadata:
 - [x] `SOURCE/lib/i18n/dictionaries/en.ts`, `SOURCE/lib/i18n/dictionaries/vi.ts` (S-05 keys)
 
 ## Investigation Targets
-- `SOURCE/app/(layer4)/_components/StatusBadge.tsx` (`:55-64` — the structure to copy; **read only, not edited** — its four hex literals and its silent `?? CONFIG.processing` fallback are TBD-09 and must not be reproduced)
+- `SOURCE/features/authoring/components/StatusBadge.tsx` (`:55-64` — the structure to copy; **read only, not edited** — its four hex literals and its silent `?? CONFIG.processing` fallback are TBD-09 and must not be reproduced)
 - `SOURCE/lib/i18n/translate.ts` (`:27` — `String(value)` substitution, the reason amounts are formatted **before** `t()`)
 - `SOURCE/lib/i18n/dictionaries/en.ts`, `SOURCE/lib/i18n/dictionaries/vi.ts` (key style and the identical-string budget)
 - `SOURCE/lib/i18n/__tests__/i18n.test.ts` (`:55-59` — the identical-string ratio assertion)
-- `SOURCE/app/(layer4)/_components/ExamRow.tsx` (`:68` — the module-local `formatDateTime(iso)` with **opposite** timezone semantics; **name-collision hazard**)
+- `SOURCE/features/authoring/components/ExamRow.tsx` (`:68` — the module-local `formatDateTime(iso)` with **opposite** timezone semantics; **name-collision hazard**)
 - `SOURCE/supabase/schema.sql` (the `payment_orders.status` CHECK — the four permitted literals C-09 branches against)
 - `docs/design/subscription-frontend-design.md` (§ Implementation Plan slice F)
 - `docs/design/subscription-frontend-design.md` (§ Main Components)
@@ -81,7 +81,7 @@ Metadata:
 - [x] All added tests pass, including the fabricated-status case and the ICT-midnight-crossing instant
 - [x] C-09 carries **no hex literals** and **no silent fallback**
 - [x] S-05 keys present in **both** dictionaries; the identical-string ratio assertion still green
-- [x] `SOURCE/app/(layer4)/_components/StatusBadge.tsx` unmodified (TBD-09)
+- [x] `SOURCE/features/authoring/components/StatusBadge.tsx` unmodified (TBD-09)
 - [x] Every Reference Contracts Compliance Check evaluates to `Y`, with evidence recorded in Investigation Notes
 - [x] **No production deploy of this branch has occurred**
 
@@ -96,11 +96,11 @@ Metadata:
 
 | Target | What was observed |
 |---|---|
-| `SOURCE/app/(layer4)/_components/StatusBadge.tsx` | `:12` `Status` union of 5 UGC values; `:14-43` `CONFIG: Record<Status, {glyph, labelKey, className}>`; `:53` `const cfg = CONFIG[status as Status] ?? CONFIG.processing`; `:55-64` the structure to copy — one `<span>` with `inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium`, then `<span aria-hidden>{glyph}</span>` followed by `{t(labelKey)}` as the accessible name. **Read only — not edited (TBD-09).** |
+| `SOURCE/features/authoring/components/StatusBadge.tsx` | `:12` `Status` union of 5 UGC values; `:14-43` `CONFIG: Record<Status, {glyph, labelKey, className}>`; `:53` `const cfg = CONFIG[status as Status] ?? CONFIG.processing`; `:55-64` the structure to copy — one `<span>` with `inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium`, then `<span aria-hidden>{glyph}</span>` followed by `{t(labelKey)}` as the accessible name. **Read only — not edited (TBD-09).** |
 | `SOURCE/lib/i18n/translate.ts` | `:27-29` `template.replace(/\{(\w+)\}/g, (whole, name) => name in values ? String(values[name]) : whole)` — a raw `39000` substitutes as `"39000"`. `:25` a missing key returns the key itself, never `""`. |
 | `SOURCE/lib/i18n/dictionaries/{en,vi}.ts` | Flat `"<area>.<key>": "value"` records, `en` is the key-set source of truth (`MessageKey = keyof typeof en`). Existing billing block ends at `billing.quota.upgradeLink`; naming is flat-camel (`billing.cta.unavailableReason`, `billing.quota.tutorExhausted`), i.e. the shipped names win over the UI Spec table's dotted variants. |
 | `SOURCE/lib/i18n/__tests__/i18n.test.ts` | `:23` key-set equality, `:27` no empty value, `:36` placeholder-set parity between locales, `:54-59` identical-string ratio `< 0.1`. |
-| `SOURCE/app/(layer4)/_components/ExamRow.tsx` | `:68` module-local, **unexported** `formatDateTime(iso)` built from `d.getDate()/getMonth()/getHours()` — the **runtime's** timezone, i.e. opposite semantics to the new module. No cross-import is possible; it is left untouched (TBD-08). |
+| `SOURCE/features/authoring/components/ExamRow.tsx` | `:68` module-local, **unexported** `formatDateTime(iso)` built from `d.getDate()/getMonth()/getHours()` — the **runtime's** timezone, i.e. opposite semantics to the new module. No cross-import is possible; it is left untouched (TBD-08). |
 | `SOURCE/supabase/schema.sql` | `payment_orders.status text not null default 'pending' check (status in ('pending', 'paid', 'expired', 'cancelled'))`, with the in-file comment stating there is deliberately **no** `'refunded'` value. |
 | `docs/design/subscription-frontend-design.md` (§ Data Contracts, Decision 3) | Signatures `formatDate(iso: string \| null, locale)`, `formatDateTime(iso: string \| null, locale)`, `formatVnd(amount: number, locale)`; `"—"` for null-ish/unparseable/non-finite, never throws. Decision 3's five-row C-09 table (glyph, dictionary key, token classes). |
 | `docs/ui-spec/subscription-ui-spec.md` (UI-D12, UI-D13, UI-D15, C-09) | Pinned `timeZone: "Asia/Ho_Chi_Minh"` **and** explicit locale; `formatVnd` before `t()`; C-09 props typed `{ status: string }` **on purpose** (a DB boundary — the union would turn a CHECK change into a silent mislabel); five branches; unrecognised = `?` + "Không xác định"/"Unrecognised" in `--destructive`. |
@@ -169,6 +169,6 @@ Plan Task 3.7 states "**All seven** [`billing.recheck.*`] keys land in **both** 
 | 1 | C-09 renders one branch per permitted literal plus one unrecognised branch, and declares no `refunded` branch | **Y** | `CONFIG: Record<OrderStatus, Appearance>` with `OrderStatus = "pending" \| "paid" \| "expired" \| "cancelled"` — the CHECK's four literals, no more; `UNRECOGNISED` is a separate constant outside `CONFIG`. `grep -nE "refunded" OrderStatusBadge.tsx` over code lines (comments stripped) → **no match**; the only occurrence is the comment recording *why* there is no such status. Tests: four permitted branches each assert their own word **and** their own glyph, plus a distinctness case (`new Set(words).size === 4`, `new Set(glyphs).size === 4`). Neither dictionary carries a `billing.status.refunded` key |
 | 2 | A fabricated status renders the unrecognised glyph and word, and the rendered word is neither the `pending` word nor the `paid` word | **Y** | `"refunded"` (chosen precisely because it is the plausible-looking value) renders `?` + `Unrecognised` / `Không xác định` in **both** locales, with `border-destructive text-destructive` and **no** `text-muted-foreground`; `not.toBe(pending)` and `not.toBe(paid)` asserted per locale for both word and glyph, after `readBadge()` has already proved presence. Five further fabricated values (`""`, `" "`, `"PENDING"`, `"Paid"`, `"unknown"`) take the same branch. M3 proves the assertions bite: reintroducing the `?? CONFIG.pending` coercion turns 11 cases red |
 
-**Both `StatusBadge.tsx` defects verified absent from C-09** — `grep -n "#" components/billing/OrderStatusBadge.tsx` → **no match at all** (zero hex literals anywhere in the file, comments included); `grep -nE "\?\?|as OrderStatus"` over code lines (comments stripped) → **no match**. `git status --porcelain -- "app/(layer4)/_components/StatusBadge.tsx" "lib/billing/types.ts"` → **empty**, i.e. TBD-09's file and the frozen types file are untouched. `ExamRow.tsx:68`'s shadowed `formatDateTime` was left in place (TBD-08); no cross-import exists in either direction.
+**Both `StatusBadge.tsx` defects verified absent from C-09** — `grep -n "#" components/billing/OrderStatusBadge.tsx` → **no match at all** (zero hex literals anywhere in the file, comments included); `grep -nE "\?\?|as OrderStatus"` over code lines (comments stripped) → **no match**. `git status --porcelain -- "features/authoring/components/StatusBadge.tsx" "lib/billing/types.ts"` → **empty**, i.e. TBD-09's file and the frozen types file are untouched. `ExamRow.tsx:68`'s shadowed `formatDateTime` was left in place (TBD-08); no cross-import exists in either direction.
 
 **Implementation choice worth recording**: `Locale` is mapped to a BCP-47 tag (`en → en-GB`, `vi → vi-VN`) rather than passed through raw. Raw `"en"` resolves to `en-US`, which renders `MM/DD/YYYY` — that would contradict the `DD/MM/YYYY` the Design Doc prints and the `DD/MM/YYYY HH:mm` plan Task 3.8 verifies against, and it would make `08/09` readable as two different dates. `formatDateTime` composes a date formatter and a time formatter joined by one space rather than using a single combined formatter, because the combined form inserts an ICU-version-dependent separator (`", "` on this runtime) — which would defeat the byte-identical guarantee the whole pinning exercise exists for.

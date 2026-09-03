@@ -11,7 +11,7 @@ Covers Work Plan Phase 3 (Tasks 3.0-3.3 / `support-system-work-plan-task-12.md` 
 
 ## Test Skeleton File Paths for Verification
 
-- `SOURCE/app/(admin)/admin/tickets/__tests__/actions.int.test.ts` — expect Group 1 (a)-(b), Group 2 (a)-(d), Group 3 (a)-(c) all green
+- `SOURCE/features/admin/__tests__/ticketActions.int.test.ts` — expect Group 1 (a)-(b), Group 2 (a)-(d), Group 3 (a)-(c) all green
 - `SOURCE/tests/e2e/fixture/support-admin-triage.fixture.e2e.test.ts` — expect Journey obligations (a)-(e) all passing
 - Component test files for `TicketQueueList`/`TicketQueueRow`/`TicketStatusBadge`/`NotificationFailureFlag`/`TicketDetailPanel`/`TicketStatusControl`/`InternalNotesPanel` (task-14) — expect all green
 

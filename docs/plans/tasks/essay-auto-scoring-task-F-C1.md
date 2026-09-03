@@ -1,7 +1,7 @@
 # Task F-C1 — `EssayRegradeControl` + RTL test
 
 Plan mapping: `docs/plans/20260829-feature-essay-auto-scoring.md` — **Phase F-C (Interaction and fixture-e2e, frontend slices V4 + V5), Task F-C1**
-Layer: **frontend** (`SOURCE/app/(layer2)/_components/**`)
+Layer: **frontend** (`SOURCE/features/exams/components/**`)
 
 Metadata:
 - Dependencies: **Task F-B1**, **Task B3.2**.
@@ -16,7 +16,7 @@ Metadata:
 
 ## Implementation Content
 
-Create `SOURCE/app/(layer2)/_components/EssayRegradeControl.tsx` as a `"use client"` component, rendered **only on S-02, inside `EssayReviewBlock`, at RS-4 / RS-5 / RS-6**.
+Create `SOURCE/features/exams/components/EssayRegradeControl.tsx` as a `"use client"` component, rendered **only on S-02, inside `EssayReviewBlock`, at RS-4 / RS-5 / RS-6**.
 
 ### Seven-step handler, copied from `RecheckOrderControl`'s documented shape
 1. `if (exhausted) return;` **before** the busy latch — at RS-6 there is nothing to send: **no action call, no busy phase, no outcome node**.
@@ -41,11 +41,11 @@ A `threw` exception reuses `profile.error.generic` — the same truth told to th
 The control stays in the tree, stays focusable, and carries `aria-disabled="true"` with `aria-describedby` pointing at `result.essay.retryExhausted`. `min-h-11` touch target (see FE-OQ-5).
 
 ## Target Files
-- [x] `SOURCE/app/(layer2)/_components/EssayRegradeControl.tsx` (new)
-- [x] `SOURCE/app/(layer2)/_components/__tests__/EssayRegradeControl.test.tsx` (new) — 16 cases
-- [x] `SOURCE/app/(layer2)/_components/EssayReviewBlock.tsx` — **extra**: the control slots in at RS-4/5/6 (F-B1 recorded this as F-C1's work)
-- [x] `SOURCE/app/(layer2)/_components/__tests__/EssayReviewBlock.test.tsx` — **extra, named by `tsc`**: two new props + a router stub
-- [x] `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` — **extra**: passes `attemptId`/`questionId` down
+- [x] `SOURCE/features/exams/components/EssayRegradeControl.tsx` (new)
+- [x] `SOURCE/features/exams/components/__tests__/EssayRegradeControl.test.tsx` (new) — 16 cases
+- [x] `SOURCE/features/exams/components/EssayReviewBlock.tsx` — **extra**: the control slots in at RS-4/5/6 (F-B1 recorded this as F-C1's work)
+- [x] `SOURCE/features/exams/components/__tests__/EssayReviewBlock.test.tsx` — **extra, named by `tsc`**: two new props + a router stub
+- [x] `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` — **extra**: passes `attemptId`/`questionId` down
 
 ## Investigation Targets
 - `docs/ui-spec/essay-auto-scoring-ui-spec.md` (§ Component: EssayRegradeControl — verify Idle + Busy + Done-refused (all five reasons) + Done-success + Threw + Exhausted states)
@@ -55,8 +55,8 @@ The control stays in the tree, stays focusable, and carries `aria-disabled="true
 - `docs/design/essay-auto-scoring-frontend-design.md` (§ Security Considerations — `console.error` logs `digest` only)
 - `SOURCE/components/billing/RecheckOrderControl.tsx` (the seven-step shape; `:22-26` the counter-example on pre-inserted live regions; `:181-184` the `digest`-only rule and why)
 - `SOURCE/components/billing/__tests__/RecheckOrderControl.test.tsx` (`:55` the counted `refresh` mock; `:56` the mocked Server Action)
-- `SOURCE/app/(layer2)/essayActions.ts` (Task B3.2 — the five-reason refusal union this control maps)
-- `SOURCE/app/(layer2)/_components/EssayReviewBlock.tsx` (Task F-B1 — where this control is rendered, at RS-4/RS-5/RS-6)
+- `SOURCE/features/exams/essayActions.ts` (Task B3.2 — the five-reason refusal union this control maps)
+- `SOURCE/features/exams/components/EssayReviewBlock.tsx` (Task F-B1 — where this control is rendered, at RS-4/RS-5/RS-6)
 - `SOURCE/lib/tutor/useTutorAction.ts` (`:26-31` — why the latch must be a synchronous `ref`)
 
 ## Reference Contracts
@@ -170,5 +170,5 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
 
 ## Notes
 - Impact scope: rendered inside `EssayReviewBlock` (Task F-B1) at RS-4/RS-5/RS-6; drives `retryEssayGrading()` (Task B3.2).
-- Scope boundary — preserve unchanged: `SOURCE/components/billing/RecheckOrderControl.tsx` (its **shape** is copied, not edited); `SOURCE/app/(layer2)/_components/EssayReviewBlock.tsx`'s other branches.
+- Scope boundary — preserve unchanged: `SOURCE/components/billing/RecheckOrderControl.tsx` (its **shape** is copied, not edited); `SOURCE/features/exams/components/EssayReviewBlock.tsx`'s other branches.
 - `router.refresh()`, **never** a local state patch: the server decides the band (first-write-wins).

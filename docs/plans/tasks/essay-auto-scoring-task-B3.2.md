@@ -1,7 +1,7 @@
-# Task B3.2 — `app/(layer2)/essayActions.ts` — the retry Server Action + `maxDuration`
+# Task B3.2 — `features/exams/essayActions.ts` — the retry Server Action + `maxDuration`
 
 Plan mapping: `docs/plans/20260829-feature-essay-auto-scoring.md` — **Phase B3 (Retry, Telemetry and the Ceiling Ripple, vertical slice V3), Task B3.2**
-Layer: **backend** (`SOURCE/app/(layer2)/**`)
+Layer: **backend** (`SOURCE/app/(exams)/**`)
 
 Metadata:
 - Dependencies: **Task B3.1**, **Task B2.1**, **Task B1.4** (this action drives the same claim → budget → provider → settle path `gradeEssays.ts` owns).
@@ -18,7 +18,7 @@ Metadata:
 
 ## Implementation Content
 
-Create `SOURCE/app/(layer2)/essayActions.ts` with `"use server"`, exporting `retryEssayGrading(attemptId, questionId)`. **Typed result, no throw, no redirect** — the caller is an affordance inside an already-rendered page (precedent: `tutorActions.ts:8-12`, citing `rateExam()`). It lives in its **own file**, not in `actions.ts`, following the recorded rule at `tutorActions.ts:1-6` ("everything guarding the door sits in one file you can read in one pass").
+Create `SOURCE/features/exams/essayActions.ts` with `"use server"`, exporting `retryEssayGrading(attemptId, questionId)`. **Typed result, no throw, no redirect** — the caller is an affordance inside an already-rendered page (precedent: `tutorActions.ts:8-12`, citing `rateExam()`). It lives in its **own file**, not in `actions.ts`, following the recorded rule at `tutorActions.ts:1-6` ("everything guarding the door sits in one file you can read in one pass").
 
 ### Order (Gate G / AC-072): authorise **before** metering
 The check runs **twice, deliberately**:
@@ -38,12 +38,12 @@ The **flag is also checked here** (read site **2 of 3**) and returns `reason: "s
 Using the `event_type` and the three `error_code` literals that **Task B3.1** already added. B3.1 wires `gradeEssays.ts`; this task wires `essayActions.ts`, because this is the commit that creates it.
 
 ### Route segment
-Add `export const maxDuration` to `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` — the route segment for this action. **Do not touch that file's scored branch (`:133` onward)**; TBD-02's deferral stays in force.
+Add `export const maxDuration` to `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` — the route segment for this action. **Do not touch that file's scored branch (`:133` onward)**; TBD-02's deferral stays in force.
 
 ## Target Files
-- [x] `SOURCE/app/(layer2)/essayActions.ts` (new)
-- [x] `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` — `export const maxDuration = 300`
-- [x] `SOURCE/app/(layer2)/__tests__/essayActions.test.ts` (new) — 41 cases
+- [x] `SOURCE/features/exams/essayActions.ts` (new)
+- [x] `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` — `export const maxDuration = 300`
+- [x] `SOURCE/features/exams/__tests__/essayActions.test.ts` (new) — 41 cases
 - [x] `SOURCE/lib/security/rateLimit.ts` — **extra, forced**: `guard()` cannot be called without a `RATE_LIMITS` key
 - [x] `SOURCE/lib/security/rateLimit.test.ts` — **extra, forced**: the classification guard goes red until the new action is categorised
 
@@ -53,11 +53,11 @@ Add `export const maxDuration` to `SOURCE/app/(layer2)/exams/[id]/attempt/[attem
 - `docs/design/essay-auto-scoring-backend-design.md` (§ Security Considerations — the three console-logging rules; `digest` only at the Server Action boundary)
 - `docs/adr/ADR-0018-essay-async-grade-write.md` (§ Decision — Decision 6: ordering claim → reserve → provider → settle is a requirement)
 - `docs/adr/ADR-0010-score-write-trust-boundary.md` (§ Decision — the reasoning that rejected a policy-only fix)
-- `SOURCE/app/(layer2)/tutorActions.ts` (`:1-6` the one-file rule; `:8-12` the typed-result, no-throw, no-redirect precedent citing `rateExam()`)
-- `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` (`:75` the `notScored` branch — F-B1's territory; `:133` onward the **scored branch, untouched**)
+- `SOURCE/features/exams/tutorActions.ts` (`:1-6` the one-file rule; `:8-12` the typed-result, no-throw, no-redirect precedent citing `rateExam()`)
+- `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` (`:75` the `notScored` branch — F-B1's territory; `:133` onward the **scored branch, untouched**)
 - `SOURCE/lib/essay/gradeEssays.ts` (Task B1.4 — the same claim → budget → provider → settle path)
 - `SOURCE/lib/tutor/telemetry.ts` (Task B3.1 — the event type and the three error codes)
-- `SOURCE/app/(layer2)/queries.ts` (Task B2.1 — the read this action authorises against)
+- `SOURCE/features/exams/queries.ts` (Task B2.1 — the read this action authorises against)
 - `SOURCE/components/billing/RecheckOrderControl.tsx` (`:181-184` — why `console.error` logs `digest` only)
 - `SOURCE/lib/scoring/essayLifecycle.ts` (Task H1 — `ESSAY_MAX_ATTEMPTS`, the states)
 
@@ -202,5 +202,5 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
 
 ## Notes
 - Impact scope: Task F-C1's `EssayRegradeControl` maps this action's five refusal reasons through `REFUSAL_KEY`.
-- Scope boundary — preserve unchanged: the **scored branch** of `result/detail/page.tsx` (`:133` onward — TBD-02's deferral stays in force); `SOURCE/app/(layer2)/actions.ts` (Task B1.5); `SOURCE/lib/essay/gradeEssays.ts` (B1.4 created it, B3.1 wired its telemetry).
+- Scope boundary — preserve unchanged: the **scored branch** of `result/detail/page.tsx` (`:133` onward — TBD-02's deferral stays in force); `SOURCE/features/exams/actions.ts` (Task B1.5); `SOURCE/lib/essay/gradeEssays.ts` (B1.4 created it, B3.1 wired its telemetry).
 - **Unselected integration candidate I-D** ("`retryEssayGrading` refusal matrix", EG-BE-022, ROI 49) lives here. Covered at unit level; it is the **second** case the engineer should swap into the integration lane if budget frees up, after I-E.

@@ -25,10 +25,10 @@ Wraps C-10 with `variant="primary"` rather than issuing its own action. `LegalLi
 Add the **S-06 `billing.*` keys to both dictionaries**.
 
 ## Target Files
-- [x] `SOURCE/app/(billing)/pricing/checkout/_components/VietQrCode.tsx`
-- [x] `SOURCE/app/(billing)/pricing/checkout/_components/TransferDetails.tsx`
-- [x] `SOURCE/app/(billing)/pricing/checkout/_components/PaymentPanel.tsx`
-- [x] `SOURCE/app/(billing)/pricing/checkout/_components/PaymentConfirm.tsx`
+- [x] `SOURCE/features/billing/components/checkout/VietQrCode.tsx`
+- [x] `SOURCE/features/billing/components/checkout/TransferDetails.tsx`
+- [x] `SOURCE/features/billing/components/checkout/PaymentPanel.tsx`
+- [x] `SOURCE/features/billing/components/checkout/PaymentConfirm.tsx`
 - [x] `SOURCE/lib/i18n/dictionaries/en.ts`, `SOURCE/lib/i18n/dictionaries/vi.ts` (S-06 keys)
 
 ## Investigation Targets
@@ -164,4 +164,4 @@ Add the **S-06 `billing.*` keys to both dictionaries**.
 - **QR / BU-2**: **no dependency added**. `package.json` still matches no `qr*`/`payos` package. C-12 renders nothing today; the screen is payable from C-14's text block, asserted in `PaymentPanel.test.tsx`.
 - **Mutation run**: 38 mutants, anchors verified unique before each run, **37 killed**. The one survivor is C-12's `payload === ""` guard, which is provably equivalent while the encoder seam returns `null` unconditionally — recorded in the file's own docblock rather than papered over.
 - **Gates**: `npm test` 1384 pass / 10 skip (116 files pass, 1 skip; +43 tests, +5 files over the 1341/111 baseline) · `test:fixture` 45 pass · `tsc --noEmit` 0 · `lint` clean · `check:bundle` PASS · `test:localdb` exit 1 with "No test suite found in file" (unchanged, deliberate).
-- **Scope**: `LegalLinks` and `RecheckOrderControl` reused byte-unchanged; no clipboard utility; `lib/security/csp.ts` untouched; no `PUBLIC_PATHS` change; `app/(billing)/queries.ts` not reformatted.
+- **Scope**: `LegalLinks` and `RecheckOrderControl` reused byte-unchanged; no clipboard utility; `lib/security/csp.ts` untouched; no `PUBLIC_PATHS` change; `features/billing/queries.ts` not reformatted.

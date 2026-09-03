@@ -1,7 +1,7 @@
 # Task F-B3 — `HistoryRowMenu` + `HistoryRow` badge + the PDF annotation line + 2 coupled test sites (one commit)
 
 Plan mapping: `docs/plans/20260829-feature-essay-auto-scoring.md` — **Phase F-B (Detail Surface and the PDF Guard, frontend slices V2 + V3), Task F-B3**
-Layer: **frontend** (`SOURCE/components/history/**`, `SOURCE/app/(HM)/**`, `SOURCE/components/pdf/**`, `SOURCE/lib/pdf/**`)
+Layer: **frontend** (`SOURCE/components/history/**`, `SOURCE/app/(history)/**`, `SOURCE/components/pdf/**`, `SOURCE/lib/pdf/**`)
 
 Metadata:
 - Dependencies: **Task F-B2**, **Task B2.3**.
@@ -20,7 +20,7 @@ Metadata:
 ### `SOURCE/components/history/HistoryRowMenu.tsx`
 Required `blockedReason` prop threaded into **both** `usePdfAction` calls (`:116-117`). `MenuAction` gains `blockedReason` and `blockedText`. **"Xem chi tiết" is NOT blocked** — blocking it would lock the student away from the retry control that clears the block. A blocked press does **not** auto-close the menu (the menu closes only on a **successful** export).
 
-### `SOURCE/app/(HM)/history/_components/HistoryRow.tsx`
+### `SOURCE/features/history/components/HistoryRow.tsx`
 `EssayLifecycleBadge state="pending"` appended to the **end** of the meta line (`:37-40`) when `entry.hasUnresolvedEssay === true`. **At the end, not beside the score**: `{score}/10 · {date} · {duration}` is one reading unit and inserting a badge mid-string breaks it; at the end it reads as an annotation on the whole line, which is what it is. The `{totalScore}/10` number **does not move** (AC-057 + D5) — the badge is what says the number is not final. Pass `blockedReason` and `hasIncompleteEssay` down (`:44-48`), and `hasIncompleteEssay` into `pdfInput` (`:23-31`).
 
 ### `SOURCE/components/pdf/AttemptPdfTemplate.tsx`
@@ -40,7 +40,7 @@ It is **time-sensitive** (uses `waitFor`, not fake timers) and has flaked **once
 
 ## Target Files
 - [x] `SOURCE/components/history/HistoryRowMenu.tsx` — both PDF items wired; "View details" deliberately not
-- [x] `SOURCE/app/(HM)/history/_components/HistoryRow.tsx` — badge at the end of the meta line; real `blockedReason`; now `async`
+- [x] `SOURCE/features/history/components/HistoryRow.tsx` — badge at the end of the meta line; real `blockedReason`; now `async`
 - [x] `SOURCE/components/pdf/AttemptPdfTemplate.tsx` — two props + one `<p>`
 - [x] `SOURCE/lib/pdf/generateAttemptPdf.ts` — forwards both
 - [x] `SOURCE/components/history/HistoryRowMenu.test.tsx` — **the 2 sites moved in F-B2**, because making the parameter required broke compile there immediately
@@ -56,11 +56,11 @@ It is **time-sensitive** (uses `waitFor`, not fake timers) and has flaked **once
 - `docs/adr/ADR-0009-pdf-generation-library-choice.md` (§ Implementation Guidance — `AttemptPdfTemplate` uses **hex/rgb literals only**; no Tailwind classes, no `components/ui`, nothing resolving through `oklch()`/`color-mix()`; the generator loads dynamically inside the handler)
 - `docs/adr/ADR-0018-essay-async-grade-write.md` (§ Amendment to ADR-0010)
 - `SOURCE/components/history/HistoryRowMenu.tsx` (`:49` the `pdfInput`; `:116-117` — **both** `usePdfAction` calls)
-- `SOURCE/app/(HM)/history/_components/HistoryRow.tsx` (`:23-31` the `pdfInput`; `:37-40` the meta line; `:44-48` the props passed down)
+- `SOURCE/features/history/components/HistoryRow.tsx` (`:23-31` the `pdfInput`; `:37-40` the meta line; `:44-48` the props passed down)
 - `SOURCE/components/pdf/AttemptPdfTemplate.tsx` (`:31-40` the optional-label pattern; `:44-49` `EYEBROW`'s `#605a52`; `:125` `totalQuestionsLabel`)
 - `SOURCE/components/history/HistoryRowMenu.test.tsx` (`:65`, `:91` — the 2 coupled render sites; **time-sensitive, uses `waitFor`**)
 - `SOURCE/components/essay/EssayLifecycleBadge.tsx` (Task F-A2)
-- `SOURCE/app/(HM)/queries.ts` (Task B2.2 — `hasUnresolvedEssay`, `hasIncompleteEssay`)
+- `SOURCE/features/history/queries.ts` (Task B2.2 — `hasUnresolvedEssay`, `hasIncompleteEssay`)
 
 ## Reference Contracts
 

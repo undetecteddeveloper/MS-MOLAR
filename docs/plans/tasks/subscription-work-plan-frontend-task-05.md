@@ -32,8 +32,8 @@ Assert:
 - `SOURCE/tests/e2e/fixture/subscription.fixture.e2e.test.ts` (**FE-2** `Proof obligation:` / `Primary failure mode:` annotation block)
 - `SOURCE/tests/e2e/fixture/subscriptionFixtureData.ts` (plan Task 0.7 — entitlement fixtures `known` / `unknown` / exhausted)
 - `SOURCE/components/billing/TutorQuotaNote.tsx` (plan Task 2.4 — the implemented component)
-- `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` (`:177`, `:230` — the two mounts)
-- `SOURCE/app/(layer2)/layout.tsx` (plan Task 2.2 — the provider mount the real route tree supplies)
+- `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` (`:177`, `:230` — the two mounts)
+- `SOURCE/app/(exams)/layout.tsx` (plan Task 2.2 — the provider mount the real route tree supplies)
 - `SOURCE/components/tutor/ExplainStepAffordance.tsx` (**read only** — its blocked-quota branch becomes reachable here)
 - `SOURCE/lib/i18n/dictionaries/en.ts`, `SOURCE/lib/i18n/dictionaries/vi.ts` (`tutor.error` — the resolved value item (e) compares against)
 - `docs/ui-spec/subscription-ui-spec.md` (§ Component: `TutorQuotaNote` — C-06 — verify default (`known`) + empty (`unknown` ⇒ `null`) states)
@@ -125,7 +125,7 @@ From `SOURCE/tests/e2e/fixture/subscription.fixture.e2e.test.ts`, FE-2 slot:
 - **`subscriptionFixtureData.ts`** — `FIXTURE_RESETS_AT = 2026-09-15T19:30:00.000Z` sits on **16/09 in ICT and 15/09 in UTC**, and `FIXTURE_BROWSER_TIMEZONE = "UTC"` exists precisely because an unpinned formatter renders the right day for the wrong reason on an ICT machine. **This machine reports `Asia/Saigon`** (verified: `Intl.DateTimeFormat().resolvedOptions().timeZone`), so the hazard is live, not theoretical. FE-2 therefore pins `process.env.TZ = FIXTURE_BROWSER_TIMEZONE` itself and asserts both that the pin took and that the pinned zone is **not** `Asia/Ho_Chi_Minh`.
 - **`TutorQuotaNote.tsx`** — takes no parameter (arity 0), returns `null` when `tutor.state !== "known"` (`:43`), and formats `formatDate(tutor.resetsAt, locale)` itself (`:51`). Values come from `useEntitlement()` + `useLocale()` — context only.
 - **`result/detail/page.tsx`** — two branches (short-answer `:165-181`, mcq `:182-236`); each ends with `{r.hasBeenWrongTwice === true && <ExplainStepAffordance …/>}` followed by `<TutorQuotaNote />` **outside** the gate. Both mounts are attribute-free.
-- **`(layer2)/layout.tsx`** — `readEntitlement(user?.id ?? null)` once at `:35`, `<EntitlementProvider value={entitlement}>` at `:41` wrapping `#main-content` which holds `children`. This is the only thing that puts the provider above the page.
+- **`(exams)/layout.tsx`** — `readEntitlement(user?.id ?? null)` once at `:35`, `<EntitlementProvider value={entitlement}>` at `:41` wrapping `#main-content` which holds `children`. This is the only thing that puts the provider above the page.
 - **`ExplainStepAffordance.tsx`** — exhausted branch at `:111-129`: a dashed-border block with `t("billing.quota.tutorExhausted")` in a `<p>` and a `<Link href="/pricing">` carrying `t("billing.quota.upgradeLink")`; **no** `role="alert"` (mount-time state), **no** native `disabled` anywhere, and the generic `t("tutor.error")` lives on a different branch (`:157`).
 - **Dictionaries** — `tutor.error` resolves to `"Couldn't load a hint. Try again."` (en) and `"Chưa lấy được gợi ý. Bạn thử lại nhé."` (vi); `billing.quota.tutorExhausted` to `"You've used all your tutor hints for this period."` / `"Bạn đã dùng hết lượt gia sư của kỳ này."`.
 - **UI Spec v1.4 § UI-D17** — states the amended behaviour directly ("**The mount passes no prop.**") and records the retirement of `formattedResetDate` by plan Task 2.4. **The "pending amendment" banner in the FE-2 file was stale and is rewritten** (see below).
@@ -133,9 +133,9 @@ From `SOURCE/tests/e2e/fixture/subscription.fixture.e2e.test.ts`, FE-2 slot:
 
 ### Form of the case, and why it deviates from the shipped driver-script convention
 
-The six shipped fixture-e2e siblings are Playwright-subset **driver scripts that nothing executes** — this repo has no `@playwright/test` and no committed `playwright.config.ts`. That form cannot discharge AC-042, whose entire claim is "the mount actually renders". FE-2 therefore keeps the convention's substance (real route tree, only the action module + the two data sources stubbed, real dictionaries, no MSW) and drops its form: it composes `RootLayout → (layer2)/layout → result/detail/page` exactly as production composes them and renders that in jsdom. `RootLayout` is included because item (e) is a per-locale claim and the locale must arrive the production way (cookie → `getLocale()` → `I18nProvider`).
+The six shipped fixture-e2e siblings are Playwright-subset **driver scripts that nothing executes** — this repo has no `@playwright/test` and no committed `playwright.config.ts`. That form cannot discharge AC-042, whose entire claim is "the mount actually renders". FE-2 therefore keeps the convention's substance (real route tree, only the action module + the two data sources stubbed, real dictionaries, no MSW) and drops its form: it composes `RootLayout → (exams)/layout → result/detail/page` exactly as production composes them and renders that in jsdom. `RootLayout` is included because item (e) is a per-locale claim and the locale must arrive the production way (cookie → `getLocale()` → `I18nProvider`).
 
-**Stub boundary**: `explainStep` (the sanctioned action module), plus the data sources `getCurrentUserProfile`, `readEntitlement`, `getResult`. Runtime-only substitutions (`server-only`, `next/headers`, `next/font/google`, `@vercel/analytics/next`, `next/navigation`, the async `SkipLink`) follow `app/(layer2)/__tests__/layout.test.tsx`. **`EntitlementProvider` is not supplied by the test at any point.**
+**Stub boundary**: `explainStep` (the sanctioned action module), plus the data sources `getCurrentUserProfile`, `readEntitlement`, `getResult`. Runtime-only substitutions (`server-only`, `next/headers`, `next/font/google`, `@vercel/analytics/next`, `next/navigation`, the async `SkipLink`) follow `app/(exams)/__tests__/layout.test.tsx`. **`EntitlementProvider` is not supplied by the test at any point.**
 
 ### The fixture-e2e lane had NO RUNNER — found here, fixed here under orchestrator authorisation
 
@@ -154,7 +154,7 @@ Shortcut that does not work, recorded so it is not retried: a positional filter 
 
 **Command and exit code:** `cd SOURCE && npm run test:fixture` → **23 passed / 23, exit 0.** The ad-hoc scratchpad config used during development has been **deleted**, so nothing can later be mistaken for the real runner.
 
-### Red evidence — provider mount deliberately removed from `(layer2)/layout.tsx`
+### Red evidence — provider mount deliberately removed from `(exams)/layout.tsx`
 
 Two rounds, restored byte-clean between (verified by `git status --porcelain`).
 
@@ -179,7 +179,7 @@ Round 2, after strengthening: **16 of 23 red.** The only non-precondition cases 
 
 | # | Mutation | Result |
 |---|---|---|
-| M0 | `EntitlementProvider` removed from `(layer2)/layout.tsx` | **caught** — 16/23 red |
+| M0 | `EntitlementProvider` removed from `(exams)/layout.tsx` | **caught** — 16/23 red |
 | M1 | one of the two `<TutorQuotaNote />` mounts deleted from the page | **caught** — (a)(b)(c)(d)(e-counters)(g) |
 | M2 | `timeZone: TIME_ZONE` dropped from `DATE_OPTIONS` in `lib/format/datetime.ts` | **caught** — (a)(b)(c)(d)(e-counters)(g) |
 | M3 | fixture `resetsAt` shifted one day earlier | **caught** — precondition + (a)(b)(c)(d)(e-counters)(g) |

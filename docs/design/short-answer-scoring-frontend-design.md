@@ -7,11 +7,11 @@
 | **Status** | Draft — implements the display slice specified by `docs/ui-spec/short-answer-scoring-ui-spec.md` (v1.0, Draft) and consumes the data contracts confirmed by `docs/design/short-answer-scoring-backend-design.md` (v1.1, Draft, code-verifier result: `consistent`, score 85). |
 | **PRD** | None — Medium-scale feature, PRD not required per this project's scale rules. Substitute source: `requirement_analysis` (resolved after user Q&A with the engineer), reproduced verbatim in the Agreement Checklist. |
 | **UI Spec** | `docs/ui-spec/short-answer-scoring-ui-spec.md` (v1.0, Draft) — canonical source for component structure, state design, visual convention, and AC-001–AC-009. This Design Doc inherits those decisions and adds only the technical implementation method (exact code structure, contract-level rationale, regression guarding, and the TBD-04/TBD-05 resolutions the UI Spec deferred to this document). |
-| **Codebase re-verification** | All facts inherited from the UI Spec were independently re-verified against the live files during this Design Doc's own investigation (`page.tsx`, `QuestionRenderer.tsx`, `queries.ts`, `types/result.ts`, `types/question.ts`, `SOURCE/app/(layer4)/actions.ts`) — see Existing Codebase Analysis. |
+| **Codebase re-verification** | All facts inherited from the UI Spec were independently re-verified against the live files during this Design Doc's own investigation (`page.tsx`, `QuestionRenderer.tsx`, `queries.ts`, `types/result.ts`, `types/question.ts`, `SOURCE/features/authoring/actions.ts`) — see Existing Codebase Analysis. |
 
 ## Overview
 
-`ResultDetailPage`'s scored render branch (`r.scored !== false`) unconditionally maps `q?.choices` (an MCQ shape). For `short_answer` questions, `q.choices` resolves to `[]` at persistence time (`SOURCE/app/(layer4)/actions.ts:533` — `choices: q.choices ?? q.subItems ?? []`), so today this branch blank-renders an empty `<ul>` for `short_answer` (no crash, no content) whenever `scored !== false`. The backend Design Doc's `short_answer` auto-scoring change will start producing `scored: true` rows for `short_answer` on newly-submitted attempts, which newly exposes this pre-existing display gap. This Design Doc adds a `questionType === 'short_answer'` sub-branch to that same scored path, reusing the exact fern/destructive/muted-foreground convention and the "Your answer"/"Stored answer" two-line text shape already shipped in the same file's not-scored branch (`page.tsx:103-114`), plus a one-line footnote copy fix in `QuestionRenderer.tsx`. `essay` and `true_false` are explicitly out of scope and must render byte-for-byte unchanged.
+`ResultDetailPage`'s scored render branch (`r.scored !== false`) unconditionally maps `q?.choices` (an MCQ shape). For `short_answer` questions, `q.choices` resolves to `[]` at persistence time (`SOURCE/features/authoring/actions.ts:533` — `choices: q.choices ?? q.subItems ?? []`), so today this branch blank-renders an empty `<ul>` for `short_answer` (no crash, no content) whenever `scored !== false`. The backend Design Doc's `short_answer` auto-scoring change will start producing `scored: true` rows for `short_answer` on newly-submitted attempts, which newly exposes this pre-existing display gap. This Design Doc adds a `questionType === 'short_answer'` sub-branch to that same scored path, reusing the exact fern/destructive/muted-foreground convention and the "Your answer"/"Stored answer" two-line text shape already shipped in the same file's not-scored branch (`page.tsx:103-114`), plus a one-line footnote copy fix in `QuestionRenderer.tsx`. `essay` and `true_false` are explicitly out of scope and must render byte-for-byte unchanged.
 
 ### Referenced UI Spec
 
@@ -76,7 +76,7 @@ Project-tier facts are recorded in `docs/project-context/external-resources.md` 
 
 | Resource (project-tier label) | Feature-specific identifier | Notes |
 |-------------------------------|-----------------------------|-------|
-| Design Origin | `DESIGN.md` — "no shadow/gradient, hairline-border + background-color layering only" rule | Governs the plain-text, no-new-decoration constraint on the new sub-branch; carried forward from UI Spec unchanged. |
+| Design Origin | `PROJECT_OVERVIEW.md §2` — "no shadow/gradient, hairline-border + background-color layering only" rule | Governs the plain-text, no-new-decoration constraint on the new sub-branch; carried forward from UI Spec unchanged. |
 | Design System | `page.tsx` (fern/destructive convention, lines 118–192); `QuestionRenderer.tsx` (footnote copy, lines 129–159); `SOURCE/components/shared/RichText.tsx` | Reused exactly, zero new component. |
 | Visual Verification Environment | Route `/exams/[id]/attempt/[attemptId]/result/detail` (requires a submitted attempt with a `short_answer` question); Playwright MCP `playwright`; `npm run dev` | No automated test exists for either target file (confirmed by Glob during this document's investigation — see Test Boundaries); this is the only verification path until a test is added. |
 | Database Schema Source (Design-Doc-specific addition) | `SOURCE/supabase/schema.sql:63` (`choices jsonb not null`) | Confirms `choices` is a non-nullable jsonb column — explains why `short_answer`'s persisted `choices` value is `[]` (not `null`/`undefined`), which is why today's bug is a blank `<ul>`, not a runtime crash (see Behavioral Claim Verification below). |
@@ -93,7 +93,7 @@ Project-tier facts are recorded in `docs/project-context/external-resources.md` 
 - [ ] `questionType === 'true_false'` in either file — its scored-branch blank-render bug (TBD-02) and its stale "not auto-scored yet" footnote (TBD-03) are pre-existing, out-of-scope backlog items discovered during the UI Spec's investigation; not touched here (AC-009).
 - [ ] The status chip (`page.tsx:121-125`) — already type-agnostic (reads only `r.isCorrect`/`r.selected`); zero code change (AC-006).
 - [ ] `RichText`, `AnswerChoice`, `FlagButton` — reused as-is, zero change.
-- [ ] Any backend file (`computeScore.ts`, `actions.ts` in `(layer2)`) — owned by the companion backend Design Doc; this document only consumes its confirmed contracts.
+- [ ] Any backend file (`computeScore.ts`, `actions.ts` in `(exams)`) — owned by the companion backend Design Doc; this document only consumes its confirmed contracts.
 - [ ] Any DB schema, query select string, or new API/server action — `getResult()`/`queries.ts` already selects and maps `essay_answer` unconditionally for every question type (`queries.ts:346,371`); no query change needed for this feature.
 - [ ] Backfill of already-persisted `exam_results` rows — none (per `resolvedScope.backfill`); this page must render both an old `scored:false` short_answer row (via the unchanged not-scored branch) and a new `scored:true` one (via the new sub-branch) correctly, since both exist simultaneously in production data.
 
@@ -112,8 +112,8 @@ Project-tier facts are recorded in `docs/project-context/external-resources.md` 
 
 #### Assumed Behaviors
 
-- [x] **`getResult()`/`queries.ts` already selects and unconditionally maps `essay_answer` → `ResultQuestion.essayAnswer` for every question type**, so no backend/query change is needed for this frontend slice to receive the correct-answer text. Evidence: `SOURCE/app/(layer2)/queries.ts:346` (select string includes `essay_answer`), `:371` (`essayAnswer: q.essay_answer ?? undefined`). Confirmed: Yes.
-- [x] **For `short_answer` questions, `ResultQuestion.choices` resolves to `[]` (not `undefined`/`null`)**, so today's scored branch renders an empty `<ul>` rather than throwing — the bug is a blank render, not a crash. Evidence: `SOURCE/app/(layer4)/actions.ts:533` (`choices: q.choices ?? q.subItems ?? []`, insert-time assembly for non-mcq questions) and `SOURCE/app/(layer2)/queries.ts:364` (`choices: questionType === "true_false" ? [] : q.choices` — for `short_answer` this passes through the `[]` persisted value); `schema.sql:63` (`choices jsonb not null`, confirming no null path exists). Confirmed: Yes.
+- [x] **`getResult()`/`queries.ts` already selects and unconditionally maps `essay_answer` → `ResultQuestion.essayAnswer` for every question type**, so no backend/query change is needed for this frontend slice to receive the correct-answer text. Evidence: `SOURCE/features/exams/queries.ts:346` (select string includes `essay_answer`), `:371` (`essayAnswer: q.essay_answer ?? undefined`). Confirmed: Yes.
+- [x] **For `short_answer` questions, `ResultQuestion.choices` resolves to `[]` (not `undefined`/`null`)**, so today's scored branch renders an empty `<ul>` rather than throwing — the bug is a blank render, not a crash. Evidence: `SOURCE/features/authoring/actions.ts:533` (`choices: q.choices ?? q.subItems ?? []`, insert-time assembly for non-mcq questions) and `SOURCE/features/exams/queries.ts:364` (`choices: questionType === "true_false" ? [] : q.choices` — for `short_answer` this passes through the `[]` persisted value); `schema.sql:63` (`choices jsonb not null`, confirming no null path exists). Confirmed: Yes.
 - [x] **`PerQuestionResult.correct` stays `undefined` for `short_answer`** (never populated by `computeScore()`), matching its `ChoiceId`/"CHỈ câu mcq" (mcq-only) type contract and the `true_false` precedent. Evidence: `SOURCE/types/result.ts:11-12`; independently confirmed against the backend Design Doc's Data Contracts "Invariants" (`computeScore()`'s short_answer branch reads `q.essayAnswer` exclusively and never sets `PerQuestionResult.correct`). Confirmed: Yes.
 - [x] **The status chip (`page.tsx:121-125`) reads only `r.isCorrect`/`r.selected`, with no `questionType` branch**, so it requires zero code change to correctly label `short_answer` rows once they carry `isCorrect`. Evidence: `page.tsx:118-126`, read directly. Confirmed: Yes.
 - [x] **No automated test currently exists for `page.tsx` (result/detail) or `QuestionRenderer.tsx`.** Evidence: `Glob "**/result/detail/**/*.test.*"` and `Glob "**/QuestionRenderer*.test.*"` both returned no matches during this Design Doc's investigation. Confirmed: Yes — recorded as a Quality Assurance Mechanisms gap (`noted`, not `adopted`) rather than silently assumed covered; see Test Boundaries for the recommended follow-up.
@@ -127,7 +127,7 @@ Project-tier facts are recorded in `docs/project-context/external-resources.md` 
 - [x] Next.js App Router Server/Client Component boundary discipline `[implicit]` - Evidence: `page.tsx` has no `"use client"` directive (Server Component, reads `getResult()` directly); `QuestionRenderer.tsx:11` has `"use client"`. Confirmed: Yes — this feature does not cross that boundary in either direction (no new client state, no new server call).
 - [x] Vietnamese inline comments matching each file's existing convention `[implicit]` - Evidence: `page.tsx:1-7`, `QuestionRenderer.tsx:1-9` header comments, both Vietnamese. Confirmed: Yes.
 - [x] Correctness-marking convention — fern `#4F7942` for correct / `--destructive` for wrong / `--muted-foreground` for skipped, status always conveyed by a text label alongside color, never color-only `[implicit]` - Evidence: `page.tsx:118-126` (status chip), `:152-161` (MCQ highlight), `:179-188` (correct/your-choice tags). Confirmed: Yes.
-- [x] "No shadow/gradient, hairline-border + background-color layering only" `[explicit]` - Source: `DESIGN.md` (repo root), per External Resources Used.
+- [x] "No shadow/gradient, hairline-border + background-color layering only" `[explicit]` - Source: `PROJECT_OVERVIEW.md §2` (repo root), per External Resources Used.
 - [x] Vitest unit tests for business logic (project's "Pha 1" testing phase) `[explicit]` - Source: `PROJECT_OVERVIEW.md` §6. Note: this standard targets *business logic*; `page.tsx`/`QuestionRenderer.tsx` are presentation, and neither currently has a test file (see Quality Assurance Mechanisms below).
 
 #### Quality Assurance Mechanisms
@@ -185,9 +185,9 @@ Inherited verbatim from `docs/ui-spec/short-answer-scoring-ui-spec.md` (single c
 
 | Type | Path | Description |
 |------|------|-------------|
-| Existing (modified) | `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` | Scored branch (lines 127–194) gains a `questionType === 'short_answer'` sub-branch before the existing `q?.choices.map(...)` render. Not-scored branch (56–117) and status-chip logic (118–126) untouched. |
-| Existing (modified, one string literal) | `SOURCE/app/(layer2)/_components/QuestionRenderer.tsx` | Line 150's `short_answer` footnote string changes; surrounding JSX, `<input>`, `maxLength`, `onChange` unchanged. Lines 129-131 (`true_false`) and 156-160 (`essay`) untouched. |
-| Existing (reused, untouched) | `SOURCE/app/(layer2)/queries.ts` (`getResult`, `ResultQuestion`) | Already selects/maps `essay_answer` (346, 371); no change needed — confirms the frontend dependency this design relies on is pre-satisfied. |
+| Existing (modified) | `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` | Scored branch (lines 127–194) gains a `questionType === 'short_answer'` sub-branch before the existing `q?.choices.map(...)` render. Not-scored branch (56–117) and status-chip logic (118–126) untouched. |
+| Existing (modified, one string literal) | `SOURCE/features/exams/components/QuestionRenderer.tsx` | Line 150's `short_answer` footnote string changes; surrounding JSX, `<input>`, `maxLength`, `onChange` unchanged. Lines 129-131 (`true_false`) and 156-160 (`essay`) untouched. |
+| Existing (reused, untouched) | `SOURCE/features/exams/queries.ts` (`getResult`, `ResultQuestion`) | Already selects/maps `essay_answer` (346, 371); no change needed — confirms the frontend dependency this design relies on is pre-satisfied. |
 | Existing (reused, untouched) | `SOURCE/types/result.ts` (`PerQuestionResult`) | `correct?: ChoiceId` (line 12, mcq-only) and `selected?: string` (line 8-10) read as-is; no type change. |
 | Existing (reused, untouched) | `SOURCE/components/shared/RichText.tsx` | Question content rendering, unchanged. |
 | New | — | None. This feature introduces zero new files, zero new components (see Similar Component Search and Minimal Surface Alternatives below). |
@@ -199,7 +199,7 @@ Inherited verbatim from `docs/ui-spec/short-answer-scoring-ui-spec.md` (single c
 
 ### Similar Component Search and Decision (Pattern 5 prevention)
 
-**Search performed**: grepped `SOURCE/components/shared` and `SOURCE/app/(layer2)/_components` for any existing generic answer-status/color-decision component (`text-[#4F7942]`, `isCorrect ? `, `status.cls`-shaped helpers) — no matches found. Also confirmed (via the UI Spec's own Existing Component Reuse Map, re-verified directly) that the only precedent for a "your answer / correct answer" two-line block is the not-scored branch's own inline JSX (`page.tsx:103-114`), not a separate component.
+**Search performed**: grepped `SOURCE/components/shared` and `SOURCE/app/(exams)/_components` for any existing generic answer-status/color-decision component (`text-[#4F7942]`, `isCorrect ? `, `status.cls`-shaped helpers) — no matches found. Also confirmed (via the UI Spec's own Existing Component Reuse Map, re-verified directly) that the only precedent for a "your answer / correct answer" two-line block is the not-scored branch's own inline JSX (`page.tsx:103-114`), not a separate component.
 
 **Decision**: **reuse, inline** — no new component is created. The not-scored branch's two-line text block shape is copied (not extracted into a shared function/component) into the new scored sub-branch, recolored and relabeled per the UI Spec's D1/D2. Rationale: this is the block's 2nd occurrence (not-scored branch = 1st, new short_answer sub-branch = 2nd); per Rule of Three (frontend-ai-guide), a 2nd occurrence warrants *considering* future consolidation, not yet extracting — extracting a shared component/prop-driven abstraction for two call sites would be premature (YAGNI) and would itself be a new cross-boundary abstraction requiring its own Minimal Surface Alternatives analysis, which the requirements at hand (a single reuse, no third consumer, engineer directive of "reuse exactly, no new design") do not justify. If a third caller of this shape appears, that is the trigger point to extract.
 
@@ -219,7 +219,7 @@ All claims are listed in the Agreement Checklist's "Assumed Behaviors" subsectio
 | `QuestionRenderer.tsx:129-131`, `156-160` (`true_false`/`essay` footnotes) | Regression guard — explicitly not touched (AC-009). |
 | `queries.ts:285-292` (`ResultQuestion` type), `344-373` (`getResult` select + mapping) | Data contract reference — confirms `essayAnswer`/`questionType`/`choices` are already correctly populated for `short_answer` rows; no change needed. |
 | `types/result.ts:6-17` (`PerQuestionResult`) | Data contract reference — confirms `correct` is mcq-only, `selected`/`isCorrect`/`scored` are the only fields this design reads for `short_answer`. |
-| `SOURCE/app/(layer4)/actions.ts:533` | Evidence — confirms `short_answer` rows persist `choices: []` at authoring time, explaining why today's bug is a blank render, not a crash. |
+| `SOURCE/features/authoring/actions.ts:533` | Evidence — confirms `short_answer` rows persist `choices: []` at authoring time, explaining why today's bug is a blank render, not a crash. |
 | `schema.sql:63` | Constraint reference — `choices jsonb not null`, confirming no null path for the `choices` column. |
 | `docs/adr/ADR-0005-multi-part-national-exam-format.md:34-76` | Governance reference — introduces `short_answer`, records the 2026-08-01 amendment superseding "not auto-scored." |
 | `docs/design/short-answer-scoring-backend-design.md` (Data Contracts, Field Propagation Map, Change Impact Map) | Cross-layer contract reference — this document's dependency on `PerQuestionResult.correct` staying unset and `essayAnswer` already reaching the client. |
@@ -238,7 +238,7 @@ No raw `Codebase Analysis`/`UI Analysis` JSON with an explicit `focusAreas` arra
 | `ui:essay-footnote-out-of-scope` | `essay` footnote ("answer on paper... not auto-scored yet") | out-of-scope | Excluded by `resolvedScope.outOfScope`; byte-for-byte preserved (AC-007/AC-009). | `QuestionRenderer.tsx:156-159` |
 | `ui:true_false-footnote-out-of-scope` (TBD-03) | `true_false` footnote is also stale (already auto-scored since commit `f1e665093`) | out-of-scope | Explicitly bundled with TBD-02 as backlog; not touched by this feature's `short_answer`-only scope. | `QuestionRenderer.tsx:129-131`; UI Spec TBD-03 |
 | `ui:true_false-empty-choice-list-bug` (TBD-02) | Pre-existing `true_false` blank-render bug in the same scored branch this feature edits | out-of-scope | `resolvedScope.inScope` = `short_answer` only; logged as backlog, must not be silently fixed (or further broken) while editing the same scored branch. | `queries.ts:364` (`choices: questionType === "true_false" ? [] : q.choices`); UI Spec TBD-02 |
-| `code:short_answer-choices-empty-array` | For `short_answer`, `ResultQuestion.choices` resolves to `[]`, not `undefined` — today's bug is a blank `<ul>`, not a crash | preserve (informs the fix; not itself changed) | Confirms the "blank-render" framing (UI Spec Overview, AC-001) is accurate. Directly re-verified beyond the UI Spec's transcription. | `SOURCE/app/(layer4)/actions.ts:533`; `queries.ts:364,368`; `schema.sql:63` |
+| `code:short_answer-choices-empty-array` | For `short_answer`, `ResultQuestion.choices` resolves to `[]`, not `undefined` — today's bug is a blank `<ul>`, not a crash | preserve (informs the fix; not itself changed) | Confirms the "blank-render" framing (UI Spec Overview, AC-001) is accurate. Directly re-verified beyond the UI Spec's transcription. | `SOURCE/features/authoring/actions.ts:533`; `queries.ts:364,368`; `schema.sql:63` |
 | `code:status-chip-type-agnostic` | Status chip (`page.tsx:121-125`) already reads only `r.isCorrect`/`r.selected`, no `questionType` branch | preserve | Zero code change required (AC-006); directly re-verified. | `page.tsx:121-125` |
 | `code:essayanswer-already-selected` | `getResult()`/`queries.ts` already selects and maps `essay_answer` unconditionally for every question type | preserve | No backend/query change needed on the frontend data path (UI Spec D3); directly re-verified. | `queries.ts:346,371` |
 | `code:perquestionresult-correct-mcq-only` | `PerQuestionResult.correct` is typed `ChoiceId`, documented "CHỈ câu mcq" | preserve | Confirms the invariant: never read `r.correct` for `short_answer`; source is `q.essayAnswer` instead. Cross-checked against the backend Design Doc's Data Contracts invariant (same claim, consistent). | `types/result.ts:11-12`; backend Design Doc Data Contracts |
@@ -255,8 +255,8 @@ No raw `Codebase Analysis`/`UI Analysis` JSON with an explicit `focusAreas` arra
 ```yaml
 Change Target: ResultDetailPage scored branch (short_answer sub-branch) + QuestionRenderer footnote copy
 Direct Impact:
-  - SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx (scored branch gains a questionType === 'short_answer' sub-branch, reusing the existing `status` local variable for color)
-  - SOURCE/app/(layer2)/_components/QuestionRenderer.tsx (one string literal in the short_answer footnote)
+  - SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx (scored branch gains a questionType === 'short_answer' sub-branch, reusing the existing `status` local variable for color)
+  - SOURCE/features/exams/components/QuestionRenderer.tsx (one string literal in the short_answer footnote)
 Indirect Impact:
   - None. No other component reads from this render branch; no data shape, prop, or exported interface changes.
 No Ripple Effect:
@@ -265,7 +265,7 @@ No Ripple Effect:
   - Status chip logic (page.tsx:118-126) — reused, not modified
   - RichText, AnswerChoice, FlagButton components — unaffected
   - getResult()/queries.ts — already selects essay_answer; unaffected
-  - Any backend file (computeScore.ts, actions.ts in (layer2)) — owned by the companion backend Design Doc
+  - Any backend file (computeScore.ts, actions.ts in (exams)) — owned by the companion backend Design Doc
   - Result Summary page (S-00) — no change, no route change
 ```
 
@@ -283,7 +283,7 @@ This change fits entirely within the existing Next.js App Router page/component 
 ```mermaid
 flowchart TD
     DB[("Supabase: exam_results, questions")]
-    GR["getResult()\nSOURCE/app/(layer2)/queries.ts — unchanged"]
+    GR["getResult()\nSOURCE/features/exams/queries.ts — unchanged"]
     RDP["ResultDetailPage\npage.tsx — scored branch gains short_answer sub-branch"]
     Browser["Rendered HTML (SSR)"]
     Player["Exam Player route (unrelated)"]
@@ -610,7 +610,7 @@ None required. No schema change, no feature flag, no new data shape. Already-per
 ### Integration Verification Points
 
 - **`ResultDetailPage`'s new `short_answer` sub-branch (AC-001–AC-006)** currently has no dedicated automated test (confirmed by Glob). **Recommendation** (not a blocking requirement of this Design Doc; flagged for the Work Plan): given `page.tsx` is an async Server Component with a `redirect()` call, a full RTL render is not straightforward — the pragmatic path is either (a) a Playwright test against a seeded attempt (consistent with the project's Pha 1 manual/Playwright-MCP verification convention), or (b) if the color-decision or fallback logic grows any further, extracting a small pure helper purely for unit-testability at that point (not now — YAGNI, since the current logic is a direct reuse of `status.cls` with no new branching to unit-test in isolation).
-- **`QuestionRenderer`'s footnote regression guard (AC-008, AC-009)** currently has no dedicated automated test. **Recommendation**: add `SOURCE/app/(layer2)/_components/QuestionRenderer.test.tsx` (jsdom + `@testing-library/react`, following the project's existing per-file `// @vitest-environment jsdom` docblock convention used by `RichText`'s test suite) asserting all three footnote strings in one pass — `short_answer` reads the new copy, `essay` and `true_false` remain byte-identical to their pre-change strings. This is a low-cost, high-value regression guard for exactly the boundary AC-009 exists to protect, and `QuestionRenderer` (a client component with fully prop-driven rendering) is straightforward to test in isolation, unlike `page.tsx`.
+- **`QuestionRenderer`'s footnote regression guard (AC-008, AC-009)** currently has no dedicated automated test. **Recommendation**: add `SOURCE/features/exams/components/__tests__/QuestionRenderer.test.tsx` (jsdom + `@testing-library/react`, following the project's existing per-file `// @vitest-environment jsdom` docblock convention used by `RichText`'s test suite) asserting all three footnote strings in one pass — `short_answer` reads the new copy, `essay` and `true_false` remain byte-identical to their pre-change strings. This is a low-cost, high-value regression guard for exactly the boundary AC-009 exists to protect, and `QuestionRenderer` (a client component with fully prop-driven rendering) is straightforward to test in isolation, unlike `page.tsx`.
 - **Manual/Playwright smoke check**: submit an exam containing a `short_answer` question via `npm run dev` once the backend change is also live, then inspect `/exams/[id]/attempt/[attemptId]/result/detail` to confirm the three golden states (correct/wrong/skipped) render with the correct text and color per the UI Spec's Visual Acceptance section. This gap is recorded, not silently skipped (Risks and Mitigation).
 
 ## Verification Strategy
@@ -666,7 +666,7 @@ None required. No schema change, no feature flag, no new data shape. Already-per
 - `docs/ui-spec/short-answer-scoring-ui-spec.md` — canonical UI Spec this document implements (v1.0, Draft).
 - `docs/design/short-answer-scoring-backend-design.md` — companion backend Design Doc (v1.1, Draft, code-verifier: consistent, 85) whose Data Contracts this document depends on.
 - `docs/adr/ADR-0005-multi-part-national-exam-format.md` — introduces `short_answer`, amended 2026-08-01 to supersede the "not auto-scored" decision.
-- `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx`, `SOURCE/app/(layer2)/_components/QuestionRenderer.tsx`, `SOURCE/app/(layer2)/queries.ts`, `SOURCE/types/result.ts`, `SOURCE/types/question.ts`, `SOURCE/app/(layer4)/actions.ts`, `SOURCE/supabase/schema.sql` — directly read/grepped during this document's investigation (see Code Inspection Evidence).
+- `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx`, `SOURCE/features/exams/components/QuestionRenderer.tsx`, `SOURCE/features/exams/queries.ts`, `SOURCE/types/result.ts`, `SOURCE/types/question.ts`, `SOURCE/features/authoring/actions.ts`, `SOURCE/supabase/schema.sql` — directly read/grepped during this document's investigation (see Code Inspection Evidence).
 
 ## Update History
 

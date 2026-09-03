@@ -8,7 +8,7 @@ Proposed — 2026-07-20. **Amends** ADR-0004 (pipeline shape: adds a third extra
 
 ### The already-shipped promise
 
-`SOURCE/app/(layer4)/_components/EntryModeField.tsx` ships an **Entry Mode** dropdown with two values, `Automatic` and `Manual`. The Automatic option displays, to every author, the sentence:
+`SOURCE/features/authoring/components/EntryModeField.tsx` ships an **Entry Mode** dropdown with two values, `Automatic` and `Manual`. The Automatic option displays, to every author, the sentence:
 
 > "AI will scan your uploaded files and extract the exam automatically — you can still edit any field."
 
@@ -121,8 +121,8 @@ On the real-file fixture set (the official 2025 Toán paper already used for ADR
 
 ## Related Information
 
-- Inert control being made real: `SOURCE/app/(layer4)/_components/EntryModeField.tsx` (HIDDEN-FEATURES #2, #3)
-- Gate being moved: `validateExamMeta()` in `SOURCE/lib/ugc/validateInput.ts`, called from `extractAndAssemble` (`SOURCE/app/(layer4)/actions.ts:121`)
+- Inert control being made real: `SOURCE/features/authoring/components/EntryModeField.tsx` (HIDDEN-FEATURES #2, #3)
+- Gate being moved: `validateExamMeta()` in `SOURCE/lib/ugc/validateInput.ts`, called from `extractAndAssemble` (`SOURCE/features/authoring/actions.ts:121`)
 - Provider, model ids, and structured-output protocol: ADR-0006 (`gemini-3.1-flash-lite` is the established cheap-model choice)
 - Advisory-AI / author-confirmation principle: ADR-0004; Design Doc §AI Extraction & Assembly
 - Error-surfacing machinery reused: Design Doc §Error-code → review-panel copy; UI Spec §ExtractionErrorPanel, §PublishBar

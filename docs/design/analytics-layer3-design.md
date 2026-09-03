@@ -10,7 +10,7 @@
 ## Design Summary (Meta)
 
 ```yaml
-design_type: "new page"           # (layer3) route group is currently empty
+design_type: "new page"           # (analytics) route group is currently empty
 risk_level: "low"                 # no DB/RLS/auth surface touched in this pass; visual + client-state only
 complexity_level: "medium"        # 2 chart types (bar + donut) with hover/tooltip interaction, hand-rolled SVG (no chart lib in package.json)
 main_constraints:
@@ -18,7 +18,7 @@ main_constraints:
   - "No chart library in dependencies (checked package.json) — charts are hand-rolled inline SVG, consistent with the project's flat, no-shadow/no-gradient design system."
   - "Must reuse SiteHeader (already covers Layer 2/3/4) and the Mực & Sơn Mài design tokens — no new theme."
 biggest_risks:
-  - "Route mismatch: SiteHeader/HomeSidebar's existing 'Analytics' nav item already points at /me/dashboard, not a /analytics or (layer3)-prefixed path (route groups are pathless). Resolved: user confirmed this page lives at app/(layer3)/me/dashboard/page.tsx so the existing nav item lights up with no nav changes needed."
+  - "Route mismatch: SiteHeader/HomeSidebar's existing 'Analytics' nav item already points at /me/dashboard, not a /analytics or (analytics)-prefixed path (route groups are pathless). Resolved: user confirmed this page lives at app/(analytics)/me/dashboard/page.tsx so the existing nav item lights up with no nav changes needed."
 unknowns:
   - "None blocking — reference has 2 full-page screenshots (BAR tab default, DONUT tab) + a hidden-features.md documenting 8 non-obvious behaviors. Real-data wiring (computeScore/attempts aggregation) is explicitly deferred to a future pass."
 ```
@@ -31,16 +31,16 @@ unknowns:
 
 ## Route & nav
 
-- New page: `app/(layer3)/me/dashboard/page.tsx` → URL `/me/dashboard`. Route groups are pathless, so this matches the **existing** "Analytics" nav item in `SiteHeader.tsx`/`HomeSidebar.tsx` (`href: "/me/dashboard"`) — confirmed with user, no nav/href edits needed.
-- Layout: no `(layer3)/layout.tsx` exists yet. Add one that renders `<SiteHeader user={...} />` above `{children}`, mirroring `(layer2)/layout.tsx` / `(layer4)/layout.tsx` (fetch the session user once, pass to header).
+- New page: `app/(analytics)/me/dashboard/page.tsx` → URL `/me/dashboard`. Route groups are pathless, so this matches the **existing** "Analytics" nav item in `SiteHeader.tsx`/`HomeSidebar.tsx` (`href: "/me/dashboard"`) — confirmed with user, no nav/href edits needed.
+- Layout: no `(analytics)/layout.tsx` exists yet. Add one that renders `<SiteHeader user={...} />` above `{children}`, mirroring `(exams)/layout.tsx` / `(authoring)/layout.tsx` (fetch the session user once, pass to header).
 
 ## Component plan (5 files — Medium scale)
 
-1. **`app/(layer3)/layout.tsx`** — session fetch + `<SiteHeader>` shell (copy pattern from `(layer4)/layout.tsx`).
-2. **`app/(layer3)/me/dashboard/page.tsx`** — server component; page chrome (title "Analytics", subtitle, `preload-fade` ordering per other pages), renders `<AnalyticsDashboard />` client island.
-3. **`app/(layer3)/_components/AnalyticsDashboard.tsx`** (client) — owns `activeTab: "bar" | "donut"`, `range: "week" | "month" | "all"`, and `filterTouched: boolean` state (hidden feature #1: dropdown displays placeholder "Filter" until touched, but data defaults to Week underneath). Renders tab bar + filter `<select>` + the active chart card.
-4. **`app/(layer3)/_components/BarChartCard.tsx`** (client) — hand-rolled SVG grouped bar chart. Implements: adaptive Y-axis via `niceCeil()` (#4), per-subject fixed colors (#5), cursor-following tooltip via `onMouseMove` (#2), hover-dim other groups to 35% opacity over 200ms (#7), automatic "NEEDS REVIEW" tag under bars where `correct/(correct+wrong) < 0.75` (#3, toggled by a `highlightWeakest` prop defaulting `true`).
-5. **`app/(layer3)/_components/DonutChartCard.tsx`** (client) — hand-rolled SVG donut (stroke-dasharray segments) + right-hand legend list with %, center `%`/label readout for the top segment. Accepts `donutHighlightCount` prop (#6, default 1, currently a no-op — all segments render full-opacity per hidden-features.md's note that dimming was removed).
+1. **`app/(analytics)/layout.tsx`** — session fetch + `<SiteHeader>` shell (copy pattern from `(authoring)/layout.tsx`).
+2. **`app/(analytics)/me/dashboard/page.tsx`** — server component; page chrome (title "Analytics", subtitle, `preload-fade` ordering per other pages), renders `<AnalyticsDashboard />` client island.
+3. **`features/analytics/components/AnalyticsDashboard.tsx`** (client) — owns `activeTab: "bar" | "donut"`, `range: "week" | "month" | "all"`, and `filterTouched: boolean` state (hidden feature #1: dropdown displays placeholder "Filter" until touched, but data defaults to Week underneath). Renders tab bar + filter `<select>` + the active chart card.
+4. **`features/analytics/components/BarChartCard.tsx`** (client) — hand-rolled SVG grouped bar chart. Implements: adaptive Y-axis via `niceCeil()` (#4), per-subject fixed colors (#5), cursor-following tooltip via `onMouseMove` (#2), hover-dim other groups to 35% opacity over 200ms (#7), automatic "NEEDS REVIEW" tag under bars where `correct/(correct+wrong) < 0.75` (#3, toggled by a `highlightWeakest` prop defaulting `true`).
+5. **`features/analytics/components/DonutChartCard.tsx`** (client) — hand-rolled SVG donut (stroke-dasharray segments) + right-hand legend list with %, center `%`/label readout for the top segment. Accepts `donutHighlightCount` prop (#6, default 1, currently a no-op — all segments render full-opacity per hidden-features.md's note that dimming was removed).
 6. **`lib/fake-data/analytics.ts`** — simulated datasets: 3 independent hardcoded per-range (`week`/`month`/`all`) correct/wrong/session-count arrays keyed by subject (#8, not derived by scaling one dataset), the fixed subject→color lookup table (#5: Math=lacquer red `--chart-1`/`#A62C2B`, English=green, Physics=blue-gray, Literature=amber, Chemistry=brown, Biology=maroon/purple), and the `niceCeil()` helper (#4).
 
 _(6 files total incl. layout — still Medium scale per the file-count table; no PRD/ADR needed since there's no architecture/data-flow decision, just a new client-rendered page.)_

@@ -8,7 +8,7 @@
 - **Report channel**: `ReportButton` (rendered only for logged-in users on a published exam; already-reported → static "✓ You reported this exam" from `hasReported`) + `ReportDialog` (LeaveExamDialog pattern + focus trap; duplicate → terminal state) calling `reportExam`.
 
 ## Files
-`SOURCE/app/(layer2)/_components/ExamCard.tsx` (edit), `SOURCE/app/(layer2)/exams/[id]/page.tsx` (edit), the exam player component (edit — QuestionFigure); new `AuthorByline`, `ReportButton`, `ReportDialog` under `(layer2)/_components/` or `components/shared/`.
+`SOURCE/features/exams/components/ExamCard.tsx` (edit), `SOURCE/app/(exams)/exams/[id]/page.tsx` (edit), the exam player component (edit — QuestionFigure); new `AuthorByline`, `ReportButton`, `ReportDialog` under `(exams)/_components/` or `components/shared/`.
 
 ## ACs / metrics
 AC-011/021/023/025/026. UI Spec §AuthorByline, §ReportButton/ReportDialog.

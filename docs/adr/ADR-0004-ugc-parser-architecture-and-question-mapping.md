@@ -119,5 +119,5 @@ Both AI steps and the assembly step return a discriminated result: either succes
 
 - PRD `docs/prd/ugc-exam-upload-prd.md` (R3–R7, R11; Undetermined Items — extraction contract, image strategy, essay handling).
 - ADR-0001 (lifecycle + RLS, admin removed; new question columns + Storage), ADR-0002 (render boundary + safe images), ADR-0003 (`author_display_name` on the same insert).
-- Code touchpoints: `SOURCE/lib/scoring/computeScore.ts`, `SOURCE/app/(layer2)/_components/TopicBreakdown.tsx` (unchanged), `SOURCE/lib/fake-data/exams.ts` (seeded topics), `SOURCE/supabase/schema.sql` (question constraints + new columns).
+- Code touchpoints: `SOURCE/lib/scoring/computeScore.ts`, `SOURCE/features/exams/components/TopicBreakdown.tsx` (unchanged), `SOURCE/lib/fake-data/exams.ts` (seeded topics), `SOURCE/supabase/schema.sql` (question constraints + new columns).
 - `docs/claude-api` reference (via the claude-api skill): multimodal document/image input, structured outputs, server-side calling, model IDs (`claude-opus-4-8` / `claude-sonnet-5` for the question file; `claude-haiku-4-5` for the answer file).

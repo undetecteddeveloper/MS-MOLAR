@@ -67,7 +67,7 @@ Inherits the UI Spec's External Resources Used table and adds the backend contra
 
 | Resource (project-tier label) | Feature-specific identifier | Notes |
 |-------------------------------|-----------------------------|-------|
-| Design Origin | `DESIGN.md` — "Mực & Sơn mài" theme; hard rules (no shadow/gradient/pill/serif-on-controls; no red < 24px on ink) | Governs ivory panel + dark part-cards + copper focus visual language (inherited from UI Spec) |
+| Design Origin | `PROJECT_OVERVIEW.md §2` — "Mực & Sơn mài" theme; hard rules (no shadow/gradient/pill/serif-on-controls; no red < 24px on ink) | Governs ivory panel + dark part-cards + copper focus visual language (inherited from UI Spec) |
 | Design System | `globals.css` tokens (`--background`/`--card`/`--foreground`/`--brand`/`--sidebar`/`--border`/`--ring`/`--sidebar-accent`/`--muted-foreground`), `.eyebrow`, `.preload-fade` + `--preload-order`; base-ui `Tooltip` (`SOURCE/components/ui/tooltip.tsx`); dialog precedent `ReportExam.tsx`/`LeaveExamDialog.tsx` | New components reuse these tokens/primitives (inherited from UI Spec) |
 | API / contract source | Backend Design Doc `docs/design/rating-system-backend-design.md` (Data Contracts + Read model + Field Propagation Map) | The typed interface this frontend consumes: `Exam.communityDifficulty`, `ExamSort`, `ExamFilters.level`, `rateExam`, `getMyRating`, `listMySubmittedExamIds`, `SOURCE/lib/rating/` |
 | Design reference (images + notes) | `SCREENSHOT/design_reference/ExamRatingPage_Layer2/` — `ERP_*` PNGs + `ERP_transitions_animations.md` | Layout, verbatim copy, animation intent only; this doc + the UI Spec win on conflict |
@@ -81,11 +81,11 @@ Inherits the UI Spec's External Resources Used table and adds the backend contra
 - [x] Add the shared `RatingForm` core + `RatingOverview` / `PartCard` / `PartDetail` and the `CircleScale` radiogroup (UI Spec component set).
 - [x] Add two shells: `RatePageShell` (standalone `/exams/[id]/rate`, bubble-expand) and `RatingModal` + `RatingModalController` (result-page auto-open, cross-fade).
 - [x] Add `RateButton` (client) and `DifficultyBadge` (display) and restructure `ExamCard` to a stretched-link so both are siblings of the card anchor.
-- [x] Add the new route `SOURCE/app/(layer2)/exams/[id]/rate/page.tsx` (Server Component; getExam + eligibility gate + getMyRating prefill).
+- [x] Add the new route `SOURCE/app/(exams)/exams/[id]/rate/page.tsx` (Server Component; getExam + eligibility gate + getMyRating prefill).
 - [x] Wire `DifficultyBadge` into the `ExamCard` Level cell and the exam-detail Difficulty cell (replace the two literal `"—"`).
 - [x] Modify `ExamFilters`: real Level `FilterRow` (Easy/Medium/Hard) + fold Hardest into the `?sort=` axis (D002).
-- [x] Modify `SOURCE/app/(layer2)/exams/page.tsx` to parse `?sort=hardest` and `?level=`, load `listMySubmittedExamIds()` + current-user, and thread per-card eligibility through `ExamBrowser` → `ExamCard`.
-- [x] Mount `RatingModalController` on the result page; require `submitExam`'s **fresh-submit** redirect to append `?rate=auto` (integration change to `(layer2)/actions.ts` line 127 only, NOT the idempotent already-submitted redirect at line 50).
+- [x] Modify `SOURCE/app/(exams)/exams/page.tsx` to parse `?sort=hardest` and `?level=`, load `listMySubmittedExamIds()` + current-user, and thread per-card eligibility through `ExamBrowser` → `ExamCard`.
+- [x] Mount `RatingModalController` on the result page; require `submitExam`'s **fresh-submit** redirect to append `?rate=auto` (integration change to `(exams)/actions.ts` line 127 only, NOT the idempotent already-submitted redirect at line 50).
 - [x] Add pure `SOURCE/lib/rating/` additions (readout model, part-metadata copy, error-copy map) and `SOURCE/components/rating/` jsdom-testable primitives (`CircleScale`, `DifficultyBadge`).
 
 #### Non-Scope (Explicitly not changing)
@@ -106,8 +106,8 @@ Inherits the UI Spec's External Resources Used table and adds the backend contra
 
 | Assumed behavior | Evidence | Confirmed | Follow-up if unconfirmed |
 |------------------|----------|-----------|--------------------------|
-| `submitExam` fresh-submit redirect can carry a query marker; the idempotent already-submitted branch is a **separate** redirect that must NOT carry it | `SOURCE/app/(layer2)/actions.ts:50` (already-submitted redirect) vs `:127` (fresh-submit redirect) | **Yes** (two distinct redirect statements read) | — |
-| `ExamCard` is one `<Link href=/exams/[id]>` wrapping all card content; a nested interactive control would be invalid | `SOURCE/app/(layer2)/_components/ExamCard.tsx:11-37` | **Yes** | — |
+| `submitExam` fresh-submit redirect can carry a query marker; the idempotent already-submitted branch is a **separate** redirect that must NOT carry it | `SOURCE/features/exams/actions.ts:50` (already-submitted redirect) vs `:127` (fresh-submit redirect) | **Yes** (two distinct redirect statements read) | — |
+| `ExamCard` is one `<Link href=/exams/[id]>` wrapping all card content; a nested interactive control would be invalid | `SOURCE/features/exams/components/ExamCard.tsx:11-37` | **Yes** | — |
 | `next/navigation` `router.replace(pathname, { scroll:false })` strips a query param without a reload (used to consume `?rate=auto`) | `ExamFilters.tsx:73` uses `router.push(pathname, { scroll:false })` for the same searchParams pattern | **Yes** (same API family in-repo) | Risk R-2: if `replace` re-renders unexpectedly, guard the open with a `useRef` "opened once" flag; verified in the modal Playwright pass |
 | base-ui `Tooltip` reveals content on hover **and** keyboard focus on a focusable `aria-disabled` control | `SOURCE/components/ui/tooltip.tsx` exists (base-ui) | **No** (behavior not verified against a focusable non-native-disabled trigger) | Risk R-3: verify in the RateButton jsdom/Playwright pass; fallback = always-visible visually-hidden `aria-describedby` reason (which is already specified), so the reason reaches AT even if the tooltip does not fire on focus |
 | `getMyRating(examId)` returns the caller's three stored scores or `null`, readable from a Server Component | Backend DD Data Contracts — `getMyRating` "mirrors hasReported", thrown on infra error | **Yes** (contract) | — |
@@ -178,23 +178,23 @@ Rendering + interaction ACs verifiable in an isolated browser/jsdom environment.
 
 | Type | Path | Description |
 |------|------|-------------|
-| Existing | `SOURCE/app/(layer2)/_components/ExamCard.tsx` | Restructure to stretched-link; add `eligibility` prop; render `DifficultyBadge` (Level cell) + `RateButton` as siblings of the anchor. |
-| Existing | `SOURCE/app/(layer2)/_components/ExamBrowser.tsx` | Thread per-card `eligibility` (compute from `submittedExamIds` + `isLoggedIn`). |
-| Existing | `SOURCE/app/(layer2)/_components/ExamFilters.tsx` | Real Level `FilterRow`; fold Hardest into `?sort=` (remove `hardest` prop + `?hardest=1`); `sort` union widened; add `selected.level`. |
-| Existing | `SOURCE/app/(layer2)/exams/page.tsx` | Parse `?sort=hardest` + `?level=`; load `listMySubmittedExamIds()` + current user; pass `sort`/`level` to `listExams`; thread eligibility inputs to `ExamBrowser`. |
-| Existing | `SOURCE/app/(layer2)/exams/[id]/page.tsx` | Replace the Difficulty `"—"` cell (`:97-100`) with `<DifficultyBadge variant="detail" communityDifficulty={exam.communityDifficulty} />`. |
-| Existing | `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/page.tsx` | Add `getMyRating(id)` read; mount `<RatingModalController examId={id} initialScores={…} />`. |
-| Existing | `SOURCE/app/(layer2)/actions.ts` | Append `?rate=auto` to the **fresh-submit** redirect (`:127`) only; leave the idempotent already-submitted redirect (`:50`) unchanged. |
+| Existing | `SOURCE/features/exams/components/ExamCard.tsx` | Restructure to stretched-link; add `eligibility` prop; render `DifficultyBadge` (Level cell) + `RateButton` as siblings of the anchor. |
+| Existing | `SOURCE/features/exams/components/ExamBrowser.tsx` | Thread per-card `eligibility` (compute from `submittedExamIds` + `isLoggedIn`). |
+| Existing | `SOURCE/features/exams/components/ExamFilters.tsx` | Real Level `FilterRow`; fold Hardest into `?sort=` (remove `hardest` prop + `?hardest=1`); `sort` union widened; add `selected.level`. |
+| Existing | `SOURCE/app/(exams)/exams/page.tsx` | Parse `?sort=hardest` + `?level=`; load `listMySubmittedExamIds()` + current user; pass `sort`/`level` to `listExams`; thread eligibility inputs to `ExamBrowser`. |
+| Existing | `SOURCE/app/(exams)/exams/[id]/page.tsx` | Replace the Difficulty `"—"` cell (`:97-100`) with `<DifficultyBadge variant="detail" communityDifficulty={exam.communityDifficulty} />`. |
+| Existing | `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/page.tsx` | Add `getMyRating(id)` read; mount `<RatingModalController examId={id} initialScores={…} />`. |
+| Existing | `SOURCE/features/exams/actions.ts` | Append `?rate=auto` to the **fresh-submit** redirect (`:127`) only; leave the idempotent already-submitted redirect (`:50`) unchanged. |
 | New (backend-owned prerequisite — must exist first) | `SOURCE/lib/rating/` | Backend DD creates `overall`/`bucket`/`formatMean`/constants; this frontend DD adds pure `readoutModel(scores)` (running-mean + status), `PART_META` copy constants, and `rateErrorMessage(error)` copy map beside them. |
-| New | `SOURCE/app/(layer2)/exams/[id]/rate/page.tsx` | Standalone Rate route (Server Component): getExam → 404; eligibility gate; getMyRating prefill; render `RatePageShell`. |
+| New | `SOURCE/app/(exams)/exams/[id]/rate/page.tsx` | Standalone Rate route (Server Component): getExam → 404; eligibility gate; getMyRating prefill; render `RatePageShell`. |
 | New | `SOURCE/components/rating/CircleScale.tsx` (+ `CircleScale.test.tsx`) | Reusable radiogroup primitive (jsdom-testable). |
 | New | `SOURCE/components/rating/DifficultyBadge.tsx` (+ `DifficultyBadge.test.tsx`) | Pure display, jsdom-testable. |
-| New | `SOURCE/app/(layer2)/_components/rating/RatingForm.tsx` | Shared client form core (state + submit adapter). |
-| New | `SOURCE/app/(layer2)/_components/rating/{RatingOverview,PartCard,PartDetail}.tsx` | Overview panel + part cards + active-part detail. |
-| New | `SOURCE/app/(layer2)/_components/rating/RatePageShell.tsx` | Page shell (bubble-expand). |
-| New | `SOURCE/app/(layer2)/_components/rating/{RatingModal,RatingModalController}.tsx` | Modal shell + open-condition controller. |
-| New | `SOURCE/app/(layer2)/_components/rating/RateButton.tsx` | Per-card client control (tooltip + disabled semantics). |
-| New | `SOURCE/app/(layer2)/_components/rating/submitRating.ts` | Shared client adapter mapping `RatingForm` scores → `rateExam` args and the error union → copy. |
+| New | `SOURCE/features/exams/components/rating/RatingForm.tsx` | Shared client form core (state + submit adapter). |
+| New | `SOURCE/features/exams/components/rating/{RatingOverview,PartCard,PartDetail}.tsx` | Overview panel + part cards + active-part detail. |
+| New | `SOURCE/features/exams/components/rating/RatePageShell.tsx` | Page shell (bubble-expand). |
+| New | `SOURCE/features/exams/components/rating/{RatingModal,RatingModalController}.tsx` | Modal shell + open-condition controller. |
+| New | `SOURCE/features/exams/components/rating/RateButton.tsx` | Per-card client control (tooltip + disabled semantics). |
+| New | `SOURCE/features/exams/components/rating/submitRating.ts` | Shared client adapter mapping `RatingForm` scores → `rateExam` args and the error union → copy. |
 
 ### Integration Points (even for new implementations)
 - **Read model** `Exam.communityDifficulty` (from `toExam`) — consumed by `DifficultyBadge` on `ExamCard` and exam-detail. No client transform beyond `formatMean`.
@@ -236,8 +236,8 @@ Facts are drawn from the task's consolidated verified frontend/UI facts and this
 | ui:F1 | Dialog precedent + the three WCAG gaps (focus-trap, focus-return, success `aria-live`) | transform | `RatingModal` extends the `ReportExam`/`LeaveExamDialog` shell (scrim `bg-[#1B1512]/40`, Esc + scrim-close, `role=dialog`/`aria-modal`/`aria-labelledby`) and adds focus-trap, focus-return-to-trigger, and an `aria-live="polite"` success region. | `ReportExam.tsx:27-132`; UI Spec RatingModal |
 | ui:F2 | 10-circle selector = accessible radiogroup (roving tabindex, arrow/Home/End, copper focus, non-color selection) | preserve | `CircleScale` implements the UI Spec radiogroup verbatim; lives under `SOURCE/components/rating/` for jsdom test collection. | UI Spec CircleScale; `vitest.config.ts:15` |
 | ui:F3 | Shared `RatingForm` core + two shells; `RatingModalController` idempotent open via transient `?rate=auto` | preserve | One `RatingForm(layout)` + `RatePageShell` + `RatingModal`/`RatingModalController`; controller opens once and strips `?rate=auto` via `router.replace`. | UI Spec Shared-form decision + RatingModalController |
-| code:F3 | Theme token collision: `DESIGN.md` "accent" = copper but CSS `--accent` = pale ivory | preserve | Copper uses `--sidebar-accent`/`--ring`/literal `#b8863b` (focus ring, `Rate →`, selected-circle mark, progress fill, 40×2 divider). Never the CSS `--accent`. | UI Spec Reuse Map token note |
-| code:F4 | Vitest collects only `lib/**` + `components/**`; component tests need jsdom docblock | transform | Pure readout/format/copy → `SOURCE/lib/rating/`; jsdom-testable primitives (`CircleScale`, `DifficultyBadge`) → `SOURCE/components/rating/`; feature shells → `app/(layer2)/_components/rating/` (Playwright/manual). | `vitest.config.ts:15` |
+| code:F3 | Theme token collision: `PROJECT_OVERVIEW.md §2` "accent" = copper but CSS `--accent` = pale ivory | preserve | Copper uses `--sidebar-accent`/`--ring`/literal `#b8863b` (focus ring, `Rate →`, selected-circle mark, progress fill, 40×2 divider). Never the CSS `--accent`. | UI Spec Reuse Map token note |
+| code:F4 | Vitest collects only `lib/**` + `components/**`; component tests need jsdom docblock | transform | Pure readout/format/copy → `SOURCE/lib/rating/`; jsdom-testable primitives (`CircleScale`, `DifficultyBadge`) → `SOURCE/components/rating/`; feature shells → `features/exams/components/rating/` (Playwright/manual). | `vitest.config.ts:15` |
 | code:F5 | `ExamFilters` treats Hardest as an independent `?hardest=1` combinable with newest/oldest, currently a no-op | transform | **D002**: fold Hardest into the `?sort=` axis (newest/oldest/hardest mutually exclusive); remove the `hardest` prop + `?hardest=1`. User-facing behavior change — flagged for confirmation. | `ExamFilters.tsx:40-44,265-268`; `exams/page.tsx:41`; prior-layer D002 |
 | code:F6 | `submitExam` has two redirects: idempotent already-submitted (`:50`) and fresh submit (`:127`) | transform | Only `:127` appends `?rate=auto` so the modal auto-opens exactly on a fresh submit; `:50` stays clean so returning to an already-submitted result never auto-pops. | `actions.ts:50,127` |
 | code:F7 | Exam-detail + ExamCard render literal `"—"` for difficulty | transform | Replaced by `DifficultyBadge`, which itself renders `—` when `communityDifficulty` is null → identical below-threshold appearance (AC-015/023 continuity). | `ExamCard.tsx:34-35`; `exams/[id]/page.tsx:97-100` |
@@ -250,15 +250,15 @@ Facts are drawn from the task's consolidated verified frontend/UI facts and this
 ```yaml
 Change Target: Exam Difficulty Rating frontend (rating form set + RateButton + DifficultyBadge + ExamCard/ExamFilters wiring + rate route + result-modal mount)
 Direct Impact:
-  - SOURCE/app/(layer2)/_components/ExamCard.tsx (stretched-link restructure; +eligibility prop; DifficultyBadge + RateButton siblings)
-  - SOURCE/app/(layer2)/_components/ExamBrowser.tsx (thread per-card eligibility)
-  - SOURCE/app/(layer2)/_components/ExamFilters.tsx (real Level row; Hardest folded into ?sort=; drop hardest prop)
-  - SOURCE/app/(layer2)/exams/page.tsx (parse ?sort=hardest + ?level=; load listMySubmittedExamIds + current user; pass sort/level to listExams)
-  - SOURCE/app/(layer2)/exams/[id]/page.tsx (Difficulty cell -> DifficultyBadge)
-  - SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/page.tsx (getMyRating + RatingModalController mount)
-  - SOURCE/app/(layer2)/actions.ts (submitExam fresh-submit redirect appends ?rate=auto)
-  - NEW SOURCE/app/(layer2)/exams/[id]/rate/page.tsx (standalone Rate route)
-  - NEW SOURCE/app/(layer2)/_components/rating/* (RatingForm, RatingOverview, PartCard, PartDetail, RatePageShell, RatingModal, RatingModalController, RateButton, submitRating)
+  - SOURCE/features/exams/components/ExamCard.tsx (stretched-link restructure; +eligibility prop; DifficultyBadge + RateButton siblings)
+  - SOURCE/features/exams/components/ExamBrowser.tsx (thread per-card eligibility)
+  - SOURCE/features/exams/components/ExamFilters.tsx (real Level row; Hardest folded into ?sort=; drop hardest prop)
+  - SOURCE/app/(exams)/exams/page.tsx (parse ?sort=hardest + ?level=; load listMySubmittedExamIds + current user; pass sort/level to listExams)
+  - SOURCE/app/(exams)/exams/[id]/page.tsx (Difficulty cell -> DifficultyBadge)
+  - SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/page.tsx (getMyRating + RatingModalController mount)
+  - SOURCE/features/exams/actions.ts (submitExam fresh-submit redirect appends ?rate=auto)
+  - NEW SOURCE/app/(exams)/exams/[id]/rate/page.tsx (standalone Rate route)
+  - NEW SOURCE/features/exams/components/rating/* (RatingForm, RatingOverview, PartCard, PartDetail, RatePageShell, RatingModal, RatingModalController, RateButton, submitRating)
   - NEW SOURCE/components/rating/{CircleScale,DifficultyBadge}.tsx (+ tests)
   - SOURCE/lib/rating/ (readoutModel, PART_META, rateErrorMessage)
 Indirect Impact:
@@ -412,7 +412,7 @@ stateDiagram-v2
 **Submit path** (via the shared `submitRating` adapter):
 
 ```ts
-// SOURCE/app/(layer2)/_components/rating/submitRating.ts  ("use client" caller; rateExam is a server action)
+// SOURCE/features/exams/components/rating/submitRating.ts  ("use client" caller; rateExam is a server action)
 // Load-bearing: the PartId->column mapping and the error-union->copy mapping are the contract seam
 // between the UI Spec's onSubmit shape and the backend rateExam signature.
 export async function submitRating(
@@ -530,7 +530,7 @@ Four in-scope surface-bearing elements the frontend introduces. (The `RatingForm
 From the backend Design Doc; restated as the interface the frontend binds to.
 
 ```ts
-// Read model (producer: toExam in (layer2)/queries.ts)
+// Read model (producer: toExam in features/exams/queries.ts)
 Exam.communityDifficulty: { bucket: "Easy"|"Medium"|"Hard"; mean: number; count: number } | null   // null -> "—"
 
 // Sort/filter (consumed by listExams)
@@ -661,7 +661,7 @@ Grounded in the **no-CI local workflow**: vitest runs locally (`lib/**`/`compone
 - UI Spec `docs/design/rating-system-ui-spec.md` (v1.1) — component decomposition, state × display matrices, a11y, verbatim copy, Golden States, resolved Undetermined Items.
 - Backend Design Doc `docs/design/rating-system-backend-design.md` (v1.0) — consumed contracts (`communityDifficulty`, `ExamSort`, `ExamFilters.level`, `rateExam`, `getMyRating`, `listMySubmittedExamIds`), Field Propagation Map, `SOURCE/lib/rating/` helpers.
 - ADR-0008 `docs/adr/ADR-0008-exam-difficulty-rating-and-on-read-aggregation.md` — on-read aggregation + cross-table authorization decisions.
-- Precedents: `SOURCE/app/(layer2)/_components/{ExamCard,ExamFilters,ExamBrowser,ReportExam,LeaveExamDialog}.tsx`; `SOURCE/app/(layer2)/exams/page.tsx`, `exams/[id]/page.tsx`, `exams/[id]/attempt/[attemptId]/result/page.tsx`; `SOURCE/app/(layer2)/{queries,actions}.ts`; `SOURCE/components/ui/tooltip.tsx`; `SOURCE/vitest.config.ts`; `SCREENSHOT/design_reference/ExamRatingPage_Layer2/ERP_transitions_animations.md`; `DESIGN.md`.
+- Precedents: `SOURCE/features/exams/components/{ExamCard,ExamFilters,ExamBrowser,ReportExam,LeaveExamDialog}.tsx`; `SOURCE/app/(exams)/exams/page.tsx`, `exams/[id]/page.tsx`, `exams/[id]/attempt/[attemptId]/result/page.tsx`; `SOURCE/features/exams/{queries,actions}.ts`; `SOURCE/components/ui/tooltip.tsx`; `SOURCE/vitest.config.ts`; `SCREENSHOT/design_reference/ExamRatingPage_Layer2/ERP_transitions_animations.md`; `PROJECT_OVERVIEW.md §2`.
 - Sibling house-style Design Doc: `docs/design/ugc-exam-upload-design.md`; `docs/design/rating-system-backend-design.md`.
 
 ## Update History

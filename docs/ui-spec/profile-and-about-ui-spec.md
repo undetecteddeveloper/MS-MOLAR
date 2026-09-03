@@ -46,7 +46,7 @@
 1. **Shape.** `globals.css:148-160` states that primary action buttons are absolute pills (`rounded-full`) set against sharp 8–12px content cards, and that the shape *contrast* — not colour — is what draws the eye to the primary action. `.claude/MEMORY.md:96` is superseded on this point.
 2. **Reading measure.** `.claude/MEMORY.md:96` sets a hard 720px cap for long-form text. Of the three legal widths, only `small` (672px) clears it. `LegalDocument.tsx:7-10` already records this reasoning and is reused verbatim by `/about`.
 
-`DESIGN.md` was deleted 2026-08-06 and must not be cited; several in-repo comments still reference it (e.g. `SOURCE/app/page.tsx:15`) and those references are stale.
+`PROJECT_OVERVIEW.md §2` was deleted 2026-08-06 and must not be cited; several in-repo comments still reference it (e.g. `SOURCE/app/page.tsx:15`) and those references are stale.
 
 ## Prototype Management
 
@@ -75,7 +75,7 @@ Prefixed `UI-` throughout, because the PRD already owns `D1`–`D12`.
 
 ### UI-D1 — `/profile` is one centered card at `small` width, not a sidebar-nav settings shell
 
-**Decision.** `SOURCE/app/(layer3)/profile/page.tsx` renders `PageContainer as="main" size="small"` (672px, `--scaffold-small`) containing exactly one `PageHeader` and one card. No section nav, no tabs, no left rail.
+**Decision.** `SOURCE/app/(analytics)/profile/page.tsx` renders `PageContainer as="main" size="small"` (672px, `--scaffold-small`) containing exactly one `PageHeader` and one card. No section nav, no tabs, no left rail.
 
 **Rationale.** There is one section. A settings shell with one entry in its nav is a promise of a second entry that this PRD explicitly refuses to make — the Won't-Have list rules out email change, deletion, sessions, 2FA, and preferences, which is every candidate for a second section. `PageContainer`'s own selection rule names `small` for "trang một-tác-vụ, luồng đọc hẹp … form", and PRD qualitative metric 1 requires the whole account to be legible "within one screen, without scrolling" — a 768px or 1152px scaffold spreads five short rows across a width that makes each row's label and its action button fall at opposite ends of the eye's travel.
 
@@ -91,7 +91,7 @@ Prefixed `UI-` throughout, because the PRD already owns `D1`–`D12`.
 
 ### UI-D3 — `SOURCE/components/ui/input.tsx` is not used. Form fields follow the `MetadataFields` class constants
 
-**Decision.** Every text and password input in this feature uses the three live class constants at `SOURCE/app/(layer4)/_components/MetadataFields.tsx:45-57`:
+**Decision.** Every text and password input in this feature uses the three live class constants at `SOURCE/features/authoring/components/MetadataFields.tsx:45-57`:
 
 - label: `eyebrow block`
 - input: `mt-1.5 min-h-11 w-full rounded-[4px] border bg-transparent px-3 py-2.5 text-sm text-foreground outline-none transition-colors duration-200 disabled:opacity-60`, with `border-brand` when the field is in error and `border-border focus:border-ring` otherwise
@@ -193,7 +193,7 @@ Either way `Avatar` sees a string or nothing, and **"nothing" always renders ini
 
 ### UI-D9 — `updateProfile`'s five English error strings are mapped to i18n keys on the client, and the map is guarded by a test
 
-**Decision.** `/profile` renders display-name errors through a client-side `Record<string, MessageKey>` keyed on the **exact literal** returned by `updateProfile` (`SOURCE/app/(layer1)/actions.ts:158-189`), with a regex branch for the rate-limit string (which interpolates a number) and `profile.error.generic` for anything unmatched — including the Supabase `error.message` that the action returns on a failed write.
+**Decision.** `/profile` renders display-name errors through a client-side `Record<string, MessageKey>` keyed on the **exact literal** returned by `updateProfile` (`SOURCE/features/auth/actions.ts:158-189`), with a regex branch for the rate-limit string (which interpolates a number) and `profile.error.generic` for anything unmatched — including the Supabase `error.message` that the action returns on a failed write.
 
 A **unit test asserts each mapped literal is byte-identical to the literal in `actions.ts`.** Editing the action's wording without editing the map fails the build instead of silently degrading every Vietnamese user to a generic message.
 
@@ -261,7 +261,7 @@ While the flag is `true`: a `LegalContentPending` notice renders above the list,
 3. **There is no footer component in this repository.** Building one is a new always-mounted surface across every route group — a larger diff than either new page in this feature, and outside the PRD's scope diagram.
 4. **The homepage sidebar is `lg:` only.** `HomeSidebar.tsx:41` is `hidden … lg:flex`, so a link placed there would be invisible to every phone user — which is most of this product's traffic and all of the people who cannot sign in.
 
-**What this costs, stated plainly.** A signed-out visitor who does not already know the URL will not find `/about` from inside the app. For a contact page that is mainly reached from a school notice, an email signature, or a search result, that is a survivable first release; it is not a good permanent state. The preferred fix and its exact location are recorded as **TBD-03** (non-blocking): a minimal `SiteFooter` carrying `/about`, `/terms`, and `/refund-policy`, mounted by `(billing)`, `(layer3)`, `(layer2)`, and `(layer4)` layouts — one component, four one-line layout edits, and it retires the "no footer" constraint permanently. The `nav.about` dictionary key is **not** added in this release, because an unused key is an unused key.
+**What this costs, stated plainly.** A signed-out visitor who does not already know the URL will not find `/about` from inside the app. For a contact page that is mainly reached from a school notice, an email signature, or a search result, that is a survivable first release; it is not a good permanent state. The preferred fix and its exact location are recorded as **TBD-03** (non-blocking): a minimal `SiteFooter` carrying `/about`, `/terms`, and `/refund-policy`, mounted by `(billing)`, `(analytics)`, `(exams)`, and `(authoring)` layouts — one component, four one-line layout edits, and it retires the "no footer" constraint permanently. The `nav.about` dictionary key is **not** added in this release, because an unused key is an unused key.
 
 **`/profile`'s entry point, by contrast, is settled.** The `HeaderProfile` and `SidebarProfile` dropdowns each gain a `/profile` link as their **first** item, above the existing Edit / My exams / Sign out. This adds no nav cell, no header tag, and no width pressure — the panel is a 224px vertical menu with room. It also does not remove the dropdowns' existing inline "Edit", even though `/profile` supersedes it; deleting a shipped affordance is a separate, reversible decision recorded as **TBD-07**.
 
@@ -272,7 +272,7 @@ While the flag is `true`: a `LegalContentPending` notice renders above the list,
 | AC | Requirement | Screen / Component | State that satisfies it |
 |---|---|---|---|
 | AC-001 | `/profile` renders for a signed-in student | S-01 `ProfilePage` → `ProfileCard` | Default |
-| AC-003 | `(layer3)` shell present, not re-implemented | S-01 `ProfilePage` | Default — page renders `PageContainer`/`PageHeader` only; `SkipLink`, `SiteHeader`, `#main-content`, `BottomNav` come from `app/(layer3)/layout.tsx` and are **not re-declared** |
+| AC-003 | `(analytics)` shell present, not re-implemented | S-01 `ProfilePage` | Default — page renders `PageContainer`/`PageHeader` only; `SkipLink`, `SiteHeader`, `#main-content`, `BottomNav` come from `app/(analytics)/layout.tsx` and are **not re-declared** |
 | AC-006 | Never-uploaded avatar shows initials, no broken image, no request to a nonexistent URL | `Avatar` | `initials` |
 | AC-007 | Initials follow D11 exactly | `deriveInitials` (`lib/profile/initials.ts`) | All seven cases in UI-D7's table |
 | AC-008 | Current display name is shown | `DisplayNameEditor` | `idle` |
@@ -334,7 +334,7 @@ While the flag is `true`: a `LegalContentPending` notice renders above the list,
 
 | Screen ID | Route | Route group | Layout inherited | Auth condition | Description |
 |---|---|---|---|---|---|
-| S-01 | `/profile` | `(layer3)` | `app/(layer3)/layout.tsx` — `SkipLink`, `SiteHeader`, `#main-content` (`tabIndex={-1}`), `.pb-bottom-nav`, `BottomNav`, `SupportWidget` | **Authenticated only.** Enforced by the existing middleware through absence from `PUBLIC_PATHS`; no new guard (PRD D9, AC-004) | One centered card: identity block, three mutable-field rows, sign-out |
+| S-01 | `/profile` | `(analytics)` | `app/(analytics)/layout.tsx` — `SkipLink`, `SiteHeader`, `#main-content` (`tabIndex={-1}`), `.pb-bottom-nav`, `BottomNav`, `SupportWidget` | **Authenticated only.** Enforced by the existing middleware through absence from `PUBLIC_PATHS`; no new guard (PRD D9, AC-004) | One centered card: identity block, three mutable-field rows, sign-out |
 | S-02 | `/profile` (overlay) | — | Portalled to `document.body` (UI-D4) | Same as S-01 | Change-password dialog |
 | S-03 | `/profile` (inline) | — | — | Same as S-01 | Avatar uploader, revealed inside the avatar row |
 | S-04 | `/profile` (inline) | — | — | Same as S-01 | Display-name inline editor, revealed inside the name row |
@@ -434,9 +434,9 @@ stateDiagram-v2
 ### Component Tree
 
 ```
-app/(layer3)/layout.tsx                                    [REUSE-AS-IS — supplies the whole shell, PRD D2]
+app/(analytics)/layout.tsx                                    [REUSE-AS-IS — supplies the whole shell, PRD D2]
   +-- SkipLink / SiteHeader / #main-content / BottomNav / SupportWidget
-      +-- app/(layer3)/profile/page.tsx                    [NEW  — Server Component]
+      +-- app/(analytics)/profile/page.tsx                    [NEW  — Server Component]
           +-- PageContainer as="main" size="small"         [REUSE-AS-IS]
           +-- PageHeader (owns the single <h1>)            [REUSE-AS-IS]
           +-- ProfileCard                                  [NEW  — "use client", owns all dialog/editor state]
@@ -452,8 +452,8 @@ app/(layer3)/layout.tsx                                    [REUSE-AS-IS — supp
               +-- ChangePasswordDialog                     [NEW  — COPY-THE-PATTERN, portalled; opened from PasswordRow]
               +-- SuccessToast                             [REUSE-AS-IS — one instance, one counter]
               +-- (sr-only role="status" pending region)   [NEW  — one per card, see UI-D6 consequence]
-      +-- app/(layer3)/profile/loading.tsx                 [NEW  — skeleton card]
-      +-- app/(layer3)/profile/error.tsx                   [NEW  — reset() wired to common.tryAgain]
+      +-- app/(analytics)/profile/loading.tsx                 [NEW  — skeleton card]
+      +-- app/(analytics)/profile/error.tsx                   [NEW  — reset() wired to common.tryAgain]
 
 app/(billing)/layout.tsx                                   [REUSE-AS-IS — UI-D12]
   +-- app/(billing)/about/page.tsx                         [NEW  — Server Component, no client boundary]
@@ -463,7 +463,7 @@ app/(billing)/layout.tsx                                   [REUSE-AS-IS — UI-D
 
 Modified existing components
   +-- components/shared/HeaderProfile.tsx                  [MODIFY — Avatar at 24px; new "Profile" menu item]
-  +-- app/(layer1)/_components/SidebarProfile.tsx          [MODIFY — Avatar at 32px; new "Profile" menu item]
+  +-- features/auth/components/SidebarProfile.tsx          [MODIFY — Avatar at 32px; new "Profile" menu item]
   +-- lib/auth/getCurrentUser.ts                           [MODIFY — CurrentUserProfile gains one optional field, additively]
 
 New non-component module
@@ -507,7 +507,7 @@ New non-component module
 
 ### Component: ProfileCard
 
-**Decision: NEW.** `SOURCE/app/(layer3)/profile/_components/ProfileCard.tsx`, `"use client"`. Owns dialog open/closed, the trigger ref for focus return, the toast counter, and the shared pending live-region text. Props: `{ user: CurrentUserProfile }` — no fetching, mirroring `SupportWidget.tsx:3-6`.
+**Decision: NEW.** `SOURCE/features/profile/components/ProfileCard.tsx`, `"use client"`. Owns dialog open/closed, the trigger ref for focus return, the toast counter, and the shared pending live-region text. Props: `{ user: CurrentUserProfile }` — no fetching, mirroring `SupportWidget.tsx:3-6`.
 
 #### State × Display Matrix
 
@@ -534,7 +534,7 @@ New non-component module
 
 ### Component: ProfileRow
 
-**Decision: NEW.** `SOURCE/app/(layer3)/profile/_components/ProfileRow.tsx`. Presentational shell used three times. Props: `{ label: string; children: React.ReactNode; action?: React.ReactNode; expanded?: React.ReactNode }`.
+**Decision: NEW.** `SOURCE/features/profile/components/ProfileRow.tsx`. Presentational shell used three times. Props: `{ label: string; children: React.ReactNode; action?: React.ReactNode; expanded?: React.ReactNode }`.
 
 Layout: `flex flex-wrap items-center gap-x-4 gap-y-3 py-4`. The label + value block carries `min-w-0` so a long email truncates inside the row rather than widening it; the action carries `ml-auto shrink-0`, so when Vietnamese labels force a wrap at 320px the button lands on its own line and stays right-aligned. `expanded`, when present, renders full-width below the row.
 
@@ -551,7 +551,7 @@ Layout: `flex flex-wrap items-center gap-x-4 gap-y-3 py-4`. The label + value bl
 
 ### Component: DisplayNameEditor
 
-**Decision: NEW.** `SOURCE/app/(layer3)/profile/_components/DisplayNameEditor.tsx`, `"use client"`. Calls the **existing** `updateProfile` via `useActionState`, unchanged (PRD D6, AC-046).
+**Decision: NEW.** `SOURCE/features/profile/components/DisplayNameEditor.tsx`, `"use client"`. Calls the **existing** `updateProfile` via `useActionState`, unchanged (PRD D6, AC-046).
 
 #### State × Display Matrix
 
@@ -583,7 +583,7 @@ Layout: `flex flex-wrap items-center gap-x-4 gap-y-3 py-4`. The label + value bl
 
 ### Component: PasswordRow
 
-**Decision: NEW.** `SOURCE/app/(layer3)/profile/_components/PasswordRow.tsx`.
+**Decision: NEW.** `SOURCE/features/profile/components/PasswordRow.tsx`.
 
 #### State × Display Matrix
 
@@ -607,7 +607,7 @@ Layout: `flex flex-wrap items-center gap-x-4 gap-y-3 py-4`. The label + value bl
 
 ### Component: ChangePasswordDialog
 
-**Decision: NEW** — `SOURCE/app/(layer3)/profile/_components/ChangePasswordDialog.tsx`, `"use client"`. **COPY-THE-PATTERN** from `SOURCE/components/support/SupportWidgetDialog.tsx` (accessibility shell) and `SOURCE/app/(layer4)/_components/DeleteDialog.tsx` (portal + scroll lock). Neither is imported; `SupportWidgetDialog.tsx:5-6` records that this repository propagates the pattern, not the code.
+**Decision: NEW** — `SOURCE/features/profile/components/ChangePasswordDialog.tsx`, `"use client"`. **COPY-THE-PATTERN** from `SOURCE/components/support/SupportWidgetDialog.tsx` (accessibility shell) and `SOURCE/features/authoring/components/DeleteDialog.tsx` (portal + scroll lock). Neither is imported; `SupportWidgetDialog.tsx:5-6` records that this repository propagates the pattern, not the code.
 
 Panel: `border-border bg-background relative w-full max-w-sm rounded-lg border p-6 outline-none`, `tabIndex={-1}`, `ref` focused on open. Scrim: `<button aria-hidden tabIndex={-1} className="absolute inset-0 cursor-default bg-[#1B1512]/40">`. Container: `fixed inset-0 z-50 flex items-center justify-center px-6`, portalled to `document.body`.
 
@@ -651,7 +651,7 @@ Panel: `border-border bg-background relative w-full max-w-sm rounded-lg border p
 
 ### Component: AvatarUploader
 
-**Decision: NEW** — `SOURCE/app/(layer3)/profile/_components/AvatarUploader.tsx`, `"use client"`. **COPY-THE-PATTERN** from `SOURCE/components/support/ScreenshotAttachment.tsx` (file-picker idiom, object-URL lifecycle).
+**Decision: NEW** — `SOURCE/features/profile/components/AvatarUploader.tsx`, `"use client"`. **COPY-THE-PATTERN** from `SOURCE/components/support/ScreenshotAttachment.tsx` (file-picker idiom, object-URL lifecycle).
 
 #### State × Display Matrix
 
@@ -687,7 +687,7 @@ Panel: `border-border bg-background relative w-full max-w-sm rounded-lg border p
 
 ### Component: SignOutButton
 
-**Decision: NEW** — `SOURCE/app/(layer3)/profile/_components/SignOutButton.tsx`. Wraps the **existing** `signOut` Server Action (`app/(layer1)/actions.ts:149-153`), unchanged.
+**Decision: NEW** — `SOURCE/features/profile/components/SignOutButton.tsx`. Wraps the **existing** `signOut` Server Action (`features/auth/actions.ts:149-153`), unchanged.
 
 #### State × Display Matrix
 
@@ -772,7 +772,7 @@ Two changes, both minimal:
 
 ### Component: SidebarProfile (modified)
 
-**Decision: MODIFY** — `SOURCE/app/(layer1)/_components/SidebarProfile.tsx`. Identical two changes to `HeaderProfile`, at `size={32}` and in a drop-**up** panel. Its state matrix is `HeaderProfile`'s with the panel direction and avatar size changed; every other row is the same and is not restated.
+**Decision: MODIFY** — `SOURCE/features/auth/components/SidebarProfile.tsx`. Identical two changes to `HeaderProfile`, at `size={32}` and in a drop-**up** panel. Its state matrix is `HeaderProfile`'s with the panel direction and avatar size changed; every other row is the same and is not restated.
 
 Its `AC-039` obligation is the exact mirror of `AC-038`, and `AC-040`'s "one deterministic choice applied in both places" is satisfied structurally — there is one `Avatar` component, so there is one behaviour, and it cannot drift.
 
@@ -887,7 +887,7 @@ Conventions enforced by `SOURCE/lib/i18n/__tests__/i18n.test.ts`: `vi.ts` must c
 
 | Tier | Width | `/profile` | `/about` |
 |---|---|---|---|
-| **1 — Mobile** | **< 768px** | `BottomNav` occupies a fixed 56px at the bottom edge (`--bottom-nav-h`); `.pb-bottom-nav` on the `(layer3)` layout wrapper reserves that space plus the iOS safe-area inset — **the page adds no bottom padding of its own**. Card is full-width inside `PageContainer`'s `px-6`. Rows wrap: label + value on line 1, the action button on line 2, right-aligned via `ml-auto`. Identity block stacks — 96px `Avatar`, then name, then email, `text-center`. Sign-out is full-width. Dialog is `max-w-sm` inside `px-6`, so it is `100vw − 3rem` here. `SuccessToast` renders **top-centre** at `top-[calc(3.75rem+env(safe-area-inset-top,0px))]`, because at the bottom it would sit directly on `BottomNav` | Single column. `<dl>` rows stack `<dt>` above `<dd>`. `break-words` on `<dd>` so a long email wraps rather than forcing horizontal scroll at 320px (AC-061) |
+| **1 — Mobile** | **< 768px** | `BottomNav` occupies a fixed 56px at the bottom edge (`--bottom-nav-h`); `.pb-bottom-nav` on the `(analytics)` layout wrapper reserves that space plus the iOS safe-area inset — **the page adds no bottom padding of its own**. Card is full-width inside `PageContainer`'s `px-6`. Rows wrap: label + value on line 1, the action button on line 2, right-aligned via `ml-auto`. Identity block stacks — 96px `Avatar`, then name, then email, `text-center`. Sign-out is full-width. Dialog is `max-w-sm` inside `px-6`, so it is `100vw − 3rem` here. `SuccessToast` renders **top-centre** at `top-[calc(3.75rem+env(safe-area-inset-top,0px))]`, because at the bottom it would sit directly on `BottomNav` | Single column. `<dl>` rows stack `<dt>` above `<dd>`. `break-words` on `<dd>` so a long email wraps rather than forcing horizontal scroll at 320px (AC-061) |
 | **2 — Tablet** | **768–1023px** | `BottomNav` does not render (`md:hidden`) and `.pb-bottom-nav` collapses to 0. `SiteHeader` shows its 5 tags and `HeaderProfile`'s display name (`max-md:hidden` lifts). Card reaches its `--scaffold-small` cap of 672px and centres. Rows stop wrapping — label/value left, action right, on one line. Identity block goes horizontal: avatar left, name + email in a left-aligned stack. Sign-out becomes `w-auto ml-auto`. `SuccessToast` moves to **bottom-centre** (`md:bottom-6`) | Card is 672px and centred. `<dt>`/`<dd>` sit on one line each — the AC-055 "two-column" reading |
 | **3 — Desktop** | **≥ 1024px** | **Identical to tier 2.** No `lg:` rule is introduced. The card is already at its width cap at 768px, so a third layout would change only the surrounding whitespace. The only `lg:` behaviour on the route belongs to `SiteHeader`, which widens its tag gap from `gap-4` to `gap-8` — shipped, untouched | **Identical to tier 2**, same reason |
 
@@ -895,7 +895,7 @@ Conventions enforced by `SOURCE/lib/i18n/__tests__/i18n.test.ts`: `vi.ts` must c
 
 | UI element | Decision | Path (existing, or where it will live) | Notes |
 |---|---|---|---|
-| `(layer3)` shell for `/profile` | **REUSE-AS-IS** | `SOURCE/app/(layer3)/layout.tsx` | Supplies `SkipLink`, `SiteHeader`, `#main-content`, `.pb-bottom-nav`, `BottomNav`, `SupportWidget`. **Do not re-declare `#main-content` or `SkipLink`** (PRD D2, AC-003) |
+| `(analytics)` shell for `/profile` | **REUSE-AS-IS** | `SOURCE/app/(analytics)/layout.tsx` | Supplies `SkipLink`, `SiteHeader`, `#main-content`, `.pb-bottom-nav`, `BottomNav`, `SupportWidget`. **Do not re-declare `#main-content` or `SkipLink`** (PRD D2, AC-003) |
 | `(billing)` shell for `/about` | **REUSE-AS-IS** | `SOURCE/app/(billing)/layout.tsx` | UI-D12; entitlement-read cost recorded as TBD-06 |
 | Page width + padding | **REUSE-AS-IS** | `SOURCE/components/layout/PageContainer.tsx` | `size="small"` on both pages — the only step under the 720px reading cap |
 | Page `<h1>` + eyebrow | **REUSE-AS-IS** | `SOURCE/components/layout/PageHeader.tsx` | Owns the single `<h1>`; **do not build a second one** |
@@ -905,21 +905,21 @@ Conventions enforced by `SOURCE/lib/i18n/__tests__/i18n.test.ts`: `vi.ts` must c
 | Origin allowlist for image URLs | **REUSE-AS-IS** | `SOURCE/components/shared/QuestionFigure.tsx` → `isAllowedImageUrl` | Pure, exported for reuse, no React dependency |
 | Signed-URL resolution (private-bucket world only) | **REUSE-AS-IS** | `SOURCE/lib/ugc/imageUrl.ts` → `resolveSignedImageUrl` | TTL 3600s, fails closed to `undefined` — which lands on `Avatar`'s `initials` state. Applies only if TBD-01 resolves to "private" |
 | Buttons (row actions, dialog footer, sign-out) | **REUSE-AS-IS** | `SOURCE/components/ui/button.tsx` | `shape="pill"` for the one primary submit; default shape + `rounded-[4px]` elsewhere. **Every call site adds `min-h-11`** — all size steps are under the touch floor and all three shipped call sites already do this |
-| Text / password inputs | **COPY-THE-PATTERN** | from `SOURCE/app/(layer4)/_components/MetadataFields.tsx:45-57` | The three live class constants (UI-D3) |
+| Text / password inputs | **COPY-THE-PATTERN** | from `SOURCE/features/authoring/components/MetadataFields.tsx:45-57` | The three live class constants (UI-D3) |
 | **`SOURCE/components/ui/input.tsx`** | **DO NOT USE** | — | **Zero call sites.** Dead scaffolding: `h-8` is 12px under the touch floor and `rounded-lg` contradicts the 4px input family. Importing it revives a component the codebase has already decided against — on a password form |
 | Modal shell, scrim, Escape, labelling | **COPY-THE-PATTERN** | from `SOURCE/components/support/SupportWidgetDialog.tsx:154-175` | Pattern, not code — `:5-6` states this is how the repo propagates modals |
-| Modal portal + body scroll lock | **COPY-THE-PATTERN** | from `SOURCE/app/(layer4)/_components/DeleteDialog.tsx:5-17, 63-70` | UI-D4; the header comment records the production bug this prevents |
+| Modal portal + body scroll lock | **COPY-THE-PATTERN** | from `SOURCE/features/authoring/components/DeleteDialog.tsx:5-17, 63-70` | UI-D4; the header comment records the production bug this prevents |
 | **Focus containment inside the modal** | **NEW** | `ChangePasswordDialog` | **No existing modal in this repo contains focus.** This is the first, and it is written, not inherited (UI-D5, AC-050) |
 | File picker | **COPY-THE-PATTERN** | from `SOURCE/components/support/ScreenshotAttachment.tsx:89-108` | `peer sr-only` input behind a styled label; `e.target.value = ""` on change; object URL in `useMemo`, revoked in cleanup. **Do not invent a third file-picker idiom** |
-| Emphasis border without layout shift | **COPY-THE-PATTERN** | from `SOURCE/app/(layer2)/_components/AnswerChoice.tsx:30` | `border-2` + 1px padding compensation |
+| Emphasis border without layout shift | **COPY-THE-PATTERN** | from `SOURCE/features/exams/components/AnswerChoice.tsx:30` | `border-2` + 1px padding compensation |
 | Route-level loading / error | **COPY-THE-PATTERN** | from the `history` route convention | `profile/loading.tsx`, `profile/error.tsx` |
-| Display-name Server Action | **REUSE-AS-IS** | `SOURCE/app/(layer1)/actions.ts:158-189` (`updateProfile`) | Unchanged (PRD D6, AC-046). Its English error strings are mapped client-side per UI-D9 |
-| Sign-out Server Action | **REUSE-AS-IS** | `SOURCE/app/(layer1)/actions.ts:149-153` (`signOut`) | Unchanged |
+| Display-name Server Action | **REUSE-AS-IS** | `SOURCE/features/auth/actions.ts:158-189` (`updateProfile`) | Unchanged (PRD D6, AC-046). Its English error strings are mapped client-side per UI-D9 |
+| Sign-out Server Action | **REUSE-AS-IS** | `SOURCE/features/auth/actions.ts:149-153` (`signOut`) | Unchanged |
 | Post-save refresh | **COPY-THE-PATTERN** | from `SOURCE/components/shared/HeaderProfile.tsx:33-41` | `router.refresh()` after a successful action (AC-047, AC-071) |
 | In-flight duplicate guard | **COPY-THE-PATTERN** | from `SOURCE/components/support/SupportWidgetDialog.tsx:60-66` | Synchronous `useRef`, not a `pending` flag — React batches two clicks in one tick (AC-069) |
 | Avatar rendering | **NEW** | `SOURCE/components/shared/Avatar.tsx` | The feature's one genuine component gap; 3 call sites = Rule of Three exactly |
 | Initials derivation | **NEW** | `SOURCE/lib/profile/initials.ts` | Pure, unit-tested per AC-007 |
-| Profile page + card + rows + editors + dialog | **NEW** | `SOURCE/app/(layer3)/profile/` and `.../profile/_components/` | See the component tree |
+| Profile page + card + rows + editors + dialog | **NEW** | `SOURCE/app/(analytics)/profile/` and `.../profile/_components/` | See the component tree |
 | `/about` page module | **NEW** | `SOURCE/app/(billing)/about/page.tsx` | Server Component; must declare `alternates: { canonical: "/about" }` |
 | Change-password Server Action | **NEW** (Design Doc owns it) | — | Not a UI artifact; listed so the reuse map is complete. `updatePassword` (`actions.ts:116-131`) is **not** modified and **not** reused (AC-026) |
 | `NAV_ITEMS` / `GUEST_NAV_ITEMS` | **UNCHANGED — do not edit** | `SOURCE/lib/nav/items.ts` | Five is a deliberate cap tied to bottom-nav muscle memory; the guest row is measured at capacity (UI-D14) |
@@ -1000,7 +1000,7 @@ No named spacing scale exists beyond Tailwind's default; each value below follow
 - Both pages use `PageContainer size="small"` — 672px. Neither grows on a wider viewport.
 - The dialog panel is `max-w-sm` (24rem) at every viewport, matching every shipped dialog in this repo.
 - **No element added by this feature is `position: fixed` except the portalled dialog** (`z-50`) and `SuccessToast` (`z-[70]`, shipped). The ladder `z-30 SiteHeader < z-40 BottomNav < z-[45] SupportWidgetTrigger < z-50 modals < z-[70] SuccessToast` is unchanged and no new rung is added.
-- The page adds **no bottom padding of its own** — `.pb-bottom-nav` on the `(layer3)` wrapper already reserves 56px plus the iOS safe-area inset, and doubling it would leave a visible dead band at 768px where the class collapses to 0.
+- The page adds **no bottom padding of its own** — `.pb-bottom-nav` on the `(analytics)` wrapper already reserves 56px plus the iOS safe-area inset, and doubling it would leave a visible dead band at 768px where the class collapses to 0.
 - The avatar preview is bounded at 64px and the rendered avatar at 96px, so an oversized source image cannot push the card's rows off-screen.
 - The chosen-file emphasis frame uses `border-2` **with** `p-[7px]` against a resting `border p-2`. A `border-2` without the compensation shifts every following row by 1px — the defect `AnswerChoice.tsx:30` exists to prevent.
 - `<dd>` on `/about` carries `break-words`, so a long contact value wraps instead of forcing horizontal scroll at 320px (AC-061).
@@ -1066,7 +1066,7 @@ Target: **WCAG 2.2 AA** (project standard — 2.2, not 2.1, which is why 2.5.8 T
 |---|---|---|---|
 | **TBD-01** | **Blocking. The avatars bucket's visibility is contradicted by two authoritative sources.** PRD **D3** locks it PUBLIC and **AC-033** asserts a cookie-less GET of an avatar object returns 200; the frontend handoff for this spec states it is **PRIVATE**, read through `resolveSignedImageUrl` (TTL 3600s, failing closed to `undefined`). Both cannot be true. This spec is written to be correct either way (UI-D8) — the only visible difference is whether `Avatar`'s `signed-url-failed` state is reachable — but the Design Doc cannot choose an object-naming scheme, a storage policy, or a read path until this is settled, and PRD **R-d** and **U3** (a minor's photograph with a permanently world-readable URL) are both built on the PUBLIC reading. **Required input**: the engineer confirms D3 as written, or amends it. | Engineer | Before Design Doc start |
 | **TBD-02** | **Blocking, and narrow.** This spec deliberately overrides the literal wording of **AC-020** ("`validatePassword`'s message is surfaced **verbatim**") because it contradicts locked decision **D10** and its criterion **AC-048** ("no user-facing display string is hardcoded; the mask is the **only** exception") — `validatePassword`'s messages are English by design (`passwordPolicy.ts:51`). UI-D10 maps the four outcomes to dictionary keys while preserving AC-020's normative core verbatim (the existing function remains the sole policy; no second policy is introduced). **Required input**: the engineer confirms the override, or amends AC-020. **Only the dialog's policy-error rendering is blocked**; nothing else in the feature waits on this. | Engineer | Before implementing `ChangePasswordDialog`'s error branch |
-| **TBD-03** | **`/about` has no in-app link surface** and this release ships without one (UI-D14), leaving a signed-out visitor to reach it by direct URL, sitemap, or search. Every existing surface is closed: `NAV_ITEMS` is capped at 5 by bottom-nav muscle memory; `GUEST_NAV_ITEMS` feeds a header row *measured* at 13px of overflow one item ago (`SiteHeader.tsx:83-88`); `HomeSidebar` is `lg:`-only. **Preferred fix, stated so it is not re-derived**: a minimal `SiteFooter` carrying `/about`, `/terms`, and `/refund-policy`, mounted by the `(billing)`, `(layer2)`, `(layer3)`, and `(layer4)` layouts — one new component and four one-line layout edits, which also retires the "no footer exists" constraint permanently. Ships with the `nav.about` key. | Engineer | Non-blocking; before `/about` is announced or submitted to Search Console (the same gate as PRD U1) |
+| **TBD-03** | **`/about` has no in-app link surface** and this release ships without one (UI-D14), leaving a signed-out visitor to reach it by direct URL, sitemap, or search. Every existing surface is closed: `NAV_ITEMS` is capped at 5 by bottom-nav muscle memory; `GUEST_NAV_ITEMS` feeds a header row *measured* at 13px of overflow one item ago (`SiteHeader.tsx:83-88`); `HomeSidebar` is `lg:`-only. **Preferred fix, stated so it is not re-derived**: a minimal `SiteFooter` carrying `/about`, `/terms`, and `/refund-policy`, mounted by the `(billing)`, `(exams)`, `(analytics)`, and `(authoring)` layouts — one new component and four one-line layout edits, which also retires the "no footer exists" constraint permanently. Ships with the `nav.about` key. | Engineer | Non-blocking; before `/about` is announced or submitted to Search Console (the same gate as PRD U1) |
 | **TBD-04** | Exact values the UI reads but does not own: the two new `RATE_LIMITS` keys and their ceilings/windows (AC-023, AC-037); the avatar constant names and their file (proposed `LIMITS.MAX_AVATAR_BYTES`, `AVATAR_MIME_TYPES`) so the client can reference rather than re-declare them; and the client-side upload timeout. The repo pattern is a `Promise.race` against a timeout resolving `{ error: "timeout" }` plus an `attemptIdRef` that ignores a stale timeout (`SupportWidgetDialog.tsx:28, 55-58`) — **note that the PRD's phrasing "the existing `AbortSignal.timeout(...)` convention" does not match the shipped code**, which uses no `AbortSignal`. | Design Doc | Before Design Doc completion |
 | **TBD-05** | Replace UI-D9's literal-match error map with a discriminated error code returned by `updateProfile`. Better long-term shape; deliberately not taken here because it changes a shared action's return type and forces edits to two shipped widgets that render `state.error` raw. If taken, it also retires UI-D10's mechanism. | Design Doc | Non-blocking; revisit when `updateProfile` is next edited for any reason |
 | **TBD-06** | `/about` inherits `(billing)/layout.tsx`, which calls `readEntitlement`. That is a pure stub today (`subscription-ui-spec.md` UI-D2), so the PRD's NFR *"`/about` adds no server work"* holds. **When the payOS backend makes `readEntitlement` a real read, that NFR breaks for all three public pages at once** and they should move to a `(public)` route group. Recorded with its trigger named so it is caught by the person who makes `readEntitlement` real. | Design Doc (subscription backend phase) | At the trigger, not on a date |

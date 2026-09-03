@@ -1,4 +1,4 @@
-# Task: `app/(billing)/queries.ts` — `listMyOrders()` and `getMyOrder()` (closes CL-01) + INT-2
+# Task: `features/billing/queries.ts` — `listMyOrders()` and `getMyOrder()` (closes CL-01) + INT-2
 
 Plan mapping: `docs/plans/subscription-work-plan.md` — **Phase 3, plan Task 3.5**
 Layer: **backend** (server-only data module + integration test; not a page/layout/component file)
@@ -16,7 +16,7 @@ Metadata:
 
 `import "server-only"`, following the four shipped route-group query modules.
 
-- **`listMyOrders()`** wraps `readBounded` and orders `created_at desc` **in SQL**. The read is flat — no embed — so the `(HM)` JavaScript-sort exception, which exists only because `.order(col, { referencedTable })` is a measured no-op for to-one embeds, **does not arise**. It maps to `MyOrderRow` with `status` typed **`string`, not the union**.
+- **`listMyOrders()`** wraps `readBounded` and orders `created_at desc` **in SQL**. The read is flat — no embed — so the `(history)` JavaScript-sort exception, which exists only because `.order(col, { referencedTable })` is a measured no-op for to-one embeds, **does not arise**. It maps to `MyOrderRow` with `status` typed **`string`, not the union**.
 - **`getMyOrder(orderCode)` imports and uses `toCheckoutOrder(row)`.** It keeps its location, its signature and its `import "server-only"`; **only its mapping step changes**. **Do not write an inline camelCase mapping for this row.**
 - `listMyOrders()` / `MyOrderRow` are unaffected — a different, list-shaped projection.
 
@@ -32,11 +32,11 @@ Create an order, then in a **fresh request-scoped client that has not called `cr
 - that `queries.ts` declares **no inline camelCase mapping of its own** for this row.
 
 ## Target Files
-- [x] `SOURCE/app/(billing)/queries.ts` (new)
+- [x] `SOURCE/features/billing/queries.ts` (new)
 - [x] `SOURCE/tests/integration/subscription.int.test.ts` (**INT-2 filled**)
 
 ## Investigation Targets
-- `SOURCE/app/(layer2)/queries.ts` and `SOURCE/app/(layer4)/queries.ts` (the shipped route-group query-module convention, incl. `import "server-only"`)
+- `SOURCE/features/exams/queries.ts` and `SOURCE/features/authoring/queries.ts` (the shipped route-group query-module convention, incl. `import "server-only"`)
 - `SOURCE/lib/supabase/boundedRead.ts` (`readBounded` — the bounded-read wrapper and its ordering options)
 - `SOURCE/lib/billing/checkoutOrder.ts` (plan Task 3.3 — the mapper this module must import, not reimplement)
 - `SOURCE/lib/billing/orderActions.ts` (plan Task 3.4 — the other producer of `CheckoutOrder`; INT-2 compares against it)
@@ -107,14 +107,14 @@ Create an order, then in a **fresh request-scoped client that has not called `cr
 - [x] **No production deploy of this branch has occurred**
 
 ## Notes
-- Impact scope: `SOURCE/app/(billing)/queries.ts`; downstream, plan Tasks 3.6, 4.2.
+- Impact scope: `SOURCE/features/billing/queries.ts`; downstream, plan Tasks 3.6, 4.2.
 - Scope boundary: `SOURCE/lib/billing/checkoutOrder.ts` is imported, never re-implemented; `SOURCE/lib/billing/types.ts` frozen.
 
 ## Investigation Notes
 
 ### Investigation Targets — what each one settled
 
-- **`SOURCE/app/(layer2)/queries.ts` / `SOURCE/app/(layer4)/queries.ts`** (plus `(HM)` and `(layer3)`, read for the sort exception) — the shipped route-group convention: `import "server-only"` on line 4, a `type XRow` describing the PostgREST row, a private mapper or an inline `.map()` in the query layer, `readBounded(label, query)` for every list read, and **throw on infrastructure error** (`if (error) throw error`) rather than degrading. `listMyExams()` is the closest structural sibling: `.order("created_at", { ascending: false })` in SQL, mapped inline to a camelCase list item, `status` left as `string`, `timestamptz` columns passed through **verbatim**. `listMyHistory()` performs no `auth.getUser()` at all and leans on RLS.
+- **`SOURCE/features/exams/queries.ts` / `SOURCE/features/authoring/queries.ts`** (plus `(history)` and `(analytics)`, read for the sort exception) — the shipped route-group convention: `import "server-only"` on line 4, a `type XRow` describing the PostgREST row, a private mapper or an inline `.map()` in the query layer, `readBounded(label, query)` for every list read, and **throw on infrastructure error** (`if (error) throw error`) rather than degrading. `listMyExams()` is the closest structural sibling: `.order("created_at", { ascending: false })` in SQL, mapped inline to a camelCase list item, `status` left as `string`, `timestamptz` columns passed through **verbatim**. `listMyHistory()` performs no `auth.getUser()` at all and leans on RLS.
 - **`SOURCE/lib/supabase/boundedRead.ts`** — `readBounded(label, query)` applies `.limit(LIST_ROW_CEILING + 1)` itself; the call site must **not** call `.limit()`. It returns `unknown[]`, so the call site casts. It throws on PostgREST error and fails **open** (logs, truncates) on ceiling breach. Consequence that decided the sort question: whatever PostgREST truncates is what the SQL ordering did **not** reach, so ordering in JS after `readBounded` loses unpredictable rows instead of the oldest ones.
 - **`SOURCE/lib/billing/checkoutOrder.ts`** — `toCheckoutOrder(row: PaymentOrderRow): CheckoutOrder`, pure, synchronous, no `server-only` (deliberately, so the fixture layer can use it as a compile-time contract). `pendingUntil` = `new Date(row.pending_until).toISOString()`; `orderCode` = `Number(row.order_code)`; `amount` → `amountVnd` rename only; four `text` fields verbatim. Imported, never re-implemented.
 - **`SOURCE/lib/billing/orderActions.ts`** — the other producer. `createOrder()` returns `toCheckoutOrder(reusable)` on the step-(0) reuse branch and `toCheckoutOrder(written.row)` on the write branch; both read the eight columns through `PAYMENT_ORDER_CHECKOUT_COLUMNS`. `findReusableOrder()` adds `.eq("user_id", …)` as a second layer **because** the exams-style precedent needs it; `recheckOrder()` deliberately does **not**, and records why: `orders_select_own` is the real enforcement for `payment_orders`, and a foreign code must be indistinguishable from a nonexistent one. `getMyOrder()` follows `recheckOrder()`, the same-table same-shape precedent.
@@ -132,7 +132,7 @@ Searched `SOURCE/**` (excluding `node_modules`) for the snake_case columns `orde
 |---|---|
 | `SOURCE/lib/billing/checkoutOrder.ts:94-104` (`toCheckoutOrder`) | **THE mapper.** The only camelCase projection of a `payment_orders` row onto `CheckoutOrder` in the repository |
 | `SOURCE/lib/billing/orderActions.ts` | Calls `toCheckoutOrder()` on both branches. No mapping of its own |
-| `SOURCE/app/(billing)/queries.ts` (this task) | Calls `toCheckoutOrder()`. **No inline mapping** — asserted by INT-2 (f), not merely reviewed |
+| `SOURCE/features/billing/queries.ts` (this task) | Calls `toCheckoutOrder()`. **No inline mapping** — asserted by INT-2 (f), not merely reviewed |
 | `SOURCE/lib/supabase/service-role.ts` | `recordPaymentOrder()` maps camelCase → **snake_case** (the write direction) and returns the raw row typed as `PaymentOrderRow`. `readPaymentOrderForSettlement()` reads two columns and renames nothing. Neither is a projection onto the contract |
 | `SOURCE/tests/e2e/service/subscriptionServiceFixtures.ts` | `SeededOrder` is what the seed call **wrote**, returned in the caller's vocabulary from its own inputs; `readOrderRow()` returns the raw snake_case row. Not a mapping of a read row |
 | `SOURCE/supabase/test-rls.ts`, `SOURCE/lib/schema/__tests__/parseForeignKeys.test.ts`, `SOURCE/lib/security/rateLimit.ts` | Column names appear as schema text / literals only. No mapping |

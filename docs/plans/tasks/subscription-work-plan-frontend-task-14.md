@@ -27,7 +27,7 @@ Assert:
 ## Investigation Targets
 - `SOURCE/tests/e2e/fixture/subscription.fixture.e2e.test.ts` (**FE-1** `Proof obligation:` / `Primary failure mode:` annotation block)
 - `SOURCE/tests/e2e/fixture/subscriptionFixtureData.ts` (plan Task 0.7 — the order fixtures with and without `qrPayload`, and the counted `createOrder` stub)
-- `SOURCE/app/(billing)/pricing/_components/PurchaseCta.tsx` (plan Task 4.4)
+- `SOURCE/features/billing/components/pricing/PurchaseCta.tsx` (plan Task 4.4)
 - `SOURCE/app/(billing)/pricing/checkout/page.tsx` and its `_components/` (plan Tasks 4.2, 4.3)
 - `SOURCE/components/billing/LegalLinks.tsx` (the links whose **document order** item (a) asserts)
 - `docs/ui-spec/subscription-ui-spec.md` (§ Component: `PurchaseCta` — C-03 — verify default + loading (creating) + error (creation failed / rate-limited) + partial (unavailable) states)
@@ -112,7 +112,7 @@ Assert:
 
 ### Harness edits (all strictly additive)
 
-`pushMock` added to the first `vi.hoisted` block and wired into the EXISTING `next/navigation` factory in place of a throwaway `push: vi.fn()`; `createOrder` appended to the existing `@/lib/billing/orderActions` factory; `getMyOrder` appended to the existing `@/app/(billing)/queries` factory. Appending rather than adding a second `vi.mock` for the same module id is load-bearing — a second factory REPLACES the first. Verified: the lane still ran 45/45 after the harness edits and before a single FE-1 case existed.
+`pushMock` added to the first `vi.hoisted` block and wired into the EXISTING `next/navigation` factory in place of a throwaway `push: vi.fn()`; `createOrder` appended to the existing `@/lib/billing/orderActions` factory; `getMyOrder` appended to the existing `@/features/billing/queries` factory. Appending rather than adding a second `vi.mock` for the same module id is load-bearing — a second factory REPLACES the first. Verified: the lane still ran 45/45 after the harness edits and before a single FE-1 case existed.
 
 ### Residuals recorded rather than dropped
 

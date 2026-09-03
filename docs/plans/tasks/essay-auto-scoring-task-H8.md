@@ -46,7 +46,7 @@ SVC-2 proves the claim **refuses**; it does **not** prove "with zero provider ca
 - `SOURCE/supabase/schema.sql` (the two function bodies as authored in H5 — the source text SVC-1(g) and SVC-2(d) scan)
 - `SOURCE/lib/scoring/essayLifecycle.ts` (`ESSAY_MAX_ATTEMPTS` — **imported**, never typed as a literal `3`)
 - `SOURCE/supabase/test-rls.ts` (Part 7 at `:133-153` — the fixture-hygiene pattern; `:1314-1320` — the `S-b` case that stays where it is)
-- `SOURCE/app/(layer2)/__tests__/recordSkillMastery.int.test.ts` (the repo's existing real-database test — setup/teardown precedent)
+- `SOURCE/features/exams/__tests__/recordSkillMastery.int.test.ts` (the repo's existing real-database test — setup/teardown precedent)
 - `SOURCE/tests/e2e/service/subscription.service.e2e.test.ts` (the order-independence claim that was written from assumption and was wrong — the reason this task **measures** it)
 - `SOURCE/vitest.localdb.config.ts` (the lane's config and glob)
 

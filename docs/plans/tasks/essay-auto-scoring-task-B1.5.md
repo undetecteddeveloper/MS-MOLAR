@@ -1,7 +1,7 @@
 # Task B1.5 — GREEN: `computeScore()` options + branch split, then `submitExam()` + `maxDuration` — TWO COMMITS WITH AN EXPLICIT BOUNDARY
 
 Plan mapping: `docs/plans/20260829-feature-essay-auto-scoring.md` — **Phase B1 (Automatic Grading Path, vertical slice V1), Task B1.5**
-Layer: **backend** (`SOURCE/lib/scoring/**`, `SOURCE/app/(layer2)/**`)
+Layer: **backend** (`SOURCE/lib/scoring/**`, `SOURCE/app/(exams)/**`)
 *(I-2 closed 2026-08-29; boundary fixed by I004)*
 
 Metadata:
@@ -40,10 +40,10 @@ The Design Doc's one-commit hazard (step 7 emitting `pending` keys with nothing 
 - **Task B1.1's test file lands in this commit** (I006). Author the cases RED first, observe the failure, **record that observation in this commit's message**, then land tests and implementation together. This commit is what turns the Early Verification Point **green**.
 - This commit imports nothing that does not already exist, so it typechecks and its whole test suite passes **on its own**.
 
-### Commit 2 (Design Doc step 9) — `SOURCE/app/(layer2)/actions.ts` and the player route segment
+### Commit 2 (Design Doc step 9) — `SOURCE/features/exams/actions.ts` and the player route segment
 
 - **`actions.ts`**: `submitExam()` reads `ESSAY_GRADING_ENABLED` (**only a trimmed `"true"` means on**), passes it into `computeScore()` as an option, and registers `after(() => gradeEssaysForAttempt(...))` **before** `redirect()` at `:192`. Registering **after** `redirect()` means, in Next, **never registering at all** — grading would silently never run once the flag was turned on, and nothing in the flag-off state could reveal it. Precedent and the rule in writing: `lib/support/actions.ts:122-127`. The Supabase client already built in `submitExam()` is **captured in the closure before** `after()` is registered, so the telemetry path carries a JWT-bearing instance (**R-05** — the alternative assumption is unverified and the design does not depend on it).
-- **`SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/page.tsx`**: `export const maxDuration` — a route-segment config that **cannot** be declared inside a `"use server"` file. Precedent: `app/(layer4)/upload/page.tsx:18`.
+- **`SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/page.tsx`**: `export const maxDuration` — a route-segment config that **cannot** be declared inside a `"use server"` file. Precedent: `app/(authoring)/upload/page.tsx:18`.
 
 ### `SOURCE/lib/supabase/service-role.ts` is in NEITHER commit
 It moved to **Task B1.3b** (I003), because `gradeEssays.ts` calls those operations and B1.5 depends on `gradeEssays.ts`, so leaving them here formed a genuine dependency cycle.
@@ -57,8 +57,8 @@ Step 7 alone emits `pending` keys with nothing to grade them — every essay rea
 - [x] `SOURCE/lib/scoring/__tests__/computeScore.test.ts` (Task B1.1's cases)
 
 **Commit 2**
-- [x] `SOURCE/app/(layer2)/actions.ts`
-- [x] `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/page.tsx`
+- [x] `SOURCE/features/exams/actions.ts`
+- [x] `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/page.tsx`
 
 ## Investigation Targets
 - `docs/design/essay-auto-scoring-backend-design.md` (§ `computeScore()` changes / D-01 — the third parameter, the branch split, `hasEssayGroundTruth()`, the two comment reasons)
@@ -71,9 +71,9 @@ Step 7 alone emits `pending` keys with nothing to grade them — every essay rea
 - `docs/adr/ADR-0011-mastery-write-trust-boundary.md` (§ Implementation Guidance — the grading pass runs after `recordExamResult` and `recordSkillMastery`; every exit is swallowed)
 - `SOURCE/lib/scoring/computeScore.ts` (`:17-18`, `:35` the two D-09 comments; `:40-41` `isScored()`; `:93-96` the signature; `:99-101` the branch)
 - `SOURCE/lib/scoring/essayLifecycle.ts` (Task H1 — `newEssayEntry()`)
-- `SOURCE/app/(layer2)/actions.ts` (`:146` the `MAX_ATTEMPT_ANSWER` slice; `:192` the `redirect()` this registration must precede)
+- `SOURCE/features/exams/actions.ts` (`:146` the `MAX_ATTEMPT_ANSWER` slice; `:192` the `redirect()` this registration must precede)
 - `SOURCE/lib/support/actions.ts` (`:122-127` — the `after()`-before-`redirect()` precedent and the rule in writing)
-- `SOURCE/app/(layer4)/upload/page.tsx` (`:18` — the `maxDuration` precedent)
+- `SOURCE/app/(authoring)/upload/page.tsx` (`:18` — the `maxDuration` precedent)
 - `SOURCE/lib/essay/gradeEssays.ts` (Task B1.4 — `gradeEssaysForAttempt`)
 
 ## Binding Decisions

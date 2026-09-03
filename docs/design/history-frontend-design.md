@@ -63,28 +63,28 @@ Inherits the UI Spec's table (which already inherits the project-tier `docs/proj
 
 | Resource (project-tier label) | Feature-specific identifier | Notes |
 |-------------------------------|-----------------------------|-------|
-| Design Origin | `DESIGN.md` — Colors, Elevation & Depth, Layout (720px grid), Shapes | Governs both on-screen History UI and `AttemptPdfTemplate` (inherited from UI Spec) |
-| Design System | `SOURCE/app/(layer4)/_components/{MyExamsList,ExamRow}.tsx`, `SOURCE/app/(layer2)/_components/{ScoreCard,ResultActions,rating/RateButton}.tsx`, `SOURCE/components/ui/{tooltip.tsx}` | On-screen components reuse freely; `AttemptPdfTemplate` may **not** use `components/ui/button.tsx` (ADR-0009) |
+| Design Origin | `PROJECT_OVERVIEW.md §2` — Colors, Elevation & Depth, Layout (720px grid), Shapes | Governs both on-screen History UI and `AttemptPdfTemplate` (inherited from UI Spec) |
+| Design System | `SOURCE/features/authoring/components/{MyExamsList,ExamRow}.tsx`, `SOURCE/features/exams/components/ScoreCard.tsx, SOURCE/features/exams/components/ResultActions.tsx, SOURCE/features/exams/components/rating/RateButton.tsx`, `SOURCE/components/ui/{tooltip.tsx}` | On-screen components reuse freely; `AttemptPdfTemplate` may **not** use `components/ui/button.tsx` (ADR-0009) |
 | Visual Verification Environment | Routes `/history`, `/exams/[id]/attempt/[attemptId]/result` | `npm run dev` + Playwright MCP + manual mid-range-Android pass before ship (inherited from UI Spec) |
 | API / contract source | Backend Design Doc `docs/design/history-backend-design.md` (Data Contracts, Field Propagation Map) | The typed interface this frontend consumes: `MyHistoryEntry`, extended `ExamResult` |
 
 ### Agreement Checklist
 
 #### Scope
-- [x] `SOURCE/app/(HM)/history/_components/{HistoryList,HistoryRow}.tsx` (new).
-- [x] `SOURCE/app/(HM)/history/{loading,error}.tsx` (new, D7).
-- [x] One line added to backend-authored `SOURCE/app/(HM)/history/page.tsx` (import + render `HistoryList`).
+- [x] `SOURCE/features/history/components/{HistoryList,HistoryRow}.tsx` (new).
+- [x] `SOURCE/app/(history)/history/{loading,error}.tsx` (new, D7).
+- [x] One line added to backend-authored `SOURCE/app/(history)/history/page.tsx` (import + render `HistoryList`).
 - [x] `SOURCE/components/history/ActionButton.tsx` (new, shared atom — Save/Share for both surfaces).
 - [x] `SOURCE/lib/pdf/generateAttemptPdf.ts` + `SOURCE/components/pdf/AttemptPdfTemplate.tsx` (new, ADR-0009's shared module).
 - [x] `SOURCE/lib/history/format.ts` (new, shared pure formatters: completion time, submitted date, PDF filename).
-- [x] Rewire `SOURCE/app/(layer2)/_components/ResultActions.tsx` (remove disabled placeholder, wire `ActionButton`).
-- [x] Extend `SOURCE/app/(layer2)/_components/ScoreCard.tsx` (real "Time" stat via new `completionTimeLabel` prop).
-- [x] Extend `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/page.tsx` (compute `pdfInput`/`completionTimeLabel`, pass to `ResultActions`/`ScoreCard`).
-- [x] `SOURCE/app/(layer2)/_components/SiteHeader.tsx` line 27, `SOURCE/app/(layer1)/_components/HomeSidebar.tsx` line 22: `href: "#"` → `href: "/history"`.
+- [x] Rewire `SOURCE/features/exams/components/ResultActions.tsx` (remove disabled placeholder, wire `ActionButton`).
+- [x] Extend `SOURCE/features/exams/components/ScoreCard.tsx` (real "Time" stat via new `completionTimeLabel` prop).
+- [x] Extend `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/page.tsx` (compute `pdfInput`/`completionTimeLabel`, pass to `ResultActions`/`ScoreCard`).
+- [x] `SOURCE/components/layout/SiteHeader.tsx` line 27, `SOURCE/features/auth/components/HomeSidebar.tsx` line 22: `href: "#"` → `href: "/history"`.
 - [x] `SOURCE/package.json`: add `jspdf`, `html2canvas` runtime dependencies.
 
 #### Non-Scope (Explicitly not changing)
-- [ ] `listMyHistory()`, `getResult()` internals, `(HM)/layout.tsx`, `(HM)/history/page.tsx`'s auth guard — backend Design Doc owns these; specified there (backend DD v1.2 is Draft status — not yet implemented as of this doc's writing; confirmed via Glob, zero files exist under `SOURCE/app/(HM)/`; see Dependency Existence Verification). This doc's own scope is exactly one import + one JSX line added to `history/page.tsx`, applied once the backend creates it.
+- [ ] `listMyHistory()`, `getResult()` internals, `(history)/layout.tsx`, `(history)/history/page.tsx`'s auth guard — backend Design Doc owns these; specified there (backend DD v1.2 is Draft status — not yet implemented as of this doc's writing; confirmed via Glob, zero files exist under `SOURCE/app/(history)/`; see Dependency Existence Verification). This doc's own scope is exactly one import + one JSX line added to `history/page.tsx`, applied once the backend creates it.
 - [ ] Any schema/RLS change — none needed or made (backend DD confirmed).
 - [ ] Pagination (R10) — deferred per UI Spec D3; ships with the bounded-scroll container only.
 - [ ] The in-progress Analytics/Layer 3 feature — unrelated, untouched.
@@ -130,7 +130,7 @@ Claims #7–9 have matching rows in Risks and Mitigation, resolved by the Early 
 - [x] Row shell classes, `" · "`-joined metadata line, `formatDateTime`-style helper `[implicit]` — Evidence: `ExamRow.tsx:56-60,94-98`. Confirmed: Yes (adopted for `HistoryRow`).
 - [x] `aria-disabled` + `aria-describedby` + `sr-only` reason span + `Tooltip`, never native `disabled`, for focusable-but-busy controls `[explicit]` — Source: UI Spec D4; `RateButton.tsx`.
 - [x] Bounded-height internally-scrolling list container (`max-h-[30rem] overflow-y-auto`) `[implicit]` — Evidence: `MyExamsList.tsx:27` (`ExamListScroll`). Confirmed: Yes (adopted per UI Spec D3).
-- [x] `loading.tsx` skeleton / `error.tsx` boundary via Next.js App Router file conventions `[implicit]` — Evidence: `(layer4)/me/exams/loading.tsx`; no prior `error.tsx` exists in this repo (first use, UI Spec D7). Confirmed: Yes.
+- [x] `loading.tsx` skeleton / `error.tsx` boundary via Next.js App Router file conventions `[implicit]` — Evidence: `(authoring)/me/exams/loading.tsx`; no prior `error.tsx` exists in this repo (first use, UI Spec D7). Confirmed: Yes.
 - [x] Pure helpers under `SOURCE/lib/**`; jsdom-testable primitives under `SOURCE/components/**` `[explicit]` — Source: `vitest.config.ts:19`; precedent `docs/design/rating-system-frontend-design.md` (fact code:F4).
 - [x] Explicit Props types, camelCase props, 0–2 function parameters (objects for 3+) `[explicit]` — Source: typescript-rules skill; existing component prop interfaces project-wide.
 - [ ] Vietnamese inline comments matching each file's existing convention `[implicit]` — Not applicable to brand-new files (no pre-existing convention to match within them); applied when editing existing Vietnamese-commented files (`ResultActions.tsx`, `ScoreCard.tsx`, `result/page.tsx`, `SiteHeader.tsx`, `HomeSidebar.tsx`).
@@ -144,7 +144,7 @@ Claims #7–9 have matching rows in Risks and Mitigation, resolved by the Early 
 - [x] `npm run build` output inspection + source grep for banned top-level `jspdf`/`html2canvas` imports — Enforces: ADR-0009's dynamic-import-only discipline — `adopted` (see Bundle-Size Verification).
 - [x] Playwright MCP / manual pass (no CI) — Covers: Save/Share end-to-end (download opens, share sheet, fallback), `error.tsx` retry, nav active-state, mid-range-Android manual QA (PRD NFR) — `adopted`.
 - [x] axe a11y audit (manual) — Covers: History list, ActionButton phases, ResultActions — `adopted` (PRD UI Quality Metric 2).
-- [ ] Unit tests for `HistoryList`/`HistoryRow`/`(HM)/history/{loading,error}.tsx` — `noted`: these are thin, presentational Server Components/route-convention files; no precedent exists in this repo for unit-testing files under `app/**/_components` directly (`ExamRow`/`MyExamsList` aren't unit-tested either) — verified instead via manual `npm run dev` + Playwright MCP pass, consistent with existing precedent. All genuinely testable logic (formatting, PDF pipeline, ActionButton state machine, template styling) is extracted into `lib/**`/`components/**` where vitest coverage is the established convention.
+- [ ] Unit tests for `HistoryList`/`HistoryRow`/`(history)/history/{loading,error}.tsx` — `noted`: these are thin, presentational Server Components/route-convention files; no precedent exists in this repo for unit-testing files under `app/**/_components` directly (`ExamRow`/`MyExamsList` aren't unit-tested either) — verified instead via manual `npm run dev` + Playwright MCP pass, consistent with existing precedent. All genuinely testable logic (formatting, PDF pipeline, ActionButton state machine, template styling) is extracted into `lib/**`/`components/**` where vitest coverage is the established convention.
 - [ ] Backend RLS harness `test-rls.ts` — `noted` (backend-owned; irrelevant to this read-only-consuming frontend layer).
 
 ### Problem to Solve
@@ -170,12 +170,12 @@ Rendering/interaction ACs verifiable in jsdom or a real browser. AC-001/002(data
 - [ ] **When** `HistoryList` renders a non-empty `entries` array, it shall render one `HistoryRow` per entry in the given order (the backend already orders by `submitted_at` descending — `HistoryList` does not re-sort). (AC-001/003 rendering half)
 - [ ] **When** a `HistoryRow` renders, it shall show the exam title, `X/10` score, submitted date, and completion time. (AC-004)
 - [ ] **When** the user activates "View details" on a row, the browser shall navigate to `/exams/{examId}/attempt/{attemptId}/result` for that exact attempt. (AC-005)
-- [ ] **When** the `/history` list read fails, `(HM)/history/error.tsx` shall render a `role="alert"` message with a "Retry" control that calls `reset()`. (AC-019 rendering half)
+- [ ] **When** the `/history` list read fails, `(history)/history/error.tsx` shall render a `role="alert"` message with a "Retry" control that calls `reset()`. (AC-019 rendering half)
 
 **PDF content and branding**
 - [ ] **When** Save or Share triggers PDF generation (either surface), the resulting file's content shall be limited to score, exam title/subject, examinee name, submitted time, and aggregate correct/wrong/total counts — `AttemptPdfData`'s type has no field capable of carrying per-question content (2026-08-22 redesign added examinee name + aggregate counts; still no per-question field). (AC-006)
 - [ ] **Given** the History-row and Result-page Save/Share actions, **when** the code is inspected, both shall import `generateAttemptPdfFile` from the same module (`SOURCE/lib/pdf/generateAttemptPdf.ts`) — exactly one implementation. (AC-007)
-- [x] **When** `AttemptPdfTemplate` renders, its visual style shall use only `DESIGN.md` "Ink & Lacquer" values expressed as literal hex/rgba strings. (AC-008)
+- [x] **When** `AttemptPdfTemplate` renders, its visual style shall use only `PROJECT_OVERVIEW.md §2` "Ink & Lacquer" values expressed as literal hex/rgba strings. (AC-008)
 
 **Save / Share**
 - [ ] **When** "Save" is activated, the branded PDF shall download using only `pdfInput` data already loaded by the calling page/row. (AC-009)
@@ -198,21 +198,21 @@ Rendering/interaction ACs verifiable in jsdom or a real browser. AC-001/002(data
 
 | Type | Path | Description |
 |------|------|-------------|
-| Planned (backend DD v1.2 — labeled "New" there, not yet implemented; confirmed via Glob, zero files exist under `SOURCE/app/(HM)/`) | `SOURCE/app/(HM)/layout.tsx` | Route-group shell — `SiteHeader` + nullable user, no redirect (D6). This doc makes no change to it once the backend creates it. |
-| Planned (backend DD v1.2 — labeled "New" there, not yet implemented) | `SOURCE/app/(HM)/history/page.tsx` | Once the backend creates it: adds `import { HistoryList } from "./_components/HistoryList"` and renders it with the entries `listMyHistory()` fetches |
-| New | `SOURCE/app/(HM)/history/_components/HistoryList.tsx` | List container + empty state |
-| New | `SOURCE/app/(HM)/history/_components/HistoryRow.tsx` | One row per attempt |
-| New | `SOURCE/app/(HM)/history/loading.tsx` | Skeleton (D7) |
-| New | `SOURCE/app/(HM)/history/error.tsx` | Error boundary + retry (D7) |
+| Planned (backend DD v1.2 — labeled "New" there, not yet implemented; confirmed via Glob, zero files exist under `SOURCE/app/(history)/`) | `SOURCE/app/(history)/layout.tsx` | Route-group shell — `SiteHeader` + nullable user, no redirect (D6). This doc makes no change to it once the backend creates it. |
+| Planned (backend DD v1.2 — labeled "New" there, not yet implemented) | `SOURCE/app/(history)/history/page.tsx` | Once the backend creates it: adds `import { HistoryList } from "./_components/HistoryList"` and renders it with the entries `listMyHistory()` fetches |
+| New | `SOURCE/features/history/components/HistoryList.tsx` | List container + empty state |
+| New | `SOURCE/features/history/components/HistoryRow.tsx` | One row per attempt |
+| New | `SOURCE/app/(history)/history/loading.tsx` | Skeleton (D7) |
+| New | `SOURCE/app/(history)/history/error.tsx` | Error boundary + retry (D7) |
 | New | `SOURCE/components/history/ActionButton.tsx` (+ `.test.tsx`) | Shared Save/Share atom |
 | New | `SOURCE/lib/pdf/generateAttemptPdf.ts` (+ `.test.ts`) | PDF orchestration: `AttemptPdfData`, `generateAttemptPdfFile`, `downloadPdfFile`, `canShareFile` |
 | New | `SOURCE/components/pdf/AttemptPdfTemplate.tsx` (+ `.test.tsx`) | Off-screen-only rasterized template, plain-hex/rgb only (ADR-0009) |
 | New | `SOURCE/lib/history/format.ts` (+ `.test.ts`) | `formatSubmittedDate`, `formatCompletionTime`, `buildPdfFilename` |
-| Existing, rewired | `SOURCE/app/(layer2)/_components/ResultActions.tsx` | Replace disabled placeholder buttons with `ActionButton` |
-| Existing, extended | `SOURCE/app/(layer2)/_components/ScoreCard.tsx` | New `completionTimeLabel: string` prop |
-| Existing, extended | `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/page.tsx` | Compute `pdfInput`/`completionTimeLabel` from the now-extended `getResult()` output; pass to `ResultActions`/`ScoreCard` |
-| Existing, extended | `SOURCE/app/(layer2)/_components/SiteHeader.tsx` | `href: "#"` → `href: "/history"` (line 27) |
-| Existing, extended | `SOURCE/app/(layer1)/_components/HomeSidebar.tsx` | `href: "#"` → `href: "/history"` (line 22); no other change |
+| Existing, rewired | `SOURCE/features/exams/components/ResultActions.tsx` | Replace disabled placeholder buttons with `ActionButton` |
+| Existing, extended | `SOURCE/features/exams/components/ScoreCard.tsx` | New `completionTimeLabel: string` prop |
+| Existing, extended | `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/page.tsx` | Compute `pdfInput`/`completionTimeLabel` from the now-extended `getResult()` output; pass to `ResultActions`/`ScoreCard` |
+| Existing, extended | `SOURCE/components/layout/SiteHeader.tsx` | `href: "#"` → `href: "/history"` (line 27) |
+| Existing, extended | `SOURCE/features/auth/components/HomeSidebar.tsx` | `href: "#"` → `href: "/history"` (line 22); no other change |
 | Existing, extended | `SOURCE/package.json` | Add `jspdf`, `html2canvas` |
 
 ### Similar Component Search and Decision
@@ -228,9 +228,9 @@ Searched for existing list-row / action-button / PDF patterns by domain and resp
 
 | Component | Status | Location |
 |-----------|--------|----------|
-| `MyHistoryEntry` type, `listMyHistory()` | **Planned** — specified by backend DD v1.2's Implementation Path Mapping (labeled "New" there), not yet implemented (confirmed: `SOURCE/app/(HM)/` contains zero files, via Glob) | Planned location: `SOURCE/app/(HM)/queries.ts` |
-| `ExamResult` (extended: `startedAt`, `submittedAt`) | **Planned** — the extension is specified by backend DD v1.2, not yet implemented. The base `ExamResult` type/`getResult()` currently exist *without* these fields (confirmed: `queries.ts:294-300` has no `startedAt`/`submittedAt`; `:317-320`'s `exam_attempts` select still returns only `exam_id`) | Current (pre-extension) shape: `SOURCE/app/(layer2)/queries.ts:294-300,306-371` |
-| `(HM)/layout.tsx`, `(HM)/history/page.tsx` | **Planned** — specified by backend DD v1.2's Implementation Path Mapping (labeled "New" there), not yet implemented (confirmed via Glob: zero files under `SOURCE/app/(HM)/`) | Planned location: `SOURCE/app/(HM)/layout.tsx`, `SOURCE/app/(HM)/history/page.tsx` |
+| `MyHistoryEntry` type, `listMyHistory()` | **Planned** — specified by backend DD v1.2's Implementation Path Mapping (labeled "New" there), not yet implemented (confirmed: `SOURCE/app/(history)/` contains zero files, via Glob) | Planned location: `SOURCE/features/history/queries.ts` |
+| `ExamResult` (extended: `startedAt`, `submittedAt`) | **Planned** — the extension is specified by backend DD v1.2, not yet implemented. The base `ExamResult` type/`getResult()` currently exist *without* these fields (confirmed: `queries.ts:294-300` has no `startedAt`/`submittedAt`; `:317-320`'s `exam_attempts` select still returns only `exam_id`) | Current (pre-extension) shape: `SOURCE/features/exams/queries.ts:294-300,306-371` |
+| `(history)/layout.tsx`, `(history)/history/page.tsx` | **Planned** — specified by backend DD v1.2's Implementation Path Mapping (labeled "New" there), not yet implemented (confirmed via Glob: zero files under `SOURCE/app/(history)/`) | Planned location: `SOURCE/app/(history)/layout.tsx`, `SOURCE/app/(history)/history/page.tsx` |
 | `Tooltip`/`TooltipTrigger`/`TooltipContent` | Verified existing | `SOURCE/components/ui/tooltip.tsx` |
 | `cn()` utility | Verified existing | `SOURCE/lib/utils.ts` |
 | `lucide-react` (icons: `Download`, `Share2`, `Loader2`) | Verified existing dependency (`^1.17.0`), already used for an icon (`Check` in `SuccessToast.tsx`) | `SOURCE/package.json:22`; `SOURCE/components/ui/SuccessToast.tsx:21` |
@@ -238,7 +238,7 @@ Searched for existing list-row / action-button / PDF patterns by domain and resp
 | `react-dom/client` (`createRoot`), `react-dom` (`flushSync`) | Verified existing (bundled with `react-dom@19.2.4`, already a dependency) | `SOURCE/package.json:26` |
 | `/images/brand_logo.png` (same-origin logo asset) | Verified existing, already served | `SiteHeader.tsx:50` |
 
-No component this design assumes is missing without a resolution path. This doc itself must newly create only `jspdf`/`html2canvas` (already resolved by ADR-0009's accepted choice). `(HM)/layout.tsx`, `(HM)/history/page.tsx`, `MyHistoryEntry`/`listMyHistory()`, and `ExamResult`'s `startedAt`/`submittedAt` extension are *prerequisites this doc consumes but does not implement* — each is specified (and correctly labeled "New", or an extension of an "Existing" file) in backend DD v1.2's own Implementation Path Mapping, itself a Draft, pre-implementation document as of this writing (confirmed: `SOURCE/app/(HM)/` has zero files via Glob; `queries.ts:294-300,317-320` still shows the pre-extension `ExamResult` shape). An implementer must build these backend items first (per backend DD v1.2) before this doc's components have real data to render against.
+No component this design assumes is missing without a resolution path. This doc itself must newly create only `jspdf`/`html2canvas` (already resolved by ADR-0009's accepted choice). `(history)/layout.tsx`, `(history)/history/page.tsx`, `MyHistoryEntry`/`listMyHistory()`, and `ExamResult`'s `startedAt`/`submittedAt` extension are *prerequisites this doc consumes but does not implement* — each is specified (and correctly labeled "New", or an extension of an "Existing" file) in backend DD v1.2's own Implementation Path Mapping, itself a Draft, pre-implementation document as of this writing (confirmed: `SOURCE/app/(history)/` has zero files via Glob; `queries.ts:294-300,317-320` still shows the pre-extension `ExamResult` shape). An implementer must build these backend items first (per backend DD v1.2) before this doc's components have real data to render against.
 
 ### Code Inspection Evidence
 
@@ -252,7 +252,7 @@ No component this design assumes is missing without a resolution path. This doc 
 | `app/page.tsx:2,37` | Sole `HomeSidebar` caller — confirms Assumed Behavior #1 |
 | `RateButton.tsx:42-75` | D4's a11y pattern source |
 | `MyExamsList.tsx:25-31`, `ExamRow.tsx:56-60,94-98,109` | Row-shell/scroll-container/metadata-line pattern source |
-| `(layer4)/me/exams/loading.tsx` | Skeleton pattern source for `(HM)/history/loading.tsx` |
+| `(authoring)/me/exams/loading.tsx` | Skeleton pattern source for `(history)/history/loading.tsx` |
 | `ADR-0009` (all sections) | The library choice, dynamic-import discipline, and styling-constraint this doc implements concretely |
 
 ### Fact Disposition Table
@@ -448,7 +448,7 @@ Output:
     = click again, AC-018)
 ```
 
-#### `SOURCE/app/(HM)/history/_components/{HistoryList,HistoryRow}.tsx` (new)
+#### `SOURCE/features/history/components/{HistoryList,HistoryRow}.tsx` (new)
 
 ```yaml
 Contract: HistoryList(props: { entries: MyHistoryEntry[] }): JSX.Element
@@ -462,7 +462,7 @@ Output: title/score/date/time text + 2 ActionButton instances + a "View details"
   /exams/{examId}/attempt/{attemptId}/result
 ```
 
-#### `SOURCE/app/(layer2)/_components/ResultActions.tsx` (rewired) / `ScoreCard.tsx` (extended)
+#### `SOURCE/features/exams/components/ResultActions.tsx` (rewired) / `ScoreCard.tsx` (extended)
 
 ```yaml
 Contract: ResultActions(props: { pdfInput: AttemptPdfData }): JSX.Element
@@ -508,10 +508,10 @@ Every phase contributes exactly one in-flow DOM node (the button) to `ActionButt
 
 | State | Mechanism |
 |---|---|
-| Loading | `(HM)/history/loading.tsx` — skeleton, mirrors `(layer4)/me/exams/loading.tsx` |
+| Loading | `(history)/history/loading.tsx` — skeleton, mirrors `(authoring)/me/exams/loading.tsx` |
 | Default | `HistoryList` renders `entries.map(HistoryRow)` |
 | Empty | `HistoryList` renders the dashed-border CTA block when `entries.length === 0` |
-| Error | `(HM)/history/error.tsx` — Next.js error boundary, `reset()` wired to "Retry" |
+| Error | `(history)/history/error.tsx` — Next.js error boundary, `reset()` wired to "Retry" |
 
 No client-side loading/error state is managed by `HistoryList` itself — both are handled by the Next.js file-convention boundaries per D7, consistent with this repo's existing `loading.tsx` precedent and this repo's first `error.tsx` use.
 
@@ -841,7 +841,7 @@ An alternative was considered and rejected: surfacing the error/confirmation tex
 
 ### ResultActions Rewiring — Before / After
 
-**Before** (`SOURCE/app/(layer2)/_components/ResultActions.tsx`):
+**Before** (`SOURCE/features/exams/components/ResultActions.tsx`):
 
 ```tsx
 export function ResultActions() {
@@ -879,7 +879,7 @@ DOM-shape guarantee preserved: before = 2 sibling `<button>` elements, no wrappe
 
 ```tsx
 // Added imports
-import { ScoreCard } from "@/app/(layer2)/_components/ScoreCard";
+import { ScoreCard } from "@/features/exams/components/ScoreCard";
 import { formatCompletionTime } from "@/lib/history/format";
 import type { AttemptPdfData } from "@/lib/pdf/generateAttemptPdf";
 
@@ -916,7 +916,7 @@ Per the UI Spec's ScoreCard extension and Element 3 of Minimal Surface Alternati
 
 1. `app/page.tsx` is `HomeSidebar`'s only caller (verified: `grep -rn "HomeSidebar"` across `SOURCE/app` returns exactly one import + one JSX usage).
 2. That caller's `activeLabel` prop is computed as `authOpen ? "Account" : "Home"` — a closed 2-value set that never depends on, or needs to represent, `"History"`.
-3. `HomeSidebar` only ever renders on `/` (the homepage). `/history` renders `(HM)/layout.tsx`, which renders `SiteHeader`, never `HomeSidebar`.
+3. `HomeSidebar` only ever renders on `/` (the homepage). `/history` renders `(history)/layout.tsx`, which renders `SiteHeader`, never `HomeSidebar`.
 4. Therefore no browser state exists where a user is "on" `/history` while looking at a rendered `HomeSidebar` — there is no active-state gap to close in `HomeSidebar` itself. Clicking "History" from the homepage sidebar navigates to `/history`, where `SiteHeader`'s real `usePathname()`-driven active-state (already correct per point above) takes over.
 
 This is the complete, final resolution — no follow-up item is left for a future doc.
@@ -964,18 +964,18 @@ Most crossings in this feature are in-memory React prop hand-offs within one req
 ```yaml
 Change Target: History frontend (HistoryList/HistoryRow + shared PDF module + ActionButton + ResultActions/ScoreCard wiring + nav)
 Direct Impact:
-  - NEW SOURCE/app/(HM)/history/_components/{HistoryList,HistoryRow}.tsx
-  - NEW SOURCE/app/(HM)/history/{loading,error}.tsx
-  - SOURCE/app/(HM)/history/page.tsx (backend-authored; +1 import, +1 render line)
+  - NEW SOURCE/features/history/components/{HistoryList,HistoryRow}.tsx
+  - NEW SOURCE/app/(history)/history/{loading,error}.tsx
+  - SOURCE/app/(history)/history/page.tsx (backend-authored; +1 import, +1 render line)
   - NEW SOURCE/components/history/ActionButton.tsx (+ .test.tsx)
   - NEW SOURCE/lib/pdf/generateAttemptPdf.ts (+ .test.ts)
   - NEW SOURCE/components/pdf/AttemptPdfTemplate.tsx (+ .test.tsx)
   - NEW SOURCE/lib/history/format.ts (+ .test.ts)
-  - SOURCE/app/(layer2)/_components/ResultActions.tsx (full rewire: disabled placeholder -> ActionButton x2)
-  - SOURCE/app/(layer2)/_components/ScoreCard.tsx (+completionTimeLabel prop, Time cell)
-  - SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/page.tsx (+pdfInput/completionTimeLabel computation)
-  - SOURCE/app/(layer2)/_components/SiteHeader.tsx (href literal, line 27)
-  - SOURCE/app/(layer1)/_components/HomeSidebar.tsx (href literal, line 22)
+  - SOURCE/features/exams/components/ResultActions.tsx (full rewire: disabled placeholder -> ActionButton x2)
+  - SOURCE/features/exams/components/ScoreCard.tsx (+completionTimeLabel prop, Time cell)
+  - SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/page.tsx (+pdfInput/completionTimeLabel computation)
+  - SOURCE/components/layout/SiteHeader.tsx (href literal, line 27)
+  - SOURCE/features/auth/components/HomeSidebar.tsx (href literal, line 22)
   - SOURCE/package.json (+jspdf, +html2canvas)
 Indirect Impact:
   - result/page.tsx's grid-cols-3 layout now receives real interactive ActionButton cells instead of inert
@@ -983,7 +983,7 @@ Indirect Impact:
   - Initial bundle size for /history and the Result route: zero increase from jsPDF/html2canvas (dynamic import);
     a small, expected increase from ActionButton/lucide-react icons already-dependency-based, not new libraries.
 No Ripple Effect:
-  - listMyHistory()/getResult() internals, (HM)/layout.tsx's guard logic, all DB/RLS (backend DD owns these, untouched here)
+  - listMyHistory()/getResult() internals, app/(history)/layout.tsx's guard logic, all DB/RLS (backend DD owns these, untouched here)
   - Any other route/component not listed above (ExamBrowser, RatingForm, upload flow, Analytics/Layer 3, etc.)
   - result/page.tsx's "Try again"/rating-entry links (untouched, unrelated content on the same page)
 ```
@@ -1021,7 +1021,7 @@ When conversion is required (`ResultActions`, `ScoreCard`), no wrapper/adapter i
 3. **`SOURCE/components/pdf/AttemptPdfTemplate.tsx` + `SOURCE/lib/pdf/generateAttemptPdf.ts`** — Depends on: (2). Prerequisite for: `ActionButton`. This is the highest-risk slice — build and manually verify (Early Verification Point) before proceeding.
 4. **`SOURCE/components/history/ActionButton.tsx`** — Depends on: (3) (imports `generateAttemptPdfFile`/`downloadPdfFile`/`canShareFile`), (1) indirectly not required (formatting happens inside `generateAttemptPdf.ts`, not in `ActionButton`).
 5. **`ResultActions.tsx` rewire + `ScoreCard.tsx`/`result/page.tsx` extension** — Depends on: (1), (4). First real end-to-end integration (Verification Level L1).
-6. **`HistoryList`/`HistoryRow`/`loading.tsx`/`error.tsx` + `history/page.tsx`'s 1-line addition** — Depends on: (1), (4) (proven by step 5), AND the backend DD's `(HM)/layout.tsx` + `(HM)/history/page.tsx` + `listMyHistory()` being implemented first (currently Planned, not yet implemented — see Dependency Existence Verification).
+6. **`HistoryList`/`HistoryRow`/`loading.tsx`/`error.tsx` + `history/page.tsx`'s 1-line addition** — Depends on: (1), (4) (proven by step 5), AND the backend DD's `(history)/layout.tsx` + `(history)/history/page.tsx` + `listMyHistory()` being implemented first (currently Planned, not yet implemented — see Dependency Existence Verification).
 7. **`SiteHeader.tsx`/`HomeSidebar.tsx` href fix** — Depends on: (6) existing (so `/history` has something to navigate to). Can technically land any time after (6); ordered last since it's the lowest-risk, purely additive-reachability change.
 
 ### Migration Strategy
@@ -1030,7 +1030,7 @@ None. No persisted state, schema, or existing data format changes. The only "mig
 
 ## Security Considerations
 
-- **Authentication & Authorization**: N/A at this layer — `/history`'s guard and RLS scoping are entirely backend-owned (backend DD AC-016/017), specified in `(HM)/history/page.tsx`/`(HM)/layout.tsx` (backend DD v1.2 — Planned, not yet implemented; see Dependency Existence Verification). This doc's components only render data the backend will have already scoped, once those prerequisites are built.
+- **Authentication & Authorization**: N/A at this layer — `/history`'s guard and RLS scoping are entirely backend-owned (backend DD AC-016/017), specified in `(history)/history/page.tsx`/`(history)/layout.tsx` (backend DD v1.2 — Planned, not yet implemented; see Dependency Existence Verification). This doc's components only render data the backend will have already scoped, once those prerequisites are built.
 - **Input Validation**: `AttemptPdfData`'s fields all originate from already-RLS-scoped, already-typed backend reads (`MyHistoryEntry`, `ExamResult`) — no external/user-controllable input enters this doc's components directly. `examTitle` is UGC-authored content but is rendered as plain text (React's default escaping) both on-screen and inside `AttemptPdfTemplate` (a literal string interpolation, not `dangerouslySetInnerHTML`) — no injection surface.
 - **Sensitive Data Handling**: No new data category. The generated PDF contains only score/time/title the user already sees on-screen (AC-006); it is never uploaded anywhere (client-only generation, AC-013) — no new data-at-rest or data-in-transit concern. The `Blob`/object URL created by `downloadPdfFile` is revoked immediately after triggering the download, avoiding a dangling in-memory reference.
 
@@ -1105,7 +1105,7 @@ Largely N/A — this feature does not replace an existing computation with an eq
 - UI Spec `docs/ui-spec/history-ui-spec.md` (v1.1) — component decomposition, state matrices, D1-D7.
 - ADR `docs/adr/ADR-0009-pdf-generation-library-choice.md` (Accepted) — library choice, dynamic-import discipline, styling constraint.
 - Backend Design Doc `docs/design/history-backend-design.md` (v1.2) — `MyHistoryEntry`, extended `ExamResult` contracts consumed here.
-- Precedents: `SOURCE/app/(layer4)/_components/{MyExamsList,ExamRow}.tsx`; `SOURCE/app/(layer2)/_components/{ScoreCard,ResultActions,rating/RateButton}.tsx`; `SOURCE/components/ui/{tooltip,SuccessToast}.tsx`; `SOURCE/app/(layer4)/me/exams/loading.tsx`; `SOURCE/app/(layer2)/__tests__/rating.int.test.ts`; `SOURCE/components/rating/ScoreScale.test.tsx`; `SOURCE/vitest.config.ts`; `SOURCE/scripts/check-ai-key-bundle.mjs`; `docs/design/rating-system-frontend-design.md` (house-style precedent).
+- Precedents: `SOURCE/features/authoring/components/{MyExamsList,ExamRow}.tsx`; `SOURCE/features/exams/components/ScoreCard.tsx, SOURCE/features/exams/components/ResultActions.tsx, SOURCE/features/exams/components/rating/RateButton.tsx`; `SOURCE/components/ui/{tooltip,SuccessToast}.tsx`; `SOURCE/app/(authoring)/me/exams/loading.tsx`; `SOURCE/features/exams/__tests__/rating.int.test.ts`; `SOURCE/components/rating/ScoreScale.test.tsx`; `SOURCE/vitest.config.ts`; `SOURCE/scripts/check-ai-key-bundle.mjs`; `docs/design/rating-system-frontend-design.md` (house-style precedent).
 - [MDN — Web Share API](https://developer.mozilla.org/docs/Web/API/Web_Share_API) / [Navigator.share()](https://developer.mozilla.org/docs/Web/API/Navigator/share) — `AbortError` on user cancellation.
 - [MDN — HTMLImageElement.decode()](https://developer.mozilla.org/docs/Web/API/HTMLImageElement/decode).
 
@@ -1114,6 +1114,6 @@ Largely N/A — this feature does not replace an existing computation with an eq
 | Date | Version | Changes | Author |
 |------|---------|---------|--------|
 | 2026-07-28 | 1.0 | Initial frontend design — HistoryList/HistoryRow, shared ActionButton, generateAttemptPdf.ts/AttemptPdfTemplate.tsx, ResultActions/ScoreCard rewiring, nav wiring (HomeSidebar gap resolved), bundle-size verification approach, Verification Strategy | Frontend design agent (Claude) |
-| 2026-07-28 | 1.1 | Code-verifier fixes (consistency 77/100, 2 major + 1 minor): (D1) corrected existence/status labels for backend-owned prerequisites (`(HM)/layout.tsx`, `(HM)/history/page.tsx`, `MyHistoryEntry`/`listMyHistory()`, extended `ExamResult`) from "Verified existing"/"already implemented" to "Planned — specified by backend DD v1.1, not yet implemented" (confirmed via Glob/Read: zero files under `SOURCE/app/(HM)/`; pre-extension `ExamResult` shape still in `queries.ts:294-300,317-320`); (D2) fixed a genuine DOM-shape bug — `ActionButton`'s Error/Fallback-Confirmed status spans moved from `Tooltip`-level siblings to `TooltipTrigger`-nested (button-descendant), absolutely-positioned children anchored by the button's own `relative`, so they never add an extra grid item to `ResultActions`' `grid-cols-3` layout in any phase; (D3) corrected the quoted `SiteHeader.isActive` snippet to match `SiteHeader.tsx:63-65` verbatim (includes the home-route ternary branch) | Frontend design agent (Claude) |
-| 2026-07-28 | 1.2 | Document-reviewer fixes (approved-with-conditions, 2 blocking + 1 recommended): (C1) fixed a stale "already exist" claim in Implementation Plan item 6 — corrected to depend on the backend DD's `(HM)/layout.tsx`/`(HM)/history/page.tsx`/`listMyHistory()` (Planned, not yet implemented), matching this doc's own Dependency Existence Verification/Non-Scope sections; (C2) added the missing Risks and Mitigation row for Assumed Behavior #8 (`flushSync`'s synchronous commit vs. logo `<img>` decode timing), so the "Claims #7–9 have matching rows" summary is now accurate; (I003) flattened `ActionButton.handleClick`'s Share branch (previously 4 levels of nesting) by extracting it into a new `attemptShare(file): Promise<"shared" \| "fallback">` helper, per coding-principles' max-3-levels-of-nesting guideline | Frontend design agent (Claude) |
+| 2026-07-28 | 1.1 | Code-verifier fixes (consistency 77/100, 2 major + 1 minor): (D1) corrected existence/status labels for backend-owned prerequisites (`(history)/layout.tsx`, `(history)/history/page.tsx`, `MyHistoryEntry`/`listMyHistory()`, extended `ExamResult`) from "Verified existing"/"already implemented" to "Planned — specified by backend DD v1.1, not yet implemented" (confirmed via Glob/Read: zero files under `SOURCE/app/(history)/`; pre-extension `ExamResult` shape still in `queries.ts:294-300,317-320`); (D2) fixed a genuine DOM-shape bug — `ActionButton`'s Error/Fallback-Confirmed status spans moved from `Tooltip`-level siblings to `TooltipTrigger`-nested (button-descendant), absolutely-positioned children anchored by the button's own `relative`, so they never add an extra grid item to `ResultActions`' `grid-cols-3` layout in any phase; (D3) corrected the quoted `SiteHeader.isActive` snippet to match `SiteHeader.tsx:63-65` verbatim (includes the home-route ternary branch) | Frontend design agent (Claude) |
+| 2026-07-28 | 1.2 | Document-reviewer fixes (approved-with-conditions, 2 blocking + 1 recommended): (C1) fixed a stale "already exist" claim in Implementation Plan item 6 — corrected to depend on the backend DD's `(history)/layout.tsx`/`(history)/history/page.tsx`/`listMyHistory()` (Planned, not yet implemented), matching this doc's own Dependency Existence Verification/Non-Scope sections; (C2) added the missing Risks and Mitigation row for Assumed Behavior #8 (`flushSync`'s synchronous commit vs. logo `<img>` decode timing), so the "Claims #7–9 have matching rows" summary is now accurate; (I003) flattened `ActionButton.handleClick`'s Share branch (previously 4 levels of nesting) by extracting it into a new `attemptShare(file): Promise<"shared" \| "fallback">` helper, per coding-principles' max-3-levels-of-nesting guideline | Frontend design agent (Claude) |
 | 2026-07-30 | 1.3 | Design-sync cross-document consistency fixes (2 medium-severity, documentation-freshness only, no design/contract change): (1) updated every citation of the backend Design Doc's version from "v1.1" to "v1.2" (header table, and body citations in Non-Scope, Implementation Path Mapping, Dependency Existence Verification, Security Considerations, References) to match `docs/design/history-backend-design.md`'s current version — its v1.2 fix pass elevated an RLS regression test to required, added a verification walkthrough, and removed dead code, none of which changed the `MyHistoryEntry`/extended `ExamResult` contracts this doc consumes; (2) corrected the header table's UI Spec citation from a conflated paraphrase ("reviewer-approved-with-conditions, conditions resolved" — actually a description of the UI Spec's Revision History review disposition, not its Status field) to a verbatim quote of `docs/ui-spec/history-ui-spec.md`'s actual `Status` field ("Draft — ready for ADR/Design Doc chain"), matching the sibling backend Design Doc's own citation convention for the same document | Frontend design agent (Claude) |

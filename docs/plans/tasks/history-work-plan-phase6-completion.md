@@ -10,8 +10,8 @@ Covers Work Plan Final Phase (Task 18 / `history-work-plan-task-18.md`) and the 
 
 ## Test Skeleton File Paths for Verification (full feature set)
 
-- `SOURCE/app/(HM)/__tests__/history.int.test.ts` — 7/7
-- `SOURCE/app/(layer2)/__tests__/getResult.int.test.ts` — 3/3
+- `SOURCE/features/history/__tests__/history.int.test.ts` — 7/7
+- `SOURCE/features/exams/__tests__/getResult.int.test.ts` — 3/3
 - `SOURCE/lib/history/format.test.ts` — author-defined, all green
 - `SOURCE/lib/pdf/generateAttemptPdf.test.ts` — author-defined, all green
 - `SOURCE/components/pdf/AttemptPdfTemplate.test.tsx` — author-defined, all green

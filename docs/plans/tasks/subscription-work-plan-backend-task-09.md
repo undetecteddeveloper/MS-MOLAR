@@ -146,7 +146,7 @@ Repo-wide grep for `gemini_unavailable` over `*.ts`/`*.tsx`/`*.sql`. Every site 
 | 5 | `SOURCE/lib/tutor/__tests__/telemetry.test.ts:261` — the two-layer equality guard | plan Task 5.5 | **not edited; passes unmodified** |
 
 Same-boundary sites that are *not* the constraint list, recorded so they are not mistaken for drift:
-- `SOURCE/app/(layer2)/tutorActions.ts:51` — `ExplainStepError`, the **client-visible** union (UI-D3 collapse constraint, plan Task 5.3). Deliberately does not widen with the CHECK.
+- `SOURCE/features/exams/tutorActions.ts:51` — `ExplainStepError`, the **client-visible** union (UI-D3 collapse constraint, plan Task 5.3). Deliberately does not widen with the CHECK.
 - `SOURCE/lib/tutor/callTutor.ts:51` — `Extract<TelemetryErrorCode, …>`, **derived**, so it carries no transcription.
 - `SOURCE/lib/tutor/telemetry.ts:33`/`:39` and `telemetry.test.ts:188` — phantom "§19" labels and a "4 named literals" comment; cleanup owned by plan Task 5.5.
 - `SOURCE/lib/supabase/service-role.ts:73` — the stale "§18" label; owned by plan Task 3.2/3.4 (traceability row I6). Out of scope here.

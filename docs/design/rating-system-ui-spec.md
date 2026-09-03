@@ -12,7 +12,7 @@ This UI Specification defines the screen structure, component decomposition, int
 | Source | Path | Version |
 |--------|------|---------|
 | Design reference (images + notes) | `SCREENSHOT/design_reference/ExamRatingPage_Layer2/` | Working tree @ branch `feat/analytics-layer3-data-logic` (no tag; not a code prototype) |
-| Theme tokens | `DESIGN.md`, `SOURCE/app/globals.css` | Working tree |
+| Theme tokens | `PROJECT_OVERVIEW.md §2`, `SOURCE/app/globals.css` | Working tree |
 
 ## Prototype Management
 
@@ -20,14 +20,14 @@ The design reference is **image-based** (four PNG screenshots + a transitions/an
 
 - **Attachment path**: `SCREENSHOT/design_reference/ExamRatingPage_Layer2/` — `ERP_screenshot_fullsize.png` (overview), `ERP_screenshot_element1.png` (Part I detail), `ERP_screenshot_element2.png` (Part II detail), `ERP_screenshot_element3.png` (Part III detail), `ERP_transitions_animations.md` (animation notes). No copy into `docs/ui-spec/assets/` is made because the reference already lives in the repo under version control and this UI Spec is co-located with the design docs per the task directive.
 - **Version identification**: repo working tree (no separate commit SHA/tag for the reference bundle).
-- **Compliance premise**: the "Mực & Sơn mài" (Ink & Lacquer) theme (`DESIGN.md`) and its tokens (`SOURCE/app/globals.css`), and the existing Layer 2 dialog/button conventions (`ReportExam.tsx`, `LeaveExamDialog.tsx`).
-- **Relationship to canonical spec**: where the reference and this document differ, this document wins. The reference supplies layout, verbatim copy, and animation intent only. In particular, the reference's card hover shadow and any drop shadows are overridden by the `DESIGN.md` hard rules (no box-shadow, no gradient) except the one pre-approved `ExamCard` hover-shadow exception already in the codebase.
+- **Compliance premise**: the "Mực & Sơn mài" (Ink & Lacquer) theme (`PROJECT_OVERVIEW.md §2`) and its tokens (`SOURCE/app/globals.css`), and the existing Layer 2 dialog/button conventions (`ReportExam.tsx`, `LeaveExamDialog.tsx`).
+- **Relationship to canonical spec**: where the reference and this document differ, this document wins. The reference supplies layout, verbatim copy, and animation intent only. In particular, the reference's card hover shadow and any drop shadows are overridden by the `PROJECT_OVERVIEW.md §2` hard rules (no box-shadow, no gradient) except the one pre-approved `ExamCard` hover-shadow exception already in the codebase.
 
 ## External Resources Used
 
 | Resource (project-tier label) | Feature-specific identifier | Notes |
 |-------------------------------|-----------------------------|-------|
-| Design Origin | `DESIGN.md` — "Mực & Sơn mài" theme; hard rules (no shadow/gradient/pill/serif-on-controls; no red text < 24px on ink) | Governs the ivory panel + dark part-cards + copper focus visual language |
+| Design Origin | `PROJECT_OVERVIEW.md §2` — "Mực & Sơn mài" theme; hard rules (no shadow/gradient/pill/serif-on-controls; no red text < 24px on ink) | Governs the ivory panel + dark part-cards + copper focus visual language |
 | Design System | `globals.css` tokens (`--background`, `--card`, `--foreground`, `--brand`, `--sidebar`/surface, `--border`, `--ring`, `--muted-foreground`), `.eyebrow`, `.preload-fade` + `--preload-order`; base-ui `Tooltip` (`SOURCE/components/ui/tooltip.tsx`); dialog precedent `ReportExam.tsx` / `LeaveExamDialog.tsx` | New components reuse these tokens/primitives; the RatingModal extends the dialog precedent with focus-trap, focus-return, and success `aria-live` |
 | Visual Verification Environment | Routes `/exams`, `/exams/[id]`, `/exams/[id]/rate`, `/exams/[id]/attempt/[attemptId]/result`; Playwright MCP `playwright` for screenshots | `npm run dev` then inspect the four screens; component render tests must live under `lib/**` or `components/**` with `// @vitest-environment jsdom` (Vitest collection constraint) |
 
@@ -282,7 +282,7 @@ Verbatim descriptions (render exactly):
 | II | `PART II · TRUE / FALSE` | `Four sub-statements per question, mark each true or false. One wrong sub-statement forfeits the whole question — no guessing by elimination.` |
 | III | `PART III · SHORT ANSWER` | `No options to pick from — solve and enter a single numeric answer. No room for guesswork.` |
 
-Note (`DESIGN.md` hard rule): the detail eyebrow is brand-red (`--brand`) on the dark surface. Because red-on-ink below 24px is disallowed, the eyebrow renders at the copper/muted weight where the small-caps size falls under 24px; brand-red is reserved for the (larger) accent. **Resolution**: use copper (`--sidebar-accent`) for the small eyebrow to stay within contrast rules, matching the overview card eyebrow, rather than literal brand-red at ~12px. This overrides the reference's red eyebrow to honor the hard rule.
+Note (`PROJECT_OVERVIEW.md §2` hard rule): the detail eyebrow is brand-red (`--brand`) on the dark surface. Because red-on-ink below 24px is disallowed, the eyebrow renders at the copper/muted weight where the small-caps size falls under 24px; brand-red is reserved for the (larger) accent. **Resolution**: use copper (`--sidebar-accent`) for the small eyebrow to stay within contrast rules, matching the overview card eyebrow, rather than literal brand-red at ~12px. This overrides the reference's red eyebrow to honor the hard rule.
 
 #### State x Display Matrix
 
@@ -466,7 +466,7 @@ Renders the community difficulty from the read model. Consumes only `communityDi
 
 ### Component: ExamFilters (Level row + Hardest — MODIFIED)
 
-Extends the existing `ExamFilters` (`SOURCE/app/(layer2)/_components/ExamFilters.tsx`). Two changes: the symbolic Level `FilterRow` becomes a real three-bucket selector, and the `Hardest` quick-sort checkbox becomes functional.
+Extends the existing `ExamFilters` (`SOURCE/features/exams/components/ExamFilters.tsx`). Two changes: the symbolic Level `FilterRow` becomes a real three-bucket selector, and the `Hardest` quick-sort checkbox becomes functional.
 
 - **Level row**: replace `<FilterRow label="Level" symbolic last />` with a real `FilterRow` whose options are `[{value:"",label:"All"},{value:"easy",label:"Easy"},{value:"medium",label:"Medium"},{value:"hard",label:"Hard"}]`, `onSelect={(v)=>setParam("level", v)}`, `selectedLabel` = the chosen bucket label. Selecting writes `?level=easy|medium|hard` to `searchParams` (AC-017/AC-021). The "Coming soon" italic panel is removed.
 - **Hardest**: remove the `title="Difficulty ranking coming soon"` from the Hardest checkbox `label`. **Updated per frontend Design Doc D002**: `?hardest=1` is REMOVED (no longer an independent, sort-combinable param). Hardest becomes a third value on the single `?sort=` axis (`newest|oldest|hardest`, mutually exclusive) — toggling Hardest writes `?sort=hardest` and visually de-selects Newest/Oldest since they share the param. This is a deliberate user-facing behavior change from the prior independent-boolean design (S#28).
@@ -508,7 +508,7 @@ Extends the existing `ExamFilters` (`SOURCE/app/(layer2)/_components/ExamFilters
 | Primary button style | Reuse | `ReportExam.tsx` primary button classes | `bg-brand text-brand-foreground rounded-[4px] px-4 py-2 text-xs font-medium uppercase tracking-[0.14em]` for header `SUBMIT` / `SUBMIT RATING`. |
 | Eyebrow label | Reuse | `.eyebrow` (globals.css) | Part eyebrows, filter labels. |
 | Staggered mount | Reuse | `.preload-fade` + `--preload-order` | RatePageShell + RatingModal entry; reduced-motion respected. |
-| Copper rule divider | Reuse (inline precedent) | Inline copper divider in `SOURCE/app/(layer1)/_components/HomeStage.tsx` (~line 38–40): `<div className="mt-4 h-0.5 w-10 bg-[#B8863B]" aria-hidden />` | Under the header `SUBMIT`, as in the reference. There is **no** reusable `rule-divider` class — copy this 40×2px inline pattern. **Token-name collision warning**: in `DESIGN.md` the token named "accent" is copper (`#b8863b`), but the CSS variable `--accent` in `globals.css` is pale ivory (`#e3d5b6`). Do **not** use the CSS `--accent` variable for the copper divider — use `--sidebar-accent` / `--ring` / literal `#b8863b`. |
+| Copper rule divider | Reuse (inline precedent) | Inline copper divider in `SOURCE/features/auth/components/HomeStage.tsx` (~line 38–40): `<div className="mt-4 h-0.5 w-10 bg-[#B8863B]" aria-hidden />` | Under the header `SUBMIT`, as in the reference. There is **no** reusable `rule-divider` class — copy this 40×2px inline pattern. **Token-name collision warning**: in `PROJECT_OVERVIEW.md §2` the token named "accent" is copper (`#b8863b`), but the CSS variable `--accent` in `globals.css` is pale ivory (`#e3d5b6`). Do **not** use the CSS `--accent` variable for the copper divider — use `--sidebar-accent` / `--ring` / literal `#b8863b`. |
 | Tooltip | Reuse | `SOURCE/components/ui/tooltip.tsx` (base-ui) | For `RateButton` disabled reason (on a focusable `aria-disabled` control). |
 | Filter row / options | Extend | `ExamFilters.tsx` `FilterRow` | Real Level options; remove symbolic branch usage for Level. |
 | `ExamCard` layout | Extend | `ExamCard.tsx` | Stretched-link restructure + `RateButton`/`DifficultyBadge` siblings. |
@@ -555,7 +555,7 @@ Hard rule reminders: **serif only** on titles/part-names — never on buttons, e
 
 | Level | Treatment | Usage |
 |-------|-----------|-------|
-| 0 (Flat) | none | Everything — **no box-shadow, no gradient** (`DESIGN.md`). Layering is by surface color (`--background` ↔ `--sidebar`) + hairline `--border`. |
+| 0 (Flat) | none | Everything — **no box-shadow, no gradient** (`PROJECT_OVERVIEW.md §2`). Layering is by surface color (`--background` ↔ `--sidebar`) + hairline `--border`. |
 | Scrim | `bg-[#1B1512]/40` | Modal backdrop only (opacity, not shadow). |
 | Exception | pre-approved `ExamCard` hover shadow | The single existing sanctioned exception; new components add none. |
 
@@ -580,7 +580,7 @@ Hard rule reminders: **serif only** on titles/part-names — never on buttons, e
 7. **Rating Modal on Result**: scrim over readable result content; ivory card centered; focus trapped.
 
 ### Layout Constraints
-- Rating panel/main block max-width consistent with Layer 2 content blocks; text columns ≤ ~720px (`DESIGN.md` layout).
+- Rating panel/main block max-width consistent with Layer 2 content blocks; text columns ≤ ~720px (`PROJECT_OVERVIEW.md §2` layout).
 - Modal card centered, `max-w` around `sm`, `px-6` viewport gutters; result content never obscured after dismissal.
 - Dark part-card band never exceeds the bordered main block's content area (bubble-expand target bound; `ERP_transitions_animations.md` §1).
 - One `rule-divider` per view (the header divider); no repeated copper rules.
@@ -623,7 +623,7 @@ Status must not be conveyed by color alone: selected circle uses a check/fill + 
 | Muted subtitle/caption | `#6b655c` | `#ede1c8` | ≥ 4.5:1 (verify at small sizes) |
 | Button label on brand | `#ede1c8` | `#a62c2b` | ≥ 4.5:1 |
 | Copper focus ring | `#b8863b` | adjacent surface | ≥ 3:1 (non-text UI, WCAG 1.4.11) |
-| Detail eyebrow (copper, <24px) | `#b8863b` | `#1b1512` | ≥ 4.5:1 — copper chosen over brand-red to satisfy the `DESIGN.md` "no red < 24px on ink" rule |
+| Detail eyebrow (copper, <24px) | `#b8863b` | `#1b1512` | ≥ 4.5:1 — copper chosen over brand-red to satisfy the `PROJECT_OVERVIEW.md §2` "no red < 24px on ink" rule |
 
 ## Open Items
 
@@ -643,4 +643,4 @@ Status must not be conveyed by color alone: selected circle uses a check/fill + 
 | Date | Version | Changes | Author |
 |------|---------|---------|--------|
 | 2026-07-23 | 1.0 | Initial UI Spec from PRD v1.1 + design reference; resolves the six UI-Spec-owned Undetermined Items (CircleScale radiogroup, shared-form + shells, modal open condition, mean precision + bucket mapping, RateButton extraction + states, form state model incl. readouts and SUBMIT/Sent swap). | UI Spec (Claude) |
-| 2026-07-23 | 1.1 | Review (approved_with_conditions) fixes: (I001) copper rule-divider Reuse Map now cites `--sidebar-accent`/`--ring` (`#b8863b`) not `--accent` (`#e3d5b6`), with the DESIGN.md-token vs CSS-variable name-collision note and the `HomeStage.tsx` (~L38–40) inline precedent; (I002) RatingModal AC-004 reconciliation made explicit (non-forcing, fully dismissible, re-readable on dismissal; `aria-modal="true"` intentionally inert-for-AT while open); (I003) header `SUBMIT` pinned to one disabled treatment (reduced-opacity/muted brand fill, native `disabled` + `aria-describedby` "Rate all three parts to submit."), Golden State 1 aligned; (I004) component tree converted to a mermaid graph. No locked product decision or resolved Undetermined Item changed. | UI Spec (Claude) |
+| 2026-07-23 | 1.1 | Review (approved_with_conditions) fixes: (I001) copper rule-divider Reuse Map now cites `--sidebar-accent`/`--ring` (`#b8863b`) not `--accent` (`#e3d5b6`), with the PROJECT_OVERVIEW.md §2-token vs CSS-variable name-collision note and the `HomeStage.tsx` (~L38–40) inline precedent; (I002) RatingModal AC-004 reconciliation made explicit (non-forcing, fully dismissible, re-readable on dismissal; `aria-modal="true"` intentionally inert-for-AT while open); (I003) header `SUBMIT` pinned to one disabled treatment (reduced-opacity/muted brand fill, native `disabled` + `aria-describedby` "Rate all three parts to submit."), Golden State 1 aligned; (I004) component tree converted to a mermaid graph. No locked product decision or resolved Undetermined Item changed. | UI Spec (Claude) |

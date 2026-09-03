@@ -29,7 +29,7 @@ Note in **both** documents that the shipped component still declares `formattedR
 - `docs/design/subscription-frontend-design.md` (§ Field Propagation Map)
 - `docs/design/subscription-frontend-design.md` (fact rows `ui:06` and `code:04`; `code:02`)
 - `SOURCE/components/billing/TutorQuotaNote.tsx` (the shipped `formattedResetDate?: string` declaration and the `unknown ⇒ return null` branch at `:30`)
-- `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` (the two `ExplainStepAffordance` call sites at `:177` and `:230` — confirm the page is an async server component with no entitlement value)
+- `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` (the two `ExplainStepAffordance` call sites at `:177` and `:230` — confirm the page is an async server component with no entitlement value)
 - `SOURCE/tests/e2e/fixture/subscription.fixture.e2e.test.ts` (case FE-2 — already written against this correction; it must need **no** edit after this amendment)
 
 ## Reference Contracts
@@ -94,7 +94,7 @@ Note in **both** documents that the shipped component still declares `formattedR
 
 ### Red phase — why no server-side producer can exist (the reasoning X-13 records)
 
-1. The mount site `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` is an **async server component** — `export default async function ResultDetailPage` at `:19` — whose only entitlement-adjacent import is `ExplainStepAffordance` (`:17`), used at `:177` and `:230`. It calls `getResult()` and `getTranslate()` and holds **no entitlement value**. (Verified this session by grep; the UI Spec's `:176,229` citation is one line stale, matching the class of drift the frontend DD records as X-5.)
+1. The mount site `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` is an **async server component** — `export default async function ResultDetailPage` at `:19` — whose only entitlement-adjacent import is `ExplainStepAffordance` (`:17`), used at `:177` and `:230`. It calls `getResult()` and `getTranslate()` and holds **no entitlement value**. (Verified this session by grep; the UI Spec's `:176,229` citation is one line stale, matching the class of drift the frontend DD records as X-5.)
 2. Producing `formattedResetDate` there would require a second `readEntitlement()` call at the page. Frontend DD fact row `code:02` fixes `readEntitlement` as **the one server read seam** and forbids a parallel read (`lib/billing/readEntitlement.ts:34`).
 3. `resetsAt` therefore exists **only inside the provider subtree** — carried inside `Quota`'s `known` variant in the `Entitlement` object that crosses the RSC boundary as `EntitlementProvider`'s `value`, i.e. **context, not a prop** (Field Propagation Map). That subtree is client-side, which is exactly where `useLocale()` is available.
 4. Consequence of the un-amended text: an implementer either invents a forbidden read path, or mounts `<TutorQuotaNote />` with the prop unfed — and `:35`'s ternary then renders the count with **no reset date, for every user, forever**, while lint, build and a provider-wrapped unit test all pass.
@@ -120,7 +120,7 @@ Note in **both** documents that the shipped component still declares `formattedR
 **Frontend Design Doc bumped 1.2 → 1.3** (Version cell + Update History row). Four edits:
 
 4. **`ui:06`** corrected: mounted as-is, **no prop passed**, component self-formats `formatDate(tutor.resetsAt, locale)` with `locale` from `useLocale()` in the `known` branch; records that through v1.2 the row read “Mounted with `formattedResetDate` from `formatDate()`” and therefore contradicted `code:04` and the Field Propagation Map; names plan Task 2.4 as the prop's retirer and X-13 as the escalation. Its UI Spec citation moved from the line number `:294-302` to a **section reference**, matching the document's own reading-note convention.
-5. **X-13 added** to Contradictions Found (after X-12): both quoted UI Spec sentences, both impossibility grounds, the fact that v1.2 corrected three of its own places **without escalating** while `ui:06` still agreed with the UI Spec, the Phase Inversion escalation and its outcome (UI Spec v1.4), the silent-failure class shared with FE-I8/R-12, and the residual owned by plan Task 2.4 (no code changes here; mount still a no-op until the `(layer2)` provider exists — A10 / R-12).
+5. **X-13 added** to Contradictions Found (after X-12): both quoted UI Spec sentences, both impossibility grounds, the fact that v1.2 corrected three of its own places **without escalating** while `ui:06` still agreed with the UI Spec, the Phase Inversion escalation and its outcome (UI Spec v1.4), the silent-failure class shared with FE-I8/R-12, and the residual owned by plan Task 2.4 (no code changes here; mount still a no-op until the `(exams)` provider exists — A10 / R-12).
 6. **Overview divergence paragraph** extended: three divergences becomes four, X-13 named as the one that had already bitten.
 7. **Reading note** for X-10/X-11/X-12 extended to cover X-13 (cited by section, quoted verbatim, text amended in UI Spec v1.4).
 
@@ -138,7 +138,7 @@ Note in **both** documents that the shipped component still declares `formattedR
 
 ### Operation verification (L3)
 
-Read in sequence: UI Spec UI-D17 → UI Spec C-06 delta → frontend DD `ui:06` → `code:04` → X-13. **One contract, stated identically**: the mount passes no prop; the note formats its own `resetsAt` from provider context inside the existing `known` branch; the shipped `formattedResetDate?: string` prop stays declared until plan Task 2.4 retires it; the mount is a no-op until the `(layer2)` provider exists.
+Read in sequence: UI Spec UI-D17 → UI Spec C-06 delta → frontend DD `ui:06` → `code:04` → X-13. **One contract, stated identically**: the mount passes no prop; the note formats its own `resetsAt` from provider context inside the existing `known` branch; the shipped `formattedResetDate?: string` prop stays declared until plan Task 2.4 retires it; the mount is a no-op until the `(exams)` provider exists.
 
 **FE-2 unchanged**: `git status --porcelain SOURCE/` is empty — no source file was touched. FE-2's contract banner (`:58-62`) already matches the amended documents, so the skeleton needs no edit.
 

@@ -103,7 +103,7 @@ The engineer set `ESSAY_GRADING_ENABLED` to a non-`true` value and reports **no 
 **Two halves confirmed without eyes on a screen:**
 
 1. **The stored bands survived**, measured read-only against prod while the flag was off: both essay elements still present, both still `graded`, `essayMax` summing to 2. Switching off deleted nothing — which is the property that makes the switch safe to use in an incident.
-2. **No read path is flag-gated, structurally.** `ESSAY_GRADING_ENABLED` appears at exactly **four** sites, and every one is a write-or-announce path: `submitExam()` (emitting keys), `retryEssayGrading()` (the action itself), the player footnote, and the author footnote. It appears **zero** times in `app/(layer2)/queries.ts`, `lib/scoring/essayLifecycle.ts`, `EssayScoreLine.tsx` or `EssayReviewBlock.tsx`. Reading an old key therefore cannot depend on the flag — this is the structural reason turning it off cannot erase a student's score.
+2. **No read path is flag-gated, structurally.** `ESSAY_GRADING_ENABLED` appears at exactly **four** sites, and every one is a write-or-announce path: `submitExam()` (emitting keys), `retryEssayGrading()` (the action itself), the player footnote, and the author footnote. It appears **zero** times in `features/exams/queries.ts`, `lib/scoring/essayLifecycle.ts`, `EssayScoreLine.tsx` or `EssayReviewBlock.tsx`. Reading an old key therefore cannot depend on the flag — this is the structural reason turning it off cannot erase a student's score.
 
 **Still outstanding:** a human opening the already-graded production attempt **with the flag off** and confirming the band is on screen. The two facts above make it near-certain; the rehearsal's entire purpose is to replace "near-certain, deduced" with "seen". Left open rather than ticked.
 
@@ -128,9 +128,9 @@ TPM 8 000 puts a 50-essay exam at ~5.5 minutes against `ESSAY_PASS_BUDGET_MS` of
 
 ## Investigation Targets
 - `docs/plans/20260829-feature-essay-auto-scoring.md` (§ Gate A; § Phase E, Task E6; § Notes — "What 'done' does not mean")
-- `SOURCE/app/(layer2)/actions.ts` (Task B1.5 — read site 1, `submitExam()`)
-- `SOURCE/app/(layer2)/essayActions.ts` (Task B3.2 — read site 2, `retryEssayGrading()`)
-- `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/page.tsx` (Task F-D1 — read site 3, the copy gate)
+- `SOURCE/features/exams/actions.ts` (Task B1.5 — read site 1, `submitExam()`)
+- `SOURCE/features/exams/essayActions.ts` (Task B3.2 — read site 2, `retryEssayGrading()`)
+- `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/page.tsx` (Task F-D1 — read site 3, the copy gate)
 - `SOURCE/lib/env/checkEnv.ts` (Task H4 — the variable registered at level `warn`)
 - `SOURCE/lib/scoring/essayLifecycle.ts` (Task H1 — `deriveEssayView()`, which is what makes an interrupted pass present as failed rather than pending forever)
 - `SOURCE/lib/tutor/telemetry.ts` (Task B3.1 — the `essay_grade` event type to look for in `telemetry_log`)

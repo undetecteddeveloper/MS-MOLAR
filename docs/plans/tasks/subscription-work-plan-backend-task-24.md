@@ -1,7 +1,7 @@
 # Task: Gate the upload path (I3) — and integration case INT-1
 
 Plan mapping: `docs/plans/subscription-work-plan.md` — **Phase 5, plan Task 5.4**
-Layer: **backend** (server action `SOURCE/app/(layer4)/actions.ts` + integration test)
+Layer: **backend** (server action `SOURCE/features/authoring/actions.ts` + integration test)
 
 Metadata:
 - Dependencies: backend-task-22 (the chokepoint), backend-task-21 (`consumeQuota`), backend-task-01 (`test:integration`), backend-task-11 (gate B on dev)
@@ -14,7 +14,7 @@ This **replaces** the superseded `LIMITS.MAX_UPLOADS_PER_DAY` DB-count check (wh
 
 ## Implementation Content
 
-In `SOURCE/app/(layer4)/actions.ts`:
+In `SOURCE/features/authoring/actions.ts`:
 - **hoist the `metaCall` derivation** (`entryMode === "automatic"`, today at `:417`) to a `const` immediately after `requireUser()`, and have `:417` consumer read it rather than re-deriving — **the value passed to `consumeQuota` and the value that gates the third call must be the same expression, evaluated once**;
 - call `consumeQuota("upload", userId, ent, metaCall ? 3 : 2)` **once, ahead of the branch at `:268`**, alongside the existing `guard("uploadExam", user.id)` at `:181`;
 - **delete** the superseded DB-count check at `:331-343` (`LIMITS.MAX_UPLOADS_PER_DAY`) rather than leaving it running in parallel.
@@ -27,13 +27,13 @@ In `SOURCE/app/(layer4)/actions.ts`:
 (e) Redis unavailable ⇒ refuse with **exactly 0** Gemini adapter invocations.
 
 ## Target Files
-- [x] `SOURCE/app/(layer4)/actions.ts`
+- [x] `SOURCE/features/authoring/actions.ts`
 - [x] `SOURCE/tests/integration/subscription.int.test.ts` (**INT-1 filled**)
 - [x] `SOURCE/lib/billing/quotaTelemetry.ts` — **thêm ở vòng rà soát**: bảng OK-04 dùng chung, rút ra khỏi hai bản sao literal
-- [x] `SOURCE/app/(layer2)/tutorActions.ts` — **thêm ở vòng rà soát**: xoá bản sao literal, import bảng dùng chung
+- [x] `SOURCE/features/exams/tutorActions.ts` — **thêm ở vòng rà soát**: xoá bản sao literal, import bảng dùng chung
 
 ## Investigation Targets
-- `SOURCE/app/(layer4)/actions.ts` (`:181` `guard("uploadExam", …)`; `:268` the branch the gate must precede; `:331-343` the superseded DB-count check to delete; `:417` the `metaCall` derivation to hoist) — **adjacent cases for the bug-fix / state sweep**
+- `SOURCE/features/authoring/actions.ts` (`:181` `guard("uploadExam", …)`; `:268` the branch the gate must precede; `:331-343` the superseded DB-count check to delete; `:417` the `metaCall` derivation to hoist) — **adjacent cases for the bug-fix / state sweep**
 - `SOURCE/lib/ugc/limits.ts` (`LIMITS.MAX_UPLOADS_PER_DAY` — confirm no other consumer survives)
 - `SOURCE/lib/billing/quota.ts` (plan Task 5.1 — `consumeQuota` signature and its three reasons)
 - `SOURCE/lib/ugc/gemini.ts` (plan Task 5.2 — the counted adapter boundary INT-1 asserts against)
@@ -84,7 +84,7 @@ In `SOURCE/app/(layer4)/actions.ts`:
 - [ ] **Production deploy is permitted only after plan Task 5.8 is green**
 
 ## Notes
-- Impact scope: `SOURCE/app/(layer4)/actions.ts`; downstream, plan Task 5.5 maps its refusal reason to a telemetry code.
+- Impact scope: `SOURCE/features/authoring/actions.ts`; downstream, plan Task 5.5 maps its refusal reason to a telemetry code.
 - Scope boundary: the diff is taken on the refusal reason string and the counter delta, **never on the response body**.
 
 ## Investigation Notes
@@ -92,7 +92,7 @@ In `SOURCE/app/(layer4)/actions.ts`:
 
 ### Đọc Investigation Targets (2026-08-20)
 
-**`SOURCE/app/(layer4)/actions.ts`** — `extractAndAssemble(formData)`, một hàm dài, các mốc thật (đo lúc bắt đầu task, file 1039 dòng):
+**`SOURCE/features/authoring/actions.ts`** — `extractAndAssemble(formData)`, một hàm dài, các mốc thật (đo lúc bắt đầu task, file 1039 dòng):
 - `:168` `const { supabase, user } = await requireUser();`
 - `:181` `const rl = await guard("uploadExam", user.id);` — cổng chi phí thứ nhất, RAM + Upstash, 5 lượt/24h.
 - `:192-193` `const entryMode: EntryMode = (formData.get("entryMode") …) === "automatic" ? "automatic" : "manual";` — **điểm SỚM NHẤT `metaCall` suy được**, vì `metaCall` là một hàm của `entryMode`.
@@ -107,7 +107,7 @@ In `SOURCE/app/(layer4)/actions.ts`:
 
 **`SOURCE/lib/ugc/gemini.ts`** — `GEMINI_CALLS_PER_OPERATION = { tutor: 1, uploadTyped: 2, uploadAutomatic: 3 }`; `generateContent()` là **điểm phát duy nhất**, và cả bốn extractor gọi nó **đúng một lần** mỗi lượt (`extractQuestions.ts:262`, `extractAnswers.ts:163`, `extractMeta.ts:110`, `callTutor.ts:97`).
 
-**`SOURCE/tests/integration/subscription.int.test.ts`** — khối chú thích INT-1 `:57-121`. Ghi nhận **hai sai lệch của khung**: (1) nghĩa vụ (d) và `@dependency` trỏ `app/(layer2)/actions.ts`, nhưng `extractAndAssemble` sống ở `app/(layer4)/actions.ts` (`(layer2)/actions.ts` không hề nhắc `MAX_UPLOADS_PER_DAY`) — khẳng định vắng mặt được viết cho **layer4**, tức file thật đang bị xử; (2) khung nói "Redis MOCKED … Supabase MOCKED", nhưng file này xoá `KV_REST_API_URL`/`KV_REST_API_TOKEN` ở tầm module cho INT-3, nên INT-1 phải tự đặt lại env và phải ghim `rateLimitStore` về `null` TRƯỚC đó.
+**`SOURCE/tests/integration/subscription.int.test.ts`** — khối chú thích INT-1 `:57-121`. Ghi nhận **hai sai lệch của khung**: (1) nghĩa vụ (d) và `@dependency` trỏ `features/exams/actions.ts`, nhưng `extractAndAssemble` sống ở `features/authoring/actions.ts` (`(exams)/actions.ts` không hề nhắc `MAX_UPLOADS_PER_DAY`) — khẳng định vắng mặt được viết cho **layer4**, tức file thật đang bị xử; (2) khung nói "Redis MOCKED … Supabase MOCKED", nhưng file này xoá `KV_REST_API_URL`/`KV_REST_API_TOKEN` ở tầm module cho INT-3, nên INT-1 phải tự đặt lại env và phải ghim `rateLimitStore` về `null` TRƯỚC đó.
 
 **`docs/design/subscription-backend-design.md`** — `:1069` (I3), `:251` (Change map), `:974-980` (lỗ `rerunExamId` nói lại cho đúng), `:931` (đặt chỗ chứ không tích từng lượt).
 
@@ -156,12 +156,12 @@ Sau khi cài đặt: `npm run test:integration` ⇒ **25 passed** (16 cũ + 9 ca
 | M4 | lời từ chối "rơi xuyên", vẫn phát Gemini | `if (false && !consumed.ok)` | (g), (e) |
 | M5 | bảng OK-04 thật ra là một hằng | ba lý do cùng một mã | (e) |
 | M6a | hằng cũ còn sót (hai cổng song song) | chèn lại một tham chiếu | (d) |
-| M6b | ca (d) đọc NHẦM file (đúng đường dẫn khung ghi sai) | trỏ sang `(layer2)/actions.ts` | (d) — bắt bằng khẳng định CÓ MẶT |
+| M6b | ca (d) đọc NHẦM file (đúng đường dẫn khung ghi sai) | trỏ sang `(exams)/actions.ts` | (d) — bắt bằng khẳng định CÓ MẶT |
 | M7 | cổng đặt SAU `Promise.all` | dời nguyên khối cổng xuống dưới stage 5 | đặt chỗ (`5 < 0` sai), (g), (e) |
 | M8a | mã telemetry gia sư gộp | `user_quota` → `not_eligible` (tutorActions.ts) | (a) |
 | M8b | cổng gia sư "rơi xuyên" | `if (false && !consumed.ok)` (tutorActions.ts) | (a) — ⚠ **BỊ THAY THẾ, xem § Vòng rà soát bên dưới**: đúng là (a) đỏ, nhưng đỏ ở khẳng định TELEMETRY, không ở khẳng định 0-lượt-gọi |
 | M9 | đường GHI ghép khoá khác đường ĐỌC | `quotaKey()` thêm hậu tố (quota.ts) | (a), (b), (c), (f), (g), (h) |
-| M10 | danh sách ADR-0013 bị nới lỏng | xoá entry `app/(layer4)/actions.ts` | `layout.test.tsx` — cổng Server Action |
+| M10 | danh sách ADR-0013 bị nới lỏng | xoá entry `features/authoring/actions.ts` | `layout.test.tsx` — cổng Server Action |
 
 Mọi probe ngoài Target Files (`quota.ts`, `tutorActions.ts`, `layout.test.tsx`) được
 khôi phục bằng **chép byte** từ bản sao lấy trước; md5 sau khôi phục khớp bản trước
@@ -197,7 +197,7 @@ nào. Phần này ghi cái **đo lại được**, và cái đã sửa.
 | **MZ (survivor đã xác nhận)** | Đột biến `return consumed.reason === "user_quota"` → `return false` tại `actions.ts` (chỗ trả lời người dùng sau khi cổng từ chối) để lại **cả làn 25 passed, exit 0**. Người cạn hạn mức nhận `failure("server", "Exam uploads are temporarily unavailable…")` thay cho câu chính sách AC-018/AC-053; ca (g) chỉ khẳng định số lượt gọi/bộ đếm/console, còn ca (e) khẳng định đúng `kind === "server"` — nên cặp ấy không tách nổi một lời từ chối CHÍNH SÁCH khỏi một lời từ chối HẠ TẦNG trên bề mặt người dùng | **ĐÃ ĐÓNG** — ca (g) thêm hai khẳng định gõ tay `expect(run.result.error.kind).toBe("validation")` và `expect(run.result.error.message).toContain("used every exam upload")`. Chạy lại đúng đột biến ấy: **(g) ĐỎ**, `AssertionError: expected 'server' to be 'validation'` |
 | **Bảng OK-04 nhân đôi, `project_budget` phía upload không được ghim** | Hai bản sao literal độc lập (`actions.ts` và `tutorActions.ts`); `satisfies Record<…>` chỉ khoá TẬP KHOÁ và MIỀN GIÁ TRỊ, không khoá từng cặp, nên `user_quota: "server"` biên dịch được ở một bên. Bản gia sư được ghim đủ 3/3; bản upload chỉ 2/3 — **cặp `project_budget` → `project_budget_exhausted` phía upload không có khẳng định nào** | **ĐÃ ĐÓNG bằng cách rút chung** — bảng chuyển sang module thường `SOURCE/lib/billing/quotaTelemetry.ts` (**không có `"use server"`**; chỉ thị ấy hạn chế EXPORT chứ không hạn chế IMPORT), cả hai file import và **xoá hẳn hai literal**. Nay đổi `project_budget` → `"server"` làm **2 ca đơn vị đỏ** trong `tutorActions.int.test.ts`, và vì hai chỗ dùng chung MỘT lời khai nên phía upload được ghim theo. Tính chất "lý do thứ tư = lỗi biên dịch" **còn nguyên sau khi dời**: thêm `"throttled"` vào `ConsumeResult` cho ra `TS1360` tại `quotaTelemetry.ts:34` **và** `TS7053` tại `actions.ts:314` + `tutorActions.ts:222` |
 | **Hai khẳng định console quá rộng** (ca (g) và (e)) | `expect(run.warnings.join("\n")).toContain("error_code=…")` tìm trên **toàn luồng** cảnh báo, mà luồng ấy còn nhận `console.warn` của chính `consumeQuota()` (`quota.ts:381`) | **ĐÃ THU HẸP** — lọc về đúng một dòng `[extractAndAssemble] cổng hạn mức từ chối:`, `toHaveLength(1)`, rồi mới kiểm nội dung. Probe hai chỗ (cho `quota.ts` phát ra `error_code=server`, và bỏ `error_code=` khỏi dòng từ chối của `actions.ts`): **bản rộng cũ để ca (e) SỐNG SÓT**, bản hẹp mới làm (e) **ĐỎ** (`expected '[extractAndAssemble] cổng hạn mức từ chối: reason=unavailable' to contain 'error_code=server'`). Hai khẳng định này mang chú thích **ĐƯỢC LÊN LỊCH THAY THẾ** bằng một khẳng định `telemetry_log` khi đường upload có `event_type` riêng — không được thừa kế trong im lặng như bằng chứng "mã ấy truy vấn được" |
-| **Khung INT-1 ghi sai đường dẫn** | `@dependency` và nghĩa vụ (d) vẫn đọc `app/(layer2)/actions.ts` trong khi phần cài đặt đọc `app/(layer4)/actions.ts` | **ĐÃ SỬA TẠI CHỖ** trong khối khung, cả hai nơi, kèm ghi chú `CORRECTED` nói rõ `extractAndAssemble` sống ở layer4 và `(layer2)/actions.ts` chưa từng nhắc `MAX_UPLOADS_PER_DAY`, nên khẳng định viết cho nó sẽ **xanh vĩnh viễn** |
+| **Khung INT-1 ghi sai đường dẫn** | `@dependency` và nghĩa vụ (d) vẫn đọc `features/exams/actions.ts` trong khi phần cài đặt đọc `features/authoring/actions.ts` | **ĐÃ SỬA TẠI CHỖ** trong khối khung, cả hai nơi, kèm ghi chú `CORRECTED` nói rõ `extractAndAssemble` sống ở layer4 và `(exams)/actions.ts` chưa từng nhắc `MAX_UPLOADS_PER_DAY`, nên khẳng định viết cho nó sẽ **xanh vĩnh viễn** |
 | **Hai giả định gánh tải chưa ghi** | (1) thứ tự ba lời gọi `int1RunUpload` là điều kiện của các literal tuyệt đối `counterBefore`/`counterAfter` ở (b)/(c)/(f); (2) `expect(int1BudgetKeys()).toHaveLength(1)` ở ca (h) giả định mọi lượt rơi vào **cùng một ngày lịch Pacific** | **ĐÃ GHI** — mỗi giả định một chú thích tại chỗ |
 
 Làn integration sau vòng này: **26 passed** (25 cũ + đối chứng dương của đường

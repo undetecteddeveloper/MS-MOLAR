@@ -1,7 +1,7 @@
 # Task B1.6 — Convert INT-1: the feature-off submit path
 
 Plan mapping: `docs/plans/20260829-feature-essay-auto-scoring.md` — **Phase B1 (Automatic Grading Path, vertical slice V1), Task B1.6**
-Layer: **backend** (`SOURCE/app/(layer2)/__tests__/**` — the integration lane)
+Layer: **backend** (`SOURCE/app/(exams)/__tests__/**` — the integration lane)
 
 Metadata:
 - Dependencies: **Task B1.5**.
@@ -12,19 +12,19 @@ Metadata:
 
 ## Implementation Content
 
-Convert `SOURCE/app/(layer2)/__tests__/essayGrading.int.test.ts` case **INT-1** from `it.todo` to an executing test.
+Convert `SOURCE/features/exams/__tests__/essayGrading.int.test.ts` case **INT-1** from `it.todo` to an executing test.
 
 **Mocked**: the Supabase client at the `createClient()` boundary (the sanctioned boundary of `getResult.int.test.ts` / `rating.int.test.ts`), the `service-role.ts` operations, `after()` (replaced by a **synchronous invocation** — the subject is *what* is registered and *when*, not how Next schedules it), Redis, `redirect()`, and global `fetch` as a **counted** mock.
 
 **Real**: `computeScore()`, `lib/scoring/essayLifecycle.ts`, `lib/scoring/wrongTwice.ts`, the i18n dictionaries.
 
 ## Target Files
-- [x] `SOURCE/app/(layer2)/__tests__/essayGrading.int.test.ts`
+- [x] `SOURCE/features/exams/__tests__/essayGrading.int.test.ts`
 
 ## Investigation Targets
-- `SOURCE/app/(layer2)/__tests__/essayGrading.int.test.ts` (the committed skeleton — INT-1's `Primary failure mode` / `Proof obligation` annotations, which this task converts verbatim in intent)
-- `SOURCE/app/(layer2)/__tests__/getResult.int.test.ts` and `SOURCE/app/(layer2)/__tests__/rating.int.test.ts` (the sanctioned `createClient()` mock boundary)
-- `SOURCE/app/(layer2)/actions.ts` (Task B1.5 commit 2 — the flag read, the threaded option, the `after()` registration at `:192`)
+- `SOURCE/features/exams/__tests__/essayGrading.int.test.ts` (the committed skeleton — INT-1's `Primary failure mode` / `Proof obligation` annotations, which this task converts verbatim in intent)
+- `SOURCE/features/exams/__tests__/getResult.int.test.ts` and `SOURCE/features/exams/__tests__/rating.int.test.ts` (the sanctioned `createClient()` mock boundary)
+- `SOURCE/features/exams/actions.ts` (Task B1.5 commit 2 — the flag read, the threaded option, the `after()` registration at `:192`)
 - `SOURCE/lib/scoring/computeScore.ts` (Task B1.5 commit 1 — the emitted keys; **real** in this lane)
 - `SOURCE/lib/scoring/essayLifecycle.ts` (Task H1 — **real** in this lane)
 - `SOURCE/lib/essay/gradeEssays.ts` (Task B1.4 — the callback whose registration is counted)
@@ -107,7 +107,7 @@ M1 is the exact defect the skeleton names as INT-1's primary failure mode; M3 is
 
 ## Quality Assurance Mechanisms
 - `npx tsc --noEmit` (strict) — Config: `SOURCE/tsconfig.json` (project-wide)
-- `npx vitest run` — Enforces: unit/integration correctness; this file is collected by the default lane — Config: `SOURCE/vitest.config.ts` (`lib/**`, `components/**`, `app/**`); covers `SOURCE/app/(layer2)/__tests__/essayGrading.int.test.ts`
+- `npx vitest run` — Enforces: unit/integration correctness; this file is collected by the default lane — Config: `SOURCE/vitest.config.ts` (`lib/**`, `components/**`, `app/**`); covers `SOURCE/features/exams/__tests__/essayGrading.int.test.ts`
 - ESLint (`--max-warnings 0`) — Config: `SOURCE/eslint.config.mjs` (project-wide)
 - `npm run build` — Config: `SOURCE/package.json` (project-wide)
 
@@ -164,5 +164,5 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
 
 ## Notes
 - Impact scope: none in production code — this task converts a skeleton case.
-- Scope boundary — preserve unchanged: INT-2 and INT-3 stay `it.todo` in this commit (Task B2.4 converts them); `SOURCE/app/(layer2)/actions.ts` and `computeScore.ts` (Task B1.5 owns them).
+- Scope boundary — preserve unchanged: INT-2 and INT-3 stay `it.todo` in this commit (Task B2.4 converts them); `SOURCE/features/exams/actions.ts` and `computeScore.ts` (Task B1.5 owns them).
 - The lane's mock boundaries are fixed by the skeleton and by `getResult.int.test.ts`/`rating.int.test.ts` — do not mock deeper than `createClient()`.

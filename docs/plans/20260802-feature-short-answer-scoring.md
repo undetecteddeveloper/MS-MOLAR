@@ -6,8 +6,8 @@ Estimated Duration: 3-4 days (solo engineer, pre-launch, no deadline pressure pe
 Estimated Impact: 11 files (5 backend, 3 frontend, 3 test/skeleton conversions) + 1 already-amended ADR
 Related Issue/PR: N/A (Medium-scale feature, no PRD; substitute source `requirement_analysis`, reproduced in both Design Docs' Agreement Checklists)
 Review Scope: fresh pre-implementation plan — planned-files scope derived from the Design Docs' Implementation Path Mapping and this plan's task targets:
-- Backend: `SOURCE/lib/scoring/computeScore.ts`, `SOURCE/lib/scoring/__tests__/computeScore.test.ts`, `SOURCE/app/(layer2)/actions.ts`, `SOURCE/app/(layer2)/__tests__/submitExam.int.test.ts`, `SOURCE/types/result.ts`, `SOURCE/scripts/dev-status.mjs`
-- Frontend: `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx`, `SOURCE/app/(layer2)/_components/QuestionRenderer.tsx`, `SOURCE/app/(layer2)/_components/__tests__/QuestionRenderer.test.tsx`
+- Backend: `SOURCE/lib/scoring/computeScore.ts`, `SOURCE/lib/scoring/__tests__/computeScore.test.ts`, `SOURCE/features/exams/actions.ts`, `SOURCE/features/exams/__tests__/submitExam.int.test.ts`, `SOURCE/types/result.ts`, `SOURCE/scripts/dev-status.mjs`
+- Frontend: `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx`, `SOURCE/features/exams/components/QuestionRenderer.tsx`, `SOURCE/features/exams/components/__tests__/QuestionRenderer.test.tsx`
 - E2E: `SOURCE/tests/e2e/fixture/short-answer-scoring.fixture.e2e.test.ts`
 - Already applied (no task, prerequisite): `docs/adr/ADR-0005-multi-part-national-exam-format.md` (2026-08-01 amendment)
 
@@ -51,7 +51,7 @@ Review Scope: fresh pre-implementation plan — planned-files scope derived from
 |-----------|----------|-----------------|---------------|
 | ESLint | Lint rules | `SOURCE/eslint.config.mjs` | project-wide |
 | `tsc`/type-check via `next build` | Static typing (strict mode) | `SOURCE/tsconfig.json` | project-wide |
-| `vitest run` | Unit/integration-test correctness | `SOURCE/vitest.config.ts` (`include: lib/**, components/**, app/**`) | `SOURCE/lib/scoring/__tests__/computeScore.test.ts`, `SOURCE/app/(layer2)/__tests__/submitExam.int.test.ts`, `SOURCE/app/(layer2)/_components/__tests__/QuestionRenderer.test.tsx` (primary correctness-proof mechanism for the backend slice) |
+| `vitest run` | Unit/integration-test correctness | `SOURCE/vitest.config.ts` (`include: lib/**, components/**, app/**`) | `SOURCE/lib/scoring/__tests__/computeScore.test.ts`, `SOURCE/features/exams/__tests__/submitExam.int.test.ts`, `SOURCE/features/exams/components/__tests__/QuestionRenderer.test.tsx` (primary correctness-proof mechanism for the backend slice) |
 | `next build` | Production build succeeds | `SOURCE/package.json` (`"build": "next build"`) | project-wide |
 | `questions.question_type CHECK IN ('mcq','essay','true_false','short_answer')` | Valid enum value | `SOURCE/supabase/schema.sql:440-442` | `public.questions` (already satisfied — no widening needed) |
 | Manual/Playwright MCP smoke verification | Visual/behavioral correctness of the 5 golden states | `.mcp.json` (`playwright` MCP server) | `/exams/[id]/attempt/[attemptId]/result/detail`, exam player short-answer input (primary correctness-proof mechanism for the frontend slice until the fixture-e2e test is live — this plan promotes it to an automated check via Task 1.6) |
@@ -68,7 +68,7 @@ Noted but not adopted for this change (recorded, not silently skipped): RLS veri
 | docs/design/short-answer-scoring-backend-design.md | Agreement Checklist Scope | Update header/doc comment in `computeScore.ts` (lines 8-15), including the true_false date correction | impl-target | Phase 1 Task 1.2 | covered | |
 | docs/design/short-answer-scoring-backend-design.md | Agreement Checklist Scope | Split `computeScore.test.ts`'s stale describe block (new `essay()` helper + regression test; rewritten `short_answer`-scored block) | verification | Phase 1 Task 1.1 | covered | |
 | docs/design/short-answer-scoring-backend-design.md | Agreement Checklist Scope / Fact Disposition `topicBreakdown-q3-callsite` | Fix pre-existing `topicBreakdown` describe block's `q3` call site to `shortAnswer("q3","Topic C", undefined)` | verification | Phase 1 Task 1.1 | covered | Must land in same task as the `shortAnswer()` helper's new 3rd parameter |
-| docs/design/short-answer-scoring-backend-design.md | Agreement Checklist Scope / Fact Disposition `submitExam-select-test-gap` | Add `SOURCE/app/(layer2)/__tests__/submitExam.int.test.ts` (required scope, SA-BE-012) | verification | Phase 1 Task 1.3 | covered | |
+| docs/design/short-answer-scoring-backend-design.md | Agreement Checklist Scope / Fact Disposition `submitExam-select-test-gap` | Add `SOURCE/features/exams/__tests__/submitExam.int.test.ts` (required scope, SA-BE-012) | verification | Phase 1 Task 1.3 | covered | |
 | docs/design/short-answer-scoring-backend-design.md | Agreement Checklist Scope / Prerequisite ADRs | Amend `docs/adr/ADR-0005-multi-part-national-exam-format.md` | prerequisite | (already applied, no task) | covered | Done alongside the Design Doc, prior to this plan |
 | docs/design/short-answer-scoring-backend-design.md | Implementation Path Mapping | `types/result.ts` stale scored-semantics doc comment (lines 14-15) | contract-change | Phase 1 Task 1.4 | covered | |
 | docs/design/short-answer-scoring-backend-design.md | Approval condition (recommended, minor) | `SOURCE/scripts/dev-status.mjs` stale pipeline-banner strings | prerequisite | Phase 1 Task 1.2 | covered | |
@@ -132,7 +132,7 @@ Noted but not adopted for this change (recorded, not silently skipped): RLS veri
 
 | Boundary | Owner (left side) | Owner (right side) | Serialized Format | Consumer Parse Rule | Expected Signal | Covered By Task(s) |
 |---|---|---|---|---|---|---|
-| `submitExam()` server action → `public.questions` (Supabase Postgres) | `SOURCE/app/(layer2)/actions.ts` `submitExam()` | `public.questions` table (Supabase/Postgres, separate process) | SQL `.select(...)` column-list string — must include `"essay_answer"` alongside the 8 pre-existing columns | Row-to-`Question` mapping: `essayAnswer: (r.essay_answer as string \| null) ?? undefined` | `submitExam.int.test.ts` asserts the mocked select-call string includes `"essay_answer"` and that the resulting `Question[]` has `essayAnswer` correctly mapped (incl. null→undefined) | Phase 1 Task 1.2 (producer/fix), Phase 1 Task 1.3 (consumer-side proof) |
+| `submitExam()` server action → `public.questions` (Supabase Postgres) | `SOURCE/features/exams/actions.ts` `submitExam()` | `public.questions` table (Supabase/Postgres, separate process) | SQL `.select(...)` column-list string — must include `"essay_answer"` alongside the 8 pre-existing columns | Row-to-`Question` mapping: `essayAnswer: (r.essay_answer as string \| null) ?? undefined` | `submitExam.int.test.ts` asserts the mocked select-call string includes `"essay_answer"` and that the resulting `Question[]` has `essayAnswer` correctly mapped (incl. null→undefined) | Phase 1 Task 1.2 (producer/fix), Phase 1 Task 1.3 (consumer-side proof) |
 
 ## Objective
 
@@ -192,14 +192,14 @@ Ship automatic scoring for `short_answer` questions end-to-end: `computeScore()`
     - **Approval condition 2 (fold-in)**: `SOURCE/scripts/dev-status.mjs` lines 54-55 — update the "Pipeline: Auto-scoring" banner text from "computeScore() pure — mcq + true_false auto-scored; short_answer/essay: stored, not auto-scored" to reflect `short_answer` now auto-scored (only `essay` remains "stored, not auto-scored").
   - **Hard sequencing rule**: the `computeScore.ts` branch and the `actions.ts` select+mapping fix land in this one commit — landing either half alone is a silent production no-op (backend DD's own top-2 named risk).
   - Proof Obligations: Task 1.1's tests turn GREEN; SA-BE-008/009 (mcq/true_false byte-identical regression) stay green throughout.
-  - Files: `SOURCE/lib/scoring/computeScore.ts`, `SOURCE/app/(layer2)/actions.ts`, `SOURCE/scripts/dev-status.mjs`
+  - Files: `SOURCE/lib/scoring/computeScore.ts`, `SOURCE/features/exams/actions.ts`, `SOURCE/scripts/dev-status.mjs`
   - Completion: Implementation Complete = branch + guard + select + mapping + both comment/string corrections done; Quality Complete = `vitest run` green with zero regressions, `tsc`/ESLint pass; Integration Complete = `computeScore()`'s new branch is reachable in production via `actions.ts`'s newly-fetched `essayAnswer` (proven by Task 1.3).
 
 - [x] **Task 1.3 — Integration test: `submitExam.int.test.ts` (SA-BE-012, required scope)**
-  - Convert the existing comment-only skeleton `SOURCE/app/(layer2)/__tests__/submitExam.int.test.ts` into an executable Vitest test using the sanctioned Supabase-client-mock boundary (pattern: `getResult.int.test.ts`/`rating.int.test.ts`).
+  - Convert the existing comment-only skeleton `SOURCE/features/exams/__tests__/submitExam.int.test.ts` into an executable Vitest test using the sanctioned Supabase-client-mock boundary (pattern: `getResult.int.test.ts`/`rating.int.test.ts`).
   - Proof Obligations (from skeleton): (a) query-shape — mocked `.select(...)` call string includes `"essay_answer"` alongside the pre-existing 8 columns (`.includes("sub_answers")` also true, proving additive, not replacing); (b) mapping correctness, non-null — `essay_answer: "1260"` → `Question.essayAnswer === "1260"` via an independently-authored literal `toEqual`/`toMatchObject`; (c) mapping correctness, null — `essay_answer: null` → `essayAnswer === undefined` strictly (key present, `toBeUndefined()`), never `null`/coerced `""`; (d) regression guard — the 8 pre-existing mapped fields stay byte-identical.
   - Dependency: Task 1.2 (the fix must exist to assert against).
-  - Files: `SOURCE/app/(layer2)/__tests__/submitExam.int.test.ts`
+  - Files: `SOURCE/features/exams/__tests__/submitExam.int.test.ts`
   - Completion: Implementation Complete = skeleton converted, all 4 proof obligations asserted and passing; Quality Complete = `vitest run` green; Integration Complete = closes the backend DD's own top-2 named risk (silent no-op undetectable by pure-unit tests).
 
 - [ ] **Task 1.4 — `types/result.ts` doc-comment correction (lines 14-15)**
@@ -229,7 +229,7 @@ Ship automatic scoring for `short_answer` questions end-to-end: `computeScore()`
     Source "Correct answer" from `q.essayAnswer` only — never `r.correct` (D3 invariant). Must not modify the not-scored branch (56-117), the status chip (118-126), or the MCQ map's content (AC-006/AC-007 regression guard).
   - Proof Obligations: AC-001 (`r.selected` displayed), AC-002 (`q.essayAnswer` displayed, never `r.correct`), AC-003 (fern when correct), AC-004 (destructive when wrong-with-answer, correct-answer line stays fern), AC-005 (muted "— skipped —" when wrong-and-unanswered) — see Reference Contract Values for exact color/label rules.
   - No ordering dependency on the backend change (dormant, degrades safely to the old blank render until `scored:true` rows exist) — included in this phase for early cross-slice integration verification via Task 1.6.
-  - Files: `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx`
+  - Files: `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx`
   - Completion: Implementation Complete = sub-branch added per the markup above [x] done; Quality Complete = ESLint/`tsc`/`next build` pass [x] done; Integration Complete = renders correctly once fed a `scored:true` `short_answer` `PerQuestionResult` (proven by Task 1.6) [ ] pending — manual/Playwright MCP live confirmation not executed in this run (no MCP/browser tool or confirmed seeded dev attempt in this execution context); code-level review confirms the guard/color/fallback logic matches the required states.
 
 - [🔄] **Task 1.6 — fixture-e2e: `short-answer-scoring.fixture.e2e.test.ts` (Test 1 + Test 2)**
@@ -258,13 +258,13 @@ Ship automatic scoring for `short_answer` questions end-to-end: `computeScore()`
 - [x] **Task 2.1 — `QuestionRenderer.tsx` footnote copy fix (AC-008/AC-009)**
   - Update line 150's `short_answer` footnote string from `"Short answer — stored, not auto-scored yet."` to `"Short answer — auto-scored after you submit."`. Do not touch the `true_false` footnote (129-131), the `essay` footnote (156-160), or the `<input>`'s `maxLength`/`placeholder`/`onChange` wiring.
   - Sequencing constraint (not a code dependency): must not land before Phase 1's backend change is live.
-  - Files: `SOURCE/app/(layer2)/_components/QuestionRenderer.tsx`
+  - Files: `SOURCE/features/exams/components/QuestionRenderer.tsx`
   - Completion: Implementation Complete = string updated exactly; Quality Complete = ESLint/`tsc` pass; Integration Complete = verified by Task 2.2.
 
 - [x] **Task 2.2 — Integration test: `QuestionRenderer.test.tsx` (AC-008/AC-009 regression guard)**
-  - Convert the existing comment-only skeleton `SOURCE/app/(layer2)/_components/__tests__/QuestionRenderer.test.tsx` into an executable RTL/jsdom test (`// @vitest-environment jsdom` docblock convention, matching `RichText`'s test suite).
+  - Convert the existing comment-only skeleton `SOURCE/features/exams/components/__tests__/QuestionRenderer.test.tsx` into an executable RTL/jsdom test (`// @vitest-environment jsdom` docblock convention, matching `RichText`'s test suite).
   - Proof Obligations (from skeleton): (a) `short_answer` footnote renders exactly `"Short answer — auto-scored after you submit."`, no match for "not auto-scored yet"; (b) `essay` footnote renders exactly the byte-identical pre-change string `"Essay question — answer on paper. Stored, not auto-scored yet."`; (c) `true_false` footnote renders exactly the byte-identical pre-change string `"True/False — stored, not auto-scored yet."`; (d) the `short_answer` `<input>`'s `maxLength="100"`, placeholder, and `onChange`→`onSelectAnswer` wiring are unaffected.
-  - Files: `SOURCE/app/(layer2)/_components/__tests__/QuestionRenderer.test.tsx`
+  - Files: `SOURCE/features/exams/components/__tests__/QuestionRenderer.test.tsx`
   - Completion: Implementation Complete = test converted, all 4 proof obligations asserted and passing; Quality Complete = `vitest run` green; Integration Complete = closes the "no automated test exists for either target file" gap named in the frontend DD's Risks and Mitigation.
 
 #### Phase Completion Criteria

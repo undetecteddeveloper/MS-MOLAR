@@ -34,9 +34,9 @@ Metadata:
 ## Investigation Targets
 - `SOURCE/scripts/pw/cli.mjs` and `SOURCE/package.json:14` (`npm run pw` — the browser driver)
 - `SOURCE/components/billing/RecheckOrderControl.tsx` (plan Task 3.7 — the control whose focus and alert behaviour is under observation)
-- `SOURCE/app/(billing)/me/orders/_components/PlanSummary.tsx` and `OrderList.tsx` (C-11 and the S-05 list; `OrderList` is the R-1 fallback wrap site)
-- `SOURCE/app/(billing)/pricing/checkout/_components/PaymentConfirm.tsx` (already a mounted client parent on S-06)
-- `SOURCE/components/billing/TutorQuotaNote.tsx` and `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` (`:177`, `:230` — item (iv))
+- `SOURCE/features/billing/components/orders/PlanSummary.tsx` and `OrderList.tsx` (C-11 and the S-05 list; `OrderList` is the R-1 fallback wrap site)
+- `SOURCE/features/billing/components/checkout/PaymentConfirm.tsx` (already a mounted client parent on S-06)
+- `SOURCE/components/billing/TutorQuotaNote.tsx` and `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` (`:177`, `:230` — item (iv))
 - `SOURCE/eslint.config.mjs` (`:1-23` — evidence that **no** `jsx-a11y` rule exists, which is why this pass is load-bearing)
 - `docs/ui-spec/subscription-ui-spec.md` (golden states 11-24)
 - `docs/design/subscription-frontend-design.md` (§ Second verification point / R-1 / R-2)

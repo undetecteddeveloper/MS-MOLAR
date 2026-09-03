@@ -81,4 +81,4 @@ Introduce **parts** as a first-class axis and **two new question types**, keepin
 
 - Official format: [vqa.moet.gov.vn structure notice](https://vqa.moet.gov.vn/vi/news/savefile/thong-bao/cau-truc-dinh-dang-de-thi-tot-nghiep-thpt-tu-nam-2025-74.html), [moet.gov.vn announcement](https://moet.gov.vn/tintuc/Pages/tin-tong-hop.aspx?ItemID=8979)
 - Live failure evidence: PROCESS.md §S#33 (2026-07-17 browser test — 22 answers vs 21 questions, 18 join errors, đề Toán TN THPT 2025)
-- Code touchpoints: `SOURCE/lib/ugc/{types,assembleExam,extractQuestions,extractAnswers,fromRows}.ts`, `SOURCE/app/(layer4)/{actions,queries}.ts`, `SOURCE/app/(layer2)/queries.ts`, `SOURCE/supabase/schema.sql`, `SOURCE/types/question.ts`
+- Code touchpoints: `SOURCE/lib/ugc/{types,assembleExam,extractQuestions,extractAnswers,fromRows}.ts`, `SOURCE/features/authoring/{actions,queries}.ts`, `SOURCE/features/exams/queries.ts`, `SOURCE/supabase/schema.sql`, `SOURCE/types/question.ts`

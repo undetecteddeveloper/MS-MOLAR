@@ -1,4 +1,4 @@
-# Task: Mount `EntitlementProvider` in `(layer2)/layout.tsx` and `(layer4)/layout.tsx` (D005 / I1)
+# Task: Mount `EntitlementProvider` in `(exams)/layout.tsx` and `(authoring)/layout.tsx` (D005 / I1)
 
 Plan mapping: `docs/plans/subscription-work-plan.md` — **Phase 2, plan Task 2.2**
 Layer: **frontend** (`SOURCE/app/**` layout files)
@@ -10,25 +10,25 @@ Metadata:
 
 ## Implementation Content
 
-Mirror `(billing)/layout.tsx:27,33` **line for line**. Both layouts already `await getCurrentUserProfile()` (`(layer2)/layout.tsx:18`, `(layer4)/layout.tsx:12`), so the change is **one `await readEntitlement(user?.id ?? null)` plus one wrapping element per file**.
+Mirror `(billing)/layout.tsx:27,33` **line for line**. Both layouts already `await getCurrentUserProfile()` (`(exams)/layout.tsx:18`, `(authoring)/layout.tsx:12`), so the change is **one `await readEntitlement(user?.id ?? null)` plus one wrapping element per file**.
 
 - **No `React.cache()`** and **no extra round trip**: route groups are siblings, so **exactly one `readEntitlement()` call happens per request**.
 - **Discipline this task must also record**: **no page or component below these layouts may call `readEntitlement()`** — they read context.
 - `SOURCE/app/(billing)/layout.tsx`, `SOURCE/lib/billing/entitlement.tsx` and `SOURCE/lib/billing/types.ts` are **not** edited.
 
 ## Target Files
-- [x] `SOURCE/app/(layer2)/layout.tsx`
-- [x] `SOURCE/app/(layer4)/layout.tsx`
-- [x] `SOURCE/app/(layer2)/__tests__/layout.test.tsx` and `SOURCE/app/(layer4)/__tests__/layout.test.tsx` (one render test per route group)
+- [x] `SOURCE/app/(exams)/layout.tsx`
+- [x] `SOURCE/app/(authoring)/layout.tsx`
+- [x] `SOURCE/app/(exams)/__tests__/layout.test.tsx` and `SOURCE/app/(authoring)/__tests__/layout.test.tsx` (one render test per route group)
 
 ## Investigation Targets
 - `SOURCE/app/(billing)/layout.tsx` (`:27`, `:33` — the shipped mount to mirror line for line; **not edited**)
-- `SOURCE/app/(layer2)/layout.tsx` (`:18` — the existing `await getCurrentUserProfile()`)
-- `SOURCE/app/(layer4)/layout.tsx` (`:12` — the existing `await getCurrentUserProfile()`)
+- `SOURCE/app/(exams)/layout.tsx` (`:18` — the existing `await getCurrentUserProfile()`)
+- `SOURCE/app/(authoring)/layout.tsx` (`:12` — the existing `await getCurrentUserProfile()`)
 - `SOURCE/lib/billing/entitlement.tsx` (**frozen** — `EntitlementProvider` and `useEntitlement`)
 - `SOURCE/lib/billing/types.ts` (**frozen** — `FREE_FALLBACK`, the value a gated child must **not** receive)
 - `SOURCE/lib/billing/readEntitlement.ts` (plan Task 2.1)
-- `SOURCE/components/tutor/ExplainStepAffordance.tsx` (a gated child under `(layer2)`; **read only**)
+- `SOURCE/components/tutor/ExplainStepAffordance.tsx` (a gated child under `(exams)`; **read only**)
 - `docs/ui-spec/subscription-ui-spec.md` (§ Component: `EntitlementProvider` / `useEntitlement` — C-01 — verify default + error (degrades to `FREE_FALLBACK`) + partial (`plan` known, quotas `unknown`) states)
 - `docs/ui-spec/subscription-ui-spec.md` (§ Component: `PlanComparison` — C-02 — verify default + partial (current plan marked, CTA suppressed) states)
 - `docs/design/subscription-backend-design.md` (§ Provider coverage / MSA-3 / I1)
@@ -86,7 +86,7 @@ Mirror `(billing)/layout.tsx:27,33` **line for line**. Both layouts already `awa
 - [x] **No production deploy of this branch has occurred** — this code reads `subscriptions`, which production does not have until plan Task 5.8
 
 ## Notes
-- Impact scope: two layouts; downstream, every gated component in `(layer2)` and `(layer4)`.
+- Impact scope: two layouts; downstream, every gated component in `(exams)` and `(authoring)`.
 - Scope boundary (must remain unmodified): `SOURCE/lib/billing/types.ts`, `SOURCE/lib/billing/entitlement.tsx`, `SOURCE/app/(billing)/layout.tsx`, `SOURCE/components/tutor/ExplainStepAffordance.tsx`.
 - `PlanComparison` (C-02) is **shipped and unchanged**; its `useEntitlement()` read at `:57` first sees a real plan after this task. It is **verified by the provider render test, not re-implemented**.
 
@@ -117,21 +117,21 @@ Mirror `(billing)/layout.tsx:27,33` **line for line**. Both layouts already `awa
 
 The wrapping element goes **between** `<SiteHeader>` and `<div id="main-content">`, i.e. it wraps
 `#main-content` only — `SkipLink`, `SiteHeader`, `BottomNav` and `SupportWidget` stay outside it.
-Both target layouts already have that exact `#main-content` div (`(layer2):28-30`, `(layer4):22-24`),
+Both target layouts already have that exact `#main-content` div (`(exams):28-30`, `(authoring):22-24`),
 so the mirror is one import line pair, one `await`, and one wrapping element per file.
 
 ### 2. Investigation Targets — what each contributed
 
 | Target | Observed |
 |---|---|
-| `(layer2)/layout.tsx:18` | `const user = await getCurrentUserProfile();` already present — the user id the read needs is in hand. |
-| `(layer4)/layout.tsx:12` | Same line, same shape. |
+| `(exams)/layout.tsx:18` | `const user = await getCurrentUserProfile();` already present — the user id the read needs is in hand. |
+| `(authoring)/layout.tsx:12` | Same line, same shape. |
 | `lib/billing/entitlement.tsx` (frozen) | `EntitlementProvider({value, children})` is a `"use client"` component over `createContext<Entitlement \| null>`; `useEntitlement()` = `use(ctx) ?? FREE_FALLBACK`. **No provider above a consumer is indistinguishable from a Free user** — this is the whole failure mode. |
 | `lib/billing/types.ts` (frozen) | `FREE_FALLBACK = {plan:"free", expiresAt:null, inGracePeriod:false, tutor:{state:"unknown"}, upload:{state:"unknown"}}`. |
 | `lib/billing/readEntitlement.ts` | Signature unchanged; real body. Supabase failure/missing row ⇒ **exactly `FREE_FALLBACK`** (fail-closed). Redis unconfigured/unreachable/`period_anchor_at` null ⇒ only the quota fields degrade to `{state:"unknown"}`, plan preserved (fail-open). Never throws to the layout. `expiresAt` normalised through `toISOString()`. |
 | `lib/billing/quota.ts` | `PLAN_LIMITS.premium = {tutor:500, upload:15}`; `periodStartEpoch("premium", anchor, …) = anchor.getTime()`; `PERIOD_MS = 30d`. |
 | `components/tutor/ExplainStepAffordance.tsx:52` (read only) | `useEntitlement().tutor` — the blocked-quota branch is unreachable while `tutor.state === "unknown"`, which is what an absent provider guarantees. |
-| `components/billing/TutorQuotaNote.tsx:30` | `if (tutor.state !== "known") return null;` — the permanent no-op under a missing provider. Used as the **real shipped gated child** in the `(layer2)` render test. |
+| `components/billing/TutorQuotaNote.tsx:30` | `if (tutor.state !== "known") return null;` — the permanent no-op under a missing provider. Used as the **real shipped gated child** in the `(exams)` render test. |
 | UI Spec C-01 (`:559`) | Frozen contract; Partial state = `plan` known + quotas `unknown`; Error state degrades to `FREE_FALLBACK`, *"indistinguishable from Free by design"* — hence the test must produce a genuine **Premium** value, or a badly-stubbed data source looks identical to an unmounted provider. |
 | UI Spec C-02 (`:618`) | `PlanComparison` marks the card matching `useEntitlement().plan` as current and suppresses its CTA. Shipped and unchanged; it renders under `(billing)`, so it is verified by the provider contract, not re-implemented here. |
 | backend DD § Provider coverage (`:870`) / MSA-3 (`:323`) / I1 (`:1067`) | Selected fix = mount in both layouts mirroring `(billing):27,33`. Sibling route groups ⇒ **exactly one** `readEntitlement()` per request; `React.cache()` deliberately absent repo-wide. Discipline: *"no page or component below these layouts may call `readEntitlement()`"*. |
@@ -180,7 +180,7 @@ Cả hai file test được chạy **trước** khi sửa layout, và cả hai �
 mà task này tồn tại: cây layout THẬT render (header, nav, widget đều có trong
 DOM dump), nhưng đứa con bị gate nhận đúng `FREE_FALLBACK`.
 
-**RED — `app/(layer2)/__tests__/layout.test.tsx` (6 failed / 3 passed):**
+**RED — `app/(exams)/__tests__/layout.test.tsx` (6 failed / 3 passed):**
 
 | Ca | Thông điệp đỏ nguyên văn |
 |---|---|
@@ -191,7 +191,7 @@ DOM dump), nhưng đứa con bị gate nhận đúng `FREE_FALLBACK`.
 | 1 lượt readEntitlement() | `expected +0 to be 1` |
 | nguồn: gọi đúng một lần | `expected [] to have a length of 1 but got +0` |
 
-**RED — `app/(layer4)/__tests__/layout.test.tsx` (7 failed / 2 passed):** cùng
+**RED — `app/(authoring)/__tests__/layout.test.tsx` (7 failed / 2 passed):** cùng
 hình dạng, với bộ số riêng —
 `expected 'free\|null\|false\|unknown\|unknown' to be 'premium\|2026-09-02T06:30:00.000Z\|false\|known:11/500@2026-08-24T06:30:00.000Z\|known:4/15@2026-08-24T06:30:00.000Z'`;
 `expected 'free\|…' to contain 'known:4/15@2026-08-24T06:30:00.000Z'`;
@@ -215,12 +215,12 @@ nhận cây làm việc trở lại đúng tập thay đổi dự kiến).
 
 | # | Đột biến | Kết quả | Ca nào bắt |
 |---|---|---|---|
-| M1 | Gỡ `EntitlementProvider` **chỉ** ở `(layer2)` | **BẮT** — (layer2) 3 đỏ, (layer4) xanh | 3 ca "không nhận FREE_FALLBACK" của đúng file (layer2) |
-| M2 | Gỡ `EntitlementProvider` **chỉ** ở `(layer4)` | **BẮT** — (layer4) 4 đỏ, (layer2) xanh | 4 ca của đúng file (layer4), gồm ca hạn mức `upload` |
+| M1 | Gỡ `EntitlementProvider` **chỉ** ở `(exams)` | **BẮT** — (exams) 3 đỏ, (authoring) xanh | 3 ca "không nhận FREE_FALLBACK" của đúng file (exams) |
+| M2 | Gỡ `EntitlementProvider` **chỉ** ở `(authoring)` | **BẮT** — (authoring) 4 đỏ, (exams) xanh | 4 ca của đúng file (authoring), gồm ca hạn mức `upload` |
 | M3 | Truyền `FREE_FALLBACK` thay cho giá trị đã `await` | **BẮT** — 3 đỏ | so khớp toàn bộ object + TutorQuotaNote |
 | M4 | Thêm một lời gọi `readEntitlement()` THỨ HAI | **BẮT** — 2 đỏ (`expected 2 to be 1`) | đếm lúc chạy **và** ca đọc mã nguồn |
 | M5 | Một đường đọc thứ hai dưới layout (`upload/page.tsx` import `readEntitlement`) | **BẮT** — 1 đỏ | ca quét phạm vi repo (binding decision) |
-| M6 | Đưa `React.cache()` vào `(layer2)` | **BẮT** — 2 đỏ | ca "KHÔNG có React.cache()" + ca đếm lời gọi trong file |
+| M6 | Đưa `React.cache()` vào `(exams)` | **BẮT** — 2 đỏ | ca "KHÔNG có React.cache()" + ca đếm lời gọi trong file |
 
 **0 đột biến sống sót.** M1 và M2 là cặp quan trọng nhất: chúng chứng minh hai
 file test phân biệt được HAI route group, chứ không phải cùng khẳng định một
@@ -241,22 +241,22 @@ M4 đẩy con số đó lên 2 và ca kiểm đỏ, nên phép đo có sức ph�
 nguồn `/cache\s*\(/` trên các dòng KHÔNG phải comment của từng layout — M6
 làm nó đỏ; (b) `grep -rn "cache(" SOURCE/app SOURCE/lib SOURCE/components` (bỏ file
 test) trả về ĐÚNG ba dòng, cả ba đều là **comment**: `entitlement.tsx:11`
-nói repo không dùng nó, cộng hai comment mới ở `(layer2)/layout.tsx:32` và
-`(layer4)/layout.tsx:26` nhắc lại lý do. Không có lời gọi thật nào.
+nói repo không dùng nó, cộng hai comment mới ở `(exams)/layout.tsx:32` và
+`(authoring)/layout.tsx:26` nhắc lại lý do. Không có lời gọi thật nào.
 
 ### 8. Binding Decisions — đánh giá lại tại Exit Gate
 
 | Source | Axis | Compliance Check | Đánh giá | Bằng chứng |
 |---|---|---|---|---|
-| `ADR-0013` § Architecture Impact | dependency_direction | Cả hai layout dùng `readEntitlement()` và truyền giá trị đó qua `EntitlementProvider`; không page/component nào bên dưới gọi `readEntitlement()` | **`Y`** | `(layer2)/layout.tsx:35` + `:41`/`:49`; `(layer4)/layout.tsx:29` + `:35`/`:43` — cùng hình dạng `(billing):27,33`. Không có lời gọi nào khác: ca quét repo (app/ + components/, trừ ba layout) trả mảng rỗng, và M5 làm nó đỏ nên nó có sức phân biệt. Lúc chạy: đúng 1 truy vấn `subscriptions` mỗi lượt render. Không thêm module, export hay phép tính quyền lợi thứ hai. |
+| `ADR-0013` § Architecture Impact | dependency_direction | Cả hai layout dùng `readEntitlement()` và truyền giá trị đó qua `EntitlementProvider`; không page/component nào bên dưới gọi `readEntitlement()` | **`Y`** | `(exams)/layout.tsx:35` + `:41`/`:49`; `(authoring)/layout.tsx:29` + `:35`/`:43` — cùng hình dạng `(billing):27,33`. Không có lời gọi nào khác: ca quét repo (app/ + components/, trừ ba layout) trả mảng rỗng, và M5 làm nó đỏ nên nó có sức phân biệt. Lúc chạy: đúng 1 truy vấn `subscriptions` mỗi lượt render. Không thêm module, export hay phép tính quyền lợi thứ hai. |
 
 Đánh giá trước khi làm là `Y` (§ 3) và đánh giá lại tại Exit Gate vẫn là `Y`;
 implementation không lệch khỏi phương án đã ghi.
 
 ### 9. Ranh giới phạm vi — xác nhận không đụng
 
-`git status` sau khi hoàn tất: chỉ `SOURCE/app/(layer2)/layout.tsx`,
-`SOURCE/app/(layer4)/layout.tsx`, file task này và hai file test mới.
+`git status` sau khi hoàn tất: chỉ `SOURCE/app/(exams)/layout.tsx`,
+`SOURCE/app/(authoring)/layout.tsx`, file task này và hai file test mới.
 `SOURCE/app/(billing)/layout.tsx`, `SOURCE/lib/billing/entitlement.tsx`,
 `SOURCE/lib/billing/types.ts` và `SOURCE/components/tutor/ExplainStepAffordance.tsx`
 **không bị sửa**.
@@ -295,8 +295,8 @@ Bốn sửa đổi, mỗi sửa đổi kèm một lượt chứng minh có sức
 
 | # | Sửa | Chứng minh ĐỎ | Khôi phục |
 |---|---|---|---|
-| 1 | Ca D005 ở cả hai file khẳng định **sự hiện diện** của probe TRƯỚC khi so giá trị (`expect(container.querySelector('[data-testid="probe"]')).not.toBeNull()`) | Gỡ mock `SkipLink`: `(layer2)` `AssertionError: expected null not to be null` tại `:266`; `(layer4)` cùng thông điệp tại `:244`. Ca D005 **ĐỎ ở cả hai file** | Mock khôi phục ⇒ 18/18 xanh |
-| 2 | `probeText()` đổi từ `querySelector(...)?.textContent ?? ""` sang `within(container).getByTestId("probe")` (ném) + chặn `textContent === null` | Cùng lượt gỡ mock: `TestingLibraryElementError: Unable to find an element by: [data-testid="probe"]`. Tổng `(layer2)` 3 failed / 6 passed (trước khi sửa: 2/7), `(layer4)` 4 failed / 5 passed | như trên |
+| 1 | Ca D005 ở cả hai file khẳng định **sự hiện diện** của probe TRƯỚC khi so giá trị (`expect(container.querySelector('[data-testid="probe"]')).not.toBeNull()`) | Gỡ mock `SkipLink`: `(exams)` `AssertionError: expected null not to be null` tại `:266`; `(authoring)` cùng thông điệp tại `:244`. Ca D005 **ĐỎ ở cả hai file** | Mock khôi phục ⇒ 18/18 xanh |
+| 2 | `probeText()` đổi từ `querySelector(...)?.textContent ?? ""` sang `within(container).getByTestId("probe")` (ném) + chặn `textContent === null` | Cùng lượt gỡ mock: `TestingLibraryElementError: Unable to find an element by: [data-testid="probe"]`. Tổng `(exams)` 3 failed / 6 passed (trước khi sửa: 2/7), `(authoring)` 4 failed / 5 passed | như trên |
 | 3 | Ca quét phạm vi repo thêm gốc `SOURCE/lib`, thêm `lib/billing/readEntitlement.ts` vào `ALLOWED`, và lọc qua `codeLines()` (đã nâng lên phạm vi module) | Thêm `__secondReadPathProbe()` gọi `readEntitlement()` vào `lib/billing/pricing.ts`: `AssertionError: expected [ 'lib/billing/pricing.ts' ] to deeply equal []` | `git checkout` ⇒ `git diff` rỗng, `git status` sạch |
 | 4 | Header § 5 sửa "5 failed / 4 passed" → **"6 failed / 3 passed"** (bảng 6 dòng bên dưới và danh sách ba ca xanh-sẵn vốn đã đúng; chỉ con số ở header sai) | — | — |
 
@@ -308,6 +308,6 @@ ra trong lượt render layout với `children` do test cấp. Lọc `codeLines(
 buộc kèm theo: `quota.ts` nhắc `readEntitlement()` ba lần trong văn xuôi
 (`:11`, `:40`, `:49`) và không lời nào là một đường đọc.
 
-Implementation (`(layer2)/layout.tsx`, `(layer4)/layout.tsx`) **không đổi một
+Implementation (`(exams)/layout.tsx`, `(authoring)/layout.tsx`) **không đổi một
 byte** trong lượt này. Cổng sau khi sửa: **1012 pass / 10 skip / 93 file**,
 `npx tsc --noEmit` 0 lỗi, `npx eslint . --max-warnings 0` sạch — đúng nền cũ.

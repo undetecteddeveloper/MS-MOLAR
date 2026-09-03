@@ -41,8 +41,8 @@ This task and F-C4 rewrite the **same file** and share the fake-clock hazard. **
 - `docs/ui-spec/essay-auto-scoring-ui-spec.md` (§ Component: HistoryRow (đang chấm marker) — verify default + partial states)
 - `docs/adr/ADR-0018-essay-async-grade-write.md` (§ Amendment to ADR-0010 — the three surfaces that must respect mutable result rows)
 - `SOURCE/app/(billing)/me/orders/__tests__/renderServerTree.tsx` (`:4-10` the empty-tree failure mode; `:25` the helper)
-- `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/page.tsx` and `…/result/detail/page.tsx` (the real route trees this lane renders)
-- `SOURCE/app/(HM)/history/_components/HistoryRow.tsx` and `SOURCE/components/history/HistoryRowMenu.tsx` (Task F-B3 — the `/history` door)
+- `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/page.tsx` and `…/result/detail/page.tsx` (the real route trees this lane renders)
+- `SOURCE/features/history/components/HistoryRow.tsx` and `SOURCE/components/history/HistoryRowMenu.tsx` (Task F-B3 — the `/history` door)
 - `SOURCE/lib/i18n/dictionaries/vi.ts` (Task F-A1 — the **real** dictionary these cases resolve strings from)
 
 ## Reference Contracts

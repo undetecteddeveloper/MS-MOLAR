@@ -19,8 +19,8 @@ Metadata:
 
 - Add `hasIncompleteEssay: boolean` (**required**) to `AttemptPdfData` in `SOURCE/lib/pdf/generateAttemptPdf.ts:11-28`, and pass it through the function body to the template.
 - Fill it at **both** construction sites, each from its own read path's **already-derived** field:
-  - `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/page.tsx:56` reads `ExamResult.hasIncompleteEssay`;
-  - `SOURCE/app/(HM)/history/_components/HistoryRow.tsx:23` reads `MyHistoryEntry.hasIncompleteEssay`.
+  - `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/page.tsx:56` reads `ExamResult.hasIncompleteEssay`;
+  - `SOURCE/features/history/components/HistoryRow.tsx:23` reads `MyHistoryEntry.hasIncompleteEssay`.
 - **Neither site re-derives the RS-6 expression.**
 
 ### Why the field belongs on this type
@@ -31,21 +31,21 @@ The backend Design Doc's Interface Change Matrix gives `AttemptPdfData` exactly 
 
 ## Target Files
 - [x] `SOURCE/lib/pdf/generateAttemptPdf.ts`
-- [x] `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/page.tsx`
-- [x] `SOURCE/app/(HM)/history/_components/HistoryRow.tsx`
+- [x] `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/page.tsx`
+- [x] `SOURCE/features/history/components/HistoryRow.tsx`
 - [x] `SOURCE/components/history/ActionButton.test.tsx`, `SOURCE/components/history/HistoryRowMenu.test.tsx`, `SOURCE/lib/pdf/generateAttemptPdf.test.ts` — **three** test files build a literal `AttemptPdfData`, not the two this task file predicted (see the sweep below). Each gained `hasIncompleteEssay: false`, which is correct — none of those fixtures has an essay.
 
 ## Investigation Targets
 - `docs/design/essay-auto-scoring-backend-design.md` (§ Hai vị từ mức-mảng / D-13 — `AttemptPdfData` gains `hasIncompleteEssay: boolean`; both construction sites fill it from their own read path)
 - `SOURCE/lib/pdf/generateAttemptPdf.ts` (`:11-28` `AttemptPdfData`; the function body that forwards to the template)
-- `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/page.tsx` (`:56` — construction site 1)
-- `SOURCE/app/(HM)/history/_components/HistoryRow.tsx` (`:23` — construction site 2; `:23-31` the `pdfInput`)
-- `SOURCE/app/(layer2)/_components/ResultActions.tsx` (`:16` — pass-through consumer, no change)
+- `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/page.tsx` (`:56` — construction site 1)
+- `SOURCE/features/history/components/HistoryRow.tsx` (`:23` — construction site 2; `:23-31` the `pdfInput`)
+- `SOURCE/features/exams/components/ResultActions.tsx` (`:16` — pass-through consumer, no change)
 - `SOURCE/components/history/ActionButton.tsx` (`:45` — pass-through consumer, no change)
 - `SOURCE/components/history/HistoryRowMenu.tsx` (`:49` — pass-through consumer, no change)
 - `SOURCE/components/history/usePdfAction.ts` (`:40` — pass-through consumer, no change here; Task F-B2 adds its third parameter)
-- `SOURCE/app/(layer2)/queries.ts` (Task B2.1 — `ExamResult.hasIncompleteEssay`)
-- `SOURCE/app/(HM)/queries.ts` (Task B2.2 — `MyHistoryEntry.hasIncompleteEssay`)
+- `SOURCE/features/exams/queries.ts` (Task B2.1 — `ExamResult.hasIncompleteEssay`)
+- `SOURCE/features/history/queries.ts` (Task B2.2 — `MyHistoryEntry.hasIncompleteEssay`)
 - `SOURCE/lib/scoring/essayLifecycle.ts` (Task H1 — EG-BE-036: the RS-6 expression lives **only** there)
 
 ## Reference Contracts
@@ -62,9 +62,9 @@ The two PDF export routes are the boundary this task closes. Both read a **publi
 
 | Kind | Sites |
 |---|---|
-| Construction (production) | `app/(layer2)/exams/[id]/attempt/[attemptId]/result/page.tsx:56`, `app/(HM)/history/_components/HistoryRow.tsx:23` |
+| Construction (production) | `app/(exams)/exams/[id]/attempt/[attemptId]/result/page.tsx:56`, `features/history/components/HistoryRow.tsx:23` |
 | Construction (test literals) | `components/history/ActionButton.test.tsx:60`, `components/history/HistoryRowMenu.test.tsx:49`, `lib/pdf/generateAttemptPdf.test.ts:62` |
-| Pass-through only | `app/(layer2)/_components/ResultActions.tsx:16`, `components/history/ActionButton.tsx:45`, `components/history/HistoryRowMenu.tsx:49`, `components/history/usePdfAction.ts:40` |
+| Pass-through only | `features/exams/components/ResultActions.tsx:16`, `components/history/ActionButton.tsx:45`, `components/history/HistoryRowMenu.tsx:49`, `components/history/usePdfAction.ts:40` |
 | Declaration | `lib/pdf/generateAttemptPdf.ts:11` |
 
 **One correction to this task file's own scope list**: it names "the two test files"; there are **three** files constructing a literal. The four pass-through consumers were confirmed unchanged, exactly as the task requires.
@@ -72,8 +72,8 @@ The two PDF export routes are the boundary this task closes. Both read a **publi
 **`tsc` named every site when the field was first made required** — the red phase was run deliberately, adding the required field *before* filling anything:
 
 ```
-app/(HM)/history/_components/HistoryRow.tsx(23,9): error TS2741: Property 'hasIncompleteEssay' is missing …
-app/(layer2)/exams/[id]/attempt/[attemptId]/result/page.tsx(56,9): error TS2741: …
+features/history/components/HistoryRow.tsx(23,9): error TS2741: Property 'hasIncompleteEssay' is missing …
+app/(exams)/exams/[id]/attempt/[attemptId]/result/page.tsx(56,9): error TS2741: …
 components/history/ActionButton.test.tsx(60,7): error TS2741: …
 components/history/HistoryRowMenu.test.tsx(49,7): error TS2741: …
 lib/pdf/generateAttemptPdf.test.ts(62,7): error TS2741: …

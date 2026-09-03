@@ -1,7 +1,7 @@
 # Task: Gate the tutor path (I2), without reopening the eligibility-disclosure surface (UI-D3 / AC-041)
 
 Plan mapping: `docs/plans/subscription-work-plan.md` — **Phase 5, plan Task 5.3**
-Layer: **backend** (server action `SOURCE/app/(layer2)/tutorActions.ts`)
+Layer: **backend** (server action `SOURCE/features/exams/tutorActions.ts`)
 
 Metadata:
 - Dependencies: backend-task-21 (`consumeQuota`), backend-task-22 (the chokepoint)
@@ -14,7 +14,7 @@ Adds a refusal branch that consumes a per-user counter. Sweep the adjacent cases
 
 ## Implementation Content
 
-Add `consumeQuota("tutor", userId, ent, 1)` **beside** the existing `guard("explainStep", userId)` at `SOURCE/app/(layer2)/tutorActions.ts:175`. **Access control does not move into `callTutor.ts`.**
+Add `consumeQuota("tutor", userId, ent, 1)` **beside** the existing `guard("explainStep", userId)` at `SOURCE/features/exams/tutorActions.ts:175`. **Access control does not move into `callTutor.ts`.**
 
 ### Constraint, binding — the two codes this refusal produces are different codes, and only one of them is client-visible
 
@@ -28,11 +28,11 @@ Add `consumeQuota("tutor", userId, ent, 1)` **beside** the existing `guard("expl
 **The positive half of AC-041 is already observable and already asserted**: FE-2 (plan Task 2.5, item (e)) asserts the pre-emptive exhausted-state string is **NOT EQUAL** to the resolved `t("tutor.error")` value in the same locale. AC-041 is satisfied *before* the press, from entitlement — not *after* the failure, from an error code. That is UI-D3 whole mechanism, and **this task must not move it**.
 
 ## Target Files
-- [ ] `SOURCE/app/(layer2)/tutorActions.ts` (gate added beside `:175`)
-- [ ] `SOURCE/app/(layer2)/__tests__/tutorActions.test.ts` (added cases)
+- [ ] `SOURCE/features/exams/tutorActions.ts` (gate added beside `:175`)
+- [ ] `SOURCE/features/exams/__tests__/tutorActions.test.ts` (added cases)
 
 ## Investigation Targets
-- `SOURCE/app/(layer2)/tutorActions.ts` (`:51` the four-literal `ExplainStepError` union; `:171` the shipped `not_eligible` refusal; `:175` `guard("explainStep", …)`) — **adjacent cases for the state sweep**
+- `SOURCE/features/exams/tutorActions.ts` (`:51` the four-literal `ExplainStepError` union; `:171` the shipped `not_eligible` refusal; `:175` `guard("explainStep", …)`) — **adjacent cases for the state sweep**
 - `SOURCE/components/tutor/ExplainStepAffordance.tsx` (`:96-99` — the collapse; **read only, must ship unmodified**)
 - `SOURCE/lib/billing/quota.ts` (plan Task 5.1 — `consumeQuota` three reasons)
 - `SOURCE/lib/tutor/telemetry.ts` (the write target for the distinct code; widened in plan Task 5.5)
@@ -86,7 +86,7 @@ Add `consumeQuota("tutor", userId, ent, 1)` **beside** the existing `guard("expl
 - [ ] **Production deploy is permitted only after plan Task 5.8 is green**
 
 ## Notes
-- Impact scope: `SOURCE/app/(layer2)/tutorActions.ts`; downstream, plan Tasks 5.5 (the mapping) and 5.7 (the three-cause telemetry proof).
+- Impact scope: `SOURCE/features/exams/tutorActions.ts`; downstream, plan Tasks 5.5 (the mapping) and 5.7 (the three-cause telemetry proof).
 - Scope boundary (must remain unmodified): `SOURCE/components/tutor/ExplainStepAffordance.tsx`; `SOURCE/lib/tutor/callTutor.ts` responsibilities.
 
 ## Investigation Notes
@@ -185,11 +185,11 @@ tests now pin: a **rate-limited** call must not also burn a period unit — `con
 request that never reaches Gemini. Probe M8 (gates swapped) confirms that case is not vacuous.
 
 **BLOCKER — one pre-existing test goes RED, and it encodes a binding decision, so it was NOT
-edited.** `app/(layer2)/__tests__/layout.test.tsx:376` (`describe("Binding decision ADR-0013 —
+edited.** `app/(exams)/__tests__/layout.test.tsx:376` (`describe("Binding decision ADR-0013 —
 một phép tính quyền lợi, KHÔNG có đường đọc thứ hai")`) walks `app/`, `components/` and `lib/`
 and asserts the only files mentioning `readEntitlement` in **code lines** are four allowlisted
 paths (the three route-group layouts + the defining module). This task's gate makes
-`app/(layer2)/tutorActions.ts` a fifth. Full suite: **1478 passed / 1 failed / 10 skipped**, and
+`features/exams/tutorActions.ts` a fifth. Full suite: **1478 passed / 1 failed / 10 skipped**, and
 that one failure is this scan — every other file, including both known flakes, is green.
 
 Why it is not resolvable inside this task's Target Files: `consumeQuota` requires a real
@@ -198,13 +198,13 @@ period start), `readEntitlement()` is its only producer, a wrapper anywhere unde
 the same scan, and `quota.ts` cannot call it without an import cycle (recorded in plan Task
 5.1). Passing an entitlement in from the client would be both an interface change and a forgeable
 security input in the one file whose stated design is to trust nothing the caller declares.
-**Plan Task 5.4 hits the identical wall** at `app/(layer4)/actions.ts`, so the rule wants stating
+**Plan Task 5.4 hits the identical wall** at `features/authoring/actions.ts`, so the rule wants stating
 once for both — escalated rather than patched.
 
 ### Session 2026-08-20 (continued) — ADR-0013 guard amended, not weakened
 
 Coordinator upheld the escalation and directed the **split** variant. Amended
-`SOURCE/app/(layer2)/__tests__/layout.test.tsx` only; **no ADR file was edited** and
+`SOURCE/app/(exams)/__tests__/layout.test.tsx` only; **no ADR file was edited** and
 ADR-0013 text is untouched.
 
 **What changed**: the one flat scan became **two scans over the same walked file set**,
@@ -214,7 +214,7 @@ exhaustive by construction and no file escapes both lists.
 - **Render path** (no directive): allowlist is byte-identical to before — the three route-group
   layouts + `lib/billing/readEntitlement.ts`. Same rule, same strictness.
 - **Server actions** (directive present): a separate allowlist, one entry, carrying its reason —
-  `app/(layer2)/tutorActions.ts`. Plan Task 5.4 adds `app/(layer4)/actions.ts`.
+  `features/exams/tutorActions.ts`. Plan Task 5.4 adds `features/authoring/actions.ts`.
 
 Grounds recorded at the allowlist: ADR-0013 forbids two **implementations** (*"Two independent
 implementations of a money-adjacent predicate is the shortest path to two different answers on
@@ -235,19 +235,19 @@ the *stricter* render-path branch, which is the safe direction.
 
 | Probe | Expected | Observed |
 |---|---|---|
-| G1 `readEntitlement` added to a page with no directive (`app/(layer2)/exams/page.tsx`, CRLF) | RED | RED — render-path case, `['app/(layer2)/exams/page.tsx']` |
+| G1 `readEntitlement` added to a page with no directive (`app/(exams)/exams/page.tsx`, CRLF) | RED | RED — render-path case, `['app/(exams)/exams/page.tsx']` |
 | G2 same, in a `lib/` helper (`lib/billing/pricing.ts`, CRLF) | RED | RED — render-path case, `['lib/billing/pricing.ts']` |
-| G3 a NEW `"use server"` module not on the action allowlist (`app/(layer4)/probeActions.ts`) | RED | RED — server-action case; **this is the property the flat list lacked** |
+| G3 a NEW `"use server"` module not on the action allowlist (`app/(authoring)/probeActions.ts`) | RED | RED — server-action case; **this is the property the flat list lacked** |
 | G4 `"use server"` removed from `tutorActions.ts` | RED | RED — it falls into the render-path bucket, proving the classifier keys on the directive and not on the path |
-| G5a `// "use server"` added as a comment to `app/(layer2)/layout.tsx` | GREEN (must not flip) | GREEN, 10/10 |
-| G5b same comment **plus** a naive `source.includes("use server")` detector | RED | RED — server-action case names `app/(layer2)/layout.tsx`, so G5a green is discriminating, not vacuous |
+| G5a `// "use server"` added as a comment to `app/(exams)/layout.tsx` | GREEN (must not flip) | GREEN, 10/10 |
+| G5b same comment **plus** a naive `source.includes("use server")` detector | RED | RED — server-action case names `app/(exams)/layout.tsx`, so G5a green is discriminating, not vacuous |
 
 **Target Files naming deviation, accepted and recorded**: the task file names
-`SOURCE/app/(layer2)/__tests__/tutorActions.test.ts`, which does not exist. The real file is
+`SOURCE/features/exams/__tests__/tutorActions.test.ts`, which does not exist. The real file is
 `tutorActions.int.test.ts`, collected by `npm test` through `vitest.config.ts`'s
 `app/**/*.test.{ts,tsx}` include (unit lane, not the integration lane). The ten cases were added
 there rather than duplicating ~200 lines of Supabase-chain mock into a near-identical file.
-A third file — `SOURCE/app/(layer2)/__tests__/layout.test.tsx` — is therefore also modified by
+A third file — `SOURCE/app/(exams)/__tests__/layout.test.tsx` — is therefore also modified by
 this task, by coordinator direction, and is outside the task file's Target Files list as written.
 
 **M6 honesty note stands**: `consumeQuota("tutor", userId, ent, 1)` is behaviourally equivalent

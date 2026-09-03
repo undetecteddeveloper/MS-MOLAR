@@ -12,7 +12,7 @@ Metadata:
 
 ## Implementation Content
 
-Build the service-lane fixture module following `SOURCE/app/(layer2)/__tests__/recordSkillMastery.int.test.ts` (this repository only existing service-lane test) and `SOURCE/supabase/test-rls.ts`:
+Build the service-lane fixture module following `SOURCE/features/exams/__tests__/recordSkillMastery.int.test.ts` (this repository only existing service-lane test) and `SOURCE/supabase/test-rls.ts`:
 
 - an **isolated id prefix per case** (`sub-svc-`) so setup and teardown are idempotent;
 - each case creates its **own** users and orders and deletes them in teardown, so a case passes twice in a row and in isolation;
@@ -26,7 +26,7 @@ Build the service-lane fixture module following `SOURCE/app/(layer2)/__tests__/r
 - [x] `SOURCE/tests/e2e/service/subscription.service.e2e.test.ts` — **comment-only edit**, not an import. An `import` added now would be unused and `eslint --max-warnings 0` would fail it, and the file's own header declares it carries no imports until the implementing task adds them with the cases. The FIXTURE HYGIENE block now names the fixture module, its per-case options and where the `vi.hoisted` session holder must be created.
 
 ## Investigation Targets
-- `SOURCE/app/(layer2)/__tests__/recordSkillMastery.int.test.ts` (the id-prefix + teardown pattern this lane copies)
+- `SOURCE/features/exams/__tests__/recordSkillMastery.int.test.ts` (the id-prefix + teardown pattern this lane copies)
 - `SOURCE/supabase/test-rls.ts` (the fixture-prefix + phased-block pattern, and how a user JWT session is obtained here)
 - `SOURCE/tests/e2e/service/subscription.service.e2e.test.ts` (SVC-1 and SVC-2 `Proof obligation:` / `Primary failure mode:` annotation blocks — the source of what the fixtures must make observable)
 - `SOURCE/tests/e2e/fixture/supportFixtureData.ts` (the shipped fixture-data convention in the sibling lane)

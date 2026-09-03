@@ -13,20 +13,20 @@ Metadata:
 - **Page**: auth guard **before** any fetch, redirecting to `/?auth=signin` (**never `/login`**); **zero rows fetched for a guest**.
 - **C-07 `OrderList` (server)**: `<ul className="flex flex-col gap-3">`, the dashed-border empty box idiom, **no height cap and no internal scroll**, **no sorting or filtering of its own** — it **re-states the non-re-sorting invariant**.
 - **C-08 `OrderRow` (server)**: created time via `formatDateTime()`, amount via `formatVnd()` + the `billing.amount` key, **`orderCode` as a raw digit string**; `md:flex-row` layout, **no `sm:`**; `min-w-0` on the text column and **no `whitespace-nowrap`** on the metadata line; a "continue paying" link **only when `pending` and `pendingUntil` is in the future**.
-- **`me/orders/{loading,error}.tsx`** per the **origin** pattern `(HM)/history/{loading,error}.tsx` — the skeleton matches its **own** page `PageContainer` **size and padding**; the error boundary **focuses its `role="alert"` on mount** via a ref on a `tabIndex={-1}` wrapper, retries via `reset()`, logs **`error.digest` only**, and its retry control carries **`min-h-11`**.
+- **`me/orders/{loading,error}.tsx`** per the **origin** pattern `(history)/history/{loading,error}.tsx` — the skeleton matches its **own** page `PageContainer` **size and padding**; the error boundary **focuses its `role="alert"` on mount** via a ref on a `tabIndex={-1}` wrapper, retries via `reset()`, logs **`error.digest` only**, and its retry control carries **`min-h-11`**.
 
 **No integration case is filled here**: **INT-3 belongs to plan Task 3.4** (it asserts `createOrder()` reuse branch) and **INT-2 to plan Task 3.5** (it asserts `getMyOrder()` mapping). Both are already resolved when this task starts — **integration 2/3 cumulative**.
 
 ## Target Files
 - [x] `SOURCE/app/(billing)/me/orders/page.tsx`
-- [x] `SOURCE/app/(billing)/me/orders/_components/OrderList.tsx`
-- [x] `SOURCE/app/(billing)/me/orders/_components/OrderRow.tsx`
+- [x] `SOURCE/features/billing/components/orders/OrderList.tsx`
+- [x] `SOURCE/features/billing/components/orders/OrderRow.tsx`
 - [x] `SOURCE/app/(billing)/me/orders/loading.tsx`
 - [x] `SOURCE/app/(billing)/me/orders/error.tsx`
 
 ## Investigation Targets
-- `SOURCE/app/(HM)/history/loading.tsx` and `SOURCE/app/(HM)/history/error.tsx` (**the origin pattern** — copy size, padding, focus handling, `reset()`, digest-only logging)
-- `SOURCE/app/(billing)/queries.ts` (plan Task 3.5 — `listMyOrders()` and `MyOrderRow`)
+- `SOURCE/app/(history)/history/loading.tsx` and `SOURCE/app/(history)/history/error.tsx` (**the origin pattern** — copy size, padding, focus handling, `reset()`, digest-only logging)
+- `SOURCE/features/billing/queries.ts` (plan Task 3.5 — `listMyOrders()` and `MyOrderRow`)
 - `SOURCE/lib/format/datetime.ts`, `SOURCE/lib/format/number.ts` (plan Task 2.3)
 - `SOURCE/components/billing/OrderStatusBadge.tsx` (plan Task 2.3 — C-09)
 - `SOURCE/app/(billing)/layout.tsx` (**frozen** — the route-group shell; do not edit)
@@ -46,7 +46,7 @@ Metadata:
 ## Boundary Context (from the plan Connection Map)
 
 **Boundary — S-05 / `PurchaseCta` → S-06 (order identifier across a navigation).**
-- Owners: `SOURCE/app/(billing)/me/orders/_components/OrderRow.tsx`, `SOURCE/app/(billing)/pricing/_components/PurchaseCta.tsx` ↔ `SOURCE/app/(billing)/pricing/checkout/page.tsx`.
+- Owners: `SOURCE/features/billing/components/orders/OrderRow.tsx`, `SOURCE/features/billing/components/pricing/PurchaseCta.tsx` ↔ `SOURCE/app/(billing)/pricing/checkout/page.tsx`.
 - **Serialized Format**: URL query string `?order={digits}` on `/pricing/checkout` — a decimal digit string, no grouping, no sign.
 - **Consumer Parse Rule**: accept **only** a value that is a **string** matching `/^\d+$/` whose `Number()` is a positive safe integer (`> 0` and `<= Number.MAX_SAFE_INTEGER`). **Never `parseInt`** — it accepts `"123abc"`. Anything else ⇒ C-13 Empty state, not an error and not a 404.
 - **Expected Signal**: navigation lands on `/pricing/checkout?order={the same orderCode createOrder() returned}` and S-06 renders that order transfer block.
@@ -57,7 +57,7 @@ Metadata:
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
-- [x] Read all Investigation Targets, starting with the `(HM)/history` origin boundary files
+- [x] Read all Investigation Targets, starting with the `(history)/history` origin boundary files
 - [x] Write failing tests: guest ⇒ redirect to `/?auth=signin` with **zero** rows fetched; empty ⇒ the dashed-border empty box, not an error; one row with an unrecognised status ⇒ C-09 unrecognised branch; `pending` + future `pendingUntil` ⇒ the "continue paying" link, absent otherwise
 ### 2. Green Phase
 - [x] Implement the page, C-07, C-08 and the two boundary files; run only the added tests
@@ -102,7 +102,7 @@ Metadata:
 - [x] All added tests pass
 - [x] The page performs **no ordering of its own**; C-07 re-states the non-re-sorting invariant
 - [x] Guest ⇒ redirect to `/?auth=signin` with zero rows fetched
-- [x] Boundary files match the `(HM)/history` origin pattern: same `PageContainer` size **and** padding, focused `role="alert"`, `reset()`, `error.digest` only, `min-h-11` retry
+- [x] Boundary files match the `(history)/history` origin pattern: same `PageContainer` size **and** padding, focused `role="alert"`, `reset()`, `error.digest` only, `min-h-11` retry
 - [x] Every Reference Contracts Compliance Check evaluates to `Y`, with evidence recorded in Investigation Notes
 - [x] **No production deploy of this branch has occurred** — and S-05 must not reach real users until SVC-2 (plan Task 6.2) passes
 
@@ -115,9 +115,9 @@ Metadata:
 
 ### Investigation Targets read (2026-08-19)
 
-**`(HM)/history/loading.tsx`** — `PageContainer as="main" size="small" padding="compact"`, one `h-8 w-32 animate-pulse rounded bg-border/60` heading block, then `mt-6 flex flex-col gap-3` with **4** `h-20 animate-pulse rounded-lg border border-border bg-card/40` blocks. Its comment states the rule: the skeleton must match **its own page's** size *and* padding or the content jumps when the skeleton is swapped for data.
+**`(history)/history/loading.tsx`** — `PageContainer as="main" size="small" padding="compact"`, one `h-8 w-32 animate-pulse rounded bg-border/60` heading block, then `mt-6 flex flex-col gap-3` with **4** `h-20 animate-pulse rounded-lg border border-border bg-card/40` blocks. Its comment states the rule: the skeleton must match **its own page's** size *and* padding or the content jumps when the skeleton is swapped for data.
 
-**`(HM)/history/error.tsx`** — `"use client"`; `useRef<HTMLDivElement>`, `useEffect(..., [error])` doing `console.error(...)` then `alertRef.current?.focus()`; wrapper `ref` + `role="alert"` + `tabIndex={-1}`; `<button type="button" onClick={reset}>`. Origin logs the **whole error object** and has **no `min-h-11`**; frontend DD § "Route boundary files" says to take those two points from `(layer3)/profile/error.tsx` instead (`{ digest: error.digest }` only, `min-h-11`, `common.tryAgain`). The four new files therefore = origin shape + profile's three corrections.
+**`(history)/history/error.tsx`** — `"use client"`; `useRef<HTMLDivElement>`, `useEffect(..., [error])` doing `console.error(...)` then `alertRef.current?.focus()`; wrapper `ref` + `role="alert"` + `tabIndex={-1}`; `<button type="button" onClick={reset}>`. Origin logs the **whole error object** and has **no `min-h-11`**; frontend DD § "Route boundary files" says to take those two points from `(analytics)/profile/error.tsx` instead (`{ digest: error.digest }` only, `min-h-11`, `common.tryAgain`). The four new files therefore = origin shape + profile's three corrections.
 
 **`(billing)/queries.ts`** — `listMyOrders(): Promise<MyOrderRow[]>`; `MyOrderRow = { orderCode: number; amountVnd: number; status: string; createdAt: string; pendingUntil: string }`. Ordering is declared **once in SQL** (`.order("created_at", { ascending: false })` against `payment_orders_user_created_idx`); the module's own comment forbids a second sort in JS. `createdAt`/`pendingUntil` leave the query **verbatim as PostgREST delivers them** (`+00:00` form, not `…Z`) — the view must not re-derive them. A guest reads 0 rows through `orders_select_own`, so `[]` is a value, not an error.
 

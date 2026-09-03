@@ -31,7 +31,7 @@ Metadata:
 - `docs/design/subscription-frontend-design.md` (§ AC ownership; contradiction rows X-10, X-11, X-12)
 - `docs/ui-spec/subscription-ui-spec.md` (§ UI-D3 at `:114-116`; the S-07 mapping at `:404`; TBD-07)
 - `docs/prd/subscription-prd.md` (R15 — Should Have; AC-041, AC-050, AC-026, AC-027, AC-035, AC-036, AC-037)
-- `SOURCE/app/(layer2)/tutorActions.ts` (`:51` — the four-literal client-visible `ExplainStepError` union AC-041 constraint protects)
+- `SOURCE/features/exams/tutorActions.ts` (`:51` — the four-literal client-visible `ExplainStepError` union AC-041 constraint protects)
 
 ## Reference Contracts
 
@@ -84,7 +84,7 @@ Metadata:
 | `docs/design/subscription-frontend-design.md` § Contradictions Found | X-10/X-11/X-12 each end in a **"Text to amend"** instruction written against UI Spec **v1.2** line numbers. X-1 and X-2 are the house pattern for closing a row: keep the ID, keep the problem statement, and state the closure inside the Resolution cell ("now CLOSED … **No contradiction remains**"). |
 | `docs/ui-spec/subscription-ui-spec.md` § UI-D3, § AC Traceability, § Open Items | UI-D3's closing line and the AC-050 row are the two verbatim sources. TBD-07's Open-Items row still read as an open request for a backend revision that has since landed. |
 | `docs/prd/subscription-prd.md` | R15 sits under the heading `### Should Have (P2)` (`:337`); R15 at `:339`, AC-050 at `:340`. AC-041 at `:319`. Confirms AC-050's requirement is **not** a Must. |
-| `SOURCE/app/(layer2)/tutorActions.ts` | `:51` — `export type ExplainStepError = "not_eligible" \| "rate_limited" \| "gemini_unavailable" \| "server";` **verified verbatim on disk**, four literals, unchanged. `ExplainStepAffordance.tsx:96-99` carries the anti-disclosure rationale; `:92-104` is the shipped pre-emptive blocked-quota branch. |
+| `SOURCE/features/exams/tutorActions.ts` | `:51` — `export type ExplainStepError = "not_eligible" \| "rate_limited" \| "gemini_unavailable" \| "server";` **verified verbatim on disk**, four literals, unchanged. `ExplainStepAffordance.tsx:96-99` carries the anti-disclosure rationale; `:92-104` is the shipped pre-emptive blocked-quota branch. |
 
 ### Citation note discovered while reading
 

@@ -1,7 +1,7 @@
 # Task F-B2 — `usePdfAction` guard + `ActionButton` + `ResultActions` + 13 coupled test sites (one commit)
 
 Plan mapping: `docs/plans/20260829-feature-essay-auto-scoring.md` — **Phase F-B (Detail Surface and the PDF Guard, frontend slices V2 + V3), Task F-B2**
-Layer: **frontend** (`SOURCE/components/history/**`, `SOURCE/app/(layer2)/_components/**`)
+Layer: **frontend** (`SOURCE/components/history/**`, `SOURCE/features/exams/components/**`)
 
 Metadata:
 - Dependencies: **Task F-A3**.
@@ -33,12 +33,12 @@ This **widens AC-058's stated scope**, which names only `ResultActions.tsx`, to 
 ## Target Files
 - [x] `SOURCE/components/history/usePdfAction.ts` — required 3rd parameter + early return above the busy latch
 - [x] `SOURCE/components/history/ActionButton.tsx` — required prop threaded to `aria-disabled`, the `sr-only` reason and the tooltip
-- [x] `SOURCE/app/(layer2)/_components/ResultActions.tsx` — threaded to **both** buttons
+- [x] `SOURCE/features/exams/components/ResultActions.tsx` — threaded to **both** buttons
 - [x] `SOURCE/components/history/ActionButton.test.tsx` — 13 render sites + 4 new blocked-state cases
 - [x] `SOURCE/components/history/HistoryRowMenu.tsx` — **extra, forced by `tsc`**: two `usePdfAction` calls
 - [x] `SOURCE/components/history/HistoryRowMenu.test.tsx` — **extra, forced**: the 2 sites the task file assigned to F-B3
-- [x] `SOURCE/app/(HM)/history/_components/HistoryRow.tsx` — **extra, forced**: passes `null` for one commit; F-B3 wires the real value
-- [x] `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/page.tsx` — **extra**: the `/result` door's blocked reason
+- [x] `SOURCE/features/history/components/HistoryRow.tsx` — **extra, forced**: passes `null` for one commit; F-B3 wires the real value
+- [x] `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/page.tsx` — **extra**: the `/result` door's blocked reason
 
 ## Investigation Targets
 - `docs/ui-spec/essay-auto-scoring-ui-spec.md` (§ Component: usePdfAction (PDF export guard) — verify idle-open + blocked + busy + error states)
@@ -47,9 +47,9 @@ This **widens AC-058's stated scope**, which names only `ResultActions.tsx`, to 
 - `docs/adr/ADR-0018-essay-async-grade-write.md` (§ Amendment to ADR-0010 — PDF export is blocked while any essay is unresolved)
 - `SOURCE/components/history/usePdfAction.ts` (`:40` the signature; `:46` `run()` — the early return goes at the top, before the `busyRef` latch)
 - `SOURCE/components/history/ActionButton.tsx` (`:45` the `pdfInput` prop; `:62` `aria-disabled`; `:95-97` the `sr-only` reason element; `:99` `TooltipContent`)
-- `SOURCE/app/(layer2)/_components/ResultActions.tsx` (`:16` the `pdfInput`; `:19-20` both buttons)
+- `SOURCE/features/exams/components/ResultActions.tsx` (`:16` the `pdfInput`; `:19-20` both buttons)
 - `SOURCE/components/history/ActionButton.test.tsx` (the **13** `<ActionButton …>` render sites)
-- `SOURCE/app/(layer2)/_components/ExplainStepAffordance.tsx` (`:11-14` — the two prior fixes of this exact bug, naming `RateButton` then `ActionButton`)
+- `SOURCE/components/tutor/ExplainStepAffordance.tsx` (`:11-14` — the two prior fixes of this exact bug, naming `RateButton` then `ActionButton`)
 - `SOURCE/lib/tutor/useTutorAction.ts` (`:26-31` — why the latch must be a synchronous `ref`, not state)
 
 ## Reference Contracts

@@ -30,7 +30,7 @@ The **R-f** condition is unchanged and not negotiable: shipping the code ceiling
 
 - **`SOURCE/lib/tutor/prompt.ts`**: declare `const TUTOR_MAX_STUDENT_ANSWER = 500;` **separately**, deliberately **not** importing `LIMITS.MAX_ATTEMPT_ANSWER`, and enforce the slice **inside** `buildTutorPrompt()` (`:100-107`) — never at a call site, **because a cap at a call site is a cap the second call site forgets**. Carry the reason in the comment: the DB ceiling is a decision about how much a student may write; this number is a decision about how many tokens we send to Gemini, **on a different budget key**. Fix the **reason** in the `:36` comment. The `questionType` union at `:37` stays **closed** (AC-071, enforced by `tsc`).
 - **`SOURCE/lib/ugc/limits.ts`**: `MAX_ATTEMPT_ANSWER: 500 → 4000`, and fix the comment at `:12-16` which hard-codes `500`.
-- **`SOURCE/app/(layer2)/_components/__tests__/QuestionRenderer.test.tsx`**: `:119` `expect(textarea?.maxLength).toBe(500)` → `toBe(4000)`, and the `:116` comment that hard-codes `"CHECK length <= 500"`.
+- **`SOURCE/features/exams/components/__tests__/QuestionRenderer.test.tsx`**: `:119` `expect(textarea?.maxLength).toBe(500)` → `toBe(4000)`, and the `:116` comment that hard-codes `"CHECK length <= 500"`.
 
 ### Ordering rule (Gate H4)
 The tutor cap lands **before or with** the raise, **never after**. In the window between them, a self-composed `short_answer` of 4000 characters flows straight into the Gemini prompt — essays never reach the tutor (the closed union excludes them), so the ripple travels through the **`short_answer`** path. The client input is capped at `LIMITS.MAX_SHORT_ANSWER = 100`, but **a client cap is not a server cap**: `submitExam` slices with `MAX_ATTEMPT_ANSWER` (`actions.ts:146`), so a hand-made request stores 4000 characters and they reach the prompt when the student presses "Giải thích bước này".
@@ -44,7 +44,7 @@ That line pins the English footnote string and is **AC-051**-coupled; it stays g
 ## Target Files
 - [x] `SOURCE/lib/tutor/prompt.ts` — `TUTOR_MAX_STUDENT_ANSWER` declared separately, slice enforced inside `buildTutorPrompt()`, the `:36` reason corrected
 - [x] `SOURCE/lib/ugc/limits.ts` — `MAX_ATTEMPT_ANSWER` 500 to 4000, comment rewritten with the asymmetry
-- [x] `SOURCE/app/(layer2)/_components/__tests__/QuestionRenderer.test.tsx` — `maxLength` pin to 4000, comment corrected; **`:112` untouched**
+- [x] `SOURCE/features/exams/components/__tests__/QuestionRenderer.test.tsx` — `maxLength` pin to 4000, comment corrected; **`:112` untouched**
 - [x] `SOURCE/lib/tutor/__tests__/prompt.test.ts` — **extra, required by this task's own Red phase** ("write the EG-BE-029 case and observe it fail"); the case has to live somewhere and the Target Files list omitted it
 
 ## Investigation Targets
@@ -54,9 +54,9 @@ That line pins the English footnote string and is **AC-051**-coupled; it stays g
 - `docs/ui-spec/essay-auto-scoring-ui-spec.md` (§ Component: QuestionRenderer (essay branch) — the `:119` maxLength coupled site)
 - `SOURCE/lib/tutor/prompt.ts` (`:36` the stale comment; `:37` the closed `questionType` union; `:100-107` `buildTutorPrompt()`'s body — where the slice is enforced)
 - `SOURCE/lib/ugc/limits.ts` (`:12-16` the comment hard-coding 500; `:17` `MAX_ATTEMPT_ANSWER`; `MAX_SHORT_ANSWER = 100`)
-- `SOURCE/app/(layer2)/_components/__tests__/QuestionRenderer.test.tsx` (`:112` the AC-051 footnote pin — **untouched**; `:116` the `"CHECK length <= 500"` comment; `:119` the `maxLength` pin)
-- `SOURCE/app/(layer2)/_components/QuestionRenderer.tsx` (`:23` the alias; `:194` `maxLength`; `:202` the `charsLeft` arithmetic — **no ceiling edit needed**)
-- `SOURCE/app/(layer2)/actions.ts` (`:146` — `submitExam` slices with `MAX_ATTEMPT_ANSWER`; a client cap is not a server cap)
+- `SOURCE/features/exams/components/__tests__/QuestionRenderer.test.tsx` (`:112` the AC-051 footnote pin — **untouched**; `:116` the `"CHECK length <= 500"` comment; `:119` the `maxLength` pin)
+- `SOURCE/features/exams/components/QuestionRenderer.tsx` (`:23` the alias; `:194` `maxLength`; `:202` the `charsLeft` arithmetic — **no ceiling edit needed**)
+- `SOURCE/features/exams/actions.ts` (`:146` — `submitExam` slices with `MAX_ATTEMPT_ANSWER`; a client cap is not a server cap)
 - `SOURCE/supabase/verify-schema.ts` (Task H6 — the ceiling gate whose red→green transition is this task's evidence)
 
 ## Boundary Context (from the work plan's Connection Map)
@@ -218,5 +218,5 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
 
 ## Notes
 - Impact scope: closes the known-red window for every later commit; the Final Phase audits the whole window from H7 to here.
-- Scope boundary — preserve unchanged: `QuestionRenderer.test.tsx:112` (**AC-051**-coupled; Open Item **I-6**, resolved at Task F-D1); `SOURCE/app/(layer2)/_components/QuestionRenderer.tsx` (**no ceiling edit** — D-04); `player.essayPlaceholder`, `player.charsLeft`, the `<textarea>` and its handler (AC-052); the `questionType` union at `prompt.ts:37` (AC-071).
+- Scope boundary — preserve unchanged: `QuestionRenderer.test.tsx:112` (**AC-051**-coupled; Open Item **I-6**, resolved at Task F-D1); `SOURCE/features/exams/components/QuestionRenderer.tsx` (**no ceiling edit** — D-04); `player.essayPlaceholder`, `player.charsLeft`, the `<textarea>` and its handler (AC-052); the `questionType` union at `prompt.ts:37` (AC-071).
 - **D-09 accounting**: `prompt.ts:36` is this task's **single** reason-only site (2 in B1.5, 1 here, 1 in B2.1, 7 in B4.1 = 11).

@@ -28,7 +28,7 @@ unknowns:
 
 ## Background and Context
 
-The Analytics page at `/me/dashboard` (route group `(layer3)`) is fully built and visually approved. Its two charts (`BarChartCard`, `DonutChartCard`) render from `SubjectStats[]`. Today that data comes from `ANALYTICS_BY_RANGE` + `getSubjectStats(range)` in `SOURCE/lib/fake-data/analytics.ts` — three hardcoded per-range datasets. This pass replaces that fake source with real per-user aggregates computed from the user's submitted exam attempts, scoped by Supabase RLS, without changing any chart props or visual design.
+The Analytics page at `/me/dashboard` (route group `(analytics)`) is fully built and visually approved. Its two charts (`BarChartCard`, `DonutChartCard`) render from `SubjectStats[]`. Today that data comes from `ANALYTICS_BY_RANGE` + `getSubjectStats(range)` in `SOURCE/lib/fake-data/analytics.ts` — three hardcoded per-range datasets. This pass replaces that fake source with real per-user aggregates computed from the user's submitted exam attempts, scoped by Supabase RLS, without changing any chart props or visual design.
 
 ### External Resources Used
 
@@ -44,10 +44,10 @@ No `docs/project-context/external-resources.md` exists in the repo; the two rows
 ## Agreement Checklist
 
 ### Scope (what to change)
-- Add `SOURCE/app/(layer3)/queries.ts` (server-only): fetch submitted results for the current user and return `Record<TimeRange, SubjectStats[]>`.
+- Add `SOURCE/features/analytics/queries.ts` (server-only): fetch submitted results for the current user and return `Record<TimeRange, SubjectStats[]>`.
 - Add `SOURCE/lib/analytics/aggregateAttempts.ts` (pure, no I/O): the reduce/exclusion/omission/ordering logic, testable without Supabase.
-- Edit `SOURCE/app/(layer3)/me/dashboard/page.tsx`: call the query server-side, pass `dataByRange` prop.
-- Edit `SOURCE/app/(layer3)/_components/AnalyticsDashboard.tsx`: accept `dataByRange`, drop `getSubjectStats`, keep tab/range/filterTouched state, add empty-state branch.
+- Edit `SOURCE/app/(analytics)/me/dashboard/page.tsx`: call the query server-side, pass `dataByRange` prop.
+- Edit `SOURCE/features/analytics/components/AnalyticsDashboard.tsx`: accept `dataByRange`, drop `getSubjectStats`, keep tab/range/filterTouched state, add empty-state branch.
 - Edit `SOURCE/lib/fake-data/analytics.ts`: remove `ANALYTICS_BY_RANGE` + `getSubjectStats`; keep all types/constants/helpers at the same path.
 - Add `SOURCE/lib/analytics/__tests__/aggregateAttempts.test.ts`: pure unit test for the reducer.
 
@@ -72,13 +72,13 @@ No `docs/project-context/external-resources.md` exists in the repo; the two rows
 |---|---|---|
 | RLS already scopes `exam_results`/`exam_attempts` to `auth.uid()` on SELECT | `SOURCE/supabase/schema.sql:201-203` (`results_select_own`), `:160-162` (`attempts_select_own`) | Yes |
 | `exams.subject` stores canonical English values matching the analytics union vocabulary | `SOURCE/lib/ugc/subjects.ts:8-19` (`SUBJECTS` canonical English), `:101-106` `normalizeSubject` maps intake to canonical; comment at `:4-6` states canonical kept English to match seed data | Yes (with nuance: canonical set is 10 subjects; analytics union is 7 → Geography/Informatics/Civic Education are legitimately excluded) |
-| A submitted attempt (`status='submitted'`) has `submitted_at` set | `SOURCE/app/(layer2)/actions.ts:121-124` — `submitExam` sets `status:'submitted'` and `submitted_at` atomically in the same `.update({...}).eq('id', attemptId)` call | Yes (code-produced rows; legacy/out-of-band rows may still be null) |
+| A submitted attempt (`status='submitted'`) has `submitted_at` set | `SOURCE/features/exams/actions.ts:121-124` — `submitExam` sets `status:'submitted'` and `submitted_at` atomically in the same `.update({...}).eq('id', attemptId)` call | Yes (code-produced rows; legacy/out-of-band rows may still be null) |
 | `exam_results.attempt_id` → `exam_attempts.id` and `exam_attempts.exam_id` → `exams.id` FKs exist (enable PostgREST embedding) | `SOURCE/supabase/schema.sql:119` (`attempt_id ... references exam_attempts`), `:102` (`exam_id ... references exams`) | Yes |
 | `correct <= total` invariant holds on every `exam_results` row (so `wrong = total - correct >= 0`) | `SOURCE/lib/scoring/computeScore.ts:71-73` (`correct` counts a subset of `scored`; `total = scored.length`) | Yes |
 
 ### Reflection in design
 - [x] Chart contract frozen → reducer emits `SubjectStats[]` with exactly `{ subject, correct, wrong, sessions }`; no chart file touched.
-- [x] RLS scoping → query uses the cookie-bound `createClient()`; no explicit `user_id` filter needed (RLS enforces it), mirroring `getResult()` in `(layer2)/queries.ts`.
+- [x] RLS scoping → query uses the cookie-bound `createClient()`; no explicit `user_id` filter needed (RLS enforces it), mirroring `getResult()` in `(exams)/queries.ts`.
 - [x] Non-union exclusion (decision #3) → reducer membership-tests against `SUBJECT_ORDER`.
 - [x] Zero-attempt omission (decision #4) → reducer emits only subjects with ≥1 counted attempt, ordered by `SUBJECT_ORDER`.
 - [x] Empty state (decision #5) → handled in `AnalyticsDashboard`, not in chart components.
@@ -90,11 +90,11 @@ No `docs/project-context/external-resources.md` exists in the repo; the two rows
 
 | Standard | Type | Reflection |
 |---|---|---|
-| Server reads live in a `queries.ts` module with `import "server-only"`, use `createClient` from `@/lib/supabase/server`, called from Server Components, results passed as props | explicit (observed and consistent across `(layer2)/queries.ts`) | `(layer3)/queries.ts` follows this exactly |
-| snake_case DB columns mapped to camelCase/domain shapes at the read boundary | explicit (`(layer2)/queries.ts:12-47` mappers) | reducer input `AttemptRow` uses camelCase `submittedAt`; query normalizes the embedded rows |
+| Server reads live in a `queries.ts` module with `import "server-only"`, use `createClient` from `@/lib/supabase/server`, called from Server Components, results passed as props | explicit (observed and consistent across `(exams)/queries.ts`) | `(analytics)/queries.ts` follows this exactly |
+| snake_case DB columns mapped to camelCase/domain shapes at the read boundary | explicit (`(exams)/queries.ts:12-47` mappers) | reducer input `AttemptRow` uses camelCase `submittedAt`; query normalizes the embedded rows |
 | Pure domain logic isolated from I/O in its own `lib/` module with a co-located `__tests__` unit test (`computeScore`) | explicit (`lib/scoring/computeScore.ts` + `lib/scoring/__tests__/computeScore.test.ts`) | reducer placed in `lib/analytics/` with `lib/analytics/__tests__/` |
-| RLS-first data access — no explicit user filter in query, RLS injects `auth.uid()` | explicit (`(layer2)/queries.ts:241-258` `getResult` relies on RLS, no `user_id` predicate) | analytics query adds no `user_id` predicate |
-| `data as unknown as Row[]` cast at the supabase-js boundary for untyped selects | implicit (repeated in `(layer2)/queries.ts`) | query casts the embedded-select result the same way — **confirmed: adopt existing `(layer2)/queries.ts` convention** |
+| RLS-first data access — no explicit user filter in query, RLS injects `auth.uid()` | explicit (`(exams)/queries.ts:241-258` `getResult` relies on RLS, no `user_id` predicate) | analytics query adds no `user_id` predicate |
+| `data as unknown as Row[]` cast at the supabase-js boundary for untyped selects | implicit (repeated in `(exams)/queries.ts`) | query casts the embedded-select result the same way — **confirmed: adopt existing `(exams)/queries.ts` convention** |
 | Vietnamese code comments, English identifiers | implicit (repo-wide) | new files follow the same convention |
 
 Implicit standards flagged above are adopted for consistency with surrounding code; confirm before implementation if a different convention is preferred.
@@ -110,7 +110,7 @@ No codebase-analysis `qualityAssurance` input was provided; the list below is fr
 | Vitest unit runner | `npm run test` (`vitest run`); include glob `lib/**/*.test.{ts,tsx}`, `components/**/*.test.{ts,tsx}` | Yes — pure reducer test at `lib/analytics/__tests__/…` matches the glob | adopted |
 | AI-key bundle guard | `node scripts/check-ai-key-bundle.mjs` | No — unrelated to analytics read path | noted (not relevant to this change area) |
 
-**Domain constraint (decisive):** the Vitest `include` glob does **not** cover `app/**`. A test placed under `app/(layer3)/**` would silently never run. This is the primary reason the pure reducer lives in `lib/analytics/` rather than beside `queries.ts`.
+**Domain constraint (decisive):** the Vitest `include` glob does **not** cover `app/**`. A test placed under `app/(analytics)/**` would silently never run. This is the primary reason the pure reducer lives in `lib/analytics/` rather than beside `queries.ts`.
 
 ## Existing Codebase Analysis
 
@@ -119,13 +119,13 @@ No codebase-analysis `qualityAssurance` input was provided; the list below is fr
 | Path | Status | Role |
 |---|---|---|
 | `SOURCE/lib/fake-data/analytics.ts` | existing (edit) | Owns `Subject`, `TimeRange`, `SubjectStats`, `SUBJECT_ORDER`, `SUBJECT_COLORS`, `RANGE_LABELS`, `NEEDS_REVIEW_THRESHOLD`, `DEFAULT_RANGE`, `niceCeil`, `computeShares` (all kept) + `ANALYTICS_BY_RANGE`, `getSubjectStats` (removed) |
-| `SOURCE/app/(layer3)/queries.ts` | **requires new creation** | server-only read: fetch submitted results, delegate to pure reducer |
+| `SOURCE/features/analytics/queries.ts` | **requires new creation** | server-only read: fetch submitted results, delegate to pure reducer |
 | `SOURCE/lib/analytics/aggregateAttempts.ts` | **requires new creation** | pure reducer (no I/O) |
 | `SOURCE/lib/analytics/__tests__/aggregateAttempts.test.ts` | **requires new creation** | pure unit test |
-| `SOURCE/app/(layer3)/me/dashboard/page.tsx` | existing (edit) | server component; add query call + prop |
-| `SOURCE/app/(layer3)/_components/AnalyticsDashboard.tsx` | existing (edit) | client container; accept prop, drop fake lookup, add empty-state branch |
-| `SOURCE/app/(layer3)/_components/BarChartCard.tsx` | existing (untouched) | consumes `SubjectStats[]` + pure helpers/constants |
-| `SOURCE/app/(layer3)/_components/DonutChartCard.tsx` | existing (untouched) | consumes `SubjectStats[]` + `SUBJECT_COLORS`/`computeShares` |
+| `SOURCE/app/(analytics)/me/dashboard/page.tsx` | existing (edit) | server component; add query call + prop |
+| `SOURCE/features/analytics/components/AnalyticsDashboard.tsx` | existing (edit) | client container; accept prop, drop fake lookup, add empty-state branch |
+| `SOURCE/features/analytics/components/BarChartCard.tsx` | existing (untouched) | consumes `SubjectStats[]` + pure helpers/constants |
+| `SOURCE/features/analytics/components/DonutChartCard.tsx` | existing (untouched) | consumes `SubjectStats[]` + `SUBJECT_COLORS`/`computeShares` |
 
 ### Existing Interface Investigation (module being changed)
 
@@ -137,13 +137,13 @@ No codebase-analysis `qualityAssurance` input was provided; the list below is fr
 Call sites of the removed symbols (Grep `fake-data/analytics`):
 - `AnalyticsDashboard.tsx:17` imports `getSubjectStats` → **rewired** to use the `dataByRange` prop.
 - `BarChartCard.tsx:15`, `DonutChartCard.tsx:16` import only kept symbols → **untouched**.
-- `me/dashboard/page.tsx` references the module only in a comment (line 3), no actual import today → will **add** an import of `getAnalyticsByRange` from `(layer3)/queries.ts` (not from fake-data).
+- `me/dashboard/page.tsx` references the module only in a comment (line 3), no actual import today → will **add** an import of `getAnalyticsByRange` from `(analytics)/queries.ts` (not from fake-data).
 
 > Fact correction to the brief: the fake-data module is imported by **3** files today (`AnalyticsDashboard`, `BarChartCard`, `DonutChartCard`); `page.tsx` only mentions it in a comment. This does not change any decision — the chart files remain the only importers that must stay untouched.
 
 ### Similar Functionality Search and Decision (Pattern 5 prevention)
 
-- Searched for existing per-user aggregation reads: none exist for analytics. `getResult()` in `(layer2)/queries.ts` reads a single attempt's stored result; it does not aggregate across attempts.
+- Searched for existing per-user aggregation reads: none exist for analytics. `getResult()` in `(exams)/queries.ts` reads a single attempt's stored result; it does not aggregate across attempts.
 - Searched for an existing pure "reduce rows to stats" domain function: `computeScore` (`lib/scoring/computeScore.ts`) is the precedent — pure, no I/O, co-located test. **Decision:** follow that pattern (new pure module + co-located test); do not extend `computeScore` (different responsibility: it scores one attempt, we aggregate many).
 - Searched for subject canonicalization: `lib/ugc/subjects.ts` owns intake canonicalization. **Decision:** do not re-canonicalize at read time — trust stored values and membership-test against `SUBJECT_ORDER` (the union is the read-side source of truth per confirmed decision #1).
 
@@ -165,12 +165,12 @@ Call sites of the removed symbols (Grep `fake-data/analytics`):
 
 | File / function | Relevance |
 |---|---|
-| `SOURCE/app/(layer2)/queries.ts` (`getResult`, `listExams`, mappers) | pattern reference: server-only read + RLS + snake→camel mapping |
+| `SOURCE/features/exams/queries.ts` (`getResult`, `listExams`, mappers) | pattern reference: server-only read + RLS + snake→camel mapping |
 | `SOURCE/lib/scoring/computeScore.ts` | pattern reference: pure domain reduce with co-located test |
 | `SOURCE/lib/scoring/__tests__/computeScore.test.ts` | pattern reference: vitest structure, literal expected values |
 | `SOURCE/lib/fake-data/analytics.ts` | integration point: types kept, fake source removed; `computeShares` sessions=0 guard at `:106` |
-| `SOURCE/app/(layer3)/_components/AnalyticsDashboard.tsx` | integration point: state owner being rewired |
-| `SOURCE/app/(layer3)/_components/BarChartCard.tsx` / `DonutChartCard.tsx` | contract reference: exact `SubjectStats[]` consumption, must stay untouched |
+| `SOURCE/features/analytics/components/AnalyticsDashboard.tsx` | integration point: state owner being rewired |
+| `SOURCE/features/analytics/components/BarChartCard.tsx` / `DonutChartCard.tsx` | contract reference: exact `SubjectStats[]` consumption, must stay untouched |
 | `SOURCE/lib/ugc/subjects.ts` | evidence for subject vocabulary (canonical English) |
 | `SOURCE/lib/supabase/server.ts` | dependency: cookie-bound RLS client |
 | `SOURCE/vitest.config.ts` | decisive constraint: include glob excludes `app/**` |
@@ -182,7 +182,7 @@ Derived from the brief's verified codebase facts (`code:` prefixed fact ids). No
 | Fact ID | Focus Area | Disposition | Rationale | Evidence |
 |---|---|---|---|---|
 | `code:fake-source-importers` | Who imports the fake module | transform | Fake symbols removed; chart files keep importing kept symbols from the same path; `AnalyticsDashboard` switches to the prop. New outcome: only `getSubjectStats`/`ANALYTICS_BY_RANGE` disappear. | Grep `fake-data/analytics`: `AnalyticsDashboard.tsx:17`, `BarChartCard.tsx:15`, `DonutChartCard.tsx:16` |
-| `code:server-read-pattern` | Established server-read pattern | preserve | `(layer3)/queries.ts` copies the `server-only` + `createClient` + props pattern verbatim. | `SOURCE/app/(layer2)/queries.ts:4-6`, `:241-258` |
+| `code:server-read-pattern` | Established server-read pattern | preserve | `(analytics)/queries.ts` copies the `server-only` + `createClient` + props pattern verbatim. | `SOURCE/features/exams/queries.ts:4-6`, `:241-258` |
 | `code:schema-join-path` | `exam_results → exam_attempts → exams.subject` | preserve | Join path and filter columns used exactly as described. | `schema.sql:99-127`, `:70-82` |
 | `code:rls-scoping` | RLS scopes results/attempts to `auth.uid()` | preserve | Query relies on RLS; no explicit user predicate added. | `schema.sql:160-162`, `:201-203` |
 | `code:kept-types` | Types/constants/helpers location | preserve | All kept at `lib/fake-data/analytics.ts`; charts untouched. | `lib/fake-data/analytics.ts:6-122` |
@@ -260,7 +260,7 @@ The whole feature becomes operational the moment `page.tsx` passes real `dataByR
 
 ## Prerequisite ADRs
 
-- Searched `docs/adr/` for `ADR-COMMON-*` covering server reads / error handling / RLS access. None found governing this area. No common technical decision is introduced here (no new logging/error-handling/contract convention) — the change follows the established `(layer2)/queries.ts` read pattern. **No new ADR required** (no architecture/data-flow/contract-system change per documentation-criteria; the SubjectStats contract is unchanged, storage location unchanged, data-passing method unchanged).
+- Searched `docs/adr/` for `ADR-COMMON-*` covering server reads / error handling / RLS access. None found governing this area. No common technical decision is introduced here (no new logging/error-handling/contract convention) — the change follows the established `(exams)/queries.ts` read pattern. **No new ADR required** (no architecture/data-flow/contract-system change per documentation-criteria; the SubjectStats contract is unchanged, storage location unchanged, data-passing method unchanged).
 
 ## Data Contracts
 
@@ -296,7 +296,7 @@ getAnalyticsByRange(): Promise<Record<TimeRange, SubjectStats[]>>
   - Columns read: `exam_results.correct`, `exam_results.total`, `exam_attempts.submitted_at`, `exam_attempts.status`, `exams.subject`. No answer/PII columns selected.
 - **Normalization:** map each embedded row to `AttemptRow` (`submitted_at → submittedAt`, `exams.subject → subject`), cast via `data as unknown as Row[]` per the repo boundary convention.
 - **Output:** `aggregateAttemptsByRange(rows, new Date())`.
-- **On error:** `if (error) throw error` (fail-fast, matches `(layer2)/queries.ts`; no silent fallback per ai-development-guide). The Server Component boundary surfaces it.
+- **On error:** `if (error) throw error` (fail-fast, matches `(exams)/queries.ts`; no silent fallback per ai-development-guide). The Server Component boundary surfaces it.
 
 ### Reducer input row (PostgREST embedded shape)
 
@@ -318,7 +318,7 @@ Not applicable — no stateful component is introduced. `AnalyticsDashboard` ret
 flowchart TD
   A["/me/dashboard page.tsx (server)"] -->|auth guard: getCurrentUser| B{authed?}
   B -->|no| R["redirect /?auth=signin"]
-  B -->|yes| C["getAnalyticsByRange() — (layer3)/queries.ts (server-only)"]
+  B -->|yes| C["getAnalyticsByRange() — features/analytics/queries.ts (server-only)"]
   C -->|createClient RLS| D[("Supabase: exam_results ⋈ exam_attempts ⋈ exams (status='submitted', auth.uid())")]
   D -->|rows| E["normalize → AttemptRow[]"]
   E --> F["aggregateAttemptsByRange(rows, now) — lib/analytics (pure)"]
@@ -388,7 +388,7 @@ Ordering is guaranteed by iterating `SUBJECT_ORDER` at emit time (not by inserti
 ## Cleanup of `lib/fake-data/analytics.ts`
 
 - Remove `const ANALYTICS_BY_RANGE` (lines 59-89) and `export function getSubjectStats` (lines 91-93).
-- Update the module's top comment: it currently says data is fake and "GĐ sau thay bằng aggregate thật" — reword to note that aggregation now lives in `(layer3)/queries.ts` + `lib/analytics/aggregateAttempts.ts` and that this file now holds only shared types/constants/helpers.
+- Update the module's top comment: it currently says data is fake and "GĐ sau thay bằng aggregate thật" — reword to note that aggregation now lives in `(analytics)/queries.ts` + `lib/analytics/aggregateAttempts.ts` and that this file now holds only shared types/constants/helpers.
 - Keep everything else at the same path so the three chart imports resolve unchanged.
 
 ### Naming-smell follow-up (documented, NOT done in this pass)
@@ -427,18 +427,18 @@ The kept symbols are domain types/helpers, but they live under `lib/fake-data/` 
 ```yaml
 Change Target: "Analytics Layer 3 data source (getSubjectStats fake → getAnalyticsByRange real)"
 Direct Impact:
-  - SOURCE/app/(layer3)/queries.ts (new file — server-only read)
+  - SOURCE/features/analytics/queries.ts (new file — server-only read)
   - SOURCE/lib/analytics/aggregateAttempts.ts (new file — pure reducer)
   - SOURCE/lib/analytics/__tests__/aggregateAttempts.test.ts (new file — unit test)
-  - SOURCE/app/(layer3)/me/dashboard/page.tsx (call query, pass prop)
-  - SOURCE/app/(layer3)/_components/AnalyticsDashboard.tsx (accept prop, drop fake lookup, empty-state branch)
+  - SOURCE/app/(analytics)/me/dashboard/page.tsx (call query, pass prop)
+  - SOURCE/features/analytics/components/AnalyticsDashboard.tsx (accept prop, drop fake lookup, empty-state branch)
   - SOURCE/lib/fake-data/analytics.ts (remove ANALYTICS_BY_RANGE + getSubjectStats; keep rest)
 Indirect Impact:
   - Page load now performs one authenticated Supabase read (previously zero) — added latency, no new loading UI (fetched server-side before render)
 No Ripple Effect:
-  - SOURCE/app/(layer3)/_components/BarChartCard.tsx (imports only kept symbols — untouched)
-  - SOURCE/app/(layer3)/_components/DonutChartCard.tsx (imports only kept symbols — untouched)
-  - SOURCE/app/(layer3)/layout.tsx (session/header shell — unrelated)
+  - SOURCE/features/analytics/components/BarChartCard.tsx (imports only kept symbols — untouched)
+  - SOURCE/features/analytics/components/DonutChartCard.tsx (imports only kept symbols — untouched)
+  - SOURCE/app/(analytics)/layout.tsx (session/header shell — unrelated)
   - SUBJECT_COLORS, Subject union, SUBJECT_ORDER, niceCeil, computeShares, RANGE_LABELS, DEFAULT_RANGE (unchanged)
   - schema.sql / RLS / migrations (no change)
 ```
@@ -503,7 +503,7 @@ Highest priority first. Each is verifiable against the pure reducer (unit) unles
 
 | ID | Risk | Likelihood | Mitigation |
 |---|---|---|---|
-| R-1 | A `status='submitted'` attempt has `null` `submitted_at`, so it is mis-bucketed | Very low | Resolved: `submitExam` sets `status:'submitted'` and `submitted_at` atomically (`SOURCE/app/(layer2)/actions.ts:121-124`), so code-produced rows always have `submitted_at`. The reducer's rule (count a `null`-`submitted_at` submitted row only in `all`, never throw) is retained as harmless-conservative handling for any legacy/out-of-band row, not as a load-bearing mitigation. |
+| R-1 | A `status='submitted'` attempt has `null` `submitted_at`, so it is mis-bucketed | Very low | Resolved: `submitExam` sets `status:'submitted'` and `submitted_at` atomically (`SOURCE/features/exams/actions.ts:121-124`), so code-produced rows always have `submitted_at`. The reducer's rule (count a `null`-`submitted_at` submitted row only in `all`, never throw) is retained as harmless-conservative handling for any legacy/out-of-band row, not as a load-bearing mitigation. |
 | R-2 | An exam stored a non-canonical / legacy subject string (pre-`normalizeSubject`) and is silently excluded | Low | Intake canonicalization enforces English union (`subjects.ts`); exclusion is the intended, documented behavior (AC-04). If unexpected data loss is observed, surface via a follow-up data audit — not a silent fallback. |
 | R-3 | PostgREST embedded-select shape differs from assumed (`exam_attempts` returned as array vs object) | Low | Normalize step handles the to-one embed; if runtime shape differs, the `data as unknown as Row[]` cast + normalize is the single adjustment point; verified at first L1 render. |
 | R-4 | Vitest silently not running the new test (wrong path) | Low | Test placed under `lib/analytics/__tests__/` to match the `lib/**` include glob; confirm by seeing the test count increase in `npm run test`. |
@@ -511,7 +511,7 @@ Highest priority first. Each is verifiable against the pure reducer (unit) unles
 ## References
 
 - Existing UI-only design: `docs/design/analytics-layer3-design.md`
-- Server-read pattern: `SOURCE/app/(layer2)/queries.ts`
+- Server-read pattern: `SOURCE/features/exams/queries.ts`
 - Pure-domain-logic precedent: `SOURCE/lib/scoring/computeScore.ts` (+ its `__tests__`)
 - Subject vocabulary: `SOURCE/lib/ugc/subjects.ts`
 - Schema: `SOURCE/supabase/schema.sql` (tables at `:70-127`, RLS at `:160-203`)

@@ -1,4 +1,4 @@
-# Phase 1 Completion: Backend — `listMyHistory()` + `getResult()` Extension + `(HM)` Guard/Layout
+# Phase 1 Completion: Backend — `listMyHistory()` + `getResult()` Extension + `(history)` Guard/Layout
 
 Covers Work Plan Phase 1 (Tasks 1.1-1.4 / `history-work-plan-task-02.md` through `history-work-plan-task-05.md`).
 
@@ -6,13 +6,13 @@ Covers Work Plan Phase 1 (Tasks 1.1-1.4 / `history-work-plan-task-02.md` through
 
 - [ ] Task 02 (1.1 — `getResult()` extension) complete: `getResult.int.test.ts` 3/3 obligations green; Early Verification Point #1 (Output Comparison) passed.
 - [ ] Task 03 (1.2 — `listMyHistory()`) complete: `history.int.test.ts` 7/7 obligations green.
-- [x] Task 04 (1.3 — `(HM)` guard/layout) complete: manual guest-guard verification confirms redirect with zero fetch.
+- [x] Task 04 (1.3 — `(history)` guard/layout) complete: manual guest-guard verification confirms redirect with zero fetch.
 - [ ] Task 05 (1.4 — RLS case H-a + walkthrough) complete: **required, blocking** — `cd SOURCE && npx tsx supabase/test-rls.ts` exits 0 including case H-a; manual real-Postgres walkthrough performed at least once.
 
 ## Test Skeleton File Paths for Verification
 
-- `SOURCE/app/(layer2)/__tests__/getResult.int.test.ts` — expect 3/3 obligations passing (a: select-shape; b: Output Comparison; c: null-`submittedAt` path)
-- `SOURCE/app/(HM)/__tests__/history.int.test.ts` — expect 7/7 obligations passing (a-g: filtering/ordering/field-completeness/omission/no-N+1/throw)
+- `SOURCE/features/exams/__tests__/getResult.int.test.ts` — expect 3/3 obligations passing (a: select-shape; b: Output Comparison; c: null-`submittedAt` path)
+- `SOURCE/features/history/__tests__/history.int.test.ts` — expect 7/7 obligations passing (a-g: filtering/ordering/field-completeness/omission/no-N+1/throw)
 - `SOURCE/supabase/test-rls.ts` (case H-a, lines ~733-801 pre-fill) — expect the full suite to exit 0, including this case, via `cd SOURCE && npx tsx supabase/test-rls.ts`
 
 ## Phase Completion Criteria (verbatim from Work Plan)

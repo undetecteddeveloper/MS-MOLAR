@@ -45,7 +45,7 @@ ADR-0018 Escalation 2 requires this **in prose**: `telemetry_log` has no `attemp
 - [x] `SOURCE/lib/tutor/__tests__/telemetry.test.ts` — **unchanged**: all three pins already updated in H5 and already green
 - [x] `SOURCE/lib/essay/gradeEssays.ts` — the telemetry call sites (this task's actual scope)
 - [x] `SOURCE/lib/essay/__tests__/gradeEssays.test.ts` — **extra**: 26 new cases for the branch→code mapping, the write path and the best-effort guarantee
-- [x] `SOURCE/app/(layer2)/actions.ts` — **extra, named by `tsc`**: passes `attempt.user_id` into the new required `GradePassInput.userId`. Reason in Investigation Notes
+- [x] `SOURCE/features/exams/actions.ts` — **extra, named by `tsc`**: passes `attempt.user_id` into the new required `GradePassInput.userId`. Reason in Investigation Notes
 
 ## Investigation Targets
 - `docs/design/essay-auto-scoring-backend-design.md` (§ Agreement Checklist Scope — `telemetry.ts`: `TelemetryEventType` gains `'essay_grade'`; `TELEMETRY_ERROR_CODES` gains three codes)
@@ -190,5 +190,5 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
 
 ## Notes
 - Impact scope: Task B3.2 uses these codes for `essayActions.ts`'s own call sites (I007).
-- Scope boundary — preserve unchanged: `buildTelemetryPayload()`'s body and its exhaustive six-column test; `telemetry_log`'s columns (**no new column** — Escalation 2); `SOURCE/app/(layer2)/essayActions.ts` (**does not exist yet** — Task B3.2 creates it and wires its own telemetry).
+- Scope boundary — preserve unchanged: `buildTelemetryPayload()`'s body and its exhaustive six-column test; `telemetry_log`'s columns (**no new column** — Escalation 2); `SOURCE/features/exams/essayActions.ts` (**does not exist yet** — Task B3.2 creates it and wires its own telemetry).
 - The `service_role` cannot write this telemetry: `telemetry_insert_own` is `with check (user_id = auth.uid())`, so the write goes through the **student's** client.

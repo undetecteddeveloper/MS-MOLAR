@@ -149,7 +149,7 @@ flowchart LR
 - PRD `docs/prd/ugc-exam-upload-prd.md` (R11 safe rendering, Security NFR, Success metric on no key/leak).
 - UI Spec `docs/ui-spec/ugc-exam-upload-ui-spec.md` (author review: plain-text text + rendered image).
 - ADR-0001 (image Storage bucket + RLS that this render path is backstopped by; verbatim storage of assembled content that render-time sanitization preserves), ADR-0004 (AI extraction produces the `image_url` structured field that feeds the `<img>` path).
-- Code: `SOURCE/components/shared/RichText.tsx`, `SOURCE/app/(layer2)/_components/QuestionRenderer.tsx`, `SOURCE/app/(layer2)/_components/AnswerChoice.tsx`.
+- Code: `SOURCE/components/shared/RichText.tsx`, `SOURCE/features/exams/components/QuestionRenderer.tsx`, `SOURCE/features/exams/components/AnswerChoice.tsx`.
 - References (behavioral evidence for the security claims):
   - react-markdown security & `rehype-raw`/`rehype-sanitize` guidance — https://www.npmjs.com/package/react-markdown and https://github.com/remarkjs/react-markdown
   - rehype-katex / KaTeX security & options — https://katex.org/docs/security and https://katex.org/docs/options.html

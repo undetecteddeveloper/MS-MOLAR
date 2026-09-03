@@ -15,10 +15,10 @@ Two verification gates: **Gate A** — schema + RLS/Storage suite (R-a…R-o, AD
 | 2.2 | [AI extractors + image crop (server-only)](task-2.2-extract.md) | 2 | 2.1 | ✅ DONE |
 | 3.1 | [Harden RichText + XSS/regression (GATE B)](task-3.1-richtext-sanitize.md) | 3 | 0.1 | ✅ DONE |
 | 3.2 | [QuestionFigure + image-origin fixtures (GATE B)](task-3.2-question-figure.md) | 3 | 0.1 | ✅ DONE |
-| 4.1 | [(layer4)/actions.ts — 5 server actions](task-4.1-actions.md) | 4 | 1.1, 2.1, 2.2 | ✅ DONE |
-| 4.2 | [(layer4)/queries.ts — read queries](task-4.2-queries.md) | 4 | 1.1 | ✅ DONE |
-| 4.3 | [(layer4)/layout.tsx](task-4.3-layout.md) | 4 | 4.1 | ✅ DONE |
-| 5.1 | [(layer2)/queries.ts — published + byline + image](task-5.1-catalog-queries.md) | 5 | 1.1 | ✅ DONE |
+| 4.1 | [features/authoring/actions.ts — 5 server actions](task-4.1-actions.md) | 4 | 1.1, 2.1, 2.2 | ✅ DONE |
+| 4.2 | [features/authoring/queries.ts — read queries](task-4.2-queries.md) | 4 | 1.1 | ✅ DONE |
+| 4.3 | [app/(authoring)/layout.tsx](task-4.3-layout.md) | 4 | 4.1 | ✅ DONE |
+| 5.1 | [features/exams/queries.ts — published + byline + image](task-5.1-catalog-queries.md) | 5 | 1.1 | ✅ DONE |
 | 5.2 | [Byline + QuestionFigure + Report channel](task-5.2-byline-image-report.md) | 5 | 5.1, 4.1, 3.2 | ✅ DONE |
 | 6.1 | [Navbar/profile — Upload + My exams (no admin)](task-6.1-navbar.md) | 6 | 4.3 | ✅ DONE |
 | 6.2 | [S-01 Upload (two files + extract)](task-6.2-upload-screen.md) | 6 | 4.1 | ✅ DONE |

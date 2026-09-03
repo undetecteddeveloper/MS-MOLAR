@@ -9,7 +9,7 @@ The exam player renders and collects input for the 2 new types **without scoring
 - Student input for new types is kept in the attempt answer payload (string encoding decided here, e.g. `"a:Đ,b:S,…"` / raw string) so it can be shown on the result page — but `computeScore` ignores it.
 
 ## Files
-Edited: `app/(layer2)/_components/QuestionRenderer.tsx` (+ attempt page wiring if the answer payload type needs widening).
+Edited: `features/exams/components/QuestionRenderer.tsx` (+ attempt page wiring if the answer payload type needs widening).
 
 ## Verification / Acceptance
 Manual: attempt a published 2025-format exam → all 22 questions renderable and answerable; navigation/pagination unaffected; no answers visible anywhere in the payload (network tab check: no `sub_answers`). Old MCQ exams unchanged. `tsc`/eslint clean; a11y: segmented controls keyboard-operable with visible state.

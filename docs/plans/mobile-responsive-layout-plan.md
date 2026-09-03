@@ -109,7 +109,7 @@ MOBILE (<768px)                     DESKTOP (≥768px)
   cả guest lẫn user đã đăng nhập. Thanh đáy KHÔNG được đổi số ô theo trạng thái
   đăng nhập: vị trí ô là trí nhớ cơ bắp, xê dịch nó là phá chính thứ khiến bottom
   nav đáng giá.
-- **`SiteHeader` chuyển chỗ** `app/(layer2)/_components/` → `components/layout/`.
+- **`SiteHeader` chuyển chỗ** `features/exams/components/` → `components/layout/`.
   Nó đã được 4 route group dùng chung và nay dùng cả ở trang chủ; nằm trong
   `_components` của layer2 là sai chỗ từ trước, và giờ thì gây hiểu nhầm thật.
 - **Trang chủ** — `HomeSidebar` chuyển thành `max-lg:hidden`; dưới `lg` trang chủ

@@ -1,7 +1,7 @@
 # Task B2.2 — `listMyHistory()`: two required booleans (Gate D CLOSED — unblocked)
 
 Plan mapping: `docs/plans/20260829-feature-essay-auto-scoring.md` — **Phase B2 (Read Path, vertical slice V2), Task B2.2**
-Layer: **backend** (`SOURCE/app/(HM)/**`)
+Layer: **backend** (`SOURCE/app/(history)/**`)
 
 Metadata:
 - Dependencies: **Task G0.3 (Gate D — CLOSED 2026-08-29)**, **Task B2.1**.
@@ -31,7 +31,7 @@ The escalation path (an RPC returning both booleans pre-derived) is **DDL**. It 
 
 ## Implementation Content
 
-In `SOURCE/app/(HM)/queries.ts`:
+In `SOURCE/features/history/queries.ts`:
 
 - Add `per_question, created_at` to the embedded select (`:64-66`). The function needs **both**, and today it fetches **neither**.
 - Add both fields to `EmbeddedRow` (`:23-34`).
@@ -45,18 +45,18 @@ In `SOURCE/app/(HM)/queries.ts`:
 The v1.0 contract said one; **D-13 overturned it** because RS-6 cannot be derived from a "still unresolved" boolean. With one field, the two PDF exits produce **two different files for one attempt** — the defect O-8 exists to prevent, and the one this feature's own review history already caught once (**F-06**). Both are **required** and always computable (`false` when no key is present), so no consumer has an `undefined` case to handle.
 
 ## Target Files
-- [x] `SOURCE/app/(HM)/queries.ts`
-- [x] `SOURCE/app/(HM)/__tests__/history.int.test.ts` — the tests the Implementation Steps call for, added to the existing file at the sanctioned `createClient()` boundary. **One pre-existing case also changed**: obligation (d)'s exhaustive `toEqual` on the whole entry now carries the two new booleans. That case failing was the boundary-change guard working, not a nuisance — it is precisely what an exhaustive comparison is for.
+- [x] `SOURCE/features/history/queries.ts`
+- [x] `SOURCE/features/history/__tests__/history.int.test.ts` — the tests the Implementation Steps call for, added to the existing file at the sanctioned `createClient()` boundary. **One pre-existing case also changed**: obligation (d)'s exhaustive `toEqual` on the whole entry now carries the two new booleans. That case failing was the boundary-change guard working, not a nuisance — it is precisely what an exhaustive comparison is for.
 - [x] `SOURCE/lib/history/filterEntries.test.ts` — **found by `tsc`**, exactly as this task's Quality Assurance section predicted ("both booleans are required, so no consumer has an `undefined` case"). Its `entry()` helper builds a literal `MyHistoryEntry`; both booleans are `false` there, which is correct — none of that file's fixtures has an essay.
 
 ## Investigation Targets
 - `docs/plans/20260829-feature-essay-auto-scoring.md` (§ Gate D — the recorded payload measurement and decision this task's select shape must match)
 - `docs/design/essay-auto-scoring-backend-design.md` (§ Agreement Checklist Scope / D-03 / D-13 — `listMyHistory()` adds `per_question, created_at`; **two** required booleans)
 - `docs/ui-spec/essay-auto-scoring-ui-spec.md` (§ Open Item O-3 — the payload measurement as a hard entry gate; § Open Item O-8 — the PDF annotation condition)
-- `SOURCE/app/(HM)/queries.ts` (`:8-18` `MyHistoryEntry`; `:23-34` `EmbeddedRow`; `:64-66` the embedded select; the `submittedAt` descending ordering)
+- `SOURCE/features/history/queries.ts` (`:8-18` `MyHistoryEntry`; `:23-34` `EmbeddedRow`; `:64-66` the embedded select; the `submittedAt` descending ordering)
 - `SOURCE/lib/supabase/boundedRead.ts` (`:74` `LIST_ROW_CEILING = 500` — unchanged by this task)
 - `SOURCE/lib/scoring/essayLifecycle.ts` (Task H1 — `hasUnresolvedEssay`, `hasIncompleteEssay`, `summariseEssays`; **the shared predicates, never re-derived here**)
-- `SOURCE/app/(layer2)/queries.ts` (Task B2.1 — the sibling read path; both must carry `created_at`)
+- `SOURCE/features/exams/queries.ts` (Task B2.1 — the sibling read path; both must carry `created_at`)
 
 ## Reference Contracts
 
@@ -86,7 +86,7 @@ Roundtrip check this task owns: the same attempt yields the **same** `hasIncompl
 
 `hasUnresolvedEssay()` and `hasIncompleteEssay()` each fold the array internally, so the naive call site runs `deriveEssayView()` **twice** per element — and for an unrecognised `essayState`, EG-BE-025's "exactly one `console.warn`" becomes two, **per history row, on every render**. Task B2.1 hit this on `getResult()` and it was found by a failing test; here the same shape was applied from the start and pinned by its own case. Mutation P4 confirms the case is load-bearing rather than decorative.
 
-**One drift risk created and recorded rather than hidden**: the derive-once-then-filter idiom now exists in **two** places — `app/(layer2)/queries.ts` and `app/(HM)/queries.ts` — because `essayLifecycle.ts` is Task H1's file and this task's scope boundary says to leave it unchanged. The two paths agreeing is exactly what **INT-2** (Task B2.4) exists to assert, so the risk is covered rather than merely noted; folding the idiom into `essayLifecycle` is a candidate for a later cleanup, not for this commit.
+**One drift risk created and recorded rather than hidden**: the derive-once-then-filter idiom now exists in **two** places — `features/exams/queries.ts` and `features/history/queries.ts` — because `essayLifecycle.ts` is Task H1's file and this task's scope boundary says to leave it unchanged. The two paths agreeing is exactly what **INT-2** (Task B2.4) exists to assert, so the risk is covered rather than merely noted; folding the idiom into `essayLifecycle` is a candidate for a later cleanup, not for this commit.
 
 ### Mutation testing: 7 mutations, 7 caught
 
@@ -172,5 +172,5 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
 
 ## Notes
 - Impact scope: B2.3 (the PDF data contract reads `MyHistoryEntry.hasIncompleteEssay`), F-B3 (`HistoryRow` reads both booleans), F-C3 (FE2E-3 renders the real `/history` row).
-- Scope boundary — preserve unchanged: `SOURCE/lib/supabase/boundedRead.ts` (`LIST_ROW_CEILING = 500`); the `submittedAt` descending ordering; the nine pre-existing `MyHistoryEntry` fields; `SOURCE/app/(layer2)/queries.ts` (Task B2.1).
+- Scope boundary — preserve unchanged: `SOURCE/lib/supabase/boundedRead.ts` (`LIST_ROW_CEILING = 500`); the `submittedAt` descending ordering; the nine pre-existing `MyHistoryEntry` fields; `SOURCE/features/exams/queries.ts` (Task B2.1).
 - Raw `per_question` stays server-side — it does **not** cross the component boundary (UI-D11).

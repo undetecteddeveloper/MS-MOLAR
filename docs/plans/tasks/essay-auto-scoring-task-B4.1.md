@@ -34,8 +34,8 @@ Correct the reason text at:
 4. `SOURCE/lib/tutor/__tests__/prompt.test.ts:251`
 5. `SOURCE/lib/scoring/__tests__/wrongTwice.test.ts:112`
 6. `SOURCE/lib/scoring/__tests__/wrongTwice.test.ts:132`
-7. `SOURCE/app/(layer2)/tutorActions.ts:269-272`
-8. `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx:6`
+7. `SOURCE/features/exams/tutorActions.ts:269-272`
+8. `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx:6`
 
 *(Eight line references across five files; they are the seven remaining D-09 **sites**, two of which sit in the same file at two line ranges.)*
 
@@ -51,8 +51,8 @@ Correct the reason text at:
 - [x] `SOURCE/lib/scoring/__tests__/computeScore.test.ts` (header + describe title)
 - [x] `SOURCE/lib/tutor/__tests__/prompt.test.ts` (the Test 3 intent block + the `@ts-expect-error` reason)
 - [x] `SOURCE/lib/scoring/__tests__/wrongTwice.test.ts` (the Behavior block + the `Q-ESSAY` fixture comment)
-- [x] `SOURCE/app/(layer2)/tutorActions.ts` (the essay-exclusion branch comment)
-- [x] `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` (file header)
+- [x] `SOURCE/features/exams/tutorActions.ts` (the essay-exclusion branch comment)
+- [x] `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` (file header)
 - [x] `SOURCE/lib/scoring/computeScore.ts` — **extra, reassigned**: the two sites this file credits to B1.5 were never actually corrected (see Investigation Notes)
 
 ## Investigation Targets
@@ -61,8 +61,8 @@ Correct the reason text at:
 - `SOURCE/lib/scoring/__tests__/computeScore.test.ts` (`:4`, `:93` — **out of scope**, D-12 — and `:131`)
 - `SOURCE/lib/tutor/__tests__/prompt.test.ts` (`:238`, `:251`)
 - `SOURCE/lib/scoring/__tests__/wrongTwice.test.ts` (`:112`, `:132`)
-- `SOURCE/app/(layer2)/tutorActions.ts` (`:269-272`)
-- `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` (`:6`; the **scored branch at `:133` onward is untouched**)
+- `SOURCE/features/exams/tutorActions.ts` (`:269-272`)
+- `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` (`:6`; the **scored branch at `:133` onward is untouched**)
 
 ## Investigation Notes
 

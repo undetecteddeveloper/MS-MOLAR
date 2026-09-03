@@ -13,7 +13,7 @@ Layer mix: **backend + frontend.** The cross-layer seam is verified in this phas
 | 2.4 Mount `TutorQuotaNote`; retire `formattedResetDate` | `subscription-work-plan-frontend-task-04.md` | frontend | [x] |
 | 2.5 fixture-e2e FE-2 | `subscription-work-plan-frontend-task-05.md` | frontend | [ ] |
 
-**Ordering constraints that are load-bearing**: plan Task 0.3 (backend-task-03) **precedes** plan Task 2.4; plan Task 2.2 **precedes** plan Task 2.4 (without the `(layer2)` provider the mount renders `null` forever while lint, build and the unit test pass).
+**Ordering constraints that are load-bearing**: plan Task 0.3 (backend-task-03) **precedes** plan Task 2.4; plan Task 2.2 **precedes** plan Task 2.4 (without the `(exams)` provider the mount renders `null` forever while lint, build and the unit test pass).
 
 ## Test skeleton files to verify (paths)
 

@@ -59,7 +59,7 @@ Nothing here is broken: the lifecycle handles it exactly as designed (unresolved
 
 ## Target Files
 - [ ] `docs/plans/20260829-feature-essay-auto-scoring.md` — Task E5's p50/p95 slot
-- [ ] *(only if a constant moves)* `SOURCE/lib/essay/groqClient.ts` (`GROQ_CALL_DEADLINE_MS`), `SOURCE/lib/essay/gradeEssays.ts` (`GROQ_MAX_CONCURRENCY`, `ESSAY_PASS_BUDGET_MS`), `SOURCE/app/(layer2)/_components/EssayGradingPoller.tsx` (the two cadence constants)
+- [ ] *(only if a constant moves)* `SOURCE/lib/essay/groqClient.ts` (`GROQ_CALL_DEADLINE_MS`), `SOURCE/lib/essay/gradeEssays.ts` (`GROQ_MAX_CONCURRENCY`, `ESSAY_PASS_BUDGET_MS`), `SOURCE/features/exams/components/EssayGradingPoller.tsx` (the two cadence constants)
 
 ## Investigation Targets
 - `docs/plans/20260829-feature-essay-auto-scoring.md` (§ Open Questions carried forward — OQ-1, O-6, OQ-7; and AC-061's separation of the three numbers)
@@ -68,7 +68,7 @@ Nothing here is broken: the lifecycle handles it exactly as designed (unresolved
 - `SOURCE/lib/essay/groqClient.ts` (Task B1.2 — `GROQ_CALL_DEADLINE_MS = 20_000`, `GROQ_MAX_IN_PASS_RETRIES = 2`, `GROQ_RETRY_MAX_WAIT_MS = 8_000`)
 - `SOURCE/lib/essay/gradeEssays.ts` (Task B1.4 — `GROQ_MAX_CONCURRENCY = 2`, `ESSAY_PASS_BUDGET_MS = 240_000`)
 - `SOURCE/lib/scoring/essayLifecycle.ts` (Task H1 — `ESSAY_PENDING_DEADLINE_MS = 600_000`, **which does not move with latency**)
-- `SOURCE/app/(layer2)/_components/EssayGradingPoller.tsx` (Task F-C2 — the five named polling constants; `ESSAY_POLL_MAX_ELAPSED_MS == ESSAY_PASS_BUDGET_MS`)
+- `SOURCE/features/exams/components/EssayGradingPoller.tsx` (Task F-C2 — the five named polling constants; `ESSAY_POLL_MAX_ELAPSED_MS == ESSAY_PASS_BUDGET_MS`)
 
 ## Investigation Notes
 _(Record here: the 10 measured round trips with p50/p95; the token counts logged from the first real run (they move `GROQ_BUDGET_DAILY_LIMIT` and `GROQ_MAX_CONCURRENCY` together — Task E2); which constants were confirmed and which moved.)_

@@ -24,7 +24,7 @@ Three ADR triggers from the documentation-criteria skill are met:
 
 ### The existing read style (the shape any mechanism must fit)
 
-`listExams` today is a single flat query — `supabase.from("exams").select(EXAM_COLUMNS).eq("status","published").order(...)` (`SOURCE/app/(layer2)/queries.ts:64-89`) — mapped by `toExam` (`:33-47`) from the shared `EXAM_COLUMNS` (`:30-31`). `ExamSort` is `"newest" | "oldest"` (`:52`); `hardest` is explicitly deferred ("`hardest` TẠM BỎ QUA (chờ rating)"). `getExam` is the same flat select for one id (`:128-138`). All reads keep the explicit `.eq("status","published")` catalog guard.
+`listExams` today is a single flat query — `supabase.from("exams").select(EXAM_COLUMNS).eq("status","published").order(...)` (`SOURCE/features/exams/queries.ts:64-89`) — mapped by `toExam` (`:33-47`) from the shared `EXAM_COLUMNS` (`:30-31`). `ExamSort` is `"newest" | "oldest"` (`:52`); `hardest` is explicitly deferred ("`hardest` TẠM BỎ QUA (chờ rating)"). `getExam` is the same flat select for one id (`:128-138`). All reads keep the explicit `.eq("status","published")` catalog guard.
 
 ### CRITICAL UNVERIFIED CONSTRAINT (flagged for the spike)
 
@@ -155,7 +155,7 @@ flowchart TD
 ## Architecture Impact
 
 - **New DB**: `public.exam_difficulty_ratings` (three part-score columns with per-part `[1,10]` CHECK, `unique(exam_id, user_id)`, `user_id default auth.uid()`), its insert-own/update-own/select-own RLS policies (each carrying `auth.uid()` + submitted-attempt `EXISTS` + published clauses), and the `exams_with_difficulty` view — all appended idempotently to the single `SOURCE/supabase/schema.sql` (`create table if not exists`, `drop policy if exists`, `create or replace view`).
-- **Changes**: `SOURCE/app/(layer2)/queries.ts` — `listExams`/`getExam` read the view; `EXAM_COLUMNS`/`toExam` extend by `avg_overall`/`rating_count`; `ExamSort` gains `hardest`; `ExamFilters` gains a `level` dimension. `SOURCE/types/exam.ts` — `Exam` gains the derived community-difficulty field. `SOURCE/app/(layer2)/_components/ExamCard.tsx` and `SOURCE/app/(layer2)/exams/[id]/page.tsx` — replace `"—"` via the display helper. `SOURCE/app/(layer2)/_components/ExamFilters.tsx` and `SOURCE/app/(layer2)/exams/page.tsx` — real `Level` filter + `Hardest` wired to `listExams`.
+- **Changes**: `SOURCE/features/exams/queries.ts` — `listExams`/`getExam` read the view; `EXAM_COLUMNS`/`toExam` extend by `avg_overall`/`rating_count`; `ExamSort` gains `hardest`; `ExamFilters` gains a `level` dimension. `SOURCE/types/exam.ts` — `Exam` gains the derived community-difficulty field. `SOURCE/features/exams/components/ExamCard.tsx` and `SOURCE/app/(exams)/exams/[id]/page.tsx` — replace `"—"` via the display helper. `SOURCE/features/exams/components/ExamFilters.tsx` and `SOURCE/app/(exams)/exams/page.tsx` — real `Level` filter + `Hardest` wired to `listExams`.
 - **New app code**: a `rateExam` server action (write, following the `reportExam`/`ReportExam.tsx` precedent) and `SOURCE/lib/rating/` (bucket/mean/`"—"` helper).
 - **Constraints added**: rating writes are a hard RLS gate on submitted-attempt existence + published; one rating per `(exam_id, user_id)`; each part score integer `[1,10]`.
 - **No ripple**: attempt/result read/write paths, scoring (`SOURCE/lib/scoring/`), UGC upload/extraction (Layer 4), and Storage are untouched.
@@ -176,6 +176,6 @@ flowchart TD
 - PRD `docs/prd/rating-system-prd.md` (v1.1) — R1–R8, NFR Performance/Security, Success metrics 1–7, Undetermined Items (table shape + on-read mechanism owned here / by the Design Doc).
 - ADR-0001 (UGC lifecycle + RLS enforcement) — `exam_reports` model, cross-table RLS, DB-is-the-gate discipline.
 - ADR-0005 (multi-part national format) — the three fixed parts (`mcq`/`true_false`/`short_answer`) a rating scores.
-- Code touchpoints: `SOURCE/supabase/schema.sql:99-106` (`exam_attempts.status`), `:182-189` (`answers_insert_own` cross-table `EXISTS`), `:247-258` (`exam_reports` shape), `:330-340` (`reports_insert_own` published clause, insert-own only); `SOURCE/app/(layer2)/queries.ts:30-31,33-47,52,64-89,128-138` (`EXAM_COLUMNS`/`toExam`/`ExamSort`/`listExams`/`getExam`).
+- Code touchpoints: `SOURCE/supabase/schema.sql:99-106` (`exam_attempts.status`), `:182-189` (`answers_insert_own` cross-table `EXISTS`), `:247-258` (`exam_reports` shape), `:330-340` (`reports_insert_own` published clause, insert-own only); `SOURCE/features/exams/queries.ts:30-31,33-47,52,64-89,128-138` (`EXAM_COLUMNS`/`toExam`/`ExamSort`/`listExams`/`getExam`).
 </content>
 </invoke>

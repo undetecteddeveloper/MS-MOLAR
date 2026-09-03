@@ -9,7 +9,7 @@ Result surfaces degrade gracefully with non-MCQ questions present (Design Doc §
 - Topic breakdown unaffected (single-topic bucket per ADR-0004 stands).
 
 ## Files
-Edited: `lib/scoring/computeScore.ts` (if needed), result page components under `app/(layer2)/exams/[id]/attempt/[attemptId]/result/`.
+Edited: `lib/scoring/computeScore.ts` (if needed), result page components under `app/(exams)/exams/[id]/attempt/[attemptId]/result/`.
 
 ## Verification / Acceptance
 Unit: `computeScore` on a mixed exam (12 mcq + 4 TF + 6 short) scores /12, ignoring the rest; existing scoring tests unchanged. Manual: result + detail pages render the mixed exam without NaN/broken percentages; non-MCQ rows show input + answer + label. `tsc`/eslint clean.

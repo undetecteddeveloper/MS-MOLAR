@@ -28,10 +28,10 @@ A real 429 records as `server` **today**, so every before/after comparison for R
 
 ## Investigation Targets
 - `SOURCE/lib/tutor/telemetry.ts` (the widened `TELEMETRY_ERROR_CODES` and the runtime filter at `:78`)
-- `SOURCE/app/(layer2)/tutorActions.ts` and `SOURCE/app/(layer4)/actions.ts` (the three refusal branches this test drives)
+- `SOURCE/features/exams/tutorActions.ts` and `SOURCE/features/authoring/actions.ts` (the three refusal branches this test drives)
 - `SOURCE/lib/billing/quota.ts` (the reasons Redis mocking must force)
 - `SOURCE/supabase/schema.sql` (the widened `telemetry_log_error_code_check`)
-- `SOURCE/app/(layer2)/__tests__/recordSkillMastery.int.test.ts` (the real-database test convention: fixture prefix, teardown)
+- `SOURCE/features/exams/__tests__/recordSkillMastery.int.test.ts` (the real-database test convention: fixture prefix, teardown)
 - `SOURCE/vitest.integration.config.ts` (plan Task 0.1 — the lane this runs under)
 - `docs/design/subscription-backend-design.md` (§ AC-047)
 
@@ -94,12 +94,12 @@ vì môi trường chứ không vì lỗi. Target Files đã lường trước �
 - `SOURCE/lib/tutor/telemetry.ts`: `TELEMETRY_ERROR_CODES` đã có đủ SÁU literal;
   `toErrorCode()` lọc LÚC CHẠY và trả `null` cho mã lạ — tức một bảng ánh xạ sai
   KHÔNG ném, nó ghi `null`. Đây là lối hỏng im lặng mà ca này phải bắt.
-- `SOURCE/app/(layer2)/tutorActions.ts`: ba nhánh từ chối đi qua `recordTutorInvoke()`,
+- `SOURCE/features/exams/tutorActions.ts`: ba nhánh từ chối đi qua `recordTutorInvoke()`,
   best-effort tuyệt đối (`console.warn` rồi nuốt). Thứ tự cổng: sở hữu → rate limit →
   `consumeQuota()` → tái kiểm tra sai-hai-lần → đọc câu hỏi → Gemini.
   `guard("explainStep")` = **3 lượt/24h/người** khi `GEMINI_PAID_TIER_ENABLED` không bật
   (`.env.local` không có biến này) → ngân sách của file là ĐÚNG 3 lượt gọi trên MỘT tài khoản.
-- `SOURCE/app/(layer4)/actions.ts`: đường upload **không thể** sinh dòng `telemetry_log`
+- `SOURCE/features/authoring/actions.ts`: đường upload **không thể** sinh dòng `telemetry_log`
   nào — `telemetry_log_event_type_check` chỉ nhận `('adaptive_route','tutor_invoke')`,
   không có event type cho upload. Mã OK-04 của cổng upload chỉ quan sát được qua
   `console.warn` phía máy chủ (đúng như `int1CaptureWarnings()` của INT-1 đã ghi).
@@ -114,7 +114,7 @@ vì môi trường chứ không vì lỗi. Target Files đã lường trước �
   `revoke select … from authenticated` ⇒ đọc ngược phải bằng service_role.
   `telemetry_insert_own` = `with check (user_id = auth.uid())` ⇒ client phải là
   phiên THẬT của chính tài khoản fixture.
-- `SOURCE/app/(layer2)/__tests__/recordSkillMastery.int.test.ts`: quy ước
+- `SOURCE/features/exams/__tests__/recordSkillMastery.int.test.ts`: quy ước
   `loadEnvLocal()` + prefix fixture + `cleanupFixtures()` chạy CẢ TRƯỚC lẫn SAU.
 - `SOURCE/vitest.integration.config.ts`: không `setupFiles`, không `testTimeout` ⇒
   mặc định 5s. Ca này chạm Postgres thật + đăng nhập thật ⇒ khai timeout TƯỜNG MINH

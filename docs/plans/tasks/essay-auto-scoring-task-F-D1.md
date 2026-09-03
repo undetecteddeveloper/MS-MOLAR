@@ -1,7 +1,7 @@
 # Task F-D1 — Flag-selected footnote key + prop chain + segment read
 
 Plan mapping: `docs/plans/20260829-feature-essay-auto-scoring.md` — **Phase F-D (Player Footnote, frontend slice V6), Task F-D1**
-Layer: **frontend** (`SOURCE/app/(layer2)/**`)
+Layer: **frontend** (`SOURCE/app/(exams)/**`)
 
 Metadata:
 - Dependencies: **Task B1.5** (the flag must be readable on the server), **Task F-C3**.
@@ -15,13 +15,13 @@ Approach (a) — **two i18n keys plus a server-read flag** — is correct **rega
 
 ## Implementation Content
 
-### `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/page.tsx`
+### `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/page.tsx`
 Read `ESSAY_GRADING_ENABLED` on the server (**read site 3 of 3** — the **copy** gate; the other two are behaviour gates in `submitExam()` and `retryEssayGrading()`) and pass it down as `essayGradingEnabled` (`:23-31`). All three read **one** variable so they flip together in a single deploy. **Never `NEXT_PUBLIC_*`** (UI-D7): a second copy of one truth on both sides of a boundary drifts, and **the client side is the side that lies to the student**.
 
-### `SOURCE/app/(layer2)/_components/ExamPlayer.tsx`
+### `SOURCE/features/exams/components/ExamPlayer.tsx`
 Accept the **optional** prop `essayGradingEnabled?: boolean` (`:28-41`) and forward it **unchanged** to `QuestionRenderer` (`:265`). **State, handlers and layout are untouched.**
 
-### `SOURCE/app/(layer2)/_components/QuestionRenderer.tsx`
+### `SOURCE/features/exams/components/QuestionRenderer.tsx`
 Accept the same optional prop (`:45-53`) and select the footnote key at `:199` — on ⇒ `player.essayScored` ("Tự luận — chấm tự động sau khi bạn nộp bài."), off ⇒ `player.essayNotScored` (today's wording, **verbatim**). Fix the **reason** in the comment at `:179-180`.
 
 **Do not touch** `player.essayPlaceholder` (`:195`), the `player.charsLeft` structure (`:201-203`), the `<textarea>`, its classes, or its `onChange` handler (AC-052). The character ceiling needs **no** edit here — both consumers read the alias at `:23` (D-04).
@@ -33,20 +33,20 @@ A **required** prop would make every existing construction site fail `tsc` and w
 The frontend DD's Implementation Path Mapping says `:112` and `:119` "must both change together", while backend **D-14** says `:112` stays green until a test exercises the enabled branch. **D-14's analysis is the one confirmed against the shipped prop shape** (optional, default `false`) — but **resolve this explicitly before writing the commit**, and **if a new case is added here that exercises the enabled branch, `:112` becomes coupled at that moment.** If the prop were ever made **required**, or its default changed to `true`, `:112` goes red immediately and becomes coupled earlier than planned. *Owner: engineer, at this task.*
 
 ## Target Files
-- [x] `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/page.tsx` — read site 3 of 3 (the copy gate)
-- [x] `SOURCE/app/(layer2)/_components/ExamPlayer.tsx` — accepts and forwards unchanged
-- [x] `SOURCE/app/(layer2)/_components/QuestionRenderer.tsx` — optional prop + flag-selected key + the corrected reason
-- [x] `SOURCE/app/(layer2)/_components/__tests__/QuestionRenderer.test.tsx` — 3 new cases + a trailing optional helper parameter
+- [x] `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/page.tsx` — read site 3 of 3 (the copy gate)
+- [x] `SOURCE/features/exams/components/ExamPlayer.tsx` — accepts and forwards unchanged
+- [x] `SOURCE/features/exams/components/QuestionRenderer.tsx` — optional prop + flag-selected key + the corrected reason
+- [x] `SOURCE/features/exams/components/__tests__/QuestionRenderer.test.tsx` — 3 new cases + a trailing optional helper parameter
 
 ## Investigation Targets
 - `docs/ui-spec/essay-auto-scoring-ui-spec.md` (§ Component: QuestionRenderer (essay branch) — verify default-with-flag-on and default-with-flag-off states)
 - `docs/design/essay-auto-scoring-frontend-design.md` (§ S-04 / MSA-F2 — optional `essayGradingEnabled?: boolean` default `false`; `ExamPlayer` forwards it; the player route segment reads the server-only flag; **Option (a): correct regardless of commit order**)
 - `docs/design/essay-auto-scoring-frontend-design.md` (§ Security Considerations — the flag crosses the boundary as a pre-read boolean, **no `NEXT_PUBLIC_*`**)
-- `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/page.tsx` (`:23-31` — where the prop is passed down; Task B1.5 added `maxDuration` here)
-- `SOURCE/app/(layer2)/_components/ExamPlayer.tsx` (`:28-41` the props; `:265` the forward to `QuestionRenderer`)
-- `SOURCE/app/(layer2)/_components/QuestionRenderer.tsx` (`:23` the ceiling alias; `:45-53` the props; `:179-180` the comment to fix; `:194` `maxLength`; `:195` `player.essayPlaceholder`; `:199` the footnote key; `:201-203` the `charsLeft` structure)
-- `SOURCE/app/(layer2)/_components/__tests__/QuestionRenderer.test.tsx` (`:112` the AC-051 footnote pin — **the I-6 decision point**; `:116`/`:119` the ceiling sites moved by Task B3.3)
-- `SOURCE/app/(layer2)/_components/__tests__/ExamPlayer.test.tsx` (must stay **green without edits** — the proof the prop is genuinely optional)
+- `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/page.tsx` (`:23-31` — where the prop is passed down; Task B1.5 added `maxDuration` here)
+- `SOURCE/features/exams/components/ExamPlayer.tsx` (`:28-41` the props; `:265` the forward to `QuestionRenderer`)
+- `SOURCE/features/exams/components/QuestionRenderer.tsx` (`:23` the ceiling alias; `:45-53` the props; `:179-180` the comment to fix; `:194` `maxLength`; `:195` `player.essayPlaceholder`; `:199` the footnote key; `:201-203` the `charsLeft` structure)
+- `SOURCE/features/exams/components/__tests__/QuestionRenderer.test.tsx` (`:112` the AC-051 footnote pin — **the I-6 decision point**; `:116`/`:119` the ceiling sites moved by Task B3.3)
+- `SOURCE/features/exams/components/__tests__/ExamPlayer.test.tsx` (must stay **green without edits** — the proof the prop is genuinely optional)
 - `SOURCE/lib/i18n/dictionaries/vi.ts` and `en.ts` (Task F-A1 — `player.essayScored` new, `player.essayNotScored` kept verbatim)
 
 ## Reference Contracts
@@ -170,5 +170,5 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
 
 ## Notes
 - Impact scope: the player screen's footnote only; Phase E's Task E6 confirms all three read sites flipped in one deploy.
-- Scope boundary — preserve unchanged: `SOURCE/app/(layer2)/_components/__tests__/ExamPlayer.test.tsx` (**green without edits** — that is the proof the prop is optional); `player.essayPlaceholder` (`:195`), the `player.charsLeft` structure (`:201-203`), the `<textarea>`, its classes and its `onChange` handler (AC-052); the ceiling alias at `:23` (**no edit** — D-04); `QuestionRenderer.test.tsx:116`/`:119` (Task B3.3).
+- Scope boundary — preserve unchanged: `SOURCE/features/exams/components/__tests__/ExamPlayer.test.tsx` (**green without edits** — that is the proof the prop is optional); `player.essayPlaceholder` (`:195`), the `player.charsLeft` structure (`:201-203`), the `<textarea>`, its classes and its `onChange` handler (AC-052); the ceiling alias at `:23` (**no edit** — D-04); `QuestionRenderer.test.tsx:116`/`:119` (Task B3.3).
 - `player.essayNotScored` is **kept**, not replaced — the old key and the new one are selected by the flag (UI-D8, one of the four deliberate AC restatements confirmed in the Final Phase).

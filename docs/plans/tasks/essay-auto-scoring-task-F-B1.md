@@ -1,7 +1,7 @@
 # Task F-B1 — `EssayReviewBlock` + the essay sub-branch inside `notScored`
 
 Plan mapping: `docs/plans/20260829-feature-essay-auto-scoring.md` — **Phase F-B (Detail Surface and the PDF Guard, frontend slices V2 + V3), Task F-B1**
-Layer: **frontend** (`SOURCE/app/(layer2)/_components/**`, one route page)
+Layer: **frontend** (`SOURCE/features/exams/components/**`, one route page)
 
 Metadata:
 - Dependencies: **Task F-A3**.
@@ -12,7 +12,7 @@ Metadata:
 
 ## Implementation Content
 
-Create `SOURCE/app/(layer2)/_components/EssayReviewBlock.tsx` as an **async Server Component**, called from **inside** the existing `notScored` branch of `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` at `:75`.
+Create `SOURCE/features/exams/components/EssayReviewBlock.tsx` as an **async Server Component**, called from **inside** the existing `notScored` branch of `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` at `:75`.
 
 Under W1 an essay **always** lands in that branch, in all three lifecycle states — so essay presentation is a **sub-branch inside** the not-scored branch, dispatching on `essayState` (UI-D1), **never a new branch beside it and never a modification of the scored branch**.
 
@@ -44,9 +44,9 @@ Presented **before** a band exists, it invites the student to self-grade and the
 `renderServerTree()` (async child).
 
 ## Target Files
-- [x] `SOURCE/app/(layer2)/_components/EssayReviewBlock.tsx` (new)
-- [x] `SOURCE/app/(layer2)/_components/__tests__/EssayReviewBlock.test.tsx` (new) — 16 cases
-- [x] `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` — import + the essay sub-branch only (two hunks)
+- [x] `SOURCE/features/exams/components/EssayReviewBlock.tsx` (new)
+- [x] `SOURCE/features/exams/components/__tests__/EssayReviewBlock.test.tsx` (new) — 16 cases
+- [x] `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` — import + the essay sub-branch only (two hunks)
 
 ## Investigation Targets
 - `docs/ui-spec/essay-auto-scoring-ui-spec.md` (§ Component: EssayReviewBlock — verify RS-0/RS-1 + RS-2 + RS-3 (+ low-confidence variant) + RS-4 + RS-5 + RS-6 states)
@@ -54,8 +54,8 @@ Presented **before** a band exists, it invites the student to self-grade and the
 - `docs/design/essay-auto-scoring-frontend-design.md` (§ Non-Scope — the scored branch of `result/detail/page.tsx` is untouched; `ExplainStepAffordance` never mounts for essays; `TutorQuotaNote`; `RichText`)
 - `docs/design/essay-auto-scoring-frontend-design.md` (§ Theme Token Map; § Security Considerations — student prose renders as a text node, not through `RichText`)
 - `docs/adr/ADR-0002-published-content-rendering-and-sanitization.md` (§ Decision, **read in reverse** — student prose is not routed through `RichText`; it renders as a text node with `whitespace-pre-wrap`, opening no new markdown/KaTeX surface)
-- `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` (`:75` the `notScored` branch; `:120` the existing plain-text rendering; `:133` onward the **scored branch — untouched**)
-- `SOURCE/app/(layer2)/queries.ts` (`:633-657` — the model answer is already returned after submission)
+- `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` (`:75` the `notScored` branch; `:120` the existing plain-text rendering; `:133` onward the **scored branch — untouched**)
+- `SOURCE/features/exams/queries.ts` (`:633-657` — the model answer is already returned after submission)
 - `SOURCE/components/essay/EssayLifecycleBadge.tsx` (Task F-A2 — the async child)
 - `SOURCE/lib/scoring/essayLifecycle.ts` (Task H1 — `EssayView`, `retryAvailable`, RS-0…RS-6)
 - `SOURCE/app/(billing)/me/orders/__tests__/renderServerTree.tsx` (`:25` — the helper; **`SOURCE/lib/test/renderServerTree.tsx` does not exist**)

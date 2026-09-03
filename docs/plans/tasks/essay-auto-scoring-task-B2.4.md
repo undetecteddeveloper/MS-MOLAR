@@ -1,7 +1,7 @@
 # Task B2.4 — Convert INT-2 and INT-3
 
 Plan mapping: `docs/plans/20260829-feature-essay-auto-scoring.md` — **Phase B2 (Read Path, vertical slice V2), Task B2.4**
-Layer: **backend** (`SOURCE/app/(layer2)/__tests__/**` — the integration lane)
+Layer: **backend** (`SOURCE/app/(exams)/__tests__/**` — the integration lane)
 
 Metadata:
 - Dependencies: **Task B2.1**, **Task B2.2**.
@@ -12,7 +12,7 @@ Metadata:
 
 ## Implementation Content
 
-Convert the remaining two cases in `SOURCE/app/(layer2)/__tests__/essayGrading.int.test.ts`.
+Convert the remaining two cases in `SOURCE/features/exams/__tests__/essayGrading.int.test.ts`.
 
 ### INT-2 — the two PDF exits cannot disagree
 ### INT-3 — a graded essay stays out of the score triple and Layer 3
@@ -26,16 +26,16 @@ INT-3 proves only the **TypeScript** half. `record_skill_mastery()`'s own exclus
 The plain `scored: false` exclusion is **already covered at unit level** by `wrongTwice.test.ts` Test 2 (`:105-140`), whose fixture is already named `Q-ESSAY`. **Do not restate it.** What is new — and the only thing justifying (c) here — is that the element now **also** carries the six new keys and arrives through the **real read path** rather than a hand-built unit fixture: the obligation is that the presence of those keys does not flip the predicate. **If that framing is dropped, (c) is duplicate coverage and should be deleted rather than written.**
 
 ## Target Files
-- [x] `SOURCE/app/(layer2)/__tests__/essayGrading.int.test.ts` — including its **FILE STATUS header**, which still said "ALL THREE CASES BELOW ARE SKELETONS. Nothing here executes an assertion yet." That sentence became false with this commit. It was rewritten rather than deleted: the *reason* it gave still governs anyone adding a case here (a file with zero collected tasks makes vitest exit 1 with "No test suite found in file"), so the reason is kept and the false status is replaced.
+- [x] `SOURCE/features/exams/__tests__/essayGrading.int.test.ts` — including its **FILE STATUS header**, which still said "ALL THREE CASES BELOW ARE SKELETONS. Nothing here executes an assertion yet." That sentence became false with this commit. It was rewritten rather than deleted: the *reason* it gave still governs anyone adding a case here (a file with zero collected tasks makes vitest exit 1 with "No test suite found in file"), so the reason is kept and the false status is replaced.
 
 ## Investigation Targets
-- `SOURCE/app/(layer2)/__tests__/essayGrading.int.test.ts` (the skeleton's INT-2 and INT-3 annotations — `Primary failure mode` / `Proof obligation`)
+- `SOURCE/features/exams/__tests__/essayGrading.int.test.ts` (the skeleton's INT-2 and INT-3 annotations — `Primary failure mode` / `Proof obligation`)
 - `docs/design/essay-auto-scoring-backend-design.md` (§ Verification Strategy / Output Comparison — three pipelines, hand-built literals, `toEqual`, **no snapshots**)
 - `docs/design/essay-auto-scoring-backend-design.md` (§ Non-Scope — `isScored()`, `wrongTwice.ts`, the MASTERY WRITE block at `schema.sql:1354`, `record_exam_result()`, `QuotaKind`/`PLAN_LIMITS`/every `consumeQuota()` call site, `PublicQuestion`, `telemetry_log` columns, backfill, any background writer, TBD-02 — **asserted as unchanged, not merely left alone**)
-- `SOURCE/app/(layer2)/queries.ts` (Task B2.1 — `getResult()`'s select must carry `created_at`)
-- `SOURCE/app/(HM)/queries.ts` (Task B2.2 — the embedded select must carry **both** `per_question` and `created_at`)
+- `SOURCE/features/exams/queries.ts` (Task B2.1 — `getResult()`'s select must carry `created_at`)
+- `SOURCE/features/history/queries.ts` (Task B2.2 — the embedded select must carry **both** `per_question` and `created_at`)
 - `SOURCE/lib/scoring/wrongTwice.ts` and `SOURCE/lib/scoring/__tests__/wrongTwice.test.ts` (`:105-140` Test 2, fixture `Q-ESSAY` — **already covers the plain exclusion; do not restate it**)
-- `SOURCE/app/(layer2)/__tests__/recordSkillMastery.int.test.ts` (where the SQL-side mastery exclusion is actually asserted)
+- `SOURCE/features/exams/__tests__/recordSkillMastery.int.test.ts` (where the SQL-side mastery exclusion is actually asserted)
 - `SOURCE/lib/scoring/essayLifecycle.ts` (Task H1 — `ESSAY_MAX_ATTEMPTS`, `summariseEssays`, `hasUnresolvedEssay`)
 
 ## Reference Contracts
@@ -97,7 +97,7 @@ Q1 is the one worth naming: it is the exact shape of defect **F-06** — two der
 
 ## Quality Assurance Mechanisms
 - `npx tsc --noEmit` (strict) — Config: `SOURCE/tsconfig.json` (project-wide)
-- `npx vitest run` — Enforces: unit/integration correctness — Config: `SOURCE/vitest.config.ts`; covers `SOURCE/app/(layer2)/__tests__/essayGrading.int.test.ts`
+- `npx vitest run` — Enforces: unit/integration correctness — Config: `SOURCE/vitest.config.ts`; covers `SOURCE/features/exams/__tests__/essayGrading.int.test.ts`
 - ESLint (`--max-warnings 0`) — Config: `SOURCE/eslint.config.mjs` (project-wide)
 - `npm run build` — Config: `SOURCE/package.json` (project-wide)
 

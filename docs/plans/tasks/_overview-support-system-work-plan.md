@@ -82,7 +82,7 @@ Final Phase
 
 | Existing Interface | New Interface | Conversion Required | Corresponding Task |
 |---|---|---|---|
-| `(layer2)/layout.tsx`, `(layer3)/layout.tsx`, `(layer4)/layout.tsx`, `(HM)/layout.tsx`, `app/page.tsx` render trees | Same trees, each gains one additive sibling `<SupportWidget user={user} />` next to `<BottomNav />` | Additive only — no existing line removed | task-09 |
+| `(exams)/layout.tsx`, `(analytics)/layout.tsx`, `(authoring)/layout.tsx`, `(history)/layout.tsx`, `app/page.tsx` render trees | Same trees, each gains one additive sibling `<SupportWidget user={user} />` next to `<BottomNav />` | Additive only — no existing line removed | task-09 |
 | `RATE_LIMITS` (`SOURCE/lib/security/rateLimit.ts`) | New member `RATE_LIMITS.submitTicket` | Additive only — no existing member's shape changes | task-06 |
 | `checkEnv.ts` | 3 new optional/warn entries (`SUPPORT_NOTIFY_EMAIL`/`SUPPORT_SMTP_USER`/`SUPPORT_SMTP_APP_PASSWORD`) | Additive only | task-05 |
 | `check-ai-key-bundle.mjs` SECRETS/marker list | Gains `SUPPORT_SMTP_APP_PASSWORD`/`SUPPORT_SMTP_USER`/`nodemailer` markers | Additive only | task-05 |

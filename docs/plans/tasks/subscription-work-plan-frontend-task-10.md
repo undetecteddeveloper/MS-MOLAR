@@ -26,9 +26,9 @@ Metadata:
 - [x] `SOURCE/app/(billing)/pricing/checkout/error.tsx`
 
 ## Investigation Targets
-- `SOURCE/app/(HM)/history/loading.tsx` and `SOURCE/app/(HM)/history/error.tsx` (the origin pattern; here at `size="small"`)
+- `SOURCE/app/(history)/history/loading.tsx` and `SOURCE/app/(history)/history/error.tsx` (the origin pattern; here at `size="small"`)
 - `SOURCE/app/(billing)/me/orders/loading.tsx` and `error.tsx` (plan Task 3.6 — the sibling implementation to stay consistent with)
-- `SOURCE/app/(billing)/queries.ts` (plan Task 3.5 — `getMyOrder(orderCode)`)
+- `SOURCE/features/billing/queries.ts` (plan Task 3.5 — `getMyOrder(orderCode)`)
 - `SOURCE/lib/supabase/middleware.ts` (`PUBLIC_PATHS` — **read only**; confirm this route is **not** added)
 - `SOURCE/lib/security/csp.ts` (**frozen** — confirm no CSP change)
 - `docs/ui-spec/subscription-ui-spec.md` (§ Component: `PaymentPanel` — C-13 — verify default (`pending`) + loading + empty (no/unknown/foreign `?order=`, one shared state) + error + partial states)
@@ -105,7 +105,7 @@ Metadata:
 
 ### Read at Step 2 (2026-08-19)
 
-- **`(HM)/history/{loading,error}.tsx`** (origin). `loading.tsx`: `PageContainer as="main" size="small" padding="compact"`, an `h-8 w-32` heading block plus four `h-20 animate-pulse` row blocks on `bg-border/60`. `error.tsx`: `"use client"`, `useEffect` logs **the whole `error` object** and focuses a `tabIndex={-1}` wrapper carrying `role="alert"`, retry `onClick={reset}` with **no `min-h-11`**, label `common.retry`.
+- **`(history)/history/{loading,error}.tsx`** (origin). `loading.tsx`: `PageContainer as="main" size="small" padding="compact"`, an `h-8 w-32` heading block plus four `h-20 animate-pulse` row blocks on `bg-border/60`. `error.tsx`: `"use client"`, `useEffect` logs **the whole `error` object** and focuses a `tabIndex={-1}` wrapper carrying `role="alert"`, retry `onClick={reset}` with **no `min-h-11`**, label `common.retry`.
 - **`(billing)/me/orders/{loading,error}.tsx`** (plan Task 3.6, the sibling). Same skeleton idiom at the **page's own** `size="default"` + default padding, three row blocks. `error.tsx` applies the frontend DD's three corrections: `console.error("(billing)/me/orders render failed", { digest: error.digest })` — **digest only** — `min-h-11` on the retry control, and `common.tryAgain`. This is the shape S-06 copies, at `size="small"`.
 - **`(billing)/queries.ts`** — `getMyOrder(orderCode: number): Promise<CheckoutOrder | null>`. Single-row `.eq("order_code", orderCode).maybeSingle()` under `orders_select_own`, **not** `readBounded`. Unknown code and foreign code both return `null` by the same branch (RLS filters the foreign row out); a failed read **throws**, and the throw is the route's `error.tsx`, never Empty. Projection goes through `toCheckoutOrder()` — the one mapper — so the eight-field `CheckoutOrder` arrives already shaped. **Not reformatted by this task.**
 - **`lib/supabase/middleware.ts`** — `PUBLIC_PATHS` holds `/`, `/login`, `/auth/callback`, `/terms`, `/refund-policy`, … ; match is `pathname === p || pathname.startsWith(p + "/")`, query strings ignored. **Read only; no entry added.**

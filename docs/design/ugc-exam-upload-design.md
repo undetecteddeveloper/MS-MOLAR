@@ -79,7 +79,7 @@ unknowns:
 - [x] Add two Storage buckets (`exam-images`, `exam-uploads`) with `storage.objects` RLS.
 - [x] Harden `RichText` (ADR-0002) + add the `QuestionFigure` origin-allowlist path; add XSS + regression + image-origin fixtures.
 - [x] Add server-side AI extractors (`SOURCE/lib/ugc/extractQuestions.ts`, `extractAnswers.ts`) + a pure-code assembler (`assembleExam.ts`) + image cropper (`cropImages.ts`).
-- [x] Add `(layer4)` routes S-01…S-03; add Server Actions + read queries.
+- [x] Add `(authoring)` routes S-01…S-03; add Server Actions + read queries.
 - [x] Extend catalog reads (`listExams`/`getExam`) to filter `status='published'` and carry `author_display_name` + question `image_url`/`question_type`.
 - [x] Extend navbar (`SiteHeader`, `HomeSidebar`) — Import→Upload, **no admin item** — and profile dropdown (My exams).
 
@@ -99,7 +99,7 @@ unknowns:
 #### Applicable Standards
 - Idempotent DDL (`drop … if exists` / `add column if not exists` / `is distinct from`) — `schema.sql` convention.
 - `SECURITY DEFINER` functions set `search_path` explicitly — only if any are added (v2.0 adds none for authorization; `handle_new_user` remains).
-- Snake_case DB ↔ camelCase TS mappers in query modules — `SOURCE/app/(layer2)/queries.ts` convention.
+- Snake_case DB ↔ camelCase TS mappers in query modules — `SOURCE/features/exams/queries.ts` convention.
 - Server Actions: `"use server"`, `createClient()`, `throw` on infra error, discriminated return (`{error?}`) on user error — existing convention.
 - **AI key never client-bundled**: the extractor modules import `@anthropic-ai/sdk` and read the key from server env; they must never be imported into a client component. A build-time check asserts the key is not in the client bundle (PRD metric 6).
 - Vietnamese comments where the surrounding file already uses them.
@@ -132,24 +132,24 @@ Traceable to PRD v2.0 R1–R15 / AC-001–AC-029 (see AC Traceability Matrix). N
 | Type | Path | Description |
 |------|------|-------------|
 | Existing | `SOURCE/supabase/schema.sql` | New columns, `exam_reports`, replaced select policies, author write policies, `with check`; Storage bucket policies. **No `is_admin`.** |
-| Existing | `SOURCE/app/(layer2)/queries.ts` | `listExams`/`getExam`/`getExamForPlayer`/`getResult` — status filter + byline + `image_url`/`question_type`. |
-| Existing | `SOURCE/app/(layer1)/actions.ts` | Auth + `updateProfile` — pattern reference. |
+| Existing | `SOURCE/features/exams/queries.ts` | `listExams`/`getExam`/`getExamForPlayer`/`getResult` — status filter + byline + `image_url`/`question_type`. |
+| Existing | `SOURCE/features/auth/actions.ts` | Auth + `updateProfile` — pattern reference. |
 | Existing | `SOURCE/lib/supabase/{server,client}.ts` | Server client via `createClient()`. |
 | Existing | `SOURCE/lib/scoring/computeScore.ts`, `_components/TopicBreakdown.tsx` | Topic bucketing — unchanged. |
 | Existing | `SOURCE/components/shared/RichText.tsx` | Hardened internally (ADR-0002). |
 | Existing | `SOURCE/lib/auth/getCurrentUser.ts` | `getCurrentUserProfile()` — own-name read; populates denormalized name. |
 | Existing | `SOURCE/supabase/test-rls.ts` | RLS harness — extended with UGC + Storage cases. |
-| Existing | `SOURCE/app/(layer2)/_components/{ExamCard,SiteHeader}.tsx`, `(layer1)/_components/HomeSidebar.tsx`, `components/shared/HeaderProfile.tsx` | Extended per UI Spec. |
-| Existing (empty) | `SOURCE/app/(layer4)/` | Home for the three new screens. |
+| Existing | `SOURCE/features/exams/components/ExamCard.tsx, SOURCE/components/layout/SiteHeader.tsx`, `(auth)/_components/HomeSidebar.tsx`, `components/shared/HeaderProfile.tsx` | Extended per UI Spec. |
+| Existing (empty) | `SOURCE/app/(authoring)/` | Home for the three new screens. |
 | New | `SOURCE/lib/ugc/extractQuestions.ts` | Server-side AI: question file → structured questions + image boxes (ADR-0004). |
 | New | `SOURCE/lib/ugc/extractAnswers.ts` | Server-side AI: answer file → answer map. |
 | New | `SOURCE/lib/ugc/assembleExam.ts` | Pure code: join by number, validate, `topic=subject`, typed result/errors. |
 | New | `SOURCE/lib/ugc/cropImages.ts` | Pure code + Storage: PDF-embedded extraction or bounding-box crop → upload → URL. |
 | New | `SOURCE/lib/ugc/{types.ts,errorCopy.ts,limits.ts}` | Shared types, error-code → copy map, input limits. |
 | New | `SOURCE/components/shared/QuestionFigure.tsx` | Origin-allowlisted `<img>` for a question image. |
-| New | `SOURCE/app/(layer4)/actions.ts` | Server Actions: extractAndAssemble / saveExam / publishExam / deleteExam / reportExam. |
-| New | `SOURCE/app/(layer4)/queries.ts` | Read queries: my-exams, one exam (assembled), hasReported. |
-| New | `SOURCE/app/(layer4)/{upload,me/exams,me/exams/[id]}/page.tsx` + `_components/*` | Screens S-01…S-03 (UI Spec). |
+| New | `SOURCE/features/authoring/actions.ts` | Server Actions: extractAndAssemble / saveExam / publishExam / deleteExam / reportExam. |
+| New | `SOURCE/features/authoring/queries.ts` | Read queries: my-exams, one exam (assembled), hasReported. |
+| New | `SOURCE/app/(authoring)/upload/page.tsx, SOURCE/app/(authoring)/me/exams/page.tsx, SOURCE/app/(authoring)/me/exams/[id]/page.tsx` + `_components/*` | Screens S-01…S-03 (UI Spec). |
 | New | `SOURCE/lib/ugc/__tests__/*`, `SOURCE/components/shared/__tests__/RichText.*.test.tsx`, `QuestionFigure.test.tsx` | Vitest fixtures. |
 
 **Similar-functionality search:** No existing extraction, sanitizer, moderation, image-crop, or reporting code exists (Grep for `extract`, `sanitize`, `report`, `crop`, `image_url`, `rehype-sanitize` → none). The one reuse is `RichText` (extend). All new modules are genuinely new.
@@ -163,12 +163,12 @@ Change Target: UGC Exam Upload v2.0 (exams/questions lifecycle + RLS + Storage, 
 Direct Impact:
   - SOURCE/supabase/schema.sql (new columns, exam_reports, replaced select policies, author write policies, with-check, backfill, Storage policies)
   - SOURCE/components/shared/RichText.tsx (hardened) + new QuestionFigure.tsx (origin-allowlisted img)
-  - SOURCE/app/(layer2)/queries.ts (status='published' filter + author_display_name + image_url/question_type)
-  - SOURCE/app/(layer2)/_components/SiteHeader.tsx, (layer1)/_components/HomeSidebar.tsx (Import->Upload, NO admin item)
-  - SOURCE/components/shared/HeaderProfile.tsx, (layer1)/_components/SidebarProfile.tsx (My exams item)
-  - SOURCE/app/(layer2)/_components/ExamCard.tsx, (layer2)/exams/[id]/page.tsx (AuthorByline; QuestionFigure; ReportButton)
+  - SOURCE/features/exams/queries.ts (status='published' filter + author_display_name + image_url/question_type)
+  - SOURCE/components/layout/SiteHeader.tsx, features/auth/components/HomeSidebar.tsx (Import->Upload, NO admin item)
+  - SOURCE/components/shared/HeaderProfile.tsx, features/auth/components/SidebarProfile.tsx (My exams item)
+  - SOURCE/features/exams/components/ExamCard.tsx, (exams)/exams/[id]/page.tsx (AuthorByline; QuestionFigure; ReportButton)
   - SOURCE/supabase/test-rls.ts (UGC + Storage RLS cases)
-  - NEW: SOURCE/lib/ugc/{extractQuestions,extractAnswers,assembleExam,cropImages,types,errorCopy,limits}.ts; SOURCE/app/(layer4)/{actions,queries,screens}
+  - NEW: SOURCE/lib/ugc/{extractQuestions,extractAnswers,assembleExam,cropImages,types,errorCopy,limits}.ts; SOURCE/app/(authoring)/{actions,queries,screens}
 Indirect Impact:
   - Every exams/questions read passes through tightened select policies — bounded by backfill + AC-027 count check.
   - RichText consumers render through the hardened pipeline with no call-site change — bounded by seeded regression fixtures.
@@ -190,13 +190,13 @@ flowchart TB
     RB["ReportButton/Dialog (S-04)"]
   end
   subgraph Server["Next.js Server (Server Actions + Components)"]
-    ACT["(layer4)/actions.ts\nextractAndAssemble / saveExam / publishExam / deleteExam / reportExam"]
+    ACT["features/authoring/actions.ts\nextractAndAssemble / saveExam / publishExam / deleteExam / reportExam"]
     EQ["lib/ugc/extractQuestions.ts (AI, multimodal)"]
     EA["lib/ugc/extractAnswers.ts (AI, cheap)"]
     AS["lib/ugc/assembleExam.ts (pure code: join by number, validate)"]
     CR["lib/ugc/cropImages.ts (PDF-embed or bbox crop -> Storage)"]
-    Q4["(layer4)/queries.ts\nmyExams / oneExam / hasReported"]
-    Q2["(layer2)/queries.ts\nlistExams/getExam (published + byline + image)"]
+    Q4["features/authoring/queries.ts\nmyExams / oneExam / hasReported"]
+    Q2["features/exams/queries.ts\nlistExams/getExam (published + byline + image)"]
     RT["RichText (hardened) + QuestionFigure (origin allowlist)"]
   end
   subgraph Data["Supabase"]
@@ -598,7 +598,7 @@ export const LIMITS = {
 | `FILE_TOO_LARGE` / `TOO_MANY_PAGES` | null | "That file is too large / has too many pages (max {…})." |
 | `STEM_TOO_LONG` / `CHOICE_TOO_LONG` | n | "Câu {n} — the {stem/choice} is too long (max {…})." |
 
-### Data Contracts — Server Actions (`(layer4)/actions.ts`)
+### Data Contracts — Server Actions (`(authoring)/actions.ts`)
 
 ```yaml
 Contract: extractAndAssemble(input): Promise<ActionResult>   ("use server")
@@ -627,7 +627,7 @@ Contract: reportExam(examId, reason): Promise<{error?: "duplicate"|"empty"|"serv
   Effect: insert exam_reports(reporter_id, reporter_display_name, reason); unique violation -> "duplicate"
 ```
 
-### Read Queries (`(layer4)/queries.ts`)
+### Read Queries (`(authoring)/queries.ts`)
 
 ```yaml
 listMyExams(): MyExam[]              # own rows, all statuses, newest-first: id,title,subject,grade,questionCount,status,createdAt
@@ -635,7 +635,7 @@ getMyExam(id): AssembledExam|null    # own; full assembled exam for review/edit:
 hasReported(examId): boolean         # a row (exam_id, auth.uid()) exists
 ```
 
-Catalog reads (`(layer2)/queries.ts`) extend `listExams`/`getExam`/`getExamForPlayer` to `.eq('status','published')` (on top of the RLS floor) and to select `author_display_name` and each question's `question_type`/`image_url`/`essay_answer`. RLS is the authorization floor; the explicit `status='published'` filter prevents a viewer's own non-published exams leaking into the catalog (R-6).
+Catalog reads (`(exams)/queries.ts`) extend `listExams`/`getExam`/`getExamForPlayer` to `.eq('status','published')` (on top of the RLS floor) and to select `author_display_name` and each question's `question_type`/`image_url`/`essay_answer`. RLS is the authorization floor; the explicit `status='published'` filter prevents a viewer's own non-published exams leaking into the catalog (R-6).
 
 ### Data Representation Decision
 
@@ -701,7 +701,7 @@ XSS suite + seeded-regression suite (ADR-0002) + `QuestionFigure` image-origin s
 
 | AC | Design element(s) |
 |----|-------------------|
-| AC-001 | `SiteHeader`/`HomeSidebar` `Upload→/upload`; `(layer4)/upload` |
+| AC-001 | `SiteHeader`/`HomeSidebar` `Upload→/upload`; `(authoring)/upload` |
 | AC-002 | `/upload` guard → `/?auth=signin` |
 | AC-003 | `extractAndAssemble` validation `{kind:"validation",fieldErrors}`; MetadataFields |
 | AC-004 | nullable school/year/semester; catalog "None" fallback |
@@ -743,8 +743,8 @@ XSS suite + seeded-regression suite (ADR-0002) + `QuestionFigure` image-origin s
 2. **Tooling** — vitest + jsdom + @testing-library/react dev deps + config.
 3. **`lib/ugc` extraction + assembly + crop** — `types`, `limits`, `errorCopy`, `extractQuestions`, `extractAnswers`, `cropImages`, `assembleExam` + assembly fixtures (answer fidelity, image mapping, errors). AI key server-only + build-time no-bundle check (metric 6).
 4. **RichText hardening + QuestionFigure** — `rehype-sanitize` + KaTeX safe config; XSS + seeded-regression + image-origin fixtures. *(ADR-0002 gate.)*
-5. **Server actions + read queries** — `(layer4)/{actions,queries}.ts` + `(layer4)/layout.tsx` (SiteHeader).
-6. **Catalog reads + byline + image** — `(layer2)/queries.ts` (`status='published'`, `author_display_name`, question `image_url`/`question_type`), `ExamCard`, exam detail (AuthorByline + QuestionFigure + ReportButton/Dialog), player (QuestionFigure).
+5. **Server actions + read queries** — `(authoring)/{actions,queries}.ts` + `(authoring)/layout.tsx` (SiteHeader).
+6. **Catalog reads + byline + image** — `(exams)/queries.ts` (`status='published'`, `author_display_name`, question `image_url`/`question_type`), `ExamCard`, exam detail (AuthorByline + QuestionFigure + ReportButton/Dialog), player (QuestionFigure).
 7. **Navbar/profile** — Import→Upload (no admin item); My exams in the profile dropdown.
 8. **Screens S-01…S-03** — Upload, My exams, Review & edit — per UI Spec (states, a11y, dialog focus trap).
 9. **QA phase** — full AC pass; RLS+Storage suite green; assembly + XSS + regression + image fixtures green; axe + keyboard a11y; AC-027 count; end-to-end upload→review→publish→attempt→report.
@@ -796,7 +796,7 @@ In dependency order: (1) schema+Storage foundation + RLS suite; (2) tooling; (3)
 - UI Spec `docs/ui-spec/ugc-exam-upload-ui-spec.md` (v2.0)
 - ADR-0001/0002/0003/0004 (`docs/adr/`, all revised for v2.0)
 - claude-api skill reference (multimodal document/image input, structured outputs, server-side calling, model IDs)
-- Code: `SOURCE/supabase/schema.sql`, `SOURCE/app/(layer2)/{queries,actions}.ts`, `SOURCE/app/(layer1)/actions.ts`, `SOURCE/lib/supabase/server.ts`, `SOURCE/lib/scoring/computeScore.ts`, `SOURCE/components/shared/RichText.tsx`, `SOURCE/lib/auth/getCurrentUser.ts`, `SOURCE/supabase/test-rls.ts`, `SOURCE/lib/fake-data/exams.ts`, `SOURCE/types/{exam,question}.ts`
+- Code: `SOURCE/supabase/schema.sql`, `SOURCE/features/exams/{queries,actions}.ts`, `SOURCE/features/auth/actions.ts`, `SOURCE/lib/supabase/server.ts`, `SOURCE/lib/scoring/computeScore.ts`, `SOURCE/components/shared/RichText.tsx`, `SOURCE/lib/auth/getCurrentUser.ts`, `SOURCE/supabase/test-rls.ts`, `SOURCE/lib/fake-data/exams.ts`, `SOURCE/types/{exam,question}.ts`
 - Security refs (ADR-0002): react-markdown security docs; KaTeX security/options; advisories GHSA-64fm-8hw2-v72w, GHSA-cvr6-37gx-v8wc, CVE-2025-23207
 
 ## v2.1 Amendment — Multi-Part National Format + Gemini Protocol (2026-07-17)
@@ -862,8 +862,8 @@ Join key changes from `number` to the composite string `` `${part}:${number}` ``
 ### v2.1 Persistence/read delta
 
 - `actions.ts`: persist `part_number`, `sub_answers`, `exams.parts`; id scheme `p<part>q<n>`; `SaveQuestionPatch` gains `subItems`/`subAnswers`/`shortAnswer` fields (validated server-side).
-- `(layer4)/queries.ts` (`getMyExam`): carries the new fields for review.
-- `(layer2)/queries.ts` (`getExamForPlayer`): selects `part_number`, `question_type`, sub-item **statements** (`choices`) — **never** `sub_answers`/`essay_answer`/`correct_answer`. `PublicQuestion` = `Omit<Question, "correctAnswer" | "essayAnswer" | "subAnswers">`.
+- `(authoring)/queries.ts` (`getMyExam`): carries the new fields for review.
+- `(exams)/queries.ts` (`getExamForPlayer`): selects `part_number`, `question_type`, sub-item **statements** (`choices`) — **never** `sub_answers`/`essay_answer`/`correct_answer`. `PublicQuestion` = `Omit<Question, "correctAnswer" | "essayAnswer" | "subAnswers">`.
 
 ### v2.1 UI delta
 
@@ -990,7 +990,7 @@ Contract: validateMetaForPublish(meta: ExamMeta): UgcError[]                    
 
 Clamping is deliberately rejected: a duration read as `900` clamped to `600` produces a plausible wrong value that survives review unnoticed, whereas `null` renders as a visibly empty required field. This is the same asymmetry that makes fabrication a hard-fail in the ADR-0007 kill criterion.
 
-### v2.2 Pipeline delta (`(layer4)/actions.ts` — `extractAndAssemble`)
+### v2.2 Pipeline delta (`(authoring)/actions.ts` — `extractAndAssemble`)
 
 The three AI calls are mutually independent and all read files that are already uploaded, so metadata extraction is **parallel, not sequential** — it adds no wall-clock latency.
 
@@ -1044,8 +1044,8 @@ Server-side enforcement is required, not merely a disabled button: `PublishBar` 
 
 ### v2.2 Read delta
 
-- `(layer4)/queries.ts` `getMyExam`: no shape change — the metadata columns were already selected for the review screen's summary. The summary merely becomes editable (UI Spec §v2.2).
-- `(layer2)/queries.ts`: **unchanged**. The catalog only ever sees `published` exams, and by the publish gate a published exam always has complete metadata — so no catalog surface has to handle a null required field.
+- `(authoring)/queries.ts` `getMyExam`: no shape change — the metadata columns were already selected for the review screen's summary. The summary merely becomes editable (UI Spec §v2.2).
+- `(exams)/queries.ts`: **unchanged**. The catalog only ever sees `published` exams, and by the publish gate a published exam always has complete metadata — so no catalog surface has to handle a null required field.
 
 ### v2.2 Test strategy delta
 

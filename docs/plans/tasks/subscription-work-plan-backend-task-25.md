@@ -30,14 +30,14 @@ Implement it **at the refusal site** (in `tutorActions.ts` / `actions.ts`), **no
 ## Target Files
 - [x] `SOURCE/lib/tutor/telemetry.ts` (`:35` widened; `:33` and `:39` comments corrected)
 - [x] `SOURCE/lib/tutor/__tests__/telemetry.test.ts` (`:49` transcription; **`:261` unmodified**)
-- [x] `SOURCE/app/(layer2)/tutorActions.ts` and `SOURCE/app/(layer4)/actions.ts` (the OK-04 mapping at each refusal site)
+- [x] `SOURCE/features/exams/tutorActions.ts` and `SOURCE/features/authoring/actions.ts` (the OK-04 mapping at each refusal site)
 
 ## Investigation Targets
 - `SOURCE/lib/tutor/telemetry.ts` (`:33`, `:35`, `:37`, `:39`, `:78`)
 - `SOURCE/lib/tutor/__tests__/telemetry.test.ts` (`:49` the hand transcription; `:261` the two-layer guard) — **adjacent cases for the boundary sweep**
 - `SOURCE/supabase/schema.sql` (both `error_code in ( … )` occurrences written in plan Task 1.1) — **adjacent case for the boundary sweep**
 - `SOURCE/lib/billing/quota.ts` (`consumeQuota` return union — the mapping source)
-- `SOURCE/app/(layer2)/tutorActions.ts`, `SOURCE/app/(layer4)/actions.ts` (the refusal sites)
+- `SOURCE/features/exams/tutorActions.ts`, `SOURCE/features/authoring/actions.ts` (the refusal sites)
 - `docs/design/subscription-backend-design.md` (§ Integration Point I11 (AC-046))
 - `docs/design/subscription-backend-design.md` (§ Design — where the write happens / OK-04)
 - `docs/ui-spec/subscription-ui-spec.md` (§ UI-D3 — This phase does NOT split the four tutor error codes)
@@ -52,7 +52,7 @@ Implement it **at the refusal site** (in `tutorActions.ts` / `actions.ts`), **no
 ## Boundary Context (from the plan Connection Map)
 
 **Boundary — Refusal branches → `telemetry_log`.**
-- Owners: `SOURCE/app/(layer2)/tutorActions.ts`, `SOURCE/app/(layer4)/actions.ts` (via `SOURCE/lib/tutor/telemetry.ts`) ↔ `public.telemetry_log` under `telemetry_insert_own`.
+- Owners: `SOURCE/features/exams/tutorActions.ts`, `SOURCE/features/authoring/actions.ts` (via `SOURCE/lib/tutor/telemetry.ts`) ↔ `public.telemetry_log` under `telemetry_insert_own`.
 - **Serialized Format**: `error_code` is one of the six CHECK literals; the runtime filter nulls unknown codes rather than throwing.
 - **Consumer Parse Rule**: the widened CHECK must already exist on the target database, or the insert fails and the best-effort write is lost **silently**.
 - **Expected Signal**: three causes ⇒ three distinct `error_code` values, and **all three inserts are accepted**.

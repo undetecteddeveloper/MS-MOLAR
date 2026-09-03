@@ -11,13 +11,13 @@ This file records the external resources available to this project and how to ac
 ### Design Origin
 - Status: present
 - Source type: token file in the repository (no separate spec doc)
-- Location: `SOURCE/app/globals.css` — the sole source of truth for the "Ink & Lacquer" / "Mực & Sơn Mài" theme since `DESIGN.md` (repo root) was **deleted 2026-08-06** (deliberate — see `.claude/MEMORY.md` §3). Design rationale/history is recorded in `.claude/MEMORY.md` §3, not in a repo file.
+- Location: `SOURCE/app/globals.css` — the sole source of truth for the "Ink & Lacquer" / "Mực & Sơn Mài" theme since `PROJECT_OVERVIEW.md §2` (repo root) was **deleted 2026-08-06** (deliberate — see `.claude/MEMORY.md` §3). Design rationale/history is recorded in `.claude/MEMORY.md` §3, not in a repo file.
 - Access method: file read (`globals.css` for tokens; `.claude/MEMORY.md` for rationale/hard rules)
 
 ### Design System
 - Status: present
 - Source type: internal package / ad-hoc in-repo components (no external catalog, no Storybook)
-- Location: `SOURCE/app/(layer2)/_components/`, `SOURCE/app/(layer1)/_components/`, base primitives in `SOURCE/components/ui/` (base-ui + cva); design tokens in `SOURCE/app/globals.css`
+- Location: `SOURCE/features/exams/components/`, `SOURCE/features/auth/components/`, base primitives in `SOURCE/components/ui/` (base-ui + cva); design tokens in `SOURCE/app/globals.css`
 - Access method: file read / import within the repo
 
 ### Guidelines
@@ -72,7 +72,7 @@ This file records the external resources available to this project and how to ac
 ## API
 
 ### API Schema Source
-- Status: not applicable — no separate API contract (no OpenAPI/GraphQL/proto). Server logic is Next.js Server Actions (`SOURCE/app/(layer1)/actions.ts`, `SOURCE/app/(layer2)/actions.ts`, `queries.ts`) calling the Supabase client directly; the API surface is code-first.
+- Status: not applicable — no separate API contract (no OpenAPI/GraphQL/proto). Server logic is Next.js Server Actions (`SOURCE/features/auth/actions.ts`, `SOURCE/features/exams/actions.ts`, `queries.ts`) calling the Supabase client directly; the API surface is code-first.
 
 ### Mock Environment
 - Status: present

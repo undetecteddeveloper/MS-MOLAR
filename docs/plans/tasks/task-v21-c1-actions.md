@@ -10,7 +10,7 @@ Persist the multi-part model (Design Doc §v2.1 Persistence delta):
 - Pipeline logger: stage lines mention parts (e.g., "22 câu / 3 phần").
 
 ## Files
-Edited: `app/(layer4)/actions.ts`, `lib/ugc/{fromRows,types}.ts` (patch types), `lib/ugc/__tests__/fromRows.test.ts`.
+Edited: `features/authoring/actions.ts`, `lib/ugc/{fromRows,types}.ts` (patch types), `lib/ugc/__tests__/fromRows.test.ts`.
 
 ## Verification / Acceptance
 `vitest` green (fromRows both id forms; round-trip assembled→rows→assembled preserves (part, number, type, answers)). `tsc` clean. Manual: upload the 2025 fixture → DB rows carry correct `part_number`/`sub_answers`; re-run works; old exams unaffected.

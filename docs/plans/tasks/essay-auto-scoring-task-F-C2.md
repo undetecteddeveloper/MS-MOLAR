@@ -1,7 +1,7 @@
 # Task F-C2 — `EssayGradingPoller` + deterministic RTL test
 
 Plan mapping: `docs/plans/20260829-feature-essay-auto-scoring.md` — **Phase F-C (Interaction and fixture-e2e, frontend slices V4 + V5), Task F-C2**
-Layer: **frontend** (`SOURCE/app/(layer2)/_components/**`, two route pages)
+Layer: **frontend** (`SOURCE/features/exams/components/**`, two route pages)
 
 Metadata:
 - Dependencies: **Task F-A3**.
@@ -16,9 +16,9 @@ Metadata:
 
 ## Implementation Content
 
-Create `SOURCE/app/(layer2)/_components/EssayGradingPoller.tsx` as a `"use client"` component, mounted on **both** result pages.
+Create `SOURCE/features/exams/components/EssayGradingPoller.tsx` as a `"use client"` component, mounted on **both** result pages.
 
-This is **entirely new code** — a repo-wide grep found `(layer2)` has **0** `router.refresh()` calls, **0** `visibilityState` uses, and the only `setInterval` in the codebase at `(layer1)/_components/HomeCarousel.tsx:88`.
+This is **entirely new code** — a repo-wide grep found `(exams)` has **0** `router.refresh()` calls, **0** `visibilityState` uses, and the only `setInterval` in the codebase at `(auth)/_components/HomeCarousel.tsx:88`.
 
 ### Mechanism: chained `setTimeout`, borrowing `ExamTimer`'s documented reasoning — **not** `setInterval`
 `setInterval` **coalesces ticks** when the tab is backgrounded, so returning to the tab fires a **burst** of `router.refresh()` calls, which is the most expensive possible behaviour for the target user (mid-range Android, unstable network).
@@ -67,20 +67,20 @@ The UI Spec's "0 bytes of JS when the feature is off" is **withdrawn** — the r
 - **No `waitFor` anywhere in this describe** — `waitFor` plus fake timers is the standing hang in this repo.
 
 ## Target Files
-- [x] `SOURCE/app/(layer2)/_components/EssayGradingPoller.tsx` (new)
-- [x] `SOURCE/app/(layer2)/_components/__tests__/EssayGradingPoller.test.tsx` (new) — 11 cases
-- [x] `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/page.tsx` (mount point)
-- [x] `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` (mount point)
+- [x] `SOURCE/features/exams/components/EssayGradingPoller.tsx` (new)
+- [x] `SOURCE/features/exams/components/__tests__/EssayGradingPoller.test.tsx` (new) — 11 cases
+- [x] `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/page.tsx` (mount point)
+- [x] `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` (mount point)
 
 ## Investigation Targets
 - `docs/ui-spec/essay-auto-scoring-ui-spec.md` (§ Component: EssayGradingPoller — verify default (polling) + stopped-at-cap + hidden-tab + resolved + not-mounted states)
 - `docs/design/essay-auto-scoring-frontend-design.md` (§ Agreement Checklist Scope — `EssayGradingPoller`: chained `setTimeout`, two-phase cadence, two independent caps, visibility skip, `aria-live` polite region, manual refresh button)
 - `docs/design/essay-auto-scoring-frontend-design.md` (§ Accessibility Requirements)
-- `SOURCE/app/(layer2)/_components/ExamTimer.tsx` (`:69-76` — the empty-live-region idiom, AB-7)
-- `SOURCE/app/(layer2)/_components/__tests__/ExamTimer.test.tsx` (`:17-19` — advance one tick at a time; nested timers need a commit point)
+- `SOURCE/features/exams/components/ExamTimer.tsx` (`:69-76` — the empty-live-region idiom, AB-7)
+- `SOURCE/features/exams/components/__tests__/ExamTimer.test.tsx` (`:17-19` — advance one tick at a time; nested timers need a commit point)
 - `SOURCE/components/billing/RecheckOrderControl.tsx` (`:22-26` — the counter-example: a region pre-filled with text)
-- `SOURCE/app/(layer1)/_components/HomeCarousel.tsx` (`:88` — the codebase's only `setInterval`, and why this component does not copy it)
-- `SOURCE/app/(layer2)/queries.ts` (Task B2.1 — `essaySummary`, `pendingCount`; the mount predicate's input)
+- `SOURCE/features/auth/components/HomeCarousel.tsx` (`:88` — the codebase's only `setInterval`, and why this component does not copy it)
+- `SOURCE/features/exams/queries.ts` (Task B2.1 — `essaySummary`, `pendingCount`; the mount predicate's input)
 - `SOURCE/lib/essay/gradeEssays.ts` (Task B1.4 — `ESSAY_PASS_BUDGET_MS = 240_000`, the anchor for `ESSAY_POLL_MAX_ELAPSED_MS`)
 - `SOURCE/lib/i18n/dictionaries/en.ts` / `vi.ts` (Task F-A1 — `result.essay.pollStopped`, `announceProgress`, `announceAllDone`)
 
@@ -207,5 +207,5 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
 
 ## Notes
 - Impact scope: F-C3 (FE2E-1 asserts zero timers in the shipped state), F-C4 (FE2E-2 drives the transition).
-- Scope boundary — preserve unchanged: `SOURCE/app/(layer2)/_components/ExamTimer.tsx` (its **reasoning** is borrowed, not its code); `HomeCarousel.tsx` (the codebase's only `setInterval` — **not** a model here); `ScoreCard.tsx`.
+- Scope boundary — preserve unchanged: `SOURCE/features/exams/components/ExamTimer.tsx` (its **reasoning** is borrowed, not its code); `HomeCarousel.tsx` (the codebase's only `setInterval` — **not** a model here); `ScoreCard.tsx`.
 - The two **cadence** constants stay owned by **O-6 / OQ-1** until measured (Task E5); the two **caps** are already re-anchored to `ESSAY_PASS_BUDGET_MS` and move only if that moves.

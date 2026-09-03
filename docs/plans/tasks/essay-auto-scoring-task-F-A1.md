@@ -51,7 +51,7 @@ Reusing them keeps the inventory at exactly **29 keys, 28 new**.
 - `SOURCE/lib/i18n/dictionaries/en.ts` (`:5-6` the reuse convention; `:334` `upload.essayStored` — **out of scope**, OQ-5)
 - `SOURCE/lib/i18n/dictionaries/vi.ts` (`:139` `player.essayNotScored` — **kept verbatim**; `:271` `upload.essayStored` — out of scope; `:653` `profile.error.sessionExpired`; `:655` `profile.error.generic`)
 - `SOURCE/lib/i18n/translate.ts` (`:4` the `Dictionary` type derived from `en.ts`; `:22-24` a missing key returns the key itself; `:25-28` an unmatched `{name}` renders verbatim)
-- `SOURCE/app/(layer2)/queries.ts` (Task B2.1 — `EssaySummary`'s field names, which the parameterised strings are wired to)
+- `SOURCE/features/exams/queries.ts` (Task B2.1 — `EssaySummary`'s field names, which the parameterised strings are wired to)
 
 ## Reference Contracts
 

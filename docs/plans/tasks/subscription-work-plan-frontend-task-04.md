@@ -4,7 +4,7 @@ Plan mapping: `docs/plans/subscription-work-plan.md` — **Phase 2, plan Task 2.
 Layer: **frontend** (`SOURCE/components/**`, `SOURCE/app/**` page file)
 
 Metadata:
-- Dependencies: **backend-task-03 (plan Task 0.3 — the CL-02 amendment, which must land first)**, frontend-task-02 (plan Task 2.2 — the `(layer2)` provider mount), frontend-task-03 (`formatDate`)
+- Dependencies: **backend-task-03 (plan Task 0.3 — the CL-02 amendment, which must land first)**, frontend-task-02 (plan Task 2.2 — the `(exams)` provider mount), frontend-task-03 (`formatDate`)
 - Provides: the only surface that renders AC-042
 - Size: Small (2 files)
 
@@ -14,17 +14,17 @@ The `formattedResetDate?: string` prop is **retired** from a shipped component c
 
 ## Implementation Content
 
-Mount at `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx:177` **and** `:230`.
+Mount at `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx:177` **and** `:230`.
 
 - **Per the plan Task 0.3 amendment: the mount passes no prop.** Inside the existing `tutor.state === "known"` branch the component formats its own `tutor.resetsAt` via `formatDate(tutor.resetsAt, locale)` with `locale` from `useLocale()`.
 - **Retire the now-unreachable `formattedResetDate?: string` prop declaration** — the shipped component still declares it, and **no producer exists or may exist** (`code:02` forbids a second `readEntitlement()` path).
 - The `unknown ⇒ return null` behaviour at `:30` is **unchanged**.
 
-**Depends on plan Task 2.2.** Without the `(layer2)` provider this mount renders `null` on **every** render, for **every** user, forever — **and lint, build and the component own unit test all pass through that**.
+**Depends on plan Task 2.2.** Without the `(exams)` provider this mount renders `null` on **every** render, for **every** user, forever — **and lint, build and the component own unit test all pass through that**.
 
 ## Target Files
 - [x] `SOURCE/components/billing/TutorQuotaNote.tsx` (prop retired; self-formatting inside the `known` branch)
-- [x] `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` (now `:180`, `:234` — two mounts, **no props**)
+- [x] `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` (now `:180`, `:234` — two mounts, **no props**)
 
 ## Investigation Targets
 - `docs/ui-spec/subscription-ui-spec.md` (§ Component: `TutorQuotaNote` — C-06 — verify default (`known`) + empty (`unknown` ⇒ `null`) states)
@@ -32,7 +32,7 @@ Mount at `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.
 - `docs/design/subscription-frontend-design.md` (§ Field Propagation Map)
 - `docs/design/subscription-frontend-design.md` (contradiction row X-13 added by plan Task 0.3; `code:02`, `code:04`)
 - `SOURCE/components/billing/TutorQuotaNote.tsx` (`:30` the `unknown ⇒ null` branch; the `formattedResetDate?: string` declaration to retire)
-- `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` (`:177`, `:230`) — **adjacent cases for the boundary sweep**
+- `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` (`:177`, `:230`) — **adjacent cases for the boundary sweep**
 - `SOURCE/lib/format/datetime.ts` (plan Task 2.3 — `formatDate`)
 - `SOURCE/lib/i18n/client.tsx` (`useLocale()`)
 - `SOURCE/lib/billing/entitlement.tsx` (**frozen** — `useEntitlement()` and the `known` narrowing)
@@ -61,7 +61,7 @@ Mount at `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.
 ## Operation Verification Methods
 - **Verification method**: the provider-wrapped unit test for the `unknown ⇒ null` branch, plus FE-2 (plan Task 2.5) rendering the **real route tree**.
 - **Success criteria**: `formattedResetDate` is no longer declared; both mounts pass **no** prop; the `unknown ⇒ null` branch is unchanged; the note renders a `<p>` with the remaining count and the reset date beside **both** call sites when `tutor.state === "known"`.
-- **Failure response**: if the note renders `null` for a user whose quota is `known`, the `(layer2)` provider mount (plan Task 2.2) is missing or wrong — **fix the mount, do not add a prop**.
+- **Failure response**: if the note renders `null` for a user whose quota is `known`, the `(exams)` provider mount (plan Task 2.2) is missing or wrong — **fix the mount, do not add a prop**.
 - **Verification level**: L2 in this task; L1 via FE-2 and the manual pass.
 
 ## Proof Obligations
@@ -99,8 +99,8 @@ Mount at `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.
 | Location | Form |
 |---|---|
 | `SOURCE/components/billing/TutorQuotaNote.tsx` | definition, `({ formattedResetDate }: { formattedResetDate?: string })` |
-| `SOURCE/app/(layer2)/__tests__/layout.test.tsx:76,201` | `<TutorQuotaNote />` — already no props (Task 2.2) |
-| `SOURCE/app/(layer4)/__tests__/layout.test.tsx:61,181` | `<TutorQuotaNote />` — already no props (Task 2.2) |
+| `SOURCE/app/(exams)/__tests__/layout.test.tsx:76,201` | `<TutorQuotaNote />` — already no props (Task 2.2) |
+| `SOURCE/app/(authoring)/__tests__/layout.test.tsx:61,181` | `<TutorQuotaNote />` — already no props (Task 2.2) |
 | `result/detail/page.tsx` | **no mount** — the gap this task closes |
 
 No other consumer exists anywhere in `SOURCE/`.
@@ -140,7 +140,7 @@ The unit test is **provider-wrapped**, so it supplies the very thing production 
 ### Resolved — stale `EXPECTED_NOTE` in the two plan Task 2.2 layout tests
 
 Adding the reset date to the `known` branch turned two **pre-existing** assertions red:
-`SOURCE/app/(layer2)/__tests__/layout.test.tsx:128,280` and `SOURCE/app/(layer4)/__tests__/layout.test.tsx:106,266`.
+`SOURCE/app/(exams)/__tests__/layout.test.tsx:128,280` and `SOURCE/app/(authoring)/__tests__/layout.test.tsx:106,266`.
 
 **What was stale.** Both defined `EXPECTED_NOTE` as the count sentence only, carrying the comment *"Không truyền prop nào, nên không có vế 'Resets on …'"* ("no prop is passed, so there is no 'Resets on …' clause"). That is the **pre-amendment** inference. Plan Task 0.3 overturned it: under UI Spec v1.4 § UI-D17 and frontend DD X-13, the no-prop mount renders the reset date **from context**. The landed mounts were already correct (both are the bare `<TutorQuotaNote />`); only the expected *value* was wrong. `getByText` matches the whole text node, so the added clause made it miss.
 
@@ -150,17 +150,17 @@ Adding the reset date to the `known` branch turned two **pre-existing** assertio
 
 | File | fixture `resetsAt` | `EXPECTED_NOTE` |
 |---|---|---|
-| `(layer2)` | `2026-08-26T12:00:00.000Z` | `7/500 tutor hints used this period. Resets on 26/08/2026.` |
-| `(layer4)` | `2026-08-24T06:30:00.000Z` | `11/500 tutor hints used this period. Resets on 24/08/2026.` |
+| `(exams)` | `2026-08-26T12:00:00.000Z` | `7/500 tutor hints used this period. Resets on 26/08/2026.` |
+| `(authoring)` | `2026-08-24T06:30:00.000Z` | `11/500 tutor hints used this period. Resets on 24/08/2026.` |
 
-The date is written as a **literal**, not as `formatDate(EXPECTED_RESETS_AT, …)`: a expected value derived from the formatter under test moves in the same direction as the formatter and proves nothing. The per-file divergence that `cef31e7` deliberately built in survives — verified by observing `(layer4)` **still red** after `(layer2)` alone was corrected.
+The date is written as a **literal**, not as `formatDate(EXPECTED_RESETS_AT, …)`: a expected value derived from the formatter under test moves in the same direction as the formatter and proves nothing. The per-file divergence that `cef31e7` deliberately built in survives — verified by observing `(authoring)` **still red** after `(exams)` alone was corrected.
 
 **The correction did not weaken the assertion — verified, not assumed.**
 
 | Mutation | Result |
 |---|---|
-| `EntitlementProvider` removed from `(layer2)/layout.tsx` only | **CAUGHT** — `(layer2)` 3 failed, `(layer4)` stayed green |
-| `EntitlementProvider` removed from `(layer4)/layout.tsx` only | **CAUGHT** — `(layer4)` 4 failed, `(layer2)` stayed green |
+| `EntitlementProvider` removed from `(exams)/layout.tsx` only | **CAUGHT** — `(exams)` 3 failed, `(authoring)` stayed green |
+| `EntitlementProvider` removed from `(authoring)/layout.tsx` only | **CAUGHT** — `(authoring)` 4 failed, `(exams)` stayed green |
 | Provider kept, counts correct, **only `resetsAt` corrupted** | **CAUGHT** by the corrected assertion |
 | Same corruption against the **pre-amendment pair** (old component + old count-only constant) | **SURVIVED — 1 passed.** The old assertion was blind to `resetsAt` |
 

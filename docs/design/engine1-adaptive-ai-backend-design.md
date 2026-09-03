@@ -42,7 +42,7 @@ complexity_rationale: >
       privileged write — see ADR-0011.
 main_constraints:
   - "Math only (D1) — four new tables, one nullable FK column, no change to any other subject's data path."
-  - "Server Actions only, no REST tier (D4) — new entry points live in app/(layer2)/ following the existing actions.ts/queries.ts convention."
+  - "Server Actions only, no REST tier (D4) — new entry points live in app/(exams)/ following the existing actions.ts/queries.ts convention."
   - "Tutor context is limited to the §10c safe-column set plus the student's own recorded answer (D3) — a hard constraint on lib/tutor/'s input type, not a preference."
   - "A failed mastery update must not break exam submission (PRD Reliability NFR) — drives the ADR-0011 decision to keep the mastery write out of record_exam_result()'s transaction."
   - "schema.sql is applied by hand on two databases (TD-005) — every new DDL block must be idempotent-by-convention and the §17 fingerprint updated in the same change."
@@ -90,11 +90,11 @@ No other project-tier resource (Design Origin/System, Visual Verification, Mock 
 - [x] Four new tables (`skill_nodes`, `skill_prerequisites`, `user_skill_mastery`, `telemetry_log`) and one new nullable column (`questions.skill_node_id`) in `SOURCE/supabase/schema.sql`, with RLS, explicit `on delete` on every new FK, and the §10c grant-list edit.
 - [x] `docs/adr/ADR-0011-mastery-write-trust-boundary.md` (new) resolving U2.
 - [x] `record_skill_mastery()` SQL function + `SOURCE/lib/supabase/service-role.ts` export `recordSkillMastery()`, called from `submitExam()` as a second, best-effort step after `recordExamResult()`.
-- [x] The `hasBeenWrongTwice` cross-attempt mechanism: `SOURCE/lib/scoring/wrongTwice.ts` (pure function) + `getResult()`'s new parallel query (`SOURCE/app/(layer2)/queries.ts`) + `PerQuestionResult.hasBeenWrongTwice?: boolean` (`SOURCE/types/result.ts`).
+- [x] The `hasBeenWrongTwice` cross-attempt mechanism: `SOURCE/lib/scoring/wrongTwice.ts` (pure function) + `getResult()`'s new parallel query (`SOURCE/features/exams/queries.ts`) + `PerQuestionResult.hasBeenWrongTwice?: boolean` (`SOURCE/types/result.ts`).
 - [x] `SOURCE/lib/adaptive/` — `skillTaxonomy.ts` (reviewed DAG data + `validateDag()`), `constants.ts` (`MASTERY_CLEARED_THRESHOLD`, `SKILL_TAG_CONFIDENCE_THRESHOLD`), `route.ts` (`recommendNextSkill()`), with unit tests.
 - [x] `SOURCE/lib/tutor/` — `prompt.ts` (`buildTutorPrompt()`, structurally answer-key-free input type), `constants.ts` (`TUTOR_CALL_DEADLINE_MS`), `callTutor.ts` (`generateHint()`, reusing `getGeminiClient()`/retry/deadline), with unit tests.
-- [x] `SOURCE/app/(layer2)/tutorActions.ts` — `explainStep()` Server Action (typed-result convention), server-side re-verification of wrong-twice eligibility, rate-limited via a new `RATE_LIMITS.explainStep` entry.
-- [x] `SOURCE/app/(layer3)/queries.ts` — `getSkillRecommendation()`, parallel to the existing `getAnalyticsByRange()`.
+- [x] `SOURCE/features/exams/tutorActions.ts` — `explainStep()` Server Action (typed-result convention), server-side re-verification of wrong-twice eligibility, rate-limited via a new `RATE_LIMITS.explainStep` entry.
+- [x] `SOURCE/features/analytics/queries.ts` — `getSkillRecommendation()`, parallel to the existing `getAnalyticsByRange()`.
 - [x] `SOURCE/supabase/seedSkillTaxonomy.ts` — idempotent upsert of the reviewed DAG, mirroring `seed.ts`'s conventions.
 - [x] `SOURCE/supabase/tagQuestionSkills.ts` — re-runnable, confidence-gated, dry-run-by-default batch skill-tagging script producing a human-reviewable report.
 - [x] `docs/prd/engine1-adaptive-ai-prd.md` U3 (confidence threshold, placeholder `0.75`) and U5 (mastery-cleared threshold, placeholder `0.7`), each a single named constant.
@@ -127,24 +127,24 @@ No other project-tier resource (Design Origin/System, Visual Verification, Mock 
 - [x] New column on an existing table requires explicit §10c grant-list classification or `verify-schema.ts` fails by design `[explicit]` - Source: `schema.sql:594-599` self-documents this (TD-001).
 - [x] Any new `SECURITY DEFINER`/privileged function needs `revoke all on function ... from public, anon[, authenticated]` by name `[explicit]` - Source: `schema.sql:732-739` (2026-08-03 incident note).
 - [x] `lib/<domain>/` pure-logic module shape: single primary exported function, Vietnamese header comment stating rationale, purely functional (no ambient clock/random reads — inject state), private unexported helpers, co-located `__tests__/` `[implicit]` - Evidence: `SOURCE/lib/scoring/computeScore.ts`, `SOURCE/lib/analytics/aggregateAttempts.ts` (`now: Date` injected explicitly for test determinism). Confirmed: Yes.
-- [x] Typed-result Server Action convention (`{error?: "code"}`, no throw, no redirect) for actions whose UI needs to react without losing state `[implicit]` - Evidence: `rateExam()`/`getMyRating()` (`SOURCE/app/(layer2)/actions.ts:177-249`) vs. throw-based `submitExam()`/`startAttempt()`. Confirmed: Yes — this design states explicitly (see Implementation Approach) which convention `explainStep()` follows and why.
-- [x] `snake_case` DB column → `camelCase` TS field via `(r.column as T | null) ?? undefined` `[implicit]` - Evidence: `SOURCE/app/(layer2)/actions.ts:130`, `SOURCE/lib/ugc/fromRows.ts:79`. Confirmed: Yes.
+- [x] Typed-result Server Action convention (`{error?: "code"}`, no throw, no redirect) for actions whose UI needs to react without losing state `[implicit]` - Evidence: `rateExam()`/`getMyRating()` (`SOURCE/features/exams/actions.ts:177-249`) vs. throw-based `submitExam()`/`startAttempt()`. Confirmed: Yes — this design states explicitly (see Implementation Approach) which convention `explainStep()` follows and why.
+- [x] `snake_case` DB column → `camelCase` TS field via `(r.column as T | null) ?? undefined` `[implicit]` - Evidence: `SOURCE/features/exams/actions.ts:130`, `SOURCE/lib/ugc/fromRows.ts:79`. Confirmed: Yes.
 - [x] Diagnostic-log helper pattern: safe-metadata-only, try/catch-wrapped, one fixed log-site prefix per module `[implicit]` - Evidence: `logExtractorExit()`/`sdkErrorDetail()` (`SOURCE/lib/ugc/gemini.ts:60-78`). Confirmed: Yes — but `logExtractorExit()`'s prefix is hardcoded `"[ugc-extract]"` (`gemini.ts:62`), so the tutor module defines its own analogous helper rather than reusing that one verbatim (see Existing Interface Investigation).
 
 #### Assumed Behaviors
 
 - [x] **`service_role` bypasses RLS and retains full table/function privileges by Supabase platform default**, without any explicit `grant` statement in `schema.sql` for that role on ordinary tables. Evidence: `record_exam_result()` (`schema.sql:820-885`) inserts into `exam_results` under `service_role` with no `grant insert ... to service_role` anywhere in the file; ADR-0010 states this explicitly ("service_role already bypasses RLS and retains its table grants"). Confirmed: Yes.
-- [x] **`submitExam()`'s idempotency short-circuit (`attempt.status === 'submitted'` → immediate redirect) runs before any scoring/recording code**, so any new post-score-write step must be inserted after that check or it will never fire on a re-visit. Evidence: `SOURCE/app/(layer2)/actions.ts:82-84`. Confirmed: Yes.
+- [x] **`submitExam()`'s idempotency short-circuit (`attempt.status === 'submitted'` → immediate redirect) runs before any scoring/recording code**, so any new post-score-write step must be inserted after that check or it will never fire on a re-visit. Evidence: `SOURCE/features/exams/actions.ts:82-84`. Confirmed: Yes.
 - [x] **`claim_attempt_answer_key()`'s `RETURNS TABLE` does not currently include `skill_node_id`.** Evidence: `schema.sql:682-696`. Confirmed: Yes — this design deliberately does not add it there (see Minimal Surface Alternatives, Element 3).
 - [x] **`verify-schema.ts`'s `parseGrantedColumns()` reads only the first `grant select (...) on public.questions` statement in the file** (non-global regex `.exec()`). Evidence: `SOURCE/supabase/verify-schema.ts:115-122` uses `/grant\s+select\s*\(([\s\S]*?)\)\s*on\s+public\.questions/i.exec(sql)` with no `g` flag. Confirmed: Yes — this is why the design edits the existing §10c statement in place rather than appending a second grant statement (see Existing Interface Investigation).
 - [x] **`vitest.config.ts`'s `include` glob covers `lib/**`, `components/**`, `app/**` but not `supabase/**`.** Evidence: `SOURCE/vitest.config.ts:19`. Confirmed: Yes — this is why the reviewed skill-taxonomy data and its DAG-validity test live under `lib/adaptive/`, not `supabase/`.
-- [x] **Vercel's Hobby-plan Serverless Function duration limit comfortably accommodates a single Gemini tutor call within the chosen `TUTOR_CALL_DEADLINE_MS = 30_000` budget.** Confirmed: Yes — verified in Phase 3 Task 13 against Vercel's own duration documentation (`https://vercel.com/docs/functions/configuring-functions/duration`, read 2026-08-14, page last updated 2026-07-01): with fluid compute (**enabled by default**) the **default** function duration is **300s on Hobby, Pro and Enterprise alike** (Hobby's maximum is also 300s), and `SOURCE/vercel.json` declares no `functions` override that could lower it — 30s sits inside the default with a 10× margin, so no `maxDuration` export is required. Two facts bound this: (a) per Next.js 16's bundled docs (`route-segment-config/maxDuration.md`), `maxDuration` is a route-segment export and for Server Actions must be set **at the page level** — a `"use server"` module cannot carry it; (b) residual, not readable from the repository: the project's dashboard-level "Default Max Duration". If that is lowered below 30s or fluid compute is disabled, the page mounting `ExplainStepAffordance` must export `maxDuration >= 30`. Recorded at the top of `SOURCE/app/(layer2)/tutorActions.ts`; the matching Risks and Mitigation row ("Tutor deadline vs. Vercel function timeout") now covers only that residual.
+- [x] **Vercel's Hobby-plan Serverless Function duration limit comfortably accommodates a single Gemini tutor call within the chosen `TUTOR_CALL_DEADLINE_MS = 30_000` budget.** Confirmed: Yes — verified in Phase 3 Task 13 against Vercel's own duration documentation (`https://vercel.com/docs/functions/configuring-functions/duration`, read 2026-08-14, page last updated 2026-07-01): with fluid compute (**enabled by default**) the **default** function duration is **300s on Hobby, Pro and Enterprise alike** (Hobby's maximum is also 300s), and `SOURCE/vercel.json` declares no `functions` override that could lower it — 30s sits inside the default with a 10× margin, so no `maxDuration` export is required. Two facts bound this: (a) per Next.js 16's bundled docs (`route-segment-config/maxDuration.md`), `maxDuration` is a route-segment export and for Server Actions must be set **at the page level** — a `"use server"` module cannot carry it; (b) residual, not readable from the repository: the project's dashboard-level "Default Max Duration". If that is lowered below 30s or fluid compute is disabled, the page mounting `ExplainStepAffordance` must export `maxDuration >= 30`. Recorded at the top of `SOURCE/features/exams/tutorActions.ts`; the matching Risks and Mitigation row ("Tutor deadline vs. Vercel function timeout") now covers only that residual.
 
 #### Quality Assurance Mechanisms
 
 - [x] ESLint — Enforces: lint rules — Config: `SOURCE/eslint.config.mjs` — Covers: project-wide — Status: `adopted`.
 - [x] `tsc --noEmit` (strict) — Enforces: static typing — Config: `SOURCE/tsconfig.json` — Covers: project-wide — Status: `adopted`.
-- [x] `vitest run` — Enforces: unit/integration-test correctness — Config: `SOURCE/vitest.config.ts` — Covers: `lib/adaptive/`, `lib/tutor/`, `lib/scoring/wrongTwice.ts`, `app/(layer2)/__tests__/`, `app/(layer3)/__tests__/` — Status: `adopted` (primary correctness-proof mechanism, see Verification Strategy).
+- [x] `vitest run` — Enforces: unit/integration-test correctness — Config: `SOURCE/vitest.config.ts` — Covers: `lib/adaptive/`, `lib/tutor/`, `lib/scoring/wrongTwice.ts`, `app/(exams)/__tests__/`, `features/analytics/__tests__/` — Status: `adopted` (primary correctness-proof mechanism, see Verification Strategy).
 - [x] `next build` — Enforces: production build succeeds — Config: `SOURCE/package.json` — Covers: project-wide — Status: `adopted`.
 - [x] `npm run verify:schema` — Enforces: DB-vs-`schema.sql` behavioral parity, including the §10c column classification and every FK's `on delete` — Config: `SOURCE/supabase/verify-schema.ts` — Covers: `public.questions`, all FKs, §17 fingerprint — Status: `adopted` (mandatory after every manual apply, per TD-005).
 - [x] `SOURCE/lib/schema/__tests__/parseForeignKeys.test.ts` — Enforces: every new `references` clause declares `on delete` — Config: reads the real `schema.sql` — Covers: `skill_prerequisites`, `questions.skill_node_id`, `user_skill_mastery`, `telemetry_log` FKs — Status: `adopted`, CI-blocking (TD-011).
@@ -160,7 +160,7 @@ Three concrete gaps, per the PRD: (1) `questions.topic` cannot carry a real skil
 ### Current Challenges
 
 - `submitExam()` already carries a security-critical trust boundary (score writes, ADR-0010) that any new write into this same request must respect without weakening it or coupling to it in a way that violates the PRD's Reliability NFR.
-- `getResult()` (`SOURCE/app/(layer2)/queries.ts:315-389`) is scoped to a single attempt today and has zero visibility into a student's other attempts — the exact gap the UI Spec's D1 flagged and deferred to this document.
+- `getResult()` (`SOURCE/features/exams/queries.ts:315-389`) is scoped to a single attempt today and has zero visibility into a student's other attempts — the exact gap the UI Spec's D1 flagged and deferred to this document.
 - The tutor's context assembly is a genuine security boundary, not a formatting concern: the same `questions` row that legitimately contains `correct_answer`/`sub_answers`/`essay_answer` (already revoked from `anon`/`authenticated` at the column-grant level, §10c) must never have those three values reach a Gemini prompt, even though the tutor Server Action itself runs authenticated (i.e., it is not blocked by the column revoke the way a naive REST read would be — the tutor's own code must not choose to route around that boundary via `claim_attempt_answer_key`/`exam_answer_key`).
 
 ### Requirements
@@ -227,11 +227,11 @@ This document reuses the PRD's own AC IDs (AC-001 through AC-031) where the PRD'
 | Existing (modified) | `SOURCE/supabase/schema.sql` | New §9b, edited §10c, new §18, new §19; §17 fingerprint updated in the same change. |
 | Existing (modified) | `SOURCE/lib/schema/schemaFingerprint.ts` | `SCHEMA_FINGERPRINT` constant updated to match the new file content (exact value computed at implementation time via `computeSchemaFingerprint()`, not fabricated here — see Verification Strategy). |
 | Existing (modified) | `SOURCE/types/result.ts` | `PerQuestionResult` gains `hasBeenWrongTwice?: boolean` (UI Spec D1's exact contract). |
-| Existing (modified) | `SOURCE/app/(layer2)/queries.ts` | `getResult()` gains a parallel query + `computeWrongTwiceQuestionIds()` call to populate the new field. |
-| Existing (modified) | `SOURCE/app/(layer2)/actions.ts` | `submitExam()` gains a non-throwing `recordSkillMastery()` call after `recordExamResult()` succeeds. |
+| Existing (modified) | `SOURCE/features/exams/queries.ts` | `getResult()` gains a parallel query + `computeWrongTwiceQuestionIds()` call to populate the new field. |
+| Existing (modified) | `SOURCE/features/exams/actions.ts` | `submitExam()` gains a non-throwing `recordSkillMastery()` call after `recordExamResult()` succeeds. |
 | Existing (modified) | `SOURCE/lib/supabase/service-role.ts` | New export `recordSkillMastery()`, mirroring `recordExamResult()`'s shape. |
 | Existing (modified) | `SOURCE/lib/security/rateLimit.ts` | `RATE_LIMITS` gains `explainStep`. |
-| Existing (modified) | `SOURCE/app/(layer3)/queries.ts` | New export `getSkillRecommendation()`, parallel to `getAnalyticsByRange()`. |
+| Existing (modified) | `SOURCE/features/analytics/queries.ts` | New export `getSkillRecommendation()`, parallel to `getAnalyticsByRange()`. |
 | Existing (reused, untouched) | `SOURCE/lib/scoring/computeScore.ts` | `ScoreResult`/`PerQuestionResult` shape consumed as-is; no change. |
 | Existing (reused, untouched) | `SOURCE/lib/ugc/gemini.ts` | `getGeminiClient()`, `QUESTION_MODEL`, `ANSWER_MODEL`, `makeDeadlineSignal()`, `sdkErrorDetail()` reused by both the tutor and the batch tagger. `logExtractorExit()` is **not** reused verbatim (hardcoded `"[ugc-extract]"` prefix — see Fact Disposition). |
 | Existing (reused, untouched) | `SOURCE/lib/security/rateLimit.ts`'s `guard()` | Reused unmodified for `explainStep`. |
@@ -247,11 +247,11 @@ This document reuses the PRD's own AC IDs (AC-001 through AC-031) where the PRD'
 | New | `SOURCE/lib/tutor/callTutor.ts` | `generateHint()`, `logTutorExit()`. |
 | New | `SOURCE/lib/tutor/__tests__/prompt.test.ts` | AC-018/019. |
 | New | `SOURCE/types/adaptive.ts` | `SkillRecommendation` type (UI Spec D6's exact contract). |
-| New | `SOURCE/app/(layer2)/tutorActions.ts` | `explainStep()` Server Action. |
-| New | `SOURCE/app/(layer2)/__tests__/tutorActions.int.test.ts` | AC-021/022/029, server-side re-verification, **AC-012/013** (seeds ≥1 success + ≥1 failed `explainStep()` call, then asserts a `telemetry_log` query — filtered by `user_id`/`event_type='tutor_invoke'` — returns exactly the expected count/outcome split, proving the "how many calls, for whom, how many failed" question is answerable; separately asserts every inserted row's columns cannot structurally hold `correct_answer`/`sub_answers`/`essay_answer`, mirroring AC-018's fixture-based approach). |
+| New | `SOURCE/features/exams/tutorActions.ts` | `explainStep()` Server Action. |
+| New | `SOURCE/features/exams/__tests__/tutorActions.int.test.ts` | AC-021/022/029, server-side re-verification, **AC-012/013** (seeds ≥1 success + ≥1 failed `explainStep()` call, then asserts a `telemetry_log` query — filtered by `user_id`/`event_type='tutor_invoke'` — returns exactly the expected count/outcome split, proving the "how many calls, for whom, how many failed" question is answerable; separately asserts every inserted row's columns cannot structurally hold `correct_answer`/`sub_answers`/`essay_answer`, mirroring AC-018's fixture-based approach). |
 | New | `SOURCE/lib/tutor/__tests__/telemetry.test.ts` | **AC-013** (unit test on the telemetry-write payload builder itself — asserts, over a battery of fixture inputs including ones that historically would have leaked answer-key material through `buildTutorPrompt()`, that the constructed insert payload has 0 occurrences of any `correct_answer`/`sub_answers`/`essay_answer` value; complements the integration test above by testing the payload-construction step in isolation, matching AC-018's own "unit test on the builder, not just an integration check" precedent). |
-| New | `SOURCE/app/(layer3)/__tests__/getSkillRecommendation.int.test.ts` | AC-014-017/028/031, **AC-012** (asserts the new `adaptive_route` telemetry insert fires on invocation, mirroring `tutorActions.int.test.ts`'s query-based proof for the routing half of R4). |
-| New | `SOURCE/app/(layer2)/__tests__/recordSkillMastery.int.test.ts` | AC-009/010 against the real `submitExam` path. |
+| New | `SOURCE/features/analytics/__tests__/getSkillRecommendation.int.test.ts` | AC-014-017/028/031, **AC-012** (asserts the new `adaptive_route` telemetry insert fires on invocation, mirroring `tutorActions.int.test.ts`'s query-based proof for the routing half of R4). |
+| New | `SOURCE/features/exams/__tests__/recordSkillMastery.int.test.ts` | AC-009/010 against the real `submitExam` path. |
 | New | `SOURCE/supabase/seedSkillTaxonomy.ts` | Idempotent DAG seeding. |
 | New | `SOURCE/supabase/tagQuestionSkills.ts` | Batch skill tagger (dry-run default). |
 
@@ -259,10 +259,10 @@ This document reuses the PRD's own AC IDs (AC-001 through AC-031) where the PRD'
 
 Two existing interfaces are directly integrated with, not merely referenced:
 
-- **`submitExam(attemptId, answers)`** (`SOURCE/app/(layer2)/actions.ts:54-165`) — public signature unchanged. Internal step 6 (`recordExamResult`) is followed by a new step 7 (`recordSkillMastery`), inserted after the existing idempotency short-circuit (line 82-84) and after the score write succeeds, per ADR-0011.
-- **`getResult(attemptId): Promise<ExamResult | null>`** (`SOURCE/app/(layer2)/queries.ts:315-412`) — public signature unchanged. Internally gains one new parallel Supabase query (cross-attempt `exam_results` read) whose result feeds `computeWrongTwiceQuestionIds()`, applied to `result.perQuestion` before return.
+- **`submitExam(attemptId, answers)`** (`SOURCE/features/exams/actions.ts:54-165`) — public signature unchanged. Internal step 6 (`recordExamResult`) is followed by a new step 7 (`recordSkillMastery`), inserted after the existing idempotency short-circuit (line 82-84) and after the score write succeeds, per ADR-0011.
+- **`getResult(attemptId): Promise<ExamResult | null>`** (`SOURCE/features/exams/queries.ts:315-412`) — public signature unchanged. Internally gains one new parallel Supabase query (cross-attempt `exam_results` read) whose result feeds `computeWrongTwiceQuestionIds()`, applied to `result.perQuestion` before return.
 
-Call sites for both: `submitExam` has exactly one call site (the exam player's submit action, unchanged); `getResult` has exactly one call site (`ResultDetailPage`, `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx:25`) plus the `/result` summary page (not read during this design's investigation, out of scope — it does not render per-question detail and is unaffected by the additive field).
+Call sites for both: `submitExam` has exactly one call site (the exam player's submit action, unchanged); `getResult` has exactly one call site (`ResultDetailPage`, `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx:25`) plus the `/result` summary page (not read during this design's investigation, out of scope — it does not render per-question detail and is unaffected by the additive field).
 
 ### Similar Functionality Search and Decision
 
@@ -270,7 +270,7 @@ Call sites for both: `submitExam` has exactly one call site (the exam player's s
 - **Cross-attempt aggregation over `exam_results.per_question`**: no existing code performs this (`aggregateAttemptsByRange`, `SOURCE/lib/analytics/aggregateAttempts.ts`, aggregates by subject/time-range from a flattened `AttemptRow`, not by per-question correctness across attempts). **Decision: new implementation** (`lib/scoring/wrongTwice.ts`), following `aggregateAttemptsByRange`'s established shape (pure reducer, injected input, no ambient reads) rather than the `analytics` domain (different bounded context — scoring/tutor-trigger, not subject-level dashboard stats).
 - **Gemini-backed classification with a confidence gate, NULL-not-a-guess**: `normalizeSubject()`/`ALIASES` (`SOURCE/lib/ugc/subjects.ts:101-106`) is the exact convention precedent D2 names. **Decision: use the existing convention** (never returns a low-confidence guess), implemented fresh for the skill-tagging domain (different input/output shape — a Gemini classification call with a numeric confidence score, not a static alias table).
 - **DAG/graph traversal**: no existing code in this repository performs graph traversal. **Decision: new implementation**, `lib/adaptive/route.ts`.
-- **Typed-result vs. throw-based Server Action**: both conventions coexist (`rateExam()` typed-result vs. `submitExam()` throw-based, both `SOURCE/app/(layer2)/actions.ts`). **Decision: `explainStep()` follows the typed-result convention** — the UI Spec's `useTutorAction` hook (mirroring `usePdfAction`'s `phase` state machine) needs `idle`/`busy`/`error`/`hint-shown` states without losing the affordance's mounted state on failure, exactly the case `rateExam()`'s own doc comment states the typed-result convention exists for ("giữ nguyên 3 điểm đã nhập khi lỗi").
+- **Typed-result vs. throw-based Server Action**: both conventions coexist (`rateExam()` typed-result vs. `submitExam()` throw-based, both `SOURCE/features/exams/actions.ts`). **Decision: `explainStep()` follows the typed-result convention** — the UI Spec's `useTutorAction` hook (mirroring `usePdfAction`'s `phase` state machine) needs `idle`/`busy`/`error`/`hint-shown` states without losing the affordance's mounted state on failure, exactly the case `rateExam()`'s own doc comment states the typed-result convention exists for ("giữ nguyên 3 điểm đã nhập khi lỗi").
 
 ### Dependency Existence Verification
 
@@ -302,15 +302,15 @@ Call sites for both: `submitExam` has exactly one call site (the exam player's s
 | `schema.sql:1184-1214` (§16b) | `on delete set null` precedent for FKs to `auth.users` from operational/log tables — applied to `telemetry_log.user_id`. |
 | `verify-schema.ts:115-122` | `parseGrantedColumns()`'s single-match behavior — the exact reason the §10c edit must be in-place, not a second statement. |
 | `verify-schema.ts:1-40` (header) | 7-check structure this design's DDL must keep passing. |
-| `SOURCE/app/(layer2)/actions.ts:54-165` (`submitExam`) | Integration point — insertion point for `recordSkillMastery()` (after line 158's `recordExamResult` block). |
-| `SOURCE/app/(layer2)/queries.ts:315-412` (`getResult`) | Integration point — insertion point for the cross-attempt query and `hasBeenWrongTwice` mapping. |
+| `SOURCE/features/exams/actions.ts:54-165` (`submitExam`) | Integration point — insertion point for `recordSkillMastery()` (after line 158's `recordExamResult` block). |
+| `SOURCE/features/exams/queries.ts:315-412` (`getResult`) | Integration point — insertion point for the cross-attempt query and `hasBeenWrongTwice` mapping. |
 | `SOURCE/lib/scoring/computeScore.ts:36-42` (`isScored`) | Data contract reference — `scored !== false` is the exact predicate the mastery-write SQL and `wrongTwice.ts` must both mirror. |
 | `SOURCE/lib/analytics/aggregateAttempts.ts` | Pattern reference — pure reducer shape, injected `now: Date`, for `lib/adaptive/route.ts` and `lib/scoring/wrongTwice.ts`. |
 | `SOURCE/lib/ugc/subjects.ts:101-106` (`normalizeSubject`) | Pattern reference — "NULL instead of a guess," D2's precedent for the batch tagger's confidence gate. |
 | `SOURCE/lib/ugc/quotaTracker.ts` | Pattern reference (optional reuse, not required scope) — dev-only Gemini usage visibility; `QuotaRole` is a closed union that would need extending (`"tutor"`/`"tagging"`) if adopted. Not adopted in this document's required scope (no AC requires it). |
-| `SOURCE/app/(layer2)/actions.ts:177-229` (`rateExam`) | Pattern reference — typed-result Server Action convention `explainStep()` follows. |
+| `SOURCE/features/exams/actions.ts:177-229` (`rateExam`) | Pattern reference — typed-result Server Action convention `explainStep()` follows. |
 | `SOURCE/components/history/usePdfAction.ts` | Referenced only to confirm the shape `explainStep()`'s return type must support (UI Spec's own territory; cited here for interface-matching, not re-designed). |
-| `SOURCE/app/(layer3)/queries.ts` (`getAnalyticsByRange`) | Pattern reference — server-only, snake_case→camelCase mapping, RLS-scoped-implicit read; `getSkillRecommendation()` mirrors its shape. |
+| `SOURCE/features/analytics/queries.ts` (`getAnalyticsByRange`) | Pattern reference — server-only, snake_case→camelCase mapping, RLS-scoped-implicit read; `getSkillRecommendation()` mirrors its shape. |
 | `SOURCE/supabase/seed.ts` | Pattern reference — env-loading, service-role client, idempotent upsert; `seedSkillTaxonomy.ts` mirrors it. |
 | `SOURCE/vitest.config.ts:19` | Constraint reference — `include` glob excludes `supabase/**`, driving the `lib/adaptive/skillTaxonomy.ts` placement decision. |
 | `docs/ui-spec/engine1-adaptive-ai-ui-spec.md` D1, D6, TBD-01/02/03/04 | Contract source for `hasBeenWrongTwice` and `SkillRecommendation`. |
@@ -660,25 +660,25 @@ Change Target: submitExam() mastery-write integration + Layer 2/3 read paths for
 Direct Impact:
   - SOURCE/supabase/schema.sql (new §9b, edited §10c, new §18, new §19, §17 fingerprint value)
   - SOURCE/lib/schema/schemaFingerprint.ts (SCHEMA_FINGERPRINT constant)
-  - SOURCE/app/(layer2)/actions.ts (submitExam gains a non-throwing recordSkillMastery() step after recordExamResult())
+  - SOURCE/features/exams/actions.ts (submitExam gains a non-throwing recordSkillMastery() step after recordExamResult())
   - SOURCE/lib/supabase/service-role.ts (new export recordSkillMastery())
-  - SOURCE/app/(layer2)/queries.ts (getResult() gains a parallel query + hasBeenWrongTwice mapping)
+  - SOURCE/features/exams/queries.ts (getResult() gains a parallel query + hasBeenWrongTwice mapping)
   - SOURCE/types/result.ts (PerQuestionResult.hasBeenWrongTwice?: boolean)
   - SOURCE/lib/security/rateLimit.ts (RATE_LIMITS.explainStep)
-  - SOURCE/app/(layer3)/queries.ts (new export getSkillRecommendation())
+  - SOURCE/features/analytics/queries.ts (new export getSkillRecommendation())
   - SOURCE/lib/adaptive/**, SOURCE/lib/tutor/**, SOURCE/lib/scoring/wrongTwice.ts, SOURCE/types/adaptive.ts (all new)
-  - SOURCE/app/(layer2)/tutorActions.ts (new)
+  - SOURCE/features/exams/tutorActions.ts (new)
   - SOURCE/supabase/seedSkillTaxonomy.ts, SOURCE/supabase/tagQuestionSkills.ts (new)
 Indirect Impact:
   - public.exam_results.per_question (jsonb) — unchanged shape, but now read a SECOND time (cross-attempt) by getResult() for the wrong-twice computation, and read a second time (by record_skill_mastery) at write time
-  - SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx — will start receiving hasBeenWrongTwice on scored, incorrect rows; UI Spec's own territory to render it (ExplainStepAffordance mount)
-  - SOURCE/app/(layer3)/me/dashboard/page.tsx — will start receiving a SkillRecommendation from a new parallel fetch; UI Spec's own territory to render it (SkillRecommendationCard mount)
+  - SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx — will start receiving hasBeenWrongTwice on scored, incorrect rows; UI Spec's own territory to render it (ExplainStepAffordance mount)
+  - SOURCE/app/(analytics)/me/dashboard/page.tsx — will start receiving a SkillRecommendation from a new parallel fetch; UI Spec's own territory to render it (SkillRecommendationCard mount)
   - npm run verify:schema — gains new checks implicitly (column classification, FK on-delete, fingerprint) covering the new DDL; no change to verify-schema.ts's own code
 No Ripple Effect:
   - computeScore.ts and its existing mcq/true_false/short_answer/essay branches (untouched)
   - record_exam_result() itself (untouched — record_skill_mastery is a sibling, not a modification)
   - Any subject other than Math (skill_node_id stays NULL; D1)
-  - Rating system, History feature, UGC upload pipeline (layer4) — except the batch tagger, which runs offline/out-of-band against the same questions table
+  - Rating system, History feature, UGC upload pipeline (authoring) — except the batch tagger, which runs offline/out-of-band against the same questions table
   - Existing RLS policies on questions/exams/exam_attempts/attempt_answers/exam_results (unchanged; only the §10c grant LIST gains one column)
 ```
 
@@ -690,8 +690,8 @@ No Ripple Effect:
 | `recordExamResult(attemptId, score)` | (unchanged) | No | No | Called first, unmodified; new sibling `recordSkillMastery()` called after |
 | (none) | `recordSkillMastery(attemptId, score)` | N/A (new) | No | New export, `SOURCE/lib/supabase/service-role.ts` |
 | `getResult(attemptId): Promise<ExamResult \| null>` | (unchanged signature; `perQuestion[].hasBeenWrongTwice` additive) | No | No | Additive optional field; existing consumers unaffected |
-| (none) | `getSkillRecommendation(): Promise<SkillRecommendation>` | N/A | No | New export, `SOURCE/app/(layer3)/queries.ts` |
-| (none) | `explainStep(attemptId, questionId): Promise<ExplainStepResult>` | N/A | No | New Server Action, `SOURCE/app/(layer2)/tutorActions.ts` |
+| (none) | `getSkillRecommendation(): Promise<SkillRecommendation>` | N/A | No | New export, `SOURCE/features/analytics/queries.ts` |
+| (none) | `explainStep(attemptId, questionId): Promise<ExplainStepResult>` | N/A | No | New Server Action, `SOURCE/features/exams/tutorActions.ts` |
 | `RATE_LIMITS` (4 keys) | `RATE_LIMITS` (5 keys, +`explainStep`) | Yes (TS literal widens) | No | Additive key; `guard()`'s call sites elsewhere unaffected (structural typing) |
 | `schema.sql` §10c grant (9 columns) | §10c grant (10 columns, +`skill_node_id`) | Yes (in-place text edit of one existing statement — see Existing Interface Investigation) | No | Verified by `verify-schema.ts` check #1 after apply |
 
@@ -701,7 +701,7 @@ Engine 1's backend sits entirely within the existing Layer 2 (Core Loop) and Lay
 
 ```mermaid
 flowchart TD
-    Player["Exam Player (client)"] -->|submit| SubmitExam["submitExam()\napp/(layer2)/actions.ts"]
+    Player["Exam Player (client)"] -->|submit| SubmitExam["submitExam()\nfeatures/exams/actions.ts"]
     SubmitExam -->|"1: claim + score (unchanged)"| ClaimRPC["claim_attempt_answer_key()\n+ computeScore()"]
     SubmitExam -->|"2: recordExamResult (unchanged)"| ScoreWrite["record_exam_result()\nservice_role, INVOKER"]
     ScoreWrite --> ExamResults[("exam_results")]
@@ -709,17 +709,17 @@ flowchart TD
     MasteryWrite -->|"joins questions.skill_node_id"| Questions[("questions")]
     MasteryWrite --> Mastery[("user_skill_mastery")]
 
-    ResultDetail["ResultDetailPage"] -->|getResult| GetResult["getResult()\napp/(layer2)/queries.ts"]
+    ResultDetail["ResultDetailPage"] -->|getResult| GetResult["getResult()\nfeatures/exams/queries.ts"]
     GetResult -->|"parallel: current attempt"| ExamResults
     GetResult -->|"parallel: ALL user's exam_results (NEW)"| WrongTwice["computeWrongTwiceQuestionIds()\nlib/scoring/wrongTwice.ts"]
     WrongTwice --> ExamResults
 
-    Dashboard["DashboardPage"] -->|getSkillRecommendation NEW| GetRec["getSkillRecommendation()\napp/(layer3)/queries.ts"]
+    Dashboard["DashboardPage"] -->|getSkillRecommendation NEW| GetRec["getSkillRecommendation()\nfeatures/analytics/queries.ts"]
     GetRec -->|reads| SkillNodes[("skill_nodes / skill_prerequisites")]
     GetRec -->|reads| Mastery
     GetRec -->|"recommendNextSkill()"| Route["lib/adaptive/route.ts"]
 
-    Affordance["ExplainStepAffordance (UI Spec)"] -->|explainStep NEW| Tutor["explainStep()\napp/(layer2)/tutorActions.ts"]
+    Affordance["ExplainStepAffordance (UI Spec)"] -->|explainStep NEW| Tutor["explainStep()\nfeatures/exams/tutorActions.ts"]
     Tutor -->|"re-verify wrong-twice"| WrongTwice
     Tutor -->|"safe columns + student answer"| Questions
     Tutor -->|"buildTutorPrompt()"| Prompt["lib/tutor/prompt.ts"]
@@ -759,7 +759,7 @@ sequenceDiagram
 
 | Integration Point | Location | Old Implementation | New Implementation | Switching Method | Verification Method |
 |---|---|---|---|---|---|
-| `submitExam()` post-score-write step | `actions.ts` (after existing line 158-162 block) | Function returns/redirects after `recordExamResult()` | New non-throwing `recordSkillMastery()` call inserted before the final `redirect()` | Direct code edit (no flag) | `SOURCE/app/(layer2)/__tests__/recordSkillMastery.int.test.ts` — AC-009/010 |
+| `submitExam()` post-score-write step | `actions.ts` (after existing line 158-162 block) | Function returns/redirects after `recordExamResult()` | New non-throwing `recordSkillMastery()` call inserted before the final `redirect()` | Direct code edit (no flag) | `SOURCE/features/exams/__tests__/recordSkillMastery.int.test.ts` — AC-009/010 |
 | `getResult()` cross-attempt read | `queries.ts` (parallel with the existing Vòng 1 query) | Single-attempt read only | `Promise.all([existingQuery, wrongTwiceQuery])`, mapped into `result.perQuestion[].hasBeenWrongTwice` | Direct code edit (no flag) | `SOURCE/lib/scoring/__tests__/wrongTwice.test.ts` (pure logic) + a `getResult` integration test extension |
 | §10c grant statement | `schema.sql:754-757` | 9-column grant | 10-column grant (+`skill_node_id`) | In-place text edit | `npm run verify:schema` check #1 |
 | `RATE_LIMITS` | `rateLimit.ts:102-107` | 4 keys | 5 keys (+`explainStep`) | Direct code edit | `tsc --noEmit` (closed-object type would reject an unregistered `guard("explainStep", ...)` call otherwise) |
@@ -796,7 +796,7 @@ sequenceDiagram
 - **Interface**: `generateHint(input: TutorPromptInput): Promise<string>` (throws a typed error on failure, caught by `explainStep()`).
 - **Dependencies**: `getGeminiClient()`, `QUESTION_MODEL`, `makeDeadlineSignal()`, `sdkErrorDetail()` (all reused from `lib/ugc/gemini.ts`); `buildTutorPrompt()`.
 
-#### `explainStep()` (Server Action, `SOURCE/app/(layer2)/tutorActions.ts`)
+#### `explainStep()` (Server Action, `SOURCE/features/exams/tutorActions.ts`)
 
 - **Responsibility**: auth + ownership check, server-side re-verification of wrong-twice eligibility (defense-in-depth per UI Spec D1's security note), rate limiting, safe-column question fetch, prompt build, Gemini call, best-effort telemetry write.
 - **Interface**: see Data Contracts below.
@@ -808,7 +808,7 @@ sequenceDiagram
 - **Interface**: see Data Contracts below.
 - **Dependencies**: none (pure).
 
-#### `getSkillRecommendation()` (`SOURCE/app/(layer3)/queries.ts`)
+#### `getSkillRecommendation()` (`SOURCE/features/analytics/queries.ts`)
 
 - **Responsibility**: fetch this user's DAG (nodes/edges, reference data) + mastery rows (RLS-scoped), call `recommendNextSkill()`, map to the UI Spec's `SkillRecommendation` contract, and attempt a best-effort `telemetry_log` insert (`event_type='adaptive_route'`) — the schema's §19 `event_type` CHECK constraint already names this value, and R4 ("Adaptive-routing and tutor events are recorded") covers routing invocations equally with tutor invocations, not tutor-only. Mirrors `explainStep()`'s telemetry-write shape: fire-and-forget, a write failure never blocks or alters the returned `SkillRecommendation` (same reasoning as `submitExam`'s `recordExamResult` failure handling — an observability write must not become a second point of failure for the user-facing read).
 - **Interface**: `getSkillRecommendation(): Promise<SkillRecommendation>`.
@@ -1056,7 +1056,7 @@ No feature flag, no dual-write/parallel-operation period (single dev DB during t
 
 ## Security Considerations
 
-- **Authentication & Authorization**: `explainStep()` is a Server Action inheriting the existing session/CSP-nonce pipeline (D4, AC-022) — no new unauthenticated entry point. `getSkillRecommendation()` runs behind `DashboardPage`'s existing `getCurrentUser()` redirect guard (`SOURCE/app/(layer3)/me/dashboard/page.tsx:18-19`), unchanged. `record_skill_mastery()`/`recordSkillMastery()` are reachable only via `service_role`, never a student's own JWT (ADR-0011).
+- **Authentication & Authorization**: `explainStep()` is a Server Action inheriting the existing session/CSP-nonce pipeline (D4, AC-022) — no new unauthenticated entry point. `getSkillRecommendation()` runs behind `DashboardPage`'s existing `getCurrentUser()` redirect guard (`SOURCE/app/(analytics)/me/dashboard/page.tsx:18-19`), unchanged. `record_skill_mastery()`/`recordSkillMastery()` are reachable only via `service_role`, never a student's own JWT (ADR-0011).
 - **Input Validation**: `explainStep(attemptId, questionId)` re-verifies ownership (attempt belongs to caller, RLS-scoped) and eligibility (server-side `computeWrongTwiceQuestionIds()` recomputation) before any Gemini call — the UI's `hasBeenWrongTwice`-gated rendering is explicitly a display convenience only, not a security boundary (UI Spec D1's own stated position, honored here).
 - **Sensitive Data Handling**: `correct_answer`/`sub_answers`/`essay_answer` never enter `TutorPromptInput` (structural exclusion, AC-018/019) and never enter `telemetry_log` (schema has no column capable of holding them, AC-013). `telemetry_log.error_code` is a constrained enum, not free text, specifically to prevent a future maintainer from routing an exception message (which could echo attacker-influenced UGC question content) into a stored log row.
 
@@ -1074,15 +1074,15 @@ No feature flag, no dual-write/parallel-operation period (single dev DB during t
 ### Data Layer Testing Strategy
 
 - **Schema dependencies**: `public.skill_nodes`, `public.skill_prerequisites`, `public.questions.skill_node_id`, `public.user_skill_mastery`, `public.telemetry_log` (all defined above); `public.record_skill_mastery()` (SQL function).
-- **Test data approach**: `SOURCE/app/(layer2)/__tests__/recordSkillMastery.int.test.ts` runs against a real dev Supabase instance (mirroring the project's existing convention that RLS/SQL-function-level correctness is only provable against real Postgres, not mocks) — seeds a minimal exam/questions/skill_nodes fixture, submits via the real `submitExam()` path, asserts the resulting `user_skill_mastery` rows match the attempt's per-question correctness for tagged questions and that untagged/unscored questions contributed nothing (AC-009/010). `lib/adaptive/__tests__/skillTaxonomy.test.ts` and `route.test.ts` use literal, independently-authored fixture DAGs (not the real curriculum content, which is a content-authoring deliverable, not a test-authoring one).
+- **Test data approach**: `SOURCE/features/exams/__tests__/recordSkillMastery.int.test.ts` runs against a real dev Supabase instance (mirroring the project's existing convention that RLS/SQL-function-level correctness is only provable against real Postgres, not mocks) — seeds a minimal exam/questions/skill_nodes fixture, submits via the real `submitExam()` path, asserts the resulting `user_skill_mastery` rows match the attempt's per-question correctness for tagged questions and that untagged/unscored questions contributed nothing (AC-009/010). `lib/adaptive/__tests__/skillTaxonomy.test.ts` and `route.test.ts` use literal, independently-authored fixture DAGs (not the real curriculum content, which is a content-authoring deliverable, not a test-authoring one).
 - **Mock limitations acknowledged**: unit tests on `record_skill_mastery`'s TS wrapper (`recordSkillMastery()`) can verify the RPC is called with the right shape, but cannot verify the SQL's `GROUP BY`/`FILTER`/join correctness — that is exactly what the required real-DB integration test (above) closes, matching testing-principles' explicit guidance that schema/query-shape mismatches "pass through undetected with mock-only testing."
 
 ### Integration Verification Points
 
 - `npm run verify:schema` after every manual apply of the new DDL — the 7-check gate this design's schema additions must keep green (column classification, FK `on delete`, §17 fingerprint), per TD-005/TD-001/TD-011.
 - New `SOURCE/supabase/test-rls.ts` cases (manually run, not CI-blocking, following the file's existing fixture-ID-prefix pattern) for `user_skill_mastery` (a second user cannot read/write another user's mastery rows) and `telemetry_log` (an authenticated user cannot read ANY row, including their own, via REST; `anon` cannot insert).
-- `SOURCE/app/(layer2)/__tests__/recordSkillMastery.int.test.ts` — the real-DB proof for AC-009/010 (see above).
-- `SOURCE/app/(layer2)/__tests__/tutorActions.int.test.ts` — asserts `explainStep()` returns `not_eligible` when the server-side wrong-twice re-verification fails even if a caller passes an arbitrary `questionId` (the exact abuse case the UI Spec's D1 security note flags).
+- `SOURCE/features/exams/__tests__/recordSkillMastery.int.test.ts` — the real-DB proof for AC-009/010 (see above).
+- `SOURCE/features/exams/__tests__/tutorActions.int.test.ts` — asserts `explainStep()` returns `not_eligible` when the server-side wrong-twice re-verification fails even if a caller passes an arbitrary `questionId` (the exact abuse case the UI Spec's D1 security note flags).
 
 ## Verification Strategy
 
@@ -1149,7 +1149,7 @@ No feature flag, no dual-write/parallel-operation period (single dev DB during t
 | §10c's grant-list edit is appended as a second statement instead of edited in place, silently defeating `parseGrantedColumns()` | Medium | Medium (a genuinely non-obvious parser limitation, easy to get wrong without having read `verify-schema.ts`'s source) | Explicitly documented in this design's Assumed Behaviors, Schema section, and Early Verification Point — `npm run verify:schema` check #1 catches it immediately if it happens anyway. |
 | §17 fingerprint not updated in the same change as the DDL (TD-005's exact, three-times-repeated failure shape) | High | Medium (this project's single most-repeated failure mode) | Fingerprint update procedure specified as an explicit step (§17 subsection) with the exact test (`schemaFingerprint.test.ts`) that fails with the correct expected value if missed. |
 | Mastery write and score write diverge (score recorded, mastery not) due to the narrow non-atomic window between the two calls | Low | Low | Accepted explicitly in ADR-0011 (Option 3 cons) — the alternative (atomic) directly violates the Reliability NFR; `submitExam`'s idempotency guard means this gap is not self-healing on retry, but is bounded to the rare case of a crash between two sequential awaited calls. |
-| `TUTOR_CALL_DEADLINE_MS` (30s) may exceed or fall outside Vercel's actual configured function duration for this Server Action | Medium | Resolved in Phase 3 Task 13, except for one residual | Resolved by **confirming the platform default**, not by an export: Vercel's fluid compute (enabled by default) gives a 300s *default* duration on Hobby/Pro/Enterprise alike, and `SOURCE/vercel.json` sets no `functions` override — 30s fits with a 10× margin (see the matching Assumed Behavior for the citation). The originally-proposed alternative, "explicitly set `export const maxDuration` on the Server Action's route segment", turned out **not to be available from the action itself**: `maxDuration` is route-segment config (`layout.tsx`/`page.tsx`/`route.ts`) and, for Server Actions, must be set on the *page* — a `"use server"` module is not a segment and may only export async functions. **Residual**: the project's dashboard-level "Default Max Duration" is not readable from the repository. If it is ever lowered below 30s, or fluid compute is disabled, the page mounting `ExplainStepAffordance` (`app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx`) must export `maxDuration >= 30`; that condition is recorded at the top of `SOURCE/app/(layer2)/tutorActions.ts` for whoever next edits that page. |
+| `TUTOR_CALL_DEADLINE_MS` (30s) may exceed or fall outside Vercel's actual configured function duration for this Server Action | Medium | Resolved in Phase 3 Task 13, except for one residual | Resolved by **confirming the platform default**, not by an export: Vercel's fluid compute (enabled by default) gives a 300s *default* duration on Hobby/Pro/Enterprise alike, and `SOURCE/vercel.json` sets no `functions` override — 30s fits with a 10× margin (see the matching Assumed Behavior for the citation). The originally-proposed alternative, "explicitly set `export const maxDuration` on the Server Action's route segment", turned out **not to be available from the action itself**: `maxDuration` is route-segment config (`layout.tsx`/`page.tsx`/`route.ts`) and, for Server Actions, must be set on the *page* — a `"use server"` module is not a segment and may only export async functions. **Residual**: the project's dashboard-level "Default Max Duration" is not readable from the repository. If it is ever lowered below 30s, or fluid compute is disabled, the page mounting `ExplainStepAffordance` (`app/(exams)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx`) must export `maxDuration >= 30`; that condition is recorded at the top of `SOURCE/features/exams/tutorActions.ts` for whoever next edits that page. |
 | `SKILL_TAG_CONFIDENCE_THRESHOLD`/`MASTERY_CLEARED_THRESHOLD` placeholders (U3/U5) are wrong for the real corpus/usage distribution | Medium | Medium (explicitly expected — both PRD-flagged as needing real data) | Both are single named constants (`lib/adaptive/constants.ts`), never scattered literals — changing either after the first real batch run/usage period is a one-line diff, per U3/U5's own PRD framing. |
 | Batch tagger's dry-run report and the actual DB write drift (engineer approves a report, but a re-run before `--apply` produces different tags due to Gemini non-determinism) | Low | Low | `--apply` re-runs the same classification logic against the corpus at apply time rather than replaying a stale report verbatim — documented as an accepted characteristic of the two-phase design (see Batch Skill-Tagging Script section) with a mitigation (engineer re-reviews the `--apply` run's own output, not only the earlier dry run, before trusting it). |
 

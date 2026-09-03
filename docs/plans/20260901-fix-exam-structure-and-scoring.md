@@ -86,9 +86,9 @@ nộp. Đề thuần trắc nghiệm không đổi gì.
 
 ### G2 — Backfill toàn bộ sang luật mới cho đồng bộ
 
-`computeScore()` được gọi **đúng một chỗ** — `app/(layer2)/actions.ts:162`, lúc
+`computeScore()` được gọi **đúng một chỗ** — `features/exams/actions.ts:162`, lúc
 nộp bài. Không nơi nào tính lại; mọi chỗ khác chỉ ĐỌC `exam_results.total_score`
-(lịch sử làm bài `(HM)/queries.ts:94`, xếp hạng đề gợi ý `rankExams.ts:73`,
+(lịch sử làm bài `(history)/queries.ts:94`, xếp hạng đề gợi ý `rankExams.ts:73`,
 analytics). Nên kết quả cũ đóng băng vĩnh viễn ở thang luật cũ.
 
 **Chốt:** tính lại toàn bộ theo luật mới, backfill một lượt. Khả thi vì
@@ -228,10 +228,10 @@ Xem mục Quyết định còn mở.
   `mapQuestionsPayload:196`
 - `lib/ugc/extractAnswers.ts` — `PROMPT:93`
 - `lib/ugc/errorCopy.ts` — `message():36`, `formatUgcError():131`
-- `app/(layer4)/_components/QuestionEditor.tsx` — stem `:175`, true_false `:270`
-- `app/(layer4)/_components/AssembledQuestionList.tsx` — hai call site QuestionEditor
-- `app/(layer4)/_components/ReviewScreen.tsx` — `:134` validate live, `:268` list
-- `app/(layer4)/actions.ts` — `:581` upload, `:856` gate lưu, `:999` gate publish
+- `features/authoring/components/QuestionEditor.tsx` — stem `:175`, true_false `:270`
+- `features/authoring/components/AssembledQuestionList.tsx` — hai call site QuestionEditor
+- `features/authoring/components/ReviewScreen.tsx` — `:134` validate live, `:268` list
+- `features/authoring/actions.ts` — `:581` upload, `:856` gate lưu, `:999` gate publish
 - `types/question.ts` — contract runtime
 - `supabase/schema.sql` — `questions:68`, `questions_type_check:463`
 
@@ -241,20 +241,20 @@ Xem mục Quyết định còn mở.
 - `lib/scoring/essayLifecycle.ts` — `ESSAY_BANDS:63`, `ESSAY_MAX_POINTS:67`,
   tổng hợp `:264`
 - `lib/scoring/wrongTwice.ts`
-- `app/(layer2)/actions.ts:162` — call site DUY NHẤT của `computeScore()`
-- `app/(layer2)/_components/EssayScoreLine.tsx`, `EssayGradingPoller.tsx`
-- `app/(layer2)/exams/[id]/attempt/[attemptId]/result/page.tsx` + `result/detail/page.tsx`
+- `features/exams/actions.ts:162` — call site DUY NHẤT của `computeScore()`
+- `features/exams/components/EssayScoreLine.tsx`, `EssayGradingPoller.tsx`
+- `app/(exams)/exams/[id]/attempt/[attemptId]/result/page.tsx` + `result/detail/page.tsx`
 - `lib/supabase/service-role.ts:67` — `p_total_score`
 - `supabase/schema.sql` — `exam_results:129`, `record_essay_grade():1130`
   (**hiện chỉ update `per_question` ở `:1169`, KHÔNG đụng `total_score`** — đây
   là mấu chốt khiến điểm tự luận không bao giờ vào ô lớn)
-- Đọc `total_score`: `app/(HM)/queries.ts:94`, `app/(layer2)/queries.ts:370`,
+- Đọc `total_score`: `features/history/queries.ts:94`, `features/exams/queries.ts:370`,
   `lib/adaptive/rankExams.ts:73`
 
 **Test/cổng phải chạy**
 - `lib/ugc/__tests__/assembleExam.test.ts:194` — biên `MAX_STEM` pass/+1 fail
 - `lib/ugc/__tests__/validateInput.test.ts`
 - `lib/scoring/__tests__/computeScore.test.ts`
-- `app/(layer2)/_components/__tests__/EssayGradingPoller.test.tsx`
+- `features/exams/components/__tests__/EssayGradingPoller.test.tsx`
 - `npm run verify:schema` — ghim trần DB thật với hằng trong mã
 - Cổng project đầy đủ (typecheck/lint/test/build) TRƯỚC khi commit

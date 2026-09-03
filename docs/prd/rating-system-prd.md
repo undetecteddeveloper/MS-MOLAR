@@ -25,10 +25,10 @@ Let a logged-in user who has submitted an exam rate its difficulty across the th
 
 MS-MOLAR is an exam-practice website (browse exams, take timed attempts, see results — the Layer 2 core loop). The Exam Browser and exam detail page already reserve space for a per-exam "Difficulty"/"Level" signal, but every surface ships it as an inert placeholder:
 
-- `ExamCard` renders `Level` as a literal `"—"` (`SOURCE/app/(layer2)/_components/ExamCard.tsx:34-35`).
-- The exam detail page renders `Difficulty` as a literal `"—"` (`SOURCE/app/(layer2)/exams/[id]/page.tsx:98-100`).
-- The Browser's `Level` filter row is symbolic only — it opens a panel that reads "Coming soon — available in a future release." (`SOURCE/app/(layer2)/_components/ExamFilters.tsx:233` and `:330-333`).
-- The Browser's `Hardest` quick-sort writes `?hardest=1` to the URL but performs no reordering; the page deliberately does not pass it to `listExams` (`SOURCE/app/(layer2)/exams/page.tsx:36-41`, `SOURCE/app/(layer2)/_components/ExamFilters.tsx:39-44`, `:265-268`).
+- `ExamCard` renders `Level` as a literal `"—"` (`SOURCE/features/exams/components/ExamCard.tsx:34-35`).
+- The exam detail page renders `Difficulty` as a literal `"—"` (`SOURCE/app/(exams)/exams/[id]/page.tsx:98-100`).
+- The Browser's `Level` filter row is symbolic only — it opens a panel that reads "Coming soon — available in a future release." (`SOURCE/features/exams/components/ExamFilters.tsx:233` and `:330-333`).
+- The Browser's `Hardest` quick-sort writes `?hardest=1` to the URL but performs no reordering; the page deliberately does not pass it to `listExams` (`SOURCE/app/(exams)/exams/page.tsx:36-41`, `SOURCE/features/exams/components/ExamFilters.tsx:39-44`, `:265-268`).
 
 Every one of these placeholders is annotated in code as "chờ rating" / "tính từ rating user" — waiting on a user-rating feature that does not yet exist. This PRD defines that feature.
 
@@ -238,7 +238,7 @@ Buckets and threshold used throughout:
 
 - Compliance standard: WCAG 2.1 AA (site default).
 - The shared rating form (both as auto-open modal and standalone page), the three part inputs, submit/saved/error states, the `ExamCard` "Rate" button (enabled and disabled states), and the Level filter are fully keyboard-operable.
-- The auto-open modal manages focus consistently with the existing dialog precedent (`SOURCE/app/(layer2)/_components/ReportExam.tsx`: Escape closes, scrim click closes, focus moves into the dialog on open), and returns focus appropriately on close.
+- The auto-open modal manages focus consistently with the existing dialog precedent (`SOURCE/features/exams/components/ReportExam.tsx`: Escape closes, scrim click closes, focus moves into the dialog on open), and returns focus appropriately on close.
 - The disabled "Rate" button's reason ("Finish this exam first") is available to assistive technology, not conveyed by visual disabled styling alone.
 - Saved/updated confirmation and error messages are announced to screen readers (e.g. `aria-live`) and status is not conveyed by color alone.
 
@@ -275,15 +275,15 @@ Implementation detail belongs to the UI Spec / ADR / Design Doc; this section re
 ### Dependencies
 
 - **Supabase** (Postgres + RLS + Auth) — the new ratings table, its RLS (insert-own / update-own / select-own, published-only), the unique `(exam_id, user_id)` constraint, and the eligibility with-check all rely on database-level enforcement. Modeled on the existing `exam_reports` table and policies (`SOURCE/supabase/schema.sql` ~247–341).
-- **Eligibility source of truth**: `exam_attempts.status = 'submitted'`, set by `submitExam` in `SOURCE/app/(layer2)/actions.ts`. Eligibility is "the current user has at least one submitted attempt on this exam".
-- **Layer 2 reads**: `SOURCE/app/(layer2)/queries.ts` — `listExams`, `ExamSort`, `ExamFilters`, `EXAM_COLUMNS`, `toExam`, `listExamFacets`, `getExam`. Community difficulty is joined/aggregated here on-read; `ExamSort` gains a `hardest` value; filters gain a Level dimension.
-- **Layer 2 / write**: a new server action (write) alongside `SOURCE/app/(layer2)/actions.ts`, following the `reportExam` precedent in `SOURCE/app/(layer4)/actions.ts`.
-- **UI-write precedent**: `SOURCE/app/(layer2)/_components/ReportExam.tsx` (dialog + server action + already-done static state) is the pattern the shared rating form's modal and "already rated" state follow.
+- **Eligibility source of truth**: `exam_attempts.status = 'submitted'`, set by `submitExam` in `SOURCE/features/exams/actions.ts`. Eligibility is "the current user has at least one submitted attempt on this exam".
+- **Layer 2 reads**: `SOURCE/features/exams/queries.ts` — `listExams`, `ExamSort`, `ExamFilters`, `EXAM_COLUMNS`, `toExam`, `listExamFacets`, `getExam`. Community difficulty is joined/aggregated here on-read; `ExamSort` gains a `hardest` value; filters gain a Level dimension.
+- **Layer 2 / write**: a new server action (write) alongside `SOURCE/features/exams/actions.ts`, following the `reportExam` precedent in `SOURCE/features/authoring/actions.ts`.
+- **UI-write precedent**: `SOURCE/features/exams/components/ReportExam.tsx` (dialog + server action + already-done static state) is the pattern the shared rating form's modal and "already rated" state follow.
 - **Placeholders replaced**:
-  - `SOURCE/app/(layer2)/_components/ExamCard.tsx:34-35` (Level `"—"`) and the addition of the "Rate" button.
-  - `SOURCE/app/(layer2)/exams/[id]/page.tsx:98-100` (Difficulty `"—"`).
-  - `SOURCE/app/(layer2)/_components/ExamFilters.tsx:39-44` (QUICK sort config), `:233` and `:330-333` (symbolic Level row), `:265-268` (inert Hardest handler).
-  - `SOURCE/app/(layer2)/exams/page.tsx:36-41` (Hardest parsed but not passed to `listExams`).
+  - `SOURCE/features/exams/components/ExamCard.tsx:34-35` (Level `"—"`) and the addition of the "Rate" button.
+  - `SOURCE/app/(exams)/exams/[id]/page.tsx:98-100` (Difficulty `"—"`).
+  - `SOURCE/features/exams/components/ExamFilters.tsx:39-44` (QUICK sort config), `:233` and `:330-333` (symbolic Level row), `:265-268` (inert Hardest handler).
+  - `SOURCE/app/(exams)/exams/page.tsx:36-41` (Hardest parsed but not passed to `listExams`).
 - **New route**: `/exams/[id]/rate` (standalone shared form), and the auto-open modal integration on `/exams/[id]/attempt/[attemptId]/result`.
 - **Exam type**: `SOURCE/types/exam.ts` (`Exam`) — a difficulty field may be added to the read model; the fixed three parts are NOT derived from `Exam.parts`.
 
@@ -327,10 +327,10 @@ Downstream design questions for the UI Spec / ADR / Design Doc. None reopens a l
 ### References
 
 - `SOURCE/supabase/schema.sql` (~247–341) — `exam_reports` table + RLS the ratings table mirrors.
-- `SOURCE/app/(layer2)/actions.ts` — `submitExam` (sets `exam_attempts.status = 'submitted'`, the eligibility source).
-- `SOURCE/app/(layer2)/queries.ts` — Layer 2 reads (`listExams`, `ExamSort`, `EXAM_COLUMNS`, `toExam`, `listExamFacets`, `getExam`) where on-read difficulty is added.
-- `SOURCE/app/(layer2)/_components/ReportExam.tsx` — dialog + action + already-done state precedent.
-- `SOURCE/app/(layer2)/_components/ExamCard.tsx` (`:34-35`), `SOURCE/app/(layer2)/exams/[id]/page.tsx` (`:98-100`), `SOURCE/app/(layer2)/_components/ExamFilters.tsx` (`:39-44`, `:233`, `:265-268`, `:330-333`), `SOURCE/app/(layer2)/exams/page.tsx` (`:36-41`) — the placeholders this feature replaces.
+- `SOURCE/features/exams/actions.ts` — `submitExam` (sets `exam_attempts.status = 'submitted'`, the eligibility source).
+- `SOURCE/features/exams/queries.ts` — Layer 2 reads (`listExams`, `ExamSort`, `EXAM_COLUMNS`, `toExam`, `listExamFacets`, `getExam`) where on-read difficulty is added.
+- `SOURCE/features/exams/components/ReportExam.tsx` — dialog + action + already-done state precedent.
+- `SOURCE/features/exams/components/ExamCard.tsx` (`:34-35`), `SOURCE/app/(exams)/exams/[id]/page.tsx` (`:98-100`), `SOURCE/features/exams/components/ExamFilters.tsx` (`:39-44`, `:233`, `:265-268`, `:330-333`), `SOURCE/app/(exams)/exams/page.tsx` (`:36-41`) — the placeholders this feature replaces.
 - `SOURCE/types/exam.ts` — `Exam` read model.
 - `docs/prd/ugc-exam-upload-prd.md` — sibling PRD; format and detail-level reference.
 

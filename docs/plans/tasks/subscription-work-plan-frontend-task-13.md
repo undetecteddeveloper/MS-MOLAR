@@ -23,10 +23,10 @@ A **second case** builds `legalContentReady === false` in a `canPurchase === tru
 **This is the highest-consequence guess in the frontend design (Risk R-9): if the predicate is wired to the release flag because both are false today, the legal gate vanishes the moment the flag is switched on.**
 
 ## Target Files
-- [x] `SOURCE/app/(billing)/pricing/checkout/__tests__/PaymentConfirm.test.tsx` — **extended, not created.** The path written here at decomposition time (`_components/__tests__/…`) is not where the file landed: plan Task 4.3 (commit `7056168`) already shipped it one level up, alongside the route's other test files, with a header saying this task's combined case was left out on purpose. A second file at the planned path would have been a duplicate suite, so the two cases were appended to the shipped one.
+- [x] `SOURCE/features/billing/components/checkout/__tests__/PaymentConfirm.test.tsx` — **extended, not created.** The path written here at decomposition time (`_components/__tests__/…`) is not where the file landed: plan Task 4.3 (commit `7056168`) already shipped it one level up, alongside the route's other test files, with a header saying this task's combined case was left out on purpose. A second file at the planned path would have been a duplicate suite, so the two cases were appended to the shipped one.
 
 ## Investigation Targets
-- `SOURCE/app/(billing)/pricing/checkout/_components/PaymentConfirm.tsx` (plan Task 4.3 — C-15 and how `legalContentReady` arrives as a prop)
+- `SOURCE/features/billing/components/checkout/PaymentConfirm.tsx` (plan Task 4.3 — C-15 and how `legalContentReady` arrives as a prop)
 - `SOURCE/app/(billing)/terms/page.tsx` and `SOURCE/app/(billing)/refund-policy/page.tsx` (the two pages the same test must render)
 - `SOURCE/components/billing/LegalDocument.tsx` (`LegalContentPending`)
 - `SOURCE/lib/i18n/dictionaries/en.ts` (whether `billing.terms.body` and `billing.refund.body` exist — the predicate source)

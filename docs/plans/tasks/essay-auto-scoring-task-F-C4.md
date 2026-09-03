@@ -32,9 +32,9 @@ jsdom has **no real `router.refresh()`** and **no painted focus ring**, so (f) p
 - `SOURCE/tests/e2e/fixture/essay-auto-scoring.fixture.e2e.test.ts` (the skeleton's FE2E-2 annotations; **and the per-`describe` clock structure Task F-C3 established**)
 - `docs/ui-spec/essay-auto-scoring-ui-spec.md` (§ Component: EssayGradingPoller — verify default (polling) + resolved states; the transition journey)
 - `docs/design/essay-auto-scoring-frontend-design.md` (§ Agreement Checklist Scope — `EssayGradingPoller`: the mount condition is `essaySummary !== undefined`, **not** `pendingCount > 0` (F-05))
-- `SOURCE/app/(layer2)/_components/EssayGradingPoller.tsx` (Task F-C2 — the cadence constants, the `aria-live` region, the mount predicate)
+- `SOURCE/features/exams/components/EssayGradingPoller.tsx` (Task F-C2 — the cadence constants, the `aria-live` region, the mount predicate)
 - `SOURCE/components/history/usePdfAction.ts` and `SOURCE/components/history/ActionButton.tsx` (Task F-B2 — the controls that unblock after the transition)
-- `SOURCE/app/(layer2)/_components/__tests__/ExamTimer.test.tsx` (`:17-19` — nested timers need their own advance; one long advance leaves React no commit point)
+- `SOURCE/features/exams/components/__tests__/ExamTimer.test.tsx` (`:17-19` — nested timers need their own advance; one long advance leaves React no commit point)
 - `SOURCE/lib/i18n/dictionaries/vi.ts` (Task F-A1 — `result.essay.announceAllDone` = "Đã chấm xong toàn bộ câu tự luận.", resolved through the **real** dictionary)
 
 ## Reference Contracts

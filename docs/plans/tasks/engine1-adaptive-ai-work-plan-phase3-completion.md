@@ -15,10 +15,10 @@ Verified 2026-08-14 via `dev-workflows-fullstack:code-verifier` + `:security-rev
 ## Test Skeleton Paths for Verification
 
 - `SOURCE/lib/scoring/__tests__/wrongTwice.test.ts` — expect 3/3 passing
-- `SOURCE/app/(layer2)/__tests__/recordSkillMastery.int.test.ts` — expect 2/2 passing against real dev Postgres (requires `.env.local` + backend-task-01's checkpoint)
+- `SOURCE/features/exams/__tests__/recordSkillMastery.int.test.ts` — expect 2/2 passing against real dev Postgres (requires `.env.local` + backend-task-01's checkpoint)
 - `SOURCE/lib/tutor/__tests__/prompt.test.ts` — expect 3/3 passing
 - `SOURCE/lib/tutor/__tests__/telemetry.test.ts` — expect 1/1 passing
-- `SOURCE/app/(layer2)/__tests__/tutorActions.int.test.ts` — expect 4/4 passing
+- `SOURCE/features/exams/__tests__/tutorActions.int.test.ts` — expect 4/4 passing
 
 ## Phase Completion Criteria (verbatim from Work Plan)
 
@@ -31,9 +31,9 @@ Verified 2026-08-14 via `dev-workflows-fullstack:code-verifier` + `:security-rev
 ## Verification Commands
 
 ```
-cd SOURCE && npx vitest run "lib/scoring" "lib/tutor" "app/(layer2)/__tests__"
+cd SOURCE && npx vitest run "lib/scoring" "lib/tutor" "app/(exams)/__tests__"
 # recordSkillMastery.int.test.ts requires the live dev DB — run separately, explicitly:
-cd SOURCE && npx vitest run "app/(layer2)/__tests__/recordSkillMastery.int.test.ts"
+cd SOURCE && npx vitest run "features/exams/__tests__/recordSkillMastery.int.test.ts"
 ```
 
 ## Next Phase Gate

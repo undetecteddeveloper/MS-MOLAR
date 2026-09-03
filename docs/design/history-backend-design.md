@@ -11,7 +11,7 @@
 
 ## Overview
 
-This Design Doc turns the backend-owned slice of PRD v1.2 into implementable detail: a new list read (`listMyHistory()`, `SOURCE/app/(HM)/queries.ts`) that returns the current user's submitted-and-scored attempts (exam title, score, timestamps) in one batched, no-N+1 read; an additive extension to the existing `getResult()` (`SOURCE/app/(layer2)/queries.ts:306-371`) so the Result page's Save/Share PDF path can compute completion time without an extra round trip (PRD AC-009); and the `(HM)` route-group layout + page-level auth guard that gates `/history`. No schema or RLS change is introduced — the existing `exam_attempts`/`exam_results`/`exams` tables and their RLS policies already carry everything this feature reads (PRD R8/AC-017, confirmed below).
+This Design Doc turns the backend-owned slice of PRD v1.2 into implementable detail: a new list read (`listMyHistory()`, `SOURCE/features/history/queries.ts`) that returns the current user's submitted-and-scored attempts (exam title, score, timestamps) in one batched, no-N+1 read; an additive extension to the existing `getResult()` (`SOURCE/features/exams/queries.ts:306-371`) so the Result page's Save/Share PDF path can compute completion time without an extra round trip (PRD AC-009); and the `(history)` route-group layout + page-level auth guard that gates `/history`. No schema or RLS change is introduced — the existing `exam_attempts`/`exam_results`/`exams` tables and their RLS policies already carry everything this feature reads (PRD R8/AC-017, confirmed below).
 
 ## Design Summary (Meta)
 
@@ -28,7 +28,7 @@ main_constraints:
   - "No schema or RLS changes (PRD R8 / AC-017) — the existing exam_attempts/exam_results/exams policies are sufficient."
   - "No N+1 — the /history list load is a single logical read (batched .in() lookups), not a per-row round trip (NFR Performance)."
   - "getResult()'s extension must be additive-only — 2 existing consumers (result/page.tsx, result/detail/page.tsx) must see zero behavior change on pre-existing fields."
-  - "Auth guard is page-level (history/page.tsx), not layout-level (HM)/layout.tsx) — mirrors (layer4)/upload/page.tsx exactly, not a new pattern."
+  - "Auth guard is page-level (history/page.tsx), not layout-level app/(history)/layout.tsx) — mirrors app/(authoring)/upload/page.tsx exactly, not a new pattern."
 biggest_risks:
   - "exams_select_visible RLS (published OR author_id=auth.uid()) can silently exclude an attempted exam's title from the batched exams lookup if the exam later became invisible — resolved by an explicit, documented decision (see 'Exams-Visibility Edge Case')."
   - "getResult()'s type extension regresses its 2 existing consumers if not strictly additive — mitigated by an explicit Output Comparison."
@@ -41,7 +41,7 @@ unknowns: []   # no PostgREST capability spike needed; this feature performs no 
 
 - **ADR-0009** (Accepted) — PDF-generation library choice. Frontend-scoped only; its Architecture Impact section states explicitly: "No server, database, or RLS impact." No backend action items derive from it. Cited here only because the frontend Design Doc's PDF module (`generateAttemptPdf.ts`/`AttemptPdfTemplate.tsx`) consumes the data contracts this doc publishes (`MyHistoryEntry`, extended `ExamResult`).
 
-No common ADR (`docs/adr/ADR-COMMON-*`) exists or is required. Search of `docs/adr/` confirms no `ADR-COMMON-*` file exists yet. This design does not introduce a new cross-component technical convention — it reuses conventions already established informally across the codebase: sequential batched selects with no PostgREST embedded joins (confirmed by a repo-wide grep for `.select("*, ` / embedded-resource syntax — zero matches in `SOURCE/app`), throw-on-infrastructure-error in every `queries.ts` function, and the page-level-guard-over-layout-level-guard pattern (`(layer4)/upload/page.tsx` vs. `(layer2)/(layer3)/(layer4) layout.tsx`). The sibling `docs/design/rating-system-backend-design.md` reached the same conclusion for the same reason (reusing ADR-0001/ADR-0008-established patterns rather than introducing a new one).
+No common ADR (`docs/adr/ADR-COMMON-*`) exists or is required. Search of `docs/adr/` confirms no `ADR-COMMON-*` file exists yet. This design does not introduce a new cross-component technical convention — it reuses conventions already established informally across the codebase: sequential batched selects with no PostgREST embedded joins (confirmed by a repo-wide grep for `.select("*, ` / embedded-resource syntax — zero matches in `SOURCE/app`), throw-on-infrastructure-error in every `queries.ts` function, and the page-level-guard-over-layout-level-guard pattern (`(authoring)/upload/page.tsx` vs. `(exams)/(analytics)/(authoring) layout.tsx`). The sibling `docs/design/rating-system-backend-design.md` reached the same conclusion for the same reason (reusing ADR-0001/ADR-0008-established patterns rather than introducing a new one).
 
 ### External Resources Used
 
@@ -57,9 +57,9 @@ No common ADR (`docs/adr/ADR-COMMON-*`) exists or is required. Search of `docs/a
 ### Agreement Checklist
 
 #### Scope
-- [x] New `listMyHistory()` read + `MyHistoryEntry` type in a new `SOURCE/app/(HM)/queries.ts`.
-- [x] Extend `getResult()` (`SOURCE/app/(layer2)/queries.ts:306-371`): its `exam_attempts` select gains `started_at, submitted_at`; `ExamResult` type gains `startedAt`/`submittedAt` (additive).
-- [x] New `SOURCE/app/(HM)/layout.tsx` (nullable-user `SiteHeader` shell, no redirect) and `SOURCE/app/(HM)/history/page.tsx` (page-level auth guard, then calls `listMyHistory()`).
+- [x] New `listMyHistory()` read + `MyHistoryEntry` type in a new `SOURCE/features/history/queries.ts`.
+- [x] Extend `getResult()` (`SOURCE/features/exams/queries.ts:306-371`): its `exam_attempts` select gains `started_at, submitted_at`; `ExamResult` type gains `startedAt`/`submittedAt` (additive).
+- [x] New `SOURCE/app/(history)/layout.tsx` (nullable-user `SiteHeader` shell, no redirect) and `SOURCE/app/(history)/history/page.tsx` (page-level auth guard, then calls `listMyHistory()`).
 - [x] Explicit decision for the exams-visibility edge case (an attempt whose exam later became invisible under RLS) — see dedicated section below.
 
 #### Non-Scope (Explicitly not changing)
@@ -80,30 +80,30 @@ No common ADR (`docs/adr/ADR-COMMON-*`) exists or is required. Search of `docs/a
 
 | # | Claim | Evidence | Confirmed |
 |---|-------|----------|-----------|
-| 1 | "Submitted implies scored" is an ordering invariant of `submitExam()`, not a DB guarantee — `exam_results` is inserted (step 5) strictly before `exam_attempts.status` is set to `'submitted'` (step 6); no CHECK constraint enforces this. A read must explicitly verify `exam_results` existence, not trust `status` alone. | `SOURCE/app/(layer2)/actions.ts:111-119` (insert), `:122-126` (status update); `SOURCE/supabase/schema.sql:99-106` (no CHECK on `status`) | Yes |
-| 2 | Every write site that sets `exam_attempts.status='submitted'` sets `submitted_at` in the **same** atomic `.update()` call — so for rows matching `.eq("status","submitted")`, `submitted_at` is guaranteed non-null. | `SOURCE/app/(layer2)/actions.ts:122-126` (single `.update({ status, submitted_at })` call); repo-wide grep for `status.*submitted` confirms this is the only production write site (`SOURCE/supabase/test-rls.ts` fixture writes are test-only, not production code) | Yes |
+| 1 | "Submitted implies scored" is an ordering invariant of `submitExam()`, not a DB guarantee — `exam_results` is inserted (step 5) strictly before `exam_attempts.status` is set to `'submitted'` (step 6); no CHECK constraint enforces this. A read must explicitly verify `exam_results` existence, not trust `status` alone. | `SOURCE/features/exams/actions.ts:111-119` (insert), `:122-126` (status update); `SOURCE/supabase/schema.sql:99-106` (no CHECK on `status`) | Yes |
+| 2 | Every write site that sets `exam_attempts.status='submitted'` sets `submitted_at` in the **same** atomic `.update()` call — so for rows matching `.eq("status","submitted")`, `submitted_at` is guaranteed non-null. | `SOURCE/features/exams/actions.ts:122-126` (single `.update({ status, submitted_at })` call); repo-wide grep for `status.*submitted` confirms this is the only production write site (`SOURCE/supabase/test-rls.ts` fixture writes are test-only, not production code) | Yes |
 | 3 | `exam_attempts.started_at` is `NOT NULL DEFAULT now()` — always present regardless of status. | `SOURCE/supabase/schema.sql:104` | Yes |
 | 4 | `exams_select_visible` RLS (`status='published' OR author_id=auth.uid()`) is defined on the base `exams` table and applies to a direct `.from("exams")` read (not only to the `exams_with_difficulty` view). | `SOURCE/supabase/schema.sql:263-268` (`create policy ... on public.exams`) | Yes |
 | 5 | No PostgREST embedded-resource join syntax (e.g. `.select("*, exams(title)")`) is used anywhere in `SOURCE/app` — sequential batched selects are the established convention. | Repo-wide grep, zero matches; precedent in `getResult()`, `getExamForPlayer()`, `getMyExam()` | Yes |
-| 6 | The Supabase JS client returns the `numeric(4,2)` `total_score` column as a JS `number` (not a string requiring parsing) — an inherited assumption already relied on by `ScoreCard.tsx`'s `.toFixed(1)` call on `result.totalScore`, not newly introduced here. | `SOURCE/app/(layer2)/queries.ts:273-279` (`ResultRow.total_score: number`, no parse step); `SOURCE/app/(layer2)/_components/ScoreCard.tsx:27` | Yes |
-| 7 | `vitest`'s `include` pattern collects any `*.test.{ts,tsx}` file under `app/**`, regardless of the prefix before `.test.ts` — so `(HM)/__tests__/history.int.test.ts` and `(layer2)/__tests__/getResult.int.test.ts` are picked up automatically by `npm test`. | `SOURCE/vitest.config.ts:19` (`include: [..., "app/**/*.test.{ts,tsx}"]`); precedent `(layer2)/__tests__/rating.int.test.ts` | Yes |
+| 6 | The Supabase JS client returns the `numeric(4,2)` `total_score` column as a JS `number` (not a string requiring parsing) — an inherited assumption already relied on by `ScoreCard.tsx`'s `.toFixed(1)` call on `result.totalScore`, not newly introduced here. | `SOURCE/features/exams/queries.ts:273-279` (`ResultRow.total_score: number`, no parse step); `SOURCE/features/exams/components/ScoreCard.tsx:27` | Yes |
+| 7 | `vitest`'s `include` pattern collects any `*.test.{ts,tsx}` file under `app/**`, regardless of the prefix before `.test.ts` — so `(history)/__tests__/history.int.test.ts` and `(exams)/__tests__/getResult.int.test.ts` are picked up automatically by `npm test`. | `SOURCE/vitest.config.ts:19` (`include: [..., "app/**/*.test.{ts,tsx}"]`); precedent `(exams)/__tests__/rating.int.test.ts` | Yes |
 
 All claims are confirmed with in-repo evidence; none require a Risks-table follow-up per se, but #1's silent-omission consequence is carried into the Risks table below because its *user-facing effect* (a row disappearing from the list) is a design decision, not just a fact.
 
 #### Applicable Standards
 
-- [x] Server-only query modules (`import "server-only"`) `[explicit]` — Source: every existing `queries.ts` (`(layer2)/queries.ts:4`, `(layer4)/queries.ts:4`).
-- [x] Snake_case DB ↔ camelCase TS mapping inside query modules `[explicit]` — Source: `(layer2)/queries.ts` `toExam`, `getResult`.
+- [x] Server-only query modules (`import "server-only"`) `[explicit]` — Source: every existing `queries.ts` (`(exams)/queries.ts:4`, `(authoring)/queries.ts:4`).
+- [x] Snake_case DB ↔ camelCase TS mapping inside query modules `[explicit]` — Source: `(exams)/queries.ts` `toExam`, `getResult`.
 - [x] Sequential batched selects (`.in()`), no PostgREST embedded joins `[implicit]` — Evidence: repo-wide grep (zero matches); `getResult()`/`getMyExam()`/`getExamForPlayer()` precedent. Confirmed: Yes (adopted for `listMyHistory()`).
 - [x] Query functions `throw` on infrastructure error, never swallow `[explicit]` — Source: every existing `queries.ts` function (`if (error) throw error;`).
-- [x] Page-level auth guard (`getCurrentUser()` + `redirect()`); route-group layout renders `SiteHeader` with a **nullable** user and never redirects `[explicit]` — Source: `(layer4)/upload/page.tsx:8-10`; `(layer2)/(layer3)/(layer4) layout.tsx` (all three structurally identical).
-- [ ] Defensive sentinel for `.in()` against an empty id array `[implicit]` — Evidence: `(layer4)/queries.ts:108` (`.in("id", questionIds.length > 0 ? questionIds : ["__none__"])`). Confirmed: Not adopted in `listMyHistory()`'s exam-title batch lookup — `examIds` is always non-empty there (step 2 already returns `[]` early, and `exam_id` is a NOT NULL FK), so the ternary and sentinel were dead code and removed per document review (I002).
-- [ ] Vietnamese inline comments matching the surrounding file's existing convention `[implicit]` — Not applicable to the brand-new `(HM)/queries.ts`/`layout.tsx`/`history/page.tsx` files (no pre-existing convention within those files to match); `PROJECT_OVERVIEW.md` mandates matching *per-file* convention on edits, not a repo-wide comment language for new files.
+- [x] Page-level auth guard (`getCurrentUser()` + `redirect()`); route-group layout renders `SiteHeader` with a **nullable** user and never redirects `[explicit]` — Source: `(authoring)/upload/page.tsx:8-10`; `(exams)/(analytics)/(authoring) layout.tsx` (all three structurally identical).
+- [ ] Defensive sentinel for `.in()` against an empty id array `[implicit]` — Evidence: `(authoring)/queries.ts:108` (`.in("id", questionIds.length > 0 ? questionIds : ["__none__"])`). Confirmed: Not adopted in `listMyHistory()`'s exam-title batch lookup — `examIds` is always non-empty there (step 2 already returns `[]` early, and `exam_id` is a NOT NULL FK), so the ternary and sentinel were dead code and removed per document review (I002).
+- [ ] Vietnamese inline comments matching the surrounding file's existing convention `[implicit]` — Not applicable to the brand-new `(history)/queries.ts`/`layout.tsx`/`history/page.tsx` files (no pre-existing convention within those files to match); `PROJECT_OVERVIEW.md` mandates matching *per-file* convention on edits, not a repo-wide comment language for new files.
 
 #### Quality Assurance Mechanisms
 
 - [x] ESLint / Prettier / `tsc` strict — Enforces: style, formatting, types — Config: repo root (`SOURCE/eslint.config.mjs`) — Covers: project-wide — Status: `adopted`.
-- [x] Vitest (`node` env), `app/**/*.test.{ts,tsx}` — Enforces: call-construction/query-shape correctness — Config: `SOURCE/vitest.config.ts` — Covers: new `(HM)/__tests__/history.int.test.ts` (PRD Success Criteria's named measurement file) + new `(layer2)/__tests__/getResult.int.test.ts` — Status: `adopted`.
+- [x] Vitest (`node` env), `app/**/*.test.{ts,tsx}` — Enforces: call-construction/query-shape correctness — Config: `SOURCE/vitest.config.ts` — Covers: new `(history)/__tests__/history.int.test.ts` (PRD Success Criteria's named measurement file) + new `(exams)/__tests__/getResult.int.test.ts` — Status: `adopted`.
 - [x] RLS verification harness `SOURCE/supabase/test-rls.ts` — Enforces: real-Postgres RLS/aggregate behavior — Status: `adopted` (elevated to a required, blocking gate per document review — no new RLS policy is introduced, PRD R8/AC-017, but case H-a is the only verification that can prove `exams_select_visible` RLS plus the explicit `.eq("status","published")` filter behave as assumed for the self-authored-exam-reverted-to-non-published scenario (R-1) against real Postgres; the mocked unit test cannot prove this — see Test Boundaries).
 - [ ] axe a11y audit — Status: `noted` (not applicable; no UI in this backend Design Doc — owned by the frontend Design Doc).
 - [ ] CI pipeline — Status: `noted` (none exists in this repo — confirmed, no `.github/workflows` directory; tests run manually via `npm test` per `SOURCE/package.json`).
@@ -114,8 +114,8 @@ The site has no page listing a user's past completed exams, and the Result page'
 
 ### Current Challenges
 
-- The closest existing list-query analog, `listMySubmittedExamIds()` (`(layer2)/queries.ts:197-205`), returns only a `Set<string>` of exam ids — no join, no timestamps, no score; structurally close (RLS-only scoping, single round trip) but not reusable as-is for History's row content.
-- `getResult()` (`(layer2)/queries.ts:317-320`) currently selects only `exam_id` from `exam_attempts` — no timestamps — so the Result page's `ScoreCard` "Time" stat is a hardcoded `"—"` placeholder today (`ScoreCard.tsx:48-50`, explicitly commented "thời gian tượng trưng").
+- The closest existing list-query analog, `listMySubmittedExamIds()` (`(exams)/queries.ts:197-205`), returns only a `Set<string>` of exam ids — no join, no timestamps, no score; structurally close (RLS-only scoping, single round trip) but not reusable as-is for History's row content.
+- `getResult()` (`(exams)/queries.ts:317-320`) currently selects only `exam_id` from `exam_attempts` — no timestamps — so the Result page's `ScoreCard` "Time" stat is a hardcoded `"—"` placeholder today (`ScoreCard.tsx:48-50`, explicitly commented "thời gian tượng trưng").
 - `exams_select_visible` RLS is a stricter, separate rule from the attempts/results RLS the PRD explicitly names as sufficient (R8/AC-017): `getResult()` already depends on it via `getExam()`, and treats an invisible exam as "not found," failing the **whole** Result page (`queries.ts:325-326`). A list of many rows cannot inherit that all-or-nothing behavior without an explicit decision (below).
 
 ### Requirements
@@ -146,19 +146,19 @@ UI-presentation ACs (AC-006/007/008 PDF content/branding, AC-010/011/012/018 bus
 
 | Type | Path | Description |
 |------|------|-------------|
-| New | `SOURCE/app/(HM)/queries.ts` | `listMyHistory()` + `MyHistoryEntry` type |
-| New | `SOURCE/app/(HM)/layout.tsx` | Route-group shell — structurally identical to `(layer3)/layout.tsx`/`(layer4)/layout.tsx` |
-| New | `SOURCE/app/(HM)/history/page.tsx` | Page-level auth guard, then calls `listMyHistory()` |
-| New | `SOURCE/app/(HM)/__tests__/history.int.test.ts` | Mocked-Supabase-client call-construction test (PRD Success Criteria's named measurement file) |
-| New | `SOURCE/app/(layer2)/__tests__/getResult.int.test.ts` | Regression + additive-field test for the `getResult()` extension |
-| Existing | `SOURCE/app/(layer2)/queries.ts:306-371` | `getResult()` — extend the `exam_attempts` select (`:317-320`) with `started_at, submitted_at`; extend `ExamResult` type (`:294-300`) |
-| Existing, downstream (unaffected) | `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/page.tsx` | Consumer of `ExamResult` — new fields available on `data`, not yet destructured/wired (frontend Design Doc) |
-| Existing, downstream (unaffected) | `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` | Consumer of `ExamResult` — new fields available, unused by this page |
-| Out of scope (frontend Design Doc) | `SOURCE/app/(HM)/_components/*`, `SOURCE/app/(layer2)/_components/ResultActions.tsx`, `SiteHeader.tsx`/`HomeSidebar.tsx` nav `href`, `generateAttemptPdf.ts`/`AttemptPdfTemplate.tsx` | UI components, nav wiring, PDF generation, share mechanics |
+| New | `SOURCE/features/history/queries.ts` | `listMyHistory()` + `MyHistoryEntry` type |
+| New | `SOURCE/app/(history)/layout.tsx` | Route-group shell — structurally identical to `(analytics)/layout.tsx`/`(authoring)/layout.tsx` |
+| New | `SOURCE/app/(history)/history/page.tsx` | Page-level auth guard, then calls `listMyHistory()` |
+| New | `SOURCE/features/history/__tests__/history.int.test.ts` | Mocked-Supabase-client call-construction test (PRD Success Criteria's named measurement file) |
+| New | `SOURCE/features/exams/__tests__/getResult.int.test.ts` | Regression + additive-field test for the `getResult()` extension |
+| Existing | `SOURCE/features/exams/queries.ts:306-371` | `getResult()` — extend the `exam_attempts` select (`:317-320`) with `started_at, submitted_at`; extend `ExamResult` type (`:294-300`) |
+| Existing, downstream (unaffected) | `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/page.tsx` | Consumer of `ExamResult` — new fields available on `data`, not yet destructured/wired (frontend Design Doc) |
+| Existing, downstream (unaffected) | `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` | Consumer of `ExamResult` — new fields available, unused by this page |
+| Out of scope (frontend Design Doc) | `SOURCE/app/(history)/_components/*`, `SOURCE/features/exams/components/ResultActions.tsx`, `SiteHeader.tsx`/`HomeSidebar.tsx` nav `href`, `generateAttemptPdf.ts`/`AttemptPdfTemplate.tsx` | UI components, nav wiring, PDF generation, share mechanics |
 
 ### Similar Functionality Search and Decision
 
-Searched for existing list-oriented reads with keywords `list*`, `submitted`, `attempt`, `history`: `listMySubmittedExamIds()` (`(layer2)/queries.ts:197-205`) and `listMyExams()` (`(layer4)/queries.ts:30-67`).
+Searched for existing list-oriented reads with keywords `list*`, `submitted`, `attempt`, `history`: `listMySubmittedExamIds()` (`(exams)/queries.ts:197-205`) and `listMyExams()` (`(authoring)/queries.ts:30-67`).
 
 - `listMySubmittedExamIds()` — closest analog by RLS-scoping pattern (relies purely on RLS, no explicit `.eq("user_id", ...)`) and by domain (also reads `exam_attempts.status='submitted'`), but returns only a `Set<string>` of exam ids for a different consumer (Rating System's Rate-button gating, ADR-0008) — changing its shape would be a breaking change to an already-shipped contract outside this feature's scope.
 - `listMyExams()` — closest analog by *return shape* (a typed `XxxListItem[]`, newest-first, single round trip) but wrong domain (author's own `exams`, not a student's `exam_attempts`).
@@ -177,8 +177,8 @@ Searched for existing list-oriented reads with keywords `list*`, `submitted`, `a
 | `exams_select_visible` RLS (`status='published' OR author_id=auth.uid()`) | Verified existing | `SOURCE/supabase/schema.sql:263-268` |
 | `createClient()` (Supabase server client) | Verified existing | `SOURCE/lib/supabase/server.ts:12-36` |
 | `getCurrentUser()` / `getCurrentUserProfile()` | Verified existing | `SOURCE/lib/auth/getCurrentUser.ts:6-20`, `:26-52` |
-| `SiteHeader` (accepts nullable `user` prop) | Verified existing | `SOURCE/app/(layer2)/_components/SiteHeader.tsx:34` |
-| `ExamResult` / `ScoreResult` types | Verified existing | `SOURCE/app/(layer2)/queries.ts:294-300`; `SOURCE/types/result.ts:25-32` |
+| `SiteHeader` (accepts nullable `user` prop) | Verified existing | `SOURCE/components/layout/SiteHeader.tsx:34` |
+| `ExamResult` / `ScoreResult` types | Verified existing | `SOURCE/features/exams/queries.ts:294-300`; `SOURCE/types/result.ts:25-32` |
 
 No component this design assumes is missing or external — everything is an existing in-repo definition.
 
@@ -186,16 +186,16 @@ No component this design assumes is missing or external — everything is an exi
 
 | File/Function | Relevance |
 |---|---|
-| `SOURCE/app/(layer2)/queries.ts:306-371` (`getResult`) | Integration point — the function extended by this design |
-| `SOURCE/app/(layer2)/queries.ts:197-205` (`listMySubmittedExamIds`) | Pattern reference — closest RLS-scoping precedent |
-| `SOURCE/app/(layer4)/queries.ts:11-67` (`MyExamListItem`, `listMyExams`) | Pattern reference — closest typed-list-return-shape precedent |
-| `SOURCE/app/(layer4)/queries.ts:82-136` (`getMyExam`) | Pattern reference — defensive `.in()` sentinel for an empty id array (`:108`) |
-| `SOURCE/app/(layer2)/actions.ts:32-129` (`submitExam`) | Integration point — the only write site for `status='submitted'`/`submitted_at`; establishes Assumed Behaviors #1/#2 |
+| `SOURCE/features/exams/queries.ts:306-371` (`getResult`) | Integration point — the function extended by this design |
+| `SOURCE/features/exams/queries.ts:197-205` (`listMySubmittedExamIds`) | Pattern reference — closest RLS-scoping precedent |
+| `SOURCE/features/authoring/queries.ts:11-67` (`MyExamListItem`, `listMyExams`) | Pattern reference — closest typed-list-return-shape precedent |
+| `SOURCE/features/authoring/queries.ts:82-136` (`getMyExam`) | Pattern reference — defensive `.in()` sentinel for an empty id array (`:108`) |
+| `SOURCE/features/exams/actions.ts:32-129` (`submitExam`) | Integration point — the only write site for `status='submitted'`/`submitted_at`; establishes Assumed Behaviors #1/#2 |
 | `SOURCE/supabase/schema.sql:99-127, 160-170, 201-207, 263-268` | Integration point — tables/RLS this feature reads, none modified |
-| `SOURCE/app/(layer4)/upload/page.tsx:8-10` | Pattern reference — the exact page-level auth-guard shape adopted for `history/page.tsx` |
-| `SOURCE/app/(layer3)/layout.tsx`, `SOURCE/app/(layer4)/layout.tsx` | Pattern reference — the exact route-group layout shape adopted for `(HM)/layout.tsx` |
-| `SOURCE/app/(layer2)/_components/ScoreCard.tsx:1-55` | Integration point (downstream, frontend-owned) — the "Time" placeholder this feature's `getResult()` extension unblocks |
-| `SOURCE/app/(layer2)/__tests__/rating.int.test.ts` | Pattern reference — the mocked-Supabase-client integration-test style both new test files follow |
+| `SOURCE/app/(authoring)/upload/page.tsx:8-10` | Pattern reference — the exact page-level auth-guard shape adopted for `history/page.tsx` |
+| `SOURCE/app/(analytics)/layout.tsx`, `SOURCE/app/(authoring)/layout.tsx` | Pattern reference — the exact route-group layout shape adopted for `(history)/layout.tsx` |
+| `SOURCE/features/exams/components/ScoreCard.tsx:1-55` | Integration point (downstream, frontend-owned) — the "Time" placeholder this feature's `getResult()` extension unblocks |
+| `SOURCE/features/exams/__tests__/rating.int.test.ts` | Pattern reference — the mocked-Supabase-client integration-test style both new test files follow |
 | `SOURCE/supabase/test-rls.ts` | Pattern reference — real-Postgres RLS regression harness (required extension, case H-a, see Test Boundaries) |
 
 ## Design
@@ -204,14 +204,14 @@ No component this design assumes is missing or external — everything is an exi
 
 **Question**: `exams_select_visible` RLS is stricter than `attempts_select_own`/`results_select_own` (PRD R8/AC-017 name only the latter two as sufficient). If a user attempted-and-scored an exam that later became invisible to them (unpublished by its author, and the user is not that author), should the History **list** omit that row, or show it with degraded info?
 
-**Decision**: **omit the row silently.** `listMyHistory()`'s batched exam-title lookup (`.from("exams").select("id, title").in("id", examIds).eq("status", "published")`) uses the same two-layer visibility guard as `getExam()` (`(layer2)/queries.ts:181-191`): `exams_select_visible` RLS (`status='published' OR author_id=auth.uid()`) scopes the read, AND an explicit `.eq("status", "published")` filter is applied on top — not RLS alone. A row whose `exam_id` has no matching title in that lookup is dropped from the returned array entirely; no placeholder title, no partial row.
+**Decision**: **omit the row silently.** `listMyHistory()`'s batched exam-title lookup (`.from("exams").select("id, title").in("id", examIds).eq("status", "published")`) uses the same two-layer visibility guard as `getExam()` (`(exams)/queries.ts:181-191`): `exams_select_visible` RLS (`status='published' OR author_id=auth.uid()`) scopes the read, AND an explicit `.eq("status", "published")` filter is applied on top — not RLS alone. A row whose `exam_id` has no matching title in that lookup is dropped from the returned array entirely; no placeholder title, no partial row.
 
 **Rationale**:
 1. **Precedent consistency, not a new invariant.** `getResult()` already treats an invisible exam as "not found" for the single-attempt case (`queries.ts:325-326`, returns `null` → caller redirects). Omitting the row from a *list* is the same underlying rule (no data surfaces for an attempt whose exam isn't currently visible to this reader) applied at list granularity instead of single-record granularity — not a new behavior invented for this feature.
 2. **A titleless row is not actionable.** The UI Spec's `HistoryRow` has no field for "unknown exam" — inventing a placeholder title (e.g. "Untitled exam") to show a degraded row would require new UI Spec surface for a case the UI Spec doesn't define, and the resulting row's "View details" link would 404 anyway (the per-question Result page depends on the same `getExam()`/RLS floor).
 3. **No AC requires completeness against every historical attempt regardless of exam visibility.** PRD AC-001 defines list scope as "`status='submitted'` and an existing `exam_results` row" — it does not additionally require "even if the exam later became invisible." This decision narrows an ambiguity the PRD leaves open, in the direction consistent with existing precedent (#1).
 4. **Zero extra query cost.** The omission falls out of the same batched `.in()` lookup already required for the title itself — no additional RLS check, no extra round trip.
-5. **Filter symmetry with `getExam()`, not RLS-alone — closes a self-authored-exam asymmetry.** `getResult()` → `getExam()` (`(layer2)/queries.ts:187`) already applies an explicit `.eq("status", "published")` filter in addition to RLS, and that filter ignores authorship entirely — so even the exam's own author gets `null` from `getExam()` once its status leaves `'published'`. If `listMyHistory()`'s title lookup relied on RLS alone (as an earlier draft of this design did), the two reads would disagree: `exams_select_visible`'s `OR author_id=auth.uid()` clause keeps a self-authored exam readable regardless of status, so a user who is the author of an exam, attempts it, then later reverts that exam's status away from `'published'`, would still see a History row with a title for that attempt — whose "View details" link then 404s via `getResult()`/`getExam()`'s stricter, authorship-blind published-only rule (`result/page.tsx:29-31` → redirect to `/exams/[id]` → that page's own `getExam()` call → `notFound()`). Applying the identical `.eq("status", "published")` filter here closes that gap: the two reads now agree on exactly which exams are "visible enough to show" for every author/status combination, not only the non-author case that RLS alone already handled correctly.
+5. **Filter symmetry with `getExam()`, not RLS-alone — closes a self-authored-exam asymmetry.** `getResult()` → `getExam()` (`(exams)/queries.ts:187`) already applies an explicit `.eq("status", "published")` filter in addition to RLS, and that filter ignores authorship entirely — so even the exam's own author gets `null` from `getExam()` once its status leaves `'published'`. If `listMyHistory()`'s title lookup relied on RLS alone (as an earlier draft of this design did), the two reads would disagree: `exams_select_visible`'s `OR author_id=auth.uid()` clause keeps a self-authored exam readable regardless of status, so a user who is the author of an exam, attempts it, then later reverts that exam's status away from `'published'`, would still see a History row with a title for that attempt — whose "View details" link then 404s via `getResult()`/`getExam()`'s stricter, authorship-blind published-only rule (`result/page.tsx:29-31` → redirect to `/exams/[id]` → that page's own `getExam()` call → `notFound()`). Applying the identical `.eq("status", "published")` filter here closes that gap: the two reads now agree on exactly which exams are "visible enough to show" for every author/status combination, not only the non-author case that RLS alone already handled correctly.
 
 **Consequence recorded as a risk** (not silently absorbed): a user could perceive a "missing" history entry if this edge case is ever hit. Given PRD's own "Won't Have" list excludes UGC-authored-exam lifecycle concerns from this feature's scope, and the site is pre-launch (few UGC exams get unpublished after being attempted), this is assessed as low-probability. See Risks and Mitigation (R-1).
 
@@ -258,7 +258,7 @@ Resolution priority: (1) new persistent state — all tie at 0; (2) crosses boun
 
 ## Data Contracts
 
-### `listMyHistory()` (new, `(HM)/queries.ts`)
+### `listMyHistory()` (new, `(history)/queries.ts`)
 
 ```yaml
 Contract: listMyHistory(): Promise<MyHistoryEntry[]>
@@ -275,7 +275,7 @@ Output:
   On Error: throw on any Supabase error at any of the 3 steps (AC-019 — the caller's error.tsx boundary handles it)
 ```
 
-### `getResult()` (extended, `(layer2)/queries.ts:306-371`)
+### `getResult()` (extended, `(exams)/queries.ts:306-371`)
 
 ```yaml
 Contract: getResult(attemptId: string): Promise<ExamResult | null>   # signature unchanged
@@ -294,7 +294,7 @@ Output:
 ### `MyHistoryEntry` / `ExamResult` deltas
 
 ```ts
-// SOURCE/app/(HM)/queries.ts — new
+// SOURCE/features/history/queries.ts — new
 export type MyHistoryEntry = {
   attemptId: string;
   examId: string;
@@ -304,7 +304,7 @@ export type MyHistoryEntry = {
   submittedAt: string;
 };
 
-// SOURCE/app/(layer2)/queries.ts — ExamResult gains 2 fields (additive)
+// SOURCE/features/exams/queries.ts — ExamResult gains 2 fields (additive)
 export type ExamResult = {
   examId: string;
   examTitle: string;
@@ -320,7 +320,7 @@ export type ExamResult = {
 ### `listMyHistory()`
 
 ```ts
-// SOURCE/app/(HM)/queries.ts
+// SOURCE/features/history/queries.ts
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 
@@ -362,14 +362,14 @@ export async function listMyHistory(): Promise<MyHistoryEntry[]> {
   if (attemptRows.length === 0) return [];
 
   // Step 3 — batch exam titles, single round trip (no N+1). Mirrors getExam()'s
-  // exact visibility convention ((layer2)/queries.ts:181-191): exams_select_visible
+  // exact visibility convention (features/exams/queries.ts:181-191): exams_select_visible
   // RLS scopes the read, AND an explicit .eq("status","published") filter is
   // applied on top — not RLS alone. This keeps the omission rule symmetric with
   // getExam()/getResult() even for a self-authored exam later reverted away from
   // "published" (see Exams-Visibility Edge Case decision).
   // examIds is always non-empty here: step 2 already returned [] when attemptRows
   // was empty, and exam_id is a NOT NULL FK — so no defensive .in() sentinel
-  // (cf. getMyExam()'s pattern, (layer4)/queries.ts:108) is needed at this call site.
+  // (cf. getMyExam()'s pattern, features/authoring/queries.ts:108) is needed at this call site.
   const examIds = [...new Set(attemptRows.map((a) => a.exam_id as string))];
   const { data: examRows, error: examErr } = await supabase
     .from("exams")
@@ -411,7 +411,7 @@ export async function listMyHistory(): Promise<MyHistoryEntry[]> {
 ### `getResult()` diff
 
 ```ts
-// SOURCE/app/(layer2)/queries.ts:317-320 — before:
+// SOURCE/features/exams/queries.ts:317-320 — before:
 const { data: attempt, error: attemptErr } = await supabase
   .from("exam_attempts")
   .select("exam_id")
@@ -425,7 +425,7 @@ const { data: attempt, error: attemptErr } = await supabase
   .eq("id", attemptId)
   .maybeSingle();
 
-// SOURCE/app/(layer2)/queries.ts:370 — return statement, before:
+// SOURCE/features/exams/queries.ts:370 — return statement, before:
 return { examId: exam.id, examTitle: exam.title, result, questions };
 
 // after:
@@ -442,10 +442,10 @@ return {
 ## Auth Guard and Layout
 
 ```tsx
-// SOURCE/app/(HM)/layout.tsx — structurally identical to (layer3)/(layer4) layout.tsx.
+// SOURCE/app/(history)/layout.tsx — structurally identical to (analytics)/(authoring) layout.tsx.
 // Nullable user, SiteHeader only, NO redirect — the guard lives in history/page.tsx (below).
 import { getCurrentUserProfile } from "@/lib/auth/getCurrentUser";
-import { SiteHeader } from "@/app/(layer2)/_components/SiteHeader";
+import { SiteHeader } from "@/features/exams/components/SiteHeader";
 
 export default async function HMLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUserProfile();
@@ -459,11 +459,11 @@ export default async function HMLayout({ children }: { children: React.ReactNode
 ```
 
 ```tsx
-// SOURCE/app/(HM)/history/page.tsx — page-level guard, mirrors (layer4)/upload/page.tsx:8-10.
+// SOURCE/app/(history)/history/page.tsx — page-level guard, mirrors app/(authoring)/upload/page.tsx:8-10.
 // Guard runs BEFORE any data fetch (AC-016: zero attempt rows fetched for a guest).
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
-import { listMyHistory } from "@/app/(HM)/queries";
+import { listMyHistory } from "@/app/(history)/queries";
 // HistoryList's props/rendering are owned by the frontend Design Doc.
 
 export default async function HistoryPage() {
@@ -476,7 +476,7 @@ export default async function HistoryPage() {
 }
 ```
 
-`loading.tsx` (skeleton) and `error.tsx` (Next.js error boundary with `reset()`) under `(HM)/history/` are frontend-owned (UI Spec D7) — this doc's only obligation to them is that `listMyHistory()` `throw`s rather than swallowing errors, which is what lets `error.tsx` catch and offer retry (AC-019).
+`loading.tsx` (skeleton) and `error.tsx` (Next.js error boundary with `reset()`) under `(history)/history/` are frontend-owned (UI Spec D7) — this doc's only obligation to them is that `listMyHistory()` `throw`s rather than swallowing errors, which is what lets `error.tsx` catch and offer retry (AC-019).
 
 ## Architecture Overview
 
@@ -486,12 +486,12 @@ flowchart TB
         HL["HistoryList / HistoryRow"]
         RP["Result page (ScoreCard, ResultActions)"]
     end
-    subgraph HM["(HM) route group — new"]
+    subgraph HM["(history) route group — new"]
         LAY["layout.tsx — SiteHeader, nullable user, no redirect"]
         PG["history/page.tsx — getCurrentUser() guard, then listMyHistory()"]
         Q["queries.ts — listMyHistory()"]
     end
-    subgraph L2["(layer2) — extended"]
+    subgraph L2["(exams) — extended"]
         GR["queries.ts — getResult() (adds started_at/submitted_at)"]
     end
     subgraph DB["Supabase (Postgres + RLS) — unchanged"]
@@ -577,23 +577,23 @@ Not applicable — this is a read-only feature. No new persistent state or lifec
 ## Change Impact Map
 
 ```yaml
-Change Target: History backend read surface (new listMyHistory() + getResult() extension + (HM) auth-guard/layout)
+Change Target: History backend read surface (new listMyHistory() + getResult() extension + (history) auth-guard/layout)
 Direct Impact:
-  - NEW SOURCE/app/(HM)/queries.ts (listMyHistory, MyHistoryEntry)
-  - NEW SOURCE/app/(HM)/layout.tsx
-  - NEW SOURCE/app/(HM)/history/page.tsx
-  - SOURCE/app/(layer2)/queries.ts (getResult(): exam_attempts select gains started_at/submitted_at; ExamResult type gains startedAt/submittedAt)
-  - NEW SOURCE/app/(HM)/__tests__/history.int.test.ts
-  - NEW SOURCE/app/(layer2)/__tests__/getResult.int.test.ts
+  - NEW SOURCE/features/history/queries.ts (listMyHistory, MyHistoryEntry)
+  - NEW SOURCE/app/(history)/layout.tsx
+  - NEW SOURCE/app/(history)/history/page.tsx
+  - SOURCE/features/exams/queries.ts (getResult(): exam_attempts select gains started_at/submitted_at; ExamResult type gains startedAt/submittedAt)
+  - NEW SOURCE/features/history/__tests__/history.int.test.ts
+  - NEW SOURCE/features/exams/__tests__/getResult.int.test.ts
 Indirect Impact:
-  - SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/page.tsx — data now carries 2 unused-until-wired fields; no behavior change
-  - SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx — same, unused
-  - SOURCE/app/(layer2)/_components/ScoreCard.tsx — future consumer of a frontend-computed completionTimeLabel; not modified here
+  - SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/page.tsx — data now carries 2 unused-until-wired fields; no behavior change
+  - SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx — same, unused
+  - SOURCE/features/exams/components/ScoreCard.tsx — future consumer of a frontend-computed completionTimeLabel; not modified here
 No Ripple Effect:
   - exam_attempts / exam_results / exams schema and RLS (zero DDL — existing policies already sufficient, PRD R8/AC-017)
   - listMySubmittedExamIds(), listExams(), getExam(), getExamForPlayer() (untouched)
   - submitExam() / startAttempt() / rateExam() / getMyRating() / computeScore() (untouched — read-only feature)
-  - SOURCE/app/(layer2)/_components/ResultActions.tsx, SiteHeader.tsx, HomeSidebar.tsx nav href (frontend Design Doc scope)
+  - SOURCE/features/exams/components/ResultActions.tsx, SiteHeader.tsx, HomeSidebar.tsx nav href (frontend Design Doc scope)
   - mupdf / Layer 4 UGC extraction path (ADR-0009 confirmed unrelated)
   - jsPDF/html2canvas PDF-generation module (ADR-0009 scope; client-side only)
 ```
@@ -621,12 +621,12 @@ All crossings above are in-memory (Server Component function calls / prop hand-o
 
 | Integration Point | Location | Integration Method | Impact Level | Contract (Input / Output / On Error) | Test Coverage |
 |---|---|---|---|---|---|
-| History list read | `(HM)/history/page.tsx` → `(HM)/queries.ts` `listMyHistory()` | call | Medium (new read path, additive to the app; no change to any existing read) | In: none (auth via RLS); Out: `MyHistoryEntry[]`; Err: throw | `history.int.test.ts` (mocked chain) + required real-Postgres walkthrough (see Integration Verification Points) |
-| Auth guard | `(HM)/history/page.tsx` `getCurrentUser()` | call, precedes the read above | High (process-flow gate — no data fetched if absent) | In: session cookie; Out: user or null; Err: caught internally by `getCurrentUser()`, treated as logged-out | Manual verification (guest hits `/history` → redirect); no existing automated test for this exact guard pattern (matches `(layer4)/upload/page.tsx`'s own untested-guard precedent) |
-| Result-page read extension | `(layer2)/queries.ts` `getResult()` | data reference (2 extra columns) | Medium (additive data-format change; used by 2 existing pages) | In: attemptId; Out: `ExamResult` (extended); Err: throw / null (unchanged) | `getResult.int.test.ts` (Output Comparison) |
+| History list read | `(history)/history/page.tsx` → `(history)/queries.ts` `listMyHistory()` | call | Medium (new read path, additive to the app; no change to any existing read) | In: none (auth via RLS); Out: `MyHistoryEntry[]`; Err: throw | `history.int.test.ts` (mocked chain) + required real-Postgres walkthrough (see Integration Verification Points) |
+| Auth guard | `(history)/history/page.tsx` `getCurrentUser()` | call, precedes the read above | High (process-flow gate — no data fetched if absent) | In: session cookie; Out: user or null; Err: caught internally by `getCurrentUser()`, treated as logged-out | Manual verification (guest hits `/history` → redirect); no existing automated test for this exact guard pattern (matches `(authoring)/upload/page.tsx`'s own untested-guard precedent) |
+| Result-page read extension | `(exams)/queries.ts` `getResult()` | data reference (2 extra columns) | Medium (additive data-format change; used by 2 existing pages) | In: attemptId; Out: `ExamResult` (extended); Err: throw / null (unchanged) | `getResult.int.test.ts` (Output Comparison) |
 | Exams-visibility filtering | `listMyHistory()`'s exam-title batch lookup vs. `exams_select_visible` RLS + explicit `.eq(status,'published')` filter (matching `getExam()`) | hook (RLS) + explicit filter (call) | Low (read-only; documented decision, not a new policy) | In: examIds; Out: subset of published-and-visible titles; Err: throw | Required, blocking `test-rls.ts` case H-a + required manual walkthrough (see Test Boundaries / Integration Verification Points) |
 
-**Conflict check**: no naming or priority conflict with existing systems. `MyHistoryEntry`/`listMyHistory` are new identifiers with no collision in `SOURCE/app` or `SOURCE/types`. `ExamResult`'s 2 new fields do not collide with any existing key on that type. The `(HM)` route group does not collide with `(layer1)`-`(layer4)` (confirmed absent via Glob before this design started).
+**Conflict check**: no naming or priority conflict with existing systems. `MyHistoryEntry`/`listMyHistory` are new identifiers with no collision in `SOURCE/app` or `SOURCE/types`. `ExamResult`'s 2 new fields do not collide with any existing key on that type. The `(history)` route group does not collide with `(auth)`-`(authoring)` (confirmed absent via Glob before this design started).
 
 ## Implementation Plan
 
@@ -634,7 +634,7 @@ All crossings above are in-memory (Server Component function calls / prop hand-o
 
 **Selected Approach**: **Vertical Slice** (feature-driven).
 
-**Selection Reason** (Phase 1-6 summary): Phase 1 (current-state analysis) found no shared foundation layer this feature must build first — unlike ADR-0008's rating system, no new table/view/RPC/PostgREST-capability spike is needed; both deliverables (the `getResult()` extension and `listMyHistory()`) read only already-existing, already-RLS-sufficient tables. Phase 2 (strategy exploration) considered a Foundation-driven/Horizontal approach (e.g., building a shared "attempt row" abstraction consumed by both `getResult()` and `listMyHistory()`) and rejected it — the two reads have different lifecycles (single detailed hydration vs. batched cheap list) per the Data Representation Decision, so a shared foundation would be a premature abstraction (YAGNI) for 2 call sites. Phase 3 (risk assessment): the two deliverables carry independent, low risk (additive type extension; new read with no schema dependency) and can each be verified in isolation. Phase 4 (constraints): no schema/RLS change, no parallel operation, pre-launch scale — nothing forces a particular build order. Phase 5: two independently-shippable vertical units — (1) `getResult()` extension + its regression test; (2) `listMyHistory()` + `(HM)` guard/layout + its test — each delivers standalone value (unblocking the Result page's real Time stat; unblocking `/history`'s list) and neither depends on the other.
+**Selection Reason** (Phase 1-6 summary): Phase 1 (current-state analysis) found no shared foundation layer this feature must build first — unlike ADR-0008's rating system, no new table/view/RPC/PostgREST-capability spike is needed; both deliverables (the `getResult()` extension and `listMyHistory()`) read only already-existing, already-RLS-sufficient tables. Phase 2 (strategy exploration) considered a Foundation-driven/Horizontal approach (e.g., building a shared "attempt row" abstraction consumed by both `getResult()` and `listMyHistory()`) and rejected it — the two reads have different lifecycles (single detailed hydration vs. batched cheap list) per the Data Representation Decision, so a shared foundation would be a premature abstraction (YAGNI) for 2 call sites. Phase 3 (risk assessment): the two deliverables carry independent, low risk (additive type extension; new read with no schema dependency) and can each be verified in isolation. Phase 4 (constraints): no schema/RLS change, no parallel operation, pre-launch scale — nothing forces a particular build order. Phase 5: two independently-shippable vertical units — (1) `getResult()` extension + its regression test; (2) `listMyHistory()` + `(history)` guard/layout + its test — each delivers standalone value (unblocking the Result page's real Time stat; unblocking `/history`'s list) and neither depends on the other.
 
 **Rejected**: Horizontal/Foundation-driven — no 3+ consumers depend on a shared foundation here (unlike ADR-0008's view); would add an unnecessary abstraction layer for 2 independent call sites.
 
@@ -645,8 +645,8 @@ All crossings above are in-memory (Server Component function calls / prop hand-o
 ### Technical Dependencies and Implementation Order
 
 1. **`getResult()` extension** — Technical reason: zero DB dependency (no schema/RLS change); can start immediately. Prerequisite for: the Result-page Save/Share PDF path (frontend Design Doc) needing completion-time inputs.
-2. **`listMyHistory()`** (`(HM)/queries.ts`) — Technical reason: reads only existing tables; independent of (1); can start immediately, in parallel.
-3. **`(HM)/layout.tsx` + `(HM)/history/page.tsx`** — Depends on: (2) existing, since the page calls `listMyHistory()`.
+2. **`listMyHistory()`** (`(history)/queries.ts`) — Technical reason: reads only existing tables; independent of (1); can start immediately, in parallel.
+3. **`(history)/layout.tsx` + `(history)/history/page.tsx`** — Depends on: (2) existing, since the page calls `listMyHistory()`.
 4. **Integration tests for (1) and (2)** — Written TDD-first per testing-principles (RED before implementation), ideally alongside each slice rather than after.
 5. **Frontend Design Doc's consumption** — downstream of (1)-(3); out of this doc's scope.
 
@@ -669,7 +669,7 @@ None. This feature introduces zero DDL — no new table, column, view, RPC, or R
 | Supabase client inside `listMyHistory()`/`getResult()` | **Yes** (client boundary, `createClient()`) | Determinism + no network in the vitest suite, matching `rating.int.test.ts`'s sanctioned boundary; proves JS call construction (query shape, `.in()`/`.eq()`/`.order()` arguments), not real-Postgres semantics |
 | `exams_select_visible` RLS (the omission behavior) | **No** — real Postgres, required | Mocks cannot prove RLS filtering (testing-principles: "Mock Limitations for Data Layer" — schema/query correctness/constraints require a real DB); see required `test-rls.ts` case H-a below |
 
-### Vitest — `SOURCE/app/(HM)/__tests__/history.int.test.ts` (mocked, mirrors `rating.int.test.ts`'s style)
+### Vitest — `SOURCE/features/history/__tests__/history.int.test.ts` (mocked, mirrors `rating.int.test.ts`'s style)
 
 - Obligation (a) — AC-001: with `exam_results` rows for attempts A and B, but `exam_attempts` returning only A as `status='submitted'` (B still `'in_progress'`), asserts the final result contains only A.
 - Obligation (b) — AC-002: `exam_results` returns `[]` → asserts `listMyHistory()` resolves to `[]` without calling the `exam_attempts`/`exams` mocks at all (early return).
@@ -678,7 +678,7 @@ None. This feature introduces zero DDL — no new table, column, view, RPC, or R
 - Obligation (e) — AC-019: a simulated Supabase error at any of the 3 steps rejects the promise (asserted via `.rejects.toBeTruthy()`), never resolves to `[]`/partial data.
 - Obligation (f) — no-N+1 regression guard: asserts the `exams` table's mocked `.from` is invoked exactly once regardless of row count (proves the batched-`.in()` shape, not a per-row call).
 
-### Vitest — `SOURCE/app/(layer2)/__tests__/getResult.int.test.ts` (new)
+### Vitest — `SOURCE/features/exams/__tests__/getResult.int.test.ts` (new)
 
 - Obligation (a) — additive extension: asserts the `exam_attempts` mock is called with `.select("exam_id, started_at, submitted_at")` (not the old 1-column select).
 - Obligation (b) — Output Comparison (below): with fixture rows, asserts the returned `ExamResult`'s pre-existing fields (`examId`, `examTitle`, `result`, `questions`) are `toEqual` the same literal values the pre-change function would have produced, and `startedAt`/`submittedAt` are correctly mapped from the mocked `started_at`/`submitted_at`.
@@ -734,13 +734,13 @@ No new RLS policy is introduced, so no case is required for general PRD complian
 - PRD `docs/prd/history-prd.md` (v1.2) — R1, R3-R9, AC-001-005, AC-009, AC-016-019, NFR Performance, Technical Considerations (Dependencies, Constraints, Assumptions).
 - UI Spec `docs/ui-spec/history-ui-spec.md` (v1.1) — D6/D7 (route-group layout, loading/error boundary ownership), AC Traceability table, TBD-02 (this doc resolves it).
 - ADR `docs/adr/ADR-0009-pdf-generation-library-choice.md` (Accepted) — frontend-scoped, confirmed zero backend impact.
-- Precedents: `SOURCE/supabase/schema.sql` (`exam_attempts` :99-106, `exam_results` :117-127, `exams` :70-82/:221-230, RLS :160-170/:201-207/:263-268); `SOURCE/app/(layer2)/queries.ts` (`getResult` :306-371, `listMySubmittedExamIds` :197-205); `SOURCE/app/(layer4)/queries.ts` (`listMyExams`/`MyExamListItem` :11-67, `getMyExam`'s `.in()` sentinel :108); `SOURCE/app/(layer2)/actions.ts` (`submitExam` :32-129); `SOURCE/app/(layer4)/upload/page.tsx` (:8-10); `SOURCE/app/(layer3)/layout.tsx`, `SOURCE/app/(layer4)/layout.tsx`; `SOURCE/app/(layer2)/__tests__/rating.int.test.ts`; `SOURCE/supabase/test-rls.ts`.
+- Precedents: `SOURCE/supabase/schema.sql` (`exam_attempts` :99-106, `exam_results` :117-127, `exams` :70-82/:221-230, RLS :160-170/:201-207/:263-268); `SOURCE/features/exams/queries.ts` (`getResult` :306-371, `listMySubmittedExamIds` :197-205); `SOURCE/features/authoring/queries.ts` (`listMyExams`/`MyExamListItem` :11-67, `getMyExam`'s `.in()` sentinel :108); `SOURCE/features/exams/actions.ts` (`submitExam` :32-129); `SOURCE/app/(authoring)/upload/page.tsx` (:8-10); `SOURCE/app/(analytics)/layout.tsx`, `SOURCE/app/(authoring)/layout.tsx`; `SOURCE/features/exams/__tests__/rating.int.test.ts`; `SOURCE/supabase/test-rls.ts`.
 - Sibling house-style Design Doc: `docs/design/rating-system-backend-design.md`.
 
 ## Update History
 
 | Date | Version | Changes | Author |
 |------|---------|---------|--------|
-| 2026-07-28 | 1.0 | Initial backend design — `listMyHistory()`, `getResult()` extension, `(HM)` auth-guard/layout, exams-visibility edge-case decision, test boundaries | Backend design agent |
-| 2026-07-28 | 1.1 | Fixed D001 (code-verifier finding): `listMyHistory()`'s exams-title batch lookup now adds an explicit `.eq("status","published")` filter matching `getExam()`'s (`(layer2)/queries.ts:187`) convention, not RLS alone — closes an asymmetry where a self-authored exam later reverted away from `'published'` would still show a titled History row whose "View details" link 404s via `getResult()`/`getExam()`. Updated: Query Implementation Shape code+comments, Exams-Visibility Edge Case decision/rationale (new point 5), Data Contracts yaml, Risk R-1, Integration Point Map, sequence diagram label | Backend design agent |
+| 2026-07-28 | 1.0 | Initial backend design — `listMyHistory()`, `getResult()` extension, `(history)` auth-guard/layout, exams-visibility edge-case decision, test boundaries | Backend design agent |
+| 2026-07-28 | 1.1 | Fixed D001 (code-verifier finding): `listMyHistory()`'s exams-title batch lookup now adds an explicit `.eq("status","published")` filter matching `getExam()`'s (`(exams)/queries.ts:187`) convention, not RLS alone — closes an asymmetry where a self-authored exam later reverted away from `'published'` would still show a titled History row whose "View details" link 404s via `getResult()`/`getExam()`. Updated: Query Implementation Shape code+comments, Exams-Visibility Edge Case decision/rationale (new point 5), Data Contracts yaml, Risk R-1, Integration Point Map, sequence diagram label | Backend design agent |
 | 2026-07-28 | 1.2 | Fixed 2 blocking + 1 recommended document-review findings: (1) elevated `test-rls.ts` case H-a from optional/recommended to **required, blocking** — the mocked `history.int.test.ts` Obligation (d) cannot prove real-Postgres RLS behavior for R-1's self-authored-exam-reverted scenario; updated External Resources Used, Applicable Standards, Quality Assurance Mechanisms, Code Inspection Evidence, Mock Boundary Decisions, Test Boundaries RLS suite header, Integration Point Map, Verification Strategy, Risk R-1; (2) added an explicit, required Integration Verification Point describing the manual real-Postgres walkthrough (attempt+score as own author, revert exam status via SQL Editor, confirm the History row disappears and `getResult()`/`getExam()` also return null/404 for the same attempt); (3) removed dead code in `listMyHistory()` Step 3 — deleted the unreachable `NO_MATCH_SENTINEL` ternary (examIds is always non-empty: step 2 returns `[]` early, `exam_id` is a NOT NULL FK) per Delete-over-Comment, updated Applicable Standards accordingly (I002) | Backend design agent |

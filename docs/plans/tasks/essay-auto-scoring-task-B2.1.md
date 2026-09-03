@@ -1,7 +1,7 @@
 # Task B2.1 — `getResult()`: `created_at` in the select, plus the three derived fields
 
 Plan mapping: `docs/plans/20260829-feature-essay-auto-scoring.md` — **Phase B2 (Read Path, vertical slice V2), Task B2.1**
-Layer: **backend** (`SOURCE/app/(layer2)/**`, `SOURCE/types/**`)
+Layer: **backend** (`SOURCE/app/(exams)/**`, `SOURCE/types/**`)
 
 Metadata:
 - Dependencies: **Task B1.5**.
@@ -19,7 +19,7 @@ Metadata:
 
 ## Implementation Content
 
-In `SOURCE/app/(layer2)/queries.ts`:
+In `SOURCE/features/exams/queries.ts`:
 
 - Add `created_at` to `getResult()`'s **select string** (`:577-579`) **and** to the `ResultRow` type (`:469-475`) — it is **absent today** (D-02). `exam_attempts.submitted_at` is **not** a substitute: AC-026 names `exam_results.created_at` specifically, and the two timestamps differ by however long `record_exam_result()` took.
 - Beside where `hasBeenWrongTwice` is attached (`:606-610`), attach:
@@ -39,9 +39,9 @@ The backend Design Doc's Agreement Checklist line for `getResult()` names only `
 `now` is **injected and frozen**. `ESSAY_PENDING_DEADLINE_MS` is 600 000; a real clock makes these cases a time bomb.
 
 ## Target Files
-- [x] `SOURCE/app/(layer2)/queries.ts`
+- [x] `SOURCE/features/exams/queries.ts`
 - [x] `SOURCE/types/result.ts`
-- [x] `SOURCE/app/(layer2)/__tests__/getResult.int.test.ts` — **not in the original list**; the task's own Implementation Steps say "write the tests" and its Operation Verification Method is an Output Comparison, so a test file was always required. It lands in the existing `getResult()` integration file, at the sanctioned `createClient()` boundary, rather than in a new one.
+- [x] `SOURCE/features/exams/__tests__/getResult.int.test.ts` — **not in the original list**; the task's own Implementation Steps say "write the tests" and its Operation Verification Method is an Output Comparison, so a test file was always required. It lands in the existing `getResult()` integration file, at the sanctioned `createClient()` boundary, rather than in a new one.
 - [x] `SOURCE/tests/e2e/fixture/subscription.fixture.e2e.test.ts` — **not in the original list, and found by `tsc`, exactly as this task's Quality Assurance section predicted** ("the required `hasIncompleteEssay` names any site that forgot it"). One call site constructs a literal `ExamResult`; it gained `hasIncompleteEssay: false`, which is the correct value there — the fixture has no essay question, so it cannot have an RS-6.
 
 ## Investigation Targets
@@ -50,7 +50,7 @@ The backend Design Doc's Agreement Checklist line for `getResult()` names only `
 - `docs/design/essay-auto-scoring-backend-design.md` (§ Field Propagation Map — the six keys across `computeScore` → jsonb → `deriveEssayView` → four surfaces)
 - `docs/design/essay-auto-scoring-backend-design.md` (§ D-02 — the select does **not** carry `created_at` today; `exam_attempts.submitted_at` is not a substitute)
 - `docs/design/essay-auto-scoring-backend-design.md` (§ D-09 — `types/result.ts:14-17` is this task's site)
-- `SOURCE/app/(layer2)/queries.ts` (`:469-475` `ResultRow`; `:577-579` `getResult()`'s select; `:606-610` where `hasBeenWrongTwice` is attached; `:633-657` the model answer already returned after submission)
+- `SOURCE/features/exams/queries.ts` (`:469-475` `ResultRow`; `:577-579` `getResult()`'s select; `:606-610` where `hasBeenWrongTwice` is attached; `:633-657` the model answer already returned after submission)
 - `SOURCE/types/result.ts` (`:14-17` the stale `scored` comment — **reason only**; `:19-24` the `hasBeenWrongTwice` precedent)
 - `SOURCE/lib/scoring/essayLifecycle.ts` (Task H1 — `deriveEssayView`, `summariseEssays`, `hasIncompleteEssay`, `EssayView`, `EssaySummary`)
 
@@ -183,5 +183,5 @@ Two gates went red for infrastructure reasons and were **discriminated, not dism
 
 ## Notes
 - Impact scope: B2.2 (the sibling read path), B2.3 (the PDF data contract), B2.4 (INT-2/INT-3), B3.2 (the retry action reads through this), F-A1 (the string parameters are wired to `EssaySummary`'s field names), F-A3/F-B1 (the display surfaces).
-- Scope boundary — preserve unchanged: `SOURCE/app/(HM)/queries.ts` (Task B2.2); the `queries.ts:633-657` model-answer branch (already permitted after submission — AC-043 constrains the **in-progress** path, not the review screen); `SOURCE/lib/scoring/essayLifecycle.ts` (H1 owns the derivations — this task **calls** them and never re-derives).
+- Scope boundary — preserve unchanged: `SOURCE/features/history/queries.ts` (Task B2.2); the `queries.ts:633-657` model-answer branch (already permitted after submission — AC-043 constrains the **in-progress** path, not the review screen); `SOURCE/lib/scoring/essayLifecycle.ts` (H1 owns the derivations — this task **calls** them and never re-derives).
 - **`types/result.ts` is NOT touched by Task B4.1** (I015).

@@ -55,7 +55,7 @@ FIFTH and final document in the LARGE chain: PRD → UI Spec → ADR → Design 
 | RLS+Storage harness `test-rls.ts` (`npx tsx`) | DB/Storage isolation / zero non-published leak | `schema.sql` policies + `storage.objects` policies |
 | Vitest + jsdom + @testing-library/react (installed in the v1.1 slice; reused) | assembly fixtures + RichText/QuestionFigure fixtures | `lib/ugc/**`, `components/shared/{RichText,QuestionFigure}.tsx` |
 | AI-key no-bundle check | key never client-bundled (metric 6) | `lib/ugc/extract*.ts` import boundary |
-| axe a11y (manual) | WCAG 2.1 AA | `app/(layer4)/**` + S-04/S-05 extensions |
+| axe a11y (manual) | WCAG 2.1 AA | `app/(authoring)/**` + S-04/S-05 extensions |
 
 ## Risks and Countermeasures
 
@@ -120,12 +120,12 @@ flowchart TB
 ### Phase 4: Server Actions + Read Queries + Layout
 **Purpose**: turn the DB/extraction foundations into server contracts. Depends on Phases 1–2.
 
-- **Task 4.1 — [(layer4)/actions.ts](tasks/task-4.1-actions.md)** — `extractAndAssemble`, `saveExam`, `publishExam`, `deleteExam`, `reportExam` per Design Doc §Data Contracts. Persist only the assembled result; snapshot `author_display_name`; discriminated returns; never log tokens/raw AI payloads.
-- **Task 4.2 — [(layer4)/queries.ts](tasks/task-4.2-queries.md)** — `listMyExams`, `getMyExam` (assembled exam for review/edit), `hasReported`. Explicit orderings; RLS floor.
-- **Task 4.3 — [(layer4)/layout.tsx](tasks/task-4.3-layout.md)** — layout mirroring `(layer2)/layout.tsx` (SiteHeader). **No admin route gate** (admin removed); page guards only require auth.
+- **Task 4.1 — [features/authoring/actions.ts](tasks/task-4.1-actions.md)** — `extractAndAssemble`, `saveExam`, `publishExam`, `deleteExam`, `reportExam` per Design Doc §Data Contracts. Persist only the assembled result; snapshot `author_display_name`; discriminated returns; never log tokens/raw AI payloads.
+- **Task 4.2 — [features/authoring/queries.ts](tasks/task-4.2-queries.md)** — `listMyExams`, `getMyExam` (assembled exam for review/edit), `hasReported`. Explicit orderings; RLS floor.
+- **Task 4.3 — [app/(authoring)/layout.tsx](tasks/task-4.3-layout.md)** — layout mirroring `(exams)/layout.tsx` (SiteHeader). **No admin route gate** (admin removed); page guards only require auth.
 
 ### Phase 5: Catalog Reads + Byline + Image + Report Channel
-- **Task 5.1 — [(layer2)/queries.ts published + byline + image](tasks/task-5.1-catalog-queries.md)** — `.eq('status','published')` (R-7 guard) + select `author_display_name` + question `question_type`/`image_url`/`essay_answer`.
+- **Task 5.1 — [features/exams/queries.ts published + byline + image](tasks/task-5.1-catalog-queries.md)** — `.eq('status','published')` (R-7 guard) + select `author_display_name` + question `question_type`/`image_url`/`essay_answer`.
 - **Task 5.2 — [Byline + QuestionFigure in card/detail/player + Report channel](tasks/task-5.2-byline-image-report.md)** — AuthorByline (card + detail, omitted when no author); QuestionFigure in the player + exam detail for image-bearing questions; ReportButton/ReportDialog + `hasReported`.
 
 ### Phase 6: Navbar/Profile + Screens S-01…S-03
@@ -278,12 +278,12 @@ flowchart TB
 - [ ] `extractMeta` failure still yields the full question list (AC-040) — **fault injection not run**; the non-fatal path is unit-covered in `extractMeta.test.ts` but not exercised through the real pipeline
 - [x] v2.1 + v2.0 fixtures unchanged — full suite **137/137 green** (102 pre-existing + 35 new)
 - [x] `tsc --noEmit` clean on all changed files; ESLint clean on all 18 changed files
-- [ ] `next build` — **BLOCKED, unrelated to v2.2**: eight files under `SOURCE/app/(layer1)/` are NTFS-corrupted (`os error 1392`, "The file or directory is corrupted and unreadable"). Turbopack aborts on `HomeSidebar.tsx`. Git still has every blob, so recovery is `git checkout` after the corrupted entries are removed — but removal needs `chkdsk`/elevated intervention and is a decision for the engineer, not a build step.
+- [ ] `next build` — **BLOCKED, unrelated to v2.2**: eight files under `SOURCE/app/(auth)/` are NTFS-corrupted (`os error 1392`, "The file or directory is corrupted and unreadable"). Turbopack aborts on `HomeSidebar.tsx`. Git still has every blob, so recovery is `git checkout` after the corrupted entries are removed — but removal needs `chkdsk`/elevated intervention and is a decision for the engineer, not a build step.
 - [ ] no-bundle check — **PASS is not trustworthy**: `scripts/check-ai-key-bundle.mjs` scanned the stale `.next-build/` from 2026-07-18 (a fresh build cannot run). Re-run after the build is unblocked; `extractMeta.ts` imports `gemini.ts`, which carries `import "server-only"`, so the compile-time guard does hold.
 
 ### Known blocker (filesystem, pre-existing)
 
-`SOURCE/app/(layer1)/{actions.ts, login/page.tsx, reset-password/page.tsx, _components/{AuthForm,HomeSidebar,HomeStage,ResetPasswordForm,SidebarProfile}.tsx}` cannot be opened by any tool (Node, PowerShell, git, icacls, Turbopack) — the NTFS entries are damaged. They are listed by directory enumeration but every `open()` returns error 1392. This predates v2.2 and touches no file this work changed. Consequences: `next build`, full-project ESLint, and any end-to-end verification are unavailable until the volume is repaired.
+`SOURCE/features/auth/actions.ts, SOURCE/app/(auth)/login/page.tsx, SOURCE/app/(auth)/reset-password/page.tsx, SOURCE/features/auth/components/{AuthForm,HomeSidebar,HomeStage,ResetPasswordForm,SidebarProfile}.tsx` cannot be opened by any tool (Node, PowerShell, git, icacls, Turbopack) — the NTFS entries are damaged. They are listed by directory enumeration but every `open()` returns error 1392. This predates v2.2 and touches no file this work changed. Consequences: `next build`, full-project ESLint, and any end-to-end verification are unavailable until the volume is repaired.
 
 ## Update History
 

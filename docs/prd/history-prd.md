@@ -11,9 +11,9 @@
 
 | Version | Date | Change |
 |---|---|---|
-| 1.0 | 2026-07-27 | Initial draft; 8 product decisions locked (History scope, PDF content, jsPDF+html2canvas, share mechanism, ResultActions reuse, drill-through, `/history` URL, separate `(HM)` layer). |
-| 1.1 | 2026-07-27 | Addressed document-reviewer findings: (1) added Background note on the `(HM)` vs. Layer 3 taxonomy split and the corresponding `PROJECT_OVERVIEW.md` §3/§5/§10 amendment; (2) extended R9 with AC-019 covering `/history` list-read failure (DB/network error) as an actionable, retryable error state, mirroring the existing PDF-generation error-resilience pattern (AC-018); (3) flagged the `getResult()` query gap (missing `started_at`/`submitted_at`) in Technical Considerations > Dependencies for the Design Doc to resolve; (4) removed the non-risk `@react-pdf/renderer` row from Risks and Mitigation (already covered under Dependencies). No locked product decisions were changed. |
-| 1.2 | 2026-07-27 | Cosmetic follow-up to a reviewer non-blocking recommendation: added one sentence to the Background section's `(HM)` layer-taxonomy note explaining why this decision is traced via a `PROJECT_OVERVIEW.md` Decisions Log entry rather than a full ADR. No locked product decisions were changed. |
+| 1.0 | 2026-07-27 | Initial draft; 8 product decisions locked (History scope, PDF content, jsPDF+html2canvas, share mechanism, ResultActions reuse, drill-through, `/history` URL, separate `(history)` layer). |
+| 1.1 | 2026-07-27 | Addressed document-reviewer findings: (1) added Background note on the `(history)` vs. Layer 3 taxonomy split and the corresponding `PROJECT_OVERVIEW.md` §3/§5/§10 amendment; (2) extended R9 with AC-019 covering `/history` list-read failure (DB/network error) as an actionable, retryable error state, mirroring the existing PDF-generation error-resilience pattern (AC-018); (3) flagged the `getResult()` query gap (missing `started_at`/`submitted_at`) in Technical Considerations > Dependencies for the Design Doc to resolve; (4) removed the non-risk `@react-pdf/renderer` row from Risks and Mitigation (already covered under Dependencies). No locked product decisions were changed. |
+| 1.2 | 2026-07-27 | Cosmetic follow-up to a reviewer non-blocking recommendation: added one sentence to the Background section's `(history)` layer-taxonomy note explaining why this decision is traced via a `PROJECT_OVERVIEW.md` Decisions Log entry rather than a full ADR. No locked product decisions were changed. |
 | 1.3 | 2026-07-30 | Design-sync consistency fix: reworded the Non-Functional Requirements > Performance bullet on `/history` list loading to describe the intended behavior (a small, fixed number of batched queries per page load, no per-row round trip / no N+1) instead of prescribing a single query/join mechanism, aligning the wording with the backend Design Doc's actual sequential batched-select implementation (the repo-wide convention — no PostgREST embedded-resource joins are used anywhere in `SOURCE/app`). No locked product decisions were changed. |
 
 ## Overview
@@ -24,16 +24,16 @@ Give a logged-in student a `/history` page listing every exam attempt they have 
 
 ### Background
 
-MS-MOLAR / TrangNguyenDigi's Layer 2 core loop already lets a student browse exams, take a timed attempt, submit, and see a Result page (`SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/page.tsx`) with a score, and a per-question detail page. What it does not have is any way to look back across *multiple* past attempts, or to keep/share a result outside the site.
+MS-MOLAR / TrangNguyenDigi's Layer 2 core loop already lets a student browse exams, take a timed attempt, submit, and see a Result page (`SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/page.tsx`) with a score, and a per-question detail page. What it does not have is any way to look back across *multiple* past attempts, or to keep/share a result outside the site.
 
 Two gaps this feature closes:
 
 1. **No history surface.** `exam_attempts` and `exam_results` already store everything needed (owner-scoped via existing RLS), but no page lists them. The "History" nav item already exists in both `SiteHeader.tsx` and `HomeSidebar.tsx` — it has always pointed at `href="#"`, a placeholder for this feature.
-2. **Dead Save/Share buttons.** `ResultActions.tsx` on the Result page already renders "Save" and "Share" buttons, `disabled`, with a "coming soon" tooltip (`SOURCE/app/(layer2)/_components/ResultActions.tsx:26-27`) — a placeholder for this same feature.
+2. **Dead Save/Share buttons.** `ResultActions.tsx` on the Result page already renders "Save" and "Share" buttons, `disabled`, with a "coming soon" tooltip (`SOURCE/features/exams/components/ResultActions.tsx:26-27`) — a placeholder for this same feature.
 
-This PRD defines both surfaces as one feature: a new `/history` list page (new top-level route group `(HM)`, sibling to the existing `(layer1)`–`(layer4)` layers per `PROJECT_OVERVIEW.md` §3) and a single shared PDF-generation module consumed by both `/history` rows and the existing Result page's Save/Share buttons. `(HM)` is a deliberate, separate route group — not folded into `(layer3)` "Reflection," which is mid-implementation on this branch for an unrelated Analytics feature.
+This PRD defines both surfaces as one feature: a new `/history` list page (new top-level route group `(history)`, sibling to the existing `(auth)`–`(authoring)` layers per `PROJECT_OVERVIEW.md` §3) and a single shared PDF-generation module consumed by both `/history` rows and the existing Result page's Save/Share buttons. `(history)` is a deliberate, separate route group — not folded into `(analytics)` "Reflection," which is mid-implementation on this branch for an unrelated Analytics feature.
 
-**Layer-taxonomy note**: `PROJECT_OVERVIEW.md` §3 originally listed "Lịch sử làm bài" (attempt history) as part of Layer 3 — Reflection, alongside weakness analysis. Per explicit product direction (2026-07-27, final — not subject to re-litigation), History is deliberately split out into its own top-level layer, `(HM)`, instead of being folded into Layer 3: Layer 3/Analytics is mid-implementation and unrelated to this feature, and History needs to ship independently of Analytics' progress. `PROJECT_OVERVIEW.md` §3, §5, and §10 have been amended accordingly (Layer 3 now scopes to weakness analysis only; a new Layer `HM` entry and Decisions Log row record this split) so the canonical taxonomy doc stays accurate rather than silently deviating from this PRD. This layer-addition decision is traced via that Decisions Log entry rather than a full ADR because it is a direct, already-locked product/scope decision made explicitly by the user — not a multi-option technical trade-off requiring comparison — so a Decisions Log row is sufficient traceability; the ADR planned later in this chain instead covers the PDF-library choice, which is the genuine multi-option technical trade-off.
+**Layer-taxonomy note**: `PROJECT_OVERVIEW.md` §3 originally listed "Lịch sử làm bài" (attempt history) as part of Layer 3 — Reflection, alongside weakness analysis. Per explicit product direction (2026-07-27, final — not subject to re-litigation), History is deliberately split out into its own top-level layer, `(history)`, instead of being folded into Layer 3: Layer 3/Analytics is mid-implementation and unrelated to this feature, and History needs to ship independently of Analytics' progress. `PROJECT_OVERVIEW.md` §3, §5, and §10 have been amended accordingly (Layer 3 now scopes to weakness analysis only; a new Layer `HM` entry and Decisions Log row record this split) so the canonical taxonomy doc stays accurate rather than silently deviating from this PRD. This layer-addition decision is traced via that Decisions Log entry rather than a full ADR because it is a direct, already-locked product/scope decision made explicitly by the user — not a multi-option technical trade-off requiring comparison — so a Decisions Log row is sufficient traceability; the ADR planned later in this chain instead covers the PDF-library choice, which is the genuine multi-option technical trade-off.
 
 The generated artifact is a **summary-only** PDF — score, completion time, and exam metadata (e.g. title) — explicitly not a per-question export; a "View details" link on every row instead points at the existing full Result page for that. Sharing uses the Web Share API to hand the browser/OS a real file (e.g., into Zalo or Messenger) rather than any new public link: no RLS changes, no new unauthenticated access path.
 
@@ -97,7 +97,7 @@ journey
 ```mermaid
 flowchart TB
     subgraph IN["In Scope — MVP"]
-        A["/history page (route group (HM)) — list of completed+scored attempts"]
+        A["/history page (route group (history)) — list of completed+scored attempts"]
         B["History row: exam title, score, submitted date, completion time, Save, Share, View details"]
         C["Shared PDF module: generateAttemptPdf.ts + AttemptPdfTemplate.tsx"]
         D["Save (download PDF) on History rows AND on the Result page's ResultActions"]
@@ -132,7 +132,7 @@ flowchart TB
 - [ ] **R3 — One shared, summary-only PDF module**: A single PDF-generation module produces a custom-branded PDF containing only the score/result, completion time, and exam metadata (e.g. title) — never per-question content — and is the only PDF-generation implementation in the codebase, called from both `/history` rows and the Result page's `ResultActions`.
   - AC-006: Given a completed attempt, when a Save or Share action triggers PDF generation (from either surface), then the resulting PDF contains only the score/result, completion time, and exam metadata — no per-question content.
   - AC-007: Given the History-row Save/Share and the Result-page Save/Share, when the code is inspected, then both call the same PDF-generation module — exactly one implementation exists, not two parallel ones.
-  - AC-008: Given the generated PDF, when it is rendered, then its visual style (colors, typography) follows the `DESIGN.md` "Ink & Lacquer" tokens rather than an unbranded default look.
+  - AC-008: Given the generated PDF, when it is rendered, then its visual style (colors, typography) follows the `PROJECT_OVERVIEW.md §2` "Ink & Lacquer" tokens rather than an unbranded default look.
 
 - [ ] **R4 — Save (download)**: Both surfaces (History row, Result page) offer a "Save" action that downloads the branded PDF to the user's device.
   - AC-009: Given a History row or the Result page, when the user activates "Save", then the branded PDF downloads using only data already available to that page/row (no extra round trip needed beyond what already loaded the row's data).
@@ -209,7 +209,7 @@ The site is pre-launch; metrics are mechanism-focused and verifiable at acceptan
 
 ### Quantitative Metrics
 
-1. **List scope correctness**: 100% of `/history` rows have `status = 'submitted'` and a matching `exam_results` row in a fixture/integration test, with 0 in-progress attempts ever appearing — measured by `SOURCE/app/(HM)/__tests__/history.int.test.ts`.
+1. **List scope correctness**: 100% of `/history` rows have `status = 'submitted'` and a matching `exam_results` row in a fixture/integration test, with 0 in-progress attempts ever appearing — measured by `SOURCE/features/history/__tests__/history.int.test.ts`.
 2. **Single PDF implementation**: exactly 1 PDF-generation implementation (`generateAttemptPdf`) exists and is called from both the History row actions and `ResultActions` — measured by code inspection at review time (0 duplicate implementations).
 3. **Guest access blocked**: 100% of unauthenticated `/history` requests redirect to `/?auth=signin` with 0 attempt rows fetched — measured by an integration test against the route guard.
 4. **Share fallback coverage**: on a browser without file-sharing support (verified: desktop Firefox), 100% of Share attempts complete via the fallback path with 0 silent failures — measured by a manual QA pass across the target browser matrix (desktop Chrome, desktop Firefox, mobile Chrome/Android, mobile Safari/iOS).
@@ -231,23 +231,23 @@ The site is pre-launch; metrics are mechanism-focused and verifiable at acceptan
 
 - **jsPDF + html2canvas** (new dependencies, `SOURCE/package.json`) — render a custom-styled DOM node client-side and rasterize it to PDF. Chosen over `@react-pdf/renderer` due to a documented React 19 / Next.js App Router incompatibility risk in that library (its internal use of a React reconciler internal broken under React 19, per upstream issue reports) — this repo runs Next.js 16.2.7 + React 19.2.4. This choice will get a short ADR; the PRD states the product-level requirement ("downloadable PDF with a custom, branded look") and records the already-confirmed library choice as a stated constraint.
 - **Existing tables, no schema change**: `exam_attempts (id, user_id, exam_id, status, started_at, submitted_at)` and `exam_results (id, attempt_id, user_id, total_score, correct, total, per_question, topic_breakdown, created_at)`, both owner-scoped by existing RLS (`SOURCE/supabase/schema.sql`). Both tables already carry everything `/history` and the PDF need.
-- **Closest existing analog**: `getResult()` and `ScoreCard` (`SOURCE/app/(layer2)/queries.ts`, `SOURCE/app/(layer2)/_components/ScoreCard.tsx`) show the single-attempt data shape and on-screen summary pattern; `/history` needs a new list-oriented read (`SOURCE/app/(HM)/queries.ts`) rather than reusing `getResult()` as-is (that function targets exactly one attempt).
-- **`getResult()` query gap (flag for Design Doc)**: `getResult()`'s `exam_attempts` read (`SOURCE/app/(layer2)/queries.ts:317-320`) currently selects only `exam_id` — it does not select `started_at`/`submitted_at`. R1/R3/AC-006 require the Result-page Save/Share PDF to include completion time (`submitted_at − started_at`), so `getResult()`'s SELECT will need `started_at` and `submitted_at` added before the Result-page Save/Share surface can compute completion time without an extra round trip. This is a note for the Design Doc to resolve, not a change made by this PRD.
-- **Existing placeholder wired by this feature**: `ResultActions.tsx` (`SOURCE/app/(layer2)/_components/ResultActions.tsx:26-27`) — currently `disabled`, tooltip "— coming soon".
-- **Existing nav items wired by this feature**: `SiteHeader.tsx` (`SOURCE/app/(layer2)/_components/SiteHeader.tsx:27`, `href="#"`) and `HomeSidebar.tsx` (`SOURCE/app/(layer1)/_components/HomeSidebar.tsx:22`, `href="#"`).
-- **Auth-guard precedent**: `SOURCE/app/(layer4)/upload/page.tsx` (`getCurrentUser()` + `redirect("/?auth=signin")`) is the pattern `/history`'s own page-level guard follows; the route-group `layout.tsx` (matching `(layer2)/layout.tsx` and `(layer3)/layout.tsx`) only renders `SiteHeader` with a nullable user — the login redirect belongs on the page itself, not the shared layout.
-- **Design system**: root `DESIGN.md` ("Ink & Lacquer") tokens govern both the on-screen History UI and the PDF template's look (R3, AC-008).
+- **Closest existing analog**: `getResult()` and `ScoreCard` (`SOURCE/features/exams/queries.ts`, `SOURCE/features/exams/components/ScoreCard.tsx`) show the single-attempt data shape and on-screen summary pattern; `/history` needs a new list-oriented read (`SOURCE/features/history/queries.ts`) rather than reusing `getResult()` as-is (that function targets exactly one attempt).
+- **`getResult()` query gap (flag for Design Doc)**: `getResult()`'s `exam_attempts` read (`SOURCE/features/exams/queries.ts:317-320`) currently selects only `exam_id` — it does not select `started_at`/`submitted_at`. R1/R3/AC-006 require the Result-page Save/Share PDF to include completion time (`submitted_at − started_at`), so `getResult()`'s SELECT will need `started_at` and `submitted_at` added before the Result-page Save/Share surface can compute completion time without an extra round trip. This is a note for the Design Doc to resolve, not a change made by this PRD.
+- **Existing placeholder wired by this feature**: `ResultActions.tsx` (`SOURCE/features/exams/components/ResultActions.tsx:26-27`) — currently `disabled`, tooltip "— coming soon".
+- **Existing nav items wired by this feature**: `SiteHeader.tsx` (`SOURCE/components/layout/SiteHeader.tsx:27`, `href="#"`) and `HomeSidebar.tsx` (`SOURCE/features/auth/components/HomeSidebar.tsx:22`, `href="#"`).
+- **Auth-guard precedent**: `SOURCE/app/(authoring)/upload/page.tsx` (`getCurrentUser()` + `redirect("/?auth=signin")`) is the pattern `/history`'s own page-level guard follows; the route-group `layout.tsx` (matching `(exams)/layout.tsx` and `(analytics)/layout.tsx`) only renders `SiteHeader` with a nullable user — the login redirect belongs on the page itself, not the shared layout.
+- **Design system**: root `PROJECT_OVERVIEW.md §2` ("Ink & Lacquer") tokens govern both the on-screen History UI and the PDF template's look (R3, AC-008).
 
 ### Constraints
 
 - No schema or RLS changes — `exam_attempts` and `exam_results` already support every read this feature needs.
 - No new public/unauthenticated route or link — the shared artifact is always a local file (R5, AC-013).
-- The new route group `(HM)` is its own top-level group, sibling to `(layer1)`–`(layer4)` (`PROJECT_OVERVIEW.md` §3) — a deliberate structural decision, independent of the currently in-progress, unrelated Analytics work in `(layer3)`.
+- The new route group `(history)` is its own top-level group, sibling to `(auth)`–`(authoring)` (`PROJECT_OVERVIEW.md` §3) — a deliberate structural decision, independent of the currently in-progress, unrelated Analytics work in `(analytics)`.
 - Target hardware baseline (`PROJECT_OVERVIEW.md` §1/§8): mid-range Android, unstable network — client-side PDF rendering must stay usable there.
 
 ### Assumptions
 
-- **Completion time is derivable today, but not currently surfaced anywhere.** `exam_attempts.started_at` defaults to `now()` at attempt-row creation (`startAttempt`, `SOURCE/app/(layer2)/actions.ts`) and `submitted_at` is set explicitly at submit time (same file, `submitExam`, line 124) — both columns already exist and are populated for every submitted attempt (Verified by direct code read). The existing `ScoreCard`'s "Time" stat on the Result page is a static `"—"` placeholder, explicitly commented as symbolic ("thời gian tượng trưng") — this feature is the first to compute and display a real completion time (`submitted_at − started_at`).
+- **Completion time is derivable today, but not currently surfaced anywhere.** `exam_attempts.started_at` defaults to `now()` at attempt-row creation (`startAttempt`, `SOURCE/features/exams/actions.ts`) and `submitted_at` is set explicitly at submit time (same file, `submitExam`, line 124) — both columns already exist and are populated for every submitted attempt (Verified by direct code read). The existing `ScoreCard`'s "Time" stat on the Result page is a static `"—"` placeholder, explicitly commented as symbolic ("thời gian tượng trưng") — this feature is the first to compute and display a real completion time (`submitted_at − started_at`).
 - A logged-in user reaching `/history` has, by construction, RLS-scoped access only to their own rows — no additional server-side filtering beyond the existing `user_id = auth.uid()` policies is required.
 
 ### Risks and Mitigation
@@ -272,14 +272,14 @@ The site is pre-launch; metrics are mechanism-focused and verifiable at acceptan
 ### References
 
 - `SOURCE/supabase/schema.sql` — `exam_attempts` / `exam_results` tables and RLS this feature reads (no changes required).
-- `SOURCE/app/(layer2)/queries.ts` — `getResult()`, the closest existing single-attempt read analog.
-- `SOURCE/app/(layer2)/_components/ResultActions.tsx` — the existing disabled Save/Share placeholder this feature wires up.
-- `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/page.tsx` — the existing per-attempt Result page (drill-through target, R2).
-- `SOURCE/app/(layer2)/_components/ScoreCard.tsx` — existing on-screen result-summary visual pattern (score, correct/wrong, symbolic "Time" placeholder this feature supersedes with a real value).
-- `SOURCE/app/(layer2)/_components/SiteHeader.tsx`, `SOURCE/app/(layer1)/_components/HomeSidebar.tsx` — nav items to wire (R7).
-- `SOURCE/app/(layer4)/upload/page.tsx` — auth-guard precedent for `/history` (R8).
+- `SOURCE/features/exams/queries.ts` — `getResult()`, the closest existing single-attempt read analog.
+- `SOURCE/features/exams/components/ResultActions.tsx` — the existing disabled Save/Share placeholder this feature wires up.
+- `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/page.tsx` — the existing per-attempt Result page (drill-through target, R2).
+- `SOURCE/features/exams/components/ScoreCard.tsx` — existing on-screen result-summary visual pattern (score, correct/wrong, symbolic "Time" placeholder this feature supersedes with a real value).
+- `SOURCE/components/layout/SiteHeader.tsx`, `SOURCE/features/auth/components/HomeSidebar.tsx` — nav items to wire (R7).
+- `SOURCE/app/(authoring)/upload/page.tsx` — auth-guard precedent for `/history` (R8).
 - `PROJECT_OVERVIEW.md` — product summary, layer system (§3), tech stack, hardware/NFR baseline (§1, §8).
-- `DESIGN.md` — "Ink & Lacquer" design tokens governing both the on-screen History UI and the PDF template.
+- `PROJECT_OVERVIEW.md §2` — "Ink & Lacquer" design tokens governing both the on-screen History UI and the PDF template.
 - `docs/prd/rating-system-prd.md` — sibling PRD; format and detail-level reference.
 
 ### Glossary
@@ -288,4 +288,4 @@ The site is pre-launch; metrics are mechanism-focused and verifiable at acceptan
 - **Completed/scored attempt**: an attempt with `status = 'submitted'` and a matching `exam_results` row — the only kind shown in History (R1).
 - **Summary PDF**: the custom-branded, score/time/metadata-only PDF this feature generates — explicitly not a per-question export (R3).
 - **History**: the new `/history` page listing a user's completed/scored attempts.
-- **`(HM)`**: the new top-level Next.js route group housing the History page, sibling to `(layer1)`–`(layer4)`.
+- **`(history)`**: the new top-level Next.js route group housing the History page, sibling to `(auth)`–`(authoring)`.

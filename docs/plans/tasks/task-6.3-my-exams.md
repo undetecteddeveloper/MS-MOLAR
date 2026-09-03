@@ -6,7 +6,7 @@
 Build `/me/exams` (server) per UI Spec S-02: `MyExamsList` (newest-first, `?published=1` banner D13), `ExamRow` (per-status actions: processing→none; failed→Review&fix+Delete; review→Continue review+Delete; draft→Continue+Delete; published→Edit+Delete, title links to the live exam), shared `StatusBadge` (D9 glyph/border/label for processing/review/draft/published/failed), `DeleteDialog` (LeaveExamDialog + focus trap + focus return). Empty state → dashed block + "Upload an exam".
 
 ## Files
-New: `SOURCE/app/(layer4)/me/exams/page.tsx` + `_components/{MyExamsList,ExamRow,StatusBadge,DeleteDialog}.tsx`, `loading.tsx`.
+New: `SOURCE/app/(authoring)/me/exams/page.tsx` + `_components/{MyExamsList,ExamRow,StatusBadge,DeleteDialog}.tsx`, `loading.tsx`.
 
 ## ACs / metrics
 AC-018/020. StatusBadge (D9).

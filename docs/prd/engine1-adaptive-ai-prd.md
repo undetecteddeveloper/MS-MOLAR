@@ -21,7 +21,7 @@ Give a Vietnamese secondary-school student studying Math a system that knows *wh
 
 ### Background
 
-MS-MOLAR / TrangNguyenDigi today is a competent exam-practice loop and nothing more: browse an exam, take it under a timer, submit, see a score, drill into per-question review (`SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx`). Layer 3 Analytics aggregates that into per-subject correct/total over a time range (`SOURCE/app/(layer3)/queries.ts`). A student who scores 6/10 on a Math exam learns exactly one thing: that they scored 6/10 on a Math exam. There is no representation anywhere in the product of *what they are actually bad at*, and no help at the moment of being stuck.
+MS-MOLAR / TrangNguyenDigi today is a competent exam-practice loop and nothing more: browse an exam, take it under a timer, submit, see a score, drill into per-question review (`SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx`). Layer 3 Analytics aggregates that into per-subject correct/total over a time range (`SOURCE/features/analytics/queries.ts`). A student who scores 6/10 on a Math exam learns exactly one thing: that they scored 6/10 on a Math exam. There is no representation anywhere in the product of *what they are actually bad at*, and no help at the moment of being stuck.
 
 Three concrete gaps, each measured against the current dev database (queried 2026-08-08):
 
@@ -159,7 +159,7 @@ flowchart TB
   - AC-007: Given the Math corpus (~47 questions, including the `'Toán'` rows), when the batch completes, then every row it considered is in one of exactly two states: tagged with an existing skill node, or explicitly NULL with a recorded reason. 0 rows are left in an undefined state.
   - AC-008: Given the batch's output, when the engineer reviews it before ship, then 100% of the assigned tags have been human-reviewed (the corpus is ~47 questions, so full review is feasible and is the accepted process under D2).
 
-- [ ] **R3 — Per-user skill mastery, written from real submissions**: A per-user, per-skill mastery record plus observed error patterns is maintained, and it is updated when a student actually submits an exam (`submitExam`, `SOURCE/app/(layer2)/actions.ts`), from per-question correctness — not from a simulation or a seeding script (D6).
+- [ ] **R3 — Per-user skill mastery, written from real submissions**: A per-user, per-skill mastery record plus observed error patterns is maintained, and it is updated when a student actually submits an exam (`submitExam`, `SOURCE/features/exams/actions.ts`), from per-question correctness — not from a simulation or a seeding script (D6).
   - AC-009: Given a student submits a Math exam containing questions with skill tags, when scoring completes, then mastery for each touched skill node reflects that attempt's per-question correctness.
   - AC-010: Given a submitted exam contains questions with a NULL skill tag, when mastery is updated, then those questions contribute to nothing and cause no error — an untagged question is a normal case, not an exception path.
   - AC-011: Given the mastery write path, when it is reviewed, then it respects the same trust boundary as score writing: `schema.sql` §11a revoked all client write privileges on result data and §11b routes writes through a function callable only by `service_role`. A mastery write that a student's own JWT can forge would re-open exactly the hole that section closed. *The mechanism is an ADR-level decision and is deliberately not designed here (see Undetermined Items U2).*
@@ -197,7 +197,7 @@ flowchart TB
 - [ ] **R9 — Normalise the `subject = 'Toán'` rows**: The 10 Math questions stored with the non-canonical subject value are normalised to the canonical `'Math'`, so they stop being invisible to the product's subject filters generally — not only to this feature's batch.
   - AC-030: Given the corpus after normalisation, when queried by canonical subject, then 0 rows remain with `subject = 'Toán'` and the Math count reconciles to ~47.
 
-- [ ] **R10 — The recommendation is visible to the student**: The routing result from R5 surfaces somewhere the student actually looks (the natural home is the existing Layer 3 dashboard, `SOURCE/app/(layer3)/me/dashboard`), rather than existing only as a callable function.
+- [ ] **R10 — The recommendation is visible to the student**: The routing result from R5 surfaces somewhere the student actually looks (the natural home is the existing Layer 3 dashboard, `SOURCE/app/(analytics)/me/dashboard`), rather than existing only as a callable function.
   - AC-031: Given a student with mastery data, when they open the surface chosen in the UI Spec, then the recommended next skill is shown with its Vietnamese label.
 
 ### Won't Have (this release)
@@ -223,7 +223,7 @@ This is a first-class product question for this feature, not an edge case, becau
 Two distinct gaps, with different causes and different correct answers:
 
 1. **No mastery data for this user.** Every user on day one; every new signup thereafter; and any existing user who has not yet submitted a Math exam since the feature shipped. Routing must return a defined result — a designated entry node of the DAG, or an explicit "not enough data yet" state the UI can render honestly (AC-028). What it must not do is return the first row it finds and present it as a diagnosis, because an arbitrary recommendation is indistinguishable, from the student's side, from a real one.
-2. **No skill tag for this question, permanently.** By design (D2), the batch tagger leaves low-confidence questions NULL rather than guessing, and some questions will therefore stay NULL forever. Additionally, tag coverage **decays continuously from the moment a batch run finishes**, because `SOURCE/app/(layer4)/actions.ts` keeps inserting new questions from UGC uploads and tagging is a separate batch step (A1). Untagged questions must be a normal, silent case: they contribute nothing to mastery (AC-010) and still support the tutor, which needs question content rather than a skill tag (AC-029).
+2. **No skill tag for this question, permanently.** By design (D2), the batch tagger leaves low-confidence questions NULL rather than guessing, and some questions will therefore stay NULL forever. Additionally, tag coverage **decays continuously from the moment a batch run finishes**, because `SOURCE/features/authoring/actions.ts` keeps inserting new questions from UGC uploads and tagging is a separate batch step (A1). Untagged questions must be a normal, silent case: they contribute nothing to mastery (AC-010) and still support the tutor, which needs question content rather than a skill tag (AC-029).
 
 The honest framing for both: the system says less when it knows less. Saying nothing is a correct product state here; saying something confident and arbitrary is the failure mode this feature is most exposed to (R-a).
 
@@ -260,7 +260,7 @@ The honest framing for both: the system says less when it knows less. Saying not
 - Compliance standard: WCAG 2.1 AA (site default).
 - Target assistive technologies: screen reader and full keyboard operation, consistent with the rest of Layer 2 (`PROJECT_OVERVIEW.md` §8).
 - The "Explain this step" control is keyboard-operable with visible focus in all three states (idle, busy, error); the busy and error states are announced (e.g. `aria-live`) and never conveyed by colour alone (AC-025, AC-026).
-- The returned hint is text rendered into the existing review page's reading flow, so it inherits the site's typography and contrast tokens (`SOURCE/app/globals.css` — the sole source of truth for the "Ink & Lacquer" theme since `DESIGN.md` was deleted 2026-08-06; see `.claude/MEMORY.md` §3) rather than introducing a new visual treatment.
+- The returned hint is text rendered into the existing review page's reading flow, so it inherits the site's typography and contrast tokens (`SOURCE/app/globals.css` — the sole source of truth for the "Ink & Lacquer" theme since `PROJECT_OVERVIEW.md §2` was deleted 2026-08-06; see `.claude/MEMORY.md` §3) rather than introducing a new visual treatment.
 - Known constraint: hint length is model-controlled. The layout must tolerate both a two-line hint and a long one without clipping or trapping focus.
 
 ## Success Criteria
@@ -307,13 +307,13 @@ The site is pre-launch and Engine 1 has no users yet on ship day. Every metric b
 ### Dependencies
 
 - **Existing Gemini integration** (`SOURCE/lib/ugc/gemini.ts`, server-only, `GEMINI_API_KEY`) — used by both the batch tagger and the tutor. Models are pinned there (`QUESTION_MODEL = "gemini-3.5-flash"`, `ANSWER_MODEL = "gemini-3.1-flash-lite"`) with a documented note that the originally chosen 2.5/2.0 model lines stopped being callable for new keys. SDK retry is enabled (`RETRY_ATTEMPTS = 3`).
-- **`SOURCE/app/(layer2)/actions.ts` — `submitExam`** — the write point for mastery (D6/R3). Note its existing shape: it claims the answer key through `claim_attempt_answer_key` (§10b), scores with `computeScore`, then records the result through `recordExamResult` under `service_role` (§11b). The mastery write joins this sequence and inherits its constraints.
+- **`SOURCE/features/exams/actions.ts` — `submitExam`** — the write point for mastery (D6/R3). Note its existing shape: it claims the answer key through `claim_attempt_answer_key` (§10b), scores with `computeScore`, then records the result through `recordExamResult` under `service_role` (§11b). The mastery write joins this sequence and inherits its constraints.
 - **`SOURCE/supabase/schema.sql`** — §10c (9-column grant on `questions`), §11a/§11b (score-write lockdown, `record_exam_result`), §16a (`schema_foreign_keys()`), §17 (`schema_version` fingerprint). The new tables and the new `questions.skill_node_id` column both land in this file.
 - **Existing per-user rate limiting** (`SOURCE/lib/security/rateLimit.ts`, `rateLimitStore.ts` backed by Upstash Redis since TD-008 was paid) — the tutor's cost guard.
-- **Existing review surface** (`SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx`) — the natural host for R7's affordance; it already renders per-question content, choices and the student's selection.
+- **Existing review surface** (`SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx`) — the natural host for R7's affordance; it already renders per-question content, choices and the student's selection.
 - **Existing i18n dictionaries** (`SOURCE/lib/i18n/dictionaries/en.ts`, `vi.ts`) — all new UI chrome strings go through them (AC-027).
-- **Layer 3 dashboard** (`SOURCE/app/(layer3)/me/dashboard`) — candidate host for R10's recommendation surface. Note that Layer 3's existing analytics aggregates by *subject*, not skill; this feature does not replace it in Sprint 1.
-- **Existing UGC insert path** (`SOURCE/app/(layer4)/actions.ts`, question insert) — the source of tag-coverage decay under A1.
+- **Layer 3 dashboard** (`SOURCE/app/(analytics)/me/dashboard`) — candidate host for R10's recommendation surface. Note that Layer 3's existing analytics aggregates by *subject*, not skill; this feature does not replace it in Sprint 1.
+- **Existing UGC insert path** (`SOURCE/features/authoring/actions.ts`, question insert) — the source of tag-coverage decay under A1.
 
 ### Constraints
 
@@ -329,7 +329,7 @@ The site is pre-launch and Engine 1 has no users yet on ship day. Every metric b
 
 These are assumptions, not decisions — they are recorded here explicitly so they can be overridden rather than discovered later.
 
-- **A1 — Newly uploaded UGC questions are tagged by re-running the batch, not inline in the upload pipeline.** The consequence, stated plainly: **tag coverage decays from the moment a batch run finishes**, because `SOURCE/app/(layer4)/actions.ts` keeps inserting questions and nothing in the upload path tags them. There is no automatic trigger and no coverage alarm in Sprint 1; someone must remember to re-run the batch. That is the same shape of dependency-on-human-memory that TD-005 documents as this project's most repeated failure mode, and it should be weighed as such if this assumption is revisited.
+- **A1 — Newly uploaded UGC questions are tagged by re-running the batch, not inline in the upload pipeline.** The consequence, stated plainly: **tag coverage decays from the moment a batch run finishes**, because `SOURCE/features/authoring/actions.ts` keeps inserting questions and nothing in the upload path tags them. There is no automatic trigger and no coverage alarm in Sprint 1; someone must remember to re-run the batch. That is the same shape of dependency-on-human-memory that TD-005 documents as this project's most repeated failure mode, and it should be weighed as such if this assumption is revisited.
 - **A2 — The Math DAG is drafted by Gemini from the Vietnamese MOET curriculum outline, then reviewed by the engineer before it ships.** Review by the engineer is a required step, not a nicety (the working plan lists "duyệt cây kỹ năng" as engineer work). Expected size: 15–25 nodes covering grades 10 and 12, because that is what the current corpus supports (32 grade-12 and 5 grade-10 Math questions).
 - **A3 — Schema goes to the dev Supabase project during Sprint 1 and to prod at ship time, applied and verified as one batch.** The two databases are therefore intentionally out of sync during the sprint. The §17 `schema_version` fingerprint is what makes that interim drift *visible* rather than silent — the mechanism that was built precisely because this drift was previously invisible for three days.
 - **A4 — "Wrong twice" is observable from stored attempt data.** Answers are only graded at submission (`submitExam`), so "twice" is assumed to mean *the same question answered incorrectly on two scored attempts*, not twice within a single in-progress attempt (which the current scoring model cannot observe). See U1 — this is the assumption most likely to need confirming before the UI Spec.
@@ -365,16 +365,16 @@ These are assumptions, not decisions — they are recorded here explicitly so th
 - `PROJECT_OVERVIEW.md` — product summary and user profile (§1), route groups (§3), tech stack (§4), testing strategy (§6), NFR baseline (§8), risk register including the feedback-loop risk (§9).
 - `TECH-DEBT.md` — TD-005 (manual schema apply, no migration tool), TD-013 (no rate limiting for unauthenticated traffic, blocked on Vercel Pro), TD-015 (`eslint-config-next` version drift); TD-001 and TD-011 for the column-grant and `on delete` conventions this feature must follow.
 - `SOURCE/supabase/schema.sql` — §10b/§10c (answer-key lockdown, the 9-column safe set), §11a/§11b (score-write lockdown, `record_exam_result`), §16a, §17 (`schema_version` fingerprint).
-- `SOURCE/app/(layer2)/actions.ts` — `submitExam`, the mastery write point (D6/R3).
-- `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` — the per-question review surface hosting R7's affordance.
+- `SOURCE/features/exams/actions.ts` — `submitExam`, the mastery write point (D6/R3).
+- `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` — the per-question review surface hosting R7's affordance.
 - `SOURCE/lib/ugc/gemini.ts` — the existing Gemini integration, pinned models, and the model-availability incident note behind risk R-b.
 - `SOURCE/lib/ugc/subjects.ts` — the 10 canonical subjects (D1) and `normalizeSubject`, the null-instead-of-guess precedent D2 mirrors.
 - `SOURCE/lib/supabase/middleware.ts` — `PUBLIC_PATHS` and the 307 redirect behaviour behind D4.
 - `SOURCE/lib/security/rateLimit.ts`, `rateLimitStore.ts` — the per-user guard the tutor must use.
-- `SOURCE/app/(layer4)/actions.ts` — the UGC question insert path behind A1's coverage decay.
+- `SOURCE/features/authoring/actions.ts` — the UGC question insert path behind A1's coverage decay.
 - `docs/adr/ADR-0010-score-write-trust-boundary.md` — the precedent for U2.
 - `docs/prd/history-prd.md`, `docs/prd/rating-system-prd.md` — sibling PRDs; format and detail-level reference.
-- `SOURCE/app/globals.css` — "Ink & Lacquer" tokens governing the affordance and hint presentation. Sole source of truth for theme since `DESIGN.md` was deleted 2026-08-06 (`.claude/MEMORY.md` §3).
+- `SOURCE/app/globals.css` — "Ink & Lacquer" tokens governing the affordance and hint presentation. Sole source of truth for theme since `PROJECT_OVERVIEW.md §2` was deleted 2026-08-06 (`.claude/MEMORY.md` §3).
 
 ### Glossary
 

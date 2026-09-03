@@ -29,9 +29,9 @@ Ba thứ **không** thuộc phạm vi tài liệu này, ghi ra để biên khôn
 | Token / theme (nguồn chuẩn duy nhất) | `SOURCE/app/globals.css` | HEAD nhánh `design/adr-0018-essay-async-grade-write` (đã merge `main` @ `7894417`) |
 | Tiền lệ nhãn vòng đời | `SOURCE/components/billing/OrderStatusBadge.tsx` | cùng trên |
 | Tiền lệ a11y "không bao giờ `disabled` gốc" | `SOURCE/components/history/ActionButton.tsx`, `SOURCE/components/tutor/ExplainStepAffordance.tsx`, `SOURCE/components/billing/RecheckOrderControl.tsx` | cùng trên |
-| Tiền lệ vòng lặp có hẹn giờ | `SOURCE/app/(layer2)/_components/ExamTimer.tsx` (chained `setTimeout` + `useEffectEvent`) | cùng trên |
+| Tiền lệ vòng lặp có hẹn giờ | `SOURCE/features/exams/components/ExamTimer.tsx` (chained `setTimeout` + `useEffectEvent`) | cùng trên |
 | Tiền lệ "server là nguồn sự thật, client chỉ `router.refresh()`" | `SOURCE/components/billing/RecheckOrderControl.tsx` (bước 5 trong khối đầu file) | cùng trên |
-| Bề mặt bị sửa | `result/page.tsx`, `result/detail/page.tsx`, `ScoreCard.tsx`, `ResultActions.tsx`, `QuestionRenderer.tsx`, `components/history/*`, `app/(HM)/history/_components/HistoryRow.tsx`, `app/(HM)/queries.ts` | cùng trên |
+| Bề mặt bị sửa | `result/page.tsx`, `result/detail/page.tsx`, `ScoreCard.tsx`, `ResultActions.tsx`, `QuestionRenderer.tsx`, `components/history/*`, `features/history/components/HistoryRow.tsx`, `features/history/queries.ts` | cùng trên |
 
 ## Prototype Management
 
@@ -46,7 +46,7 @@ Sự thật mức dự án nằm ở `docs/project-context/external-resources.md
 | Resource (project-tier label) | Feature-specific identifier | Notes |
 |---|---|---|
 | Design Origin | `SOURCE/app/globals.css` — khối `:root` token, khối §"Tương phản hình học" (dòng ~145–157), khối `@layer base` (`.eyebrow`, dòng ~285) | Không token mới nào được thêm bởi tính năng này — xem § Design Tokens và Open Item **O-4** |
-| Design System | `SOURCE/components/billing/OrderStatusBadge.tsx`, `SOURCE/components/ui/button.tsx` (biến thể `pill` dòng 46), `SOURCE/components/history/{ActionButton,HistoryRowMenu,usePdfAction}`, `SOURCE/app/(layer2)/_components/{ScoreCard,ResultActions,ExamTimer,QuestionRenderer}.tsx` | Cấu trúc badge và ba idiom a11y đều **tái dùng**, không phát minh lại |
+| Design System | `SOURCE/components/billing/OrderStatusBadge.tsx`, `SOURCE/components/ui/button.tsx` (biến thể `pill` dòng 46), `SOURCE/components/history/{ActionButton,HistoryRowMenu,usePdfAction}`, `SOURCE/features/exams/components/{ScoreCard,ResultActions,ExamTimer,QuestionRenderer}.tsx` | Cấu trúc badge và ba idiom a11y đều **tái dùng**, không phát minh lại |
 | Guidelines | `SOURCE/app/globals.css` (quy tắc cứng: chỉ token, không hex cứng, không box-shadow, không gradient) + `.claude/MEMORY.md` §3 (lý do/lịch sử) | Nơi hai nguồn mâu thuẫn, **globals.css thắng** — xem UI-D2 |
 | Visual Verification Environment | Route `/exams/[id]/attempt/[attemptId]/result`, `/exams/[id]/attempt/[attemptId]/result/detail`, `/history`, `/exams/[id]/attempt/[attemptId]`; `npm run dev` + Playwright MCP (`playwright`); test RTL cùng thư mục component | Cần một lượt thi **đã nộp** có ít nhất một câu `essay`; production hiện có **0** bài tự luận đã nộp (đo 2026-08-27), nên mọi kiểm tra thị giác phải chạy trên dev với dữ liệu gieo sẵn |
 
@@ -76,7 +76,7 @@ Những quyết định UI mà PRD/ADR giao xuống, cộng những quyết đ�
 - `.claude/MEMORY.md:96` — *"Bo góc nhẹ … Không dùng hình pill."*
 - `SOURCE/app/globals.css` §"Tương phản hình học" (dòng ~145–157) — *"Nút hành động = viên thuốc bo tròn tuyệt đối… KHÔNG có token `--radius-pill`: `rounded-full` của Tailwind đã đúng bằng 9999px mà tài liệu yêu cầu"*.
 
-Theo **globals.css**, vì ba lý do độc lập: (1) `docs/project-context/external-resources.md` → *Design Origin* tuyên bố thẳng rằng `globals.css` là **nguồn chuẩn duy nhất** của theme kể từ khi `DESIGN.md` bị xoá 2026-08-06, và MEMORY.md chỉ giữ *lý do/lịch sử*; (2) `globals.css` mới hơn và tự nó viết ra cả cơ chế lẫn lý do; (3) hình dạng này **đã ship**: `SOURCE/components/ui/button.tsx:46` có hẳn biến thể `shape="pill"` (**là `shape`, không phải `variant` — kiểm trên file thật; bản v1.0 ghi nhầm tên prop**), và hai badge đang chạy thật (`OrderStatusBadge`, `app/(layer4)/_components/StatusBadge.tsx`) đều là `rounded-full`.
+Theo **globals.css**, vì ba lý do độc lập: (1) `docs/project-context/external-resources.md` → *Design Origin* tuyên bố thẳng rằng `globals.css` là **nguồn chuẩn duy nhất** của theme kể từ khi `PROJECT_OVERVIEW.md §2` bị xoá 2026-08-06, và MEMORY.md chỉ giữ *lý do/lịch sử*; (2) `globals.css` mới hơn và tự nó viết ra cả cơ chế lẫn lý do; (3) hình dạng này **đã ship**: `SOURCE/components/ui/button.tsx:46` có hẳn biến thể `shape="pill"` (**là `shape`, không phải `variant` — kiểm trên file thật; bản v1.0 ghi nhầm tên prop**), và hai badge đang chạy thật (`OrderStatusBadge`, `features/authoring/components/StatusBadge.tsx`) đều là `rounded-full`.
 
 **Tài liệu trọng tài mà brief nêu tên — `docs/market/UI-Design-Research.md` — không còn tồn tại trong cây** (đã kiểm: `docs/market/` chỉ có `Edtech-CoreFeatures-Research.md`). `globals.css` trích dẫn nó như nguồn của chính mình, nên lập luận sống sót dù file thì không. Việc này được ghi ra thay vì bỏ qua, để phiên sau không đi tìm một file không có.
 
@@ -182,7 +182,7 @@ Nếu kỹ sư muốn con số hiện ra, xem **O-2**.
 
 ### UI-D11 — `/history` nhận **hai boolean đã suy ra**, không nhận `per_question`
 
-**Quyết định.** `listMyHistory()` (`SOURCE/app/(HM)/queries.ts`) bổ sung `per_question` và `created_at` vào lượt `select`, suy ra **hai** boolean ngay trong hàm map, và chỉ hai boolean đó vào `MyHistoryEntry`: **`hasUnresolvedEssay`** (chốt chặn xuất PDF) và **`hasIncompleteEssay`** (điều kiện in dòng `result.essay.pdfIncomplete` trong tệp). *(Sửa ở v1.3. Bản v1.2 nói **một** boolean tên `essayUnresolved`. Một boolean là KHÔNG ĐỦ: RS-6 = `failed` ∧ `!retryAvailable` không suy ra được từ "chưa giải quyết", nên lối xuất PDF ở `/history` sẽ in ra một tệp KHÁC với lối xuất ở trang kết quả cho cùng một lượt thi — xem Design Doc backend D-13 và frontend F-06. Tên trường cũng lấy theo hợp đồng backend.)* Dữ liệu `per_question` thô **không** băng qua biên vào cây component.
+**Quyết định.** `listMyHistory()` (`SOURCE/features/history/queries.ts`) bổ sung `per_question` và `created_at` vào lượt `select`, suy ra **hai** boolean ngay trong hàm map, và chỉ hai boolean đó vào `MyHistoryEntry`: **`hasUnresolvedEssay`** (chốt chặn xuất PDF) và **`hasIncompleteEssay`** (điều kiện in dòng `result.essay.pdfIncomplete` trong tệp). *(Sửa ở v1.3. Bản v1.2 nói **một** boolean tên `essayUnresolved`. Một boolean là KHÔNG ĐỦ: RS-6 = `failed` ∧ `!retryAvailable` không suy ra được từ "chưa giải quyết", nên lối xuất PDF ở `/history` sẽ in ra một tệp KHÁC với lối xuất ở trang kết quả cho cùng một lượt thi — xem Design Doc backend D-13 và frontend F-06. Tên trường cũng lấy theo hợp đồng backend.)* Dữ liệu `per_question` thô **không** băng qua biên vào cây component.
 
 **Lý do.** `MyHistoryEntry` hiện **không** mang `per_question` (đã kiểm: `attemptId, examId, examTitle, subject, totalScore, startedAt, submittedAt, correct, total`), nên AC-057 trên `/history` **không thể** thoả nếu không đụng truy vấn — đây là một thay đổi bắt buộc, không phải tuỳ chọn, và PRD không nêu tên nó. Giữ mảng thô ra ngoài cây component vì `HistoryRow` không có việc gì phải đọc điểm từng câu; một prop boolean là bề mặt nhỏ nhất đủ cho cả nhãn (AC-057) lẫn chốt PDF (AC-058).
 
@@ -409,7 +409,7 @@ graph TD
 
 ### Component: EssayLifecycleBadge
 
-**Mới.** Server Component. Đường dẫn đề xuất: `SOURCE/components/essay/EssayLifecycleBadge.tsx` (thư mục mới — component được dùng bởi cả `(layer2)` lẫn `(HM)`, đúng lý do `components/history/` và `components/billing/` đã tồn tại ngoài cây route).
+**Mới.** Server Component. Đường dẫn đề xuất: `SOURCE/components/essay/EssayLifecycleBadge.tsx` (thư mục mới — component được dùng bởi cả `(exams)` lẫn `(history)`, đúng lý do `components/history/` và `components/billing/` đã tồn tại ngoài cây route).
 
 Chép **cấu trúc** của `SOURCE/components/billing/OrderStatusBadge.tsx`: một `<span>` viên thuốc, một glyph `aria-hidden`, rồi **chữ** làm tên khả truy cập. Nhờ vậy nhãn vẫn phân biệt được khi in đen trắng và trình đọc màn hình chỉ đọc chữ.
 
@@ -447,7 +447,7 @@ Khung ngoài chung: `inline-flex items-center gap-1.5 rounded-full border px-2.5
 
 ### Component: EssayScoreLine
 
-**Mới.** Server Component. Đường dẫn đề xuất: `SOURCE/app/(layer2)/_components/EssayScoreLine.tsx`. Render **ngay dưới** `ScoreCard` và **trên** khối "Nộp sau giờ" trong `result/page.tsx`.
+**Mới.** Server Component. Đường dẫn đề xuất: `SOURCE/features/exams/components/EssayScoreLine.tsx`. Render **ngay dưới** `ScoreCard` và **trên** khối "Nộp sau giờ" trong `result/page.tsx`.
 
 **Hình dạng thị giác** mượn đúng khối cảnh báo quá giờ đã có trên chính trang này (`border-border bg-card rounded-lg border border-dashed px-4 py-3 text-sm`), vì đó là tiền lệ tại chỗ cho *"một câu bổ nghĩa cho con số phía trên"*, và nó chỉ dùng token, không đổ bóng, không gradient.
 
@@ -482,7 +482,7 @@ Khung ngoài chung: `inline-flex items-center gap-1.5 rounded-full border px-2.5
 
 ### Component: EssayReviewBlock
 
-**Mới.** Server Component. Đường dẫn đề xuất: `SOURCE/app/(layer2)/_components/EssayReviewBlock.tsx`, được gọi từ **bên trong** nhánh `notScored` sẵn có của `result/detail/page.tsx`.
+**Mới.** Server Component. Đường dẫn đề xuất: `SOURCE/features/exams/components/EssayReviewBlock.tsx`, được gọi từ **bên trong** nhánh `notScored` sẵn có của `result/detail/page.tsx`.
 
 **Vị trí chính xác trong file, và vì sao.** `result/detail/page.tsx` tính `const notScored = r.scored === false;` rồi rẽ nhánh trên đó. Theo W1, câu tự luận **luôn** rơi vào nhánh ấy, ở **cả ba** trạng thái vòng đời. Nên trình bày tự luận là một **nhánh con bên trong nhánh không-chấm**, rẽ trên `<lifecycle>` (UI-D1) — **không phải** một nhánh mới cạnh nó, và tuyệt đối **không phải** một sửa đổi trong nhánh có-chấm.
 
@@ -525,9 +525,9 @@ Khung ngoài chung: `inline-flex items-center gap-1.5 rounded-full border px-2.5
 
 ### Component: EssayGradingPoller
 
-**Mới.** `"use client"`. Đường dẫn đề xuất: `SOURCE/app/(layer2)/_components/EssayGradingPoller.tsx` — đúng thư mục mà D8 nêu tên.
+**Mới.** `"use client"`. Đường dẫn đề xuất: `SOURCE/features/exams/components/EssayGradingPoller.tsx` — đúng thư mục mà D8 nêu tên.
 
-**Đây là mã hoàn toàn mới: không có component polling/interval nào tồn tại trong `(layer2)`.** Tiền lệ gần nhất là `ExamTimer.tsx` (chained `setTimeout` + `useEffectEvent`), và tài liệu này mượn **cơ chế** của nó chứ không mượn mục đích.
+**Đây là mã hoàn toàn mới: không có component polling/interval nào tồn tại trong `(exams)`.** Tiền lệ gần nhất là `ExamTimer.tsx` (chained `setTimeout` + `useEffectEvent`), và tài liệu này mượn **cơ chế** của nó chứ không mượn mục đích.
 
 **Cơ chế bắt buộc: `router.refresh()`.** Cả `result/page.tsx` lẫn `result/detail/page.tsx` là **Server Component** đọc `getResult()`. `router.refresh()` là **cơ chế duy nhất** chạm tới được chúng — một `fetch()` phía client sẽ phải có một route mới (AC-022 cấm), và một bản vá state cục bộ sẽ tạo ra một nguồn sự thật thứ hai cho band. Tiền lệ đã chạy thật: `RecheckOrderControl.tsx` bước 5 (*"`router.refresh()` — KHÔNG phải `revalidatePath()`… ở đây KHÔNG vá badge cục bộ"*).
 
@@ -594,7 +594,7 @@ Ba lựa chọn a11y ở đây đều là quyết định, không phải mặc �
 
 ### Component: EssayRegradeControl
 
-**Mới.** `"use client"`. Đường dẫn đề xuất: `SOURCE/app/(layer2)/_components/EssayRegradeControl.tsx`. Chỉ render trên **S-02**, bên trong `EssayReviewBlock`, ở RS-4 / RS-5 / RS-6.
+**Mới.** `"use client"`. Đường dẫn đề xuất: `SOURCE/features/exams/components/EssayRegradeControl.tsx`. Chỉ render trên **S-02**, bên trong `EssayReviewBlock`, ở RS-4 / RS-5 / RS-6.
 
 **Vì sao chỉ ở S-02.** Chấm lại là hành động **trên một câu**. S-01 không có bề mặt từng câu; đặt nút ở đó buộc phải phát minh một bộ chọn câu, tức là một thành phần mới cho một hành động hiếm. S-01 thay vào đó **dẫn đường** ("mở Chi tiết để chấm lại").
 
@@ -738,7 +738,7 @@ Kết quả: `phase` **ở nguyên `"idle"`**. Không pha bận, không sinh fil
 
 ### Component: HistoryRow (đang chấm marker)
 
-**Đổi.** `SOURCE/app/(HM)/history/_components/HistoryRow.tsx` (Server Component).
+**Đổi.** `SOURCE/features/history/components/HistoryRow.tsx` (Server Component).
 
 Dòng meta hôm nay là `{score}/10 · {ngày} · {thời gian làm}`. Thêm `EssayLifecycleBadge state="pending"` **vào cuối** dòng đó khi `entry.hasUnresolvedEssay === true`.
 
@@ -754,7 +754,7 @@ Dòng meta hôm nay là `{score}/10 · {ngày} · {thời gian làm}`. Thêm `Es
 
 | State | Default | Loading | Empty | Error | Partial |
 |---|---|---|---|---|---|
-| Display | Dòng meta như hôm nay, không badge | N/A — Server Component; skeleton mức danh sách do `(HM)/history/loading.tsx` lo, không đổi | N/A — trạng thái rỗng thuộc `HistoryList` | N/A — lỗi đọc danh sách do `(HM)/history/error.tsx` lo, không đổi | **`hasUnresolvedEssay === true`** → dòng meta + `◌ Đang chấm`; menu ⋯ chặn PDF |
+| Display | Dòng meta như hôm nay, không badge | N/A — Server Component; skeleton mức danh sách do `(history)/history/loading.tsx` lo, không đổi | N/A — trạng thái rỗng thuộc `HistoryList` | N/A — lỗi đọc danh sách do `(history)/history/error.tsx` lo, không đổi | **`hasUnresolvedEssay === true`** → dòng meta + `◌ Đang chấm`; menu ⋯ chặn PDF |
 
 #### Interaction Definition
 
@@ -768,7 +768,7 @@ Dòng meta hôm nay là `{score}/10 · {ngày} · {thời gian làm}`. Thêm `Es
 
 ### Component: ScoreCard (unchanged — explicit non-change)
 
-**Không đổi.** `SOURCE/app/(layer2)/_components/ScoreCard.tsx` **không nhận prop mới, không đổi một dòng render nào**, trong toàn bộ tính năng này. Ghi thành một mục riêng vì đây là một **quyết định**, không phải một sự bỏ sót — và vì code-verifier cần một khẳng định để đối chiếu.
+**Không đổi.** `SOURCE/features/exams/components/ScoreCard.tsx` **không nhận prop mới, không đổi một dòng render nào**, trong toàn bộ tính năng này. Ghi thành một mục riêng vì đây là một **quyết định**, không phải một sự bỏ sót — và vì code-verifier cần một khẳng định để đối chiếu.
 
 Cụ thể, ba thứ này giữ **đúng cơ sở tính của hôm nay**:
 
@@ -795,7 +795,7 @@ Lý do đầy đủ ở **UI-D3**.
 
 ### Component: QuestionRenderer (essay branch)
 
-**Đổi.** `SOURCE/app/(layer2)/_components/QuestionRenderer.tsx`, nhánh `type === "essay"`. Client component, chạy trong lúc học sinh **đang làm bài** — trước mọi việc chấm.
+**Đổi.** `SOURCE/features/exams/components/QuestionRenderer.tsx`, nhánh `type === "essay"`. Client component, chạy trong lúc học sinh **đang làm bài** — trước mọi việc chấm.
 
 Hai thay đổi, không hơn:
 
@@ -896,15 +896,15 @@ Không thêm breakpoint tuỳ biến nào (dự án cố ý không khai breakpoi
 | Dòng điểm tự luận | **New** | — | Không có component nào trên trang kết quả nhận một cặp earned/max thứ hai |
 | Khối bao ngoài của dòng điểm | **Reuse (hình dạng)** | Khối "Nộp sau giờ" trong `result/page.tsx` | Cùng class, cùng vai trò "câu bổ nghĩa cho con số phía trên" |
 | Nút chấm lại | **New** (pattern **Reuse**) | Pattern từ `SOURCE/components/billing/RecheckOrderControl.tsx`; vỏ nút từ `SOURCE/components/ui/button.tsx` (`variant="outline"`, `className="min-h-11"`) | Bảy bước handler, ba idiom a11y, `Record<>` cho lý do — chép nguyên |
-| Poller | **New** | Cơ chế hẹn giờ từ `SOURCE/app/(layer2)/_components/ExamTimer.tsx` | Không có component polling nào trong `(layer2)`. Chỉ mượn chained `setTimeout` + `useEffectEvent` |
+| Poller | **New** | Cơ chế hẹn giờ từ `SOURCE/features/exams/components/ExamTimer.tsx` | Không có component polling nào trong `(exams)`. Chỉ mượn chained `setTimeout` + `useEffectEvent` |
 | Hook PDF | **Extend** | `SOURCE/components/history/usePdfAction.ts` | Thêm tham số thứ ba + một dòng về sớm |
 | Nút Lưu/Chia sẻ | **Extend** | `SOURCE/components/history/ActionButton.tsx` | Thêm prop, đổi chữ ô lý do; **không** thêm node in-flow |
 | Menu ⋯ | **Extend** | `SOURCE/components/history/HistoryRowMenu.tsx` | Thêm prop, chuyển xuống cả hai `usePdfAction` |
-| Hàng lịch sử | **Extend** | `SOURCE/app/(HM)/history/_components/HistoryRow.tsx` | Thêm badge + truyền `blockedReason` |
-| Truy vấn lịch sử | **Extend** | `SOURCE/app/(HM)/queries.ts` | Thêm `per_question` + `created_at` vào select; suy ra **hai** boolean `hasUnresolvedEssay` + `hasIncompleteEssay` (UI-D11) |
-| Ô nhập tự luận | **Extend (chỉ chữ + hằng)** | `SOURCE/app/(layer2)/_components/QuestionRenderer.tsx` | Một chuỗi + một trần; `<textarea>` không đổi |
-| `ScoreCard` | **Reuse, 0 thay đổi** | `SOURCE/app/(layer2)/_components/ScoreCard.tsx` | UI-D3 |
-| `ResultActions` | **Extend (chỉ truyền prop)** | `SOURCE/app/(layer2)/_components/ResultActions.tsx` | Nhận `blockedReason`, chuyển xuống hai `ActionButton` |
+| Hàng lịch sử | **Extend** | `SOURCE/features/history/components/HistoryRow.tsx` | Thêm badge + truyền `blockedReason` |
+| Truy vấn lịch sử | **Extend** | `SOURCE/features/history/queries.ts` | Thêm `per_question` + `created_at` vào select; suy ra **hai** boolean `hasUnresolvedEssay` + `hasIncompleteEssay` (UI-D11) |
+| Ô nhập tự luận | **Extend (chỉ chữ + hằng)** | `SOURCE/features/exams/components/QuestionRenderer.tsx` | Một chuỗi + một trần; `<textarea>` không đổi |
+| `ScoreCard` | **Reuse, 0 thay đổi** | `SOURCE/features/exams/components/ScoreCard.tsx` | UI-D3 |
+| `ResultActions` | **Extend (chỉ truyền prop)** | `SOURCE/features/exams/components/ResultActions.tsx` | Nhận `blockedReason`, chuyển xuống hai `ActionButton` |
 | `RichText` | **Reuse, 0 thay đổi** | `SOURCE/components/shared/RichText.tsx` | Nội dung câu hỏi vẫn render qua nó. **Bài làm của học sinh KHÔNG đi qua `RichText`** — nó đã là chữ thuần trong nhánh không-chấm hôm nay, và mở một đường render markdown cho văn bản do học sinh viết là mở một bề mặt mới không cần thiết |
 | `ExplainStepAffordance` | **Reuse, 0 thay đổi, KHÔNG mount cho tự luận** | `SOURCE/components/tutor/ExplainStepAffordance.tsx` | AC-016 |
 | Nhánh có-chấm của `result/detail/page.tsx` | **Không đụng vào** | — | Giữ TBD-02 ở trạng thái hoãn có chủ đích |

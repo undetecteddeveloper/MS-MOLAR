@@ -64,7 +64,7 @@ The code is correct. Correct **both documents** to describe the caught-exception
 
 Each of these is a **current-tense assertion that is false**, not a moved line number.
 
-**P3a. The `(layer2)` provider exists.** `subscription-frontend-design.md` asserts in **eight** places that `app/(layer2)/layout.tsx` mounts no `EntitlementProvider`, making the UI-D17 `TutorQuotaNote` mount a permanent no-op and AC-042 unrenderable — at `:158` (A10), `:1129` (R-12), `:999` (FE-I8), `:290`, `:310`, `:350` (code:01), `:1028`, `:953`. It **does** mount, at `(layer2)/layout.tsx:41`, alongside `(billing):33` and `(layer4):35`. **A10 is still marked `Confirmed: No` and R-12 is still rated High.** Only the v1.8 close-out bullet at `:191` acknowledges reality, so the document contradicts itself. Correct all of it: discharge A10, re-rate R-12, and fix the eight assertions.
+**P3a. The `(exams)` provider exists.** `subscription-frontend-design.md` asserts in **eight** places that `app/(exams)/layout.tsx` mounts no `EntitlementProvider`, making the UI-D17 `TutorQuotaNote` mount a permanent no-op and AC-042 unrenderable — at `:158` (A10), `:1129` (R-12), `:999` (FE-I8), `:290`, `:310`, `:350` (code:01), `:1028`, `:953`. It **does** mount, at `(exams)/layout.tsx:41`, alongside `(billing):33` and `(authoring):35`. **A10 is still marked `Confirmed: No` and R-12 is still rated High.** Only the v1.8 close-out bullet at `:191` acknowledges reality, so the document contradicts itself. Correct all of it: discharge A10, re-rate R-12, and fix the eight assertions.
 
 **P3b. `TutorQuotaNote` is rendered.** `subscription-backend-design.md:323`, `:932`, `:1102` say a repo-wide grep returns only its own definition. It is imported at `result/detail/page.tsx:18` and rendered at `:180` and `:234`. The doc's own AC-042 close-out row at `:256` already says it renders.
 
@@ -107,7 +107,7 @@ Add to the work plan's documentation-debt register, each with a named owner:
 - [x] `SOURCE/supabase/verify-schema.ts` (S1)
 - [x] `SOURCE/scripts/check-ai-key-bundle.mjs` (S2 — export `SECRETS`, no behaviour change)
 - [x] a new test pinning `SECRETS` (S2)
-- [x] `SOURCE/app/(billing)/pricing/_components/PurchaseCta.tsx` + its test (S3)
+- [x] `SOURCE/features/billing/components/pricing/PurchaseCta.tsx` + its test (S3)
 - [x] `SOURCE/components/billing/RecheckOrderControl.tsx` + its test (S3)
 - [x] `docs/design/subscription-frontend-design.md` (F-D002, F-D003, P3a, P3h, P3i, Part 4)
 - [x] `docs/design/subscription-backend-design.md` (P3b–P3g)
@@ -122,7 +122,7 @@ Every versioned document edited here needs a **version bump and a revision-histo
 ## Completion Criteria
 - [x] All three security fixes land, each with a test that can fail
 - [x] C-15's props and the `recheckOrder` error routing are correct in **both** governing documents
-- [x] No document asserts the `(layer2)` provider is absent, that `TutorQuotaNote` renders nowhere, that `createOrder()` has no caller, or that `readEntitlement()` has three call sites
+- [x] No document asserts the `(exams)` provider is absent, that `TutorQuotaNote` renders nowhere, that `createOrder()` has no caller, or that `readEntitlement()` has three call sites
 - [x] The UI Spec's two revision tables agree
 - [x] Group B is recorded with owners, not silently dropped
 - [ ] Full gates green: `npm test`, `test:integration`, `test:fixture`, `test:localdb`, `tsc`, `lint`, `check:bundle`, `build`
@@ -229,10 +229,10 @@ from `Promise<SettleResult>` to `Promise<RecheckOutcome>`.
 
 | | Verified in code | Sites corrected |
 |---|---|---|
-| **P3a** | `EntitlementProvider` mounted in **all three** layouts — `(billing)`, `(layer2)`, `(layer4)` — each fed by its own `await readEntitlement(user?.id ?? null)`; `TutorQuotaNote` renders beside both affordance call sites | **Sixteen**, not the eight named: A1's evidence, A10, the AC-042 paragraph, FE-AC-26, the Design-Summary "What changes" row, the change-map row, two dependency-verification rows, the code-inspection row, fact `code:01`, the Field Propagation Map, the change-impact precondition block, FE-I8, Technical Dependencies 1b, the Test Boundaries note, the verification-strategy row, R-12. **A10 → `Confirmed: Yes`; R-12 → Low.** R-12's *detectability* argument is kept — every automated gate still passes on a null mount — and FE-AC-26 stays open, because the precondition landing is not the observation |
+| **P3a** | `EntitlementProvider` mounted in **all three** layouts — `(billing)`, `(exams)`, `(authoring)` — each fed by its own `await readEntitlement(user?.id ?? null)`; `TutorQuotaNote` renders beside both affordance call sites | **Sixteen**, not the eight named: A1's evidence, A10, the AC-042 paragraph, FE-AC-26, the Design-Summary "What changes" row, the change-map row, two dependency-verification rows, the code-inspection row, fact `code:01`, the Field Propagation Map, the change-impact precondition block, FE-I8, Technical Dependencies 1b, the Test Boundaries note, the verification-strategy row, R-12. **A10 → `Confirmed: Yes`; R-12 → Low.** R-12's *detectability* argument is kept — every automated gate still passes on a null mount — and FE-AC-26 stays open, because the precondition landing is not the observation |
 | **P3b** | `TutorQuotaNote` imported and rendered twice on the result-detail page | 3 sites + the D005 consumer table's "today" column header, which stated the pre-D005 answer in the present tense |
 | **P3c** | `PurchaseCta` → `createOrder()`; `RecheckOrderControl` → `recheckOrder()`; both routes ship | 4 sites |
-| **P3d** | **Five** production call sites: three layouts + `tutorActions.ts` + `actions.ts`. The two Server Actions call `readEntitlement()` directly and get their `Entitlement` that way | Invariant **restated as the render-path invariant**, not deleted; the "no page or component below" discipline scoped the same way; **I2/I3 now name the `Entitlement` producer**. The sanctioning guard is a shipped **test** — `app/(layer2)/__tests__/layout.test.tsx`, two closed lists (`RENDER_PATH_ALLOWED`, `SERVER_ACTION_ALLOWED`), admission gated on a real `"use server"` prologue — so the ADR-0013 citation is to what the guard encodes: ADR-0013 forbids two *implementations*, not two *call sites* |
+| **P3d** | **Five** production call sites: three layouts + `tutorActions.ts` + `actions.ts`. The two Server Actions call `readEntitlement()` directly and get their `Entitlement` that way | Invariant **restated as the render-path invariant**, not deleted; the "no page or component below" discipline scoped the same way; **I2/I3 now name the `Entitlement` producer**. The sanctioning guard is a shipped **test** — `app/(exams)/__tests__/layout.test.tsx`, two closed lists (`RENDER_PATH_ALLOWED`, `SERVER_ACTION_ALLOWED`), admission gated on a real `"use server"` prologue — so the ADR-0013 citation is to what the guard encodes: ADR-0013 forbids two *implementations*, not two *call sites* |
 | **P3e** | `queries.ts` imports `toCheckoutOrder`; `getMyOrder()` returns it | **E-02 closed** (row struck, original statement preserved); the § S-06 read-path paragraph corrected |
 | **P3f** | `quota.ts` reads `subscriptions.period_anchor_at` + `user_profiles.created_at` via the request-scoped client on the fallback, and `consumeQuota()` maps a `null` period start to `{ ok: false, reason: "unavailable" }` — verified, not assumed | A two-branch boundary table added to the signature block; the Test Boundaries row corrected to **Redis *and* Postgres**, with the consequence stated: a Redis-only mock leaves the fallback unexercised |
 | **P3g** | `lib/billing/quotaTelemetry.ts` exists; both importers are `"use server"` files | Added to the Change Impact Map NEW-file list; the "mapping lives beside the call" claim corrected, with the constraint recorded — a `"use server"` file may export only async functions, so neither refusal site can hold a shared const, and the directive restricts **exports, not imports** |

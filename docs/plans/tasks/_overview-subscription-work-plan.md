@@ -13,7 +13,7 @@ Replace the fail-closed entitlement stub with a working paid tier: sell a 30-day
 
 ### Background and Context
 
-The UI phase shipped first (S-01…S-04, `EntitlementProvider`, the frozen `lib/billing/types.ts`), leaving one deliberate seam — `readEntitlement()` body — and one deliberate gap: the provider is mounted in `(billing)` only, while every gated component renders in `(layer2)` / `(layer4)`. There is **no payment code of any kind** and no `payment_orders` / `subscriptions` table. Both Design Docs select **Hybrid** (a thin horizontal foundation, then vertical slices) with the schema as a hard gate in front of everything.
+The UI phase shipped first (S-01…S-04, `EntitlementProvider`, the frozen `lib/billing/types.ts`), leaving one deliberate seam — `readEntitlement()` body — and one deliberate gap: the provider is mounted in `(billing)` only, while every gated component renders in `(exams)` / `(authoring)`. There is **no payment code of any kind** and no `payment_orders` / `subscriptions` table. Both Design Docs select **Hybrid** (a thin horizontal foundation, then vertical slices) with the schema as a hard gate in front of everything.
 
 ## Task Division Design
 
@@ -228,7 +228,7 @@ Every task whose phase carries the negative check keeps the line **"No productio
 2. **Assert on values and on row counts, never on "a call happened."** The recurring hollow-test shapes this feature must guard against are named in the backend DD `:1141`: asserting that `settleOrder` was called does not prove the amount was compared; asserting settlement succeeded does not prove the second replay wrote nothing.
 3. **One producer per contract.** Period start, checkout mapping, pending window, settlement path, provider boundary — each has exactly one owner (see Common Processing Points).
 4. **`npm run verify:schema` and `npm run check:bundle` are two distinct scripts.** Neither pipes into the other; both must be run separately.
-5. **The frozen set is frozen**: `SOURCE/lib/billing/types.ts`, `entitlement.tsx`, `app/(billing)/layout.tsx`, `lib/security/csp.ts`, `lib/nav/items.ts`, `app/(layer4)/_components/StatusBadge.tsx`, `components/tutor/ExplainStepAffordance.tsx`.
+5. **The frozen set is frozen**: `SOURCE/lib/billing/types.ts`, `entitlement.tsx`, `app/(billing)/layout.tsx`, `lib/security/csp.ts`, `lib/nav/items.ts`, `features/authoring/components/StatusBadge.tsx`, `components/tutor/ExplainStepAffordance.tsx`.
 
 ### Risks and Countermeasures (carried from the plan)
 
@@ -243,7 +243,7 @@ Every task whose phase carries the negative check keeps the line **"No productio
 ### Impact Scope Management
 
 - **Allowed change scope**: exactly the Review Scope paths listed in the work plan header (backend, frontend, tests/config).
-- **Preserved areas (no task may edit)**: `SOURCE/lib/billing/types.ts`, `SOURCE/lib/billing/entitlement.tsx`, `SOURCE/app/(billing)/layout.tsx`, `SOURCE/lib/security/csp.ts`, `SOURCE/lib/nav/items.ts`, `SOURCE/app/(layer4)/_components/StatusBadge.tsx`, `SOURCE/components/tutor/ExplainStepAffordance.tsx`.
+- **Preserved areas (no task may edit)**: `SOURCE/lib/billing/types.ts`, `SOURCE/lib/billing/entitlement.tsx`, `SOURCE/app/(billing)/layout.tsx`, `SOURCE/lib/security/csp.ts`, `SOURCE/lib/nav/items.ts`, `SOURCE/features/authoring/components/StatusBadge.tsx`, `SOURCE/components/tutor/ExplainStepAffordance.tsx`.
 - **Assertions that must pass unmodified**: `telemetry.test.ts:261`; `rateLimit.test.ts:127-135`, `:137-142`, `:166-171`, `:186-192`.
 
 ## Baseline measured this session

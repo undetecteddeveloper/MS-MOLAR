@@ -28,8 +28,8 @@ Defines the `/history` list page, the rewiring of the Result page's `ResultActio
 
 | Source | Path | Version |
 |--------|------|---------|
-| Theme definition | `DESIGN.md` (repo root) | repo `feat/rating-system`, "Ink & Lacquer" alpha |
-| Existing component precedent | `SOURCE/app/(layer4)/_components/MyExamsList.tsx`, `ExamRow.tsx`, `StatusBadge.tsx`; `SOURCE/app/(layer2)/_components/ScoreCard.tsx`, `ResultActions.tsx`, `rating/RateButton.tsx`; `SOURCE/app/(layer4)/_components/ExtractionProgress.tsx`, `ExtractionErrorPanel.tsx` | repo `feat/rating-system` |
+| Theme definition | `PROJECT_OVERVIEW.md §2` (repo root) | repo `feat/rating-system`, "Ink & Lacquer" alpha |
+| Existing component precedent | `SOURCE/features/authoring/components/MyExamsList.tsx`, `ExamRow.tsx`, `StatusBadge.tsx`; `SOURCE/features/exams/components/ScoreCard.tsx`, `ResultActions.tsx`, `rating/RateButton.tsx`; `SOURCE/features/authoring/components/ExtractionProgress.tsx`, `ExtractionErrorPanel.tsx` | repo `feat/rating-system` |
 | Prototype code | None provided | — |
 
 ## Prototype Management
@@ -42,9 +42,9 @@ Project-tier facts are recorded in `docs/project-context/external-resources.md` 
 
 | Resource (project-tier label) | Feature-specific identifier | Notes |
 |-------------------------------|-----------------------------|-------|
-| Design Origin | `DESIGN.md` — Colors, Elevation & Depth, Shapes sections | Governs both on-screen History UI and the `AttemptPdfTemplate` subtree (R3/AC-008) |
-| Design System | `SOURCE/app/(layer4)/_components/{MyExamsList,ExamRow,StatusBadge}.tsx`, `SOURCE/app/(layer2)/_components/{ScoreCard,ResultActions,rating/RateButton}.tsx`, `SOURCE/components/ui/{tooltip,button}.tsx` | On-screen History/ResultActions UI may use any of these freely; `AttemptPdfTemplate` may **not** use `components/ui/button.tsx` (ADR-0009) |
-| Guidelines | `DESIGN.md` (visual rules) | Contrast rule (no brand-red-on-black below 24px), no-shadow rule, serif-only-for-display rule |
+| Design Origin | `PROJECT_OVERVIEW.md §2` — Colors, Elevation & Depth, Shapes sections | Governs both on-screen History UI and the `AttemptPdfTemplate` subtree (R3/AC-008) |
+| Design System | `SOURCE/features/authoring/components/{MyExamsList,ExamRow,StatusBadge}.tsx`, `SOURCE/features/exams/components/ScoreCard.tsx, SOURCE/features/exams/components/ResultActions.tsx, SOURCE/features/exams/components/rating/RateButton.tsx`, `SOURCE/components/ui/{tooltip,button}.tsx` | On-screen History/ResultActions UI may use any of these freely; `AttemptPdfTemplate` may **not** use `components/ui/button.tsx` (ADR-0009) |
+| Guidelines | `PROJECT_OVERVIEW.md §2` (visual rules) | Contrast rule (no brand-red-on-black below 24px), no-shadow rule, serif-only-for-display rule |
 | Visual Verification Environment | Routes `/history`, `/exams/[id]/attempt/[attemptId]/result` | Verified via `npm run dev` + Playwright MCP + manual mid-range-Android pass (PRD NFR Performance) before ship |
 
 ## Decisions Record
@@ -58,8 +58,8 @@ Items delegated to this UI Spec by the PRD's Undetermined Items section, plus su
 | D3 | **History list pagination threshold (resolves PRD Undetermined Item #3)**: MVP ships with **zero query-level pagination** (R10 stays deferred, single unpaginated read per PRD lock). To keep the on-screen list ergonomic on the mid-range-Android baseline without a second query, the list renders inside a bounded-height, internally-scrolling container (`max-h-[30rem] overflow-y-auto`, mirroring `MyExamsList`'s `ExamListScroll`) instead of an unbounded page-length list. A concrete **future trigger** for real (cursor-based, query-level) pagination is set at **50 rows** per user — the Work Plan / Design Doc treats crossing this as the signal to pick up R10; revisit sooner if the mid-range-Android manual QA pass (PRD NFR Performance) shows jank before 50 rows. | Satisfies R10's explicit MVP lock (no pagination shipped) while still resolving the "threshold" question the PRD leaves open, using an existing in-repo scroll-container pattern (zero new interaction to design) rather than inventing a "Load more" control. 50 is a deliberately round, checkable number tied to the same NFR the PRD already cites (mid-range Android/unstable network), not an arbitrary guess. |
 | D4 | **Save/Share accessibility pattern**: both actions use `RateButton`'s `aria-disabled="true"` + `aria-describedby` (pointing at a same-DOM `sr-only` reason span) + `Tooltip` pattern for their busy state, **not** `ResultActions`'s current native `disabled` + `title`-only pattern. Native `disabled` removes the element from the tab order, which fails the PRD Accessibility NFR ("fully keyboard-operable, both idle and busy states"). | Reuses an already-audited, in-repo a11y fix (see `RateButton.tsx`'s WCAG 1.4.3 code comment) instead of re-deriving the pattern; keeps Save/Share focusable and their reason discoverable by AT during busy/error states. |
 | D5 | **Nav wiring requires no new active-state logic**: `SiteHeader`'s `isActive` is already computed from `usePathname()` (`item.href !== "#" && pathname.startsWith(item.href)`) — changing `href: "#"` to `href: "/history"` alone makes "History" highlight correctly on any `/history/*` route, with no other code change. `HomeSidebar`'s `activeLabel` is a static prop set by its only caller (the homepage) and can never be `"History"` (the homepage is the only page that renders `HomeSidebar`; `/history` renders `SiteHeader` instead) — so `HomeSidebar` needs only its `href` fixed, no active-logic change. | Prevents scope creep: the two files use genuinely different active-state mechanisms, but only one (`SiteHeader`) ever needs to *show* History as active, and its existing logic already handles it. |
-| D6 | **`(HM)` route-group layout**: `SOURCE/app/(HM)/layout.tsx` renders only `SiteHeader` with a nullable user (matching `(layer2)/layout.tsx` / `(layer3)/layout.tsx`); the auth guard (AC-016) lives in `SOURCE/app/(HM)/history/page.tsx` itself, following the `(layer4)/upload/page.tsx` precedent (`getCurrentUser()` + `redirect("/?auth=signin")`). | PRD Technical Considerations > Dependencies already names this precedent explicitly; restated here so the UI Spec's screen/component ownership is unambiguous. |
-| D7 | **List loading/error via Next.js route conventions**: `(HM)/history/loading.tsx` (skeleton, mirrors `(layer4)/me/exams/loading.tsx`) for the Loading state; `(HM)/history/error.tsx` (Next.js error boundary, client component) for the list-read failure state (AC-019), using its `reset()` callback as the "Retry" action. | Idiomatic App Router mechanism already used once in this codebase (`loading.tsx`); `error.tsx`'s built-in `reset()` gives a working retry with no manual refetch plumbing. |
+| D6 | **`(history)` route-group layout**: `SOURCE/app/(history)/layout.tsx` renders only `SiteHeader` with a nullable user (matching `(exams)/layout.tsx` / `(analytics)/layout.tsx`); the auth guard (AC-016) lives in `SOURCE/app/(history)/history/page.tsx` itself, following the `(authoring)/upload/page.tsx` precedent (`getCurrentUser()` + `redirect("/?auth=signin")`). | PRD Technical Considerations > Dependencies already names this precedent explicitly; restated here so the UI Spec's screen/component ownership is unambiguous. |
+| D7 | **List loading/error via Next.js route conventions**: `(history)/history/loading.tsx` (skeleton, mirrors `(authoring)/me/exams/loading.tsx`) for the Loading state; `(history)/history/error.tsx` (Next.js error boundary, client component) for the list-read failure state (AC-019), using its `reset()` callback as the "Retry" action. | Idiomatic App Router mechanism already used once in this codebase (`loading.tsx`); `error.tsx`'s built-in `reset()` gives a working retry with no manual refetch plumbing. |
 
 ## AC Traceability (PRD → Screens/Components)
 
@@ -74,7 +74,7 @@ No prototype exists, so this replaces the template's prototype-specific traceabi
 | AC-005 | "View details" → existing Result page | S-01 HistoryRow | Default |
 | AC-006 | PDF contains only score/time/metadata | AttemptPdfTemplate | Default |
 | AC-007 | Exactly one PDF implementation | No UI surface — code-inspection concern (Design Doc/Work Plan); both `HistoryRow`'s ActionButton and `ResultActions` import the same module (Component Tree) | — |
-| AC-008 | PDF follows `DESIGN.md` tokens | AttemptPdfTemplate | Default |
+| AC-008 | PDF follows `PROJECT_OVERVIEW.md §2` tokens | AttemptPdfTemplate | Default |
 | AC-009 | Save uses only already-loaded data, no extra round trip | ActionButton (Save) | Default |
 | AC-010 | Busy state, not double-triggerable | ActionButton | Loading |
 | AC-011 | Share opens native share sheet with file | ActionButton (Share) | Default → Loading → Default |
@@ -124,15 +124,15 @@ flowchart LR
 ### Component Tree
 
 ```
-S-01 /history  (SOURCE/app/(HM)/history/page.tsx)
-  +-- (HM)/layout.tsx -- SiteHeader (existing, extended: href="/history")
+S-01 /history  (SOURCE/app/(history)/history/page.tsx)
+  +-- app/(history)/layout.tsx -- SiteHeader (existing, extended: href="/history")
   +-- HistoryList (new, server component)
       +-- HistoryRow (new)  [x N]
           +-- ActionButton (new, shared atom)  -- Save
           +-- ActionButton (new, shared atom)  -- Share
           +-- "View details" Link (existing Link pattern)
-  +-- (HM)/history/loading.tsx  -- skeleton (Loading state, see HistoryList matrix)
-  +-- (HM)/history/error.tsx    -- error boundary (Error state, see HistoryList matrix)
+  +-- app/(history)/history/loading.tsx  -- skeleton (Loading state, see HistoryList matrix)
+  +-- app/(history)/history/error.tsx    -- error boundary (Error state, see HistoryList matrix)
 
 S-02 /exams/[id]/attempt/[attemptId]/result  (existing page, extended)
   +-- ScoreCard (existing, extended: Time stat computed, no longer "--")
@@ -149,7 +149,7 @@ Shared, non-routed (referenced by both S-01 and S-02):
 
 ### Component: SiteHeader (nav extension)
 
-Existing `SOURCE/app/(layer2)/_components/SiteHeader.tsx`. Change: `NAV` array's `{ label: "History", href: "#" }` → `{ label: "History", href: "/history" }`. No other change (D5: `isActive` logic already handles it).
+Existing `SOURCE/components/layout/SiteHeader.tsx`. Change: `NAV` array's `{ label: "History", href: "#" }` → `{ label: "History", href: "/history" }`. No other change (D5: `isActive` logic already handles it).
 
 #### Interaction Definition
 
@@ -161,7 +161,7 @@ Existing `SOURCE/app/(layer2)/_components/SiteHeader.tsx`. Change: `NAV` array's
 
 ### Component: HomeSidebar (nav extension)
 
-Existing `SOURCE/app/(layer1)/_components/HomeSidebar.tsx`. Change: `NAV` array's `{ label: "History", href: "#" }` → `{ label: "History", href: "/history" }`. No `activeLabel` logic change (D5).
+Existing `SOURCE/features/auth/components/HomeSidebar.tsx`. Change: `NAV` array's `{ label: "History", href: "#" }` → `{ label: "History", href: "/history" }`. No `activeLabel` logic change (D5).
 
 #### Interaction Definition
 
@@ -179,7 +179,7 @@ New server component for S-01. Layout mirrors `MyExamsList`: heading "History" (
 
 | State | Default | Loading | Empty | Error | Partial |
 |-------|---------|---------|-------|-------|---------|
-| Display | `HistoryRow` list, newest-first (AC-001/003) | `(HM)/history/loading.tsx`: heading skeleton + 4 pulsing row placeholders (`animate-pulse`, `border-border`, `rounded-lg`, no shadow — mirrors `(layer4)/me/exams/loading.tsx`) | Dashed-border block: serif "No results yet" + caption "Finish an exam to see it here." + primary Link "Browse exams" → `/exams` (AC-002) | `(HM)/history/error.tsx`: bordered `role="alert"` notice "Couldn't load your history right now." + "Retry" button calling `reset()` (AC-019) | 1+ rows have an unavailable completion time (data-integrity edge case, e.g. malformed timestamp): that row's Time cell shows "—" (matches `ScoreCard`'s existing symbolic-placeholder convention); the row otherwise renders and functions normally |
+| Display | `HistoryRow` list, newest-first (AC-001/003) | `(history)/history/loading.tsx`: heading skeleton + 4 pulsing row placeholders (`animate-pulse`, `border-border`, `rounded-lg`, no shadow — mirrors `(authoring)/me/exams/loading.tsx`) | Dashed-border block: serif "No results yet" + caption "Finish an exam to see it here." + primary Link "Browse exams" → `/exams` (AC-002) | `(history)/history/error.tsx`: bordered `role="alert"` notice "Couldn't load your history right now." + "Retry" button calling `reset()` (AC-019) | 1+ rows have an unavailable completion time (data-integrity edge case, e.g. malformed timestamp): that row's Time cell shows "—" (matches `ScoreCard`'s existing symbolic-placeholder convention); the row otherwise renders and functions normally |
 
 #### Interaction Definition
 
@@ -239,7 +239,7 @@ Accessibility pattern (D4, generalizes `RateButton`'s fix): the button is **alwa
 
 ### Component: ResultActions (rewired)
 
-Existing `SOURCE/app/(layer2)/_components/ResultActions.tsx`. Change: remove the `disabled` attribute, the `title="{label} — coming soon"` tooltip, and wire each of the two buttons to render an `ActionButton` (Save, Share) instead of a static disabled `<button>`. **Preserves the exact existing structural contract**: renders its two buttons as bare siblings with no wrapping element — the caller (`result/page.tsx`) continues to place them inside its own `grid-cols-3` alongside "Return", so all three cells remain equal height/width. No change to that caller.
+Existing `SOURCE/features/exams/components/ResultActions.tsx`. Change: remove the `disabled` attribute, the `title="{label} — coming soon"` tooltip, and wire each of the two buttons to render an `ActionButton` (Save, Share) instead of a static disabled `<button>`. **Preserves the exact existing structural contract**: renders its two buttons as bare siblings with no wrapping element — the caller (`result/page.tsx`) continues to place them inside its own `grid-cols-3` alongside "Return", so all three cells remain equal height/width. No change to that caller.
 
 #### State x Display Matrix
 
@@ -255,7 +255,7 @@ Identical to `ActionButton`'s matrix above, ×2 instances (Save, Share) sharing 
 
 ### Component: ScoreCard (extended)
 
-Existing `SOURCE/app/(layer2)/_components/ScoreCard.tsx`. Change: the "Time" stat (`dl` third column, currently a hardcoded `—`) now receives a real `completionTimeLabel: string` prop, computed by the page from `submitted_at − started_at` (same display format as `HistoryRow`, above) and rendered in place of the placeholder. Requires `getResult()` (`SOURCE/app/(layer2)/queries.ts`) to also select `started_at`/`submitted_at` on the `exam_attempts` read — a Design Doc-owned query change (PRD flags this gap explicitly), not a UI Spec concern.
+Existing `SOURCE/features/exams/components/ScoreCard.tsx`. Change: the "Time" stat (`dl` third column, currently a hardcoded `—`) now receives a real `completionTimeLabel: string` prop, computed by the page from `submitted_at − started_at` (same display format as `HistoryRow`, above) and rendered in place of the placeholder. Requires `getResult()` (`SOURCE/features/exams/queries.ts`) to also select `started_at`/`submitted_at` on the `exam_attempts` read — a Design Doc-owned query change (PRD flags this gap explicitly), not a UI Spec concern.
 
 #### State x Display Matrix
 
@@ -271,13 +271,13 @@ New. The rasterized-to-PDF DOM subtree (via `html2canvas`), consumed identically
 
 **Hard styling constraint (ADR-0009, applies only to this subtree)**: every style must resolve to a plain hex value or a literal `rgb()`/`rgba()` function — the root `globals.css` custom properties (`--background #ede1c8`, `--foreground #1b1512`, `--brand #a62c2b`, `--border #d8c9a8`, and literal `#B8863B` copper) are safe; it must **not** import `components/ui/button.tsx` (confirmed `color-mix(in_oklch, ...)` in its `secondary` variant, and effectively every variant once its `hover:bg-primary/80`-style opacity modifiers are considered) and must **not** use any Tailwind slash-opacity utility (e.g. `bg-brand/8`, `border-brand/40`) — these compile to `color-mix()` regardless of whether the base color is a token or an arbitrary hex, and `html2canvas` cannot parse the resulting `color-mix()`/`oklch()` output. Where a translucent fill is needed (e.g. a subtle copper-tinted rule), use a literal `rgba()` value instead (e.g. `rgba(184,134,59,0.08)`), mirroring the already-safe `--sidebar-border: rgb(237 225 200 / 0.12)` token.
 
-**Visual layout** (content width follows `DESIGN.md`'s existing 720px long-text grid convention, applied here as the template's fixed content width):
+**Visual layout** (content width follows `PROJECT_OVERVIEW.md §2`'s existing 720px long-text grid convention, applied here as the template's fixed content width):
 - Header: site wordmark/logo (plain `<img>`, same-origin `/images/brand_logo.png`) + a `rule-divider`-style bar (`rgba` copper, 2px height, 40px width — not a Tailwind opacity utility).
 - Title block: exam title, Source Serif 4, `#1b1512`, matching `ScoreCard`'s serif h1 treatment.
-- Score block: score `X/10` large, Source Serif 4, `#a62c2b` (brand, plain hex — safe; large-size clears the DESIGN.md 24px contrast-floor rule for brand-on-light).
+- Score block: score `X/10` large, Source Serif 4, `#a62c2b` (brand, plain hex — safe; large-size clears the PROJECT_OVERVIEW.md §2 24px contrast-floor rule for brand-on-light).
 - Metadata row: submitted date, completion time (same format as `HistoryRow`), joined with " · ", `#6b655c` muted, sans (Be Vietnam Pro).
 - Footer: 1px hairline (`#d8c9a8`) then a caption "Generated by MS-MOLAR · summary only, not a full transcript" + generation timestamp, `#6b655c`, `body-sm`.
-- No shadows, no gradients (DESIGN.md Elevation & Depth rule — this subtree has zero exception, unlike `ExamCard`'s documented hover-shadow one-off).
+- No shadows, no gradients (PROJECT_OVERVIEW.md §2 Elevation & Depth rule — this subtree has zero exception, unlike `ExamCard`'s documented hover-shadow one-off).
 
 #### State x Display Matrix
 
@@ -290,7 +290,7 @@ New. The rasterized-to-PDF DOM subtree (via `html2canvas`), consumed identically
 | AC ID | EARS Condition | User Action | System Response |
 |-------|---------------|-------------|-----------------|
 | AC-006 | When Save/Share triggers generation | (system, via `ActionButton`) | Template renders with only score/time/exam-metadata — no per-question content is ever included in its markup |
-| AC-008 | When the PDF is produced | (system) | Visual style follows `DESIGN.md` tokens (see above), not an unbranded default |
+| AC-008 | When the PDF is produced | (system) | Visual style follows `PROJECT_OVERVIEW.md §2` tokens (see above), not an unbranded default |
 
 ## Design Tokens and Component Map
 
@@ -312,22 +312,22 @@ New. The rasterized-to-PDF DOM subtree (via `html2canvas`), consumed identically
 | UI Element | Decision | Existing Component | Notes |
 |-----------|----------|--------------------|-------|
 | Nav item ("History") | Extend | `SiteHeader.tsx`, `HomeSidebar.tsx` | `href` fix only (D5); no `isActive` logic change |
-| `(HM)` route-group layout | New (pattern-copied) | `(layer2)/layout.tsx`, `(layer3)/layout.tsx` | Renders `SiteHeader` only, nullable user (D6) |
-| Auth guard on `/history` | New (pattern-reused) | `(layer4)/upload/page.tsx` | `getCurrentUser()` + `redirect("/?auth=signin")`, page-level not layout-level |
-| History row shell | New, pattern-informed | `SOURCE/app/(layer4)/_components/ExamRow.tsx` | Same `<li>` shell classes, `" · "`-joined metadata line, `formatDateTime` convention; domain differs (attempts vs. UGC exams) so a new component, not a literal import |
-| History list container + empty state | New, pattern-informed | `SOURCE/app/(layer4)/_components/MyExamsList.tsx` | Adopts its empty-state-with-CTA shape (AC-002) and its `ExamListScroll` bounded-height container (D3); **not** `ExamBrowser.tsx`'s empty state (that one has no CTA, insufficient for AC-002) |
-| Status/score display precedent | Reuse (pattern) | `SOURCE/app/(layer2)/_components/ScoreCard.tsx` | Large serif score number treatment informs the AttemptPdfTemplate score block |
-| Save/Share disabled-but-meaningful pattern | Reuse (pattern) | `SOURCE/app/(layer2)/_components/rating/RateButton.tsx` | `aria-disabled` + `aria-describedby` + `Tooltip`, **not** `ResultActions`'s current native-`disabled` + `title` pattern (D4) |
-| Busy-state live-region precedent | Reuse (pattern) | `SOURCE/app/(layer4)/_components/ExtractionProgress.tsx` | Informs `ActionButton`'s `role="status" aria-live="polite"` busy/fallback announcements (compact per-button form, not a full banner, given row density) |
-| Actionable-error panel precedent | Reuse (pattern), extended | `SOURCE/app/(layer4)/_components/ExtractionErrorPanel.tsx` | Existing panel lacks a Retry control; `HistoryList`'s Error state and `ActionButton`'s Error state both add one (list: dedicated button via `error.tsx`'s `reset()`; per-action: re-click Save/Share) |
+| `(history)` route-group layout | New (pattern-copied) | `(exams)/layout.tsx`, `(analytics)/layout.tsx` | Renders `SiteHeader` only, nullable user (D6) |
+| Auth guard on `/history` | New (pattern-reused) | `(authoring)/upload/page.tsx` | `getCurrentUser()` + `redirect("/?auth=signin")`, page-level not layout-level |
+| History row shell | New, pattern-informed | `SOURCE/features/authoring/components/ExamRow.tsx` | Same `<li>` shell classes, `" · "`-joined metadata line, `formatDateTime` convention; domain differs (attempts vs. UGC exams) so a new component, not a literal import |
+| History list container + empty state | New, pattern-informed | `SOURCE/features/authoring/components/MyExamsList.tsx` | Adopts its empty-state-with-CTA shape (AC-002) and its `ExamListScroll` bounded-height container (D3); **not** `ExamBrowser.tsx`'s empty state (that one has no CTA, insufficient for AC-002) |
+| Status/score display precedent | Reuse (pattern) | `SOURCE/features/exams/components/ScoreCard.tsx` | Large serif score number treatment informs the AttemptPdfTemplate score block |
+| Save/Share disabled-but-meaningful pattern | Reuse (pattern) | `SOURCE/features/exams/components/rating/RateButton.tsx` | `aria-disabled` + `aria-describedby` + `Tooltip`, **not** `ResultActions`'s current native-`disabled` + `title` pattern (D4) |
+| Busy-state live-region precedent | Reuse (pattern) | `SOURCE/features/authoring/components/ExtractionProgress.tsx` | Informs `ActionButton`'s `role="status" aria-live="polite"` busy/fallback announcements (compact per-button form, not a full banner, given row density) |
+| Actionable-error panel precedent | Reuse (pattern), extended | `SOURCE/features/authoring/components/ExtractionErrorPanel.tsx` | Existing panel lacks a Retry control; `HistoryList`'s Error state and `ActionButton`'s Error state both add one (list: dedicated button via `error.tsx`'s `reset()`; per-action: re-click Save/Share) |
 | Tooltip | Reuse | `SOURCE/components/ui/tooltip.tsx` | Used by `ActionButton`'s busy/error reason (via `RateButton`'s pattern) |
 | shadcn Button | Reuse (on-screen only) | `SOURCE/components/ui/button.tsx` | Freely usable in `HistoryRow`/`ResultActions`/`HistoryList`'s on-screen controls; **forbidden** inside `AttemptPdfTemplate` (ADR-0009) |
-| Loading skeleton | Reuse (pattern) | `SOURCE/app/(layer4)/me/exams/loading.tsx` | Same `animate-pulse` row-placeholder treatment for `(HM)/history/loading.tsx` |
+| Loading skeleton | Reuse (pattern) | `SOURCE/app/(authoring)/me/exams/loading.tsx` | Same `animate-pulse` row-placeholder treatment for `(history)/history/loading.tsx` |
 | Route-level error boundary | New (idiomatic Next.js) | — | No existing `error.tsx` precedent in this codebase; first use, following Next.js App Router convention |
 
 ### Design Tokens
 
-No new token values are introduced. All values below are already defined in `DESIGN.md` and `SOURCE/app/globals.css`.
+No new token values are introduced. All values below are already defined in `PROJECT_OVERVIEW.md §2` and `SOURCE/app/globals.css`.
 
 #### Color Roles
 
@@ -364,7 +364,7 @@ Unchanged from the site defaults: Serif (Source Serif 4) for the History page `h
 
 - `/history` content column: `max-w-2xl`, centered, `px-6 py-10` (matches `MyExamsList`).
 - List scroll region: `max-h-[30rem] overflow-y-auto` (D3) — page itself does not scroll further than needed for the heading + this region.
-- `AttemptPdfTemplate` content width: fixed at the site's existing 720px long-text convention (`DESIGN.md` Layout); exact pixel/DPI rasterization parameters are a Design Doc decision (see Open Items).
+- `AttemptPdfTemplate` content width: fixed at the site's existing 720px long-text convention (`PROJECT_OVERVIEW.md §2` Layout); exact pixel/DPI rasterization parameters are a Design Doc decision (see Open Items).
 - Result page's existing 3-column `grid-cols-3` (Save/Share/Return) is unchanged in shape.
 
 ## Accessibility Requirements
@@ -399,14 +399,14 @@ Compliance target: WCAG 2.1 AA (site default, per PRD NFR Accessibility). Audit 
 | Row title/body text | `#1b1512` | `#ede1c8` | ~12.9:1 (AA/AAA both clear) |
 | ActionButton enabled icon/label color | `#a62c2b` (brand) | `#ede1c8` | ~5.4:1 — clears 4.5:1 normal-text floor (do **not** use copper `#b8863b` for this, per RateButton's documented ~2.49:1 failure) |
 | Row metadata (date/time) | `#6b655c` (muted) | `#ede1c8` | ~4.5:1 |
-| PDF score (large, ≥ 24px) | `#a62c2b` | `#ede1c8` | Large-text floor (3:1) clears easily; also satisfies DESIGN.md's "no brand-red below 24px" rule since the score renders large |
+| PDF score (large, ≥ 24px) | `#a62c2b` | `#ede1c8` | Large-text floor (3:1) clears easily; also satisfies PROJECT_OVERVIEW.md §2's "no brand-red below 24px" rule since the score renders large |
 | Copper rule/border | `#b8863b` | `#ede1c8` | Non-text UI ≥ 3:1 — decorative rule only, never text |
 
 ## Open Items
 
 | ID | Description | Owner | Deadline |
 |----|-------------|-------|----------|
-| TBD-01 | Exact `html2canvas` rasterization scale/DPI and resulting `AttemptPdfTemplate` pixel dimensions (this spec fixes only the CSS content width, 720px, per DESIGN.md's existing convention) | Design Doc | Before Design Doc sign-off |
+| TBD-01 | Exact `html2canvas` rasterization scale/DPI and resulting `AttemptPdfTemplate` pixel dimensions (this spec fixes only the CSS content width, 720px, per PROJECT_OVERVIEW.md §2's existing convention) | Design Doc | Before Design Doc sign-off |
 | TBD-02 | `getResult()` query change to select `started_at`/`submitted_at` (flagged by the PRD; needed for `ScoreCard`'s real Time stat on the Result page) | Design Doc | Before Design Doc sign-off |
 | TBD-03 | Confirm the D3 "50 rows" pagination-revisit trigger against real usage once available; adjust if the mid-range-Android manual QA pass surfaces jank earlier | Work Plan (post-MVP) | At R10 pickup, non-blocking for this feature's MVP ship |
 

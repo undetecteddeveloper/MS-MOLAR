@@ -24,7 +24,7 @@ Observe and record:
 
 ## Investigation Targets
 - `SOURCE/app/(billing)/me/orders/page.tsx` and its `_components/` (plan Tasks 3.6, 3.7 — the surface under observation)
-- `SOURCE/app/(billing)/queries.ts` (plan Task 3.5 — the `created_at desc` ordering being observed)
+- `SOURCE/features/billing/queries.ts` (plan Task 3.5 — the `created_at desc` ordering being observed)
 - `SOURCE/lib/format/datetime.ts`, `SOURCE/lib/format/number.ts` (plan Task 2.3 — the formatters whose output is being read)
 - `SOURCE/scripts/pw/cli.mjs` (`npm run pw` — the browser driver used for the 360px observation)
 - `docs/design/subscription-frontend-design.md` (§ Early verification point)
@@ -62,7 +62,7 @@ Observe and record:
 Read before observation (plan Task 3.8 — browser half):
 
 - `SOURCE/app/(billing)/me/orders/page.tsx` — server component. Auth gate (`getCurrentUser()` → `redirect("/?auth=signin")`) runs **before** `listMyOrders()`. Render order is fixed in JSX: `PageHeader` → `<PlanSummary />` → `<OrderList orders={orders} />`, so C-11 sits above the list by construction. No sort at this layer.
-- `SOURCE/app/(billing)/queries.ts` — `listMyOrders()` reads `order_code, amount, status, created_at, pending_until` from `payment_orders` with `.order("created_at", { ascending: false })` (line 95), mapping `order_code` through `Number()` (line 102). Newest-first is declared **once**, in SQL.
+- `SOURCE/features/billing/queries.ts` — `listMyOrders()` reads `order_code, amount, status, created_at, pending_until` from `payment_orders` with `.order("created_at", { ascending: false })` (line 95), mapping `order_code` through `Number()` (line 102). Newest-first is declared **once**, in SQL.
 - `_components/OrderList.tsx` — invariant: never re-sorts or filters; renders `<ul>` of `<OrderRow>` keyed by `orderCode`. Empty state is a dashed panel, not an alert.
 - `_components/OrderRow.tsx` — three AC-026 values per row: `formatDateTime(order.createdAt, locale)`, `t("billing.amount", { amount: formatVnd(order.amountVnd, locale) })` (format-then-translate), and `String(order.orderCode)` raw (no grouping). "Continue paying" link is gated on `status === "pending" && Date.parse(pendingUntil) > Date.now()` — both conjuncts, `pendingUntil` taken as given, never recomputed from `created_at`.
 - `_components/PlanSummary.tsx` — `"use client"`, reads `useEntitlement()`; provider is mounted only in `(billing)/layout.tsx`, which is why the route lives under `(billing)`. Renders `<dl>` with the plan `Pair` always present plus three quota `Pair`s **only when `tutor.state === "known" && upload.state === "known"`**; otherwise one sentence `t("billing.quota.unavailable")` and no `0`/`—`.

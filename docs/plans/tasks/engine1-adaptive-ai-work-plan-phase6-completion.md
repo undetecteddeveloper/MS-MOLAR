@@ -6,7 +6,7 @@ Covers Work Plan Final Phase (Tasks 22-27). Task 22 has its own file (`engine1-a
 
 - [x] **Task 22 — Full regression + prod schema apply**: see `engine1-adaptive-ai-work-plan-backend-task-14.md` (⚠ BLOCKING). **Dev-side regression: DONE and green** (see Task 22 section below). **Prod side: DONE 2026-08-16** — P-1 closed, see the Finding P-1 section (now resolved).
 - [x] **Task 23 — Security review**: walk ADR-0011's mechanism end to end (INVOKER, `service_role`-only, revoke-by-name on `record_skill_mastery()`); re-confirm D3/AC-018/019 answer-key containment across both the prompt (backend-task-11) and telemetry (backend-task-12) paths; confirm D4 (hint renders only via `RichText`, no competing path — frontend-task-01); confirm `explainStep()` (backend-task-13) has 0 unauthenticated code paths and every invocation passes through `guard()` (AC-022, PRD Success Criteria #11).
-- [x] **Task 24 — Coverage check**: 70%+ on `lib/adaptive/**`, `lib/tutor/**`, `lib/scoring/wrongTwice.ts`, `components/tutor/**`, `app/(layer3)/_components/SkillRecommendationCard.tsx`.
+- [x] **Task 24 — Coverage check**: 70%+ on `lib/adaptive/**`, `lib/tutor/**`, `lib/scoring/wrongTwice.ts`, `components/tutor/**`, `features/analytics/components/SkillRecommendationCard.tsx`.
 - [x] **Task 25 — Risk closure walk**: every backend DD, frontend DD and PRD risk has a passing evidenced mitigation or an explicitly accepted residual.
 - [x] **Task 26 — Design Doc / PRD acceptance criteria final walk**: AC-001 through AC-031, disposition recorded per AC.
 - [x] **Task 27 — Document updates**: Update History appended to both Design Docs, the ADR, and the UI Spec; U3/U5 shipped values recorded; R9 disposition recorded.
@@ -81,7 +81,7 @@ Telemetry path: `telemetry_log` has **no column** that could carry answer-key ma
 | `lib/tutor/telemetry.ts` | 100 | 100 | 100 | 100 |
 | `components/tutor/ExplainStepAffordance.tsx` | 100 | 100 | 100 | 100 |
 | `components/tutor/useTutorAction.ts` | 100 | 100 | 100 | 100 |
-| `app/(layer3)/_components/SkillRecommendationCard.tsx` | 100 | 100 | 100 | 100 |
+| `features/analytics/components/SkillRecommendationCard.tsx` | 100 | 100 | 100 | 100 |
 
 **Total across the required scope: 96.65% statements / 88.80% branches / 100% functions / 98.84% lines.** Every path clears the 70% bar; the lowest single file is `route.ts` at 91.80% statements (uncovered: line 103, the `a.id === b.id` leg of the third sort key — unreachable in practice because node ids are unique).
 

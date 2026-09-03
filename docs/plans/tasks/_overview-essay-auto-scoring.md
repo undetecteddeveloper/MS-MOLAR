@@ -168,7 +168,7 @@ all phases → Final
 ### Impact scope management
 
 - **Allowed change scope**: the ~55 files enumerated in the work plan's Review Scope — backend 8 new + 20 modified, frontend 10 new + 15 modified, 3 test skeletons converted, 3 DDL groups applied by hand to two Supabase projects.
-- **Preserved areas**: `ScoreCard.tsx` (0 diff), `wrongTwice.ts`, `schema.sql:1354`, `record_exam_result()`, the `exam_results` column DDL, `QuotaKind`/`PLAN_LIMITS`/`consumeQuota()` call sites, `TutorPromptInput.questionType`, `PublicQuestion`'s `Omit`, `buildTelemetryPayload()`'s body, the scored branch of `result/detail/page.tsx`, `ExamPlayer.test.tsx`, `RichText`, all `(layer4)` surfaces except the OQ-5 decision, and **`SOURCE/supabase/test-rls.ts`** (I-1 closed in favour of the runnable service lane; the shipped `S-b` case at `:1314-1320` stays where it is).
+- **Preserved areas**: `ScoreCard.tsx` (0 diff), `wrongTwice.ts`, `schema.sql:1354`, `record_exam_result()`, the `exam_results` column DDL, `QuotaKind`/`PLAN_LIMITS`/`consumeQuota()` call sites, `TutorPromptInput.questionType`, `PublicQuestion`'s `Omit`, `buildTelemetryPayload()`'s body, the scored branch of `result/detail/page.tsx`, `ExamPlayer.test.tsx`, `RichText`, all `(authoring)` surfaces except the OQ-5 decision, and **`SOURCE/supabase/test-rls.ts`** (I-1 closed in favour of the runnable service lane; the shipped `S-b` case at `:1314-1320` stays where it is).
 
 ## Open Items still owned by the engineer
 

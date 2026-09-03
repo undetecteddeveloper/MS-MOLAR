@@ -26,7 +26,7 @@ Create the service-integration-e2e Vitest configuration scoped to `SOURCE/tests/
 - `SOURCE/vitest.config.ts` (the `resolve.alias` block and the `test.include` glob at `:19`)
 - `SOURCE/package.json` (the `scripts` block)
 - `SOURCE/tests/e2e/service/subscription.service.e2e.test.ts` (the comments-only SVC-1 / SVC-2 skeleton this config must collect)
-- `SOURCE/app/(layer2)/__tests__/recordSkillMastery.int.test.ts` (the repository only existing service-lane test)
+- `SOURCE/features/exams/__tests__/recordSkillMastery.int.test.ts` (the repository only existing service-lane test)
 - `SOURCE/supabase/verify-schema.ts` (what gate B actually checks — referenced by the header comment this task writes)
 - `docs/design/subscription-backend-design.md` (§ Verification Strategy)
 
@@ -78,7 +78,7 @@ Recorded during Step 2 (all six Investigation Targets read in full).
 - `SOURCE/vitest.integration.config.ts` (plan Task 0.1, the sibling this task mirrors) — same alias, `environment: "node"`, only `test.include` differs. Header carries the why-it-is-separate rationale in Vietnamese. No `--passWithNoTests`. This file is the shape precedent followed here.
 - `SOURCE/package.json` — `scripts` block; `test:integration` at the line above the new entry. `test` stays `vitest run` (untouched). `verify:schema` is `npx tsx supabase/verify-schema.ts`, standalone and not chained into `check:bundle`; the header comment names it exactly as invoked.
 - `SOURCE/tests/e2e/service/subscription.service.e2e.test.ts` — comments-only skeleton, no imports/describe/it. Its "HOW THIS FILE IS RUN" block dictates this task's three requirements (alias, node env, include glob; the script name; the blocking gate-B precondition), and its wording of the precondition is the source the header paraphrases.
-- `SOURCE/app/(layer2)/__tests__/recordSkillMastery.int.test.ts` — the repo's only existing service-lane test; lives under `app/**` and therefore inside the CI glob, but is a real-dev-DB test. Read for lane semantics only; not a target of this task and left untouched.
+- `SOURCE/features/exams/__tests__/recordSkillMastery.int.test.ts` — the repo's only existing service-lane test; lives under `app/**` and therefore inside the CI glob, but is a real-dev-DB test. Read for lane semantics only; not a target of this task and left untouched.
 - `SOURCE/supabase/verify-schema.ts` — gate B: eight read-only checks against the live DB via production credentials; item 6 (every FK's `on delete` from the live catalog) and item 7 (schema fingerprint, TD-005) are the ones the header's precondition depends on. Run command per its own header: `cd SOURCE && npx tsx supabase/verify-schema.ts`.
 - `docs/design/subscription-backend-design.md` § Verification Strategy — the gate A / gate B table states the sequence "gate A green -> hand-apply to dev -> **gate B green on dev** -> only then write TypeScript against the schema", and that this checkpoint "has failed silently three times in this repository's history". That is the fact the config header must make actionable, and it is stated there as a blocking precondition with an explicit "fix the database, not the test" instruction.
 

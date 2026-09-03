@@ -6,7 +6,7 @@ Layer: **frontend** (`SOURCE/components/essay/**`)
 Metadata:
 - Dependencies: **Task F-A1**.
 - Blocks: **Task F-A3**, and through it F-B1, F-B3 and F-C2.
-- Provides: the three lifecycle appearances as one pure label component, usable from both `(layer2)` and `(HM)`.
+- Provides: the three lifecycle appearances as one pure label component, usable from both `(exams)` and `(history)`.
 - Size: Small (2 files)
 - Verification level: **L2**.
 
@@ -15,7 +15,7 @@ Each case carries **at least one positive assertion** (`getByText`/`getByRole` t
 
 ## Implementation Content
 
-Create `SOURCE/components/essay/EssayLifecycleBadge.tsx` as an **async Server Component**. It sits in `components/essay/` because **both `(layer2)` and `(HM)` use it** — the same reason `components/history/` and `components/billing/` exist outside the route tree.
+Create `SOURCE/components/essay/EssayLifecycleBadge.tsx` as an **async Server Component**. It sits in `components/essay/` because **both `(exams)` and `(history)` use it** — the same reason `components/history/` and `components/billing/` exist outside the route tree.
 
 Copy the **structure** of `SOURCE/components/billing/OrderStatusBadge.tsx:86-93`: a pill `<span>`, an `aria-hidden` glyph, then **text** as the accessible name — so the label survives black-and-white printing and a screen reader reads **only the words**.
 

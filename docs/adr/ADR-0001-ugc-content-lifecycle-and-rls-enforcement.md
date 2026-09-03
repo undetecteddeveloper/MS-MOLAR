@@ -115,7 +115,7 @@ In the same idempotent file, after the column is added: `update public.exams set
 
 ## Architecture Impact
 
-- **Changes**: `public.exams` (new columns + status constraint), `public.questions` (new columns + tightened select policy), `public.user_profiles` (update policy gains `with check`), `SOURCE/app/(layer2)/queries.ts` (reads now filtered by policy; `listExams`/`getExam`/`getExamForPlayer` select `status`/`author_id`/`author_display_name` and `question_type`/`image_url`/`essay_answer` where needed).
+- **Changes**: `public.exams` (new columns + status constraint), `public.questions` (new columns + tightened select policy), `public.user_profiles` (update policy gains `with check`), `SOURCE/features/exams/queries.ts` (reads now filtered by policy; `listExams`/`getExam`/`getExamForPlayer` select `status`/`author_id`/`author_display_name` and `question_type`/`image_url`/`essay_answer` where needed).
 - **New**: `public.exam_reports` + policies; image + private-uploads Storage buckets + policies; new server actions and author read queries (Design Doc).
 - **Removed vs v1.1**: `is_admin()`, admin RLS branches, the pending-cap trigger, the role-preservation trigger, the review-queue/report-admin read path.
 - **Constraints added**: publication is a hard RLS gate; one report per user per exam; non-published images confined in Storage.

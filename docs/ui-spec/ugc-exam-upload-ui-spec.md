@@ -12,7 +12,7 @@
 
 This UI Specification defines the screens, components, states, and interactions for the AI-assisted UGC exam upload feature. It covers the UI surfaces of PRD requirements R1–R11 and R13, R15. R12 (RLS confinement) and R14 (backfill) have no UI surface and are owned by ADR-0001 / Design Doc. R11's image-render safety and R10's author-attribution rendering are included here; their data mechanisms (Storage bucket, denormalized name) are ADR/Design Doc scope.
 
-All new screens use the site-wide "Ink & Lacquer" theme (`DESIGN.md`) and the existing layer-2 component conventions — no new design language is introduced.
+All new screens use the site-wide "Ink & Lacquer" theme (`PROJECT_OVERVIEW.md §2`) and the existing layer-2 component conventions — no new design language is introduced.
 
 ### What changed from v1.1 (for reviewers migrating from the old spec)
 
@@ -29,8 +29,8 @@ All new screens use the site-wide "Ink & Lacquer" theme (`DESIGN.md`) and the ex
 
 | Source | Path | Version |
 |--------|------|---------|
-| Theme definition | `E:\StemWeb_project\MS-MOLAR\DESIGN.md` | repo `main` (alpha) |
-| Existing component conventions | `SOURCE/app/(layer2)/_components/`, `SOURCE/app/(layer1)/_components/AuthForm.tsx` | repo `main` |
+| Theme definition | `E:\StemWeb_project\MS-MOLAR\PROJECT_OVERVIEW.md §2` | repo `main` (alpha) |
+| Existing component conventions | `SOURCE/features/exams/components/`, `SOURCE/features/auth/components/AuthForm.tsx` | repo `main` |
 | Prototype code | None provided | — |
 
 ## Prototype Management
@@ -43,7 +43,7 @@ Downstream documents treat these as fixed unless a listed escalation triggers.
 
 | ID | Decision | Rationale |
 |----|----------|-----------|
-| D1 | **Routes**: `/upload` (metadata + two-file upload + trigger extraction), `/me/exams` (author self-service list), `/me/exams/[id]` (review & edit of one exam — the assembled result, correction, and Publish; also used to edit a published exam's fields and to view a failed/draft exam). All live in a new `(layer4)` route group under the existing `SiteHeader`. **No `/admin/*` routes.** | `/me/*` matches existing `/me/dashboard`; the old `/admin/import` dead link and all admin routes are removed with admin moderation |
+| D1 | **Routes**: `/upload` (metadata + two-file upload + trigger extraction), `/me/exams` (author self-service list), `/me/exams/[id]` (review & edit of one exam — the assembled result, correction, and Publish; also used to edit a published exam's fields and to view a failed/draft exam). All live in a new `(authoring)` route group under the existing `SiteHeader`. **No `/admin/*` routes.** | `/me/*` matches existing `/me/dashboard`; the old `/admin/import` dead link and all admin routes are removed with admin moderation |
 | D2 | **Two-file upload, not paste**: the author supplies a **question file** and an **answer file** (each image or PDF) via two labeled file pickers. There is no text-paste path. Extraction runs **server-side** after the author triggers it; there is no client-side live preview (the API key is server-only). | PRD R3/R4; matches how teachers keep exams (a question sheet + an answer key) and lets authors submit real documents |
 | D3 | **Extraction is an explicit, visible server step**: after "Extract", the UI shows a non-blocking processing state (not instant); on success it lands on the review screen; on failure it shows a structured, `Câu N`-identifying error and the author fixes input and retries. Metadata and file selections survive every failure. | PRD R15/AC-029, reliability NFR (no data loss); AI round-trip is seconds, not sub-second |
 | D4 | **Author review is the quality gate**: the review screen (S-03) shows the assembled exam per question — plain-text stem, the cropped **image if any**, the four choices A–D, and the **correct answer taken from the answer file** — and lets the author correct any field in place. Publishing is a distinct action, disabled until the exam validates cleanly. There is no admin approval. | PRD R7/R8; AI is non-deterministic and can misread, so a human confirmation replaces admin pre-moderation |
@@ -508,7 +508,7 @@ Unchanged from v1.1. ExamCard: a "by {display_name}" row between title and the S
 
 ### Design Tokens
 
-All tokens come from `DESIGN.md` and `SOURCE/app/globals.css`; this feature introduces **no new token values**. (Color roles, typography, spacing, elevation, radius are identical to v1.1 — see below; the only change is that the monospace role now applies to the UploadGuide example only, and there is no paste textarea.)
+All tokens come from `PROJECT_OVERVIEW.md §2` and `SOURCE/app/globals.css`; this feature introduces **no new token values**. (Color roles, typography, spacing, elevation, radius are identical to v1.1 — see below; the only change is that the monospace role now applies to the UploadGuide example only, and there is no paste textarea.)
 
 #### Color Roles
 
@@ -519,7 +519,7 @@ All tokens come from `DESIGN.md` and `SOURCE/app/globals.css`; this feature intr
 | Card surface | `--block-bg` / `bg-card` | ivory card variant | ExamRow, question cards, panels |
 | Primary action | `--brand` | `#A62C2B` | Extract/Publish/Delete/Send buttons, error text, correct-answer tag |
 | On primary | `--brand-foreground` | `#EDE1C8` | Text on vermillion buttons |
-| Accent (gold rule/underline) | DESIGN.md gold hex | `#B8863B` | `rule-divider`, focus underline, Published/Review badge border, success-banner left rule — never small text. NOT the Tailwind `--accent` (`#e3d5b6`); the inherited Cancel-hover `hover:bg-accent` uses `#e3d5b6`, not the gold hex |
+| Accent (gold rule/underline) | PROJECT_OVERVIEW.md §2 gold hex | `#B8863B` | `rule-divider`, focus underline, Published/Review badge border, success-banner left rule — never small text. NOT the Tailwind `--accent` (`#e3d5b6`); the inherited Cancel-hover `hover:bg-accent` uses `#e3d5b6`, not the gold hex |
 | Muted text | `muted-foreground` | `#6B655C` | Captions, bylines, timestamps, disabled hints |
 | Border | `border` | `#D8C9A8` | Hairlines, card borders, Draft badge |
 | Nav surface | `--nav-bg` | `rgb(27 21 18 / 0.97)` | SiteHeader (unchanged) |
@@ -624,7 +624,7 @@ Gains an `optional` presentation mode (drives the `*`/`aria-required` and the em
 
 - **On S-01** in Automatic mode: rendered inside the disclosure with the caption "Leave these empty — we'll read them from your file. You can edit everything before publishing."
 - **On S-03** (new usage): the same component renders the exam's metadata as an editable block above the question list, replacing the read-only metadata summary described in §ReviewScreen.
-- **AI-proposed marker**: a field populated by extraction and not yet touched by the author carries a small `.eyebrow`-styled caption "from your file" beneath it, in `muted`, plus `aria-describedby` pointing at that caption. The marker is **informational only** — it never blocks, never colours the field, and disappears once the author edits the field. Per DESIGN.md the marker uses `muted`, not `accent` or `primary`; it is not a status and must not read as one.
+- **AI-proposed marker**: a field populated by extraction and not yet touched by the author carries a small `.eyebrow`-styled caption "from your file" beneath it, in `muted`, plus `aria-describedby` pointing at that caption. The marker is **informational only** — it never blocks, never colours the field, and disappears once the author edits the field. Per PROJECT_OVERVIEW.md §2 the marker uses `muted`, not `accent` or `primary`; it is not a status and must not read as one.
 - **Missing required field**: rendered with the standard error treatment already used for `fieldErrors`, driven by the `META_INCOMPLETE` items in the error panel — no new visual language.
 
 #### State x Display Matrix

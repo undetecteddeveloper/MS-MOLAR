@@ -10,7 +10,7 @@ Covers Work Plan Phase 2 (Tasks 7-8 / `engine1-adaptive-ai-work-plan-backend-tas
 ## Test Skeleton Paths for Verification
 
 - `SOURCE/lib/adaptive/__tests__/route.test.ts` — expect 4/4 tests passing (prerequisite-gate, recency+determinism, cold start, node-absent-from-mastery)
-- `SOURCE/app/(layer3)/__tests__/getSkillRecommendation.int.test.ts` — expect 3/3 tests passing (telemetry insert, cold-start+fire-and-forget, mapping fidelity)
+- `SOURCE/features/analytics/__tests__/getSkillRecommendation.int.test.ts` — expect 3/3 tests passing (telemetry insert, cold-start+fire-and-forget, mapping fidelity)
 
 ## Phase Completion Criteria (verbatim from Work Plan)
 
@@ -20,7 +20,7 @@ Covers Work Plan Phase 2 (Tasks 7-8 / `engine1-adaptive-ai-work-plan-backend-tas
 ## Verification Commands
 
 ```
-cd SOURCE && npx vitest run "lib/adaptive" "app/(layer3)/__tests__/getSkillRecommendation.int.test.ts"
+cd SOURCE && npx vitest run "lib/adaptive" "features/analytics/__tests__/getSkillRecommendation.int.test.ts"
 ```
 
 ## Implementation Notes (2026-08-15)

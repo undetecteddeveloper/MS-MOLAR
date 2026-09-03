@@ -45,7 +45,7 @@ Read this file first. It exists so the next session does not re-derive a day of 
 The engineer approved **with these open**. They are enumerated with concrete fix instructions in the design-sync report; the two criticals are summarised here because they have teeth.
 
 ### CL-01 (critical) — two mappings for one contract
-Backend v1.4 created `toCheckoutOrder()` in `SOURCE/lib/billing/checkoutOrder.ts` as the single snake_case → `CheckoutOrder` mapper and deliberately did **not** edit the frontend-owned `app/(billing)/queries.ts`. The frontend document still specifies its own inline mapping.
+Backend v1.4 created `toCheckoutOrder()` in `SOURCE/lib/billing/checkoutOrder.ts` as the single snake_case → `CheckoutOrder` mapper and deliberately did **not** edit the frontend-owned `features/billing/queries.ts`. The frontend document still specifies its own inline mapping.
 
 **This is the only item that produces a failing test rather than a silent divergence** — the backend already specifies a deep-equality contract test between `createOrder()` and `getMyOrder()`. `pendingUntil` as PostgREST's `+00:00` form ≠ `toISOString()`'s `…Z` form: same instant, different string, and it is the deadline text AC-027 observes.
 

@@ -1,7 +1,7 @@
 # Task F-A3 — `EssayScoreLine` + insertion into `result/page.tsx` (FRONTEND EARLY VERIFICATION POINT)
 
 Plan mapping: `docs/plans/20260829-feature-essay-auto-scoring.md` — **Phase F-A (Display Foundation, frontend slices V0 + V1), Task F-A3**
-Layer: **frontend** (`SOURCE/app/(layer2)/_components/**`, one route page)
+Layer: **frontend** (`SOURCE/features/exams/components/**`, one route page)
 
 Metadata:
 - Dependencies: **Task F-A2**, **Task B2.1**.
@@ -12,7 +12,7 @@ Metadata:
 
 ## Implementation Content
 
-Create `SOURCE/app/(layer2)/_components/EssayScoreLine.tsx` as an **async Server Component** and insert it in `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/page.tsx` **between** `ScoreCard` (`:86`) and the overtime block (`:92`).
+Create `SOURCE/features/exams/components/EssayScoreLine.tsx` as an **async Server Component** and insert it in `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/page.tsx` **between** `ScoreCard` (`:86`) and the overtime block (`:92`).
 
 Visual shape borrows the overtime warning already on this page (`border-border bg-card rounded-lg border border-dashed px-4 py-3 text-sm`) — the in-place precedent for "a sentence qualifying the number above", **tokens only, no shadow, no gradient**. The component adds **no margin of its own**; vertical rhythm belongs to the page's `gap-5`.
 
@@ -45,9 +45,9 @@ No new prop, no changed render line. `result.totalScore.toFixed(1)` + `/10`, `Đ
 **`SOURCE/lib/test/renderServerTree.tsx` does not exist** — import from the existing path. This slice is the helper's **second** consumer; **Rule of Three is not met, so do not extract it.** The forced-revisit condition is a **third** consumer, at which point it moves to `SOURCE/lib/test/renderServerTree.tsx` (a name without a `.test.tsx` suffix, so `vitest.config.ts:20` does not collect it).
 
 ## Target Files
-- [x] `SOURCE/app/(layer2)/_components/EssayScoreLine.tsx` (new)
-- [x] `SOURCE/app/(layer2)/_components/__tests__/EssayScoreLine.test.tsx` (new) — 10 cases
-- [x] `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/page.tsx` — import + insertion only
+- [x] `SOURCE/features/exams/components/EssayScoreLine.tsx` (new)
+- [x] `SOURCE/features/exams/components/__tests__/EssayScoreLine.test.tsx` (new) — 10 cases
+- [x] `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/page.tsx` — import + insertion only
 
 ## Investigation Targets
 - `docs/ui-spec/essay-auto-scoring-ui-spec.md` (§ Component: EssayScoreLine — verify not-rendered + default + loading + partial + empty states; **no separate error state**)
@@ -56,11 +56,11 @@ No new prop, no changed render line. `result.totalScore.toFixed(1)` + `/10`, `Đ
 - `docs/design/essay-auto-scoring-frontend-design.md` (§ Non-Scope — `ScoreCard.tsx` is a **0-diff zone**)
 - `docs/design/essay-auto-scoring-frontend-design.md` (§ Theme Token Map — zero new tokens, zero hard-coded hex, `#4F7942` deliberately not used)
 - `docs/adr/ADR-0018-essay-async-grade-write.md` (§ Amendment to ADR-0010 — `ScoreCard`/`/history` show a "đang chấm" marker instead of a number about to change, on a **separate labelled line**, with `ScoreCard` a 0-diff zone)
-- `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/page.tsx` (`:86` `ScoreCard`; `:92` the overtime block; the page's `gap-5`)
-- `SOURCE/app/(layer2)/_components/ScoreCard.tsx` (**0-diff zone** — read, never edit)
+- `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/page.tsx` (`:86` `ScoreCard`; `:92` the overtime block; the page's `gap-5`)
+- `SOURCE/features/exams/components/ScoreCard.tsx` (**0-diff zone** — read, never edit)
 - `SOURCE/app/(billing)/me/orders/__tests__/renderServerTree.tsx` (`:4-10` the empty-tree failure mode it documents; `:25` the helper to import)
 - `SOURCE/components/essay/EssayLifecycleBadge.tsx` (Task F-A2 — the async child that forces `renderServerTree()`)
-- `SOURCE/app/(layer2)/queries.ts` (Task B2.1 — `essaySummary`, `earned`, `max`, `gradedCount`, `pendingCount`, `failedCount`)
+- `SOURCE/features/exams/queries.ts` (Task B2.1 — `essaySummary`, `earned`, `max`, `gradedCount`, `pendingCount`, `failedCount`)
 
 ## Reference Contracts
 
@@ -190,5 +190,5 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
 
 ## Notes
 - Impact scope: F-B1 (the detail surface), F-B2 (the PDF guard), F-C2 (the poller mounts on this page).
-- Scope boundary — preserve unchanged: **`SOURCE/app/(layer2)/_components/ScoreCard.tsx` — 0-diff zone; any diff is a regression.** Also `SOURCE/app/(billing)/me/orders/__tests__/renderServerTree.tsx` (**imported, not moved** — this is its second consumer; Rule of Three is not met).
+- Scope boundary — preserve unchanged: **`SOURCE/features/exams/components/ScoreCard.tsx` — 0-diff zone; any diff is a regression.** Also `SOURCE/app/(billing)/me/orders/__tests__/renderServerTree.tsx` (**imported, not moved** — this is its second consumer; Rule of Three is not met).
 - `SOURCE/lib/test/renderServerTree.tsx` **does not exist**. Do not import from that path.

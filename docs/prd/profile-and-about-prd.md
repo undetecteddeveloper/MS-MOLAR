@@ -22,11 +22,11 @@ Give a logged-in student one screen at `/profile` where they can see who their a
 
 ### Background
 
-The product has an account, but it has no account **screen**. Everything a student can currently do to their own identity happens inside a dropdown menu that exists twice, in two places, with the same three items: `HeaderProfile.tsx` in the site header (`SOURCE/components/shared/HeaderProfile.tsx`) and `SidebarProfile.tsx` in the homepage sidebar (`SOURCE/app/(layer1)/_components/SidebarProfile.tsx`). Both offer exactly *Edit* (display name only), *Đề của tôi*, and *Đăng xuất*. Both render the same hardcoded placeholder image, `/images/user-avatar-placeholder.png` (`HeaderProfile.tsx:19`, `SidebarProfile.tsx:19`), for every user on the platform.
+The product has an account, but it has no account **screen**. Everything a student can currently do to their own identity happens inside a dropdown menu that exists twice, in two places, with the same three items: `HeaderProfile.tsx` in the site header (`SOURCE/components/shared/HeaderProfile.tsx`) and `SidebarProfile.tsx` in the homepage sidebar (`SOURCE/features/auth/components/SidebarProfile.tsx`). Both offer exactly *Edit* (display name only), *Đề của tôi*, and *Đăng xuất*. Both render the same hardcoded placeholder image, `/images/user-avatar-placeholder.png` (`HeaderProfile.tsx:19`, `SidebarProfile.tsx:19`), for every user on the platform.
 
 Three consequences follow, and this PRD exists to close them:
 
-1. **There is no way to change a password from inside the app.** The only password-change path in the codebase is `updatePassword` (`SOURCE/app/(layer1)/actions.ts:116-131`), which runs in a **recovery session** — the student must claim they forgot their password, wait for an email, click a link, and land on `/reset-password`. A student who simply wants to rotate a password they still know has to pretend they lost it. `updatePassword` also performs **no current-password check**, which is correct for a recovery flow (the email link *is* the proof) and wrong for a signed-in flow, where the proof of identity is the password itself.
+1. **There is no way to change a password from inside the app.** The only password-change path in the codebase is `updatePassword` (`SOURCE/features/auth/actions.ts:116-131`), which runs in a **recovery session** — the student must claim they forgot their password, wait for an email, click a link, and land on `/reset-password`. A student who simply wants to rotate a password they still know has to pretend they lost it. `updatePassword` also performs **no current-password check**, which is correct for a recovery flow (the email link *is* the proof) and wrong for a signed-in flow, where the proof of identity is the password itself.
 2. **Every account looks identical.** No `avatar_url` column exists on `public.user_profiles` (`SOURCE/supabase/schema.sql:16-21`), and no Storage bucket holds user portraits. The identity surface of the product is a 12-character display name.
 3. **The product has no contact page.** There is no route on which the owner's name, email, or phone number appears. The only inbound channel is the support widget, which requires an account (support-system PRD, D2). A parent, a school, or a student who cannot sign in has nowhere to look.
 
@@ -42,14 +42,14 @@ Accepted by the engineer before this PRD was written. Downstream documents inher
 | ID | Decision | Rationale / consequence recorded here |
 |---|---|---|
 | **D1** | `/about` is **publicly reachable without login**. | It is a contact page. A contact page behind a login answers nobody who needs it. Mechanically this means one new entry in `PUBLIC_PATHS` — see R11 and R-c, because that list is a counted security constraint, not a convenience array. |
-| **D2** | `/profile` lives at `SOURCE/app/(layer3)/profile/` and **inherits the existing `(layer3)` layout shell**. | `SOURCE/app/(layer3)/layout.tsx` already supplies `SkipLink`, `SiteHeader`, `BottomNav`, `SupportWidget`, and the `#main-content` skip target. Building a bespoke shell would duplicate five imports and silently drop the WCAG 2.4.1 skip target. |
+| **D2** | `/profile` lives at `SOURCE/app/(analytics)/profile/` and **inherits the existing `(analytics)` layout shell**. | `SOURCE/app/(analytics)/layout.tsx` already supplies `SkipLink`, `SiteHeader`, `BottomNav`, `SupportWidget`, and the `#main-content` skip target. Building a bespoke shell would duplicate five imports and silently drop the WCAG 2.4.1 skip target. |
 | **D3** | The Supabase Storage bucket for avatars is **PRIVATE**. `user_profiles.avatar_url` stores the **object path**, not a fetchable URL; reads resolve a signed URL at render time. Write access is restricted per-user by RLS on `storage.objects` scoped to a `{auth.uid()}/` folder prefix. | **Superseded the original PUBLIC decision on 2026-08-17 — see `docs/adr/ADR-0016-avatar-storage-visibility-and-read-path.md`.** The subjects of these photographs are minors (see Context). A public bucket serves objects over unauthenticated HTTPS with no expiry, so an observed URL keeps working forever — including after the student replaces or deletes the avatar. That is not recoverable once objects have been served publicly, whereas the cost of the private path (one Storage round trip on the header render path) is both recoverable and measurable. Every existing bucket in the project is private and `resolveSignedImageUrl` (`SOURCE/lib/ugc/imageUrl.ts:26`) already implements this read path, fail-closed. The write restriction follows the repository's established ownership pattern, `(storage.foldername(name))[1] = auth.uid()::text` (`SOURCE/supabase/schema.sql:1528`). |
 | **D4** | The uploaded avatar must **also** render in the existing site header and the homepage sidebar widgets, not only on `/profile`. | An avatar that only appears on the page where you uploaded it is not an identity, it is a form field. Concretely: `HeaderProfile.tsx:69` and `SidebarProfile.tsx:67`, both of which currently hardcode `/images/user-avatar-placeholder.png`. |
 | **D5** | A successful password change **revokes the user's OTHER sessions and keeps the current one**. | Matches OWASP guidance that a successful password change invalidates other sessions, while not punishing the person who just did the right thing by logging them out of the device they are holding. Supabase expresses exactly this as `signOut({ scope: 'others' })`. **Bounded claim** — see R-b: Supabase revokes *refresh* tokens; an already-issued access token elsewhere remains valid until it expires. D5 promises revocation, not instantaneous lockout, and no requirement below claims more. |
-| **D6** | Display-name rules stay **exactly as they are today**: non-empty, at most 12 characters, matching `/^[\p{L}.]+$/u` (letters and dots only). The existing `updateProfile` Server Action is **reused, not reimplemented**. | The rules live once, at `SOURCE/app/(layer1)/actions.ts:162-167`, and are already mirrored as a client-side input filter in both dropdowns (`HeaderProfile.tsx:126`, `SidebarProfile.tsx:121`). A third implementation is a third place to drift. Reuse also inherits the existing `guard("updateProfile", user.id)` rate limit (`actions.ts:177`) for free. |
+| **D6** | Display-name rules stay **exactly as they are today**: non-empty, at most 12 characters, matching `/^[\p{L}.]+$/u` (letters and dots only). The existing `updateProfile` Server Action is **reused, not reimplemented**. | The rules live once, at `SOURCE/features/auth/actions.ts:162-167`, and are already mirrored as a client-side input filter in both dropdowns (`HeaderProfile.tsx:126`, `SidebarProfile.tsx:121`). A third implementation is a third place to drift. Reuse also inherits the existing `guard("updateProfile", user.id)` rate limit (`actions.ts:177`) for free. |
 | **D7** | The **current password is re-verified server-side** before the password is changed. | The student is already signed in, so the session cookie proves only that *someone* has the device. OWASP: re-authenticate before a password change to protect against an attacker with temporary access to an unattended session. This is the single difference between this flow and the existing recovery-session `updatePassword`, which deliberately has no such check. |
 | **D8** | Avatar constraints: MIME must be one of `image/jpeg`, `image/png`, `image/webp`; **maximum size 2MB**. | Same three types the repository already accepts for support screenshots (`SOURCE/supabase/setup-storage.ts:34`), at a quarter of that feature's 8MB ceiling — an avatar is displayed at 24–32 CSS pixels in the header and never needs the headroom a full-screen bug screenshot does. |
-| **D9** | Unauthenticated visitors to `/profile` are redirected by the **existing middleware** to `/?auth=signin`. | `SOURCE/lib/supabase/middleware.ts:115-120` sets `pathname = "/"` and `search = "?auth=signin"` for any non-public path without a session. No new guard is written. **`/login` is only a compatibility stub** that redirects onward (`SOURCE/app/(layer1)/login/page.tsx`); the codebase never redirects *to* it, so no criterion below asserts anything about it as a destination. |
+| **D9** | Unauthenticated visitors to `/profile` are redirected by the **existing middleware** to `/?auth=signin`. | `SOURCE/lib/supabase/middleware.ts:115-120` sets `pathname = "/"` and `search = "?auth=signin"` for any non-public path without a session. No new guard is written. **`/login` is only a compatibility stub** that redirects onward (`SOURCE/app/(auth)/login/page.tsx`); the codebase never redirects *to* it, so no criterion below asserts anything about it as a destination. |
 | **D10** | All user-facing strings go through i18n (`SOURCE/lib/i18n/dictionaries/`), **including the `/about` placeholders**. | The dictionaries are type-coupled — `vi.ts` is typed `Dictionary` derived from `en.ts` (`SOURCE/lib/i18n/dictionaries/vi.ts:8-10`), so a key added to one and forgotten in the other is a compile error, not a runtime blank. Putting the placeholders through the same path means the real values (U1) land in one file, not scattered through JSX. |
 
 ### Derived Decisions (D11–D12) — introduced by this PRD
@@ -70,7 +70,7 @@ Ground truth for every requirement below. Each was read during authoring; downst
 | Profile table is `public.user_profiles` (**not** `profiles`): `id uuid pk references auth.users(id) on delete cascade`, `display_name text`, `role text not null default 'student'`, `created_at timestamptz`. **No `avatar_url` column exists.** | `SOURCE/supabase/schema.sql:16-21` |
 | Rows are auto-created by the `handle_new_user()` trigger with an OAuth-aware display-name fallback chain. | `SOURCE/supabase/schema.sql:26-56` |
 | RLS `profiles_select_own` / `profiles_update_own` already permit self read and self update. No new table-level policy is needed for a new column. | `SOURCE/supabase/schema.sql` §L1 |
-| Existing Server Actions: `signUp`, `signInWithOAuth`, `requestPasswordReset`, `updatePassword` (recovery-session, **no** current-password check), `signIn`, `signOut` (redirects `/?auth=signin`), `updateProfile` (display name, rate-limited). | `SOURCE/app/(layer1)/actions.ts:21, 66, 93, 116, 134, 149, 158` |
+| Existing Server Actions: `signUp`, `signInWithOAuth`, `requestPasswordReset`, `updatePassword` (recovery-session, **no** current-password check), `signIn`, `signOut` (redirects `/?auth=signin`), `updateProfile` (display name, rate-limited). | `SOURCE/features/auth/actions.ts:21, 66, 93, 116, 134, 149, 158` |
 | `validatePassword` enforces ≥10 characters, ≤72 **bytes** (bcrypt truncation boundary), no whitespace-only, and a small common-password denylist. | `SOURCE/lib/auth/passwordPolicy.ts:55-75` |
 | `guard(action, userId)` takes **no** limit/window arguments — both are looked up from `RATE_LIMITS[action]`, and `action` is typed `keyof typeof RATE_LIMITS`. A new limited action therefore requires a **new keyed entry** in `RATE_LIMITS`. | `SOURCE/lib/security/rateLimit.ts:107-160, 187-207` |
 | The limiter is **keyed by user id** and therefore protects only signed-in traffic. Unauthenticated flooding is TD-008/TD-013, open and cost-blocked. | `SOURCE/lib/security/rateLimit.ts:19-21` |
@@ -187,7 +187,7 @@ journey
 ```mermaid
 flowchart TB
     subgraph IN["In Scope — this release"]
-        A["/profile route under app/(layer3)/profile/, inheriting the (layer3) shell (D2)"]
+        A["/profile route under app/(analytics)/profile/, inheriting the (analytics) shell (D2)"]
         B["Identity panel: avatar with initials fallback, display name, read-only registered email"]
         C["Password row rendered as the constant mask •••••••• with no reveal control (D12)"]
         D["Sign-out control reusing the existing signOut Server Action"]
@@ -228,11 +228,11 @@ flowchart TB
 
 ---
 
-- [ ] **R1 — `/profile` exists, is authenticated-only, and reuses the `(layer3)` shell (D2, D9)**
-  The route is `SOURCE/app/(layer3)/profile/` and it renders only for a signed-in user. Access control is the existing middleware; no new guard is written.
+- [ ] **R1 — `/profile` exists, is authenticated-only, and reuses the `(analytics)` shell (D2, D9)**
+  The route is `SOURCE/app/(analytics)/profile/` and it renders only for a signed-in user. Access control is the existing middleware; no new guard is written.
   - **AC-001**: Given a signed-in student, when they request `/profile`, then the page renders with HTTP 200 and shows the identity panel of R2.
   - **AC-002**: Given a request to `/profile` carrying **no** session cookie, when it reaches the server, then the response is a redirect whose final resolved URL is **`/?auth=signin`**, and **no** part of the profile markup (no avatar, no email, no mask, no dialog trigger) appears in any response body along that chain. Verified by a cookie-less request asserting the final URL and asserting the absence of the student's email string.
-  - **AC-003**: Given `/profile` renders, when its DOM is inspected, then it is inside the `(layer3)` shell — the `SkipLink`, the `SiteHeader`, the `#main-content` skip target with `tabIndex={-1}`, and the `BottomNav` are all present, supplied by `app/(layer3)/layout.tsx` and not re-implemented by the page.
+  - **AC-003**: Given `/profile` renders, when its DOM is inspected, then it is inside the `(analytics)` shell — the `SkipLink`, the `SiteHeader`, the `#main-content` skip target with `tabIndex={-1}`, and the `BottomNav` are all present, supplied by `app/(analytics)/layout.tsx` and not re-implemented by the page.
   - **AC-004**: Given `PUBLIC_PATHS` after this feature ships, when it is inspected, then it does **not** contain `/profile` or any prefix that would cover it — `/profile` is protected by being absent from that list, which is the only mechanism the middleware has.
   - **AC-005**: Given a signed-in student, when `/profile` loads its data, then every field displayed derives from **their own** `auth.users` record and their own `user_profiles` row; the page issues no query that could return another user's row, and RLS `profiles_select_own` remains the backstop.
 
@@ -252,7 +252,7 @@ flowchart TB
 ---
 
 - [ ] **R3 — Sign out from `/profile`**
-  Reuses the existing `signOut` Server Action (`SOURCE/app/(layer1)/actions.ts:149-153`) unchanged.
+  Reuses the existing `signOut` Server Action (`SOURCE/features/auth/actions.ts:149-153`) unchanged.
   - **AC-014**: Given a signed-in student on `/profile`, when they activate the sign-out control, then the existing `signOut` action runs and they land on `/?auth=signin`.
   - **AC-015**: Given a student who has just signed out, when they navigate back to `/profile` (including via browser Back), then they are redirected to `/?auth=signin` — the session is actually terminated, not merely navigated away from.
 
@@ -270,7 +270,7 @@ flowchart TB
   - **AC-023**: Given repeated change-password submissions from one account, when they exceed the configured ceiling within the configured window, then further attempts are refused with an actionable retry message via `guard()` using a **new keyed entry in `RATE_LIMITS`** (`SOURCE/lib/security/rateLimit.ts:107-160`) — not by passing arguments to `guard()`, which takes none. Choosing the ceiling and window is a Design Doc item; that a keyed entry exists and is enforced is not.
   - **AC-024**: Given the whole change-password path — client component, Server Action, error branches, and the rate-limited branch — when the code is inspected, then **no** password field value (current, new, or confirm) is passed to `console.*`, to any logger, to telemetry, into a thrown `Error` message, or into any value returned to the client. Verified by an automated repository assertion over the feature's files that matches zero occurrences, so a later edit that adds a debug log breaks the build.
   - **AC-025**: Given a successful change, when the UI settles, then the dialog closes, a confirmation is announced to assistive technology (the `SuccessToast.tsx` `aria-live` pattern), and **the new password is never displayed** anywhere.
-  - **AC-026**: Given the existing recovery flow, when this feature ships, then `updatePassword` (`SOURCE/app/(layer1)/actions.ts:116-131`) is **unchanged** — it still performs no current-password check, because in a recovery session the emailed link is the proof. A regression test asserts the forgot-password → `/reset-password` path still completes.
+  - **AC-026**: Given the existing recovery flow, when this feature ships, then `updatePassword` (`SOURCE/features/auth/actions.ts:116-131`) is **unchanged** — it still performs no current-password check, because in a recovery session the emailed link is the proof. A regression test asserts the forgot-password → `/reset-password` path still completes.
 
 ---
 
@@ -303,7 +303,7 @@ flowchart TB
   - **AC-043**: Given an empty or whitespace-only display name submitted server-side, when it is processed, then it is refused and the stored name is unchanged.
   - **AC-044**: Given a display name longer than **12** characters submitted server-side, when it is processed, then it is refused and the stored name is unchanged.
   - **AC-045**: Given a display name that does not match `/^[\p{L}.]+$/u` — for example `Nguyen Van A` (space), `user_01` (underscore and digits), or `😀` — when it is submitted **server-side**, then it is refused and the stored name is unchanged. Accented Vietnamese letters (`Nguyễn`) are accepted, because `\p{L}` includes them.
-  - **AC-046**: Given the `/profile` display-name control, when the code is inspected, then it calls the **existing** `updateProfile` Server Action (`SOURCE/app/(layer1)/actions.ts:158-189`); no second validation of the three rules exists on the server, so the rules cannot drift between `/profile` and the two dropdowns.
+  - **AC-046**: Given the `/profile` display-name control, when the code is inspected, then it calls the **existing** `updateProfile` Server Action (`SOURCE/features/auth/actions.ts:158-189`); no second validation of the three rules exists on the server, so the rules cannot drift between `/profile` and the two dropdowns.
   - **AC-047**: Given a successful display-name change on `/profile`, when the UI settles, then the new name is shown on `/profile`, in `HeaderProfile`, and in `SidebarProfile` without the student manually reloading — matching the `router.refresh()` behaviour the two dropdowns already implement (`HeaderProfile.tsx:33-41`).
 
 ---
@@ -444,7 +444,7 @@ Each is observable by one engineer with SQL over their own tables, the output of
 11. **`PUBLIC_PATHS` integrity**: the exact-array test passes with **6** entries, and `robots.ts` + `sitemap.ts` both reflect `/about` — measured by the AC-063 test plus the AC-064/AC-065 review, in the same commit. A red test here is the intended outcome of forgetting one of the three.
 12. **Schema integrity**: `npm run verify:schema` **passes** against a re-pasted database — measured on the day the schema change lands. A stale fingerprint is the failure mode this gate exists for.
 13. **No regression in the existing gates**: `npx tsc --noEmit`, `npx eslint --max-warnings 0`, `npx vitest run`, `npm run build`, `npm run check:bundle` all pass — **0** new errors and **0** new warnings, measured before merge.
-14. **Bundle cost**: the `/profile` route's First Load JS, read from the `npm run build` route table, is **within +15 KB** of the median of the existing `(layer3)` routes; `/about` is within **+2 KB** of `/terms`. Measured once, from the build output, before merge. A dialog and a file input should not cost more than that; if they do, something heavy was imported by accident.
+14. **Bundle cost**: the `/profile` route's First Load JS, read from the `npm run build` route table, is **within +15 KB** of the median of the existing `(analytics)` routes; `/about` is within **+2 KB** of `/terms`. Measured once, from the build output, before merge. A dialog and a file input should not cost more than that; if they do, something heavy was imported by accident.
 15. **Accessibility gate**: **0** new ESLint `jsx-a11y` warnings (the lint gate already runs at `--max-warnings 0`), **plus** a documented manual keyboard pass over the change-password dialog covering open, tab order, focus containment, `Esc`, and focus restoration — 5/5 steps pass. Deliberately **not** stated as an axe score: the repository has no axe.
 
 ### Qualitative Metrics
@@ -466,11 +466,11 @@ Each is observable by one engineer with SQL over their own tables, the output of
 
 **On existing code — reused, not rewritten:**
 
-- `SOURCE/app/(layer1)/actions.ts` — `signOut` (R3) and `updateProfile` (R7) are reused **unchanged**. A **new** action is added for the password change; `updatePassword` at `:116-131` stays as it is (AC-026).
+- `SOURCE/features/auth/actions.ts` — `signOut` (R3) and `updateProfile` (R7) are reused **unchanged**. A **new** action is added for the password change; `updatePassword` at `:116-131` stays as it is (AC-026).
 - `SOURCE/lib/auth/passwordPolicy.ts` — `validatePassword` is the sole policy for the new password (AC-020).
 - `SOURCE/lib/security/rateLimit.ts` — **two new keyed entries** in `RATE_LIMITS` (`:107-160`). `guard()` accepts no limit or window arguments; both come from the keyed entry.
 - `SOURCE/lib/auth/getCurrentUser.ts` — `CurrentUserProfile` (`:22`) gains the avatar reference; 7 call sites including 5 route-group layouts must keep compiling (AC-041).
-- `SOURCE/app/(layer3)/layout.tsx` — supplies the whole shell for `/profile` (D2, AC-003).
+- `SOURCE/app/(analytics)/layout.tsx` — supplies the whole shell for `/profile` (D2, AC-003).
 - `SOURCE/components/ui/SuccessToast.tsx` — the announcement pattern for AC-025 and AC-054. Read its header comment before changing it; it documents why a permanently-mounted live region is silent.
 - `SOURCE/components/support/SupportWidgetDialog.tsx` — the accessible-modal **pattern** for the change-password dialog (AC-050). The support feature inherited it from `ReportExam.tsx` by copying the pattern, not the code; do the same.
 - `SOURCE/components/layout/PageContainer.tsx` + `PageHeader.tsx` — width scale and the single `<h1>` for both new pages. `LegalDocument.tsx` is the closest existing composition for `/about` (centered, `size="small"`, `PageHeader` owns the heading).
@@ -483,7 +483,7 @@ Each is observable by one engineer with SQL over their own tables, the output of
 - `SOURCE/lib/supabase/middleware.ts` — one entry in `PUBLIC_PATHS`, with its reason in place (AC-062).
 - `SOURCE/lib/supabase/__tests__/publicPaths.test.ts` — the exact-array assertion and its count comment (AC-063).
 - `SOURCE/app/robots.ts`, `SOURCE/app/sitemap.ts` — both track `PUBLIC_PATHS` by their own comments (AC-064, AC-065).
-- `SOURCE/components/shared/HeaderProfile.tsx`, `SOURCE/app/(layer1)/_components/SidebarProfile.tsx` — the hardcoded `/images/user-avatar-placeholder.png` at `:19` in each becomes conditional (AC-038, AC-039).
+- `SOURCE/components/shared/HeaderProfile.tsx`, `SOURCE/features/auth/components/SidebarProfile.tsx` — the hardcoded `/images/user-avatar-placeholder.png` at `:19` in each becomes conditional (AC-038, AC-039).
 
 **On external services:**
 
@@ -538,7 +538,7 @@ Three items, all business decisions. None blocks starting the UI Spec or the Des
 **Repository**
 
 - `SOURCE/supabase/schema.sql:16-21` — `user_profiles` definition; `:26-56` new-user trigger; `:372-390` and `:1524-1529` storage-policy precedents; §17 the fingerprint block.
-- `SOURCE/app/(layer1)/actions.ts` — `updatePassword:116-131`, `signOut:149-153`, `updateProfile:158-189` (display-name rules at `:162-167`, rate limit at `:177`).
+- `SOURCE/features/auth/actions.ts` — `updatePassword:116-131`, `signOut:149-153`, `updateProfile:158-189` (display-name rules at `:162-167`, rate limit at `:177`).
 - `SOURCE/lib/auth/passwordPolicy.ts:55-75` — `validatePassword`.
 - `SOURCE/lib/security/rateLimit.ts:19-21` (user-keyed caveat), `:107-160` (`RATE_LIMITS`), `:187-207` (`guard`).
 - `SOURCE/lib/auth/getCurrentUser.ts:22, 26-52` — `CurrentUserProfile` and its fallback chain.
@@ -549,8 +549,8 @@ Three items, all business decisions. None blocks starting the UI Spec or the Des
 - `SOURCE/lib/security/csp.ts:56` — `img-src` already includes the Supabase origin.
 - `SOURCE/next.config.ts` — no `images` block; `SOURCE/components/shared/QuestionFigure.tsx:50` — the repository's dynamic-Storage-image precedent.
 - `SOURCE/app/(billing)/terms/page.tsx:8-12, 14-24` — public static page precedent and the `alternates.canonical` trap; `SOURCE/app/(billing)/layout.tsx:1-13` — why a route group may mix public and private routes.
-- `SOURCE/app/(layer3)/layout.tsx` — the shell `/profile` inherits.
-- `SOURCE/components/shared/HeaderProfile.tsx:19, 33-41, 67, 69, 126`; `SOURCE/app/(layer1)/_components/SidebarProfile.tsx:19, 67, 121` — the two widgets that must show the avatar, their `router.refresh()` pattern, their 44px touch floor, and their client-side display-name filter.
+- `SOURCE/app/(analytics)/layout.tsx` — the shell `/profile` inherits.
+- `SOURCE/components/shared/HeaderProfile.tsx:19, 33-41, 67, 69, 126`; `SOURCE/features/auth/components/SidebarProfile.tsx:19, 67, 121` — the two widgets that must show the avatar, their `router.refresh()` pattern, their 44px touch floor, and their client-side display-name filter.
 - `SOURCE/components/ui/SuccessToast.tsx`; `SOURCE/components/support/SupportWidgetDialog.tsx`; `SOURCE/components/billing/LegalDocument.tsx`; `SOURCE/components/layout/PageContainer.tsx`; `SOURCE/components/layout/PageHeader.tsx`; `SOURCE/components/shared/SkipLink.tsx`.
 - `SOURCE/package.json:9-14` — the verify gates.
 
@@ -570,7 +570,7 @@ Three items, all business decisions. None blocks starting the UI Spec or the Des
 
 ### Glossary
 
-- **`(layer3)`** — the Next.js route group holding the analytics/account area; supplies the shared shell `/profile` inherits (D2).
+- **`(analytics)`** — the Next.js route group holding the analytics/account area; supplies the shared shell `/profile` inherits (D2).
 - **`PUBLIC_PATHS`** — the exported array in `lib/supabase/middleware.ts` listing every path reachable without a session. Matching is by exact equality **or** segment prefix, so `/about` would also cover `/about/x` but not `/about-us`. It is a counted security constraint with an automated gate.
 - **Initials fallback** — the avatar shown when a student has no uploaded image; derived per D11 from the display name, which cannot contain spaces.
 - **Mask constant** — the literal `••••••••` (8 × U+2022) shown in the password row; a constant, not localized, carrying no length information (D12).

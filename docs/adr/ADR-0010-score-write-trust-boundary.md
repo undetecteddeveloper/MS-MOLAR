@@ -2,9 +2,9 @@
 
 ## Status
 
-Accepted — 2026-08-03. Closes Critical #2 of `docs/security-review-2026-08-03.md`.
+Accepted — 2026-08-03. Closes Critical #2 of the 2026-08-03 security review (that document is no longer in the repo; its still-open items are tracked in `TECH-DEBT.md`).
 
-- Security review: `docs/security-review-2026-08-03.md` — Critical #2 ("Students can write their own scores into the database").
+- Security review: the 2026-08-03 security review (that document is no longer in the repo; its still-open items are tracked in `TECH-DEBT.md`) — Critical #2 ("Students can write their own scores into the database").
 - Sibling: ADR-0001 (owns the RLS-enforcement posture this ADR makes an exception to).
 - Schema: `SOURCE/supabase/schema.sql` §11. Gate: `SOURCE/supabase/test-rls.ts` cases S-a…S-e.
 
@@ -50,5 +50,5 @@ Tightening the policy alone cannot close abuse (1): a student can legitimately s
 ## Consequences
 
 - `submitExam` no longer writes through the user's client; a regression to `supabase.from("exam_results").insert(...)` is a `42501` in production, and is caught earlier by `submitExam.int.test.ts` obligation (f).
-- Deployment now has a second hand-applied SQL section that must land with the code (`docs/TECH-DEBT.md` TD-005). `npm run verify:schema` checks §10 and §11 together and distinguishes "permission revoked" (`42501`) from "merely blocked by the foreign key" (`23503`), so a half-applied §11 cannot read as green.
+- Deployment now has a second hand-applied SQL section that must land with the code (`TECH-DEBT.md` TD-005). `npm run verify:schema` checks §10 and §11 together and distinguishes "permission revoked" (`42501`) from "merely blocked by the foreign key" (`23503`), so a half-applied §11 cannot read as green.
 - `exam_results` is now append-only from every client's perspective. Any future "retake / rescore" feature must go through the same privileged path rather than an `UPDATE` policy.

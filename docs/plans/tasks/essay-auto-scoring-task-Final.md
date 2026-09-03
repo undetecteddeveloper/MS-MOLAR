@@ -93,7 +93,7 @@ All four are engineer decisions recorded as flagged restatements **instead of** 
 - [ ] the scored branch of `result/detail/page.tsx`
 - [ ] `ExamPlayer.test.tsx`
 - [ ] `RichText`
-- [ ] all `(layer4)` surfaces **except** the OQ-5 decision
+- [ ] all `(authoring)` surfaces **except** the OQ-5 decision
 
 ### 4. Security review — done 2026-08-30
 - [x] `GROQ_API_KEY` read **only** inside `groqClient.ts:228` (a `server-only` module). The only other mentions are `checkEnv.ts`'s presence check (reads existence, never the value) and comments. **`npm run check:bundle` exit 0** — "8 server-only secrets do not reach the client".
@@ -156,7 +156,7 @@ Four reasons this is read as environmental rather than as a regression, and all 
 - [x] **Literal `it.todo(` across the whole `tests/` tree and all three files: 0.** Measured with `grep -F`, not `grep "it.todo"` — the unescaped `.` matches prose and reports phantom todos, which it did on the first pass here.
 
 #### Correction to this section's own premise
-`essayGrading.int.test.ts` lives at **`app/(layer2)/__tests__/`**, not `tests/integration/`, so it runs in the **default** vitest lane — `vitest.integration.config.ts` includes only `tests/integration/**`. That is not drift: **eleven** other `*.int.test.ts` files sit under `app/` and `lib/` by the same established convention. The phrase "integration lane" names the file's *kind*, not the vitest project it belongs to.
+`essayGrading.int.test.ts` lives at **`app/(exams)/__tests__/`**, not `tests/integration/`, so it runs in the **default** vitest lane — `vitest.integration.config.ts` includes only `tests/integration/**`. That is not drift: **eleven** other `*.int.test.ts` files sit under `app/` and `lib/` by the same established convention. The phrase "integration lane" names the file's *kind*, not the vitest project it belongs to.
 ### 9. Manual verification on dev with seeded data
 *(Production has 0 submitted essays, so there is no other path.)*
 - [ ] **IV-1** — the read contract works: `EssayScoreLine` shows `1 / 1 điểm` plus the denominator sentence; `ScoreCard` unchanged **to the pixel**
@@ -255,7 +255,7 @@ Every gate below was run **separately, with a real exit code**, at commit `6f85b
 - `docs/adr/ADR-0018-essay-async-grade-write.md` (§ Implementation Guidance — item #8: no background writer; § Consequences — the pre-feature fingerprint `29931beeb950`)
 - `TECH-DEBT.md` (TD-005, TD-029, TD-030)
 - All per-task Gate E4 exit-code tables from **H7 to B3.3** (the known-red window audit)
-- `SOURCE/lib/scoring/wrongTwice.ts`, `SOURCE/app/(layer2)/_components/ScoreCard.tsx`, `SOURCE/app/(layer2)/_components/__tests__/ExamPlayer.test.tsx`, `SOURCE/supabase/schema.sql:1354`, `SOURCE/lib/tutor/telemetry.ts` (`buildTelemetryPayload()`), `SOURCE/lib/billing/quota.ts` (the unchanged-claims list)
+- `SOURCE/lib/scoring/wrongTwice.ts`, `SOURCE/features/exams/components/ScoreCard.tsx`, `SOURCE/features/exams/components/__tests__/ExamPlayer.test.tsx`, `SOURCE/supabase/schema.sql:1354`, `SOURCE/lib/tutor/telemetry.ts` (`buildTelemetryPayload()`), `SOURCE/lib/billing/quota.ts` (the unchanged-claims list)
 
 ## Reference Contracts
 
@@ -361,7 +361,7 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
 
 ## Notes
 - Impact scope: verification and documents only. **No feature code changes in this phase.**
-- Scope boundary — preserve unchanged: everything in item 3's list, most sharply **`SOURCE/app/(layer2)/_components/ScoreCard.tsx` (0 diff)** and **`SOURCE/lib/scoring/wrongTwice.ts` (not one byte)**.
+- Scope boundary — preserve unchanged: everything in item 3's list, most sharply **`SOURCE/features/exams/components/ScoreCard.tsx` (0 diff)** and **`SOURCE/lib/scoring/wrongTwice.ts` (not one byte)**.
 - **Merging everything in this plan leaves the feature disabled in production.** Grading real student writing begins only after Phase E, and Phase E begins only after Gate A6 carries a real date.
 
 ---

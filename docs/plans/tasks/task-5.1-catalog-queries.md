@@ -1,12 +1,12 @@
-# Task 5.1 — (layer2)/queries.ts — published + byline + image
+# Task 5.1 — features/exams/queries.ts — published + byline + image
 
 **Phase**: 5 · **Depends on**: 1.1 · **Type**: Contract-change + Quality
 
 ## Goal
-Extend `SOURCE/app/(layer2)/queries.ts` `listExams`/`getExam`/`getExamForPlayer`: add `.eq('status','published')` (explicit R-7 guard on top of the RLS floor, so a viewer's own non-published exams never leak into the catalog) and select `author_display_name` into the `Exam` view-model plus each question's `question_type`/`image_url`/`essay_answer` (additive columns; existing callers keep working).
+Extend `SOURCE/features/exams/queries.ts` `listExams`/`getExam`/`getExamForPlayer`: add `.eq('status','published')` (explicit R-7 guard on top of the RLS floor, so a viewer's own non-published exams never leak into the catalog) and select `author_display_name` into the `Exam` view-model plus each question's `question_type`/`image_url`/`essay_answer` (additive columns; existing callers keep working).
 
 ## Files
-`SOURCE/app/(layer2)/queries.ts` (edit `EXAM_COLUMNS`/`toExam` and the question mapper).
+`SOURCE/features/exams/queries.ts` (edit `EXAM_COLUMNS`/`toExam` and the question mapper).
 
 ## ACs / metrics
 AC-011/021/024/027; R-7 guard.

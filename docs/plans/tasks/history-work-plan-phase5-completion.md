@@ -19,7 +19,7 @@ Covers Work Plan Phase 5 (Tasks 5.1-5.2 / `history-work-plan-task-16.md` through
 ## Verification Commands
 
 ```
-grep -n "History" SOURCE/app/(layer2)/_components/SiteHeader.tsx SOURCE/app/(layer1)/_components/HomeSidebar.tsx
+grep -n "History" SOURCE/components/layout/SiteHeader.tsx SOURCE/features/auth/components/HomeSidebar.tsx
 ```
 
 Manual: click "History" from `SiteHeader` (any route) and from `HomeSidebar` (homepage) — confirm both land on `/history`; confirm active-highlight on `SiteHeader`'s "History" item across any `/history*` route.

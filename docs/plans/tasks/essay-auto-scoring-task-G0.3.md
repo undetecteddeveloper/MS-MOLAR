@@ -41,7 +41,7 @@ Complete Gate D items D1–D5:
 
 ## Investigation Targets
 - `docs/plans/20260829-feature-essay-auto-scoring.md` (§ Gate D — OQ-3 / UI Spec O-3 / FE-OQ-3)
-- `SOURCE/app/(HM)/queries.ts` (`listMyHistory()` — the embedded select at `:64-66`, `EmbeddedRow` at `:23-34`, `MyHistoryEntry` at `:8-18`)
+- `SOURCE/features/history/queries.ts` (`listMyHistory()` — the embedded select at `:64-66`, `EmbeddedRow` at `:23-34`, `MyHistoryEntry` at `:8-18`)
 - `SOURCE/lib/supabase/boundedRead.ts` (`LIST_ROW_CEILING = 500` at `:74` — the ceiling the measurement must use)
 - `docs/design/essay-auto-scoring-backend-design.md` (§ Agreement Checklist Scope / D-03 / D-13 — the two required booleans B2.2 will derive)
 - `docs/ui-spec/essay-auto-scoring-ui-spec.md` (§ Open Item O-3 — the UI Spec makes this a hard Work Plan entry gate)
@@ -101,5 +101,5 @@ Run each command **separately** from `SOURCE/` and record its **real exit code**
 
 ## Notes
 - Impact scope: unblocks Task B2.2 and, through it, Tasks B2.3, B2.4 and the whole read path.
-- Scope boundary: read-only measurement. No change to `SOURCE/app/(HM)/queries.ts` in this task — that is B2.2.
+- Scope boundary: read-only measurement. No change to `SOURCE/features/history/queries.ts` in this task — that is B2.2.
 - OQ-3, UI Spec O-3 and FE-OQ-3 are **one** question with three IDs; closing Gate D closes all three.

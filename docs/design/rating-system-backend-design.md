@@ -68,10 +68,10 @@ No common ADR (`docs/adr/ADR-COMMON-*`) exists or is required: the error-return 
 - [x] Add `public.exam_difficulty_ratings` (three integer part-score columns, per-part `[1,10]` CHECK, `unique(exam_id, user_id)`, `user_id uuid default auth.uid() references auth.users(id) on delete cascade`, `exam_id references exams(id) on delete cascade`), appended idempotently AFTER the `exam_reports` policies in `schema.sql`.
 - [x] Add insert-own + update-own + select-own RLS policies on the ratings table; each write policy AND-s `user_id = auth.uid()`, a published-exam `EXISTS`, and a submitted-attempt `EXISTS`.
 - [x] Add the `public.exams_with_difficulty` view (`create or replace view`) exposing all `exams` columns + `rating_count` + `avg_overall` (NULL when `rating_count < 3`).
-- [x] Extend `SOURCE/app/(layer2)/queries.ts`: `listExams`/`getExam` read the view; `ExamRow`/`EXAM_COLUMNS`/`toExam` gain `avg_overall`/`rating_count` → mapped to `Exam.communityDifficulty`; `ExamSort` gains `hardest`; `ExamFilters` gains `level`; add `listMySubmittedExamIds()`.
+- [x] Extend `SOURCE/features/exams/queries.ts`: `listExams`/`getExam` read the view; `ExamRow`/`EXAM_COLUMNS`/`toExam` gain `avg_overall`/`rating_count` → mapped to `Exam.communityDifficulty`; `ExamSort` gains `hardest`; `ExamFilters` gains `level`; add `listMySubmittedExamIds()`.
 - [x] Add `SOURCE/types/exam.ts` — `Exam.communityDifficulty: { bucket: 'Easy'|'Medium'|'Hard'; mean: number; count: number } | null`.
 - [x] Add `SOURCE/lib/rating/` pure module: `overall()`, `bucket()`, `communityDifficultyFrom()`, `formatMean()`, part-score validation, and the `RATING_MIN`/`RATING_MAX`/`RATING_THRESHOLD` constants.
-- [x] Add `rateExam(examId, scores)` and `getMyRating(examId)` beside `SOURCE/app/(layer2)/actions.ts`.
+- [x] Add `rateExam(examId, scores)` and `getMyRating(examId)` beside `SOURCE/features/exams/actions.ts`.
 - [x] Extend `SOURCE/supabase/test-rls.ts` with rating RLS cases; add `SOURCE/lib/rating/__tests__/` vitest fixtures.
 
 #### Non-Scope (Explicitly not changing)
@@ -90,8 +90,8 @@ No common ADR (`docs/adr/ADR-COMMON-*`) exists or is required: the error-return 
 #### Applicable Standards
 - [x] Idempotent DDL (`create table if not exists` / `drop constraint if exists` + `add constraint` / `drop policy if exists` + `create policy` / `create or replace view`) `[explicit]` — Source: `SOURCE/supabase/schema.sql` convention (e.g. `exam_reports` block :247-341).
 - [x] RLS write policy AND-s `user_id = auth.uid()` + a published `EXISTS` + a cross-table eligibility `EXISTS` `[explicit]` — Source: `reports_insert_own` (`schema.sql:331-335`, published clause) + `answers_insert_own` (`schema.sql:182-189`, cross-table `EXISTS`).
-- [x] Snake_case DB ↔ camelCase TS mappers in query modules `[explicit]` — Source: `SOURCE/app/(layer2)/queries.ts` `toExam` (:33-47).
-- [x] Server Actions: `"use server"`, `createClient()`, `throw` on infrastructure error, discriminated `{ error? }` return on user error `[explicit]` — Source: `reportExam` (`SOURCE/app/(layer4)/actions.ts:960-987`), `submitExam` (`SOURCE/app/(layer2)/actions.ts`).
+- [x] Snake_case DB ↔ camelCase TS mappers in query modules `[explicit]` — Source: `SOURCE/features/exams/queries.ts` `toExam` (:33-47).
+- [x] Server Actions: `"use server"`, `createClient()`, `throw` on infrastructure error, discriminated `{ error? }` return on user error `[explicit]` — Source: `reportExam` (`SOURCE/features/authoring/actions.ts:960-987`), `submitExam` (`SOURCE/features/exams/actions.ts`).
 - [x] Status-object (not redirect) return so a failed write preserves the user's input `[explicit]` — Source: PRD AC-025 + `reportExam`'s `{ error?: "duplicate"|"empty"|"server" }` non-leaking mapping.
 - [x] Pure, unit-testable domain helpers live under `SOURCE/lib/**` (vitest collects only `lib/**` + `components/**`) `[explicit]` — Source: `SOURCE/vitest.config.ts:15`; precedent `SOURCE/lib/scoring/computeScore.ts` + its tests.
 - [x] Numeric domain limits centralized as named constants `[implicit]` — Evidence: `SOURCE/lib/ugc/limits.ts` `LIMITS`. Confirmed: Yes (adopt the same pattern in `SOURCE/lib/rating/` for `RATING_MIN`/`RATING_MAX`/`RATING_THRESHOLD`).
@@ -99,8 +99,8 @@ No common ADR (`docs/adr/ADR-COMMON-*`) exists or is required: the error-return 
 
 #### Assumed Behaviors
 
-- [ ] **`exam_attempts.status = 'submitted'` is the authoritative eligibility source** and `user_id default auth.uid()` scopes a row to the current user. Evidence: `schema.sql:99-106` (table def) + `SOURCE/app/(layer2)/actions.ts:121-125` (`submitExam` sets `status='submitted'`). Confirmed: **Yes**.
-- [ ] **Supabase `.upsert(row, { onConflict: 'exam_id,user_id' })` performs an insert-or-update against the unique constraint** (not reliant on catching 23505). Evidence: `submitExam` uses `.upsert(answerRows, { onConflict: "attempt_id,question_id" })` (`SOURCE/app/(layer2)/actions.ts:101-104`). Confirmed: **Yes**.
+- [ ] **`exam_attempts.status = 'submitted'` is the authoritative eligibility source** and `user_id default auth.uid()` scopes a row to the current user. Evidence: `schema.sql:99-106` (table def) + `SOURCE/features/exams/actions.ts:121-125` (`submitExam` sets `status='submitted'`). Confirmed: **Yes**.
+- [ ] **Supabase `.upsert(row, { onConflict: 'exam_id,user_id' })` performs an insert-or-update against the unique constraint** (not reliant on catching 23505). Evidence: `submitExam` uses `.upsert(answerRows, { onConflict: "attempt_id,question_id" })` (`SOURCE/features/exams/actions.ts:101-104`). Confirmed: **Yes**.
 - [ ] **SQL comparison predicates against NULL are never true, so `.gte/.lt` on `avg_overall` excludes below-threshold (NULL) rows for free.** Evidence: SQL three-valued-logic standard. Confirmed: **Yes** (language semantics) — but the *PostgREST-on-a-view wiring* of this is verified by the spike (see next item).
 - [ ] **PostgREST honours `.order('avg_overall', { ascending:false, nullsFirst:false })` + chained secondary `.order('created_at').order('id')` AND `.gte/.lt` range predicates on a VIEW column, against this Postgres/Supabase version.** Evidence: none locatable in-repo; ADR-0008 flags this as the CRITICAL UNVERIFIED CONSTRAINT. Confirmed: **No** → tied to the phase-0 spike (Risks row R-1) with the RPC fallback.
 - [ ] **A standard (non-`security_invoker`) Postgres view aggregates across ALL raters' ratings** regardless of the `ratings_select_own` RLS (definer semantics), so `rating_count`/`avg_overall` are correct rather than showing only the caller's own rating. Evidence: Postgres view privilege semantics; not verified on this project. Confirmed: **No** → verified by the spike's count assertion (Risks row R-2).
@@ -162,8 +162,8 @@ Backend-verifiable subset of PRD v1.1 ACs (UI-presentation ACs are frontend-owne
 | Type | Path | Description |
 |------|------|-------------|
 | Existing | `SOURCE/supabase/schema.sql` | Append `exam_difficulty_ratings` + RLS at the TRUE END of the file (~:464, after the section-9 BACKFILL — not mid-file after `exam_reports` :340); add `exams_with_difficulty` view. Mirrors `exam_reports` shape (:247-258) + `answers_insert_own` cross-table `EXISTS` (:182-189) + `reports_insert_own` published clause (:331-335). |
-| Existing | `SOURCE/app/(layer2)/queries.ts` | `ExamRow`/`EXAM_COLUMNS`/`toExam` gain `avg_overall`/`rating_count`; `listExams`/`getExam` read the view; `ExamSort` gains `hardest`; `ExamFilters` gains `level`; add `listMySubmittedExamIds()`. |
-| Existing | `SOURCE/app/(layer2)/actions.ts` | Add `rateExam(examId, scores)` and `getMyRating(examId)` beside `startAttempt`/`submitExam`. |
+| Existing | `SOURCE/features/exams/queries.ts` | `ExamRow`/`EXAM_COLUMNS`/`toExam` gain `avg_overall`/`rating_count`; `listExams`/`getExam` read the view; `ExamSort` gains `hardest`; `ExamFilters` gains `level`; add `listMySubmittedExamIds()`. |
+| Existing | `SOURCE/features/exams/actions.ts` | Add `rateExam(examId, scores)` and `getMyRating(examId)` beside `startAttempt`/`submitExam`. |
 | Existing | `SOURCE/types/exam.ts` | `Exam` gains `communityDifficulty`. |
 | Existing | `SOURCE/supabase/test-rls.ts` | Add rating cases R-p…R-u (mirroring the R-i/R-j/R-k reports cases, :429-473). |
 | Existing | `SOURCE/vitest.config.ts` | No change — `lib/**` already collected. |
@@ -171,7 +171,7 @@ Backend-verifiable subset of PRD v1.1 ACs (UI-presentation ACs are frontend-owne
 | New | `SOURCE/lib/rating/__tests__/rating.test.ts` | Boundary fixtures + threshold-agreement test. |
 
 ### Integration Points (Include even for new implementations)
-- **Integration Target**: `SOURCE/app/(layer2)/queries.ts` reads (`listExams`, `getExam`) — the sole mapping point where `avg_overall`/`rating_count` become `Exam.communityDifficulty` via `toExam`.
+- **Integration Target**: `SOURCE/features/exams/queries.ts` reads (`listExams`, `getExam`) — the sole mapping point where `avg_overall`/`rating_count` become `Exam.communityDifficulty` via `toExam`.
 - **Invocation Method**: Server Components call `listExams(filters)` / `getExam(id)`; the Browser page additionally calls `listMySubmittedExamIds()`; the rating surfaces call `rateExam` (server action) and `getMyRating`.
 
 ### Code Inspection Evidence
@@ -182,11 +182,11 @@ Backend-verifiable subset of PRD v1.1 ACs (UI-presentation ACs are frontend-owne
 | `SOURCE/supabase/schema.sql:182-189` (`answers_insert_own`) | pattern reference — cross-table `EXISTS` with-check (the eligibility clause) |
 | `SOURCE/supabase/schema.sql:331-335` (`reports_insert_own`) | pattern reference — published-exam `EXISTS` AND-ed into an insert policy |
 | `SOURCE/supabase/schema.sql:99-106` (`exam_attempts`) | integration point — eligibility source of truth (`status='submitted'`, `user_id default auth.uid()`) |
-| `SOURCE/app/(layer2)/queries.ts:30-47` (`EXAM_COLUMNS`/`toExam`) | integration point — single mapping point extended with the two new fields |
-| `SOURCE/app/(layer2)/queries.ts:52-89` (`ExamSort`/`ExamFilters`/`listExams`) | integration point — sort/filter extension |
-| `SOURCE/app/(layer2)/actions.ts:101-104` (`submitExam` upsert) | pattern reference — `.upsert(..., { onConflict })` idiom `rateExam` reuses |
-| `SOURCE/app/(layer4)/actions.ts:960-987` (`reportExam`) | pattern reference — non-leaking `{ error? }` return-shape precedent |
-| `SOURCE/app/(layer4)/actions.ts:62-69` (`requireUser`) | pattern reference — auth gate (adapted: `rateExam` returns a status object rather than redirect on the eligibility path) |
+| `SOURCE/features/exams/queries.ts:30-47` (`EXAM_COLUMNS`/`toExam`) | integration point — single mapping point extended with the two new fields |
+| `SOURCE/features/exams/queries.ts:52-89` (`ExamSort`/`ExamFilters`/`listExams`) | integration point — sort/filter extension |
+| `SOURCE/features/exams/actions.ts:101-104` (`submitExam` upsert) | pattern reference — `.upsert(..., { onConflict })` idiom `rateExam` reuses |
+| `SOURCE/features/authoring/actions.ts:960-987` (`reportExam`) | pattern reference — non-leaking `{ error? }` return-shape precedent |
+| `SOURCE/features/authoring/actions.ts:62-69` (`requireUser`) | pattern reference — auth gate (adapted: `rateExam` returns a status object rather than redirect on the eligibility path) |
 | `SOURCE/supabase/test-rls.ts:429-473` (R-i/R-j/R-k) | pattern reference — reports RLS cases the rating cases mirror |
 | `SOURCE/lib/scoring/computeScore.ts` + `__tests__/computeScore.test.ts` | pattern reference — pure server-side domain fn + literal-fixture vitest style |
 | `SOURCE/lib/ugc/limits.ts` (`LIMITS`) | pattern reference — centralized numeric-limit constants |
@@ -203,7 +203,7 @@ The HC-02 backend-codebase-analyzer output was supplied as verified ground-truth
 | HC-02-F2 | Idempotent single-file `schema.sql` convention | preserve | New block uses `create table if not exists`, paired `drop constraint if exists NAME` + `add constraint NAME check(...)`, `alter table enable row level security`, `drop policy if exists`/`create policy`; appended at the TRUE END of the file (~:464, after the section-9 BACKFILL). No exams column/trigger/backfill (ADR R8). | `schema.sql` conventions throughout; `exam_reports` block :247-341; file runs to :464 |
 | HC-02-F3 | RLS: `exam_reports` has insert-own + select-own but NO update-own | transform | Ratings are an upsert → add insert-own AND update-own AND select-own. Each write policy AND-s (a) `user_id = auth.uid()`; (b) published `EXISTS`; (c) submitted-attempt eligibility `EXISTS`. | `reports_insert_own` :331-335; `answers_insert_own` :182-189 |
 | HC-02-F4 | Per-part scores integer `[1,10]` via CHECK | preserve | A single CHECK constrains all three part columns to `between 1 and 10`; the `[1,10]` range is also a TS constant pair (`RATING_MIN`/`RATING_MAX`) in `SOURCE/lib/rating/` (LIMITS pattern). | `lib/ugc/limits.ts` `LIMITS` pattern |
-| HC-02-F5 | `rateExam` server action beside `(layer2)/actions.ts` | transform | `'use server'`; auth gate; early eligibility pre-check returning `{ error?: 'ineligible'\|'invalid'\|'server' }` (RLS remains authoritative); `.upsert(..., { onConflict: 'exam_id,user_id' })` (NOT insert; not reliant on 23505); returns a status object (NOT redirect) so the modal keeps input on error (AC-025); mirrors `reportExam`'s non-leaking mapping. | `reportExam` `actions.ts:960-987`; `submitExam` upsert :101-104 |
+| HC-02-F5 | `rateExam` server action beside `(exams)/actions.ts` | transform | `'use server'`; auth gate; early eligibility pre-check returning `{ error?: 'ineligible'\|'invalid'\|'server' }` (RLS remains authoritative); `.upsert(..., { onConflict: 'exam_id,user_id' })` (NOT insert; not reliant on 23505); returns a status object (NOT redirect) so the modal keeps input on error (AC-025); mirrors `reportExam`'s non-leaking mapping. | `reportExam` `actions.ts:960-987`; `submitExam` upsert :101-104 |
 | HC-02-F6 | Exam read model gains `communityDifficulty` | transform | `Exam.communityDifficulty: { bucket: 'Easy'\|'Medium'\|'Hard'; mean: number; count: number } \| null` (null → UI `"—"`). Added via `ExamRow`/`EXAM_COLUMNS`/`toExam` single mapping point; `getExam` reuses `EXAM_COLUMNS` so detail gets it for free. | `queries.ts:30-47` |
 | HC-02-F7 | Pure helpers live under `SOURCE/lib/rating/` | preserve | vitest collects only `lib/**` + `components/**`; `bucket()`/`overall()`/threshold gating go under `SOURCE/lib/rating/`. Bucket boundaries Easy `[1,4)` / Medium `[4,7)` / Hard `[7,10]`; 4.0→Medium, 7.0→Hard, 10.0→Hard; mean display one-decimal (`toFixed(1)`); threshold N=3. | `vitest.config.ts:15`; `lib/scoring` precedent |
 | HC-02-F8 | Submitted-exam-id set for Rate-button eligibility | preserve | A single query `select distinct exam_id from exam_attempts where status='submitted'` (user scoped via RLS), returned once per page — no per-card N+1. Exposed as `listMySubmittedExamIds()`. | `exam_attempts` :99-106; NFR Performance |
@@ -216,8 +216,8 @@ The HC-02 backend-codebase-analyzer output was supplied as verified ground-truth
 Change Target: Exam Difficulty Rating backend (ratings table + RLS + view + Layer 2 reads/writes + lib/rating)
 Direct Impact:
   - SOURCE/supabase/schema.sql (new exam_difficulty_ratings table + constraints + insert/update/select RLS; new exams_with_difficulty view)
-  - SOURCE/app/(layer2)/queries.ts (ExamRow/EXAM_COLUMNS/toExam +2 fields; listExams/getExam read the view; ExamSort += 'hardest'; ExamFilters += level; new listMySubmittedExamIds)
-  - SOURCE/app/(layer2)/actions.ts (new rateExam + getMyRating)
+  - SOURCE/features/exams/queries.ts (ExamRow/EXAM_COLUMNS/toExam +2 fields; listExams/getExam read the view; ExamSort += 'hardest'; ExamFilters += level; new listMySubmittedExamIds)
+  - SOURCE/features/exams/actions.ts (new rateExam + getMyRating)
   - SOURCE/types/exam.ts (Exam.communityDifficulty)
   - NEW SOURCE/lib/rating/ (bucket/overall/communityDifficultyFrom/formatMean/isValidPartScore + constants)
   - SOURCE/supabase/test-rls.ts (rating cases R-p…R-u)
@@ -578,7 +578,7 @@ export function communityDifficultyFrom(
 
 ### Data Contracts
 
-#### `rateExam` (server action, `(layer2)/actions.ts`) (Fact HC-02-F5)
+#### `rateExam` (server action, `(exams)/actions.ts`) (Fact HC-02-F5)
 
 ```yaml
 Contract: rateExam(examId: string, scores: { partI: number; partII: number; partIII: number }): Promise<{ error?: "ineligible" | "invalid" | "server" }>   ("use server")
@@ -599,7 +599,7 @@ Invariants:
   - No exams column is written; no trigger fires (AC-022).
 ```
 
-#### `getMyRating` (read, `(layer2)/actions.ts` or `queries.ts`) — mirrors `hasReported`
+#### `getMyRating` (read, `(exams)/actions.ts` or `queries.ts`) — mirrors `hasReported`
 
 ```yaml
 Contract: getMyRating(examId: string): Promise<{ partI: number; partII: number; partIII: number } | null>
@@ -610,7 +610,7 @@ Output:
   On Error: throw on infrastructure error (Server Component boundary), consistent with getExam/getResult
 ```
 
-#### `listMySubmittedExamIds` (read, `(layer2)/queries.ts`) (Fact HC-02-F8)
+#### `listMySubmittedExamIds` (read, `(exams)/queries.ts`) (Fact HC-02-F8)
 
 ```yaml
 Contract: listMySubmittedExamIds(): Promise<Set<string>>
@@ -626,7 +626,7 @@ Output:
 
 ```yaml
 Contract: Exam.communityDifficulty: { bucket: "Easy"|"Medium"|"Hard"; mean: number; count: number } | null
-Producer: toExam(row) in (layer2)/queries.ts — communityDifficultyFrom(row.avg_overall, row.rating_count)
+Producer: toExam(row) in features/exams/queries.ts — communityDifficultyFrom(row.avg_overall, row.rating_count)
 Guarantees:
   - null exactly when the exam has < 3 ratings (view NULLs avg_overall; helper double-checks count) → frontend renders "—" (AC-015)
   - mean is the unrounded community mean (frontend applies formatMean for one-decimal display); bucket per [1,4)/[4,7)/[7,10]
@@ -659,10 +659,10 @@ Consumers (frontend Design Doc): ExamCard Level line, exam detail Difficulty cel
 | Integration Point | Location | Integration Method | Impact Level | Contract (Input / Output / On Error) | Test Coverage |
 |-------------------|----------|--------------------|-------------|--------------------------------------|---------------|
 | Eligibility source | `exam_attempts.status` (`schema.sql:99-106`) | read-only (RLS `EXISTS` + action precheck) | Low (read-only) | In: (examId, auth.uid()); Out: exists submitted row?; Err: — | RLS R-p/R-q; action unit (mocked) |
-| Catalog read model | `(layer2)/queries.ts` `toExam`/`EXAM_COLUMNS` | data reference (+2 columns from view) | Medium (data-format change, additive) | In: view row; Out: `Exam.communityDifficulty`; Err: throw | vitest lib/rating; output comparison |
-| Sort/filter | `(layer2)/queries.ts` `listExams` | call (new sort value + optional filter) | High (process-flow change: source relation + order/filter branches) | In: `ExamFilters{level?,sort?}`; Out: `Exam[]`; Err: throw | spike S2/S3; RLS positive rows |
-| Rating write | `(layer2)/actions.ts` `rateExam` → `exam_difficulty_ratings` | call (upsert) + hook (RLS with-check reads exams + exam_attempts) | High (new write path) | In: (examId, scores); Out: `{error?}`; Err: mapped, non-leaking | RLS R-p…R-u; action unit |
-| Rate-button gating | `(layer2)/queries.ts` `listMySubmittedExamIds` | data reference | Low (read-only) | In: auth.uid(); Out: `Set<examId>`; Err: throw | RLS scope (attempts_select_own) |
+| Catalog read model | `(exams)/queries.ts` `toExam`/`EXAM_COLUMNS` | data reference (+2 columns from view) | Medium (data-format change, additive) | In: view row; Out: `Exam.communityDifficulty`; Err: throw | vitest lib/rating; output comparison |
+| Sort/filter | `(exams)/queries.ts` `listExams` | call (new sort value + optional filter) | High (process-flow change: source relation + order/filter branches) | In: `ExamFilters{level?,sort?}`; Out: `Exam[]`; Err: throw | spike S2/S3; RLS positive rows |
+| Rating write | `(exams)/actions.ts` `rateExam` → `exam_difficulty_ratings` | call (upsert) + hook (RLS with-check reads exams + exam_attempts) | High (new write path) | In: (examId, scores); Out: `{error?}`; Err: mapped, non-leaking | RLS R-p…R-u; action unit |
+| Rate-button gating | `(exams)/queries.ts` `listMySubmittedExamIds` | data reference | Low (read-only) | In: auth.uid(); Out: `Set<examId>`; Err: throw | RLS scope (attempts_select_own) |
 
 **Conflict check**: no naming or priority conflict with existing systems. The ratings table name (`exam_difficulty_ratings`) does not collide with `exam_reports`; the view name (`exams_with_difficulty`) is new; `ExamSort='hardest'` is additive to the existing union; `ExamFilters.level` is a new optional key. The explicit `.eq('status','published')` catalog guard is preserved on both view reads (no change to the published-only invariant).
 
@@ -821,7 +821,7 @@ Run: `cd SOURCE && npx tsx supabase/test-rls.ts` — re-run after every schema e
 
 - PRD `docs/prd/rating-system-prd.md` (v1.1) — R1–R8, NFRs, Success metrics 1–7, Undetermined Items (table shape + on-read mechanism owned here).
 - ADR `docs/adr/ADR-0008-exam-difficulty-rating-and-on-read-aggregation.md` — Decisions 1–3, the blocking spike, option comparison.
-- Precedents: `SOURCE/supabase/schema.sql` (`exam_reports` :247-258, `answers_insert_own` :182-189, `reports_insert_own` :331-335, `exam_attempts` :99-106); `SOURCE/app/(layer2)/queries.ts` (:30-89, :128-138); `SOURCE/app/(layer2)/actions.ts` (`submitExam` upsert :101-104); `SOURCE/app/(layer4)/actions.ts` (`reportExam` :960-987, `requireUser` :62-69); `SOURCE/supabase/test-rls.ts` (:429-473); `SOURCE/lib/scoring/computeScore.ts` + tests; `SOURCE/lib/ugc/limits.ts`; `SOURCE/vitest.config.ts`.
+- Precedents: `SOURCE/supabase/schema.sql` (`exam_reports` :247-258, `answers_insert_own` :182-189, `reports_insert_own` :331-335, `exam_attempts` :99-106); `SOURCE/features/exams/queries.ts` (:30-89, :128-138); `SOURCE/features/exams/actions.ts` (`submitExam` upsert :101-104); `SOURCE/features/authoring/actions.ts` (`reportExam` :960-987, `requireUser` :62-69); `SOURCE/supabase/test-rls.ts` (:429-473); `SOURCE/lib/scoring/computeScore.ts` + tests; `SOURCE/lib/ugc/limits.ts`; `SOURCE/vitest.config.ts`.
 - Sibling house-style Design Doc: `docs/design/ugc-exam-upload-design.md`.
 
 ## Update History

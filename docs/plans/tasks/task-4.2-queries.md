@@ -1,9 +1,9 @@
-# Task 4.2 — (layer4)/queries.ts — read queries
+# Task 4.2 — features/authoring/queries.ts — read queries
 
 **Phase**: 4 · **Depends on**: 1.1 · **Type**: Implementation + Quality
 
 ## Goal
-Implement `SOURCE/app/(layer4)/queries.ts`:
+Implement `SOURCE/features/authoring/queries.ts`:
 - `listMyExams()` — own rows, all statuses, newest-first: `id,title,subject,grade,questionCount,status,createdAt`.
 - `getMyExam(id)` — own; the full assembled exam for review/edit: metadata + questions (`stem, question_type, choices, correct_answer, essay_answer, image_url`).
 - `hasReported(examId)` — a row `(exam_id, auth.uid())` exists (own-report read).
@@ -11,7 +11,7 @@ Implement `SOURCE/app/(layer4)/queries.ts`:
 Each obtains the client via `await createClient()`; RLS is the authorization floor. snake_case↔camelCase mappers per the `queries.ts` convention. Explicit `order by` (never insertion order).
 
 ## Files
-New: `SOURCE/app/(layer4)/queries.ts`.
+New: `SOURCE/features/authoring/queries.ts`.
 
 ## ACs / metrics
 AC-014/020/026. Missing-sort-key guard (explicit ordering).

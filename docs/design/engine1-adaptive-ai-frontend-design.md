@@ -87,11 +87,11 @@ Inherits the UI Spec's External Resources Used table (unchanged — no environme
 
 - [x] Add `SOURCE/components/tutor/useTutorAction.ts` — the 4-phase (`idle`/`busy`/`hint-shown`/`error`) client state machine calling `explainStep()`.
 - [x] Add `SOURCE/components/tutor/ExplainStepAffordance.tsx` — the client island consuming the hook, rendering the button / hint panel / error text per UI Spec state × display matrix.
-- [x] Add `SOURCE/app/(layer3)/_components/SkillRecommendationCard.tsx` — a zero-JS Server Component rendering the populated or cold-start state.
+- [x] Add `SOURCE/features/analytics/components/SkillRecommendationCard.tsx` — a zero-JS Server Component rendering the populated or cold-start state.
 - [x] Mount `ExplainStepAffordance` inside `ResultDetailPage`'s existing per-question `<li>` (both the `mcq` and `short_answer` scored sub-branches), gated by `r.hasBeenWrongTwice`.
 - [x] Mount `SkillRecommendationCard` inside `DashboardPage`, between `PageHeader` and the existing `AnalyticsDashboard` block, fed by a new parallel `getSkillRecommendation()` fetch.
 - [x] Add the i18n keys the UI Spec names (`tutor.*` × 4, `analytics.recommend*` × 6, reuse `common.retry`) to both `en.ts` and `vi.ts`, with exact placement (see i18n section).
-- [x] Add `SOURCE/components/tutor/ExplainStepAffordance.test.tsx` and `SOURCE/app/(layer3)/_components/SkillRecommendationCard.test.tsx`.
+- [x] Add `SOURCE/components/tutor/ExplainStepAffordance.test.tsx` and `SOURCE/features/analytics/components/SkillRecommendationCard.test.tsx`.
 
 #### Non-Scope (Explicitly not changing)
 
@@ -118,7 +118,7 @@ Inherits the UI Spec's External Resources Used table (unchanged — no environme
 | `getSkillRecommendation()` returns `SkillRecommendation = { skillLabel: string; reasonCode: "prerequisite-gate"\|"lowest-mastery"\|"recently-wrong" } \| null`, readable from a Server Component | Backend Design Doc § Data Contracts + Field Propagation Map (`{nodeId,labelVi,reasonCode}` → `{skillLabel:labelVi,reasonCode}`) | **Yes** (contract) | — |
 | `useT()` requires no `I18nProvider` wrapper in a jsdom test — it falls back to `DEFAULT_LOCALE` when no context is present | `SOURCE/lib/i18n/client.tsx:33-36` (`ctx?.t ?? createTranslate(getDictionary(DEFAULT_LOCALE))`) | **Yes** | — |
 | An `async function` Server Component can be rendered in a vitest/jsdom RTL test via `render(await Component(props))` without a real Next.js RSC runtime, given the component performs no React Server-only APIs beyond `await getTranslate()` | Standard React Testing Library technique for async Server Components; **no existing test file in this repository exercises it** (`ExamCard.tsx`/`ExamBrowser.tsx` are async Server Components with zero test coverage today) | **No** (technique is sound but unprecedented here) | Risk (see Risks and Mitigation): if it proves incompatible with this repo's RTL/vitest/jsdom versions at implementation time, fall back to manual/Playwright-only verification for `SkillRecommendationCard`, matching the `ExamCard`/`ExamBrowser` precedent of zero RTL coverage for untested async Server Components — do not reopen the UI Spec's server-component decision to force testability |
-| `vitest.config.ts`'s `include` glob (`lib/**`, `components/**`, `app/**/*.test.{ts,tsx}`) collects both new test files regardless of which of `components/tutor/` or `app/(layer3)/_components/` they live in | `SOURCE/vitest.config.ts:19` | **Yes** | — |
+| `vitest.config.ts`'s `include` glob (`lib/**`, `components/**`, `app/**/*.test.{ts,tsx}`) collects both new test files regardless of which of `components/tutor/` or `features/analytics/components/` they live in | `SOURCE/vitest.config.ts:19` | **Yes** | — |
 
 #### Applicable Standards
 
@@ -138,7 +138,7 @@ Inherits the UI Spec's External Resources Used table (unchanged — no environme
 
 - [x] ESLint (`eslint --max-warnings 0`, CI-blocking) — Config: `SOURCE/eslint.config.mjs` — Covers: project-wide — Status: `adopted`.
 - [x] `tsc --noEmit` (strict) — Config: `SOURCE/tsconfig.json` — Covers: project-wide — Status: `adopted` (also the mechanism that would catch a missing `vi.ts` key for any new `tutor.*`/`analytics.recommend*` entry).
-- [x] Vitest (jsdom, real DOM render, mocked I/O boundary) — Covers: `SOURCE/components/tutor/ExplainStepAffordance.test.tsx`, `SOURCE/app/(layer3)/_components/SkillRecommendationCard.test.tsx` — Config: `SOURCE/vitest.config.ts` — Status: `adopted`.
+- [x] Vitest (jsdom, real DOM render, mocked I/O boundary) — Covers: `SOURCE/components/tutor/ExplainStepAffordance.test.tsx`, `SOURCE/features/analytics/components/SkillRecommendationCard.test.tsx` — Config: `SOURCE/vitest.config.ts` — Status: `adopted`.
 - [x] `next build` — Covers: project-wide — Status: `adopted`.
 - [x] Playwright MCP / manual pass (no CI) — Covers: the real `explainStep()` round trip on a seeded wrong-twice question, the real `getSkillRecommendation()` render on cold-start and populated accounts, full keyboard pass, `prefers-reduced-motion` N/A (no motion introduced by this document) — Status: `adopted` (the no-CI local workflow's acceptance for interaction/a11y ACs, per `PROJECT_OVERVIEW.md` §6).
 - [ ] Automated axe (`axe-core`/`jest-axe`) — Status: `noted` — no such package exists in `package.json` today; UI Spec's own TBD-06 defers adding it (or downgrading the metric) to the Work Plan. This document does not resolve TBD-06.
@@ -191,19 +191,19 @@ Rendering + interaction ACs verifiable in an isolated browser/jsdom environment.
 
 | Type | Path | Description |
 |------|------|-------------|
-| Existing (modified) | `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` | Mount `ExplainStepAffordance` at the end of both scored sub-branches, gated by `r.hasBeenWrongTwice`. |
-| Existing (modified) | `SOURCE/app/(layer3)/me/dashboard/page.tsx` | Parallel-fetch `getSkillRecommendation()`; mount `SkillRecommendationCard` between `PageHeader` and the existing `AnalyticsDashboard` block. |
+| Existing (modified) | `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` | Mount `ExplainStepAffordance` at the end of both scored sub-branches, gated by `r.hasBeenWrongTwice`. |
+| Existing (modified) | `SOURCE/app/(analytics)/me/dashboard/page.tsx` | Parallel-fetch `getSkillRecommendation()`; mount `SkillRecommendationCard` between `PageHeader` and the existing `AnalyticsDashboard` block. |
 | Existing (modified) | `SOURCE/lib/i18n/dictionaries/en.ts`, `vi.ts` | New `tutor.*` block (appended) + `analytics.recommend*` keys (extend the existing `analytics.*` block in place). |
 | Existing (reused, untouched) | `SOURCE/components/shared/RichText.tsx` | Renders the tutor hint (D4); zero modification. |
 | Existing (reused, untouched) | `SOURCE/components/layout/BentoGrid.tsx` (`BentoCell`) | Reused with explicit `span="full"` for both new surfaces; zero modification. |
 | Existing (reused, untouched) | `SOURCE/components/ui/button.tsx` | `ExplainStepAffordance` uses `Button variant="outline"` with a `min-h-11` override; zero modification. |
 | Existing (pattern reference only, not imported) | `SOURCE/components/history/usePdfAction.ts`, `ActionButton.tsx` | `useTutorAction`/`ExplainStepAffordance` mirror this shape; different domain, not a shared import (see Similar Component Search below). |
-| Existing (pattern reference only) | `SOURCE/app/(admin)/admin/ModerationRow.tsx:57-66` | Native `<details>`/`<summary>` precedent for `SkillRecommendationCard`'s disclosure. |
+| Existing (pattern reference only) | `SOURCE/features/admin/components/ModerationRow.tsx:57-66` | Native `<details>`/`<summary>` precedent for `SkillRecommendationCard`'s disclosure. |
 | New | `SOURCE/components/tutor/useTutorAction.ts` | The 4-phase state machine + `busyRef` guard, calling `explainStep()`. |
 | New | `SOURCE/components/tutor/ExplainStepAffordance.tsx` | The client island rendering the button/hint-panel/error states. |
 | New | `SOURCE/components/tutor/ExplainStepAffordance.test.tsx` | jsdom component test, mocks `explainStep`. |
-| New | `SOURCE/app/(layer3)/_components/SkillRecommendationCard.tsx` | Server Component, populated + cold-start states. |
-| New | `SOURCE/app/(layer3)/_components/SkillRecommendationCard.test.tsx` | jsdom component test via `render(await Component(props))`. |
+| New | `SOURCE/features/analytics/components/SkillRecommendationCard.tsx` | Server Component, populated + cold-start states. |
+| New | `SOURCE/features/analytics/components/SkillRecommendationCard.test.tsx` | jsdom component test via `render(await Component(props))`. |
 
 ### Existing Component Investigation
 
@@ -228,8 +228,8 @@ No technical debt was found to supersede in any of the above — every reuse tar
 
 | Dependency | Status | Evidence |
 |---|---|---|
-| `explainStep(attemptId, questionId): Promise<ExplainStepResult>` | External dependency — backend-owned, **requires new creation** by the backend Design Doc's own Implementation Path Mapping (`SOURCE/app/(layer2)/tutorActions.ts`) | Backend Design Doc § Existing Codebase Analysis / Data Contracts |
-| `getSkillRecommendation(): Promise<SkillRecommendation>` | External dependency — backend-owned, **requires new creation** (`SOURCE/app/(layer3)/queries.ts`) | Backend Design Doc § Existing Codebase Analysis / Data Contracts |
+| `explainStep(attemptId, questionId): Promise<ExplainStepResult>` | External dependency — backend-owned, **requires new creation** by the backend Design Doc's own Implementation Path Mapping (`SOURCE/features/exams/tutorActions.ts`) | Backend Design Doc § Existing Codebase Analysis / Data Contracts |
+| `getSkillRecommendation(): Promise<SkillRecommendation>` | External dependency — backend-owned, **requires new creation** (`SOURCE/features/analytics/queries.ts`) | Backend Design Doc § Existing Codebase Analysis / Data Contracts |
 | `SkillRecommendation` type | External dependency — backend-owned, **requires new creation** (`SOURCE/types/adaptive.ts`) | Backend Design Doc § Implementation Path Mapping |
 | `PerQuestionResult.hasBeenWrongTwice?: boolean` | External dependency — backend-owned, **requires new creation** (`SOURCE/types/result.ts` extension) | Backend Design Doc § Implementation Path Mapping |
 | `RichText` | Verified existing | `SOURCE/components/shared/RichText.tsx` |
@@ -237,7 +237,7 @@ No technical debt was found to supersede in any of the above — every reuse tar
 | `Button` (cva, `variant="outline"`) | Verified existing | `SOURCE/components/ui/button.tsx:12-13` |
 | `useT()` / `getTranslate()` | Verified existing | `SOURCE/lib/i18n/client.tsx:33-36`, `SOURCE/lib/i18n/server.ts:24-26` |
 | `usePdfAction`/`ActionButton` (pattern reference) | Verified existing | `SOURCE/components/history/usePdfAction.ts`, `ActionButton.tsx` |
-| `ModerationRow.tsx`'s `<details>`/`<summary>` (pattern reference) | Verified existing | `SOURCE/app/(admin)/admin/ModerationRow.tsx:57-66` |
+| `ModerationRow.tsx`'s `<details>`/`<summary>` (pattern reference) | Verified existing | `SOURCE/features/admin/components/ModerationRow.tsx:57-66` |
 | `useTutorAction`, `ExplainStepAffordance`, `SkillRecommendationCard` | Requires new creation | This document. |
 
 ### Code Inspection Evidence
@@ -253,7 +253,7 @@ No technical debt was found to supersede in any of the above — every reuse tar
 | `DifficultyBadge.tsx:1-9,31` | `"use client"` + `useT()` shape for a directly-RTL-testable pure display component — considered and not selected for `SkillRecommendationCard` (see Similar Component Search). |
 | `ExamCard.tsx:15` (`export async function ExamCard(...)`) | Confirms this repo's existing convention that async Server Components calling `getTranslate()` internally carry zero RTL test coverage — the precedent this document's fallback (if the async-render test technique fails) would follow. |
 | `ModerationRow.tsx:57-66` | Native `<details>`/`<summary>` precedent for the recommendation card's disclosure. |
-| `SOURCE/vitest.config.ts:17-19` | `include` glob confirms both new test file locations (`components/tutor/`, `app/(layer3)/_components/`) are collected under `npm test`. |
+| `SOURCE/vitest.config.ts:17-19` | `include` glob confirms both new test file locations (`components/tutor/`, `features/analytics/components/`) are collected under `npm test`. |
 | `en.ts:213-232` (existing `analytics.*` block), `en.ts:484-485` (file tail, `ugcError.fieldGeneric` then `} as const;`) | Exact insertion points for the new i18n keys (see i18n section). |
 
 ### Fact Disposition Table
@@ -271,7 +271,7 @@ Facts drawn from the task's consolidated frontend codebase-analyzer + ui-analyze
 | code:F7 | Native `<details>`/`<summary>` already shipped at `ModerationRow.tsx:57-66` | preserve | Reused as-is for the "why this skill" disclosure — not a novel pattern, cited as precedent not invention. | `ModerationRow.tsx:57-66` |
 | code:F8 | i18n split: client components call `useT()`, server components call `await getTranslate()`; missing `vi.ts` key is a compile error | preserve | `ExplainStepAffordance` (`"use client"`) calls `useT()`; `SkillRecommendationCard` (Server Component) calls `getTranslate()` — both follow the existing split exactly. | `client.tsx`, `server.ts`, `en.ts:488` |
 | code:F9 | Theme rule: `--brand` only on light surfaces, `--brand-on-dark` required on dark surfaces (RateButton AA-failure incident precedent) | preserve | Neither new component renders on a dark surface and neither introduces brand-red — confirmed no token risk. | `globals.css`; RateButton.tsx header comment |
-| code:F10 | Mobile-responsive rules: 44px min touch target, `md:`/`lg:`-only breakpoints, never `order-*`, `.pb-bottom-nav` already applied by host layouts | preserve/transform | `ExplainStepAffordance`'s `Button` gets an explicit `min-h-11` override (no existing size variant meets 44px); both host pages already receive `.pb-bottom-nav` from their layout wrappers — confirmed no new handling needed. | `mobile-responsive-layout-plan.md`; `(layer2)/layout.tsx`, `(layer3)/layout.tsx` |
+| code:F10 | Mobile-responsive rules: 44px min touch target, `md:`/`lg:`-only breakpoints, never `order-*`, `.pb-bottom-nav` already applied by host layouts | preserve/transform | `ExplainStepAffordance`'s `Button` gets an explicit `min-h-11` override (no existing size variant meets 44px); both host pages already receive `.pb-bottom-nav` from their layout wrappers — confirmed no new handling needed. | `mobile-responsive-layout-plan.md`; `(exams)/layout.tsx`, `(analytics)/layout.tsx` |
 | code:F11 | No `Card`/`Badge`/`Alert`/`Dialog` primitive exists in `SOURCE/components/ui/`; UI Spec deliberately reuses `BentoCell` rather than adding one | preserve | Carried forward, not reopened. | UI Spec D2 |
 | code:F12 | `Button` exists but is under-adopted; UI Spec chose `variant="outline"` for `ExplainStepAffordance` as a deliberate "stop compounding the inconsistency" choice | preserve | Carried forward, not reopened. | UI Spec § Existing Component Reuse Map |
 | code:F13 | `SuccessToast`'s lesson: a static `aria-live` region is never announced — text must mutate | transform | Applied narrowly: the busy-state sr-only reason span mutates `"" → tutor.busy → ""` exactly mirroring `ActionButton`'s **already-shipped** pattern (no `aria-live` attribute on that span in the shipped code — see Accessibility Implementation for why this differs from a literal `aria-live` region); the hint panel and error paragraph rely on mount/unmount DOM mutation, which UI Spec's own Screen Reader table confirms is sufficient here (no repeated-trigger case, unlike `SuccessToast`'s). | `SuccessToast.tsx`; `ActionButton.tsx:93-97`; UI Spec § Accessibility Requirements |
@@ -371,7 +371,7 @@ type SkillRecommendation =
   | { skillLabel: string; reasonCode: "prerequisite-gate" | "lowest-mastery" | "recently-wrong" }
   | null; // null = cold start (AC-028)
 
-// Server Action (SOURCE/app/(layer2)/tutorActions.ts, backend-owned)
+// Server Action (SOURCE/features/exams/tutorActions.ts, backend-owned)
 // NOTE argument order: (attemptId, questionId) — differs from ExplainStepAffordanceProps'
 // UI-Spec-fixed field declaration order (questionId, attemptId). See Risks and Mitigation.
 function explainStep(attemptId: string, questionId: string): Promise<ExplainStepResult>;
@@ -379,7 +379,7 @@ type ExplainStepResult =
   | { hint: string }
   | { error: "not_eligible" | "rate_limited" | "gemini_unavailable" | "server" };
 
-// Server query (SOURCE/app/(layer3)/queries.ts, backend-owned)
+// Server query (SOURCE/features/analytics/queries.ts, backend-owned)
 function getSkillRecommendation(): Promise<SkillRecommendation>;
 ```
 
@@ -403,7 +403,7 @@ export interface ExplainStepAffordanceProps {
   attemptId: string;
 }
 
-// SOURCE/app/(layer3)/_components/SkillRecommendationCard.tsx (UI Spec's exact fixed shape)
+// SOURCE/features/analytics/components/SkillRecommendationCard.tsx (UI Spec's exact fixed shape)
 interface SkillRecommendationCardProps {
   recommendation: SkillRecommendation;
 }
@@ -417,10 +417,10 @@ Direct Impact:
   - NEW SOURCE/components/tutor/useTutorAction.ts
   - NEW SOURCE/components/tutor/ExplainStepAffordance.tsx
   - NEW SOURCE/components/tutor/ExplainStepAffordance.test.tsx
-  - NEW SOURCE/app/(layer3)/_components/SkillRecommendationCard.tsx
-  - NEW SOURCE/app/(layer3)/_components/SkillRecommendationCard.test.tsx
-  - SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx (mount ExplainStepAffordance in both scored branches)
-  - SOURCE/app/(layer3)/me/dashboard/page.tsx (parallel getSkillRecommendation() fetch; mount SkillRecommendationCard)
+  - NEW SOURCE/features/analytics/components/SkillRecommendationCard.tsx
+  - NEW SOURCE/features/analytics/components/SkillRecommendationCard.test.tsx
+  - SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx (mount ExplainStepAffordance in both scored branches)
+  - SOURCE/app/(analytics)/me/dashboard/page.tsx (parallel getSkillRecommendation() fetch; mount SkillRecommendationCard)
   - SOURCE/lib/i18n/dictionaries/en.ts, vi.ts (new tutor.* block + analytics.recommend* keys)
 Indirect Impact:
   - ResultDetailPage's per-question <ol> gains its first-ever client boundary (one small client chunk added to a previously all-server route) — bundle-size effect only, no behavior change to the not-scored branch or to questions where hasBeenWrongTwice is false/absent
@@ -485,7 +485,7 @@ graph TD
         AFF --> HOOK
     end
     subgraph EXT["Backend (consumed, not redesigned here)"]
-        ES["explainStep(attemptId, questionId)\napp/(layer2)/tutorActions.ts"]
+        ES["explainStep(attemptId, questionId)\nfeatures/exams/tutorActions.ts"]
     end
     HOOK -->|"await"| ES
     AFF -->|"hint-shown"| RT["RichText [reused, unmodified]"]
@@ -502,7 +502,7 @@ graph TD
         PH -.-> AD
     end
     subgraph EXT2["Backend (consumed)"]
-        GSR["getSkillRecommendation()\napp/(layer3)/queries.ts"]
+        GSR["getSkillRecommendation()\nfeatures/analytics/queries.ts"]
     end
     S02 -->|"Promise.all"| GSR
 ```
@@ -618,7 +618,7 @@ stateDiagram-v2
 // exact typed-result contract this hook consumes.
 
 import { useRef, useState } from "react";
-import { explainStep } from "@/app/(layer2)/tutorActions";
+import { explainStep } from "@/app/(exams)/tutorActions";
 
 export type TutorPhase = "idle" | "busy" | "hint-shown" | "error";
 
@@ -736,7 +736,7 @@ export function ExplainStepAffordance({ questionId, attemptId }: ExplainStepAffo
 ```
 
 ```tsx
-// SOURCE/app/(layer3)/_components/SkillRecommendationCard.tsx
+// SOURCE/features/analytics/components/SkillRecommendationCard.tsx
 //
 // SkillRecommendationCard -- "what to practise next" (PRD R10, UI Spec
 // S-02/D3/D6). Server Component, no "use client" -- the only interactivity is
@@ -997,7 +997,7 @@ N/A — this design introduces entirely new behavior (no prior frontend implemen
   - **Promoting `useTutorAction`'s shape into a shared hook** (generalizing `usePdfAction` + `useTutorAction`) — deliberately not done now (Rule of Three: 2 occurrences, not 3 — see Common ADR Process). Revisit if a genuine 3rd async-button state-machine need appears.
   - **Automated axe tooling** (`axe-core`/`jest-axe`) — UI Spec's own TBD-06, Work-Plan-owned. Not added here.
 - **Intentional limitations**: no per-error-code copy differentiation (Minimal Surface Element 2); no `idPrefix` prop on `ExplainStepAffordance` (Minimal Surface Element 3); no client-side re-verification of `hasBeenWrongTwice` or re-bucketing of `SkillRecommendation` (both are consumed as server-computed, trusted values).
-- **Extension points (existing, with current consumers)**: the `usePdfAction`/`ActionButton` busy-state-machine shape (current consumer: `SOURCE/components/history/`; now also the pattern reference for `useTutorAction`, not a shared import); `RichText`'s hardened pipeline (current consumers: question/choice content across Layer 2; now also the tutor hint); `BentoCell` (current consumers: `app/(layer2)/exams/[id]/page.tsx` and the Rating System's cards; now also this feature's two surfaces).
+- **Extension points (existing, with current consumers)**: the `usePdfAction`/`ActionButton` busy-state-machine shape (current consumer: `SOURCE/components/history/`; now also the pattern reference for `useTutorAction`, not a shared import); `RichText`'s hardened pipeline (current consumers: question/choice content across Layer 2; now also the tutor hint); `BentoCell` (current consumers: `app/(exams)/exams/[id]/page.tsx` and the Rating System's cards; now also this feature's two surfaces).
 
 ## Alternative Solutions
 
@@ -1026,7 +1026,7 @@ N/A — this design introduces entirely new behavior (no prior frontend implemen
 - Backend Design Doc `docs/design/engine1-adaptive-ai-backend-design.md` (v1.0) — consumed contracts (`hasBeenWrongTwice`, `SkillRecommendation`, `explainStep()`, `getSkillRecommendation()`), Field Propagation Map.
 - ADR-0002 `docs/adr/ADR-0002-published-content-rendering-and-sanitization.md` — the hardened `RichText` pipeline reused verbatim for the tutor hint.
 - ADR-0010/ADR-0011 (backend-owned) — cited only as what makes the consumed data trustworthy; not redesigned here.
-- Precedents: `SOURCE/components/history/{usePdfAction,ActionButton}.tsx`; `SOURCE/components/shared/RichText.tsx`; `SOURCE/components/layout/BentoGrid.tsx`; `SOURCE/app/(admin)/admin/ModerationRow.tsx`; `SOURCE/app/(layer2)/_components/{ExamCard,ExamBrowser}.tsx`; `SOURCE/components/rating/DifficultyBadge.tsx`; `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx`; `SOURCE/app/(layer3)/me/dashboard/page.tsx`, `_components/AnalyticsDashboard.tsx`; `SOURCE/lib/i18n/{client.tsx,server.ts,dictionaries/{en,vi}.ts}`; `SOURCE/vitest.config.ts`.
+- Precedents: `SOURCE/components/history/{usePdfAction,ActionButton}.tsx`; `SOURCE/components/shared/RichText.tsx`; `SOURCE/components/layout/BentoGrid.tsx`; `SOURCE/features/admin/components/ModerationRow.tsx`; `SOURCE/features/exams/components/{ExamCard,ExamBrowser}.tsx`; `SOURCE/components/rating/DifficultyBadge.tsx`; `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx`; `SOURCE/app/(analytics)/me/dashboard/page.tsx`, `_components/AnalyticsDashboard.tsx`; `SOURCE/lib/i18n/{client.tsx,server.ts,dictionaries/{en,vi}.ts}`; `SOURCE/vitest.config.ts`.
 - Sibling house-style Design Doc: `docs/design/rating-system-frontend-design.md`.
 
 ## Update History

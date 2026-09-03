@@ -8,11 +8,11 @@ Related Issue/PR: —
 Review Scope: Planned-files scope derived from the Design Doc §Change Impact Map. Exactly these paths may change:
 - NEW `SOURCE/lib/analytics/aggregateAttempts.ts`
 - NEW `SOURCE/lib/analytics/__tests__/aggregateAttempts.test.ts`
-- NEW `SOURCE/app/(layer3)/queries.ts`
+- NEW `SOURCE/features/analytics/queries.ts`
 - EDIT `SOURCE/lib/fake-data/analytics.ts`
-- EDIT `SOURCE/app/(layer3)/me/dashboard/page.tsx`
-- EDIT `SOURCE/app/(layer3)/_components/AnalyticsDashboard.tsx`
-- **Out of scope (a diff here is a failure):** `SOURCE/app/(layer3)/_components/BarChartCard.tsx`, `SOURCE/app/(layer3)/_components/DonutChartCard.tsx`, `schema.sql`, RLS, migrations, and the kept symbols in `lib/fake-data/analytics.ts` (`SUBJECT_COLORS`, `Subject`, `SUBJECT_ORDER`, `niceCeil`, `computeShares`, `RANGE_LABELS`, `DEFAULT_RANGE`, `NEEDS_REVIEW_THRESHOLD`).
+- EDIT `SOURCE/app/(analytics)/me/dashboard/page.tsx`
+- EDIT `SOURCE/features/analytics/components/AnalyticsDashboard.tsx`
+- **Out of scope (a diff here is a failure):** `SOURCE/features/analytics/components/BarChartCard.tsx`, `SOURCE/features/analytics/components/DonutChartCard.tsx`, `schema.sql`, RLS, migrations, and the kept symbols in `lib/fake-data/analytics.ts` (`SUBJECT_COLORS`, `Subject`, `SUBJECT_ORDER`, `niceCeil`, `computeShares`, `RANGE_LABELS`, `DEFAULT_RANGE`, `NEEDS_REVIEW_THRESHOLD`).
 
 ## Related Documents
 - Design Doc(s):
@@ -48,7 +48,7 @@ Adopted quality gates for the change area (Design Doc §Quality Assurance Mechan
 | TypeScript type check (`npx tsc --noEmit`) | New module signatures, `dataByRange` prop type, embedded-select `Row` typing | `SOURCE/tsconfig.json` | All 6 changed files (project-wide check) |
 | ESLint (`npm run lint`) | Lint/style on new and edited files | `SOURCE/.eslintrc*` / `eslint` config | All 6 changed files (project-wide check) |
 | Vitest unit runner (`npm run test` → `vitest run`) | Pure reducer behavior via co-located test; test must actually be discovered | `SOURCE/vitest.config.ts` (include glob `lib/**/*.test.{ts,tsx}`, `components/**/*.test.{ts,tsx}`) | `SOURCE/lib/analytics/**` (reducer + `__tests__`) |
-| **Domain constraint (decisive):** Vitest `include` glob does NOT cover `app/**` | A test under `app/(layer3)/**` would silently never run → the pure reducer must live under `lib/analytics/` | `SOURCE/vitest.config.ts` | `SOURCE/lib/analytics/aggregateAttempts.ts` placement |
+| **Domain constraint (decisive):** Vitest `include` glob does NOT cover `app/**` | A test under `app/(analytics)/**` would silently never run → the pure reducer must live under `lib/analytics/` | `SOURCE/vitest.config.ts` | `SOURCE/lib/analytics/aggregateAttempts.ts` placement |
 
 *(`node scripts/check-ai-key-bundle.mjs` is noted in the Design Doc as not relevant to this change area — not a gate here.)*
 
@@ -116,7 +116,7 @@ Binding observable values copied verbatim from the Design Doc that the implement
 Replace the hardcoded fake analytics source (`ANALYTICS_BY_RANGE` + `getSubjectStats`) at `/me/dashboard` with real per-user, RLS-scoped Supabase aggregates, while keeping every chart prop contract byte-identical. The only client change is a thin container rewire. This implements the "Real data" item deferred by the UI-only predecessor design.
 
 ## Background
-The Analytics page (route group `(layer3)`) is fully built and visually approved; its two charts render from `SubjectStats[]` supplied today by three hardcoded per-range datasets. This pass computes those stats from the user's submitted exam attempts via one supabase-js nested embed plus a pure TypeScript reduce — no Postgres view/RPC, no schema, no migration. The reduce lives in `lib/analytics/` (not `app/**`) specifically because the Vitest `include` glob does not scan `app/**`.
+The Analytics page (route group `(analytics)`) is fully built and visually approved; its two charts render from `SubjectStats[]` supplied today by three hardcoded per-range datasets. This pass computes those stats from the user's submitted exam attempts via one supabase-js nested embed plus a pure TypeScript reduce — no Postgres view/RPC, no schema, no migration. The reduce lives in `lib/analytics/` (not `app/**`) specifically because the Vitest `include` glob does not scan `app/**`.
 
 ## Risks and Countermeasures
 
@@ -167,7 +167,7 @@ Implementation approach: **Vertical Slice** (Design Doc §Implementation Approac
 **Verification**: Manual first-render check of the live PostgREST embed shape + RLS review (L1); no automated test covers the live join (mocks cannot verify joins).
 
 #### Tasks
-- [x] Task 1: Create `SOURCE/app/(layer3)/queries.ts` with `import "server-only"`, `createClient` from `@/lib/supabase/server`, mirroring `(layer2)/queries.ts`. Implement `getAnalyticsByRange(): Promise<Record<TimeRange, SubjectStats[]>>`:
+- [x] Task 1: Create `SOURCE/features/analytics/queries.ts` with `import "server-only"`, `createClient` from `@/lib/supabase/server`, mirroring `(exams)/queries.ts`. Implement `getAnalyticsByRange(): Promise<Record<TimeRange, SubjectStats[]>>`:
   - Query: `from("exam_results").select("correct, total, exam_attempts!inner(submitted_at, status, exams!inner(subject))").eq("exam_attempts.status", "submitted")` — no explicit `user_id` predicate (RLS enforces). No answer/PII columns selected.
   - `if (error) throw error` (fail-fast, no fallback).
   - Normalize each `Row` to `AttemptRow` (`submitted_at→submittedAt`, `exams.subject→subject`), cast via `data as unknown as Row[]`.
@@ -187,13 +187,13 @@ Implementation approach: **Vertical Slice** (Design Doc §Implementation Approac
 **Verification**: L1 render (real per-user charts, empty-state branch) + regression git-diff of the two frozen chart files.
 
 #### Tasks
-- [x] Task 1: Edit `SOURCE/app/(layer3)/me/dashboard/page.tsx` — keep the `getCurrentUser` auth guard/redirect; after the guard add `const dataByRange = await getAnalyticsByRange();` (import from `@/app/(layer3)/queries`); render `<AnalyticsDashboard dataByRange={dataByRange} />`. All page chrome unchanged.
+- [x] Task 1: Edit `SOURCE/app/(analytics)/me/dashboard/page.tsx` — keep the `getCurrentUser` auth guard/redirect; after the guard add `const dataByRange = await getAnalyticsByRange();` (import from `@/app/(analytics)/queries`); render `<AnalyticsDashboard dataByRange={dataByRange} />`. All page chrome unchanged.
   - **Proof Obligations**: A1/AC-07 (single server fetch, all ranges), auth guard preserved.
-- [x] Task 2: Edit `SOURCE/app/(layer3)/_components/AnalyticsDashboard.tsx` — new signature `AnalyticsDashboard({ dataByRange }: { dataByRange: Record<TimeRange, SubjectStats[]> })`; drop the `getSubjectStats` import, import `SubjectStats` type from `@/lib/fake-data/analytics`; replace `const data = getSubjectStats(range)` with `const data = dataByRange[range]`; keep `tab`/`range`/`filterTouched` state and `filterSlot` as-is. Add the empty-state branch: when `data.length === 0`, render an empty-state panel in place of the chart card (heading "No data yet" + line "Complete a submitted attempt in this range to see analytics."), reusing `rounded-md border border-border bg-card p-5`, while still rendering tab nav + range filterSlot. Chart components are never called with an empty array.
+- [x] Task 2: Edit `SOURCE/features/analytics/components/AnalyticsDashboard.tsx` — new signature `AnalyticsDashboard({ dataByRange }: { dataByRange: Record<TimeRange, SubjectStats[]> })`; drop the `getSubjectStats` import, import `SubjectStats` type from `@/lib/fake-data/analytics`; replace `const data = getSubjectStats(range)` with `const data = dataByRange[range]`; keep `tab`/`range`/`filterTouched` state and `filterSlot` as-is. Add the empty-state branch: when `data.length === 0`, render an empty-state panel in place of the chart card (heading "No data yet" + line "Complete a submitted attempt in this range to see analytics."), reusing `rounded-md border border-border bg-card p-5`, while still rendering tab nav + range filterSlot. Chart components are never called with an empty array.
   - **Proof Obligations**: AC-07 (instant toggle, no loading), AC-08/AC-09 (empty state per user & per range), AC-10 (degenerate-donut guard — charts never receive empty array).
-- [x] Task 3: Edit `SOURCE/lib/fake-data/analytics.ts` — remove `const ANALYTICS_BY_RANGE` (lines 59–89) and `export function getSubjectStats` (lines 91–93); reword the module top comment to note aggregation now lives in `(layer3)/queries.ts` + `lib/analytics/aggregateAttempts.ts` and this file now holds only shared types/constants/helpers. Keep every other symbol at the same path.
+- [x] Task 3: Edit `SOURCE/lib/fake-data/analytics.ts` — remove `const ANALYTICS_BY_RANGE` (lines 59–89) and `export function getSubjectStats` (lines 91–93); reword the module top comment to note aggregation now lives in `(analytics)/queries.ts` + `lib/analytics/aggregateAttempts.ts` and this file now holds only shared types/constants/helpers. Keep every other symbol at the same path.
   - **Proof Obligations**: chart imports (`BarChartCard.tsx:15`, `DonutChartCard.tsx:16`) resolve unchanged; kept symbols untouched.
-- [x] Task 4: Regression check — `git diff SOURCE/app/(layer3)/_components/BarChartCard.tsx SOURCE/app/(layer3)/_components/DonutChartCard.tsx` must be **empty** (AC-12). Confirmed empty after frontend-task-03 edits.
+- [x] Task 4: Regression check — `git diff SOURCE/features/analytics/components/BarChartCard.tsx SOURCE/features/analytics/components/DonutChartCard.tsx` must be **empty** (AC-12). Confirmed empty after frontend-task-03 edits.
 - [ ] Quality check (staged): `npx tsc --noEmit`, `npm run lint`, `npm run test`.
 
 #### Phase Completion Criteria
@@ -290,6 +290,6 @@ flowchart TD
 
 ## Notes
 - **No test skeletons / UI Spec / ADR** were provided. E2E gap check: this is a data-logic pass on an already-built single-page dashboard with no multi-step user-facing journey and no new cross-service boundary (single RLS-scoped read within the existing runtime) → no fixture-e2e or service-integration-e2e gap flagged.
-- **Decisive placement constraint**: the pure reducer MUST live under `SOURCE/lib/analytics/` because Vitest's `include` glob excludes `app/**`; a test under `app/(layer3)/**` would silently never run (R-4).
+- **Decisive placement constraint**: the pure reducer MUST live under `SOURCE/lib/analytics/` because Vitest's `include` glob excludes `app/**`; a test under `app/(analytics)/**` would silently never run (R-4).
 - **Frozen contract**: `SubjectStats` props for `BarChartCard`/`DonutChartCard` stay byte-identical; a diff in either chart file is a failure (AC-12).
 - **Follow-up (out of scope)**: rename `lib/fake-data/analytics.ts` to a non-"fake" path in a single future commit that updates all importers together (Design Doc §Naming-smell follow-up).

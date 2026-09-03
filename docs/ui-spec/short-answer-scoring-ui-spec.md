@@ -21,9 +21,9 @@ This UI Specification covers only the **frontend display slice** of "Add automat
 
 | Source | Path | Version |
 |--------|------|---------|
-| Existing production pattern (fern/destructive MCQ correctness marking) | `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` lines 118–192 | repo `feat/rating-system`, current HEAD `ea6e40b` |
+| Existing production pattern (fern/destructive MCQ correctness marking) | `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` lines 118–192 | repo `feat/rating-system`, current HEAD `ea6e40b` |
 | Existing production pattern ("Your answer" / "Stored answer" two-line text block) | Same file, lines 57–116 (the "not scored" branch) | Same |
-| Theme definition | `DESIGN.md` (repo root) — "Ink & Lacquer" theme | Same |
+| Theme definition | `PROJECT_OVERVIEW.md §2` (repo root) — "Ink & Lacquer" theme | Same |
 | Design tokens | `SOURCE/app/globals.css` | Same |
 
 ## Prototype Management
@@ -41,8 +41,8 @@ Project-tier facts are recorded in `docs/project-context/external-resources.md` 
 
 | Resource (project-tier label) | Feature-specific identifier | Notes |
 |-------------------------------|-----------------------------|-------|
-| Design Origin | `DESIGN.md` — "no shadow/gradient, hairline-border + background-color layering only" rule | Governs the plain-text, no-new-decoration constraint on the new short_answer sub-branch |
-| Design System | `SOURCE/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` (existing fern/destructive convention, lines 118–192); `SOURCE/app/(layer2)/_components/QuestionRenderer.tsx` (footnote copy, lines 136–153); `SOURCE/components/shared/RichText.tsx` | This feature reuses these exact pieces; introduces no new component |
+| Design Origin | `PROJECT_OVERVIEW.md §2` — "no shadow/gradient, hairline-border + background-color layering only" rule | Governs the plain-text, no-new-decoration constraint on the new short_answer sub-branch |
+| Design System | `SOURCE/app/(exams)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx` (existing fern/destructive convention, lines 118–192); `SOURCE/features/exams/components/QuestionRenderer.tsx` (footnote copy, lines 136–153); `SOURCE/components/shared/RichText.tsx` | This feature reuses these exact pieces; introduces no new component |
 | Visual Verification Environment | Route `/exams/[id]/attempt/[attemptId]/result/detail` (requires a submitted attempt containing a `short_answer` question); Playwright MCP `playwright`; `npm run dev` | No automated test currently exists for this page or `QuestionRenderer` (confirmed by search) — manual/Playwright verification is the only current check until a test is added (Work Plan concern) |
 
 ## Decisions Record
@@ -79,7 +79,7 @@ Project-tier facts are recorded in `docs/project-context/external-resources.md` 
 
 ### D3 — Correct-answer text source: `q.essayAnswer`, never `r.correct`
 
-**Decision**: the correct-answer text for `short_answer` is read from `q.essayAnswer` (the `questions` map already returned by `getResult()`, `SOURCE/app/(layer2)/queries.ts` lines 291/371 — confirmed present and populated for every question type unconditionally, independent of `scored` status). `PerQuestionResult.correct` (`SOURCE/types/result.ts` line 12) is typed `ChoiceId` and is documented as "CHỈ câu mcq" (MCQ only) — it must not be read for `short_answer`.
+**Decision**: the correct-answer text for `short_answer` is read from `q.essayAnswer` (the `questions` map already returned by `getResult()`, `SOURCE/features/exams/queries.ts` lines 291/371 — confirmed present and populated for every question type unconditionally, independent of `scored` status). `PerQuestionResult.correct` (`SOURCE/types/result.ts` line 12) is typed `ChoiceId` and is documented as "CHỈ câu mcq" (MCQ only) — it must not be read for `short_answer`.
 
 **Rationale**: this is the same source the existing not-scored branch already uses for `storedAnswer` (`page.tsx` line 66: `q?.essayAnswer ?? ""`). Zero query/backend change is required for this frontend slice — `getResult()` already selects and maps `essay_answer` unconditionally for all question types.
 
@@ -247,7 +247,7 @@ No responsive change. The two-line text block reuses the same `flex flex-col gap
 | "Your answer" / "Stored answer" two-line text block | Reuse (recolored + one label renamed) | `page.tsx` lines 103–114 (not-scored branch) | See Decisions D1/D2. Not-scored branch's own JSX is untouched. |
 | Status chip (Correct/Wrong/Skipped) | Reuse, zero change | `page.tsx` lines 121–125 | Already type-agnostic; no code change needed to support `short_answer`. |
 | `RichText` (question content renderer) | Reuse, zero change | `SOURCE/components/shared/RichText.tsx` | Unchanged. |
-| `QuestionRenderer` short_answer footnote | Extend (copy only) | `SOURCE/app/(layer2)/_components/QuestionRenderer.tsx` lines 149–151 | One string literal changes; surrounding JSX, input, `maxLength`, placeholder unchanged. |
+| `QuestionRenderer` short_answer footnote | Extend (copy only) | `SOURCE/features/exams/components/QuestionRenderer.tsx` lines 149–151 | One string literal changes; surrounding JSX, input, `maxLength`, placeholder unchanged. |
 | New component | — | — | None. This feature adds zero new components and zero new files. |
 
 ### Design Tokens
@@ -284,7 +284,7 @@ No new token is introduced. This feature is a pure reuse of already-shipped valu
 
 | Level | Treatment | Usage |
 |-------|-----------|-------|
-| 0 (Flat) | none — no box-shadow, no gradient (`DESIGN.md` hard rule) | The new text block is plain paragraphs with no border/box; layering is by text color only, consistent with the not-scored precedent it reuses. |
+| 0 (Flat) | none — no box-shadow, no gradient (`PROJECT_OVERVIEW.md §2` hard rule) | The new text block is plain paragraphs with no border/box; layering is by text color only, consistent with the not-scored precedent it reuses. |
 
 #### Border Radius Scale
 
