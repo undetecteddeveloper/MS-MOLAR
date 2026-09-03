@@ -1,11 +1,11 @@
 "use client";
 
 // Error boundary gốc — bắt mọi lỗi render không được boundary con nào đỡ
-// (hiện chỉ `(HM)/history` có error.tsx riêng). Không có file này thì trên
+// (hiện chỉ `(history)/history` có error.tsx riêng). Không có file này thì trên
 // production người dùng nhận màn trắng "Application error: a server-side
 // exception has occurred", kèm digest trần, không có đường quay lại.
 //
-// Theo precedent của `(HM)/history/error.tsx`: role="alert" + nhận focus khi
+// Theo precedent của `(history)/history/error.tsx`: role="alert" + nhận focus khi
 // render, "Try again" nối thẳng vào reset().
 
 import { useEffect, useRef } from "react";

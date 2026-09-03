@@ -2,7 +2,7 @@
 // Design Doc: docs/design/history-backend-design.md (v1.2)
 // PRD: docs/prd/history-prd.md (v1.3, AC-009)
 // Generated: 2026-07-30 | Budget Used: integration 3/3 (this file is slot 3 of 3
-//   by ROI rank — see SOURCE/app/(HM)/__tests__/history.int.test.ts's header
+//   by ROI rank — see SOURCE/features/history/__tests__/history.int.test.ts's header
 //   for the full feature-level budget accounting)
 //
 // Converted from skeleton (history backend Task 1.1): getResult()'s extension

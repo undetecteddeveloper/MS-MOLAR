@@ -339,7 +339,7 @@ describe("ActionButton", () => {
       "utf-8"
     );
     const historyRowSource = readFileSync(
-      join(process.cwd(), "app/(HM)/history/_components/HistoryRow.tsx"),
+      join(process.cwd(), "features/history/components/HistoryRow.tsx"),
       "utf-8"
     );
 

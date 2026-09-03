@@ -1,6 +1,6 @@
 "use client";
 
-// Error boundary for /admin/tickets — mirrors (HM)/history/error.tsx's
+// Error boundary for /admin/tickets — mirrors (history)/history/error.tsx's
 // pattern exactly (this repo's established error.tsx idiom): role="alert"
 // receives focus on render, Retry wired directly to reset() (re-runs the
 // failed Server Component render, re-attempting listSupportTickets()).

@@ -1,6 +1,6 @@
 "use client";
 
-// Error boundary của /me/orders — khuôn GỐC `(HM)/history/error.tsx` (UI-D18,
+// Error boundary của /me/orders — khuôn GỐC `(history)/history/error.tsx` (UI-D18,
 // FE-AC-12): node `role="alert"` NHẬN FOCUS lúc mount qua một ref trên lớp bọc
 // `tabIndex={-1}`, và "Làm lại" nối THẲNG vào `reset()` để chạy lại chính lượt
 // render server vừa hỏng. Không có nửa danh sách: lượt đọc hoặc ra dòng, hoặc

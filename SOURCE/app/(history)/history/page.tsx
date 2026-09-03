@@ -1,4 +1,4 @@
-// (HM)/history — page-level auth guard, mirrors (authoring)/upload/page.tsx:8-10.
+// (history)/history — page-level auth guard, mirrors (authoring)/upload/page.tsx:8-10.
 // Guard runs strictly BEFORE any data fetch (AC-016: zero attempt rows fetched
 // for a guest — backend Design Doc history-backend-design.md v1.2, § Auth
 // Guard and Layout).
@@ -14,10 +14,10 @@
 import { redirect } from "next/navigation";
 import { getCurrentUserProfile } from "@/lib/auth/getCurrentUser";
 import { getTranslate } from "@/lib/i18n/server";
-import { listMyHistory } from "@/app/(HM)/queries";
+import { listMyHistory } from "@/features/history/queries";
 import { filterHistoryEntries, type HistoryEntryFilters } from "@/lib/history/filterEntries";
-import { HistoryFilters } from "./_components/HistoryFilters";
-import { HistoryList } from "./_components/HistoryList";
+import { HistoryFilters } from "@/features/history/components/HistoryFilters";
+import { HistoryList } from "@/features/history/components/HistoryList";
 import { PageContainer } from "@/components/layout/PageContainer";
 
 type SearchParams = Promise<{

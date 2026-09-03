@@ -363,7 +363,7 @@ describe("Binding decision ADR-0013 — một phép tính quyền lợi, KHÔNG 
     // MỘT khung dùng chung và chỉ khung ấy gọi. (analytics) gia nhập từ khi
     // /profile có tab Usage: tab đó render `PlanSummary` (C-11), và một layout
     // KHÔNG mount provider thì `useEntitlement()` trả `FREE_FALLBACK` — người
-    // Premium thấy hạn mức Free, im lặng. (HM) là layout duy nhất cố ý KHÔNG
+    // Premium thấy hạn mức Free, im lặng. (history) là layout duy nhất cố ý KHÔNG
     // mount provider (`entitlement: false`).
     "components/layout/AppShell.tsx",
     "lib/billing/readEntitlement.ts",

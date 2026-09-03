@@ -241,7 +241,7 @@ describe("the route group above this page mounts EntitlementProvider", () => {
     //
     // B1 (2026-09-03): các layout route group nay uỷ quyền cho khung dùng chung
     // `components/layout/AppShell.tsx`, và CHÍNH KHUNG mount provider (mặc
-    // định), trừ khi layout gọi với `entitlement: false` — (HM) là layout duy
+    // định), trừ khi layout gọi với `entitlement: false` — (history) là layout duy
     // nhất làm thế. Nên "mount" ở đây = tự viết `<EntitlementProvider` HOẶC gọi
     // `AppShell(` mà không tắt entitlement. Chỉ xét dòng MÃ để một lời nhắc
     // trong comment không được tính là mount.

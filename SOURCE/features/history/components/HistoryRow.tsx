@@ -8,7 +8,7 @@
 // details" (front-adjust: previously 3 separate controls). pdfInput is built
 // once per row from the entry's own already-loaded fields — no extra fetch
 // (AC-009).
-import type { MyHistoryEntry } from "@/app/(HM)/queries";
+import type { MyHistoryEntry } from "@/features/history/queries";
 import { EssayLifecycleBadge } from "@/components/essay/EssayLifecycleBadge";
 import { HistoryRowMenu } from "@/components/history/HistoryRowMenu";
 import { getTranslate } from "@/lib/i18n/server";

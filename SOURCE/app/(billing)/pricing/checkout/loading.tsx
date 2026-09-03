@@ -1,4 +1,4 @@
-// Skeleton của /pricing/checkout (S-06) — khuôn GỐC `(HM)/history/loading.tsx`
+// Skeleton của /pricing/checkout (S-06) — khuôn GỐC `(history)/history/loading.tsx`
 // (UI-D18, FE-I9), qua bản đã sửa ba điểm ở `me/orders/loading.tsx`.
 //
 // Phải khớp CHÍNH XÁC size + padding của `page.tsx` — `size="small"`, padding

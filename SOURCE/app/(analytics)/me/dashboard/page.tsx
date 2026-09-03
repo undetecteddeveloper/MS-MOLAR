@@ -2,7 +2,7 @@
 // target (SiteHeader.tsx/HomeSidebar.tsx already point here; route groups are
 // pathless, so no nav change was needed once this page exists — docs/design/
 // analytics-layer3-design.md § Route & nav). Page-level auth guard mirrors
-// (HM)/history/page.tsx / (authoring)/upload/page.tsx: guard runs strictly
+// (history)/history/page.tsx / (authoring)/upload/page.tsx: guard runs strictly
 // before any data fetch.
 
 import { redirect } from "next/navigation";

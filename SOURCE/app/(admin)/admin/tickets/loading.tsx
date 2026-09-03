@@ -1,4 +1,4 @@
-// Loading state for /admin/tickets — mirrors (HM)/history/loading.tsx's
+// Loading state for /admin/tickets — mirrors (history)/history/loading.tsx's
 // pattern (heading skeleton + pulsing row placeholders), matching this
 // route's own page.tsx size ("default", default padding) so the skeleton
 // doesn't shift layout when data replaces it.

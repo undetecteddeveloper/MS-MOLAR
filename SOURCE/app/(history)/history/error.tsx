@@ -23,7 +23,7 @@ export default function Error({
   const alertRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    console.error("(HM)/history render failed", { error });
+    console.error("(history)/history render failed", { error });
     alertRef.current?.focus();
   }, [error]);
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { filterHistoryEntries } from "./filterEntries";
-import type { MyHistoryEntry } from "@/app/(HM)/queries";
+import type { MyHistoryEntry } from "@/features/history/queries";
 
 function entry(overrides: Partial<MyHistoryEntry>): MyHistoryEntry {
   return {

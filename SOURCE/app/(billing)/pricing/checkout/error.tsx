@@ -1,7 +1,7 @@
 "use client";
 
 // Error boundary của /pricing/checkout (S-06) — khuôn GỐC
-// `(HM)/history/error.tsx` (UI-D18, FE-AC-12), giống hệt bản đã sửa ba điểm ở
+// `(history)/history/error.tsx` (UI-D18, FE-AC-12), giống hệt bản đã sửa ba điểm ở
 // `me/orders/error.tsx`: node `role="alert"` NHẬN FOCUS lúc mount qua một ref
 // trên lớp bọc `tabIndex={-1}`, và "Làm lại" nối THẲNG vào `reset()` để chạy
 // lại chính lượt render server vừa hỏng.

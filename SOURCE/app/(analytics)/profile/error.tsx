@@ -1,6 +1,6 @@
 "use client";
 
-// Error boundary của /profile — khuôn của (HM)/history/error.tsx: node
+// Error boundary của /profile — khuôn của (history)/history/error.tsx: node
 // role="alert" NHẬN focus lúc render, và "Làm lại" nối thẳng vào reset() để
 // chạy lại chính lượt render server vừa hỏng.
 //

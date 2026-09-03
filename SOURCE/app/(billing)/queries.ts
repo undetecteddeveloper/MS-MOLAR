@@ -1,6 +1,6 @@
 // Route group (billing) — hai lệnh ĐỌC của màn "đơn của tôi" (S-05) và màn
 // thanh toán (S-06). Server-only, theo đúng bốn module queries.ts đã ship
-// ((HM), (exams), (analytics), (authoring)): mapping snake_case → camelCase xảy ra
+// ((history), (exams), (analytics), (authoring)): mapping snake_case → camelCase xảy ra
 // MỘT lần, ở tầng query, nên không component nào nhìn thấy tên cột CSDL.
 // Frontend DD § Data-Fetching Plan; backend DD § "One mapper, not two" (I010)
 // và Escalation E-02 (CL-01).
@@ -68,7 +68,7 @@ type MyOrderListRow = {
  * THỨ TỰ KHAI BẰNG SQL, đúng một lần, và không có lượt sắp lại nào ở JavaScript
  * — `.order("created_at", { ascending: false })` khớp thẳng chỉ mục
  * `payment_orders_user_created_idx (user_id, created_at desc)` (schema.sql).
- * Ngoại lệ sắp-ở-JS của `(HM)/queries.ts` KHÔNG áp dụng ở đây: nó tồn tại vì
+ * Ngoại lệ sắp-ở-JS của `features/history/queries.ts` KHÔNG áp dụng ở đây: nó tồn tại vì
  * `.order(col, { referencedTable })` là một no-op ĐO ĐƯỢC với embed to-one, còn
  * lượt đọc này phẳng, không embed. Và sắp ở JS sau một `readBounded` là chủ
  * động chọn sai: phần bị PostgREST cắt khi chạm trần sẽ là phần CHƯA sắp, nên

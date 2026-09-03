@@ -96,7 +96,7 @@ export interface HistoryDriver {
 // --- Fixture data -----------------------------------------------------------
 // See the "Fixture-data residual" header note above — these profiles stand in
 // for Task 01's undelivered historyFixtureData.ts, matching MyHistoryEntry's
-// exact field shape (SOURCE/app/(HM)/queries.ts).
+// exact field shape (SOURCE/features/history/queries.ts).
 
 export interface FixtureHistoryEntry {
   attemptId: string;
@@ -435,7 +435,7 @@ export async function runHE2(driver: HistoryDriver, backend: FixtureBackend): Pr
 // AC-018/AC-019 — see file header / skeleton comments preserved in git history
 // for full ROI and behavior narrative.
 
-/** (a) AC-019 — a simulated list-read failure renders (HM)/history/error.tsx's
+/** (a) AC-019 — a simulated list-read failure renders (history)/history/error.tsx's
  *  role="alert" + "Retry"; clicking Retry re-attempts the read (call-count
  *  spy increments by exactly 1). */
 export async function checkHE3ListReadFailureRendersErrorAndRetries(

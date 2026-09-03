@@ -1,4 +1,4 @@
-// Skeleton của /me/orders — khuôn GỐC `(HM)/history/loading.tsx` (UI-D18,
+// Skeleton của /me/orders — khuôn GỐC `(history)/history/loading.tsx` (UI-D18,
 // FE-I9).
 //
 // Phải khớp CHÍNH XÁC size + padding của `page.tsx` — `size="default"`, padding

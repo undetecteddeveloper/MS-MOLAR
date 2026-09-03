@@ -1,7 +1,7 @@
 // S-05 `/me/orders` — đơn hàng của tôi (UI Spec UI-D11, S-05; frontend DD
 // § Main Components). Server component.
 //
-// CHỐT ĐĂNG NHẬP CHẠY TRƯỚC MỌI LƯỢT ĐỌC, khuôn của `(HM)/history/page.tsx` và
+// CHỐT ĐĂNG NHẬP CHẠY TRƯỚC MỌI LƯỢT ĐỌC, khuôn của `(history)/history/page.tsx` và
 // `(authoring)/me/exams/page.tsx`. Thứ tự hai dòng đầu là điều kiện được nghiệm
 // thu chứ không phải thói quen: một lượt `listMyOrders()` đứng trước chốt vẫn
 // trả `[]` (RLS `orders_select_own` lọc sạch), nên màn hình trông vẫn đúng

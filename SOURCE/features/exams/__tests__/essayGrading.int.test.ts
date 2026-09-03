@@ -713,7 +713,7 @@ describe("submitExam() — essay grading feature flag (INT-1)", () => {
 // @category: integration
 // @lane: integration
 // @dependency: SOURCE/features/exams/queries.ts (getResult) +
-//   SOURCE/app/(HM)/queries.ts (listMyHistory) + real
+//   SOURCE/features/history/queries.ts (listMyHistory) + real
 //   SOURCE/lib/scoring/essayLifecycle.ts + mocked Supabase client on both paths
 // @complexity: medium
 // @real-dependency: none — the sanctioned mock boundary of getResult.int.test.ts
@@ -722,7 +722,7 @@ describe("submitExam() — essay grading feature flag (INT-1)", () => {
 //   prove Postgres semantics.
 // Primary failure mode: one read path is extended and the other is not — most
 //   likely `listMyHistory()`'s select gains `per_question` but not `created_at`
-//   (backend DD § Implementation Path Mapping, `(HM)/queries.ts:64-66`), so its
+//   (backend DD § Implementation Path Mapping, `features/history/queries.ts:64-66`), so its
 //   deadline derivation runs against a missing/`undefined` timestamp and an
 //   overdue pending question is classified as still-pending there while /result
 //   classifies it as RS-6. The student then gets a PDF with the incomplete-essay
@@ -775,7 +775,7 @@ describe("submitExam() — essay grading feature flag (INT-1)", () => {
 // -----------------------------------------------------------------------------
 
 const { getResult } = await import("@/features/exams/queries");
-const { listMyHistory } = await import("@/app/(HM)/queries");
+const { listMyHistory } = await import("@/features/history/queries");
 
 /** Frozen. The deadline is 600 000 ms with an exclusive boundary, so a real clock
  *  would make every lifecycle fixture below a time bomb. */

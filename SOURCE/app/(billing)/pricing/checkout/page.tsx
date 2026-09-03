@@ -2,7 +2,7 @@
 // `PaymentPanel` — C-13; frontend DD § Main Components). Server component.
 //
 // CHỐT ĐĂNG NHẬP CHẠY TRƯỚC MỌI LƯỢT ĐỌC, cùng khuôn với `me/orders/page.tsx`
-// và `(HM)/history/page.tsx`. Thứ tự hai dòng đầu là điều kiện được nghiệm thu
+// và `(history)/history/page.tsx`. Thứ tự hai dòng đầu là điều kiện được nghiệm thu
 // chứ không phải thói quen: `getMyOrder()` đứng trước chốt vẫn trả `null` (RLS
 // `orders_select_own` lọc sạch), nên màn hình trông vẫn ĐÚNG trong khi một
 // khách chưa đăng nhập đã kịp chạm vào database. Đích chuyển hướng là
@@ -50,7 +50,7 @@ import { isPayable, PaymentPanel } from "./_components/PaymentPanel";
 export const metadata: Metadata = { title: "Checkout" };
 
 /** Next.js giao `searchParams` dưới dạng Promise (khuôn của
- *  `(HM)/history/page.tsx`). Kiểu khai `string | string[]` vì một tham số LẶP
+ *  `(history)/history/page.tsx`). Kiểu khai `string | string[]` vì một tham số LẶP
  *  LẠI trên query string tới đây dưới dạng MẢNG — và mảng phải rơi vào trạng
  *  thái Rỗng, không được ném. */
 type SearchParams = Promise<{ order?: string | string[] }>;

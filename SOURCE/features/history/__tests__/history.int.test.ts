@@ -83,7 +83,7 @@
 //   to [] or partial data.
 // @category: core-functionality
 // @lane: integration
-// @dependency: SOURCE/app/(HM)/queries.ts (listMyHistory) + mocked Supabase
+// @dependency: SOURCE/features/history/queries.ts (listMyHistory) + mocked Supabase
 //   client (createClient() boundary)
 // @complexity: medium
 // @real-dependency: none — the Supabase client is the sanctioned mock boundary
@@ -157,7 +157,7 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(async () => ({ from: fromMock })),
 }));
 
-const { listMyHistory } = await import("../queries");
+const { listMyHistory } = await import("@/features/history/queries");
 
 type BuilderResult = { data: unknown[] | null; error: unknown };
 type BuilderCall = { method: string; args: unknown[] };
@@ -360,7 +360,7 @@ describe("listMyHistory — scope predicates, ordering, field completeness, exam
 //   attempt with no essays and a legacy row), D-13/O-8/F-06 (TWO fields, not one),
 //   AC-012 (Output Comparison pipeline 3).
 // @lane: integration
-// @dependency: SOURCE/app/(HM)/queries.ts (listMyHistory) + REAL
+// @dependency: SOURCE/features/history/queries.ts (listMyHistory) + REAL
 //   SOURCE/lib/scoring/essayLifecycle.ts + mocked Supabase client
 // @real-dependency: none — the same sanctioned createClient() boundary as Test 1.
 //

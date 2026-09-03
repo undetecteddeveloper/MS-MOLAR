@@ -13,8 +13,8 @@
 // responsibility, both already applied by the caller.
 import Link from "next/link";
 import { getTranslate } from "@/lib/i18n/server";
-import type { MyHistoryEntry } from "@/app/(HM)/queries";
-import { HistoryRow } from "./HistoryRow";
+import type { MyHistoryEntry } from "@/features/history/queries";
+import { HistoryRow } from "@/features/history/components/HistoryRow";
 
 export async function HistoryList({
   entries,

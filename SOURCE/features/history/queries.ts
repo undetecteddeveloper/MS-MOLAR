@@ -1,4 +1,4 @@
-// (HM) route group — History read (backend Design Doc history-backend-design.md
+// (history) route group — History read (backend Design Doc history-backend-design.md
 // v1.2, § Query Implementation Shape). Server-only, mirrors features/exams/queries.ts's
 // snake_case DB → camelCase mapping and throw-on-infrastructure-error convention.
 import "server-only";

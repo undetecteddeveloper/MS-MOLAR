@@ -5,7 +5,7 @@
 // listMyHistory()'s 3 sequential Supabase calls for no real cost benefit —
 // RLS already scopes the read to auth.uid(), so the unfiltered fetch is
 // small per-user.
-import type { MyHistoryEntry } from "@/app/(HM)/queries";
+import type { MyHistoryEntry } from "@/features/history/queries";
 
 export interface HistoryEntryFilters {
   subject?: string;

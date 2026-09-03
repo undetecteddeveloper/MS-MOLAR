@@ -1,7 +1,7 @@
 // AppShell — khung dùng chung cho MỌI route group đã đăng nhập (B1, 2026-09-03).
 //
-// Trước đây năm layout — (exams), (analytics), (authoring), (billing), (HM) — chép
-// nhau TỪNG KÝ TỰ trừ tên hàm ((HM) thiếu EntitlementProvider). Một chỗ sửa
+// Trước đây năm layout — (exams), (analytics), (authoring), (billing), (history) — chép
+// nhau TỪNG KÝ TỰ trừ tên hàm ((history) thiếu EntitlementProvider). Một chỗ sửa
 // thành năm chỗ sửa, và hai khối comment giải thích "vì sao" cũng bị nhân năm.
 // Nay mỗi layout còn vài dòng gọi vào đây; phần "vì sao" sống ở một nơi.
 //
@@ -26,7 +26,7 @@ import { SupportWidget } from "@/components/support/SupportWidget";
 type AppShellProps = {
   children: React.ReactNode;
   /** `false` = KHÔNG đọc quyền lợi và KHÔNG mount EntitlementProvider. Chỉ
-   *  (HM)/history dùng — xem comment ở layout đó. Mặc định `true`. */
+   *  (history)/history dùng — xem comment ở layout đó. Mặc định `true`. */
   entitlement?: boolean;
 };
 

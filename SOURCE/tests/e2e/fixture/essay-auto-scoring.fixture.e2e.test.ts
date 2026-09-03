@@ -176,7 +176,7 @@ vi.mock("@/lib/auth/getCurrentUser", () => ({
 vi.mock("@/lib/billing/readEntitlement", () => ({ readEntitlement: readEntitlementMock }));
 vi.mock("@/features/exams/queries", () => ({ getResult: getResultMock }));
 vi.mock("@/features/exams/actions", () => ({ getMyRating: getMyRatingMock }));
-vi.mock("@/app/(HM)/queries", () => ({ listMyHistory: listMyHistoryMock }));
+vi.mock("@/features/history/queries", () => ({ listMyHistory: listMyHistoryMock }));
 // The PDF pipeline is the one thing whose ABSENCE of a call is the assertion.
 vi.mock("@/lib/pdf/generateAttemptPdf", () => ({
   generateAttemptPdfFile: generatePdfMock,
@@ -189,12 +189,12 @@ import RootLayout from "@/app/layout";
 import Layer2Layout from "@/app/(exams)/layout";
 import ResultPage from "@/app/(exams)/exams/[id]/attempt/[attemptId]/result/page";
 import ResultDetailPage from "@/app/(exams)/exams/[id]/attempt/[attemptId]/result/detail/page";
-import { HistoryRow } from "@/app/(HM)/history/_components/HistoryRow";
+import { HistoryRow } from "@/features/history/components/HistoryRow";
 import { HistoryRowMenu } from "@/components/history/HistoryRowMenu";
 import { ResultActions } from "@/features/exams/components/ResultActions";
 import { EssayGradingPoller } from "@/features/exams/components/EssayGradingPoller";
 import type { ExamResult } from "@/features/exams/queries";
-import type { MyHistoryEntry } from "@/app/(HM)/queries";
+import type { MyHistoryEntry } from "@/features/history/queries";
 import { DEFAULT_LOCALE } from "@/lib/i18n/locales";
 import { getDictionary } from "@/lib/i18n/translate";
 import {

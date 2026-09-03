@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 // `pricing/checkout/{loading,error}.tsx` — plan Task 4.2, FE-I9 / UI-D18.
-// Origin pattern: `(HM)/history/{loading,error}.tsx`, with the three
+// Origin pattern: `(history)/history/{loading,error}.tsx`, with the three
 // corrections the frontend DD's "Route boundary files" table takes from
 // `(analytics)/profile/` and `me/orders/` already ships: `error.digest` ONLY in
 // the log, `min-h-11` on the retry control, `common.tryAgain` as its label.

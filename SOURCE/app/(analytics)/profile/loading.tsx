@@ -1,4 +1,4 @@
-// Skeleton của /profile — khuôn của (HM)/history/loading.tsx.
+// Skeleton của /profile — khuôn của (history)/history/loading.tsx.
 //
 // Phải khớp CHÍNH XÁC size + padding của page.tsx (`small`, padding mặc định):
 // lệch một nấc thì nội dung giật lên/xuống đúng lúc skeleton được thay bằng dữ
