@@ -320,18 +320,31 @@ const codeLines = (src: string) => src.split("\n").filter((l) => !/^\s*(\/\/|\*|
 
 describe("(layer2)/layout.tsx — mã nguồn: không memo hoá, không đường đọc thứ hai", () => {
   const layoutSource = readFileSync(path.join(HERE, "..", "layout.tsx"), "utf8");
+  // B1 (2026-09-03): lượt đọc quyền lợi nay sống trong khung dùng chung
+  // components/layout/AppShell.tsx; layout chỉ uỷ quyền. Hai ca dưới soi KHUNG,
+  // và một ca mới ghim rằng layout không tự mở một đường đọc thứ hai.
+  const shellSource = readFileSync(
+    path.join(HERE, "..", "..", "..", "components", "layout", "AppShell.tsx"),
+    "utf8"
+  );
+
+  it("layout.tsx uỷ quyền cho AppShell và KHÔNG tự gọi readEntitlement()", () => {
+    const code = codeLines(layoutSource).join("\n");
+    expect(/\bAppShell\s*\(/.test(code)).toBe(true);
+    expect(/\breadEntitlement\s*\(/.test(code)).toBe(false);
+  });
 
   it("KHÔNG có React.cache() — sự vắng mặt đó là một quyết định, không phải sơ suất", () => {
     // entitlement.tsx:11 nói thẳng repo không có `React.cache()` ở bất kỳ đâu.
     // "Đúng một lượt đọc mỗi request" ở đây suy ra từ cách Next phân giải route
     // group, KHÔNG phải từ memo hoá — thêm cache() vào là thay một lập luận
     // đúng bằng một cơ chế không cần thiết.
-    const code = codeLines(layoutSource).join("\n");
+    const code = codeLines(shellSource).join("\n");
     expect(/\bcache\s*\(/.test(code)).toBe(false);
   });
 
-  it("gọi readEntitlement() ĐÚNG một lần trong file", () => {
-    const calls = codeLines(layoutSource).filter((l) => /\breadEntitlement\s*\(/.test(l));
+  it("AppShell gọi readEntitlement() ĐÚNG một lần trong file", () => {
+    const calls = codeLines(shellSource).filter((l) => /\breadEntitlement\s*\(/.test(l));
     expect(calls).toHaveLength(1);
   });
 });
@@ -345,15 +358,14 @@ describe("Binding decision ADR-0013 — một phép tính quyền lợi, KHÔNG 
    *  Mọi file ĐƯỜNG RENDER khác dưới app/, components/ VÀ lib/ chỉ được đọc
    *  context qua `useEntitlement()`. */
   const RENDER_PATH_ALLOWED = [
-    "app/(billing)/layout.tsx",
-    "app/(layer2)/layout.tsx",
-    // (layer3) gia nhập danh sách này khi /profile có tab Usage: tab đó render
-    // `PlanSummary` (C-11), và một layout KHÔNG mount provider thì
-    // `useEntitlement()` trả `FREE_FALLBACK` — người Premium thấy hạn mức
-    // Free, im lặng. Đây là một LAYOUT mount provider, đúng hình dạng ba dòng
-    // còn lại; nó không phải một đường đọc thứ hai.
-    "app/(layer3)/layout.tsx",
-    "app/(layer4)/layout.tsx",
+    // B1 (2026-09-03): bốn layout (billing)/(layer2)/(layer3)/(layer4) từng
+    // đứng ở đây, mỗi cái gọi readEntitlement() một lần; nay chúng uỷ quyền cho
+    // MỘT khung dùng chung và chỉ khung ấy gọi. (layer3) gia nhập từ khi
+    // /profile có tab Usage: tab đó render `PlanSummary` (C-11), và một layout
+    // KHÔNG mount provider thì `useEntitlement()` trả `FREE_FALLBACK` — người
+    // Premium thấy hạn mức Free, im lặng. (HM) là layout duy nhất cố ý KHÔNG
+    // mount provider (`entitlement: false`).
+    "components/layout/AppShell.tsx",
     "lib/billing/readEntitlement.ts",
   ];
 

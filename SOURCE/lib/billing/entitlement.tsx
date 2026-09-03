@@ -10,6 +10,9 @@
 //
 // VÌ SAO KHÔNG PHẢI HOOK TỰ FETCH: repo không có `React.cache()` ở bất kỳ đâu,
 // không có memo hoá theo request, và KHÔNG có hook client nào fetch dữ liệu.
+// (Cập nhật 2026-09-03: lib/auth/getCurrentUser.ts nay dùng `React.cache()`
+// để gộp lượt auth giữa layout và page — vẫn là memo theo request PHÍA SERVER,
+// không phải hook client fetch, nên kết luận ở đây không đổi.)
 // Hook duy nhất chạm mạng là useTutorAction, và nó gọi Server Action — tức MỘT
 // vòng round-trip cho MỖI chỗ gọi. Chép hình dạng đó cho entitlement là đặt một
 // round-trip sau mỗi component bị gate, phá thẳng NFR Performance của PRD

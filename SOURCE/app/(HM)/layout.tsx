@@ -2,29 +2,17 @@
 // history-backend-design.md v1.2, § Auth Guard and Layout). Structurally
 // identical to (layer3)/(layer4) layout.tsx — nullable user, SiteHeader only,
 // NO redirect (the guard lives in history/page.tsx instead, see AC-016).
+//
+// Khung dùng chung: components/layout/AppShell.tsx (B1, 2026-09-03) — header,
+// SkipLink, BottomNav, SupportWidget đều ở đó.
 
-import { getCurrentUserProfile } from "@/lib/auth/getCurrentUser";
-import { SiteHeader } from "@/components/layout/SiteHeader";
-import { BottomNav } from "@/components/layout/BottomNav";
-import { SkipLink } from "@/components/shared/SkipLink";
-import { SupportWidget } from "@/components/support/SupportWidget";
+import { AppShell } from "@/components/layout/AppShell";
 
 export default async function HMLayout({ children }: { children: React.ReactNode }) {
-  const user = await getCurrentUserProfile();
-
-  return (
-    <div className="min-h-dvh">
-      <SkipLink />
-      <SiteHeader user={user} />
-      {/* id + tabIndex={-1}: đích nhảy của SkipLink (WCAG 2.4.1). tabIndex âm
-          cho phép nhận tiêu điểm bằng lập trình mà không chen vào thứ tự Tab. */}
-      {/* pb-bottom-nav: chừa chỗ cho BottomNav (fixed) để dòng cuối của trang
-          không chui xuống dưới nó. Tự về 0 từ 768px vì thanh đáy không render. */}
-      <div id="main-content" tabIndex={-1} className="pb-bottom-nav">
-        {children}
-      </div>
-      <BottomNav signedIn={Boolean(user)} />
-      <SupportWidget user={user} />
-    </div>
-  );
+  // `entitlement: false`: (HM) trước B1 là layout DUY NHẤT không mount
+  // EntitlementProvider và không gọi readEntitlement(). Giữ nguyên để hành vi
+  // không đổi — bật lên là thêm một lượt đọc quyền lợi cho mỗi lần mở /history
+  // mà không component nào dưới đó cần, và đó là một quyết định riêng, không
+  // phải sản phẩm phụ của việc gộp layout.
+  return AppShell({ children, entitlement: false });
 }

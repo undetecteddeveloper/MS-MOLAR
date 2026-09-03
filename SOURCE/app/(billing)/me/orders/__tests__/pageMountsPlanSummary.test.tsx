@@ -238,8 +238,23 @@ describe("the route group above this page mounts EntitlementProvider", () => {
     // `<EntitlementProvider` chứ không phải `EntitlementProvider`: cả trang lẫn
     // layout đều NHẮC TÊN provider trong văn xuôi, và một lời nhắc không mount
     // được gì cả.
+    //
+    // B1 (2026-09-03): các layout route group nay uỷ quyền cho khung dùng chung
+    // `components/layout/AppShell.tsx`, và CHÍNH KHUNG mount provider (mặc
+    // định), trừ khi layout gọi với `entitlement: false` — (HM) là layout duy
+    // nhất làm thế. Nên "mount" ở đây = tự viết `<EntitlementProvider` HOẶC gọi
+    // `AppShell(` mà không tắt entitlement. Chỉ xét dòng MÃ để một lời nhắc
+    // trong comment không được tính là mount.
+    const codeOf = (file: string) =>
+      readFileSync(file, "utf8")
+        .split("\n")
+        .filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l))
+        .join("\n");
+    const mountsProvider = (code: string) =>
+      code.includes("<EntitlementProvider") ||
+      (/\bAppShell\s*\(/.test(code) && !/entitlement:\s*false/.test(code));
     const mounting = chain
-      .filter((file) => readFileSync(file, "utf8").includes("<EntitlementProvider"))
+      .filter((file) => mountsProvider(codeOf(file)))
       .map((file) => path.relative(APP_ROOT, file).split(path.sep).join("/"));
 
     expect(mounting).toEqual(["(billing)/layout.tsx"]);

@@ -301,16 +301,29 @@ describe("(layer4)/layout.tsx — đúng MỘT lượt đọc mỗi request (UI-
 
 describe("(layer4)/layout.tsx — mã nguồn: không memo hoá, không đường đọc thứ hai", () => {
   const layoutSource = readFileSync(path.join(HERE, "..", "layout.tsx"), "utf8");
+  // B1 (2026-09-03): lượt đọc quyền lợi nay sống trong khung dùng chung
+  // components/layout/AppShell.tsx; layout chỉ uỷ quyền. Hai ca dưới soi KHUNG,
+  // và một ca mới ghim rằng layout không tự mở một đường đọc thứ hai.
+  const shellSource = readFileSync(
+    path.join(HERE, "..", "..", "..", "components", "layout", "AppShell.tsx"),
+    "utf8"
+  );
+
+  it("layout.tsx uỷ quyền cho AppShell và KHÔNG tự gọi readEntitlement()", () => {
+    const code = codeLines(layoutSource).join("\n");
+    expect(/\bAppShell\s*\(/.test(code)).toBe(true);
+    expect(/\breadEntitlement\s*\(/.test(code)).toBe(false);
+  });
 
   const codeLines = (src: string) => src.split("\n").filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l));
 
   it("KHÔNG có React.cache() — sự vắng mặt đó là một quyết định, không phải sơ suất", () => {
-    const code = codeLines(layoutSource).join("\n");
+    const code = codeLines(shellSource).join("\n");
     expect(/\bcache\s*\(/.test(code)).toBe(false);
   });
 
-  it("gọi readEntitlement() ĐÚNG một lần trong file", () => {
-    const calls = codeLines(layoutSource).filter((l) => /\breadEntitlement\s*\(/.test(l));
+  it("AppShell gọi readEntitlement() ĐÚNG một lần trong file", () => {
+    const calls = codeLines(shellSource).filter((l) => /\breadEntitlement\s*\(/.test(l));
     expect(calls).toHaveLength(1);
   });
 });
