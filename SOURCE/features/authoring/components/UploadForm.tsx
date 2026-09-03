@@ -13,10 +13,10 @@
 //     (AC-036), server validateExamMeta vẫn là nguồn sự thật cuối.
 //   - Đổi mode không xoá giá trị; khối metadata tự mở khi có giá trị đã gõ
 //     hoặc có lỗi (không bao giờ giấu field đang lỗi — a11y UI Spec §v2.2).
-// KHÔNG bao gồm navbar — do (layer4)/layout.tsx cung cấp.
+// KHÔNG bao gồm navbar — do (authoring)/layout.tsx cung cấp.
 
 import { useState, useTransition } from "react";
-import { extractAndAssemble } from "@/app/(layer4)/actions";
+import { extractAndAssemble } from "@/features/authoring/actions";
 import { useT } from "@/lib/i18n/client";
 import type { Translate } from "@/lib/i18n/translate";
 import { LIMITS } from "@/lib/ugc/limits";
@@ -24,11 +24,11 @@ import type { UgcActionError } from "@/lib/ugc/types";
 import {
   MetadataFields,
   type ExamMetaFormValue,
-} from "./MetadataFields";
-import { FileUploadFields } from "./FileUploadFields";
-import { ImportInstructions } from "./ImportInstructions";
-import { EntryModeField, type EntryMode } from "./EntryModeField";
-import { ExtractionProgress } from "./ExtractionProgress";
+} from "@/features/authoring/components/MetadataFields";
+import { FileUploadFields } from "@/features/authoring/components/FileUploadFields";
+import { ImportInstructions } from "@/features/authoring/components/ImportInstructions";
+import { EntryModeField, type EntryMode } from "@/features/authoring/components/EntryModeField";
+import { ExtractionProgress } from "@/features/authoring/components/ExtractionProgress";
 
 const EMPTY_META: ExamMetaFormValue = {
   title: "",

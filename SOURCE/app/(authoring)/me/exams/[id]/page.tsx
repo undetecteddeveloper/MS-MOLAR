@@ -4,9 +4,9 @@
 
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
-import { getMyExam } from "@/app/(layer4)/queries";
-import { ReviewScreen } from "@/app/(layer4)/_components/ReviewScreen";
-import { renderReviewNodes } from "@/app/(layer4)/_components/reviewNodes";
+import { getMyExam } from "@/features/authoring/queries";
+import { ReviewScreen } from "@/features/authoring/components/ReviewScreen";
+import { renderReviewNodes } from "@/features/authoring/components/reviewNodes";
 import { PageContainer } from "@/components/layout/PageContainer";
 
 export default async function ReviewExamPage({

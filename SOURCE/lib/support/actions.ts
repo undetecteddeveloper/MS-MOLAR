@@ -38,7 +38,7 @@ function intOrNull(v: FormDataEntryValue | null): number | null {
 }
 
 /**
- * Cố ý KHÔNG mirror `requireUser()`'s redirect behavior ((layer4)/actions.ts) —
+ * Cố ý KHÔNG mirror `requireUser()`'s redirect behavior (features/authoring/actions.ts) —
  * widget mount ở 5 route group + trang chủ, không có một đích redirect tự
  * nhiên nào, và nó luôn được gọi từ một dialog trong trang mà state của dialog
  * (message đã gõ, intent đã chọn, ảnh đã đính) sẽ mất sạch nếu redirect() cả

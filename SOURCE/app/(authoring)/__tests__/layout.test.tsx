@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-// (layer4)/layout.tsx — EntitlementProvider mount (backend DD D005 / I1, ADR-0013
+// (authoring)/layout.tsx — EntitlementProvider mount (backend DD D005 / I1, ADR-0013
 // § Architecture Impact, UI Spec C-01).
 //
 // File song sinh với `app/(exams)/__tests__/layout.test.tsx`, và nó phải là hai
@@ -57,7 +57,7 @@ vi.mock("@/lib/support/actions", () => ({ submitSupportTicket: vi.fn() }));
 vi.mock("@/lib/i18n/actions", () => ({ setLocale: vi.fn() }));
 vi.mock("@/features/auth/actions", () => ({ signOut: vi.fn() }));
 
-import Layer4Layout from "../layout";
+import Layer4Layout from "@/app/(authoring)/layout";
 import { TutorQuotaNote } from "@/components/billing/TutorQuotaNote";
 import { useEntitlement } from "@/lib/billing/entitlement";
 import { FREE_FALLBACK, type Entitlement, type Quota } from "@/lib/billing/types";
@@ -170,7 +170,7 @@ const describeEntitlement = (e: Entitlement) =>
     describeQuota(e.upload),
   ].join("|");
 
-/** Đọc qua hook THẬT, ở đúng vị trí một `page.tsx` của (layer4) chiếm giữ. */
+/** Đọc qua hook THẬT, ở đúng vị trí một `page.tsx` của (authoring) chiếm giữ. */
 function EntitlementProbe() {
   const entitlement = useEntitlement();
   return <span data-testid="probe">{describeEntitlement(entitlement)}</span>;
@@ -181,9 +181,9 @@ async function renderLayer4() {
   // đang thiếu (frontend DD Risk R-12), nên ở đây không có lớp bọc nào.
   //
   // TutorQuotaNote đứng đây với vai trò MỘT COMPONENT `useEntitlement()` CÓ
-  // THẬT ĐÃ SHIP — không phải một lời khai rằng nó mount dưới (layer4) trong
+  // THẬT ĐÃ SHIP — không phải một lời khai rằng nó mount dưới (authoring) trong
   // production (UI Spec C-06 đặt nó ở result-detail của (exams)). Bề mặt bị
-  // gate của riêng (layer4) là hạn mức upload, và nó chưa có component nào;
+  // gate của riêng (authoring) là hạn mức upload, và nó chưa có component nào;
   // trường `upload` vì thế được khẳng định qua probe ở dưới.
   return render(
     await Layer4Layout({
@@ -240,7 +240,7 @@ afterEach(() => {
 
 // ═════════════════════════════════════════════════════════════════════════════
 
-describe("(layer4)/layout.tsx — đứa con bị gate KHÔNG nhận FREE_FALLBACK (I1)", () => {
+describe("(authoring)/layout.tsx — đứa con bị gate KHÔNG nhận FREE_FALLBACK (I1)", () => {
   it("giao đúng giá trị Premium thật, so khớp TOÀN BỘ object", async () => {
     const { container } = await renderLayer4();
 
@@ -260,7 +260,7 @@ describe("(layer4)/layout.tsx — đứa con bị gate KHÔNG nhận FREE_FALLBA
     expect(probeText(container).startsWith("free|")).toBe(false);
   });
 
-  it("hạn mức UPLOAD — bề mặt bị gate của chính (layer4) — đọc được là `known`", async () => {
+  it("hạn mức UPLOAD — bề mặt bị gate của chính (authoring) — đọc được là `known`", async () => {
     const { container } = await renderLayer4();
 
     // Nửa quan trọng của route group này. `unknown` là fail-OPEN nên cổng phía
@@ -285,7 +285,7 @@ describe("(layer4)/layout.tsx — đứa con bị gate KHÔNG nhận FREE_FALLBA
   });
 });
 
-describe("(layer4)/layout.tsx — đúng MỘT lượt đọc mỗi request (UI-D1)", () => {
+describe("(authoring)/layout.tsx — đúng MỘT lượt đọc mỗi request (UI-D1)", () => {
   it("một lượt render với hai component đọc context ⇒ 1 lượt readEntitlement()", async () => {
     await renderLayer4();
 
@@ -299,7 +299,7 @@ describe("(layer4)/layout.tsx — đúng MỘT lượt đọc mỗi request (UI-
   });
 });
 
-describe("(layer4)/layout.tsx — mã nguồn: không memo hoá, không đường đọc thứ hai", () => {
+describe("(authoring)/layout.tsx — mã nguồn: không memo hoá, không đường đọc thứ hai", () => {
   const layoutSource = readFileSync(path.join(HERE, "..", "layout.tsx"), "utf8");
   // B1 (2026-09-03): lượt đọc quyền lợi nay sống trong khung dùng chung
   // components/layout/AppShell.tsx; layout chỉ uỷ quyền. Hai ca dưới soi KHUNG,

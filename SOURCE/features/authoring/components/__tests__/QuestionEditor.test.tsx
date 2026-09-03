@@ -25,9 +25,9 @@ import { fireEvent, render, waitFor, within } from "@testing-library/react";
 
 import { describe, expect, it, vi } from "vitest";
 import type { AssembledQuestion } from "@/lib/ugc/types";
-import { QuestionEditor } from "../QuestionEditor";
-import { renderReviewNodes } from "../reviewNodes";
-import { reviewNodeKey } from "../reviewNodes.types";
+import { QuestionEditor } from "@/features/authoring/components/QuestionEditor";
+import { renderReviewNodes } from "@/features/authoring/components/reviewNodes";
+import { reviewNodeKey } from "@/features/authoring/components/reviewNodes.types";
 
 // Nạp động (`next/dynamic`) trong jsdom phải đi qua cả cây module
 // react-markdown + remark + rehype + katex, và nó chỉ được KHỞI ĐỘNG khi nhánh

@@ -2,7 +2,7 @@
 // nhau (DisplayNameEditor, ChangePasswordDialog) và năm nút viền nằm ở năm chỗ,
 // nên chúng ở đây thay vì được chép đi chép lại.
 //
-// ⚠ CHÉP THEO MẪU từ app/(layer4)/_components/MetadataFields.tsx:45-57, KHÔNG
+// ⚠ CHÉP THEO MẪU từ features/authoring/components/MetadataFields.tsx:45-57, KHÔNG
 // import components/ui/input.tsx. Component đó có ĐÚNG KHÔNG chỗ gọi nào trong
 // repo: `h-8` của nó là 32px — hụt 12px so với sàn chạm 44px — và `rounded-lg`
 // của nó chọi lại họ bo góc 4px mà mọi form thật trong repo đang dùng. Dựng lại

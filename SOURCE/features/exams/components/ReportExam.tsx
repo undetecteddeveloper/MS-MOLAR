@@ -8,7 +8,7 @@ import { useT } from "@/lib/i18n/client";
 // Chỉ render cho user đã đăng nhập trên đề published (parent quyết định).
 
 import { useEffect, useRef, useState } from "react";
-import { reportExam } from "@/app/(layer4)/actions";
+import { reportExam } from "@/features/authoring/actions";
 import { LIMITS } from "@/lib/ugc/limits";
 
 interface ReportExamProps {

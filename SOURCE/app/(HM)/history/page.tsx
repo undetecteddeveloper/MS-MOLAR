@@ -1,4 +1,4 @@
-// (HM)/history — page-level auth guard, mirrors (layer4)/upload/page.tsx:8-10.
+// (HM)/history — page-level auth guard, mirrors (authoring)/upload/page.tsx:8-10.
 // Guard runs strictly BEFORE any data fetch (AC-016: zero attempt rows fetched
 // for a guest — backend Design Doc history-backend-design.md v1.2, § Auth
 // Guard and Layout).

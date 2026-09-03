@@ -8,7 +8,7 @@
 //     aria-modal, aria-labelledby trỏ vào <h2> của chính panel, scrim là button
 //     aria-hidden/tabIndex={-1}, Escape qua listener trên window, panel nhận
 //     focus lúc mở qua ref + tabIndex={-1};
-//   - portal + khoá cuộn nền từ app/(layer4)/_components/DeleteDialog.tsx:111-161.
+//   - portal + khoá cuộn nền từ features/authoring/components/DeleteDialog.tsx:111-161.
 //
 // ⚠ PORTAL LÀ BẮT BUỘC, KHÔNG PHẢI TRAU CHUỐT (Design Doc C9). `position: fixed`
 // neo theo viewport TRỪ KHI có tổ tiên tạo containing block, mà `backdrop-blur`

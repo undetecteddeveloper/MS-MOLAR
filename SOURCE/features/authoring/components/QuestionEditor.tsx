@@ -34,7 +34,7 @@ import {
   SUB_ITEM_CLASS,
   type RenderedText,
   type ReviewQuestionNodes,
-} from "./reviewNodes.types";
+} from "@/features/authoring/components/reviewNodes.types";
 
 // ---------------------------------------------------------------------------
 // RichText Ở MÀN NÀY: node của SERVER là chính, chunk client là đường lui

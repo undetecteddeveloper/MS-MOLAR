@@ -1,6 +1,6 @@
 // Layout route group (HM) — khung chung cho History (backend Design Doc
 // history-backend-design.md v1.2, § Auth Guard and Layout). Structurally
-// identical to (analytics)/(layer4) layout.tsx — nullable user, SiteHeader only,
+// identical to (analytics)/(authoring) layout.tsx — nullable user, SiteHeader only,
 // NO redirect (the guard lives in history/page.tsx instead, see AC-016).
 //
 // Khung dùng chung: components/layout/AppShell.tsx (B1, 2026-09-03) — header,

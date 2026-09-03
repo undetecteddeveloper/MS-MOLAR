@@ -27,10 +27,10 @@ function banner() {
   console.log("  (auth) Auth            — login, reset-password");
   console.log("  (exams) Exam taking     — browse, attempt, submit, result");
   console.log("  (analytics) —               — chưa có route (reserved)");
-  console.log("  (layer4) UGC upload      — upload, review, publish, my-exams");
+  console.log("  (authoring) UGC upload      — upload, review, publish, my-exams");
   console.log("");
   console.log(line());
-  console.log("Pipeline: UGC Exam Upload  (lib/ugc/*, app/(layer4)/actions.ts)");
+  console.log("Pipeline: UGC Exam Upload  (lib/ugc/*, features/authoring/actions.ts)");
   console.log(line());
   console.log("  extractAndAssemble() — 8 stages, log prefix [ugc-pipeline]:");
   console.log("    1/8  Metadata          manual: validate ngay · automatic: AI đọc trang 1");

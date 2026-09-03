@@ -4,7 +4,7 @@
 // UI-D15, frontend Design Doc Decision 3). Client component vì chữ phải theo
 // ngôn ngữ đang chọn, đúng như `StatusBadge.tsx` đã giải thích cho chính nó.
 //
-// CẤU TRÚC chép từ `app/(layer4)/_components/StatusBadge.tsx:55-64`: một
+// CẤU TRÚC chép từ `features/authoring/components/StatusBadge.tsx:55-64`: một
 // <span> viên thuốc, một glyph `aria-hidden`, rồi CHỮ làm tên khả truy cập —
 // nhờ vậy badge vẫn phân biệt được khi in đen trắng, và trình đọc màn hình chỉ
 // đọc chữ (AC-043).

@@ -2,7 +2,7 @@
 // § Main Components). Server component.
 //
 // CHỐT ĐĂNG NHẬP CHẠY TRƯỚC MỌI LƯỢT ĐỌC, khuôn của `(HM)/history/page.tsx` và
-// `(layer4)/me/exams/page.tsx`. Thứ tự hai dòng đầu là điều kiện được nghiệm
+// `(authoring)/me/exams/page.tsx`. Thứ tự hai dòng đầu là điều kiện được nghiệm
 // thu chứ không phải thói quen: một lượt `listMyOrders()` đứng trước chốt vẫn
 // trả `[]` (RLS `orders_select_own` lọc sạch), nên màn hình trông vẫn đúng
 // trong khi khách chưa đăng nhập đã kịp chạm vào database. Đích chuyển hướng là

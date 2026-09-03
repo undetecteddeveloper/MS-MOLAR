@@ -3,8 +3,8 @@
 
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
-import { listMyExams } from "@/app/(layer4)/queries";
-import { MyExamsList } from "@/app/(layer4)/_components/MyExamsList";
+import { listMyExams } from "@/features/authoring/queries";
+import { MyExamsList } from "@/features/authoring/components/MyExamsList";
 import { PageContainer } from "@/components/layout/PageContainer";
 
 export default async function MyExamsPage({

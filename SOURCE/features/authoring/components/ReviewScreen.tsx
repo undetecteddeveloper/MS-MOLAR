@@ -25,7 +25,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { saveExam, publishExam } from "@/app/(layer4)/actions";
+import { saveExam, publishExam } from "@/features/authoring/actions";
 import { useT } from "@/lib/i18n/client";
 import { validateAssembledExam } from "@/lib/ugc/assembleExam";
 import { LIMITS } from "@/lib/ugc/limits";
@@ -37,13 +37,13 @@ import type {
   SaveExamPatch,
   UgcError,
 } from "@/lib/ugc/types";
-import { StatusBadge } from "./StatusBadge";
-import { ExtractionErrorPanel } from "./ExtractionErrorPanel";
-import { AssembledQuestionList } from "./AssembledQuestionList";
-import { MetadataFields, type ExamMetaFormValue } from "./MetadataFields";
-import { PointsPanel, type PointsAssignment } from "./PointsPanel";
-import { PublishBar } from "./PublishBar";
-import type { ReviewNodes } from "./reviewNodes.types";
+import { StatusBadge } from "@/features/authoring/components/StatusBadge";
+import { ExtractionErrorPanel } from "@/features/authoring/components/ExtractionErrorPanel";
+import { AssembledQuestionList } from "@/features/authoring/components/AssembledQuestionList";
+import { MetadataFields, type ExamMetaFormValue } from "@/features/authoring/components/MetadataFields";
+import { PointsPanel, type PointsAssignment } from "@/features/authoring/components/PointsPanel";
+import { PublishBar } from "@/features/authoring/components/PublishBar";
+import type { ReviewNodes } from "@/features/authoring/components/reviewNodes.types";
 
 interface ReviewScreenProps {
   examId: string;

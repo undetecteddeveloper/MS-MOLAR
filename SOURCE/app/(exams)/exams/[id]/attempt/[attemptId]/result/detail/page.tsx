@@ -36,7 +36,7 @@ import { EssayGradingPoller } from "@/features/exams/components/EssayGradingPoll
  *
  *  300 chu khong phai mot con so vua khit: no bang MAC DINH cua fluid compute,
  *  bang dung hai route segment khac trong repo dang dung
- *  (`.../attempt/[attemptId]/page.tsx:18`, `(layer4)/upload/page.tsx:18`), va
+ *  (`.../attempt/[attemptId]/page.tsx:18`, `(authoring)/upload/page.tsx:18`), va
  *  nam tren ca hai thu trang nay can — worst case mot luot cham lai la
  *  3 x GROQ_CALL_DEADLINE_MS + hai lan cho backoff ~76 s, con `explainStep()`
  *  can >= 30 s (dung con so `tutorActions.ts:28-31` da neu ten trang nay de doi).

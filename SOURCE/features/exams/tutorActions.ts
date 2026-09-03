@@ -58,7 +58,7 @@ export type ExplainStepResult = { hint: string } | { error: ExplainStepError };
 
 // Ánh xạ OK-04 (`consumeQuota()` reason → `telemetry_log.error_code`) sống ở
 // `@/lib/billing/quotaTelemetry` — MỘT bản khai duy nhất, dùng chung với cổng
-// upload trong `app/(layer4)/actions.ts`. Trước đây mỗi file giữ một bản sao
+// upload trong `features/authoring/actions.ts`. Trước đây mỗi file giữ một bản sao
 // literal và không có gì ghim chúng vào nhau; xem khối chú thích của module ấy
 // để biết vì sao chỗ hợp nhất phải là một module KHÔNG `"use server"`.
 

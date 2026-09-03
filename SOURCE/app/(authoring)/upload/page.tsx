@@ -3,11 +3,11 @@
 
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
-import { UploadForm } from "@/app/(layer4)/_components/UploadForm";
+import { UploadForm } from "@/features/authoring/components/UploadForm";
 import { PageContainer } from "@/components/layout/PageContainer";
 
 // Trần thời gian cho function chạy Server Action của route này — chủ yếu là
-// `extractAndAssemble` (app/(layer4)/actions.ts), đường dài nhất trong app:
+// `extractAndAssemble` (features/authoring/actions.ts), đường dài nhất trong app:
 // upload file → mupdf parse → extractQuestions (≤150s, FATAL_CALL_DEADLINE_MS)
 // → extractAnswers (≤150s nữa) → ghi DB.
 //

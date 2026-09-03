@@ -6,7 +6,7 @@
 // Delete. Trạng thái saving/publishing + thông báo lỗi.
 
 import { useT } from "@/lib/i18n/client";
-import { DeleteDialog } from "./DeleteDialog";
+import { DeleteDialog } from "@/features/authoring/components/DeleteDialog";
 
 interface PublishBarProps {
   isPublished: boolean;

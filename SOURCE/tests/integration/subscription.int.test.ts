@@ -69,11 +69,11 @@
 //   upload allowance is consumed in BOTH branches (rerunExamId set and unset).
 // @category: core-functionality
 // @lane: integration
-// @dependency: app/(layer4)/actions.ts, features/exams/tutorActions.ts,
+// @dependency: features/authoring/actions.ts, features/exams/tutorActions.ts,
 //   lib/billing/quota.ts (consumeQuota), lib/ugc/gemini.ts (emit chokepoint),
 //   lib/billing/readEntitlement.ts
 //   CORRECTED (was `features/exams/actions.ts`): `extractAndAssemble` — the
-//   function AC-017/018/019 talk about — lives in `app/(layer4)/actions.ts`.
+//   function AC-017/018/019 talk about — lives in `features/authoring/actions.ts`.
 //   `features/exams/actions.ts` never mentioned `MAX_UPLOADS_PER_DAY`, so an
 //   absence assertion written against it would have been permanently green.
 // @complexity: high
@@ -114,7 +114,7 @@
 //       This is the backend DD's stated "expected difference": the deleted
 //       row-count check counted rows created and a re-run creates none, so this
 //       assertion fails against the OLD behaviour. (AC-017 + AC-019)
-//   (d) `SOURCE/app/(layer4)/actions.ts` contains no surviving reference to
+//   (d) `SOURCE/features/authoring/actions.ts` contains no surviving reference to
 //       `LIMITS.MAX_UPLOADS_PER_DAY` — an absence assertion, so the old check
 //       cannot be left running in parallel with the new gate. (AC-017)
 //       CORRECTED (was `features/exams/actions.ts`): `extractAndAssemble` lives
@@ -499,7 +499,7 @@ async function signedInClient(email: string, password: string): Promise<Supabase
 //
 // 1. KHUNG GHI SAI ĐƯỜNG DẪN Ở NGHĨA VỤ (d). Khung viết
 //    `SOURCE/features/exams/actions.ts`, nhưng `extractAndAssemble` — hàm mà cả
-//    AC-017/018/019 nói tới — sống ở `SOURCE/app/(layer4)/actions.ts`;
+//    AC-017/018/019 nói tới — sống ở `SOURCE/features/authoring/actions.ts`;
 //    `features/exams/actions.ts` chưa từng nhắc `LIMITS.MAX_UPLOADS_PER_DAY` một lần
 //    nào, nên một khẳng định vắng mặt viết cho nó sẽ XANH VĨNH VIỄN mà không
 //    quan sát gì. Ca (d) vì thế đọc file layer4, và mở đầu bằng hai khẳng định
@@ -623,7 +623,7 @@ vi.mock("@upstash/redis", () => {
   };
 });
 
-const { extractAndAssemble } = await import("@/app/(layer4)/actions");
+const { extractAndAssemble } = await import("@/features/authoring/actions");
 const { explainStep } = await import("@/features/exams/tutorActions");
 
 /** Hợp đồng lỗi của S-01 (`UgcActionFailure`), lấy TỪ CHÍNH chữ ký hàm thay vì
@@ -997,7 +997,7 @@ async function int1RunTutor(userId: string): Promise<Int1TutorRun> {
   return { result, telemetry, geminiCalls: int1GenerateContent.mock.calls.length };
 }
 
-const INT1_ACTIONS_PATH = resolve(__dirname, "../../app/(layer4)/actions.ts");
+const INT1_ACTIONS_PATH = resolve(__dirname, "../../features/authoring/actions.ts");
 
 /** Ảnh chụp của dãy thao tác, chạy MỘT lần trong `beforeAll`; mỗi `it` chỉ đọc
  *  ảnh chụp — cùng lối INT-2/INT-3. */
@@ -1344,7 +1344,7 @@ describe(
     // ---------------------------------------------------------------------
     // (d) AC-017 — khẳng định VẮNG MẶT, kèm hai khẳng định CÓ MẶT
     // ---------------------------------------------------------------------
-    it("(d) `app/(layer4)/actions.ts` không còn tham chiếu nào tới `LIMITS.MAX_UPLOADS_PER_DAY`, và cổng mới đứng ở chỗ của nó", () => {
+    it("(d) `features/authoring/actions.ts` không còn tham chiếu nào tới `LIMITS.MAX_UPLOADS_PER_DAY`, và cổng mới đứng ở chỗ của nó", () => {
       // Hai khẳng định CÓ MẶT trước đã: "không tìm thấy chuỗi" và "đọc nhầm
       // file / file rỗng" cho ra cùng một kết quả, và khung INT-1 ghi sai
       // đường dẫn ((exams)) đúng theo cách đó.

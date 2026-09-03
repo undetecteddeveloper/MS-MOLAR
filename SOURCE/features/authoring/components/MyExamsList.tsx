@@ -12,9 +12,9 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import type { MyExamListItem } from "@/app/(layer4)/queries";
+import type { MyExamListItem } from "@/features/authoring/queries";
 import { useT } from "@/lib/i18n/client";
-import { ExamRow } from "./ExamRow";
+import { ExamRow } from "@/features/authoring/components/ExamRow";
 import {
   Tabs,
   TabsIndicator,

@@ -26,7 +26,7 @@ describe("TicketStatusBadge", () => {
     expect(new Set(labels).size).toBe(3);
   });
 
-  it("uses distinct glyphs from (layer4)/StatusBadge's own set (◌/◑/○/●/▲)", () => {
+  it("uses distinct glyphs from (authoring)/StatusBadge's own set (◌/◑/○/●/▲)", () => {
     const otherGlyphs = new Set(["◌", "◑", "○", "●", "▲"]);
     for (const status of ["new", "in_progress", "resolved"] as const) {
       const { container, unmount } = render(<TicketStatusBadge status={status} />);

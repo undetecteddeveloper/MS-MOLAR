@@ -1,6 +1,6 @@
 // UGC Exam Upload v2.1 — dựng AssembledExam từ rows DB (Task 4.1/4.2 + C1).
-// Dùng chung bởi (layer4)/actions.ts (publish/save re-validate) và
-// (layer4)/queries.ts (getMyExam cho màn review S-03). Thuần — test được.
+// Dùng chung bởi features/authoring/actions.ts (publish/save re-validate) và
+// features/authoring/queries.ts (getMyExam cho màn review S-03). Thuần — test được.
 
 import { repairTrueFalseStem } from "./tfShape";
 import type {

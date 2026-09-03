@@ -1,7 +1,7 @@
 "use client";
 
 // TicketStatusBadge — nhãn trạng thái ticket hỗ trợ (UI Spec, I002 fix).
-// Sibling ĐỘC LẬP của StatusBadge.tsx ((layer4)) — Status/CONFIG riêng, KHÔNG
+// Sibling ĐỘC LẬP của StatusBadge.tsx ((authoring)) — Status/CONFIG riêng, KHÔNG
 // merge vào StatusBadge's CONFIG (UI-D2/I002). Glyph khác hẳn bộ ◌/◑/○/●/▲
 // của StatusBadge để hai hệ thống không lẫn vào nhau.
 

@@ -1,4 +1,4 @@
-// Loading state for /history — skeleton mirrors (layer4)/me/exams/loading.tsx's
+// Loading state for /history — skeleton mirrors (authoring)/me/exams/loading.tsx's
 // pattern (heading skeleton + pulsing row placeholders), per the frontend DD's
 // HistoryList states table (D7): 4 placeholder rows for this list.
 

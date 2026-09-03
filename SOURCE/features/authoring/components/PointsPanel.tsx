@@ -26,7 +26,7 @@ import { useT } from "@/lib/i18n/client";
 import { distributePoints, isTotalBalanced, sumPoints } from "@/lib/ugc/distributePoints";
 import { LIMITS } from "@/lib/ugc/limits";
 import type { AssembledQuestion, ExtractedPart } from "@/lib/ugc/types";
-import { partNumbersOf } from "./AssembledQuestionList";
+import { partNumbersOf } from "@/features/authoring/components/AssembledQuestionList";
 
 /** Điểm được gán cho một câu, định danh theo (part, number) như mọi nơi ở layer 4. */
 export interface PointsAssignment {

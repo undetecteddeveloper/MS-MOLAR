@@ -6,7 +6,7 @@
 
 import { notFound } from "next/navigation";
 import { getExam } from "@/features/exams/queries";
-import { hasReported } from "@/app/(layer4)/queries";
+import { hasReported } from "@/features/authoring/queries";
 import { StartAttemptButton } from "@/features/exams/components/StartAttemptButton";
 import { ReportExam } from "@/features/exams/components/ReportExam";
 import { AuthorByline } from "@/components/shared/AuthorByline";

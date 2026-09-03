@@ -350,7 +350,7 @@ describe("(exams)/layout.tsx — mã nguồn: không memo hoá, không đường
 });
 
 // Khẳng định PHẠM VI REPO — đặt ở đúng một chỗ (file này) thay vì nhân đôi sang
-// (layer4), vì nó nói về toàn bộ cây chứ không về một route group.
+// (authoring), vì nó nói về toàn bộ cây chứ không về một route group.
 describe("Binding decision ADR-0013 — một phép tính quyền lợi, KHÔNG có đường đọc thứ hai", () => {
   const sourceRoot = path.join(HERE, "..", "..", "..");
 
@@ -358,7 +358,7 @@ describe("Binding decision ADR-0013 — một phép tính quyền lợi, KHÔNG 
    *  Mọi file ĐƯỜNG RENDER khác dưới app/, components/ VÀ lib/ chỉ được đọc
    *  context qua `useEntitlement()`. */
   const RENDER_PATH_ALLOWED = [
-    // B1 (2026-09-03): bốn layout (billing)/(exams)/(analytics)/(layer4) từng
+    // B1 (2026-09-03): bốn layout (billing)/(exams)/(analytics)/(authoring) từng
     // đứng ở đây, mỗi cái gọi readEntitlement() một lần; nay chúng uỷ quyền cho
     // MỘT khung dùng chung và chỉ khung ấy gọi. (analytics) gia nhập từ khi
     // /profile có tab Usage: tab đó render `PlanSummary` (C-11), và một layout
@@ -401,7 +401,7 @@ describe("Binding decision ADR-0013 — một phép tính quyền lợi, KHÔNG 
     // trần ngân sách; không có React context nào ở đây để `useEntitlement()`
     // đọc, và tin vào quyền lợi do FormData khai thì giả mạo được — trong đúng
     // một hàm có bất biến là không tin bất cứ thứ gì người gọi khai.
-    "app/(layer4)/actions.ts",
+    "features/authoring/actions.ts",
   ];
 
   /** Directive prologue của một Server Action: một string literal đứng MỘT MÌNH

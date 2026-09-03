@@ -2,7 +2,7 @@
 //
 // RULE OF THREE, and the decision it forced (Design Doc C11). This map already
 // exists twice — lib/support/actions.ts:22 (three image types) and
-// app/(layer4)/actions.ts:55 (the same three plus application/pdf) — each with
+// features/authoring/actions.ts:55 (the same three plus application/pdf) — each with
 // a comment explaining why it was written out rather than shared. changeAvatar
 // would have been the third copy, which is where "two similar things" becomes
 // "a thing that drifts", so it is extracted here instead.

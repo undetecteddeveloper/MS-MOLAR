@@ -48,7 +48,7 @@ import {
   type RenderedText,
   type ReviewNodes,
   type ReviewQuestionNodes,
-} from "./reviewNodes.types";
+} from "@/features/authoring/components/reviewNodes.types";
 
 function rendered(source: string, className: string, inline: boolean): RenderedText {
   return { source, node: <RichText text={source} inline={inline} className={className} /> };

@@ -49,7 +49,7 @@
 // VÌ SAO CẢ BA NGUYÊN NHÂN ĐỀU ĐI ĐƯỜNG GIA SƯ (và đường upload thì không thể)
 // =============================================================================
 // `telemetry_log_event_type_check` chỉ nhận `('adaptive_route','tutor_invoke')`
-// — KHÔNG có event type nào cho upload. Cổng hạn mức của `app/(layer4)/
+// — KHÔNG có event type nào cho upload. Cổng hạn mức của `app/(authoring)/
 // actions.ts` vì thế không ghi nổi một dòng `telemetry_log` nào; mã OK-04 của
 // nó chỉ quan sát được qua `console.warn` phía máy chủ (đúng như
 // `int1CaptureWarnings()` trong `subscription.int.test.ts` đã ghi). AC-047 do

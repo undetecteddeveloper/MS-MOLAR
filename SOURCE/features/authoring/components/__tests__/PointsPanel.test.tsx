@@ -30,7 +30,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { LIMITS } from "@/lib/ugc/limits";
 import type { AssembledQuestion, ExtractedPart } from "@/lib/ugc/types";
-import { PointsPanel, type PointsAssignment } from "../PointsPanel";
+import { PointsPanel, type PointsAssignment } from "@/features/authoring/components/PointsPanel";
 
 /** jsdom không có matchMedia — panel đọc nó để chọn mở/thu mặc định. */
 function stubMatchMedia(matches: boolean) {

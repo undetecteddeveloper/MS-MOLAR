@@ -13,9 +13,9 @@
 "use client";
 
 import type { AssembledQuestion, ExtractedPart, UgcError } from "@/lib/ugc/types";
-import { PartHeading } from "./PartHeading";
-import { QuestionEditor } from "./QuestionEditor";
-import { reviewNodeKey, type ReviewNodes } from "./reviewNodes.types";
+import { PartHeading } from "@/features/authoring/components/PartHeading";
+import { QuestionEditor } from "@/features/authoring/components/QuestionEditor";
+import { reviewNodeKey, type ReviewNodes } from "@/features/authoring/components/reviewNodes.types";
 
 interface AssembledQuestionListProps {
   questions: AssembledQuestion[];

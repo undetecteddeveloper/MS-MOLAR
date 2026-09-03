@@ -2,7 +2,7 @@
 // `telemetry_log.error_code` (backend DD § OK-04, plan Task 5.5).
 //
 // Module này là một module THƯỜNG, KHÔNG có chỉ thị `"use server"`, và đó là
-// toàn bộ lý do nó tồn tại. Hai chỗ từ chối — `app/(layer4)/actions.ts` (cổng
+// toàn bộ lý do nó tồn tại. Hai chỗ từ chối — `features/authoring/actions.ts` (cổng
 // upload) và `features/exams/tutorActions.ts` (cổng gia sư) — đều là file
 // `"use server"`, tức mọi export của chúng phải là hàm async: chúng không thể
 // export nổi một hằng dùng chung cho nhau. Chỉ thị ấy hạn chế EXPORT, không hạn

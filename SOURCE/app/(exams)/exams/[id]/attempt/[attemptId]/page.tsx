@@ -8,7 +8,7 @@ import { ExamPlayer } from "@/features/exams/components/ExamPlayer";
 import { renderQuestionNodes } from "@/features/exams/components/questionNodes";
 
 // Route segment cua `submitExam()`. 300s la tran cung cua Vercel voi fluid
-// compute — cung ly do va cung con so nhu `app/(layer4)/upload/page.tsx:18`.
+// compute — cung ly do va cung con so nhu `app/(authoring)/upload/page.tsx:18`.
 //
 // Vi sao khai o DAY chu khong trong actions.ts: `maxDuration` la route-segment
 // config, va no KHONG khai duoc trong mot file `"use server"`. Pass cham tu

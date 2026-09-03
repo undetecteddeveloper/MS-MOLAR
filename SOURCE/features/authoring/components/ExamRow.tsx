@@ -17,11 +17,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import type { MyExamListItem } from "@/app/(layer4)/queries";
+import type { MyExamListItem } from "@/features/authoring/queries";
 import { useT } from "@/lib/i18n/client";
 import type { MessageKey, Translate } from "@/lib/i18n/translate";
-import { StatusBadge } from "./StatusBadge";
-import { DeleteDialog } from "./DeleteDialog";
+import { StatusBadge } from "@/features/authoring/components/StatusBadge";
+import { DeleteDialog } from "@/features/authoring/components/DeleteDialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   ContextMenu,

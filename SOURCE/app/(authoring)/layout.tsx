@@ -1,4 +1,4 @@
-// Layout route group (layer4) — khung chung cho MỌI trang Layer 4.
+// Layout route group (authoring) — khung chung cho MỌI trang Layer 4.
 // Theme dùng thẳng root "Mực & Sơn mài" (globals.css) — không có scope riêng.
 // SiteHeader dùng chung với Layer 2/3 (xem comment trong SiteHeader.tsx).
 //

@@ -18,7 +18,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import type { AssembledQuestion, ExtractedPart } from "@/lib/ugc/types";
-import { AssembledQuestionList, partNumbersOf } from "../AssembledQuestionList";
+import { AssembledQuestionList, partNumbersOf } from "@/features/authoring/components/AssembledQuestionList";
 
 afterEach(cleanup);
 

@@ -18,7 +18,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { deleteExam } from "@/app/(layer4)/actions";
+import { deleteExam } from "@/features/authoring/actions";
 import { useT } from "@/lib/i18n/client";
 
 interface DeleteDialogProps {
