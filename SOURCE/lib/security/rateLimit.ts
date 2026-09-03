@@ -188,7 +188,7 @@ export const RATE_LIMITS = {
   // 2 tài khoản dùng hết phần mình đã chạm trần 20 lượt/ngày. Chặn thật cho vế
   // đó là một ngân sách mức PROJECT (đếm chung mọi user, mọi đường gọi Gemini) —
   // chưa có, còn nợ, xem TD-019.
-  uploadExam: { limit: 5, windowMs: 24 * 60 * 60 * 1000 },
+  uploadExam: { limit: 10, windowMs: 24 * 60 * 60 * 1000 },
   // Đổi mật khẩu (/profile — PRD profile-and-about AC-023). CHẶT HƠN HẲN mọi
   // mục trên, và vì một lý do KHÁC CẢ HAI HỌ TRÊN. Khối đầu tốn một dòng DB của
   // CHÍNH ta; explainStep/uploadExam tiêu vào hạn ngạch của bên thứ ba. Mục này
