@@ -1,6 +1,6 @@
 // AppShell — khung dùng chung cho MỌI route group đã đăng nhập (B1, 2026-09-03).
 //
-// Trước đây năm layout — (layer2), (layer3), (layer4), (billing), (HM) — chép
+// Trước đây năm layout — (exams), (layer3), (layer4), (billing), (HM) — chép
 // nhau TỪNG KÝ TỰ trừ tên hàm ((HM) thiếu EntitlementProvider). Một chỗ sửa
 // thành năm chỗ sửa, và hai khối comment giải thích "vì sao" cũng bị nhân năm.
 // Nay mỗi layout còn vài dòng gọi vào đây; phần "vì sao" sống ở một nơi.
@@ -33,7 +33,7 @@ type AppShellProps = {
 /**
  * Gọi như một HÀM từ layout (`return AppShell({ children })`), không phải như
  * một phần tử JSX. Lý do là cơ học, không phải phong cách: hai test layout
- * (`app/(layer2)/__tests__/layout.test.tsx`, `(layer4)`) render CÂY THẬT bằng
+ * (`app/(exams)/__tests__/layout.test.tsx`, `(layer4)`) render CÂY THẬT bằng
  * `render(await Layout({ children }))` trong jsdom, và bộ render client của
  * React 19 từ chối một phần tử async — nó suspend và cả cây ra rỗng. Layout
  * giữ dạng `export default async function` và trả thẳng kết quả của hàm này,

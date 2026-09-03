@@ -49,7 +49,7 @@
 //   three-time TD-005 failure shape.
 //
 // FIXTURE HYGIENE. Follow the shipped precedent in
-//   `SOURCE/app/(layer2)/__tests__/recordSkillMastery.int.test.ts` (this repo's
+//   `SOURCE/features/exams/__tests__/recordSkillMastery.int.test.ts` (this repo's
 //   only existing service-lane test) and `SOURCE/supabase/test-rls.ts`: an
 //   isolated id prefix per case (e.g. "sub-svc-") for idempotent setup and
 //   teardown. Each case creates its own users and orders and deletes them in

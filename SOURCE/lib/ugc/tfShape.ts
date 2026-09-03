@@ -10,7 +10,7 @@
 //
 //   · lúc BÓC TÁCH  — vá ngay khi model vừa trả lời, để dữ liệu mới lưu đúng;
 //   · lúc ĐỌC ĐỂ DUYỆT (`fromRows`) — vá row CŨ đã nằm sẵn trong DB;
-//   · lúc ĐỌC ĐỂ LÀM BÀI (`(layer2)/queries`) — cùng lý do, và đây là nơi
+//   · lúc ĐỌC ĐỂ LÀM BÀI (`(exams)/queries`) — cùng lý do, và đây là nơi
 //     KHÔNG vá thì học sinh nhìn thấy một câu hỏi không có gì để bấm.
 //
 // Vá ở đường đọc là một SHIM CHO DỮ LIỆU CŨ, đúng lối mà codebase đã dùng hai

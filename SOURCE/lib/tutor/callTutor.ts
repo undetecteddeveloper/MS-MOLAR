@@ -7,7 +7,7 @@
 //
 // Ranh giới trách nhiệm: ở đây chỉ có "gọi model và PHÂN LOẠI thất bại"; quyền
 // truy cập, tái kiểm tra điều kiện sai-hai-lần, rate limit và lệnh ghi telemetry
-// là việc của explainStep() (app/(layer2)/tutorActions.ts).
+// là việc của explainStep() (features/exams/tutorActions.ts).
 
 import {
   generateContent,

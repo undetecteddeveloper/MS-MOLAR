@@ -8,7 +8,7 @@
 // typed-result mà hook này tiêu thụ.
 
 import { useRef, useState } from "react";
-import { explainStep } from "@/app/(layer2)/tutorActions";
+import { explainStep } from "@/features/exams/tutorActions";
 
 export type TutorPhase = "idle" | "busy" | "hint-shown" | "error";
 

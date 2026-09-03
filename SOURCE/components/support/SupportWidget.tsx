@@ -12,7 +12,7 @@ import { SupportWidgetTrigger } from "@/components/support/SupportWidgetTrigger"
 import { SupportWidgetDialog } from "@/components/support/SupportWidgetDialog";
 import { TRIGGER_ID } from "@/components/support/SupportWidgetTrigger";
 
-// Route đang làm bài (layer2) — widget VẮNG MẶT thật sự ở đây (AC-005, D1),
+// Route đang làm bài (exams) — widget VẮNG MẶT thật sự ở đây (AC-005, D1),
 // không phải ẩn bằng CSS. Một hằng số regex DUY NHẤT dùng chung cho cả 5 mount
 // point — đổi hình dạng route thì chỉ sửa đúng dòng này.
 const ATTEMPT_ROUTE_RE = /^\/exams\/[^/]+\/attempt\/[^/]+$/;

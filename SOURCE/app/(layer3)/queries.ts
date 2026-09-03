@@ -1,5 +1,5 @@
 // (layer3) route group — Analytics read (docs/design/analytics-layer3-data-logic-design.md
-// § getAnalyticsByRange). Server-only, mirrors (layer2)/queries.ts's/(HM)/queries.ts's
+// § getAnalyticsByRange). Server-only, mirrors features/exams/queries.ts's/(HM)/queries.ts's
 // snake_case DB → camelCase mapping + throw-on-infrastructure-error convention.
 // RLS scopes the read to auth.uid() — no explicit user_id predicate needed
 // (results_select_own/attempts_select_own, supabase/schema.sql).

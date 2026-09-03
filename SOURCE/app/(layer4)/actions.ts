@@ -52,7 +52,7 @@ import { checkUploadFile, isAllowedMime, validateExamMeta } from "@/lib/ugc/vali
 
 // Ánh xạ OK-04 (`consumeQuota()` reason → `telemetry_log.error_code`) sống ở
 // `@/lib/billing/quotaTelemetry` — MỘT bản khai duy nhất, dùng chung với cổng
-// gia sư trong `app/(layer2)/tutorActions.ts`. Trước đây mỗi file giữ một bản
+// gia sư trong `features/exams/tutorActions.ts`. Trước đây mỗi file giữ một bản
 // sao literal và không có gì ghim chúng vào nhau; xem khối chú thích của module
 // ấy để biết vì sao chỗ hợp nhất phải là một module KHÔNG `"use server"`.
 

@@ -78,7 +78,7 @@ export const LIST_ROW_CEILING = 500;
  *
  * Khai theo cấu trúc thay vì import type generic của `@supabase/supabase-js`:
  * các call site trong repo đã đúc kết quả bằng `as unknown as Row[]` (xem
- * (layer2)/queries.ts), nên buộc helper phải khớp generic của builder chỉ thêm
+ * features/exams/queries.ts), nên buộc helper phải khớp generic của builder chỉ thêm
  * việc mà không thêm an toàn.
  */
 interface BoundedListQuery {

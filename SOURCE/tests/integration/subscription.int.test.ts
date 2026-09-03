@@ -69,12 +69,12 @@
 //   upload allowance is consumed in BOTH branches (rerunExamId set and unset).
 // @category: core-functionality
 // @lane: integration
-// @dependency: app/(layer4)/actions.ts, app/(layer2)/tutorActions.ts,
+// @dependency: app/(layer4)/actions.ts, features/exams/tutorActions.ts,
 //   lib/billing/quota.ts (consumeQuota), lib/ugc/gemini.ts (emit chokepoint),
 //   lib/billing/readEntitlement.ts
-//   CORRECTED (was `app/(layer2)/actions.ts`): `extractAndAssemble` — the
+//   CORRECTED (was `features/exams/actions.ts`): `extractAndAssemble` — the
 //   function AC-017/018/019 talk about — lives in `app/(layer4)/actions.ts`.
-//   `app/(layer2)/actions.ts` never mentioned `MAX_UPLOADS_PER_DAY`, so an
+//   `features/exams/actions.ts` never mentioned `MAX_UPLOADS_PER_DAY`, so an
 //   absence assertion written against it would have been permanently green.
 // @complexity: high
 // Mock boundary (backend DD Test Boundaries, `consumeQuota` row): Redis is
@@ -117,8 +117,8 @@
 //   (d) `SOURCE/app/(layer4)/actions.ts` contains no surviving reference to
 //       `LIMITS.MAX_UPLOADS_PER_DAY` — an absence assertion, so the old check
 //       cannot be left running in parallel with the new gate. (AC-017)
-//       CORRECTED (was `app/(layer2)/actions.ts`): `extractAndAssemble` lives
-//       in layer4, and `app/(layer2)/actions.ts` never mentioned
+//       CORRECTED (was `features/exams/actions.ts`): `extractAndAssemble` lives
+//       in layer4, and `features/exams/actions.ts` never mentioned
 //       `MAX_UPLOADS_PER_DAY` — the assertion as written would have been
 //       permanently green while observing nothing. The implementation below
 //       reads layer4 and opens with two PRESENCE assertions so that "string not
@@ -360,7 +360,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 /** Nạp `.env.local` vào `process.env` — vitest không tự nạp và
  *  `vitest.integration.config.ts` khai không `setupFiles` nào. Chép từ
- *  `app/(layer2)/__tests__/recordSkillMastery.int.test.ts`, kể cả việc bóc cặp
+ *  `features/exams/__tests__/recordSkillMastery.int.test.ts`, kể cả việc bóc cặp
  *  nháy bao ngoài (Next.js bóc khi nó nạp file, nên vài giá trị được ghi có
  *  nháy và vẫn chạy đúng ở production). Không ghi đè biến đã có sẵn. */
 function loadEnvLocal(): void {
@@ -498,9 +498,9 @@ async function signedInClient(email: string, password: string): Promise<Supabase
 // chúng KHÁC khung, và khác có lý do:
 //
 // 1. KHUNG GHI SAI ĐƯỜNG DẪN Ở NGHĨA VỤ (d). Khung viết
-//    `SOURCE/app/(layer2)/actions.ts`, nhưng `extractAndAssemble` — hàm mà cả
+//    `SOURCE/features/exams/actions.ts`, nhưng `extractAndAssemble` — hàm mà cả
 //    AC-017/018/019 nói tới — sống ở `SOURCE/app/(layer4)/actions.ts`;
-//    `(layer2)/actions.ts` chưa từng nhắc `LIMITS.MAX_UPLOADS_PER_DAY` một lần
+//    `features/exams/actions.ts` chưa từng nhắc `LIMITS.MAX_UPLOADS_PER_DAY` một lần
 //    nào, nên một khẳng định vắng mặt viết cho nó sẽ XANH VĨNH VIỄN mà không
 //    quan sát gì. Ca (d) vì thế đọc file layer4, và mở đầu bằng hai khẳng định
 //    CÓ MẶT (file tồn tại, và nó chứa `extractAndAssemble`) — không có chúng
@@ -624,7 +624,7 @@ vi.mock("@upstash/redis", () => {
 });
 
 const { extractAndAssemble } = await import("@/app/(layer4)/actions");
-const { explainStep } = await import("@/app/(layer2)/tutorActions");
+const { explainStep } = await import("@/features/exams/tutorActions");
 
 /** Hợp đồng lỗi của S-01 (`UgcActionFailure`), lấy TỪ CHÍNH chữ ký hàm thay vì
  *  import lại tên kiểu: một lần đổi kiểu trả về sẽ hiện ra ở đây là lỗi biên
@@ -1347,7 +1347,7 @@ describe(
     it("(d) `app/(layer4)/actions.ts` không còn tham chiếu nào tới `LIMITS.MAX_UPLOADS_PER_DAY`, và cổng mới đứng ở chỗ của nó", () => {
       // Hai khẳng định CÓ MẶT trước đã: "không tìm thấy chuỗi" và "đọc nhầm
       // file / file rỗng" cho ra cùng một kết quả, và khung INT-1 ghi sai
-      // đường dẫn ((layer2)) đúng theo cách đó.
+      // đường dẫn ((exams)) đúng theo cách đó.
       expect(existsSync(INT1_ACTIONS_PATH)).toBe(true);
       const source = readFileSync(INT1_ACTIONS_PATH, "utf8");
       expect(source).toContain("export async function extractAndAssemble(");

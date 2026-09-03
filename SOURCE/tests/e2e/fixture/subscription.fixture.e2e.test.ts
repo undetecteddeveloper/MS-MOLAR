@@ -69,13 +69,13 @@
 // about what renders. So FE-2 keeps the convention's SUBSTANCE — the real route
 // tree, only the action module and the two data sources stubbed, real
 // dictionaries, no MSW — and drops its FORM, composing
-// `RootLayout -> (layer2)/layout -> the result-detail page` exactly as
+// `RootLayout -> (exams)/layout -> the result-detail page` exactly as
 // production composes them and rendering that through
 // `@testing-library/react`. The provider therefore comes from where production
-// puts it (`app/(layer2)/layout.tsx:41`), which is the whole point: delete that
+// puts it (`app/(exams)/layout.tsx:41`), which is the whole point: delete that
 // mount and FE-2 goes red — which is exactly what a provider-wrapped unit test
 // cannot do. Precedent for rendering a real layout tree this way:
-// `SOURCE/app/(layer2)/__tests__/layout.test.tsx` (plan Task 2.2).
+// `SOURCE/app/(exams)/__tests__/layout.test.tsx` (plan Task 2.2).
 //
 // WHAT THIS FORM CANNOT COVER, recorded rather than quietly dropped: jsdom
 // paints nothing and lays nothing out, so the PAINTED focus ring, the 360px
@@ -127,7 +127,7 @@
 // components, the dictionaries and the date formatter are all REAL.
 // `readEntitlement()` is a data source and not the thing under test: the
 // skeleton's own mock boundary reads "entitlement is supplied as a FIXTURE at
-// the real (layer2) provider mount", and the entitlement fixtures are
+// the real (exams) provider mount", and the entitlement fixtures are
 // `Entitlement` VALUES, which is the shape that arrives at that mount. Stubbing
 // it does not weaken the primary failure mode, because the mount, the context
 // and every consumer below it stay real. (`layout.test.tsx` stubs one layer
@@ -279,19 +279,19 @@
 // ROI: 80 (BV:8 x Freq:9 + Legal:0 + Defect:8)
 // @category: fixture-e2e
 // @lane: fixture-e2e
-// @dependency: full-ui (mocked backend) — app/(layer2) layout + its
+// @dependency: full-ui (mocked backend) — app/(exams) layout + its
 //   EntitlementProvider mount (backend DD D005 / I1), the result-detail page
 //   (both ExplainStepAffordance call sites), components/billing/TutorQuotaNote.tsx,
 //   components/tutor/ExplainStepAffordance.tsx, the en/vi dictionaries
 // @complexity: high
 // Mock boundary: entitlement is supplied as a FIXTURE at the real
-//   `(layer2)` provider mount; the tutor action module is stubbed. The LAYOUT
+//   `(exams)` provider mount; the tutor action module is stubbed. The LAYOUT
 //   TREE IS REAL AND UNMOCKED — backend DD Test Boundaries, "Provider coverage
 //   (I1)" row: "nothing — render the real layout tree ... a mocked provider
 //   would assert the mock".
-// @real-dependency: app/(layer2)/layout.tsx and its EntitlementProvider mount
+// @real-dependency: app/(exams)/layout.tsx and its EntitlementProvider mount
 //   (marked "nothing mocked" in the backend DD's Mock Boundary Decisions table).
-//   Requires backend DD step 1b (the `(layer2)` provider mount) to exist.
+//   Requires backend DD step 1b (the `(exams)` provider mount) to exist.
 //
 // WHY THIS IS A BROWSER CASE AND NOT A COMPONENT CASE — this is the whole point
 //   of the slot. The frontend DD records it explicitly (Test Boundaries,
@@ -442,7 +442,7 @@ vi.mock("next/navigation", () => ({
 // `SkipLink` is an async Server Component. React 19's client renderer refuses
 // one outright: it suspends and the WHOLE tree comes back empty, i.e. the case
 // would be red for the wrong reason. Same environment limit, same treatment and
-// same reasoning as `app/(layer2)/__tests__/layout.test.tsx:70`. It sits OUTSIDE
+// same reasoning as `app/(exams)/__tests__/layout.test.tsx:70`. It sits OUTSIDE
 // the provider, so it stands between no assertion in this file.
 vi.mock("@/components/shared/SkipLink", () => ({ SkipLink: () => null }));
 
@@ -456,7 +456,7 @@ vi.mock("@/components/shared/SkipLink", () => ({ SkipLink: () => null }));
 // database, no credentials and no network.
 vi.mock("@/lib/support/actions", () => ({ submitSupportTicket: vi.fn() }));
 vi.mock("@/lib/i18n/actions", () => ({ setLocale: vi.fn() }));
-vi.mock("@/app/(layer1)/actions", () => ({ signOut: vi.fn() }));
+vi.mock("@/features/auth/actions", () => ({ signOut: vi.fn() }));
 
 // --- The sanctioned mock boundary + the two data sources ---------------------
 // `explainStep` is the ACTION MODULE (the frontend DD's sanctioned boundary).
@@ -464,7 +464,7 @@ vi.mock("@/app/(layer1)/actions", () => ({ signOut: vi.fn() }));
 // `getResult` is the page's. The layouts, the EntitlementProvider mount, the
 // page, TutorQuotaNote, ExplainStepAffordance, the dictionaries and
 // `lib/format/datetime.ts` all run REAL.
-vi.mock("@/app/(layer2)/tutorActions", () => ({ explainStep: explainStepMock }));
+vi.mock("@/features/exams/tutorActions", () => ({ explainStep: explainStepMock }));
 // `getCurrentUser` is FE-3's addition: a factory replaces the WHOLE module, and
 // S-05's login gate reads `getCurrentUser` while FE-2's route reads
 // `getCurrentUserProfile`. Without both names on one factory the other lane's
@@ -474,12 +474,12 @@ vi.mock("@/lib/auth/getCurrentUser", () => ({
   getCurrentUser: getCurrentUserMock,
 }));
 vi.mock("@/lib/billing/readEntitlement", () => ({ readEntitlement: readEntitlementMock }));
-vi.mock("@/app/(layer2)/queries", () => ({ getResult: getResultMock }));
+vi.mock("@/features/exams/queries", () => ({ getResult: getResultMock }));
 
 import RootLayout from "@/app/layout";
-import Layer2Layout from "@/app/(layer2)/layout";
-import ResultDetailPage from "@/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page";
-import type { ExamResult } from "@/app/(layer2)/queries";
+import Layer2Layout from "@/app/(exams)/layout";
+import ResultDetailPage from "@/app/(exams)/exams/[id]/attempt/[attemptId]/result/detail/page";
+import type { ExamResult } from "@/features/exams/queries";
 import { TutorQuotaNote } from "@/components/billing/TutorQuotaNote";
 import type { Entitlement } from "@/lib/billing/types";
 import { LOCALES, type Locale } from "@/lib/i18n/locales";
@@ -630,10 +630,10 @@ const FIXTURE_RESULT: ExamResult = {
 // =============================================================================
 
 /**
- * `RootLayout -> (layer2)/layout -> result-detail page`.
+ * `RootLayout -> (exams)/layout -> result-detail page`.
  *
  * NOTHING here supplies `EntitlementProvider`: it is reached only because
- * `app/(layer2)/layout.tsx` mounts it. Delete that mount and every assertion
+ * `app/(exams)/layout.tsx` mounts it. Delete that mount and every assertion
  * about the note dies — which is the one thing a provider-wrapped unit test
  * can never do (frontend DD Risk R-12).
  *
@@ -979,7 +979,7 @@ describe("FE-2 (d) fail-OPEN: unknown quota hides the note without breaking the 
 
     // THE POSITIVE CONTROL, and it is the only reason the four assertions above
     // mean anything. Mutation-checked: with `EntitlementProvider` deleted from
-    // `(layer2)/layout.tsx` every quota is `unknown`, so "no note, no 0, no —"
+    // `(exams)/layout.tsx` every quota is `unknown`, so "no note, no 0, no —"
     // is trivially true and this case stayed GREEN against exactly the tree
     // AC-042 exists to catch. Feeding the SAME harness a `known` quota has to
     // produce the note — otherwise "absent" means "broken", not "fail-OPEN".
@@ -1097,7 +1097,7 @@ describe("FE-2 (g) every interactive element in the new states is reachable and 
     const items = questionItems(container);
 
     // WITHOUT THIS, THIS WHOLE BLOCK MEASURES THE HARNESS. Mutation-checked:
-    // with `EntitlementProvider` deleted from `(layer2)/layout.tsx`, every
+    // with `EntitlementProvider` deleted from `(exams)/layout.tsx`, every
     // quota is `unknown`, so the `known` and `exhausted` rows below scan the
     // very same idle button the `unknown` row scans — and all three stayed
     // GREEN against a tree where the state under test never existed. The

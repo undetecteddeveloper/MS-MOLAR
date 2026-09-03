@@ -119,7 +119,7 @@ function printReport() {
 
 // --- Layer-specific query chains (copied from each layer's queries.ts) -----
 
-// 2026-08-16: thêm `created_at` cho khớp bản gốc ở (layer2)/queries.ts sau khi
+// 2026-08-16: thêm `created_at` cho khớp bản gốc ở features/exams/queries.ts sau khi
 // ADR-0015 nới cột này cho tín hiệu mới-cũ. Đây đúng là kiểu trôi lệch mà header
 // file này cảnh báo — benchmark mà không sửa theo thì đang đo một truy vấn
 // không còn tồn tại.

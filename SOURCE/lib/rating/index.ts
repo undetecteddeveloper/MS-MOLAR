@@ -115,7 +115,7 @@ export function readoutModel(scores: Partial<Record<PartId, PartScore>>): Readou
   return { value: formatMean(mean), status: `${rated.length}/${PART_IDS.length} RATED` };
 }
 
-/** Discriminated error union của rateExam ((layer2)/actions.ts) — copy độc lập
+/** Discriminated error union của rateExam (features/exams/actions.ts) — copy độc lập
  *  (không import file "use server") để giữ lib/rating thuần. */
 export type RateExamError = "ineligible" | "invalid" | "rate_limited" | "server";
 

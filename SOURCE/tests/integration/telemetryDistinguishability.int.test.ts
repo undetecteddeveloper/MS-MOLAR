@@ -81,7 +81,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 /** Nạp `.env.local` vào `process.env` — vitest không tự nạp và
  *  `vitest.integration.config.ts` không khai `setupFiles` nào. Chép nguyên quy
- *  ước của `app/(layer2)/__tests__/recordSkillMastery.int.test.ts` và
+ *  ước của `features/exams/__tests__/recordSkillMastery.int.test.ts` và
  *  `tests/integration/subscription.int.test.ts`, kể cả việc bóc cặp nháy bao
  *  ngoài. KHÔNG bao giờ nạp `.env.local.prod-backup`: file ấy nằm ngay cạnh và
  *  giữ credential PROD. */
@@ -231,7 +231,7 @@ vi.mock("@/lib/supabase/server", () => ({
   },
 }));
 
-const { explainStep } = await import("@/app/(layer2)/tutorActions");
+const { explainStep } = await import("@/features/exams/tutorActions");
 
 // Ghim bộ đếm rate limit dùng chung về `null` NGAY BÂY GIỜ, khi env còn trống.
 // Khẳng định luôn thay vì gọi suông: nếu một ngày ai đó đặt lại env sớm hơn

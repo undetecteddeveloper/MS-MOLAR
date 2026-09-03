@@ -1,6 +1,6 @@
 // Layout route group (billing) — UI Spec UI-D7.
 //
-// Khung giống hệt (layer2)/layout.tsx, cộng thêm EntitlementProvider. Ba route
+// Khung giống hệt (exams)/layout.tsx, cộng thêm EntitlementProvider. Ba route
 // nằm dưới đây: /pricing (cần đăng nhập) và /terms, /refund-policy (CÔNG KHAI).
 //
 // Một group chứa cả trang cần đăng nhập lẫn trang công khai là hợp lệ và không

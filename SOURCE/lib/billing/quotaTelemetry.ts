@@ -3,7 +3,7 @@
 //
 // Module này là một module THƯỜNG, KHÔNG có chỉ thị `"use server"`, và đó là
 // toàn bộ lý do nó tồn tại. Hai chỗ từ chối — `app/(layer4)/actions.ts` (cổng
-// upload) và `app/(layer2)/tutorActions.ts` (cổng gia sư) — đều là file
+// upload) và `features/exams/tutorActions.ts` (cổng gia sư) — đều là file
 // `"use server"`, tức mọi export của chúng phải là hàm async: chúng không thể
 // export nổi một hằng dùng chung cho nhau. Chỉ thị ấy hạn chế EXPORT, không hạn
 // chế IMPORT, nên một module thứ ba như file này là chỗ hợp nhất hợp lệ duy

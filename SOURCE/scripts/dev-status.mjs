@@ -24,8 +24,8 @@ function banner() {
   console.log(line("═"));
   console.log("");
   console.log("Layers:");
-  console.log("  (layer1) Auth            — login, reset-password");
-  console.log("  (layer2) Exam taking     — browse, attempt, submit, result");
+  console.log("  (auth) Auth            — login, reset-password");
+  console.log("  (exams) Exam taking     — browse, attempt, submit, result");
   console.log("  (layer3) —               — chưa có route (reserved)");
   console.log("  (layer4) UGC upload      — upload, review, publish, my-exams");
   console.log("");
@@ -45,7 +45,7 @@ function banner() {
   console.log("  Live: log [ugc-pipeline] sẽ xuất hiện bên dưới khi có ai upload đề.");
   console.log("");
   console.log(line());
-  console.log("Pipeline: Auto-scoring  (lib/scoring/computeScore.ts, app/(layer2)/actions.ts)");
+  console.log("Pipeline: Auto-scoring  (lib/scoring/computeScore.ts, features/exams/actions.ts)");
   console.log(line());
   console.log("  submitExam() — 6 steps (không log riêng, chạy trong 1 request):");
   console.log("    1/6  Load attempt      theo attemptId, RLS-scoped, idempotent nếu đã nộp");

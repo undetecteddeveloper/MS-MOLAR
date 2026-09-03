@@ -168,14 +168,14 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/components/shared/SkipLink", () => ({ SkipLink: () => null }));
 vi.mock("@/lib/i18n/actions", () => ({ setLocale: vi.fn() }));
-vi.mock("@/app/(layer1)/actions", () => ({ signOut: vi.fn() }));
+vi.mock("@/features/auth/actions", () => ({ signOut: vi.fn() }));
 vi.mock("@/lib/support/actions", () => ({ submitSupportTicket: vi.fn() }));
 vi.mock("@/lib/auth/getCurrentUser", () => ({
   getCurrentUserProfile: getProfileMock,
 }));
 vi.mock("@/lib/billing/readEntitlement", () => ({ readEntitlement: readEntitlementMock }));
-vi.mock("@/app/(layer2)/queries", () => ({ getResult: getResultMock }));
-vi.mock("@/app/(layer2)/actions", () => ({ getMyRating: getMyRatingMock }));
+vi.mock("@/features/exams/queries", () => ({ getResult: getResultMock }));
+vi.mock("@/features/exams/actions", () => ({ getMyRating: getMyRatingMock }));
 vi.mock("@/app/(HM)/queries", () => ({ listMyHistory: listMyHistoryMock }));
 // The PDF pipeline is the one thing whose ABSENCE of a call is the assertion.
 vi.mock("@/lib/pdf/generateAttemptPdf", () => ({
@@ -186,20 +186,20 @@ vi.mock("@/lib/pdf/generateAttemptPdf", () => ({
 
 import { renderServerTree } from "@/app/(billing)/me/orders/__tests__/renderServerTree";
 import RootLayout from "@/app/layout";
-import Layer2Layout from "@/app/(layer2)/layout";
-import ResultPage from "@/app/(layer2)/exams/[id]/attempt/[attemptId]/result/page";
-import ResultDetailPage from "@/app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page";
+import Layer2Layout from "@/app/(exams)/layout";
+import ResultPage from "@/app/(exams)/exams/[id]/attempt/[attemptId]/result/page";
+import ResultDetailPage from "@/app/(exams)/exams/[id]/attempt/[attemptId]/result/detail/page";
 import { HistoryRow } from "@/app/(HM)/history/_components/HistoryRow";
 import { HistoryRowMenu } from "@/components/history/HistoryRowMenu";
-import { ResultActions } from "@/app/(layer2)/_components/ResultActions";
-import { EssayGradingPoller } from "@/app/(layer2)/_components/EssayGradingPoller";
-import type { ExamResult } from "@/app/(layer2)/queries";
+import { ResultActions } from "@/features/exams/components/ResultActions";
+import { EssayGradingPoller } from "@/features/exams/components/EssayGradingPoller";
+import type { ExamResult } from "@/features/exams/queries";
 import type { MyHistoryEntry } from "@/app/(HM)/queries";
 import { DEFAULT_LOCALE } from "@/lib/i18n/locales";
 import { getDictionary } from "@/lib/i18n/translate";
 import {
   ESSAY_POLL_FAST_INTERVAL_MS,
-} from "@/app/(layer2)/_components/EssayGradingPoller";
+} from "@/features/exams/components/EssayGradingPoller";
 
 const DICT = getDictionary(DEFAULT_LOCALE);
 const EXAM_ID = "11111111-1111-1111-1111-111111111111";
@@ -347,7 +347,7 @@ function historyEntry(over: Partial<MyHistoryEntry> = {}): MyHistoryEntry {
   } as MyHistoryEntry;
 }
 
-/** `RootLayout -> (layer2)/layout -> /result`, composed the way production
+/** `RootLayout -> (exams)/layout -> /result`, composed the way production
  *  composes it. Nothing here supplies `EntitlementProvider` — it is reached
  *  only because the route-group layout mounts it, which is the one thing a
  *  provider-wrapped unit test can never prove.
@@ -430,7 +430,7 @@ function disabledNodes(root: HTMLElement): Element[] {
 //   card is the unchanged not-auto-scored branch.
 // @category: fixture-e2e
 // @lane: fixture-e2e
-// @dependency: full-UI in-process (RootLayout -> (layer2) layout -> result/page.tsx
+// @dependency: full-UI in-process (RootLayout -> (exams) layout -> result/page.tsx
 //   and result/detail/page.tsx), mocked backend (getResult stub), mocked
 //   next/navigation, mocked generateAttemptPdf
 // @complexity: medium
@@ -906,7 +906,7 @@ describe("PDF export guard — both exits agree for one attempt (FE2E-3)", () =>
 //     to the page for: whether this answer was scored.
 //   Freq 9 -- every graded essay card, every attempt, for every student.
 // @lane: fixture-e2e
-// @dependency: full-UI in-process (RootLayout -> (layer2) layout ->
+// @dependency: full-UI in-process (RootLayout -> (exams) layout ->
 //   result/detail/page.tsx), mocked backend (getResult stub)
 // @complexity: low
 // @real-dependency: none

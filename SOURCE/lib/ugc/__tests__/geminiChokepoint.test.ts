@@ -323,7 +323,7 @@ describe("ranh giới trách nhiệm sau khi gom về một điểm phát", () =
 
   it("callTutor.ts không mọc thêm quyền truy cập, hạn mức hay ngân sách", () => {
     // Trách nhiệm của file đó là "gọi model và phân loại thất bại"; quyền truy
-    // cập/hạn mức/ngân sách thuộc explainStep() ở app/(layer2)/tutorActions.ts.
+    // cập/hạn mức/ngân sách thuộc explainStep() ở features/exams/tutorActions.ts.
     // Kiểm trên DÒNG MÃ nên câu chú thích đầu file nói về đúng ranh giới này
     // không tự làm ca test xanh giả.
     const callTutorCode = codeLines(

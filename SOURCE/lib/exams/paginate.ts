@@ -1,6 +1,6 @@
 // Phân trang cho danh sách đề (TD-026, 2026-08-27).
 //
-// Ở ĐÂY chứ không phải trong `app/(layer2)/queries.ts` vì file đó có
+// Ở ĐÂY chứ không phải trong `features/exams/queries.ts` vì file đó có
 // `import "server-only"`: một hàm THUẦN nằm trong đó thì không thể kiểm bằng
 // unit test mà không dựng cả một môi trường server giả — và phép số học phân
 // trang là đúng loại code cần unit test nhất (off-by-one im lặng).

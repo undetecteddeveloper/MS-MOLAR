@@ -35,7 +35,7 @@ export const FIXTURE_USER = { id: "support-fixture-user-1", email: "fixture-supp
 /** Any real non-attempt mounted route (UI-D1) — widget renders here when logged in. */
 export const FIXTURE_MOUNTED_ROUTE = "/exams";
 
-/** A `(layer2)` exam-attempt route shape — widget must be structurally absent (AC-005, D1). */
+/** A `(exams)` exam-attempt route shape — widget must be structurally absent (AC-005, D1). */
 export const FIXTURE_ATTEMPT_ROUTE = "/exams/exam-fixture/attempt/attempt-fixture";
 
 // --- submitSupportTicket response fixtures ----------------------------------

@@ -46,7 +46,7 @@
 // Plan itself): the Work Plan's Task Dependency Diagram places this task (4.3)
 // *before* Phase 5 (nav wiring, Tasks 16/17). At the point this task runs,
 // SiteHeader's "History" nav item still has `href="#"` (confirmed:
-// SOURCE/app/(layer2)/_components/SiteHeader.tsx:27) — clicking it would not
+// SOURCE/features/exams/components/SiteHeader.tsx:27) — clicking it would not
 // navigate anywhere. Every navigation step below (including the "return to
 // History" step) uses `driver.goto("/history")` directly instead of clicking
 // the nav item. HE1 obligation (f) (nav active-highlight) is recorded as
@@ -54,7 +54,7 @@
 // `checkHE1NavActiveHighlightExpectedPending` below.
 //
 // Cross-surface consistency finding (HE1 obligation (e)): the Result page's
-// `ScoreCard` (SOURCE/app/(layer2)/_components/ScoreCard.tsx) renders score
+// `ScoreCard` (SOURCE/features/exams/components/ScoreCard.tsx) renders score
 // (`{totalScore}/10`) and completion time, but — unlike HistoryRow — never
 // renders the submitted date; `submittedAt` is used only for
 // `formatCompletionTime`'s diff calc and the PDF's own content, never as a

@@ -40,13 +40,13 @@ import { fileURLToPath } from "node:url";
 import { act, fireEvent, render, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ExplainStepAffordance } from "./ExplainStepAffordance";
-import type { ExplainStepResult } from "@/app/(layer2)/tutorActions";
+import type { ExplainStepResult } from "@/features/exams/tutorActions";
 
-vi.mock("@/app/(layer2)/tutorActions", () => ({
+vi.mock("@/features/exams/tutorActions", () => ({
   explainStep: vi.fn(),
 }));
 
-import { explainStep } from "@/app/(layer2)/tutorActions";
+import { explainStep } from "@/features/exams/tutorActions";
 
 const mockExplainStep = vi.mocked(explainStep);
 
@@ -79,7 +79,7 @@ describe("ExplainStepAffordance", () => {
   // @lane: integration
   // @dependency: SOURCE/components/tutor/ExplainStepAffordance.tsx +
   //   SOURCE/components/tutor/useTutorAction.ts + mocked
-  //   SOURCE/app/(layer2)/tutorActions.ts (explainStep)
+  //   SOURCE/features/exams/tutorActions.ts (explainStep)
   // @complexity: medium
   // @real-dependency: none — sanctioned mock boundary (frontend DD Mock Boundary
   //   Decisions: explainStep is the I/O boundary; useTutorAction's own

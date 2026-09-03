@@ -5,7 +5,7 @@
 //
 // ═══ VÌ SAO PHẢI CÓ ═══
 //
-// `computeScore()` được gọi ĐÚNG MỘT CHỖ — `app/(layer2)/actions.ts`, lúc nộp
+// `computeScore()` được gọi ĐÚNG MỘT CHỖ — `features/exams/actions.ts`, lúc nộp
 // bài. Không nơi nào tính lại; mọi bề mặt khác chỉ ĐỌC `exam_results.total_score`
 // (lịch sử làm bài, xếp hạng đề gợi ý, analytics). Nên nếu không backfill thì
 // HAI THANG ĐIỂM SỐNG CHUNG TRONG MỘT CỘT: lượt thi hôm qua chấm theo tỉ lệ,

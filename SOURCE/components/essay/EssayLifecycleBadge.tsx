@@ -1,7 +1,7 @@
 // EssayLifecycleBadge — nhãn trạng thái vòng đời chấm tự luận (ADR-0018,
 // UI Spec § Component: EssayLifecycleBadge).
 //
-// Ở `components/essay/` chứ không trong cây route, vì CẢ `(layer2)` LẪN `(HM)`
+// Ở `components/essay/` chứ không trong cây route, vì CẢ `(exams)` LẪN `(HM)`
 // đều dùng nó — cùng lý do `components/history/` và `components/billing/` tồn
 // tại bên ngoài cây route.
 //

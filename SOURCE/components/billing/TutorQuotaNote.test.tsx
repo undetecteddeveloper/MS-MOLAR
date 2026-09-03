@@ -7,7 +7,7 @@
 //
 //   Test dưới đây BỌC PROVIDER, tức là nó tự cấp đúng cái thứ mà production có
 //   thể đang thiếu. Một mount trả `null` VĨNH VIỄN (thiếu EntitlementProvider ở
-//   `(layer2)/layout.tsx`) vẫn qua lint, qua build, và vẫn qua file này.
+//   `(exams)/layout.tsx`) vẫn qua lint, qua build, và vẫn qua file này.
 //   => File này KHÔNG chứng minh AC-042. AC-042 do FE-2 (plan Task 2.5, cây
 //      route thật) và lượt kiểm thủ công (plan Task 6.5 mục iv) đóng.
 //
@@ -107,7 +107,7 @@ function readNote(host: HTMLElement): { text: string; className: string } {
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PAGE_PATH = resolve(
   HERE,
-  "../../app/(layer2)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx"
+  "../../app/(exams)/exams/[id]/attempt/[attemptId]/result/detail/page.tsx"
 );
 const COMPONENT_PATH = resolve(HERE, "./TutorQuotaNote.tsx");
 

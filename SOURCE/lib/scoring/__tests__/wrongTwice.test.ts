@@ -191,7 +191,7 @@ describe("computeWrongTwiceQuestionIds — scored:false exclusion and scored:und
 //   keyed on questionId at all. The real per-exam/per-attempt scoping risk lives
 //   one level up, in the CALLER's query shape — a `.eq()` narrowing the history
 //   read below "all of this user's attempts" — and is covered by obligation (f)
-//   of app/(layer2)/__tests__/getResult.int.test.ts. This test is kept as
+//   of features/exams/__tests__/getResult.int.test.ts. This test is kept as
 //   executable documentation that the contract is global by construction.
 // Proof obligation: a literal 2-attempt fixture from two attempts belonging to
 //   different exam contexts, sharing one questionId, both wrong -> assert that

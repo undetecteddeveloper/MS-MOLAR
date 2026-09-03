@@ -20,11 +20,11 @@ import { ExplainStepAffordance } from "./ExplainStepAffordance";
 import { EntitlementProvider } from "@/lib/billing/entitlement";
 import { FREE_FALLBACK, type Entitlement } from "@/lib/billing/types";
 
-vi.mock("@/app/(layer2)/tutorActions", () => ({
+vi.mock("@/features/exams/tutorActions", () => ({
   explainStep: vi.fn(),
 }));
 
-import { explainStep } from "@/app/(layer2)/tutorActions";
+import { explainStep } from "@/features/exams/tutorActions";
 
 const mockExplainStep = vi.mocked(explainStep);
 

@@ -68,7 +68,7 @@ export function answerPresentation(type: AssembledQuestion["type"]): {
  * không" thành một so sánh CỤC BỘ ngay tại chỗ hiển thị — không cần cờ dirty
  * nào phải xuyên qua ba tầng component, và không có trạng thái thứ hai để mà
  * lệch pha. Đây là khác biệt bản chất với màn LÀM BÀI
- * (`(layer2)/_components/questionNodes.types.ts`), nơi chuỗi bất biến nên node
+ * (`features/exams/components/questionNodes.types.ts`), nơi chuỗi bất biến nên node
  * không bao giờ ôi.
  */
 export interface RenderedText {

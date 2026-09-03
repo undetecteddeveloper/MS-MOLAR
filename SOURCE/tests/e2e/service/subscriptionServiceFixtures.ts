@@ -13,7 +13,7 @@
 //   `tearDown(); setUp(); tearDown();` twice over, asserting `countFixtureRows()`
 //   returns all zeros after each teardown, and it is owed the moment gate B is green.
 //
-// PRECEDENT. `SOURCE/app/(layer2)/__tests__/recordSkillMastery.int.test.ts` (this
+// PRECEDENT. `SOURCE/features/exams/__tests__/recordSkillMastery.int.test.ts` (this
 //   repository's only existing service-lane test) and `SOURCE/supabase/test-rls.ts`:
 //   hand-loaded `.env.local`, a service-role `admin` client for seeding, a REAL
 //   signed-in anon client per user for anything RLS decides, a per-fixture id prefix,

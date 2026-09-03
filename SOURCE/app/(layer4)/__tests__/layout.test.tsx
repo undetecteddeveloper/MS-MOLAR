@@ -3,7 +3,7 @@
 // (layer4)/layout.tsx — EntitlementProvider mount (backend DD D005 / I1, ADR-0013
 // § Architecture Impact, UI Spec C-01).
 //
-// File song sinh với `app/(layer2)/__tests__/layout.test.tsx`, và nó phải là hai
+// File song sinh với `app/(exams)/__tests__/layout.test.tsx`, và nó phải là hai
 // file chứ không phải một: khẳng định ở đây là *route group NÀO mount provider*,
 // nên một ca kiểm chung chạy qua một layout duy nhất sẽ xanh trong khi group kia
 // vẫn trống. Gỡ provider khỏi đúng một trong hai file phải làm đúng một file test
@@ -12,9 +12,9 @@
 //
 // Khẳng định phạm vi repo ("không page/component nào dưới layout gọi
 // readEntitlement()") KHÔNG lặp lại ở đây — nó nói về cả cây, và sống đúng một
-// chỗ, trong file (layer2).
+// chỗ, trong file (exams).
 //
-// RANH GIỚI MOCK — giống hệt file (layer2): nguồn dữ liệu của `readEntitlement()`
+// RANH GIỚI MOCK — giống hệt file (exams): nguồn dữ liệu của `readEntitlement()`
 // bị stub, còn `readEntitlement()` và `EntitlementProvider` thì KHÔNG. Một
 // provider bị mock sẽ chỉ khẳng định chính cái mock đó.
 //
@@ -67,7 +67,7 @@ import { FREE_FALLBACK, type Entitlement, type Quota } from "@/lib/billing/types
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
 // ─────────────────────────── Số liệu cố định ────────────────────────────────
-// CỐ Ý KHÁC bộ số của file (layer2): hai file kỳ vọng hai giá trị khác nhau,
+// CỐ Ý KHÁC bộ số của file (exams): hai file kỳ vọng hai giá trị khác nhau,
 // nên một lời sao chép nhầm giữa hai layout không thể xanh ở cả hai chỗ.
 
 const USER = {
@@ -182,7 +182,7 @@ async function renderLayer4() {
   //
   // TutorQuotaNote đứng đây với vai trò MỘT COMPONENT `useEntitlement()` CÓ
   // THẬT ĐÃ SHIP — không phải một lời khai rằng nó mount dưới (layer4) trong
-  // production (UI Spec C-06 đặt nó ở result-detail của (layer2)). Bề mặt bị
+  // production (UI Spec C-06 đặt nó ở result-detail của (exams)). Bề mặt bị
   // gate của riêng (layer4) là hạn mức upload, và nó chưa có component nào;
   // trường `upload` vì thế được khẳng định qua probe ở dưới.
   return render(

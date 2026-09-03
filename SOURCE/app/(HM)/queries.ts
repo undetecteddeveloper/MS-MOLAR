@@ -1,5 +1,5 @@
 // (HM) route group — History read (backend Design Doc history-backend-design.md
-// v1.2, § Query Implementation Shape). Server-only, mirrors (layer2)/queries.ts's
+// v1.2, § Query Implementation Shape). Server-only, mirrors features/exams/queries.ts's
 // snake_case DB → camelCase mapping and throw-on-infrastructure-error convention.
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
@@ -73,7 +73,7 @@ export async function listMyHistory(): Promise<MyHistoryEntry[]> {
   //    exam_attempts.status một mình (Assumed Behavior #1 / AC-001).
   //  - `exam_attempts!inner` + .eq(status,'submitted') ⇒ loại attempt dở dang.
   //  - `exams!inner` + .eq(...exams.status,'published') ⇒ giữ nguyên quy ước
-  //    visibility của getExam() ((layer2)/queries.ts): RLS exams_select_visible
+  //    visibility của getExam() (features/exams/queries.ts): RLS exams_select_visible
   //    lọc, VÀ thêm filter published tường minh chồng lên — không dựa RLS một
   //    mình. Nhờ `!inner`, đề không published (kể cả đề CỦA CHÍNH người đọc bị
   //    hạ khỏi 'published') làm cả dòng bị loại, đúng ngữ nghĩa "omitted, not

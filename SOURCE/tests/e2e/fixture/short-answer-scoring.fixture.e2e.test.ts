@@ -107,7 +107,7 @@ export interface FixturePerQuestionResult {
   scored?: boolean;
 }
 
-/** Structural stand-in for `ResultQuestion` (`SOURCE/app/(layer2)/queries.ts`). */
+/** Structural stand-in for `ResultQuestion` (`SOURCE/features/exams/queries.ts`). */
 export interface FixtureResultQuestion {
   content: string;
   choices: { id: FixtureChoiceId; text: string }[];
