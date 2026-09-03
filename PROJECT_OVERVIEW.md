@@ -45,16 +45,23 @@ truyền thống Việt Nam, phẳng (không 3D, không box-shadow/gradient). Co
 
 ## 3. UI Architecture — Route Groups
 
-| Route group | Chức năng |
-|---|---|
-| `(layer1)` — Entry & Identity | Đăng nhập / đăng ký, OAuth callback, reset password |
-| `(layer2)` — Core Loop *(ưu tiên cao nhất)* | Chọn đề (browse/filter), làm bài (timer, flag câu), nộp bài, xem kết quả |
-| `(layer3)` — Reflection / Analytics | Phân tích điểm yếu, gợi ý ôn tập — đang xây dở (xem `docs/design/analytics-layer3-*`) |
-| `(layer4)` — Content Infrastructure (UGC) | Upload đề (PDF → Gemini extract), review trước khi publish, quản lý đề của tôi |
-| `(HM)` — History | Lịch sử làm bài đã nộp, xem lại + lưu/chia sẻ PDF kết quả |
-| `(admin)` | Trang kiểm duyệt nội bộ — danh sách đề bị report, gỡ/khôi phục (auth qua `ADMIN_USER_IDS`, không có role trong DB — xem ADR-0001) |
+> Đổi tên 2026-09-03 (refactor B3): `(layer1)`→`(auth)`, `(layer2)`→`(exams)`,
+> `(layer3)`→`(analytics)`, `(layer4)`→`(authoring)`, `(HM)`→`(history)`. Tài liệu
+> trong `docs/` viết trước ngày đó vẫn dùng tên cũ — đọc theo bảng này. URL
+> người dùng không đổi (tên nhóm route không xuất hiện trên đường dẫn). Code
+> của mỗi tính năng nằm ở `SOURCE/features/<tên>/` — xem `ARCHITECTURE.md`.
 
-Layer HM và (admin) độc lập với tiến độ Layer 3 (Analytics) — không phụ thuộc lẫn nhau.
+| Route group | Tên cũ | Chức năng | Code |
+|---|---|---|---|
+| `(auth)` — Entry & Identity | (layer1) | Đăng nhập / đăng ký, OAuth callback, reset password | `features/auth` |
+| `(exams)` — Core Loop *(ưu tiên cao nhất)* | (layer2) | Chọn đề (browse/filter), làm bài (timer, flag câu), nộp bài, xem kết quả | `features/exams` |
+| `(analytics)` — Reflection / Analytics | (layer3) | Phân tích điểm yếu, gợi ý ôn tập (`docs/design/analytics-layer3-*`); hồ sơ cá nhân `/profile` | `features/analytics`, `features/profile` |
+| `(authoring)` — Content Infrastructure (UGC) | (layer4) | Upload đề (PDF → Gemini extract), review trước khi publish, quản lý đề của tôi | `features/authoring` |
+| `(history)` — History | (HM) | Lịch sử làm bài đã nộp, xem lại + lưu/chia sẻ PDF kết quả | `features/history` |
+| `(billing)` — Subscription | — | Bảng giá, thanh toán payOS, đơn hàng; `/terms`, `/refund-policy`, `/about` công khai | `features/billing` |
+| `(admin)` | — | Trang kiểm duyệt nội bộ — danh sách đề bị report, gỡ/khôi phục; hàng đợi ticket hỗ trợ (auth qua `ADMIN_USER_IDS`, không có role trong DB — xem ADR-0001) | `features/admin` |
+
+(history) và (admin) độc lập với tiến độ Analytics — không phụ thuộc lẫn nhau.
 
 ---
 
@@ -80,14 +87,17 @@ Layer HM và (admin) độc lập với tiến độ Layer 3 (Analytics) — kh�
 ```
 MS-MOLAR/
 ├── SOURCE/                  # Toàn bộ source code (Next.js app, Root Directory trên Vercel)
-│   ├── app/                 # App Router — route groups (layer1..4, HM, admin, auth)
-│   ├── components/          # Shared UI (components/ui = primitives, components/[feature])
+│   ├── app/                 # App Router — CHỈ page/layout/loading/error, theo route group
+│   │                        #   (auth) (exams) (analytics) (authoring) (history) (billing) (admin)
+│   ├── features/            # Code của từng tính năng: queries.ts, actions.ts, components/, __tests__/
+│   ├── components/          # UI dùng chung (components/ui = primitives, layout/, shared/, ...)
 │   ├── lib/                 # Utilities, Supabase client, security, ugc, pdf, schema...
 │   └── supabase/            # schema.sql, seed.ts, test-rls.ts, verify-schema.ts
 ├── docs/                    # PRD, ADR, Design Doc, UI Spec, work plan theo từng feature
 ├── SCREENSHOT/              # Ảnh tham chiếu thiết kế + screenshot tạm (Playwright MCP)
 ├── DESIGN.md                # Design token — nguồn duy nhất, xem §2
 ├── TECH-DEBT.md             # Sổ ghi nợ kỹ thuật
+├── ARCHITECTURE.md          # Cái gì để đâu, vì sao, thêm màn hình mới thì tạo file ở đâu
 └── PROJECT_OVERVIEW.md      # File này
 ```
 
