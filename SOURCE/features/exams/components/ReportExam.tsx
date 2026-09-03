@@ -8,6 +8,7 @@ import { useT } from "@/lib/i18n/client";
 // Chỉ render cho user đã đăng nhập trên đề published (parent quyết định).
 
 import { useEffect, useRef, useState } from "react";
+// eslint-disable-next-line no-restricted-imports -- rò chéo có sẵn trước B4 (2026-09-03): reportExam sống cạnh moderateExam ở authoring/actions. Xem ARCHITECTURE.md § Import chéo.
 import { reportExam } from "@/features/authoring/actions";
 import { LIMITS } from "@/lib/ugc/limits";
 

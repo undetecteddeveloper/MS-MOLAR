@@ -20,6 +20,7 @@
 
 import Link from "next/link";
 import { Tabs, TabsIndicator, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs";
+// eslint-disable-next-line no-restricted-imports -- rò chéo có sẵn trước B4 (2026-09-03): tab Usage của /profile tái dùng PlanSummary của billing. Xem ARCHITECTURE.md § Import chéo.
 import { PlanSummary } from "@/features/billing/components/orders/PlanSummary";
 import { useT } from "@/lib/i18n/client";
 import type { CurrentUserProfile } from "@/lib/auth/getCurrentUser";

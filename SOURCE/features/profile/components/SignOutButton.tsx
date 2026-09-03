@@ -12,6 +12,7 @@
 
 import { useRef } from "react";
 import { useFormStatus } from "react-dom";
+// eslint-disable-next-line no-restricted-imports -- rò chéo có sẵn trước B4 (2026-09-03): signOut là của auth; profile chỉ đặt nút. Xem ARCHITECTURE.md § Import chéo.
 import { signOut } from "@/features/auth/actions";
 import { useT } from "@/lib/i18n/client";
 import { cn } from "@/lib/utils";
