@@ -56,8 +56,13 @@
 
 alter table public.questions alter column points drop not null;
 
-insert into public.schema_version (id, fingerprint)
-values (1, '92e1574f1013')
-on conflict (id) do update
-  set fingerprint = excluded.fingerprint,
-      applied_at  = now();
+-- §17 — vân tay ĐÃ ĐƯỢC GỠ KHỎI FILE NÀY ngày 2026-09-03, khi migration
+-- 20260903000000_hot_path_indexes_* đưa schema.sql sang vân tay 4ecb67741520.
+-- Cùng lý do và cùng cách với 20260901020000_*: cổng migrationsMatchSchema
+-- đòi mọi câu lệnh của mọi migration sau baseline phải có mặt trong schema.sql,
+-- mà schema.sql chỉ giữ ĐÚNG MỘT câu ghi vân tay — vân tay hiện tại — nên chỉ
+-- migration MỚI NHẤT giữ được câu ấy. Gỡ nó không đổi gì trên database đã áp
+-- file này; DB dựng lại từ đầu vẫn được đóng dấu bởi migration cuối dãy.
+-- (Lưu ý đo 2026-09-03: prod CHƯA có dòng ledger cho file này — xem
+-- `supabase migration list --linked`; dev có vân tay 92e1574f1013 nhưng ledger
+-- cũng không có dòng — file được áp tay trên cả hai.)

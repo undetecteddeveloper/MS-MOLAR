@@ -2419,6 +2419,52 @@ create policy "questions_select_visible" on public.questions
   );
 
 -- ----------------------------------------------------------------------------
+-- 19. Chỉ mục cho các cột tra cứu nóng (2026-09-03, refactor hiệu năng A2).
+--
+--     Postgres tự tạo chỉ mục cho PRIMARY KEY và UNIQUE, KHÔNG tạo cho khoá
+--     ngoại. Tới 2026-09-03 file này có 22 bảng mà chỉ 4 chỉ mục tự khai, và
+--     không cột nào dưới đây có chỉ mục — đọc bằng `pg_indexes` trên CẢ dev
+--     lẫn prod, không suy từ file (TD-005: file và DB từng lệch nhau).
+--
+--     ĐO TRƯỚC KHI THÊM, và con số nói thật: prod hôm đó có 91 lượt làm bài,
+--     16 kết quả, 7 đề, 387 ô trả lời. Ở cỡ đó `explain analyze` cho Seq Scan
+--     trên mọi truy vấn dưới đây (2–6 ms) và planner SẼ TIẾP TỤC chọn Seq Scan
+--     kể cả khi có chỉ mục — với bảng vài trang, quét tuần tự rẻ hơn đi qua
+--     B-tree. Chỉ mục ở đây mua cái này: khi bảng lớn theo người dùng thật, các
+--     màn dưới KHÔNG lặng lẽ chuyển từ mili-giây sang quét toàn bảng — và không
+--     ai phải nhớ ra để thêm nó vào đúng ngày đó. Xác nhận planner DÙNG được
+--     chúng bằng `set enable_seqscan = off` rồi `explain` (ghi trong migration).
+--
+--     Cột đầu mỗi chỉ mục là cột lọc, cột sau là cột sắp xếp — khớp đúng hình
+--     dạng truy vấn PostgREST sinh ra, để một chỉ mục phục vụ cả WHERE lẫn
+--     ORDER BY và không cần Sort riêng.
+-- ----------------------------------------------------------------------------
+
+-- Lịch sử làm bài + dashboard: lọc theo người, mới nhất trước.
+-- (app/(HM)/queries.ts listMyHistory, app/(layer2)/queries.ts listMySubmittedExamIds)
+create index if not exists exam_attempts_user_submitted_idx
+  on public.exam_attempts (user_id, submitted_at desc);
+
+-- Đếm/lọc lượt làm bài theo đề (xếp hạng đề, "đã làm", cascade khi xoá đề).
+create index if not exists exam_attempts_exam_idx
+  on public.exam_attempts (exam_id);
+
+-- Analytics + lịch sử: kết quả của một người, mới nhất trước.
+-- (app/(layer3)/queries.ts getAnalyticsByRange, app/(HM)/queries.ts)
+create index if not exists exam_results_user_created_idx
+  on public.exam_results (user_id, created_at desc);
+
+-- "Đề của tôi": lọc theo tác giả. (app/(layer4)/queries.ts listMyExams, getMyExam)
+create index if not exists exams_author_idx
+  on public.exams (author_id);
+
+-- Khoá ngoại attempt_answers.question_id → questions ON DELETE CASCADE (§15):
+-- xoá một câu hỏi buộc Postgres tìm mọi ô trả lời của nó — không có chỉ mục
+-- thì mỗi câu bị xoá là một lần quét toàn bảng attempt_answers.
+create index if not exists attempt_answers_question_idx
+  on public.attempt_answers (question_id);
+
+-- ----------------------------------------------------------------------------
 -- 17. Phiên bản schema — DB tự khai nó đang chạy bản nào (2026-08-07).
 --
 --     Vì sao có phần này (TECH-DEBT TD-005): file này được paste TAY vào SQL
@@ -2457,7 +2503,7 @@ revoke all on public.schema_version from anon, authenticated;
 -- nó — xem lib/schema/schemaFingerprint.ts).
 -- @schema-fingerprint-begin
 insert into public.schema_version (id, fingerprint)
-values (1, '92e1574f1013')
+values (1, '4ecb67741520')
 on conflict (id) do update
   set fingerprint = excluded.fingerprint,
       applied_at  = now();
