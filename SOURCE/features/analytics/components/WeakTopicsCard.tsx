@@ -13,7 +13,7 @@
 // là hai con số mâu thuẫn nhau trên cùng màn hình.
 import { useT } from "@/lib/i18n/client";
 import { MIN_TOPIC_QUESTIONS, type TopicWeakness } from "@/lib/analytics/weakTopics";
-import { SUBJECT_COLORS } from "@/lib/fake-data/analytics";
+import { SUBJECT_COLORS } from "@/lib/analytics/constants";
 
 export function WeakTopicsCard({ topics }: { topics: TopicWeakness[] }) {
   const t = useT();

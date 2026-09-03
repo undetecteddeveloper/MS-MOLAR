@@ -28,7 +28,7 @@ import {
   RANGE_ORDER,
   type SubjectStats,
   type TimeRange,
-} from "@/lib/fake-data/analytics";
+} from "@/lib/analytics/constants";
 
 type Tab = "bar" | "donut";
 

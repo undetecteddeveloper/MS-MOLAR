@@ -9,7 +9,7 @@
 import { useT } from "@/lib/i18n/client";
 
 import { useRef, useState, type ReactNode } from "react";
-import { NEEDS_REVIEW_THRESHOLD, niceCeil, type SubjectStats } from "@/lib/fake-data/analytics";
+import { NEEDS_REVIEW_THRESHOLD, niceCeil, type SubjectStats } from "@/lib/analytics/constants";
 
 // Hệ toạ độ nội bộ (viewBox) — SVG scale theo bề ngang card qua w-full.
 const VB_WIDTH = 920;

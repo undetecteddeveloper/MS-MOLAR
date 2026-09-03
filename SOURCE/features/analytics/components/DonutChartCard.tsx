@@ -14,7 +14,7 @@ import {
   computeShares,
   type Subject,
   type SubjectStats,
-} from "@/lib/fake-data/analytics";
+} from "@/lib/analytics/constants";
 
 const SIZE = 200;
 const STROKE = 34;

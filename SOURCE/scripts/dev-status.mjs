@@ -24,10 +24,12 @@ function banner() {
   console.log(line("═"));
   console.log("");
   console.log("Layers:");
-  console.log("  (auth) Auth            — login, reset-password");
-  console.log("  (exams) Exam taking     — browse, attempt, submit, result");
-  console.log("  (analytics) —               — chưa có route (reserved)");
-  console.log("  (authoring) UGC upload      — upload, review, publish, my-exams");
+  console.log("  (auth)       Auth          — login, reset-password            → features/auth");
+  console.log("  (exams)      Exam taking   — browse, attempt, submit, result → features/exams");
+  console.log("  (analytics)  Analytics     — me/dashboard, profile            → features/analytics, features/profile");
+  console.log("  (authoring)  UGC upload    — upload, review, publish, my-exams → features/authoring");
+  console.log("  (history)    History       — history                          → features/history");
+  console.log("  (billing)    Subscription  — pricing, checkout, me/orders     → features/billing");
   console.log("");
   console.log(line());
   console.log("Pipeline: UGC Exam Upload  (lib/ugc/*, features/authoring/actions.ts)");

@@ -241,7 +241,7 @@
    ExamPlayer sẽ lơ lửng cách mép màn hình đúng ngần ấy.
 
    `:has()` chứ không phải một class thứ hai trên chính khối cha: khối đó do
-   `(layer2)/layout.tsx` (Server Component) render, mà layout phía server không
+   `(exams)/layout.tsx` → components/layout/AppShell.tsx (Server Component) render, mà layout phía server không
    biết pathname. Đánh dấu từ phía con — nơi ĐÃ biết mình là màn làm bài — là
    cách duy nhất không phải kéo thêm một client component vào layout chỉ để
    đọc URL. Safe-area vẫn giữ: thanh Home ảo của iOS không biến mất theo. */

@@ -1557,7 +1557,7 @@ async function main() {
 
   console.log("\nRLS checks (History H-a):");
 
-  /** Đúng query listMyHistory() phát (app/(HM)/queries.ts), thu hẹp về fixture H-a. */
+  /** Đúng query listMyHistory() phát (features/history/queries.ts), thu hẹp về fixture H-a. */
   const haJoin = () =>
     userA
       .from("exam_results")

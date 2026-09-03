@@ -11,7 +11,7 @@ import { rankWeakTopicsByRange, type TopicWeakness } from "@/lib/analytics/weakT
 import { MASTERY_CLEARED_THRESHOLD } from "@/lib/adaptive/constants";
 import { recommendNextSkill } from "@/lib/adaptive/route";
 import { buildTelemetryPayload } from "@/lib/tutor/telemetry";
-import { NEEDS_REVIEW_THRESHOLD, type SubjectStats, type TimeRange } from "@/lib/fake-data/analytics";
+import { NEEDS_REVIEW_THRESHOLD, type SubjectStats, type TimeRange } from "@/lib/analytics/constants";
 import type { SkillRecommendation } from "@/types/adaptive";
 
 // PostgREST embedded shape: exam_results -> exam_attempts (!inner, to-one) ->

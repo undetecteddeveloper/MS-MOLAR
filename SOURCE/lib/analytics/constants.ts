@@ -1,14 +1,15 @@
-// lib/fake-data/analytics — hằng số/helper thuần cho Analytics (Layer 3),
+// lib/analytics/constants — hằng số/helper thuần cho Analytics (Layer 3),
 // dùng bởi BarChartCard.tsx/DonutChartCard.tsx/AnalyticsDashboard.tsx (docs/
 // design/analytics-layer3-design.md component plan #6). Union 7 môn (khác
 // SUBJECTS 10 môn của lib/ugc/subjects.ts — Geography/Informatics/Civic
 // Education nằm ngoài phạm vi Analytics theo
 // docs/design/analytics-layer3-data-logic-design.md).
 //
-// Dù tên file còn "fake-data" (naming-smell đã ghi nhận, cố tình CHƯA rename —
-// xem data-logic design doc § Naming-smell follow-up, path này bị 3 file import
-// nên rename sẽ lan diff không cần thiết), file KHÔNG còn chứa dữ liệu giả lập
-// nào — chỉ types/constants/helpers thuần. Dữ liệu thật đến từ
+// Tên cũ là lib/fake-data/analytics.ts (đổi 2026-09-03, refactor mục 6): tên
+// ấy nói "dữ liệu giả" trong khi file KHÔNG còn chứa dữ liệu giả lập nào — chỉ
+// types/constants/helpers thuần, 7 chỗ dùng thật. Trước đó cố tình chưa rename
+// vì sợ lan diff (data-logic design doc § Naming-smell follow-up); đợt dọn thư
+// mục này chính là lúc trả. Dữ liệu thật đến từ
 // features/analytics/queries.ts (getAnalyticsByRange, đọc Supabase RLS-scoped) qua
 // lib/analytics/aggregateAttempts.ts (reducer thuần, có test riêng).
 

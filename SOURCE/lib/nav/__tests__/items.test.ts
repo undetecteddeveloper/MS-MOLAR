@@ -70,7 +70,10 @@ describe("mọi thanh điều hướng đều đi qua navPrefetch", () => {
   // vẫn sót component thứ tư khi ai đó thêm nó. Quét nguồn thì bắt được đúng
   // câu hỏi cần hỏi: "có file nào render NAV_ITEMS mà không hỏi navPrefetch
   // không?"
-  const roots = ["app", "components"];
+  // features/ (B2, 2026-09-03): HomeSidebar (nav trang chủ) nay ở
+  // features/auth/components/ — thiếu gốc này thì phép quét đếm thiếu một thanh
+  // và ca "ít nhất 3 file" bên dưới đỏ đúng như nó được thiết kế để đỏ.
+  const roots = ["app", "components", "features"];
 
   function walk(dir: string): string[] {
     return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
