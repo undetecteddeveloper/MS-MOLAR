@@ -256,7 +256,7 @@ describe("bốn call site đi qua chokepoint", () => {
 
     await extractQuestions(PNG_FILE);
 
-    expectRoutedThroughChokepoint("gemini-3.5-flash");
+    expectRoutedThroughChokepoint("gemini-3.6-flash");
   });
 
   it("extractAnswers phát qua wrapper, không gọi thẳng SDK", async () => {
@@ -266,7 +266,7 @@ describe("bốn call site đi qua chokepoint", () => {
 
     // Model KHÁC extractQuestions (model rẻ) — hai kỳ vọng khác nhau, nên một
     // implementation nối nhầm hai extractor vào nhau không thể xanh cả hai ca.
-    expectRoutedThroughChokepoint("gemini-3.1-flash-lite");
+    expectRoutedThroughChokepoint("gemini-3.5-flash-lite");
   });
 
   it("extractMeta phát qua wrapper, không gọi thẳng SDK", async () => {
@@ -284,7 +284,7 @@ describe("bốn call site đi qua chokepoint", () => {
 
     await extractMeta(PNG_FILE);
 
-    expectRoutedThroughChokepoint("gemini-3.1-flash-lite");
+    expectRoutedThroughChokepoint("gemini-3.5-flash-lite");
   });
 
   it("generateHint (gia sư) phát qua wrapper, không gọi thẳng SDK", async () => {
@@ -295,7 +295,7 @@ describe("bốn call site đi qua chokepoint", () => {
 
     await generateHint(TUTOR_INPUT);
 
-    expectRoutedThroughChokepoint("gemini-3.5-flash");
+    expectRoutedThroughChokepoint("gemini-3.6-flash");
   });
 });
 

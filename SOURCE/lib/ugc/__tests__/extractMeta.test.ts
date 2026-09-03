@@ -79,7 +79,7 @@ describe("extractMeta — mapping từ structured output", () => {
     generateContentMock.mockResolvedValue(metaMessage(FULL_PAYLOAD));
     await extractMeta(PNG_FILE);
     expect(generateContentMock).toHaveBeenCalledTimes(1);
-    expect(generateContentMock.mock.calls[0][0].model).toBe("gemini-3.1-flash-lite");
+    expect(generateContentMock.mock.calls[0][0].model).toBe("gemini-3.5-flash-lite");
   });
 });
 

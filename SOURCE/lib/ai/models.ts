@@ -29,12 +29,23 @@
 // khoản mới không có quota free cho 2 dòng model cũ này). Xác nhận bằng
 // client.models.list() + gọi thử trực tiếp: chỉ dòng 3.x hoạt động.
 
+// LƯU Ý (2026-09-03): chuyển tạm sang hai tên model 3.x KHÁC — gemini-3.5-flash
+// và gemini-3.1-flash-lite (dòng cũ ở trên) đã vét cạn quota free-tier
+// 20 request/ngày của account trên PROD. Quota Google cấp theo cặp
+// (project, TÊN MODEL) — quotaId `GenerateRequestsPerDayPerProjectPerModel-FreeTier`
+// (xem lib/security/rateLimit.ts) — nên đổi tên model là đổi sang một bucket
+// 20/ngày MỚI, tách khỏi bucket đã cạn. Đã xác nhận cả hai tên dưới đây gọi
+// generateContent thật thành công với key hiện tại (client.models.list() +
+// gọi thử) trước khi đổi. Đây là cách né TẠM để test trên prod, không phải
+// nâng năng lực thật — quota 20/ngày vẫn còn nguyên, chỉ là một bucket khác.
+// Đổi lại dòng cũ (hoặc bật GEMINI_PAID_TIER_ENABLED thật) khi hết nhu cầu test.
+
 /** Model đọc file đề (multimodal, ảnh + PDF). Cũng là model gia sư Socratic. */
-export const QUESTION_MODEL = "gemini-3.5-flash";
+export const QUESTION_MODEL = "gemini-3.6-flash";
 
 /** Model đọc file đáp án (rẻ hơn). Dùng chung cho batch gắn thẻ kỹ năng —
  *  phân loại hàng loạt, cùng hạng chi phí/độ khó với việc đọc file đáp án. */
-export const ANSWER_MODEL = "gemini-3.1-flash-lite";
+export const ANSWER_MODEL = "gemini-3.5-flash-lite";
 
 // Model chấm tự luận (Groq, ADR-0018). Đặt Ở ĐÂY chứ KHÔNG trong
 // lib/essay/groqClient.ts vì đúng lý do file này tồn tại: groqClient.ts có

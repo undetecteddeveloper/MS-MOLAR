@@ -123,7 +123,7 @@ describe("extractQuestions — mapping từ structured output", () => {
     );
     await extractQuestions(PNG_FILE);
     const params = generateContentMock.mock.calls[0][0];
-    expect(params.model).toBe("gemini-3.5-flash");
+    expect(params.model).toBe("gemini-3.6-flash");
     expect(params.contents[0].inlineData.mimeType).toBe("image/png");
     expect(params.config.responseMimeType).toBe("application/json");
   });
@@ -200,7 +200,7 @@ describe("extractAnswers — mapping từ structured output", () => {
       { part: 1, number: 1, type: "mcq", letter: "C" },
       { part: 1, number: 2, type: "essay", text: "Dùng quy nạp." },
     ]);
-    expect(generateContentMock.mock.calls[0][0].model).toBe("gemini-3.1-flash-lite");
+    expect(generateContentMock.mock.calls[0][0].model).toBe("gemini-3.5-flash-lite");
   });
 
   it("EXTRACTION_FAILED khi letter ngoài A–D", async () => {
