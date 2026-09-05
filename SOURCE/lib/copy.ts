@@ -78,10 +78,15 @@ export const copy = {
   "home.cta": "Bắt đầu luyện đề",
   "home.browse": "Xem kho đề",
   "home.newExams": "Đề mới đăng",
-  // Chữ trong hình minh hoạ hero (HeroFigure) — trang trí, nhưng vẫn là chữ
-  // hiển thị nên sống ở đây chứ không hardcode trong JSX.
-  "home.figure.sheet": "Phiếu trả lời",
-  "home.figure.scored": "Chấm xong ngay",
+  // Khối công nghệ cạnh hero cho khách (TechStack). Mỗi dòng là VAI TRÒ thật
+  // của công nghệ đó trong repo, không phải khẩu hiệu — Gemini đọc đề (ADR-0006)
+  // và gợi ý gia sư (Engine 1), Groq chấm tự luận (ADR-0018).
+  "home.tech.title": "Nền tảng công nghệ",
+  "home.tech.nextjs": "Giao diện và máy chủ",
+  "home.tech.supabase": "Dữ liệu, đăng nhập, lưu trữ",
+  "home.tech.gemini": "Đọc đề từ ảnh và PDF, gợi ý gia sư",
+  "home.tech.groq": "Chấm bài tự luận",
+  "home.tech.claude": "Công cụ đã xây dựng website này",
   // Ba điều khách chưa đăng nhập cần biết (kho đề chỉ đọc được sau đăng nhập).
   "home.point1": "Đề thật từ các trường và các kỳ thi, do cộng đồng đóng góp.",
   "home.point2": "Nộp bài là có điểm ngay, kèm đáp án từng câu.",

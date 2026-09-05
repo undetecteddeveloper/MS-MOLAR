@@ -2,8 +2,8 @@ import { headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AboutPrompt } from "@/features/auth/components/AboutPrompt";
-import { HeroFigure } from "@/features/auth/components/HeroFigure";
 import { HomeStage, type AuthMode } from "@/features/auth/components/HomeStage";
+import { TechStack } from "@/features/auth/components/TechStack";
 import { ExamBrowser } from "@/features/exams/components/ExamBrowser";
 import { listExamsRanked } from "@/features/exams/queries";
 import { BottomNav } from "@/components/layout/BottomNav";
@@ -21,9 +21,9 @@ import { buildHomeJsonLd, serializeJsonLd } from "@/lib/seo/jsonLd";
 // docs/design/ui-refactor-san-truong-design.md §3.
 //
 // BỐ CỤC HAI CỘT từ 1024px, và CỘT PHẢI ĐỔI THEO TRẠNG THÁI ĐĂNG NHẬP:
-//   - khách  → HeroFigure (phiếu trả lời vẽ bằng CSS). Kho đề nằm sau đăng nhập
-//              (RLS `to authenticated`) nên KHÔNG có thẻ đề thật nào để hiện;
-//              chỗ trống đó được lấp bằng thứ nói được sản phẩm làm gì.
+//   - khách  → TechStack (bốn công nghệ website chạy trên + công cụ đã xây nó,
+//              logo màu chính thức). Kho đề nằm sau đăng nhập (RLS `to
+//              authenticated`) nên KHÔNG có thẻ đề thật nào để hiện cho khách.
 //   - đã vào → ba đề mới nhất, thẻ thật, bấm được. Người đã đăng nhập mở trang
 //              chủ là để làm đề, nên đường tới đề ngắn nhất có thể.
 // Dưới 1024px cả hai rơi xuống dưới khối chữ theo đúng thứ tự DOM.
@@ -118,10 +118,10 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ a
                   </section>
                 )
               ) : (
-                // `justify-self-end` trên màn rộng: hình neo về mép phải cột,
-                // giữ khoảng thở giữa nó và khối chữ thay vì dính sát nhau.
-                <div className="lg:justify-self-end">
-                  <HeroFigure />
+                // `max-w-md` + `justify-self-end`: khối neo về mép phải cột và
+                // không phình theo cột, giữ khoảng thở với khối chữ.
+                <div className="w-full max-w-md lg:justify-self-end">
+                  <TechStack />
                 </div>
               ))}
           </div>
