@@ -30,8 +30,8 @@
 import { Download, Loader2, Share2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { usePdfAction } from "@/components/history/usePdfAction";
-import { useT } from "@/lib/i18n/client";
-import type { MessageKey } from "@/lib/i18n/translate";
+import { t } from "@/lib/copy";
+import type { MessageKey } from "@/lib/copy";
 import type { AttemptPdfData } from "@/lib/pdf/generateAttemptPdf";
 
 const LABEL_KEY = { save: "common.save", share: "common.share" } as const satisfies Record<
@@ -54,7 +54,6 @@ export interface ActionButtonProps {
 }
 
 export function ActionButton({ action, pdfInput, idPrefix, blockedReason }: ActionButtonProps) {
-  const t = useT();
   const { phase, run } = usePdfAction(action, pdfInput, blockedReason);
   const blocked = blockedReason !== null;
   const reasonId = `${idPrefix}-${action}-reason`;

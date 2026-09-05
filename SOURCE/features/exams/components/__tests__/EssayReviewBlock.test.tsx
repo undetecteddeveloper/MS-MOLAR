@@ -16,13 +16,12 @@ vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined })
 // BAN THAN control la THAT: chi router bi stub.
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }) }));
 
-import { renderServerTree } from "@/app/(billing)/me/orders/__tests__/renderServerTree";
+import { renderServerTree } from "@/tests/helpers/renderServerTree";
 import { EssayReviewBlock } from "@/features/exams/components/EssayReviewBlock";
-import { DEFAULT_LOCALE } from "@/lib/i18n/locales";
-import { getDictionary } from "@/lib/i18n/translate";
+import { copy } from "@/lib/copy";
 import type { EssayView } from "@/lib/scoring/essayLifecycle";
 
-const DICT = getDictionary(DEFAULT_LOCALE);
+const DICT = copy;
 const STUDENT = "BAI_LAM_CUA_HOC_SINH";
 const MODEL = "DAP_AN_MAU_CUA_TAC_GIA";
 

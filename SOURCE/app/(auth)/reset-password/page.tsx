@@ -4,12 +4,11 @@
 // hết hạn) → middleware đã chặn từ ngoài; guard đây là lớp thứ hai.
 
 import { redirect } from "next/navigation";
-import { getTranslate } from "@/lib/i18n/server";
+import { t } from "@/lib/copy";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { ResetPasswordForm } from "@/features/auth/components/ResetPasswordForm";
 
 export default async function ResetPasswordPage() {
-  const t = await getTranslate();
   const user = await getCurrentUser();
   if (!user) redirect("/?auth=signin");
 

@@ -47,14 +47,14 @@ import { SkillRecommendationCard } from "@/features/analytics/components/SkillRe
 
 // Expected copy authored here independently of the dictionary file, so a silent
 // edit to en.ts fails these tests instead of being re-derived into agreement.
-const EYEBROW = "What to practise next"; // analytics.recommendTitle (en)
-const WHY_LABEL = "Why this skill?"; // analytics.recommendWhy (en)
+const EYEBROW = "Nên luyện gì tiếp theo"; // analytics.recommendTitle (en)
+const WHY_LABEL = "Vì sao là kỹ năng này?"; // analytics.recommendWhy (en)
 const COLD_START =
-  "Not enough data yet — practise a Math exam to get your first recommendation."; // analytics.recommendColdStart (en)
+  "Chưa đủ dữ liệu — bạn luyện một đề Toán để nhận gợi ý đầu tiên nhé."; // analytics.recommendColdStart (en)
 const REASON_COPY = {
-  "prerequisite-gate": "A skill you haven't mastered yet comes before this one.",
-  "lowest-mastery": "This is the skill you're weakest at right now.",
-  "recently-wrong": "You got this one wrong recently.",
+  "prerequisite-gate": "Có một kỹ năng nền bạn chưa nắm vững đứng trước kỹ năng này.",
+  "lowest-mastery": "Đây là kỹ năng bạn đang yếu nhất lúc này.",
+  "recently-wrong": "Bạn vừa làm sai kỹ năng này gần đây.",
 } as const;
 
 const SKILL_LABEL = "Lũy thừa"; // curriculum content, never routed through i18n

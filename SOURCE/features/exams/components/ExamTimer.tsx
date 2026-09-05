@@ -6,8 +6,8 @@
 "use client";
 
 import { useEffect, useEffectEvent, useState } from "react";
-import { useT } from "@/lib/i18n/client";
-import type { Translate } from "@/lib/i18n/translate";
+import { t } from "@/lib/copy";
+import type { Translate } from "@/lib/copy";
 
 interface ExamTimerProps {
   durationMinutes: number;
@@ -16,7 +16,6 @@ interface ExamTimerProps {
 }
 
 export function ExamTimer({ durationMinutes, onTimeUp }: ExamTimerProps) {
-  const t = useT();
   const [remaining, setRemaining] = useState(() => Math.max(0, Math.round(durationMinutes * 60)));
 
   // Fire lúc hết giờ phải dùng `onTimeUp` MỚI NHẤT (nó đóng gói answers hiện

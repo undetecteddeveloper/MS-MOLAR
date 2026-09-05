@@ -1,26 +1,18 @@
-// SkipLink — "Skip to content" cho người dùng bàn phím (WCAG 2.4.1 Bypass
-// Blocks). Trước đây site không có: mỗi lần đổi trang, người dùng bàn phím
-// phải Tab qua toàn bộ 5–6 tag điều hướng (giống hệt nhau ở mọi trang) mới
-// chạm được nội dung.
+// SkipLink — "Tới nội dung chính" cho người dùng bàn phím (WCAG 2.4.1 Bypass
+// Blocks). Phải là phần tử focus được ĐẦU TIÊN trong DOM của mỗi khung layout,
+// đặt TRƯỚC navbar. Ẩn bằng sr-only, hiện như một viên thuốc xanh khi nhận tiêu
+// điểm — KHÔNG dùng `display: none` vì thứ đó ẩn luôn khỏi thứ tự Tab.
 //
-// Phải là phần tử focus được ĐẦU TIÊN trong DOM của mỗi khung layout, đặt
-// TRƯỚC navbar/sidebar. Ẩn khỏi mắt thường bằng sr-only, hiện ra như một khối
-// đặc khi nhận tiêu điểm (`focus:not-sr-only`) — KHÔNG dùng `display: none` vì
-// thứ đó cũng ẩn luôn khỏi thứ tự Tab, làm liên kết trở nên vô dụng.
-//
-// Đích nhảy tới là `#main-content` — id gắn trên khối nội dung của mỗi layout
-// (xem (layer2|3|4|HM)/layout.tsx và app/page.tsx). Khối đó mang tabIndex={-1}
-// để trình duyệt thực sự dời tiêu điểm vào nó; không có tabIndex, một số trình
-// duyệt chỉ cuộn màn hình mà tiêu điểm vẫn nằm lại ở navbar.
+// Đích nhảy là `#main-content` — id trên khối nội dung của mỗi layout, mang
+// tabIndex={-1} để trình duyệt thực sự dời tiêu điểm vào nó.
 
-import { getTranslate } from "@/lib/i18n/server";
+import { t } from "@/lib/copy";
 
 export async function SkipLink() {
-  const t = await getTranslate();
   return (
     <a
       href="#main-content"
-      className="bg-background text-foreground sr-only rounded-md border-2 border-[color:var(--ring)] px-4 py-2 font-sans text-sm font-medium focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-50"
+      className="bg-primary text-primary-foreground focus-visible:ring-ring sr-only rounded-full px-4 py-2.5 text-sm font-semibold focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-50 focus-visible:ring-3"
     >
       {t("common.skipToContent")}
     </a>

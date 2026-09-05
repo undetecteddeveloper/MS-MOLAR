@@ -13,8 +13,8 @@ import { useEffect, useRef, useState } from "react";
 import { submitSupportTicket } from "@/lib/support/actions";
 import type { SubmitTicketResult, TicketIntent } from "@/lib/support/types";
 import type { ScreenshotCheck } from "@/lib/support/validateScreenshot";
-import type { MessageKey } from "@/lib/i18n/translate";
-import { useT } from "@/lib/i18n/client";
+import type { MessageKey } from "@/lib/copy";
+import { t } from "@/lib/copy";
 import { IntentSelector } from "@/components/support/IntentSelector";
 import { MessageField } from "@/components/support/MessageField";
 import { ScreenshotAttachment } from "@/components/support/ScreenshotAttachment";
@@ -44,7 +44,6 @@ interface SupportWidgetDialogProps {
 }
 
 export function SupportWidgetDialog({ open, onClose }: SupportWidgetDialogProps) {
-  const t = useT();
   const [phase, setPhase] = useState<Phase>("compose");
   const [intent, setIntent] = useState<TicketIntent | null>(null);
   const [message, setMessage] = useState("");

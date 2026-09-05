@@ -12,39 +12,36 @@ import { buildHomeJsonLd, serializeJsonLd } from "../jsonLd";
 
 type Node = Record<string, unknown>;
 
-const graph = (locale: "en" | "vi") => buildHomeJsonLd(locale)["@graph"] as Node[];
-const nodeOfType = (locale: "en" | "vi", type: string) =>
-  graph(locale).find((n) => n["@type"] === type) as Node;
+const graph = () => buildHomeJsonLd()["@graph"] as Node[];
+const nodeOfType = (type: string) =>
+  graph().find((n) => n["@type"] === type) as Node;
 
 describe("buildHomeJsonLd", () => {
   it("mọi url/@id đều tuyệt đối theo SITE_URL — đường dẫn tương đối bị Google bỏ qua trong im lặng", () => {
-    for (const node of graph("en")) {
+    for (const node of graph()) {
       expect(String(node["@id"]).startsWith(`${SITE_URL}/#`)).toBe(true);
       expect(String(node.url).startsWith(SITE_URL)).toBe(true);
     }
-    expect(String(nodeOfType("en", "Organization").logo).startsWith(SITE_URL)).toBe(true);
+    expect(String(nodeOfType("Organization").logo).startsWith(SITE_URL)).toBe(true);
   });
 
   it("WebSite trỏ publisher về ĐÚNG @id của Organization — sai id là hai thực thể rời nhau", () => {
-    const org = nodeOfType("en", "Organization");
-    const site = nodeOfType("en", "WebSite");
+    const org = nodeOfType("Organization");
+    const site = nodeOfType("WebSite");
     expect(site.publisher).toEqual({ "@id": org["@id"] });
   });
 
   it("khai các cách viết tên thương hiệu mà người dùng thật sẽ gõ", () => {
     // Mục tiêu duy nhất của khối này là tìm-theo-tên (SEO-TODO.md): thiếu biến
     // thể có dấu cách thì "MS MOLAR" không khớp được với "MS-MOLAR".
-    const alt = nodeOfType("vi", "Organization").alternateName as string[];
+    const alt = nodeOfType("Organization").alternateName as string[];
     expect(alt).toContain("MS MOLAR");
     expect(alt).toContain("MSMOLAR");
   });
 
-  it("mô tả và inLanguage đi theo ngôn ngữ đang render, không hard-code một thứ tiếng", () => {
-    expect(nodeOfType("vi", "WebSite").inLanguage).toBe("vi-VN");
-    expect(nodeOfType("en", "WebSite").inLanguage).toBe("en-US");
-    expect(nodeOfType("vi", "Organization").description).not.toBe(
-      nodeOfType("en", "Organization").description,
-    );
+  it("inLanguage là vi-VN và mô tả là tiếng Việt — site chỉ còn một ngôn ngữ", () => {
+    expect(nodeOfType("WebSite").inLanguage).toBe("vi-VN");
+    expect(String(nodeOfType("Organization").description)).toContain("luyện đề");
   });
 });
 
@@ -61,6 +58,6 @@ describe("serializeJsonLd", () => {
   });
 
   it("đầu ra của buildHomeJsonLd nhét được vào thẻ inline mà không chứa `<`", () => {
-    expect(serializeJsonLd(buildHomeJsonLd("vi"))).not.toContain("<");
+    expect(serializeJsonLd(buildHomeJsonLd())).not.toContain("<");
   });
 });

@@ -9,12 +9,11 @@
 // đổi sai — xem lại proof obligation trước khi sửa file này.
 
 import type { TicketWithNotes } from "@/lib/supabase/service-role";
-import { useT } from "@/lib/i18n/client";
+import { t } from "@/lib/copy";
 import { TicketStatusControl } from "@/features/admin/components/tickets/TicketStatusControl";
 import { InternalNotesPanel } from "@/features/admin/components/tickets/InternalNotesPanel";
 
 export function TicketDetailPanel({ ticket }: { ticket: TicketWithNotes }) {
-  const t = useT();
   return (
     <div className="border-border mt-3 border-t pt-3">
       <p className="whitespace-pre-wrap text-sm">{ticket.message}</p>

@@ -44,7 +44,7 @@ function Harness({
       <button
         ref={triggerRef}
         type="button"
-        aria-label="Change name"
+        aria-label="Đổi tên"
         onClick={() => setOpen(true)}
       />
       {open && (
@@ -71,12 +71,12 @@ function renderEditor(displayName = "an.nguyen") {
 
 function startEditing() {
   act(() => {
-    screen.getByRole("button", { name: "Change name" }).click();
+    screen.getByRole("button", { name: "Đổi tên" }).click();
   });
 }
 
 function input(): HTMLInputElement {
-  return screen.getByLabelText("Display name") as HTMLInputElement;
+  return screen.getByLabelText("Tên hiển thị") as HTMLInputElement;
 }
 
 function submitForm() {
@@ -87,7 +87,7 @@ describe("trạng thái nghỉ", () => {
   it("hiện tên hiện hành dưới dạng chữ, kèm nút mở trình sửa (AC-008)", () => {
     renderEditor("an.nguyen");
     expect(screen.getByText("an.nguyen")).toBeDefined();
-    expect(screen.getByRole("button", { name: "Change name" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Đổi tên" })).toBeDefined();
   });
 });
 
@@ -100,7 +100,7 @@ describe("trình sửa", () => {
     expect(field.getAttribute("name")).toBe("displayName");
     const describedBy = field.getAttribute("aria-describedby") as string;
     expect(document.getElementById(describedBy)?.textContent).toBe(
-      "Max 12 characters, letters and dots only."
+      "Tối đa 12 ký tự, chỉ chữ cái và dấu chấm."
     );
   });
 
@@ -127,7 +127,7 @@ describe("trình sửa", () => {
     startEditing();
     fireEvent.change(input(), { target: { value: "" } });
 
-    expect(screen.getByRole("button", { name: "Save" }).getAttribute("aria-disabled")).toBe("true");
+    expect(screen.getByRole("button", { name: "Lưu" }).getAttribute("aria-disabled")).toBe("true");
     // Một ô trống mà người dùng còn đang gõ dở KHÔNG phải một thất bại.
     expect(screen.queryByRole("alert")).toBeNull();
   });
@@ -145,10 +145,10 @@ describe("trình sửa", () => {
     renderEditor();
     startEditing();
     act(() => {
-      screen.getByRole("button", { name: "Cancel" }).click();
+      screen.getByRole("button", { name: "Huỷ" }).click();
     });
 
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Change name" }));
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Đổi tên" }));
   });
 });
 
@@ -166,7 +166,7 @@ describe("đường server", () => {
     expect(updateProfileMock).toHaveBeenCalledTimes(1);
     expect(props.onSuccess).toHaveBeenCalledWith("profile.name.saved");
     expect(refresh).toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "Change name" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Đổi tên" })).toBeDefined();
   });
 
   it("câu tiếng Anh của updateProfile được DỊCH, không lộ nguyên văn (UI-D9)", async () => {
@@ -182,7 +182,7 @@ describe("đường server", () => {
     });
 
     expect(screen.getByRole("alert").textContent).toBe(
-      "Display name may only contain letters and dots."
+      "Tên hiển thị chỉ được gồm chữ cái và dấu chấm."
     );
   });
 
@@ -198,7 +198,7 @@ describe("đường server", () => {
 
     expect(input().value).toBe("bao.tran");
     expect(input().readOnly).toBe(false);
-    expect(screen.getByRole("button", { name: "Save" }).getAttribute("aria-disabled")).toBe("false");
+    expect(screen.getByRole("button", { name: "Lưu" }).getAttribute("aria-disabled")).toBe("false");
   });
 
   it("lỗi → ô nhập được nối với dòng lỗi, và id đó CHỈ tồn tại lúc có lỗi", async () => {
@@ -232,7 +232,7 @@ describe("đường server", () => {
       submitForm();
     });
 
-    expect(screen.getByRole("alert").textContent).toBe("Something went wrong. Try again.");
+    expect(screen.getByRole("alert").textContent).toBe("Có lỗi xảy ra. Hãy thử lại.");
   });
 
   it("gửi hai lần trong một tick chỉ chạy Server Action MỘT lần (AC-069)", async () => {

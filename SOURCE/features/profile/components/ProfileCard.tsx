@@ -8,8 +8,8 @@
 import { useRef, useState } from "react";
 import { Pencil } from "lucide-react";
 import type { CurrentUserProfile } from "@/lib/auth/getCurrentUser";
-import { useT } from "@/lib/i18n/client";
-import type { MessageKey } from "@/lib/i18n/translate";
+import { t } from "@/lib/copy";
+import type { MessageKey } from "@/lib/copy";
 import { AVATAR_LIMITS } from "@/lib/profile/limits";
 import { Avatar } from "@/components/shared/Avatar";
 import { SuccessToast } from "@/components/ui/SuccessToast";
@@ -35,7 +35,6 @@ interface ProfileCardProps {
 }
 
 export function ProfileCard({ user }: ProfileCardProps) {
-  const t = useT();
   const [dialogOpen, setDialogOpen] = useState(false);
   // MỘT bộ đếm cho BA nguồn thành công (đổi mật khẩu / đổi ảnh / đổi tên).
   // `n: 0` nghĩa là "chưa bắn lần nào" và phải giữ đúng 0 cho tới lần thành

@@ -5,8 +5,8 @@
 // merge vào StatusBadge's CONFIG (UI-D2/I002). Glyph khác hẳn bộ ◌/◑/○/●/▲
 // của StatusBadge để hai hệ thống không lẫn vào nhau.
 
-import { useT } from "@/lib/i18n/client";
-import type { MessageKey } from "@/lib/i18n/translate";
+import { t } from "@/lib/copy";
+import type { MessageKey } from "@/lib/copy";
 import type { TicketStatus } from "@/lib/support/types";
 import { cn } from "@/lib/utils";
 
@@ -25,7 +25,6 @@ const CONFIG: Record<TicketStatus, { glyph: string; labelKey: MessageKey; classN
 };
 
 export function TicketStatusBadge({ status, className }: { status: TicketStatus; className?: string }) {
-  const t = useT();
   // Không có giá trị nào ngoài 3 trạng thái cố định thực sự tới được đây (AC-028
   // DB default 'new'), nhưng fallback về 'new' thay vì render trống — mirror
   // StatusBadge's `CONFIG[status] ?? CONFIG.processing` convention.

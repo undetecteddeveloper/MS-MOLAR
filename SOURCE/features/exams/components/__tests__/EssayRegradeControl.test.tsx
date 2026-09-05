@@ -23,10 +23,9 @@ vi.mock("@/features/exams/essayActions", () => ({ retryEssayGrading: retryMock }
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: refreshMock }) }));
 
 import { EssayRegradeControl } from "@/features/exams/components/EssayRegradeControl";
-import { DEFAULT_LOCALE } from "@/lib/i18n/locales";
-import { getDictionary } from "@/lib/i18n/translate";
+import { copy } from "@/lib/copy";
 
-const DICT = getDictionary(DEFAULT_LOCALE);
+const DICT = copy;
 const ATTEMPT = "a1";
 const QUESTION = "q1";
 

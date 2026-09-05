@@ -31,8 +31,8 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 // eslint-disable-next-line no-restricted-imports -- rò chéo có sẵn trước B4 (2026-09-03): changeAvatar/updateProfile/changePassword còn nằm chung file với signIn/signUp. Xem ARCHITECTURE.md § Import chéo.
 import { changePassword, type AuthState } from "@/features/auth/actions";
-import { useT } from "@/lib/i18n/client";
-import type { MessageKey } from "@/lib/i18n/translate";
+import { t } from "@/lib/copy";
+import type { MessageKey } from "@/lib/copy";
 import { profileMessage, resolveActionError, type ProfileMessage } from "@/features/profile/components/errorMessages";
 import {
   actionRowCls,
@@ -92,7 +92,6 @@ export function ChangePasswordDialog({
   onSuccess,
   onStatus,
 }: ChangePasswordDialogProps) {
-  const t = useT();
   const [error, setError] = useState<ProfileMessage | null>(null);
   const [pending, setPending] = useState(false);
 

@@ -155,7 +155,7 @@ vi.mock("next/font/google", () => {
     variable: options.variable ?? "",
     className: "",
   });
-  return { Geist_Mono: font, Source_Serif_4: font, Be_Vietnam_Pro: font };
+  return { Lexend: font, Geist_Mono: font, Source_Serif_4: font, Be_Vietnam_Pro: font };
 });
 vi.mock("@vercel/analytics/next", () => ({ Analytics: () => null }));
 vi.mock("next/navigation", () => ({
@@ -167,7 +167,6 @@ vi.mock("next/navigation", () => ({
   },
 }));
 vi.mock("@/components/shared/SkipLink", () => ({ SkipLink: () => null }));
-vi.mock("@/lib/i18n/actions", () => ({ setLocale: vi.fn() }));
 vi.mock("@/features/auth/actions", () => ({ signOut: vi.fn() }));
 vi.mock("@/lib/support/actions", () => ({ submitSupportTicket: vi.fn() }));
 vi.mock("@/lib/auth/getCurrentUser", () => ({
@@ -184,7 +183,7 @@ vi.mock("@/lib/pdf/generateAttemptPdf", () => ({
   canShareFile: () => false,
 }));
 
-import { renderServerTree } from "@/app/(billing)/me/orders/__tests__/renderServerTree";
+import { renderServerTree } from "@/tests/helpers/renderServerTree";
 import RootLayout from "@/app/layout";
 import Layer2Layout from "@/app/(exams)/layout";
 import ResultPage from "@/app/(exams)/exams/[id]/attempt/[attemptId]/result/page";
@@ -195,13 +194,12 @@ import { ResultActions } from "@/features/exams/components/ResultActions";
 import { EssayGradingPoller } from "@/features/exams/components/EssayGradingPoller";
 import type { ExamResult } from "@/features/exams/queries";
 import type { MyHistoryEntry } from "@/features/history/queries";
-import { DEFAULT_LOCALE } from "@/lib/i18n/locales";
-import { getDictionary } from "@/lib/i18n/translate";
+import { copy } from "@/lib/copy";
 import {
   ESSAY_POLL_FAST_INTERVAL_MS,
 } from "@/features/exams/components/EssayGradingPoller";
 
-const DICT = getDictionary(DEFAULT_LOCALE);
+const DICT = copy;
 const EXAM_ID = "11111111-1111-1111-1111-111111111111";
 const ATTEMPT_ID = "22222222-2222-2222-2222-222222222222";
 const ESSAY_QID = "essay-q1";

@@ -1,5 +1,5 @@
 "use client";
-import { useT } from "@/lib/i18n/client";
+import { t } from "@/lib/copy";
 
 // RatingRubric — shared core of the standalone Rating Page (academic-rubric
 // redesign, replaces the old RatingForm/RatingOverview/PartCard/PartDetail
@@ -39,7 +39,7 @@ import {
 } from "@/lib/rating";
 import { ScoreScale } from "@/components/rating/ScoreScale";
 import { SuccessToast } from "@/components/ui/SuccessToast";
-import type { MessageKey } from "@/lib/i18n/translate";
+import type { MessageKey } from "@/lib/copy";
 import { submitRating } from "@/features/exams/components/rating/submitRating";
 
 /**
@@ -82,7 +82,6 @@ export interface RatingRubricProps {
 type SubmitState = "idle" | "submitting" | "error";
 
 export function RatingRubric({ examId, initialScores }: RatingRubricProps) {
-  const t = useT();
   const [scores, setScores] = useState<Partial<Record<PartId, PartScore>>>(initialScores ?? {});
   const [activeIndex, setActiveIndex] = useState(0);
   const [direction, setDirection] = useState<1 | -1>(1);

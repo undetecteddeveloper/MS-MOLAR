@@ -26,7 +26,7 @@
 // Visual "tờ giấy trắng": nền card, hairline, điểm lớn nổi bật (UI-LAYER-MAP 4.4) —
 // KHÔNG fill màu (màu template chỉ tượng trưng, Q6).
 
-import { getTranslate } from "@/lib/i18n/server";
+import { t } from "@/lib/copy";
 import type { ScoreResult } from "@/types/result";
 
 export async function ScoreCard({
@@ -47,7 +47,6 @@ export async function ScoreCard({
    *  AC-012 ("dòng cũ giữ nguyên từng byte") tiếp tục đúng sau thay đổi này. */
   pending?: boolean;
 }) {
-  const t = await getTranslate();
   const wrong = result.total - result.correct;
 
   return (

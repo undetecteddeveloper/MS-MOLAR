@@ -17,23 +17,23 @@ describe("MessageField", () => {
   it("typing calls onChange with the new value", () => {
     const onChange = vi.fn();
     render(<MessageField value="" onChange={onChange} error={null} disabled={false} />);
-    const textarea = screen.getByLabelText("Message") as HTMLTextAreaElement;
+    const textarea = screen.getByLabelText("Nội dung") as HTMLTextAreaElement;
     fireEvent.change(textarea, { target: { value: "x" } });
     expect(onChange).toHaveBeenCalledWith("x");
   });
 
   it("preserves the value verbatim when disabled (readOnly, not native disabled — stays focusable)", () => {
     render(<MessageField value="already typed" onChange={() => {}} error={null} disabled={true} />);
-    const textarea = screen.getByLabelText("Message") as HTMLTextAreaElement;
+    const textarea = screen.getByLabelText("Nội dung") as HTMLTextAreaElement;
     expect(textarea.value).toBe("already typed");
     expect(textarea.disabled).toBe(false); // native disabled would break focus/AT discoverability
     expect(textarea.readOnly).toBe(true);
   });
 
   it("renders the validation error as role=alert linked via aria-describedby", () => {
-    render(<MessageField value="" onChange={() => {}} error="Please enter a message." disabled={false} />);
-    expect(screen.getByRole("alert").textContent).toBe("Please enter a message.");
-    const textarea = screen.getByLabelText("Message");
+    render(<MessageField value="" onChange={() => {}} error="Vui lòng nhập nội dung." disabled={false} />);
+    expect(screen.getByRole("alert").textContent).toBe("Vui lòng nhập nội dung.");
+    const textarea = screen.getByLabelText("Nội dung");
     expect(textarea.getAttribute("aria-describedby")).toBe(screen.getByRole("alert").id);
   });
 });

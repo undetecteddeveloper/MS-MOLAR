@@ -8,7 +8,7 @@
 import { useActionState } from "react";
 import { addTicketNoteAction } from "@/features/admin/ticketActions";
 import type { TicketActionState } from "@/lib/support/types";
-import { useT } from "@/lib/i18n/client";
+import { t } from "@/lib/copy";
 
 interface InternalNote {
   id: string;
@@ -24,7 +24,6 @@ async function noteFormAction(_prev: TicketActionState, formData: FormData): Pro
 }
 
 function InternalNoteForm({ ticketId }: { ticketId: string }) {
-  const t = useT();
   const [state, formAction, pending] = useActionState<TicketActionState, FormData>(
     noteFormAction,
     null
@@ -58,7 +57,6 @@ function InternalNoteForm({ ticketId }: { ticketId: string }) {
 }
 
 export function InternalNotesPanel({ ticketId, notes }: { ticketId: string; notes: InternalNote[] }) {
-  const t = useT();
   return (
     <div className="border-border mt-4 border-t pt-4">
       {notes.length === 0 ? (

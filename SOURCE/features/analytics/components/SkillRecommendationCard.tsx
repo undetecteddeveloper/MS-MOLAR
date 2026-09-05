@@ -9,9 +9,9 @@
 // nội dung chương trình học, không phải chữ giao diện). Tự cắt/gộp/xếp lại nhãn
 // ở đây là để UI trôi lệch âm thầm khỏi giá trị backend thật sự đã tính.
 
-import { getTranslate } from "@/lib/i18n/server";
+import { t } from "@/lib/copy";
 import { BentoCell } from "@/components/layout/BentoGrid";
-import type { MessageKey } from "@/lib/i18n/translate";
+import type { MessageKey } from "@/lib/copy";
 import type { SkillRecommendation } from "@/types/adaptive";
 
 type ReasonCode = Exclude<SkillRecommendation, null>["reasonCode"];
@@ -27,7 +27,6 @@ interface SkillRecommendationCardProps {
 }
 
 export async function SkillRecommendationCard({ recommendation }: SkillRecommendationCardProps) {
-  const t = await getTranslate();
 
   // Cold start (chưa có dòng mastery nào) là ca ĐÔNG NHẤT ngoài đời — mọi tài
   // khoản mới đều rơi vào đây — nên nó có nhánh render tử tế riêng, chứ không

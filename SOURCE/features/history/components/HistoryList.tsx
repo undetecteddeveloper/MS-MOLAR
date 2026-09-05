@@ -12,7 +12,7 @@
 // listMyHistory()'s (ordering) and filterHistoryEntries()'s (filtering)
 // responsibility, both already applied by the caller.
 import Link from "next/link";
-import { getTranslate } from "@/lib/i18n/server";
+import { t } from "@/lib/copy";
 import type { MyHistoryEntry } from "@/features/history/queries";
 import { HistoryRow } from "@/features/history/components/HistoryRow";
 
@@ -25,7 +25,6 @@ export async function HistoryList({
   isFiltered?: boolean;
   examineeName: string;
 }) {
-  const t = await getTranslate();
   return (
     <div className="w-full">
       {entries.length === 0 ? (

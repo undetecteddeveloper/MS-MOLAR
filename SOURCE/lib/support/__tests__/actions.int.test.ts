@@ -17,7 +17,6 @@ vi.mock("@/lib/supabase/service-role", () => ({
   flagSupportTicketNotifyFailed: vi.fn(async () => ({ error: null })),
 }));
 vi.mock("@/lib/security/rateLimit", () => ({ guard: vi.fn(async () => ({ ok: true, retryAfterSeconds: 0 })) }));
-vi.mock("@/lib/i18n/server", () => ({ getTranslate: vi.fn(async () => (key: string) => key) }));
 vi.mock("@/lib/mail/sendSupportNotification", () => ({
   sendSupportNotification: vi.fn(async () => ({ ok: true })),
 }));

@@ -74,10 +74,10 @@ function setup(questions: AssembledQuestion[], parts: ExtractedPart[] = PARTS) {
     <PointsPanel questions={questions} parts={parts} onApply={onApply} />
   );
   const totalInput = container.querySelector<HTMLInputElement>(
-    'input[aria-label="Total marks for the selected range"]'
+    'input[aria-label="Tổng điểm cho phạm vi đã chọn"]'
   )!;
   const applyButton = [...container.querySelectorAll("button")].find(
-    (b) => b.textContent?.trim() === "Split marks"
+    (b) => b.textContent?.trim() === "Chia điểm"
   )!;
   return { container, onApply, totalInput, applyButton };
 }
@@ -102,7 +102,7 @@ describe("PointsPanel — chia theo phần", () => {
   it("đổi phần thì phạm vi đổi theo", () => {
     const { container, onApply, totalInput, applyButton } = setup(TWO_PART);
     const select = container.querySelector<HTMLSelectElement>(
-      'select[aria-label="Part to assign marks to"]'
+      'select[aria-label="Phần cần gán điểm"]'
     )!;
     // Dropdown in ĐÚNG tiêu đề đề gốc, không phải "Part 1"/"Part 2".
     expect([...select.options].map((o) => o.textContent)).toEqual([
@@ -127,15 +127,15 @@ describe("PointsPanel — chia theo dãy câu", () => {
     const { container, onApply, totalInput, applyButton } = setup(TWO_PART);
     fireEvent.click(
       [...container.querySelectorAll("button")].find(
-        (b) => b.textContent?.trim() === "Pick a range"
+        (b) => b.textContent?.trim() === "Chọn dãy câu"
       )!
     );
     fireEvent.change(
-      container.querySelector<HTMLInputElement>('input[aria-label="From question"]')!,
+      container.querySelector<HTMLInputElement>('input[aria-label="Từ câu"]')!,
       { target: { value: "3" } }
     );
     fireEvent.change(
-      container.querySelector<HTMLInputElement>('input[aria-label="To question"]')!,
+      container.querySelector<HTMLInputElement>('input[aria-label="Đến câu"]')!,
       { target: { value: "5" } }
     );
     fireEvent.change(totalInput, { target: { value: "1.5" } });
@@ -157,7 +157,7 @@ describe("PointsPanel — từ chối thay vì ghi biểu điểm hỏng", () =>
 
     expect(onApply).not.toHaveBeenCalled();
     expect(container.querySelector('[role="alert"]')?.textContent).toContain(
-      "greater than 0"
+      "lớn hơn 0"
     );
   });
 
@@ -165,15 +165,15 @@ describe("PointsPanel — từ chối thay vì ghi biểu điểm hỏng", () =>
     const { container, onApply, totalInput, applyButton } = setup(TWO_PART);
     fireEvent.click(
       [...container.querySelectorAll("button")].find(
-        (b) => b.textContent?.trim() === "Pick a range"
+        (b) => b.textContent?.trim() === "Chọn dãy câu"
       )!
     );
     fireEvent.change(
-      container.querySelector<HTMLInputElement>('input[aria-label="From question"]')!,
+      container.querySelector<HTMLInputElement>('input[aria-label="Từ câu"]')!,
       { target: { value: "40" } }
     );
     fireEvent.change(
-      container.querySelector<HTMLInputElement>('input[aria-label="To question"]')!,
+      container.querySelector<HTMLInputElement>('input[aria-label="Đến câu"]')!,
       { target: { value: "50" } }
     );
     fireEvent.change(totalInput, { target: { value: "2" } });

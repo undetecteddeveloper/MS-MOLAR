@@ -6,7 +6,7 @@
 // giữa các dòng.
 
 "use client";
-import { useT } from "@/lib/i18n/client";
+import { t } from "@/lib/copy";
 
 import type { ReactNode } from "react";
 import {
@@ -37,7 +37,6 @@ export function DonutChartCard({
   filterSlot: ReactNode;
   donutHighlightCount?: number;
 }) {
-  const t = useT();
   // Sort giảm dần theo % — donut segment bắt đầu từ 12h theo chiều kim đồng hồ,
   // legend liệt kê cùng thứ tự (khớp design reference).
   const shares = [...computeShares(data)].sort((a, b) => b.pct - a.pct);

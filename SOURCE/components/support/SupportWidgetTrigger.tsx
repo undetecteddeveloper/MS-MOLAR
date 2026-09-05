@@ -5,7 +5,7 @@
 
 import { MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useT } from "@/lib/i18n/client";
+import { t } from "@/lib/copy";
 
 // Id, không ref: SupportWidget (cha) cần focus lại nút này khi dialog đóng
 // (UI-D7 — Escape/scrim/Cancel phải trả focus về trigger, không rơi về
@@ -19,7 +19,6 @@ interface SupportWidgetTriggerProps {
 }
 
 export function SupportWidgetTrigger({ onOpen }: SupportWidgetTriggerProps) {
-  const t = useT();
 
   return (
     <Button

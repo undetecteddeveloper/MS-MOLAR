@@ -12,7 +12,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { useEffect, useRef, useTransition } from "react";
 import { submitExam } from "@/features/exams/actions";
-import { useT } from "@/lib/i18n/client";
+import { t } from "@/lib/copy";
 import { ExamTimer } from "@/features/exams/components/ExamTimer";
 import { LeaveExamDialog } from "@/features/exams/components/LeaveExamDialog";
 import { QuestionRenderer } from "@/features/exams/components/QuestionRenderer";
@@ -53,7 +53,6 @@ export function ExamPlayer({
   parts,
   essayGradingEnabled,
 }: ExamPlayerProps) {
-  const t = useT();
   const { current, answers, flags, selectAnswer, toggleFlag, goto, next, prev } = useExamPlayer(
     questions.length
   );

@@ -14,9 +14,9 @@ describe("IntentSelector", () => {
     render(<IntentSelector value={null} onChange={() => {}} error={null} disabled={false} />);
     const radios = screen.getAllByRole("radio");
     expect(radios).toHaveLength(3);
-    expect(screen.getByRole("radio", { name: "Bug report" })).toBeDefined();
-    expect(screen.getByRole("radio", { name: "Suggestion" })).toBeDefined();
-    expect(screen.getByRole("radio", { name: "Question" })).toBeDefined();
+    expect(screen.getByRole("radio", { name: "Báo lỗi" })).toBeDefined();
+    expect(screen.getByRole("radio", { name: "Góp ý" })).toBeDefined();
+    expect(screen.getByRole("radio", { name: "Câu hỏi" })).toBeDefined();
   });
 
   it("none pre-selected by default (Default state == Empty state, no separate affordance)", () => {
@@ -31,17 +31,17 @@ describe("IntentSelector", () => {
     const { rerender } = render(
       <IntentSelector value={null} onChange={onChange} error={null} disabled={false} />
     );
-    screen.getByRole("radio", { name: "Suggestion" }).click();
+    screen.getByRole("radio", { name: "Góp ý" }).click();
     expect(onChange).toHaveBeenCalledWith("suggestion");
 
     rerender(<IntentSelector value="suggestion" onChange={onChange} error={null} disabled={false} />);
-    expect(screen.getByRole("radio", { name: "Suggestion" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByRole("radio", { name: "Góp ý" }).getAttribute("aria-checked")).toBe("true");
   });
 
   it("a click while disabled does not call onChange (no-op guard)", () => {
     const onChange = vi.fn();
     render(<IntentSelector value={null} onChange={onChange} error={null} disabled={true} />);
-    screen.getByRole("radio", { name: "Bug report" }).click();
+    screen.getByRole("radio", { name: "Báo lỗi" }).click();
     expect(onChange).not.toHaveBeenCalled();
   });
 
@@ -50,11 +50,11 @@ describe("IntentSelector", () => {
       <IntentSelector
         value={null}
         onChange={() => {}}
-        error="Please pick a feedback type."
+        error="Vui lòng chọn một loại phản hồi."
         disabled={false}
       />
     );
-    expect(screen.getByRole("alert").textContent).toBe("Please pick a feedback type.");
+    expect(screen.getByRole("alert").textContent).toBe("Vui lòng chọn một loại phản hồi.");
     const group = screen.getByRole("radiogroup");
     expect(group.getAttribute("aria-describedby")).toBe(screen.getByRole("alert").id);
   });

@@ -106,7 +106,7 @@ describe("ActionButton", () => {
     );
 
     const { container } = render(<ActionButton action="save" pdfInput={PDF_INPUT} idPrefix="a" blockedReason={null} />);
-    const button = within(container).getByRole("button", { name: "Save" });
+    const button = within(container).getByRole("button", { name: "Lưu" });
 
     fireEvent.click(button); // idle -> busy (busyRef true, synchronously, before the promise settles)
     fireEvent.click(button); // rapid second click, still busy — must be a no-op
@@ -128,7 +128,7 @@ describe("ActionButton", () => {
     shareMock.mockResolvedValue(undefined);
 
     const { container } = render(<ActionButton action="share" pdfInput={PDF_INPUT} idPrefix="b" blockedReason={null} />);
-    const button = within(container).getByRole("button", { name: "Share" });
+    const button = within(container).getByRole("button", { name: "Chia sẻ" });
 
     fireEvent.click(button);
     expect(button.getAttribute("aria-busy")).toBe("true");
@@ -151,7 +151,7 @@ describe("ActionButton", () => {
     const { container, rerender } = render(
       <ActionButton action="share" pdfInput={PDF_INPUT} idPrefix="c" blockedReason={null} />
     );
-    const button = within(container).getByRole("button", { name: "Share" });
+    const button = within(container).getByRole("button", { name: "Chia sẻ" });
 
     fireEvent.click(button);
     await waitFor(() => expect(mockDownload).toHaveBeenCalledTimes(1));
@@ -159,7 +159,7 @@ describe("ActionButton", () => {
     expect(vi.mocked(navigator.share)).not.toHaveBeenCalled();
 
     const status = await within(container).findByRole("status");
-    expect(status.textContent).toBe("Downloaded — sharing isn't supported in this browser.");
+    expect(status.textContent).toBe("Đã tải về — trình duyệt này không hỗ trợ chia sẻ.");
     expect(status.getAttribute("aria-live")).toBe("polite");
 
     // Persists through a no-op re-render (no auto-dismiss timer, D1).
@@ -180,7 +180,7 @@ describe("ActionButton", () => {
     shareMock.mockRejectedValue(new DOMException("User cancelled the share", "AbortError"));
 
     const { container } = render(<ActionButton action="share" pdfInput={PDF_INPUT} idPrefix="d" blockedReason={null} />);
-    const button = within(container).getByRole("button", { name: "Share" });
+    const button = within(container).getByRole("button", { name: "Chia sẻ" });
 
     fireEvent.click(button);
     await waitFor(() => expect(button.getAttribute("aria-busy")).toBe("false"));
@@ -194,12 +194,12 @@ describe("ActionButton", () => {
     mockGenerate.mockRejectedValueOnce(new Error("network blip"));
 
     const { container } = render(<ActionButton action="save" pdfInput={PDF_INPUT} idPrefix="e" blockedReason={null} />);
-    const button = within(container).getByRole("button", { name: "Save" });
+    const button = within(container).getByRole("button", { name: "Lưu" });
 
     fireEvent.click(button);
 
     const alert = await within(container).findByRole("alert");
-    expect(alert.textContent).toBe("Couldn't generate the PDF. Try again.");
+    expect(alert.textContent).toBe("Không tạo được file PDF. Thử lại nhé.");
     expect(button.getAttribute("aria-disabled")).toBe("false");
     expect(button.getAttribute("aria-busy")).toBe("false");
 
@@ -236,7 +236,7 @@ describe("ActionButton", () => {
       const { container } = render(
         <ActionButton action="save" pdfInput={PDF_INPUT} idPrefix="f-busy" blockedReason={null} />
       );
-      const button = within(container).getByRole("button", { name: "Save" });
+      const button = within(container).getByRole("button", { name: "Lưu" });
       fireEvent.click(button);
       expect(button.getAttribute("aria-busy")).toBe("true");
 
@@ -254,7 +254,7 @@ describe("ActionButton", () => {
       const { container } = render(
         <ActionButton action="save" pdfInput={PDF_INPUT} idPrefix="f-error" blockedReason={null} />
       );
-      const button = within(container).getByRole("button", { name: "Save" });
+      const button = within(container).getByRole("button", { name: "Lưu" });
       fireEvent.click(button);
       await within(container).findByRole("alert");
 
@@ -270,7 +270,7 @@ describe("ActionButton", () => {
       const { container } = render(
         <ActionButton action="share" pdfInput={PDF_INPUT} idPrefix="f-fallback" blockedReason={null} />
       );
-      const button = within(container).getByRole("button", { name: "Share" });
+      const button = within(container).getByRole("button", { name: "Chia sẻ" });
       fireEvent.click(button);
       await within(container).findByRole("status");
 
@@ -292,7 +292,7 @@ describe("ActionButton", () => {
       const shareRender = render(
         <ActionButton action="share" pdfInput={PDF_INPUT} idPrefix="g-share" blockedReason={null} />
       );
-      const shareButton = within(shareRender.container).getByRole("button", { name: "Share" });
+      const shareButton = within(shareRender.container).getByRole("button", { name: "Chia sẻ" });
       fireEvent.click(shareButton);
       await waitFor(() => expect(shareButton.getAttribute("aria-busy")).toBe("false"));
 
@@ -301,14 +301,14 @@ describe("ActionButton", () => {
       const fallbackRender = render(
         <ActionButton action="share" pdfInput={PDF_INPUT} idPrefix="g-fallback" blockedReason={null} />
       );
-      fireEvent.click(within(fallbackRender.container).getByRole("button", { name: "Share" }));
+      fireEvent.click(within(fallbackRender.container).getByRole("button", { name: "Chia sẻ" }));
       await within(fallbackRender.container).findByRole("status");
 
       // Save branch.
       const saveRender = render(
         <ActionButton action="save" pdfInput={PDF_INPUT} idPrefix="g-save" blockedReason={null} />
       );
-      const saveButton = within(saveRender.container).getByRole("button", { name: "Save" });
+      const saveButton = within(saveRender.container).getByRole("button", { name: "Lưu" });
       fireEvent.click(saveButton);
       await waitFor(() => expect(saveButton.getAttribute("aria-busy")).toBe("false"));
 
@@ -384,7 +384,7 @@ describe("ActionButton — trạng thái BỊ CHẶN (AC-058)", () => {
     const { container } = render(
       <ActionButton action="save" pdfInput={PDF_INPUT} idPrefix="blk1" blockedReason={REASON} />
     );
-    const button = within(container).getByRole("button", { name: /Save/ });
+    const button = within(container).getByRole("button", { name: /Lưu/ });
 
     fireEvent.click(button);
 
@@ -393,14 +393,14 @@ describe("ActionButton — trạng thái BỊ CHẶN (AC-058)", () => {
     expect(mockGenerate).not.toHaveBeenCalled();
     expect(button.getAttribute("aria-busy")).toBe("false");
     // Khẳng định dương: nút vẫn ở đó và vẫn đọc được tên.
-    expect(button.textContent).toContain("Save");
+    expect(button.textContent).toContain("Lưu");
   });
 
   it("KHÔNG BAO GIỜ thuộc tính `disabled` gốc — nút vẫn tới được bằng bàn phím", () => {
     const { container } = render(
       <ActionButton action="share" pdfInput={PDF_INPUT} idPrefix="blk2" blockedReason={REASON} />
     );
-    const button = within(container).getByRole("button", { name: /Share/ });
+    const button = within(container).getByRole("button", { name: /Chia sẻ/ });
 
     // `disabled` gỡ phần tử khỏi thứ tự tab VÀ đẩy lý do ra ngoài tầm với của
     // trình đọc màn hình — đúng hai thứ AC-058 muốn có.
@@ -413,7 +413,7 @@ describe("ActionButton — trạng thái BỊ CHẶN (AC-058)", () => {
     const { container } = render(
       <ActionButton action="save" pdfInput={PDF_INPUT} idPrefix="blk3" blockedReason={REASON} />
     );
-    const button = within(container).getByRole("button", { name: /Save/ });
+    const button = within(container).getByRole("button", { name: /Lưu/ });
 
     const reasonId = button.getAttribute("aria-describedby");
     expect(reasonId).toBeTruthy();
@@ -427,7 +427,7 @@ describe("ActionButton — trạng thái BỊ CHẶN (AC-058)", () => {
     const { container } = render(
       <ActionButton action="save" pdfInput={PDF_INPUT} idPrefix="blk4" blockedReason={null} />
     );
-    const button = within(container).getByRole("button", { name: /Save/ });
+    const button = within(container).getByRole("button", { name: /Lưu/ });
 
     fireEvent.click(button);
 

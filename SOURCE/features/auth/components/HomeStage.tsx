@@ -1,61 +1,85 @@
 "use client";
 
-// HomeStage — content area của homepage (Layer 1, S#17). Hero và AuthForm là
-// HAI TRẠNG THÁI của cùng một vùng nội dung (không tách 2 page riêng): cả hai
-// cùng mount, xếp chồng trong một grid cell, swap bằng CSS transition
-// opacity/translate theo prop `auth` (đọc từ URL `?auth=signin|signup` — server
-// page truyền xuống). Điều hướng bằng <Link> soft navigation → component KHÔNG
-// remount → transition chạy mượt cả hai chiều. Panel đang ẩn có `inert` (không
-// tab/đọc screen-reader vào được). Hướng transition: NGANG phải→trái (engineer
-// chốt vòng sửa 1) — hero trượt ra trái, form trượt vào từ phải.
+// HomeStage — vùng hero của trang chủ. Hero và AuthForm là HAI TRẠNG THÁI của
+// cùng một vùng (không tách page /login riêng): cả hai cùng mount, xếp chồng
+// trong một grid cell, hoán đổi bằng transition opacity/translate theo prop
+// `auth` (đọc từ URL `?auth=signin|signup` — server page truyền xuống). Điều
+// hướng bằng <Link> soft navigation → component KHÔNG remount → transition chạy
+// mượt cả hai chiều. Panel đang ẩn có `inert` (không tab/đọc screen-reader).
+//
+// Theme "Sân trường" (2026-09-04): hero căn trái — một câu tiêu đề display, một
+// đoạn dẫn, một nút chính, một liên kết phụ. Băng chuyền 3 mục cũ đã gỡ: một
+// trang chủ nói MỘT điều rõ hơn ba điều luân phiên.
 import Link from "next/link";
-import { useT } from "@/lib/i18n/client";
+import { ChevronLeft } from "lucide-react";
+import { t } from "@/lib/copy";
 import { AuthForm } from "@/features/auth/components/AuthForm";
-import { HomeCarousel } from "@/features/auth/components/HomeCarousel";
+import { Button } from "@/components/ui/button";
 
 export type AuthMode = "signin" | "signup" | null;
 
-export function HomeStage({ auth }: { auth: AuthMode }) {
-  const t = useT();
+export function HomeStage({ auth, signedIn }: { auth: AuthMode; signedIn: boolean }) {
   const showAuth = auth !== null;
 
   return (
-    // `grid-cols-1` chứ không phải `grid` trần: `grid` không khai cột nào thì
-    // hai section rơi vào một cột NGẦM có kích thước `auto`, mà `auto` co giãn
-    // theo max-content của nội dung — cột phình to hơn khung chứa và `w-full`
-    // không ngăn được. Thẻ AuthForm vì thế rộng 440px trong khung 360px, biến
-    // <main> thành khung cuộn NGANG (đo được: scrollWidth 488 / clientWidth
-    // 360). `grid-cols-1` sinh ra `minmax(0, 1fr)` — chặn trần đúng bằng bề
-    // rộng khung, và cận dưới 0 cho phép con thật sự co lại.
-    <div className="relative z-10 my-auto grid w-full grid-cols-1">
+    // `grid-cols-1` chứ không phải `grid` trần: cột ngầm `auto` phình theo
+    // max-content của con và biến <main> thành khung cuộn NGANG ở 360px (đo
+    // được scrollWidth 488). `grid-cols-1` sinh `minmax(0, 1fr)` — chặn trần
+    // đúng bằng bề rộng khung.
+    // Panel đang ẨN rời khỏi luồng (`absolute`) để chiều cao vùng hero chỉ do
+    // panel đang HIỆN quyết định — nếu để cả hai trong cùng một ô grid, thẻ đăng
+    // nhập cao hơn hero sẽ đẩy phần "Đề mới đăng" xuống dưới màn hình đầu tiên
+    // ngay cả khi không ai mở form (đo 2026-09-04: hở ~350px trên desktop).
+    <div className="relative grid w-full grid-cols-1">
       {/* ---------- Trạng thái 1: Hero ---------- */}
-      {/* Section hero bỏ max-w-3xl (S#22 vòng sửa 1) — hàng h1+logo cần trải
-          FULL bề ngang content area để logo nằm sát mép phải; các khối text
-          khác tự giới hạn bề rộng riêng (p có max-w-xl, eyebrow/CTA theo
-          nội dung) nên không bị ảnh hưởng. */}
-      {/* Nội dung hero nay là MỘT MỤC trong HomeCarousel ("Giới thiệu"), cạnh
-          "Có tích hợp AI" và "Học tập thích ứng" — xem HomeCarousel.tsx. */}
       <section
         inert={showAuth || undefined}
-        className={`col-start-1 row-start-1 w-full self-center transition-all duration-500 ease-out ${
-          showAuth ? "pointer-events-none -translate-x-6 opacity-0" : "translate-x-0 opacity-100"
+        aria-labelledby="home-title"
+        className={`flex flex-col gap-5 transition-all duration-500 ease-out motion-reduce:transition-none ${
+          showAuth
+            ? "pointer-events-none absolute inset-x-0 top-0 -translate-x-6 opacity-0"
+            : "relative translate-x-0 opacity-100"
         }`}
       >
-        <HomeCarousel />
+        <h1 id="home-title" className="text-display max-w-[16ch] font-bold">
+          {t("home.title")}
+        </h1>
+        <p className="text-muted-foreground max-w-[36ch] text-base leading-relaxed sm:text-lg">
+          {t("home.lead")}
+        </p>
+        <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-5">
+          {/* Khách → mở form đăng nhập tại chỗ; đã đăng nhập → vào thẳng kho đề. */}
+          <Button
+            render={<Link href={signedIn ? "/exams" : "/?auth=signup"} />}
+            size="lg"
+            nativeButton={false}
+          >
+            {t("home.cta")}
+          </Button>
+          <Link
+            href="/exams"
+            className="text-primary focus-visible:ring-ring inline-flex min-h-11 items-center rounded-lg font-semibold underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:outline-none"
+          >
+            {t("home.browse")}
+          </Link>
+        </div>
       </section>
 
-      {/* ---------- Trạng thái 2: Auth form ---------- */}
+      {/* ---------- Trạng thái 2: Form đăng nhập / đăng ký ---------- */}
       <section
         inert={!showAuth || undefined}
-        className={`col-start-1 row-start-1 flex max-w-3xl flex-col self-center transition-all duration-500 ease-out ${
-          showAuth ? "translate-x-0 opacity-100" : "pointer-events-none translate-x-6 opacity-0"
+        className={`flex w-full max-w-md flex-col gap-3 transition-all duration-500 ease-out motion-reduce:transition-none ${
+          showAuth
+            ? "relative translate-x-0 opacity-100"
+            : "pointer-events-none absolute inset-x-0 top-0 translate-x-6 opacity-0"
         }`}
       >
         <Link
           href="/"
-          className="mb-4 inline-flex items-center gap-2 self-start font-sans text-xs font-medium tracking-[0.16em] text-[color:var(--muted-foreground)] uppercase transition-colors hover:text-[#1B1512]"
+          className="text-muted-foreground hover:text-foreground focus-visible:ring-ring inline-flex min-h-11 items-center gap-1 self-start rounded-lg pr-2 text-sm font-medium transition-colors focus-visible:ring-3 focus-visible:outline-none"
         >
-          <span aria-hidden>←</span> {t("common.back")}
+          <ChevronLeft aria-hidden className="size-4" />
+          {t("common.back")}
         </Link>
         {/* key theo mode: deep-link ?auth=signup mở đúng tab (AuthForm giữ mode
             trong state nội bộ, chỉ đọc initialMode lúc mount). */}

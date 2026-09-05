@@ -4,7 +4,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isAdminUserId } from "@/lib/auth/admin";
-import { getTranslate } from "@/lib/i18n/server";
+import { t } from "@/lib/copy";
 import { moderateExam } from "@/lib/supabase/service-role";
 
 export type ModerationState = { error?: string; info?: string } | null;
@@ -24,7 +24,6 @@ export async function moderateExamAction(
   const action = String(formData.get("action") ?? "");
   const reason = String(formData.get("reason") ?? "");
 
-  const t = await getTranslate();
 
   if (!examId) return { error: t("admin.errMissingExamId") };
   if (action !== "remove" && action !== "restore") {

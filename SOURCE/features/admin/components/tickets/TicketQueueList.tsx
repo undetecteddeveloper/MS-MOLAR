@@ -3,12 +3,11 @@
 // TicketQueueList — danh sách ticket, most-recent-first (đã sắp ở
 // listSupportTickets, AC-041) — không phân trang ở v1 (khối lượng PRD giả định).
 
-import { useT } from "@/lib/i18n/client";
+import { t } from "@/lib/copy";
 import type { TicketWithNotes } from "@/lib/supabase/service-role";
 import { TicketQueueRow } from "@/features/admin/components/tickets/TicketQueueRow";
 
 export function TicketQueueList({ tickets }: { tickets: TicketWithNotes[] }) {
-  const t = useT();
 
   if (tickets.length === 0) {
     return <p className="text-muted-foreground text-sm">{t("support.admin.empty")}</p>;

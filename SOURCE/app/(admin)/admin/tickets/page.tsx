@@ -7,7 +7,7 @@
 import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { isAdminUserId } from "@/lib/auth/admin";
-import { getTranslate } from "@/lib/i18n/server";
+import { t } from "@/lib/copy";
 import { listSupportTickets } from "@/lib/supabase/service-role";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { TicketQueueList } from "@/features/admin/components/tickets/TicketQueueList";
@@ -18,7 +18,6 @@ export default async function AdminTicketsPage() {
   const user = await getCurrentUser();
   if (!user || !isAdminUserId(user.id)) notFound();
 
-  const t = await getTranslate();
   const tickets = await listSupportTickets();
 
   return (

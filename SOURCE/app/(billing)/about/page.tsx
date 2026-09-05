@@ -4,7 +4,7 @@
 // Vì sao nằm trong route group (billing) dù chẳng liên quan gì tới thanh toán:
 // quyền truy cập do middleware quyết theo TỪNG PATH (PUBLIC_PATHS), KHÔNG theo
 // route group — (billing)/layout.tsx:5-12 đã ghi rõ điều đó và nhóm này vốn
-// đang chứa hai trang công khai khác (/terms, /refund-policy) dùng đúng khung
+// đang chứa hai trang công khai khác (/terms) dùng đúng khung
 // LegalDocument dưới đây. Đặt ở đây là dùng lại một tiền lệ đã có, không phải
 // dựng nhóm route thứ sáu chỉ để chứa một trang tĩnh.
 //
@@ -20,13 +20,13 @@
 
 import type { Metadata } from "next";
 import { LegalDocument } from "@/components/billing/LegalDocument";
-import { getTranslate } from "@/lib/i18n/server";
+import { t } from "@/lib/copy";
 
 // `alternates.canonical` PHẢI khai lại: root layout đặt mặc định `canonical:
 // "/"` cho mọi trang. Để nguyên thì trang này tự khai mình là bản sao trang chủ
 // — hỏng im lặng, chỉ lộ ra ở Search Console. Cùng lý do với /terms.
 export const metadata: Metadata = {
-  title: "About Us",
+  title: "Giới thiệu",
   alternates: { canonical: "/about" },
 };
 
@@ -52,7 +52,6 @@ const CONTACT = {
 const CONTACT_IS_PLACEHOLDER = false;
 
 export default async function AboutPage() {
-  const t = await getTranslate();
 
   return (
     <LegalDocument title={t("about.title")}>

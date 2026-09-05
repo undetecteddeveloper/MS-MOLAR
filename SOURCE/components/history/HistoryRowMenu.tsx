@@ -42,7 +42,7 @@ import Link from "next/link";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePdfAction } from "@/components/history/usePdfAction";
-import { useT } from "@/lib/i18n/client";
+import { t } from "@/lib/copy";
 import type { AttemptPdfData } from "@/lib/pdf/generateAttemptPdf";
 
 export interface HistoryRowMenuProps {
@@ -120,7 +120,6 @@ export function HistoryRowMenu({
   examTitle,
   blockedReason,
 }: HistoryRowMenuProps) {
-  const t = useT();
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelStyle = usePanelPosition(open, triggerRef);

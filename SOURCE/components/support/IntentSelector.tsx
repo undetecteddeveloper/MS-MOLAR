@@ -4,8 +4,8 @@
 // có lựa chọn thứ 4 dưới bất kỳ hình thức nào — đúng bằng độ dài INTENTS.
 
 import type { TicketIntent } from "@/lib/support/types";
-import type { MessageKey } from "@/lib/i18n/translate";
-import { useT } from "@/lib/i18n/client";
+import type { MessageKey } from "@/lib/copy";
+import { t } from "@/lib/copy";
 
 const INTENTS: readonly TicketIntent[] = ["bug", "suggestion", "question"];
 
@@ -23,7 +23,6 @@ interface IntentSelectorProps {
 }
 
 export function IntentSelector({ value, onChange, error, disabled }: IntentSelectorProps) {
-  const t = useT();
   const errorId = "support-intent-error";
 
   return (

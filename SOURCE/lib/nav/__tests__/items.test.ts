@@ -116,7 +116,8 @@ describe("mọi thanh điều hướng đều đi qua navPrefetch", () => {
         );
       });
 
-    expect(navFiles.length).toBeGreaterThanOrEqual(3);
+    // 2026-09-04: sidebar riêng của trang chủ đã gỡ — chỉ còn SiteHeader + BottomNav.
+    expect(navFiles.length).toBeGreaterThanOrEqual(2);
   });
 });
 

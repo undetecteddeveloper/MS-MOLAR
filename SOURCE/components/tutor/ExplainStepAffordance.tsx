@@ -15,13 +15,12 @@
 
 import { Lightbulb, Loader2 } from "lucide-react";
 import dynamic from "next/dynamic";
-import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { BentoCell } from "@/components/layout/BentoGrid";
 import { Button } from "@/components/ui/button";
 import { useEntitlement } from "@/lib/billing/entitlement";
 import { isQuotaExhausted } from "@/lib/billing/types";
-import { useT } from "@/lib/i18n/client";
+import { t } from "@/lib/copy";
 import { useTutorAction } from "./useTutorAction";
 
 // RichText nạp ĐỘNG, không import tĩnh (TD-021). Lý do nằm ở xác suất: component
@@ -47,7 +46,6 @@ export interface ExplainStepAffordanceProps {
 }
 
 export function ExplainStepAffordance({ questionId, attemptId }: ExplainStepAffordanceProps) {
-  const t = useT();
   const { phase, hint, run } = useTutorAction(attemptId, questionId);
   const { tutor } = useEntitlement();
   // questionId đã là key của chính danh sách câu hỏi nên tự nó duy nhất trong
@@ -118,12 +116,6 @@ export function ExplainStepAffordance({ questionId, attemptId }: ExplainStepAffo
         <p className="text-foreground text-sm leading-relaxed">
           {t("billing.quota.tutorExhausted")}
         </p>
-        <Link
-          href="/pricing"
-          className="text-brand mt-2 inline-flex min-h-11 items-center text-sm underline-offset-4 hover:underline"
-        >
-          {t("billing.quota.upgradeLink")}
-        </Link>
       </div>
     );
   }

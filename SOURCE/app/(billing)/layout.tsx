@@ -1,7 +1,7 @@
 // Layout route group (billing) — UI Spec UI-D7.
 //
-// Khung giống hệt (exams)/layout.tsx, cộng thêm EntitlementProvider. Ba route
-// nằm dưới đây: /pricing (cần đăng nhập) và /terms, /refund-policy (CÔNG KHAI).
+// Khung giống hệt (exams)/layout.tsx, cộng thêm EntitlementProvider. Hai route
+// nằm dưới đây: /terms và /about (CÔNG KHAI). Các trang billing đã gỡ khỏi giao diện 2026-09-04.
 //
 // Một group chứa cả trang cần đăng nhập lẫn trang công khai là hợp lệ và không
 // cần xử lý gì đặc biệt: quyền truy cập do middleware quyết theo TỪNG PATH

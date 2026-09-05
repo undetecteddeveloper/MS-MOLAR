@@ -40,7 +40,7 @@ afterEach(() => {
 });
 
 function triggerQuery() {
-  return screen.queryByRole("button", { name: "Send feedback" });
+  return screen.queryByRole("button", { name: "Gửi phản hồi" });
 }
 
 describe("SupportWidget", () => {

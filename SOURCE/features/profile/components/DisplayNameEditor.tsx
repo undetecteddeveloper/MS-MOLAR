@@ -16,8 +16,8 @@ import { useActionState, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 // eslint-disable-next-line no-restricted-imports -- rò chéo có sẵn trước B4 (2026-09-03): changeAvatar/updateProfile/changePassword còn nằm chung file với signIn/signUp. Xem ARCHITECTURE.md § Import chéo.
 import { updateProfile, type AuthState } from "@/features/auth/actions";
-import { useT } from "@/lib/i18n/client";
-import type { MessageKey } from "@/lib/i18n/translate";
+import { t } from "@/lib/copy";
+import type { MessageKey } from "@/lib/copy";
 import { DISPLAY_NAME_MAX, filterDisplayNameInput } from "@/lib/profile/displayName";
 import { resolveDisplayNameError, type ProfileMessage } from "@/features/profile/components/errorMessages";
 import {
@@ -55,7 +55,6 @@ export function DisplayNameEditor({
   onSuccess,
   onStatus,
 }: DisplayNameEditorProps) {
-  const t = useT();
   const router = useRouter();
   const [draft, setDraft] = useState(displayName);
   const submittingRef = useRef(false);

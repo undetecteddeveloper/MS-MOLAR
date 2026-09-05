@@ -37,7 +37,7 @@ const isPublic = (pathname: string) =>
 
 describe("thành phần danh sách", () => {
   it("hiện có đúng 7 mục — 6 đường ĐỌC + đúng 1 đường GHI (webhook payOS)", () => {
-    // Ghim nguyên văn để cả việc thiếu lẫn việc thừa đều bị bắt. Con số 7 ở
+    // Ghim nguyên văn để cả việc thiếu lẫn việc thừa đều bị bắt. Con số 6 ở
     // đây KHÔNG phải con số 6 của AC-032: /about (ADR-0017) về TRƯỚC webhook,
     // nên tổng đã lệch khỏi cách đếm cũ. Xem khối chú thích đầu file.
     expect(PUBLIC_PATHS).toEqual([
@@ -45,7 +45,6 @@ describe("thành phần danh sách", () => {
       "/login",
       "/auth/callback",
       "/terms",
-      "/refund-policy",
       "/about",
       "/api/payments/payos/webhook",
     ]);
@@ -61,7 +60,6 @@ describe("thành phần danh sách", () => {
       "/login", // redirect stub sang /?auth=signin
       "/auth/callback", // route handler: đổi code lấy phiên, không nhận payload tuỳ ý
       "/terms",
-      "/refund-policy",
       "/about",
     ];
     const WRITE_PATHS: string[] = [
@@ -95,7 +93,6 @@ describe("thành phần danh sách", () => {
 describe("ngữ nghĩa khớp — bằng HOẶC tiền tố theo đoạn", () => {
   it("hai trang pháp lý công khai (AC-038)", () => {
     expect(isPublic("/terms")).toBe(true);
-    expect(isPublic("/refund-policy")).toBe(true);
   });
 
   it("trang giới thiệu công khai (AC-056)", () => {

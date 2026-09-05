@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { getTranslate } from "@/lib/i18n/server";
+import { t } from "@/lib/copy";
 
 // Trang 404 toàn site. Trước đây rơi vào bản mặc định của Next.js (chữ đen
 // trên nền trắng, font hệ thống) — lạc hẳn khỏi theme "Mực & Sơn mài".
@@ -11,11 +11,10 @@ import { getTranslate } from "@/lib/i18n/server";
 // route tồn tại, ADR-0001).
 
 export const metadata: Metadata = {
-  title: "Page not found",
+  title: "Không tìm thấy trang",
 };
 
 export default async function NotFound() {
-  const t = await getTranslate();
   return (
     <main className="bg-background flex min-h-dvh flex-col items-center justify-center px-6 py-16 text-center">
       <p className="text-brand font-mono text-sm tracking-[0.28em] uppercase">404</p>

@@ -26,11 +26,11 @@ export default function GlobalError({
   }, [error]);
 
   return (
-    // `lang="en"` cố định ở đây là CỐ Ý, không phải sót lượt i18n: file này
+    // `lang="vi"` cố định ở đây là CỐ Ý, không phải sót lượt i18n: file này
     // thay thế toàn bộ cây <html> nên I18nProvider của root layout không còn
     // tồn tại, và nội dung bên dưới cũng luôn là tiếng Anh. Khai đúng thứ tiếng
     // đang thực sự hiển thị vẫn tốt hơn khai theo cookie rồi đọc sai giọng.
-    <html lang="en">
+    <html lang="vi">
       <body
         style={{
           margin: 0,

@@ -19,7 +19,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { deleteExam } from "@/features/authoring/actions";
-import { useT } from "@/lib/i18n/client";
+import { t } from "@/lib/copy";
 
 interface DeleteDialogProps {
   examId: string;
@@ -43,7 +43,6 @@ export function DeleteDialog({
   open: controlledOpen,
   onOpenChange,
 }: DeleteDialogProps) {
-  const t = useT();
   const isControlled = controlledOpen !== undefined;
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const open = isControlled ? controlledOpen : uncontrolledOpen;

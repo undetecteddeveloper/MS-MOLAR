@@ -9,7 +9,7 @@
 // but has no Retry control).
 
 import { useEffect, useRef } from "react";
-import { useT } from "@/lib/i18n/client";
+import { t } from "@/lib/copy";
 import { PageContainer } from "@/components/layout/PageContainer";
 
 export default function Error({
@@ -19,7 +19,6 @@ export default function Error({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  const t = useT();
   const alertRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

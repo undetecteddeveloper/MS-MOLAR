@@ -8,7 +8,7 @@
 import { useActionState } from "react";
 import { changeTicketStatusAction } from "@/features/admin/ticketActions";
 import type { TicketActionState, TicketStatus } from "@/lib/support/types";
-import { useT } from "@/lib/i18n/client";
+import { t } from "@/lib/copy";
 
 const STATUSES: readonly TicketStatus[] = ["new", "in_progress", "resolved"];
 
@@ -22,7 +22,6 @@ async function statusFormAction(
 }
 
 export function TicketStatusControl({ ticketId, status }: { ticketId: string; status: TicketStatus }) {
-  const t = useT();
   const [state, formAction, pending] = useActionState<TicketActionState, FormData>(
     statusFormAction,
     null

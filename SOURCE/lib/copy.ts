@@ -1,13 +1,15 @@
-// Từ điển tiếng Việt. Kiểu `Dictionary` ép phủ ĐỦ bộ khoá của `en.ts` — thiếu
-// một khoá là lỗi biên dịch, nên không thể vô tình đẩy lên bản dịch sót chỗ.
+// Toàn bộ câu chữ hiển thị của MS-MOLAR — MỘT file, chỉ tiếng Việt.
 //
-// Giọng văn: xưng hô "bạn", không dùng "quý khách/người dùng". Thuật ngữ giữ
-// theo cách nói trong trường phổ thông Việt Nam ("đề", "lượt làm bài", "học kỳ")
-// chứ không dịch máy móc từ tiếng Anh.
+// Trước 2026-09-04 repo có lớp i18n hai ngôn ngữ (cookie locale, provider,
+// nút đổi ngôn ngữ, hai từ điển en/vi). Engineer quyết định bỏ hẳn tiếng Anh
+// trong đợt refactor UI; giữ lại đúng phần có ích: bảng khoá → chuỗi để sửa
+// lời một chỗ, và hàm `t()` thay tham số `{name}`.
+//
+// Quy ước đặt tên khoá: `<vùng>.<khoá>`. Vùng `common` cho chuỗi lặp ở nhiều
+// màn hình. Chuỗi có tham số dùng `{name}`, gọi `t("key", { name })`.
+// Giọng văn: xưng "bạn", thuật ngữ theo cách nói trong trường phổ thông.
 
-import type { Dictionary } from "./en";
-
-export const vi: Dictionary = {
+export const copy = {
   // --- Dùng chung ---------------------------------------------------------
   "common.cancel": "Huỷ",
   "common.edit": "Sửa",
@@ -48,10 +50,10 @@ export const vi: Dictionary = {
 
   // --- Điều hướng ---------------------------------------------------------
   "nav.home": "Trang chủ",
-  "nav.exams": "Đề thi",
+  "nav.exams": "Kho đề",
   "nav.analytics": "Thống kê",
   "nav.history": "Lịch sử",
-  "nav.upload": "Tải lên",
+  "nav.upload": "Nhập đề",
   "nav.account": "Tài khoản",
   "nav.language": "Ngôn ngữ",
   "nav.switchTo": "Chuyển sang {language}",
@@ -68,6 +70,24 @@ export const vi: Dictionary = {
   "home.bodyPart3": " và phân tích điểm yếu, để bạn học đúng trọng tâm và tiến bộ nhanh hơn.",
   "home.getStarted": "Bắt đầu",
   "home.aboutPrompt": "Bạn muốn tìm thông tin của chúng tôi? Nhấn vào đây",
+  // Trang chủ theme "Sân trường" (2026-09-04) — hero căn trái, một câu tiêu đề,
+  // một đoạn dẫn, một hành động chính.
+  "home.title": "Luyện đề thật, chấm ngay, biết mình yếu chỗ nào.",
+  "home.lead":
+    "Kho đề THCS và THPT cập nhật liên tục. Làm bài có đồng hồ, chấm điểm tức thì, thống kê theo từng môn.",
+  "home.cta": "Bắt đầu luyện đề",
+  "home.browse": "Xem kho đề",
+  "home.newExams": "Đề mới đăng",
+  // Chữ trong hình minh hoạ hero (HeroFigure) — trang trí, nhưng vẫn là chữ
+  // hiển thị nên sống ở đây chứ không hardcode trong JSX.
+  "home.figure.sheet": "Phiếu trả lời",
+  "home.figure.scored": "Chấm xong ngay",
+  // Ba điều khách chưa đăng nhập cần biết (kho đề chỉ đọc được sau đăng nhập).
+  "home.point1": "Đề thật từ các trường và các kỳ thi, do cộng đồng đóng góp.",
+  "home.point2": "Nộp bài là có điểm ngay, kèm đáp án từng câu.",
+  "home.point3": "Thống kê theo môn để bạn biết mình còn yếu chỗ nào.",
+  "home.viewAllExams": "Xem tất cả đề",
+  "home.about": "Về MS-MOLAR",
 
   // --- Băng chuyền trang chủ (HomeCarousel) -------------------------------
   "home.carouselLabel": "Điểm nổi bật của nền tảng",
@@ -99,16 +119,20 @@ export const vi: Dictionary = {
   "auth.sendResetLink": "Gửi liên kết đặt lại",
   "auth.showPassword": "Hiện mật khẩu",
   "auth.hidePassword": "Ẩn mật khẩu",
-  "auth.backToSignIn": "← Quay lại đăng nhập",
+  "auth.backToSignIn": "Quay lại đăng nhập",
   "auth.orSignInWith": "Hoặc đăng nhập bằng",
   "auth.orSignUpWith": "Hoặc đăng ký bằng",
 
   // --- Danh sách đề -------------------------------------------------------
-  "exams.title": "Đề thi",
+  "exams.title": "Kho đề",
   "exams.noMatch": "Không có đề nào khớp",
   "exams.noMatchHint": "Thử bỏ bớt bộ lọc để thấy nhiều đề hơn.",
-  "exams.level": "Mức độ",
+  "exams.level": "Độ khó",
   "exams.start": "Làm bài",
+  "exams.open": "Làm đề",
+  "exams.questionCount": "{count} câu",
+  "exams.filterActive": "Đang lọc",
+  "exams.filterSummary": "Bộ lọc ({count})",
   "exams.duration": "Thời lượng",
   "exams.minutesShort": "phút",
   "exams.difficulty": "Độ khó",
@@ -213,7 +237,7 @@ export const vi: Dictionary = {
   "result.essay.announceAllDone": "Đã chấm xong toàn bộ câu tự luận.",
 
   // --- Chấm độ khó --------------------------------------------------------
-  "rating.rate": "Chấm →",
+  "rating.rate": "Chấm điểm",
   "rating.overall": "Tổng thể",
   "rating.rateAllParts": "Chấm đủ cả ba phần mới gửi được.",
   "rating.needAttemptTitle": "Bạn cần làm xong đề này trước",
@@ -797,4 +821,21 @@ export const vi: Dictionary = {
   "about.phone": "Số điện thoại liên hệ",
   "about.placeholderNotice":
     "Thông tin liên hệ ở trên là dữ liệu tạm, sẽ được thay bằng thông tin thật trước khi ra mắt.",
+} satisfies Record<string, string>;
+
+export type Dictionary = typeof copy;
+export type MessageKey = keyof Dictionary;
+export type TranslateValues = Record<string, string | number>;
+/** Hàm tra chuỗi. Dùng được ở cả server lẫn client component (thuần, không context). */
+export type Translate = (key: MessageKey, values?: TranslateValues) => string;
+
+export const t: Translate = (key, values) => {
+  const template: string | undefined = copy[key];
+  // Không bao giờ trả chuỗi rỗng: khoá lọt lưới kiểu thì hiện chính khoá đó ra
+  // màn hình còn hơn một khoảng trống câm không ai biết là bug.
+  if (template === undefined) return key;
+  if (!values) return template;
+  return template.replace(/\{(\w+)\}/g, (whole, name: string) =>
+    name in values ? String(values[name]) : whole
+  );
 };

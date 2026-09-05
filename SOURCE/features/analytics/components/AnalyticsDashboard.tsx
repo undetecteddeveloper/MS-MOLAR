@@ -1,6 +1,6 @@
 "use client";
-import { useT } from "@/lib/i18n/client";
-import type { MessageKey } from "@/lib/i18n/translate";
+import { t } from "@/lib/copy";
+import type { MessageKey } from "@/lib/copy";
 
 // AnalyticsDashboard — client island for /me/dashboard (Layer 3). Owns
 // activeTab/range/filterTouched state per docs/design/analytics-layer3-design.md
@@ -55,7 +55,6 @@ export function AnalyticsDashboard({
   dataByRange: Record<TimeRange, SubjectStats[]>;
   weakTopicsByRange: Record<TimeRange, TopicWeakness[]>;
 }) {
-  const t = useT();
   const [tab, setTab] = useState<Tab>("bar");
   const [range, setRange] = useState<TimeRange>(DEFAULT_RANGE);
   const [filterTouched, setFilterTouched] = useState(false);

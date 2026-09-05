@@ -2,7 +2,7 @@
 
 // HistoryRowMenu [integration] — front-adjust: the consolidated ⋯ menu that
 // replaces HistoryRow's previous 3 separate controls (2x ActionButton +
-// "View details" Link). Save/Share still route through usePdfAction
+// "Xem chi tiết" Link). Save/Share still route through usePdfAction
 // (components/history/usePdfAction.ts) — the same hook ActionButton.tsx uses — so this
 // file focuses on the NEW behavior this component adds on top of that
 // already-proven state machine (ActionButton.test.tsx covers busy/error/
@@ -98,7 +98,7 @@ describe("HistoryRowMenu", () => {
       />
     );
     const trigger = within(container).getByRole("button", {
-      name: "More actions for Đề Vật Lý 10",
+      name: "Thao tác khác cho Đề Vật Lý 10",
     });
     expect(trigger.getAttribute("aria-haspopup")).toBe("menu");
     expect(trigger.getAttribute("aria-expanded")).toBe("false");
@@ -107,12 +107,12 @@ describe("HistoryRowMenu", () => {
 
   it("(b) clicking the trigger opens a menu containing Save, Share, and View details", () => {
     const { container } = renderMenu();
-    fireEvent.click(within(container).getByRole("button", { name: /More actions/ }));
+    fireEvent.click(within(container).getByRole("button", { name: /Thao tác khác cho/ }));
 
     const menu = screen.getByRole("menu");
-    expect(within(menu).getByRole("menuitem", { name: /Save/ })).toBeTruthy();
-    expect(within(menu).getByRole("menuitem", { name: /Share/ })).toBeTruthy();
-    const link = within(menu).getByRole("menuitem", { name: "View details" });
+    expect(within(menu).getByRole("menuitem", { name: /Lưu/ })).toBeTruthy();
+    expect(within(menu).getByRole("menuitem", { name: /Chia sẻ/ })).toBeTruthy();
+    const link = within(menu).getByRole("menuitem", { name: "Xem chi tiết" });
     expect(link.getAttribute("href")).toBe("/exams/exam-1/attempt/attempt-1/result");
   });
 
@@ -121,8 +121,8 @@ describe("HistoryRowMenu", () => {
     mockGenerate.mockResolvedValue(file);
 
     const { container } = renderMenu();
-    fireEvent.click(within(container).getByRole("button", { name: /More actions/ }));
-    fireEvent.click(screen.getByRole("menuitem", { name: /Save/ }));
+    fireEvent.click(within(container).getByRole("button", { name: /Thao tác khác cho/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Lưu/ }));
 
     await waitFor(() => expect(mockDownload).toHaveBeenCalledWith(file));
     await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
@@ -135,8 +135,8 @@ describe("HistoryRowMenu", () => {
     vi.mocked(navigator.share).mockResolvedValue(undefined);
 
     const { container } = renderMenu();
-    fireEvent.click(within(container).getByRole("button", { name: /More actions/ }));
-    fireEvent.click(screen.getByRole("menuitem", { name: /Share/ }));
+    fireEvent.click(within(container).getByRole("button", { name: /Thao tác khác cho/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Chia sẻ/ }));
 
     await waitFor(() => expect(navigator.share).toHaveBeenCalledWith({ files: [file] }));
     await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
@@ -148,12 +148,12 @@ describe("HistoryRowMenu", () => {
     mockCanShare.mockReturnValue(false);
 
     const { container } = renderMenu();
-    fireEvent.click(within(container).getByRole("button", { name: /More actions/ }));
-    fireEvent.click(screen.getByRole("menuitem", { name: /Share/ }));
+    fireEvent.click(within(container).getByRole("button", { name: /Thao tác khác cho/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Chia sẻ/ }));
 
     await waitFor(() => expect(mockDownload).toHaveBeenCalledWith(file));
     const status = await screen.findByRole("status");
-    expect(status.textContent).toBe("Downloaded — sharing isn't supported in this browser.");
+    expect(status.textContent).toBe("Đã tải về — trình duyệt này không hỗ trợ chia sẻ.");
     expect(screen.getByRole("menu")).not.toBeNull(); // stays open
   });
 
@@ -161,23 +161,23 @@ describe("HistoryRowMenu", () => {
     mockGenerate.mockRejectedValueOnce(new Error("network blip"));
 
     const { container } = renderMenu();
-    fireEvent.click(within(container).getByRole("button", { name: /More actions/ }));
-    fireEvent.click(screen.getByRole("menuitem", { name: /Save/ }));
+    fireEvent.click(within(container).getByRole("button", { name: /Thao tác khác cho/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Lưu/ }));
 
     const alert = await screen.findByRole("alert");
-    expect(alert.textContent).toBe("Couldn't generate the PDF. Try again.");
+    expect(alert.textContent).toBe("Không tạo được file PDF. Thử lại nhé.");
     expect(screen.getByRole("menu")).not.toBeNull(); // stays open
 
     // Retry succeeds and then auto-closes.
     const file = mockFile();
     mockGenerate.mockResolvedValueOnce(file);
-    fireEvent.click(screen.getByRole("menuitem", { name: /Save/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Lưu/ }));
     await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
   });
 
   it("(g) clicking the scrim (outside the menu) closes it without triggering an action", () => {
     const { container } = renderMenu();
-    fireEvent.click(within(container).getByRole("button", { name: /More actions/ }));
+    fireEvent.click(within(container).getByRole("button", { name: /Thao tác khác cho/ }));
     expect(screen.getByRole("menu")).not.toBeNull();
 
     const scrim = container.querySelector('button[aria-hidden="true"]');
@@ -198,10 +198,10 @@ describe("HistoryRowMenu", () => {
     );
 
     const { container } = renderMenu();
-    fireEvent.click(within(container).getByRole("button", { name: /More actions/ }));
-    const saveItem = screen.getByRole("menuitem", { name: /Save/ });
+    fireEvent.click(within(container).getByRole("button", { name: /Thao tác khác cho/ }));
+    const saveItem = screen.getByRole("menuitem", { name: /Lưu/ });
     fireEvent.click(saveItem);
-    fireEvent.click(screen.getByRole("menuitem", { name: /Saving/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Đang lưu/ }));
 
     expect(mockGenerate).toHaveBeenCalledTimes(1);
     resolveGenerate(mockFile());

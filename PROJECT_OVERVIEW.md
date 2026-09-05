@@ -33,59 +33,47 @@
 
 ---
 
-## 2. Design System — theme "Mực & Sơn mài" (Ink & Lacquer)
+## 2. Design System — theme "Sân trường" (2026-09-04)
 
-Bản sắc: biên tập cổ điển (kiểu New York Times) kết hợp bảng màu sơn mài truyền
-thống Việt Nam. Phẳng — không 3D, không box-shadow, không gradient.
+Thay theme "Mực & Sơn mài" (kem + serif + đỏ son, 2026-08-06 → 2026-09-04) —
+engineer nhận định layout cũ "không có gì nổi bật" và chọn hướng này trong ba
+prototype vì "vừa đơn giản vừa cuốn hút màu sắc hơn". Ưu tiên điện thoại (học
+sinh lớp 6–12, Android tầm trung). Chỉ tiếng Việt, chỉ bản sáng.
 
-> **Nguồn giá trị là `SOURCE/app/globals.css`.** Mục này là quy tắc và lý do;
-> khi hai bên lệch nhau thì `globals.css` thắng (xem cảnh báo WCAG cuối mục).
-> File `DESIGN.md` — nơi từng giữ vai trò này — **đã bị xoá có chủ đích
-> 2026-08-06**; đừng đi tìm và đừng khôi phục. Tài liệu trong `docs/` trỏ về
+> **Nguồn giá trị là `SOURCE/app/globals.css`.** Quy tắc, lý do và bảng tương
+> phản đầy đủ ở `docs/design/ui-refactor-san-truong-design.md`. Khi hai bên lệch
+> nhau thì `globals.css` thắng. Tài liệu trong `docs/` trỏ về
 > "PROJECT_OVERVIEW.md §2" là trỏ về đây.
 
-**Màu:**
-- primary (Đỏ son) `#A62C2B` · on-primary (Ngà) `#EDE1C8` · primary-hover `#8F2523`
-- background (Ngà) `#EDE1C8` · foreground (Đen sơn mài, warm black) `#1B1512`
-- surface `#1B1512` · on-surface `#EDE1C8`
-- accent (Vàng đồng) `#B8863B` · on-accent `#1B1512`
-- muted (Xám khói) `#6B655C` · on-muted `#EDE1C8`
-- border `#D8C9A8`
+**Màu (6 màu làm việc):** nền trắng `#FFFFFF` · bề mặt xanh nhạt `#EEF7F1`
+(thẻ, chip — "viền" của theme này) · chữ `#14291C` · chữ phụ `#4F6656` · hành
+động `#117A45` · vàng nắng `#FFC531` (nền nhẹ `#FFF3CF`) · sai/xoá `#C43E2A`.
+Viền ô nhập `#6F8D78`; kẻ trang trí `#CFE3D6`.
 
-**Typography:** Serif (Source Serif 4) chỉ cho `display`/`h1`/`h2`/`quote`; Sans
-(Be Vietnam Pro) cho phần còn lại (body, label-caps, UI, nav) — vì hỗ trợ đầy đủ
-dấu tiếng Việt. Line-height serif 1.15–1.3; sans body 1.6–1.7.
+**Typography:** MỘT họ chữ — Lexend 400/500/600/700 (`next/font/google`, subset
+`latin + vietnamese`). Số dùng `tabular-nums` thay font mono. Nhãn nhỏ
+(`.eyebrow`) là chữ thường 12px/600 — KHÔNG in hoa giãn chữ.
 
-**Layout:** max-width 720px cho khối text dài; spacing theo scale (xs 4px … xl
-40px); tối đa 1 `rule-divider` mỗi section.
+**Hình dạng:** bán kính gốc 14px; thẻ 18px (`rounded-card`); nút hành động và
+chip `rounded-full` (viên thuốc). Nút cao 44px mặc định (sàn vùng chạm), 52px
+cho hành động chính của một màn hình.
 
-**Elevation & Depth:** Không box-shadow, không gradient — phân lớp bằng màu
-nền/surface + border mỏng. Muốn "nổi" thì border 2px màu accent, không dùng shadow.
-
-**Shapes:** Bo góc nhẹ — 4px (button/input), 8px (card). Không dùng hình pill.
+**Phẳng:** không box-shadow, không gradient — phân lớp bằng NỀN TÔ (surface),
+viền chỉ còn ở ô nhập (WCAG 1.4.11) và kẻ chia trong danh sách. Hover/active
+đổi nền, không đổi hình.
 
 **Quy tắc cứng:**
-- Đỏ son (primary) không phủ khối text lớn hay nền lớn — chỉ accent/vùng nhỏ/banner/tag.
-- Không bao giờ dùng chữ trắng tinh (`#FFFFFF`) trên nền primary — dùng on-primary (Ngà).
-- Không bao giờ dùng đen tuyền (`#000000`) — foreground/surface dùng warm black `#1B1512`.
-- Vàng đồng (accent) không dùng cho khối lớn hay text dài — chỉ divider/border/icon/hover underline.
-- Không trộn serif vào button, label, navigation.
-- Không dùng text primary-trên-surface (hoặc ngược lại) nhỏ hơn 24px — thiếu tương phản.
+- Vàng nắng chỉ 1,6:1 trên trắng → KHÔNG BAO GIỜ là ranh giới thông tin một
+  mình: đứng sau icon/chữ đen (ô active thanh đáy), kèm viền đậm, hoặc làm nền
+  tô nhẹ. Thanh tiến độ tô XANH.
+- Một khối vàng (`Card variant="sun"`) mỗi màn hình — hai khối là vàng hết nghĩa "nhấn".
+- Chữ đỏ dùng `#C43E2A` (5,1:1); `#E4573D` chỉ cho khối/điểm số cỡ lớn.
+- Không nhãn in hoa, không dấu chấm giữa nối meta, không mũi tên sau chữ nút,
+  không tô màu một cụm từ trong tiêu đề.
+- Dùng token (`bg-surface`, `text-muted-foreground`…), đừng hardcode hex.
 
-**⚠ Giá trị đã hiệu chỉnh theo WCAG (2026-08-06).** Bảng màu trên là bản sắc
-thiết kế, nhưng vài giá trị KHÔNG đạt ngưỡng tương phản nên code dùng biến thể
-khác. Lấy `SOURCE/app/globals.css` làm nguồn chuẩn cho token, đừng chép hex từ
-bảng trên vào code:
-
-- `--ring` (focus) `#8a6222`, KHÔNG phải `#B8863B` (chỉ 2.49:1, cần 3:1).
-- `--input` (viền ô nhập) `#877748`, KHÔNG phải `#D8C9A8` (1.26:1). `--border` vẫn
-  `#D8C9A8` — kẻ trang trí không chịu ngưỡng.
-- `--muted-foreground` `#605a52`, KHÔNG phải `#6B655C` (4.45:1, hụt 4.5:1).
-- `--brand-on-dark` `#e86b5c` — dùng THAY đỏ son khi đặt trên nền đen sơn mài
-  (nav/sidebar). Đỏ son `#A62C2B` trên `#1B1512` chỉ 2.44:1, đúng như quy tắc
-  "<24px" ở trên đã cảnh báo. Nền ngà vẫn dùng `#A62C2B`.
-- Dùng token (`text-[color:var(--muted-foreground)]`), đừng hardcode hex — đợt sửa
-  này đã phải đi gỡ 29 chỗ hardcode vì chúng vượt mặt token.
+**Copy:** toàn bộ câu chữ ở `SOURCE/lib/copy.ts` (một từ điển tiếng Việt, hàm
+`t()`); module i18n hai ngôn ngữ đã gỡ 2026-09-04.
 
 ---
 
@@ -104,7 +92,7 @@ bảng trên vào code:
 | `(analytics)` — Reflection / Analytics | (layer3) | Phân tích điểm yếu, gợi ý ôn tập (`docs/design/analytics-layer3-*`); hồ sơ cá nhân `/profile` | `features/analytics`, `features/profile` |
 | `(authoring)` — Content Infrastructure (UGC) | (layer4) | Upload đề (PDF → Gemini extract), review trước khi publish, quản lý đề của tôi | `features/authoring` |
 | `(history)` — History | (HM) | Lịch sử làm bài đã nộp, xem lại + lưu/chia sẻ PDF kết quả | `features/history` |
-| `(billing)` — Subscription | — | Bảng giá, thanh toán payOS, đơn hàng; `/terms`, `/refund-policy`, `/about` công khai | `features/billing` |
+| `(billing)` — trang công khai | — | `/terms`, `/about` (công khai). Các trang giá / thanh toán / đơn hàng / chính sách hoàn tiền đã GỠ khỏi giao diện 2026-09-04; phần chạy ngầm (webhook payOS, `lib/billing`, entitlement, schema) giữ nguyên để bật lại không phải làm lại | `features/billing` (queries), `lib/billing` |
 | `(admin)` | — | Trang kiểm duyệt nội bộ — danh sách đề bị report, gỡ/khôi phục; hàng đợi ticket hỗ trợ (auth qua `ADMIN_USER_IDS`, không có role trong DB — xem ADR-0001) | `features/admin` |
 
 (history) và (admin) độc lập với tiến độ Analytics — không phụ thuộc lẫn nhau.
@@ -227,5 +215,8 @@ Ghi lại các quyết định kỹ thuật quan trọng để tránh revisit kh
 | — | shadcn-style primitives (base-ui + cva) thay vì MUI/Antd | Unstyled, dễ customize theo token riêng của §2 |
 | 2026-07-27 | History (lịch sử làm bài) tách thành layer riêng `(HM)` thay vì gộp vào Layer 3 (Reflection) | Layer 3 dở dang cho Analytics; tách để triển khai độc lập |
 | **2026-08-06** | **Bỏ hẳn tầm nhìn ban đầu: homepage 3D (Three.js scene bàn gỗ + máy Mac, GSAP transition, "Spatial Memory" visual-language-per-layer)** | Không bao giờ được implement — `package.json` không có `three`/`gsap`; `(layer1)` thực tế là trang đăng nhập phẳng. Theme thật đang dùng là "Mực & Sơn mài" (§2), editorial/phẳng, ưu tiên tốc độ tải trên Android tầm trung hơn hiệu ứng 3D. Tài liệu cũ mô tả 3D đã bị xoá khỏi file này ở lần rà soát 2026-08-06 để tránh gây hiểu nhầm cho agent đọc sau. |
+| **2026-09-04** | **Theme "Sân trường" thay "Mực & Sơn mài"** — trắng, xanh lá đậm, vàng nắng, Lexend; nút viên thuốc, thẻ 18px, không viền/bóng. Chọn trong 3 prototype (A Vở ô ly, B Sân trường, C Phòng tự học) | Engineer: layout cũ tự nghĩ/từ template, không nổi bật; B "vừa đơn giản vừa cuốn hút màu sắc hơn". Chi tiết: `docs/design/ui-refactor-san-truong-design.md` |
+| 2026-09-04 | Bỏ tiếng Anh, gỡ module i18n; toàn bộ copy ở `lib/copy.ts` | Engineer chốt chỉ tiếng Việt; đồng thời đóng TD-033 (bundle nạp cả hai từ điển) |
+| 2026-09-04 | Gỡ các trang billing (giá, thanh toán, đơn hàng, hoàn tiền) và mọi chỗ nhắc Premium khỏi giao diện; giữ `lib/billing`, webhook payOS, schema | Tính năng chưa áp vào website; giữ phần ngầm để bật lại không phải làm lại |
 
 > Agent: Khi engineer ra quyết định kỹ thuật mới trong quá trình làm việc, thêm vào bảng này và ghi ngày.

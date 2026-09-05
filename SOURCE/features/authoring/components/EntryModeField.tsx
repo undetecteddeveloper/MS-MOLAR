@@ -7,8 +7,8 @@
 // giá trị tác giả gõ luôn thắng AI (normalizeMeta).
 
 import { useState } from "react";
-import { useT } from "@/lib/i18n/client";
-import type { MessageKey } from "@/lib/i18n/translate";
+import { t } from "@/lib/copy";
+import type { MessageKey } from "@/lib/copy";
 import type { EntryMode } from "@/lib/ugc/types";
 
 export type { EntryMode };
@@ -27,7 +27,6 @@ export function EntryModeField({
   onChange: (mode: EntryMode) => void;
   disabled?: boolean;
 }) {
-  const t = useT();
   const [focused, setFocused] = useState(false);
 
   return (

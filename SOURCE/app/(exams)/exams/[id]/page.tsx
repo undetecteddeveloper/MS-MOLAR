@@ -12,13 +12,12 @@ import { ReportExam } from "@/features/exams/components/ReportExam";
 import { AuthorByline } from "@/components/shared/AuthorByline";
 import { DifficultyBadge } from "@/components/rating/DifficultyBadge";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
-import { getTranslate } from "@/lib/i18n/server";
+import { t } from "@/lib/copy";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 import { BentoGrid, BentoCell } from "@/components/layout/BentoGrid";
 
 export default async function ExamDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const t = await getTranslate();
   const { id } = await params;
   const exam = await getExam(id);
 

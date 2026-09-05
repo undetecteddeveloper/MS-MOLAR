@@ -11,12 +11,11 @@
 // "use client" vì nó nằm trong AnalyticsDashboard (client island) và phải đổi
 // theo cùng bộ lọc range với biểu đồ — một thẻ đứng yên khi biểu đồ đổi range
 // là hai con số mâu thuẫn nhau trên cùng màn hình.
-import { useT } from "@/lib/i18n/client";
+import { t } from "@/lib/copy";
 import { MIN_TOPIC_QUESTIONS, type TopicWeakness } from "@/lib/analytics/weakTopics";
 import { SUBJECT_COLORS } from "@/lib/analytics/constants";
 
 export function WeakTopicsCard({ topics }: { topics: TopicWeakness[] }) {
-  const t = useT();
 
   return (
     <div className="border-border bg-card mt-4 rounded-md border p-5">

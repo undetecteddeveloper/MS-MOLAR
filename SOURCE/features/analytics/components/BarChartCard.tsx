@@ -6,7 +6,7 @@
 // nhóm khác khi hover 35%/200ms (#7).
 
 "use client";
-import { useT } from "@/lib/i18n/client";
+import { t } from "@/lib/copy";
 
 import { useRef, useState, type ReactNode } from "react";
 import { NEEDS_REVIEW_THRESHOLD, niceCeil, type SubjectStats } from "@/lib/analytics/constants";
@@ -48,7 +48,6 @@ export function BarChartCard({
   filterSlot: ReactNode;
   highlightWeakest?: boolean;
 }) {
-  const t = useT();
   const [hovered, setHovered] = useState<string | null>(null);
   const [tooltip, setTooltip] = useState<Tooltip | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);

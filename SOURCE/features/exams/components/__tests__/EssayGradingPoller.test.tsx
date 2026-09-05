@@ -27,10 +27,9 @@ import {
   ESSAY_POLL_MAX_REFRESHES,
   ESSAY_POLL_MAX_ELAPSED_MS,
 } from "@/features/exams/components/EssayGradingPoller";
-import { DEFAULT_LOCALE } from "@/lib/i18n/locales";
-import { getDictionary } from "@/lib/i18n/translate";
+import { copy } from "@/lib/copy";
 
-const DICT = getDictionary(DEFAULT_LOCALE);
+const DICT = copy;
 
 beforeEach(() => {
   vi.useFakeTimers();

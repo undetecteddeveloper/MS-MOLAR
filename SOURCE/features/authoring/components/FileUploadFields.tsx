@@ -8,7 +8,7 @@
 // hỗ trợ drag & drop thật, không chỉ click-to-browse.
 
 import { useRef, useState } from "react";
-import { useT } from "@/lib/i18n/client";
+import { t } from "@/lib/copy";
 import { LIMITS } from "@/lib/ugc/limits";
 
 const MAX_MB = Math.round(LIMITS.MAX_FILE_BYTES / (1024 * 1024));
@@ -25,7 +25,6 @@ interface DropzoneProps {
 }
 
 function Dropzone({ id, label, hint, file, onSelect, disabled, error }: DropzoneProps) {
-  const t = useT();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [hover, setHover] = useState(false);
@@ -156,7 +155,6 @@ export function FileUploadFields({
   questionError,
   answerError,
 }: FileUploadFieldsProps) {
-  const t = useT();
   const hint = t("upload.fileHint", { mb: MAX_MB, pages: LIMITS.MAX_PDF_PAGES });
   return (
     <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">

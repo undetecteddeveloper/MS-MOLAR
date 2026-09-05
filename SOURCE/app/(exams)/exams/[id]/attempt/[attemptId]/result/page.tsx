@@ -11,7 +11,7 @@
 // sẽ vỡ bố cục nếu giữ nguyên grid đó).
 
 import Link from "next/link";
-import { getTranslate } from "@/lib/i18n/server";
+import { t } from "@/lib/copy";
 import { redirect } from "next/navigation";
 import { getCurrentUserProfile } from "@/lib/auth/getCurrentUser";
 import { getMyRating } from "@/features/exams/actions";
@@ -31,7 +31,6 @@ export default async function ResultPage({
 }: {
   params: Promise<{ id: string; attemptId: string }>;
 }) {
-  const t = await getTranslate();
   const { id, attemptId } = await params;
   const data = await getResult(attemptId);
 

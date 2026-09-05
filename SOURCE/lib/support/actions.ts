@@ -7,8 +7,8 @@ import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { flagSupportTicketNotifyFailed } from "@/lib/supabase/service-role";
 import { guard } from "@/lib/security/rateLimit";
-import { getTranslate } from "@/lib/i18n/server";
-import type { Translate } from "@/lib/i18n/translate";
+import { t } from "@/lib/copy";
+import type { Translate } from "@/lib/copy";
 import { LIMITS } from "@/lib/ugc/limits";
 import { checkScreenshotFile } from "@/lib/support/validateScreenshot";
 import type { SubmitTicketResult, TicketIntent } from "@/lib/support/types";
@@ -123,7 +123,7 @@ export async function submitSupportTicket(formData: FormData): Promise<SubmitTic
   // cho client, nên bước 8 (return) không bao giờ chờ bước 9 (gửi mail) dù
   // chỉ một mili giây. Phải ĐĂNG KÝ trước return (yêu cầu của chính after()),
   // nhưng thân callback không chạy cho tới khi response đã xong.
-  const translate = await getTranslate();
+  const translate = t;
   after(() =>
     sendTicketNotificationSafely(
       {

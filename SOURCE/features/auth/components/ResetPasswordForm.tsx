@@ -1,5 +1,5 @@
 "use client";
-import { useT } from "@/lib/i18n/client";
+import { t } from "@/lib/copy";
 
 // ResetPasswordForm — form đặt mật khẩu mới (Layer 1, S#23). User tới đây từ
 // link email reset (recovery session đã có nhờ /auth/callback). Submit →
@@ -13,7 +13,6 @@ import { updatePassword, type AuthState } from "@/features/auth/actions";
 import { PASSWORD_MIN_LENGTH } from "@/lib/auth/passwordPolicy";
 
 export function ResetPasswordForm() {
-  const t = useT();
   const [state, formAction, pending] = useActionState<AuthState, FormData>(updatePassword, null);
 
   return (
@@ -53,7 +52,6 @@ function Field({
   label: string;
   autoComplete: string;
 }) {
-  const t = useT();
   const [show, setShow] = useState(false);
 
   return (

@@ -34,7 +34,7 @@ function fixtureTicket(overrides: Partial<TicketWithNotes> = {}): TicketWithNote
 describe("TicketQueueList", () => {
   it("empty array renders the documented empty-state message (empty input Failure Mode)", () => {
     render(<TicketQueueList tickets={[]} />);
-    expect(screen.getByText("No feedback yet.")).toBeDefined();
+    expect(screen.getByText("Chưa có phản hồi nào.")).toBeDefined();
   });
 
   it("non-empty array renders one row per ticket", () => {

@@ -56,9 +56,6 @@ export const PUBLIC_PATHS = [
   // tài khoản, nếu không thì "đồng ý điều khoản" là đồng ý với một trang bị
   // chặn (PRD R11/AC-038).
   "/terms",
-  // Cùng lý do. AC-040 buộc trang này nói rõ gói KHÔNG tự động gia hạn — kỳ
-  // vọng dễ hiểu sai nhất của mô hình trả trước.
-  "/refund-policy",
   // Trang giới thiệu + liên hệ (ADR-0017). Toàn bộ đối tượng của nó là người
   // CHƯA có tài khoản: phụ huynh muốn biết ai vận hành site, học sinh cần số
   // điện thoại vì không đăng nhập được. Đặt nó sau đăng nhập là cấu hình duy

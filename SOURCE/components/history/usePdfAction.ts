@@ -6,7 +6,7 @@
 // second implementation. ActionButton keeps its own UI shell and now simply
 // delegates to this hook.
 import { useRef, useState } from "react";
-import { useT } from "@/lib/i18n/client";
+import { t } from "@/lib/copy";
 import {
   canShareFile,
   downloadPdfFile,
@@ -53,7 +53,6 @@ export function usePdfAction(
   pdfInput: AttemptPdfData,
   blockedReason: string | null,
 ) {
-  const t = useT();
   const [phase, setPhase] = useState<PdfActionPhase>("idle");
   const busyRef = useRef(false); // synchronous guard — aria-disabled does not block the click event (D4/AC-010)
 

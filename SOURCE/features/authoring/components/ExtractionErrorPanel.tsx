@@ -5,12 +5,11 @@
 
 "use client";
 
-import { useT } from "@/lib/i18n/client";
+import { t } from "@/lib/copy";
 import { formatUgcError } from "@/lib/ugc/errorCopy";
 import type { UgcError } from "@/lib/ugc/types";
 
 export function ExtractionErrorPanel({ errors }: { errors: UgcError[] }) {
-  const t = useT();
   if (errors.length === 0) return null;
   return (
     <div

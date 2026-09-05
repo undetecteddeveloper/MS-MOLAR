@@ -9,7 +9,7 @@
 import { useEffect, useMemo } from "react";
 import { LIMITS } from "@/lib/ugc/limits";
 import { checkScreenshotFile, type ScreenshotCheck } from "@/lib/support/validateScreenshot";
-import { useT } from "@/lib/i18n/client";
+import { t } from "@/lib/copy";
 
 type ScreenshotErrorReason = Exclude<ScreenshotCheck, { ok: true }>["reason"];
 
@@ -21,7 +21,6 @@ interface ScreenshotAttachmentProps {
 }
 
 export function ScreenshotAttachment({ file, error, onSelect, disabled }: ScreenshotAttachmentProps) {
-  const t = useT();
   // Tạo URL đồng bộ trong render (useMemo), KHÔNG setState trong effect
   // (react-hooks/set-state-in-effect) — effect bên dưới chỉ lo dọn dẹp.
   const objectUrl = useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);

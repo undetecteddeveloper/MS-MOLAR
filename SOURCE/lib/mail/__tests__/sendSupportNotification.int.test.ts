@@ -6,7 +6,7 @@
 //   metric 14)
 //
 // SMTP transport mocked (no live Gmail account/credential in CI); real
-// SOURCE/lib/i18n/translate.ts createTranslate()/dictionaries used, NOT mocked —
+// SOURCE/lib/copy.ts t() used, NOT mocked —
 // a mocked translate function would defeat the point of proving locale-invariance.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -15,14 +15,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // server/react-server bundle) — mirrors submitExam.int.test.ts's precedent.
 vi.mock("server-only", () => ({}));
 
-import { createTranslate, getDictionary } from "@/lib/i18n/translate";
 import {
   composeSupportNotificationSubject,
   sendSupportNotification,
   type SupportTicketMailPayload,
 } from "@/lib/mail/sendSupportNotification";
-import { en } from "@/lib/i18n/dictionaries/en";
-import { vi as viDict } from "@/lib/i18n/dictionaries/vi";
+import { copy, t } from "@/lib/copy";
 
 const sendMailMock = vi.fn();
 vi.mock("nodemailer", () => ({
@@ -73,11 +71,11 @@ describe("Group 1 — [report-ms] subject-prefix contract", () => {
     const locales = ["vi", "en"] as const;
 
     for (const intent of intents) {
-      const prefixes = locales.map((locale) =>
+      const prefixes = locales.map(() =>
         composeSupportNotificationSubject({
           intent,
           shortRef: "abc12345",
-          translate: createTranslate(getDictionary(locale)),
+          translate: t,
         }).slice(0, 12)
       );
       for (const prefix of prefixes) {
@@ -92,7 +90,7 @@ describe("Group 1 — [report-ms] subject-prefix contract", () => {
 
     const result = await sendSupportNotification({
       ticket: fixtureTicket("bug"),
-      translate: createTranslate(getDictionary("vi")),
+      translate: t,
     });
 
     expect(result.ok).toBe(false);
@@ -106,8 +104,7 @@ describe("Group 2 — report-ms token absent from both i18n dictionaries", () =>
   it("neither vi.ts nor en.ts contains 'report-ms' in any key or value", () => {
     const containsToken = (dict: Record<string, string>) =>
       Object.entries(dict).some(([k, v]) => k.includes("report-ms") || v.includes("report-ms"));
-    expect(containsToken(en)).toBe(false);
-    expect(containsToken(viDict)).toBe(false);
+    expect(containsToken(copy)).toBe(false);
   });
 });
 
@@ -120,7 +117,7 @@ describe("Group 3 — sendSupportNotification never throws (D5 backstop)", () =>
     await expect(
       sendSupportNotification({
         ticket: fixtureTicket("suggestion"),
-        translate: createTranslate(getDictionary("en")),
+        translate: t,
       })
     ).resolves.toEqual({ ok: false, error: expect.any(String) });
   });
@@ -131,7 +128,7 @@ describe("Group 3 — sendSupportNotification never throws (D5 backstop)", () =>
     await expect(
       sendSupportNotification({
         ticket: fixtureTicket("question"),
-        translate: createTranslate(getDictionary("en")),
+        translate: t,
       })
     ).resolves.toEqual({ ok: false, error: expect.any(String) });
   });
@@ -142,7 +139,7 @@ describe("Group 3 — sendSupportNotification never throws (D5 backstop)", () =>
     await expect(
       sendSupportNotification({
         ticket: fixtureTicket("bug"),
-        translate: createTranslate(getDictionary("en")),
+        translate: t,
       })
     ).resolves.toEqual({ ok: false, error: expect.any(String) });
     expect(sendMailMock).not.toHaveBeenCalled();

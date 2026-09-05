@@ -17,7 +17,7 @@ Repo này chọn cách **"`app/` chỉ chứa trang, mọi code khác nằm ngo�
 | `app/` | `page.tsx`, `layout.tsx`, `loading.tsx`, `error.tsx`, `route.ts`, metadata (`sitemap.ts`, `robots.ts`, `opengraph-image.tsx`), `globals.css` | queries, actions, component riêng của tính năng |
 | `features/<tên>/` | Toàn bộ code của MỘT tính năng: `queries.ts` (đọc), `actions.ts` (ghi, `"use server"`), `components/`, `__tests__/`. Khi một trong hai phình to thì nó tách thành THƯ MỤC cùng tên với `index.ts` làm mặt tiền, hoặc thành nhiều module mà `actions.ts` re-export — đường import ngoài không đổi (§6) | Trang. Code của tính năng khác (§4) |
 | `components/` | UI dùng chung giữa ≥2 tính năng: `ui/` (primitive shadcn/base-ui), `layout/` (AppShell, SiteHeader, BottomNav), `shared/`, cùng vài nhóm theo chủ đề (`billing/`, `tutor/`, `essay/`, `support/`) | Component chỉ một tính năng dùng — cái đó ở `features/<tên>/components/` |
-| `lib/` | Logic thuần và hạ tầng không có UI: Supabase client, security, i18n, scoring, ugc, schema, billing… | JSX (trừ `lib/i18n/client.tsx`, `lib/billing/entitlement.tsx` — provider mỏng) |
+| `lib/` | Logic thuần và hạ tầng không có UI: Supabase client, security, copy (từ điển tiếng Việt), scoring, ugc, schema, billing… | JSX (trừ `lib/billing/entitlement.tsx` — provider mỏng) |
 | `types/` | Kiểu dữ liệu dùng chung (`exam.ts`, `question.ts`) | |
 | `hooks/` | Hook client dùng chung | |
 | `supabase/` | `schema.sql` (canonical, có giải thích), `migrations/` (cơ chế áp), seed, test RLS | |
@@ -41,7 +41,7 @@ người dùng thấy.
 | `(analytics)` | (layer3) | `/me/dashboard`, `/profile` | `features/analytics/`, `features/profile/` |
 | `(authoring)` | (layer4) | `/upload`, `/me/exams`, `/me/exams/[id]` | `features/authoring/` |
 | `(history)` | (HM) | `/history` | `features/history/` |
-| `(billing)` | — | `/pricing`, `/pricing/checkout`, `/me/orders`, `/terms`, `/refund-policy`, `/about` | `features/billing/` |
+| `(billing)` | — | `/terms`, `/about` (trang giá/thanh toán/đơn hàng/hoàn tiền đã gỡ 2026-09-04; `lib/billing` + webhook payOS giữ) | `features/billing/` |
 | `(admin)` | — | `/admin`, `/admin/tickets` | `features/admin/` |
 
 Mỗi nhóm có một `layout.tsx` 3–5 dòng gọi `AppShell`
@@ -73,8 +73,8 @@ Ví dụ: màn "Bảng xếp hạng" ở `/leaderboard`, thuộc tính năng exa
    nằm trong thư mục `__tests__/` cạnh code (131 file theo kiểu này, 24 file
    cũ còn đặt cạnh file — không di chuyển để tránh diff vô ích, file mới thì
    theo `__tests__/`).
-6. **Chuỗi hiển thị**: thêm khoá vào `lib/i18n/dictionaries/en.ts` VÀ `vi.ts`;
-   server dùng `getTranslate()`, client dùng `useT()`.
+6. **Chuỗi hiển thị**: thêm khoá tiếng Việt vào `lib/copy.ts` (một từ điển duy nhất);
+   server lẫn client đều gọi `t("khoá")` từ `@/lib/copy` (thuần, không context).
 7. **Đường dẫn cần đăng nhập?** Mặc định là có. Trang công khai phải thêm vào
    `PUBLIC_PATHS` trong `lib/supabase/middleware.ts` — đọc comment ở đó trước
    (có ADR đứng sau con số mục cho phép ghi).
@@ -101,7 +101,6 @@ tại dòng đó — chúng là NỢ, không phải tiền lệ:
 | `features/exams/components/ReportExam.tsx` | `features/authoring/actions` | `reportExam` sống cạnh `moderateExam` |
 | `features/profile/components/{AvatarUploader,ChangePasswordDialog,DisplayNameEditor}.tsx` | `features/auth/actions` | `changeAvatar`/`updateProfile`/`changePassword` còn chung file với `signIn`/`signUp` — tách thành `features/profile/actions.ts` là việc tiếp theo |
 | `features/profile/components/SignOutButton.tsx` | `features/auth/actions` | `signOut` là của auth |
-| `features/profile/components/ProfileTabs.tsx` | `features/billing/components/orders/PlanSummary` | tab Usage tái dùng thẻ gói của billing |
 
 Chiều ngược — `lib/` hoặc `components/` import `features/` — hiện có ba chỗ
 (`components/shared/HeaderProfile.tsx` → auth, `components/tutor/useTutorAction.ts`
@@ -148,7 +147,7 @@ Hai luật khi tách:
 - `lib/supabase/service-role.ts` — 13 hàm, đã vượt ngưỡng ADR-0010; có test đếm
   (ADR-0019). Di chuyển thì được, thêm hàm thì không.
 - Bucket `exam-images`, `avatars` là PRIVATE (ADR-0016). Ký URL, không mở public.
-- `lib/i18n` dùng cookie, không tiền tố `/vi/` (comment đầu `lib/i18n/server.ts`).
+- Site chỉ tiếng Việt từ 2026-09-04: `lib/copy.ts` thay `lib/i18n` (cookie locale, provider, nút đổi ngôn ngữ đã gỡ).
 - Bốn làn vitest (§6) không gộp — lý do ở đầu mỗi `vitest.*.config.ts`.
 
 ## 7. Cổng kiểm tra trước mỗi commit (chạy trong `SOURCE/`)
@@ -169,7 +168,7 @@ còn trỏ đường dẫn cũ sẽ làm `tsc` đỏ oan cho tới khi build l�
 ## 8. Tài liệu liên quan
 
 - `PROJECT_OVERVIEW.md` — stack, quy ước commit, bảng nhóm route.
-- `TECH-DEBT.md` — nợ đang mở (TD-029 service_role, TD-033 từ điển i18n).
+- `TECH-DEBT.md` — nợ đang mở (TD-029 service_role, TD-033 đã trả 2026-09-04 khi gỡ i18n).
 - `docs/adr/` — mỗi quyết định có ngày và lý do; ADR thắng file này khi mâu thuẫn.
 - `BACK-END-ARCHITECTURE-MAP.md` (bản đồ backend cũ) và `DESIGN.md` **không còn
   tồn tại**. File này thay cái thứ nhất; `PROJECT_OVERVIEW.md` §2 thay cái thứ hai.

@@ -54,11 +54,9 @@ vi.mock("next/navigation", () => ({ usePathname: () => "/upload" }));
 // việc phải stub `next/navigation`; SkipLink nằm NGOÀI provider.
 vi.mock("@/components/shared/SkipLink", () => ({ SkipLink: () => null }));
 vi.mock("@/lib/support/actions", () => ({ submitSupportTicket: vi.fn() }));
-vi.mock("@/lib/i18n/actions", () => ({ setLocale: vi.fn() }));
 vi.mock("@/features/auth/actions", () => ({ signOut: vi.fn() }));
 
 import Layer4Layout from "@/app/(authoring)/layout";
-import { TutorQuotaNote } from "@/components/billing/TutorQuotaNote";
 import { useEntitlement } from "@/lib/billing/entitlement";
 import { FREE_FALLBACK, type Entitlement, type Quota } from "@/lib/billing/types";
 
@@ -115,7 +113,6 @@ const EXPECTED_PROBE = [
  *  so khớp mốc ISO chính xác thay vì một chuỗi ngày đã format). Vai trò còn lại
  *  của ca dùng hằng này là chứng minh một component ĐÃ SHIP nhận được giá trị
  *  thật — bộ đếm `11/500` (không thể ra từ FREE_FALLBACK) đủ cho điều đó. */
-const EXPECTED_NOTE = `${TUTOR_USED}/${PREMIUM_TUTOR_LIMIT} tutor hints used this period.`;
 
 // ───────────────────────── Nguồn dữ liệu bị stub ─────────────────────────────
 
@@ -190,7 +187,6 @@ async function renderLayer4() {
       children: (
         <>
           <EntitlementProbe />
-          <TutorQuotaNote />
         </>
       ),
     })
@@ -269,13 +265,6 @@ describe("(authoring)/layout.tsx — đứa con bị gate KHÔNG nhận FREE_FAL
     expect(probeText(container)).toContain(
       `known:${UPLOAD_USED}/${PREMIUM_UPLOAD_LIMIT}@${EXPECTED_RESETS_AT}`
     );
-  });
-
-  it("một component useEntitlement() ĐÃ SHIP cũng nhận được giá trị thật", async () => {
-    const { container } = await renderLayer4();
-    const q = within(container);
-
-    expect(q.getByText(EXPECTED_NOTE)).toBeTruthy();
   });
 
   it("đọc quyền lợi bằng ĐÚNG user id mà layout vừa phân giải", async () => {

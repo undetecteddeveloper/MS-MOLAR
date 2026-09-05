@@ -18,8 +18,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { MyExamListItem } from "@/features/authoring/queries";
-import { useT } from "@/lib/i18n/client";
-import type { MessageKey, Translate } from "@/lib/i18n/translate";
+import { t } from "@/lib/copy";
+import type { MessageKey, Translate } from "@/lib/copy";
 import { StatusBadge } from "@/features/authoring/components/StatusBadge";
 import { DeleteDialog } from "@/features/authoring/components/DeleteDialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -72,7 +72,6 @@ function formatDateTime(iso: string): string {
 }
 
 export function ExamRow({ item }: { item: MyExamListItem }) {
-  const t = useT();
   const primary = primaryAction(item);
   const isPublished = item.status === "published";
   // Published: tiêu đề trỏ tới đề live; còn lại trỏ màn review (nếu có action).

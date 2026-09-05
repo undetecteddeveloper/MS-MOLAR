@@ -11,7 +11,7 @@ describe("SupportWidgetTrigger", () => {
   it("renders a labelled button that calls onOpen on click", () => {
     const onOpen = vi.fn();
     render(<SupportWidgetTrigger onOpen={onOpen} />);
-    const button = screen.getByRole("button", { name: "Send feedback" });
+    const button = screen.getByRole("button", { name: "Gửi phản hồi" });
     button.click();
     expect(onOpen).toHaveBeenCalledTimes(1);
   });

@@ -28,7 +28,7 @@ describe("TicketStatusControl", () => {
     fireEvent.change(select, { target: { value: "resolved" } });
 
     await act(async () => {
-      screen.getByRole("button", { name: /Save|working/i }).click();
+      screen.getByRole("button", { name: /Lưu|Đang xử lý/i }).click();
       await Promise.resolve();
     });
 

@@ -13,7 +13,7 @@
 
 import { redirect } from "next/navigation";
 import { getCurrentUserProfile } from "@/lib/auth/getCurrentUser";
-import { getTranslate } from "@/lib/i18n/server";
+import { t } from "@/lib/copy";
 import { listMyHistory } from "@/features/history/queries";
 import { filterHistoryEntries, type HistoryEntryFilters } from "@/lib/history/filterEntries";
 import { HistoryFilters } from "@/features/history/components/HistoryFilters";
@@ -47,7 +47,6 @@ export default async function HistoryPage({ searchParams }: { searchParams: Sear
   const user = await getCurrentUserProfile();
   if (!user) redirect("/?auth=signin");
 
-  const t = await getTranslate();
   const sp = await searchParams;
   const entries = await listMyHistory();
 

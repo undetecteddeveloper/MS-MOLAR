@@ -7,7 +7,7 @@
 // "Cancel" outline phụ. Esc hoặc click scrim = Cancel.
 
 import { useEffect } from "react";
-import { useT } from "@/lib/i18n/client";
+import { t } from "@/lib/copy";
 
 interface LeaveExamDialogProps {
   open: boolean;
@@ -16,7 +16,6 @@ interface LeaveExamDialogProps {
 }
 
 export function LeaveExamDialog({ open, onCancel, onLeave }: LeaveExamDialogProps) {
-  const t = useT();
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) {

@@ -13,7 +13,7 @@
 // câu sẽ đọc như ba thứ đang chờ tác giả điền.
 
 import { useEffect, useRef, useState } from "react";
-import { useT } from "@/lib/i18n/client";
+import { t } from "@/lib/copy";
 import { LIMITS } from "@/lib/ugc/limits";
 
 interface PartHeadingProps {
@@ -27,7 +27,6 @@ interface PartHeadingProps {
 }
 
 export function PartHeading({ partNumber, title, onChange, disabled }: PartHeadingProps) {
-  const t = useT();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(title ?? "");
   const inputRef = useRef<HTMLInputElement>(null);

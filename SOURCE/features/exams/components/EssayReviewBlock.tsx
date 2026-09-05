@@ -36,7 +36,7 @@
 
 import { EssayLifecycleBadge } from "@/components/essay/EssayLifecycleBadge";
 import { EssayRegradeControl } from "@/features/exams/components/EssayRegradeControl";
-import { getTranslate } from "@/lib/i18n/server";
+import { t } from "@/lib/copy";
 import { isEssayIncomplete, type EssayView } from "@/lib/scoring/essayLifecycle";
 
 /** Bảng tra NĂM chuỗi (UI-D12) — KHÔNG `toFixed`, KHÔNG làm tròn, KHÔNG nội suy.
@@ -82,7 +82,6 @@ export async function EssayReviewBlock({
   attemptId: string;
   questionId: string;
 }) {
-  const t = await getTranslate();
 
   // RS-6 = "thất bại VÀ hết lượt". Biểu thức ấy KHÔNG được viết lại ở đây:
   // `isEssayIncomplete()` là LỜI KHAI DUY NHẤT của RS-6 trong toàn repo

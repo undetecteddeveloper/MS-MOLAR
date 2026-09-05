@@ -50,7 +50,7 @@ describe("AssembledQuestionList — heading luôn có", () => {
   it("đề KHÔNG chia phần vẫn có đúng một heading, nhãn mặc định", () => {
     const { container } = setup([question(1, 1), question(1, 2)], []);
     const headings = [...container.querySelectorAll("h2")];
-    expect(headings.map((h) => h.textContent)).toEqual(["Part 1"]);
+    expect(headings.map((h) => h.textContent)).toEqual(["Phần 1"]);
     expect(container.querySelectorAll("section")).toHaveLength(1);
   });
 
@@ -75,7 +75,7 @@ describe("AssembledQuestionList — heading luôn có", () => {
     );
     expect([...container.querySelectorAll("h2")].map((h) => h.textContent)).toEqual([
       "I. PHẦN ĐỌC HIỂU",
-      "Part 3",
+      "Phần 3",
     ]);
   });
 
@@ -89,7 +89,7 @@ describe("AssembledQuestionList — sửa tiêu đề phần", () => {
   it("gõ tiêu đề mới rồi Enter ⇒ đẩy chuỗi đã trim lên", () => {
     const { container, onChangePartTitle } = setup([question(1, 1)], []);
     fireEvent.click(
-      [...container.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Edit")!
+      [...container.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Sửa")!
     );
     const input = container.querySelector("input")!;
     fireEvent.change(input, { target: { value: "  I. PHẦN ĐỌC HIỂU  " } });
@@ -104,7 +104,7 @@ describe("AssembledQuestionList — sửa tiêu đề phần", () => {
       [{ number: 1, title: "PHẦN I" }]
     );
     fireEvent.click(
-      [...container.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Edit")!
+      [...container.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Sửa")!
     );
     const input = container.querySelector("input")!;
     fireEvent.change(input, { target: { value: "   " } });
@@ -119,7 +119,7 @@ describe("AssembledQuestionList — sửa tiêu đề phần", () => {
       [{ number: 1, title: "PHẦN I" }]
     );
     fireEvent.click(
-      [...container.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Edit")!
+      [...container.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Sửa")!
     );
     const input = container.querySelector("input")!;
     fireEvent.change(input, { target: { value: "gõ nhầm" } });
@@ -135,7 +135,7 @@ describe("AssembledQuestionList — sửa tiêu đề phần", () => {
       [{ number: 1, title: "PHẦN I" }]
     );
     fireEvent.click(
-      [...container.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Edit")!
+      [...container.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Sửa")!
     );
     fireEvent.blur(container.querySelector("input")!);
 

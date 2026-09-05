@@ -63,7 +63,7 @@ function Harness({ onSuccess, onStatus }: { onSuccess: () => void; onStatus: () 
         className="peer sr-only"
         onChange={(e) => setFile(e.target.files?.[0] ?? null)}
       />
-      <label htmlFor="profile-avatar">Change picture</label>
+      <label htmlFor="profile-avatar">Đổi ảnh</label>
       {file && (
         <AvatarUploader
           id="profile-avatar-panel"
@@ -87,7 +87,7 @@ function renderUploader() {
 }
 
 function fileInput(): HTMLInputElement {
-  return screen.getByLabelText("Change picture") as HTMLInputElement;
+  return screen.getByLabelText("Đổi ảnh") as HTMLInputElement;
 }
 
 /** Người dùng chọn một tệp trong trình quản lý tệp của máy. Đây là ĐƯỜNG VÀO
@@ -106,7 +106,7 @@ describe("từ chối phía client — không byte nào rời máy", () => {
     pick(fakeFile("animation.gif", "image/gif", 1024));
 
     expect(screen.getByRole("alert").textContent).toBe(
-      "Only JPG, PNG and WebP images are accepted."
+      "Chỉ nhận ảnh JPG, PNG và WebP."
     );
     expect(changeAvatarMock).not.toHaveBeenCalled();
   });
@@ -116,7 +116,7 @@ describe("từ chối phía client — không byte nào rời máy", () => {
     pick(fakeFile("huge.jpg", "image/jpeg", AVATAR_LIMITS.MAX_BYTES + 1));
 
     expect(screen.getByRole("alert").textContent).toBe(
-      "That image is over 2MB. Choose a smaller one."
+      "Ảnh này nặng hơn 2MB. Hãy chọn ảnh nhẹ hơn."
     );
     expect(changeAvatarMock).not.toHaveBeenCalled();
   });
@@ -126,14 +126,14 @@ describe("từ chối phía client — không byte nào rời máy", () => {
     pick(fakeFile("exact.jpg", "image/jpeg", AVATAR_LIMITS.MAX_BYTES));
 
     expect(screen.queryByRole("alert")).toBeNull();
-    expect(screen.getByRole("button", { name: "Save" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Lưu" })).toBeDefined();
   });
 
   it("tệp bị từ chối KHÔNG có nút Lưu, và cũng không tạo object URL nào để rò", () => {
     renderUploader();
     pick(fakeFile("animation.gif", "image/gif", 1024));
 
-    expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Lưu" })).toBeNull();
     expect(document.querySelector("img[src='blob:fake-url']")).toBeNull();
   });
 
@@ -153,24 +153,24 @@ describe("chọn xong — xem trước rồi mới Lưu (UI-D11)", () => {
     expect(changeAvatarMock).not.toHaveBeenCalled();
     expect(screen.getByText("chan-dung.png")).toBeDefined();
     expect(document.querySelector("img[src='blob:fake-url']")).not.toBeNull();
-    expect(screen.getByRole("button", { name: "Save" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Lưu" })).toBeDefined();
   });
 
   it("KHÔNG còn bước 'Chọn ảnh' trung gian — chọn tệp xong là vào thẳng xem trước", () => {
     renderUploader();
     // Trước khi chọn: khối này chưa tồn tại, nên không có nút nào của nó cả.
-    expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Huỷ" })).toBeNull();
     pick(fakeFile("chan-dung.png", "image/png", 4096));
     // Sau khi chọn: đi thẳng tới xem trước, không có nút mở bộ chọn thứ hai.
     expect(screen.queryByRole("button", { name: "Choose an image" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Save" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Lưu" })).toBeDefined();
   });
 
   it("Huỷ trả tiêu điểm về bộ chọn tệp, không thả xuống <body>", () => {
     renderUploader();
     pick(fakeFile("chan-dung.png", "image/png", 4096));
     act(() => {
-      screen.getByRole("button", { name: "Cancel" }).click();
+      screen.getByRole("button", { name: "Huỷ" }).click();
     });
 
     expect(document.activeElement).toBe(fileInput());
@@ -190,7 +190,7 @@ describe("đường upload", () => {
     const props = renderUploader();
     pick(fakeFile("chan-dung.png", "image/png", 4096));
     await act(async () => {
-      screen.getByRole("button", { name: "Save" }).click();
+      screen.getByRole("button", { name: "Lưu" }).click();
     });
     return props;
   }
@@ -207,22 +207,22 @@ describe("đường upload", () => {
     expect(props.onSuccess).toHaveBeenCalledWith("profile.avatar.saved");
     expect(refresh).toHaveBeenCalled();
     // Khối xem trước đã biến mất; bộ chọn tệp thì vẫn ở đó.
-    expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Lưu" })).toBeNull();
     expect(fileInput()).toBeDefined();
   });
 
   it("hỏng → GIỮ tệp đã chọn để thử lại bằng một cú chạm (AC-067)", async () => {
     await pickAndSave({ error: "profile.avatar.uploadFailed" });
 
-    expect(screen.getByRole("alert").textContent).toBe("The picture was not saved. Try again.");
+    expect(screen.getByRole("alert").textContent).toBe("Chưa lưu được ảnh. Hãy thử lại.");
     expect(screen.getByText("chan-dung.png")).toBeDefined();
-    expect(screen.getByRole("button", { name: "Save" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Lưu" })).toBeDefined();
   });
 
   it("bị chặn tần suất → câu lỗi mang số giây thật", async () => {
     await pickAndSave({ error: "profile.error.rateLimited:120" });
     expect(screen.getByRole("alert").textContent).toBe(
-      "Too many attempts. Try again in 120 seconds."
+      "Thao tác quá nhiều lần. Thử lại sau 120 giây."
     );
   });
 
@@ -237,7 +237,7 @@ describe("đường upload", () => {
     pick(fakeFile("chan-dung.png", "image/png", 4096));
 
     act(() => {
-      const save = screen.getByRole("button", { name: "Save" });
+      const save = screen.getByRole("button", { name: "Lưu" });
       save.click();
       save.click();
     });

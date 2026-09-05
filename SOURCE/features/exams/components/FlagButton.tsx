@@ -4,7 +4,7 @@
 // TEMPLATE/L2/ExamPage) — active = viền/chữ brand.
 "use client";
 
-import { useT } from "@/lib/i18n/client";
+import { t } from "@/lib/copy";
 
 interface FlagButtonProps {
   flagged: boolean;
@@ -12,7 +12,6 @@ interface FlagButtonProps {
 }
 
 export function FlagButton({ flagged, onToggle }: FlagButtonProps) {
-  const t = useT();
   return (
     <button
       type="button"

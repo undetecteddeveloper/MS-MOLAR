@@ -29,7 +29,7 @@ afterEach(cleanup);
 
 function openDialog() {
   act(() => {
-    screen.getByRole("button", { name: "Change password" }).click();
+    screen.getByRole("button", { name: "Đổi mật khẩu" }).click();
   });
 }
 
@@ -38,7 +38,7 @@ describe("khối danh tính", () => {
     render(<ProfileCard user={USER} />);
 
     // Tên xuất hiện ĐÚNG MỘT lần (2026-08-17). Trước đây là hai: một trong khối
-    // danh tính, một làm giá trị của hàng "Display name" — nhưng hàng đó chỉ
+    // danh tính, một làm giá trị của hàng "Tên hiển thị" — nhưng hàng đó chỉ
     // hiển thị lại đúng cái tên nằm ngay phía trên nó, và cái nhãn ấy tồn tại
     // chỉ để làm chỗ treo một cái nút. Nút đó nay là bút chì đứng cạnh chính
     // cái tên, nên hàng thừa đã bị bỏ.
@@ -55,7 +55,7 @@ describe("khối danh tính", () => {
   it("email được nói rõ là KHÔNG đổi được, và không có ô nhập nào cho nó (AC-009)", () => {
     const { container } = render(<ProfileCard user={USER} />);
 
-    expect(screen.getByText("Cannot be changed")).toBeDefined();
+    expect(screen.getByText("Không thể thay đổi")).toBeDefined();
     // Lúc nghỉ, ô nhập DUY NHẤT trên thẻ là bộ chọn tệp ảnh (nó luôn nằm trong
     // cây từ 2026-08-21, xem describe bên dưới). Không có ô text nào — email
     // không sửa được thì cũng không được có chỗ để gõ vào.
@@ -70,7 +70,7 @@ describe("khối danh tính", () => {
 // chuyển chỗ đó, nên chúng theo chân xuống đây.
 describe("bộ chọn ảnh — mở thẳng trình quản lý tệp", () => {
   function avatarInput(): HTMLInputElement {
-    return screen.getByLabelText("Change picture") as HTMLInputElement;
+    return screen.getByLabelText("Đổi ảnh") as HTMLInputElement;
   }
 
   it("'Đổi ảnh' là NHÃN của input file, không phải nút mở một khối trung gian", () => {
@@ -79,7 +79,7 @@ describe("bộ chọn ảnh — mở thẳng trình quản lý tệp", () => {
     // Nhãn trỏ đúng vào ô file → cú chạm đầu tiên mở trình quản lý tệp.
     expect(avatarInput().type).toBe("file");
     // Và không có nút nào mang chữ đó — nút thì phải có onClick để mở gì đó.
-    expect(screen.queryByRole("button", { name: "Change picture" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Đổi ảnh" })).toBeNull();
   });
 
   it("input thật là `peer sr-only`, KHÔNG phải `hidden` — giữ điểm dừng Tab và ở lại cây a11y", () => {
@@ -99,14 +99,14 @@ describe("bộ chọn ảnh — mở thẳng trình quản lý tệp", () => {
 
   it("nhãn hiển thị phản chiếu focus của input ẩn qua peer-focus-visible", () => {
     render(<ProfileCard user={USER} />);
-    const label = screen.getByText("Change picture");
+    const label = screen.getByText("Đổi ảnh");
     expect(label.className).toContain("peer-focus-visible:border-ring");
   });
 
   it("aria-describedby của input trỏ tới một node CÓ THẬT, ngay cả khi chưa chọn gì", () => {
     render(<ProfileCard user={USER} />);
     const id = avatarInput().getAttribute("aria-describedby") as string;
-    expect(document.getElementById(id)?.textContent).toBe("JPG, PNG or WebP, up to 2MB.");
+    expect(document.getElementById(id)?.textContent).toBe("JPG, PNG hoặc WebP, tối đa 2MB.");
   });
 
   it("chọn tệp → khối xem trước hiện ra, và `value` được reset để chọn LẠI vẫn bắn onChange", () => {
@@ -120,7 +120,7 @@ describe("bộ chọn ảnh — mở thẳng trình quản lý tệp", () => {
     });
 
     expect(screen.getByText("chan-dung.png")).toBeDefined();
-    expect(screen.getByRole("button", { name: "Save" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Lưu" })).toBeDefined();
     expect(input.value).toBe("");
   });
 });
@@ -141,7 +141,7 @@ describe("hàng mật khẩu", () => {
     expect((document.querySelector(".font-mono") as HTMLElement).getAttribute("aria-hidden")).toBe(
       "true"
     );
-    expect(screen.getByText("Your password is not shown here.")).toBeDefined();
+    expect(screen.getByText("Mật khẩu của bạn không hiển thị ở đây.")).toBeDefined();
   });
 
   it("KHÔNG tồn tại control hiện mật khẩu nào (AC-011)", () => {
@@ -156,7 +156,7 @@ describe("hàng mật khẩu", () => {
   it("nói rõ VÌ SAO không thể hiện lại được", () => {
     render(<ProfileCard user={USER} />);
     expect(
-      screen.getByText("Hashed — not even we can show it again.")
+      screen.getByText("Đã băm — chúng tôi cũng không xem lại được.")
     ).toBeDefined();
   });
 });
@@ -164,7 +164,7 @@ describe("hàng mật khẩu", () => {
 describe("vòng focus của hộp thoại — việc của CHA (AC-050)", () => {
   it("Escape đóng hộp thoại và trả focus về nút đã mở nó", () => {
     render(<ProfileCard user={USER} />);
-    const trigger = screen.getByRole("button", { name: "Change password" });
+    const trigger = screen.getByRole("button", { name: "Đổi mật khẩu" });
     openDialog();
     expect(screen.getByRole("dialog")).toBeDefined();
 
@@ -178,11 +178,11 @@ describe("vòng focus của hộp thoại — việc của CHA (AC-050)", () => 
 
   it("Huỷ cũng trả focus về đúng nút đó", () => {
     render(<ProfileCard user={USER} />);
-    const trigger = screen.getByRole("button", { name: "Change password" });
+    const trigger = screen.getByRole("button", { name: "Đổi mật khẩu" });
     openDialog();
 
     act(() => {
-      screen.getByRole("button", { name: "Cancel" }).click();
+      screen.getByRole("button", { name: "Huỷ" }).click();
     });
 
     expect(document.activeElement).toBe(trigger);

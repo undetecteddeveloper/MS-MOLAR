@@ -19,7 +19,7 @@ import { notFound } from "next/navigation";
 import { getMyRating } from "@/features/exams/actions";
 import { RatingRubric } from "@/features/exams/components/rating/RatingRubric";
 import { getExam, listMySubmittedExamIds } from "@/features/exams/queries";
-import { getTranslate } from "@/lib/i18n/server";
+import { t } from "@/lib/copy";
 import { mapFromMyRating } from "@/lib/rating";
 import { PageContainer } from "@/components/layout/PageContainer";
 
@@ -46,7 +46,6 @@ export default async function RatePage({
   const { id } = await params;
   const { returnTo } = await searchParams;
   const backHref = safeBackHref(returnTo);
-  const t = await getTranslate();
 
   const exam = await getExam(id);
   if (!exam) {

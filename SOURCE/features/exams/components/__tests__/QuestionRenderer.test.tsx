@@ -104,9 +104,9 @@ describe("QuestionRenderer — footnote copy (AC-008/AC-009)", () => {
     const { container } = renderQuestion(SHORT_ANSWER_QUESTION);
 
     expect(
-      within(container).getByText("Short answer — auto-scored after you submit.")
+      within(container).getByText("Trả lời ngắn — chấm tự động sau khi bạn nộp bài.")
     ).toBeTruthy();
-    expect(within(container).queryByText(/not auto-scored yet/i)).toBeNull();
+    expect(within(container).queryByText(/đã lưu, chưa chấm tự động/i)).toBeNull();
   });
 
   // Chuỗi cũ ("Essay question — answer on paper.") CỐ Ý bị thay, không phải
@@ -119,7 +119,7 @@ describe("QuestionRenderer — footnote copy (AC-008/AC-009)", () => {
     const { container } = renderQuestion(ESSAY_QUESTION);
 
     expect(
-      within(container).getByText("Essay — your working is saved with the attempt, not auto-scored yet.")
+      within(container).getByText("Tự luận — bài làm được lưu cùng lượt thi, chưa chấm tự động.")
     ).toBeTruthy();
 
     // Ô nhập phải TỒN TẠI (đây là thứ bug prod làm mất) và bị chặn đúng ở trần
@@ -150,7 +150,7 @@ describe("QuestionRenderer — footnote copy (AC-008/AC-009)", () => {
   it("true_false: footnote stays byte-identical to the pre-change string (AC-009 guard)", () => {
     const { container } = renderQuestion(TRUE_FALSE_QUESTION);
 
-    expect(within(container).getByText("True/False — stored, not auto-scored yet.")).toBeTruthy();
+    expect(within(container).getByText("Đúng/Sai — đã lưu, chưa chấm tự động.")).toBeTruthy();
   });
 
   it("short_answer: <input> maxLength/placeholder/onChange wiring is unaffected by the copy-only change", () => {
@@ -160,7 +160,7 @@ describe("QuestionRenderer — footnote copy (AC-008/AC-009)", () => {
     const input = container.querySelector("input");
     expect(input).not.toBeNull();
     expect(input?.getAttribute("maxlength")).toBe("100");
-    expect(input?.getAttribute("placeholder")).toBe("e.g. 1260 / 1,04");
+    expect(input?.getAttribute("placeholder")).toBe("ví dụ: 1260 / 1,04");
 
     fireEvent.change(input as HTMLInputElement, { target: { value: "1260" } });
     expect(onSelectAnswer).toHaveBeenCalledWith("1260");
@@ -196,7 +196,7 @@ describe("QuestionRenderer — chân trang tự luận do cờ AC-067 chọn", (
 
     // Đây chính là hành vi giữ cho chuỗi đã ghim ở ca AC-009 phía trên xanh.
     expect(container.textContent).toContain(
-      "Essay — your working is saved with the attempt, not auto-scored yet."
+      "Tự luận — bài làm được lưu cùng lượt thi, chưa chấm tự động."
     );
     expect(container.textContent).not.toContain("auto-scored after you submit");
   });
@@ -204,8 +204,8 @@ describe("QuestionRenderer — chân trang tự luận do cờ AC-067 chọn", (
   it("cờ BẬT ⇒ câu MỚI, và câu cũ biến mất", () => {
     const { container } = renderQuestion(ESSAY_QUESTION, undefined, { essayGradingEnabled: true });
 
-    expect(container.textContent).toContain("Essay — auto-scored after you submit.");
-    expect(container.textContent).not.toContain("not auto-scored yet");
+    expect(container.textContent).toContain("Tự luận — chấm tự động sau khi bạn nộp bài.");
+    expect(container.textContent).not.toContain("đã lưu, chưa chấm tự động");
   });
 
   it("cờ KHÔNG đụng tới ô nhập, chỗ giữ chỗ hay bộ đếm ký tự (AC-052)", () => {

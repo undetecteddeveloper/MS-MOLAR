@@ -38,6 +38,6 @@ describe("TicketStatusBadge", () => {
 
   it("falls back to the 'new' entry for an unrecognized status instead of rendering blank", () => {
     render(<TicketStatusBadge status={"weird" as unknown as TicketStatus} />);
-    expect(screen.getByText("New")).toBeDefined();
+    expect(screen.getByText("Mới")).toBeDefined();
   });
 });

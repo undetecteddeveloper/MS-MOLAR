@@ -36,8 +36,8 @@
 // `font-medium`. Muốn một màu dương thật thì phải THÊM token `--success` và
 // đóng TBD-04 — đó là việc của kỹ sư/product, và nó KHÔNG chặn ship.
 
-import { getTranslate } from "@/lib/i18n/server";
-import type { MessageKey } from "@/lib/i18n/translate";
+import { t } from "@/lib/copy";
+import type { MessageKey } from "@/lib/copy";
 import type { EssayRenderState } from "@/lib/scoring/essayLifecycle";
 
 type Appearance = { glyph: string; labelKey: MessageKey; className: string };
@@ -66,7 +66,6 @@ const APPEARANCE: Record<EssayRenderState, Appearance> = {
 };
 
 export async function EssayLifecycleBadge({ state }: { state: EssayRenderState }) {
-  const t = await getTranslate();
   const appearance = APPEARANCE[state];
 
   return (

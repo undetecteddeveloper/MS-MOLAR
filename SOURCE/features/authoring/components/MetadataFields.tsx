@@ -16,7 +16,7 @@
 // Restyle theo prototype UI_Layer4_main: nhãn eyebrow, viền focus vàng đồng
 // (--ring); đỏ dành riêng cho lỗi.
 
-import { useT } from "@/lib/i18n/client";
+import { t } from "@/lib/copy";
 import { LIMITS } from "@/lib/ugc/limits";
 import { SUBJECTS, SUBJECT_LABELS } from "@/lib/ugc/subjects";
 import type { MetaFieldName } from "@/lib/ugc/types";
@@ -64,7 +64,6 @@ export function MetadataFields({
   optionalMode,
   aiFilled,
 }: MetadataFieldsProps) {
-  const t = useT();
   const req = optionalMode ? null : <span className="text-brand">*</span>;
   const ariaReq = !optionalMode;
 

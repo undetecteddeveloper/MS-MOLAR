@@ -32,15 +32,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "yearly",
       priority: 0.3,
     },
-    {
-      url: `${SITE_URL}/refund-policy`,
-      lastModified,
-      changeFrequency: "yearly",
-      priority: 0.3,
-    },
     // Trang giới thiệu + liên hệ (ADR-0017). Ưu tiên cao hơn hai trang pháp lý
     // vì đây LÀ một đích tìm kiếm thật — người ta tra tên đơn vị vận hành và
-    // số điện thoại — trong khi /terms và /refund-policy chỉ cần index được.
+    // số điện thoại — trong khi /terms chỉ cần index được.
     // Chưa có liên kết in-app nào trỏ tới nó (NAV_ITEMS đã kín 5 chỗ, repo
     // không có footer), nên sitemap hiện là đường vào duy nhất ngoài gõ URL.
     {

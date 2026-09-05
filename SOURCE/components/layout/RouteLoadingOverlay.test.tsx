@@ -99,7 +99,7 @@ describe("RouteLoadingOverlay", () => {
     await clickLink(anchor("/history"));
     expect(isPending()).toBe(true);
     // Vùng aria-live phải có chữ để trình đọc màn hình phát ra được.
-    expect(screen.getByRole("status").textContent).toBe("Loading");
+    expect(screen.getByRole("status").textContent).toBe("Đang tải");
 
     // Không tự tắt trong lúc còn đứng ở path cũ.
     act(() => vi.advanceTimersByTime(3_000));
@@ -112,7 +112,7 @@ describe("RouteLoadingOverlay", () => {
   });
 
   it("redirect VỀ CHÍNH path cũ (guard đăng nhập) vẫn tắt được lớp phủ", async () => {
-    // Khách chưa đăng nhập bấm "Exams" → middleware đá về `/?auth=signin`:
+    // Khách chưa đăng nhập bấm "Kho đề" → middleware đá về `/?auth=signin`:
     // xuất phát ở `/` và cũng kết thúc ở `/`. So pathname trơn thì lớp phủ
     // không có cách nào biết mình đã tới nơi — đây là lý do khoá vị trí phải
     // gồm cả query. Đo được trên trình duyệt thật, không phải ca giả định.

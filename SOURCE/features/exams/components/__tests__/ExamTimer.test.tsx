@@ -46,7 +46,7 @@ describe("ExamTimer", () => {
   it("hiển thị MM:SS từ durationMinutes, có role=timer để screen reader đọc", () => {
     render(<ExamTimer durationMinutes={45} onTimeUp={() => {}} />);
     expect(readout()).toBe("45:00");
-    expect(screen.getByRole("timer").getAttribute("aria-label")).toBe("Time remaining");
+    expect(screen.getByRole("timer").getAttribute("aria-label")).toBe("Thời gian còn lại");
   });
 
   it("đếm lùi từng giây", () => {
@@ -133,17 +133,17 @@ describe("ExamTimer", () => {
   it("cảnh báo phút cuối có NHÃN CHỮ, không chỉ đổi màu (WCAG 1.4.1)", () => {
     // 1 phút 2 giây: còn trên ngưỡng → chưa cảnh báo.
     render(<ExamTimer durationMinutes={1.05} onTimeUp={() => {}} />);
-    expect(screen.queryByText("Last minute")).toBeNull();
+    expect(screen.queryByText("Phút cuối")).toBeNull();
 
     // Đếm qua mốc 60s → nhãn xuất hiện. Màu đỏ là tín hiệu PHỤ; nhãn chữ mới là
     // tín hiệu người mù màu đỏ-lục đọc được.
     tickSeconds(3);
     expect(readout()).toBe("01:00");
-    expect(screen.getByText("Last minute")).not.toBeNull();
+    expect(screen.getByText("Phút cuối")).not.toBeNull();
   });
 
   it("chuỗi trong role=timer vẫn sạch MM:SS dù đã thêm nhãn cảnh báo", () => {
-    // Nhãn "Last minute" và vùng live nằm NGOÀI phần tử role=timer, nếu lọt vào
+    // Nhãn "Phút cuối" và vùng live nằm NGOÀI phần tử role=timer, nếu lọt vào
     // trong thì trình đọc màn hình sẽ đọc "00:59 Last minute ..." thành một cục.
     render(<ExamTimer durationMinutes={1} onTimeUp={() => {}} />);
     expect(readout()).toBe("01:00");
@@ -157,13 +157,13 @@ describe("ExamTimer", () => {
     expect(live()).toBe("");
 
     tickSeconds(6); // → 30s, đúng mốc
-    expect(live()).toBe("30 seconds remaining");
+    expect(live()).toBe("Còn 30 giây");
 
     tickSeconds(1); // → 29s, giữa hai mốc → im lặng trở lại
     expect(live()).toBe("");
 
     tickSeconds(19); // → 10s, mốc cuối
-    expect(live()).toBe("10 seconds remaining");
+    expect(live()).toBe("Còn 10 giây");
   });
 
   it("mốc phút dùng số nhiều đúng ngữ pháp", () => {
@@ -171,6 +171,6 @@ describe("ExamTimer", () => {
     const live = () => container.querySelector('[aria-live="polite"]')!.textContent;
 
     tickSeconds(3); // → 60s
-    expect(live()).toBe("1 minute remaining");
+    expect(live()).toBe("Còn 1 phút");
   });
 });

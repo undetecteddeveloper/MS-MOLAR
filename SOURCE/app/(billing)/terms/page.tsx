@@ -15,15 +15,14 @@
 import type { Metadata } from "next";
 import { LegalDocument } from "@/components/billing/LegalDocument";
 import { LegalProse } from "@/components/billing/LegalProse";
-import { getTranslate } from "@/lib/i18n/server";
+import { t } from "@/lib/copy";
 
 export const metadata: Metadata = {
-  title: "Terms of Service",
+  title: "Điều khoản dịch vụ",
   alternates: { canonical: "/terms" },
 };
 
 export default async function TermsPage() {
-  const t = await getTranslate();
   return (
     <LegalDocument title={t("billing.terms.title")}>
       <LegalProse body={t("billing.terms.body")} />

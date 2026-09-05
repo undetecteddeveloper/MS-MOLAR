@@ -7,13 +7,12 @@
 // height cứng nên không cần đo nội dung.
 
 import { useState } from "react";
-import { useT } from "@/lib/i18n/client";
+import { t } from "@/lib/copy";
 import { LIMITS } from "@/lib/ugc/limits";
 
 const MAX_MB = Math.round(LIMITS.MAX_FILE_BYTES / (1024 * 1024));
 
 export function ImportInstructions() {
-  const t = useT();
   const [open, setOpen] = useState(true);
 
   return (

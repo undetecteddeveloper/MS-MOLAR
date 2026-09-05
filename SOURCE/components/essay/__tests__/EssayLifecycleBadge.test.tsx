@@ -24,17 +24,16 @@ vi.mock("server-only", () => ({}));
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined }) }));
 
 import { EssayLifecycleBadge } from "../EssayLifecycleBadge";
-import { DEFAULT_LOCALE } from "@/lib/i18n/locales";
-import { getDictionary } from "@/lib/i18n/translate";
+import { copy } from "@/lib/copy";
 
 afterEach(cleanup);
 
 /** Không có cookie ⇒ `DEFAULT_LOCALE`. Chuỗi mong đợi lấy TỪ CHÍNH từ điển mà
- *  component sẽ giải ra, qua `getDictionary(DEFAULT_LOCALE)` — KHÔNG gõ lại và
+ *  component sẽ giải ra, qua `copy` — KHÔNG gõ lại và
  *  KHÔNG chọn cứng một ngôn ngữ. Gõ lại là tạo một lời khai thứ hai sẽ trôi
  *  lệch; chọn cứng `vi` là làm ca này đỏ vào ngày ai đó đổi ngôn ngữ mặc định,
  *  vì một lý do chẳng liên quan gì tới cái huy hiệu này. */
-const DICT = getDictionary(DEFAULT_LOCALE);
+const DICT = copy;
 const EXPECTED = {
   pending: DICT["result.essay.state.pending"],
   graded: DICT["result.essay.state.graded"],

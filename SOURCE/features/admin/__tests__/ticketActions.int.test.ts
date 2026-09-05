@@ -24,7 +24,6 @@ afterEach(() => {
   vi.doUnmock("@/lib/auth/admin");
   vi.doUnmock("@/lib/supabase/service-role");
   vi.doUnmock("@/lib/mail/sendSupportNotification");
-  vi.doUnmock("@/lib/i18n/server");
   vi.doUnmock("next/cache");
 });
 
@@ -87,9 +86,6 @@ describe("Group 2 — independent admin re-authorization (AC-021/AC-024), no ema
     // real request scope (no Next.js server runtime in vitest) — mocked
     // uniformly here since every Group 2/2b test needs it regardless of its
     // own session/service-role mock shape.
-    vi.doMock("@/lib/i18n/server", () => ({
-      getTranslate: vi.fn(async () => (key: string) => key),
-    }));
     // revalidatePath() requires a real Next.js static-generation store on
     // the success path — not present under vitest.
     vi.doMock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -196,9 +192,6 @@ describe("Group 2b — changeTicketStatusAction rejects an out-of-range status b
     vi.doMock("@/lib/supabase/service-role", () => ({
       changeSupportTicketStatus: changeSupportTicketStatusMock,
       addSupportTicketNote: vi.fn(),
-    }));
-    vi.doMock("@/lib/i18n/server", () => ({
-      getTranslate: vi.fn(async () => (key: string) => key),
     }));
 
     const { changeTicketStatusAction } = await import("@/features/admin/ticketActions");

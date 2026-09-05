@@ -26,14 +26,14 @@ afterEach(() => {
 });
 
 function fillValidCompose() {
-  screen.getByRole("radio", { name: "Bug report" }).click();
-  const textarea = screen.getByLabelText("Message") as HTMLTextAreaElement;
+  screen.getByRole("radio", { name: "Báo lỗi" }).click();
+  const textarea = screen.getByLabelText("Nội dung") as HTMLTextAreaElement;
   fireEvent.change(textarea, { target: { value: "The submit button does not respond" } });
 }
 
 function clickSubmit() {
   act(() => {
-    screen.getByRole("button", { name: /^Send$|Sending/ }).click();
+    screen.getByRole("button", { name: /^Gửi$|Đang gửi/ }).click();
   });
 }
 
@@ -47,15 +47,15 @@ describe("SupportWidgetDialog", () => {
     render(<SupportWidgetDialog open={true} onClose={() => {}} />);
     expect(screen.getByRole("dialog")).toBeDefined();
     expect(screen.getAllByRole("radio")).toHaveLength(3);
-    expect(screen.getByLabelText("Message")).toBeDefined();
+    expect(screen.getByLabelText("Nội dung")).toBeDefined();
   });
 
   it("submitting with no intent selected shows validation error, never calls submitSupportTicket", () => {
     render(<SupportWidgetDialog open={true} onClose={() => {}} />);
-    const textarea = screen.getByLabelText("Message") as HTMLTextAreaElement;
+    const textarea = screen.getByLabelText("Nội dung") as HTMLTextAreaElement;
     fireEvent.change(textarea, { target: { value: "message only, no intent chosen" } });
     clickSubmit();
-    expect(screen.getByText("Please pick a feedback type.")).toBeDefined();
+    expect(screen.getByText("Vui lòng chọn một loại phản hồi.")).toBeDefined();
     expect(submitMock).not.toHaveBeenCalled();
   });
 
@@ -84,7 +84,7 @@ describe("SupportWidgetDialog", () => {
     });
 
     expect(screen.getByRole("status")).toBeDefined();
-    expect(screen.getByText("Reference: ab12cd34")).toBeDefined();
+    expect(screen.getByText("Mã tham chiếu: ab12cd34")).toBeDefined();
   });
 
   it("a rate-limited refusal preserves intent/message exactly as typed (AC-020)", async () => {
@@ -99,9 +99,9 @@ describe("SupportWidgetDialog", () => {
       await Promise.resolve();
     });
 
-    expect(screen.getByText("You're sending a bit fast — try again in a few minutes.")).toBeDefined();
-    expect(screen.getByRole("radio", { name: "Bug report" }).getAttribute("aria-checked")).toBe("true");
-    expect((screen.getByLabelText("Message") as HTMLTextAreaElement).value).toBe(
+    expect(screen.getByText("Bạn gửi hơi nhanh — thử lại sau ít phút nhé.")).toBeDefined();
+    expect(screen.getByRole("radio", { name: "Báo lỗi" }).getAttribute("aria-checked")).toBe("true");
+    expect((screen.getByLabelText("Nội dung") as HTMLTextAreaElement).value).toBe(
       "The submit button does not respond"
     );
   });
@@ -124,7 +124,7 @@ describe("SupportWidgetDialog", () => {
     });
 
     expect(submitMock).toHaveBeenCalledTimes(1);
-    const submitButton = screen.getByRole("button", { name: /Sending/ });
+    const submitButton = screen.getByRole("button", { name: /Đang gửi/ });
     expect(submitButton.getAttribute("aria-disabled")).toBe("true");
 
     await act(async () => {
@@ -148,9 +148,9 @@ describe("SupportWidgetDialog", () => {
       await vi.advanceTimersByTimeAsync(20000);
     });
 
-    expect(screen.getByText("Couldn't send — might be a network issue. Please try again.")).toBeDefined();
-    expect(screen.getByRole("radio", { name: "Bug report" }).getAttribute("aria-checked")).toBe("true");
-    expect((screen.getByLabelText("Message") as HTMLTextAreaElement).value).toBe(
+    expect(screen.getByText("Chưa gửi được — có thể do mạng. Bạn thử lại nhé.")).toBeDefined();
+    expect(screen.getByRole("radio", { name: "Báo lỗi" }).getAttribute("aria-checked")).toBe("true");
+    expect((screen.getByLabelText("Nội dung") as HTMLTextAreaElement).value).toBe(
       "The submit button does not respond"
     );
   });

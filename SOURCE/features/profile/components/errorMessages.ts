@@ -20,8 +20,8 @@
 // là chuỗi thô. Chuỗi thô lọt ra màn hình vừa là tiếng Anh giữa trang tiếng
 // Việt, vừa là đường để câu chữ của nhà cung cấp rò ra client.
 
-import { en } from "@/lib/i18n/dictionaries/en";
-import type { MessageKey, TranslateValues } from "@/lib/i18n/translate";
+import { copy } from "@/lib/copy";
+import type { MessageKey, TranslateValues } from "@/lib/copy";
 import { PASSWORD_MAX_BYTES, PASSWORD_MIN_LENGTH } from "@/lib/auth/passwordPolicy";
 import { DISPLAY_NAME_MAX } from "@/lib/profile/displayName";
 import { AVATAR_LIMITS } from "@/lib/profile/limits";
@@ -86,7 +86,7 @@ const UPDATE_PROFILE_RATE_LIMIT_RE = /^Too many updates\. Try again in (\d+) sec
  * thể mượn được chuỗi của vùng đó.
  */
 function isProfileMessageKey(raw: string): raw is MessageKey {
-  return raw.startsWith("profile.") && Object.prototype.hasOwnProperty.call(en, raw);
+  return raw.startsWith("profile.") && Object.prototype.hasOwnProperty.call(copy, raw);
 }
 
 /**

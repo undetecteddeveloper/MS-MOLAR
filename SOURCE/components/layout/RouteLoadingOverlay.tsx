@@ -46,7 +46,7 @@
 import Image from "next/image";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { useT } from "@/lib/i18n/client";
+import { t } from "@/lib/copy";
 import {
   isNavigationGuarded,
   onPageNavigationIndicatorStart,
@@ -64,7 +64,6 @@ function locationKey(pathname: string, search: string): string {
 }
 
 export function RouteLoadingOverlay() {
-  const t = useT();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   // URL người dùng ĐANG đứng lúc bấm. Còn khớp URL hiện tại nghĩa là lượt điều

@@ -10,7 +10,7 @@
 
 import { useEffect, useRef } from "react";
 import Link from "next/link";
-import { useT } from "@/lib/i18n/client";
+import { t } from "@/lib/copy";
 
 export default function GlobalRouteError({
   error,
@@ -19,7 +19,6 @@ export default function GlobalRouteError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  const t = useT();
   const alertRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

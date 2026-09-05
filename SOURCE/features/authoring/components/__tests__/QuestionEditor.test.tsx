@@ -92,7 +92,7 @@ describe("QuestionEditor — LaTeX ở chế độ xem", () => {
   it("chế độ sửa trả lại chuỗi NGUỒN để sửa được công thức", () => {
     const { container } = renderEditor();
 
-    fireEvent.click(within(container).getByRole("button", { name: /edit/i }));
+    fireEvent.click(within(container).getByRole("button", { name: /Sửa/i }));
 
     expect(within(container).getByDisplayValue("Tính $\\frac{1}{2} + \\frac{1}{3}$.")).toBeTruthy();
     expect(within(container).getByDisplayValue("$\\frac{5}{6}$")).toBeTruthy();
@@ -185,8 +185,8 @@ describe("Task E4 — essay footnote follows ESSAY_GRADING_ENABLED", () => {
     essayAnswer: "Dạng y = ax + b với a khác 0.",
   } as AssembledQuestion;
 
-  const OFF = "stored, not auto-scored yet";
-  const ON = "auto-scored after the student submits";
+  const OFF = "Tự luận — đã lưu, chưa chấm tự động.";
+  const ON = "Tự luận — chấm tự động sau khi học sinh nộp bài.";
 
   it("shows the not-scored string when the flag is absent, the scored string when it is on, and never both", () => {
     // Default (prop omitted) must be the OFF text: fail-closed, so a call site

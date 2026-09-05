@@ -90,8 +90,8 @@ describe("cổng chống trôi lệch: sàn độ dài chỉ có MỘT nguồn",
   });
 
   it("câu gợi ý dùng tham số {min}, không viết sẵn con số vào bản dịch", () => {
-    for (const locale of ["en", "vi"]) {
-      const line = read(`lib/i18n/dictionaries/${locale}.ts`)
+    for (const locale of ["copy"]) {
+      const line = read(`lib/${locale}.ts`)
         .split("\n")
         .find((l) => l.includes('"auth.passwordHint"'));
       expect(line, `thiếu khoá auth.passwordHint trong ${locale}.ts`).toBeDefined();

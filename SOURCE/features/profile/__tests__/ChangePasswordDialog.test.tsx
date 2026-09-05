@@ -38,9 +38,9 @@ function panelOf(): HTMLElement {
 
 function fields() {
   return {
-    current: screen.getByLabelText("Current password") as HTMLInputElement,
-    next: screen.getByLabelText("New password") as HTMLInputElement,
-    confirm: screen.getByLabelText("Confirm new password") as HTMLInputElement,
+    current: screen.getByLabelText("Mật khẩu hiện tại") as HTMLInputElement,
+    next: screen.getByLabelText("Mật khẩu mới") as HTMLInputElement,
+    confirm: screen.getByLabelText("Nhập lại mật khẩu mới") as HTMLInputElement,
   };
 }
 
@@ -52,7 +52,7 @@ function fill(current: string, next: string, confirm: string) {
 }
 
 function submit() {
-  fireEvent.submit(screen.getByRole("button", { name: /Update password|Saving/ }).closest("form")!);
+  fireEvent.submit(screen.getByRole("button", { name: /Cập nhật mật khẩu|Đang lưu/ }).closest("form")!);
 }
 
 beforeEach(() => {
@@ -79,7 +79,7 @@ describe("khuôn hộp thoại", () => {
     expect(dialog.getAttribute("aria-modal")).toBe("true");
 
     const labelledBy = dialog.getAttribute("aria-labelledby") as string;
-    expect(document.getElementById(labelledBy)?.textContent).toBe("Change password");
+    expect(document.getElementById(labelledBy)?.textContent).toBe("Đổi mật khẩu");
     expect(document.querySelectorAll("input[type=password]").length).toBe(3);
   });
 
@@ -116,7 +116,7 @@ describe("khuôn hộp thoại", () => {
 describe("bẫy focus — hành vi MỚI, không kế thừa từ modal nào trong repo", () => {
   it("Tab từ phần tử CUỐI vòng về phần tử ĐẦU", () => {
     renderDialog();
-    const submitBtn = screen.getByRole("button", { name: "Update password" });
+    const submitBtn = screen.getByRole("button", { name: "Cập nhật mật khẩu" });
     submitBtn.focus();
     expect(document.activeElement).toBe(submitBtn);
 
@@ -132,7 +132,7 @@ describe("bẫy focus — hành vi MỚI, không kế thừa từ modal nào tro
 
     fireEvent.keyDown(current, { key: "Tab", shiftKey: true });
 
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Update password" }));
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Cập nhật mật khẩu" }));
   });
 
   it("Shift+Tab ngay khi vừa mở (focus đang ở panel) vòng xuống phần tử CUỐI, không thoát ra trang", () => {
@@ -142,7 +142,7 @@ describe("bẫy focus — hành vi MỚI, không kế thừa từ modal nào tro
 
     fireEvent.keyDown(panel, { key: "Tab", shiftKey: true });
 
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Update password" }));
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Cập nhật mật khẩu" }));
   });
 
   it("Tab ở GIỮA không bị chặn — trình duyệt tự đi tiếp", () => {
@@ -161,7 +161,7 @@ describe("từ chối phía client — KHÔNG lượt mạng nào được phát
     fill("", "a-new-password", "a-new-password");
     submit();
 
-    expect(screen.getByRole("alert").textContent).toBe("Enter your current password.");
+    expect(screen.getByRole("alert").textContent).toBe("Hãy nhập mật khẩu hiện tại.");
     expect(changePasswordMock).not.toHaveBeenCalled();
   });
 
@@ -170,7 +170,7 @@ describe("từ chối phía client — KHÔNG lượt mạng nào được phát
     fill("cu-rich-2026", "moi-rich-2026", "moi-rich-2027");
     submit();
 
-    expect(screen.getByRole("alert").textContent).toBe("The two new passwords do not match.");
+    expect(screen.getByRole("alert").textContent).toBe("Hai ô mật khẩu mới không khớp nhau.");
     expect(changePasswordMock).not.toHaveBeenCalled();
   });
 
@@ -220,7 +220,7 @@ describe("aria-describedby chỉ tồn tại khi lỗi tồn tại", () => {
     // Suy từ hằng số: thứ đang kiểm là "gợi ý CÓ nêu sàn độ dài", không phải
     // sàn đó bằng bao nhiêu — viết số cứng làm test fail mỗi lần chính sách đổi.
     expect(document.getElementById(describedBy)?.textContent).toBe(
-      `At least ${PASSWORD_MIN_LENGTH} characters.`
+      `Tối thiểu ${PASSWORD_MIN_LENGTH} ký tự.`
     );
   });
 });
@@ -249,7 +249,7 @@ describe("đường server", () => {
       submit();
     });
 
-    expect(screen.getByRole("alert").textContent).toBe("That is not your current password.");
+    expect(screen.getByRole("alert").textContent).toBe("Mật khẩu hiện tại không đúng.");
     expect(props.onClose).not.toHaveBeenCalled();
     expect(fields().current.getAttribute("aria-disabled")).toBe("false");
   });
@@ -266,7 +266,7 @@ describe("đường server", () => {
     });
 
     expect(screen.getByRole("alert").textContent).toBe(
-      "That password is too common. Choose a different one."
+      "Mật khẩu này quá phổ biến. Hãy chọn mật khẩu khác."
     );
   });
 
@@ -280,7 +280,7 @@ describe("đường server", () => {
     });
 
     expect(screen.getByRole("alert").textContent).toBe(
-      "Too many attempts. Try again in 900 seconds."
+      "Thao tác quá nhiều lần. Thử lại sau 900 giây."
     );
   });
 
@@ -326,7 +326,7 @@ describe("đường server", () => {
     const f = fields();
     expect(f.current.disabled).toBe(false);
     expect(f.current.getAttribute("aria-disabled")).toBe("true");
-    expect(screen.getByRole("button", { name: "Cancel" }).getAttribute("aria-disabled")).toBeNull();
+    expect(screen.getByRole("button", { name: "Huỷ" }).getAttribute("aria-disabled")).toBeNull();
 
     await act(async () => {
       release(null);

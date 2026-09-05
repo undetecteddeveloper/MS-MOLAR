@@ -12,7 +12,7 @@
 import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { hasAdminsConfigured, isAdminUserId } from "@/lib/auth/admin";
-import { getTranslate } from "@/lib/i18n/server";
+import { t } from "@/lib/copy";
 import { listReportedExams } from "@/lib/supabase/service-role";
 import { ModerationRow } from "@/features/admin/components/ModerationRow";
 import { PageContainer } from "@/components/layout/PageContainer";
@@ -23,7 +23,6 @@ export default async function AdminPage() {
   const user = await getCurrentUser();
   if (!user || !isAdminUserId(user.id)) notFound();
 
-  const t = await getTranslate();
   const exams = await listReportedExams();
   const pending = exams.filter((e) => e.status !== "removed");
   const removed = exams.filter((e) => e.status === "removed");

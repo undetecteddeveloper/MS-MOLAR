@@ -2,35 +2,29 @@
 
 // BottomNav — thanh điều hướng ĐÁY, chỉ hiện dưới 768px.
 //
-// Lý do tồn tại (tài liệu Mobile-Layout-Research-MS §4.2 "Kiến trúc
-// Bottom-Heavy"): hơn 90% máy bán ra tại VN có màn hình trên 6 inch, nên phần
-// trên cùng màn hình là "Vùng Đỏ" — ngón cái phải vươn tới, thường buộc đổi tư
-// thế cầm hoặc dùng tay thứ hai. Năm đích chính vì thế được bóc khỏi header và
-// neo xuống viền dưới (Vùng Xanh).
+// Lý do tồn tại (Mobile-Layout-Research-MS §4.2): hơn 90% máy bán tại VN có màn
+// trên 6 inch, phần trên màn hình là "Vùng Đỏ" ngón cái phải vươn tới. Năm đích
+// chính vì thế neo xuống viền dưới. Nó cũng trả một lỗi đo được: trước đây 5
+// link + nút ngôn ngữ + ô profile nhồi một hàng làm mọi route tràn ngang 118px
+// ở 360px.
 //
-// Nó đồng thời trả một lỗi ĐO ĐƯỢC: trước thay đổi này, dãy 5 nav link + nút
-// ngôn ngữ + ô profile nhồi trong MỘT hàng ngang làm mọi route đã đăng nhập
-// tràn ngang 118px ở viewport 360px (scrollWidth 468 / clientWidth 350), và ô
-// profile nằm hẳn ngoài màn hình ở x=402–468.
+// SỐ Ô LUÔN LÀ 5, không đổi theo trạng thái đăng nhập: vị trí ô là trí nhớ cơ
+// bắp, xê dịch lúc đăng nhập/đăng xuất là phá đúng tính chất khiến thanh đáy
+// đáng dùng. Khách bấm ô cần đăng nhập thì middleware đưa về form đăng nhập.
 //
-// SỐ Ô LUÔN LÀ 5, không đổi theo trạng thái đăng nhập. Guest KHÔNG được thêm ô
-// "Account" ở đây (tag đó ở lại trên header): vị trí của một ô trong thanh đáy
-// là trí nhớ cơ bắp — người dùng bấm theo VỊ TRÍ chứ không đọc nhãn — nên xê
-// dịch nó lúc đăng nhập/đăng xuất là phá đúng cái tính chất khiến bottom nav
-// đáng dùng. Đây cũng là lý do dùng `NAV_ITEMS` chứ không phải `GUEST_NAV_ITEMS`.
+// Theme "Sân trường": nền trắng, ô đang chọn = icon đen trong viên thuốc VÀNG
+// NẮNG + nhãn đậm. Vàng chỉ đứng SAU icon đen (9,5:1) — tự nó không mang thông
+// tin, nên không phạm ngưỡng 3:1 của WCAG 1.4.11.
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BarChart3, ClipboardList, History, Home, Upload, type LucideIcon } from "lucide-react";
 import { NAV_ITEMS, isExamFocusRoute, isNavItemActive, navPrefetch } from "@/lib/nav/items";
-import { useT } from "@/lib/i18n/client";
-import type { MessageKey } from "@/lib/i18n/translate";
+import { t } from "@/lib/copy";
+import type { MessageKey } from "@/lib/copy";
 
-// Icon tra theo KHOÁ i18n, không theo thứ tự mảng: thêm/bớt/đổi chỗ một mục
-// trong NAV_ITEMS thì icon vẫn đi đúng mục của nó.
-// `Partial<Record<…>>` chứ không phải `Record<…>`: MessageKey là toàn bộ tập
-// khoá của từ điển (hàng trăm khoá), khai đủ là vô nghĩa — nhưng kiểu này vẫn
-// bắt được lỗi gõ sai tên khoá, là thứ thật sự cần bắt.
+// Icon tra theo KHOÁ, không theo thứ tự mảng: thêm/bớt/đổi chỗ một mục trong
+// NAV_ITEMS thì icon vẫn đi đúng mục của nó.
 const ICONS: Partial<Record<MessageKey, LucideIcon>> = {
   "nav.home": Home,
   "nav.exams": ClipboardList,
@@ -41,25 +35,18 @@ const ICONS: Partial<Record<MessageKey, LucideIcon>> = {
 
 export function BottomNav({ signedIn = false }: { signedIn?: boolean }) {
   const pathname = usePathname();
-  const t = useT();
 
-  // Chế độ tập trung khi đang làm bài (isExamFocusRoute). Thanh này vốn CHỈ
-  // hiện dưới 768px (`md:hidden`), nên "không render" ở đây đúng bằng "ẩn trên
-  // mobile" — không cần thêm class nào. Đọc pathname lúc render chứ không phải
-  // trong effect ⇒ bản dựng phía server đã đúng, không có một khung hình nào
-  // thanh này kịp nháy lên rồi biến mất.
+  // Chế độ tập trung khi làm bài: thanh này vốn chỉ hiện dưới 768px, nên "không
+  // render" đúng bằng "ẩn trên mobile". Đọc pathname lúc render ⇒ bản dựng
+  // phía server đã đúng, không có khung hình nào thanh này nháy lên rồi mất.
   if (isExamFocusRoute(pathname)) return null;
 
   return (
     <nav
-      // `md:hidden` — trên ≥768px tài liệu §3.1 nói bề ngang đã đủ để bỏ lối
-      // điều hướng nén và quay lại dãy tag ngang, việc mà SiteHeader lo.
-      //
-      // z-40: dưới modal (z-50: LeaveExamDialog, ReportExam, DeleteDialog) và
-      // dưới toast (z-70) — một thanh điều hướng đè lên hộp thoại xác nhận rời
-      // trang sẽ khiến người dùng bấm nhầm ngay giữa lúc đang mất bài làm.
+      // z-40: dưới modal (z-50) và toast (z-70) — thanh điều hướng đè lên hộp
+      // thoại xác nhận rời bài sẽ khiến người dùng bấm nhầm đúng lúc mất bài.
       aria-label={t("nav.primary")}
-      className="border-t border-[color:var(--nav-border)] bg-[var(--nav-bg)] fixed inset-x-0 bottom-0 z-40 backdrop-blur md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-[color:var(--nav-border)] bg-[var(--nav-bg)] backdrop-blur md:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
     >
       <ul className="flex items-stretch">
@@ -70,29 +57,27 @@ export function BottomNav({ signedIn = false }: { signedIn?: boolean }) {
             <li key={item.key} className="min-w-0 flex-1">
               <Link
                 href={item.href}
-                // Xem `navPrefetch`: với khách, prefetch một đích sau-đăng-nhập
-                // đổi lấy một 307 + một lượt render server hoàn toàn bỏ đi.
                 prefetch={navPrefetch(item, signedIn)}
                 aria-current={active ? "page" : undefined}
-                // min-h-14 = 56px: trên ngưỡng 44–48px mà tài liệu §4.3 yêu cầu
-                // cho vùng chạm. Chia đều `flex-1` nên bề ngang mỗi ô ở 360px
-                // là 72px — cũng vượt ngưỡng.
+                // min-h-15 = 60px = --bottom-nav-h: trên ngưỡng 44–48px của
+                // vùng chạm; bề ngang mỗi ô ở 360px là 72px.
                 className={[
-                  "flex min-h-14 flex-col items-center justify-center gap-1 px-1 py-1.5 transition-colors",
-                  // Màu chữ/icon trên nền đen sơn mài phải dùng
-                  // --brand-on-dark: đỏ son gốc #A62C2B trên #1B1512 chỉ đạt
-                  // 2.44:1, hụt cả 4.5:1 (chữ) lẫn 3:1 (chỉ báo phi văn bản).
-                  active
-                    ? "text-[color:var(--brand-on-dark)]"
-                    : "text-[#EDE1C8]/60 active:text-[#EDE1C8]",
+                  "focus-visible:ring-ring flex min-h-15 flex-col items-center justify-center gap-1 px-1 pt-1.5 pb-1 transition-colors focus-visible:ring-3 focus-visible:ring-inset focus-visible:outline-none",
+                  active ? "text-foreground" : "text-muted-foreground active:text-foreground",
                 ].join(" ")}
               >
-                {Icon && <Icon aria-hidden className="size-5 shrink-0" strokeWidth={1.75} />}
-                {/* Nhãn KHÔNG uppercase-tracking như dãy tag desktop: ở 10px
-                    cộng tracking 0.2em thì "Thống kê" tràn khỏi ô 72px. Đây là
-                    chỗ bố cục thắng sự đồng bộ hình thức — nhãn đọc được quan
-                    trọng hơn việc trông giống hệt navbar desktop. */}
-                <span className="w-full truncate text-center font-sans text-[10px] leading-none font-medium">
+                <span
+                  className={`flex h-7 w-11 items-center justify-center rounded-full transition-colors ${
+                    active ? "bg-sun" : ""
+                  }`}
+                >
+                  {Icon && <Icon aria-hidden className="size-[22px] shrink-0" strokeWidth={1.9} />}
+                </span>
+                <span
+                  className={`w-full truncate text-center text-[11px] leading-none ${
+                    active ? "font-semibold" : "font-medium"
+                  }`}
+                >
                   {t(item.key)}
                 </span>
               </Link>

@@ -1,5 +1,5 @@
 "use client";
-import { useT } from "@/lib/i18n/client";
+import { t } from "@/lib/copy";
 
 // ReportExam — kênh báo cáo đề published (UGC v2.0, AC-025/026 / Task 5.2).
 // Nút "{t("report.title")}" mở dialog (khuôn LeaveExamDialog: scrim đen sơn mài,
@@ -19,7 +19,6 @@ interface ReportExamProps {
 }
 
 export function ReportExam({ examId, initiallyReported }: ReportExamProps) {
-  const t = useT();
   const [reported, setReported] = useState(initiallyReported);
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");

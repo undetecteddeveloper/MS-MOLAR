@@ -3,7 +3,7 @@
 // UgcError để UI chỉ việc hiển thị. v2.1: nhãn câu nhận biết PHẦN — caller
 // truyền partNumber CHỈ với đề nhiều phần (đề 1 phần giữ nguyên "Câu N").
 
-import type { Translate } from "../i18n/translate";
+import type { Translate } from "@/lib/copy";
 import { LIMITS } from "./limits";
 import type { MetaFieldName, UgcError, UgcErrorCode, UgcErrorParams } from "./types";
 

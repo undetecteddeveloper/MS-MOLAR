@@ -3,11 +3,10 @@
 
 import { useActionState } from "react";
 import { moderateExamAction, type ModerationState } from "@/features/admin/actions";
-import { useT } from "@/lib/i18n/client";
+import { t } from "@/lib/copy";
 import type { ModeratableExam } from "@/lib/supabase/service-role";
 
 export function ModerationRow({ exam }: { exam: ModeratableExam }) {
-  const t = useT();
   const [state, formAction, pending] = useActionState<ModerationState, FormData>(
     moderateExamAction,
     null

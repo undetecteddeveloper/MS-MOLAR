@@ -14,7 +14,7 @@ import { useRef } from "react";
 import { useFormStatus } from "react-dom";
 // eslint-disable-next-line no-restricted-imports -- rò chéo có sẵn trước B4 (2026-09-03): signOut là của auth; profile chỉ đặt nút. Xem ARCHITECTURE.md § Import chéo.
 import { signOut } from "@/features/auth/actions";
-import { useT } from "@/lib/i18n/client";
+import { t } from "@/lib/copy";
 import { cn } from "@/lib/utils";
 import { outlineButtonCls } from "@/features/profile/components/styles";
 
@@ -28,7 +28,6 @@ export function SignOutButton() {
 
 /** Tách riêng vì `useFormStatus` chỉ đọc được trạng thái của form CHA nó. */
 function SubmitButton() {
-  const t = useT();
   const { pending } = useFormStatus();
   // Chốt đồng bộ: cửa sổ giữa lúc bấm và lúc redirect rất ngắn, nhưng hai cú
   // bấm trong đó không được phép bắn hai lượt đăng xuất. KHÔNG cần mở lại —

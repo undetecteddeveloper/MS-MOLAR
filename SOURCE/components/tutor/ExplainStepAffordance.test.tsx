@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-// ExplainStepAffordance [integration] — the "Explain this step" tutor
+// ExplainStepAffordance [integration] — the "Giải thích bước này" tutor
 // affordance and, through it, useTutorAction's 4-phase state machine (no
 // separate hook test file is named by the frontend Design Doc's own
 // Implementation Path Mapping; the hook is exercised through the component it
@@ -55,9 +55,9 @@ const mockExplainStep = vi.mocked(explainStep);
 const ATTEMPT_ID = "attempt-fixture-111";
 const QUESTION_ID = "question-fixture-222";
 
-const IDLE_LABEL = "Explain this step"; // tutor.explainThisStep (en)
-const RETRY_LABEL = "Retry"; // common.retry (en), reused per ActionButton's LABEL_KEY precedent
-const ERROR_COPY = "Couldn't load a hint. Try again."; // tutor.error (en) — ONE generic copy for all 4 backend codes
+const IDLE_LABEL = "Giải thích bước này"; // tutor.explainThisStep (en)
+const RETRY_LABEL = "Thử lại"; // common.retry (en), reused per ActionButton's LABEL_KEY precedent
+const ERROR_COPY = "Chưa lấy được gợi ý. Bạn thử lại nhé."; // tutor.error (en) — ONE generic copy for all 4 backend codes
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -250,7 +250,7 @@ describe("ExplainStepAffordance", () => {
     expect(within(container).queryByRole("button", { name: IDLE_LABEL })).toBeNull();
     expect(within(container).queryByRole("button", { name: RETRY_LABEL })).toBeNull();
     expect(container.querySelectorAll("button").length).toBe(0);
-    expect(container.textContent).toContain("Hint"); // tutor.hintEyebrow
+    expect(container.textContent).toContain("Gợi ý"); // tutor.hintEyebrow
 
     // Hồi quy Phase 5 Task 19 (đo bằng bàn phím trên trình duyệt thật, không
     // phải suy diễn): D5 xoá hẳn cái nút vừa GIỮ FOCUS của người dùng bàn phím,

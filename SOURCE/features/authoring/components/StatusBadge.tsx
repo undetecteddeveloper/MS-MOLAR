@@ -5,8 +5,8 @@
 // dựa màu). Client component vì nhãn phải theo ngôn ngữ đang chọn — cả hai nơi
 // dùng nó (ExamRow, ReviewScreen) đều đã là client nên không mất gì.
 
-import { useT } from "@/lib/i18n/client";
-import type { MessageKey } from "@/lib/i18n/translate";
+import { t } from "@/lib/copy";
+import type { MessageKey } from "@/lib/copy";
 import { cn } from "@/lib/utils";
 
 type Status = "processing" | "review" | "draft" | "published" | "failed";
@@ -49,7 +49,6 @@ export function StatusBadge({
   status: string;
   className?: string;
 }) {
-  const t = useT();
   const cfg = CONFIG[status as Status] ?? CONFIG.processing;
   return (
     <span

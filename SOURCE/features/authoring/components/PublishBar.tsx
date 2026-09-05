@@ -5,7 +5,7 @@
 // sạch). Đề đã published: "Save changes" (validate trước khi ghi). Luôn có
 // Delete. Trạng thái saving/publishing + thông báo lỗi.
 
-import { useT } from "@/lib/i18n/client";
+import { t } from "@/lib/copy";
 import { DeleteDialog } from "@/features/authoring/components/DeleteDialog";
 
 interface PublishBarProps {
@@ -33,7 +33,6 @@ export function PublishBar({
   onSave,
   onPublish,
 }: PublishBarProps) {
-  const t = useT();
   const busy = saving || publishing;
   return (
     <div className="sticky bottom-0 -mx-6 border-t border-border bg-background/95 px-6 py-4 backdrop-blur">

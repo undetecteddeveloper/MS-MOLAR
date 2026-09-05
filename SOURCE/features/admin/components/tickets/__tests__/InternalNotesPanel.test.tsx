@@ -22,8 +22,8 @@ afterEach(cleanup);
 describe("InternalNotesPanel", () => {
   it("empty notes list shows the empty-state message, form still shown", () => {
     render(<InternalNotesPanel ticketId="ticket-1" notes={[]} />);
-    expect(screen.getByText("No internal notes yet.")).toBeDefined();
-    expect(screen.getByPlaceholderText(/Internal note/)).toBeDefined();
+    expect(screen.getByText("Chưa có ghi chú nội bộ.")).toBeDefined();
+    expect(screen.getByPlaceholderText(/Ghi chú nội bộ/)).toBeDefined();
   });
 
   it("renders existing notes with text + admin id + timestamp", () => {
@@ -40,11 +40,11 @@ describe("InternalNotesPanel", () => {
 
   it("submitting a note forwards the exact (ticketId, noteText) pair to addTicketNoteAction", async () => {
     render(<InternalNotesPanel ticketId="ticket-42" notes={[]} />);
-    const textarea = screen.getByPlaceholderText(/Internal note/) as HTMLTextAreaElement;
+    const textarea = screen.getByPlaceholderText(/Ghi chú nội bộ/) as HTMLTextAreaElement;
     fireEvent.change(textarea, { target: { value: "a fresh note" } });
 
     await act(async () => {
-      screen.getByRole("button", { name: /Save note|working/i }).click();
+      screen.getByRole("button", { name: /Lưu ghi chú|Đang xử lý/i }).click();
       await Promise.resolve();
     });
 

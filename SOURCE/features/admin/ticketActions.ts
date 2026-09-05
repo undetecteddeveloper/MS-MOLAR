@@ -7,10 +7,10 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isAdminUserId } from "@/lib/auth/admin";
-import { getTranslate } from "@/lib/i18n/server";
+import { t } from "@/lib/copy";
 import { addSupportTicketNote, changeSupportTicketStatus } from "@/lib/supabase/service-role";
 import type { TicketActionState, TicketStatus } from "@/lib/support/types";
-import type { MessageKey } from "@/lib/i18n/translate";
+import type { MessageKey } from "@/lib/copy";
 
 const VALID_STATUSES: readonly TicketStatus[] = ["new", "in_progress", "resolved"];
 
@@ -28,7 +28,6 @@ export async function changeTicketStatusAction(
   ticketId: string,
   nextStatus: TicketStatus
 ): Promise<TicketActionState> {
-  const t = await getTranslate();
 
   const supabase = await createClient();
   const {
@@ -68,7 +67,6 @@ export async function addTicketNoteAction(
   ticketId: string,
   noteText: string
 ): Promise<TicketActionState> {
-  const t = await getTranslate();
 
   const supabase = await createClient();
   const {

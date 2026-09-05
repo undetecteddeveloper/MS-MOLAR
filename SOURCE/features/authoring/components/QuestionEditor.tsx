@@ -23,8 +23,8 @@
 import dynamic from "next/dynamic";
 import { useState, type ReactNode } from "react";
 import { QuestionFigure } from "@/components/shared/QuestionFigure";
-import { useT } from "@/lib/i18n/client";
-import type { MessageKey } from "@/lib/i18n/translate";
+import { t } from "@/lib/copy";
+import type { MessageKey } from "@/lib/copy";
 import { LIMITS, maxEssayAnswerFor, maxStemFor } from "@/lib/ugc/limits";
 import type { AssembledQuestion, ChoiceId, SubItemId } from "@/lib/ugc/types";
 import {
@@ -150,7 +150,6 @@ export function QuestionEditor({
   subject,
   essayGradingEnabled = false,
 }: QuestionEditorProps) {
-  const t = useT();
   const [editing, setEditing] = useState(false);
   const q = question;
   const empty = <span className="text-brand">{t("upload.emptyPlaceholder")}</span>;

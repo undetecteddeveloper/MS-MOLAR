@@ -15,7 +15,7 @@
 // ExamPlayer của test TRƯỚC vẫn còn sống, listener của nó vẫn gắn trên
 // document, và sẽ giành lấy click của test SAU (bắt trước, gọi
 // preventDefault/stopPropagation, rồi set state lên đúng CÂY CŨ chứ không
-// phải container test hiện tại) — dialog "Leave this exam?" không hiện ra ở
+// phải container test hiện tại) — dialog "Rời khỏi đề này?" không hiện ra ở
 // container đang kiểm, dù cơ chế chặn vẫn chạy đúng. Luôn `unmount()` trong
 // `afterEach` khi test một component dùng hook này.
 //
@@ -81,10 +81,10 @@ afterEach(() => {
 });
 
 describe("ExamPlayer — về danh sách đề (Breadcrumbs)", () => {
-  it("mốc 'Exams' trỏ /exams, mốc cuối là tên đề hiện tại (không phải link)", () => {
+  it("mốc 'Kho đề' trỏ /exams, mốc cuối là tên đề hiện tại (không phải link)", () => {
     const { container } = renderPlayer();
 
-    const link = within(container).getByRole("link", { name: "Exams" });
+    const link = within(container).getByRole("link", { name: "Kho đề" });
     expect(link.getAttribute("href")).toBe("/exams");
     expect(within(container).getAllByText("Đề kiểm tra giữa kỳ").length).toBeGreaterThan(0);
   });
@@ -92,20 +92,20 @@ describe("ExamPlayer — về danh sách đề (Breadcrumbs)", () => {
   it("là thẻ <a> thật (không phải button) — để interceptor useLeaveGuard bắt được", () => {
     const { container } = renderPlayer();
 
-    const link = within(container).getByRole("link", { name: "Exams" });
+    const link = within(container).getByRole("link", { name: "Kho đề" });
     expect(link.tagName).toBe("A");
   });
 
   it("bấm vào KHÔNG rời trang thẳng — useLeaveGuard chặn và hiện modal xác nhận", () => {
     const { container } = renderPlayer();
 
-    const link = within(container).getByRole("link", { name: "Exams" });
+    const link = within(container).getByRole("link", { name: "Kho đề" });
     fireEvent.click(link);
 
-    // Modal "Leave this exam?" (LeaveExamDialog) phải xuất hiện — bằng chứng
+    // Modal "Rời khỏi đề này?" (LeaveExamDialog) phải xuất hiện — bằng chứng
     // interceptor CAPTURE PHASE của useLeaveGuard đã chặn cú click này lại,
     // thay vì để next/link điều hướng thẳng.
     expect(within(container).getByRole("dialog")).toBeTruthy();
-    expect(within(container).getByText("Leave this exam?")).toBeTruthy();
+    expect(within(container).getByText("Rời khỏi đề này?")).toBeTruthy();
   });
 });

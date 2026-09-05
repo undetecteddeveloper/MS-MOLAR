@@ -1,13 +1,11 @@
-// ExamBrowser — danh sách đề trong Exam Browser (Layer 2).
-// Lưới ExamCard responsive: 1 cột (mobile) → 2 (sm) → 3 (lg) với gap đều
-// (S#19 — container /exams nới max-w-6xl để đủ chỗ 3 card/hàng). Empty state
-// khi lọc không ra kết quả. Lọc do ExamFilters (overlay) đảm nhiệm.
+// ExamBrowser — lưới thẻ đề: 1 cột (mobile) → 2 (sm) → 3 (lg). Empty state khi
+// lọc không ra kết quả. Lọc do ExamFilters đảm nhiệm.
 // Rating System (R4, NFR Performance): tính eligibility per-card TẠI ĐÂY, từ
-// MỘT set submittedExamIds + isLoggedIn nhận từ ExamsPage — KHÔNG per-card
-// fetch (Minimal Surface Alternatives Element 1, frontend DD).
+// MỘT tập submittedExamIds + isLoggedIn nhận từ trang — KHÔNG per-card fetch.
 
-import { getTranslate } from "@/lib/i18n/server";
+import { t } from "@/lib/copy";
 import type { Exam } from "@/types/exam";
+import { Card } from "@/components/ui/card";
 import { ExamCard } from "@/features/exams/components/ExamCard";
 import type { RateEligibility } from "@/features/exams/components/rating/RateButton";
 
@@ -15,21 +13,34 @@ interface ExamBrowserProps {
   exams: Exam[];
   submittedExamIds: Set<string>;
   isLoggedIn: boolean;
+  /** `grid` (mặc định) = lưới 1→2→3 cột của /exams. `stack` = một cột dọc, cho
+   *  cột hẹp bên phải hero ở trang chủ. */
+  layout?: "grid" | "stack";
 }
 
-export async function ExamBrowser({ exams, submittedExamIds, isLoggedIn }: ExamBrowserProps) {
-  const t = await getTranslate();
+export async function ExamBrowser({
+  exams,
+  submittedExamIds,
+  isLoggedIn,
+  layout = "grid",
+}: ExamBrowserProps) {
   if (exams.length === 0) {
     return (
-      <div className="border-border flex min-h-50 flex-col items-center justify-center gap-2 rounded-lg border border-dashed py-16 text-center">
-        <p className="text-foreground font-serif text-lg">{t("exams.noMatch")}</p>
+      <Card variant="outline" className="items-center justify-center gap-1 border-dashed py-14 text-center">
+        <p className="text-foreground text-lg font-semibold">{t("exams.noMatch")}</p>
         <p className="text-muted-foreground text-sm">{t("exams.noMatchHint")}</p>
-      </div>
+      </Card>
     );
   }
 
   return (
-    <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <ul
+      className={
+        layout === "stack"
+          ? "flex flex-col gap-3"
+          : "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+      }
+    >
       {exams.map((exam) => (
         <ExamCard
           key={exam.id}

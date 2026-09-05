@@ -69,11 +69,9 @@ vi.mock("next/navigation", () => ({ usePathname: () => "/exams" }));
 // provider nên không đứng giữa khẳng định nào của file này.
 vi.mock("@/components/shared/SkipLink", () => ({ SkipLink: () => null }));
 vi.mock("@/lib/support/actions", () => ({ submitSupportTicket: vi.fn() }));
-vi.mock("@/lib/i18n/actions", () => ({ setLocale: vi.fn() }));
 vi.mock("@/features/auth/actions", () => ({ signOut: vi.fn() }));
 
 import Layer2Layout from "@/app/(exams)/layout";
-import { TutorQuotaNote } from "@/components/billing/TutorQuotaNote";
 import { useEntitlement } from "@/lib/billing/entitlement";
 import { FREE_FALLBACK, type Entitlement, type Quota } from "@/lib/billing/types";
 
@@ -135,7 +133,6 @@ const EXPECTED_PROBE = [
  *  so khớp mốc ISO chính xác thay vì một chuỗi ngày đã format). Vai trò còn lại
  *  của ca dùng hằng này là chứng minh component bị gate THÔI trả null — bộ đếm
  *  `7/500` (không thể ra từ FREE_FALLBACK) đủ cho điều đó. */
-const EXPECTED_NOTE = `${TUTOR_USED}/${PREMIUM_TUTOR_LIMIT} tutor hints used this period.`;
 
 // ───────────────────────── Nguồn dữ liệu bị stub ─────────────────────────────
 
@@ -208,7 +205,6 @@ async function renderLayer2() {
       children: (
         <>
           <EntitlementProbe />
-          <TutorQuotaNote />
         </>
       ),
     })
@@ -278,16 +274,6 @@ describe("(exams)/layout.tsx — đứa con bị gate KHÔNG nhận FREE_FALLBAC
 
     expect(probeText(container)).not.toBe(describeEntitlement(FREE_FALLBACK));
     expect(probeText(container).startsWith("free|")).toBe(false);
-  });
-
-  it("TutorQuotaNote — component bị gate CÓ THẬT — thôi trả null vĩnh viễn (AC-042 nửa render)", async () => {
-    const { container } = await renderLayer2();
-    const q = within(container);
-
-    // Đây là chế độ hỏng nguyên bản, đọc được bằng mắt: thiếu provider thì
-    // `tutor.state === "unknown"` và TutorQuotaNote.tsx:30 trả null cho MỌI
-    // người dùng, mãi mãi, trong khi mọi cổng tĩnh vẫn xanh.
-    expect(q.getByText(EXPECTED_NOTE)).toBeTruthy();
   });
 
   it("đọc quyền lợi bằng ĐÚNG user id mà layout vừa phân giải", async () => {

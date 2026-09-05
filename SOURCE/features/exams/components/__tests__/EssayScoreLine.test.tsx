@@ -20,13 +20,12 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined }) }));
 
-import { renderServerTree } from "@/app/(billing)/me/orders/__tests__/renderServerTree";
+import { renderServerTree } from "@/tests/helpers/renderServerTree";
 import { EssayScoreLine } from "@/features/exams/components/EssayScoreLine";
-import { DEFAULT_LOCALE } from "@/lib/i18n/locales";
-import { getDictionary } from "@/lib/i18n/translate";
+import { copy } from "@/lib/copy";
 import type { EssaySummary } from "@/lib/scoring/essayLifecycle";
 
-const DICT = getDictionary(DEFAULT_LOCALE);
+const DICT = copy;
 const HREF = "/exams/e1/attempt/a1/result/detail";
 
 function summary(over: Partial<EssaySummary> = {}): EssaySummary {

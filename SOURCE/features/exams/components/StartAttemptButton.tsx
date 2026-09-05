@@ -14,11 +14,10 @@
 // bấm liên kết) và tự khoá + đổi nhãn trong lúc chờ.
 
 import { startAttempt } from "@/features/exams/actions";
-import { getTranslate } from "@/lib/i18n/server";
+import { t } from "@/lib/copy";
 import { StartAttemptSubmit } from "@/features/exams/components/StartAttemptSubmit";
 
 export async function StartAttemptButton({ examId }: { examId: string }) {
-  const t = await getTranslate();
   const start = startAttempt.bind(null, examId);
 
   return (

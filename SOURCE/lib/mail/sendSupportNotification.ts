@@ -5,7 +5,7 @@
 // nhầm client import ngay lúc build.
 import "server-only";
 import nodemailer from "nodemailer";
-import type { Translate } from "@/lib/i18n/translate";
+import type { Translate } from "@/lib/copy";
 import type { TicketIntent } from "@/lib/support/types";
 
 // R16/D10 — token BẮT BUỘC đứng đầu MỌI subject module này compose, kể cả

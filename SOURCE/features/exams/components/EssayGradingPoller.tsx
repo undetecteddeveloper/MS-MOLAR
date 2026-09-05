@@ -36,7 +36,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { useT } from "@/lib/i18n/client";
+import { t } from "@/lib/copy";
 
 /** Nhịp nhanh cho một phút đầu. */
 export const ESSAY_POLL_FAST_INTERVAL_MS = 5_000;
@@ -73,7 +73,6 @@ export function EssayGradingPoller({
   pendingCount: number;
   gradedCount: number;
 }) {
-  const t = useT();
   const router = useRouter();
   const [stopped, setStopped] = useState(false);
   const [announcement, setAnnouncement] = useState("");

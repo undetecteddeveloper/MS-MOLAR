@@ -7,14 +7,13 @@
 
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
-import { getTranslate } from "@/lib/i18n/server";
+import { t } from "@/lib/copy";
 import { getAnalyticsByRange, getSkillRecommendation } from "@/features/analytics/queries";
 import { AnalyticsDashboard } from "@/features/analytics/components/AnalyticsDashboard";
 import { SkillRecommendationCard } from "@/features/analytics/components/SkillRecommendationCard";
 import { PageContainer } from "@/components/layout/PageContainer";
 
 export default async function DashboardPage() {
-  const t = await getTranslate();
   const user = await getCurrentUser();
   if (!user) redirect("/?auth=signin");
 

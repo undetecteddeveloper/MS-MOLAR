@@ -13,7 +13,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import type { MyExamListItem } from "@/features/authoring/queries";
-import { useT } from "@/lib/i18n/client";
+import { t } from "@/lib/copy";
 import { ExamRow } from "@/features/authoring/components/ExamRow";
 import {
   Tabs,
@@ -38,7 +38,6 @@ export function MyExamsList({
   exams: MyExamListItem[];
   justPublished: boolean;
 }) {
-  const t = useT();
   const pending = exams.filter((exam) => exam.status !== "published");
   const published = exams.filter((exam) => exam.status === "published");
 

@@ -6,8 +6,8 @@
 // đòi trạng thái này sống qua reload (frontend DD State Transitions).
 
 import { useState } from "react";
-import { useT } from "@/lib/i18n/client";
-import type { MessageKey } from "@/lib/i18n/translate";
+import { t } from "@/lib/copy";
+import type { MessageKey } from "@/lib/copy";
 import type { TicketWithNotes } from "@/lib/supabase/service-role";
 import type { TicketIntent } from "@/lib/support/types";
 import { TicketStatusBadge } from "@/features/admin/components/tickets/TicketStatusBadge";
@@ -21,7 +21,6 @@ const INTENT_LABEL_KEY: Record<TicketIntent, MessageKey> = {
 };
 
 export function TicketQueueRow({ ticket }: { ticket: TicketWithNotes }) {
-  const t = useT();
   const [expanded, setExpanded] = useState(false);
 
   return (

@@ -19,6 +19,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ExplainStepAffordance } from "./ExplainStepAffordance";
 import { EntitlementProvider } from "@/lib/billing/entitlement";
 import { FREE_FALLBACK, type Entitlement } from "@/lib/billing/types";
+import { copy } from "@/lib/copy";
 
 vi.mock("@/features/exams/tutorActions", () => ({
   explainStep: vi.fn(),
@@ -31,10 +32,9 @@ const mockExplainStep = vi.mocked(explainStep);
 const ATTEMPT_ID = "attempt-fixture-333";
 const QUESTION_ID = "question-fixture-444";
 
-const IDLE_LABEL = "Explain this step"; // tutor.explainThisStep (en)
-const EXHAUSTED_COPY = "You've used all your tutor hints for this period."; // billing.quota.tutorExhausted
-const UPGRADE_LABEL = "See plans"; // billing.quota.upgradeLink
-const GENERIC_ERROR = "Couldn't load a hint. Try again."; // tutor.error (en)
+const IDLE_LABEL = copy["tutor.explainThisStep"];
+const EXHAUSTED_COPY = copy["billing.quota.tutorExhausted"];
+const GENERIC_ERROR = copy["tutor.error"];
 
 function renderWith(entitlement: Entitlement) {
   return render(
@@ -51,15 +51,12 @@ const exhausted = (plan: "free" | "premium", limit: number): Entitlement => ({
 });
 
 describe("hết hạn mức kỳ → không có nút, không có lời gọi nào", () => {
-  it("Free đã dùng 5/5: hiện lý do + lối nâng cấp, KHÔNG có nút gia sư (AC-014)", () => {
+  it("Free đã dùng 5/5: hiện lý do, KHÔNG có nút gia sư và KHÔNG có lối nâng cấp (AC-014)", () => {
     const { container } = renderWith(exhausted("free", 5));
     const q = within(container);
 
     expect(q.queryByRole("button")).toBeNull();
     expect(q.getByText(EXHAUSTED_COPY)).toBeTruthy();
-
-    const link = q.getByRole("link", { name: UPGRADE_LABEL });
-    expect(link.getAttribute("href")).toBe("/pricing");
   });
 
   it("KHÔNG gọi explainStep lần nào ở ca bị chặn — 0 request tới Gemini (AC-014)", () => {
@@ -83,14 +80,6 @@ describe("hết hạn mức kỳ → không có nút, không có lời gọi nà
     // nhau. Sau thay đổi này thì không.
     expect(within(container).queryByText(GENERIC_ERROR)).toBeNull();
     expect(EXHAUSTED_COPY).not.toBe(GENERIC_ERROR);
-  });
-
-  it("vùng chạm của lối nâng cấp đạt sàn 44px", () => {
-    const { container } = renderWith(exhausted("free", 5));
-    const link = within(container).getByRole("link", { name: UPGRADE_LABEL });
-    // Không có size nào của Button đạt 44px nên mọi đích chạm trong repo đều
-    // phải override — ghim lại để lần refactor sau không đánh rơi.
-    expect(link.className).toContain("min-h-11");
   });
 });
 
@@ -129,8 +118,5 @@ describe("không dùng `disabled` gốc ở bất kỳ trạng thái nào", () =
     // ĐỌC lý do. Ở đây giải bằng cách không có nút — lý do là văn bản thường,
     // và lối đi tiếp là một liên kết thật, focus được.
     expect(container.querySelector("button[disabled]")).toBeNull();
-    const link = within(container).getByRole("link", { name: UPGRADE_LABEL });
-    link.focus();
-    expect(document.activeElement).toBe(link);
   });
 });

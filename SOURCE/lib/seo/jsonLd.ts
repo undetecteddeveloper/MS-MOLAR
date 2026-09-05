@@ -16,21 +16,17 @@
 // khai để trỏ tới — khai một action dẫn tới trang đòi đăng nhập là tự tạo dữ
 // liệu sai.
 
-import type { Locale } from "@/lib/i18n/locales";
 import { SITE_URL } from "@/lib/siteUrl";
 
 /** Cách viết tên thương hiệu mà người dùng thật sẽ gõ vào ô tìm kiếm. Google
  *  không tự suy ra "MS MOLAR" (cách nhau bằng dấu cách) từ "MS-MOLAR". */
 const ALTERNATE_NAMES = ["MS MOLAR", "MSMOLAR", "MS-Molar"];
 
-const DESCRIPTION: Record<Locale, string> = {
-  en: "Online exam practice platform for secondary and high school students in Vietnam. Practise real exams, get scored instantly, and track your progress.",
-  vi: "Nền tảng luyện đề trực tuyến cho học sinh THCS và THPT tại Việt Nam. Luyện đề thật, chấm điểm tức thì và theo dõi tiến bộ của bạn.",
-};
+const DESCRIPTION = "Nền tảng luyện đề trực tuyến cho học sinh THCS và THPT tại Việt Nam. Luyện đề thật, chấm điểm tức thì và theo dõi tiến bộ của bạn.";
 
 /** BCP-47 cho `inLanguage` — schema.org muốn thẻ ngôn ngữ đầy đủ, không phải
  *  mã 2 chữ cái trần như cookie i18n của dự án. */
-const BCP47: Record<Locale, string> = { en: "en-US", vi: "vi-VN" };
+const IN_LANGUAGE = "vi-VN";
 
 /**
  * Đồ thị JSON-LD của trang chủ: một `Organization` và một `WebSite` trỏ về nó.
@@ -39,7 +35,7 @@ const BCP47: Record<Locale, string> = { en: "en-US", vi: "vi-VN" };
  * tham chiếu chéo được mà không lặp dữ liệu — và để lần sau thêm node mới
  * (`WebPage`, `Course`…) chỉ việc trỏ `@id` chứ không phải chép lại cả khối.
  */
-export function buildHomeJsonLd(locale: Locale): Record<string, unknown> {
+export function buildHomeJsonLd(): Record<string, unknown> {
   const organizationId = `${SITE_URL}/#organization`;
   const websiteId = `${SITE_URL}/#website`;
 
@@ -55,7 +51,7 @@ export function buildHomeJsonLd(locale: Locale): Record<string, unknown> {
         // `app/icon.png` — Next phục vụ nó ở `/icon.png`; dùng lại thay vì
         // thêm một file logo thứ hai phải nhớ đồng bộ.
         logo: `${SITE_URL}/icon.png`,
-        description: DESCRIPTION[locale],
+        description: DESCRIPTION,
       },
       {
         "@type": "WebSite",
@@ -63,7 +59,7 @@ export function buildHomeJsonLd(locale: Locale): Record<string, unknown> {
         name: "MS-MOLAR",
         alternateName: ALTERNATE_NAMES,
         url: `${SITE_URL}/`,
-        inLanguage: BCP47[locale],
+        inLanguage: IN_LANGUAGE,
         publisher: { "@id": organizationId },
       },
     ],

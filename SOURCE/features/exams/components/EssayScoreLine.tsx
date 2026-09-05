@@ -45,7 +45,7 @@
 
 import Link from "next/link";
 import { EssayLifecycleBadge } from "@/components/essay/EssayLifecycleBadge";
-import { getTranslate } from "@/lib/i18n/server";
+import { t } from "@/lib/copy";
 import type { EssaySummary } from "@/lib/scoring/essayLifecycle";
 
 /** Band hiển thị hai chữ số thập phân, cắt số 0 thừa: `0.75`, `1`, `0.5`. */
@@ -60,7 +60,6 @@ export async function EssayScoreLine({
   summary: EssaySummary | undefined;
   detailHref: string;
 }) {
-  const t = await getTranslate();
 
   // KHÔNG khoá vòng đời nào ⇒ KHÔNG node nào. Xem đầu file.
   if (!summary) return null;

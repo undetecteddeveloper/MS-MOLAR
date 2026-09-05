@@ -22,7 +22,7 @@
 // và giấu nó đi nghĩa là bắt họ bấm Publish để hỏi server còn thiếu bao nhiêu.
 
 import { useState, useSyncExternalStore } from "react";
-import { useT } from "@/lib/i18n/client";
+import { t } from "@/lib/copy";
 import { distributePoints, isTotalBalanced, sumPoints } from "@/lib/ugc/distributePoints";
 import { LIMITS } from "@/lib/ugc/limits";
 import type { AssembledQuestion, ExtractedPart } from "@/lib/ugc/types";
@@ -59,7 +59,6 @@ function getWideSnapshot(): boolean {
 type ScopeKind = "part" | "range";
 
 export function PointsPanel({ questions, parts, onApply, disabled = false }: PointsPanelProps) {
-  const t = useT();
   const partNumbers = partNumbersOf(questions);
 
   // Mobile mặc định THU GỌN (panel chiếm chỗ hiển thị vốn đã hẹp), desktop mở.

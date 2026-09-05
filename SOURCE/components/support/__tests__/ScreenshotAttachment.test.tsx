@@ -26,14 +26,14 @@ function pngFile(name: string, size = 1024): File {
 describe("ScreenshotAttachment", () => {
   it("no file selected: shows the file input, no thumbnail", () => {
     render(<ScreenshotAttachment file={null} error={null} onSelect={() => {}} disabled={false} />);
-    expect(screen.getByLabelText(/Attach a screenshot/)).toBeDefined();
+    expect(screen.getByLabelText(/Đính kèm ảnh chụp màn hình/)).toBeDefined();
     expect(screen.queryByRole("img")).toBeNull();
   });
 
   it("selecting a valid file calls onSelect(file, null)", () => {
     const onSelect = vi.fn();
     render(<ScreenshotAttachment file={null} error={null} onSelect={onSelect} disabled={false} />);
-    const input = screen.getByLabelText(/Attach a screenshot/) as HTMLInputElement;
+    const input = screen.getByLabelText(/Đính kèm ảnh chụp màn hình/) as HTMLInputElement;
     const file = pngFile("shot.png");
     Object.defineProperty(input, "files", { value: [file] });
     input.dispatchEvent(new Event("change", { bubbles: true }));
@@ -46,7 +46,7 @@ describe("ScreenshotAttachment", () => {
       <ScreenshotAttachment file={null} error={null} onSelect={onSelect} disabled={false} />
     );
     const firstFile = pngFile("first.png");
-    let input = screen.getByLabelText(/Attach a screenshot/) as HTMLInputElement;
+    let input = screen.getByLabelText(/Đính kèm ảnh chụp màn hình/) as HTMLInputElement;
     Object.defineProperty(input, "files", { value: [firstFile] });
     input.dispatchEvent(new Event("change", { bubbles: true }));
 
@@ -54,12 +54,12 @@ describe("ScreenshotAttachment", () => {
     // With a file attached, the control swaps to the thumbnail+remove view —
     // there is exactly one slot, so the file input isn't reachable without
     // removing first. Exercise the remove control, then re-select.
-    screen.getByText("Remove image").click();
+    screen.getByText("Xoá ảnh").click();
     expect(onSelect).toHaveBeenLastCalledWith(null, null);
 
     rerender(<ScreenshotAttachment file={null} error={null} onSelect={onSelect} disabled={false} />);
     const secondFile = pngFile("second.png");
-    input = screen.getByLabelText(/Attach a screenshot/) as HTMLInputElement;
+    input = screen.getByLabelText(/Đính kèm ảnh chụp màn hình/) as HTMLInputElement;
     Object.defineProperty(input, "files", { value: [secondFile] });
     input.dispatchEvent(new Event("change", { bubbles: true }));
     expect(onSelect).toHaveBeenLastCalledWith(secondFile, null);
@@ -69,7 +69,7 @@ describe("ScreenshotAttachment", () => {
   it("an oversized file is rejected client-side: onSelect(null, 'too_large'), same LIMITS as the server", () => {
     const onSelect = vi.fn();
     render(<ScreenshotAttachment file={null} error={null} onSelect={onSelect} disabled={false} />);
-    const input = screen.getByLabelText(/Attach a screenshot/) as HTMLInputElement;
+    const input = screen.getByLabelText(/Đính kèm ảnh chụp màn hình/) as HTMLInputElement;
     const tooBig = pngFile("big.png", LIMITS.MAX_SCREENSHOT_BYTES + 1);
     Object.defineProperty(input, "files", { value: [tooBig] });
     input.dispatchEvent(new Event("change", { bubbles: true }));
@@ -79,7 +79,7 @@ describe("ScreenshotAttachment", () => {
   it("a disallowed MIME type is rejected client-side: onSelect(null, 'invalid_type')", () => {
     const onSelect = vi.fn();
     render(<ScreenshotAttachment file={null} error={null} onSelect={onSelect} disabled={false} />);
-    const input = screen.getByLabelText(/Attach a screenshot/) as HTMLInputElement;
+    const input = screen.getByLabelText(/Đính kèm ảnh chụp màn hình/) as HTMLInputElement;
     const pdf = new File([new Uint8Array(10)], "doc.pdf", { type: "application/pdf" });
     Object.defineProperty(input, "files", { value: [pdf] });
     input.dispatchEvent(new Event("change", { bubbles: true }));

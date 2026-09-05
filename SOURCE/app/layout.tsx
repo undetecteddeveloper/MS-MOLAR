@@ -1,37 +1,24 @@
 import { Suspense } from "react";
 import type { Metadata, Viewport } from "next";
-import { Geist_Mono, Source_Serif_4, Be_Vietnam_Pro } from "next/font/google";
+import { Lexend } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { RouteLoadingOverlay } from "@/components/layout/RouteLoadingOverlay";
-import { I18nProvider } from "@/lib/i18n/client";
-import { getLocale } from "@/lib/i18n/server";
 import { SITE_URL } from "@/lib/siteUrl";
 import "./globals.css";
 
-// Font theo globals.css ("Mực & Sơn mài") — đồng bộ TOÀN site (S#17):
-// Source Serif 4 cho display/h1/h2/quote (--font-serif/--font-heading),
-// Be Vietnam Pro cho body/label-caps (--font-sans). Geist Mono giữ cho
-// --font-mono (timer MM:SS, nhãn chữ cái A/B/C/D). Merriweather + Geist Sans
-// đã gỡ khỏi bundle (TTF Merriweather vẫn nằm trong ASSETS/fonts).
-const sourceSerif = Source_Serif_4({
-  variable: "--font-source-serif",
-  subsets: ["latin", "vietnamese"],
-});
-
-const beVietnamPro = Be_Vietnam_Pro({
-  variable: "--font-be-vietnam",
+// Theme "Sân trường" (globals.css, 2026-09-04): MỘT họ chữ duy nhất — Lexend,
+// có đủ dấu tiếng Việt, 4 độ đậm. Ba font của theme cũ (Source Serif 4, Be
+// Vietnam Pro, Geist Mono) đã gỡ: bớt 8 file font trên Android tầm trung, và
+// số trong đồng hồ/điểm dùng `tabular-nums` của chính Lexend thay cho mono.
+const lexend = Lexend({
+  variable: "--font-lexend",
   subsets: ["latin", "vietnamese"],
   weight: ["400", "500", "600", "700"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin", "latin-ext"],
-});
-
 const DESCRIPTION =
-  "Online exam practice platform for secondary and high school students in Vietnam. Practise real exams, get scored instantly, and track your progress.";
+  "Nền tảng luyện đề trực tuyến cho học sinh THCS và THPT. Làm đề thật có đồng hồ, chấm điểm tức thì và xem mình còn yếu chỗ nào.";
 
 export const metadata: Metadata = {
   // metadataBase biến mọi đường dẫn tương đối bên dưới (og:image, canonical)
@@ -39,15 +26,15 @@ export const metadata: Metadata = {
   // nhận về path trần — mất hẳn ảnh preview khi chia sẻ link.
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "MS-MOLAR — Practise exams online",
-    // Trang con chỉ cần khai `title: "History"` là ra "History · MS-MOLAR".
+    default: "MS-MOLAR – Luyện đề trực tuyến",
+    // Trang con chỉ cần khai `title: "Lịch sử"` là ra "Lịch sử · MS-MOLAR".
     template: "%s · MS-MOLAR",
   },
   description: DESCRIPTION,
   applicationName: "MS-MOLAR",
-  // Ba trang public: `/`, `/terms`, `/refund-policy` (hai trang sau do tính
-  // năng Subscription thêm — PRD R11). Phần còn lại nằm sau đăng nhập nên không
-  // có gì để index. Chi tiết per-path ở app/robots.ts và app/sitemap.ts.
+  // Ba trang public: `/`, `/terms`, `/about`. Phần còn lại nằm sau đăng nhập
+  // nên không có gì để index. Chi tiết per-path ở app/robots.ts và
+  // app/sitemap.ts.
   //
   // `canonical: "/"` ở ĐÂY là canonical MẶC ĐỊNH của root layout, không phải
   // lời khẳng định rằng chỉ có một trang public. Trang nào cần canonical riêng
@@ -66,30 +53,30 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     siteName: "MS-MOLAR",
-    title: "MS-MOLAR — Practise exams online",
+    title: "MS-MOLAR – Luyện đề trực tuyến",
     description: DESCRIPTION,
     url: "/",
-    locale: "en_US",
+    locale: "vi_VN",
     images: [
       {
         url: "/opengraph-image",
         width: 1200,
         height: 630,
-        alt: "MS-MOLAR — practise exams online",
+        alt: "MS-MOLAR – luyện đề trực tuyến",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "MS-MOLAR — Practise exams online",
+    title: "MS-MOLAR – Luyện đề trực tuyến",
     description: DESCRIPTION,
     images: ["/opengraph-image"],
   },
 };
 
-// Màu thanh địa chỉ trên mobile — đen sơn mài, khớp sidebar homepage.
+// Màu thanh địa chỉ trên mobile — trắng, khớp navbar.
 export const viewport: Viewport = {
-  themeColor: "#1B1512",
+  themeColor: "#ffffff",
   // `viewport-fit=cover` — BẮT BUỘC để `env(safe-area-inset-*)` trả giá trị
   // thật. Thiếu nó thì mọi safe-area inset luôn bằng 0 và thanh điều hướng đáy
   // (BottomNav) sẽ nằm lọt dưới thanh Home ảo của iPhone: người dùng thấy nút
@@ -105,21 +92,18 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   // `lang` PHẢI khớp ngôn ngữ đang hiển thị (WCAG 3.1.1 Language of Page).
-  // Trước đây hard-code "en" — khi người dùng chọn tiếng Việt, trình đọc màn
-  // hình vẫn phát âm bằng bộ tổng hợp giọng Anh, ra thứ tiếng Việt gần như
-  // không nghe hiểu được. Trình dịch tự động của trình duyệt cũng đọc thuộc
-  // tính này để quyết định có mời dịch trang hay không.
-  const locale = await getLocale();
-
+  // Site chỉ còn tiếng Việt từ 2026-09-04 (module i18n hai ngôn ngữ đã gỡ),
+  // nên "vi" là hằng số: trình đọc màn hình chọn đúng bộ tổng hợp giọng, và
+  // trình dịch tự động của trình duyệt không mời dịch một trang tiếng Việt.
   return (
     <html
-      lang={locale}
-      className={`${geistMono.variable} ${sourceSerif.variable} ${beVietnamPro.variable} h-full antialiased`}
+      lang="vi"
+      className={`${lexend.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">
-        {/* Lớp phủ "Loading" lúc chuyển trang phải nằm TRONG I18nProvider (nó
-            đọc `useT`) và ở root layout — layout của từng route group sẽ
-            remount theo route, tức là chính lúc cần nó nhất thì nó biến mất.
+        {/* Lớp phủ "Loading" lúc chuyển trang nằm ở root layout — layout của
+            từng route group sẽ remount theo route, tức là chính lúc cần nó
+            nhất thì nó biến mất.
 
             <Suspense> là bắt buộc vì component đọc `useSearchParams()`: trên
             một route được prerender tĩnh, Next bắt cả cây phải rơi về render
@@ -128,12 +112,10 @@ export default async function RootLayout({
             tĩnh (`next build` in ƒ cho tất cả), nên ranh giới này chưa đổi gì
             hôm nay; nó ở đây để cái ngày ai đó làm một trang tĩnh không kéo
             theo một cú hồi quy hiệu năng không ai nối được về nguyên nhân. */}
-        <I18nProvider locale={locale}>
-          {children}
-          <Suspense fallback={null}>
-            <RouteLoadingOverlay />
-          </Suspense>
-        </I18nProvider>
+        {children}
+        <Suspense fallback={null}>
+          <RouteLoadingOverlay />
+        </Suspense>
         <Analytics />
         <SpeedInsights />
       </body>

@@ -17,8 +17,8 @@
 
 import { useState, useTransition } from "react";
 import { extractAndAssemble } from "@/features/authoring/actions";
-import { useT } from "@/lib/i18n/client";
-import type { Translate } from "@/lib/i18n/translate";
+import { t } from "@/lib/copy";
+import type { Translate } from "@/lib/copy";
 import { LIMITS } from "@/lib/ugc/limits";
 import type { UgcActionError } from "@/lib/ugc/types";
 import {
@@ -63,7 +63,6 @@ function validateRequired(m: ExamMetaFormValue, t: Translate): Record<string, st
 }
 
 export function UploadForm() {
-  const t = useT();
   const [meta, setMeta] = useState<ExamMetaFormValue>(EMPTY_META);
   const [entryMode, setEntryMode] = useState<EntryMode>("automatic");
   const [metaOpen, setMetaOpen] = useState(false);

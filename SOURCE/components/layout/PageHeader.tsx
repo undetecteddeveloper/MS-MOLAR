@@ -1,32 +1,30 @@
-// PageHeader — khối mở đầu chuẩn của mọi trang, dựng theo trật tự layout của
-// Supabase Studio (docs/market/UI-Design-Research.md §2):
+// PageHeader — khối mở đầu chuẩn của mọi trang:
 //
 //     [breadcrumbs]        ← luôn trên cùng
 //     [eyebrow]
 //     [tiêu đề]  [actions] ← hành động chính nằm cùng hàng tiêu đề
 //     [mô tả]
-//     [subnav]             ← điều hướng phụ ngay bên dưới, có hairline chia
+//     [subnav]             ← điều hướng phụ ngay bên dưới, có kẻ chia
 //
-// Trước đây mỗi trang tự dựng cụm này bằng tay (`<h1 className="font-serif
-// text-2xl">` + `<p className="mt-1 text-sm">`), nên cỡ chữ và khoảng cách
-// lệch nhau giữa các trang. Gom về một chỗ để thứ bậc là thuộc tính của hệ
-// thống chứ không phải của từng file.
+// Gom về một chỗ để thứ bậc chữ là thuộc tính của hệ thống chứ không của từng
+// file. Theme "Sân trường": tiêu đề Lexend 700, 26px (28px từ sm), không in hoa
+// nhãn nhỏ.
 
 import { Breadcrumbs, type Crumb } from "./Breadcrumbs";
 import { cn } from "@/lib/utils";
 
 type PageHeaderProps = {
   title: string;
-  /** Nhãn nhỏ in hoa phía trên tiêu đề (phân loại trang). */
+  /** Nhãn nhỏ phía trên tiêu đề (phân loại trang) — chữ thường. */
   eyebrow?: string;
   description?: string;
   breadcrumbs?: Crumb[];
   /** Nút/hành động chính, căn phải cùng hàng tiêu đề. */
   actions?: React.ReactNode;
-  /** Điều hướng phụ (tab giữa các trang con) — hiện ngay dưới, có hairline. */
+  /** Điều hướng phụ (tab giữa các trang con) — hiện ngay dưới, có kẻ chia. */
   subnav?: React.ReactNode;
-  /** `display` = thang chữ hiển thị đặc kiểu Supabase hero (72px, leading 1.0).
-   *  Dành cho trang đích/mở đầu; trang tác vụ dùng `default`. */
+  /** `display` = thang chữ hiển thị (clamp 30–52px) cho trang đích; trang tác
+   *  vụ dùng `default`. */
   size?: "default" | "display";
   className?: string;
 };
@@ -49,13 +47,13 @@ export function PageHeader({
 
       {eyebrow && <p className="eyebrow">{eyebrow}</p>}
 
-      {/* items-start (không phải items-center): khi tiêu đề xuống 2–3 dòng,
-          căn giữa sẽ đẩy nút hành động trôi xuống lửng lơ giữa khối chữ. */}
+      {/* items-start: khi tiêu đề xuống 2–3 dòng, căn giữa sẽ đẩy nút hành
+          động trôi lửng lơ giữa khối chữ. */}
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
         <h1
           className={cn(
-            "text-foreground min-w-0 font-serif",
-            size === "display" ? "text-display font-semibold" : "text-2xl"
+            "text-foreground min-w-0 font-bold",
+            size === "display" ? "text-display" : "text-[1.625rem] leading-tight sm:text-3xl"
           )}
         >
           {title}
@@ -64,9 +62,8 @@ export function PageHeader({
       </div>
 
       {description && (
-        // max-w-prose: giới hạn nhịp đọc ~65 ký tự/dòng ngay cả trong scaffold
-        // `full` 72rem — dòng mô tả trải hết 1152px là không đọc nổi.
-        <p className="text-muted-foreground max-w-prose text-sm">{description}</p>
+        // max-w-prose: giới hạn ~65 ký tự/dòng ngay cả trong scaffold `full`.
+        <p className="text-muted-foreground max-w-prose text-base leading-relaxed">{description}</p>
       )}
 
       {subnav && (

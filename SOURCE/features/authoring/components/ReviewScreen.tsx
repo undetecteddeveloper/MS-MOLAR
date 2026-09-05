@@ -26,7 +26,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { saveExam, publishExam } from "@/features/authoring/actions";
-import { useT } from "@/lib/i18n/client";
+import { t } from "@/lib/copy";
 import { validateAssembledExam } from "@/lib/ugc/assembleExam";
 import { LIMITS } from "@/lib/ugc/limits";
 import { validateMetaForPublish } from "@/lib/ugc/normalizeMeta";
@@ -127,7 +127,6 @@ export function ReviewScreen({
   nodes,
   essayGradingEnabled = false,
 }: ReviewScreenProps) {
-  const t = useT();
   const [exam, setExam] = useState<AssembledExam>(initialExam);
   const [status, setStatus] = useState(initialStatus);
   const [dirty, setDirty] = useState(false);

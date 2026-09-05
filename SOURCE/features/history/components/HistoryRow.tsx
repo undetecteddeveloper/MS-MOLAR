@@ -11,7 +11,7 @@
 import type { MyHistoryEntry } from "@/features/history/queries";
 import { EssayLifecycleBadge } from "@/components/essay/EssayLifecycleBadge";
 import { HistoryRowMenu } from "@/components/history/HistoryRowMenu";
-import { getTranslate } from "@/lib/i18n/server";
+import { t } from "@/lib/copy";
 import { formatCompletionTime, formatSubmittedDate } from "@/lib/history/format";
 import type { AttemptPdfData } from "@/lib/pdf/generateAttemptPdf";
 
@@ -22,7 +22,6 @@ export async function HistoryRow({
   entry: MyHistoryEntry;
   examineeName: string;
 }) {
-  const t = await getTranslate();
   const pdfInput: AttemptPdfData = {
     subject: entry.subject,
     examTitle: entry.examTitle,

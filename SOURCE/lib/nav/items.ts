@@ -13,7 +13,7 @@
 // trên một màn hình có thể tô sáng HAI mục khác nhau — một bug im lặng, không
 // crash, chỉ khiến người dùng không tin cái nào nữa.
 
-import type { MessageKey } from "@/lib/i18n/translate";
+import type { MessageKey } from "@/lib/copy";
 
 export type NavItem = {
   key: MessageKey;

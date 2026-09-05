@@ -1,5 +1,5 @@
 "use client";
-import { useT } from "@/lib/i18n/client";
+import { t } from "@/lib/copy";
 
 // HistoryFilters — sticky left-rail filter, cùng bố cục với ExamFilters
 // (/exams): tay nắm mảnh (tam giác + nhãn dọc "BỘ LỌC") đứng cạnh nội dung,
@@ -36,7 +36,6 @@ const OPTIONS_BG = "rgba(237, 225, 200, 0.99)";
 const SCRIM_BG = "rgba(27, 21, 18, 0.08)";
 
 export function HistoryFilters({ subjects, exams, selected }: HistoryFiltersProps) {
-  const t = useT();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();

@@ -13,20 +13,19 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentUserProfile } from "@/lib/auth/getCurrentUser";
-import { getTranslate } from "@/lib/i18n/server";
+import { t } from "@/lib/copy";
 import { PageContainer } from "@/components/layout/PageContainer";
-import { ProfileTabs } from "@/features/profile/components/ProfileTabs";
+import { ProfileCard } from "@/features/profile/components/ProfileCard";
 
 // KHÔNG khai `alternates.canonical` — khác /terms và /about một cách có chủ ý.
 // Hai trang kia cần được index nên phải sửa lại mặc định `canonical: "/"` của
 // root layout; trang này bị robots.ts chặn (nội dung của nó là dữ liệu cá
 // nhân), nên một canonical riêng chỉ để công bố một URL không ai được bò vào.
 export const metadata: Metadata = {
-  title: "Your profile",
+  title: "Hồ sơ",
 };
 
 export default async function ProfilePage() {
-  const t = await getTranslate();
 
   // Chốt chặn cấp trang, cùng khuôn với me/dashboard/page.tsx:19-20 — middleware
   // đã chặn rồi (/profile không nằm trong PUBLIC_PATHS), nhưng khoảng cách giữa
@@ -46,7 +45,7 @@ export default async function ProfilePage() {
           cùng quy ước với /exams (trang đầu tiên áp dụng, xem exams/page.tsx). */}
       <h1 className="sr-only">{t("profile.title")}</h1>
       <div className="preload-fade mt-6" style={{ "--preload-order": 1 } as React.CSSProperties}>
-        <ProfileTabs user={user} />
+        <ProfileCard user={user} />
       </div>
     </PageContainer>
   );

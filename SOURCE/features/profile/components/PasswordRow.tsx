@@ -9,7 +9,7 @@
 // không `title`/`aria-label` nào hứa hiển thị được gì. Mặt nạ cũng KHÔNG phải
 // một <input> — nó là text node, nên không có `value` nào cho devtools đọc.
 
-import { useT } from "@/lib/i18n/client";
+import { t } from "@/lib/copy";
 import { ProfileRow } from "@/features/profile/components/ProfileRow";
 import { outlineButtonCls } from "@/features/profile/components/styles";
 
@@ -30,7 +30,6 @@ interface PasswordRowProps {
 }
 
 export function PasswordRow({ onOpen, triggerRef }: PasswordRowProps) {
-  const t = useT();
 
   return (
     <ProfileRow

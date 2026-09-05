@@ -11,7 +11,7 @@
 // ("essay không bao giờ chấm") không còn đúng.
 
 import Link from "next/link";
-import { getTranslate } from "@/lib/i18n/server";
+import { t } from "@/lib/copy";
 import { redirect } from "next/navigation";
 import { getResult } from "@/features/exams/queries";
 import { decodeTfAnswer, formatSubAnswers } from "@/lib/ugc/tfCodec";
@@ -20,7 +20,6 @@ import { PageContainer } from "@/components/layout/PageContainer";
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 import { QuestionFigure } from "@/components/shared/QuestionFigure";
 import { ExplainStepAffordance } from "@/components/tutor/ExplainStepAffordance";
-import { TutorQuotaNote } from "@/components/billing/TutorQuotaNote";
 import { EssayReviewBlock } from "@/features/exams/components/EssayReviewBlock";
 import { EssayGradingPoller } from "@/features/exams/components/EssayGradingPoller";
 
@@ -49,7 +48,6 @@ export default async function ResultDetailPage({
 }: {
   params: Promise<{ id: string; attemptId: string }>;
 }) {
-  const t = await getTranslate();
   const { id, attemptId } = await params;
   const data = await getResult(attemptId);
 
@@ -320,7 +318,6 @@ export default async function ResultDetailPage({
                     {r.hasBeenWrongTwice === true && (
                       <ExplainStepAffordance questionId={r.questionId} attemptId={attemptId} />
                     )}
-                    <TutorQuotaNote />
                   </>
                 ) : (
                   <>
@@ -374,7 +371,6 @@ export default async function ResultDetailPage({
                     {r.hasBeenWrongTwice === true && (
                       <ExplainStepAffordance questionId={r.questionId} attemptId={attemptId} />
                     )}
-                    <TutorQuotaNote />
                   </>
                 )}
               </li>

@@ -5,7 +5,7 @@
 // discoverable cho AT, cùng chủ đích với RateButton's aria-disabled idiom.
 
 import { LIMITS } from "@/lib/ugc/limits";
-import { useT } from "@/lib/i18n/client";
+import { t } from "@/lib/copy";
 
 interface MessageFieldProps {
   value: string;
@@ -15,7 +15,6 @@ interface MessageFieldProps {
 }
 
 export function MessageField({ value, onChange, error, disabled }: MessageFieldProps) {
-  const t = useT();
   const errorId = "support-message-error";
 
   return (

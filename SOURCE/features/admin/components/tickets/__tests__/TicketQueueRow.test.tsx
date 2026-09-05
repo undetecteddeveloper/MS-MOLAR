@@ -43,12 +43,12 @@ describe("TicketQueueRow", () => {
 
   it("notify_failed flag is visible in the collapsed row WITHOUT expanding (AC-022, AC-032)", () => {
     render(<TicketQueueRow ticket={fixtureTicket({ notifyFailed: true })} />);
-    expect(screen.getByText("Notification email failed")).toBeDefined();
+    expect(screen.getByText("Email báo chưa gửi được")).toBeDefined();
   });
 
   it("no notify_failed flag when the ticket's notification succeeded", () => {
     render(<TicketQueueRow ticket={fixtureTicket({ notifyFailed: false })} />);
-    expect(screen.queryByText("Notification email failed")).toBeNull();
+    expect(screen.queryByText("Email báo chưa gửi được")).toBeNull();
   });
 
   it("clicking the row expands it, revealing TicketDetailPanel's status control", () => {
@@ -61,8 +61,8 @@ describe("TicketQueueRow", () => {
 
   it("collapsed row always shows intent, message excerpt, status badge, created time", () => {
     render(<TicketQueueRow ticket={fixtureTicket()} />);
-    expect(screen.getByText("Bug report")).toBeDefined();
+    expect(screen.getByText("Báo lỗi")).toBeDefined();
     expect(screen.getByText("the button freezes")).toBeDefined();
-    expect(screen.getByText("New")).toBeDefined();
+    expect(screen.getByText("Mới")).toBeDefined();
   });
 });

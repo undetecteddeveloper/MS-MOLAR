@@ -17,7 +17,7 @@
 // không làm mất thông tin "đã làm bao nhiêu".
 
 import { useEffect, useRef } from "react";
-import { useT } from "@/lib/i18n/client";
+import { t } from "@/lib/copy";
 
 /** Trên ngưỡng này thì đổi sang lưới dày + khung cuộn. */
 const COMPACT_THRESHOLD = 10;
@@ -39,7 +39,6 @@ export function QuestionPagination({
   flaggedIndices,
   onJump,
 }: QuestionPaginationProps) {
-  const t = useT();
   const answered = new Set(answeredIndices);
   const flagged = new Set(flaggedIndices);
   const compact = total > COMPACT_THRESHOLD;

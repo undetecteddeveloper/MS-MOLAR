@@ -18,7 +18,7 @@
 
 "use client";
 import { Fragment } from "react";
-import { useT } from "@/lib/i18n/client";
+import { t } from "@/lib/copy";
 
 import type { ChoiceId, PublicQuestion, SubItemId } from "@/types/question";
 import { LIMITS } from "@/lib/ugc/limits";
@@ -90,7 +90,6 @@ export function QuestionRenderer({
   onToggleFlag,
   essayGradingEnabled = false,
 }: QuestionRendererProps) {
-  const t = useT();
   const type = question.questionType ?? "mcq";
 
   return (
@@ -241,7 +240,7 @@ export function QuestionRenderer({
               onChange={(e) => onSelectAnswer(e.target.value)}
               maxLength={LIMITS.MAX_SHORT_ANSWER}
               className="border-border bg-card text-foreground focus:border-ring w-full max-w-xs rounded-md border px-3 py-2 text-sm outline-none"
-              placeholder="e.g. 1260 / 1,04"
+              placeholder={t("upload.shortAnswerExample")}
             />
             <p className="text-muted-foreground mt-1 text-xs italic">
               {t("player.shortAnswerScored")}

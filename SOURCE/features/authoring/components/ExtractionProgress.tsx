@@ -6,10 +6,9 @@
 // NHÃN trong cùng trạng thái tiến trình (chạy song song, không phải giai đoạn
 // tuần tự riêng — UI Spec §v2.2 ExtractionProgress).
 
-import { useT } from "@/lib/i18n/client";
+import { t } from "@/lib/copy";
 
 export function ExtractionProgress({ metaStep }: { metaStep?: boolean }) {
-  const t = useT();
   return (
     <div
       role="status"

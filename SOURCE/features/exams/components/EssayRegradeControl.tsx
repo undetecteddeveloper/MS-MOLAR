@@ -26,8 +26,8 @@ import { useRouter } from "next/navigation";
 import { Loader2, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { retryEssayGrading, type RetryRefusal } from "@/features/exams/essayActions";
-import { useT } from "@/lib/i18n/client";
-import type { MessageKey } from "@/lib/i18n/translate";
+import { t } from "@/lib/copy";
+import type { MessageKey } from "@/lib/copy";
 
 /** NĂM lý do, NĂM câu — khai bằng `Record` chứ KHÔNG bằng `switch` có
  *  `default`. Đó là toàn bộ điểm của nó: thêm một lý do vào `RetryRefusal` trở
@@ -67,7 +67,6 @@ export function EssayRegradeControl({
    *  KHÔNG tự suy lại `state === "failed" && !retryAvailable` (EG-BE-036). */
   exhausted: boolean;
 }) {
-  const t = useT();
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   const busyRef = useRef(false);
