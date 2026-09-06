@@ -1,9 +1,6 @@
-// StartAttemptButton — nút "Bắt đầu" trên màn Exam Detail (Layer 2).
-// GĐ 2 (M2.6): startAttempt() Server Action tạo attempt trong DB rồi redirect.
-// (Trước đây GĐ 1 sinh attemptId client-side bằng crypto.randomUUID.)
-// GĐ 3 M3.2: style brand, full-width trên mobile, auto trên desktop.
-// S#17: button-primary theo globals.css — nền đỏ son, chữ ngà, bo 4px, hover đậm
-// hơn (#8F2523); bỏ glow shadow (quy tắc "không đổ bóng").
+// StartAttemptButton — nút "Làm bài" trên trang chi tiết đề.
+// startAttempt() Server Action tạo attempt trong DB rồi redirect sang trang
+// làm bài. Diện mạo nằm ở StartAttemptSubmit (theme "Sân trường").
 //
 // Chỉ báo chờ (2026-08-28): RouteLoadingOverlay bắt điều hướng bằng cách nghe
 // click trên thẻ <a>. Nút này KHÔNG phải thẻ <a> — nó submit một form gọi

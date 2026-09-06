@@ -3,8 +3,18 @@
 // mean từ view exams_with_difficulty) — KHÔNG re-bucket ở client (AC-018).
 //
 // Theme "Sân trường": nhãn chữ + thang 3 vạch (Dễ 1 / Trung bình 2 / Khó 3) —
-// trạng thái đọc được bằng hình lẫn chữ. `card` trả <span> (đặt trong hàng meta
-// của ExamCard), `detail` trả <dd> (khớp <dl> của trang chi tiết đề).
+// trạng thái đọc được bằng hình lẫn chữ.
+//
+// CẢ HAI biến thể trả <span> NỘI TUYẾN, không tự mang thẻ ngữ nghĩa nào:
+//   card    hàng meta của ExamCard — chữ dịu 14px, mean nằm trong `title`.
+//   detail  GIÁ TRỊ của một dòng trong bảng thông số ở trang chi tiết đề —
+//           mean hiện thành chữ, cỡ và màu thừa hưởng từ <dd> của dòng đó.
+//
+// Trước 2026-09-06 biến thể `detail` tự trả <dd> để cắm thẳng vào <dl> của
+// trang chi tiết đề. Bản dựng lại của trang gom <dt> và <dd> về một component
+// dòng dùng chung, nên <dd> tự-mang đó rơi vào trong một <dd> khác — HTML sai
+// và React báo lỗi hydration. Nay ngữ nghĩa <dl> chỉ do NƠI GỌI quyết định,
+// component này chỉ lo phần nhìn.
 
 "use client";
 
@@ -47,15 +57,17 @@ export function DifficultyBadge({ communityDifficulty, variant }: DifficultyBadg
 
   if (variant === "detail") {
     return (
-      <dd
-        className={`mt-1 flex items-center gap-2 text-xl font-semibold ${
-          communityDifficulty ? "text-foreground" : "text-muted-foreground"
+      // Chưa đủ lượt chấm → cả dòng dịu lại; có giá trị thì để nguyên màu và độ
+      // đậm của <dd> bọc ngoài, để mọi giá trị trong bảng thông số cùng một cỡ.
+      <span
+        className={`inline-flex items-center gap-2 ${
+          communityDifficulty ? "" : "text-muted-foreground"
         }`}
       >
         {label}
         {mean && <span className="text-muted-foreground text-sm font-normal">{mean}</span>}
         {meter}
-      </dd>
+      </span>
     );
   }
 

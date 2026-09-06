@@ -141,6 +141,11 @@ export const copy = {
   "exams.duration": "Thời lượng",
   "exams.minutesShort": "phút",
   "exams.difficulty": "Độ khó",
+  "exams.facts": "Thông tin đề",
+  "exams.questionTotal": "Số câu",
+  "exams.beforeStartTitle": "Trước khi bắt đầu",
+  "exams.beforeStartBody":
+    "Bạn có {minutes} phút cho {count} câu. Đồng hồ chạy ngay khi bạn bấm Làm bài, xong sớm thì nộp sớm.",
   "exams.toggleSortDirection": "Đổi chiều sắp xếp",
   "exams.ascending": "Tăng dần",
   "exams.descending": "Giảm dần",
@@ -256,6 +261,9 @@ export const copy = {
   "report.placeholder": "Mô tả vấn đề…",
   "report.submit": "Gửi báo cáo",
   "report.submitting": "Đang gửi…",
+  "report.reported": "Bạn đã báo cáo đề này.",
+  "report.errorEmpty": "Bạn hãy mô tả vấn đề trước khi gửi.",
+  "report.errorGeneric": "Chưa gửi được báo cáo. Bạn thử lại sau nhé.",
 
   // --- Lịch sử ------------------------------------------------------------
   "history.title": "Lịch sử",

@@ -1,8 +1,16 @@
-// Exam Detail — /exams/[id] (Layer 2).
-// Server Component: xem thông tin đề trước khi bắt đầu (GĐ 2 M2.5, thay fake-data).
-// GĐ 3 M3.2: visual language L2 "tờ giấy trắng" — SiteHeader + back link + eyebrow
-// môn/lớp + tiêu đề serif + ô meta (số câu/thời gian) + nút brand. Mobile-first.
-// Feedback: bỏ eyebrow môn/lớp + dòng hướng dẫn; back link "Trang trước"; căn giữa toàn bộ.
+// Chi tiết đề — /exams/[id]. Server Component: xem thông tin đề trước khi bắt đầu.
+//
+// Theme "Sân trường" (2026-09-06, docs/design/ui-refactor-san-truong-design.md):
+// trang một-tác-vụ, căn TRÁI, đọc từ trên xuống — định vị, nhãn môn/lớp, tên
+// đề, tác giả, thông số, rồi thẻ vàng "Trước khi bắt đầu" mang nút Làm bài.
+// Thẻ vàng là chỗ táo bạo DUY NHẤT của màn hình (§4.1) và nút hành động chính
+// đứng trong đó: mắt dừng ở màu vàng là dừng đúng chỗ có việc để làm. Từ
+// 768px thông số và thẻ vàng đứng cạnh nhau; cột thẻ vàng rộng cố định 20rem
+// để nút không bị kéo dài theo màn hình.
+//
+// Bento 6 ô kẻ viền của bản trước bỏ (viền là dấu vết theme cũ, §5), và bản
+// thay thế đầu tiên — lưới 2 cột có ô trải hàng — cũng bỏ nốt: engineer
+// 2026-09-06 chỉ ra hai chỗ hổng của nó. Xem chú thích tại <dl> bên dưới.
 
 import { notFound } from "next/navigation";
 import { getExam } from "@/features/exams/queries";
@@ -15,7 +23,8 @@ import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { t } from "@/lib/copy";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
-import { BentoGrid, BentoCell } from "@/components/layout/BentoGrid";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
 
 export default async function ExamDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -28,101 +37,119 @@ export default async function ExamDetailPage({ params }: { params: Promise<{ id:
   // Report channel chỉ cho user đã đăng nhập (AC-025). Đề UGC mới có byline.
   const user = await getCurrentUser();
   const alreadyReported = user ? await hasReported(id) : false;
+  const questionCount = exam.questionIds.length;
 
   return (
-    <div className="bg-background">
-      <PageContainer as="main" size="small" className="flex flex-col">
-        {/* Breadcrumbs thay link "← Back" trần (quy tắc Supabase Studio: dải
-            định vị luôn nằm trên cùng). Khác biệt thực chất, không chỉ hình
-            thức: "← Back" chỉ nói ĐI ĐÂU chứ không nói ĐANG Ở ĐÂU, và người
-            vào thẳng từ link chia sẻ thì không có "trang trước" nào cả. */}
-        <Breadcrumbs
-          items={[{ label: t("nav.exams"), href: "/exams" }, { label: exam.title }]}
-          className="preload-fade self-start text-xs"
-          style={{ "--preload-order": 1 } as React.CSSProperties}
-        />
+    <PageContainer
+      as="main"
+      padding="none"
+      className="flex flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8"
+    >
+      {/* Breadcrumbs thay "← Back": nói ĐANG Ở ĐÂU chứ không chỉ ĐI ĐÂU, và
+          người vào từ link chia sẻ thì không có "trang trước" nào cả. */}
+      <Breadcrumbs
+        items={[{ label: t("nav.exams"), href: "/exams" }, { label: exam.title }]}
+        className="text-xs"
+      />
 
-        {/* preload order 2 — khối tổng quan fade sau navbar + back link (S#21). */}
-        <div
-          className="preload-fade mt-6 flex flex-col items-center text-center"
-          style={{ "--preload-order": 2 } as React.CSSProperties}
-        >
-          <h1 className="text-3xl leading-tight sm:text-4xl">{exam.title}</h1>
-
-          {/* Byline UGC (Task 5.2) — dưới tiêu đề, chỉ hiện với đề có tác giả. */}
-          <AuthorByline name={exam.authorDisplayName} className="mt-2" />
-
-          {/* Lưới Bento (docs/market/UI-Design-Research.md §2). Trước đây là 6 ô
-              đều nhau 2×3 với chuỗi class `border-border bg-card rounded-lg
-              border p-5` chép tay 6 lần; nay là BentoCell, và bề rộng mỗi ô
-              chạy theo NỘI DUNG chứ không chia đều máy móc:
-                hàng 1  số câu (3) · thời lượng (3) · độ khó (6)
-                hàng 2  trường (6) · năm (3) · học kỳ (3)
-              School và Difficulty lấy nửa hàng vì chúng chứa chuỗi/chỉ báo dài,
-              còn các ô số thì một con số ngắn không cần chỗ rộng.
-              Thứ tự JSX = thứ tự đọc = thứ tự nhìn thấy (không dùng order-*). */}
-          <BentoGrid as="dl" className="mt-8 w-full">
-              <BentoCell span="quarter">
-                <dt className="eyebrow">{t("common.questions")}</dt>
-                <dd className="text-foreground mt-2 font-serif text-2xl tabular-nums">
-                  {exam.questionIds.length}
-                </dd>
-              </BentoCell>
-              <BentoCell span="quarter">
-                <dt className="eyebrow">{t("exams.duration")}</dt>
-                <dd className="text-foreground mt-2 font-serif text-2xl tabular-nums">
-                  {exam.durationMinutes}{" "}
-                  <span className="text-muted-foreground text-base">{t("exams.minutesShort")}</span>
-                </dd>
-              </BentoCell>
-              <BentoCell span="half">
-                <dt className="eyebrow">{t("exams.difficulty")}</dt>
-                <DifficultyBadge communityDifficulty={exam.communityDifficulty} variant="detail" />
-              </BentoCell>
-              <BentoCell span="half">
-                <dt className="eyebrow">{t("common.school")}</dt>
-                <dd
-                  className={`mt-2 font-serif text-lg leading-snug ${
-                    exam.school ? "text-foreground" : "text-muted-foreground"
-                  }`}
-                >
-                  {exam.school ?? t("common.none")}
-                </dd>
-              </BentoCell>
-              <BentoCell span="quarter">
-                <dt className="eyebrow">{t("common.year")}</dt>
-                <dd
-                  className={`mt-2 font-serif text-2xl tabular-nums ${
-                    exam.schoolYear !== undefined ? "text-foreground" : "text-muted-foreground"
-                  }`}
-                >
-                  {exam.schoolYear ?? t("common.none")}
-                </dd>
-              </BentoCell>
-              <BentoCell span="quarter">
-                <dt className="eyebrow">{t("common.semester")}</dt>
-                <dd
-                  className={`mt-2 font-serif text-2xl ${
-                    exam.semester ? "text-foreground" : "text-muted-foreground"
-                  }`}
-                >
-                  {exam.semester ?? t("common.none")}
-                </dd>
-              </BentoCell>
-          </BentoGrid>
-
-          <div className="mt-8">
-            <StartAttemptButton examId={exam.id} />
-          </div>
-
-          {/* Report channel (Task 5.2) — chỉ user đã đăng nhập. */}
-          {user && (
-            <div className="mt-6">
-              <ReportExam examId={exam.id} initiallyReported={alreadyReported} />
-            </div>
-          )}
+      <header className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Badge>{exam.subject}</Badge>
+          <Badge>{t("exams.gradeValue", { grade: exam.grade })}</Badge>
         </div>
-      </PageContainer>
+        {/* Cùng thang chữ với PageHeader (26px → 30px). Không dùng PageHeader vì
+            hàng nhãn môn/lớp phải nằm GIỮA breadcrumbs và tiêu đề. */}
+        <h1 className="text-[1.625rem] leading-tight font-bold sm:text-3xl">{exam.title}</h1>
+        <AuthorByline name={exam.authorDisplayName} />
+      </header>
+
+      <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_20rem] md:items-start">
+        <Card as="section" aria-label={t("exams.facts")} padding="none">
+          {/* MỘT <dl>, HAI vùng — chia theo việc thông số đó có LUÔN TỒN TẠI hay
+              không. Đây là chỗ sửa hai lỗ hổng engineer chỉ ra 2026-09-06: bản
+              trước xếp cả sáu thông số vào lưới 2 cột, nên ô nào dài (trường,
+              độ khó) phải trải hết hàng và bỏ lại một nửa hàng trống, còn ô nào
+              vắng dữ liệu cũng để lại một nửa hàng trống.
+                · Hai ô TRÊN — số câu và thời lượng — là hai cột. Cả hai LUÔN có
+                  giá trị (question_ids, duration_minutes NOT NULL), nên cặp ô
+                  này không thể hụt mất một nửa.
+                · Phần còn lại là DÒNG trải hết bề ngang, nhãn trái giá trị
+                  phải. Trường, năm học, học kỳ đều nullable: vắng thì mất
+                  nguyên dòng chứ không để lại ô trống lửng. Dòng cũng là chỗ
+                  duy nhất chứa nổi tên trường dài mà không phải chia đôi hàng.
+              Kẻ chia giữa các dòng là ngoại lệ đã cho phép của quy tắc "nền tô
+              thay viền" (§4.2: viền còn ở ô nhập và kẻ chia trong danh sách);
+              kẻ chạy hết bề ngang thẻ nên thẻ để padding="none", mỗi dòng tự
+              đệm lấy. */}
+          <dl className="grid grid-cols-2">
+            <div className="border-border flex flex-col gap-1 border-r px-4 py-4 sm:px-5">
+              <dt className="eyebrow">{t("exams.questionTotal")}</dt>
+              <dd className="text-[1.75rem] leading-none font-bold tabular-nums">
+                {questionCount}
+              </dd>
+            </div>
+            <div className="flex flex-col gap-1 px-4 py-4 sm:px-5">
+              <dt className="eyebrow">{t("exams.duration")}</dt>
+              <dd className="text-[1.75rem] leading-none font-bold tabular-nums">
+                {exam.durationMinutes}{" "}
+                <span className="text-muted-foreground text-base font-normal">
+                  {t("exams.minutesShort")}
+                </span>
+              </dd>
+            </div>
+
+            <FactRow label={t("exams.difficulty")}>
+              <DifficultyBadge communityDifficulty={exam.communityDifficulty} variant="detail" />
+            </FactRow>
+            {exam.school && <FactRow label={t("common.school")}>{exam.school}</FactRow>}
+            {exam.schoolYear !== undefined && (
+              <FactRow label={t("common.year")}>
+                <span className="tabular-nums">{exam.schoolYear}</span>
+              </FactRow>
+            )}
+            {exam.semester && <FactRow label={t("common.semester")}>{exam.semester}</FactRow>}
+          </dl>
+        </Card>
+
+        <Card as="section" variant="sun" aria-labelledby="exam-start-title" className="gap-4">
+          <div className="flex flex-col gap-1.5">
+            <h2 id="exam-start-title" className="text-lg font-semibold">
+              {t("exams.beforeStartTitle")}
+            </h2>
+            <p className="text-sm leading-relaxed">
+              {t("exams.beforeStartBody", {
+                minutes: exam.durationMinutes,
+                count: questionCount,
+              })}
+            </p>
+          </div>
+          <StartAttemptButton examId={exam.id} />
+        </Card>
+      </div>
+
+      {/* Kênh báo cáo — chỉ người đã đăng nhập. Hành động phụ, đứng cuối trang,
+          dưới một đường kẻ chạy hết bề ngang. Đường kẻ đó sửa lỗ hổng thứ hai:
+          hai thẻ trên hiếm khi cao bằng nhau (thẻ thông số co theo số dòng có
+          dữ liệu), nên trước đây liên kết này đứng chơ vơ sau một mảng trắng
+          không có gì đóng lại. Kẻ ngang biến mảng trắng đó thành khoảng thở của
+          một dòng khép trang. Căn TRÁI theo §3 — ngoại lệ căn giữa chỉ dành cho
+          chân trang chủ. */}
+      {user && (
+        <div className="border-border border-t pt-4">
+          <ReportExam examId={exam.id} initiallyReported={alreadyReported} />
+        </div>
+      )}
+    </PageContainer>
+  );
+}
+
+/** Một DÒNG thông số: nhãn trái, giá trị phải, kẻ chia phía trên. col-span-2 để
+ *  dòng trải hết bề ngang lưới hai cột của cặp ô trên. */
+function FactRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="border-border col-span-2 flex items-center justify-between gap-4 border-t px-4 py-3 sm:px-5">
+      <dt className="text-muted-foreground shrink-0 text-sm">{label}</dt>
+      <dd className="text-foreground min-w-0 text-right font-semibold">{children}</dd>
     </div>
   );
 }

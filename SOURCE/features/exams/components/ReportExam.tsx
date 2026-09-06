@@ -1,16 +1,26 @@
 "use client";
-import { t } from "@/lib/copy";
 
-// ReportExam — kênh báo cáo đề published (UGC v2.0, AC-025/026 / Task 5.2).
-// Nút "{t("report.title")}" mở dialog (khuôn LeaveExamDialog: scrim đen sơn mài,
-// Esc/click scrim = đóng, focus trap tối thiểu). Đã report (từ hasReported hoặc
-// sau khi gửi/trùng) → trạng thái tĩnh "✓ You reported this exam".
-// Chỉ render cho user đã đăng nhập trên đề published (parent quyết định).
+// ReportExam — kênh báo cáo đề đã đăng (UGC v2.0, AC-025/026 / Task 5.2). Chỉ
+// render cho người đã đăng nhập trên đề đã đăng (trang cha quyết định).
+//
+// Theme "Sân trường" (2026-09-06): nút mở là một dòng chữ dịu kèm icon cờ —
+// hành động phụ, không tranh mắt với nút Làm bài. Hộp thoại: scrim xanh đen
+// mờ, thẻ trắng bo 18px không viền không bóng; nằm sát đáy trên điện thoại
+// (ngón cái với tới), căn giữa từ 640px. Trạng thái đã báo cáo có dấu tích +
+// câu chữ, không chỉ đổi màu (§4.3). Câu chữ qua lib/copy — bản trước còn để
+// lọt chuỗi tiếng Anh cứng trong mã.
+//
+// Cơ chế giữ nguyên: Esc / bấm scrim = đóng, tiêu điểm vào ô nhập khi mở,
+// reportExam() Server Action, kết quả "duplicate" coi như đã báo cáo.
 
 import { useEffect, useRef, useState } from "react";
+import { Check, Flag } from "lucide-react";
 // eslint-disable-next-line no-restricted-imports -- rò chéo có sẵn trước B4 (2026-09-03): reportExam sống cạnh moderateExam ở authoring/actions. Xem ARCHITECTURE.md § Import chéo.
 import { reportExam } from "@/features/authoring/actions";
 import { LIMITS } from "@/lib/ugc/limits";
+import { t } from "@/lib/copy";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/input";
 
 interface ReportExamProps {
   examId: string;
@@ -39,8 +49,12 @@ export function ReportExam({ examId, initiallyReported }: ReportExamProps) {
 
   if (reported) {
     return (
-      <p className="text-muted-foreground text-sm" aria-live="polite">
-        ✓ You reported this exam
+      <p
+        className="text-muted-foreground inline-flex min-h-11 items-center gap-1.5 text-sm"
+        aria-live="polite"
+      >
+        <Check aria-hidden className="text-success size-4" />
+        {t("report.reported")}
       </p>
     );
   }
@@ -48,7 +62,7 @@ export function ReportExam({ examId, initiallyReported }: ReportExamProps) {
   async function onSubmit() {
     const trimmed = reason.trim();
     if (trimmed.length === 0) {
-      setError("Please describe the problem.");
+      setError(t("report.errorEmpty"));
       return;
     }
     setSubmitting(true);
@@ -62,73 +76,67 @@ export function ReportExam({ examId, initiallyReported }: ReportExamProps) {
       setReported(true); // đã report từ trước — trạng thái cuối
       setOpen(false);
     } else if (result.error === "empty") {
-      setError("Please describe the problem.");
+      setError(t("report.errorEmpty"));
     } else {
-      setError("Couldn't submit the report right now. Please try again.");
+      setError(t("report.errorGeneric"));
     }
   }
 
   return (
     <>
-      <button
+      {/* `-ml-5` bù phần đệm của nút để icon cờ thẳng mép trái với nội dung. */}
+      <Button
         type="button"
+        variant="ghost"
         onClick={() => setOpen(true)}
-        className="text-muted-foreground hover:text-brand text-sm underline-offset-4 transition-colors hover:underline"
+        className="text-muted-foreground hover:text-foreground -ml-5 self-start"
       >
+        <Flag aria-hidden />
         {t("report.title")}
-      </button>
+      </Button>
 
       {open && (
         <div
           role="dialog"
           aria-modal="true"
           aria-labelledby="report-exam-title"
-          className="fixed inset-0 z-50 flex items-center justify-center px-6"
+          className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center sm:p-6"
         >
           <button
             aria-hidden
             tabIndex={-1}
             onClick={() => setOpen(false)}
-            className="absolute inset-0 cursor-default bg-[#1B1512]/40"
+            className="bg-foreground/40 absolute inset-0 cursor-default"
           />
-          <div className="border-border bg-background relative w-full max-w-sm rounded-lg border p-6">
-            <h2 id="report-exam-title" className="text-foreground font-serif text-xl">
+          <div className="bg-background rounded-card relative flex w-full max-w-sm flex-col gap-3 p-5">
+            <h2 id="report-exam-title" className="text-foreground text-lg font-semibold">
               {t("report.title")}
             </h2>
-            <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
-              Tell us what&apos;s wrong with this exam (incorrect answers, inappropriate content,
-              etc.).
-            </p>
-            <textarea
+            <p className="text-muted-foreground text-sm leading-relaxed">{t("report.intro")}</p>
+            <Textarea
               ref={textareaRef}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               maxLength={LIMITS.MAX_REPORT_REASON}
               rows={4}
-              className="border-border bg-card text-foreground focus:border-brand mt-4 w-full resize-none rounded-[4px] border p-3 text-sm outline-none"
+              aria-labelledby="report-exam-title"
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? "report-exam-error" : undefined}
+              className="min-h-0 resize-none text-sm"
               placeholder={t("report.placeholder")}
             />
             {error && (
-              <p className="text-brand mt-2 text-sm" role="alert">
+              <p id="report-exam-error" className="text-destructive text-sm" role="alert">
                 {error}
               </p>
             )}
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="border-border text-foreground hover:bg-accent rounded-[4px] border px-4 py-2 text-xs font-medium tracking-[0.14em] uppercase transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={onSubmit}
-                disabled={submitting}
-                className="bg-brand text-brand-foreground rounded-full px-4 py-2 text-xs font-medium tracking-[0.14em] uppercase transition-opacity hover:opacity-90 disabled:opacity-60"
-              >
+            <div className="flex justify-end gap-2 pt-1">
+              <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
+                {t("common.cancel")}
+              </Button>
+              <Button type="button" onClick={onSubmit} disabled={submitting}>
                 {submitting ? t("report.submitting") : t("report.submit")}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
