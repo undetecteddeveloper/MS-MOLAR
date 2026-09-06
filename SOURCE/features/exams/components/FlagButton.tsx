@@ -1,9 +1,16 @@
 // FlagButton — đánh dấu câu hiện tại để xem lại (Layer 2). GĐ 3 M3.1 Task 3.
 // State sống trong useExamPlayer (in-memory session, không persist DB) — controlled
-// qua props flagged/onToggle. Bordered pill + glyph + nhãn chữ (đồng bộ
-// TEMPLATE/L2/ExamPage) — active = viền/chữ brand.
+// qua props flagged/onToggle.
+//
+// Theme "Sân trường" (2026-09-06): primitive Button cỡ 36px (nút trong thẻ).
+// Chưa đánh dấu = viên thuốc trắng, chữ dịu, nằm trên thẻ câu hỏi đã tô; đã
+// đánh dấu = viên thuốc vàng nắng + lá cờ TÔ ĐẶC. Trạng thái đổi cả hình lẫn
+// màu, và vàng chỉ đứng sau chữ/icon đen (design plan §2). `aria-pressed` nói
+// phần còn lại cho trình đọc màn hình.
 "use client";
 
+import { Flag } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { t } from "@/lib/copy";
 
 interface FlagButtonProps {
@@ -13,28 +20,17 @@ interface FlagButtonProps {
 
 export function FlagButton({ flagged, onToggle }: FlagButtonProps) {
   return (
-    <button
+    <Button
       type="button"
+      variant={flagged ? "sun" : "plain"}
+      size="sm"
       onClick={onToggle}
       aria-pressed={flagged}
       title={flagged ? t("player.unflagHint") : t("player.flagHint")}
-      className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium tracking-[0.04em] uppercase transition-colors ${
-        flagged ? "border-brand text-brand" : "border-border text-muted-foreground hover:bg-accent"
-      }`}
+      className={flagged ? undefined : "text-muted-foreground hover:text-foreground"}
     >
-      <svg
-        aria-hidden
-        viewBox="0 0 16 16"
-        className="size-3.5"
-        fill={flagged ? "currentColor" : "none"}
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-      >
-        <path d="M3.5 1.5v13" strokeLinecap="round" />
-        <path d="M3.5 2.5h8.5l-2 3 2 3H3.5z" />
-      </svg>
-      <span>{flagged ? t("player.flagged") : t("player.flag")}</span>
-    </button>
+      <Flag aria-hidden className={flagged ? "fill-current" : undefined} />
+      {flagged ? t("player.flagged") : t("player.flag")}
+    </Button>
   );
 }

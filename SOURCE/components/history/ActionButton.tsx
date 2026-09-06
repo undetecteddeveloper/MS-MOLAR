@@ -29,6 +29,8 @@
 // one in-flow node to its parent AND never leaks layout height to the page.
 import { Download, Loader2, Share2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { usePdfAction } from "@/components/history/usePdfAction";
 import { t } from "@/lib/copy";
 import type { MessageKey } from "@/lib/copy";
@@ -76,18 +78,21 @@ export function ActionButton({ action, pdfInput, idPrefix, blockedReason }: Acti
         // `relative` is required — it anchors every absolutely-positioned descendant below (error/status text,
         // and the sr-only reason span) so none of them ever become extra in-flow siblings of this button, or —
         // worse, since they'd have no positioned ancestor at all — get positioned against the document root (D2).
-        className="relative flex items-center justify-center rounded-xl border border-border bg-card px-3 py-4 text-brand transition-colors hover:border-brand/40"
-      >
-        {phase === "busy" ? (
-          <Loader2 className="size-6 animate-spin" aria-hidden />
-        ) : (
-          <Icon className="size-6" aria-hidden />
+        // Theme "Sân trường": viên thuốc surface của primitive Button, nhãn HIỆN
+        // RA cạnh icon (icon-only bắt học sinh đoán). `relative` + `w-full` giữ
+        // hình dạng DOM đã mô tả ở đầu file; mọi span trạng thái vẫn là con
+        // tuyệt đối của chính nút này.
+        className={cn(
+          buttonVariants({ variant: "secondary" }),
+          "relative w-full px-3 aria-disabled:opacity-60"
         )}
-        <span className="sr-only">{label}</span>
+      >
+        {phase === "busy" ? <Loader2 className="animate-spin" aria-hidden /> : <Icon aria-hidden />}
+        <span>{label}</span>
         {phase === "error" && (
           <span
             role="alert"
-            className="text-brand absolute top-full left-1/2 z-10 mt-1 w-max max-w-40 -translate-x-1/2 text-center text-sm"
+            className="text-destructive absolute top-full left-1/2 z-10 mt-1 w-max max-w-40 -translate-x-1/2 text-center text-sm"
           >
             {t("history.pdfError")}
           </span>

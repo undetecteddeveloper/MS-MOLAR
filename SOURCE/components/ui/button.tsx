@@ -26,6 +26,10 @@ const buttonVariants = cva(
           "bg-surface text-foreground hover:bg-[color-mix(in_oklch,var(--surface),var(--foreground)_7%)] aria-expanded:bg-[color-mix(in_oklch,var(--surface),var(--foreground)_7%)]",
         outline:
           "border-border bg-background text-foreground hover:bg-surface aria-expanded:bg-surface",
+        // Trắng — cho nút nằm TRÊN một khối đã tô (thẻ surface, thẻ vàng): cùng
+        // vai trò với `plain` của Card và Badge.
+        plain:
+          "bg-card text-foreground hover:bg-[color-mix(in_oklch,var(--card),var(--foreground)_6%)] aria-expanded:bg-[color-mix(in_oklch,var(--card),var(--foreground)_6%)]",
         ghost: "text-foreground hover:bg-surface aria-expanded:bg-surface",
         // Vàng nắng — MỘT nút mỗi màn hình, và luôn kèm chữ đen (vàng không đủ
         // tương phản để tự nó mang thông tin).
@@ -35,7 +39,8 @@ const buttonVariants = cva(
         link: "text-primary h-auto px-0 underline-offset-4 hover:underline",
       },
       size: {
-        default: "h-11 px-5 text-sm has-data-[icon=inline-end]:pr-4 has-data-[icon=inline-start]:pl-4",
+        default:
+          "h-11 px-5 text-sm has-data-[icon=inline-end]:pr-4 has-data-[icon=inline-start]:pl-4",
         xs: "h-8 gap-1 px-3 text-xs [&_svg:not([class*='size-'])]:size-3.5",
         sm: "h-9 gap-1.5 px-4 text-sm",
         lg: "h-13 px-6 text-base [&_svg:not([class*='size-'])]:size-5",

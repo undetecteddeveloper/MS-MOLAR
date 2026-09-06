@@ -1,12 +1,11 @@
 // QuestionPagination — sidebar điều hướng giữa các câu (Layer 2). GĐ 3 M3.1 Task 2–3.
-// Đồng bộ TEMPLATE/L2/ExamPage: card hairline bo góc 8px, mỗi câu một ô vuông —
-// đang xem = viền 2px accent, đã làm = nền brand, chưa làm = hairline; câu đánh
-// dấu có chấm nhỏ ở góc trên-phải.
+// Thẻ tô nền surface, mỗi câu một ô TRÒN — đang xem = viên vàng nắng chữ đen
+// (cùng ngôn ngữ với ô đang chọn của BottomNav), đã làm = nền xanh chữ trắng,
+// chưa làm = ô trắng chữ dịu; câu đánh dấu có chấm đen ở góc trên-phải.
 // (Swipe cho mobile — UI-LAYER-MAP 8.2 — xử lý ở ExamPlayer.)
 //
 // KHÔNG có "use client" nhưng đây LÀ client component: nó nhận prop `onJump`
-// là hàm, nên chỉ render được bên trong ranh giới client của ExamPlayer. Vì
-// vậy phải tra từ điển bằng `useT()`, không dùng `getTranslate()` của server.
+// là hàm, nên chỉ render được bên trong ranh giới client của ExamPlayer.
 //
 // HAI CHẾ ĐỘ theo số câu (bug prod 2026-08-17):
 // Lưới 4 cột không giới hạn chiều cao chỉ ổn với đề seed ~5–12 câu. Đề thật
@@ -18,6 +17,7 @@
 
 import { useEffect, useRef } from "react";
 import { t } from "@/lib/copy";
+import { Card } from "@/components/ui/card";
 
 /** Trên ngưỡng này thì đổi sang lưới dày + khung cuộn. */
 const COMPACT_THRESHOLD = 10;
@@ -54,9 +54,9 @@ export function QuestionPagination({
   }, [current, compact]);
 
   return (
-    <div className="border-border rounded-lg border p-5">
-      <div className="mb-3.5 flex items-baseline justify-between gap-3">
-        <span className="eyebrow">{t("common.questions")}</span>
+    <Card padding="none" className="gap-3.5 p-4 sm:p-5">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="text-sm font-semibold">{t("common.questions")}</span>
         {compact && (
           <span className="text-muted-foreground text-xs tabular-nums" aria-live="polite">
             {t("player.answeredCount", { done: answered.size, total })}
@@ -90,21 +90,21 @@ export function QuestionPagination({
                     (isAnswered ? ` (${t("player.answeredStatus")})` : "") +
                     (isFlagged ? ` (${t("player.flagged")})` : "")
                   }
-                  className={`relative flex aspect-square w-full items-center justify-center rounded tabular-nums transition-colors ${
+                  className={`focus-visible:ring-ring/40 relative flex aspect-square w-full items-center justify-center rounded-full font-semibold tabular-nums transition-colors focus-visible:ring-3 focus-visible:outline-none ${
                     compact ? "text-xs" : "text-sm"
                   } ${
                     isCurrent
-                      ? "border-ring text-foreground border-2"
+                      ? "bg-sun text-foreground"
                       : isAnswered
-                        ? "bg-brand text-brand-foreground border border-transparent hover:opacity-90"
-                        : "border-border text-muted-foreground hover:border-ring/50 hover:text-foreground border"
+                        ? "bg-primary text-primary-foreground hover:bg-[color-mix(in_oklch,var(--primary),black_10%)]"
+                        : "bg-card text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   {i + 1}
                   {isFlagged && (
                     <span
                       aria-hidden
-                      className="bg-ring ring-background absolute -top-1 -right-1 size-2 rounded-full ring-2"
+                      className="bg-foreground ring-surface absolute top-0 right-0 size-2.5 rounded-full ring-2"
                     />
                   )}
                 </button>
@@ -113,6 +113,6 @@ export function QuestionPagination({
           })}
         </ol>
       </nav>
-    </div>
+    </Card>
   );
 }

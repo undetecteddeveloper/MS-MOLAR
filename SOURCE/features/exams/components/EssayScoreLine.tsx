@@ -39,12 +39,14 @@
 // sẽ làm cả dòng giật mỗi lần cập nhật.
 //
 // Hình khối mượn khối cảnh báo quá giờ đã có sẵn trên chính trang này — tiền lệ
-// tại chỗ cho "một câu chú thích cho con số bên trên". Chỉ token, không shadow,
-// không gradient. Component KHÔNG tự mang margin: nhịp dọc thuộc về `gap-5`
-// của trang.
+// tại chỗ cho "một câu chú thích cho con số bên trên": thẻ viền nét đứt (biến
+// thể `outline` của Card — theme "Sân trường" chỉ dành viền nét đứt cho trạng
+// thái tạm/chưa ngã ngũ). Chỉ token, không shadow, không gradient. Component
+// KHÔNG tự mang margin: nhịp dọc thuộc về `gap-5` của trang.
 
 import Link from "next/link";
 import { EssayLifecycleBadge } from "@/components/essay/EssayLifecycleBadge";
+import { Card } from "@/components/ui/card";
 import { t } from "@/lib/copy";
 import type { EssaySummary } from "@/lib/scoring/essayLifecycle";
 
@@ -60,7 +62,6 @@ export async function EssayScoreLine({
   summary: EssaySummary | undefined;
   detailHref: string;
 }) {
-
   // KHÔNG khoá vòng đời nào ⇒ KHÔNG node nào. Xem đầu file.
   if (!summary) return null;
 
@@ -68,10 +69,10 @@ export async function EssayScoreLine({
   const hasScore = gradedCount > 0;
 
   const score = hasScore
-    // `formatPoints` cho CẢ HAI vế: từ B1 mẫu số là điểm thật của đề (7, 5.5…),
-    // không còn là một phép đếm số câu, nên `String(max)` sẽ in ra "5.5" thô
-    // hoặc "7" tuỳ may rủi của dấu phẩy động.
-    ? t("result.essay.points", { earned: formatPoints(earned), max: formatPoints(max) })
+    ? // `formatPoints` cho CẢ HAI vế: từ B1 mẫu số là điểm thật của đề (7, 5.5…),
+      // không còn là một phép đếm số câu, nên `String(max)` sẽ in ra "5.5" thô
+      // hoặc "7" tuỳ may rủi của dấu phẩy động.
+      t("result.essay.points", { earned: formatPoints(earned), max: formatPoints(max) })
     : "—";
 
   // Thứ tự nhánh có ý nghĩa: `pending` THẮNG mọi thứ khác, vì khi còn câu đang
@@ -85,13 +86,13 @@ export async function EssayScoreLine({
   })();
 
   return (
-    <div className="border-border bg-card rounded-lg border border-dashed px-4 py-3 text-sm">
+    <Card variant="outline" padding="compact" className="gap-1.5 border-dashed text-sm">
       <div className="flex items-center gap-3">
         <span className="eyebrow">{t("result.essay.label")}</span>
         {pendingCount > 0 && <EssayLifecycleBadge state="pending" />}
       </div>
 
-      <p className="font-serif text-2xl tabular-nums">{score}</p>
+      <p className="text-2xl font-bold tabular-nums">{score}</p>
 
       <p className="text-muted-foreground">
         {note}
@@ -107,6 +108,6 @@ export async function EssayScoreLine({
           </>
         )}
       </p>
-    </div>
+    </Card>
   );
 }

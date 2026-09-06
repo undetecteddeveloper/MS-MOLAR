@@ -2,17 +2,23 @@
 // Giữ state làm bài qua useExamPlayer (useReducer — tracer code M1.5): câu, đáp án, flag.
 // Nộp bài gọi submitExam() Server Action (batch on submit, Q2=A) — action tự redirect.
 // Task 3: ExamTimer đếm ngược → hết giờ auto-submit (PA A); FlagButton đánh dấu câu.
-// Layout đồng bộ TEMPLATE/L2/ExamPage (redesign UI-only — logic/hooks giữ nguyên):
-// header (tên đề + đồng hồ + nút Nộp bài) → 2 cột (card câu hỏi trái, sidebar
-// điều hướng phải). SiteHeader (navbar) vẫn từ (exams)/layout.tsx.
+// Bố cục: header (lối thoát mobile, tên đề, đồng hồ, Nộp bài desktop) → 2 cột
+// (thẻ câu hỏi trái, bảng câu hỏi phải) → thanh Câu trước / Nộp bài / Câu sau.
+// SiteHeader (navbar) vẫn từ (exams)/layout.tsx.
 // M3.2 Task 1: mobile vuốt trái/phải chuyển câu (useSwipe); desktop dùng phím ← → .
+//
+// Theme "Sân trường" (2026-09-06): đợt này CHỈ đổi diện mạo — màu, khoảng
+// cách, bo góc, chữ. Bố cục, đồng hồ và logic nộp bài giữ nguyên từng dòng vì
+// đây là chế độ tập trung, màn nhạy nhất toàn site. Nút dùng primitive Button;
+// đồng hồ là chip (ExamTimer); thẻ câu hỏi và bảng câu hỏi tô nền surface.
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useRef, useTransition } from "react";
 import { submitExam } from "@/features/exams/actions";
 import { t } from "@/lib/copy";
+import { Button } from "@/components/ui/button";
 import { ExamTimer } from "@/features/exams/components/ExamTimer";
 import { LeaveExamDialog } from "@/features/exams/components/LeaveExamDialog";
 import { QuestionRenderer } from "@/features/exams/components/QuestionRenderer";
@@ -122,13 +128,18 @@ export function ExamPlayer({
       {/* S#28: modal xác nhận rời trang (mở khi guard chặn một click nav). */}
       <LeaveExamDialog open={pendingHref !== null} onCancel={cancelLeave} onLeave={confirmLeave} />
 
-      {/* `full` (72rem = 1152px) thay số ma thuật max-w-[1100px] cũ — chênh
-          52px, không đổi bố cục, nhưng màn làm bài không còn là bề rộng ngoại
-          lệ duy nhất của app và mép nội dung thẳng hàng mép navbar. */}
-      <PageContainer as="main" size="full" className="flex flex-col gap-6">
-        {/* Header — tên đề (trái) · đồng hồ + nút Nộp bài (phải). Không sticky:
-            khu vực trả lời đã tự cuộn trong khung 238px (QuestionRenderer) nên
-            trang hiếm khi cần cuộn dài. preload order 1 — fade sau navbar (S#21). */}
+      {/* `full` (72rem): màn làm bài cùng bề rộng với kho đề, mép nội dung
+          thẳng hàng mép navbar. Lề 16px ở mobile (như các trang (exams) khác)
+          để hai dải dính đỉnh/đáy bên dưới bleed đúng bằng `-mx-4`. */}
+      <PageContainer
+        as="main"
+        size="full"
+        padding="none"
+        className="flex flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8"
+      >
+        {/* Header — tên đề (trái) · đồng hồ + nút Nộp bài (phải). Không sticky ở
+            desktop: khu vực trả lời đã tự cuộn trong khung 238px (QuestionRenderer)
+            nên trang hiếm khi cần cuộn dài. */}
         {/* Dưới 768px khối này DÍNH ĐỈNH và nén lại: đồng hồ đếm ngược là thông
             tin phải nhìn thấy LIÊN TỤC trong một bài thi có giờ, nhưng trước
             thay đổi này nó cuộn mất ngay khi người dùng bắt đầu đọc câu hỏi đầu
@@ -148,10 +159,7 @@ export function ExamPlayer({
             được nhảy vị trí theo dữ liệu. Nay: cụm phải `shrink-0` giữ nguyên
             chỗ, phần chữ bên trái co lại và cắt bằng dấu ba chấm ở MỌI bề
             rộng — `title` giữ lại tên đầy đủ khi rê chuột. */}
-        <div
-          className="preload-fade flex items-end justify-between gap-4 max-md:bg-background/95 max-md:sticky max-md:top-0 max-md:z-20 max-md:-mx-4 max-md:items-center max-md:gap-2 max-md:px-4 max-md:py-2 max-md:backdrop-blur"
-          style={{ "--preload-order": 1 } as React.CSSProperties}
-        >
+        <div className="max-md:bg-background/95 flex items-end justify-between gap-4 max-md:sticky max-md:top-0 max-md:z-20 max-md:-mx-4 max-md:items-center max-md:gap-2 max-md:px-4 max-md:py-2 max-md:backdrop-blur">
           {/* Lối quay về /exams — bản MOBILE. Dưới 768px cả SiteHeader lẫn
               BottomNav đều ẩn ở route này (isExamFocusRoute), nên nếu không có
               nút này thì lối ra duy nhất là nút Back của trình duyệt — và với
@@ -169,7 +177,7 @@ export function ExamPlayer({
           <Link
             href="/exams"
             aria-label={t("player.backToExams")}
-            className="text-muted-foreground hover:text-foreground active:text-foreground -ml-3 flex size-11 shrink-0 items-center justify-center rounded-md transition-colors md:hidden"
+            className="text-muted-foreground hover:bg-surface hover:text-foreground active:text-foreground focus-visible:ring-ring/40 -ml-3 flex size-11 shrink-0 items-center justify-center rounded-full transition-colors focus-visible:ring-3 focus-visible:outline-none md:hidden"
           >
             <ArrowLeft aria-hidden className="size-5" strokeWidth={2} />
           </Link>
@@ -191,76 +199,51 @@ export function ExamPlayer({
             />
             <h1
               title={examTitle}
-              className="text-foreground truncate font-serif text-2xl font-semibold max-md:text-base sm:text-3xl"
+              className="text-foreground truncate text-base font-semibold md:text-2xl md:font-bold lg:text-3xl"
             >
               {examTitle}
             </h1>
-            <div className="bg-ring mt-3 h-0.5 w-10 max-md:hidden" />
           </div>
-          <div className="flex shrink-0 items-center gap-4 max-md:gap-2">
-            <div className="border-border min-w-[130px] rounded-md border px-4 py-2 text-center max-md:min-w-0 max-md:border-0 max-md:px-0 max-md:py-0">
-              {/* Nhãn "Thời gian còn lại" ẩn trên mobile — định dạng MM:SS
-                  trong một dải điều khiển đã tự nói nó là đồng hồ. */}
-              <span className="eyebrow block max-md:hidden">{t("player.timeRemaining")}</span>
-              <ExamTimer durationMinutes={durationMinutes} onTimeUp={submit} />
-            </div>
+          <div className="flex shrink-0 items-center gap-3 max-md:gap-2">
+            {/* ExamTimer tự là một chip (nền surface, đỏ nhạt ở phút cuối) —
+                không bọc thêm khung nào. Nhãn "Thời gian còn lại" nằm trong
+                `aria-label` của đồng hồ; định dạng MM:SS + icon đã tự nói nó là
+                đồng hồ. */}
+            <ExamTimer durationMinutes={durationMinutes} onTimeUp={submit} />
             {/* Ẩn trên mobile: bản Nộp bài của mobile nằm trong dải dính ĐÁY
                 (Vùng Xanh của ngón cái, §4.2). Hai nút cùng chức năng trên một
                 màn hình sẽ khiến người dùng phải đoán chúng có khác nhau không.
                 ExamTimer thì KHÔNG nhân bản — nó mang `onTimeUp` tự nộp bài,
                 mount hai lần là hai bộ đếm cùng chạy. */}
-            <button
-              type="button"
-              onClick={submit}
-              disabled={submitting}
-              className="bg-brand text-brand-foreground rounded-full px-5 py-3 text-xs font-medium tracking-[0.04em] uppercase transition-opacity hover:opacity-90 disabled:opacity-50 max-md:hidden"
-            >
+            <Button type="button" onClick={submit} disabled={submitting} className="max-md:hidden">
               {submitting ? t("player.submitting") : t("player.submit")}
-            </button>
+            </Button>
           </div>
         </div>
 
-        {/* Khu vực chính — card câu hỏi (trái) + sidebar điều hướng (phải).
-            preload order 2 (S#21). */}
-        <div
-          className="preload-fade flex flex-wrap items-start gap-6"
-          style={{ "--preload-order": 2 } as React.CSSProperties}
-        >
+        {/* Khu vực chính — card câu hỏi (trái) + sidebar điều hướng (phải). */}
+        <div className="flex flex-wrap items-start gap-6">
           {/* Vùng đọc câu hỏi — bắt cử chỉ vuốt ngang để chuyển câu trên mobile. */}
           <div
             className="min-w-0 flex-1 basis-[480px]"
             onTouchStart={swipe.onTouchStart}
             onTouchEnd={swipe.onTouchEnd}
           >
-            {/* Nhãn PHẦN — KHÔNG dùng `.eyebrow` nữa. `.eyebrow` là style NHÃN
-                NGẮN (uppercase + tracking 0.08em + 12px + muted): đúng cho "Thời
-                gian còn lại", sai cho thứ đang đổ vào đây. Nội dung thật trong
-                DB là cả một đoạn ba câu — vd "PHẦN I. (3.0 điểm) Câu trắc
-                nghiệm nhiều phương án lựa chọn. Thí sinh trả lời từ câu 1 đến
-                câu 12. Mỗi câu hỏi thí sinh chỉ chọn một phương án." — và
-                `uppercase` của CSS ép TOÀN BỘ đoạn đó thành chữ hoa (bản thân
-                chuỗi trong DB vốn là chữ thường, chỉ "PHẦN I." mới viết hoa).
-                Chữ hoa toàn bộ xoá hình dạng từ (word shape) nên mắt phải đọc
-                từng chữ cái; cộng thêm 12px + giãn chữ + màu mờ thì đây là khối
-                khó đọc nhất màn hình, trong khi nó lại là HƯỚNG DẪN LÀM BÀI bắt
-                buộc phải đọc ("chỉ chọn một phương án").
-                Nay: giữ nguyên chữ như tác giả đề đã viết, 14px, giãn dòng
-                thoáng, tương phản đầy đủ, và bọc trong khối nền + kẻ dọc — thứ
-                bậc do KÍCH CỠ và cái khối đảm nhiệm, không phải do làm mờ chữ.
-                Khối nền + hairline là cách phân lớp của theme (không đổ bóng). */}
+            {/* Nhãn PHẦN — KHÔNG dùng `.eyebrow`. Nội dung thật trong DB là cả
+                một đoạn ba câu — vd "PHẦN I. (3.0 điểm) Câu trắc nghiệm nhiều
+                phương án lựa chọn. Thí sinh trả lời từ câu 1 đến câu 12. Mỗi
+                câu hỏi thí sinh chỉ chọn một phương án." — và đây là HƯỚNG DẪN
+                LÀM BÀI bắt buộc phải đọc ("chỉ chọn một phương án"), nên giữ
+                nguyên chữ như tác giả đề đã viết, 14px, giãn dòng thoáng, tương
+                phản đầy đủ. Một vạch xanh bên trái đánh dấu "lời dẫn", không
+                tô nền: ngay dưới là thẻ câu hỏi đã tô surface, hai khối tô
+                chồng nhau sẽ dính thành một.
+                Đo ở 390px với nhãn phần dài nhất (đoạn 3 câu): ~119px kể cả lề
+                dưới — chỗ tốn nằm ở LINE-HEIGHT của 4 dòng chữ thường, không
+                nằm ở đệm, nên không bó thêm được mà không phá phần dễ đọc. */}
             {currentPartTitle && (
               <p
-                /* Đệm dọc bó sát hơn ở mobile. Đo ở 390px với nhãn phần dài
-                   nhất (đoạn 3 câu): 127px kể cả lề dưới, so với ~87px của bản
-                   `.eyebrow` cũ. Bó đệm + lề chỉ lấy lại 8px (còn 119px) — chỗ
-                   tốn nằm ở LINE-HEIGHT của 4 dòng chữ thường, không nằm ở
-                   đệm, nên không bó thêm được nữa mà không phá lại chính phần
-                   dễ đọc vừa giành được.
-                   Vẫn đắt hơn bản cũ ~32px, xấp xỉ một dòng câu hỏi trên màn
-                   hẹp (xem ghi chú chi phí chiều cao ở khối header). Chấp nhận:
-                   đây là HƯỚNG DẪN LÀM BÀI bắt buộc đọc, và bản cũ tuy ngắn
-                   hơn nhưng gần như không ai đọc nổi. */
-                className="border-ring bg-muted text-foreground mb-3 border-l-2 py-2 pr-3 pl-3 text-sm leading-relaxed text-pretty sm:mb-4 sm:py-2.5 sm:pl-3.5"
+                className="border-primary text-foreground mb-3 border-l-2 py-0.5 pl-3 text-sm leading-relaxed text-pretty sm:mb-4 sm:pl-3.5"
                 aria-live="polite"
               >
                 {currentPartTitle}
@@ -268,6 +251,7 @@ export function ExamPlayer({
             )}
             <QuestionRenderer
               index={current + 1}
+              total={questions.length}
               question={question}
               essayGradingEnabled={essayGradingEnabled}
               nodes={questionNodes[current]}
@@ -289,43 +273,54 @@ export function ExamPlayer({
               onToggleFlag={() => toggleFlag(question.id)}
             />
 
-            {/* Điều hướng Trước/Tiếp.
+            {/* Điều hướng Câu trước / Câu sau.
                 Dưới 768px cụm này DÍNH ĐÁY (`sticky bottom-*`) ngay trên
                 BottomNav: đo trước thay đổi này, với đề chỉ 5 câu thì khối
                 điều hướng + bảng câu hỏi đã nằm ở y≈797 — đúng một viewport
                 bên dưới — nên mỗi lần chuyển câu là một lần cuộn xuống rồi
                 cuộn ngược lên. Đề 40 câu thì khoảng cách đó nhân lên.
-                bottom = chiều cao BottomNav + safe-area (§6.2). */}
-            <div className="border-border mt-4 flex items-center justify-between gap-3 border-t pt-4 max-md:bg-background/95 max-md:sticky max-md:bottom-[env(safe-area-inset-bottom,0px)] max-md:z-20 max-md:-mx-4 max-md:px-4 max-md:pb-3 max-md:backdrop-blur">
-              <button
+                bottom = chiều cao BottomNav + safe-area (§6.2).
+                Ở mobile hai nút chuyển câu là nút TRÒN chỉ có mũi tên (nhãn
+                chữ giữ cho trình đọc màn hình) để "Nộp bài" ở giữa có chỗ
+                trải rộng — ba viên thuốc có chữ không đứng vừa 328px. Từ 768px
+                nhãn "Câu trước / Câu sau" hiện ra. Kẻ ngang chỉ ở mobile: dải
+                dính đáy mờ 95% cần một mép để tách khỏi nội dung cuộn dưới nó. */}
+            <div className="max-md:bg-background/95 mt-4 flex items-center justify-between gap-3 pt-4 max-md:sticky max-md:bottom-[env(safe-area-inset-bottom,0px)] max-md:z-20 max-md:-mx-4 max-md:border-t max-md:px-4 max-md:pb-3 max-md:backdrop-blur">
+              <Button
                 type="button"
+                variant="secondary"
                 onClick={prev}
                 disabled={current === 0}
-                className="border-border text-foreground hover:border-ring disabled:hover:border-border min-h-11 rounded-md border px-4 py-2.5 text-xs font-medium tracking-[0.04em] uppercase transition-colors disabled:cursor-default disabled:opacity-40"
+                aria-label={t("player.prevQuestion")}
+                className="max-md:w-11 max-md:px-0"
               >
-                ← {t("player.previous")}
-              </button>
+                <ChevronLeft aria-hidden />
+                <span className="max-md:sr-only">{t("player.prevQuestion")}</span>
+              </Button>
               {/* Nộp bài NHÂN BẢN ở đây CHỈ trên mobile: bản gốc nằm trong
                   header trang, và header đó cuộn mất ngay khi người dùng bắt
                   đầu đọc câu hỏi. Nút quan trọng nhất của màn hình không được
                   đòi cuộn ngược lên mới bấm được (§4.2 Sticky CTA).
                   `md:hidden` để desktop không có hai nút Nộp bài cùng lúc. */}
-              <button
+              <Button
                 type="button"
                 onClick={submit}
                 disabled={submitting}
-                className="bg-brand text-brand-foreground min-h-11 rounded-full px-4 py-2.5 text-xs font-medium tracking-[0.04em] uppercase transition-opacity hover:opacity-90 disabled:opacity-50 md:hidden"
+                className="flex-1 md:hidden"
               >
                 {submitting ? t("player.submitting") : t("player.submit")}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="secondary"
                 onClick={next}
                 disabled={current === questions.length - 1}
-                className="border-border text-foreground hover:border-ring disabled:hover:border-border min-h-11 rounded-md border px-4 py-2.5 text-xs font-medium tracking-[0.04em] uppercase transition-colors disabled:cursor-default disabled:opacity-40"
+                aria-label={t("player.nextQuestion")}
+                className="max-md:w-11 max-md:px-0"
               >
-                {t("common.next")}
-              </button>
+                <span className="max-md:sr-only">{t("player.nextQuestion")}</span>
+                <ChevronRight aria-hidden />
+              </Button>
             </div>
           </div>
 

@@ -1,11 +1,17 @@
 // ExamTimer — đồng hồ đếm ngược cho Exam Player (Layer 2). GĐ 3 M3.1 Task 3.
 // Đếm từ `durationMinutes` về 0; hết giờ → gọi `onTimeUp` (ExamPlayer auto-submit, PA A).
-// Hiển thị MM:SS dạng serif (đồng bộ TEMPLATE/L2/ExamPage), KHÔNG nhấp nháy
-// (UI-LAYER-MAP 4.2) — chỉ đổi màu cảnh báo ở phút cuối. Đếm bằng setTimeout
-// từng giây để tránh dồn tick khi tab nền.
+// Hiển thị MM:SS, KHÔNG nhấp nháy (UI-LAYER-MAP 4.2) — chỉ đổi màu cảnh báo ở
+// phút cuối. Đếm bằng setTimeout từng giây để tránh dồn tick khi tab nền.
+//
+// Theme "Sân trường" (2026-09-06): đồng hồ là một CHIP (viên thuốc tô nền
+// surface, icon + số). Phút cuối: chip đổi sang nền đỏ nhạt, số đỏ, kèm nhãn
+// chữ "Phút cuối" NGAY TRONG chip — nằm ngang thay vì xuống dòng để chip không
+// cao lên lúc chạm mốc 60 giây (dải header dính đỉnh ở mobile, mọi thay đổi
+// chiều cao ở đó là một cú giật). Logic đếm giữ nguyên từng dòng.
 "use client";
 
 import { useEffect, useEffectEvent, useState } from "react";
+import { Timer as TimerIcon } from "lucide-react";
 import { t } from "@/lib/copy";
 import type { Translate } from "@/lib/copy";
 
@@ -46,11 +52,20 @@ export function ExamTimer({ durationMinutes, onTimeUp }: ExamTimerProps) {
   const low = remaining <= 60; // cảnh báo phút cuối
 
   return (
-    <>
+    <span
+      className={`inline-flex h-10 shrink-0 items-center gap-2 rounded-full px-3.5 transition-colors sm:h-11 sm:px-4 ${
+        low ? "bg-destructive/10" : "bg-surface"
+      }`}
+    >
+      <TimerIcon
+        aria-hidden
+        strokeWidth={2}
+        className={`size-4 shrink-0 ${low ? "text-destructive" : "text-muted-foreground"}`}
+      />
       <span
         role="timer"
         aria-label={t("player.timeRemaining")}
-        className={`font-serif text-2xl font-semibold tabular-nums transition-colors ${
+        className={`text-lg font-semibold tabular-nums transition-colors ${
           low ? "text-destructive" : "text-foreground"
         }`}
       >
@@ -63,7 +78,11 @@ export function ExamTimer({ durationMinutes, onTimeUp }: ExamTimerProps) {
           "bình thường" trông ra sao — không đọc được tín hiệu chỉ-bằng-màu.
           Nằm NGOÀI phần tử role="timer" để chuỗi MM:SS mà trình đọc màn hình
           lấy ra vẫn sạch. */}
-      {low && <span className="eyebrow text-destructive mt-1 block">{t("player.lastMinute")}</span>}
+      {low && (
+        <span className="text-destructive text-xs font-semibold whitespace-nowrap">
+          {t("player.lastMinute")}
+        </span>
+      )}
 
       {/* role="timer" KHÔNG tự đọc lên: nó chỉ gắn nhãn vai trò cho phần tử,
           không phải vùng động. Trước đây người dùng trình đọc màn hình phải chủ
@@ -73,7 +92,7 @@ export function ExamTimer({ durationMinutes, onTimeUp }: ExamTimerProps) {
       <span aria-live="polite" className="sr-only">
         {ANNOUNCE_AT.has(remaining) ? announce(t, remaining) : ""}
       </span>
-    </>
+    </span>
   );
 }
 

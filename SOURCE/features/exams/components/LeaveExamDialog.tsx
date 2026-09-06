@@ -1,13 +1,16 @@
 "use client";
 
 // LeaveExamDialog — modal cảnh báo rời trang làm bài (S#28 Q3, Layer 2).
-// Theme Mực & Sơn mài: card nền background + viền hairline, KHÔNG đổ bóng
-// (globals.css Elevation & Depth) — phân lớp bằng scrim đen sơn mài mờ.
-// Nút chính "Leave" đỏ son (hành động rời = hành động chính user đang muốn);
-// "Cancel" outline phụ. Esc hoặc click scrim = Cancel.
+// Theme "Sân trường": thẻ trắng bo 18px, không viền, không bóng — phân lớp bằng
+// scrim xanh đen mờ; dưới 640px thẻ dính đáy như một tấm kéo lên (cùng khuôn
+// với hộp thoại báo cáo đề ở ReportExam). "Huỷ" là nút phụ (surface); "Rời khỏi"
+// mang màu đỏ vì nó xoá bài đang làm dở — màu nói đúng hậu quả, không nói đúng
+// ý muốn. Esc hoặc click scrim = Huỷ.
 
 import { useEffect } from "react";
 import { t } from "@/lib/copy";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 
 interface LeaveExamDialogProps {
   open: boolean;
@@ -32,39 +35,29 @@ export function LeaveExamDialog({ open, onCancel, onLeave }: LeaveExamDialogProp
       role="dialog"
       aria-modal="true"
       aria-labelledby="leave-exam-title"
-      className="fixed inset-0 z-50 flex items-center justify-center px-6"
+      className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center sm:p-6"
     >
       {/* Scrim — click ra ngoài = Hủy. */}
       <button
         aria-hidden
         tabIndex={-1}
         onClick={onCancel}
-        className="absolute inset-0 cursor-default bg-[#1B1512]/40"
+        className="bg-foreground/40 absolute inset-0 cursor-default"
       />
-      <div className="border-border bg-background relative w-full max-w-sm rounded-lg border p-6">
-        <h2 id="leave-exam-title" className="text-foreground font-serif text-xl">
+      <Card variant="plain" className="relative w-full max-w-sm gap-3 p-5">
+        <h2 id="leave-exam-title" className="text-foreground text-lg font-semibold">
           {t("player.leaveTitle")}
         </h2>
-        <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
-          {t("player.leaveBody")}
-        </p>
-        <div className="mt-6 flex justify-end gap-3">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="border-border text-foreground hover:bg-accent rounded-[4px] border px-4 py-2 text-xs font-medium tracking-[0.14em] uppercase transition-colors"
-          >
+        <p className="text-muted-foreground text-sm leading-relaxed">{t("player.leaveBody")}</p>
+        <div className="flex justify-end gap-2 pt-1">
+          <Button type="button" variant="secondary" onClick={onCancel}>
             {t("common.cancel")}
-          </button>
-          <button
-            type="button"
-            onClick={onLeave}
-            className="bg-brand text-brand-foreground rounded-full px-4 py-2 text-xs font-medium tracking-[0.14em] uppercase transition-opacity hover:opacity-90"
-          >
+          </Button>
+          <Button type="button" variant="destructive" onClick={onLeave}>
             {t("player.leave")}
-          </button>
+          </Button>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

@@ -82,7 +82,6 @@ export async function EssayReviewBlock({
   attemptId: string;
   questionId: string;
 }) {
-
   // RS-6 = "thất bại VÀ hết lượt". Biểu thức ấy KHÔNG được viết lại ở đây:
   // `isEssayIncomplete()` là LỜI KHAI DUY NHẤT của RS-6 trong toàn repo
   // (EG-BE-036), và một phép quét mã nguồn trong `essayLifecycle.test.ts` cưỡng
@@ -101,7 +100,7 @@ export async function EssayReviewBlock({
         <EssayLifecycleBadge state={view.state} />
 
         {view.state === "graded" && view.earned !== null && (
-          <span className="font-serif text-lg tabular-nums">
+          <span className="text-lg font-semibold tabular-nums">
             {t("result.essay.band", {
               band: BAND_LABEL[String(view.earned)] ?? String(view.earned),
             })}

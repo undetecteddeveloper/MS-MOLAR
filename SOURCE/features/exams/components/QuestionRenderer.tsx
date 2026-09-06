@@ -1,8 +1,7 @@
 // QuestionRenderer — hiển thị nội dung một câu hỏi + khu vực trả lời (Layer 2).
-// GĐ 3 M3.1 Task 2: đồng bộ layout TEMPLATE/L2/ExamPage — card hairline bo góc
-// 8px, hàng đầu "Câu N" + FlagButton, khu vực trả lời cao cố định 238px cuộn
-// dọc khi nội dung dài.
-// Task 5: nội dung render markdown + LaTeX qua <RichText>.
+// GĐ 3 M3.1 Task 2: hàng đầu "Câu N trên T" + thanh tiến độ + FlagButton, khu
+// vực trả lời cao cố định 238px cuộn dọc khi nội dung dài.
+// Task 5: nội dung render markdown + LaTeX qua <RichText> (nay ở server, TD-023).
 // v2.1 (ADR-0005, Task D2): thêm 2 dạng trả lời — true_false (4 ý a–d, mỗi ý
 // segmented Đ/S; input mã hoá tfCodec thành 1 chuỗi) và short_answer (ô nhập
 // ngắn). Cả hai "Not auto-scored yet" (product decision — chấm điểm là feature
@@ -15,6 +14,10 @@
 // Lưu ý bảo mật KHÔNG đổi theo: chữ điền vào là nội dung LỰA CHỌN của chính
 // học sinh (`PublicQuestion.choices`), không phải đáp án đúng — `correctAnswer`
 // vẫn không có mặt ở phía này.
+//
+// Theme "Sân trường" (2026-09-06): thẻ câu hỏi tô nền surface (Card); các khối
+// con — bài đọc, lựa chọn, ý Đ/S — là ô TRẮNG trên nền đó; viền chỉ còn ở ô
+// nhập (Input/Textarea). Bố cục và chiều cao khu vực trả lời giữ nguyên.
 
 "use client";
 import { Fragment } from "react";
@@ -23,8 +26,14 @@ import { t } from "@/lib/copy";
 import type { ChoiceId, PublicQuestion, SubItemId } from "@/types/question";
 import { LIMITS } from "@/lib/ugc/limits";
 import { decodeTfAnswer, encodeTfAnswer } from "@/lib/ugc/tfCodec";
-import type { PassageChunkNode, QuestionNodes } from "@/features/exams/components/questionNodes.types";
+import type {
+  PassageChunkNode,
+  QuestionNodes,
+} from "@/features/exams/components/questionNodes.types";
 import { QuestionFigure } from "@/components/shared/QuestionFigure";
+import { Card } from "@/components/ui/card";
+import { Input, Label, Textarea } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
 import { AnswerChoice } from "@/features/exams/components/AnswerChoice";
 import { FlagButton } from "@/features/exams/components/FlagButton";
 
@@ -34,6 +43,11 @@ const MAX_ATTEMPT_ANSWER = LIMITS.MAX_ATTEMPT_ANSWER;
 interface QuestionRendererProps {
   /** Số thứ tự câu (1-based) — để hiển thị "Câu N". */
   index: number;
+  /** Tổng số câu của đề. Có thì nhãn thành "Câu N trên T" và hiện thanh tiến
+   *  độ vị trí bên dưới (design plan §3 "Làm bài"); vắng thì nhãn "Câu N" như
+   *  cũ và KHÔNG có thanh nào — tuỳ chọn để mọi chỗ dựng hiện có (kể cả test)
+   *  giữ nguyên chữ ký. */
+  total?: number;
   /** Không cần đáp án để render — dùng PublicQuestion (bảo mật, M2.6/v2.1). */
   question: PublicQuestion;
   /**
@@ -81,6 +95,7 @@ interface QuestionRendererProps {
 
 export function QuestionRenderer({
   index,
+  total,
   question,
   nodes,
   selectedAnswer,
@@ -91,12 +106,24 @@ export function QuestionRenderer({
   essayGradingEnabled = false,
 }: QuestionRendererProps) {
   const type = question.questionType ?? "mcq";
+  const progressId = `question-progress-${question.id}`;
 
   return (
-    <div className="border-border flex flex-col gap-5 rounded-lg border p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <span className="eyebrow">{t("upload.questionLabel", { number: index })}</span>
-        <FlagButton flagged={flagged} onToggle={onToggleFlag} />
+    <Card padding="none" className="gap-5 p-4 sm:p-6">
+      {/* Hàng đầu: vị trí trong đề + nút đánh dấu; dưới là thanh tiến độ VỊ TRÍ
+          (câu 7 trên 40 = 7/40) tô XANH — vàng nắng không đạt 3:1 trên nền
+          sáng nên không được làm ranh giới thông tin một mình (design plan §2).
+          Thanh do nhãn bên trên đặt tên (`aria-labelledby`). */}
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <span id={progressId} className="text-foreground text-sm font-semibold">
+            {total !== undefined
+              ? t("player.questionOf", { number: index, total })
+              : t("upload.questionLabel", { number: index })}
+          </span>
+          <FlagButton flagged={flagged} onToggle={onToggleFlag} />
+        </div>
+        {total !== undefined && <Progress value={index} max={total} aria-labelledby={progressId} />}
       </div>
 
       {/* NGỮ LIỆU DÙNG CHUNG (A1) — bài đọc mà cả nhóm câu cùng tham chiếu.
@@ -105,13 +132,13 @@ export function QuestionRenderer({
           Cao TỐI ĐA 260px rồi tự cuộn, không cao theo nội dung. Một bài đọc
           400 từ để nở tự do sẽ đẩy câu hỏi VÀ toàn bộ khu vực trả lời xuống
           dưới màn hình — trên điện thoại thì học sinh phải cuộn đi cuộn lại
-          giữa bài đọc và bốn lựa chọn cho từng câu một. Khung riêng có nền
-          `bg-card` cũng nói rõ "phần này dùng chung, không phải đề bài của
-          riêng câu này". */}
+          giữa bài đọc và bốn lựa chọn cho từng câu một. Ô trắng riêng trên nền
+          surface cũng nói rõ "phần này dùng chung, không phải đề bài của riêng
+          câu này". */}
       {nodes.passage && (
         <section
           aria-label={nodes.passageTitle ?? t("player.sharedPassage")}
-          className="border-border bg-card max-h-[260px] overflow-y-auto rounded-lg border p-4"
+          className="bg-card max-h-[260px] overflow-y-auto rounded-lg p-4"
         >
           {nodes.passageTitle && (
             <p className="text-muted-foreground mb-2 text-xs">{nodes.passageTitle}</p>
@@ -137,20 +164,8 @@ export function QuestionRenderer({
         </section>
       )}
 
-      {/* Nội dung câu hỏi — `font-serif` + một nấc cỡ chữ so với trước.
-          Serif KHÔNG phải trang trí: globals.css xếp serif cho "tiêu đề & nội
-          dung đọc", và màn xem lại bài (result/detail) VỐN ĐÃ render thân câu
-          hỏi bằng `font-serif text-lg` — player mới là chỗ lệch chuẩn. Cho hai
-          màn cùng một khuôn mặt chữ nghĩa là cùng một câu hỏi trông giống nhau
-          dù đang làm bài hay đang dò lại.
-          Nó cũng tách thân câu hỏi khỏi phần CÒN LẠI của màn hình, vốn sans
-          hết: nhãn "Câu N", nút, và quan trọng nhất là các LỰA CHỌN
-          (AnswerChoice, sans 16px). Trước thay đổi này câu hỏi 18px và lựa chọn
-          16px cùng font cùng màu — cách nhau đúng 2px, nên mắt không có mỏ neo
-          để biết đọc cái nào trước. Nay khác cả font lẫn cỡ (20px so với 16px).
-          Giữ 18px ở mobile: màn hẹp thì mỗi nấc cỡ chữ ăn thêm một dòng, và
-          khu vực trả lời bên dưới cao CỐ ĐỊNH 238px nên phần đọc được của câu
-          hỏi là thứ bị ép trước tiên. */}
+      {/* Nội dung câu hỏi — kiểu chữ do `questionNodes.tsx` quyết định (nguồn
+          chân lý duy nhất): lớn và đậm hơn lựa chọn một nấc để mắt có mỏ neo. */}
       {nodes.content}
 
       {/* Hình thân câu (UGC v2.0, Task 5.2) — chỉ render nếu có + origin hợp lệ. */}
@@ -180,7 +195,9 @@ export function QuestionRenderer({
           </fieldset>
         )}
 
-        {/* true_false (v2.1): mỗi ý a–d một segmented Đ/S. */}
+        {/* true_false (v2.1): mỗi ý a–d một segmented Đ/S. Nút đang chọn tô đặc
+            màu chữ (như huy hiệu chữ cái của lựa chọn đã chọn) — đọc được bằng
+            độ sáng, không chỉ bằng màu. */}
         {type === "true_false" && (
           <div className="flex flex-col gap-2.5">
             {SUB_ITEM_IDS.map((sid) => {
@@ -189,11 +206,8 @@ export function QuestionRenderer({
               const sel = decodeTfAnswer(selectedAnswer);
               const current = sel[sid];
               return (
-                <div
-                  key={sid}
-                  className="border-border bg-card flex items-center gap-3 rounded-lg border p-3"
-                >
-                  <span className="text-muted-foreground w-4 shrink-0 font-mono text-sm">
+                <div key={sid} className="bg-card flex items-center gap-3 rounded-lg p-3">
+                  <span className="text-muted-foreground w-4 shrink-0 text-sm font-semibold">
                     {sid})
                   </span>
                   {nodes.subItems[sid]}
@@ -210,10 +224,10 @@ export function QuestionRenderer({
                           type="button"
                           aria-pressed={active}
                           onClick={() => onSelectAnswer(encodeTfAnswer({ ...sel, [sid]: v }))}
-                          className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
+                          className={`focus-visible:ring-ring/40 min-w-9 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:ring-3 focus-visible:outline-none ${
                             active
-                              ? "border-foreground bg-foreground text-background"
-                              : "border-border text-muted-foreground hover:border-ring"
+                              ? "bg-foreground text-background"
+                              : "bg-surface text-muted-foreground hover:text-foreground"
                           }`}
                         >
                           {v ? "Đ" : "S"}
@@ -224,27 +238,25 @@ export function QuestionRenderer({
                 </div>
               );
             })}
-            <p className="text-muted-foreground mt-1 text-xs italic">{t("player.tfNotScored")}</p>
+            <p className="text-muted-foreground mt-1 text-xs">{t("player.tfNotScored")}</p>
           </div>
         )}
 
         {/* short_answer (v2.1): một ô nhập giá trị ngắn. */}
         {type === "short_answer" && (
           <div className="flex flex-col gap-2">
-            <label htmlFor={`short-${question.id}`} className="text-muted-foreground text-xs">
+            <Label htmlFor={`short-${question.id}`} className="mb-0">
               {t("player.yourAnswer")}
-            </label>
-            <input
+            </Label>
+            <Input
               id={`short-${question.id}`}
               value={selectedAnswer ?? ""}
               onChange={(e) => onSelectAnswer(e.target.value)}
               maxLength={LIMITS.MAX_SHORT_ANSWER}
-              className="border-border bg-card text-foreground focus:border-ring w-full max-w-xs rounded-md border px-3 py-2 text-sm outline-none"
+              className="max-w-xs"
               placeholder={t("upload.shortAnswerExample")}
             />
-            <p className="text-muted-foreground mt-1 text-xs italic">
-              {t("player.shortAnswerScored")}
-            </p>
+            <p className="text-muted-foreground mt-1 text-xs">{t("player.shortAnswerScored")}</p>
           </div>
         )}
 
@@ -268,21 +280,19 @@ export function QuestionRenderer({
             lượt nộp bài lúc submit. */}
         {type === "essay" && (
           <div className="flex h-full flex-col gap-2">
-            <label htmlFor={`essay-${question.id}`} className="text-muted-foreground text-xs">
+            <Label htmlFor={`essay-${question.id}`} className="mb-0">
               {t("player.yourAnswer")}
-            </label>
-            <textarea
+            </Label>
+            <Textarea
               id={`essay-${question.id}`}
               value={selectedAnswer ?? ""}
               onChange={(e) => onSelectAnswer(e.target.value)}
               maxLength={MAX_ATTEMPT_ANSWER}
               placeholder={t("player.essayPlaceholder")}
-              className="border-border bg-card text-foreground focus:border-ring min-h-32 w-full flex-1 resize-y rounded-md border px-3 py-2 text-sm leading-relaxed outline-none"
+              className="min-h-32 flex-1 resize-y leading-relaxed"
             />
             <div className="text-muted-foreground flex items-center justify-between gap-3 text-xs">
-              <span className="italic">
-                {t(essayGradingEnabled ? "player.essayScored" : "player.essayNotScored")}
-              </span>
+              <span>{t(essayGradingEnabled ? "player.essayScored" : "player.essayNotScored")}</span>
               <span className="shrink-0 tabular-nums">
                 {t("player.charsLeft", {
                   remaining: MAX_ATTEMPT_ANSWER - (selectedAnswer?.length ?? 0),
@@ -292,7 +302,7 @@ export function QuestionRenderer({
           </div>
         )}
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -311,11 +321,12 @@ function fillOf(
  * Một chỗ trống trong bài đọc.
  *
  * Ba trạng thái, phân biệt bằng VIỀN + NỀN chứ không bằng màu chữ: chỗ trống
- * nằm giữa dòng văn serif 16px, nên đổi màu chữ ở cỡ ấy vừa khó thấy vừa phá
- * nhịp đọc của cả câu.
- *   - đang làm  → viền đỏ son + nền đỏ nhạt (cùng accent với lựa chọn đã chọn)
- *   - đã điền   → viền vàng đồng, chữ đầy đủ tương phản
- *   - còn trống → viền ngà, nền khối, dãy gạch mờ
+ * nằm giữa dòng văn 16px, nên đổi màu chữ ở cỡ ấy vừa khó thấy vừa phá nhịp
+ * đọc của cả câu.
+ *   - đang làm  → viền vàng nắng + nền vàng nhẹ (cùng ngôn ngữ với lựa chọn
+ *                 đang chọn ở AnswerChoice)
+ *   - đã điền   → nền surface, chữ đậm vừa, không viền
+ *   - còn trống → viền nét đứt, dãy gạch mờ — hình dạng "ô chờ điền"
  *
  * `align-baseline` + `items-baseline`: khối inline-flex mặc định canh theo đáy
  * hộp, nên không có hai dòng này thì mỗi chỗ trống đội dòng chữ quanh nó lên
@@ -331,18 +342,18 @@ function PassageBlank({
   current: boolean;
 }) {
   const tone = current
-    ? "border-brand bg-brand/10 text-foreground"
+    ? "border-sun bg-sun-soft text-foreground"
     : filled
-      ? "border-ring bg-card text-foreground"
-      : "border-border bg-muted text-muted-foreground";
+      ? "bg-surface border-transparent text-foreground"
+      : "border-border text-muted-foreground border-dashed bg-transparent";
   return (
     <span
-      className={`mx-0.5 inline-flex items-baseline gap-1.5 rounded-[5px] border px-1.5 align-baseline transition-colors ${tone}`}
+      className={`mx-0.5 inline-flex items-baseline gap-1.5 rounded-[6px] border px-1.5 align-baseline transition-colors ${tone}`}
     >
       {chunk.label !== null && (
-        <span className="font-mono text-[11px] tabular-nums">({chunk.label})</span>
+        <span className="text-[11px] font-semibold tabular-nums">({chunk.label})</span>
       )}
-      <span className={filled ? "font-serif" : "font-sans text-sm tracking-[0.14em]"}>
+      <span className={filled ? "font-medium" : "text-sm tracking-[0.14em]"}>
         {filled ?? "____"}
       </span>
     </span>

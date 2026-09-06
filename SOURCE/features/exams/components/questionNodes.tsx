@@ -35,21 +35,27 @@ import {
   splitPassageBlanks,
   splitPassageParagraphs,
 } from "@/lib/ugc/passageBlanks";
-import type { PassageChunkNode, PassageNodes, QuestionNodes } from "@/features/exams/components/questionNodes.types";
+import type {
+  PassageChunkNode,
+  PassageNodes,
+  QuestionNodes,
+} from "@/features/exams/components/questionNodes.types";
 
-/** Thân câu hỏi — font-serif, một nấc lớn hơn phần còn lại của màn hình.
- *  (Lý do chọn serif + cỡ chữ: xem ghi chú trong QuestionRenderer.) */
-const CONTENT_CLASS = "text-foreground font-serif text-lg leading-[1.75] text-pretty sm:text-xl";
+/** Thân câu hỏi — một nấc lớn hơn và đậm hơn phần còn lại của màn hình (18px
+ *  → 20px từ sm, weight 500) để mắt có mỏ neo biết đọc gì trước: các lựa chọn
+ *  bên dưới là 16px/400. Theme chỉ có một họ chữ (Lexend) nên khác biệt do CỠ
+ *  và ĐỘ ĐẬM gánh, không còn serif/sans. */
+const CONTENT_CLASS = "text-foreground text-lg leading-relaxed font-medium text-pretty sm:text-xl";
 
 /** Nhãn lựa chọn A–D — sans 16px, `flex-1` vì nằm cạnh badge chữ cái. */
-const CHOICE_CLASS = "flex-1 text-base leading-relaxed text-card-foreground";
+const CHOICE_CLASS = "text-foreground min-w-0 flex-1 text-base leading-relaxed";
 
 /** Nội dung ý a–d của câu true_false — sans 14px, `flex-1` cạnh nhãn "a)". */
-const SUB_ITEM_CLASS = "text-card-foreground flex-1 text-sm leading-relaxed";
+const SUB_ITEM_CLASS = "text-foreground min-w-0 flex-1 text-sm leading-relaxed";
 
-/** Ngữ liệu dùng chung (A1) — serif như thân câu vì nó CŨNG là văn bản để đọc,
- *  nhưng nhỏ hơn một nấc: câu hỏi vẫn phải là thứ mắt bắt vào trước. */
-const PASSAGE_CLASS = "text-foreground font-serif text-base leading-[1.75] text-pretty";
+/** Ngữ liệu dùng chung (A1) — cũng là văn bản để đọc, nhưng nhỏ hơn thân câu
+ *  một nấc: câu hỏi vẫn phải là thứ mắt bắt vào trước. */
+const PASSAGE_CLASS = "text-foreground text-base leading-relaxed text-pretty";
 
 /**
  * Render sẵn nội dung của TẤT CẢ câu hỏi. Thứ tự phần tử trả về khớp 1-1 với
@@ -57,7 +63,7 @@ const PASSAGE_CLASS = "text-foreground font-serif text-base leading-[1.75] text-
  */
 export function renderQuestionNodes(
   questions: PublicQuestion[],
-  passages: Exam["passages"] = [],
+  passages: Exam["passages"] = []
 ): QuestionNodes[] {
   // A1: render MỘT LẦN cho mỗi ngữ liệu, rồi dùng lại phần tử cho mọi câu trỏ
   // vào nó. Đây chính là khoản tiết kiệm mà A1 tồn tại để lấy: một bài đọc của
@@ -113,11 +119,7 @@ export function renderQuestionNodes(
  * nhìn thấy là VỊ TRÍ trong đề (`index + 1`, đúng nhãn "Câu N" của player), nên
  * ánh xạ phải đi qua vị trí đó chứ không được coi số in là chỉ số.
  */
-function renderPassage(
-  text: string,
-  passageId: string,
-  questions: PublicQuestion[]
-): PassageNodes {
+function renderPassage(text: string, passageId: string, questions: PublicQuestion[]): PassageNodes {
   // Nhóm câu của bài đọc này, kèm số hiển thị — cùng thứ tự với `questions`.
   const group: { question: PublicQuestion; number: number }[] = [];
   questions.forEach((q, i) => {

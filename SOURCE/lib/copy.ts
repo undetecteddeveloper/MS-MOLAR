@@ -183,8 +183,10 @@ export const copy = {
   "player.flagged": "Đã đánh dấu",
   "player.flagHint": "Đánh dấu câu này để xem lại",
   "player.unflagHint": "Bỏ đánh dấu câu này",
-  "player.previous": "Trước",
   "player.answeredStatus": "đã làm",
+  "player.questionOf": "Câu {number} trên {total}",
+  "player.prevQuestion": "Câu trước",
+  "player.nextQuestion": "Câu sau",
 
   // --- Kết quả ------------------------------------------------------------
   "result.title": "Kết quả",
@@ -195,13 +197,19 @@ export const copy = {
     "Lượt làm này trễ {time} so với thời gian cho phép, nên điểm không được tính là kết quả hợp lệ theo thời gian.",
   "result.storedAnswerLabel": "Đáp án đã lưu:",
   "result.skippedLabel": "Bỏ trống",
-  "result.return": "Quay về",
+  "result.outOfTen": "trên 10",
+  "result.nextTitle": "Tiếp theo",
+  "result.nextBody": "Xem lại từng câu để biết bạn sai ở đâu, rồi làm lại đề khi đã chắc hơn.",
+  "result.reviewEach": "Xem từng câu",
+  "result.retake": "Làm lại đề",
+  "result.backToExams": "Về kho đề",
+  "result.backToResult": "Về trang kết quả",
   "result.attemptDetails": "Chi tiết lượt làm bài",
   "result.notAutoScored": "Chưa chấm tự động",
   "result.correctAnswer": "Đáp án đúng",
   "result.yourChoice": "Bạn chọn",
   "result.editRating": "Sửa điểm chấm của bạn",
-  "result.rateThisExam": "Chấm độ khó đề này",
+  "result.rateThisExam": "Đánh giá đề này",
 
   // --- Chấm tự luận (ADR-0018) — 28 khoá mới ------------------------------
   // Mọi chuỗi ở đây là HẰNG DO ỨNG DỤNG SỞ HỮU. KHÔNG chuỗi nào do model sinh
@@ -247,7 +255,7 @@ export const copy = {
   "result.essay.announceAllDone": "Đã chấm xong toàn bộ câu tự luận.",
 
   // --- Chấm độ khó --------------------------------------------------------
-  "rating.rate": "Chấm điểm",
+  "rating.rate": "Đánh giá",
   "rating.overall": "Tổng thể",
   "rating.rateAllParts": "Chấm đủ cả ba phần mới gửi được.",
   "rating.needAttemptTitle": "Bạn cần làm xong đề này trước",
@@ -255,7 +263,7 @@ export const copy = {
   "rating.title": "Chấm độ khó",
 
   // --- Báo cáo đề ---------------------------------------------------------
-  "report.title": "Báo cáo đề này",
+  "report.title": "Báo cáo",
   "report.intro":
     "Cho chúng tôi biết đề này có vấn đề gì (đáp án sai, nội dung không phù hợp, v.v.).",
   "report.placeholder": "Mô tả vấn đề…",
@@ -373,7 +381,8 @@ export const copy = {
   "upload.pointsPanelRatioLabel": "Tỉ lệ điểm câu {number}",
   "upload.pointsPanelInvalidTotal": "Nhập tổng điểm lớn hơn 0.",
   "upload.pointsPanelEmptyScope": "Chọn phần hoặc dãy câu có ít nhất một câu.",
-  "upload.pointsPanelCannotSplit": "Tổng điểm quá nhỏ để chia cho {count} câu — mỗi câu phải được hơn 0 điểm.",
+  "upload.pointsPanelCannotSplit":
+    "Tổng điểm quá nhỏ để chia cho {count} câu — mỗi câu phải được hơn 0 điểm.",
   "upload.examDetails": "Thông tin đề",
   "upload.fixedAfterPublish": "Môn và khối lớp không đổi được sau khi xuất bản.",
   "upload.removeImage": "Bỏ ảnh",
@@ -562,9 +571,9 @@ export const copy = {
   "ugcError.tooManyQuestions": "Quá nhiều câu — một đề chỉ được tối đa {max} câu.",
   "ugcError.wrongChoiceCount":
     "{q} — đọc được {count} lựa chọn; câu trắc nghiệm cần {min}–{max} lựa chọn, đánh nhãn từ A liền mạch. Bạn sửa bên dưới hoặc tải lại file.",
-  "ugcError.emptyPassage": "Ngữ liệu {index} — phần bài đọc chung đang trống; bạn bổ sung bên dưới nhé.",
-  "ugcError.passageTooLong":
-    "Ngữ liệu {index} — phần bài đọc chung quá dài (tối đa {max} ký tự).",
+  "ugcError.emptyPassage":
+    "Ngữ liệu {index} — phần bài đọc chung đang trống; bạn bổ sung bên dưới nhé.",
+  "ugcError.passageTooLong": "Ngữ liệu {index} — phần bài đọc chung quá dài (tối đa {max} ký tự).",
   "ugcError.passageMissing":
     "{q} — câu này trỏ tới một bài đọc chung không có trong đề. Bạn tải lại file, hoặc gỡ liên kết bên dưới.",
   "ugcError.emptyStem": "{q} — phần đề bài đang trống; bạn bổ sung bên dưới nhé.",
@@ -578,8 +587,7 @@ export const copy = {
   "ugcError.fileTooLarge": "File này quá nặng (tối đa {mb} MB).",
   "ugcError.tooManyPages": "File này quá nhiều trang (tối đa {max}).",
   "ugcError.stemTooLong": "{q} — đề bài quá dài (tối đa {max} ký tự).",
-  "ugcError.stemTooLongForSubject":
-    "{q} — đề bài quá dài (tối đa {max} ký tự cho môn đã chọn).",
+  "ugcError.stemTooLongForSubject": "{q} — đề bài quá dài (tối đa {max} ký tự cho môn đã chọn).",
   "ugcError.choiceTooLong": "{q} — lựa chọn {choice} quá dài (tối đa {max} ký tự).",
   "ugcError.essayAnswerTooLong": "{q} — đáp án mẫu quá dài (tối đa {max} ký tự).",
   "ugcError.essayAnswerTooLongForSubject":
@@ -593,7 +601,8 @@ export const copy = {
     "Thông tin đề — {field} nằm ngoài khoảng cho phép ({range}). Bạn sửa lại ở trên.",
   "ugcError.metaExtractionFailed":
     "Thông tin đề — chúng tôi không đọc được thông tin đề từ file của bạn. Bạn tự điền ở trên nhé.",
-  "ugcError.pointsMissing": "{q} — chưa có điểm. Bạn nhập điểm cho câu này bên dưới trước khi đăng nhé.",
+  "ugcError.pointsMissing":
+    "{q} — chưa có điểm. Bạn nhập điểm cho câu này bên dưới trước khi đăng nhé.",
   "ugcError.pointsTotalMismatch":
     "Biểu điểm — tổng điểm các câu đang là {total}/{expected}. Bạn chỉnh lại cho đủ {expected} điểm nhé.",
   "ugcError.durationRange": "{min}–{max} phút",

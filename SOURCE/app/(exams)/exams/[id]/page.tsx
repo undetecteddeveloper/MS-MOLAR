@@ -132,10 +132,10 @@ export default async function ExamDetailPage({ params }: { params: Promise<{ id:
           hai thẻ trên hiếm khi cao bằng nhau (thẻ thông số co theo số dòng có
           dữ liệu), nên trước đây liên kết này đứng chơ vơ sau một mảng trắng
           không có gì đóng lại. Kẻ ngang biến mảng trắng đó thành khoảng thở của
-          một dòng khép trang. Căn TRÁI theo §3 — ngoại lệ căn giữa chỉ dành cho
-          chân trang chủ. */}
+          một dòng khép trang. Căn GIỮA (2026-09-06, đổi từ căn trái) — cùng
+          lối với liên kết đánh giá đề ở trang kết quả. */}
       {user && (
-        <div className="border-border border-t pt-4">
+        <div className="border-border border-t pt-4 text-center">
           <ReportExam examId={exam.id} initiallyReported={alreadyReported} />
         </div>
       )}

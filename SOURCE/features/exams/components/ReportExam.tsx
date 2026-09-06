@@ -8,7 +8,8 @@
 // mờ, thẻ trắng bo 18px không viền không bóng; nằm sát đáy trên điện thoại
 // (ngón cái với tới), căn giữa từ 640px. Trạng thái đã báo cáo có dấu tích +
 // câu chữ, không chỉ đổi màu (§4.3). Câu chữ qua lib/copy — bản trước còn để
-// lọt chuỗi tiếng Anh cứng trong mã.
+// lọt chuỗi tiếng Anh cứng trong mã. Nút mở được cha căn giữa cả dòng, nên
+// không còn bù lề trái cho icon.
 //
 // Cơ chế giữ nguyên: Esc / bấm scrim = đóng, tiêu điểm vào ô nhập khi mở,
 // reportExam() Server Action, kết quả "duplicate" coi như đã báo cáo.
@@ -84,12 +85,11 @@ export function ReportExam({ examId, initiallyReported }: ReportExamProps) {
 
   return (
     <>
-      {/* `-ml-5` bù phần đệm của nút để icon cờ thẳng mép trái với nội dung. */}
       <Button
         type="button"
         variant="ghost"
         onClick={() => setOpen(true)}
-        className="text-muted-foreground hover:text-foreground -ml-5 self-start"
+        className="text-muted-foreground hover:text-foreground"
       >
         <Flag aria-hidden />
         {t("report.title")}

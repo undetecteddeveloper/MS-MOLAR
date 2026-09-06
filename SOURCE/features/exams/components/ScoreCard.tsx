@@ -22,10 +22,15 @@
 //        nhảy. Ô lớn đi thẳng từ "đang chấm…" sang điểm CUỐI.
 //
 // Đề thuần trắc nghiệm: `pending` luôn `false` ⇒ không đổi một pixel nào.
-// Template `resultpage_L2_mobile.png` block lớn: tên đề · số câu đúng · sai · thời gian.
-// Visual "tờ giấy trắng": nền card, hairline, điểm lớn nổi bật (UI-LAYER-MAP 4.4) —
-// KHÔNG fill màu (màu template chỉ tượng trưng, Q6).
+//
+// Theme "Sân trường" (2026-09-06): thẻ tô nền surface, căn giữa (một trong hai
+// ngoại lệ của quy tắc căn trái — design plan §3). Điểm 64px màu xanh hành
+// động, "trên 10" đứng cạnh. Ba ô Đúng / Sai / Thời gian là ô trắng trên nền
+// surface; Đúng và Sai có chấm màu ĐI KÈM chữ (trạng thái bằng hình lẫn màu,
+// §4.3). KHÔNG có ô "Bỏ trống": `wrong = total − correct` là phép suy đã ghim
+// ở trên, tách bỏ trống ra khỏi "Sai" là đổi nghĩa con số.
 
+import { Card } from "@/components/ui/card";
 import { t } from "@/lib/copy";
 import type { ScoreResult } from "@/types/result";
 
@@ -50,43 +55,49 @@ export async function ScoreCard({
   const wrong = result.total - result.correct;
 
   return (
-    <section className="border-border bg-card rounded-xl border p-6 text-center sm:p-8">
+    <Card as="section" className="items-center gap-2 text-center">
       <span className="eyebrow">{t("result.title")}</span>
-      <h1 className="text-card-foreground mt-2 font-serif text-2xl leading-snug">{examTitle}</h1>
+      <h1 className="text-foreground text-xl leading-snug font-semibold">{examTitle}</h1>
 
       {/* Điểm lớn nổi bật — thang 10, HOẶC "đang chấm…" khi chưa ngã ngũ (G1). */}
       {pending ? (
-        <p className="text-muted-foreground mt-5 font-serif text-2xl leading-none">
+        <p className="text-muted-foreground mt-3 text-xl font-semibold">
           {t("result.scorePending")}
         </p>
       ) : (
-        <p className="mt-5 flex items-baseline justify-center gap-1">
-          <span className="text-brand font-serif text-6xl leading-none tabular-nums">
+        <p className="mt-3 flex items-baseline justify-center gap-2">
+          <span className="text-primary text-[4rem] leading-none font-bold tabular-nums">
             {result.totalScore.toFixed(1)}
           </span>
-          <span className="text-muted-foreground font-serif text-2xl">/10</span>
+          <span className="text-muted-foreground text-lg font-medium">{t("result.outOfTen")}</span>
         </p>
       )}
 
       {/* Thống kê: đúng · sai · thời gian. Time cell nhận completionTimeLabel
           đã format sẵn từ caller (Task 12) — component này chỉ hiển thị, không
           tự tính toán ngày giờ (xem lib/history/format.ts). */}
-      <dl className="border-border mt-6 grid grid-cols-3 gap-3 border-t pt-5 text-center">
-        <div className="flex flex-col gap-1">
-          <dt className="eyebrow">{t("common.correct")}</dt>
-          <dd className="text-foreground font-serif text-xl tabular-nums">{result.correct}</dd>
-        </div>
-        <div className="flex flex-col gap-1">
-          <dt className="eyebrow">{t("common.wrong")}</dt>
-          <dd className="text-foreground font-serif text-xl tabular-nums">{wrong}</dd>
-        </div>
-        <div className="flex flex-col gap-1">
-          <dt className="eyebrow">{t("result.time")}</dt>
-          <dd className="text-muted-foreground font-serif text-xl tabular-nums">
-            {completionTimeLabel}
-          </dd>
-        </div>
+      <dl className="mt-4 grid w-full grid-cols-3 gap-2">
+        <Stat label={t("common.correct")} value={result.correct} dot="bg-success" />
+        <Stat label={t("common.wrong")} value={wrong} dot="bg-destructive" />
+        <Stat label={t("result.time")} value={completionTimeLabel} />
       </dl>
-    </section>
+    </Card>
+  );
+}
+
+/** Một ô thống kê: nhãn nhỏ (kèm chấm màu nếu có) trên, số dưới. */
+function Stat({ label, value, dot }: { label: string; value: string | number; dot?: string }) {
+  return (
+    <div className="bg-card flex flex-col items-center gap-1 rounded-lg px-2 py-3">
+      <dt className="text-muted-foreground flex items-center gap-1.5 text-xs font-semibold">
+        {dot && <span aria-hidden className={`size-2 shrink-0 rounded-full ${dot}`} />}
+        {label}
+      </dt>
+      {/* 18px ở mobile, 20px từ sm, không gãy dòng: "17m 54s" ở 20px rộng hơn ô
+          ~88px của lưới ba cột tại 360px và từng gãy thành hai dòng. */}
+      <dd className="text-foreground text-lg font-bold whitespace-nowrap tabular-nums sm:text-xl">
+        {value}
+      </dd>
+    </div>
   );
 }
