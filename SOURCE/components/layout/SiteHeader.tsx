@@ -64,7 +64,7 @@ export function SiteHeader({ user = null }: { user?: MenuUser | null }) {
                       // Mục điều hướng là viên thuốc; mục đang chọn tô nền
                       // surface + chữ đậm — trạng thái đọc được bằng hình lẫn
                       // màu, không chỉ bằng màu.
-                      "focus-visible:ring-ring inline-flex h-10 items-center rounded-full px-3.5 text-sm transition-colors focus-visible:ring-3 focus-visible:outline-none",
+                      "focus-visible:ring-ring inline-flex h-10 items-center rounded-full px-3 text-sm whitespace-nowrap transition-colors lg:px-3.5 focus-visible:ring-3 focus-visible:outline-none",
                       isActive
                         ? "bg-surface text-foreground font-semibold"
                         : "text-muted-foreground hover:bg-surface hover:text-foreground font-medium",
