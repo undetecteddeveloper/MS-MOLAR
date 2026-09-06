@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { AboutPrompt } from "@/features/auth/components/AboutPrompt";
 import { HomeStage, type AuthMode } from "@/features/auth/components/HomeStage";
 import { TechStack } from "@/features/auth/components/TechStack";
+import { HomeRipple } from "@/features/home/ripple/HomeRipple";
 import { ExamBrowser } from "@/features/exams/components/ExamBrowser";
 import { listExamsRanked } from "@/features/exams/queries";
 import { BottomNav } from "@/components/layout/BottomNav";
@@ -61,7 +62,14 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ a
   const showAside = authMode === null;
 
   return (
-    <div className="bg-background min-h-dvh">
+    // `relative isolate`: tạo stacking context riêng để lớp sóng ô vuông
+    // (HomeRipple, z âm) nằm TRÊN nền trắng của chính div này nhưng DƯỚI mọi
+    // nội dung. Thiếu `isolate`, z âm rơi xuống dưới cả nền trắng và không bao
+    // giờ thấy được.
+    // `data-ripple-root`: mốc dừng khi HomeRipple dò ngược từ điểm chạm lên
+    // xem có đè lên khối có nền tô hay chữ không (features/home/ripple/tap.ts).
+    <div data-ripple-root className="bg-background relative isolate min-h-dvh">
+      <HomeRipple />
       {/* Structured data — lib/seo/jsonLd.ts. Hằng số do repo sinh, đã qua
           serializeJsonLd() để không thể cắt được thẻ script. */}
       <script
@@ -76,7 +84,12 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ a
           chừa chỗ cho BottomNav; tự về 0 từ 768px. */}
       <main id="main-content" tabIndex={-1} className="pb-bottom-nav">
         <PageContainer size="full" className="flex flex-col gap-10 py-6 sm:py-10">
-          <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-12">
+          {/* Hai cột chỉ khi cột phải có mặt. Lúc form đăng nhập mở, cột phải
+              ẩn mà lưới vẫn hai cột thì form bị dồn sang trái nửa màn hình —
+              engineer 2026-09-06: form phải nằm giữa. */}
+          <div
+            className={`grid items-center gap-10 ${showAside ? "lg:grid-cols-2 lg:gap-12" : ""}`}
+          >
             <div className="flex flex-col gap-6">
               <HomeStage auth={authMode} signedIn={user !== null} />
 
@@ -126,7 +139,10 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ a
               ))}
           </div>
 
-          <div className="border-border flex border-t pt-4">
+          {/* justify-center: engineer 2026-09-06, liên kết chân trang căn giữa
+              — ngoại lệ có chủ đích của quy tắc "căn trái toàn bộ" (design doc
+              §3), vì đây là dòng khép trang, không phải nội dung để đọc. */}
+          <div className="border-border flex justify-center border-t pt-4">
             <AboutPrompt />
           </div>
         </PageContainer>

@@ -66,11 +66,13 @@ export function HomeStage({ auth, signedIn }: { auth: AuthMode; signedIn: boolea
       </section>
 
       {/* ---------- Trạng thái 2: Form đăng nhập / đăng ký ---------- */}
+      {/* `justify-self-center`: form nằm giữa ô grid (engineer 2026-09-06);
+          hero ở trạng thái kia vẫn căn trái theo design doc §3. */}
       <section
         inert={!showAuth || undefined}
         className={`flex w-full max-w-md flex-col gap-3 transition-all duration-500 ease-out motion-reduce:transition-none ${
           showAuth
-            ? "relative translate-x-0 opacity-100"
+            ? "relative translate-x-0 justify-self-center opacity-100"
             : "pointer-events-none absolute inset-x-0 top-0 translate-x-6 opacity-0"
         }`}
       >

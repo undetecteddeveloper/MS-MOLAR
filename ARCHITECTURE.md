@@ -36,7 +36,7 @@ người dùng thấy.
 
 | `app/` | Tên cũ (docs trước 2026-09-03) | URL | Code ở |
 |---|---|---|---|
-| `(auth)` | (layer1) | `/login`, `/reset-password` (form đăng nhập nằm ở `/?auth=signin`, tức `app/page.tsx`) | `features/auth/` |
+| `(auth)` | (layer1) | `/login`, `/reset-password` (form đăng nhập nằm ở `/?auth=signin`, tức `app/page.tsx`) | `features/auth/` (hero, form, khối công nghệ); `features/home/ripple/` (sóng ô vuông trên nền trang chủ — toán thuần + lớp canvas nạp động) |
 | `(exams)` | (layer2) | `/exams`, `/exams/[id]`, `/exams/[id]/attempt/...`, `.../rate` | `features/exams/` |
 | `(analytics)` | (layer3) | `/me/dashboard`, `/profile` | `features/analytics/`, `features/profile/` |
 | `(authoring)` | (layer4) | `/upload`, `/me/exams`, `/me/exams/[id]` | `features/authoring/` |
