@@ -45,10 +45,17 @@ export function SiteHeader({ user = null }: { user?: MenuUser | null }) {
       <div className="mx-auto flex h-15 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
         <Wordmark />
 
-        <nav aria-label={t("nav.secondary")} className="flex items-center gap-2 md:gap-3">
+        {/* min-w-0 trên nav và min-w-0 ở ô tài khoản (HeaderProfile) là cặp cho
+            phép TÊN NGƯỜI DÙNG co lại thay vì đẩy cả header tràn ngang: mặc định
+            flex item không co dưới bề rộng nội dung, nên ở 768px một tên dài
+            (tài khoản mới mang tên = phần đầu email, vd "smithnguyen247+abc")
+            từng đẩy ô tài khoản ra tới 820px trên khung 768px — đo 2026-09-06 ở
+            /me/dashboard. Dãy liên kết giữ shrink-0: chúng đã whitespace-nowrap,
+            co là gãy. */}
+        <nav aria-label={t("nav.secondary")} className="flex min-w-0 items-center gap-2 md:gap-3">
           {/* Dãy liên kết — CHỈ từ 768px. Dưới ngưỡng đó chúng sống ở BottomNav;
               render cả hai là hai thanh điều hướng cùng nội dung trên một màn. */}
-          <ul className="hidden items-center gap-1 md:flex">
+          <ul className="hidden shrink-0 items-center gap-1 md:flex">
             {items.map((item) => {
               const isActive = isNavItemActive(pathname, item.href);
               return (
@@ -64,7 +71,11 @@ export function SiteHeader({ user = null }: { user?: MenuUser | null }) {
                       // Mục điều hướng là viên thuốc; mục đang chọn tô nền
                       // surface + chữ đậm — trạng thái đọc được bằng hình lẫn
                       // màu, không chỉ bằng màu.
-                      "focus-visible:ring-ring inline-flex h-10 items-center rounded-full px-3 text-sm whitespace-nowrap transition-colors lg:px-3.5 focus-visible:ring-3 focus-visible:outline-none",
+                      // Đệm 10px ở dải 768–1023 (14px từ 1024): ở đúng 768px,
+                      // năm mục + ô tài khoản chỉ còn 9px dư với tên 7 ký tự
+                      // (đo 2026-09-06); đệm 12px từng cắt "AnhPhat" thành
+                      // "AnhP…" ngay khi tên được phép co (min-w-0 ở trên).
+                      "focus-visible:ring-ring inline-flex h-10 items-center rounded-full px-2.5 text-sm whitespace-nowrap transition-colors lg:px-3.5 focus-visible:ring-3 focus-visible:outline-none",
                       isActive
                         ? "bg-surface text-foreground font-semibold"
                         : "text-muted-foreground hover:bg-surface hover:text-foreground font-medium",

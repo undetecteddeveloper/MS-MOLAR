@@ -38,7 +38,7 @@ export function HeaderProfile({
   }
 
   return (
-    <div className="relative">
+    <div className="relative min-w-0">
       {open && (
         <button
           aria-hidden
@@ -48,18 +48,21 @@ export function HeaderProfile({
         />
       )}
 
-      {/* Trigger — avatar + tên (ẩn dưới 768px) + chevron. min-h-11: sàn 44px. */}
+      {/* Trigger — avatar + tên (ẩn dưới 768px) + chevron. min-h-11: sàn 44px.
+          min-w-0 ở tên (và ở <div> bọc ngoài) để tên CO LẠI và cắt "…" khi header
+          hết chỗ — không có nó, flex item giữ bề rộng nội dung và tên dài đẩy cả
+          header tràn ngang ở 768px (xem chú thích tại <nav> trong SiteHeader). */}
       <button
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="bg-surface hover:bg-[color-mix(in_oklch,var(--surface),var(--foreground)_7%)] focus-visible:ring-ring flex min-h-11 items-center gap-2 rounded-full py-1 pr-2.5 pl-1.5 transition-colors focus-visible:ring-3 focus-visible:outline-none"
+        className="bg-surface hover:bg-[color-mix(in_oklch,var(--surface),var(--foreground)_7%)] focus-visible:ring-ring flex max-w-full min-h-11 items-center gap-2 rounded-full py-1 pr-2.5 pl-1.5 transition-colors focus-visible:ring-3 focus-visible:outline-none"
       >
         {/* Avatar thay cho <Image>: next.config.ts không khai remotePatterns,
             URL Supabase đưa vào <Image> là lỗi LÚC CHẠY. */}
-        <Avatar src={avatarUrl} name={displayName} size={28} />
-        <span className="text-foreground max-w-32 truncate text-sm font-medium max-md:hidden">
+        <Avatar src={avatarUrl} name={displayName} size={28} className="shrink-0" />
+        <span className="text-foreground min-w-0 max-w-32 truncate text-sm font-medium max-md:hidden">
           {displayName}
         </span>
         <ChevronDown
