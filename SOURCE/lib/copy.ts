@@ -17,7 +17,6 @@ export const copy = {
   "common.remove": "Bỏ",
   "common.clear": "Xoá lọc",
   "common.filters": "Bộ lọc",
-  "common.filter": "Lọc",
   "common.retry": "Thử lại",
   "common.tryAgain": "Làm lại",
   "common.home": "Trang chủ",
@@ -293,22 +292,20 @@ export const copy = {
   "analytics.noDataHint": "Hoàn thành một lượt làm bài đã nộp trong khoảng này để xem thống kê.",
   "analytics.timeRangeFilter": "Lọc theo khoảng thời gian",
   "analytics.barTitle": "Đúng và sai theo môn",
-  "analytics.barHint": "Chọn một môn để xem chi tiết",
-  "analytics.barAlt": "Số câu đúng và sai theo từng môn",
   "analytics.needsReview": "Cần ôn lại",
-  "analytics.donutTitle": "Môn luyện nhiều nhất",
-  "analytics.donutAlt": "Tỷ lệ lượt luyện tập theo môn",
-  "analytics.tabBar": "Cột",
-  "analytics.tabDonut": "Tròn",
+  "analytics.donutTitle": "Thời gian luyện theo môn",
+  "analytics.donutAlt": "Thời gian làm bài theo từng môn",
+  "analytics.timeTotal": "tổng",
   "analytics.rangeWeek": "Tuần",
   "analytics.rangeMonth": "Tháng",
   "analytics.rangeAll": "Toàn thời gian",
-  "analytics.donutSubtitle": "% tỷ lệ lượt luyện tập theo môn, trong {range} này",
+  "analytics.donutSubtitle": "Cộng dồn thời gian làm các lượt đã nộp, mỗi lượt tối đa bằng thời lượng đề.",
   // SkillRecommendationCard (Engine 1) — đặt cùng vị trí tương đối với en.ts.
   "analytics.recommendTitle": "Nên luyện gì tiếp theo",
   "analytics.recommendColdStart":
     "Chưa đủ dữ liệu — bạn luyện một đề Toán để nhận gợi ý đầu tiên nhé.",
   "analytics.recommendWhy": "Vì sao là kỹ năng này?",
+  "analytics.recommendAction": "Tìm đề Toán",
   "analytics.recommendReasonPrerequisiteGate":
     "Có một kỹ năng nền bạn chưa nắm vững đứng trước kỹ năng này.",
   "analytics.recommendReasonLowestMastery": "Đây là kỹ năng bạn đang yếu nhất lúc này.",
@@ -320,7 +317,7 @@ export const copy = {
   "analytics.weakTopicsEmpty": "Chưa có chỗ nào nổi lên rõ rệt.",
   "analytics.weakTopicsEmptyHint":
     "Bạn làm thêm vài đề nữa nhé — một chủ đề cần ít nhất {min} câu đã làm mới xuất hiện ở đây.",
-  "analytics.weakTopicScore": "Đúng {correct}/{total} · {accuracy}%",
+  "analytics.weakTopicCorrect": "Đúng {correct}/{total}",
 
   // --- Tải đề lên (UGC) ---------------------------------------------------
   "upload.title": "Tải đề lên",

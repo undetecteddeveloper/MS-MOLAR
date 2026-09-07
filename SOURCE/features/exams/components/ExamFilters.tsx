@@ -32,6 +32,7 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { chipVariants } from "@/components/ui/chip";
 
 /** Rating System — khớp ExamSort (queries) + ExamLevel lowercase slug (IP-6). */
 type ExamSort = "newest" | "oldest" | "hardest";
@@ -78,14 +79,6 @@ const LEVEL_OPTIONS: { value: ExamLevel | ""; labelKey: MessageKey }[] = [
   { value: "medium", labelKey: "exams.levelMedium" },
   { value: "hard", labelKey: "exams.levelHard" },
 ];
-
-// Chip: viên thuốc 40px. Đang chọn = nền xanh đen + chữ trắng (đối lập rõ với
-// chip nghỉ nền surface) — trạng thái đọc được cả bằng độ đậm lẫn màu.
-const CHIP =
-  "inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-sm font-medium whitespace-nowrap transition-colors focus-visible:ring-3 focus-visible:ring-ring/40 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-40";
-const CHIP_IDLE =
-  "bg-surface text-foreground hover:bg-[color-mix(in_oklch,var(--surface),var(--foreground)_7%)]";
-const CHIP_ON = "bg-foreground text-background";
 
 export function ExamFilters({
   subjects,
@@ -175,7 +168,7 @@ export function ExamFilters({
           type="button"
           aria-expanded={open}
           onClick={togglePanel}
-          className={`${CHIP} ${hasFilters ? CHIP_ON : CHIP_IDLE}`}
+          className={chipVariants({ active: hasFilters })}
         >
           <SlidersHorizontal aria-hidden className="size-4" />
           {hasFilters ? t("exams.filterSummary", { count: activeCount }) : t("common.filters")}
@@ -191,7 +184,7 @@ export function ExamFilters({
               type="button"
               aria-pressed={on}
               onClick={() => setSort(q.value)}
-              className={`${CHIP} ${on ? CHIP_ON : CHIP_IDLE}`}
+              className={chipVariants({ active: on })}
             >
               {t(q.labelKey)}
             </button>
@@ -204,7 +197,7 @@ export function ExamFilters({
           disabled={!sort}
           aria-label={t("exams.toggleSortDirection")}
           title={t("exams.toggleSortDirection")}
-          className={`${CHIP} ${CHIP_IDLE}`}
+          className={chipVariants()}
         >
           {ascending ? (
             <ArrowUpNarrowWide aria-hidden className="size-4" />

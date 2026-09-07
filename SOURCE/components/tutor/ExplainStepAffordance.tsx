@@ -16,8 +16,8 @@
 import { Lightbulb, Loader2 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useEffect, useRef } from "react";
-import { BentoCell } from "@/components/layout/BentoGrid";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { useEntitlement } from "@/lib/billing/entitlement";
 import { isQuotaExhausted } from "@/lib/billing/types";
 import { t } from "@/lib/copy";
@@ -63,12 +63,12 @@ export function ExplainStepAffordance({ questionId, attemptId }: ExplainStepAffo
   // trang thật, còn trong jsdom nhiều lần render cùng questionId sống chung một
   // document, và getElementById sẽ trả về panel của lần render TRƯỚC.
   //
-  // Ref nằm trên một <div> bọc ngoài chứ không trên chính <BentoCell>: BentoCell
-  // là component đa hình (`as` = div|li|section), nên khai một prop `ref` ở đó
-  // buộc TS giao props của cả ba thẻ và không kiểu ref nào thoả được. Đổi API
-  // một component dùng chung để lấy một lời gọi .focus() cục bộ là cái giá sai;
-  // <div> bọc ngoài không đổi bố cục vì <li> cha đã là flex-col (item vẫn dàn
-  // hết chiều ngang).
+  // Ref nằm trên một <div> bọc ngoài chứ không trên chính <Card>: Card là
+  // component đa hình (`as` = div|li|section|article) và cố ý không nhận `ref`
+  // — khai một prop `ref` ở đó buộc TS giao props của cả bốn thẻ và không kiểu
+  // ref nào thoả được. Đổi API một component dùng chung để lấy một lời gọi
+  // .focus() cục bộ là cái giá sai; <div> bọc ngoài không đổi bố cục vì <li>
+  // cha đã là flex-col (item vẫn dàn hết chiều ngang).
   const hintRef = useRef<HTMLDivElement>(null);
   const showHint = phase === "hint-shown" && hint !== null;
   useEffect(() => {
@@ -80,11 +80,23 @@ export function ExplainStepAffordance({ questionId, attemptId }: ExplainStepAffo
   // lần nữa cho câu này.
   if (showHint) {
     return (
-      <div ref={hintRef} tabIndex={-1} className="focus-visible:outline-ring rounded-[var(--radius-card)] focus-visible:outline-2 focus-visible:outline-offset-2">
-        <BentoCell span="full">
-          <span className="eyebrow">{t("tutor.hintEyebrow")}</span>
-          <RichText text={hint} className="text-foreground mt-2 text-base leading-relaxed" />
-        </BentoCell>
+      // Theme "Sân trường" (2026-09-06): thẻ surface bo 18px thay BentoCell kẻ
+      // viền. Nó đứng ngay dưới dãy lựa chọn (cũng tô surface, nhưng bo 14px và
+      // cách nhau 8px) — bo góc lớn hơn, đệm rộng hơn và khoảng cách 16px phía
+      // trên là thứ tách nó khỏi dãy ấy; icon bóng đèn cạnh nhãn nói đây là lời
+      // gia sư, không phải một đáp án thứ năm.
+      <div
+        ref={hintRef}
+        tabIndex={-1}
+        className="focus-visible:outline-ring rounded-card focus-visible:outline-2 focus-visible:outline-offset-2"
+      >
+        <Card>
+          <span className="eyebrow flex items-center gap-1.5">
+            <Lightbulb aria-hidden className="size-3.5" />
+            {t("tutor.hintEyebrow")}
+          </span>
+          <RichText text={hint} className="text-foreground text-base leading-relaxed" />
+        </Card>
       </div>
     );
   }
@@ -112,11 +124,9 @@ export function ExplainStepAffordance({ questionId, attemptId }: ExplainStepAffo
       // xuất hiện giữa chừng (không có đường nào đi từ nút sang đây — nút không
       // tồn tại khi đã hết lượt). role="alert" ở đây sẽ ngắt lời trình đọc màn
       // hình ngay khi tải trang mà chẳng báo được thay đổi nào.
-      <div className="border-border rounded-lg border border-dashed px-4 py-3">
-        <p className="text-foreground text-sm leading-relaxed">
-          {t("billing.quota.tutorExhausted")}
-        </p>
-      </div>
+      <Card variant="outline" padding="compact" className="border-dashed">
+        <p className="text-sm leading-relaxed">{t("billing.quota.tutorExhausted")}</p>
+      </Card>
     );
   }
 
@@ -124,8 +134,7 @@ export function ExplainStepAffordance({ questionId, attemptId }: ExplainStepAffo
     <div>
       <Button
         type="button"
-        variant="outline"
-        className="min-h-11"
+        variant="secondary"
         onClick={run}
         // Chuỗi "true"/"false" chứ không phải boolean — theo đúng quy ước của
         // ActionButton.

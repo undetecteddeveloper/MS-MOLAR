@@ -22,9 +22,10 @@ type EmbeddedRow = {
   total: number;
   topic_breakdown: { topic: string; correct: number; total: number }[] | null;
   exam_attempts: {
+    started_at: string;
     submitted_at: string | null;
     status: string;
-    exams: { subject: string };
+    exams: { subject: string; duration_minutes: number | null };
   };
 };
 
@@ -48,7 +49,7 @@ export async function getAnalyticsByRange(): Promise<AnalyticsPageData> {
     supabase
       .from("exam_results")
       .select(
-        "correct, total, topic_breakdown, exam_attempts!inner(submitted_at, status, exams!inner(subject))"
+        "correct, total, topic_breakdown, exam_attempts!inner(started_at, submitted_at, status, exams!inner(subject, duration_minutes))"
       )
       .eq("exam_attempts.status", "submitted")
   )) as EmbeddedRow[];
@@ -56,7 +57,12 @@ export async function getAnalyticsByRange(): Promise<AnalyticsPageData> {
   const rows: AttemptRow[] = embedded.map((row) => ({
     correct: row.correct,
     total: row.total,
+    // `started_at` + `duration_minutes` đi kèm để reducer cộng thời gian làm bài
+    // theo môn, trần theo thời lượng đề (vòng tròn "Thời gian luyện theo môn",
+    // 2026-09-06) — cùng lệnh đọc, không thêm round-trip.
+    startedAt: row.exam_attempts.started_at,
     submittedAt: row.exam_attempts.submitted_at,
+    durationMinutes: row.exam_attempts.exams.duration_minutes,
     subject: row.exam_attempts.exams.subject,
   }));
 

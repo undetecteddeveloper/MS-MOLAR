@@ -1,6 +1,6 @@
-// Layout route group (analytics) — khung chung cho Analytics. Theme dùng thẳng
-// root "Mực & Sơn mài" (globals.css), SiteHeader dùng chung với Layer 2/4
-// (xem comment trong SiteHeader.tsx).
+// Layout route group (analytics) — khung chung cho Thống kê và Hồ sơ. Theme
+// "Sân trường" lấy thẳng từ token gốc (globals.css); SiteHeader dùng chung toàn
+// site (xem comment trong SiteHeader.tsx).
 //
 // Khung dùng chung: components/layout/AppShell.tsx (B1, 2026-09-03) — header,
 // SkipLink, BottomNav, SupportWidget và EntitlementProvider đều ở đó.
