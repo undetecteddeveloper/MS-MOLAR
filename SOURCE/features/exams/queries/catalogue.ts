@@ -11,6 +11,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { readBounded } from "@/lib/supabase/boundedRead";
 import { BUCKET_HARD_MIN, BUCKET_MEDIUM_MIN, RATING_MIN } from "@/lib/rating";
+import { toSearchTerm } from "@/lib/search/normalize";
 import type { Exam } from "@/types/exam";
 import { EXAM_COLUMNS, toExam, type ExamRow } from "./rows";
 
@@ -54,6 +55,9 @@ export interface ExamFilters {
   level?: ExamLevel;
   /** Đảo chiều trục `sort` đang chọn — bỏ qua nếu `sort` không được truyền. */
   dir?: SortDirection;
+  /** Từ khoá tìm theo TÊN đề, chuỗi thô từ `?q=` (ADR-0020). Chuẩn hoá ở đây
+   *  bằng `toSearchTerm`; rỗng/quá ngắn sau chuẩn hoá = không lọc. */
+  q?: string;
 }
 
 /**
@@ -71,6 +75,13 @@ export async function fetchExamRows(filters?: ExamFilters): Promise<ExamRow[]> {
   // Đọc qua view exams_with_difficulty (ADR-0008 Decision 2) — exams.* + 2 cột
   // aggregate; .eq('status','published') giữ nguyên trên view (R-3).
   let query = supabase.from("exams_with_difficulty").select(EXAM_COLUMNS).eq("status", "published");
+  // Tìm theo tên (ADR-0020): vị từ ILIKE trên cột chuẩn hoá `title_search`
+  // (chỉ mục GIN trigram), chạy DB-side TRƯỚC xếp hạng — chỉ hẹp tập ứng viên,
+  // không đổi thứ tự (ADR-0015), và đúng cả khi kho vượt cửa sổ `readBounded`.
+  // `toSearchTerm` chỉ để lại [a-z0-9 ] nên mẫu không chứa ký tự đặc biệt của
+  // LIKE (`%`, `_`, `\`) hay của bộ lọc PostgREST (`,`, `(`, `)`).
+  const term = toSearchTerm(filters?.q);
+  if (term) query = query.ilike("title_search", `%${term}%`);
   if (filters?.subject) query = query.eq("subject", filters.subject);
   if (filters?.grade !== undefined && !Number.isNaN(filters.grade)) {
     query = query.eq("grade", filters.grade);

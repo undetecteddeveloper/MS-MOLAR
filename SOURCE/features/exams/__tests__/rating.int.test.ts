@@ -47,7 +47,7 @@ function createQueryBuilder(result: { data: unknown[]; error: null }) {
     };
   // "limit": các lệnh đọc danh sách đi qua `readBounded` (P3), nó áp biên bằng
   // .limit() trước khi await builder.
-  for (const method of ["select", "eq", "gte", "lt", "order", "limit"]) {
+  for (const method of ["select", "eq", "gte", "lt", "ilike", "order", "limit"]) {
     builder[method] = chain(method);
   }
   builder.then = (onFulfilled: (value: typeof result) => unknown) =>
@@ -686,7 +686,7 @@ describe("listExamsRanked — thứ tự mặc định của /exams và ngân s�
     fromMock.mockImplementation((table: string) => {
       issued.push(table);
       const builder: Record<string, unknown> = {};
-      for (const method of ["select", "eq", "gte", "lt", "order", "limit"]) {
+      for (const method of ["select", "eq", "gte", "lt", "ilike", "order", "limit"]) {
         builder[method] = () => builder;
       }
       builder.then = (onFulfilled: (value: { data: unknown[]; error: null }) => unknown) =>
@@ -703,5 +703,44 @@ describe("listExamsRanked — thứ tự mặc định của /exams và ngân s�
 
     settle();
     await pending;
+  });
+});
+
+// =============================================================================
+// Tìm đề theo tên (ADR-0020) — `q` là MỘT vị từ ILIKE trên cột chuẩn hoá
+// =============================================================================
+// Hợp đồng ở tầng fetch nền: `q` chuẩn hoá bằng `toSearchTerm` (thường hoá, bỏ
+// dấu, đ→d, chỉ còn [a-z0-9 ]) rồi thành đúng MỘT `.ilike("title_search",
+// "%term%")`; rỗng/quá ngắn sau chuẩn hoá thì KHÔNG có `.ilike` nào. Chỉ mục và
+// RLS thật do làn localdb (`tests/e2e/service/exam-search.*`) chứng minh; ở đây
+// chỉ chứng minh HÌNH DẠNG truy vấn — bỏ vị từ này là tìm kiếm âm thầm thành
+// "trả cả kho".
+describe("listExams — q lọc theo tên qua cột title_search (ADR-0020)", () => {
+  beforeEach(() => {
+    fromMock.mockReset();
+  });
+
+  it("q có dấu, hoa, ký tự lạ → một .ilike('title_search', '%term%') với term đã chuẩn hoá", async () => {
+    const { builder, calls } = createQueryBuilder({ data: [], error: null });
+    fromMock.mockReturnValue(builder);
+
+    await listExams({ q: "  Toán 10 (Giữa kì) %_\ " });
+
+    const ilikes = calls.filter((c) => c.method === "ilike");
+    expect(ilikes).toEqual([{ method: "ilike", args: ["title_search", "%toan 10 giua ki%"] }]);
+    // Vẫn là danh mục published, vẫn thứ tự nền ổn định — q chỉ hẹp tập ứng viên.
+    expect(calls).toContainEqual({ method: "eq", args: ["status", "published"] });
+    expect(calls).toContainEqual({ method: "order", args: ["id"] });
+  });
+
+  it("q rỗng hoặc chỉ còn dưới 2 ký tự sau chuẩn hoá → không có .ilike nào", async () => {
+    for (const q of ["", "   ", "!", "a", "đ"]) {
+      const { builder, calls } = createQueryBuilder({ data: [], error: null });
+      fromMock.mockReturnValue(builder);
+
+      await listExams({ q });
+
+      expect(calls.some((c) => c.method === "ilike")).toBe(false);
+    }
   });
 });

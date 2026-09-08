@@ -120,6 +120,7 @@ một thư mục:
 | `rows.ts` | `ExamRow`, `EXAM_COLUMNS`, `toExam` — mapper dùng chung |
 | `catalogue.ts` | `/exams`, `/exams/[id]`: lọc, sắp xếp, facet, tập đề đã nộp |
 | `ranking.ts` | Xếp hạng cá nhân hoá (ADR-0015) |
+| `search.ts` | Gợi ý đề khi gõ vào ô tìm trên header — RPC `search_exams` (ADR-0020); bộ lọc `?q=` của Kho đề nằm trong `catalogue.ts` |
 | `player.ts` | Màn làm bài. **Không bao giờ select đáp án** |
 | `result.ts` | Kết quả + màn Chi tiết. Nơi duy nhất đọc đáp án, qua RPC `exam_answer_key()` |
 | `index.ts` | Mặt tiền — re-export |

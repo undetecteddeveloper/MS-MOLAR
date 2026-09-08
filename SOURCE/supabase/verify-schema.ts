@@ -469,6 +469,28 @@ async function main() {
       ? `claim_attempt_answer_key không gọi được: ${ck.error.code ?? ""} ${ck.error.message} — apply schema.sql §10b`
       : "claim_attempt_answer_key tồn tại và authenticated gọi được"
   );
+
+  // ADR-0020 — tìm đề theo tên: CÙNG một hàm, hai vai, hai kết cục. authenticated
+  // gọi được (mảng, có thể rỗng — từ khoá này không khớp đề nào); anon bị
+  // `revoke` nên 42501. Thiếu vế anon thì một lượt `grant execute … to public`
+  // vô ý cũng xanh, trong khi ô tìm là đường đọc catalog duy nhất không đi qua
+  // trang đã bảo vệ.
+  const se = await probe.rpc("search_exams", { q: "__verify_schema_no_such_title__", max_results: 1 });
+  assert(
+    !se.error && Array.isArray(se.data),
+    se.error
+      ? `search_exams không gọi được: ${se.error.code ?? ""} ${se.error.message} — apply schema.sql § "Tìm đề theo tên" (ADR-0020)`
+      : "search_exams tồn tại và authenticated gọi được"
+  );
+  const seAnon =
+    (await anonClient.rpc("search_exams", { q: "__verify_schema_no_such_title__", max_results: 1 }))
+      .error?.code ?? null;
+  assert(
+    seAnon === "42501",
+    seAnon === "42501"
+      ? "search_exams: anon bị từ chối (42501) — EXECUTE chỉ authenticated/service_role"
+      : `search_exams: anon KHÔNG bị từ chối (mã ${describeCode(seAnon)}) — thiếu \`revoke all on function public.search_exams(text, int) from public, anon\``
+  );
   }
 
   // ==========================================================================

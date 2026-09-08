@@ -132,6 +132,12 @@ export const RATE_LIMITS = {
   // đường dò `order_code` tốn chính suất của kẻ dò (FE-B-02, hệ quả 3).
   createOrder: { limit: 15, windowMs: 60 * 60 * 1000 },
   recheckOrder: { limit: 30, windowMs: 60 * 60 * 1000 },
+  // Gợi ý đề khi gõ (ADR-0020, `GET /api/exams/search`). Nhóm tốn-DB: mỗi lượt
+  // là một truy vấn trigram trên `exams` của CHÍNH ta. Cửa sổ PHÚT chứ không
+  // giờ vì đây là ô gõ-tới-đâu-tìm-tới-đó: 120/phút là hai lượt mỗi giây, cao
+  // hơn mọi tốc độ gõ thật (client còn debounce 250ms) nhưng chặn được một vòng
+  // lặp tự động nện endpoint này.
+  searchExams: { limit: 120, windowMs: 60 * 1000 },
   // Gia sư Socratic (Engine 1, AC-022). NGOẠI LỆ của cả khối trên, và chặt vì
   // một lý do khác hẳn: các mục trên chỉ tốn một dòng DB của CHÍNH ta, còn mục
   // này tiêu vào hạn ngạch của bên thứ ba mà ta không tự nới được. Key Gemini
