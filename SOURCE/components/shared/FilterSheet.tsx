@@ -45,6 +45,10 @@ export function FilterSheet({ open, onClose, onClear, clearDisabled, children }:
       <div
         role="dialog"
         aria-label={t("common.filters")}
+        // Mốc cho SupportWidgetTrigger tự ẩn khi bảng lọc đang mở (engineer
+        // 2026-09-08): nút hỗ trợ (z-45) từng đè lên góc dưới phải của bottom
+        // sheet (z-30) ở 360px, che mất ô "Nộp đến ngày" / hàng Độ khó.
+        data-filter-sheet=""
         className="bg-background rounded-t-card animate-in fade-in slide-in-from-bottom-4 fixed inset-x-0 bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom,0px))] z-30 flex max-h-[70dvh] flex-col overflow-hidden duration-200 ease-out motion-reduce:animate-none md:absolute md:inset-x-auto md:top-full md:bottom-auto md:left-0 md:mt-2 md:max-h-[32rem] md:w-80 md:rounded-card md:border md:border-border"
       >
         <div className="border-border flex items-center justify-between gap-3 border-b px-4 py-2">

@@ -34,7 +34,12 @@ export function SupportWidgetTrigger({ onOpen }: SupportWidgetTriggerProps) {
       // kỳ viewport nào ≤768px, cấu trúc chứ không phải canh tay (UI-D6).
       // size-14 ghi đè scale "icon" mặc định (size-8) — Button chưa có bậc
       // size lớn cỡ này.
-      className="fixed right-4 bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom,0px)+1rem)] z-[45] size-14 md:right-6 md:bottom-6"
+      // Ẩn khi một bảng lọc (`FilterSheet`, mốc `data-filter-sheet`) đang mở:
+      // nút này (z-45) nằm TRÊN bottom sheet (z-30) nên ở 360px từng che ô
+      // nhập cuối của bảng lọc Kho đề lẫn Lịch sử (engineer 2026-09-08). Chỉ
+      // bảng lọc, không phải mọi dialog — hộp thoại hỗ trợ của chính nó cần
+      // nút này còn trong DOM để trả tiêu điểm về khi đóng (UI-D7).
+      className="fixed right-4 bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom,0px)+1rem)] z-[45] size-14 md:right-6 md:bottom-6 [body:has([data-filter-sheet])_&]:hidden"
     >
       <MessageCircle aria-hidden className="size-6" strokeWidth={1.75} />
     </Button>
