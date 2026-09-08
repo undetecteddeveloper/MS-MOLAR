@@ -16,6 +16,9 @@ interface ExamBrowserProps {
   /** `grid` (mặc định) = lưới 1→2→3 cột của /exams. `stack` = một cột dọc, cho
    *  cột hẹp bên phải hero ở trang chủ. */
   layout?: "grid" | "stack";
+  /** Từ khoá đang tìm (`?q=`, ADR-0020) — trạng thái rỗng nhắc lại đúng từ
+   *  khoá để người dùng biết vì sao lưới trống. */
+  query?: string;
 }
 
 export async function ExamBrowser({
@@ -23,12 +26,17 @@ export async function ExamBrowser({
   submittedExamIds,
   isLoggedIn,
   layout = "grid",
+  query,
 }: ExamBrowserProps) {
   if (exams.length === 0) {
     return (
       <Card variant="outline" className="items-center justify-center gap-1 border-dashed py-14 text-center">
-        <p className="text-foreground text-lg font-semibold">{t("exams.noMatch")}</p>
-        <p className="text-muted-foreground text-sm">{t("exams.noMatchHint")}</p>
+        <p className="text-foreground text-lg font-semibold">
+          {query !== undefined ? t("exams.noSearchMatch", { query }) : t("exams.noMatch")}
+        </p>
+        <p className="text-muted-foreground text-sm">
+          {query !== undefined ? t("exams.noSearchMatchHint") : t("exams.noMatchHint")}
+        </p>
       </Card>
     );
   }
