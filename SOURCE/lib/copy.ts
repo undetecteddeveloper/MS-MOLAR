@@ -274,6 +274,10 @@ export const copy = {
 
   // --- Lịch sử ------------------------------------------------------------
   "history.title": "Lịch sử",
+  "history.subtitle": "Các lượt làm bài bạn đã nộp, mới nhất xếp trước.",
+  "history.subjectFilter": "Lọc theo môn",
+  "history.pagination": "Các trang lịch sử",
+  "history.totalCount": "{total} lượt làm",
   "history.noMatches": "Không có kết quả khớp",
   "history.noMatchesHint": "Thử chỉnh lại hoặc xoá bộ lọc.",
   "history.noResults": "Chưa có kết quả nào",

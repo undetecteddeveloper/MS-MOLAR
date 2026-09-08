@@ -1,18 +1,25 @@
-// HistoryList — /history content column (S-01, Task 13). Server Component.
-// Front-adjust (2026-08-17): tiêu đề trang bỏ khỏi UI nhìn thấy được (điều
-// hướng đã tô sáng mục History) và bộ lọc chuyển ra rail bên cạnh nội dung —
-// xem HistoryFilters.tsx + history/page.tsx (bố cục nay khớp ExamFilters/
-// ExamBrowser trên /exams, chỉ khác danh mục lọc bên trong). Bounded-height,
-// internally-scrolling row container (D3) instead of an unbounded list; the
-// dashed-border empty state distinguishes "genuinely no history yet" (CTA to
-// /exams, AC-002) from "filtered down to zero" (no CTA — the fix is clearing
-// filters, not browsing exams).
+// HistoryList — cột nội dung của /history. Server Component.
 //
-// Invariant: never re-sorts or re-filters `entries` itself — that is
-// listMyHistory()'s (ordering) and filterHistoryEntries()'s (filtering)
-// responsibility, both already applied by the caller.
+// Theme "Sân trường" (2026-09-07): danh sách TRẢI TỰ NHIÊN theo trang — không
+// còn khung cuộn riêng cao 30rem của bản trước (D3): một vùng cuộn lồng trong
+// trang cuộn là hai thanh cuộn tranh một ngón tay trên điện thoại, và dưới
+// danh sách không còn nội dung nào để mà "giữ chỗ". Trang cắt bằng `?page=`
+// (lib/history/paginate.ts), nơi gọi đặt ExamPagination ngay dưới.
+//
+// Hai trạng thái rỗng phân biệt nhau bằng HÀNH ĐỘNG đi kèm, không chỉ bằng
+// câu chữ: chưa từng làm bài → nút xanh tới Kho đề (AC-002); lọc về không →
+// nút "Xoá lọc" về /history trần — việc cần làm là bỏ lọc, không phải đi tìm
+// đề. Cả hai là thẻ viền nét đứt căn giữa, cùng khuôn với Kho đề và Thống kê.
+//
+// Bất biến giữ nguyên: không tự sắp xếp hay lọc lại `entries` — thứ tự là việc
+// của listMyHistory(), lọc là của filterHistoryEntries(), cắt trang là của
+// paginateHistory(); cả ba đã chạy ở nơi gọi.
+
 import Link from "next/link";
+import { buttonVariants } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { t } from "@/lib/copy";
+import { cn } from "@/lib/utils";
 import type { MyHistoryEntry } from "@/features/history/queries";
 import { HistoryRow } from "@/features/history/components/HistoryRow";
 
@@ -25,54 +32,36 @@ export async function HistoryList({
   isFiltered?: boolean;
   examineeName: string;
 }) {
+  if (entries.length === 0) {
+    return (
+      <Card variant="outline" className="items-center gap-1 border-dashed px-6 py-12 text-center">
+        <h2 className="text-lg font-semibold">
+          {isFiltered ? t("history.noMatches") : t("history.noResults")}
+        </h2>
+        <p className="text-muted-foreground max-w-prose text-sm leading-relaxed">
+          {isFiltered ? t("history.noMatchesHint") : t("history.noResultsHint")}
+        </p>
+        {isFiltered ? (
+          <Link
+            href="/history"
+            className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "mt-3")}
+          >
+            {t("common.clear")}
+          </Link>
+        ) : (
+          <Link href="/exams" className={cn(buttonVariants(), "mt-3")}>
+            {t("common.browseExams")}
+          </Link>
+        )}
+      </Card>
+    );
+  }
+
   return (
-    <div className="w-full">
-      {entries.length === 0 ? (
-        <div className="border-border flex flex-col items-center gap-2 rounded-lg border border-dashed px-6 py-16 text-center">
-          {isFiltered ? (
-            <>
-              <p className="text-foreground font-serif text-lg">{t("history.noMatches")}</p>
-              <p className="text-muted-foreground text-sm">{t("history.noMatchesHint")}</p>
-            </>
-          ) : (
-            <>
-              <p className="text-foreground font-serif text-lg">{t("history.noResults")}</p>
-              <p className="text-muted-foreground text-sm">{t("history.noResultsHint")}</p>
-              <Link
-                href="/exams"
-                className="bg-brand text-brand-foreground mt-2 rounded-full px-4 py-2 text-xs font-medium tracking-[0.14em] uppercase transition-opacity hover:opacity-90"
-              >
-                {t("common.browseExams")}
-              </Link>
-            </>
-          )}
-        </div>
-      ) : (
-        // Trần chiều cao khác nhau theo bề rộng, CỐ Ý:
-        //  - Desktop (≥768px): giữ 30rem — khung có trần là quyết định thiết kế
-        //    sẵn có (D3), trang còn nội dung khác bên dưới.
-        //  - Mobile: 30rem cố định để lại một mảng trống lớn giữa dòng cuối và
-        //    thanh điều hướng đáy, trong khi danh sách BÊN TRONG vẫn đang cuộn
-        //    vì bị cắt — vừa xấu vừa lãng phí, ở đúng nơi màn hình chật nhất.
-        //    `100dvh - 15rem` trừ đi phần chiều cao đã bị chiếm: navbar 60px +
-        //    đệm trang + khối tiêu đề + đệm đáy cho BottomNav. `dvh` chứ không
-        //    `vh`: thanh địa chỉ trình duyệt ẩn/hiện khi cuộn làm `vh` sai số
-        //    (§3.2 tài liệu mobile).
-        // `md:pr-2` chứ không phải `pr-2`: rãnh 8px này sinh ra để thanh cuộn
-        // cổ điển của desktop không đè lên mép phải thẻ. Trên mobile thanh cuộn
-        // là kiểu PHỦ (overlay, không chiếm bề rộng — đo được clientWidth ===
-        // offsetWidth === 358 ở 390×844), nên nó không che gì cả mà chỉ bóp thẻ
-        // lại 8px: thẻ rộng 350px trong khi nút FILTERS ngay phía trên rộng 358
-        // và cùng bắt đầu ở x=16. Hai khối xếp chồng lệch nhau 8px ở đúng một
-        // phía là kiểu lệch mắt bắt được ngay mà không chỉ ra được vì sao.
-        // Từ 768px trở lên bộ lọc là một rail dọc BÊN TRÁI, không còn khối nào
-        // nằm trên để so mép — nên ở đó rãnh cuộn giữ nguyên.
-        <ul className="flex max-h-[calc(100dvh-15rem)] flex-col gap-3 overflow-y-auto md:max-h-[30rem] md:pr-2">
-          {entries.map((entry) => (
-            <HistoryRow key={entry.attemptId} entry={entry} examineeName={examineeName} />
-          ))}
-        </ul>
-      )}
-    </div>
+    <ul className="flex flex-col gap-3">
+      {entries.map((entry) => (
+        <HistoryRow key={entry.attemptId} entry={entry} examineeName={examineeName} />
+      ))}
+    </ul>
   );
 }

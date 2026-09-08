@@ -5,14 +5,10 @@ import type { MessageKey } from "@/lib/copy";
 // ExamFilters — thanh lọc của Kho đề (theme "Sân trường", 2026-09-04).
 //
 // Một hàng CHIP ngay dưới tiêu đề trang: [Bộ lọc (n)] [Mới nhất] [Cũ nhất]
-// [Khó nhất] [chiều sắp xếp] [Xoá lọc]. Bấm "Bộ lọc" mở bảng chọn:
-//  - <768px: BOTTOM SHEET neo đáy màn hình (vùng ngón cái), cao tối đa 70dvh,
-//    nằm TRÊN BottomNav (bottom = --bottom-nav-h + safe-area).
-//  - ≥768px: bảng thả xuống ngay dưới hàng chip, rộng 20rem.
-// Trong bảng, mỗi hàng (Môn, Lớp, Trường, Năm, Học kỳ, Độ khó) mở IN-FLOW
-// (đẩy hàng dưới xuống) ở MỌI bề rộng — bản trước dùng overlay `absolute` trên
-// desktop và từng bị BottomNav/scroll container cắt (2026-08-09); in-flow trong
-// một khung cuộn là tổ hợp trình duyệt tính đúng ở mọi nơi.
+// [Khó nhất] [chiều sắp xếp] [Xoá lọc]. Bấm "Bộ lọc" mở bảng chọn — vỏ bảng
+// (bottom sheet dưới 768px / thả xuống từ 768px, scrim, phần đầu) là
+// `FilterSheet`, mỗi hàng chọn là `FilterRow`; cả hai ở components/shared vì
+// Lịch sử dùng cùng khuôn (2026-09-07), chỉ khác danh mục hàng bên trong.
 //
 // State lọc ở URL searchParams → Server Component re-query. Rating System
 // (D002): Level lọc thật; Newest/Oldest/Hardest là MỘT trục ?sort= loại trừ
@@ -22,17 +18,12 @@ import type { MessageKey } from "@/lib/copy";
 // render ở left:-46px (ngoài màn hình) ở mọi bề rộng dưới 1244px.
 
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
-import {
-  ArrowDownWideNarrow,
-  ArrowUpNarrowWide,
-  Check,
-  ChevronDown,
-  SlidersHorizontal,
-  X,
-} from "lucide-react";
+import { useState, useTransition } from "react";
+import { ArrowDownWideNarrow, ArrowUpNarrowWide, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { chipVariants } from "@/components/ui/chip";
+import { FilterRow } from "@/components/shared/FilterRow";
+import { FilterSheet } from "@/components/shared/FilterSheet";
 
 /** Rating System — khớp ExamSort (queries) + ExamLevel lowercase slug (IP-6). */
 type ExamSort = "newest" | "oldest" | "hardest";
@@ -214,238 +205,98 @@ export function ExamFilters({
         )}
       </div>
 
-      {open && (
-        <>
-          {/* Scrim — làm dịu lưới đề để bảng chọn nổi lên; bấm để đóng. */}
-          <button
-            aria-hidden
-            tabIndex={-1}
-            onClick={closePanel}
-            className="bg-foreground/20 animate-in fade-in fixed inset-0 z-10 cursor-default duration-200 motion-reduce:animate-none"
-          />
-          <div
-            role="dialog"
-            aria-label={t("common.filters")}
-            // Mobile: bottom sheet; `dvh` chứ không `vh` vì thanh địa chỉ
-            // Safari/Chrome ẩn-hiện làm `vh` cắt mất phần dưới sheet.
-            // Desktop (md:): bảng thả xuống dưới hàng chip. Hai nhánh viết TÁCH
-            // (mobile không tiền tố, desktop sau `md:`) — không viết một nền
-            // rồi ghi đè bằng `max-md:*`, hai khai báo cùng thuộc tính sẽ tranh
-            // nhau theo thứ tự stylesheet.
-            className="bg-background rounded-t-card animate-in fade-in slide-in-from-bottom-4 fixed inset-x-0 bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom,0px))] z-30 flex max-h-[70dvh] flex-col overflow-hidden duration-200 ease-out motion-reduce:animate-none md:absolute md:inset-x-auto md:top-full md:bottom-auto md:left-0 md:mt-2 md:max-h-[32rem] md:w-80 md:rounded-card md:border md:border-border"
-          >
-            <div className="border-border flex items-center justify-between gap-3 border-b px-4 py-2">
-              <span className="text-base font-semibold">{t("common.filters")}</span>
-              <div className="flex items-center gap-1">
-                <Button
-                  type="button"
-                  variant="link"
-                  size="sm"
-                  onClick={clearAll}
-                  disabled={!hasFilters}
-                >
-                  {t("common.clear")}
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={closePanel}
-                  aria-label={t("common.cancel")}
-                >
-                  <X aria-hidden />
-                </Button>
-              </div>
-            </div>
-
-            <div className="overflow-y-auto">
-              <FilterRow
-                filterKey="subject"
-                label={t("common.subject")}
-                selectedLabel={selected.subject}
-                currentValue={selected.subject ?? ""}
-                options={[
-                  { value: "", label: t("common.all") },
-                  ...subjects.map((s) => ({ value: s, label: s })),
-                ]}
-                onSelect={(v) => setParam("subject", v)}
-                open={openFilterKey === "subject"}
-                onOpenChange={(v) => setOpenFilterKey(v ? "subject" : null)}
-              />
-              <FilterRow
-                filterKey="grade"
-                label={t("common.grade")}
-                selectedLabel={
-                  selected.grade !== undefined
-                    ? t("exams.gradeValue", { grade: selected.grade })
-                    : undefined
-                }
-                currentValue={selected.grade !== undefined ? String(selected.grade) : ""}
-                options={[
-                  { value: "", label: t("common.all") },
-                  ...grades.map((g) => ({
-                    value: String(g),
-                    label: t("exams.gradeValue", { grade: g }),
-                  })),
-                ]}
-                onSelect={(v) => setParam("grade", v)}
-                open={openFilterKey === "grade"}
-                onOpenChange={(v) => setOpenFilterKey(v ? "grade" : null)}
-              />
-              <FilterRow
-                filterKey="school"
-                label={t("common.school")}
-                selectedLabel={selected.school}
-                currentValue={selected.school ?? ""}
-                options={[
-                  { value: "", label: t("common.all") },
-                  ...schools.map((s) => ({ value: s, label: s })),
-                ]}
-                onSelect={(v) => setParam("school", v)}
-                open={openFilterKey === "school"}
-                onOpenChange={(v) => setOpenFilterKey(v ? "school" : null)}
-              />
-              <FilterRow
-                filterKey="year"
-                label={t("common.year")}
-                selectedLabel={selected.year !== undefined ? String(selected.year) : undefined}
-                currentValue={selected.year !== undefined ? String(selected.year) : ""}
-                options={[
-                  { value: "", label: t("common.all") },
-                  ...years.map((y) => ({ value: String(y), label: String(y) })),
-                ]}
-                onSelect={(v) => setParam("year", v)}
-                open={openFilterKey === "year"}
-                onOpenChange={(v) => setOpenFilterKey(v ? "year" : null)}
-              />
-              <FilterRow
-                filterKey="semester"
-                label={t("common.semester")}
-                selectedLabel={selected.semester}
-                currentValue={selected.semester ?? ""}
-                options={[
-                  { value: "", label: t("common.all") },
-                  ...semesters.map((s) => ({ value: s, label: s })),
-                ]}
-                onSelect={(v) => setParam("semester", v)}
-                open={openFilterKey === "semester"}
-                onOpenChange={(v) => setOpenFilterKey(v ? "semester" : null)}
-              />
-              <FilterRow
-                filterKey="level"
-                label={t("exams.level")}
-                selectedLabel={
-                  selected.level !== undefined
-                    ? t(
-                        LEVEL_OPTIONS.find((o) => o.value === selected.level)?.labelKey ??
-                          "common.all"
-                      )
-                    : undefined
-                }
-                currentValue={selected.level ?? ""}
-                options={LEVEL_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
-                onSelect={(v) => setParam("level", v)}
-                open={openFilterKey === "level"}
-                onOpenChange={(v) => setOpenFilterKey(v ? "level" : null)}
-                last
-              />
-            </div>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-interface Option {
-  value: string;
-  label: string;
-}
-
-function FilterRow({
-  filterKey,
-  label,
-  selectedLabel,
-  currentValue,
-  options,
-  onSelect,
-  open: rowOpen,
-  onOpenChange,
-  last = false,
-}: {
-  filterKey: string;
-  label: string;
-  selectedLabel?: string;
-  currentValue?: string;
-  options: Option[];
-  onSelect: (value: string) => void;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  last?: boolean;
-}) {
-  const rowRef = useRef<HTMLDivElement>(null);
-
-  // Cuộn hàng vừa mở vào vùng nhìn thấy của khung cuộn: bảng chọn mở IN-FLOW,
-  // hàng gần đáy sẽ lộ nội dung mới dưới mép cuộn — không cuộn hộ là "mở ra mà
-  // không thấy gì". `scrollIntoView` là no-op trong jsdom nên test không cần
-  // guard.
-  useEffect(() => {
-    if (!rowOpen) return;
-    rowRef.current?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
-  }, [rowOpen]);
-
-  return (
-    <div
-      ref={rowRef}
-      data-filter-key={filterKey}
-      className={last ? "" : "border-border border-b"}
-    >
-      <button
-        type="button"
-        aria-expanded={rowOpen}
-        onClick={() => onOpenChange(!rowOpen)}
-        className="hover:bg-surface flex min-h-12 w-full items-center justify-between gap-3 px-4 py-2.5 text-left transition-colors"
-      >
-        <span className="flex min-w-0 flex-col">
-          <span className="text-sm font-medium">{label}</span>
-          {selectedLabel && (
-            <span className="text-primary truncate text-sm font-semibold">{selectedLabel}</span>
-          )}
-        </span>
-        <ChevronDown
-          aria-hidden
-          className={`text-muted-foreground size-4 shrink-0 transition-transform ${rowOpen ? "rotate-180" : ""}`}
+      <FilterSheet open={open} onClose={closePanel} onClear={clearAll} clearDisabled={!hasFilters}>
+        <FilterRow
+          filterKey="subject"
+          label={t("common.subject")}
+          selectedLabel={selected.subject}
+          currentValue={selected.subject ?? ""}
+          options={[
+            { value: "", label: t("common.all") },
+            ...subjects.map((s) => ({ value: s, label: s })),
+          ]}
+          onSelect={(v) => setParam("subject", v)}
+          open={openFilterKey === "subject"}
+          onOpenChange={(v) => setOpenFilterKey(v ? "subject" : null)}
         />
-      </button>
-
-      {rowOpen && (
-        <ul className="flex flex-col gap-0.5 px-2 pb-2">
-          {options.map((opt) => {
-            const active = opt.value === currentValue;
-            return (
-              <li key={opt.value || "all"}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onSelect(opt.value);
-                    onOpenChange(false);
-                  }}
-                  aria-pressed={active}
-                  className={`flex min-h-11 w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
-                    active ? "bg-surface text-foreground font-semibold" : "text-muted-foreground hover:bg-surface hover:text-foreground"
-                  }`}
-                >
-                  <Check
-                    aria-hidden
-                    className={`size-4 shrink-0 ${active ? "text-primary" : "text-transparent"}`}
-                  />
-                  {opt.label}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+        <FilterRow
+          filterKey="grade"
+          label={t("common.grade")}
+          selectedLabel={
+            selected.grade !== undefined
+              ? t("exams.gradeValue", { grade: selected.grade })
+              : undefined
+          }
+          currentValue={selected.grade !== undefined ? String(selected.grade) : ""}
+          options={[
+            { value: "", label: t("common.all") },
+            ...grades.map((g) => ({
+              value: String(g),
+              label: t("exams.gradeValue", { grade: g }),
+            })),
+          ]}
+          onSelect={(v) => setParam("grade", v)}
+          open={openFilterKey === "grade"}
+          onOpenChange={(v) => setOpenFilterKey(v ? "grade" : null)}
+        />
+        <FilterRow
+          filterKey="school"
+          label={t("common.school")}
+          selectedLabel={selected.school}
+          currentValue={selected.school ?? ""}
+          options={[
+            { value: "", label: t("common.all") },
+            ...schools.map((s) => ({ value: s, label: s })),
+          ]}
+          onSelect={(v) => setParam("school", v)}
+          open={openFilterKey === "school"}
+          onOpenChange={(v) => setOpenFilterKey(v ? "school" : null)}
+        />
+        <FilterRow
+          filterKey="year"
+          label={t("common.year")}
+          selectedLabel={selected.year !== undefined ? String(selected.year) : undefined}
+          currentValue={selected.year !== undefined ? String(selected.year) : ""}
+          options={[
+            { value: "", label: t("common.all") },
+            ...years.map((y) => ({ value: String(y), label: String(y) })),
+          ]}
+          onSelect={(v) => setParam("year", v)}
+          open={openFilterKey === "year"}
+          onOpenChange={(v) => setOpenFilterKey(v ? "year" : null)}
+        />
+        <FilterRow
+          filterKey="semester"
+          label={t("common.semester")}
+          selectedLabel={selected.semester}
+          currentValue={selected.semester ?? ""}
+          options={[
+            { value: "", label: t("common.all") },
+            ...semesters.map((s) => ({ value: s, label: s })),
+          ]}
+          onSelect={(v) => setParam("semester", v)}
+          open={openFilterKey === "semester"}
+          onOpenChange={(v) => setOpenFilterKey(v ? "semester" : null)}
+        />
+        <FilterRow
+          filterKey="level"
+          label={t("exams.level")}
+          selectedLabel={
+            selected.level !== undefined
+              ? t(
+                  LEVEL_OPTIONS.find((o) => o.value === selected.level)?.labelKey ??
+                    "common.all"
+                )
+              : undefined
+          }
+          currentValue={selected.level ?? ""}
+          options={LEVEL_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
+          onSelect={(v) => setParam("level", v)}
+          open={openFilterKey === "level"}
+          onOpenChange={(v) => setOpenFilterKey(v ? "level" : null)}
+          last
+        />
+      </FilterSheet>
     </div>
   );
 }

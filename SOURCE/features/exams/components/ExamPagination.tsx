@@ -1,4 +1,5 @@
-// ExamPagination — điều hướng trang cho /exams (TD-026).
+// ExamPagination — điều hướng trang cho /exams (TD-026), và từ 2026-09-07 cho
+// cả /history (`basePath` + nhãn riêng; phép cắt trang ở lib/pagination).
 //
 // SERVER COMPONENT, cố ý: chỉ sinh link — không state, không handler. Điều
 // hướng bằng `?page=` chứ không "tải thêm": trang đề là thứ người dùng CHIA SẺ
@@ -17,9 +18,19 @@ interface ExamPaginationProps {
   total: number;
   /** searchParams thô của trang, TRỪ `page` — chép lại nguyên vẹn vào mỗi link. */
   params: Record<string, string | undefined>;
+  /** Đường dẫn gốc của danh sách — mặc định Kho đề; Lịch sử truyền `/history`. */
+  basePath?: string;
+  /** Nhãn trợ năng của thanh điều hướng — mặc định theo Kho đề. */
+  ariaLabel?: string;
+  /** Dòng tổng dưới thanh ("12 đề", "47 lượt làm") — ĐÃ dịch; mặc định theo Kho đề. */
+  totalLabel?: string;
 }
 
-function buildHref(params: Record<string, string | undefined>, page: number): string {
+function buildHref(
+  basePath: string,
+  params: Record<string, string | undefined>,
+  page: number
+): string {
   const sp = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) {
     if (v) sp.set(k, v);
@@ -28,7 +39,7 @@ function buildHref(params: Record<string, string | undefined>, page: number): st
   // trong lịch sử trình duyệt và trong mắt crawler.
   if (page > 1) sp.set("page", String(page));
   const qs = sp.toString();
-  return qs ? `/exams?${qs}` : "/exams";
+  return qs ? `${basePath}?${qs}` : basePath;
 }
 
 // 44px (min-h-11) — ngưỡng vùng chạm: thanh này cũng hiện trên mobile, nơi nó
@@ -38,15 +49,26 @@ const LINK_CLASS =
 const DISABLED_CLASS =
   "bg-surface text-muted-foreground inline-flex min-h-11 cursor-not-allowed items-center gap-1 rounded-full px-4 text-sm font-semibold opacity-50";
 
-export async function ExamPagination({ page, pageCount, total, params }: ExamPaginationProps) {
+export async function ExamPagination({
+  page,
+  pageCount,
+  total,
+  params,
+  basePath = "/exams",
+  ariaLabel,
+  totalLabel,
+}: ExamPaginationProps) {
   // Một trang thì không có gì để điều hướng.
   if (pageCount <= 1) return null;
 
   return (
-    <nav aria-label={t("exams.pagination")} className="mt-8 flex flex-col items-center gap-3">
+    <nav
+      aria-label={ariaLabel ?? t("exams.pagination")}
+      className="mt-8 flex flex-col items-center gap-3"
+    >
       <div className="flex items-center gap-2">
         {page > 1 ? (
-          <Link href={buildHref(params, page - 1)} rel="prev" className={LINK_CLASS}>
+          <Link href={buildHref(basePath, params, page - 1)} rel="prev" className={LINK_CLASS}>
             <ChevronLeft aria-hidden className="size-4" />
             {t("exams.previousPage")}
           </Link>
@@ -64,7 +86,7 @@ export async function ExamPagination({ page, pageCount, total, params }: ExamPag
         </span>
 
         {page < pageCount ? (
-          <Link href={buildHref(params, page + 1)} rel="next" className={LINK_CLASS}>
+          <Link href={buildHref(basePath, params, page + 1)} rel="next" className={LINK_CLASS}>
             {t("exams.nextPage")}
             <ChevronRight aria-hidden className="size-4" />
           </Link>
@@ -76,7 +98,9 @@ export async function ExamPagination({ page, pageCount, total, params }: ExamPag
         )}
       </div>
 
-      <p className="text-muted-foreground text-sm">{t("exams.totalCount", { total })}</p>
+      <p className="text-muted-foreground text-sm">
+        {totalLabel ?? t("exams.totalCount", { total })}
+      </p>
     </nav>
   );
 }

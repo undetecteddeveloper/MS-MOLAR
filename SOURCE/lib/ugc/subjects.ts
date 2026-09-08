@@ -109,3 +109,11 @@ export function normalizeSubject(raw: string | null | undefined): Subject | null
 export function isSubject(v: string): v is Subject {
   return (SUBJECTS as readonly string[]).includes(v);
 }
+
+/** Nhãn tiếng Việt cho một giá trị môn ĐỌC TỪ DB (`exams.subject`), nơi kiểu
+ *  chỉ là `string`: giá trị canonical → nhãn, giá trị ngoài danh mục (dữ liệu
+ *  cũ, seed lạ) → trả nguyên chứ không rỗng — một chip không tên còn tệ hơn một
+ *  chip tên tiếng Anh. */
+export function subjectLabel(raw: string): string {
+  return isSubject(raw) ? SUBJECT_LABELS[raw] : raw;
+}

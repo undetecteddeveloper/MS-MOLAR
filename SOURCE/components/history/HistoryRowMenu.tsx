@@ -2,9 +2,12 @@
 
 // HistoryRowMenu — front-adjust: consolidates HistoryRow's 3 separate
 // controls (Save ActionButton, Share ActionButton, "View details" Link) into
-// a single ⋯ trigger + dropdown menu, matching HeaderProfile.tsx's existing
-// dropdown convention (scrim + role="menu" panel, ivory-on-border styling)
-// rather than introducing a new menu primitive.
+// a single ⋯ trigger + dropdown menu, matching HeaderProfile.tsx's dropdown
+// convention (scrim + role="menu" panel) rather than introducing a new menu
+// primitive. Theme "Sân trường" (2026-09-07): nút ⋯ là viên thuốc TRẮNG 36px
+// (`plain`, cỡ nút-trong-thẻ) trên thẻ surface; bảng menu cùng lớp vỏ với
+// HeaderProfile (popover trắng, viền mảnh, bo 14px, mục 44px bo 11px). Hết
+// viền-xám-chữ-nâu của theme cũ.
 //
 // Save/Share route through the same usePdfAction hook ActionButton uses
 // (AC-007 single PDF pipeline) — each has its own busyRef instance, so
@@ -15,24 +18,19 @@
 //
 // ⚠ POSITIONING (2026-08-09, real bug — same shape as ExamFilters.tsx's
 // FilterRow fix, same day): the panel used to be `position: absolute
-// top-full right-0`, anchored to THIS row. HistoryList renders rows inside
-// `<ul class="max-h-[...] overflow-y-auto">` (a bounded, internally-scrolling
-// list, D3) sitting just above the mobile BottomNav (`fixed z-40`). An
-// `absolute` descendant's containing block is the nearest POSITIONED
-// ancestor — here, this row's own `.relative` wrapper — which is itself
-// INSIDE that scroll container, so the panel's paint position is still
-// subject to the list's clipping box. For any row whose menu-open position
-// lands near the bottom of the currently-scrolled list (trivially true once
-// a user accumulates enough history to fill/scroll the list — this is NOT a
-// fixed-count bug, it gets MORE likely as `entries` grows, not less), the
-// panel rendered flush against — and got visually eaten by — BottomNav.
-// Fix: compute the panel's position from the trigger's viewport rect
-// (`getBoundingClientRect`) and render it via `createPortal` to `document
-// .body` with `position: fixed`. This is a structural guarantee, not an
-// implicit one — the panel is no longer a descendant of ANY scroll
-// container, so no future ancestor change (an added `overflow`, a `max-h`,
-// a `transform` for an unrelated animation) can silently reintroduce this
-// clipping. Direction flips (opens upward) and height clamps with its own
+// top-full right-0`, anchored to THIS row, inside HistoryList's then-bounded
+// `overflow-y-auto` list sitting just above the mobile BottomNav (`fixed
+// z-40`). An `absolute` descendant's containing block is the nearest
+// POSITIONED ancestor — here, this row's own `.relative` wrapper — which was
+// INSIDE that scroll container, so the panel's paint position was subject to
+// the list's clipping box and got visually eaten by BottomNav for rows near
+// the bottom. Fix: compute the panel's position from the trigger's viewport
+// rect (`getBoundingClientRect`) and render it via `createPortal` to
+// `document.body` with `position: fixed`. The list no longer scrolls on its
+// own (2026-09-07: it paginates instead), but the portal stays as a
+// STRUCTURAL guarantee — no future ancestor change (an added `overflow`, a
+// `max-h`, a `transform` for an unrelated animation) can silently reintroduce
+// the clipping. Direction flips (opens upward) and height clamps with its own
 // `overflow-y-auto` when the trigger is close enough to the viewport edge
 // that even the flipped side doesn't have room — the panel can never render
 // partially off-screen or behind BottomNav, regardless of how tall its
@@ -42,7 +40,9 @@ import Link from "next/link";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePdfAction } from "@/components/history/usePdfAction";
+import { buttonVariants } from "@/components/ui/button";
 import { t } from "@/lib/copy";
+import { cn } from "@/lib/utils";
 import type { AttemptPdfData } from "@/lib/pdf/generateAttemptPdf";
 
 export interface HistoryRowMenuProps {
@@ -58,10 +58,11 @@ export interface HistoryRowMenuProps {
   blockedReason: string | null;
 }
 
-/** Trần chiều cao "muốn có" của panel — 3 mục + có thể thêm 1 dòng lỗi/fallback.
- *  Không phải hằng cứng bố cục, chỉ là ngưỡng ước lượng để quyết định mở lên/
- *  xuống; panel luôn tự `overflow-y-auto` nếu chỗ thật sự có ít hơn số này. */
-const MENU_PREFERRED_MAX_PX = 260;
+/** Trần chiều cao "muốn có" của panel — 3 mục 44px + đệm + có thể thêm dòng
+ *  lý do chặn/lỗi. Không phải hằng cứng bố cục, chỉ là ngưỡng ước lượng để
+ *  quyết định mở lên/xuống; panel luôn tự `overflow-y-auto` nếu chỗ thật sự có
+ *  ít hơn số này. */
+const MENU_PREFERRED_MAX_PX = 280;
 const MENU_MIN_PX = 100;
 const GAP_PX = 8;
 
@@ -114,6 +115,11 @@ function usePanelPosition(open: boolean, triggerRef: React.RefObject<HTMLButtonE
   return style;
 }
 
+/** Một mục menu — dùng chung cho hai nút PDF lẫn liên kết Xem chi tiết để ba
+ *  mục không trôi khỏi nhau về đệm hay cỡ chữ. */
+const ITEM_CLASS =
+  "hover:bg-surface flex min-h-11 w-full items-center gap-2.5 rounded-lg px-3 text-left text-sm font-medium text-foreground transition-colors aria-disabled:opacity-60";
+
 export function HistoryRowMenu({
   pdfInput,
   resultHref,
@@ -148,10 +154,10 @@ export function HistoryRowMenu({
   }
 
   // Vị trí tính MỘT LẦN lúc mở (usePanelPosition), không theo dõi liên tục —
-  // cuộn danh sách (hoặc resize) thì đóng menu, giống hành vi chuẩn của hầu
-  // hết dropdown khác, thay vì phải định vị lại theo thời gian thực. `capture:
-  // true` để bắt được cả cuộn bên trong `<ul overflow-y-auto>` của HistoryList
-  // (sự kiện scroll không bubble, chỉ capture hoặc gắn thẳng lên phần tử cuộn).
+  // cuộn trang (hoặc resize) thì đóng menu, giống hành vi chuẩn của hầu hết
+  // dropdown khác, thay vì phải định vị lại theo thời gian thực. `capture:
+  // true` để bắt được cả cuộn bên trong bất kỳ khung cuộn con nào (sự kiện
+  // scroll không bubble, chỉ capture hoặc gắn thẳng lên phần tử cuộn).
   useEffect(() => {
     if (!open) return;
     function handleScrollOrResize() {
@@ -183,9 +189,9 @@ export function HistoryRowMenu({
         aria-expanded={open}
         aria-label={t("history.moreActionsFor", { title: examTitle })}
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center justify-center rounded-xl border border-border bg-card p-3 text-brand transition-colors hover:border-brand/40"
+        className={buttonVariants({ variant: "plain", size: "icon-sm" })}
       >
-        <MoreHorizontal className="size-5" aria-hidden />
+        <MoreHorizontal aria-hidden />
       </button>
 
       {open &&
@@ -194,7 +200,7 @@ export function HistoryRowMenu({
           <div
             role="menu"
             style={panelStyle}
-            className="border-border bg-card animate-in fade-in zoom-in-95 z-50 w-56 overflow-y-auto rounded-md border p-1 shadow-sm duration-150 ease-out"
+            className="border-border bg-popover animate-in fade-in z-50 w-60 overflow-y-auto rounded-xl border p-1.5 duration-150 ease-out motion-reduce:animate-none"
           >
             {/* CẢ HAI mục PDF nhận `blockedReason`. Nối một mục mà quên mục
                 kia là sai lầm dễ xảy ra nhất ở lát này, VÀ MỖI CỬA TRÔNG VẪN
@@ -223,12 +229,7 @@ export function HistoryRowMenu({
                 chặn nó là khoá học sinh khỏi đúng cái nút chấm lại sẽ GỠ được
                 cái chặn kia. Cửa duy nhất ra khỏi trạng thái bị chặn đi qua
                 đây. */}
-            <Link
-              role="menuitem"
-              href={resultHref}
-              onClick={close}
-              className="hover:bg-accent flex w-full items-center gap-2 rounded-[4px] px-3 py-2 text-left text-sm text-foreground transition-colors"
-            >
+            <Link role="menuitem" href={resultHref} onClick={close} className={ITEM_CLASS}>
               <ArrowUpRight className="size-4 shrink-0" aria-hidden />
               {t("common.viewDetails")}
             </Link>
@@ -273,7 +274,7 @@ function MenuAction({
         // đóng — menu chỉ đóng khi xuất THÀNH CÔNG.
         aria-disabled={blocked || busy ? "true" : "false"}
         aria-busy={busy}
-        className="hover:bg-accent flex w-full items-center gap-2 rounded-[4px] px-3 py-2 text-left text-sm text-foreground transition-colors"
+        className={cn(ITEM_CLASS)}
       >
         {busy ? (
           <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
@@ -283,15 +284,19 @@ function MenuAction({
         {busy ? busyLabel : label}
       </button>
       {blocked && (
-        <p className="text-muted-foreground px-3 pb-1 text-xs">{blockedReason}</p>
+        <p className="text-muted-foreground px-3 pb-1.5 text-xs leading-snug">{blockedReason}</p>
       )}
       {phase === "error" && (
-        <p role="alert" className="text-brand px-3 pb-1 text-xs">
+        <p role="alert" className="text-destructive px-3 pb-1.5 text-xs leading-snug">
           {errorText}
         </p>
       )}
       {phase === "fallback-confirmed" && fallbackText && (
-        <p role="status" aria-live="polite" className="text-muted-foreground px-3 pb-1 text-xs">
+        <p
+          role="status"
+          aria-live="polite"
+          className="text-muted-foreground px-3 pb-1.5 text-xs leading-snug"
+        >
           {fallbackText}
         </p>
       )}

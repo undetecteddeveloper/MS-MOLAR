@@ -4,6 +4,12 @@
 // `import "server-only"`: một hàm THUẦN nằm trong đó thì không thể kiểm bằng
 // unit test mà không dựng cả một môi trường server giả — và phép số học phân
 // trang là đúng loại code cần unit test nhất (off-by-one im lặng).
+//
+// Phép cắt/kẹp trang nằm ở `lib/pagination/paginate.ts` (dùng chung với
+// /history từ 2026-09-07); file này chỉ giữ CỠ TRANG của Kho đề và quyết định
+// "xếp hạng trước rồi mới cắt" dưới đây.
+
+import { paginate } from "@/lib/pagination/paginate";
 
 /**
  * Số đề mỗi trang của `/exams` (TD-026, 2026-08-27).
@@ -43,7 +49,7 @@ export const EXAMS_PAGE_SIZE = 12;
  *
  * Export (thay vì để private) vì phép số học trang là chỗ off-by-one sinh
  * sống, và nó kiểm được mà không cần dựng cả một Supabase giả — xem
- * `__tests__/paginateExams.test.ts`.
+ * `__tests__/paginate.test.ts`.
  *
  * MỘT ngữ nghĩa phân trang cho CẢ HAI nhánh (`?sort` tường minh lẫn mặc định
  * cá nhân hoá), cố ý: hai ngữ nghĩa khác nhau sẽ làm tổng số trang nhảy khi
@@ -54,11 +60,6 @@ export function paginateExams<T>(
   ordered: T[],
   page: number
 ): { exams: T[]; page: number; pageCount: number; total: number } {
-  const total = ordered.length;
-  const pageCount = Math.max(1, Math.ceil(total / EXAMS_PAGE_SIZE));
-  // Kẹp thay vì trả trang rỗng: `?page=999` gõ tay (hoặc một link cũ sau khi
-  // đề bị gỡ) phải cho thấy đề, không phải một lưới trắng không giải thích gì.
-  const current = Math.min(Math.max(1, Math.trunc(page) || 1), pageCount);
-  const start = (current - 1) * EXAMS_PAGE_SIZE;
-  return { exams: ordered.slice(start, start + EXAMS_PAGE_SIZE), page: current, pageCount, total };
+  const { items, ...rest } = paginate(ordered, page, EXAMS_PAGE_SIZE);
+  return { exams: items, ...rest };
 }
