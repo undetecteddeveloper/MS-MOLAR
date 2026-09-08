@@ -21,6 +21,7 @@ import { AuthorByline } from "@/components/shared/AuthorByline";
 import { DifficultyBadge } from "@/components/rating/DifficultyBadge";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { t } from "@/lib/copy";
+import { subjectLabel } from "@/lib/ugc/subjects";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 import { Badge } from "@/components/ui/badge";
@@ -54,7 +55,7 @@ export default async function ExamDetailPage({ params }: { params: Promise<{ id:
 
       <header className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-1.5">
-          <Badge>{exam.subject}</Badge>
+          <Badge>{subjectLabel(exam.subject)}</Badge>
           <Badge>{t("exams.gradeValue", { grade: exam.grade })}</Badge>
         </div>
         {/* Cùng thang chữ với PageHeader (26px → 30px). Không dùng PageHeader vì

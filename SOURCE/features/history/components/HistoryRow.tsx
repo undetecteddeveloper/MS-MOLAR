@@ -53,7 +53,8 @@ export async function HistoryRow({
   examineeName: string;
 }) {
   const pdfInput: AttemptPdfData = {
-    subject: entry.subject,
+    // PDF in nhãn tiếng Việt như mọi bề mặt khác (mẫu PDF không đổi, chỉ dữ liệu).
+    subject: subjectLabel(entry.subject),
     examTitle: entry.examTitle,
     totalScore: entry.totalScore,
     examineeName,

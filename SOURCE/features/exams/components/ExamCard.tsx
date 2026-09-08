@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { AuthorByline } from "@/components/shared/AuthorByline";
 import { DifficultyBadge } from "@/components/rating/DifficultyBadge";
 import { RateButton, type RateEligibility } from "@/features/exams/components/rating/RateButton";
+import { subjectLabel } from "@/lib/ugc/subjects";
 
 interface ExamCardProps {
   exam: Exam;
@@ -40,7 +41,9 @@ export async function ExamCard({ exam, eligibility }: ExamCardProps) {
       />
 
       <div className="flex flex-wrap items-center gap-1.5">
-        <Badge variant="plain">{exam.subject}</Badge>
+        {/* Nhãn tiếng Việt (DB lưu khoá canonical "Math") — cùng `subjectLabel`
+            với Thống kê và Lịch sử; site chỉ có một ngôn ngữ (engineer 2026-09-08). */}
+        <Badge variant="plain">{subjectLabel(exam.subject)}</Badge>
         <Badge variant="plain">{t("exams.gradeValue", { grade: exam.grade })}</Badge>
       </div>
 

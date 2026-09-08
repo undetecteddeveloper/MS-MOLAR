@@ -26,6 +26,7 @@ import { EssayGradingPoller } from "@/features/exams/components/EssayGradingPoll
 import { ResultActions } from "@/features/exams/components/ResultActions";
 import { mapFromMyRating } from "@/lib/rating";
 import { formatCompletionTime, formatOvertime } from "@/lib/history/format";
+import { subjectLabel } from "@/lib/ugc/subjects";
 import type { AttemptPdfData } from "@/lib/pdf/generateAttemptPdf";
 import { cn } from "@/lib/utils";
 import { PageContainer } from "@/components/layout/PageContainer";
@@ -63,7 +64,9 @@ export default async function ResultPage({
   // (Task 13) and generateAttemptPdf.ts use, so all surfaces stay in sync.
   const completionTimeLabel = formatCompletionTime(data.startedAt, data.submittedAt);
   const pdfInput: AttemptPdfData = {
-    subject,
+    // PDF in nhãn tiếng Việt như mọi bề mặt khác (mẫu PDF không đổi, chỉ dữ
+    // liệu) — cùng `subjectLabel` với HistoryRow, hai lối xuất vẫn cùng một tệp.
+    subject: subjectLabel(subject),
     examTitle,
     totalScore: result.totalScore,
     examineeName: user?.displayName ?? "",

@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { chipVariants } from "@/components/ui/chip";
 import { FilterRow } from "@/components/shared/FilterRow";
 import { FilterSheet } from "@/components/shared/FilterSheet";
+import { subjectLabel } from "@/lib/ugc/subjects";
 
 /** Rating System — khớp ExamSort (queries) + ExamLevel lowercase slug (IP-6). */
 type ExamSort = "newest" | "oldest" | "hardest";
@@ -150,6 +151,13 @@ export function ExamFilters({
   ].filter((v) => v !== undefined).length;
   const hasFilters = activeCount > 0;
 
+  // Môn hiện bằng NHÃN tiếng Việt và xếp theo nhãn ("Hóa học, Tiếng Anh, Toán,
+  // Vật lý") — giá trị URL vẫn là khoá canonical ("Math") vì đó là giá trị DB
+  // và là tham số lọc thật của /exams (SkillRecommendationCard trỏ tới nó).
+  const sortedSubjects = [...subjects].sort((a, b) =>
+    subjectLabel(a).localeCompare(subjectLabel(b), "vi")
+  );
+
   return (
     <div className="relative" data-pending={isPending ? "" : undefined}>
       {/* Hàng chip — cuộn ngang ở màn hẹp thay vì xuống dòng: một hàng công cụ
@@ -209,11 +217,13 @@ export function ExamFilters({
         <FilterRow
           filterKey="subject"
           label={t("common.subject")}
-          selectedLabel={selected.subject}
+          selectedLabel={
+            selected.subject !== undefined ? subjectLabel(selected.subject) : undefined
+          }
           currentValue={selected.subject ?? ""}
           options={[
             { value: "", label: t("common.all") },
-            ...subjects.map((s) => ({ value: s, label: s })),
+            ...sortedSubjects.map((s) => ({ value: s, label: subjectLabel(s) })),
           ]}
           onSelect={(v) => setParam("subject", v)}
           open={openFilterKey === "subject"}
