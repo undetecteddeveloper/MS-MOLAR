@@ -119,6 +119,10 @@ describe("guard", () => {
     // đó chịu cả hai bất biến `limit >= 15` và `windowMs >= 60_000` bên dưới.
     "createOrder",
     "recheckOrder",
+    // ADR-0020: gợi ý đề khi gõ — một truy vấn trigram trên `exams` của chính
+    // ta, không hạn ngạch bên thứ ba, không nhận credential. Cửa sổ phút (60_000)
+    // đúng bằng sàn của nhóm này.
+    "searchExams",
   ];
   // `uploadExam` thuộc nhóm này chứ KHÔNG phải nhóm tốn-DB, dù nó cũng ghi DB và
   // cũng nhận file: thứ giới hạn nó là hạn ngạch Gemini, y như explainStep, và

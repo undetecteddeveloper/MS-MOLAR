@@ -101,6 +101,91 @@ alter table public.exams add constraint exams_semester_check
   check (semester is null or semester in ('HK1', 'HK2'));
 
 -- ----------------------------------------------------------------------------
+-- Tìm đề theo tên (ADR-0020, 2026-09-08) — chuẩn hoá + trigram, chạy TRONG
+-- Postgres, không dịch vụ tìm kiếm ngoài.
+--
+-- Vì sao ở ĐÂY (ngay sau bảng exams, trước §12b): view `exams_with_difficulty`
+-- dùng `e.*`, và `e.*` bung ra rồi ĐÓNG BĂNG lúc view được tạo — cột sinh phải
+-- tồn tại TRƯỚC khi file tạo view thì view mới phơi được nó. Trên DB đã có view
+-- từ trước, migration phải drop/tạo lại view (migration 2026-09-01 là tiền lệ).
+--
+-- `search_normalize` khai IMMUTABLE dù `unaccent()` gốc chỉ STABLE: hàm gốc
+-- STABLE vì từ điển được tra theo `search_path`; gọi với từ điển ĐÍCH DANH
+-- (`extensions.unaccent`) thì kết quả không còn phụ thuộc phiên — đúng điều
+-- kiện để dùng trong cột sinh và chỉ mục. Bản JS `lib/search/normalize.ts`
+-- làm ĐÚNG cùng các bước; làn localdb so hai bản trên cùng chuỗi tiếng Việt.
+-- Đổi cách chuẩn hoá về sau = dựng lại cột sinh, không chỉ sửa hàm.
+-- ----------------------------------------------------------------------------
+create extension if not exists unaccent with schema extensions;
+create extension if not exists pg_trgm with schema extensions;
+
+create or replace function public.search_normalize(input text)
+returns text
+language sql
+immutable
+parallel safe
+strict
+set search_path = ''
+as $$
+  select btrim(
+    regexp_replace(
+      regexp_replace(
+        lower(extensions.unaccent('extensions.unaccent'::regdictionary, translate(input, 'đĐ', 'dD'))),
+        '[^a-z0-9]+', ' ', 'g'
+      ),
+      '\s+', ' ', 'g'
+    )
+  )
+$$;
+
+-- Cột sinh chứ không phải trigger: không có đường ghi nào (seed, UGC publish,
+-- sửa tay trong SQL Editor) quên được nó.
+alter table public.exams add column if not exists title_search text
+  generated always as (public.search_normalize(title)) stored;
+
+-- GIN trigram: tăng tốc cả `ILIKE '%term%'` (bộ lọc ?q= của Kho đề) lẫn toán tử
+-- `<%` (word_similarity — chịu lỗi gõ trong RPC search_exams).
+create index if not exists exams_title_search_trgm_idx
+  on public.exams using gin (title_search extensions.gin_trgm_ops);
+
+-- Gợi ý khi gõ. SECURITY INVOKER: RLS `exams_select_visible` áp lên người gọi,
+-- nên khách chưa đăng nhập không thấy gì (và bị revoke luôn cho rõ ý). STABLE,
+-- không ghi. Xếp: bắt đầu bằng từ khoá → đầu một từ → chứa từ khoá → giống
+-- nhất (word_similarity, chịu lỗi gõ) → mới nhất. Từ khoá chuẩn hoá NGAY TRONG
+-- hàm nên người gọi gửi chuỗi thô; chuỗi ra chỉ còn [a-z0-9 ] nên không có ký
+-- tự đặc biệt nào của LIKE lọt vào mẫu.
+create or replace function public.search_exams(q text, max_results int default 6)
+returns table (id text, title text, subject text, grade int)
+language sql
+stable
+security invoker
+set search_path = ''
+as $$
+  with term as (
+    select public.search_normalize(coalesce(q, '')) as t
+  )
+  select e.id, e.title, e.subject, e.grade
+  from public.exams e, term
+  where e.status = 'published'
+    and length(term.t) >= 2
+    and (
+      e.title_search like '%' || term.t || '%'
+      or term.t operator(extensions.<%) e.title_search
+    )
+  order by
+    (e.title_search like term.t || '%') desc,
+    (e.title_search like '% ' || term.t || '%') desc,
+    (e.title_search like '%' || term.t || '%') desc,
+    extensions.word_similarity(term.t, e.title_search) desc,
+    e.created_at desc,
+    e.id
+  limit least(greatest(coalesce(max_results, 6), 1), 20)
+$$;
+
+revoke all on function public.search_exams(text, int) from public, anon;
+grant execute on function public.search_exams(text, int) to authenticated, service_role;
+
+-- ----------------------------------------------------------------------------
 -- Logic L2 — Core Loop: attempts, answers, results
 -- ----------------------------------------------------------------------------
 
@@ -2503,7 +2588,7 @@ revoke all on public.schema_version from anon, authenticated;
 -- nó — xem lib/schema/schemaFingerprint.ts).
 -- @schema-fingerprint-begin
 insert into public.schema_version (id, fingerprint)
-values (1, '4ecb67741520')
+values (1, 'eab3b6e1534a')
 on conflict (id) do update
   set fingerprint = excluded.fingerprint,
       applied_at  = now();

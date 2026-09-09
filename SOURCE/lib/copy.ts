@@ -148,6 +148,11 @@ export const copy = {
   "exams.toggleSortDirection": "Đổi chiều sắp xếp",
   "exams.ascending": "Tăng dần",
   "exams.descending": "Giảm dần",
+  // Tìm đề theo tên (ADR-0020).
+  "exams.searchChip": "Tìm: “{query}”",
+  "exams.searchChipRemove": "Bỏ từ khoá “{query}”",
+  "exams.noSearchMatch": "Không tìm thấy đề nào cho “{query}”",
+  "exams.noSearchMatchHint": "Thử từ khoá ngắn hơn, hoặc bỏ bớt bộ lọc.",
   // Phân trang (TD-026).
   "exams.pagination": "Các trang danh sách đề",
   "exams.previousPage": "Trước",
@@ -271,6 +276,20 @@ export const copy = {
   "report.reported": "Bạn đã báo cáo đề này.",
   "report.errorEmpty": "Bạn hãy mô tả vấn đề trước khi gửi.",
   "report.errorGeneric": "Chưa gửi được báo cáo. Bạn thử lại sau nhé.",
+
+  // --- Ô tìm đề trên header (ADR-0020) ------------------------------------
+  "search.label": "Tìm đề",
+  "search.placeholder": "Tìm đề theo tên",
+  "search.open": "Mở ô tìm đề",
+  "search.close": "Đóng ô tìm đề",
+  "search.clear": "Xoá từ khoá",
+  "search.hint": "Gõ ít nhất 2 ký tự để tìm.",
+  "search.loading": "Đang tìm…",
+  "search.error": "Chưa tìm được lúc này. Nhấn Enter để mở kho đề.",
+  "search.noResults": "Không tìm thấy đề nào cho “{query}”.",
+  "search.viewAll": "Xem tất cả kết quả cho “{query}”",
+  "search.resultsAnnouncement": "{count} gợi ý. Dùng phím mũi tên để chọn, Enter để mở.",
+  "search.hitMeta": "{subject}, lớp {grade}",
 
   // --- Lịch sử ------------------------------------------------------------
   "history.title": "Lịch sử",

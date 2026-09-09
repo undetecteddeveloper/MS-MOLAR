@@ -66,7 +66,11 @@ export function HeaderProfile({
         {/* Avatar thay cho <Image>: next.config.ts không khai remotePatterns,
             URL Supabase đưa vào <Image> là lỗi LÚC CHẠY. */}
         <Avatar src={avatarUrl} name={displayName} size={28} className="shrink-0" />
-        <span className="text-foreground min-w-0 max-w-32 truncate text-sm font-medium max-md:hidden">
+        {/* Tên chỉ hiện từ 1024px (trước 2026-09-08: từ 768px). Ở dải 768–1023
+            nút kính lúp của HeaderSearch (44px) chiếm đúng phần dư còn lại của
+            hàng, và tên co còn "A…" (đo 2026-09-08: ô tài khoản 93px ở 768px)
+            — một cái tên bị cắt nói ít hơn không có tên; avatar vẫn định danh. */}
+        <span className="text-foreground min-w-0 max-w-32 truncate text-sm font-medium max-lg:hidden">
           {displayName}
         </span>
         <ChevronDown

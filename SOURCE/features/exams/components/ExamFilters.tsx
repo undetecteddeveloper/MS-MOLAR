@@ -19,7 +19,7 @@ import type { MessageKey } from "@/lib/copy";
 
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
-import { ArrowDownWideNarrow, ArrowUpNarrowWide, SlidersHorizontal } from "lucide-react";
+import { ArrowDownWideNarrow, ArrowUpNarrowWide, Search, SlidersHorizontal, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { chipVariants } from "@/components/ui/chip";
 import { FilterRow } from "@/components/shared/FilterRow";
@@ -48,6 +48,8 @@ interface ExamFiltersProps {
   };
   sort?: ExamSort;
   dir?: SortDirection;
+  /** Từ khoá đang tìm (`?q=`, ADR-0020) — hiện thành chip có nút bỏ ở đầu hàng. */
+  query?: string;
 }
 
 /** Chiều mặc định của mỗi trục khi không có `dir` — khớp queries. */
@@ -81,6 +83,7 @@ export function ExamFilters({
   selected,
   sort,
   dir,
+  query,
 }: ExamFiltersProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -150,6 +153,9 @@ export function ExamFilters({
     selected.level,
   ].filter((v) => v !== undefined).length;
   const hasFilters = activeCount > 0;
+  // Từ khoá không đếm vào "Bộ lọc (n)" (nó có chip riêng) nhưng vẫn là thứ
+  // "Xoá lọc" phải xoá được.
+  const canClear = hasFilters || query !== undefined;
 
   // Môn hiện bằng NHÃN tiếng Việt và xếp theo nhãn ("Hóa học, Tiếng Anh, Toán,
   // Vật lý") — giá trị URL vẫn là khoá canonical ("Math") vì đó là giá trị DB
@@ -161,8 +167,29 @@ export function ExamFilters({
   return (
     <div className="relative" data-pending={isPending ? "" : undefined}>
       {/* Hàng chip — cuộn ngang ở màn hẹp thay vì xuống dòng: một hàng công cụ
-          hai dòng trông như hai nhóm điều khiển khác nhau. */}
-      <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:-mx-6 sm:px-6 [&::-webkit-scrollbar]:hidden">
+          hai dòng trông như hai nhóm điều khiển khác nhau. `key` theo từ khoá:
+          chip "Tìm:" xuất hiện/biến mất sau round-trip đẩy các chip còn lại
+          sang ngang, và vì tới sau cửa sổ 500ms nên bị tính CLS (đo 2026-09-08);
+          hàng không có state riêng nên dựng lại là vô hại. */}
+      <div
+        key={query ?? ""}
+        className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:-mx-6 sm:px-6 [&::-webkit-scrollbar]:hidden"
+      >
+        {/* Chip từ khoá đứng ĐẦU hàng: nó là điều kiện hẹp nhất đang áp lên lưới,
+            và bấm vào là bỏ đúng nó (giữ nguyên các bộ lọc khác). */}
+        {query !== undefined && (
+          <button
+            type="button"
+            onClick={() => setParam("q", "")}
+            aria-label={t("exams.searchChipRemove", { query })}
+            className={chipVariants({ active: true })}
+          >
+            <Search aria-hidden className="size-4" />
+            <span className="max-w-48 truncate">{t("exams.searchChip", { query })}</span>
+            <X aria-hidden className="size-4" />
+          </button>
+        )}
+
         <button
           type="button"
           aria-expanded={open}
@@ -206,14 +233,14 @@ export function ExamFilters({
           {ascending ? t("exams.ascending") : t("exams.descending")}
         </button>
 
-        {hasFilters && (
+        {canClear && (
           <Button type="button" variant="link" size="sm" onClick={clearAll} className="shrink-0">
             {t("common.clear")}
           </Button>
         )}
       </div>
 
-      <FilterSheet open={open} onClose={closePanel} onClear={clearAll} clearDisabled={!hasFilters}>
+      <FilterSheet open={open} onClose={closePanel} onClear={clearAll} clearDisabled={!canClear}>
         <FilterRow
           filterKey="subject"
           label={t("common.subject")}

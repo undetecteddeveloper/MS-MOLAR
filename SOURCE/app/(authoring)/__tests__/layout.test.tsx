@@ -47,7 +47,13 @@ vi.mock("@/lib/supabase/server", () => ({ createClient: createClientMock }));
 vi.mock("@/lib/auth/getCurrentUser", () => ({
   getCurrentUserProfile: getCurrentUserProfileMock,
 }));
-vi.mock("next/navigation", () => ({ usePathname: () => "/upload" }));
+// `useRouter`/`useSearchParams`: ô tìm đề trên header (HeaderSearch, ADR-0020)
+// là client component con của SiteHeader và đọc hai hook này lúc mount.
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/upload",
+  useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), back: vi.fn() }),
+}));
 // SkipLink là async Server Component (`getTranslate()` từ lib/i18n/server). Bộ
 // render client của React 19 từ chối component async — nó suspend và CẢ CÂY ra
 // rỗng, tức ca kiểm sẽ đỏ vì lý do sai. Giới hạn môi trường jsdom, cùng loại với

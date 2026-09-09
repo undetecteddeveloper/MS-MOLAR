@@ -16,6 +16,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { HeaderProfile, type MenuUser } from "@/components/shared/HeaderProfile";
+import { HeaderSearch } from "@/components/layout/HeaderSearch";
 import { Wordmark } from "@/components/layout/Wordmark";
 import {
   GUEST_NAV_ITEMS,
@@ -42,7 +43,9 @@ export function SiteHeader({ user = null }: { user?: MenuUser | null }) {
         focusMode ? " max-md:hidden" : ""
       }`}
     >
-      <div className="mx-auto flex h-15 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
+      {/* `relative`: thanh tìm đề trên điện thoại phủ trọn hàng này (HeaderSearch,
+          `absolute inset-0`) — neo vào đây chứ không vào <nav> để phủ cả logo. */}
+      <div className="relative mx-auto flex h-15 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
         <Wordmark />
 
         {/* min-w-0 trên nav và min-w-0 ở ô tài khoản (HeaderProfile) là cặp cho
@@ -98,6 +101,10 @@ export function SiteHeader({ user = null }: { user?: MenuUser | null }) {
               {t("auth.signIn")}
             </Link>
           )}
+
+          {/* Ô tìm đề CHỈ khi đã đăng nhập: kho đề nằm sau RLS `to authenticated`,
+              khách tìm gì cũng không ra (ADR-0020). */}
+          {user && <HeaderSearch />}
 
           {user && <HeaderProfile displayName={user.displayName} avatarUrl={user.avatarUrl} />}
         </nav>

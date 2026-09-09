@@ -62,6 +62,10 @@ function fingerprintOf(fileName: string): string | null {
   return /_([0-9a-f]{12})\.sql$/.exec(fileName)?.[1] ?? null;
 }
 
+/** Câu §17 ghi vân tay xuống DB, ĐÃ chuẩn hoá — xem ngoại lệ trong ca cuối. */
+const FINGERPRINT_UPSERT_RE =
+  /^insert into public\.schema_version \(id, fingerprint\) values \(1, '([0-9a-f]{12})'\)/;
+
 /** Chuẩn hoá để so khớp câu lệnh giữa hai file: bỏ comment, gộp khoảng trắng.
  *  Cùng phép chuẩn hoá mà vân tay dùng, nên hai cổng không thể bất đồng về
  *  việc "hai câu lệnh này có giống nhau không". */
@@ -141,6 +145,22 @@ describe("migrations ↔ schema.sql (TD-005)", () => {
       const content = readFileSync(resolve(MIGRATIONS_DIR, file), "utf8");
       for (const statement of splitSqlStatements(content)) {
         const needle = normalize(statement.text);
+        // Câu ghi vân tay (§17) là NGOẠI LỆ có chủ đích: mỗi migration ghi vân
+        // tay CỦA NÓ xuống `schema_version`, còn schema.sql chỉ mang vân tay
+        // HIỆN TẠI — nên câu ấy trong mọi migration trước migration mới nhất tất
+        // yếu không còn trong schema.sql. Thứ cần ghim ở đây là nó TỰ NHẤT QUÁN:
+        // vân tay ghi xuống DB phải là vân tay trong TÊN FILE (2026-09-08: migration
+        // đầu tiên nối sau một migration có câu ghi vân tay đã làm ca này đỏ vì
+        // đúng lý do đó, chứ không vì ai quên gì).
+        const upsert = FINGERPRINT_UPSERT_RE.exec(needle);
+        if (upsert) {
+          expect(
+            upsert[1],
+            `\`${file}\` (dòng ${statement.line}) ghi vân tay '${upsert[1]}' xuống schema_version nhưng tên file khai '${fingerprintOf(file)}'.\n` +
+              "Câu ghi vân tay của một migration phải ghi ĐÚNG vân tay trong tên file đó."
+          ).toBe(fingerprintOf(file));
+          continue;
+        }
         expect(
           haystackSet.has(needle),
           `\nMIGRATION ĐI TRƯỚC schema.sql.\n\n` +
