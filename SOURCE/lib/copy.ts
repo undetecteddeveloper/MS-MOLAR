@@ -303,7 +303,8 @@ export const copy = {
   "analytics.rangeWeek": "Tuần",
   "analytics.rangeMonth": "Tháng",
   "analytics.rangeAll": "Toàn thời gian",
-  "analytics.donutSubtitle": "Cộng dồn thời gian làm các lượt đã nộp, mỗi lượt tối đa bằng thời lượng đề.",
+  "analytics.donutSubtitle":
+    "Cộng dồn thời gian làm các lượt đã nộp, mỗi lượt tối đa bằng thời lượng đề.",
   // SkillRecommendationCard (Engine 1) — đặt cùng vị trí tương đối với en.ts.
   "analytics.recommendTitle": "Nên luyện gì tiếp theo",
   "analytics.recommendColdStart":
@@ -519,9 +520,9 @@ export const copy = {
   "upload.examDuration": "Thời lượng làm bài",
   "upload.examPaper": "File đề",
   "upload.answerKey": "File đáp án",
-  "upload.fileHint": "PNG, JPEG, WebP hoặc PDF · tối đa {mb} MB · PDF tối đa {pages} trang",
-  "upload.maxFileSize": "Dung lượng tối đa: {mb}MB mỗi file · PDF tối đa {pages} trang.",
-  "upload.filledAutomatically": "— hệ thống tự điền",
+  "upload.fileHint": "PNG, JPEG, WebP hoặc PDF, tối đa {mb} MB, PDF tối đa {pages} trang",
+  "upload.maxFileSize": "Dung lượng tối đa {mb} MB mỗi file, PDF tối đa {pages} trang.",
+  "upload.filledAutomatically": "hệ thống tự điền",
   "upload.automaticNote":
     "AI sẽ quét file bạn tải lên và tự trích xuất đề — bạn vẫn sửa được mọi trường.",
   "upload.manualNote": "Bạn tự nhập toàn bộ thông tin đề; AI vẫn trích xuất câu hỏi và đáp án.",
@@ -558,11 +559,13 @@ export const copy = {
   "upload.publishedBanner": "Đề của bạn đã đăng và hiện có trong kho đề.",
   "upload.tabPending": "Chờ xử lý",
   "upload.tabPublished": "Đã đăng",
-  "upload.actionReviewFix": "Rà soát & sửa",
-  "upload.actionContinueReview": "Rà soát tiếp",
-  "upload.actionContinue": "Làm tiếp",
+  "upload.actionEdit": "Chỉnh sửa",
   "upload.gradeShort": "Lớp {grade}",
   "upload.publishedAt": "Đã đăng {date}",
+  "upload.createdAt": "Tạo {date}",
+  "upload.optional": "không bắt buộc",
+  "upload.deleteExam": "Xoá đề này",
+  "upload.tabsLabel": "Lọc đề theo trạng thái",
 
   // --- Lỗi trích xuất đề (UgcError) ---------------------------------------
   "ugcError.oneIssueToFix": "Còn 1 lỗi phải sửa trước khi đăng:",

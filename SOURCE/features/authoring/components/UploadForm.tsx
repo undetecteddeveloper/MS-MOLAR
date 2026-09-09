@@ -6,21 +6,34 @@
 // /me/exams/[id] (?src=auto ở chế độ Automatic); thất bại → hiện lỗi, giữ form.
 //
 // v2.2 (ADR-0007) — Entry Mode THÀNH THẬT:
-//   - Automatic (mặc định): khối metadata gấp lại "filled in automatically",
-//     field optional (AC-037) — chỉ validate 2 file; AI đọc metadata từ trang
-//     1 file đề; gate chuyển sang publish. Đã gõ gì thì giá trị đó THẮNG AI.
+//   - Automatic (mặc định): khối metadata gấp lại "hệ thống tự điền", field
+//     optional (AC-037) — chỉ validate 2 file; AI đọc metadata từ trang 1 file
+//     đề; gate chuyển sang publish. Đã gõ gì thì giá trị đó THẮNG AI.
 //   - Manual: hành vi v2.1 — validate required client-side trước submit
 //     (AC-036), server validateExamMeta vẫn là nguồn sự thật cuối.
 //   - Đổi mode không xoá giá trị; khối metadata tự mở khi có giá trị đã gõ
 //     hoặc có lỗi (không bao giờ giấu field đang lỗi — a11y UI Spec §v2.2).
+//
+// Theme "Sân trường" (2026-09-09): tiêu đề trang do page.tsx dựng (PageHeader);
+// hướng dẫn và khối thông tin đề là thẻ surface; chế độ nhập là hai chip; lỗi
+// màu đỏ (bản trước tô màu brand — nay là xanh lá). Nút Bắt đầu là hành động
+// chính DUY NHẤT của màn nên cao 52px (§2), trải hết bề ngang dưới 640px, căn
+// trái từ đó theo quy tắc căn trái toàn site (§3) — bản 2026-08-09 căn giữa vì
+// cặp ô thả file đối xứng, nhưng nay mọi khối trên nó đều là thẻ căn trái nên
+// một nút lệch tâm mới là thứ đọc như lỗi. Khối "đang đọc file" THẾ CHỖ nút
+// khi đang chạy: không có gì phía trên bị đẩy xuống dưới ngón tay.
 // KHÔNG bao gồm navbar — do (authoring)/layout.tsx cung cấp.
 
 import { useState, useTransition } from "react";
+import { ChevronDown } from "lucide-react";
 import { extractAndAssemble } from "@/features/authoring/actions";
 import { t } from "@/lib/copy";
 import type { Translate } from "@/lib/copy";
 import { LIMITS } from "@/lib/ugc/limits";
 import type { UgcActionError } from "@/lib/ugc/types";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import {
   MetadataFields,
   type ExamMetaFormValue,
@@ -47,7 +60,12 @@ function validateRequired(m: ExamMetaFormValue, t: Translate): Record<string, st
   if (!m.title.trim()) errors.title = t("upload.errTitleRequired");
   if (!m.subject.trim()) errors.subject = t("upload.errSubjectRequired");
   const grade = Number(m.grade);
-  if (!m.grade.trim() || !Number.isInteger(grade) || grade < LIMITS.MIN_GRADE || grade > LIMITS.MAX_GRADE) {
+  if (
+    !m.grade.trim() ||
+    !Number.isInteger(grade) ||
+    grade < LIMITS.MIN_GRADE ||
+    grade > LIMITS.MAX_GRADE
+  ) {
     errors.grade = t("upload.errGradeRange", { min: LIMITS.MIN_GRADE, max: LIMITS.MAX_GRADE });
   }
   const duration = Number(m.durationMinutes);
@@ -92,7 +110,11 @@ export function UploadForm() {
     if (!questionFile) nextFileErrors.question = t("upload.errQuestionFileRequired");
     if (!answerFile) nextFileErrors.answer = t("upload.errAnswerFileRequired");
 
-    if (Object.keys(requiredErrors).length > 0 || nextFileErrors.question || nextFileErrors.answer) {
+    if (
+      Object.keys(requiredErrors).length > 0 ||
+      nextFileErrors.question ||
+      nextFileErrors.answer
+    ) {
       setClientErrors(Object.keys(requiredErrors).length > 0 ? requiredErrors : null);
       setFileErrors(nextFileErrors);
       return;
@@ -122,23 +144,33 @@ export function UploadForm() {
     });
   }
 
-  return (
-    <div className="flex flex-col gap-6">
-      {/* Tiêu đề trang bỏ khỏi UI nhìn thấy được — điều hướng đã đủ ngữ cảnh
-          (mục Upload trên navbar tô sáng); h1 sr-only giữ mốc cho trình đọc
-          màn hình (cùng quy ước /exams). */}
-      <h1 className="sr-only">{t("upload.title")}</h1>
+  const metaFields = (
+    <MetadataFields
+      value={meta}
+      onChange={(patch) => setMeta((m) => ({ ...m, ...patch }))}
+      fieldErrors={fieldErrors}
+      disabled={pending}
+      optionalMode={isAutomatic}
+    />
+  );
 
+  return (
+    // `pb-14` dưới 640px: nút Bắt đầu trải hết bề ngang, và ở cuối trang nút
+    // hỗ trợ (fixed, góc phải, 56px trên BottomNav) đè lên 56px bên phải của
+    // nó — đo 2026-09-09 ở 360px: nút 604–656, nút hỗ trợ 608–664. Đệm thêm
+    // đúng chiều cao nút hỗ trợ để Bắt đầu cuộn lên được khỏi vùng đó. Từ
+    // 640px nút tự co bề rộng, căn trái, không còn chạm góc phải.
+    <div className="flex flex-col gap-5 pb-14 sm:pb-0">
       <ImportInstructions />
 
       {error && (
         <div
           role="alert"
-          className="rounded-[4px] border border-brand bg-brand/8 px-4 py-3 text-sm text-brand"
+          className="bg-destructive/10 text-destructive rounded-card px-4 py-3 text-sm"
         >
-          {error.message}
+          <p className="font-semibold">{error.message}</p>
           {error.errors && error.errors.length > 0 && (
-            <ul className="mt-2 list-disc pl-5">
+            <ul className="mt-2 list-disc pl-5 leading-relaxed">
               {error.errors.map((e, i) => (
                 <li key={i}>{e.message}</li>
               ))}
@@ -150,59 +182,46 @@ export function UploadForm() {
       <EntryModeField value={entryMode} onChange={setEntryMode} disabled={pending} />
 
       {isAutomatic ? (
-        // Khối metadata gấp/mở (cùng idiom ImportInstructions: grid-rows 0fr↔1fr).
-        <div className="rounded-[4px] border border-border">
+        // Khối metadata gấp/mở — cùng khuôn ImportInstructions: không animate
+        // chiều cao (§7), nội dung tỏ dần bằng .motion-unfold.
+        <Card padding="none">
           <button
             type="button"
             onClick={() => setMetaOpen((v) => !v)}
             aria-expanded={metaExpanded}
-            className="flex w-full items-center justify-between gap-4 px-4 py-3.5 text-left text-sm font-medium text-foreground"
+            aria-controls="exam-details-body"
+            className="focus-visible:ring-ring/40 rounded-card flex min-h-12 w-full items-center justify-between gap-4 px-4 py-3 text-left focus-visible:ring-3 focus-visible:outline-none sm:px-5"
           >
-            <span>
-              {t("upload.examDetails")}{" "}
-              <span className="font-normal text-muted-foreground">
+            <span className="flex flex-wrap items-baseline gap-x-2">
+              <span className="text-base font-semibold">{t("upload.examDetails")}</span>
+              <span className="text-muted-foreground text-sm">
                 {t("upload.filledAutomatically")}
               </span>
             </span>
-            <span
+            <ChevronDown
               aria-hidden
-              className={[
-                "text-ring transition-transform duration-300",
-                metaExpanded ? "rotate-180" : "",
-              ].join(" ")}
-            >
-              ▾
-            </span>
+              className={cn(
+                "text-muted-foreground size-5 shrink-0 transition-[rotate] ease-out",
+                metaExpanded && "rotate-180"
+              )}
+            />
           </button>
-          <div
-            className={[
-              "grid transition-[grid-template-rows] duration-300 ease-out",
-              metaExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
-            ].join(" ")}
-          >
-            <div className="overflow-hidden">
-              <div className="px-4 pb-4">
-                <p className="mb-4 text-xs leading-relaxed text-muted-foreground">
-                  {t("upload.leaveEmptyHint")}
-                </p>
-                <MetadataFields
-                  value={meta}
-                  onChange={(patch) => setMeta((m) => ({ ...m, ...patch }))}
-                  fieldErrors={fieldErrors}
-                  disabled={pending}
-                  optionalMode
-                />
-              </div>
+          {metaExpanded && (
+            <div id="exam-details-body" className="motion-unfold px-4 pb-4 sm:px-5 sm:pb-5">
+              <p className="text-muted-foreground mb-4 max-w-prose text-sm leading-relaxed">
+                {t("upload.leaveEmptyHint")}
+              </p>
+              {metaFields}
             </div>
-          </div>
-        </div>
+          )}
+        </Card>
       ) : (
-        <MetadataFields
-          value={meta}
-          onChange={(patch) => setMeta((m) => ({ ...m, ...patch }))}
-          fieldErrors={fieldErrors}
-          disabled={pending}
-        />
+        <Card as="section" aria-labelledby="exam-details-heading">
+          <h2 id="exam-details-heading" className="text-base font-semibold">
+            {t("upload.examDetails")}
+          </h2>
+          {metaFields}
+        </Card>
       )}
 
       <FileUploadFields
@@ -221,25 +240,15 @@ export function UploadForm() {
         answerError={fileErrors.answer}
       />
 
-      {pending && <ExtractionProgress metaStep={isAutomatic} />}
-
-      {/* Canh GIỮA ở mọi bề rộng — trước đây desktop canh trái riêng (đọc
-          nhịp theo lề trái của form), nhưng vì 2 dropzone phía trên đứng
-          thành CẶP đối xứng (grid 2 cột đều nhau), một nút canh trái bên
-          dưới đọc như lệch tâm so với cặp đó chứ không phải "điểm kết thúc
-          rõ ràng" như dự tính — engineer xác nhận lệch (2026-08-09). Canh
-          giữa để nút luôn là điểm hội tụ của cả 2 khung phía trên, ở mọi
-          breakpoint. */}
-      <div className="flex justify-center pt-2">
-        <button
-          type="button"
-          onClick={onSubmit}
-          disabled={pending}
-          className="min-h-11 rounded-[4px] bg-brand px-7 py-2.5 text-xs font-medium uppercase tracking-[0.14em] text-brand-foreground transition-[background-color,transform] duration-200 hover:bg-[#8F2523] active:scale-[0.97] disabled:pointer-events-none disabled:opacity-60"
-        >
-          {pending ? t("common.processing") : t("upload.start")}
-        </button>
-      </div>
+      {pending ? (
+        <ExtractionProgress metaStep={isAutomatic} />
+      ) : (
+        <div className="pt-1">
+          <Button type="button" size="lg" onClick={onSubmit} className="w-full sm:w-auto">
+            {t("upload.start")}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

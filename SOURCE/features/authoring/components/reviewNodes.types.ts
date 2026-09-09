@@ -36,7 +36,7 @@ export const SUB_ITEM_CLASS = "flex-1 text-sm text-foreground";
 
 /** short_answer: giá trị mong đợi — một dòng, nên `inline` + `block` để vẫn có khung. */
 export const SHORT_ANSWER_CLASS =
-  "mt-1 block rounded-[4px] border border-border bg-card px-3 py-1.5 text-sm text-foreground";
+  "mt-1 block rounded-xl bg-card px-4 py-2.5 text-sm text-foreground";
 
 /** Ngữ liệu dùng chung (A1) ở màn review — chỉ ĐỌC, nên không cần khung input.
  *  Cao tối đa rồi cuộn, cùng lý do với màn làm bài: một bài đọc 400 từ để nở
@@ -44,8 +44,7 @@ export const SHORT_ANSWER_CLASS =
 export const PASSAGE_CLASS = "text-foreground text-sm leading-relaxed";
 
 /** essay: đáp án mẫu — nhiều dòng, khối thật. */
-export const ESSAY_ANSWER_CLASS =
-  "mt-1 rounded-[4px] border border-border bg-card p-3 text-sm text-foreground";
+export const ESSAY_ANSWER_CLASS = "mt-1 rounded-xl bg-card p-4 text-sm text-foreground";
 
 /** `essayAnswer` dùng chung MỘT cột DB nhưng hai kiểu trình bày. */
 export function answerPresentation(type: AssembledQuestion["type"]): {

@@ -1,18 +1,33 @@
 "use client";
 
-// FileUploadFields — 2 dropzone (câu hỏi + đáp án) (UI Spec §FileUploadFields
-// / Task 6.2). Hiện tên file đã chọn + nút gỡ; hint loại/kích thước/số trang.
-// Controlled bởi UploadForm (giữ selection khi lỗi). Cả 2 file bắt buộc.
-// Restyle theo prototype UI_Layer4_main: viền chấm, glyph "+" idle, crossfade
-// sang text hint/tên file khi hover hoặc đã có file (HIDDEN-FEATURES #6);
-// hỗ trợ drag & drop thật, không chỉ click-to-browse.
+// FileUploadFields — 2 ô thả file (đề + đáp án) (UI Spec §FileUploadFields /
+// Task 6.2). Hiện tên + dung lượng file đã chọn, nút Bỏ; hint loại/kích
+// thước/số trang. Controlled bởi UploadForm (giữ selection khi lỗi). Cả 2
+// file bắt buộc. Hỗ trợ kéo thả thật, không chỉ nhấp để chọn.
+//
+// Theme "Sân trường" (2026-09-09): ô bo 18px viền NÉT ĐỨT màu `--input` (đủ
+// 3:1 — đây là ranh giới của một ô nhập, WCAG 1.4.11), icon tải lên + dòng chữ
+// LUÔN hiện. Bản trước chỉ hiện dấu "+" cho tới khi rê chuột — trên điện thoại
+// không có rê chuột, nên học sinh chỉ thấy một dấu cộng và phải đoán. Đã chọn
+// file: viền xanh + nền surface + icon tích, tên file thay chữ hướng dẫn. Kéo
+// file rê qua: cùng diện mạo "đã chọn" để báo "thả vào đây". Lỗi: viền đỏ +
+// câu lỗi bên dưới.
 
 import { useRef, useState } from "react";
+import { FileCheck2, Upload } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { t } from "@/lib/copy";
 import { LIMITS } from "@/lib/ugc/limits";
+import { cn } from "@/lib/utils";
 
 const MAX_MB = Math.round(LIMITS.MAX_FILE_BYTES / (1024 * 1024));
 const ACCEPT = LIMITS.ALLOWED_MIME.join(",");
+
+/** "1,2 MB" / "340 KB" — đủ để tác giả biết mình vừa chọn đúng file. */
+function formatBytes(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1).replace(".", ",")} MB`;
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
 
 interface DropzoneProps {
   id: string;
@@ -27,8 +42,10 @@ interface DropzoneProps {
 function Dropzone({ id, label, hint, file, onSelect, disabled, error }: DropzoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
-  const [hover, setHover] = useState(false);
-  const showText = !!file || hover || dragOver;
+  const labelId = `${id}-label`;
+  const hintId = `${id}-hint`;
+  const errorId = `${id}-error`;
+  const filled = !!file || dragOver;
 
   function openPicker() {
     if (!disabled) inputRef.current?.click();
@@ -44,14 +61,15 @@ function Dropzone({ id, label, hint, file, onSelect, disabled, error }: Dropzone
 
   return (
     <div>
-      <span className="eyebrow block">
-        {label} <span className="text-brand">*</span>
+      <span id={labelId} className="text-foreground mb-1.5 block text-sm font-medium">
+        {label}
       </span>
 
       <div
         role="button"
         tabIndex={disabled ? -1 : 0}
-        aria-describedby={error ? `${id}-error` : undefined}
+        aria-labelledby={labelId}
+        aria-describedby={error ? errorId : hintId}
         onClick={openPicker}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
@@ -59,66 +77,61 @@ function Dropzone({ id, label, hint, file, onSelect, disabled, error }: Dropzone
             openPicker();
           }
         }}
-        onMouseEnter={() => setHover(true)}
-        onMouseLeave={() => setHover(false)}
         onDragOver={(e) => {
           e.preventDefault();
           if (!disabled) setDragOver(true);
         }}
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
-        className={[
-          "mt-1.5 grid h-28 cursor-pointer place-items-center rounded-[4px] border border-dashed px-3 text-center transition-[border-color,background-color,transform] duration-200 active:scale-[0.99]",
+        className={cn(
+          "rounded-card flex min-h-32 cursor-pointer flex-col items-center justify-center gap-2 border-2 border-dashed px-4 py-5 text-center transition-[border-color,background-color,scale] ease-out motion-safe:active:scale-[0.98]",
+          "focus-visible:ring-ring/40 focus-visible:ring-3 focus-visible:outline-none",
           error
-            ? "border-brand"
-            : dragOver || file
-              ? "border-ring"
-              : "border-border hover:border-ring",
-          // Kéo file rê qua: phóng nhẹ + tô nền mờ để báo "thả vào đây" rõ hơn
-          // chỉ đổi màu viền — dragOver là trạng thái CHỦ ĐỘNG chờ hành động
-          // thả, nên phản hồi mạnh hơn hover thường.
-          dragOver ? "scale-[1.02] bg-ring/5" : "",
-          disabled ? "pointer-events-none opacity-60" : "",
-        ].join(" ")}
+            ? "border-destructive"
+            : filled
+              ? "border-primary bg-surface"
+              : "border-input hover:bg-surface",
+          disabled && "pointer-events-none opacity-60"
+        )}
       >
-        <span
-          aria-hidden
-          className={[
-            "col-start-1 row-start-1 text-2xl text-muted-foreground transition-opacity duration-300",
-            showText ? "opacity-0" : "opacity-100",
-          ].join(" ")}
-        >
-          +
-        </span>
-        <span
-          className={[
-            "col-start-1 row-start-1 max-w-full truncate px-2 text-sm text-foreground transition-opacity duration-300",
-            showText ? "opacity-100" : "opacity-0",
-          ].join(" ")}
-        >
+        {file ? (
+          <FileCheck2 aria-hidden className="text-primary size-6" />
+        ) : (
+          <Upload aria-hidden className="text-muted-foreground size-6" />
+        )}
+        <span className="max-w-full truncate text-sm font-medium">
           {file ? file.name : t("upload.dragDrop")}
         </span>
+        {file && (
+          <span className="text-muted-foreground text-xs tabular-nums">
+            {formatBytes(file.size)}
+          </span>
+        )}
       </div>
 
-      <div className="mt-1 flex items-center justify-between gap-3">
-        <p className="text-xs text-muted-foreground">{hint}</p>
+      <div className="mt-1.5 flex items-start justify-between gap-3">
+        <p id={hintId} className="text-muted-foreground text-xs leading-relaxed">
+          {hint}
+        </p>
         {file && (
-          <button
+          <Button
             type="button"
+            variant="link"
+            size="sm"
+            className="h-auto shrink-0 px-0"
             onClick={(e) => {
               e.stopPropagation();
               onSelect(null);
               if (inputRef.current) inputRef.current.value = "";
             }}
             disabled={disabled}
-            className="shrink-0 text-xs text-muted-foreground underline-offset-4 hover:text-brand hover:underline disabled:opacity-60"
           >
             {t("common.remove")}
-          </button>
+          </Button>
         )}
       </div>
       {error && (
-        <p id={`${id}-error`} className="mt-1 animate-in fade-in text-xs text-brand duration-200">
+        <p id={errorId} className="motion-unfold text-destructive mt-1 text-sm">
           {error}
         </p>
       )}
@@ -157,7 +170,7 @@ export function FileUploadFields({
 }: FileUploadFieldsProps) {
   const hint = t("upload.fileHint", { mb: MAX_MB, pages: LIMITS.MAX_PDF_PAGES });
   return (
-    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <Dropzone
         id="question-file"
         label={t("upload.examPaper")}

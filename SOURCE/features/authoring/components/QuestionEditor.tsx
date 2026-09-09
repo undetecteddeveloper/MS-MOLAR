@@ -8,25 +8,35 @@
 // "$\frac{1}{2}$" và tác giả không có cách nào biết đề sẽ hiển thị đúng hay
 // không cho tới khi đã publish. Chế độ SỬA vẫn là chuỗi NGUỒN (phải sửa được
 // LaTeX thì mới sửa được công thức) — đó là lý do hai chế độ khác nhau.
-// Chế độ xem: stem plain-text, QuestionFigure cho hình, lựa chọn A–D, đáp án
-// đúng chú thích "from your answer file"; essay → đáp án mẫu read-only +
-// "Essay — stored, not auto-scored yet". v2.1 (ADR-0005) thêm 2 variant:
-// true_false (4 ý a–d, mỗi ý toggle Đ/S theo file đáp án) và short_answer
-// (giá trị mong đợi) — cả hai "stored, not auto-scored yet" như essay.
-// Chế độ sửa: input stem/choices/ý/đáp án + gỡ hình. Thay đổi đẩy lên
-// ReviewScreen (re-validate live).
+// Chế độ xem: stem, QuestionFigure cho hình, lựa chọn A–D, đáp án đúng chú
+// thích "lấy từ file đáp án"; essay → đáp án mẫu read-only. v2.1 (ADR-0005)
+// thêm 2 variant: true_false (4 ý a–d, mỗi ý toggle Đ/S theo file đáp án) và
+// short_answer (giá trị mong đợi). Chế độ sửa: input stem/choices/ý/đáp án +
+// gỡ hình. Thay đổi đẩy lên ReviewScreen (re-validate live).
 //
 // Ghi chú phạm vi: THÊM/THAY hình từ màn review chưa hỗ trợ (cần action upload
 // hình riêng — ngoài 5 action Task 4.1); MVP chỉ cho GỠ hình (đặt imageUrl=null).
 // Hình ban đầu đến từ bước trích xuất.
+//
+// Theme "Sân trường" (2026-09-09): mỗi câu là thẻ surface bo 18px; câu có lỗi
+// mang viền đỏ 2px KÈM huy hiệu "Cần sửa" (trạng thái bằng hình lẫn chữ, §4.3
+// — viền đỏ một mình là màu đơn thuần). Huy hiệu A/B/C/D là ô tròn TRẮNG trên
+// surface, đáp án đúng tô xanh đặc — cùng ngôn ngữ "huy hiệu đặc = đang chọn"
+// của màn làm bài. Ô nhập là primitive Input/Textarea (trắng trên surface, hết
+// viền 4px). Nút Sửa/Xong là viên thuốc 36px cỡ nút-trong-thẻ.
 
 import dynamic from "next/dynamic";
 import { useState, type ReactNode } from "react";
 import { QuestionFigure } from "@/components/shared/QuestionFigure";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input, Textarea } from "@/components/ui/input";
 import { t } from "@/lib/copy";
 import type { MessageKey } from "@/lib/copy";
 import { LIMITS, maxEssayAnswerFor, maxStemFor } from "@/lib/ugc/limits";
 import type { AssembledQuestion, ChoiceId, SubItemId } from "@/lib/ugc/types";
+import { cn } from "@/lib/utils";
 import {
   answerPresentation,
   CHOICE_CLASS,
@@ -65,10 +75,9 @@ import {
 // Cùng một `import()` cho cả `dynamic` lẫn `warmRichText` — bundler gộp về
 // MỘT chunk và promise của module được nhớ, nên hâm nóng không tải hai lần.
 
-const LazyRichText = dynamic(
-  () => import("@/components/shared/RichText").then((m) => m.RichText),
-  { ssr: false }
-);
+const LazyRichText = dynamic(() => import("@/components/shared/RichText").then((m) => m.RichText), {
+  ssr: false,
+});
 
 /** Bắt đầu nạp chunk RichText NGAY khi tác giả vào chế độ sửa — xem bất biến ở trên. */
 function warmRichText() {
@@ -111,11 +120,22 @@ const TYPE_LABEL_KEY: Record<AssembledQuestion["type"], MessageKey> = {
   short_answer: "upload.typeShortAnswer",
 };
 
+/** Nút tròn/viên thuốc chọn trạng thái trong thẻ: trắng khi nghỉ, tô đặc khi
+ *  đang chọn. Chung cho huy hiệu A–D và toggle Đ/S. */
+const TOGGLE_BASE =
+  "inline-flex shrink-0 items-center justify-center rounded-full text-sm font-semibold transition-[background-color,color,scale] ease-out motion-safe:active:scale-90 focus-visible:ring-ring/40 focus-visible:ring-3 focus-visible:outline-none";
+const TOGGLE_IDLE =
+  "bg-card text-muted-foreground hover:bg-[color-mix(in_oklch,var(--card),var(--foreground)_6%)]";
+
+/** Ô nhập trong thẻ: 40px, chữ 14px — cùng cỡ với panel biểu điểm. */
+const FIELD = "h-10 text-sm";
+const NOTE = "text-muted-foreground mt-2 text-sm";
+
 interface QuestionEditorProps {
   question: AssembledQuestion;
   /** Cập nhật một phần câu này (ReviewScreen giữ state tổng). */
   onChange: (patch: Partial<AssembledQuestion>) => void;
-  /** Câu này có lỗi (để viền cảnh báo). */
+  /** Câu này có lỗi (để viền cảnh báo + huy hiệu). */
   hasError: boolean;
   /** Nội dung server render sẵn cho CHÍNH câu này (TD-027). Vắng = render ở client. */
   nodes?: ReviewQuestionNodes;
@@ -152,7 +172,7 @@ export function QuestionEditor({
 }: QuestionEditorProps) {
   const [editing, setEditing] = useState(false);
   const q = question;
-  const empty = <span className="text-brand">{t("upload.emptyPlaceholder")}</span>;
+  const empty = <span className="text-destructive">{t("upload.emptyPlaceholder")}</span>;
   // Cùng nguồn trần với validateAssembledExam — nếu hai bên lệch, tác giả gõ
   // tới trần của textarea rồi vẫn thấy lỗi "quá dài" mà không gõ thêm được.
   const maxStem = maxStemFor(subject);
@@ -175,24 +195,46 @@ export function QuestionEditor({
   const choiceSlots = slots(
     CHOICE_IDS,
     (q.choices ?? []).map((c) => c.id),
-    LIMITS.MAX_CHOICES,
+    LIMITS.MAX_CHOICES
   );
   const subItemSlots = slots(
     SUB_ITEM_IDS,
     (q.subItems ?? []).map((si) => si.id),
-    LIMITS.MAX_SUB_ITEMS,
+    LIMITS.MAX_SUB_ITEMS
   );
 
   return (
-    <li
+    <Card
+      as="li"
       id={`p${q.part}q${q.number}`}
-      className={`scroll-mt-20 rounded-lg border p-5 ${
-        hasError ? "border-brand" : "border-border"
-      }`}
+      // Viền lỗi bằng `outline` (không chiếm chỗ) để thẻ có lỗi không dày hơn
+      // thẻ bên cạnh 2px — cùng đệm, cùng bề rộng nội dung.
+      className={cn(
+        "scroll-mt-24 gap-0",
+        hasError && "outline-destructive outline-2 -outline-offset-2"
+      )}
     >
-      <div className="flex items-center justify-between gap-3">
-        <span className="eyebrow">{t("upload.questionLabel", { number: q.number })}</span>
-        <div className="flex items-center gap-3">
+      {/* Hàng tiêu đề KHÔNG xuống dòng ở cấp này: khi nó xuống dòng, nhóm bên
+          phải (điểm + nút Sửa) rơi xuống dòng hai và `justify-between` dồn nó
+          về mép TRÁI — nút hành động của thẻ nhảy vào giữa thẻ, mỗi thẻ một
+          chỗ (thấy ở 360px, thẻ có huy hiệu lỗi, 2026-09-09). Thay vào đó chỗ
+          co giãn là nhóm NHÃN bên trái: hết chỗ thì huy hiệu tụt xuống dòng
+          dưới, còn điểm và nút Sửa đứng yên ở mép phải mọi thẻ — đúng cột mà
+          tác giả lướt dọc để soát biểu điểm. */}
+      <div className="flex items-center justify-between gap-x-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1">
+          <span className="mr-0.5 text-sm font-semibold">
+            {t("upload.questionLabel", { number: q.number })}
+          </span>
+          <Badge variant="plain">{t(TYPE_LABEL_KEY[q.type])}</Badge>
+          {hasError && (
+            <Badge variant="wrong">
+              <span aria-hidden>▲</span>
+              {t("status.needsFixing")}
+            </Badge>
+          )}
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
           {/* B1 — ĐIỂM của câu. Ở hàng tiêu đề chứ không nằm dưới cùng: nó là
               thuộc tính của cả câu, ngang hàng với loại câu, và tác giả soát
               biểu điểm bằng cách lướt dọc mép phải chứ không mở từng thẻ.
@@ -202,8 +244,8 @@ export function QuestionEditor({
               Chế độ SỬA luôn hiện ô, kể cả khi trống, vì đó là lúc tác giả cần
               biết rằng ô ấy TỒN TẠI để mà điền. */}
           {editing ? (
-            <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <input
+            <label className="text-muted-foreground flex items-center gap-1.5 text-sm">
+              <Input
                 type="number"
                 inputMode="decimal"
                 min={0}
@@ -223,20 +265,23 @@ export function QuestionEditor({
                   onChange({ points: n });
                 }}
                 aria-label={t("upload.pointsLabel")}
-                className="w-16 rounded-[4px] border border-border bg-card px-2 py-1 text-right text-xs text-foreground outline-none focus:border-brand"
+                className="h-9 w-20 px-3 text-right text-sm"
               />
               {t("upload.pointsSuffix")}
             </label>
           ) : (
             q.points !== undefined && (
-              <span className="text-xs text-muted-foreground tabular-nums">
+              <span className="text-muted-foreground text-sm tabular-nums">
                 {t("upload.pointsValue", { points: String(q.points) })}
               </span>
             )
           )}
-          <span className="text-xs text-muted-foreground">{t(TYPE_LABEL_KEY[q.type])}</span>
-          <button
+          {/* Đang sửa: nút Xong TRẮNG (`plain`) — `secondary` là surface trên
+              surface, tan vào thẻ và trông như một chữ trơ. */}
+          <Button
             type="button"
+            variant={editing ? "plain" : "ghost"}
+            size="sm"
             onClick={() => {
               // Vào chế độ sửa = tác giả sắp làm chuỗi lệch khỏi node của
               // server, tức sắp cần chunk RichText. Nạp NGAY từ đây để nó về
@@ -244,21 +289,20 @@ export function QuestionEditor({
               if (!editing) warmRichText();
               setEditing((v) => !v);
             }}
-            className="text-xs text-muted-foreground underline-offset-4 hover:text-brand hover:underline"
           >
             {editing ? t("common.done") : t("common.edit")}
-          </button>
+          </Button>
         </div>
       </div>
 
       {/* NGỮ LIỆU DÙNG CHUNG (A1) — chỉ ĐỌC ở đây, có chủ đích: nó thuộc về
           NHÓM câu chứ không của riêng câu này, nên một ô sửa trên mỗi card sẽ
           là N ô cùng ghi vào một chỗ. Sửa nội dung bài đọc nằm ở khối riêng
-          trên đầu màn review (PassageEditor). Ở đây tác giả chỉ cần thấy câu
-          hỏi này gắn với bài đọc nào. */}
+          trên đầu màn review. Ở đây tác giả chỉ cần thấy câu hỏi này gắn với
+          bài đọc nào. */}
       {nodes?.passage && (
-        <details className="border-border bg-card mt-3 rounded-[4px] border p-3">
-          <summary className="text-muted-foreground cursor-pointer text-xs">
+        <details className="bg-card mt-3 rounded-xl px-4 py-3">
+          <summary className="text-muted-foreground cursor-pointer text-sm font-medium">
             {nodes.passageTitle ?? t("upload.sharedPassage")}
           </summary>
           <div className="mt-2 max-h-60 overflow-y-auto">{nodes.passage.node}</div>
@@ -267,12 +311,12 @@ export function QuestionEditor({
 
       {/* Stem */}
       {editing ? (
-        <textarea
+        <Textarea
           value={q.stem}
           onChange={(e) => onChange({ stem: e.target.value })}
           maxLength={maxStem}
           rows={3}
-          className="mt-3 w-full resize-y rounded-[4px] border border-border bg-card p-3 text-sm text-foreground outline-none focus:border-brand"
+          className="mt-3 min-h-24 resize-y text-sm"
           placeholder={t("upload.questionText")}
         />
       ) : (
@@ -282,19 +326,17 @@ export function QuestionEditor({
       {/* Hình */}
       {q.imageUrl && (
         <div className="mt-3">
-          <QuestionFigure
-            url={q.imageUrl}
-            questionNumber={q.number}
-            className="max-h-72 w-auto"
-          />
+          <QuestionFigure url={q.imageUrl} questionNumber={q.number} className="max-h-72 w-auto" />
           {editing && (
-            <button
+            <Button
               type="button"
+              variant="link"
+              size="sm"
               onClick={() => onChange({ imageUrl: undefined })}
-              className="mt-1 text-xs text-muted-foreground underline-offset-4 hover:text-brand hover:underline"
+              className="mt-1 px-0"
             >
               {t("upload.removeImage")}
-            </button>
+            </Button>
           )}
         </div>
       )}
@@ -312,35 +354,30 @@ export function QuestionEditor({
                   aria-pressed={isCorrect}
                   aria-label={t("upload.markChoiceCorrect", { choice: cid })}
                   onClick={() => onChange({ correctAnswer: cid })}
-                  className={`flex size-6 shrink-0 items-center justify-center rounded-full border text-xs font-medium transition-colors ${
-                    isCorrect
-                      ? "border-[#3f7d4f] bg-[#3f7d4f] text-white"
-                      : "border-border text-muted-foreground hover:border-brand"
-                  }`}
+                  className={cn(
+                    TOGGLE_BASE,
+                    "size-9",
+                    isCorrect ? "bg-primary text-primary-foreground" : TOGGLE_IDLE
+                  )}
                 >
                   {cid}
                 </button>
                 {editing ? (
-                  <input
+                  <Input
                     value={choice?.text ?? ""}
                     onChange={(e) => {
                       const text = e.target.value;
-                      const others = (q.choices ?? []).filter(
-                        (c) => c.id !== cid,
-                      );
+                      const others = (q.choices ?? []).filter((c) => c.id !== cid);
                       // Xoá trắng = GỠ lựa chọn, không phải giữ một lựa chọn
                       // rỗng: giữ lại sẽ đẻ ra EMPTY_CHOICE cho đúng cái ô mà
                       // tác giả vừa cố ý dọn đi.
-                      const next = (
-                        text === "" ? others : [...others, { id: cid, text }]
-                      ).sort(
-                        (a, b) =>
-                          CHOICE_IDS.indexOf(a.id) - CHOICE_IDS.indexOf(b.id),
+                      const next = (text === "" ? others : [...others, { id: cid, text }]).sort(
+                        (a, b) => CHOICE_IDS.indexOf(a.id) - CHOICE_IDS.indexOf(b.id)
                       );
                       onChange({ choices: next });
                     }}
                     maxLength={LIMITS.MAX_CHOICE}
-                    className="flex-1 rounded-[4px] border border-border bg-card px-3 py-1.5 text-sm text-foreground outline-none focus:border-brand"
+                    className={cn(FIELD, "flex-1")}
                     placeholder={t("upload.choicePlaceholder", { choice: cid })}
                   />
                 ) : choice ? (
@@ -351,20 +388,20 @@ export function QuestionEditor({
                     inline
                   />
                 ) : (
-                  <span className="flex-1 text-sm text-foreground">{empty}</span>
+                  <span className="flex-1 text-sm">{empty}</span>
                 )}
               </div>
             );
           })}
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className={NOTE}>
             {t("upload.correctAnswer")}{" "}
             {q.correctAnswer ? (
               <>
-                <span className="text-foreground">{q.correctAnswer}</span>{" "}
+                <span className="text-foreground font-semibold">{q.correctAnswer}</span>{" "}
                 {t("upload.fromYourAnswerFile")}
               </>
             ) : (
-              <span className="text-brand">{t("upload.notSet")}</span>
+              <span className="text-destructive">{t("upload.notSet")}</span>
             )}
           </p>
         </div>
@@ -380,25 +417,23 @@ export function QuestionEditor({
             const answer = q.subAnswers?.[sid];
             return (
               <div key={sid} className="flex items-center gap-3">
-                <span className="w-4 shrink-0 text-xs font-medium text-muted-foreground">
+                <span className="text-muted-foreground w-5 shrink-0 text-sm font-semibold">
                   {sid})
                 </span>
                 {editing ? (
-                  <input
+                  <Input
                     value={item?.text ?? ""}
                     onChange={(e) => {
                       const text = e.target.value;
                       const others = (q.subItems ?? []).filter((s) => s.id !== sid);
                       // Xoá trắng = GỠ ý (cùng lý do với lựa chọn mcq ở trên).
-                      const next = (
-                        text === "" ? others : [...others, { id: sid, text }]
-                      ).sort(
-                        (a, b) => SUB_ITEM_IDS.indexOf(a.id) - SUB_ITEM_IDS.indexOf(b.id),
+                      const next = (text === "" ? others : [...others, { id: sid, text }]).sort(
+                        (a, b) => SUB_ITEM_IDS.indexOf(a.id) - SUB_ITEM_IDS.indexOf(b.id)
                       );
                       onChange({ subItems: next });
                     }}
                     maxLength={LIMITS.MAX_CHOICE}
-                    className="flex-1 rounded-[4px] border border-border bg-card px-3 py-1.5 text-sm text-foreground outline-none focus:border-brand"
+                    className={cn(FIELD, "flex-1")}
                     placeholder={t("upload.statementPlaceholder", { item: sid })}
                   />
                 ) : item ? (
@@ -409,9 +444,11 @@ export function QuestionEditor({
                     inline
                   />
                 ) : (
-                  <span className="flex-1 text-sm text-foreground">{empty}</span>
+                  <span className="flex-1 text-sm">{empty}</span>
                 )}
-                {/* Toggle Đ/S — đáp án của ý này (từ file đáp án, sửa được). */}
+                {/* Toggle Đ/S — đáp án của ý này (từ file đáp án, sửa được).
+                    Đ đang chọn tô xanh, S đang chọn tô đỏ; chữ Đ/S là kênh
+                    thông tin, màu chỉ tô thêm. */}
                 <div
                   className="flex shrink-0 gap-1"
                   role="group"
@@ -425,13 +462,15 @@ export function QuestionEditor({
                         type="button"
                         aria-pressed={active}
                         onClick={() => onChange({ subAnswers: { ...q.subAnswers, [sid]: v } })}
-                        className={`rounded-[4px] border px-2 py-0.5 text-xs font-medium transition-colors ${
+                        className={cn(
+                          TOGGLE_BASE,
+                          "size-9",
                           active
                             ? v
-                              ? "border-[#3f7d4f] bg-[#3f7d4f] text-white"
-                              : "border-brand bg-brand text-white"
-                            : "border-border text-muted-foreground hover:border-brand"
-                        }`}
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-destructive text-white"
+                            : TOGGLE_IDLE
+                        )}
                       >
                         {v ? "Đ" : "S"}
                       </button>
@@ -441,9 +480,8 @@ export function QuestionEditor({
               </div>
             );
           })}
-          <p className="mt-1 text-xs text-muted-foreground">
-            {t("upload.tfPerStatement")}{" "}
-            <span className="italic">{t("upload.storedNotScored")}</span>
+          <p className={NOTE}>
+            {t("upload.tfPerStatement")} {t("upload.storedNotScored")}
           </p>
         </div>
       )}
@@ -451,13 +489,13 @@ export function QuestionEditor({
       {/* short_answer (v2.1): giá trị mong đợi */}
       {q.type === "short_answer" && (
         <div className="mt-4">
-          <p className="text-xs text-muted-foreground">{t("upload.expectedAnswer")}</p>
+          <p className="text-muted-foreground text-sm">{t("upload.expectedAnswer")}</p>
           {editing ? (
-            <input
+            <Input
               value={q.essayAnswer ?? ""}
               onChange={(e) => onChange({ essayAnswer: e.target.value })}
               maxLength={LIMITS.MAX_SHORT_ANSWER}
-              className="mt-1 w-full rounded-[4px] border border-border bg-card px-3 py-1.5 text-sm text-foreground outline-none focus:border-brand"
+              className={cn(FIELD, "mt-1")}
               placeholder={t("upload.shortAnswerExample")}
             />
           ) : q.essayAnswer ? (
@@ -467,27 +505,23 @@ export function QuestionEditor({
               {...answerPresentation(q.type)}
             />
           ) : (
-            <p className="mt-1 rounded-[4px] border border-border bg-card px-3 py-1.5 text-sm text-foreground">
-              {empty}
-            </p>
+            <p className="bg-card mt-1 rounded-xl px-4 py-2.5 text-sm">{empty}</p>
           )}
-          <p className="mt-1 text-xs italic text-muted-foreground">
-            {t("upload.shortAnswerStored")}
-          </p>
+          <p className={NOTE}>{t("upload.shortAnswerStored")}</p>
         </div>
       )}
 
       {/* Essay: đáp án mẫu */}
       {q.type === "essay" && (
         <div className="mt-4">
-          <p className="text-xs text-muted-foreground">{t("upload.modelAnswer")}</p>
+          <p className="text-muted-foreground text-sm">{t("upload.modelAnswer")}</p>
           {editing ? (
-            <textarea
+            <Textarea
               value={q.essayAnswer ?? ""}
               onChange={(e) => onChange({ essayAnswer: e.target.value })}
               maxLength={maxEssayAnswer}
               rows={4}
-              className="mt-1 w-full resize-y rounded-[4px] border border-border bg-card p-3 text-sm text-foreground outline-none focus:border-brand"
+              className="mt-1 resize-y text-sm"
             />
           ) : q.essayAnswer ? (
             <ViewText
@@ -496,9 +530,7 @@ export function QuestionEditor({
               {...answerPresentation(q.type)}
             />
           ) : (
-            <p className="mt-1 rounded-[4px] border border-border bg-card p-3 text-sm text-foreground">
-              {empty}
-            </p>
+            <p className="bg-card mt-1 rounded-xl p-4 text-sm">{empty}</p>
           )}
           {/* OQ-5 / Task E4, quyết định (b) — HAI KHOÁ CHỌN THEO CỜ, không phải
               một khoá viết lại.
@@ -512,11 +544,11 @@ export function QuestionEditor({
               Nên giữ cả hai và chọn theo cờ, đúng khuôn `player.essayScored` /
               `player.essayNotScored` mà AC-051 / UI-D8 đã dựng cho màn làm bài
               (Task F-D1). Một khoá thì luôn có một trạng thái nó nói dối. */}
-          <p className="mt-1 text-xs italic text-muted-foreground">
+          <p className={NOTE}>
             {t(essayGradingEnabled ? "upload.essayScored" : "upload.essayStored")}
           </p>
         </div>
       )}
-    </li>
+    </Card>
   );
 }

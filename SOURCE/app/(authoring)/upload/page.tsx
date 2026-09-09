@@ -1,10 +1,14 @@
 // S-01 Upload — /upload (UGC v2.0, Task 6.2). Server guard → /?auth=signin
-// (AC-002). Form là client component (giữ state metadata + file).
+// (AC-002). Form là client component (giữ state metadata + file); tiêu đề và
+// câu dẫn dựng ở đây bằng PageHeader chuẩn (theme "Sân trường", 2026-09-09) —
+// bản trước giấu h1 (sr-only), nay hiện rõ như mọi trang khác.
 
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
+import { t } from "@/lib/copy";
 import { UploadForm } from "@/features/authoring/components/UploadForm";
 import { PageContainer } from "@/components/layout/PageContainer";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 // Trần thời gian cho function chạy Server Action của route này — chủ yếu là
 // `extractAndAssemble` (features/authoring/actions.ts), đường dài nhất trong app:
@@ -22,7 +26,13 @@ export default async function UploadPage() {
   if (!user) redirect("/?auth=signin");
 
   return (
-    <PageContainer as="main" size="default">
+    <PageContainer
+      as="main"
+      size="default"
+      padding="none"
+      className="flex flex-col gap-5 px-4 py-6 sm:px-6 sm:py-8"
+    >
+      <PageHeader title={t("upload.title")} description={t("upload.intro")} />
       <UploadForm />
     </PageContainer>
   );

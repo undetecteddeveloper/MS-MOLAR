@@ -11,8 +11,14 @@
 // Chế độ mặc định là XEM — không phải một ô input luôn hiện. Trên một đề đúng
 // (đa số), heading không cần sửa, và ba ô input viền sáng nằm giữa danh sách
 // câu sẽ đọc như ba thứ đang chờ tác giả điền.
+//
+// Theme "Sân trường" (2026-09-09): dòng 16px đậm có vạch xanh bên trái, không
+// tô nền — cùng ngôn ngữ nhãn phần ở màn làm bài (tô nền là dính vào thẻ câu
+// ngay dưới). Nút Sửa là viên thuốc ghost 36px; ô sửa là primitive Input.
 
 import { useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { t } from "@/lib/copy";
 import { LIMITS } from "@/lib/ugc/limits";
 
@@ -45,8 +51,8 @@ export function PartHeading({ partNumber, title, onChange, disabled }: PartHeadi
 
   if (editing) {
     return (
-      <div className="mb-3 flex items-center gap-2">
-        <input
+      <div className="mb-3">
+        <Input
           ref={inputRef}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -67,28 +73,32 @@ export function PartHeading({ partNumber, title, onChange, disabled }: PartHeadi
           maxLength={LIMITS.MAX_PART_TITLE}
           placeholder={fallback}
           aria-label={t("upload.partTitleLabel", { part: partNumber })}
-          className="border-border bg-card text-foreground focus:border-brand w-full max-w-md rounded-[4px] border px-2 py-1 text-sm outline-none"
+          className="max-w-md"
         />
       </div>
     );
   }
 
   return (
-    <div className="mb-3 flex items-center gap-2">
-      <h2 id={`part-${partNumber}`} className="eyebrow">
+    <div className="mb-3 flex items-center gap-3">
+      <h2
+        id={`part-${partNumber}`}
+        className="border-primary min-w-0 border-l-4 pl-3 text-base leading-tight font-semibold"
+      >
         {title ?? fallback}
       </h2>
       {!disabled && (
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="sm"
           onClick={() => {
             setDraft(title ?? "");
             setEditing(true);
           }}
-          className="text-muted-foreground hover:text-brand text-xs underline-offset-4 hover:underline"
         >
           {t("common.edit")}
-        </button>
+        </Button>
       )}
     </div>
   );

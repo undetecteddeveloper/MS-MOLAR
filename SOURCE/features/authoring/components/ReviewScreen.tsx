@@ -10,9 +10,9 @@
 // v2.2 (ADR-0007):
 //   - Khối metadata SỬA ĐƯỢC (MetadataFields) thay summary read-only; subject/
 //     grade sửa được khi CHƯA publish (server cascade topic).
-//   - Marker "from your file" trên field AI điền chưa chạm — session-derived
-//     từ ?src=auto (O-7/TBD-07: reload mất marker là chủ đích); sửa field nào
-//     marker field đó biến mất.
+//   - Marker "lấy từ file của bạn" trên field AI điền chưa chạm — session-
+//     derived từ ?src=auto (O-7/TBD-07: reload mất marker là chủ đích); sửa
+//     field nào marker field đó biến mất.
 //   - Lỗi META_* sort TRƯỚC lỗi từng câu, link tới #exam-details.
 //
 // B1 (biểu điểm): gate tổng điểm nằm HOÀN TOÀN ở server (validatePointsForPublish
@@ -21,9 +21,16 @@
 // không phải thông tin. Đổi lại, lỗi server trả về lúc bấm Publish phải hiện
 // ĐẦY ĐỦ: trước bản này chỉ `message` được hiển thị còn mảng `errors` bị vứt,
 // nên tác giả nhận đúng một dòng "Fix these issues" mà không biết issue nào.
+//
+// Theme "Sân trường" (2026-09-09): PageHeader chuẩn (breadcrumbs Đề của tôi /
+// tên đề, huy hiệu trạng thái ở hàng tiêu đề, số câu làm mô tả) thay liên kết
+// "← Đề của tôi" + h1 trơn; khối thông tin đề và bài đọc là thẻ surface; hết
+// hộp viền 4px. Nút "Xoá đề này" rời PublishBar xuống CHÂN TRANG, sau một kẻ
+// chia chạy hết bề ngang — cùng lối với "báo cáo đề" ở chi tiết đề: hành động
+// phá huỷ đứng một mình, xa nút Xuất bản, và thanh dính đáy chỉ còn hai nút
+// nên đứng vừa 360px.
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { saveExam, publishExam } from "@/features/authoring/actions";
 import { t } from "@/lib/copy";
@@ -37,10 +44,17 @@ import type {
   SaveExamPatch,
   UgcError,
 } from "@/lib/ugc/types";
+import { Card } from "@/components/ui/card";
+import { Label, Textarea } from "@/components/ui/input";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { StatusBadge } from "@/features/authoring/components/StatusBadge";
+import { DeleteDialog } from "@/features/authoring/components/DeleteDialog";
 import { ExtractionErrorPanel } from "@/features/authoring/components/ExtractionErrorPanel";
 import { AssembledQuestionList } from "@/features/authoring/components/AssembledQuestionList";
-import { MetadataFields, type ExamMetaFormValue } from "@/features/authoring/components/MetadataFields";
+import {
+  MetadataFields,
+  type ExamMetaFormValue,
+} from "@/features/authoring/components/MetadataFields";
 import { PointsPanel, type PointsAssignment } from "@/features/authoring/components/PointsPanel";
 import { PublishBar } from "@/features/authoring/components/PublishBar";
 import type { ReviewNodes } from "@/features/authoring/components/reviewNodes.types";
@@ -138,7 +152,7 @@ export function ReviewScreen({
   // biểu điểm B1). Xoá ngay khi tác giả sửa bất cứ thứ gì: một danh sách lỗi
   // chụp từ lần bấm trước sẽ nói sai về đề hiện tại.
   const [publishErrors, setPublishErrors] = useState<UgcError[]>([]);
-  // Marker "from your file": field có giá trị khi đến từ Automatic, chưa chạm.
+  // Marker "lấy từ file của bạn": field có giá trị khi đến từ Automatic, chưa chạm.
   const [aiFilled, setAiFilled] = useState<ReadonlySet<MetaFieldName>>(() => {
     if (!srcAuto) return new Set();
     const v = toFormValue(initialExam);
@@ -157,6 +171,7 @@ export function ReviewScreen({
   const shownErrors = [...errors, ...publishErrors];
   const isPublished = status === "published";
   const canPublish = errors.length === 0;
+  const busy = saving || publishing;
 
   // v2.1: danh tính câu = (part, number) — "Câu 1" các phần khác nhau độc lập.
   function onChangeQuestion(part: number, number: number, patch: Partial<AssembledQuestion>) {
@@ -249,7 +264,8 @@ export function ReviewScreen({
         const d = Number.parseInt(patch.durationMinutes, 10);
         meta.durationMinutes = Number.isInteger(d) && d > 0 ? d : 0;
       }
-      if (patch.school !== undefined) meta.school = patch.school.trim() === "" ? undefined : patch.school;
+      if (patch.school !== undefined)
+        meta.school = patch.school.trim() === "" ? undefined : patch.school;
       if (patch.schoolYear !== undefined) {
         const y = Number.parseInt(patch.schoolYear, 10);
         meta.schoolYear = Number.isInteger(y) ? y : undefined;
@@ -306,81 +322,77 @@ export function ReviewScreen({
     router.refresh();
   }
 
+  const title = exam.meta.title.trim() === "" ? t("upload.untitledExam") : exam.meta.title;
+  const questionCount =
+    exam.questions.length === 1
+      ? t("upload.oneQuestion")
+      : t("upload.questionCount", { count: exam.questions.length });
+
   return (
-    <div className="flex flex-col gap-6 pb-4">
-      <div>
-        <Link
-          href="/me/exams"
-          className="eyebrow hover:text-brand inline-flex items-center gap-1 transition-colors"
-        >
-          ← {t("common.myExams")}
-        </Link>
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-foreground text-2xl">
-            {exam.meta.title.trim() === "" ? t("upload.untitledExam") : exam.meta.title}
-          </h1>
-          <StatusBadge status={status} />
-        </div>
-        <p className="text-muted-foreground mt-1 text-sm">
-          {exam.questions.length === 1
-            ? t("upload.oneQuestion")
-            : t("upload.questionCount", { count: exam.questions.length })}
-        </p>
-        {isPublished && (
-          <p className="text-muted-foreground mt-2 text-sm">{t("upload.publishedNotice")}</p>
-        )}
-      </div>
+    <div className="flex flex-col gap-5">
+      <PageHeader
+        breadcrumbs={[{ label: t("common.myExams"), href: "/me/exams" }, { label: title }]}
+        title={title}
+        description={
+          isPublished ? `${questionCount}. ${t("upload.publishedNotice")}` : questionCount
+        }
+        actions={<StatusBadge status={status} on="background" />}
+      />
 
       <ExtractionErrorPanel errors={shownErrors} />
 
       {/* v2.2: khối metadata sửa được — anchor cho link lỗi META_*. */}
-      <section id="exam-details" className="rounded-[4px] border border-border p-4">
-        <h2 className="mb-4 text-sm font-medium text-foreground">{t("upload.examDetails")}</h2>
+      <Card
+        as="section"
+        id="exam-details"
+        aria-labelledby="exam-details-heading"
+        className="scroll-mt-24"
+      >
+        <h2 id="exam-details-heading" className="text-lg font-semibold">
+          {t("upload.examDetails")}
+        </h2>
         <MetadataFields
           value={toFormValue(exam)}
           onChange={onChangeMeta}
           fieldErrors={fieldErrors}
-          disabled={saving || publishing}
+          disabled={busy}
           aiFilled={aiFilled}
         />
         {isPublished && (
-          <p className="mt-3 text-xs text-muted-foreground">{t("upload.fixedAfterPublish")}</p>
+          <p className="text-muted-foreground text-sm">{t("upload.fixedAfterPublish")}</p>
         )}
-      </section>
+      </Card>
 
       {/* A1 — ngữ liệu dùng chung, sửa được MỘT chỗ cho cả nhóm câu. Đặt TRÊN
           danh sách câu vì đó là thứ tự đọc của đề gốc, và vì sửa ở đây ảnh
           hưởng nhiều câu bên dưới. */}
       {exam.passages.length > 0 && (
-        <section className="border-border rounded-[4px] border p-4">
-          <h2 className="text-foreground mb-1 text-sm font-medium">
-            {t("upload.sharedPassages")}
-          </h2>
-          <p className="text-muted-foreground mb-4 text-xs">
-            {t("upload.sharedPassagesHint")}
-          </p>
-          <div className="flex flex-col gap-4">
-            {exam.passages.map((p, i) => (
-              <div key={p.id}>
-                <label
-                  htmlFor={`passage-${p.id}`}
-                  className="text-muted-foreground mb-1 block text-xs"
-                >
-                  {p.title ?? t("upload.passageLabel", { index: i + 1 })}
-                </label>
-                <textarea
-                  id={`passage-${p.id}`}
-                  value={p.text}
-                  onChange={(e) => onChangePassage(p.id, e.target.value)}
-                  maxLength={LIMITS.MAX_PASSAGE}
-                  rows={8}
-                  disabled={saving || publishing}
-                  className="border-border bg-card text-foreground focus:border-brand w-full resize-y rounded-[4px] border p-3 text-sm outline-none"
-                />
-              </div>
-            ))}
+        <Card as="section" aria-labelledby="passages-heading" className="gap-4">
+          <div className="flex flex-col gap-1">
+            <h2 id="passages-heading" className="text-lg font-semibold">
+              {t("upload.sharedPassages")}
+            </h2>
+            <p className="text-muted-foreground max-w-prose text-sm leading-relaxed">
+              {t("upload.sharedPassagesHint")}
+            </p>
           </div>
-        </section>
+          {exam.passages.map((p, i) => (
+            <div key={p.id}>
+              <Label htmlFor={`passage-${p.id}`}>
+                {p.title ?? t("upload.passageLabel", { index: i + 1 })}
+              </Label>
+              <Textarea
+                id={`passage-${p.id}`}
+                value={p.text}
+                onChange={(e) => onChangePassage(p.id, e.target.value)}
+                maxLength={LIMITS.MAX_PASSAGE}
+                rows={8}
+                disabled={busy}
+                className="resize-y text-sm"
+              />
+            </div>
+          ))}
+        </Card>
       )}
 
       <AssembledQuestionList
@@ -392,7 +404,7 @@ export function ReviewScreen({
         nodes={nodes}
         subject={exam.meta.subject}
         essayGradingEnabled={essayGradingEnabled}
-        disabled={saving || publishing}
+        disabled={busy}
       />
 
       {/* Panel gán điểm — chỉ dựng khi đề CÓ câu: trên một đề rỗng nó không có
@@ -403,9 +415,32 @@ export function ReviewScreen({
           questions={exam.questions}
           parts={exam.parts}
           onApply={onApplyPoints}
-          disabled={saving || publishing}
+          disabled={busy}
         />
       )}
+
+      {/* Xoá đề: dòng khép trang sau một kẻ chia hết bề ngang (cùng lối với
+          "báo cáo đề" ở chi tiết đề) — đứng TRƯỚC thanh dính đáy trong DOM để
+          thanh luôn là phần tử cuối của trang.
+
+          `pb-24`: khoảng đệm để dòng này CUỘN LÊN ĐƯỢC khỏi dải cố định (bảng
+          điểm + nút hỗ trợ, cao 56px, chân cách thanh hành động ~20px). Đo
+          2026-09-09 ở 360px: không đệm thì ở cuối trang liên kết dừng đúng
+          dưới bảng điểm và không bấm được — Playwright báo "subtree intercepts
+          pointer events", trên điện thoại là một liên kết chết.
+
+          Căn TRÁI (quy tắc §3), không căn giữa như "báo cáo đề": từ 768px bảng
+          điểm MỞ SẴN và neo góc phải, cao ~300px — một liên kết căn giữa ở cuối
+          trang 768 nằm đúng dưới nó (đo 2026-09-09: click hết hạn 30s), còn ở
+          mép trái thì không có gì che. */}
+      <div className="border-border flex border-t pt-4 pb-24">
+        <DeleteDialog
+          examId={examId}
+          examTitle={title}
+          triggerVariant="link"
+          triggerLabel={t("upload.deleteExam")}
+        />
+      </div>
 
       <PublishBar
         isPublished={isPublished}
@@ -414,8 +449,6 @@ export function ReviewScreen({
         publishing={publishing}
         dirty={dirty}
         error={error}
-        examId={examId}
-        examTitle={exam.meta.title}
         onSave={persist}
         onPublish={onPublish}
       />

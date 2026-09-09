@@ -1,35 +1,34 @@
 "use client";
 
 // MyExamsList — danh sách đề của user (UI Spec §MyExamsList / Task 6.3).
-// Mới nhất trước (query đã order); empty → khối gạch đứt + link Upload.
-// Banner ?published=1 (D13) do page truyền `justPublished`.
+// Mới nhất trước (query đã order); rỗng → thẻ nét đứt + nút tải đề. Băng
+// ?published=1 (D13) do page truyền `justPublished`. Client Component vì giữ
+// state nhóm đang xem.
 //
-// Layout theo template SCREENSHOT/design_reference/ReviewPage_Layer4: 2 tab
-// Pending/Published (underline, base-ui Tabs) — Pending = mọi status CHƯA
-// published (processing/failed/review/draft), Published = status published.
-// Danh sách mỗi tab cuộn trong container riêng (max-height + overflow-y-auto)
-// — trang ngoài không cuộn thêm. Client Component vì cần state tab hiện tại.
+// Theme "Sân trường" (2026-09-09): hai chip Chờ xử lý / Đã đăng thay hai tab
+// gạch chân in hoa (primitive Tabs của theme cũ xoá theo — hết nơi dùng), cùng
+// ngôn ngữ chip ở Thống kê và Lịch sử: luôn đúng một viên đậm. Chờ xử lý =
+// mọi status CHƯA published (processing/failed/review/draft).
+//
+// Bỏ khung cuộn riêng 30rem của bản trước, cùng lý do đã ghi ở Lịch sử: vùng
+// cuộn lồng trong trang cuộn là hai thanh cuộn tranh một ngón tay trên điện
+// thoại, và dưới danh sách không còn nội dung nào để giữ chỗ. Danh sách của
+// một tác giả ngắn (listMyExams có biên), không cần phân trang.
+//
+// `key` trên <ul> theo nhóm đang xem: đổi chip là một cây mới, các hàng của
+// nhóm kia không "trượt" thành hàng của nhóm này (đo ở Lịch sử 2026-09-07).
 
+import { useState } from "react";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { CircleCheck } from "lucide-react";
 import type { MyExamListItem } from "@/features/authoring/queries";
 import { t } from "@/lib/copy";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Chip } from "@/components/ui/chip";
 import { ExamRow } from "@/features/authoring/components/ExamRow";
-import {
-  Tabs,
-  TabsIndicator,
-  TabsList,
-  TabsPanel,
-  TabsTab,
-} from "@/components/ui/tabs";
 
-function ExamListScroll({ children }: { children: ReactNode }) {
-  return (
-    <ul className="flex max-h-[30rem] flex-col gap-3 overflow-y-auto pr-2">
-      {children}
-    </ul>
-  );
-}
+type Tab = "pending" | "published";
 
 export function MyExamsList({
   exams,
@@ -38,82 +37,50 @@ export function MyExamsList({
   exams: MyExamListItem[];
   justPublished: boolean;
 }) {
+  const [tab, setTab] = useState<Tab>("pending");
   const pending = exams.filter((exam) => exam.status !== "published");
   const published = exams.filter((exam) => exam.status === "published");
+  const shown = tab === "pending" ? pending : published;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-5">
       {justPublished && (
-        <div
-          role="status"
-          className="rounded-lg border border-[#3f7d4f] bg-[#3f7d4f]/8 px-4 py-3 text-sm text-[#2f6b3f]"
-        >
-          ✓ {t("upload.publishedBanner")}
-        </div>
+        <Card role="status" padding="compact" className="flex-row items-center gap-3">
+          <CircleCheck aria-hidden className="text-success size-5 shrink-0" />
+          <p className="text-sm leading-relaxed">{t("upload.publishedBanner")}</p>
+        </Card>
       )}
 
-      {/* Tiêu đề trang bỏ khỏi UI nhìn thấy được — điều hướng đã đủ ngữ cảnh;
-          h1 sr-only giữ mốc cho trình đọc màn hình (cùng quy ước /exams). */}
-      <h1 className="sr-only">{t("common.myExams")}</h1>
-      <div className="flex justify-end">
-        <Link
-          href="/upload"
-          className="shrink-0 rounded-[4px] bg-brand px-4 py-2 text-xs font-medium uppercase tracking-[0.14em] text-brand-foreground transition-opacity hover:opacity-90"
-        >
-          {t("upload.uploadAnExam")}
-        </Link>
-      </div>
-
       {exams.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border px-6 py-16 text-center">
+        <Card variant="outline" className="items-center gap-4 border-dashed px-6 py-12 text-center">
           <p className="text-muted-foreground">{t("upload.noneUploaded")}</p>
-          <Link
-            href="/upload"
-            className="text-sm text-brand underline-offset-4 hover:underline"
-          >
+          <Button render={<Link href="/upload" />} nativeButton={false}>
             {t("upload.uploadAnExam")}
-          </Link>
-        </div>
+          </Button>
+        </Card>
       ) : (
-        <Tabs defaultValue="pending">
-          <TabsList>
-            <TabsTab value="pending">
+        <>
+          <div role="group" aria-label={t("upload.tabsLabel")} className="flex flex-wrap gap-2">
+            <Chip active={tab === "pending"} onClick={() => setTab("pending")}>
               {t("upload.tabPending")} ({pending.length})
-            </TabsTab>
-            <TabsTab value="published">
+            </Chip>
+            <Chip active={tab === "published"} onClick={() => setTab("published")}>
               {t("upload.tabPublished")} ({published.length})
-            </TabsTab>
-            <TabsIndicator />
-          </TabsList>
+            </Chip>
+          </div>
 
-          <TabsPanel value="pending" className="mt-4">
-            {pending.length === 0 ? (
-              <p className="py-12 text-center text-sm text-muted-foreground">
-                {t("upload.nothingPending")}
-              </p>
-            ) : (
-              <ExamListScroll>
-                {pending.map((exam) => (
-                  <ExamRow key={exam.id} item={exam} />
-                ))}
-              </ExamListScroll>
-            )}
-          </TabsPanel>
-
-          <TabsPanel value="published" className="mt-4">
-            {published.length === 0 ? (
-              <p className="py-12 text-center text-sm text-muted-foreground">
-                {t("upload.nonePublished")}
-              </p>
-            ) : (
-              <ExamListScroll>
-                {published.map((exam) => (
-                  <ExamRow key={exam.id} item={exam} />
-                ))}
-              </ExamListScroll>
-            )}
-          </TabsPanel>
-        </Tabs>
+          {shown.length === 0 ? (
+            <p className="text-muted-foreground py-10 text-center text-sm">
+              {tab === "pending" ? t("upload.nothingPending") : t("upload.nonePublished")}
+            </p>
+          ) : (
+            <ul key={tab} className="flex flex-col gap-3">
+              {shown.map((exam) => (
+                <ExamRow key={exam.id} item={exam} />
+              ))}
+            </ul>
+          )}
+        </>
       )}
     </div>
   );

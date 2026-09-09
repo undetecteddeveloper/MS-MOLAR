@@ -31,7 +31,14 @@ export default async function ReviewExamPage({
   const { src } = await searchParams;
 
   return (
-    <PageContainer as="main" size="default">
+    // Cùng nhịp lề với /me/exams và /history (16px dưới 640px, 24px từ đó) —
+    // PublishBar dùng `-mx-4 sm:-mx-6` để trải hết bề ngang theo đúng hai nấc này.
+    <PageContainer
+      as="main"
+      size="default"
+      padding="none"
+      className="px-4 py-6 sm:px-6 sm:py-8"
+    >
       <ReviewScreen
         examId={detail.id}
         status={detail.status}

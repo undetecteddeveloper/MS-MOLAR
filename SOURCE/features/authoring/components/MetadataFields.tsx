@@ -6,18 +6,21 @@
 // fieldErrors gộp từ 2 nguồn: validate client + fieldErrors server (cùng key).
 //
 // v2.2 (ADR-0007):
-//   - `optionalMode` (S-01 Automatic): bỏ dấu * / aria-required — field để
-//     trống được, AI đọc từ file đề; gate chuyển sang publish.
+//   - `optionalMode` (S-01 Automatic): field để trống được, AI đọc từ file đề;
+//     gate chuyển sang publish.
 //   - Subject là <select> từ SUBJECTS (O-9 — vocabulary chuẩn hoá, value
 //     canonical, nhãn tiếng Việt).
-//     Chỉ in nhãn Việt: bản trước in kèm khoá canonical "(Math)" — một khoá
-//     tiếng Anh lọt ra màn hình, site chỉ có một ngôn ngữ (engineer 2026-09-08).
 //   - `aiFilled` (S-03): field do AI điền chưa được tác giả chạm mang caption
-//     "from your file" (muted, aria-describedby — KHÔNG phải màu trạng thái;
-//     session-derived theo O-7/TBD-07, mất khi reload là chủ đích).
-// Restyle theo prototype UI_Layer4_main: nhãn eyebrow, viền focus vàng đồng
-// (--ring); đỏ dành riêng cho lỗi.
+//     "lấy từ file của bạn" (muted, aria-describedby — KHÔNG phải màu trạng
+//     thái; session-derived theo O-7/TBD-07, mất khi reload là chủ đích).
+//
+// Theme "Sân trường" (2026-09-09): primitive Input/Select/Label, lỗi màu đỏ
+// (`--destructive`; bản trước dùng màu brand, nay là xanh lá). Bỏ dấu sao:
+// bắt buộc là mặc định của một form, ô KHÔNG bắt buộc mới cần nói ra — nhãn
+// ghi "(không bắt buộc)". Ở chế độ Automatic mọi ô đều để trống được nên không
+// ô nào mang chú thích đó (đầu khối đã nói "hệ thống tự điền").
 
+import { Input, Label, Select } from "@/components/ui/input";
 import { t } from "@/lib/copy";
 import { LIMITS } from "@/lib/ugc/limits";
 import { SUBJECTS, SUBJECT_LABELS } from "@/lib/ugc/subjects";
@@ -40,23 +43,12 @@ interface MetadataFieldsProps {
   disabled?: boolean;
   /** v2.2: chế độ Automatic S-01 — field required thành optional (AC-037). */
   optionalMode?: boolean;
-  /** v2.2: field AI điền chưa chạm — marker "from your file" (AC-034). */
+  /** v2.2: field AI điền chưa chạm — marker "lấy từ file của bạn" (AC-034). */
   aiFilled?: ReadonlySet<MetaFieldName>;
 }
 
-const labelCls = "eyebrow block";
-const errCls = "mt-1 animate-in fade-in text-xs text-brand duration-200";
-const aiCls = "eyebrow mt-1 block text-muted-foreground";
-
-function fieldInputCls(hasError: boolean) {
-  return [
-    // min-h-11: `px-3 py-2.5 text-sm` cho ra đúng 42px — hụt 2px so với sàn
-    // 44px của tài liệu Mobile-Layout-Research-MS §4.3. Ô nhập liệu là nơi sai
-    // số 2px đó đắt nhất: gõ hụt vào ô bên cạnh trong một form dài.
-    "mt-1.5 min-h-11 w-full rounded-[4px] border bg-transparent px-3 py-2.5 text-sm text-foreground outline-none transition-colors duration-200 disabled:opacity-60",
-    hasError ? "border-brand" : "border-border focus:border-ring",
-  ].join(" ");
-}
+const ERR_CLASS = "motion-unfold text-destructive mt-1.5 text-sm";
+const AI_CLASS = "text-muted-foreground mt-1.5 block text-xs font-semibold";
 
 export function MetadataFields({
   value,
@@ -66,16 +58,19 @@ export function MetadataFields({
   optionalMode,
   aiFilled,
 }: MetadataFieldsProps) {
-  const req = optionalMode ? null : <span className="text-brand">*</span>;
   const ariaReq = !optionalMode;
+  // Chú thích "(không bắt buộc)" chỉ có nghĩa khi CÓ ô bắt buộc để so.
+  const optional = optionalMode ? null : (
+    <span className="text-muted-foreground font-normal"> ({t("upload.optional")})</span>
+  );
 
-  /** Caption "from your file" + aria-describedby cho field AI điền (M7). */
+  /** Caption "lấy từ file của bạn" + aria-describedby cho field AI điền (M7). */
   function aiMark(field: MetaFieldName) {
     if (!aiFilled?.has(field)) return { caption: null, describedBy: undefined };
     const id = `meta-${field}-ai`;
     return {
       caption: (
-        <span id={id} className={aiCls}>
+        <span id={id} className={AI_CLASS}>
           {t("upload.fromYourFile")}
         </span>
       ),
@@ -92,36 +87,30 @@ export function MetadataFields({
   const durationAi = aiMark("durationMinutes");
 
   return (
-    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <div className="sm:col-span-2">
-        <label htmlFor="meta-title" className={labelCls}>
-          {t("upload.fieldTitle")} {req}
-        </label>
-        <input
+        <Label htmlFor="meta-title">{t("upload.fieldTitle")}</Label>
+        <Input
           id="meta-title"
           value={value.title}
           onChange={(e) => onChange({ title: e.target.value })}
           maxLength={LIMITS.MAX_TITLE}
           disabled={disabled}
-          className={fieldInputCls(!!fieldErrors?.title)}
           aria-invalid={!!fieldErrors?.title}
           aria-required={ariaReq}
           aria-describedby={titleAi.describedBy}
         />
         {titleAi.caption}
-        {fieldErrors?.title && <p className={errCls}>{fieldErrors.title}</p>}
+        {fieldErrors?.title && <p className={ERR_CLASS}>{fieldErrors.title}</p>}
       </div>
 
       <div>
-        <label htmlFor="meta-subject" className={labelCls}>
-          {t("upload.fieldSubject")} {req}
-        </label>
-        <select
+        <Label htmlFor="meta-subject">{t("upload.fieldSubject")}</Label>
+        <Select
           id="meta-subject"
           value={value.subject}
           onChange={(e) => onChange({ subject: e.target.value })}
           disabled={disabled}
-          className={fieldInputCls(!!fieldErrors?.subject)}
           aria-invalid={!!fieldErrors?.subject}
           aria-required={ariaReq}
           aria-describedby={subjectAi.describedBy}
@@ -134,16 +123,14 @@ export function MetadataFields({
               {SUBJECT_LABELS[s]}
             </option>
           ))}
-        </select>
+        </Select>
         {subjectAi.caption}
-        {fieldErrors?.subject && <p className={errCls}>{fieldErrors.subject}</p>}
+        {fieldErrors?.subject && <p className={ERR_CLASS}>{fieldErrors.subject}</p>}
       </div>
 
       <div>
-        <label htmlFor="meta-grade" className={labelCls}>
-          {t("upload.fieldGrade")} {req}
-        </label>
-        <input
+        <Label htmlFor="meta-grade">{t("upload.fieldGrade")}</Label>
+        <Input
           id="meta-grade"
           type="number"
           inputMode="numeric"
@@ -152,59 +139,59 @@ export function MetadataFields({
           value={value.grade}
           onChange={(e) => onChange({ grade: e.target.value })}
           disabled={disabled}
-          className={fieldInputCls(!!fieldErrors?.grade)}
           aria-invalid={!!fieldErrors?.grade}
           aria-required={ariaReq}
           aria-describedby={gradeAi.describedBy}
         />
         {gradeAi.caption}
-        {fieldErrors?.grade && <p className={errCls}>{fieldErrors.grade}</p>}
+        {fieldErrors?.grade && <p className={ERR_CLASS}>{fieldErrors.grade}</p>}
       </div>
 
       <div>
-        <label htmlFor="meta-school" className={labelCls}>
+        <Label htmlFor="meta-school">
           {t("common.school")}
-        </label>
-        <input
+          {optional}
+        </Label>
+        <Input
           id="meta-school"
           value={value.school}
           onChange={(e) => onChange({ school: e.target.value })}
           maxLength={LIMITS.MAX_SCHOOL}
           disabled={disabled}
-          className={fieldInputCls(!!fieldErrors?.school)}
           aria-invalid={!!fieldErrors?.school}
           aria-describedby={schoolAi.describedBy}
         />
         {schoolAi.caption}
-        {fieldErrors?.school && <p className={errCls}>{fieldErrors.school}</p>}
+        {fieldErrors?.school && <p className={ERR_CLASS}>{fieldErrors.school}</p>}
       </div>
 
       <div>
-        <label htmlFor="meta-semester" className={labelCls}>
+        <Label htmlFor="meta-semester">
           {t("common.semester")}
-        </label>
-        <select
+          {optional}
+        </Label>
+        <Select
           id="meta-semester"
           value={value.semester}
           onChange={(e) => onChange({ semester: e.target.value })}
           disabled={disabled}
-          className={fieldInputCls(!!fieldErrors?.semester)}
           aria-invalid={!!fieldErrors?.semester}
           aria-describedby={semesterAi.describedBy}
         >
           <option value="">{t("common.none")}</option>
           <option value="HK1">HK1</option>
           <option value="HK2">HK2</option>
-        </select>
+        </Select>
         {semesterAi.caption}
-        {fieldErrors?.semester && <p className={errCls}>{fieldErrors.semester}</p>}
+        {fieldErrors?.semester && <p className={ERR_CLASS}>{fieldErrors.semester}</p>}
       </div>
 
       <div>
-        <label htmlFor="meta-year" className={labelCls}>
+        <Label htmlFor="meta-year">
           {t("upload.schoolYear")}
-        </label>
-        <input
+          {optional}
+        </Label>
+        <Input
           id="meta-year"
           type="number"
           inputMode="numeric"
@@ -213,20 +200,17 @@ export function MetadataFields({
           value={value.schoolYear}
           onChange={(e) => onChange({ schoolYear: e.target.value })}
           disabled={disabled}
-          className={fieldInputCls(!!fieldErrors?.schoolYear)}
           aria-invalid={!!fieldErrors?.schoolYear}
           aria-describedby={yearAi.describedBy}
         />
         {yearAi.caption}
-        {fieldErrors?.schoolYear && <p className={errCls}>{fieldErrors.schoolYear}</p>}
+        {fieldErrors?.schoolYear && <p className={ERR_CLASS}>{fieldErrors.schoolYear}</p>}
       </div>
 
       <div className="sm:col-span-2">
-        <label htmlFor="meta-duration" className={labelCls}>
-          {t("upload.examDuration")} {req}
-        </label>
-        <div className="mt-1.5 flex items-center gap-3">
-          <input
+        <Label htmlFor="meta-duration">{t("upload.examDuration")}</Label>
+        <div className="flex items-center gap-3">
+          <Input
             id="meta-duration"
             type="number"
             inputMode="numeric"
@@ -235,20 +219,15 @@ export function MetadataFields({
             value={value.durationMinutes}
             onChange={(e) => onChange({ durationMinutes: e.target.value })}
             disabled={disabled}
-            className={[
-              "min-h-11 w-28 rounded-[4px] border bg-transparent px-3 py-2.5 text-sm text-foreground outline-none transition-colors duration-200 disabled:opacity-60",
-              fieldErrors?.durationMinutes ? "border-brand" : "border-border focus:border-ring",
-            ].join(" ")}
+            className="w-28"
             aria-invalid={!!fieldErrors?.durationMinutes}
             aria-required={ariaReq}
             aria-describedby={durationAi.describedBy}
           />
-          <span className="text-sm text-muted-foreground">{t("upload.minutes")}</span>
+          <span className="text-muted-foreground text-sm">{t("upload.minutes")}</span>
         </div>
         {durationAi.caption}
-        {fieldErrors?.durationMinutes && (
-          <p className={errCls}>{fieldErrors.durationMinutes}</p>
-        )}
+        {fieldErrors?.durationMinutes && <p className={ERR_CLASS}>{fieldErrors.durationMinutes}</p>}
       </div>
     </div>
   );

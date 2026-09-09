@@ -1,12 +1,18 @@
 "use client";
 
-// EntryModeField — chọn Automatic/Manual. v2.2 (ADR-0007): control đã THÀNH
-// THẬT (hết HIDDEN-FEATURES #2/#3) — Automatic: metadata để trống được, AI đọc
-// từ trang 1 file đề, gate chuyển sang publish; Manual: hành vi v2.1 (nhập tay,
-// validate trước mọi AI call). Đổi mode KHÔNG BAO GIỜ xoá giá trị đã gõ —
-// giá trị tác giả gõ luôn thắng AI (normalizeMeta).
+// EntryModeField — chọn Tự động/Thủ công. v2.2 (ADR-0007): control đã THÀNH
+// THẬT — Automatic: metadata để trống được, AI đọc từ trang 1 file đề, gate
+// chuyển sang publish; Manual: hành vi v2.1 (nhập tay, validate trước mọi AI
+// call). Đổi mode KHÔNG BAO GIỜ xoá giá trị đã gõ — giá trị tác giả gõ luôn
+// thắng AI (normalizeMeta).
+//
+// Theme "Sân trường" (2026-09-09): hai viên thuốc (primitive Chip) thay hộp thả
+// xuống. Hai lựa chọn thì nhìn thấy cả hai cùng lúc là đúng hơn giấu một cái
+// sau mũi tên; và đây là cùng ngôn ngữ với Tuần/Tháng ở Thống kê, Tất cả/Toán
+// ở Lịch sử — luôn đúng một viên đậm. Dòng ghi chú dưới đổi theo lựa chọn,
+// tỏ dần bằng `.motion-unfold` (không trượt cao — §7).
 
-import { useState } from "react";
+import { Chip } from "@/components/ui/chip";
 import { t } from "@/lib/copy";
 import type { MessageKey } from "@/lib/copy";
 import type { EntryMode } from "@/lib/ugc/types";
@@ -18,6 +24,11 @@ const NOTE_KEY: Record<EntryMode, MessageKey> = {
   manual: "upload.manualNote",
 };
 
+const MODES: { value: EntryMode; labelKey: MessageKey }[] = [
+  { value: "automatic", labelKey: "upload.automatic" },
+  { value: "manual", labelKey: "upload.manual" },
+];
+
 export function EntryModeField({
   value,
   onChange,
@@ -27,40 +38,27 @@ export function EntryModeField({
   onChange: (mode: EntryMode) => void;
   disabled?: boolean;
 }) {
-  const [focused, setFocused] = useState(false);
-
   return (
     <div>
-      <label htmlFor="entry-mode" className="eyebrow block">
+      <p id="entry-mode-label" className="text-foreground mb-1.5 text-sm font-medium">
         {t("upload.entryMode")}
-      </label>
-      <div className="relative mt-1.5">
-        <select
-          id="entry-mode"
-          value={value}
-          onChange={(e) => onChange(e.target.value as EntryMode)}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          disabled={disabled}
-          className="min-h-11 w-full appearance-none rounded-[4px] border border-border bg-transparent px-3 py-2.5 text-sm text-foreground outline-none transition-colors duration-200 focus:border-ring disabled:opacity-60"
-        >
-          <option value="automatic">{t("upload.automatic")}</option>
-          <option value="manual">{t("upload.manual")}</option>
-        </select>
-        <span
-          aria-hidden
-          className={[
-            "pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-ring transition-transform duration-300",
-            focused ? "rotate-180" : "",
-          ].join(" ")}
-        >
-          ▾
-        </span>
+      </p>
+      <div role="group" aria-labelledby="entry-mode-label" className="flex flex-wrap gap-2">
+        {MODES.map((m) => (
+          <Chip
+            key={m.value}
+            active={value === m.value}
+            onClick={() => onChange(m.value)}
+            disabled={disabled}
+          >
+            {t(m.labelKey)}
+          </Chip>
+        ))}
       </div>
       <p
         key={value}
         aria-live="polite"
-        className="mt-1.5 animate-in fade-in slide-in-from-top-1 text-xs text-muted-foreground duration-[250ms]"
+        className="motion-unfold text-muted-foreground mt-2 max-w-prose text-sm leading-relaxed"
       >
         {t(NOTE_KEY[value])}
       </p>
