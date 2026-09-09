@@ -22,6 +22,11 @@
   --font-serif: var(--font-lexend);
   --font-heading: var(--font-lexend);
   --font-mono: ui-monospace, "Cascadia Mono", "Segoe UI Mono", Menlo, monospace;
+  /* Đường cong chuyển động MẠNH hơn mặc định của Tailwind (khối CHUYỂN ĐỘNG
+     cuối file): `ease-out`/`ease-in-out` của mọi utility trong repo ăn theo. */
+  --ease-out: var(--ease-out-strong);
+  --ease-in-out: var(--ease-in-out-strong);
+  --ease-drawer: var(--ease-drawer);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -375,4 +380,222 @@
 
 .rich-text th {
   font-weight: 600;
+}
+
+/* ============================================================
+   CHUYỂN ĐỘNG (2026-09-08) — từ vựng dùng chung cho toàn site. Quy tắc và
+   lý do ở docs/design/ui-refactor-san-truong-design.md §6. Tóm tắt:
+
+   - Chỉ chuyển động `opacity`, `scale`, `translate` (không layout/paint).
+   - Không fade nội dung trang lúc tải: đo 2026-08-22, bỏ fade giảm LCP
+     348ms. Hai điểm nhấn một-lần (điểm số, thanh biểu đồ) chỉ dùng scale —
+     transform không hoãn LCP như opacity 0.
+   - Vào bằng @starting-style + transition (ngắt được giữa chừng, mở lại khi
+     đang đóng thì chạy ngược mượt); ĐÓNG luôn nhanh hơn MỞ.
+   - `[data-closing]` là trạng thái đang đóng — components/shared/usePresence
+     giữ phần tử thêm đúng khoảng *-exit rồi mới gỡ khỏi cây.
+   - Giảm chuyển động (prefers-reduced-motion): giữ mờ/tỏ, bỏ dịch chuyển.
+   ============================================================ */
+:root {
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out-strong: cubic-bezier(0.77, 0, 0.175, 1);
+  /* Đường cong ngăn kéo iOS (Ionic) — chỉ cho bottom sheet. */
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --motion-pop: 180ms;
+  --motion-pop-exit: 120ms;
+  --motion-modal: 220ms;
+  --motion-modal-exit: 150ms;
+  --motion-sheet: 320ms;
+  --motion-sheet-exit: 200ms;
+}
+
+/* Scrim — chỉ mờ/tỏ. */
+.motion-scrim {
+  transition: opacity var(--motion-pop) var(--ease-out-strong);
+}
+@starting-style {
+  .motion-scrim {
+    opacity: 0;
+  }
+}
+.motion-scrim[data-closing] {
+  opacity: 0;
+  transition-duration: var(--motion-pop-exit);
+}
+
+/* Menu / popover — phóng ra từ GÓC NEO (mặc định trên-phải, nơi gọi ghi đè
+   bằng `transform-origin` inline khi menu mở ngược lên). Không bao giờ từ
+   scale(0): vật thật không hiện ra từ hư không. */
+.motion-pop {
+  transform-origin: top right;
+  transition:
+    opacity var(--motion-pop) var(--ease-out-strong),
+    scale var(--motion-pop) var(--ease-out-strong);
+}
+@starting-style {
+  .motion-pop {
+    opacity: 0;
+    scale: 0.96;
+  }
+}
+.motion-pop[data-closing] {
+  opacity: 0;
+  scale: 0.98;
+  transition-duration: var(--motion-pop-exit);
+}
+
+/* Hộp thoại giữa màn — gốc ở TÂM (không neo vào nút nào). */
+.motion-modal {
+  transform-origin: center;
+  transition:
+    opacity var(--motion-modal) var(--ease-out-strong),
+    scale var(--motion-modal) var(--ease-out-strong),
+    translate var(--motion-modal) var(--ease-out-strong);
+}
+@starting-style {
+  .motion-modal {
+    opacity: 0;
+    scale: 0.96;
+    translate: 0 8px;
+  }
+}
+.motion-modal[data-closing] {
+  opacity: 0;
+  scale: 0.98;
+  transition-duration: var(--motion-modal-exit);
+}
+
+/* Bottom sheet (<768px): trượt từ mép dưới bằng đúng chiều cao của nó
+   (`100%` của translate = kích thước bản thân, không cần biết cao bao nhiêu).
+   Từ 768px cùng phần tử là bảng thả xuống → hành xử như .motion-pop, gốc
+   trên-trái vì bảng neo vào mép trái hàng chip. */
+.motion-sheet {
+  transition: translate var(--motion-sheet) var(--ease-drawer);
+}
+@starting-style {
+  .motion-sheet {
+    translate: 0 100%;
+  }
+}
+.motion-sheet[data-closing] {
+  translate: 0 100%;
+  transition: translate var(--motion-sheet-exit) var(--ease-out-strong);
+}
+@media (min-width: 768px) {
+  .motion-sheet {
+    transform-origin: top left;
+    transition:
+      opacity var(--motion-pop) var(--ease-out-strong),
+      scale var(--motion-pop) var(--ease-out-strong),
+      translate var(--motion-pop) var(--ease-out-strong);
+  }
+  @starting-style {
+    .motion-sheet {
+      opacity: 0;
+      scale: 0.96;
+      translate: 0 -4px;
+    }
+  }
+  .motion-sheet[data-closing] {
+    opacity: 0;
+    scale: 0.98;
+    translate: 0 -4px;
+    transition-duration: var(--motion-pop-exit);
+  }
+}
+
+/* Danh sách lựa chọn mở IN-FLOW trong một hàng lọc: chỉ tỏ dần + nhích
+   xuống 4px. KHÔNG animate chiều cao — FilterRow cuộn hàng vừa mở vào tầm
+   nhìn ngay lúc mở, chiều cao đang lớn dần sẽ làm nó cuộn hụt. */
+.motion-unfold {
+  transition:
+    opacity 160ms var(--ease-out-strong),
+    translate 160ms var(--ease-out-strong);
+}
+@starting-style {
+  .motion-unfold {
+    opacity: 0;
+    translate: 0 -4px;
+  }
+}
+
+/* Viên vàng của ô đang chọn trên BottomNav: nảy lên khi đổi tab. */
+@keyframes motion-pill-in {
+  from {
+    scale: 0.6;
+  }
+}
+.motion-pill-in {
+  animation: motion-pill-in 220ms var(--ease-out-strong);
+}
+
+/* Huy hiệu chữ cái của đáp án vừa chọn: nảy nhẹ, có vượt đà 8% — một lượt
+   chọn là một cú chạm có chủ đích, đáng một nhịp phản hồi nhìn thấy được. */
+@keyframes motion-badge-in {
+  0% {
+    scale: 0.7;
+  }
+  60% {
+    scale: 1.08;
+  }
+  100% {
+    scale: 1;
+  }
+}
+.motion-badge-in {
+  animation: motion-badge-in 220ms var(--ease-out-strong);
+}
+
+/* Điểm số ở trang kết quả: "lắng" từ 86% về đúng cỡ. Chỉ scale, không
+   opacity — LCP của trang này là chính con số, opacity 0 sẽ hoãn nó. */
+@keyframes motion-settle {
+  from {
+    scale: 0.86;
+  }
+}
+.motion-settle {
+  animation: motion-settle 600ms var(--ease-out-strong) both;
+}
+
+/* Thanh biểu đồ Thống kê: mọc từ trái, thanh sau trễ thanh trước 60ms
+   (`--motion-i` do nơi gọi đặt). Chỉ scale — cùng lý do LCP ở trên. */
+@keyframes motion-grow-x {
+  from {
+    scale: 0 1;
+  }
+}
+.motion-grow-x {
+  transform-origin: left center;
+  animation: motion-grow-x 700ms var(--ease-out-strong) both;
+  animation-delay: calc(var(--motion-i, 0) * 60ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .motion-pop,
+  .motion-pop[data-closing],
+  .motion-modal,
+  .motion-modal[data-closing],
+  .motion-sheet,
+  .motion-sheet[data-closing],
+  .motion-unfold {
+    scale: none !important;
+    translate: none !important;
+    transition: opacity 150ms ease !important;
+  }
+  /* Sheet mobile vốn không mờ/tỏ (chỉ trượt) — khi bỏ trượt thì cho nó mờ/tỏ
+     để không hiện/biến đột ngột. */
+  @starting-style {
+    .motion-sheet {
+      opacity: 0;
+    }
+  }
+  .motion-sheet[data-closing] {
+    opacity: 0;
+  }
+  .motion-pill-in,
+  .motion-badge-in,
+  .motion-settle,
+  .motion-grow-x {
+    animation: none;
+  }
 }

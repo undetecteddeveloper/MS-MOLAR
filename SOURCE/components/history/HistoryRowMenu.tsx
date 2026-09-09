@@ -41,6 +41,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePdfAction } from "@/components/history/usePdfAction";
 import { buttonVariants } from "@/components/ui/button";
+import { POP_EXIT_MS, usePresence } from "@/components/shared/usePresence";
 import { t } from "@/lib/copy";
 import { cn } from "@/lib/utils";
 import type { AttemptPdfData } from "@/lib/pdf/generateAttemptPdf";
@@ -101,6 +102,8 @@ function usePanelPosition(open: boolean, triggerRef: React.RefObject<HTMLButtonE
         top: rect.bottom + GAP_PX,
         right,
         maxHeight: Math.min(Math.max(spaceBelow, MENU_MIN_PX), MENU_PREFERRED_MAX_PX),
+        // Gốc phóng ra (globals.css .motion-pop) đặt ở góc dính với nút ⋯.
+        transformOrigin: "top right",
       });
     } else {
       setStyle({
@@ -108,6 +111,7 @@ function usePanelPosition(open: boolean, triggerRef: React.RefObject<HTMLButtonE
         bottom: window.innerHeight - rect.top + GAP_PX,
         right,
         maxHeight: Math.min(Math.max(spaceAbove, MENU_MIN_PX), MENU_PREFERRED_MAX_PX),
+        transformOrigin: "bottom right",
       });
     }
   }, [open, triggerRef]);
@@ -128,7 +132,11 @@ export function HistoryRowMenu({
 }: HistoryRowMenuProps) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const panelStyle = usePanelPosition(open, triggerRef);
+  // Panel ở lại thêm 120ms sau khi đóng để chạy chiều thu (globals.css
+  // §CHUYỂN ĐỘNG) — vị trí tính theo `present` chứ không theo `open`, nếu
+  // không style về null ngay lúc đóng và panel nhảy về góc 0,0 trước khi mờ đi.
+  const { present, closing } = usePresence(open, POP_EXIT_MS);
+  const panelStyle = usePanelPosition(present, triggerRef);
   const save = usePdfAction("save", pdfInput, blockedReason);
   const share = usePdfAction("share", pdfInput, blockedReason);
 
@@ -194,13 +202,15 @@ export function HistoryRowMenu({
         <MoreHorizontal aria-hidden />
       </button>
 
-      {open &&
+      {present &&
         panelStyle &&
         createPortal(
           <div
             role="menu"
             style={panelStyle}
-            className="border-border bg-popover animate-in fade-in z-50 w-60 overflow-y-auto rounded-xl border p-1.5 duration-150 ease-out motion-reduce:animate-none"
+            data-closing={closing ? "" : undefined}
+            inert={closing || undefined}
+            className="motion-pop border-border bg-popover z-50 w-60 overflow-y-auto rounded-xl border p-1.5"
           >
             {/* CẢ HAI mục PDF nhận `blockedReason`. Nối một mục mà quên mục
                 kia là sai lầm dễ xảy ra nhất ở lát này, VÀ MỖI CỬA TRÔNG VẪN

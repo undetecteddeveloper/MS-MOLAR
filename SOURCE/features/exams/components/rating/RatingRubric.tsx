@@ -200,7 +200,7 @@ export function RatingRubric({ examId, initialScores }: RatingRubricProps) {
           type="button"
           onClick={goPrev}
           disabled={isFirst}
-          className="text-foreground hover:text-brand disabled:hover:text-foreground text-xs font-medium tracking-[0.14em] uppercase transition-all disabled:opacity-30"
+          className="text-foreground hover:text-brand disabled:hover:text-foreground text-xs font-medium tracking-[0.14em] uppercase transition-colors disabled:opacity-30"
         >
           ← {t("rating.prev")}
         </button>
@@ -208,7 +208,7 @@ export function RatingRubric({ examId, initialScores }: RatingRubricProps) {
           type="button"
           onClick={goNext}
           disabled={isLast}
-          className="text-foreground hover:text-brand disabled:hover:text-foreground text-xs font-medium tracking-[0.14em] uppercase transition-all disabled:opacity-30"
+          className="text-foreground hover:text-brand disabled:hover:text-foreground text-xs font-medium tracking-[0.14em] uppercase transition-colors disabled:opacity-30"
         >
           {t("common.next")}
         </button>
@@ -234,7 +234,7 @@ export function RatingRubric({ examId, initialScores }: RatingRubricProps) {
             aria-describedby={
               submitDisabled && submitState !== "submitting" ? submitHintId : undefined
             }
-            className="bg-brand text-brand-foreground flex items-center gap-2 rounded-full px-5 py-2.5 text-xs font-medium tracking-[0.14em] uppercase transition-all duration-200 hover:opacity-90 disabled:opacity-50"
+            className="bg-brand text-brand-foreground flex items-center gap-2 rounded-full px-5 py-2.5 text-xs font-medium tracking-[0.14em] uppercase transition-opacity duration-200 hover:opacity-90 disabled:opacity-50"
           >
             {submitState === "submitting" && (
               <svg aria-hidden viewBox="0 0 24 24" className="h-3 w-3 motion-safe:animate-spin">

@@ -16,9 +16,16 @@
 // Phần đầu (tiêu đề, Xoá lọc, Đóng) và scrim nằm ở đây; các HÀNG lọc là
 // children — Kho đề có sáu hàng chọn, Lịch sử có một hàng chọn + hai hàng
 // khoảng giá trị, nên vỏ không được đoán trước nội dung.
+//
+// Chuyển động (2026-09-08, globals.css §CHUYỂN ĐỘNG): dưới 768px sheet trượt
+// lên từ mép dưới 320ms theo đường cong ngăn kéo, thu xuống 200ms; từ 768px
+// bảng phóng ra từ góc trên-trái 180ms, thu 120ms. `usePresence` giữ phần tử
+// thêm đúng khoảng thu để chiều đóng có gì mà chạy; trong lúc đó `inert` để
+// không bấm trúng một bảng đang biến mất.
 
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SHEET_EXIT_MS, usePresence } from "@/components/shared/usePresence";
 import { t } from "@/lib/copy";
 
 type FilterSheetProps = {
@@ -31,7 +38,9 @@ type FilterSheetProps = {
 };
 
 export function FilterSheet({ open, onClose, onClear, clearDisabled, children }: FilterSheetProps) {
-  if (!open) return null;
+  const { present, closing } = usePresence(open, SHEET_EXIT_MS);
+  if (!present) return null;
+  const closingAttr = closing ? "" : undefined;
 
   return (
     <>
@@ -40,16 +49,19 @@ export function FilterSheet({ open, onClose, onClear, clearDisabled, children }:
         aria-hidden
         tabIndex={-1}
         onClick={onClose}
-        className="bg-foreground/20 animate-in fade-in fixed inset-0 z-10 cursor-default duration-200 motion-reduce:animate-none"
+        data-closing={closingAttr}
+        className="motion-scrim bg-foreground/20 fixed inset-0 z-10 cursor-default"
       />
       <div
         role="dialog"
         aria-label={t("common.filters")}
+        data-closing={closingAttr}
+        inert={closing || undefined}
         // Mốc cho SupportWidgetTrigger tự ẩn khi bảng lọc đang mở (engineer
         // 2026-09-08): nút hỗ trợ (z-45) từng đè lên góc dưới phải của bottom
         // sheet (z-30) ở 360px, che mất ô "Nộp đến ngày" / hàng Độ khó.
         data-filter-sheet=""
-        className="bg-background rounded-t-card animate-in fade-in slide-in-from-bottom-4 fixed inset-x-0 bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom,0px))] z-30 flex max-h-[70dvh] flex-col overflow-hidden duration-200 ease-out motion-reduce:animate-none md:absolute md:inset-x-auto md:top-full md:bottom-auto md:left-0 md:mt-2 md:max-h-[32rem] md:w-80 md:rounded-card md:border md:border-border"
+        className="motion-sheet bg-background rounded-t-card fixed inset-x-0 bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom,0px))] z-30 flex max-h-[70dvh] flex-col overflow-hidden md:absolute md:inset-x-auto md:top-full md:bottom-auto md:left-0 md:mt-2 md:max-h-[32rem] md:w-80 md:rounded-card md:border md:border-border"
       >
         <div className="border-border flex items-center justify-between gap-3 border-b px-4 py-2">
           <span className="text-base font-semibold">{t("common.filters")}</span>

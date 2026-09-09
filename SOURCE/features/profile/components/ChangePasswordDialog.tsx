@@ -275,13 +275,13 @@ export function ChangePasswordDialog({
         onClick={() => {
           if (!submittingRef.current) closeAndReset();
         }}
-        className="absolute inset-0 cursor-default bg-[#1B1512]/40"
+        className="motion-scrim absolute inset-0 cursor-default bg-[#1B1512]/40"
       />
       <div
         ref={panelRef}
         tabIndex={-1}
         onKeyDown={trapTab}
-        className="border-border bg-background relative w-full max-w-sm rounded-lg border p-6 outline-none"
+        className="motion-modal border-border bg-background relative w-full max-w-sm rounded-lg border p-6 outline-none"
       >
         <h2 id={TITLE_ID} className="text-foreground font-serif text-xl">
           {t("profile.password.change")}

@@ -69,7 +69,7 @@ export async function HistoryRow({
     <Card
       as="li"
       padding="compact"
-      className="group relative flex-row items-start gap-3 transition-colors hover:bg-[color-mix(in_oklch,var(--surface),var(--foreground)_4%)] sm:gap-4"
+      className="group relative flex-row items-start gap-3 transition-colors hover:bg-[color-mix(in_oklch,var(--surface),var(--foreground)_4%)] active:bg-[color-mix(in_oklch,var(--surface),var(--foreground)_7%)] sm:gap-4"
     >
       <Link
         href={resultHref}

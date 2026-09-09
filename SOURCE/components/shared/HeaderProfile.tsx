@@ -12,6 +12,7 @@ import { ChevronDown } from "lucide-react";
 import { signOut } from "@/features/auth/actions";
 import { t } from "@/lib/copy";
 import { Avatar } from "@/components/shared/Avatar";
+import { POP_EXIT_MS, usePresence } from "@/components/shared/usePresence";
 
 export type MenuUser = { displayName: string; avatarUrl: string | null };
 
@@ -32,6 +33,9 @@ export function HeaderProfile({
   avatarUrl: string | null;
 }) {
   const [open, setOpen] = useState(false);
+  // Menu ở lại thêm 120ms sau khi đóng để chạy chiều thu (globals.css
+  // §CHUYỂN ĐỘNG); scrim thì gỡ ngay — không giữ một lớp chặn click vô hình.
+  const { present, closing } = usePresence(open, POP_EXIT_MS);
 
   function close() {
     setOpen(false);
@@ -57,7 +61,7 @@ export function HeaderProfile({
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="bg-surface hover:bg-[color-mix(in_oklch,var(--surface),var(--foreground)_7%)] focus-visible:ring-ring flex max-w-full min-h-11 items-center gap-2 rounded-full py-1 pr-2.5 pl-1.5 transition-colors focus-visible:ring-3 focus-visible:outline-none"
+        className="bg-surface hover:bg-[color-mix(in_oklch,var(--surface),var(--foreground)_7%)] focus-visible:ring-ring flex max-w-full min-h-11 items-center gap-2 rounded-full py-1 pr-2.5 pl-1.5 transition-[background-color,scale] ease-out motion-safe:active:scale-97 focus-visible:ring-3 focus-visible:outline-none"
       >
         {/* Avatar thay cho <Image>: next.config.ts không khai remotePatterns,
             URL Supabase đưa vào <Image> là lỗi LÚC CHẠY. */}
@@ -71,13 +75,15 @@ export function HeaderProfile({
         />
       </button>
 
-      {open && (
+      {present && (
         <div
           role="menu"
+          data-closing={closing ? "" : undefined}
+          inert={closing || undefined}
           // `w-max`: menu ôm sát mục dài nhất, không có bề rộng cố định để trống
           // bên phải (engineer 2026-09-04). `max-w-64` chặn mục dài nếu sau này
           // thêm; không đặt min-width — ba mục hiện tại đủ ngắn để tự quyết.
-          className="border-border bg-popover absolute top-full right-0 z-20 mt-2 w-max max-w-64 rounded-xl border p-1.5"
+          className="motion-pop border-border bg-popover absolute top-full right-0 z-20 mt-2 w-max max-w-64 rounded-xl border p-1.5"
         >
           <Link role="menuitem" href="/profile" onClick={close} className={itemCls()}>
             {t("common.profile")}

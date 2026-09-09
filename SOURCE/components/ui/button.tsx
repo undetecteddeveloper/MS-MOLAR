@@ -15,8 +15,11 @@ import { cn } from "@/lib/utils";
 // cho hành động chính DUY NHẤT của một màn hình. `sm` 36px cho nút trong thẻ.
 //
 // Trạng thái: hover/active đổi NỀN (tối thêm 8%), không đổi hình, không bóng.
+// Phản hồi bấm (2026-09-08): co 3% trong 150ms lúc `:active` — giao diện
+// "nghe thấy" cú bấm ngay cả khi mạng chưa trả lời. `link` không co: chữ
+// gạch chân co lại trông như lỗi. Tắt khi giảm chuyển động (motion-safe).
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center gap-2 border border-transparent bg-clip-padding font-semibold whitespace-nowrap transition-colors outline-none select-none focus-visible:ring-3 focus-visible:ring-ring/40 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/button inline-flex shrink-0 items-center justify-center gap-2 border border-transparent bg-clip-padding font-semibold whitespace-nowrap transition-[color,background-color,border-color,scale] ease-out outline-none select-none focus-visible:ring-3 focus-visible:ring-ring/40 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
@@ -54,6 +57,12 @@ const buttonVariants = cva(
         default: "rounded-lg",
       },
     },
+    compoundVariants: [
+      {
+        variant: ["default", "secondary", "outline", "plain", "ghost", "sun", "destructive"],
+        className: "motion-safe:active:scale-97",
+      },
+    ],
     defaultVariants: {
       variant: "default",
       size: "default",

@@ -29,7 +29,7 @@ export function SubjectBarChart({ data }: { data: SubjectStats[] }) {
 
   return (
     <ul className="flex flex-col gap-4">
-      {data.map((stat) => {
+      {data.map((stat, index) => {
         const total = stat.correct + stat.wrong;
         // total = 0 chỉ xảy ra với đề không có câu chấm tự động (thuần tự luận):
         // không có gì để gắn cờ, và không vẽ thanh.
@@ -62,8 +62,13 @@ export function SubjectBarChart({ data }: { data: SubjectStats[] }) {
                 trên 46) vẫn thấy được. */}
             <div
               aria-hidden
-              className="flex h-3 gap-0.5"
-              style={{ width: `${(total / maxTotal) * 100}%` }}
+              className="motion-grow-x flex h-3 gap-0.5"
+              style={
+                {
+                  width: `${(total / maxTotal) * 100}%`,
+                  "--motion-i": index,
+                } as React.CSSProperties
+              }
             >
               {stat.correct > 0 && (
                 <span

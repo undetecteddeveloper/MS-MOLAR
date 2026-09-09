@@ -120,9 +120,9 @@ export function DeleteDialog({
               aria-hidden
               tabIndex={-1}
               onClick={closeAndReturnFocus}
-              className="absolute inset-0 cursor-default bg-[#1B1512]/40"
+              className="motion-scrim absolute inset-0 cursor-default bg-[#1B1512]/40"
             />
-            <div className="border-border bg-background relative w-full max-w-sm rounded-lg border p-6">
+            <div className="motion-modal border-border bg-background relative w-full max-w-sm rounded-lg border p-6">
               <h2 id="delete-exam-title" className="text-foreground font-serif text-xl">
                 {t("upload.deleteTitle")}
               </h2>

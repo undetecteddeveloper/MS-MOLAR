@@ -62,10 +62,10 @@ export function SuccessToast({ message, trigger, durationMs = 3000 }: SuccessToa
           desktop — vật thể phải bay vào từ phía mép nó neo. */}
       <div
         aria-hidden
-        className={`pointer-events-none fixed inset-x-0 top-[calc(3.75rem+env(safe-area-inset-top,0px))] z-[70] flex justify-center px-4 transition-all motion-reduce:transition-none md:top-auto md:bottom-6 ${
+        className={`pointer-events-none fixed inset-x-0 top-[calc(3.75rem+env(safe-area-inset-top,0px))] z-[70] flex justify-center px-4 transition-[opacity,translate] motion-reduce:transition-none md:top-auto md:bottom-6 ${
           visible
             ? "translate-y-0 opacity-100 duration-300 [transition-timing-function:cubic-bezier(0.34,1.56,0.64,1)]"
-            : "-translate-y-3 opacity-0 duration-200 ease-in md:translate-y-3"
+            : "-translate-y-3 opacity-0 duration-150 ease-out md:translate-y-3"
         }`}
       >
         <div className="border-border bg-foreground text-background flex items-center gap-2 rounded-md border px-4 py-2.5 text-sm font-medium">

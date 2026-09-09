@@ -32,7 +32,7 @@ export async function ExamCard({ exam, eligibility }: ExamCardProps) {
   return (
     <Card
       as="li"
-      className="group relative h-full transition-colors hover:bg-[color-mix(in_oklch,var(--surface),var(--foreground)_4%)]"
+      className="group relative h-full transition-colors hover:bg-[color-mix(in_oklch,var(--surface),var(--foreground)_4%)] active:bg-[color-mix(in_oklch,var(--surface),var(--foreground)_7%)]"
     >
       <Link
         href={`/exams/${exam.id}`}

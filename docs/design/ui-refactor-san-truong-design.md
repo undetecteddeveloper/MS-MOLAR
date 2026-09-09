@@ -113,3 +113,32 @@ Không in hoa nhãn, không dấu chấm giữa nối meta, không mũi tên sau
 - Gỡ `app/(billing)/pricing`, `me/orders`, `refund-policy`; gỡ component UI billing (`features/billing/components/**`, `components/billing/{LegalLinks,OrderStatusBadge,RecheckOrderControl,TutorQuotaNote}`); giữ `lib/billing`, `features/billing/queries.ts`, webhook payOS, schema.
 - Token + font + primitives (`button`, `input`, `card`, `badge`, `chip`, `progress`) → khung (SiteHeader, BottomNav, PageHeader) → từng nhóm trang theo thứ tự ưu tiên.
 - Mỗi nhóm trang: chụp 360/768/1280, đối chiếu mục 2–4, đo CLS/long task, engineer duyệt, 6 cổng, commit.
+
+## 7. Chuyển động (2026-09-08, nhánh `design/motion`)
+
+Nguồn giá trị: khối `CHUYỂN ĐỘNG` cuối `app/globals.css`; chiều đóng qua `components/shared/usePresence.ts`. Khung quyết định cho MỖI hiệu ứng, theo thứ tự: (1) người dùng thấy bao nhiêu lần một ngày — càng nhiều càng ít chuyển động; (2) nó nói điều gì — phản hồi, không gian, hay chỉ "cho đẹp"; (3) đường cong; (4) thời lượng, trần 320ms.
+
+| Hiệu ứng | Ở đâu | Số | Vì sao |
+|---|---|---|---|
+| Co 3% khi bấm | Button (trừ `link`), Chip, viên điều hướng header, ô tài khoản, phân trang, ô số câu (10%) | 150ms, `--ease-out-strong` | Giao diện "nghe thấy" cú bấm trước khi mạng trả lời. Tắt khi giảm chuyển động. |
+| Bottom sheet trượt lên / thu xuống | FilterSheet < 768px | mở 320ms `--ease-drawer`, đóng 200ms | Vật thể vào từ mép nó neo; đóng nhanh hơn mở vì người dùng đã quyết. `translate: 0 100%` = đúng chiều cao sheet, không cần biết cao bao nhiêu. |
+| Phóng từ góc neo | Bảng lọc ≥ 768px, menu tài khoản, menu ⋯ của hàng, tooltip, context menu | mở 180ms (tooltip 125), đóng 120ms; từ scale 0.96 | Popover phóng từ nút mở nó, không từ tâm; không bao giờ từ scale 0. Menu ⋯ đổi gốc theo hướng mở (trên-phải / dưới-phải). |
+| Hộp thoại phóng từ tâm | LeaveExam, ReportExam, Delete, Support, ChangePassword | 220ms, scale 0.96 + 8px | Modal không neo vào nút nào → gốc ở tâm. Chỉ chiều VÀO; các hộp ở nhóm chưa dựng lại sẽ nhận `usePresence` khi tới lượt. |
+| Danh sách lựa chọn tỏ dần | FilterRow | 160ms, opacity + 4px | Không animate chiều cao: FilterRow cuộn hàng vừa mở vào tầm nhìn ngay lúc mở, chiều cao đang lớn dần làm nó cuộn hụt. |
+| Viên vàng nảy | BottomNav khi đổi tab | 220ms từ scale 0.6 | Xác nhận "bạn đang ở đây"; chỉ scale nên không đụng LCP. |
+| Huy hiệu đáp án nảy | AnswerChoice khi chọn | 220ms, vượt đà 8% | Một lượt chọn là một cú chạm có chủ đích; 220ms đủ thấy, không đủ làm chậm 40 câu. |
+| Điểm số lắng | ScoreCard | 600ms từ scale 0.86 | Khoảnh khắc một-lần-mỗi-bài, được phép chậm hơn. CHỈ scale: LCP của trang là chính con số, opacity 0 sẽ hoãn nó. |
+| Thanh biểu đồ mọc | SubjectBarChart | 700ms, so le 60ms | Trang trí một lần mỗi lượt xem; chỉ scale (cùng lý do LCP). |
+
+Không làm, và vì sao:
+
+- **Không fade/stagger nội dung trang lúc tải** (lưới đề, danh sách lịch sử). Đo 2026-08-22: bỏ fade giảm LCP 348ms. Người dùng mở các trang này hàng chục lần một ngày — chuyển động ở đây là thuế, không phải quà.
+- **Không animate chuyển câu trong màn làm bài** (40 lượt/bài, phần lớn bằng bàn phím). Chỉ còn phản hồi bấm.
+- **Không bóng, không gradient, không blur** — theme phẳng; hiệu ứng chỉ dùng `opacity`, `scale`, `translate` (không layout/paint, chạy ngoài luồng chính).
+- **Không `transition-all`** ở đâu nữa: Tabs, SuccessToast, HomeStage, RatingRubric đã ghi đúng thuộc tính. `ease-in` ở chiều ra của toast đổi sang `ease-out` (khởi đầu chậm = cảm giác ì).
+
+Đường cong: `--ease-out` và `--ease-in-out` của Tailwind được trỏ sang bản mạnh (`cubic-bezier(0.23,1,0.32,1)`, `cubic-bezier(0.77,0,0.175,1)`) trong `@theme`, nên mọi `ease-out` có sẵn trong repo (Progress, HomeStage, UploadForm…) tự ăn theo — đường cong mặc định của trình duyệt quá yếu để chuyển động trông có chủ ý.
+
+Giảm chuyển động (`prefers-reduced-motion`): giữ mờ/tỏ 150ms, bỏ mọi `translate`/`scale`, tắt bốn keyframe; `usePresence` gỡ phần tử ngay (không giữ thêm khoảng đóng).
+
+Đo (Playwright, dev, 2026-09-08): xem bảng số trong Notion row "Chuyển động toàn site" và commit message.

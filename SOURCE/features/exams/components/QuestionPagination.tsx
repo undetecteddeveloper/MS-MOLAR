@@ -90,7 +90,7 @@ export function QuestionPagination({
                     (isAnswered ? ` (${t("player.answeredStatus")})` : "") +
                     (isFlagged ? ` (${t("player.flagged")})` : "")
                   }
-                  className={`focus-visible:ring-ring/40 relative flex aspect-square w-full items-center justify-center rounded-full font-semibold tabular-nums transition-colors focus-visible:ring-3 focus-visible:outline-none ${
+                  className={`focus-visible:ring-ring/40 relative flex aspect-square w-full items-center justify-center rounded-full font-semibold tabular-nums transition-[color,background-color,scale] ease-out motion-safe:active:scale-90 focus-visible:ring-3 focus-visible:outline-none ${
                     compact ? "text-xs" : "text-sm"
                   } ${
                     isCurrent

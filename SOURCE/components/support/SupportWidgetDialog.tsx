@@ -160,12 +160,12 @@ export function SupportWidgetDialog({ open, onClose }: SupportWidgetDialogProps)
         aria-hidden
         tabIndex={-1}
         onClick={resetAndClose}
-        className="absolute inset-0 cursor-default bg-[#1B1512]/40"
+        className="motion-scrim absolute inset-0 cursor-default bg-[#1B1512]/40"
       />
       <div
         ref={dialogRef}
         tabIndex={-1}
-        className="border-border bg-background relative w-full max-w-sm rounded-lg border p-6 outline-none"
+        className="motion-modal border-border bg-background relative w-full max-w-sm rounded-lg border p-6 outline-none"
       >
         {phase === "success" && result ? (
           <div role="status" aria-live="polite">

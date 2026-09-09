@@ -81,7 +81,7 @@ export function FilterRow({
       </button>
 
       {rowOpen && (
-        <ul className="flex flex-col gap-0.5 px-2 pb-2">
+        <ul className="motion-unfold flex flex-col gap-0.5 px-2 pb-2">
           {options.map((opt) => {
             const active = opt.value === currentValue;
             return (

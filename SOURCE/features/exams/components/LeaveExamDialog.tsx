@@ -42,9 +42,9 @@ export function LeaveExamDialog({ open, onCancel, onLeave }: LeaveExamDialogProp
         aria-hidden
         tabIndex={-1}
         onClick={onCancel}
-        className="bg-foreground/40 absolute inset-0 cursor-default"
+        className="motion-scrim bg-foreground/40 absolute inset-0 cursor-default"
       />
-      <Card variant="plain" className="relative w-full max-w-sm gap-3 p-5">
+      <Card variant="plain" className="motion-modal relative w-full max-w-sm gap-3 p-5">
         <h2 id="leave-exam-title" className="text-foreground text-lg font-semibold">
           {t("player.leaveTitle")}
         </h2>

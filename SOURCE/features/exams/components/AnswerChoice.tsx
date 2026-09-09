@@ -41,7 +41,7 @@ interface AnswerChoiceProps {
 export function AnswerChoice({ name, choice, label, selected, onSelect }: AnswerChoiceProps) {
   return (
     <label
-      className={`has-[:focus-visible]:ring-ring/40 flex cursor-pointer items-center rounded-lg border-2 px-4 py-[11px] transition-colors has-[:focus-visible]:ring-3 ${
+      className={`has-[:focus-visible]:ring-ring/40 flex cursor-pointer items-center rounded-lg border-2 px-4 py-[11px] transition-[color,background-color,border-color,scale] ease-out motion-safe:active:scale-[0.985] has-[:focus-visible]:ring-3 ${
         selected
           ? "border-sun bg-sun-soft"
           : "bg-card border-transparent hover:bg-[color-mix(in_oklch,var(--card),var(--foreground)_5%)]"
@@ -60,8 +60,10 @@ export function AnswerChoice({ name, choice, label, selected, onSelect }: Answer
         // size-6 (24px) chứ KHÔNG phải size-7: badge phải thấp hơn dòng text
         // (text-base/leading-relaxed ≈ 26px) để không làm hàng cao thêm — xem
         // phép tính 238px ở đầu file.
+        // `motion-badge-in` chỉ gắn khi đang chọn → animation chạy đúng lúc
+        // huy hiệu này TRỞ THÀNH được chọn (globals.css §CHUYỂN ĐỘNG).
         className={`mr-3 flex size-6 shrink-0 items-center justify-center rounded-full text-sm font-semibold transition-colors ${
-          selected ? "bg-foreground text-background" : "bg-surface text-muted-foreground"
+          selected ? "motion-badge-in bg-foreground text-background" : "bg-surface text-muted-foreground"
         }`}
       >
         {choice.id}

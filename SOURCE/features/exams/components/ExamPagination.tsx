@@ -45,7 +45,7 @@ function buildHref(
 // 44px (min-h-11) — ngưỡng vùng chạm: thanh này cũng hiện trên mobile, nơi nó
 // là cách DUY NHẤT xem tiếp.
 const LINK_CLASS =
-  "bg-surface text-foreground hover:bg-[color-mix(in_oklch,var(--surface),var(--foreground)_7%)] focus-visible:ring-ring/40 inline-flex min-h-11 items-center gap-1 rounded-full px-4 text-sm font-semibold transition-colors focus-visible:ring-3 focus-visible:outline-none";
+  "bg-surface text-foreground hover:bg-[color-mix(in_oklch,var(--surface),var(--foreground)_7%)] focus-visible:ring-ring/40 inline-flex min-h-11 items-center gap-1 rounded-full px-4 text-sm font-semibold transition-[color,background-color,scale] ease-out motion-safe:active:scale-97 focus-visible:ring-3 focus-visible:outline-none";
 const DISABLED_CLASS =
   "bg-surface text-muted-foreground inline-flex min-h-11 cursor-not-allowed items-center gap-1 rounded-full px-4 text-sm font-semibold opacity-50";
 

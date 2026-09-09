@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 // bật/tắt (nút mở bảng lọc mang aria-expanded, nút đảo chiều sắp xếp) để giữ
 // đúng bộ lớp mà không gán nhầm ngữ nghĩa.
 const chipVariants = cva(
-  "inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-sm font-medium whitespace-nowrap transition-colors focus-visible:ring-3 focus-visible:ring-ring/40 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-40",
+  "inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-sm font-medium whitespace-nowrap transition-[color,background-color,scale] ease-out motion-safe:active:scale-97 focus-visible:ring-3 focus-visible:ring-ring/40 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-40",
   {
     variants: {
       active: {

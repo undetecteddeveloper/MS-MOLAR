@@ -62,13 +62,16 @@ export function BottomNav({ signedIn = false }: { signedIn?: boolean }) {
                 // min-h-15 = 60px = --bottom-nav-h: trên ngưỡng 44–48px của
                 // vùng chạm; bề ngang mỗi ô ở 360px là 72px.
                 className={[
-                  "focus-visible:ring-ring flex min-h-15 flex-col items-center justify-center gap-1 px-1 pt-1.5 pb-1 transition-colors focus-visible:ring-3 focus-visible:ring-inset focus-visible:outline-none",
+                  "group focus-visible:ring-ring flex min-h-15 flex-col items-center justify-center gap-1 px-1 pt-1.5 pb-1 transition-colors focus-visible:ring-3 focus-visible:ring-inset focus-visible:outline-none",
                   active ? "text-foreground" : "text-muted-foreground active:text-foreground",
                 ].join(" ")}
               >
+                {/* Viên vàng: `motion-pill-in` chỉ gắn khi đang chọn nên animation
+                    chạy đúng lúc ô này TRỞ THÀNH đang chọn (đổi trang); co 10%
+                    khi ngón tay đang đè lên ô (group-active). */}
                 <span
-                  className={`flex h-7 w-11 items-center justify-center rounded-full transition-colors ${
-                    active ? "bg-sun" : ""
+                  className={`flex h-7 w-11 items-center justify-center rounded-full transition-[background-color,scale] ease-out motion-safe:group-active:scale-90 ${
+                    active ? "bg-sun motion-pill-in" : ""
                   }`}
                 >
                   {Icon && <Icon aria-hidden className="size-[22px] shrink-0" strokeWidth={1.9} />}

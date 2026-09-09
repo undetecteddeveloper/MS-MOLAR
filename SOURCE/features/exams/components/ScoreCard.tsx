@@ -66,7 +66,7 @@ export async function ScoreCard({
         </p>
       ) : (
         <p className="mt-3 flex items-baseline justify-center gap-2">
-          <span className="text-primary text-[4rem] leading-none font-bold tabular-nums">
+          <span className="motion-settle text-primary text-[4rem] leading-none font-bold tabular-nums">
             {result.totalScore.toFixed(1)}
           </span>
           <span className="text-muted-foreground text-lg font-medium">{t("result.outOfTen")}</span>

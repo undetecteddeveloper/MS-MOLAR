@@ -75,7 +75,7 @@ export function SiteHeader({ user = null }: { user?: MenuUser | null }) {
                       // năm mục + ô tài khoản chỉ còn 9px dư với tên 7 ký tự
                       // (đo 2026-09-06); đệm 12px từng cắt "AnhPhat" thành
                       // "AnhP…" ngay khi tên được phép co (min-w-0 ở trên).
-                      "focus-visible:ring-ring inline-flex h-10 items-center rounded-full px-2.5 text-sm whitespace-nowrap transition-colors lg:px-3.5 focus-visible:ring-3 focus-visible:outline-none",
+                      "focus-visible:ring-ring inline-flex h-10 items-center rounded-full px-2.5 text-sm whitespace-nowrap transition-[color,background-color,scale] ease-out motion-safe:active:scale-97 lg:px-3.5 focus-visible:ring-3 focus-visible:outline-none",
                       isActive
                         ? "bg-surface text-foreground font-semibold"
                         : "text-muted-foreground hover:bg-surface hover:text-foreground font-medium",

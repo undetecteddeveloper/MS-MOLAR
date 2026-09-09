@@ -32,7 +32,7 @@ function ContextMenuContent({
         <ContextMenuPrimitive.Popup
           data-slot="context-menu-content"
           className={cn(
-            "min-w-[9rem] rounded-[4px] border border-border bg-background p-1 shadow-none outline-none transition-opacity duration-200 data-[starting-style]:opacity-0 data-[ending-style]:opacity-0",
+            "min-w-[9rem] rounded-[4px] border border-border bg-background p-1 shadow-none outline-none origin-(--transform-origin) transition-[opacity,scale] duration-150 ease-out data-[starting-style]:opacity-0 data-[starting-style]:scale-95 data-[ending-style]:opacity-0 data-[ending-style]:scale-98",
             className
           )}
           {...props}

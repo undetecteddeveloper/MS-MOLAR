@@ -106,9 +106,9 @@ export function ReportExam({ examId, initiallyReported }: ReportExamProps) {
             aria-hidden
             tabIndex={-1}
             onClick={() => setOpen(false)}
-            className="bg-foreground/40 absolute inset-0 cursor-default"
+            className="motion-scrim bg-foreground/40 absolute inset-0 cursor-default"
           />
-          <div className="bg-background rounded-card relative flex w-full max-w-sm flex-col gap-3 p-5">
+          <div className="motion-modal bg-background rounded-card relative flex w-full max-w-sm flex-col gap-3 p-5">
             <h2 id="report-exam-title" className="text-foreground text-lg font-semibold">
               {t("report.title")}
             </h2>

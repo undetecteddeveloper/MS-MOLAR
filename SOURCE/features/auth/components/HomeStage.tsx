@@ -35,7 +35,7 @@ export function HomeStage({ auth, signedIn }: { auth: AuthMode; signedIn: boolea
       <section
         inert={showAuth || undefined}
         aria-labelledby="home-title"
-        className={`flex flex-col gap-5 transition-all duration-500 ease-out motion-reduce:transition-none ${
+        className={`flex flex-col gap-5 transition-[opacity,translate] duration-500 ease-out motion-reduce:transition-none ${
           showAuth
             ? "pointer-events-none absolute inset-x-0 top-0 -translate-x-6 opacity-0"
             : "relative translate-x-0 opacity-100"
@@ -70,7 +70,7 @@ export function HomeStage({ auth, signedIn }: { auth: AuthMode; signedIn: boolea
           hero ở trạng thái kia vẫn căn trái theo design doc §3. */}
       <section
         inert={!showAuth || undefined}
-        className={`flex w-full max-w-md flex-col gap-3 transition-all duration-500 ease-out motion-reduce:transition-none ${
+        className={`flex w-full max-w-md flex-col gap-3 transition-[opacity,translate] duration-500 ease-out motion-reduce:transition-none ${
           showAuth
             ? "relative translate-x-0 justify-self-center opacity-100"
             : "pointer-events-none absolute inset-x-0 top-0 translate-x-6 opacity-0"
