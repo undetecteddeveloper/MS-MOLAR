@@ -10,6 +10,8 @@
 //     trống được, AI đọc từ file đề; gate chuyển sang publish.
 //   - Subject là <select> từ SUBJECTS (O-9 — vocabulary chuẩn hoá, value
 //     canonical, nhãn tiếng Việt).
+//     Chỉ in nhãn Việt: bản trước in kèm khoá canonical "(Math)" — một khoá
+//     tiếng Anh lọt ra màn hình, site chỉ có một ngôn ngữ (engineer 2026-09-08).
 //   - `aiFilled` (S-03): field do AI điền chưa được tác giả chạm mang caption
 //     "from your file" (muted, aria-describedby — KHÔNG phải màu trạng thái;
 //     session-derived theo O-7/TBD-07, mất khi reload là chủ đích).
@@ -129,7 +131,7 @@ export function MetadataFields({
           </option>
           {SUBJECTS.map((s) => (
             <option key={s} value={s}>
-              {SUBJECT_LABELS[s]} ({s})
+              {SUBJECT_LABELS[s]}
             </option>
           ))}
         </select>
