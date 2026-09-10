@@ -7,8 +7,17 @@
 // hỏng hoặc chưa tải xong, và đó là sàn đúng cho control dùng để rời khỏi một
 // tài khoản trên máy dùng chung.
 //
-// Nằm dưới một hairline, tách khỏi ba hàng phía trên, vì nó RỜI KHỎI trang chứ
-// không sửa gì trên trang.
+// Theme "Sân trường" (2026-09-10): viên thuốc đỏ nhạt (`destructive`) — cùng
+// họ với "Rời khỏi" ở màn làm bài: một hành động rời đi, không phải sửa gì.
+//
+// CO THEO CHỮ, không trải hết bề ngang — và vị trí (căn giữa) do ProfileCard
+// quyết định, không phải file này.
+//
+// Vì sao không trải rộng, đo ở 360×740: nút hỗ trợ nổi ở góc dưới phải (z-45)
+// chiếm 288–344 × 608–664; nút Đăng xuất trải rộng nằm 633–677 nên góc phải
+// của nó bị đè 36×31px. Trang này ngắn nên không cuộn được, và đệm đáy kiểu
+// /upload không kéo nút lên. Co theo chữ rồi căn giữa thì nút nằm gọn trong
+// 122–238, cách nút hỗ trợ 50px.
 
 import { useRef } from "react";
 import { useFormStatus } from "react-dom";
@@ -16,11 +25,11 @@ import { useFormStatus } from "react-dom";
 import { signOut } from "@/features/auth/actions";
 import { t } from "@/lib/copy";
 import { cn } from "@/lib/utils";
-import { outlineButtonCls } from "@/features/profile/components/styles";
+import { buttonVariants } from "@/components/ui/button";
 
 export function SignOutButton() {
   return (
-    <form action={signOut} className="flex w-full justify-center">
+    <form action={signOut} className="flex">
       <SubmitButton />
     </form>
   );
@@ -45,18 +54,7 @@ function SubmitButton() {
         }
         submittedRef.current = true;
       }}
-      // Đỏ son cho CHỮ, không phải cho nền: quy tắc cứng của theme là đỏ son
-      // không phủ khối lớn (.claude/MEMORY.md §3) — một nút nền đỏ ở đây vừa
-      // phạm luật đó vừa hét to hơn mức cần thiết cho việc đăng xuất.
-      // Căn giữa (form bọc `justify-center`), không còn `md:ml-auto`: đăng xuất
-      // không thuộc cột hành động căn phải của các hàng phía trên.
-      //
-      // ⚠ PHẢI đi qua cn(): `outlineButtonCls` đã mang sẵn `text-foreground`, và
-      // nối chuỗi trần thì Tailwind xử va chạm theo THỨ TỰ TRONG STYLESHEET chứ
-      // không theo thứ tự trong thuộc tính class — `text-brand` viết sau vẫn
-      // thua. cn() (tailwind-merge) bỏ hẳn lớp bị ghi đè, nên cái sau thắng
-      // thật. Bản trước dùng nối chuỗi và nút hiện ra màu đen.
-      className={cn(outlineButtonCls, "text-brand w-full md:w-auto")}
+      className={cn(buttonVariants({ variant: "destructive" }), "aria-disabled:opacity-60")}
     >
       {pending ? t("common.working") : t("common.signOut")}
     </button>

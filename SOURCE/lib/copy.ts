@@ -525,6 +525,8 @@ export const copy = {
     "Đang đăng nhập bằng {email}. Gỡ một đề sẽ rút nó khỏi kho ngay lập tức và chặn lượt làm bài mới; tác giả không tự hoàn tác được.",
   "admin.awaitingReview": "Chờ xử lý",
   "admin.removed": "Đã gỡ",
+  "admin.author": "Tác giả: {name}",
+  "admin.removeExam": "Gỡ khỏi kho",
   "admin.oneReport": "1 báo cáo",
   "admin.reportCount": "{count} báo cáo",
   "admin.statusLabel": "trạng thái:",
@@ -696,6 +698,11 @@ export const copy = {
   "support.admin.meta.page": "Trang",
   "support.admin.meta.userAgent": "Trình duyệt",
   "support.admin.meta.screen": "Màn hình",
+  "support.admin.intro": "Phản hồi học sinh gửi từ nút hỗ trợ, mới nhất xếp trước.",
+  "support.admin.hasScreenshot": "Kèm ảnh",
+  "support.admin.statusLabel": "Trạng thái",
+  "support.admin.notesTitle": "Ghi chú nội bộ",
+  "support.admin.noteLabel": "Thêm ghi chú",
 
   // --- Gia sư AI (Giải thích bước này) — Engine 1 Adaptive AI ---
   // Đặt cùng vị trí tương đối với en.ts để hai file dễ so nhau; `Dictionary`

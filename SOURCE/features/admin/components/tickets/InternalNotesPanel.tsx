@@ -4,11 +4,20 @@
 // addTicketNoteAction(ticketId, noteText) là 2 tham số PHẲNG (task-13);
 // noteFormAction là adapter cục bộ bắc cầu sang khuôn useActionState
 // (prevState, formData), cùng mẫu với statusFormAction.
+//
+// Theme "Sân trường" (2026-09-10): tiêu đề nhỏ + mỗi ghi chú một thẻ TRẮNG con;
+// ô nhập là primitive Textarea, nút Lưu ghi chú 36px. Ngày giờ qua bộ định
+// dạng chung ghim Asia/Ho_Chi_Minh (bản trước `toLocaleString()` theo giờ
+// máy). Meta tách bằng khoảng cách, không dấu chấm giữa (§5).
 
-import { useActionState } from "react";
+import { useActionState, useId } from "react";
 import { addTicketNoteAction } from "@/features/admin/ticketActions";
 import type { TicketActionState } from "@/lib/support/types";
 import { t } from "@/lib/copy";
+import { formatDateTime } from "@/lib/format/datetime";
+import { buttonVariants } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Label, Textarea } from "@/components/ui/input";
 
 interface InternalNote {
   id: string;
@@ -28,26 +37,33 @@ function InternalNoteForm({ ticketId }: { ticketId: string }) {
     noteFormAction,
     null
   );
+  const textareaId = useId();
 
   return (
-    <form action={formAction} className="mt-3 flex flex-col gap-2">
+    <form action={formAction} className="flex flex-col gap-2">
       <input type="hidden" name="ticketId" value={ticketId} />
-      <textarea
+      {/* Nhãn sr-only: tiêu đề "Ghi chú nội bộ" ngay trên đã nói ô này để làm
+          gì cho người nhìn; trình đọc màn hình vẫn cần một nhãn gắn với ô. */}
+      <Label htmlFor={textareaId} className="sr-only">
+        {t("support.admin.noteLabel")}
+      </Label>
+      <Textarea
+        id={textareaId}
         name="noteText"
         rows={2}
         placeholder={t("support.admin.notePlaceholder")}
-        className="border-border bg-background rounded-md border p-2 text-sm"
+        className="min-h-20"
       />
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-3">
         <button
           type="submit"
           disabled={pending}
-          className="border-border hover:border-brand rounded-md border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
+          className={buttonVariants({ variant: "plain", size: "sm" })}
         >
           {pending ? t("common.working") : t("support.admin.noteSubmit")}
         </button>
         {state?.error && (
-          <p role="alert" className="text-brand text-xs">
+          <p role="alert" className="text-destructive text-sm">
             {state.error}
           </p>
         )}
@@ -58,18 +74,20 @@ function InternalNoteForm({ ticketId }: { ticketId: string }) {
 
 export function InternalNotesPanel({ ticketId, notes }: { ticketId: string; notes: InternalNote[] }) {
   return (
-    <div className="border-border mt-4 border-t pt-4">
+    <div className="flex flex-col gap-3">
+      <h3 className="text-sm font-semibold">{t("support.admin.notesTitle")}</h3>
       {notes.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t("support.admin.notesEmpty")}</p>
       ) : (
         <ul className="flex flex-col gap-2">
           {notes.map((note) => (
-            <li key={note.id} className="bg-card rounded-md p-2 text-sm">
-              <p className="whitespace-pre-wrap">{note.noteText}</p>
-              <p className="text-muted-foreground mt-1 text-xs">
-                {note.adminId ?? "—"} · {new Date(note.createdAt).toLocaleString()}
+            <Card key={note.id} as="li" variant="plain" padding="compact" className="gap-1">
+              <p className="text-sm leading-relaxed whitespace-pre-wrap">{note.noteText}</p>
+              <p className="text-muted-foreground flex flex-wrap gap-x-3 text-xs tabular-nums">
+                <span className="break-all">{note.adminId ?? "—"}</span>
+                <span>{formatDateTime(note.createdAt)}</span>
               </p>
-            </li>
+            </Card>
           ))}
         </ul>
       )}

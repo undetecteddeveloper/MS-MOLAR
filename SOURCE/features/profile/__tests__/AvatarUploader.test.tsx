@@ -176,10 +176,28 @@ describe("chọn xong — xem trước rồi mới Lưu (UI-D11)", () => {
     expect(document.activeElement).toBe(fileInput());
   });
 
-  it("thu hồi object URL khi tháo — không rò blob", () => {
-    const { unmount } = render(<Harness onSuccess={vi.fn()} onStatus={vi.fn()} />);
+  // Hợp đồng ĐỔI 2026-09-10, cùng lý do đã ghi trong AvatarUploader.tsx: bản
+  // trước thu hồi object URL trong cleanup của một effect, và dưới React
+  // StrictMode (mặc định của `next dev`) lượt "gắn → dọn → gắn lại" thu hồi
+  // đúng cái URL mà `useMemo` vừa tạo và sẽ không tạo lại — ảnh xem trước
+  // KHÔNG BAO GIỜ hiện ra khi chạy dev (đo: `naturalWidth = 0`). Nay URL được
+  // thu hồi ở `onLoad` của chính thẻ <img>: đúng thời điểm trình duyệt đã giải
+  // mã xong ảnh và URL hết việc, và không đi qua effect nào để StrictMode đụng
+  // vào. Đánh đổi đã cân: nếu người dùng đóng khối TRƯỚC khi ảnh giải mã xong
+  // thì một URL không được thu hồi — vài mili-giây trong đời một tab, đổi lấy
+  // một tính năng chạy được.
+  it("thu hồi object URL ngay khi ảnh xem trước tải xong — không rò blob", () => {
+    render(<Harness onSuccess={vi.fn()} onStatus={vi.fn()} />);
     pick(fakeFile("chan-dung.png", "image/png", 4096));
-    unmount();
+
+    const img = document.querySelector("#profile-avatar-panel img") as HTMLImageElement;
+    expect(img.getAttribute("src")).toBe("blob:fake-url");
+    // jsdom không tự tải ảnh nên `load` không bao giờ tự bắn; bắn tay đúng sự
+    // kiện mà trình duyệt thật sẽ bắn.
+    act(() => {
+      img.dispatchEvent(new Event("load"));
+    });
+
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:fake-url");
   });
 });

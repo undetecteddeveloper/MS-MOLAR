@@ -7,24 +7,32 @@
 // Screenshot CHỈ qua <img src=...> — không đi qua bất kỳ pipeline diễn giải
 // markup nào. Đây là chỗ một sản phẩm dành cho học sinh dễ bị XSS nhất nếu
 // đổi sai — xem lại proof obligation trước khi sửa file này.
+//
+// Theme "Sân trường" (2026-09-10): mở ra bằng `.motion-unfold` dưới một kẻ
+// chia; nội dung học sinh gõ nằm trong thẻ TRẮNG con (trắng trên surface tách
+// rõ mà không cần viền); ba dòng meta nhãn tiếng Việt; ảnh trên nền trắng bo
+// 14px thay viền.
 
 import type { TicketWithNotes } from "@/lib/supabase/service-role";
 import { t } from "@/lib/copy";
+import { Card } from "@/components/ui/card";
 import { TicketStatusControl } from "@/features/admin/components/tickets/TicketStatusControl";
 import { InternalNotesPanel } from "@/features/admin/components/tickets/InternalNotesPanel";
 
-export function TicketDetailPanel({ ticket }: { ticket: TicketWithNotes }) {
+export function TicketDetailPanel({ ticket, id }: { ticket: TicketWithNotes; id?: string }) {
   return (
-    <div className="border-border mt-3 border-t pt-3">
-      <p className="whitespace-pre-wrap text-sm">{ticket.message}</p>
+    <div id={id} className="motion-unfold border-border mt-3 flex flex-col gap-4 border-t pt-3">
+      <Card variant="plain" padding="compact">
+        <p className="text-sm leading-relaxed whitespace-pre-wrap">{ticket.message}</p>
+      </Card>
 
-      <dl className="text-muted-foreground mt-3 grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 text-xs">
+      <dl className="text-muted-foreground grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
         <dt>{t("support.admin.meta.page")}</dt>
         <dd className="whitespace-pre-wrap break-all">{ticket.pageUrl ?? "—"}</dd>
         <dt>{t("support.admin.meta.userAgent")}</dt>
         <dd className="whitespace-pre-wrap break-all">{ticket.userAgent ?? "—"}</dd>
         <dt>{t("support.admin.meta.screen")}</dt>
-        <dd>
+        <dd className="tabular-nums">
           {ticket.screenWidth ?? "?"}×{ticket.screenHeight ?? "?"}
         </dd>
       </dl>
@@ -34,13 +42,11 @@ export function TicketDetailPanel({ ticket }: { ticket: TicketWithNotes }) {
         <img
           src={ticket.screenshotUrl}
           alt={t("support.admin.screenshotAlt")}
-          className="border-border mt-3 max-h-80 rounded-md border object-contain"
+          className="bg-card max-h-80 self-start rounded-lg object-contain"
         />
       )}
 
-      <div className="mt-4">
-        <TicketStatusControl ticketId={ticket.id} status={ticket.status} />
-      </div>
+      <TicketStatusControl ticketId={ticket.id} status={ticket.status} />
 
       <InternalNotesPanel ticketId={ticket.id} notes={ticket.notes} />
     </div>

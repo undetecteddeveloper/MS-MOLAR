@@ -3,23 +3,24 @@
 // VÌ SAO KHÔNG PHẢI MỘT BỘ MARKDOWN: LegalDocument.tsx đã chốt "KHÔNG dùng
 // <RichText>" vì đó là đường dành cho UGC KHÔNG TIN CẬY, và vì kéo một bộ phân
 // tích markdown vào một trang tĩnh là thêm phụ thuộc cho một việc không cần.
-// Quyết định đó vẫn đứng. Cái ở đây KHÔNG phải markdown: nó đọc DUY NHẤT tiền
-// tố ĐẦU DÒNG của mỗi dòng, và KHÔNG phân tích gì bên trong dòng — không `**`,
-// không liên kết, không mã. Một chuỗi `**` lọt vào nội dung sẽ hiện ra nguyên
-// văn hai dấu sao chứ không âm thầm biến thành thẻ, và đó là hành vi ĐÚNG cho
-// văn bản pháp lý: cái hiện lên phải bằng đúng cái đã duyệt.
+// Cái ở đây KHÔNG phải markdown: nó đọc DUY NHẤT tiền tố ĐẦU DÒNG của mỗi
+// dòng, và KHÔNG phân tích gì bên trong dòng — không `**`, không liên kết,
+// không mã. Một chuỗi `**` lọt vào nội dung sẽ hiện ra nguyên văn hai dấu sao
+// chứ không âm thầm biến thành thẻ, và đó là hành vi ĐÚNG cho văn bản pháp lý:
+// cái hiện lên phải bằng đúng cái đã duyệt.
 //
 // BỐN LOẠI DÒNG, và không có loại thứ năm:
 //   "## "  → <h2>     mốc điều hướng cho trình đọc màn hình (WCAG 2.4.10)
 //   "- "   → <li>     các dòng "- " liền nhau gộp thành MỘT <ul>
-//   "> "   → khối lưu ý, viền trái, dùng cho cảnh báo trọng yếu
+//   "> "   → khối lưu ý, vạch xanh bên trái, dùng cho cảnh báo trọng yếu
 //   còn lại → <p>
 // Dòng trống chỉ để tách khối trong nguồn; nó không sinh phần tử nào.
 //
-// KHÔNG CÓ <table>: bản so sánh Free/Premium được viết thành các dòng "- ".
-// Một bảng ba cột ở 360px là đúng cái nguy cơ tràn ngang mà UI Spec § Layout
-// Constraints bắt phải ĐO, nên ở đây danh sách không phải một sự nhân nhượng —
-// nó là dạng đọc được trên điện thoại, nơi phần lớn người dùng thật sẽ đọc.
+// KHÔNG CÓ <table>: một bảng ba cột ở 360px là đúng cái nguy cơ tràn ngang mà
+// UI Spec bắt phải ĐO, nên danh sách là dạng đọc được trên điện thoại.
+//
+// Theme "Sân trường" (2026-09-10): h2 khối 18px/600 chữ thường (§2), cách khối
+// trước 8px thêm để mắt bắt được mốc; khối lưu ý là vạch xanh hành động 2px.
 
 /** Cắt thân văn bản thành khối. Trả về mảng phần tử đã dựng sẵn. */
 function renderBlocks(body: string): React.ReactNode[] {
@@ -53,7 +54,7 @@ function renderBlocks(body: string): React.ReactNode[] {
 
     if (line.startsWith("## ")) {
       out.push(
-        <h2 key={`h-${out.length}`} className="mt-2 text-base font-semibold">
+        <h2 key={`h-${out.length}`} className="mt-2 text-lg font-semibold">
           {line.slice(3)}
         </h2>
       );

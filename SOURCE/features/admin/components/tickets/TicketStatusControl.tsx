@@ -3,14 +3,27 @@
 // TicketStatusControl — đổi status ticket. changeTicketStatusAction(ticketId,
 // nextStatus) là 2 tham số PHẲNG (task-13), không khớp trực tiếp khuôn
 // useActionState (prevState, formData) — statusFormAction là adapter cục bộ
-// bắc cầu hai hình dạng đó (frontend DD Fact Disposition Table).
+// bắc cầu hai hình dạng đó.
+//
+// Theme "Sân trường" (2026-09-10): ô chọn là primitive Select (cùng vỏ Input,
+// 44px), nút Lưu xanh cùng cao 44px đứng cạnh từ 640px, xếp dọc dưới đó.
 
-import { useActionState } from "react";
+import { useActionState, useId } from "react";
 import { changeTicketStatusAction } from "@/features/admin/ticketActions";
 import type { TicketActionState, TicketStatus } from "@/lib/support/types";
 import { t } from "@/lib/copy";
+import type { MessageKey } from "@/lib/copy";
+import { cn } from "@/lib/utils";
+import { buttonVariants } from "@/components/ui/button";
+import { Label, Select } from "@/components/ui/input";
 
 const STATUSES: readonly TicketStatus[] = ["new", "in_progress", "resolved"];
+
+const STATUS_LABEL_KEY: Record<TicketStatus, MessageKey> = {
+  new: "support.admin.status.new",
+  in_progress: "support.admin.status.inProgress",
+  resolved: "support.admin.status.resolved",
+};
 
 async function statusFormAction(
   _prev: TicketActionState,
@@ -26,39 +39,40 @@ export function TicketStatusControl({ ticketId, status }: { ticketId: string; st
     statusFormAction,
     null
   );
+  const selectId = useId();
 
   return (
-    <form action={formAction} className="flex items-center gap-2">
+    <form action={formAction} className="flex flex-col gap-2">
       <input type="hidden" name="ticketId" value={ticketId} />
-      <select
-        name="status"
-        defaultValue={status}
-        disabled={pending}
-        className="border-border bg-background rounded-md border px-2 py-1.5 text-sm disabled:opacity-50"
-      >
-        {STATUSES.map((s) => (
-          <option key={s} value={s}>
-            {t(
-              s === "new"
-                ? "support.admin.status.new"
-                : s === "in_progress"
-                  ? "support.admin.status.inProgress"
-                  : "support.admin.status.resolved"
-            )}
-          </option>
-        ))}
-      </select>
-      {/* disabled (native), mirror ModerationRow.tsx's own convention exactly
-          — this admin surface's precedent uses native disabled, not aria-disabled. */}
-      <button
-        type="submit"
-        disabled={pending}
-        className="border-border hover:border-brand rounded-md border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
-      >
-        {pending ? t("common.working") : t("common.save")}
-      </button>
+      <Label htmlFor={selectId} className="mb-0">
+        {t("support.admin.statusLabel")}
+      </Label>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <Select
+          id={selectId}
+          name="status"
+          defaultValue={status}
+          disabled={pending}
+          wrapperClassName="sm:w-56"
+        >
+          {STATUSES.map((s) => (
+            <option key={s} value={s}>
+              {t(STATUS_LABEL_KEY[s])}
+            </option>
+          ))}
+        </Select>
+        {/* disabled (native), mirror ModerationRow — bề mặt quản trị này dùng
+            disabled gốc, không phải aria-disabled.
+            `self-start`: trong cột dọc ở mobile, nút mặc định giãn hết bề ngang
+            và đuôi phải của nó rơi dưới nút hỗ trợ nổi (đo 360×740: nút Lưu
+            28–332 × 595–639, nút hỗ trợ 288–344 × 608–664 — đè 44×31px). Co
+            theo chữ thì nút kết thúc ở x≈120. */}
+        <button type="submit" disabled={pending} className={cn(buttonVariants(), "self-start")}>
+          {pending ? t("common.working") : t("common.save")}
+        </button>
+      </div>
       {state?.error && (
-        <p role="alert" className="text-brand text-xs">
+        <p role="alert" className="text-destructive text-sm">
           {state.error}
         </p>
       )}
