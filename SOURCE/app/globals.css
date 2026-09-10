@@ -312,6 +312,18 @@
    CSS thuần cuối file). Nếu tái diễn: nghi Turbopack persistent cache trên
    Vercel; đổi nội dung file này thật để build không tái dùng artifact.
 
+   TÁI DIỄN 2026-09-10, lần này nặng hơn: lượt deploy production đầu tiên của
+   nhánh refactor ra HTML MỚI kèm CSS CŨ. `verify:deployed` bắt được — file CSS
+   được nạp chỉ phủ 94,51% (thiếu 33 token), và những token thiếu đúng là lõi
+   theme mới: `--surface`, `--sun`, `--success`, `--wrong`, cả họ `--motion-*`
+   và `--ease-*`, `rounded-card`, `bg-sun`. Đọc thẳng file CSS mà production
+   phục vụ: KHÔNG có `#117a45` hay `#eef7f1`, nhưng CÓ `#EDE1C8`, `#1B1512`,
+   `#A62C2B` — tức bảng màu "Mực & Sơn mài" của theme CŨ. Trong khi HTML cùng
+   lượt đó đã là mã mới (h1 của /about hiện rõ, đúng lớp PageHeader). Build cục
+   bộ trên đúng commit ấy sinh CSS ĐÚNG (190 biến), nên lỗi nằm ở cache của
+   Vercel, không ở mã. Cách chữa đã dùng: đổi thật nội dung file này rồi push
+   để build không còn artifact nào để tái dùng.
+
    Trễ 180ms trước khi fade vào (khuyến nghị useLinkStatus): điều hướng đã
    prefetch thường về đích trong vài chục ms, hiện ngay sẽ nháy trên mọi cú
    bấm. `visibility` chứ không `display` để ảnh logo vẫn được tải sẵn.
