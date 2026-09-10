@@ -19,8 +19,8 @@ export default async function ResetPasswordPage() {
           {t("auth.setNewPassword")}
         </h1>
         <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
-          {t("auth.signedInAs")} <span className="font-medium">{user.email}</span>. Enter a new
-          password for your account.
+          {t("auth.signedInAs")} <span className="font-medium">{user.email}</span>.{" "}
+          {t("auth.resetPasswordIntro")}
         </p>
         <div className="mt-6">
           <ResetPasswordForm />

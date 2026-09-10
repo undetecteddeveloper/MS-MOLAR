@@ -438,7 +438,9 @@ export const copy = {
   "result.correctAnswerLabel": "Đáp án đúng:",
   "result.skipped": "— bỏ trống —",
   "report.submitError": "Chưa gửi được báo cáo lúc này. Bạn thử lại nhé.",
-  "auth.enterNewPasswordFor": "Nhập mật khẩu mới cho",
+  "auth.resetPasswordIntro": "Hãy nhập mật khẩu mới cho tài khoản này.",
+  "auth.newPassword": "Mật khẩu mới",
+  "auth.confirmNewPassword": "Nhập lại mật khẩu mới",
   "history.shareUnsupported": "Đã tải về — trình duyệt này không hỗ trợ chia sẻ.",
 
   "error.somethingBroke": "Có gì đó hỏng rồi",
@@ -516,6 +518,7 @@ export const copy = {
   "status.draft": "Bản nháp",
   "status.published": "Đã đăng",
   "status.needsFixing": "Cần sửa",
+  "status.removed": "Đã gỡ",
 
   // --- Kiểm duyệt (bổ sung) -----------------------------------------------
   "admin.intro":
@@ -690,6 +693,9 @@ export const copy = {
   "support.admin.status.new": "Mới",
   "support.admin.status.inProgress": "Đang xử lý",
   "support.admin.status.resolved": "Đã xử lý",
+  "support.admin.meta.page": "Trang",
+  "support.admin.meta.userAgent": "Trình duyệt",
+  "support.admin.meta.screen": "Màn hình",
 
   // --- Gia sư AI (Giải thích bước này) — Engine 1 Adaptive AI ---
   // Đặt cùng vị trí tương đối với en.ts để hai file dễ so nhau; `Dictionary`

@@ -17,8 +17,13 @@ export function ResetPasswordForm() {
 
   return (
     <form action={formAction} className="flex flex-col gap-5">
-      <Field id="password" name="password" label="New password" autoComplete="new-password" />
-      <Field id="confirm" name="confirm" label="Confirm new password" autoComplete="new-password" />
+      <Field id="password" name="password" label={t("auth.newPassword")} autoComplete="new-password" />
+      <Field
+        id="confirm"
+        name="confirm"
+        label={t("auth.confirmNewPassword")}
+        autoComplete="new-password"
+      />
 
       <p className="text-xs text-[color:var(--muted-foreground)]">
         {t("auth.passwordHint", { min: PASSWORD_MIN_LENGTH })}

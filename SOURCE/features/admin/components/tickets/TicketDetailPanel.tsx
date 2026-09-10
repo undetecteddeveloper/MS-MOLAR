@@ -19,11 +19,11 @@ export function TicketDetailPanel({ ticket }: { ticket: TicketWithNotes }) {
       <p className="whitespace-pre-wrap text-sm">{ticket.message}</p>
 
       <dl className="text-muted-foreground mt-3 grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 text-xs">
-        <dt>URL</dt>
+        <dt>{t("support.admin.meta.page")}</dt>
         <dd className="whitespace-pre-wrap break-all">{ticket.pageUrl ?? "—"}</dd>
-        <dt>User-Agent</dt>
+        <dt>{t("support.admin.meta.userAgent")}</dt>
         <dd className="whitespace-pre-wrap break-all">{ticket.userAgent ?? "—"}</dd>
-        <dt>Screen</dt>
+        <dt>{t("support.admin.meta.screen")}</dt>
         <dd>
           {ticket.screenWidth ?? "?"}×{ticket.screenHeight ?? "?"}
         </dd>

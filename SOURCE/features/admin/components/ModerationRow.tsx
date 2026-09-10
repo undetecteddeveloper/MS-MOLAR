@@ -4,7 +4,21 @@
 import { useActionState } from "react";
 import { moderateExamAction, type ModerationState } from "@/features/admin/actions";
 import { t } from "@/lib/copy";
+import type { MessageKey } from "@/lib/copy";
 import type { ModeratableExam } from "@/lib/supabase/service-role";
+
+/** Trạng thái đề là KHOÁ tiếng Anh trong DB ("published", "removed"…) — không
+ *  bao giờ in thẳng ra màn hình. Cùng bảng nhãn với StatusBadge của nhóm tác
+ *  giả, cộng "removed" (chỉ có ở màn kiểm duyệt). Giá trị lạ rơi về "Đang xử
+ *  lý" theo đúng lệ `CONFIG[status] ?? CONFIG.processing` của StatusBadge. */
+const STATUS_LABEL_KEY: Record<string, MessageKey> = {
+  processing: "status.processing",
+  review: "status.needsReview",
+  draft: "status.draft",
+  published: "status.published",
+  failed: "status.needsFixing",
+  removed: "status.removed",
+};
 
 export function ModerationRow({ exam }: { exam: ModeratableExam }) {
   const [state, formAction, pending] = useActionState<ModerationState, FormData>(
@@ -31,7 +45,8 @@ export function ModerationRow({ exam }: { exam: ModeratableExam }) {
             {exam.authorDisplayName
               ? ` · ${t("common.by")} ${exam.authorDisplayName}`
               : ""}{" "}
-            · {t("admin.statusLabel")} {exam.status}
+            · {t("admin.statusLabel")}{" "}
+            {t(STATUS_LABEL_KEY[exam.status] ?? "status.processing")}
           </span>
         </div>
         <button
