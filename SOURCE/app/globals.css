@@ -334,6 +334,18 @@
    MS-MOLAR (ô logo trên header đang cố ý để trống chờ logo mới, §doc dòng 10).
    Thay bằng ba chấm nhấp nhô vẽ thẳng bằng token: chỉ báo chờ không còn phải
    tải một tấm ảnh nửa MB — đúng thứ nó sinh ra để che.
+
+   TÁI DIỄN LẦN BA, CÙNG NGÀY 2026-09-11: đúng commit đổi `.route-loading-mark`
+   (ảnh) thành `.route-loading-dot` (ba chấm) lên production, `verify:deployed`
+   báo đỏ — CSS đã deploy còn nguyên `route-loading-mark`/`route-loading-spin`
+   của bản ảnh cũ, không có `route-loading-dot`/`route-loading-wave`. Lần này
+   ĐỌC ĐƯỢC NGUYÊN NHÂN THẲNG TỪ LOG BUILD (Vercel, không phải suy luận): dòng
+   đầu tiên là "Restored build cache from previous deployment", và "Compiled
+   successfully in 3.8s" — nhanh bất thường so với build cục bộ (~20s). Cache
+   build liên tục (persistent) của Turbopack trên Vercel giữ lại bản dựng CSS
+   TỪ COMMIT TRƯỚC dù mã nguồn đã đổi. Cách chữa vẫn là đổi thật nội dung file
+   này để cache không còn gì để tái dùng — đoạn bạn đang đọc CHÍNH LÀ lượt đổi
+   đó.
    ============================================================ */
 @keyframes route-loading-appear {
   to {
