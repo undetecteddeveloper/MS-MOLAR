@@ -6,26 +6,27 @@
 //
 // ⚠ Satori KHÔNG hỗ trợ đủ CSS như trình duyệt — chỉ flexbox, không grid,
 // mọi phần tử nhiều con phải khai `display: flex` tường minh.
+//
+// Theme "Sân trường" (2026-09-11), và đây là màn hình NGƯỜI LẠ NHÌN THẤY ĐẦU
+// TIÊN về sản phẩm. Bản trước sai hai chuyện cùng lúc: bảng màu vẫn là "Mực &
+// Sơn mài" (kem/nâu đen/đỏ son), và câu giới thiệu viết bằng tiếng Anh trên
+// một sản phẩm chỉ có tiếng Việt. Ảnh `brand-mark.png` cũng gỡ: hình trong đó
+// là khối "PAGS", không phải mốc thương hiệu của MS-MOLAR — ô logo trên header
+// đang cố ý để trống chờ logo mới, ảnh chia sẻ đi theo đúng quyết định đó.
 
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { ImageResponse } from "next/og";
+import { t } from "@/lib/copy";
 
-export const alt = "MS-MOLAR — practise exams online";
+export const alt = t("meta.ogAlt");
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-// Đọc lúc render trên server (không phải bundle client). Dùng bản 256px thay
-// vì brand_logo.png 497KB — Satori chỉ vẽ nó ở 200px.
-const markDataUri = `data:image/png;base64,${readFileSync(
-  join(process.cwd(), "public/images/brand-mark.png"),
-).toString("base64")}`;
-
-// Theme "Mực & Sơn mài" (globals.css) — giữ đúng token của globals.css.
-const INK = "#1B1512";
-const IVORY = "#EDE1C8";
-const VERMILION = "#A62C2B";
-const BRONZE = "#B08D57";
+// Token của globals.css chép tay sang: Satori không đọc được biến CSS.
+const WHITE = "#ffffff";
+const INK = "#14291c";
+const MUTED = "#4f6656";
+const PRIMARY = "#117a45";
+const SUN = "#ffc531";
 
 export default function OpengraphImage() {
   return new ImageResponse(
@@ -35,23 +36,20 @@ export default function OpengraphImage() {
           width: "100%",
           height: "100%",
           display: "flex",
-          alignItems: "center",
-          gap: 64,
-          padding: "0 88px",
-          background: IVORY,
-          // Hairline đỏ son quanh mép — phẳng, không đổ bóng, đúng tinh thần
-          // "flat + hairline" của globals.css.
-          borderTop: `18px solid ${VERMILION}`,
-          borderBottom: `18px solid ${VERMILION}`,
+          flexDirection: "column",
+          justifyContent: "center",
+          padding: "0 96px",
+          background: WHITE,
+          // Hai vệt xanh sát mép trên/dưới — phẳng, không đổ bóng, không
+          // gradient, đúng tinh thần của globals.css.
+          borderTop: `18px solid ${PRIMARY}`,
+          borderBottom: `18px solid ${PRIMARY}`,
         }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element -- Satori chỉ hiểu <img>, không dùng được next/image. */}
-        <img src={markDataUri} width={220} height={220} alt="" />
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
           <div
             style={{
-              fontSize: 76,
+              fontSize: 84,
               fontWeight: 700,
               letterSpacing: "-0.02em",
               color: INK,
@@ -59,22 +57,26 @@ export default function OpengraphImage() {
           >
             MS-MOLAR
           </div>
-          <div style={{ display: "flex", width: 120, height: 3, background: BRONZE }} />
+
+          {/* Một điểm vàng nắng duy nhất trên cả tấm ảnh — vàng ở theme này
+              không bao giờ là ranh giới thông tin một mình, ở đây nó chỉ là
+              gạch trang trí dưới tên. */}
+          <div style={{ display: "flex", width: 132, height: 6, background: SUN }} />
+
           {/* Xuống dòng thủ công: Satori không tự wrap theo ý muốn, tách 2 dòng
               riêng để ngắt câu đúng chỗ. gap nhỏ để 2 dòng đọc như một khối. */}
           <div
             style={{
               display: "flex",
               flexDirection: "column",
-              gap: 6,
-              fontSize: 34,
+              gap: 8,
+              fontSize: 38,
               lineHeight: 1.3,
-              color: INK,
-              opacity: 0.82,
+              color: MUTED,
             }}
           >
-            <div>Practise real exams online. Instant scoring,</div>
-            <div>worked answers, progress you can track.</div>
+            <div>{t("meta.ogTaglineLine1")}</div>
+            <div>{t("meta.ogTaglineLine2")}</div>
           </div>
         </div>
       </div>

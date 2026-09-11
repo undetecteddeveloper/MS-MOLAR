@@ -27,14 +27,6 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(search),
 }));
 
-// next/image trong jsdom: chỉ cần một <img> để cây render được.
-vi.mock("next/image", () => ({
-  default: ({ src, alt, className }: { src: string; alt: string; className?: string }) => (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src={src} alt={alt} className={className} />
-  ),
-}));
-
 function overlay() {
   const el = document.querySelector(".route-loading");
   if (!el) throw new Error("không thấy lớp phủ");
@@ -87,10 +79,25 @@ afterEach(() => {
 });
 
 describe("RouteLoadingOverlay", () => {
-  it("mặc định ẩn, và LUÔN có mặt trong DOM (ảnh logo phải tải sẵn)", () => {
+  it("mặc định ẩn, nhưng LUÔN có mặt trong DOM", () => {
     render(<RouteLoadingOverlay />);
     expect(isPending()).toBe(false);
-    expect(document.querySelector("img")?.getAttribute("src")).toBe("/images/brand_logo.png");
+  });
+
+  // Chỉ báo chờ phải vẽ được bằng chính nó, không đi tải gì thêm: bản trước
+  // quay một ảnh logo 497KB, tức lượt "đang tải" nào cũng phải chờ tải ảnh
+  // trước khi báo được là đang tải. Ba chấm + số thứ tự `--motion-i` là hợp
+  // đồng với globals.css (jsdom không nạp CSS nên kiểm phần DOM nó bám vào).
+  it("chỉ báo là ba chấm vẽ bằng CSS — không ảnh nào phải tải", () => {
+    render(<RouteLoadingOverlay />);
+    const dots = document.querySelectorAll(".route-loading-dot");
+    expect(dots).toHaveLength(3);
+    expect([...dots].map((d) => d.getAttribute("style"))).toEqual([
+      "--motion-i: 0;",
+      "--motion-i: 1;",
+      "--motion-i: 2;",
+    ]);
+    expect(document.querySelector("img")).toBeNull();
   });
 
   it("bấm liên kết sang path khác → bật; route mới commit → tự tắt", async () => {

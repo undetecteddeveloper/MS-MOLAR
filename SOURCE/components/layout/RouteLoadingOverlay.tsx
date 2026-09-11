@@ -37,13 +37,18 @@
 //      route nào commit, cũng không có sự kiện nào bắn. Sau ngần này mili giây
 //      thì trả màn hình lại cho người dùng, thà mất chỉ báo còn hơn khoá cứng.
 //
-// Lớp phủ LUÔN nằm trong DOM (ẩn bằng `visibility`), CỐ Ý: ảnh logo vì thế
-// được tải xong từ lúc trang load: nếu chỉ mount lúc bấm thì chỉ báo "đang
-// tải" của ta lại phải chờ tải một tấm ảnh — đúng thứ nó sinh ra để che.
-// Phần fade-in trễ 180ms (globals.css) làm nốt việc còn lại: điều hướng đã
-// prefetch xong chạy nhanh hơn ngần đó sẽ không nháy gì lên màn hình cả.
+// Lớp phủ LUÔN nằm trong DOM (ẩn bằng `visibility`), CỐ Ý: không phải dựng cây
+// DOM vào đúng khoảnh khắc trình duyệt đang bận điều hướng. Phần fade-in trễ
+// 180ms (globals.css) làm nốt việc còn lại: điều hướng đã prefetch xong chạy
+// nhanh hơn ngần đó sẽ không nháy gì lên màn hình cả.
+//
+// Theme "Sân trường" (2026-09-11): chỉ báo chờ là BA CHẤM nhấp nhô, vẽ bằng
+// token màu, không còn ảnh nào. Bản trước quay `brand_logo.png` — 497KB, và
+// hình trong đó là khối "PAGS" vàng viền đỏ, không phải mốc thương hiệu của
+// MS-MOLAR (ô logo trên header đang để trống chờ logo mới). Một chỉ báo "đang
+// tải" phải chờ tải nửa MB ảnh là tự mâu thuẫn, nhất là trên Android tầm trung
+// và mạng yếu — nhóm người dùng chính (PROJECT_OVERVIEW §1).
 
-import Image from "next/image";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { t } from "@/lib/copy";
@@ -145,26 +150,30 @@ export function RouteLoadingOverlay() {
       <div
         aria-hidden
         data-pending={pending ? "true" : "false"}
-        // Nền ngà 94%: đủ đục để chữ "LOADING" và logo tách khỏi tiêu đề trang
-        // bên dưới, vẫn còn thấy được trang cũ mờ mờ — đây là lớp phủ chờ, nếu
-        // che kín 100% thì nó thành một trang trắng và người dùng mất mốc "mình
-        // vẫn đang ở đâu đó". KHÔNG dùng backdrop-blur: máy Android tầm trung
-        // (nhóm người dùng chính, PROJECT_OVERVIEW §1) trả giá thật cho nó,
-        // đúng vào lúc thiết bị đang bận điều hướng.
-        className="route-loading pointer-events-none fixed inset-0 z-[90] flex flex-col items-center justify-center gap-5 bg-[#EDE1C8]/94"
+        // Nền surface 94%: đủ đục để ba chấm và chữ tách khỏi tiêu đề trang bên
+        // dưới, vẫn còn thấy được trang cũ mờ mờ — đây là lớp phủ chờ, nếu che
+        // kín 100% thì nó thành một trang trắng và người dùng mất mốc "mình vẫn
+        // đang ở đâu đó". Xanh nhạt chứ không trắng: trang nền đã là trắng, một
+        // lớp trắng phủ lên trắng thì không có ranh giới nào để mắt bắt vào —
+        // đúng cách theme này phân lớp, bằng NỀN TÔ chứ không bằng viền.
+        // KHÔNG dùng backdrop-blur: máy Android tầm trung (nhóm người dùng
+        // chính, PROJECT_OVERVIEW §1) trả giá thật cho nó, đúng vào lúc thiết bị
+        // đang bận điều hướng.
+        className="route-loading bg-surface/94 pointer-events-none fixed inset-0 z-[90] flex flex-col items-center justify-center gap-5"
       >
-        {/* width/height = tỉ lệ gốc 715×650 ở mật độ 2× của cỡ hiển thị 72px,
-            để logo không rỗ trên màn hình retina. Cỡ THẬT do class quyết. */}
-        <Image
-          src="/images/brand_logo.png"
-          alt=""
-          width={158}
-          height={144}
-          className="route-loading-mark h-[72px] w-auto"
-        />
-        <p className="font-sans text-xs font-medium tracking-[0.2em] text-[#1B1512]/70 uppercase">
-          {label}
-        </p>
+        {/* `items-end`: ba chấm nhấp nhô LÊN, nên mép dưới là đường chuẩn đứng
+            yên để mắt đọc ra biên độ. `--motion-i` là số thứ tự chấm, globals.css
+            nhân ra độ trễ — cùng khuôn với thanh biểu đồ ở Thống kê. */}
+        <div className="flex items-end gap-3">
+          {[0, 1, 2].map((i) => (
+            <span
+              key={i}
+              className="route-loading-dot bg-primary size-3 rounded-full"
+              style={{ "--motion-i": i } as React.CSSProperties}
+            />
+          ))}
+        </div>
+        <p className="text-muted-foreground text-sm font-medium">{label}</p>
       </div>
 
       {/* aria-live chỉ được đọc khi NỘI DUNG đổi, không phải khi phần tử hiện

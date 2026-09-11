@@ -455,6 +455,13 @@ export const copy = {
   "error.notFoundBody": "Liên kết có thể đã hỏng, hoặc đề đã bị tác giả gỡ xuống hay xoá đi.",
   "error.reference": "Mã tham chiếu:",
 
+  // --- Ảnh preview khi chia sẻ link (app/opengraph-image.tsx) -------------
+  // Tách sẵn thành hai dòng: Satori không tự ngắt dòng theo ý muốn, nên chỗ
+  // xuống dòng phải do câu chữ quyết định chứ không do bề rộng ảnh.
+  "meta.ogAlt": "MS-MOLAR — luyện đề trực tuyến",
+  "meta.ogTaglineLine1": "Luyện đề thật, có đồng hồ bấm giờ.",
+  "meta.ogTaglineLine2": "Chấm điểm tức thì, biết ngay mình yếu chỗ nào.",
+
   // --- Dùng chung (bổ sung) -----------------------------------------------
   "common.all": "Tất cả",
   "common.subject": "Môn học",

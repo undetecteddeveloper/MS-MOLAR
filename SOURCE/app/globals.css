@@ -326,7 +326,14 @@
 
    Trễ 180ms trước khi fade vào (khuyến nghị useLinkStatus): điều hướng đã
    prefetch thường về đích trong vài chục ms, hiện ngay sẽ nháy trên mọi cú
-   bấm. `visibility` chứ không `display` để ảnh logo vẫn được tải sẵn.
+   bấm. `visibility` chứ không `display` để lớp phủ ở SẴN trong cây — không
+   phải dựng DOM vào đúng khoảnh khắc trình duyệt đang bận điều hướng.
+
+   THEME "SÂN TRƯỜNG" (2026-09-11): bản cũ quay ảnh `brand_logo.png` 497KB —
+   một khối vuông vàng viền đỏ in "PAGS", tức KHÔNG PHẢI mốc thương hiệu của
+   MS-MOLAR (ô logo trên header đang cố ý để trống chờ logo mới, §doc dòng 10).
+   Thay bằng ba chấm nhấp nhô vẽ thẳng bằng token: chỉ báo chờ không còn phải
+   tải một tấm ảnh nửa MB — đúng thứ nó sinh ra để che.
    ============================================================ */
 @keyframes route-loading-appear {
   to {
@@ -334,17 +341,29 @@
   }
 }
 
-@keyframes route-loading-spin {
-  to {
-    transform: rotate(360deg);
+/* Ba chấm nhấp nhô thành gợn sóng: mỗi chấm lên 8px rồi về, chấm sau trễ chấm
+   trước 160ms nên sóng quét hết dãy trong 320ms rồi nghỉ. BIÊN ĐỘ CỐ ĐỊNH
+   (8px, không theo cỡ chữ) vì ở đây chuyển động chính là thông tin: nó phải
+   đọc được như nhau trên mọi cỡ màn. Chỉ `translate` — không layout, không
+   repaint, chạy trên compositor đúng lúc thiết bị đang bận điều hướng.
+   `ease-in-out` thường chứ không phải `--ease-in-out-strong`: đường cong mạnh
+   giữ chấm đứng lại ở hai đầu, ra ba cú nhảy rời rạc thay vì một gợn sóng. */
+@keyframes route-loading-wave {
+  0%,
+  60%,
+  100% {
+    translate: 0 0;
+  }
+  30% {
+    translate: 0 -8px;
   }
 }
 
-/* Bản cho người tắt hiệu ứng: nhịp mờ/tỏ tại chỗ — ở đây chuyển động CHÍNH
-   LÀ thông tin, bỏ hết thì lớp phủ đứng im như một trang treo. */
+/* Bản cho người tắt hiệu ứng: nhịp mờ/tỏ tại chỗ, vẫn lệch pha theo từng chấm
+   — bỏ hết thì lớp phủ đứng im như một trang treo. */
 @keyframes route-loading-pulse {
   50% {
-    opacity: 0.35;
+    opacity: 0.3;
   }
 }
 
@@ -358,13 +377,18 @@
   animation: route-loading-appear 200ms ease-out 180ms forwards;
 }
 
-.route-loading[data-pending="true"] .route-loading-mark {
-  animation: route-loading-spin 1200ms linear infinite;
+.route-loading[data-pending="true"] .route-loading-dot {
+  animation: route-loading-wave 1000ms ease-in-out infinite;
+  animation-delay: calc(var(--motion-i, 0) * 160ms);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .route-loading[data-pending="true"] .route-loading-mark {
-    animation: route-loading-pulse 1600ms ease-in-out infinite;
+  .route-loading[data-pending="true"] .route-loading-dot {
+    animation: route-loading-pulse 1200ms ease-in-out infinite;
+    /* Khai LẠI độ trễ: dạng viết tắt `animation` ở dòng trên reset
+       `animation-delay` về 0s, ba chấm sẽ mờ/tỏ đồng loạt như một khối nháy.
+       Giữ lệch pha thì vẫn còn đọc ra được cái "lần lượt" của gợn sóng. */
+    animation-delay: calc(var(--motion-i, 0) * 160ms);
   }
 }
 

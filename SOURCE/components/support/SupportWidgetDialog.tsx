@@ -160,7 +160,7 @@ export function SupportWidgetDialog({ open, onClose }: SupportWidgetDialogProps)
         aria-hidden
         tabIndex={-1}
         onClick={resetAndClose}
-        className="motion-scrim absolute inset-0 cursor-default bg-[#1B1512]/40"
+        className="motion-scrim bg-foreground/40 absolute inset-0 cursor-default"
       />
       <div
         ref={dialogRef}
