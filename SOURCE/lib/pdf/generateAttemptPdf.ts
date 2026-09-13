@@ -91,7 +91,8 @@ export async function generateAttemptPdfFile(data: AttemptPdfData): Promise<File
     await waitForTemplateAssets(container);
 
     const canvas = await html2canvas(container.firstElementChild as HTMLElement, {
-      backgroundColor: "#ede1c8",
+      // Cùng nền với template (theme "Sân trường": trang trắng, 2026-09-13).
+      backgroundColor: "#ffffff",
       scale: 2,
       useCORS: true,
     });

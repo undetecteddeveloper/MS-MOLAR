@@ -4,6 +4,8 @@
 // Consumed identically by generateAttemptPdf.ts (Task 09), result/page.tsx's
 // ScoreCard usage (Task 12), and HistoryRow (Task 13) — no per-caller reformatting.
 
+import { normalizeSearch } from "@/lib/search/normalize";
+
 const EM_DASH = "—";
 
 function pad2(n: number): string {
@@ -79,13 +81,17 @@ export function formatOvertime(overtimeSeconds: number): string {
 
 const MAX_SLUG_LENGTH = 60;
 
-/** Lowercase, non-alphanumeric runs collapsed to single hyphens, <=60 chars, no leading/trailing hyphen. */
+/** Lowercase, bỏ dấu tiếng Việt, mọi run ký tự lạ gom thành MỘT gạch nối, ≤60
+ *  ký tự, không gạch nối ở hai đầu.
+ *
+ *  Bỏ dấu TRƯỚC khi gom (2026-09-13, engineer test trên điện thoại thật): bản
+ *  cũ coi mọi chữ có dấu là "không phải [a-z0-9]", nên "Kiểm tra cuối học kỳ
+ *  II" ra tệp `ki-m-tra-cu-i-h-c-k-ii.pdf`. Dùng chính bộ chuẩn hoá của tìm đề
+ *  (`normalizeSearch`: NFD, bỏ dấu kết hợp, đ→d, còn lại [a-z0-9 ] đã gộp và
+ *  cắt hai đầu) rồi đổi khoảng trắng thành gạch nối — không viết một bản bỏ
+ *  dấu thứ hai để lệch với bản kia. */
 function slugify(title: string): string {
-  const collapsed = title
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+  const collapsed = normalizeSearch(title).replace(/ /g, "-");
   if (collapsed === "") return "exam";
 
   const truncated = collapsed.slice(0, MAX_SLUG_LENGTH).replace(/-+$/g, "");

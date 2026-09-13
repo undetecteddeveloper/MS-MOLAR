@@ -133,6 +133,17 @@ describe("buildPdfFilename", () => {
     ).toBe("geometry-chapter-2-review_20260305.pdf");
   });
 
+  it("bỏ dấu tiếng Việt thay vì cắt chữ có dấu thành gạch nối (lỗi 2026-09-13)", () => {
+    expect(buildPdfFilename("Kiểm tra cuối học kỳ II", "2026-07-15T09:00:00.000Z")).toBe(
+      "kiem-tra-cuoi-hoc-ky-ii_20260715.pdf",
+    );
+    // đ/Đ không phân rã được bằng NFD — phải đổi tường minh, và gạch ngang dài
+    // (–) là ký tự lạ như mọi dấu câu khác.
+    expect(buildPdfFilename("Đề thi Ngữ văn – Đọc hiểu", "2026-07-15T09:00:00.000Z")).toBe(
+      "de-thi-ngu-van-doc-hieu_20260715.pdf",
+    );
+  });
+
   it("falls back to the exam slug for an empty/whitespace title", () => {
     expect(buildPdfFilename("   ", "2026-07-15T09:00:00.000Z")).toBe(
       "exam_20260715.pdf",

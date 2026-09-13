@@ -145,7 +145,19 @@ describe("AttemptPdfTemplate — chú thích tự luận chưa hoàn tất", () 
     // có sẵn trong file, không mang màu mới. Việc "không hàm màu hiện đại nào
     // lọt vào" đã có một rào chắn RIÊNG ở trên trong chính file này — nhân bản
     // nó ở đây chỉ tạo một lời khai thứ hai để trôi lệch.
-    expect(SOURCE_TEXT).toContain("#605a52");
+    // `#4f6656` = `--muted-foreground` của theme "Sân trường" (2026-09-13;
+    // trước đó là `#605a52` của theme cũ).
+    expect(SOURCE_TEXT).toContain("#4f6656");
     expect(SOURCE_TEXT).not.toMatch(/className=/);
+  });
+
+  it("theme 'Sân trường' (2026-09-13): nền trắng, điểm xanh hành động, chữ Lexend qua biến của next/font", () => {
+    expect(SOURCE_TEXT).toContain('"#ffffff"');
+    expect(SOURCE_TEXT).toContain('"#117a45"');
+    expect(SOURCE_TEXT).toContain("var(--font-lexend)");
+    // Hai họ chữ của theme cũ không còn được nạp ở app/layout.tsx — gọi tên
+    // chúng là rơi về font hệ thống.
+    expect(SOURCE_TEXT).not.toContain("Be Vietnam Pro");
+    expect(SOURCE_TEXT).not.toContain("Source Serif 4");
   });
 });
