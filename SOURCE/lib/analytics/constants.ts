@@ -34,6 +34,26 @@ export interface SubjectStats {
   /** Tổng giây làm bài (bắt đầu → nộp) của các lượt trong khoảng — dữ liệu của
    *  vòng tròn "Thời gian luyện theo môn" (engineer 2026-09-06). */
   seconds: number;
+  /** Điểm TRUNG BÌNH (thang 10) của các lượt đã chấm xong trong khoảng; `null`
+   *  khi chưa lượt nào chấm xong. Dữ liệu của hàng Ngữ văn/Tiếng Anh trong
+   *  "Kết quả theo môn" (engineer 2026-09-13): câu tự luận chỉ "đúng" khi trọn
+   *  điểm nên đếm đúng/sai không diễn tả được hai môn này — điểm mới diễn tả. */
+  avgScore: number | null;
+  /** Số lượt còn câu tự luận đang chấm — không kéo trung bình về 0. */
+  pendingSessions: number;
+  /** Số câu tự luận nộp TRỐNG trong khoảng (mỗi câu tính 0 điểm — quy ước "bỏ
+   *  trống = sai"; đây là con số nói vì sao trung bình thấp). */
+  blankEssays: number;
+}
+
+/** Hai môn hiện ĐIỂM TRUNG BÌNH thay cho đúng/sai (engineer 2026-09-13). Cố
+ *  định theo môn, không theo "đề có câu tự luận hay không": học sinh cần một
+ *  hàng đọc được cùng một cách mỗi tuần, không phải một hàng đổi dạng tuỳ đề
+ *  tuần này có tự luận hay không. */
+export const ESSAY_SUBJECTS: readonly Subject[] = ["Literature", "English"];
+
+export function isEssaySubject(subject: Subject): boolean {
+  return ESSAY_SUBJECTS.includes(subject);
 }
 
 /** Màu cố định theo môn — ổn định qua mọi khoảng thời gian, không gán theo hạng

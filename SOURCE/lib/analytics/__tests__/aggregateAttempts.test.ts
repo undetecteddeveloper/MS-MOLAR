@@ -31,6 +31,8 @@ function row(overrides: Partial<AttemptRow>): AttemptRow {
     submittedAt: DEFAULT_SUBMITTED,
     durationMinutes: 45,
     subject: "Math",
+    totalScore: 8,
+    blankEssays: 0,
     ...overrides,
   };
 }
@@ -38,12 +40,68 @@ function row(overrides: Partial<AttemptRow>): AttemptRow {
 describe("aggregateAttemptsByRange", () => {
   it("AC-01/AC-02/AC-03: sums correct, derives wrong = total - correct, counts sessions", () => {
     const rows = [
-      row({ correct: 8, total: 10, subject: "Math" }),
-      row({ correct: 5, total: 10, subject: "Math" }),
+      row({ correct: 8, total: 10, subject: "Math", totalScore: 8 }),
+      row({ correct: 5, total: 10, subject: "Math", totalScore: 5 }),
     ];
     const result = aggregateAttemptsByRange(rows, NOW);
     const math = result.week.find((s) => s.subject === "Math");
-    expect(math).toEqual({ subject: "Math", correct: 13, wrong: 7, sessions: 2, seconds: 1200 });
+    expect(math).toEqual({
+      subject: "Math",
+      correct: 13,
+      wrong: 7,
+      sessions: 2,
+      seconds: 1200,
+      avgScore: 6.5,
+      pendingSessions: 0,
+      blankEssays: 0,
+    });
+  });
+
+  // 2026-09-13 — hàng Ngữ văn/Tiếng Anh đọc ĐIỂM TRUNG BÌNH thay đúng/sai.
+  it("avgScore (2026-09-13): mean of total_score over scored attempts only; pending attempts count as sessions but not in the mean", () => {
+    const rows = [
+      row({ subject: "Literature", correct: 0, total: 0, totalScore: 6 }),
+      row({ subject: "Literature", correct: 0, total: 0, totalScore: 8 }),
+      // Còn câu tự luận đang chấm: điểm hiện tại là con số tạm → null.
+      row({ subject: "Literature", correct: 0, total: 0, totalScore: null }),
+    ];
+    const lit = aggregateAttemptsByRange(rows, NOW).week.find((s) => s.subject === "Literature");
+    expect(lit?.sessions).toBe(3);
+    expect(lit?.avgScore).toBe(7);
+    expect(lit?.pendingSessions).toBe(1);
+    // Đúng/sai vẫn 0/0 cho đề thuần tự luận — chính vì thế hàng này không đọc
+    // bằng hai ô đếm.
+    expect(lit?.correct).toBe(0);
+    expect(lit?.wrong).toBe(0);
+  });
+
+  it("avgScore: every attempt still grading → null (never 0), and a blank essay submission scores 0.0 rather than vanishing", () => {
+    const pendingOnly = [row({ subject: "English", correct: 0, total: 0, totalScore: null })];
+    expect(aggregateAttemptsByRange(pendingOnly, NOW).week[0]).toMatchObject({
+      subject: "English",
+      avgScore: null,
+      pendingSessions: 1,
+    });
+
+    // Nộp trống: Groq settle band 0 ngay, total_score = 0 — lượt "bỏ trống" hiện
+    // ra là 0,0/10 kèm số câu bỏ trống, không phải 0 đúng · 0 sai.
+    const blank = [row({ subject: "Literature", correct: 0, total: 0, totalScore: 0, blankEssays: 2 })];
+    expect(aggregateAttemptsByRange(blank, NOW).week[0]).toMatchObject({
+      subject: "Literature",
+      avgScore: 0,
+      blankEssays: 2,
+      pendingSessions: 0,
+    });
+  });
+
+  it("avgScore: a non-finite score is treated like a pending attempt — the mean never becomes NaN", () => {
+    const rows = [
+      row({ subject: "Math", totalScore: Number.NaN }),
+      row({ subject: "Math", totalScore: 7 }),
+    ];
+    const math = aggregateAttemptsByRange(rows, NOW).week.find((s) => s.subject === "Math");
+    expect(math?.avgScore).toBe(7);
+    expect(math?.pendingSessions).toBe(1);
   });
 
   it("AC-02: wrong is always derived (total - correct), never a stored field", () => {
@@ -87,7 +145,18 @@ describe("aggregateAttemptsByRange", () => {
     expect(result.week).toEqual([]);
     expect(result.month).toEqual([]);
     // Không có mốc nộp thì không đo được thời gian — lượt vẫn đếm, giây = 0.
-    expect(result.all).toEqual([{ subject: "Biology", correct: 8, wrong: 2, sessions: 1, seconds: 0 }]);
+    expect(result.all).toEqual([
+      {
+        subject: "Biology",
+        correct: 8,
+        wrong: 2,
+        sessions: 1,
+        seconds: 0,
+        avgScore: 8,
+        pendingSessions: 0,
+        blankEssays: 0,
+      },
+    ]);
   });
 
   it("seconds (2026-09-06): started→submitted per attempt, summed per subject, sliced by range like everything else", () => {

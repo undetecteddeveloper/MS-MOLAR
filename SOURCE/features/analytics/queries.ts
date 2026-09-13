@@ -8,6 +8,8 @@ import { createClient } from "@/lib/supabase/server";
 import { readBounded } from "@/lib/supabase/boundedRead";
 import { aggregateAttemptsByRange, type AttemptRow } from "@/lib/analytics/aggregateAttempts";
 import { rankWeakTopicsByRange, type TopicWeakness } from "@/lib/analytics/weakTopics";
+import { deriveEssayView } from "@/lib/scoring/essayLifecycle";
+import type { PerQuestionResult } from "@/types/result";
 import { MASTERY_CLEARED_THRESHOLD } from "@/lib/adaptive/constants";
 import { recommendNextSkill } from "@/lib/adaptive/route";
 import { buildTelemetryPayload } from "@/lib/tutor/telemetry";
@@ -20,6 +22,11 @@ import type { SkillRecommendation } from "@/types/adaptive";
 type EmbeddedRow = {
   correct: number;
   total: number;
+  /** `numeric` — driver có thể trả CHUỖI ("6.50"); chuẩn hoá ngay tại biên. */
+  total_score: number | string;
+  per_question: PerQuestionResult[] | null;
+  /** Mốc suy vòng đời tự luận (pending quá hạn → failed). */
+  created_at: string;
   topic_breakdown: { topic: string; correct: number; total: number }[] | null;
   exam_attempts: {
     started_at: string;
@@ -44,38 +51,53 @@ export async function getAnalyticsByRange(): Promise<AnalyticsPageData> {
   // `topic_breakdown` đi kèm trong CHÍNH lệnh đọc này chứ không phải một lệnh
   // thứ hai: hai bộ số liệu rút ra từ cùng một tập dòng, tách ra đọc lại là
   // thêm một round-trip cho dữ liệu đã nằm sẵn trong tay.
+  // `total_score` + `per_question` + `created_at` đi kèm (2026-09-13) cho hàng
+  // Ngữ văn/Tiếng Anh: điểm trung bình thay đúng/sai — cùng lệnh đọc.
   const embedded = (await readBounded(
     "getAnalyticsByRange",
     supabase
       .from("exam_results")
       .select(
-        "correct, total, topic_breakdown, exam_attempts!inner(started_at, submitted_at, status, exams!inner(subject, duration_minutes))"
+        "correct, total, total_score, per_question, created_at, topic_breakdown, exam_attempts!inner(started_at, submitted_at, status, exams!inner(subject, duration_minutes))"
       )
       .eq("exam_attempts.status", "submitted")
   )) as EmbeddedRow[];
 
-  const rows: AttemptRow[] = embedded.map((row) => ({
-    correct: row.correct,
-    total: row.total,
-    // `started_at` + `duration_minutes` đi kèm để reducer cộng thời gian làm bài
-    // theo môn, trần theo thời lượng đề (vòng tròn "Thời gian luyện theo môn",
-    // 2026-09-06) — cùng lệnh đọc, không thêm round-trip.
-    startedAt: row.exam_attempts.started_at,
-    submittedAt: row.exam_attempts.submitted_at,
-    durationMinutes: row.exam_attempts.exams.duration_minutes,
-    subject: row.exam_attempts.exams.subject,
-  }));
+  // Cùng mốc `now` cho cả hai reducer VÀ cho phép suy vòng đời tự luận — hai
+  // lượt `new Date()` riêng có thể rơi vào hai phía của một biên range và làm
+  // biểu đồ mâu thuẫn với danh sách ngay bên cạnh nó.
+  const now = new Date();
+
+  const rows: AttemptRow[] = embedded.map((row) => {
+    // Vòng đời từng câu tự luận suy ĐÚNG MỘT LẦN mỗi dòng (cùng cách getResult()
+    // làm): `null` = không phải câu tự luận có chấm. Lượt còn câu `pending` thì
+    // `total_score` là con số TẠM → totalScore null, không vào trung bình.
+    const perQuestion = row.per_question ?? [];
+    const essays = perQuestion
+      .map((r) => ({ row: r, view: deriveEssayView(r, row.created_at, now) }))
+      .filter((e) => e.view !== null);
+    const pending = essays.some((e) => e.view!.state === "pending");
+    const blankEssays = essays.filter((e) => (e.row.selected ?? "").trim() === "").length;
+    return {
+      correct: row.correct,
+      total: row.total,
+      totalScore: pending ? null : Number(row.total_score),
+      blankEssays,
+      // `started_at` + `duration_minutes` đi kèm để reducer cộng thời gian làm bài
+      // theo môn, trần theo thời lượng đề (vòng tròn "Thời gian luyện theo môn",
+      // 2026-09-06) — cùng lệnh đọc, không thêm round-trip.
+      startedAt: row.exam_attempts.started_at,
+      submittedAt: row.exam_attempts.submitted_at,
+      durationMinutes: row.exam_attempts.exams.duration_minutes,
+      subject: row.exam_attempts.exams.subject,
+    };
+  });
 
   const topicRows = embedded.map((row) => ({
     subject: row.exam_attempts.exams.subject,
     submittedAt: row.exam_attempts.submitted_at,
     topicBreakdown: row.topic_breakdown ?? [],
   }));
-
-  // Cùng mốc `now` cho cả hai reducer — hai lượt `new Date()` riêng có thể rơi
-  // vào hai phía của một biên range và làm biểu đồ mâu thuẫn với danh sách
-  // ngay bên cạnh nó.
-  const now = new Date();
 
   // Dùng LẠI ngưỡng "NEEDS REVIEW" của biểu đồ: nếu một môn bị gắn cờ theo mốc
   // 75% mà danh sách chủ đề lại lọc theo mốc khác, người đọc sẽ thấy một môn

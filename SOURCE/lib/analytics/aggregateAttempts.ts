@@ -21,6 +21,14 @@ export interface AttemptRow {
   durationMinutes: number | null;
   /** Chuỗi thô từ exams.subject — có thể KHÔNG thuộc union 7 môn Thống kê. */
   subject: string;
+  /** `exam_results.total_score` (thang 10) khi lượt đã CHẤM XONG; `null` khi
+   *  còn câu tự luận đang chấm (2026-09-13) — lượt ấy vẫn đếm vào `sessions`/
+   *  `seconds` nhưng KHÔNG vào trung bình: một con số tạm không được kéo trung
+   *  bình về 0 rồi tự nhảy lên vài phút sau. */
+  totalScore: number | null;
+  /** Số câu tự luận nộp TRỐNG trong lượt này (mỗi câu 0 điểm — "bỏ trống =
+   *  sai"); hàng Ngữ văn/Tiếng Anh in con số này để nói vì sao trung bình thấp. */
+  blankEssays: number;
 }
 
 const RANGE_DAYS: Record<Exclude<TimeRange, "all">, number> = { week: 7, month: 30 };
@@ -76,7 +84,19 @@ export function aggregateAttemptsByRange(
   for (const range of RANGES) {
     const lowerBound = range === "all" ? null : now.getTime() - RANGE_DAYS[range] * 24 * 60 * 60 * 1000;
 
-    const acc = new Map<Subject, { correct: number; wrong: number; sessions: number; seconds: number }>();
+    const acc = new Map<
+      Subject,
+      {
+        correct: number;
+        wrong: number;
+        sessions: number;
+        seconds: number;
+        scoreSum: number;
+        scoredSessions: number;
+        pendingSessions: number;
+        blankEssays: number;
+      }
+    >();
 
     for (const row of rows) {
       if (!isAnalyticsSubject(row.subject)) continue;
@@ -87,18 +107,45 @@ export function aggregateAttemptsByRange(
         if (Number.isNaN(submittedMs) || submittedMs < lowerBound) continue;
       }
 
-      const entry = acc.get(row.subject) ?? { correct: 0, wrong: 0, sessions: 0, seconds: 0 };
+      const entry = acc.get(row.subject) ?? {
+        correct: 0,
+        wrong: 0,
+        sessions: 0,
+        seconds: 0,
+        scoreSum: 0,
+        scoredSessions: 0,
+        pendingSessions: 0,
+        blankEssays: 0,
+      };
       entry.correct += row.correct;
       entry.wrong += row.total - row.correct;
       entry.sessions += 1;
       entry.seconds += elapsedSeconds(row.startedAt, row.submittedAt, row.durationMinutes);
+      // Trung bình chỉ trên lượt đã chấm xong; điểm hỏng (NaN) bỏ như lượt
+      // đang chấm — không ném, không kéo trung bình thành NaN.
+      if (row.totalScore !== null && Number.isFinite(row.totalScore)) {
+        entry.scoreSum += row.totalScore;
+        entry.scoredSessions += 1;
+      } else {
+        entry.pendingSessions += 1;
+      }
+      entry.blankEssays += row.blankEssays;
       acc.set(row.subject, entry);
     }
 
-    result[range] = SUBJECT_ORDER.filter((subject) => acc.has(subject)).map((subject) => ({
-      subject,
-      ...acc.get(subject)!,
-    }));
+    result[range] = SUBJECT_ORDER.filter((subject) => acc.has(subject)).map((subject) => {
+      const e = acc.get(subject)!;
+      return {
+        subject,
+        correct: e.correct,
+        wrong: e.wrong,
+        sessions: e.sessions,
+        seconds: e.seconds,
+        avgScore: e.scoredSessions > 0 ? e.scoreSum / e.scoredSessions : null,
+        pendingSessions: e.pendingSessions,
+        blankEssays: e.blankEssays,
+      };
+    });
   }
 
   return result;
