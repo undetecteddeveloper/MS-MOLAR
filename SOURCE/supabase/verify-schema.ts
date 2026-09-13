@@ -77,7 +77,7 @@ import { resolve } from "node:path";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { fkKey, resolveForeignKeys } from "../lib/schema/parseForeignKeys";
 import { SUBJECTS, normalizeSubject } from "../lib/ugc/subjects";
-import { LIMITS } from "../lib/ugc/limits";
+import { attemptAnswerDbCeiling } from "../lib/ugc/limits";
 import { ESSAY_MAX_ATTEMPTS } from "../lib/scoring/essayLifecycle";
 import {
   SCHEMA_FINGERPRINT,
@@ -1073,7 +1073,9 @@ async function main() {
   //     nhưng "được thiết kế để bị từ chối" chính là mệnh đề mà cổng này tồn tại
   //     để KIỂM CHỨNG — không được phép vừa là giả định vừa là kết luận trên một
   //     database thật.
-  const CEILING = LIMITS.MAX_ATTEMPT_ANSWER;
+  // Trần RỘNG NHẤT mà mã cho một môn gõ (Ngữ văn/Tiếng Anh 8000 từ
+  // 2026-09-13) — DB không biết môn nên CHECK phải bằng đúng con số này.
+  const CEILING = attemptAnswerDbCeiling();
   if (!probe)
     skip(
       `hai probe trần ký tự (${CEILING} và ${CEILING + 1} ký tự) — cả hai PHÁT lệnh INSERT vào attempt_answers`
@@ -1109,18 +1111,18 @@ async function main() {
   assert(
     atCeiling === "23503" && ceilingClean,
     atCeiling === "23503" && ceilingClean
-      ? `Bài làm dài đúng trần (${CEILING} ký tự) QUA được CHECK trên DB thật (chết ở khoá ngoại, 23503) — trần DB KHÔNG thấp hơn LIMITS.MAX_ATTEMPT_ANSWER`
+      ? `Bài làm dài đúng trần (${CEILING} ký tự) QUA được CHECK trên DB thật (chết ở khoá ngoại, 23503) — trần DB KHÔNG thấp hơn attemptAnswerDbCeiling()`
       : atCeiling === "23514"
-        ? `TRẦN DB THẤP HƠN TRẦN TRONG MÃ: ${CEILING} ký tự bị attempt_answers_answer_check từ chối (23514) trong khi LIMITS.MAX_ATTEMPT_ANSWER = ${CEILING}. Postgres sẽ từ chối NGUYÊN LƯỢT NỘP BÀI của học sinh viết dài — apply lại trần trong schema.sql (${residueNote})`
+        ? `TRẦN DB THẤP HƠN TRẦN TRONG MÃ: ${CEILING} ký tự bị attempt_answers_answer_check từ chối (23514) trong khi attemptAnswerDbCeiling() = ${CEILING}. Postgres sẽ từ chối NGUYÊN LƯỢT NỘP BÀI của học sinh viết dài — apply lại trần trong schema.sql (${residueNote})`
         : `Probe trần ký tự trả mã BẤT NGỜ ${describeCode(atCeiling)} (mong đợi 23503) — cổng không đo được gì; ${residueNote}`
   );
 
   assert(
     overCeiling === "23514" && ceilingClean,
     overCeiling === "23514" && ceilingClean
-      ? `Bài làm quá trần một ký tự (${CEILING + 1}) bị attempt_answers_answer_check TỪ CHỐI (23514) — trần DB đúng bằng LIMITS.MAX_ATTEMPT_ANSWER = ${CEILING}`
+      ? `Bài làm quá trần một ký tự (${CEILING + 1}) bị attempt_answers_answer_check TỪ CHỐI (23514) — trần DB đúng bằng attemptAnswerDbCeiling() = ${CEILING}`
       : overCeiling === "23503"
-        ? `TRẦN DB CAO HƠN TRẦN TRONG MÃ (hoặc CHECK vắng mặt): ${CEILING + 1} ký tự lọt qua CHECK và chỉ chết ở khoá ngoại (23503), trong khi LIMITS.MAX_ATTEMPT_ANSWER = ${CEILING}. Mã đang cắt bài làm sớm hơn DB cần — nâng LIMITS.MAX_ATTEMPT_ANSWER cho khớp (${residueNote})`
+        ? `TRẦN DB CAO HƠN TRẦN TRONG MÃ (hoặc CHECK vắng mặt): ${CEILING + 1} ký tự lọt qua CHECK và chỉ chết ở khoá ngoại (23503), trong khi attemptAnswerDbCeiling() = ${CEILING}. Mã đang cắt bài làm sớm hơn DB cần — nâng trần trong lib/ugc/limits.ts cho khớp (${residueNote})`
         : `Probe trần ký tự trả mã BẤT NGỜ ${describeCode(overCeiling)} (mong đợi 23514) — cổng không đo được gì; ${residueNote}`
   );
   }

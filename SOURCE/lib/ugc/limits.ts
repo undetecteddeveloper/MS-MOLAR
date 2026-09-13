@@ -26,10 +26,10 @@ export const LIMITS = {
   MIN_CHOICES: 2,
   MAX_CHOICES: 4,
   MAX_SHORT_ANSWER: 100,
-  // Trần cho BÀI LÀM của người thi (attempt_answers.answer), KHÁC với
+  // Trần MẶC ĐỊNH cho BÀI LÀM của người thi (attempt_answers.answer), KHÁC với
   // MAX_ESSAY_ANSWER ở dưới — cái đó là đáp án mẫu của tác giả đề, lưu ở
-  // questions.essay_answer. Giá trị này PHẢI khớp CHECK trong
-  // supabase/schema.sql: `length(answer) <= 4000`.
+  // questions.essay_answer. KHÔNG phải trần của mọi môn — xem
+  // MAX_ATTEMPT_ANSWER_BY_SUBJECT ngay dưới và đọc qua maxAttemptAnswerFor().
   //
   // 500 → 4000 (Essay Auto-Scoring R11/D11): một bài tự luận có rubric không
   // viết nổi trong 500 ký tự. Con số 4000 KHÔNG có cơ sở thực nghiệm —
@@ -41,8 +41,19 @@ export const LIMITS = {
   //   · mã THẤP hơn DB  ⇒ cắt oan bài làm — mất một phần, còn cứu được.
   //   · mã CAO hơn DB   ⇒ Postgres từ chối NGUYÊN lượt nộp bài — học sinh mất
   //     cả bài thi. Không bao giờ được để cửa sổ nằm ở phía này.
-  // `npm run verify:schema` đọc lại trần này từ DB THẬT và đỏ nếu hai bên lệch.
+  // CHECK trong supabase/schema.sql (`length(answer) <= 8000`) PHẢI bằng trần
+  // RỘNG NHẤT của bảng dưới — đọc qua attemptAnswerDbCeiling(); `npm run
+  // verify:schema` đọc lại trần ấy từ DB THẬT và đỏ nếu hai bên lệch.
   MAX_ATTEMPT_ANSWER: 4000,
+  // Trần bài làm NỚI theo môn (engineer 2026-09-13, test trên điện thoại thật:
+  // ô viết bài Ngữ văn vẫn dừng ở 4000). Văn: một bài nghị luận văn học đủ ý
+  // vượt 4000 ký tự là bình thường; Anh: bài viết (writing) dài tương tự. Bảng
+  // này là bản song sinh của MAX_STEM_BY_SUBJECT — cùng cách đọc, cùng nhánh
+  // "chưa biết môn → trần rộng nhất" (không bao giờ cắt oan vì thiếu dữ liệu).
+  MAX_ATTEMPT_ANSWER_BY_SUBJECT: {
+    Literature: 8000,
+    English: 8000,
+  } as Record<string, number>,
   // B1 — TỔNG điểm một đề phải cộng đủ trước khi publish. 10 không phải một
   // lựa chọn kỹ thuật: đó là thang điểm của mọi đề phổ thông Việt Nam, và tầng
   // chấm đã quy mọi lượt thi về đúng thang này (Σ(điểm đạt)/Σ(points)×10). Đề
@@ -173,6 +184,27 @@ export function maxStemFor(subject: string | null | undefined): number {
   }
   const canonical = normalizeSubject(subject);
   return (canonical && LIMITS.MAX_STEM_BY_SUBJECT[canonical]) || LIMITS.MAX_STEM;
+}
+
+/** Trần BÀI LÀM tự luận của người thi cho MỘT môn. Cùng ba nhánh với
+ *  maxStemFor. Cả ô nhập (QuestionRenderer) lẫn lát cắt lúc nộp (submitExam)
+ *  đọc qua đây — hai nơi lệch nhau thì người làm bài gõ tới trần mà vẫn bị
+ *  cắt âm thầm lúc nộp. */
+export function maxAttemptAnswerFor(subject: string | null | undefined): number {
+  if (isSubjectUnknown(subject)) {
+    return widest(LIMITS.MAX_ATTEMPT_ANSWER_BY_SUBJECT, LIMITS.MAX_ATTEMPT_ANSWER);
+  }
+  const canonical = normalizeSubject(subject);
+  return (
+    (canonical && LIMITS.MAX_ATTEMPT_ANSWER_BY_SUBJECT[canonical]) || LIMITS.MAX_ATTEMPT_ANSWER
+  );
+}
+
+/** Trần mà CHECK `attempt_answers_answer_check` trên DB phải bằng: trần rộng
+ *  nhất mà một môn được phép — DB không biết môn, nên nó phải chứa được bài
+ *  dài nhất mà mã cho gõ. `verify:schema` probe đúng con số này. */
+export function attemptAnswerDbCeiling(): number {
+  return widest(LIMITS.MAX_ATTEMPT_ANSWER_BY_SUBJECT, LIMITS.MAX_ATTEMPT_ANSWER);
 }
 
 /** Trần đáp án mẫu áp dụng cho MỘT môn. Cùng ba nhánh với maxStemFor. */

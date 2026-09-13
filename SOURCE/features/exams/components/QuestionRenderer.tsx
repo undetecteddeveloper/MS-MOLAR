@@ -24,7 +24,7 @@ import { Fragment } from "react";
 import { t } from "@/lib/copy";
 
 import type { ChoiceId, PublicQuestion, SubItemId } from "@/types/question";
-import { LIMITS } from "@/lib/ugc/limits";
+import { LIMITS, maxAttemptAnswerFor } from "@/lib/ugc/limits";
 import { decodeTfAnswer, encodeTfAnswer } from "@/lib/ugc/tfCodec";
 import type {
   PassageChunkNode,
@@ -38,7 +38,6 @@ import { AnswerChoice } from "@/features/exams/components/AnswerChoice";
 import { FlagButton } from "@/features/exams/components/FlagButton";
 
 const SUB_ITEM_IDS: SubItemId[] = ["a", "b", "c", "d"];
-const MAX_ATTEMPT_ANSWER = LIMITS.MAX_ATTEMPT_ANSWER;
 
 interface QuestionRendererProps {
   /** Số thứ tự câu (1-based) — để hiển thị "Câu N". */
@@ -107,6 +106,9 @@ export function QuestionRenderer({
 }: QuestionRendererProps) {
   const type = question.questionType ?? "mcq";
   const progressId = `question-progress-${question.id}`;
+  // Trần bài làm tự luận THEO MÔN của chính câu này (Ngữ văn/Tiếng Anh 8000,
+  // còn lại 4000) — cùng hàm submitExam dùng để cắt lúc nộp.
+  const maxAttemptAnswer = maxAttemptAnswerFor(question.subject);
 
   return (
     <Card padding="none" className="gap-5 p-4 sm:p-6">
@@ -274,10 +276,11 @@ export function QuestionRenderer({
             đúng một nửa: `computeScore()` vẫn không chấm, nhưng band ĐƯỢC ghi
             bởi đường bất đồng bộ sau khi nộp — nên câu chữ phải do CỜ chọn,
             không do một sự thật cố định.
-            maxLength = TRẦN THẬT của DB: attempt_answers.answer CHECK
-            length <= 500. Cắt ở client + đếm ký tự còn lại để người làm bài
-            thấy giới hạn TRƯỚC khi gõ hụt, thay vì bị Postgres từ chối nguyên
-            lượt nộp bài lúc submit. */}
+            maxLength = trần THEO MÔN (maxAttemptAnswerFor — Ngữ văn/Tiếng Anh
+            8000, còn lại 4000; engineer 2026-09-13), cùng hàm mà submitExam
+            cắt lúc nộp, và DB CHECK bằng trần rộng nhất. Cắt ở client + đếm
+            ký tự còn lại để người làm bài thấy giới hạn TRƯỚC khi gõ hụt, thay
+            vì bị Postgres từ chối nguyên lượt nộp bài lúc submit. */}
         {type === "essay" && (
           <div className="flex h-full flex-col gap-2">
             <Label htmlFor={`essay-${question.id}`} className="mb-0">
@@ -287,7 +290,7 @@ export function QuestionRenderer({
               id={`essay-${question.id}`}
               value={selectedAnswer ?? ""}
               onChange={(e) => onSelectAnswer(e.target.value)}
-              maxLength={MAX_ATTEMPT_ANSWER}
+              maxLength={maxAttemptAnswer}
               placeholder={t("player.essayPlaceholder")}
               className="min-h-32 flex-1 resize-y leading-relaxed"
             />
@@ -295,7 +298,7 @@ export function QuestionRenderer({
               <span>{t(essayGradingEnabled ? "player.essayScored" : "player.essayNotScored")}</span>
               <span className="shrink-0 tabular-nums">
                 {t("player.charsLeft", {
-                  remaining: MAX_ATTEMPT_ANSWER - (selectedAnswer?.length ?? 0),
+                  remaining: maxAttemptAnswer - (selectedAnswer?.length ?? 0),
                 })}
               </span>
             </div>

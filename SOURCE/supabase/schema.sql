@@ -558,12 +558,16 @@ alter table public.exams add column if not exists parts jsonb;
 -- 500 -> 4000 (Essay Auto-Scoring R11/D11): một bài tự luận có rubric không
 -- viết nổi trong 500 ký tự. Con số 4000 KHÔNG có cơ sở thực nghiệm — production
 -- có 0 bài tự luận đã nộp — nên nó được chọn bằng lập luận và ghi ở
--- docs/design/essay-auto-scoring-backend-design.md § Trần ký tự. Nó PHẢI bằng
--- LIMITS.MAX_ATTEMPT_ANSWER (lib/ugc/limits.ts:17); npm run verify:schema đọc
--- lại trần này từ DB THẬT và đỏ nếu hai bên lệch.
+-- docs/design/essay-auto-scoring-backend-design.md § Trần ký tự.
+--
+-- 4000 -> 8000 (2026-09-13): trần trong mã nay NỚI THEO MÔN (Ngữ văn, Tiếng
+-- Anh: 8000; còn lại 4000 — LIMITS.MAX_ATTEMPT_ANSWER_BY_SUBJECT). DB không
+-- biết môn nên CHECK phải chứa được bài dài nhất mã cho gõ: nó PHẢI bằng
+-- attemptAnswerDbCeiling() (lib/ugc/limits.ts); npm run verify:schema đọc lại
+-- trần này từ DB THẬT và đỏ nếu hai bên lệch.
 alter table public.attempt_answers drop constraint if exists attempt_answers_answer_check;
 alter table public.attempt_answers add constraint attempt_answers_answer_check
-  check (answer is null or length(answer) <= 4000);
+  check (answer is null or length(answer) <= 8000);
 
 -- ----------------------------------------------------------------------------
 -- 8d. UGC — NGỮ LIỆU DÙNG CHUNG (A1, 2026-09-01).
@@ -2588,7 +2592,7 @@ revoke all on public.schema_version from anon, authenticated;
 -- nó — xem lib/schema/schemaFingerprint.ts).
 -- @schema-fingerprint-begin
 insert into public.schema_version (id, fingerprint)
-values (1, 'eab3b6e1534a')
+values (1, '187d3ed24f0c')
 on conflict (id) do update
   set fingerprint = excluded.fingerprint,
       applied_at  = now();

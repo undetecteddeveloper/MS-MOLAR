@@ -123,17 +123,31 @@ describe("QuestionRenderer — footnote copy (AC-008/AC-009)", () => {
     ).toBeTruthy();
 
     // Ô nhập phải TỒN TẠI (đây là thứ bug prod làm mất) và bị chặn đúng ở trần
-    // của DB — attempt_answers.answer CHECK length <= 4000 (nâng 500 → 4000 ở
-    // Task H7/B3.3, R11/D11: một bài tự luận có rubric không viết nổi trong 500
-    // ký tự). Con số này DI CHUYỂN CÙNG `LIMITS.MAX_ATTEMPT_ANSWER`:
-    // `QuestionRenderer.tsx:23` alias hằng đó, và cả `maxLength` lẫn phép tính
-    // `charsLeft` đều đọc alias — nên không có literal thứ hai nào để trôi lệch.
+    // THEO MÔN của câu — Toán dùng trần mặc định 4000 (nâng 500 → 4000 ở Task
+    // H7/B3.3, R11/D11: một bài tự luận có rubric không viết nổi trong 500 ký
+    // tự). Con số này DI CHUYỂN CÙNG `maxAttemptAnswerFor()` (lib/ugc/limits):
+    // cả `maxLength` lẫn phép tính `charsLeft` đều đọc cùng một biến — nên
+    // không có literal thứ hai nào để trôi lệch.
     const textarea = container.querySelector("textarea");
     expect(textarea).not.toBeNull();
     expect(textarea?.maxLength).toBe(4000);
     // Nhãn phải trỏ đúng ô nhập (a11y) — id do questionType + question.id sinh ra.
     expect(textarea?.id).toBe(`essay-${ESSAY_QUESTION.id}`);
     expect(container.querySelector(`label[for="essay-${ESSAY_QUESTION.id}"]`)).not.toBeNull();
+  });
+
+  it("essay Ngữ văn / Tiếng Anh: ô nhập nới lên 8000 ký tự, bộ đếm đi theo (engineer 2026-09-13)", () => {
+    // Nhãn tiếng Việt như dữ liệu cũ trong DB (TD-016) vẫn phải tra ra môn —
+    // trần đi qua normalizeSubject, không so chuỗi thô.
+    for (const subject of ["Literature", "Ngữ văn", "English", "Tiếng Anh"]) {
+      const { container } = renderQuestion({ ...ESSAY_QUESTION, subject });
+      const textarea = container.querySelector("textarea");
+      expect(textarea?.maxLength, subject).toBe(8000);
+      expect(within(container).getByText("Còn 8000 ký tự"), subject).toBeTruthy();
+    }
+    // Môn khác giữ trần mặc định.
+    const math = renderQuestion({ ...ESSAY_QUESTION, subject: "Math" });
+    expect(math.container.querySelector("textarea")?.maxLength).toBe(4000);
   });
 
   it("essay: typing forwards the text to onSelectAnswer (bug prod 2026-08-17)", () => {

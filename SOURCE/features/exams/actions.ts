@@ -11,7 +11,7 @@ import { recordExamResult, recordSkillMastery } from "@/lib/supabase/service-rol
 import { guard } from "@/lib/security/rateLimit";
 import { isValidPartScore } from "@/lib/rating";
 import { computeScore } from "@/lib/scoring/computeScore";
-import { LIMITS } from "@/lib/ugc/limits";
+import { maxAttemptAnswerFor } from "@/lib/ugc/limits";
 import type { ChoiceId, Question } from "@/types/question";
 
 /**
@@ -148,14 +148,16 @@ export async function submitExam(
     .map((id) => byId.get(id))
     .filter((q): q is Question => q !== undefined);
 
-  // 4. Batch-insert answers (null nếu bỏ trống; cắt khớp CHECK v2.1).
-  // LIMITS.MAX_ATTEMPT_ANSWER thay số 500 viết cứng: ô nhập tự luận ở
-  // QuestionRenderer đọc CÙNG hằng số đó để đếm ký tự còn lại — hai nơi lệch
-  // nhau thì người làm bài gõ tới trần mà vẫn bị cắt âm thầm ở đây.
+  // 4. Batch-insert answers (null nếu bỏ trống; cắt khớp trần THEO MÔN).
+  // maxAttemptAnswerFor(q.subject) thay số viết cứng: ô nhập tự luận ở
+  // QuestionRenderer đọc CÙNG hàm đó để đếm ký tự còn lại — hai nơi lệch nhau
+  // thì người làm bài gõ tới trần mà vẫn bị cắt âm thầm ở đây. DB CHECK bằng
+  // trần rộng nhất (attemptAnswerDbCeiling), nên lát cắt này không bao giờ
+  // dài hơn thứ Postgres nhận.
   const answerRows = questions.map((q) => ({
     attempt_id: attemptId,
     question_id: q.id,
-    answer: answers[q.id]?.slice(0, LIMITS.MAX_ATTEMPT_ANSWER) ?? null,
+    answer: answers[q.id]?.slice(0, maxAttemptAnswerFor(q.subject)) ?? null,
   }));
   const { error: ansErr } = await supabase
     .from("attempt_answers")
