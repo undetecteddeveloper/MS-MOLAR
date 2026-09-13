@@ -83,7 +83,10 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ a
       {/* id + tabIndex={-1} = đích nhảy của SkipLink (WCAG 2.4.1). pb-bottom-nav
           chừa chỗ cho BottomNav; tự về 0 từ 768px. */}
       <main id="main-content" tabIndex={-1} className="pb-bottom-nav">
-        <PageContainer size="full" className="flex flex-col gap-10 py-6 sm:py-10">
+        {/* Đệm TRÊN nhỏ hơn đệm dưới (engineer 2026-09-13, test trên điện thoại
+            thật: "nâng cụm hero cao hơn một chút") — hero đứng sát navbar hơn,
+            đệm dưới giữ nguyên để chân trang không dâng theo. */}
+        <PageContainer size="full" className="flex flex-col gap-10 pt-3 pb-6 sm:pt-6 sm:pb-10">
           {/* Hai cột chỉ khi cột phải có mặt. Lúc form đăng nhập mở, cột phải
               ẩn mà lưới vẫn hai cột thì form bị dồn sang trái nửa màn hình —
               engineer 2026-09-06: form phải nằm giữa. */}

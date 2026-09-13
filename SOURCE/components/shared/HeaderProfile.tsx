@@ -8,7 +8,6 @@
 // Action). Mục "Sửa tên" đã bỏ từ 2026-08-17 — /profile làm việc đó tử tế hơn.
 import Link from "next/link";
 import { useState } from "react";
-import { ChevronDown } from "lucide-react";
 import { signOut } from "@/features/auth/actions";
 import { t } from "@/lib/copy";
 import { Avatar } from "@/components/shared/Avatar";
@@ -52,16 +51,20 @@ export function HeaderProfile({
         />
       )}
 
-      {/* Trigger — avatar + tên (ẩn dưới 768px) + chevron. min-h-11: sàn 44px.
+      {/* Trigger — avatar + tên (ẩn dưới 1024px). min-h-11: sàn 44px.
           min-w-0 ở tên (và ở <div> bọc ngoài) để tên CO LẠI và cắt "…" khi header
           hết chỗ — không có nó, flex item giữ bề rộng nội dung và tên dài đẩy cả
-          header tràn ngang ở 768px (xem chú thích tại <nav> trong SiteHeader). */}
+          header tràn ngang ở 768px (xem chú thích tại <nav> trong SiteHeader).
+          Mũi tên ▾ bỏ 2026-09-13 (engineer, test điện thoại thật): viên thuốc
+          surface + `aria-haspopup` đã nói đây là nút mở menu; mũi tên chỉ thêm
+          16px vào một hàng vốn chật ở 360px. Đệm phải bằng đệm trái khi chỉ có
+          avatar, nới ra 12px từ 1024px để tên không dính mép. */}
       <button
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="bg-surface hover:bg-[color-mix(in_oklch,var(--surface),var(--foreground)_7%)] focus-visible:ring-ring flex max-w-full min-h-11 items-center gap-2 rounded-full py-1 pr-2.5 pl-1.5 transition-[background-color,scale] ease-out motion-safe:active:scale-97 focus-visible:ring-3 focus-visible:outline-none"
+        className="bg-surface hover:bg-[color-mix(in_oklch,var(--surface),var(--foreground)_7%)] focus-visible:ring-ring flex max-w-full min-h-11 items-center gap-2 rounded-full px-1.5 py-1 transition-[background-color,scale] ease-out motion-safe:active:scale-97 focus-visible:ring-3 focus-visible:outline-none lg:pr-3"
       >
         {/* Avatar thay cho <Image>: next.config.ts không khai remotePatterns,
             URL Supabase đưa vào <Image> là lỗi LÚC CHẠY. */}
@@ -73,10 +76,6 @@ export function HeaderProfile({
         <span className="text-foreground min-w-0 max-w-32 truncate text-sm font-medium max-lg:hidden">
           {displayName}
         </span>
-        <ChevronDown
-          aria-hidden
-          className={`text-muted-foreground size-4 shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
-        />
       </button>
 
       {present && (
