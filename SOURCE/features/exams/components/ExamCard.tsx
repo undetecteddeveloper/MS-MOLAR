@@ -27,17 +27,16 @@ interface ExamCardProps {
 //
 // KHÔNG `translate` khi hover: Tailwind v4 dịch `translate-y-*` ra thuộc tính
 // `translate`, thứ tự tạo stacking context và từng nuốt click của Link stretched
-// (bug 2026-08). Phản hồi hover là đổi nền + đổi màu tiêu đề.
+// (bug 2026-08). Phản hồi hover là đổi nền + đổi màu tiêu đề — qua `.card-linked`
+// (globals.css), tức chỉ khi hover/nhấn CHÍNH liên kết phủ: `active:bg-*` đặt
+// thẳng trên thẻ từng làm cả thẻ đổi nền khi chỉ chạm nút chấm sao (2026-09-13).
 export async function ExamCard({ exam, eligibility }: ExamCardProps) {
   return (
-    <Card
-      as="li"
-      className="group relative h-full transition-colors hover:bg-[color-mix(in_oklch,var(--surface),var(--foreground)_4%)] active:bg-[color-mix(in_oklch,var(--surface),var(--foreground)_7%)]"
-    >
+    <Card as="li" className="card-linked relative h-full">
       <Link
         href={`/exams/${exam.id}`}
         aria-label={exam.title}
-        className="rounded-card focus-visible:ring-ring/40 absolute inset-0 z-0 focus-visible:ring-3 focus-visible:outline-none"
+        className="card-link rounded-card focus-visible:ring-ring/40 absolute inset-0 z-0 focus-visible:ring-3 focus-visible:outline-none"
       />
 
       <div className="flex flex-wrap items-center gap-1.5">
@@ -47,7 +46,7 @@ export async function ExamCard({ exam, eligibility }: ExamCardProps) {
         <Badge variant="plain">{t("exams.gradeValue", { grade: exam.grade })}</Badge>
       </div>
 
-      <h3 className="group-hover:text-primary text-lg leading-snug font-semibold transition-colors">
+      <h3 className="card-linked-title text-lg leading-snug font-semibold">
         {exam.title}
       </h3>
 

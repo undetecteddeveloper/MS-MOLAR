@@ -430,6 +430,34 @@
   font-weight: 600;
 }
 
+/* ------------------------------------------------------------
+   THẺ CÓ LIÊN KẾT PHỦ (stretched link — ExamCard, HistoryRow). Phản hồi
+   hover/nhấn của thẻ đi theo CHÍNH liên kết phủ, không theo nút con (⋯, chấm
+   sao) đứng trong thẻ. `:active`/`:hover` của trình duyệt lan lên MỌI tổ tiên,
+   nên `active:bg-*` đặt thẳng trên thẻ làm cả thẻ đổi nền khi chỉ chạm vào nút
+   ⋯ (đo trên điện thoại thật 2026-09-13). `:has(> .card-link:active)` chỉ khớp
+   khi phần tử đang được nhấn LÀ liên kết phủ. Hover chỉ bật trên thiết bị có
+   hover — cùng luật với biến thể `hover:` của Tailwind v4. Không layer để thắng
+   `bg-surface` của Card như một biến thể utility thường.
+   ------------------------------------------------------------ */
+.card-linked {
+  transition: background-color 150ms var(--ease-out-strong);
+}
+.card-linked:has(> .card-link:active) {
+  background-color: color-mix(in oklch, var(--surface), var(--foreground) 7%);
+}
+.card-linked-title {
+  transition: color 150ms var(--ease-out-strong);
+}
+@media (hover: hover) {
+  .card-linked:has(> .card-link:hover) {
+    background-color: color-mix(in oklch, var(--surface), var(--foreground) 4%);
+  }
+  .card-linked:has(> .card-link:hover) .card-linked-title {
+    color: var(--primary);
+  }
+}
+
 /* ============================================================
    CHUYỂN ĐỘNG (2026-09-08) — từ vựng dùng chung cho toàn site. Quy tắc và
    lý do ở docs/design/ui-refactor-san-truong-design.md §6. Tóm tắt:

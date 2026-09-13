@@ -32,6 +32,11 @@
 // pdfInput dựng một lần mỗi hàng từ trường đã tải sẵn — không fetch thêm
 // (AC-009); hai boolean tự luận ĐỌC từ đường đọc, không suy lại tại chỗ
 // (EG-BE-036).
+//
+// Phản hồi hover/nhấn của thẻ qua `.card-linked` (globals.css): chỉ theo liên
+// kết phủ, không theo nút ⋯ — chạm ⋯ trên điện thoại từng làm cả thẻ đổi nền
+// (2026-09-13). Ô điểm `self-center`: cột chữ cao hơn 56px khi tên đề gãy hai
+// dòng, ô điểm căn đầu trông như bị đẩy lên góc.
 
 import Link from "next/link";
 import type { MyHistoryEntry } from "@/features/history/queries";
@@ -69,15 +74,15 @@ export async function HistoryRow({
     <Card
       as="li"
       padding="compact"
-      className="group relative flex-row items-start gap-3 transition-colors hover:bg-[color-mix(in_oklch,var(--surface),var(--foreground)_4%)] active:bg-[color-mix(in_oklch,var(--surface),var(--foreground)_7%)] sm:gap-4"
+      className="card-linked relative flex-row items-start gap-3 sm:gap-4"
     >
       <Link
         href={resultHref}
         aria-label={entry.examTitle}
-        className="rounded-card focus-visible:ring-ring/40 absolute inset-0 z-0 focus-visible:ring-3 focus-visible:outline-none"
+        className="card-link rounded-card focus-visible:ring-ring/40 absolute inset-0 z-0 focus-visible:ring-3 focus-visible:outline-none"
       />
 
-      <p className="bg-card flex size-14 shrink-0 flex-col items-center justify-center rounded-xl leading-none tabular-nums">
+      <p className="bg-card flex size-14 shrink-0 flex-col items-center justify-center self-center rounded-xl leading-none tabular-nums">
         <span className="text-xl font-bold">{entry.totalScore.toFixed(1)}</span>
         <span className="text-muted-foreground mt-1 text-[0.6875rem] font-semibold">/10</span>
       </p>
@@ -106,7 +111,7 @@ export async function HistoryRow({
             />
           </div>
         </div>
-        <h3 className="group-hover:text-primary line-clamp-2 leading-snug font-semibold transition-colors">
+        <h3 className="card-linked-title line-clamp-2 leading-snug font-semibold">
           {entry.examTitle}
         </h3>
         <p className="text-muted-foreground flex flex-wrap gap-x-3 gap-y-0.5 text-sm tabular-nums">
