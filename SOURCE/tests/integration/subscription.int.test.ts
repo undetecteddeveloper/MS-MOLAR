@@ -624,7 +624,7 @@ vi.mock("@upstash/redis", () => {
 });
 
 const { extractAndAssemble } = await import("@/features/authoring/actions");
-const { explainStep } = await import("@/features/exams/tutorActions");
+const { hintDuringAttempt } = await import("@/features/exams/tutorActions");
 
 /** Hợp đồng lỗi của S-01 (`UgcActionFailure`), lấy TỪ CHÍNH chữ ký hàm thay vì
  *  import lại tên kiểu: một lần đổi kiểu trả về sẽ hiện ra ở đây là lỗi biên
@@ -659,24 +659,17 @@ const INT1_TUTOR_OK_USER_ID = "1c3f0a10-0000-4000-8000-00000000a004";
 const INT1_TUTOR_ATTEMPT_ID = "int1-attempt";
 const INT1_TUTOR_QUESTION_ID = "int1-question";
 
-/** Lịch sử làm bài khiến `int1-question` ĐỦ ĐIỀU KIỆN "sai hai lần": HAI dòng
- *  `exam_results` với HAI `attempt_id` KHÁC NHAU, mỗi dòng chấm câu ấy là sai.
- *  `computeWrongTwiceQuestionIds()` đếm theo attemptId phân biệt và ngưỡng là
- *  2, nên một dòng là chưa đủ; và dòng ĐANG XEM phải mang đúng
- *  `INT1_TUTOR_ATTEMPT_ID`, vì `explainStep()` còn đòi câu này đang sai TRONG
- *  CHÍNH lượt ấy (`eligibleInThisAttempt`).
+/** Đề của lượt gia sư — arm `exams` phải trả `question_ids` CHỨA câu được hỏi,
+ *  và dòng attempt phải `in_progress`: từ 2026-09-13 `hintDuringAttempt()` gác
+ *  bằng "lượt của mình, đang mở, câu thuộc đề" (không còn "sai hai lần" và
+ *  không còn đọc `exam_results`).
  *
- *  Vì sao fixture này quan trọng hơn vẻ ngoài của nó: với `[]`, đường gia sư
+ *  Vì sao fixture này quan trọng hơn vẻ ngoài của nó: thiếu nó, đường gia sư
  *  từ chối ở stage 4 và KHÔNG BAO GIỜ gọi Gemini — nên `geminiCalls === 0` của
  *  ca (a) đúng kể cả khi cổng hạn mức bị gỡ sạch. Đo được, không phải suy: gỡ
  *  cổng và đổi kỳ vọng thành `toBe(999)` cho ra `expected +0 to be 999`. */
-function int1EligibleResults(): Record<string, unknown>[] {
-  const wrong = [{ questionId: INT1_TUTOR_QUESTION_ID, isCorrect: false, scored: true }];
-  return [
-    { attempt_id: INT1_TUTOR_ATTEMPT_ID, per_question: wrong },
-    { attempt_id: "int1-attempt-truoc", per_question: wrong },
-  ];
-}
+const INT1_TUTOR_EXAM_ID = "int1-exam";
+const INT1_TUTOR_EXAM_ROW = { question_ids: [INT1_TUTOR_QUESTION_ID] };
 
 /** `user_profiles.created_at` của cả ba: MỘT PHÚT TRƯỚC, tính lúc nạp module.
  *
@@ -724,11 +717,10 @@ interface Int1Fixture {
   ownExam: Record<string, unknown> | null;
   /** Dòng `exam_attempts` cho đường gia sư. */
   attempt: Record<string, unknown> | null;
-  /** Dòng `exam_results` mà `fetchOwnAttemptHistory()` đọc để tính lại tập
-   *  "sai hai lần". PHẢI khác rỗng cho đường gia sư: `[]` làm
-   *  `computeWrongTwiceQuestionIds()` trả tập rỗng và `explainStep()` từ chối
-   *  bằng `not_eligible` TRƯỚC Gemini — tức một CỔNG KHÁC thoả mãn khẳng định
-   *  "đúng 0 lượt gọi" của ca (a), bất kể cổng hạn mức còn sống hay không. */
+  /** Dòng `exam_results`. Đường gia sư KHÔNG còn đọc bảng này (2026-09-13 —
+   *  cổng "sai hai lần" bỏ); arm giữ lại để builder giả không ném nếu một đường
+   *  khác chạm tới. Với đường gia sư, thứ quyết định "đủ điều kiện" nay là
+   *  `attempt.status` + `ownExam.question_ids` (xem INT1_TUTOR_EXAM_ROW). */
   results: Record<string, unknown>[];
   /** Giá trị `count` mà truy vấn ĐẾM DÒNG cũ (`head: true`) trả về. Giữ lại để
    *  lượt chạy ĐỎ trên bản cài đặt cũ đi được tới cùng một chỗ như bản mới —
@@ -970,7 +962,7 @@ async function int1RunUpload(options: {
 }
 
 interface Int1TutorRun {
-  result: Awaited<ReturnType<typeof explainStep>>;
+  result: Awaited<ReturnType<typeof hintDuringAttempt>>;
   telemetry: Record<string, unknown>[];
   geminiCalls: number;
 }
@@ -984,16 +976,18 @@ async function int1RunTutor(userId: string): Promise<Int1TutorRun> {
   sessionClientHolder.current = int1SupabaseClient(
     {
       userId,
-      ownExam: null,
-      attempt: { user_id: userId },
-      results: int1EligibleResults(),
+      // Arm `exams` phục vụ cổng "câu thuộc đề" của đường gia sư (không phải
+      // nhánh re-run của upload — lượt này không đi đường upload).
+      ownExam: INT1_TUTOR_EXAM_ROW,
+      attempt: { user_id: userId, exam_id: INT1_TUTOR_EXAM_ID, status: "in_progress" },
+      results: [],
       examRowCount: 0,
     },
     trail,
     telemetry
   );
   int1GenerateContent.mockClear();
-  const result = await explainStep(INT1_TUTOR_ATTEMPT_ID, INT1_TUTOR_QUESTION_ID);
+  const result = await hintDuringAttempt(INT1_TUTOR_ATTEMPT_ID, INT1_TUTOR_QUESTION_ID, "");
   return { result, telemetry, geminiCalls: int1GenerateContent.mock.calls.length };
 }
 

@@ -27,7 +27,6 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { QuestionFigure } from "@/components/shared/QuestionFigure";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
-import { ExplainStepAffordance } from "@/components/tutor/ExplainStepAffordance";
 import { EssayReviewBlock } from "@/features/exams/components/EssayReviewBlock";
 import { EssayGradingPoller } from "@/features/exams/components/EssayGradingPoller";
 
@@ -284,13 +283,12 @@ export default async function ResultDetailPage({
               {q && <RichText text={q.content} className={CONTENT_CLASS} />}
               {figure}
 
-              {/* Engine 1 (AC-023/024): gia sư "Giải thích bước này" mount ở
-                  CUỐI cả hai nhánh CÓ CHẤM (short_answer và mcq), ngay trước
-                  khi đóng <li>, và CHỈ khi cờ đúng bằng true — vắng mặt/false/
-                  undefined đều không mount (fail-closed, UI Spec D1). Nhánh
-                  KHÔNG chấm ở trên không có mount này: câu không chấm không thể
-                  mang một `hasBeenWrongTwice` có nghĩa. Cờ này chỉ là tiện ích
-                  hiển thị — explainStep() tự tái kiểm tra điều kiện phía server. */}
+              {/* Gia sư "Giải thích bước này" từng mount ở cuối hai nhánh có
+                  chấm, gác bằng `hasBeenWrongTwice` (Engine 1, AC-023/024).
+                  Chuyển sang MÀN LÀM BÀI 2026-09-13 (engineer: gợi ý cần lúc
+                  đang bí, không phải lúc đã làm xong) — trang này không còn cửa
+                  gọi gia sư; cờ `hasBeenWrongTwice` vẫn là dữ liệu của đường
+                  đọc, chỉ không còn bề mặt nào dùng. */}
               {isShortAnswer ? (
                 <>
                   <div className="flex flex-col gap-1 text-sm">
@@ -305,9 +303,6 @@ export default async function ResultDetailPage({
                       <span className="text-success font-medium">{q?.essayAnswer || "—"}</span>
                     </p>
                   </div>
-                  {r.hasBeenWrongTwice === true && (
-                    <ExplainStepAffordance questionId={r.questionId} attemptId={attemptId} />
-                  )}
                 </>
               ) : (
                 <>
@@ -359,9 +354,6 @@ export default async function ResultDetailPage({
                       );
                     })}
                   </ul>
-                  {r.hasBeenWrongTwice === true && (
-                    <ExplainStepAffordance questionId={r.questionId} attemptId={attemptId} />
-                  )}
                 </>
               )}
             </li>

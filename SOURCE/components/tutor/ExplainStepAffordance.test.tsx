@@ -40,22 +40,22 @@ import { fileURLToPath } from "node:url";
 import { act, fireEvent, render, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ExplainStepAffordance } from "./ExplainStepAffordance";
-import type { ExplainStepResult } from "@/features/exams/tutorActions";
+import type { TutorHintResult } from "@/features/exams/tutorActions";
 
 vi.mock("@/features/exams/tutorActions", () => ({
-  explainStep: vi.fn(),
+  hintDuringAttempt: vi.fn(),
 }));
 
-import { explainStep } from "@/features/exams/tutorActions";
+import { hintDuringAttempt } from "@/features/exams/tutorActions";
 
-const mockExplainStep = vi.mocked(explainStep);
+const mockExplainStep = vi.mocked(hintDuringAttempt);
 
 // Deliberately NOT symmetric/interchangeable-looking — a swapped call site must
 // fail Test 2's assertion on the values alone, not merely on argument count.
 const ATTEMPT_ID = "attempt-fixture-111";
 const QUESTION_ID = "question-fixture-222";
 
-const IDLE_LABEL = "Giải thích bước này"; // tutor.explainThisStep (en)
+const IDLE_LABEL = "Gợi ý cho câu này"; // tutor.explainThisStep (en)
 const RETRY_LABEL = "Thử lại"; // common.retry (en), reused per ActionButton's LABEL_KEY precedent
 const ERROR_COPY = "Chưa lấy được gợi ý. Bạn thử lại nhé."; // tutor.error (en) — ONE generic copy for all 4 backend codes
 
@@ -95,10 +95,10 @@ describe("ExplainStepAffordance", () => {
   //   using a literal call-count assertion, not merely "the UI still looks busy."
   it("AC-025: busyRef synchronous double-activation guard — a second activation while busy is a no-op (at most 1 explainStep() call)", async () => {
     // Held open: phase stays "busy" for the whole assertion window.
-    let resolveExplain!: (result: ExplainStepResult) => void;
+    let resolveExplain!: (result: TutorHintResult) => void;
     mockExplainStep.mockImplementation(
       () =>
-        new Promise<ExplainStepResult>((resolve) => {
+        new Promise<TutorHintResult>((resolve) => {
           resolveExplain = resolve;
         })
     );
@@ -174,8 +174,8 @@ describe("ExplainStepAffordance", () => {
 
     // The SOLE guard against a silent swap — both parameters are plain strings,
     // so either order compiles. Two distinguishable fixtures make the swap fail.
-    expect(mockExplainStep).toHaveBeenCalledWith(ATTEMPT_ID, QUESTION_ID);
-    expect(mockExplainStep.mock.calls[0]).toEqual([ATTEMPT_ID, QUESTION_ID]);
+    expect(mockExplainStep).toHaveBeenCalledWith(ATTEMPT_ID, QUESTION_ID, "");
+    expect(mockExplainStep.mock.calls[0]).toEqual([ATTEMPT_ID, QUESTION_ID, ""]);
   });
 
   // ===========================================================================
@@ -397,7 +397,7 @@ describe("ExplainStepAffordance", () => {
 
     fireEvent.click(button); // fully activatable with nothing but {questionId, attemptId}
     await waitFor(() => expect(mockExplainStep).toHaveBeenCalledTimes(1));
-    expect(mockExplainStep).toHaveBeenCalledWith(ATTEMPT_ID, QUESTION_ID);
+    expect(mockExplainStep).toHaveBeenCalledWith(ATTEMPT_ID, QUESTION_ID, "");
 
     // Structural half of AC-029: neither the component nor its hook may read a
     // skill-tag-shaped value at all. The mount/no-mount DECISION itself

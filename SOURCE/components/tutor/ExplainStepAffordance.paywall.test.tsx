@@ -22,12 +22,12 @@ import { FREE_FALLBACK, type Entitlement } from "@/lib/billing/types";
 import { copy } from "@/lib/copy";
 
 vi.mock("@/features/exams/tutorActions", () => ({
-  explainStep: vi.fn(),
+  hintDuringAttempt: vi.fn(),
 }));
 
-import { explainStep } from "@/features/exams/tutorActions";
+import { hintDuringAttempt } from "@/features/exams/tutorActions";
 
-const mockExplainStep = vi.mocked(explainStep);
+const mockExplainStep = vi.mocked(hintDuringAttempt);
 
 const ATTEMPT_ID = "attempt-fixture-333";
 const QUESTION_ID = "question-fixture-444";

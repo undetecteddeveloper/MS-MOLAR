@@ -90,6 +90,11 @@ interface QuestionRendererProps {
    *  — vốn dựng component mà KHÔNG truyền nó — nhận `false`, in
    *  `player.essayNotScored`, và chuỗi đã ghim ở đó ở nguyên XANH. */
   essayGradingEnabled?: boolean;
+  /** Khe cho nút/bảng gợi ý của gia sư (ExplainStepAffordance) — ExamPlayer
+   *  dựng và truyền xuống, component này chỉ đặt chỗ: NGAY DƯỚI đề bài, TRÊN
+   *  khu vực trả lời (2026-09-13). Không import gì từ tutor ở đây, để thẻ câu
+   *  hỏi vẫn render được ở nơi không có EntitlementProvider (test, preview). */
+  hintSlot?: React.ReactNode;
 }
 
 export function QuestionRenderer({
@@ -103,6 +108,7 @@ export function QuestionRenderer({
   flagged,
   onToggleFlag,
   essayGradingEnabled = false,
+  hintSlot,
 }: QuestionRendererProps) {
   const type = question.questionType ?? "mcq";
   const progressId = `question-progress-${question.id}`;
@@ -178,6 +184,11 @@ export function QuestionRenderer({
           className="max-h-80 w-auto"
         />
       )}
+
+      {/* Gợi ý của gia sư — giữa đề bài và khu vực trả lời: người bí đọc lại đề
+          rồi mới cần một cái gợi ý, và lời gia sư đứng ngay dưới đề để đối
+          chiếu, không phải dưới bốn lựa chọn đã cuộn khuất. */}
+      {hintSlot}
 
       {/* Khu vực trả lời — chiều cao cố định, cuộn dọc khi dài (đồng bộ template). */}
       <div className="h-[238px] overflow-y-auto pr-2">

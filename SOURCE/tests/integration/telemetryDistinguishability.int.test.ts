@@ -231,7 +231,7 @@ vi.mock("@/lib/supabase/server", () => ({
   },
 }));
 
-const { explainStep } = await import("@/features/exams/tutorActions");
+const { hintDuringAttempt } = await import("@/features/exams/tutorActions");
 
 // Ghim bộ đếm rate limit dùng chung về `null` NGAY BÂY GIỜ, khi env còn trống.
 // Khẳng định luôn thay vì gọi suông: nếu một ngày ai đó đặt lại env sớm hơn
@@ -279,7 +279,6 @@ let admin: SupabaseClient;
 let fixtureUserId: string;
 /** `exam_attempts.id` là uuid do DB sinh — đọc lại sau khi seed. */
 let attemptId: string;
-let previousAttemptId: string;
 
 interface TelemetryRow {
   id: string;
@@ -292,7 +291,7 @@ interface TelemetryRow {
 
 interface TutorRun {
   label: string;
-  result: Awaited<ReturnType<typeof explainStep>>;
+  result: Awaited<ReturnType<typeof hintDuringAttempt>>;
   geminiCalls: number;
   redisOps: string[];
   warnings: string[];
@@ -361,11 +360,11 @@ async function cleanupFixtures(): Promise<void> {
  *  gọi thấy được, nên thiếu một trong hai thì `explainStep()` từ chối ở bước 5
  *  bằng `not_eligible` và ca "sự cố nhà cung cấp" không bao giờ tới Gemini.
  *
- *  HAI dòng `exam_results` với HAI `attempt_id` KHÁC NHAU:
- *  `computeWrongTwiceQuestionIds()` đếm theo attempt phân biệt với ngưỡng 2, và
- *  `explainStep()` còn đòi câu này đang sai TRONG CHÍNH lượt đang xem. Thiếu
- *  fixture này thì cả ba lượt đều dừng ở bước 4 và ba dòng telemetry sẽ mang
- *  cùng một mã `not_eligible` — tức bài kiểm tra tự làm mình vô hiệu. */
+ *  MỘT lượt `in_progress` (2026-09-13): `hintDuringAttempt()` gác bằng "lượt
+ *  đang mở + câu thuộc đề", không còn "sai hai lần" — nên không cần dòng
+ *  `exam_results` nào. Thiếu lượt đang mở thì cả ba lượt gọi dừng ở bước 1 và
+ *  ba dòng telemetry sẽ mang cùng một mã `not_eligible` — tức bài kiểm tra tự
+ *  làm mình vô hiệu. */
 async function setupFixtures(): Promise<void> {
   const question = await admin.from("questions").insert({
     id: QUESTION_ID,
@@ -395,38 +394,12 @@ async function setupFixtures(): Promise<void> {
 
   const attempts = await admin
     .from("exam_attempts")
-    .insert([
-      { exam_id: EXAM_ID, user_id: fixtureUserId, status: "submitted" },
-      { exam_id: EXAM_ID, user_id: fixtureUserId, status: "submitted" },
-    ])
+    .insert([{ exam_id: EXAM_ID, user_id: fixtureUserId, status: "in_progress" }])
     .select("id");
   if (attempts.error) throw attempts.error;
   const ids = (attempts.data ?? []).map((r) => (r as { id: string }).id);
-  if (ids.length !== 2) throw new Error(`AC-047: cần 2 attempt fixture, nhận ${ids.length}`);
-  [attemptId, previousAttemptId] = ids;
-
-  const wrong = [{ questionId: QUESTION_ID, isCorrect: false, scored: true }];
-  const results = await admin.from("exam_results").insert([
-    {
-      attempt_id: attemptId,
-      user_id: fixtureUserId,
-      total_score: 0,
-      correct: 0,
-      total: 1,
-      per_question: wrong,
-      topic_breakdown: [],
-    },
-    {
-      attempt_id: previousAttemptId,
-      user_id: fixtureUserId,
-      total_score: 0,
-      correct: 0,
-      total: 1,
-      per_question: wrong,
-      topic_breakdown: [],
-    },
-  ]);
-  if (results.error) throw results.error;
+  if (ids.length !== 1) throw new Error(`AC-047: cần 1 attempt fixture, nhận ${ids.length}`);
+  [attemptId] = ids;
 }
 
 /** Đọc ngược bằng service_role: `revoke select … from anon, authenticated` nên
@@ -468,9 +441,9 @@ async function runTutor(label: string, seed: { quota: number; budget: number }):
 
   const warnings: string[] = [];
   const restoreWarn = captureWarnings(warnings);
-  let result: Awaited<ReturnType<typeof explainStep>>;
+  let result: Awaited<ReturnType<typeof hintDuringAttempt>>;
   try {
-    result = await explainStep(attemptId, QUESTION_ID);
+    result = await hintDuringAttempt(attemptId, QUESTION_ID, "");
   } finally {
     restoreWarn();
   }
@@ -603,7 +576,7 @@ describe(
         // lượt chạy (readEntitlement, consumeQuota) không được phép làm ca này
         // đỏ, và cũng không được phép làm nó xanh hộ.
         expect(
-          run.warnings.filter((w) => w.includes("[explainStep] telemetry_log")),
+          run.warnings.filter((w) => w.includes("[hintDuringAttempt] telemetry_log")),
           `lượt "${run.label}" có cảnh báo telemetry`
         ).toEqual([]);
       }

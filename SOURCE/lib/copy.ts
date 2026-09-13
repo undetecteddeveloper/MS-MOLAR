@@ -716,7 +716,9 @@ export const copy = {
   // --- Gia sư AI (Giải thích bước này) — Engine 1 Adaptive AI ---
   // Đặt cùng vị trí tương đối với en.ts để hai file dễ so nhau; `Dictionary`
   // chỉ ràng buộc ĐỦ KHOÁ chứ không ràng buộc thứ tự.
-  "tutor.explainThisStep": "Giải thích bước này",
+  // Nút gợi ý trong thẻ câu hỏi của màn làm bài (2026-09-13; trước là "Giải
+  // thích bước này" ở trang chi tiết kết quả).
+  "tutor.explainThisStep": "Gợi ý cho câu này",
   "tutor.busy": "Đang lấy gợi ý…",
   "tutor.error": "Chưa lấy được gợi ý. Bạn thử lại nhé.",
   "tutor.hintEyebrow": "Gợi ý",

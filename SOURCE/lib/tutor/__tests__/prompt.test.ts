@@ -249,22 +249,46 @@ describe("buildTutorPrompt — chỉ dẫn Socratic tiếng Việt, không nêu 
 //   this line is expected to FAIL TO COMPILE today (proving the exclusion is
 //   enforced at the type level) and is the intended catch if `essay` is ever
 //   added to the union without a conscious, reviewed widening of this type.
-describe("TutorPromptInput.questionType — loại trừ 'essay' ở mức kiểu", () => {
-  it("chỉ nhận mcq/true_false/short_answer; 'essay' bị chặn lúc biên dịch, không phải lúc chạy", () => {
-    const accepted: TutorPromptInput["questionType"][] = ["mcq", "true_false", "short_answer"];
+// 2026-09-13: union NỚI để nhận "essay" — một quyết định có chủ đích, không
+// phải lỡ tay (engineer: gợi ý chuyển sang màn làm bài, mở cho mọi câu kể cả tự
+// luận). Ca "@ts-expect-error" cũ đã làm đúng việc của nó: nó đỏ khi union nới,
+// và bản nới này đi kèm ba ràng buộc thay thế được ghim ngay dưới.
+describe("TutorPromptInput.questionType — nhận cả 'essay' (gợi ý khi đang làm bài)", () => {
+  const ESSAY_SENTINEL = "SENTINEL-ESSAY-MODEL-ANSWER";
+  const essayInput: TutorPromptInput = {
+    questionContent: "Phân tích hình tượng người lính trong bài thơ Đồng chí.",
+    questionType: "essay",
+    studentAnswer: "Mở bài: giới thiệu Chính Hữu và hoàn cảnh sáng tác…",
+  };
 
-    // @ts-expect-error — "essay" nằm ngoài union của TutorPromptInput.questionType.
-    // Lý do KHÔNG còn là "essay không bao giờ được chấm" (ADR-0018 làm câu đó
-    // sai); lý do là "sai hai lần" đọc `isCorrect`, một vị từ NHỊ PHÂN mà câu tự
-    // luận không có — nó có một band liên tục. Dòng này
-    // PHẢI báo lỗi biên dịch; nếu ai đó nới union để nhận "essay", chính directive
-    // này thành "unused" và `tsc --noEmit` gãy — buộc phải xem lại có chủ đích.
-    const essayType: TutorPromptInput["questionType"] = "essay";
+  it("bốn dạng câu đều là giá trị hợp lệ của union", () => {
+    const accepted: TutorPromptInput["questionType"][] = ["mcq", "true_false", "short_answer", "essay"];
+    expect(accepted).toHaveLength(4);
+  });
 
-    expect(accepted).toEqual(["mcq", "true_false", "short_answer"]);
-    // Ghi nhận đúng bản chất của rào chắn: KHÔNG có kiểm tra lúc chạy nào loại
-    // bỏ "essay" — `tsc` mới là cổng, nên directive ở trên là thứ phải giữ.
-    expect(essayType).toBe("essay");
+  it("prompt tự luận: có chỉ dẫn Socratic, có luật 'không viết bài mẫu', mang đề + bản nháp, và KHÔNG mang đáp án mẫu", () => {
+    const prompt = buildTutorPrompt(essayInput);
+    expect(prompt).toContain(SOCRATIC_INSTRUCTION);
+    // Chép tay, không import: luật riêng cho tự luận phải tồn tại trong khối
+    // chỉ dẫn CHUNG, không nằm trong một nhánh có thể rơi rụng.
+    expect(prompt).toContain("KHÔNG viết bài mẫu");
+    expect(prompt).toContain("tự luận (viết bài)");
+    expect(prompt).toContain(essayInput.questionContent);
+    expect(prompt).toContain(essayInput.studentAnswer);
+    // Cả khi bị truyền nguyên dòng `questions` mang essay_answer (đáp án mẫu),
+    // thân hàm chỉ nội suy đích danh từng trường nên sentinel không có đường ra.
+    const fromFullRow = buildTutorPrompt({
+      ...essayInput,
+      essay_answer: ESSAY_SENTINEL,
+      correct_answer: ESSAY_SENTINEL,
+    } as unknown as TutorPromptInput);
+    expect(fromFullRow).not.toContain(ESSAY_SENTINEL);
+  });
+
+  it("bản nháp trống vẫn dựng được prompt — khối bài làm hiện ra trống, không mất ngữ cảnh", () => {
+    const prompt = buildTutorPrompt({ ...essayInput, studentAnswer: "" });
+    expect(prompt).toContain("Bài làm của học sinh");
+    expect(prompt).toContain(essayInput.questionContent);
   });
 });
 

@@ -1,12 +1,20 @@
 "use client";
 
-// ExplainStepAffordance — cửa vào của gia sư "Giải thích bước này" (PRD R7, UI
-// Spec S-01/D4/D5). Chỉ mount khi hasBeenWrongTwice là true (mặc định đóng,
-// AC-024) — chính ResultDetailPage quyết định việc đó, component này không tự
-// gác. Máy trạng thái nằm ở useTutorAction (cùng thư mục).
+// ExplainStepAffordance — cửa vào của gia sư "Gợi ý cho câu này" (PRD R7, UI
+// Spec S-01/D4/D5). Từ 2026-09-13 nó đứng trong THẺ CÂU HỎI của màn làm bài
+// (ExamPlayer → QuestionRenderer `hintSlot`), mở cho MỌI câu kể cả tự luận —
+// engineer: "người ta cần gợi ý lúc đang bí, không phải lúc đã làm xong". Bản
+// trước mount ở trang Chi tiết kết quả, chỉ khi hasBeenWrongTwice. Máy trạng
+// thái nằm ở useTutorAction (cùng thư mục).
 // Gợi ý của Gemini render QUA RichText (D4/ADR-0002) vì nó phái sinh từ nội dung
 // câu hỏi do người dùng tải lên (bị ảnh hưởng bởi kẻ tấn công) — ở đây không mở
 // thêm một đường render nào không đi qua sanitize.
+//
+// `hint`/`onHint`: ExamPlayer giữ gợi ý đã nhận THEO CÂU. Component này được
+// mount lại (`key={question.id}`) mỗi lần đổi câu nên state trong hook về idle
+// — không có `hint` prop thì quay lại câu vừa hỏi sẽ thấy nút chứ không thấy
+// lời gia sư, và bấm lần nữa là tốn thêm một lượt. `draftAnswer` là bài làm
+// hiện tại của câu, gửi kèm để gia sư trả lời đúng chỗ em ấy đang kẹt.
 //
 // KHÔNG BAO GIỜ dùng `disabled` gốc (làm nút rơi khỏi thứ tự tab/focus — đúng
 // con bug đã phải sửa hai lần trong repo này: RateButton rồi ActionButton);
@@ -23,12 +31,11 @@ import { isQuotaExhausted } from "@/lib/billing/types";
 import { t } from "@/lib/copy";
 import { useTutorAction } from "./useTutorAction";
 
-// RichText nạp ĐỘNG, không import tĩnh (TD-021). Lý do nằm ở xác suất: component
-// này chỉ mount khi học sinh đã sai câu đó HAI lần, và ngay cả lúc đó bảng gợi ý
-// vẫn chỉ render sau khi họ CHỦ ĐỘNG bấm nút. Import tĩnh thì cây markdown+KaTeX
-// (122.5 KB gzip — chunk client lớn nhất dự án) nằm trong bundle đầu của trang
-// Chi tiết kết quả cho MỌI người xem, kể cả người làm đúng hết và không bao giờ
-// thấy cái nút này.
+// RichText nạp ĐỘNG, không import tĩnh (TD-021/TD-023). Lý do nằm ở xác suất:
+// bảng gợi ý chỉ render sau khi học sinh CHỦ ĐỘNG bấm nút. Import tĩnh thì cây
+// markdown+KaTeX (122.5 KB gzip — chunk client lớn nhất dự án) nằm trong bundle
+// đầu của MÀN LÀM BÀI cho mọi người, kể cả người không bao giờ bấm — đúng thứ
+// TD-023 đã đẩy ra khỏi màn này bằng cách render nội dung câu hỏi ở server.
 //
 // `ssr: false` là ĐÚNG chứ không phải để né lỗi: `hint` chỉ tồn tại sau một lời
 // gọi Server Action từ tương tác người dùng, nên ở lượt render server nó luôn
@@ -37,17 +44,32 @@ const RichText = dynamic(() => import("@/components/shared/RichText").then((m) =
   ssr: false,
 });
 
-/** Cố ý chỉ hai trường: kiểu props này KHÔNG mang nổi đáp án
- *  (correct_answer/sub_answers/essay_answer) lẫn nhãn kỹ năng — phòng thủ theo
- *  cấu trúc cho AC-018/019 và AC-029. */
+/** Kiểu props này KHÔNG mang nổi đáp án (correct_answer/sub_answers/
+ *  essay_answer) lẫn nhãn kỹ năng — phòng thủ theo cấu trúc cho AC-018/019 và
+ *  AC-029. Ba trường thêm 2026-09-13 đều là DỮ LIỆU CỦA HỌC SINH hoặc lời gia
+ *  sư đã nhận, không phải một chỗ để đáp án chui vào. */
 export interface ExplainStepAffordanceProps {
   questionId: string;
   attemptId: string;
+  /** Bài làm hiện tại của câu (chưa nộp). Đọc lúc bấm. Mặc định rỗng. */
+  draftAnswer?: string;
+  /** Gợi ý đã nhận cho câu này ở một lượt mount trước — có thì hiện ngay. */
+  hint?: string | null;
+  /** Báo lên cha khi nhận được gợi ý, để cha giữ theo câu. */
+  onHint?: (hint: string) => void;
 }
 
-export function ExplainStepAffordance({ questionId, attemptId }: ExplainStepAffordanceProps) {
-  const { phase, hint, run } = useTutorAction(attemptId, questionId);
+export function ExplainStepAffordance({
+  questionId,
+  attemptId,
+  draftAnswer = "",
+  hint: storedHint = null,
+  onHint,
+}: ExplainStepAffordanceProps) {
+  const { phase, hint: freshHint, run } = useTutorAction(attemptId, questionId, onHint);
   const { tutor } = useEntitlement();
+  // Bản đã nhận ở lượt trước (cha giữ) hoặc bản vừa về trong lượt này.
+  const hint = storedHint ?? freshHint;
   // questionId đã là key của chính danh sách câu hỏi nên tự nó duy nhất trong
   // một trang — không cần thêm prop idPrefix (Minimal Surface Element 3).
   const reasonId = `tutor-${questionId}-reason`;
@@ -70,10 +92,16 @@ export function ExplainStepAffordance({ questionId, attemptId }: ExplainStepAffo
   // .focus() cục bộ là cái giá sai; <div> bọc ngoài không đổi bố cục vì <li>
   // cha đã là flex-col (item vẫn dàn hết chiều ngang).
   const hintRef = useRef<HTMLDivElement>(null);
-  const showHint = phase === "hint-shown" && hint !== null;
+  // Gợi ý cha giữ từ trước hiện ngay lúc mount (không cần phase); gợi ý vừa về
+  // thì đợi phase — hai đường cùng một bảng.
+  const showHint = hint !== null && (storedHint !== null || phase === "hint-shown");
+  // Chỉ bắt focus khi bảng THAY THẾ nút trong lượt này — lúc quay lại một câu
+  // đã có gợi ý, người dùng vừa bấm số câu trên bảng câu hỏi, không nên bị
+  // giật focus.
+  const focusOnReveal = phase === "hint-shown";
   useEffect(() => {
-    if (showHint) hintRef.current?.focus();
-  }, [showHint]);
+    if (showHint && focusOnReveal) hintRef.current?.focus();
+  }, [showHint, focusOnReveal]);
 
   // D5: gợi ý hiện ra là trạng thái CUỐI của lượt render này — nút bị THAY THẾ
   // hẳn (không phải ẩn đi hay khoá lại), nên không còn nút nào để gọi gia sư
@@ -135,7 +163,8 @@ export function ExplainStepAffordance({ questionId, attemptId }: ExplainStepAffo
       <Button
         type="button"
         variant="secondary"
-        onClick={run}
+        size="sm"
+        onClick={() => run(draftAnswer)}
         // Chuỗi "true"/"false" chứ không phải boolean — theo đúng quy ước của
         // ActionButton.
         aria-disabled={phase === "busy" ? "true" : "false"}

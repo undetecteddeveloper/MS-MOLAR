@@ -37,6 +37,12 @@ vi.mock("@/features/exams/actions", () => ({
   submitExam: vi.fn(),
 }));
 
+// Nút gợi ý (ExplainStepAffordance, 2026-09-13) kéo theo tutorActions — cũng
+// server-only; không bấm trong test này nên mock tối thiểu như submitExam.
+vi.mock("@/features/exams/tutorActions", () => ({
+  hintDuringAttempt: vi.fn(),
+}));
+
 // useLeaveGuard gọi useRouter() — component test (không phải Next test runner)
 // không có App Router thật mounted. Chỉ cần push (dùng khi confirmLeave, không
 // gọi trong test này) nên mock tối thiểu.

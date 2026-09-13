@@ -13,11 +13,18 @@
 //      trên input. Nhờ vậy, kể cả khi có ai đó ép cả dòng bảng `questions` vào
 //      đây, mấy cột đáp án cũng không có đường ra chuỗi prompt.
 // `__tests__/prompt.test.ts` khoá cả hai lớp lại (0 lần xuất hiện sentinel trên
-// dàn fixture 3 dạng câu, cộng bằng chứng biên dịch cho việc loại trừ essay).
+// dàn fixture 3 dạng câu chấm tự động + ca tự luận riêng).
 //
 // CỐ Ý KHÔNG có trường `correctAnswer?: never` hay tương tự làm "chặn thêm":
 // bất biến của backend DD là "TutorPromptInput has no field named or shaped like
 // an answer-key field" — thêm trường như thế là tự phá bất biến đó.
+//
+// 2026-09-13 — GỢI Ý KHI ĐANG LÀM BÀI (engineer: "người ta cần gợi ý lúc đang
+// bí, không phải lúc đã làm xong"). Gia sư rời trang Chi tiết kết quả sang màn
+// làm bài; cổng "sai hai lần" bỏ, nên lý do loại trừ tự luận (cổng ấy cần vị từ
+// nhị phân `isCorrect`) không còn — union `questionType` nay nhận cả "essay",
+// và khối chỉ dẫn nói rõ với tự luận chỉ gợi hướng lập luận, không viết bài
+// mẫu. Hai lớp rào chắn đáp án ở trên KHÔNG đổi một chữ.
 
 /** Trần ký tự của BÀI LÀM khi nó đi vào prompt Gemini.
  *
@@ -38,12 +45,11 @@
  *  PHÉP CẮT ĐƯỢC CƯỠNG CHẾ TRONG `buildTutorPrompt()`, KHÔNG PHẢI Ở CALL SITE:
  *  một phép cắt ở call site là một phép cắt mà call site THỨ HAI sẽ quên.
  *
- *  Đường ripple đi qua `short_answer` chứ không qua `essay`: union
- *  `questionType` loại trừ essay ở mức kiểu, nên bài tự luận không tới được
- *  gia sư. Nhưng ô short_answer chỉ bị chặn ở `LIMITS.MAX_SHORT_ANSWER = 100`
- *  phía CLIENT, và một phép chặn ở client KHÔNG phải một phép chặn ở server —
- *  `submitExam` cắt bằng `MAX_ATTEMPT_ANSWER` (`actions.ts:146`), nên một
- *  request tự soạn lưu được 4000 ký tự và chúng đi thẳng vào đây. */
+ *  Từ 2026-09-13 bài tự luận (tới 8000 ký tự với Ngữ văn/Tiếng Anh) cũng đi
+ *  qua đây dưới dạng BẢN NHÁP đang viết dở — phép cắt 500 ký tự này chính là
+ *  thứ giữ hoá đơn Gemini không đi theo trần bài làm. Ô short_answer cũng vậy:
+ *  nó chỉ bị chặn ở `LIMITS.MAX_SHORT_ANSWER = 100` phía CLIENT, và một phép
+ *  chặn ở client KHÔNG phải một phép chặn ở server. */
 export const TUTOR_MAX_STUDENT_ANSWER = 500;
 
 /** Một lựa chọn/ý con để hiển thị cho model: chỉ NHÃN + NỘI DUNG, không có
@@ -60,27 +66,23 @@ interface LabelledOption {
 export interface TutorPromptInput {
   /** Đề bài, nguyên văn (có thể chứa LaTeX $...$). */
   questionContent: string;
-  /** essay bị loại — union này ĐÓNG, và `tsc` là cổng cưỡng chế (AC-071).
+  /** Bốn dạng câu, KỂ CẢ tự luận (nới 2026-09-13).
    *
-   *  LÝ DO ĐÃ ĐỔI kể từ Essay Auto-Scoring (ADR-0018), giá trị thì KHÔNG. Câu
-   *  cũ ở đây viết "không bao giờ được chấm" — điều đó nay SAI: câu tự luận
-   *  được chấm tự động và mang một band.
-   *
-   *  Lý do đúng là về PHÉP SO SÁNH, không về việc có chấm hay không: gia sư
-   *  chỉ mở cho câu "sai hai lần", mà `wrongTwice` đọc `isCorrect` — một vị từ
-   *  NHỊ PHÂN. Câu tự luận không có `isCorrect`; nó có một band liên tục cùng
-   *  một trạng thái vòng đời, nên "sai hai lần" không phát biểu được cho nó.
-   *
-   *  Và nới union ra để nhận "essay" không chỉ sai về khái niệm — nó lùa văn
-   *  xuôi của học sinh vào prompt Gemini, tức một nhà cung cấp thứ hai, trên
-   *  một khoá ngân sách thứ hai, cho một bài đã được Groq chấm rồi. */
-  questionType: "mcq" | "true_false" | "short_answer";
+   *  Union này từng ĐÓNG ở ba dạng chấm tự động, vì gia sư chỉ mở cho câu "sai
+   *  hai lần" mà `wrongTwice` đọc `isCorrect` — một vị từ NHỊ PHÂN mà một band
+   *  tự luận không trả lời được. Cổng ấy nay không còn (gợi ý trong lúc làm
+   *  bài), nên lý do loại trừ cũng không còn. Cái giá đã được cân nhắc: văn
+   *  xuôi của học sinh đi vào prompt Gemini dưới dạng bản nháp cắt 500 ký tự
+   *  (`TUTOR_MAX_STUDENT_ANSWER`), trên khoá ngân sách `ai:budget:` — và mỗi
+   *  lượt vẫn qua rate limit + hạn mức kỳ như mọi dạng câu khác. */
+  questionType: "mcq" | "true_false" | "short_answer" | "essay";
   /** Chỉ có ở mcq — bốn phương án A–D, KHÔNG đánh dấu phương án nào đúng. */
   choices?: LabelledOption[];
   /** Chỉ có ở true_false — nội dung các ý a–d, KHÔNG kèm đáp án Đ/S. */
   subItems?: LabelledOption[];
-  /** Bài làm của học sinh, nguyên văn như attempt_answers.answer lưu (mcq: "B";
-   *  true_false: chuỗi tfCodec "a:Đ,b:S"; short_answer: giá trị đã điền). */
+  /** Bài làm HIỆN TẠI (đang làm dở) của học sinh, nguyên văn như ô nhập đang
+   *  giữ (mcq: "B"; true_false: chuỗi tfCodec "a:Đ,b:S"; short_answer: giá trị
+   *  đã điền; essay: đoạn đang viết). Rỗng khi chưa làm gì. */
   studentAnswer: string;
 }
 
@@ -94,13 +96,14 @@ const SOCRATIC_INSTRUCTION =
 
 /** Khối chỉ dẫn dùng CHUNG cho mọi dạng câu hỏi — cố ý không nằm trong bất kỳ
  *  nhánh theo `questionType` nào, để không thể rơi rụng ở đúng một nhánh. */
-const INSTRUCTION_BLOCK = `Bạn là gia sư Toán đang kèm một học sinh trung học ở Việt Nam.
-Học sinh này đã làm sai câu hỏi dưới đây ở nhiều lượt làm bài khác nhau, nên điều em ấy cần là gỡ chỗ hiểu sai, không phải nhận kết quả.
+const INSTRUCTION_BLOCK = `Bạn là gia sư đang kèm một học sinh trung học ở Việt Nam.
+Học sinh này ĐANG LÀM BÀI và bị bí ở câu hỏi dưới đây, nên điều em ấy cần là một hướng suy nghĩ để tự đi tiếp, không phải nhận kết quả.
 
 Yêu cầu bắt buộc:
 - ${SOCRATIC_INSTRUCTION}
-- Dẫn dắt bằng 1–3 câu hỏi ngắn, giúp học sinh tự kiểm tra lại bước làm của mình.
-- Chỉ ra bước hoặc ý mà lập luận có thể đã lệch, nhưng không làm hộ và không kết luận phương án nào đúng.
+- Dẫn dắt bằng 1–3 câu hỏi ngắn, giúp học sinh tự kiểm tra lại cách hiểu đề và bước làm của mình.
+- Chỉ ra kiến thức hoặc bước cần dùng tới, nhưng không làm hộ và không kết luận phương án nào đúng.
+- Với câu tự luận: chỉ gợi hướng lập luận hoặc dàn ý sơ lược, KHÔNG viết bài mẫu và không viết thay đoạn nào.
 - Bạn KHÔNG được cho biết đáp án đúng của câu này; cũng đừng suy đoán rồi khẳng định chắc chắn.
 - Viết tối đa 5 câu, giữ nguyên ký hiệu LaTeX ($...$) nếu đề có.`;
 
@@ -108,14 +111,16 @@ const QUESTION_TYPE_LABELS: Record<TutorPromptInput["questionType"], string> = {
   mcq: "trắc nghiệm nhiều lựa chọn (A–D)",
   true_false: "đúng/sai từng ý (a–d)",
   short_answer: "trả lời ngắn (điền giá trị)",
+  essay: "tự luận (viết bài)",
 };
 
 /** Nói cho model biết cách ĐỌC chuỗi bài làm — nếu không, "a:Đ,b:S" trông như
  *  rác và model dễ bịa ra ý học sinh không hề chọn. */
 const STUDENT_ANSWER_HINTS: Record<TutorPromptInput["questionType"], string> = {
-  mcq: "nhãn phương án em ấy đã chọn",
+  mcq: "nhãn phương án em ấy đang chọn, trống nếu chưa chọn",
   true_false: 'dạng "ý:Đ hoặc S", chỉ gồm những ý em ấy đã trả lời',
-  short_answer: "giá trị em ấy đã điền",
+  short_answer: "giá trị em ấy đã điền, trống nếu chưa điền",
+  essay: "đoạn em ấy đang viết dở, có thể trống nếu chưa viết gì",
 };
 
 /** Danh sách nhãn + nội dung, mỗi dòng một mục; rỗng/không có → chuỗi rỗng để

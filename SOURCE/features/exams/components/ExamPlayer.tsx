@@ -15,10 +15,11 @@
 
 import Link from "next/link";
 import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
-import { useEffect, useRef, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { submitExam } from "@/features/exams/actions";
 import { t } from "@/lib/copy";
 import { Button } from "@/components/ui/button";
+import { ExplainStepAffordance } from "@/components/tutor/ExplainStepAffordance";
 import { ExamTimer } from "@/features/exams/components/ExamTimer";
 import { LeaveExamDialog } from "@/features/exams/components/LeaveExamDialog";
 import { QuestionRenderer } from "@/features/exams/components/QuestionRenderer";
@@ -65,6 +66,10 @@ export function ExamPlayer({
   );
   const [submitting, startSubmit] = useTransition();
   const submittedRef = useRef(false);
+  // Gợi ý gia sư đã nhận, THEO CÂU (2026-09-13): affordance mount lại mỗi lần
+  // đổi câu (key=question.id) nên state của nó không giữ được; giữ ở đây để
+  // quay lại câu đã hỏi vẫn thấy lời gia sư thay vì một cái nút tốn thêm lượt.
+  const [hints, setHints] = useState<Record<string, string>>({});
 
   // S#28: cảnh báo rời trang khi đang làm bài — chặn click nav trong app
   // (modal tuỳ biến) + refresh/đóng tab (beforeunload). Tắt khi đang submit
@@ -286,6 +291,20 @@ export function ExamPlayer({
               }}
               flagged={Boolean(flags[question.id])}
               onToggleFlag={() => toggleFlag(question.id)}
+              /* Gợi ý khi đang bí (engineer 2026-09-13) — mọi câu, kể cả tự
+                 luận; server tự gác (lượt của mình, đang mở, câu thuộc đề, rate
+                 limit, hạn mức). `key` theo câu để máy trạng thái về idle khi
+                 đổi câu; bản nháp đọc từ `answers` lúc bấm. */
+              hintSlot={
+                <ExplainStepAffordance
+                  key={question.id}
+                  attemptId={attemptId}
+                  questionId={question.id}
+                  draftAnswer={answers[question.id] ?? ""}
+                  hint={hints[question.id] ?? null}
+                  onHint={(hint) => setHints((prev) => ({ ...prev, [question.id]: hint }))}
+                />
+              }
             />
 
             {/* Điều hướng Câu trước / Câu sau.
