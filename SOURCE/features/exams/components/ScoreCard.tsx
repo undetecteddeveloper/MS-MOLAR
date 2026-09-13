@@ -23,6 +23,14 @@
 //
 // Đề thuần trắc nghiệm: `pending` luôn `false` ⇒ không đổi một pixel nào.
 //
+// 2026-09-13 (engineer, test điện thoại thật): lúc `pending`, ô lớn hiện một
+// VÒNG XOAY thay cho câu "Đang chấm phần tự luận…" (câu ấy còn lại cho trình
+// đọc màn hình), và dòng "Tự luận" riêng dưới thẻ (EssayScoreLine) bỏ hẳn —
+// thẻ này là chỗ DUY NHẤT nói về trạng thái chấm. Vòng xoay giữ đúng chiều cao
+// 64px của con số để lúc điểm cuối đáp xuống, ba ô Đúng/Sai/Thời gian không
+// nhảy. `pending` vẫn đọc từ `unresolvedCount` của EssayGradingPoller — lượt
+// refresh cuối của poller là lượt gỡ vòng xoay.
+//
 // Theme "Sân trường" (2026-09-06): thẻ tô nền surface, căn giữa (một trong hai
 // ngoại lệ của quy tắc căn trái — design plan §3). Điểm 64px màu xanh hành
 // động, "trên 10" đứng cạnh. Ba ô Đúng / Sai / Thời gian là ô trắng trên nền
@@ -30,6 +38,7 @@
 // §4.3). KHÔNG có ô "Bỏ trống": `wrong = total − correct` là phép suy đã ghim
 // ở trên, tách bỏ trống ra khỏi "Sai" là đổi nghĩa con số.
 
+import { Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { t } from "@/lib/copy";
 import type { ScoreResult } from "@/types/result";
@@ -59,10 +68,13 @@ export async function ScoreCard({
       <span className="eyebrow">{t("result.title")}</span>
       <h1 className="text-foreground text-xl leading-snug font-semibold">{examTitle}</h1>
 
-      {/* Điểm lớn nổi bật — thang 10, HOẶC "đang chấm…" khi chưa ngã ngũ (G1). */}
+      {/* Điểm lớn nổi bật — thang 10, HOẶC vòng xoay khi chưa ngã ngũ (G1).
+          `h-16` = 64px, đúng chiều cao dòng điểm bên dưới; role="status" để
+          câu sr-only được đọc lên khi thẻ hiện. */}
       {pending ? (
-        <p className="text-muted-foreground mt-3 text-xl font-semibold">
-          {t("result.scorePending")}
+        <p role="status" className="mt-3 flex h-16 items-center justify-center">
+          <Loader2 aria-hidden className="text-primary size-10 animate-spin" />
+          <span className="sr-only">{t("result.scorePending")}</span>
         </p>
       ) : (
         <p className="mt-3 flex items-baseline justify-center gap-2">

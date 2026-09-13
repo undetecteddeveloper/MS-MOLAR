@@ -3,13 +3,18 @@
 // Attempt chưa nộp / không tồn tại / không thuộc user → redirect về trang đề (Q2=A).
 //
 // Bố cục theo theme "Sân trường" (2026-09-06, design plan §3 "Kết quả"):
-// breadcrumbs → thẻ điểm (surface, căn giữa) → dòng điểm tự luận (nếu có) →
-// khối quá giờ (nếu có) → thẻ VÀNG "Tiếp theo" mang hai nút Xem từng câu /
-// Làm lại đề → hàng Lưu · Chia sẻ · Về kho đề → liên kết chấm độ khó dưới một
-// kẻ chia khép trang. Thẻ vàng là chỗ táo bạo duy nhất của màn hình (§4.1) và
-// hai hành động chính đứng trong đó, cùng lối với thẻ "Trước khi bắt đầu" của
-// trang chi tiết đề. Route, dữ liệu và thứ tự của các khối cảnh báo (tự luận,
-// quá giờ) giữ nguyên.
+// breadcrumbs → thẻ điểm (surface, căn giữa) → khối quá giờ (nếu có) → thẻ
+// VÀNG "Tiếp theo" mang hai nút Xem từng câu / Làm lại đề → hàng Lưu · Chia sẻ
+// · Về kho đề → liên kết chấm độ khó dưới một kẻ chia khép trang. Thẻ vàng là
+// chỗ táo bạo duy nhất của màn hình (§4.1) và hai hành động chính đứng trong
+// đó, cùng lối với thẻ "Trước khi bắt đầu" của trang chi tiết đề.
+//
+// Dòng "Tự luận" riêng (EssayScoreLine, ADR-0018 FE-AC-01) bỏ 2026-09-13 theo
+// engineer sau khi test trên điện thoại thật: thẻ điểm đã gánh được vai trò đó
+// — còn câu chưa chấm thì ô lớn hiện vòng xoay thay con số, chấm xong thì hiện
+// điểm CUỐI (G1 trong ScoreCard). Hai khối cùng nói "đang chấm" là một khối
+// thừa. Lối vào nút chấm lại (RS-4/RS-5) vẫn qua "Xem từng câu" → trang chi
+// tiết, nơi EssayRegradeControl đứng cạnh chính câu bị lỗi.
 //
 // 2026-07-27: bỏ hẳn khối "Topics" (số câu đúng theo chủ đề, cũ dùng
 // TopicBreakdown.tsx — component đã xóa, không còn nơi nào khác dùng).
@@ -21,7 +26,6 @@ import { getCurrentUserProfile } from "@/lib/auth/getCurrentUser";
 import { getMyRating } from "@/features/exams/actions";
 import { getResult } from "@/features/exams/queries";
 import { ScoreCard } from "@/features/exams/components/ScoreCard";
-import { EssayScoreLine } from "@/features/exams/components/EssayScoreLine";
 import { EssayGradingPoller } from "@/features/exams/components/EssayGradingPoller";
 import { ResultActions } from "@/features/exams/components/ResultActions";
 import { mapFromMyRating } from "@/lib/rating";
@@ -109,19 +113,6 @@ export default async function ResultPage({
         // refresh cuối cùng của poller cũng là lượt gỡ chữ "đang chấm…".
         pending={(data.essaySummary?.unresolvedCount ?? 0) > 0}
       />
-
-      {/* Điểm tự luận — DÒNG RIÊNG CÓ NHÃN, đặt giữa ScoreCard và khối quá
-          giờ (ADR-0018 § Amendment to ADR-0010, FE-AC-01).
-
-          Vì sao không gộp vào ScoreCard: `exam_results` không còn bất biến
-          sau insert, nên một band có thể đáp xuống trong lúc học sinh đang
-          nhìn trang. Gộp con số đang-đổi ấy vào ô điểm lớn làm chính con số
-          học sinh tin tưởng nhất tự nhảy.
-
-          Component tự trả `null` khi không câu nào mang khoá vòng đời, nên
-          với một dòng cũ KHÔNG node nào vào cây (AC-012 đúng từng byte).
-          Không bọc thêm div: nhịp dọc thuộc về `gap-5` của trang. */}
-      <EssayScoreLine summary={data.essaySummary} detailHref={detailHref} />
 
       {/* Bộ poll — mount khi `essaySummary !== undefined`, KHÔNG phải khi
           `pendingCount > 0`.

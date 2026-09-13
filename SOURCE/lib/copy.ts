@@ -227,11 +227,6 @@ export const copy = {
   //   3. Không câu nào giải thích VÌ SAO band là band đó — một đầu ra thứ hai
   //      do model viết là một bề mặt tiêm chích thứ hai (R9).
   "result.essay.label": "Tự luận",
-  "result.essay.points": "{earned} / {max} điểm",
-  "result.essay.denominator": "Tính trên {n} câu tự luận đã chấm xong.",
-  "result.essay.stillGrading": "Còn {k} câu đang chấm — điểm tự luận sẽ tự cập nhật.",
-  "result.essay.someFailed": "{k} câu chấm thất bại — mở Chi tiết để chấm lại.",
-  "result.essay.noneGraded": "Chưa có câu tự luận nào chấm xong. Mở Chi tiết để chấm lại.",
   "result.essay.state.pending": "Đang chấm",
   "result.essay.state.graded": "Đã chấm",
   "result.essay.state.failed": "Chấm thất bại",
@@ -294,7 +289,6 @@ export const copy = {
   // --- Lịch sử ------------------------------------------------------------
   "history.title": "Lịch sử",
   "history.subtitle": "Các lượt làm bài bạn đã nộp, mới nhất xếp trước.",
-  "history.subjectFilter": "Lọc theo môn",
   "history.pagination": "Các trang lịch sử",
   "history.totalCount": "{total} lượt làm",
   "history.noMatches": "Không có kết quả khớp",
