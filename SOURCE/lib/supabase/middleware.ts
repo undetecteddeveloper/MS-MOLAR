@@ -5,6 +5,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE_OPTIONS } from "./cookieOptions";
+import { RECOVERY_COOKIE, RECOVERY_PATH, isRecoveryAllowedPath } from "@/lib/auth/recovery";
 
 /** Các path không yêu cầu đăng nhập. `/auth/callback` (S#23): điểm về của
  * OAuth + email link — request tới đây CHƯA có cookie session, không whitelist
@@ -158,6 +159,19 @@ export async function updateSession(request: NextRequest, cspContext?: CspContex
   const isPublic = PUBLIC_PATHS.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`),
   );
+  const recoveryPending = request.cookies.has(RECOVERY_COOKIE);
+
+  // PHIÊN ĐANG KHÔI PHỤC MẬT KHẨU (lib/auth/recovery.ts, 2026-09-13): có cờ +
+  // có phiên ⇒ mọi đường ngoài /reset-password (và /auth/callback) đều về đó,
+  // KỂ CẢ các path public — trang chủ hiện người này như đã đăng nhập là mở
+  // lại đúng cửa vừa đóng. Đứng TRƯỚC guard "chưa đăng nhập" vì nó chỉ áp cho
+  // người CÓ phiên; hai guard không giao nhau.
+  if (user && recoveryPending && !isRecoveryAllowedPath(pathname)) {
+    const url = request.nextUrl.clone();
+    url.pathname = RECOVERY_PATH;
+    url.search = "";
+    return withCsp(NextResponse.redirect(url));
+  }
 
   // Chưa đăng nhập + route cần bảo vệ → về homepage với form auth mở
   // (auth nằm trong content area của `/` từ S#17, không còn page /login riêng).
@@ -165,8 +179,21 @@ export async function updateSession(request: NextRequest, cspContext?: CspContex
     const url = request.nextUrl.clone();
     url.pathname = "/";
     url.search = "?auth=signin";
-    return withCsp(NextResponse.redirect(url));
+    const response = withCsp(NextResponse.redirect(url));
+    if (recoveryPending) clearRecoveryCookie(response);
+    return response;
   }
 
+  // Cờ khôi phục mà KHÔNG còn phiên (link hết hạn, đã đăng xuất ở tab khác) là
+  // cờ mồ côi — gỡ ngay, để lượt đăng nhập thường sau đó không bị ép về màn
+  // đặt lại vì một link đã bỏ dở hôm trước.
+  if (!user && recoveryPending) clearRecoveryCookie(supabaseResponse);
+
   return withCsp(supabaseResponse);
+}
+
+/** Gỡ cờ khôi phục trên response. `maxAge: 0` + cùng `path` với lúc gắn — một
+ *  cookie xoá ở path khác là một cookie chưa xoá. */
+function clearRecoveryCookie(response: NextResponse): void {
+  response.cookies.set(RECOVERY_COOKIE, "", { path: "/", maxAge: 0 });
 }

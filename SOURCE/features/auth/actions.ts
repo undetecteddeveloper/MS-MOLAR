@@ -3,11 +3,12 @@
 // Xem ARCHITECTURE.md (gốc repo).
 "use server";
 
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { validatePassword } from "@/lib/auth/passwordPolicy";
+import { RECOVERY_COOKIE } from "@/lib/auth/recovery";
 import { guard } from "@/lib/security/rateLimit";
 import { AVATARS_BUCKET } from "@/lib/profile/avatarStorage";
 import { extensionForMime } from "@/lib/profile/imageExtension";
@@ -132,7 +133,16 @@ export async function updatePassword(
   const { error } = await supabase.auth.updateUser({ password });
   if (error) return { error: error.message };
 
+  // Mật khẩu mới đã vào ⇒ phiên này hết là phiên khôi phục: gỡ cờ để
+  // middleware thôi ép về /reset-password (lib/auth/recovery.ts).
+  await clearRecoveryFlag();
   redirect("/exams");
+}
+
+/** Gỡ cờ "đang khôi phục mật khẩu" — cùng `path` với lúc gắn ở /auth/callback. */
+async function clearRecoveryFlag(): Promise<void> {
+  const cookieStore = await cookies();
+  cookieStore.set(RECOVERY_COOKIE, "", { path: "/", maxAge: 0 });
 }
 
 /** Đăng nhập email/password. */
@@ -150,10 +160,13 @@ export async function signIn(
   redirect("/exams");
 }
 
-/** Đăng xuất, quay về homepage với form đăng nhập mở. */
+/** Đăng xuất, quay về homepage với form đăng nhập mở. Gỡ luôn cờ khôi phục
+ *  mật khẩu (nếu có): đây là lối thoát sớm của người bấm nhầm link "quên mật
+ *  khẩu" — không gỡ thì lượt đăng nhập thường kế tiếp lại bị ép về đặt lại. */
 export async function signOut() {
   const supabase = await createClient();
   await supabase.auth.signOut();
+  await clearRecoveryFlag();
   redirect("/?auth=signin");
 }
 

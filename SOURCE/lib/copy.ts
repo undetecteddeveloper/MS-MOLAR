@@ -433,6 +433,9 @@ export const copy = {
   "result.skipped": "— bỏ trống —",
   "report.submitError": "Chưa gửi được báo cáo lúc này. Bạn thử lại nhé.",
   "auth.resetPasswordIntro": "Hãy nhập mật khẩu mới cho tài khoản này.",
+  "auth.recoveryLocked":
+    "Bạn chỉ vào được các trang khác sau khi đặt mật khẩu mới.",
+  "auth.notYourAccount": "Không phải tài khoản của bạn?",
   "auth.newPassword": "Mật khẩu mới",
   "auth.confirmNewPassword": "Nhập lại mật khẩu mới",
   "history.shareUnsupported": "Đã tải về — trình duyệt này không hỗ trợ chia sẻ.",
@@ -498,12 +501,14 @@ export const copy = {
   // --- Lịch sử (bổ sung) --------------------------------------------------
   "history.sharing": "Đang chia sẻ…",
   "history.moreActionsFor": "Thao tác khác cho {title}",
-  "history.pdfResultTitle": "KẾT QUẢ BÀI THI",
-  "history.pdfScoreLabel": "ĐIỂM SỐ",
-  "history.pdfExamineeLabel": "NGƯỜI THI",
-  "history.pdfSubmittedLabel": "THỜI GIAN NỘP BÀI",
-  "history.pdfCorrectLabel": "CÂU ĐÚNG",
-  "history.pdfWrongLabel": "CÂU SAI",
+  // Nhãn PDF viết thường (2026-09-13): mẫu PDF theo theme "Sân trường" dùng
+  // eyebrow không in hoa — nhãn in hoa khó đọc với dấu tiếng Việt (§5).
+  "history.pdfResultTitle": "Kết quả bài thi",
+  "history.pdfScoreLabel": "Điểm số",
+  "history.pdfExamineeLabel": "Người thi",
+  "history.pdfSubmittedLabel": "Thời gian nộp bài",
+  "history.pdfCorrectLabel": "Câu đúng",
+  "history.pdfWrongLabel": "Câu sai",
   "history.pdfTotalQuestions": "Tổng cộng {total} câu",
   "history.exam": "Đề thi",
   "history.score": "Điểm",
