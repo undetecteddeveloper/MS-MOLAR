@@ -53,6 +53,18 @@ export function partNumbersOf(questions: { part: number }[]): number[] {
   return [...new Set(questions.map((q) => q.part))].sort((a, b) => a - b);
 }
 
+/** Khoá composite `${part}:${number}` của mọi câu đang có lỗi — khớp
+ *  validateAssembledExam (partNumber null = đề 1 phần). Export vì bảng nhảy
+ *  tới câu (QuestionJumpDock) tô đỏ đúng những câu này; hai nơi tự gom khoá
+ *  theo hai cách là hai cơ hội để bảng tô đỏ một câu mà thẻ không báo lỗi. */
+export function questionErrorKeys(errors: UgcError[]): Set<string> {
+  return new Set(
+    errors
+      .filter((e) => e.questionNumber !== null)
+      .map((e) => `${e.partNumber ?? 1}:${e.questionNumber}`),
+  );
+}
+
 export function AssembledQuestionList({
   questions,
   parts,
@@ -64,12 +76,7 @@ export function AssembledQuestionList({
   essayGradingEnabled = false,
   disabled = false,
 }: AssembledQuestionListProps) {
-  // Khoá lỗi composite — khớp validateAssembledExam (partNumber null = đề 1 phần).
-  const errorKeys = new Set(
-    errors
-      .filter((e) => e.questionNumber !== null)
-      .map((e) => `${e.partNumber ?? 1}:${e.questionNumber}`),
-  );
+  const errorKeys = questionErrorKeys(errors);
 
   // Đề rỗng: không có nhóm nào để dựng. Lỗi NO_QUESTIONS_FOUND đã nói hộ ở
   // ExtractionErrorPanel, nên một heading "Phần 1" trống rỗng ở đây chỉ là một

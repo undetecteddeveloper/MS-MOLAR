@@ -50,7 +50,11 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { StatusBadge } from "@/features/authoring/components/StatusBadge";
 import { DeleteDialog } from "@/features/authoring/components/DeleteDialog";
 import { ExtractionErrorPanel } from "@/features/authoring/components/ExtractionErrorPanel";
-import { AssembledQuestionList } from "@/features/authoring/components/AssembledQuestionList";
+import {
+  AssembledQuestionList,
+  questionErrorKeys,
+} from "@/features/authoring/components/AssembledQuestionList";
+import { QuestionJumpDock } from "@/features/authoring/components/QuestionJumpDock";
 import {
   MetadataFields,
   type ExamMetaFormValue,
@@ -337,6 +341,17 @@ export function ReviewScreen({
           isPublished ? `${questionCount}. ${t("upload.publishedNotice")}` : questionCount
         }
         actions={<StatusBadge status={status} on="background" />}
+      />
+
+      {/* Dải dính đỉnh + bảng nhảy tới câu (engineer 2026-09-13) — cùng vai
+          với bảng câu hỏi của màn làm bài: trang dài, cần tới một câu cụ thể
+          liên tục. Đứng sau PageHeader để lúc ở đầu trang nó là một hàng
+          thường, cuộn xuống thì dính dưới navbar. */}
+      <QuestionJumpDock
+        title={title}
+        questions={exam.questions}
+        parts={exam.parts}
+        errorKeys={questionErrorKeys(shownErrors)}
       />
 
       <ExtractionErrorPanel errors={shownErrors} />

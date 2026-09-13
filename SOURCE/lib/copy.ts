@@ -35,6 +35,8 @@ export const copy = {
   "common.correct": "Đúng",
   "common.wrong": "Sai",
   "common.questions": "Câu hỏi",
+  // Nút mở bảng nhảy tới câu (màn làm bài trên điện thoại, màn sửa đề).
+  "common.questionPalette": "Bảng câu hỏi",
   "common.by": "bởi",
   "common.none": "Không",
   "common.skipToContent": "Tới nội dung chính",
@@ -524,6 +526,7 @@ export const copy = {
   "status.draft": "Bản nháp",
   "status.published": "Đã đăng",
   "status.needsFixing": "Cần sửa",
+  "status.needsFixingCount": "{count} câu cần sửa",
   "status.removed": "Đã gỡ",
 
   // --- Kiểm duyệt (bổ sung) -----------------------------------------------

@@ -30,6 +30,11 @@ interface QuestionPaginationProps {
   /** Các index được đánh dấu để xem lại (flag). */
   flaggedIndices: number[];
   onJump: (index: number) => void;
+  /** `sidebar` (mặc định): thẻ surface đứng cột phải từ 768px. `popover`: nằm
+   *  trong bảng thả xuống của QuestionPaletteDock trên điện thoại — thẻ TRẮNG
+   *  (vỏ popover đã có viền), khung cuộn cao hơn (nửa màn hình) vì không còn
+   *  phải đứng cạnh thẻ câu hỏi. */
+  variant?: "sidebar" | "popover";
 }
 
 export function QuestionPagination({
@@ -38,10 +43,12 @@ export function QuestionPagination({
   answeredIndices,
   flaggedIndices,
   onJump,
+  variant = "sidebar",
 }: QuestionPaginationProps) {
   const answered = new Set(answeredIndices);
   const flagged = new Set(flaggedIndices);
   const compact = total > COMPACT_THRESHOLD;
+  const popover = variant === "popover";
 
   // Cuộn ô của câu đang xem vào tầm nhìn khi nó nằm ngoài khung. `block:
   // "nearest"` để khung chỉ nhích vừa đủ, không giật về giữa mỗi lần chuyển
@@ -54,7 +61,11 @@ export function QuestionPagination({
   }, [current, compact]);
 
   return (
-    <Card padding="none" className="gap-3.5 p-4 sm:p-5">
+    <Card
+      variant={popover ? "plain" : "tint"}
+      padding="none"
+      className={popover ? "gap-3 p-3" : "gap-3.5 p-4 sm:p-5"}
+    >
       <div className="flex items-baseline justify-between gap-3">
         <span className="text-sm font-semibold">{t("common.questions")}</span>
         {compact && (
@@ -68,9 +79,12 @@ export function QuestionPagination({
           ref={listRef}
           className={
             compact
-              ? // max-h ≈ 4 hàng ô 5 cột: card tổng còn ~250px thay vì ~600px
-                // với đề 40 câu, xấp xỉ chiều cao card câu hỏi bên cạnh.
-                "grid max-h-[11rem] grid-cols-5 gap-2 overflow-y-auto pr-1"
+              ? // Sidebar: max-h ≈ 4 hàng ô 5 cột — card tổng còn ~250px thay vì
+                // ~600px với đề 40 câu, xấp xỉ chiều cao card câu hỏi bên cạnh.
+                // Popover: tới nửa màn hình, còn lại tự cuộn.
+                popover
+                ? "grid max-h-[min(50vh,22rem)] grid-cols-5 gap-2 overflow-y-auto pr-1"
+                : "grid max-h-[11rem] grid-cols-5 gap-2 overflow-y-auto pr-1"
               : "grid grid-cols-4 gap-2"
           }
         >
@@ -97,7 +111,10 @@ export function QuestionPagination({
                       ? "bg-sun text-foreground"
                       : isAnswered
                         ? "bg-primary text-primary-foreground hover:bg-[color-mix(in_oklch,var(--primary),black_10%)]"
-                        : "bg-card text-muted-foreground hover:text-foreground"
+                        : popover
+                          ? // Thẻ trắng: ô "chưa làm" tô surface để còn thấy ô.
+                            "bg-surface text-muted-foreground hover:text-foreground"
+                          : "bg-card text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   {i + 1}

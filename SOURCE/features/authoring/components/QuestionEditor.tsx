@@ -207,10 +207,13 @@ export function QuestionEditor({
     <Card
       as="li"
       id={`p${q.part}q${q.number}`}
+      // tabIndex={-1}: đích focus của bảng nhảy tới câu (QuestionJumpDock) —
+      // nhận focus bằng lập trình, không chen vào thứ tự Tab.
+      tabIndex={-1}
       // Viền lỗi bằng `outline` (không chiếm chỗ) để thẻ có lỗi không dày hơn
       // thẻ bên cạnh 2px — cùng đệm, cùng bề rộng nội dung.
       className={cn(
-        "scroll-mt-24 gap-0",
+        "scroll-mt-24 gap-0 focus:outline-none",
         hasError && "outline-destructive outline-2 -outline-offset-2"
       )}
     >
@@ -220,7 +223,14 @@ export function QuestionEditor({
           chỗ (thấy ở 360px, thẻ có huy hiệu lỗi, 2026-09-09). Thay vào đó chỗ
           co giãn là nhóm NHÃN bên trái: hết chỗ thì huy hiệu tụt xuống dòng
           dưới, còn điểm và nút Sửa đứng yên ở mép phải mọi thẻ — đúng cột mà
-          tác giả lướt dọc để soát biểu điểm. */}
+          tác giả lướt dọc để soát biểu điểm.
+
+          2026-09-13 (engineer, test điện thoại thật): ở chế độ SỬA, ô nhập
+          điểm + chữ "điểm" (~110px) từng đứng cạnh nút Xong ngay trên hàng
+          này, và ở 360px chúng ép nhóm nhãn gãy hai dòng mỗi lần bấm Sửa —
+          bố cục thẻ đổi theo nút bấm. Nay ô nhập điểm có HÀNG RIÊNG ngay
+          dưới (chỉ khi đang sửa); hàng tiêu đề giữ nguyên hình ở cả hai chế
+          độ: [Câu N · loại · lỗi] … [điểm (chỉ khi xem) · Sửa/Xong]. */}
       <div className="flex items-center justify-between gap-x-3">
         <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1">
           <span className="mr-0.5 text-sm font-semibold">
@@ -235,46 +245,15 @@ export function QuestionEditor({
           )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {/* B1 — ĐIỂM của câu. Ở hàng tiêu đề chứ không nằm dưới cùng: nó là
-              thuộc tính của cả câu, ngang hàng với loại câu, và tác giả soát
-              biểu điểm bằng cách lướt dọc mép phải chứ không mở từng thẻ.
-
-              Chế độ XEM chỉ in khi đề có khai điểm — đề thuần trắc nghiệm cân
-              bằng thì một dòng "1 điểm" trên cả 40 thẻ là nhiễu thuần tuý.
-              Chế độ SỬA luôn hiện ô, kể cả khi trống, vì đó là lúc tác giả cần
-              biết rằng ô ấy TỒN TẠI để mà điền. */}
-          {editing ? (
-            <label className="text-muted-foreground flex items-center gap-1.5 text-sm">
-              <Input
-                type="number"
-                inputMode="decimal"
-                min={0}
-                // `any`, KHÔNG phải "0.25": thang bậc PHẦN II có bậc 0.1, và
-                // với step="0.25" trình duyệt coi 0.1 là giá trị không hợp lệ
-                // (Firefox tô đỏ ô) trong khi cổng publish lại chấp nhận nó —
-                // hai nơi nói ngược nhau về cùng một con số.
-                step="any"
-                value={q.points ?? ""}
-                onChange={(e) => {
-                  const raw = e.target.value;
-                  if (raw === "") return onChange({ points: undefined });
-                  const n = Number(raw);
-                  // Số không hợp lệ ⇒ GIỮ NGUYÊN giá trị cũ, không ghi
-                  // `undefined`: gõ dở "0." không được phép xoá mất điểm câu.
-                  if (!Number.isFinite(n) || n <= 0) return;
-                  onChange({ points: n });
-                }}
-                aria-label={t("upload.pointsLabel")}
-                className="h-9 w-20 px-3 text-right text-sm"
-              />
-              {t("upload.pointsSuffix")}
-            </label>
-          ) : (
-            q.points !== undefined && (
-              <span className="text-muted-foreground text-sm tabular-nums">
-                {t("upload.pointsValue", { points: String(q.points) })}
-              </span>
-            )
+          {/* B1 — ĐIỂM của câu ở chế độ XEM: thuộc tính của cả câu, ngang
+              hàng với loại câu; tác giả soát biểu điểm bằng cách lướt dọc mép
+              phải chứ không mở từng thẻ. Chỉ in khi đề có khai điểm — đề thuần
+              trắc nghiệm cân bằng thì một dòng "1 điểm" trên cả 40 thẻ là nhiễu
+              thuần tuý. */}
+          {!editing && q.points !== undefined && (
+            <span className="text-muted-foreground text-sm tabular-nums">
+              {t("upload.pointsValue", { points: String(q.points) })}
+            </span>
           )}
           {/* Đang sửa: nút Xong TRẮNG (`plain`) — `secondary` là surface trên
               surface, tan vào thẻ và trông như một chữ trơ. */}
@@ -294,6 +273,37 @@ export function QuestionEditor({
           </Button>
         </div>
       </div>
+
+      {/* Ô ĐIỂM ở chế độ SỬA — hàng riêng, luôn hiện kể cả khi trống, vì đó là
+          lúc tác giả cần biết rằng ô ấy TỒN TẠI để mà điền. */}
+      {editing && (
+        <label className="text-muted-foreground mt-3 flex items-center gap-2 text-sm">
+          <span className="text-foreground font-medium">{t("upload.pointsLabel")}</span>
+          <Input
+            type="number"
+            inputMode="decimal"
+            min={0}
+            // `any`, KHÔNG phải "0.25": thang bậc PHẦN II có bậc 0.1, và
+            // với step="0.25" trình duyệt coi 0.1 là giá trị không hợp lệ
+            // (Firefox tô đỏ ô) trong khi cổng publish lại chấp nhận nó —
+            // hai nơi nói ngược nhau về cùng một con số.
+            step="any"
+            value={q.points ?? ""}
+            onChange={(e) => {
+              const raw = e.target.value;
+              if (raw === "") return onChange({ points: undefined });
+              const n = Number(raw);
+              // Số không hợp lệ ⇒ GIỮ NGUYÊN giá trị cũ, không ghi
+              // `undefined`: gõ dở "0." không được phép xoá mất điểm câu.
+              if (!Number.isFinite(n) || n <= 0) return;
+              onChange({ points: n });
+            }}
+            aria-label={t("upload.pointsLabel")}
+            className="h-9 w-20 px-3 text-right text-sm"
+          />
+          {t("upload.pointsSuffix")}
+        </label>
+      )}
 
       {/* NGỮ LIỆU DÙNG CHUNG (A1) — chỉ ĐỌC ở đây, có chủ đích: nó thuộc về
           NHÓM câu chứ không của riêng câu này, nên một ô sửa trên mỗi card sẽ

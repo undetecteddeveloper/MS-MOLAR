@@ -23,6 +23,7 @@ import { ExamTimer } from "@/features/exams/components/ExamTimer";
 import { LeaveExamDialog } from "@/features/exams/components/LeaveExamDialog";
 import { QuestionRenderer } from "@/features/exams/components/QuestionRenderer";
 import { QuestionPagination } from "@/features/exams/components/QuestionPagination";
+import { QuestionPaletteDock } from "@/features/exams/components/QuestionPaletteDock";
 import { useExamPlayer } from "@/hooks/useExamPlayer";
 import { useLeaveGuard } from "@/hooks/useLeaveGuard";
 import { useSwipe } from "@/hooks/useSwipe";
@@ -210,6 +211,20 @@ export function ExamPlayer({
                 `aria-label` của đồng hồ; định dạng MM:SS + icon đã tự nói nó là
                 đồng hồ. */}
             <ExamTimer durationMinutes={durationMinutes} onTimeUp={submit} />
+            {/* Bảng câu hỏi — CHỈ dưới 768px, trong chính dải dính đỉnh này
+                (engineer 2026-09-13, test điện thoại thật): bản trước bảng
+                nằm dưới thẻ câu hỏi, mỗi lần nhảy câu là một lần lướt xuống
+                rồi lướt lên. Nút mang tiến độ "đã làm/tổng"; bảng thả xuống
+                góc phải ngay dưới cụm tiêu đề/đồng hồ. Từ 768px bảng là cột
+                phải dính theo cuộn (bên dưới). */}
+            <QuestionPaletteDock
+              className="md:hidden"
+              current={current}
+              total={questions.length}
+              answeredIndices={answeredIndices}
+              flaggedIndices={flaggedIndices}
+              onJump={goto}
+            />
             {/* Ẩn trên mobile: bản Nộp bài của mobile nằm trong dải dính ĐÁY
                 (Vùng Xanh của ngón cái, §4.2). Hai nút cùng chức năng trên một
                 màn hình sẽ khiến người dùng phải đoán chúng có khác nhau không.
@@ -324,11 +339,15 @@ export function ExamPlayer({
             </div>
           </div>
 
-          {/* Mobile: bó về đúng bề rộng của sidebar desktop rồi canh GIỮA.
-              Trước đây `w-full` kéo lưới giãn hết bề ngang màn hình nên các ô
-              số phình to bất thường và cả khối lệch hẳn về mép trái so với
-              card câu hỏi phía trên. ≥sm trả lại hành vi sidebar cũ. */}
-          <div className="mx-auto w-full max-w-[260px] basis-[260px] sm:mx-0 sm:w-auto sm:max-w-none sm:min-w-[240px]">
+          {/* Cột phải — CHỈ từ 768px (dưới đó bảng sống trong dải dính đỉnh,
+              QuestionPaletteDock ở trên). DÍNH theo cuộn dưới navbar
+              (`top-[4.5rem]` = navbar 60px + 12px; navbar hiện từ 768px trên
+              route này) để bảng luôn trong tầm với khi thẻ câu hỏi dài hơn
+              một màn — engineer 2026-09-13. Bề rộng 216px ở 768–1023 là con
+              số làm cột câu hỏi (`basis-[480px]`) + khe 24px vừa khít 720px
+              nội dung của khung 768, không gãy xuống dòng; từ 1024 trả lại
+              260px. `self-start`: sticky chỉ chạy khi item thấp hơn hàng. */}
+          <div className="max-md:hidden md:sticky md:top-[4.5rem] md:min-w-[216px] md:basis-[216px] md:self-start lg:min-w-[240px] lg:basis-[260px]">
             <QuestionPagination
               current={current}
               total={questions.length}
