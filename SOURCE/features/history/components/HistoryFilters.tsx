@@ -2,23 +2,17 @@
 
 // HistoryFilters — thanh lọc của /history (theme "Sân trường", 2026-09-07).
 //
-// Cùng khuôn với Kho đề: một hàng CHIP ngay dưới tiêu đề, bấm "Bộ lọc" mở
-// bảng chọn (`FilterSheet`: bottom sheet dưới 768px, thả xuống từ 768px). Rail
-// dọc "BỘ LỌC" viết đứng + bảng nền ngà của bản trước bỏ hẳn — đó là theme cũ,
-// và nó là bản chép thứ hai của ExamFilters đã lệch khỏi bản gốc.
+// Cùng khuôn với Kho đề: một chip "Bộ lọc" ngay dưới tiêu đề, bấm mở bảng chọn
+// (`FilterSheet`: bottom sheet dưới 768px, thả xuống từ 768px). Rail dọc "BỘ
+// LỌC" viết đứng + bảng nền ngà của bản trước bỏ hẳn — đó là theme cũ, và nó là
+// bản chép thứ hai của ExamFilters đã lệch khỏi bản gốc.
 //
-// MÔN nằm NGAY TRÊN HÀNG CHIP, không nằm trong bảng: đó là trục lọc học sinh
-// bấm nhiều nhất, danh mục ngắn (tối đa 10 môn, thường 1–3), và một chip cho
-// mỗi môn đọc được trạng thái đang chọn mà không phải mở gì cả. "Tất cả" là
-// chip đầu, tô đậm khi chưa chọn môn nào — hàng chip luôn có ĐÚNG MỘT chip
-// đậm (cùng ngôn ngữ với Tuần/Tháng/Toàn thời gian ở Thống kê). Giá trị môn là
-// khoá canonical trong DB ("Math"); nhãn qua `subjectLabel()`.
-//
-// Trong bảng chỉ còn hai hàng KHOẢNG GIÁ TRỊ: Điểm và Ngày nộp. Hàng "Đề thi"
-// (chọn một đề trong danh sách) của bản trước bỏ theo yêu cầu engineer
-// (2026-09-08): nó lặp lại đúng danh sách đang hiện ngay dưới — muốn xem các
-// lượt của một đề thì cuộn danh sách là thấy, không cần mở bảng. Số đếm trên
-// chip "Bộ lọc (n)" đếm hai hàng ấy; môn không đếm vì nó đã hiện ngay cạnh.
+// MÔN HỌC là một HÀNG TRONG BẢNG (`FilterRow` — cùng hàng với Kho đề), theo yêu
+// cầu engineer 2026-09-13 sau khi test trên điện thoại thật. Bản 2026-09-07 trải
+// mỗi môn thành một chip trên hàng chip; hàng ấy cuộn ngang ở 360px nên tài
+// khoản luyện nhiều môn phải kéo mới thấy hết, và hai bề mặt (Kho đề, Lịch sử)
+// lọc cùng một trục bằng hai giao diện khác nhau. Nay bảng có ba hàng: Môn học ·
+// Điểm · Ngày nộp, và chip "Bộ lọc (n)" đếm cả ba.
 //
 // State lọc ở URL searchParams (chia sẻ/quay lại được) → Server Component lọc
 // trong bộ nhớ qua `filterHistoryEntries()` trên MỘT lượt đọc — không round-trip
@@ -29,8 +23,9 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
 import { SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Chip, chipVariants } from "@/components/ui/chip";
+import { chipVariants } from "@/components/ui/chip";
 import { Input } from "@/components/ui/input";
+import { FilterRow } from "@/components/shared/FilterRow";
 import { FilterSheet } from "@/components/shared/FilterSheet";
 import { t } from "@/lib/copy";
 import { subjectLabel } from "@/lib/ugc/subjects";
@@ -45,6 +40,7 @@ export interface HistoryFiltersSelected {
 }
 
 interface HistoryFiltersProps {
+  /** Khoá canonical trong DB ("Math"), đã xếp theo nhãn tiếng Việt ở page. */
   subjects: string[];
   selected: HistoryFiltersSelected;
 }
@@ -55,6 +51,19 @@ export function HistoryFilters({ subjects, selected }: HistoryFiltersProps) {
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
+  // Hàng nào trong bảng đang mở danh sách — CHỈ MỘT hàng tại một thời điểm
+  // (cùng quy ước ExamFilters; xem chú thích đầu FilterRow).
+  const [openFilterKey, setOpenFilterKey] = useState<string | null>(null);
+
+  function togglePanel() {
+    setOpen((v) => !v);
+    setOpenFilterKey(null);
+  }
+
+  function closePanel() {
+    setOpen(false);
+    setOpenFilterKey(null);
+  }
 
   function setParam(key: string, value: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -67,51 +76,31 @@ export function HistoryFilters({ subjects, selected }: HistoryFiltersProps) {
   }
 
   function clearAll() {
-    setOpen(false);
+    closePanel();
     startTransition(() => router.push(pathname, { scroll: false }));
   }
 
-  // Điểm và Ngày nộp mỗi thứ đếm là MỘT bộ lọc dù đặt một hay cả hai đầu.
+  // Môn học, Điểm và Ngày nộp — mỗi thứ đếm là MỘT bộ lọc dù đặt một hay cả hai
+  // đầu khoảng.
   const panelCount = [
+    selected.subject,
     selected.scoreMin ?? selected.scoreMax,
     selected.dateFrom ?? selected.dateTo,
   ].filter((v) => v !== undefined).length;
-  const hasPanelFilters = panelCount > 0;
-  const hasFilters = hasPanelFilters || selected.subject !== undefined;
+  const hasFilters = panelCount > 0;
 
   return (
     <div className="relative" data-pending={isPending ? "" : undefined}>
-      {/* Hàng chip — cuộn ngang ở màn hẹp thay vì xuống dòng (cùng ExamFilters). */}
-      <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:-mx-6 sm:px-6 [&::-webkit-scrollbar]:hidden">
+      <div className="flex items-center gap-2">
         <button
           type="button"
           aria-expanded={open}
-          onClick={() => setOpen((v) => !v)}
-          className={chipVariants({ active: hasPanelFilters })}
+          onClick={togglePanel}
+          className={chipVariants({ active: hasFilters })}
         >
           <SlidersHorizontal aria-hidden className="size-4" />
-          {hasPanelFilters ? t("exams.filterSummary", { count: panelCount }) : t("common.filters")}
+          {hasFilters ? t("exams.filterSummary", { count: panelCount }) : t("common.filters")}
         </button>
-
-        {subjects.length > 0 && (
-          <>
-            <span aria-hidden className="bg-border mx-1 h-6 w-px shrink-0" />
-            <div
-              role="group"
-              aria-label={t("history.subjectFilter")}
-              className="flex items-center gap-2"
-            >
-              <Chip active={selected.subject === undefined} onClick={() => setParam("subject", "")}>
-                {t("common.all")}
-              </Chip>
-              {subjects.map((s) => (
-                <Chip key={s} active={selected.subject === s} onClick={() => setParam("subject", s)}>
-                  {subjectLabel(s)}
-                </Chip>
-              ))}
-            </div>
-          </>
-        )}
 
         {hasFilters && (
           <Button type="button" variant="link" size="sm" onClick={clearAll} className="shrink-0">
@@ -120,12 +109,23 @@ export function HistoryFilters({ subjects, selected }: HistoryFiltersProps) {
         )}
       </div>
 
-      <FilterSheet
-        open={open}
-        onClose={() => setOpen(false)}
-        onClear={clearAll}
-        clearDisabled={!hasFilters}
-      >
+      <FilterSheet open={open} onClose={closePanel} onClear={clearAll} clearDisabled={!hasFilters}>
+        <FilterRow
+          filterKey="subject"
+          label={t("common.subject")}
+          selectedLabel={
+            selected.subject !== undefined ? subjectLabel(selected.subject) : undefined
+          }
+          currentValue={selected.subject ?? ""}
+          options={[
+            { value: "", label: t("common.all") },
+            ...subjects.map((s) => ({ value: s, label: subjectLabel(s) })),
+          ]}
+          onSelect={(v) => setParam("subject", v)}
+          open={openFilterKey === "subject"}
+          onOpenChange={(v) => setOpenFilterKey(v ? "subject" : null)}
+        />
+
         <RangeRow label={t("history.score")}>
           <RangeField
             type="number"
@@ -165,7 +165,8 @@ export function HistoryFilters({ subjects, selected }: HistoryFiltersProps) {
 }
 
 /** Một hàng KHOẢNG GIÁ TRỊ trong bảng lọc — nhãn trên, hai ô nhập dưới. Cùng
- *  đệm và cỡ nhãn với `FilterRow` của Kho đề để hai bảng đứng chung một khuôn. */
+ *  đệm và cỡ nhãn với `FilterRow` (hàng Môn học ngay trên) để ba hàng đứng
+ *  chung một khuôn. */
 function RangeRow({
   label,
   last = false,

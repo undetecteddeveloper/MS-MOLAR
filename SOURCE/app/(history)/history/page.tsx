@@ -5,9 +5,10 @@
 //
 // Bố cục theo theme "Sân trường" (2026-09-07, design plan §3 "Lịch sử"):
 // PageHeader ("Lịch sử" hiện rõ + một câu nói trang này có gì — bản trước giấu
-// tiêu đề sr-only và mở trang bằng một tay nắm "BỘ LỌC" viết đứng) → hàng chip
-// (Bộ lọc, chip môn) → danh sách thẻ theo trang → ExamPagination. Bề rộng
-// `default` (48rem): một cột hàng, không phải lưới thẻ như Kho đề.
+// tiêu đề sr-only và mở trang bằng một tay nắm "BỘ LỌC" viết đứng) → chip "Bộ
+// lọc" (bảng ba hàng: Môn học · Điểm · Ngày nộp — hàng chip môn riêng bỏ
+// 2026-09-13) → danh sách thẻ theo trang → ExamPagination. Bề rộng `default`
+// (48rem): một cột hàng, không phải lưới thẻ như Kho đề.
 //
 // Luồng dữ liệu KHÔNG đổi: MỘT lượt `listMyHistory()`, lọc trong bộ nhớ qua
 // `filterHistoryEntries()` theo URL (cùng quy ước ExamFilters), rồi cắt trang
@@ -60,9 +61,9 @@ export default async function HistoryPage({ searchParams }: { searchParams: Sear
   const sp = await searchParams;
   const entries = await listMyHistory();
 
-  // Chip môn xếp theo NHÃN tiếng Việt ("Hóa học, Toán, Vật lý"), không theo khoá
-  // DB ("Chemistry, Math, Physics") — thứ tự trên màn hình phải là thứ tự của
-  // chữ người dùng đọc.
+  // Danh sách môn trong bảng lọc xếp theo NHÃN tiếng Việt ("Hóa học, Toán, Vật
+  // lý"), không theo khoá DB ("Chemistry, Math, Physics") — thứ tự trên màn hình
+  // phải là thứ tự của chữ người dùng đọc.
   const subjects = [...new Set(entries.map((e) => e.subject))].sort((a, b) =>
     subjectLabel(a).localeCompare(subjectLabel(b), "vi")
   );
