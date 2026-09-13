@@ -203,6 +203,13 @@ export type MetaFieldName =
  * manual = tác giả nhập, validate trước mọi AI call (hành vi v2.1). */
 export type EntryMode = "automatic" | "manual";
 
+/** Nguồn ĐÁP ÁN của một lượt tải đề (2026-09-13 — engineer: đề sưu tầm thường
+ * in sẵn đáp án ở cuối, bắt tách ra file riêng là bắt làm thêm một việc):
+ * in-exam = phần đáp án nằm ngay trong file đề (một file, extractAnswers đọc
+ * cùng file ấy); separate = file đáp án riêng (hành vi v2.0–v2.2). Trục này ĐỘC
+ * LẬP với EntryMode (metadata), không gộp thành bốn giá trị. */
+export type AnswerSource = "in-exam" | "separate";
+
 /** Metadata thô do AI đọc từ TRANG 1 file đề (ADR-0007). MỌI field nullable —
  * null nghĩa là "không in trên trang", model bị CẤM suy đoán. schoolYear/
  * semester giữ NGUYÊN VĂN chuỗi in trên đề ("2024 – 2025", "HỌC KÌ I") —

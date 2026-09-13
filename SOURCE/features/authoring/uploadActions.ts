@@ -22,7 +22,13 @@ import { extractQuestions } from "@/lib/ugc/extractQuestions";
 import { ANSWER_MODEL, QUESTION_MODEL } from "@/lib/ugc/gemini";
 import { normalizeMeta, type TypedMeta } from "@/lib/ugc/normalizeMeta";
 import { createPipelineLogger } from "@/lib/ugc/pipelineLog";
-import type { EntryMode, ExamMeta, ExtractedMeta, UgcActionFailure } from "@/lib/ugc/types";
+import type {
+  AnswerSource,
+  EntryMode,
+  ExamMeta,
+  ExtractedMeta,
+  UgcActionFailure,
+} from "@/lib/ugc/types";
 import { validateExamMeta } from "@/lib/ugc/validateInput";
 
 // Ánh xạ OK-04 (`consumeQuota()` reason → `telemetry_log.error_code`) sống ở
@@ -41,10 +47,11 @@ import {
 } from "./internals";
 
 /**
- * S-01 → upload 2 file + AI extract + assemble + persist (Design Doc §Data Flow).
- * FormData: entryMode (automatic|manual — v2.2), title, subject, grade,
- * durationMinutes, school?, schoolYear?, semester?, questionFile, answerFile,
- * examId? (re-run từ đề failed của mình).
+ * S-01 → upload 1–2 file + AI extract + assemble + persist (Design Doc §Data Flow).
+ * FormData: entryMode (automatic|manual — v2.2), answerSource (in-exam|separate
+ * — 2026-09-13; thiếu = separate như client cũ), title, subject, grade,
+ * durationMinutes, school?, schoolYear?, semester?, questionFile, answerFile
+ * (bắt buộc khi answerSource=separate), examId? (re-run từ đề failed của mình).
  * Thành công (kể cả assembly còn lỗi cần sửa) → redirect /me/exams/[id];
  * thất bại trước đó → trả UgcActionFailure, KHÔNG mất dữ liệu form.
  */
@@ -123,33 +130,48 @@ export async function extractAndAssemble(formData: FormData): Promise<UgcActionF
     log.ok(1, "metadata", `tác giả gõ trước ${Object.keys(typed).length} field`, stageT);
   }
 
-  // --- 2. Hai file bắt buộc (AC-005) + loại/kích thước/số trang (AC-006). --
+  // --- 2. File đề bắt buộc (AC-005); file đáp án bắt buộc KHI đáp án là file
+  //        riêng (2026-09-13 — đề có sẵn đáp án thì một file là đủ);
+  //        loại/kích thước/số trang (AC-006). ---------------------------------
   stageT = log.now();
-  log.stage(2, "Kiểm tra 2 file (bắt buộc, loại, kích thước, số trang PDF)");
+  // Thiếu answerSource (client cũ) → separate: giữ nguyên hành vi v2.2.
+  const answerSource: AnswerSource =
+    (formData.get("answerSource") as string | null) === "in-exam" ? "in-exam" : "separate";
+  const separateKey = answerSource === "separate";
+  log.stage(
+    2,
+    separateKey
+      ? "Kiểm tra 2 file (bắt buộc, loại, kích thước, số trang PDF)"
+      : "Kiểm tra file đề (đáp án nằm trong đề — không có file đáp án riêng)"
+  );
   const questionFile = formData.get("questionFile");
   const answerFile = formData.get("answerFile");
-  if (
-    !(questionFile instanceof File) ||
-    questionFile.size === 0 ||
-    !(answerFile instanceof File) ||
-    answerFile.size === 0
-  ) {
-    log.fail(2, "file", "thiếu file câu hỏi hoặc file đáp án", stageT);
-    return failure("file", "Both the question file and the answer file are required.");
+  if (!(questionFile instanceof File) || questionFile.size === 0) {
+    log.fail(2, "file", "thiếu file câu hỏi", stageT);
+    return failure("file", "The question file is required.");
+  }
+  if (separateKey && (!(answerFile instanceof File) || answerFile.size === 0)) {
+    log.fail(2, "file", "thiếu file đáp án (nguồn đáp án = file riêng)", stageT);
+    return failure("file", "The answer file is required when the answer key is a separate file.");
   }
   const qRefOr = await toFileRef(questionFile, "Question file", log);
   if ("error" in qRefOr) {
     log.fail(2, "file câu hỏi", qRefOr.error.message, stageT);
     return qRefOr;
   }
-  const aRefOr = await toFileRef(answerFile, "Answer file", log);
-  if ("error" in aRefOr) {
-    log.fail(2, "file đáp án", aRefOr.error.message, stageT);
-    return aRefOr;
-  }
-  log.ok(2, "file", "cả 2 file hợp lệ", stageT);
   const qRef = qRefOr.ref;
-  const aRef = aRefOr.ref;
+  // Đáp án nằm trong đề: CÙNG MỘT FileRef đi vào cả hai bộ trích xuất — không
+  // đọc file hai lần, không tải lên Storage hai lần.
+  let aRef = qRef;
+  if (separateKey) {
+    const aRefOr = await toFileRef(answerFile as File, "Answer file", log);
+    if ("error" in aRefOr) {
+      log.fail(2, "file đáp án", aRefOr.error.message, stageT);
+      return aRefOr;
+    }
+    aRef = aRefOr.ref;
+  }
+  log.ok(2, "file", separateKey ? "cả 2 file hợp lệ" : "file đề hợp lệ (đáp án trong đề)", stageT);
 
   // --- 2b. Hạn mức kỳ + ngân sách ngày (I3 — AC-017/018/019/024/053). -----
   // TẮT (2026-09-03): Subscription feature đang tạm hoãn, chưa áp lên website
@@ -279,22 +301,35 @@ export async function extractAndAssemble(formData: FormData): Promise<UgcActionF
     }
     await supabase.storage
       .from(UPLOADS_BUCKET)
-      .remove([
-        `${examId}/questions.${EXT_BY_MIME[qRef.mediaType]}`,
-        `${examId}/answers.${EXT_BY_MIME[aRef.mediaType]}`,
-      ]);
+      .remove(
+        separateKey
+          ? [
+              `${examId}/questions.${EXT_BY_MIME[qRef.mediaType]}`,
+              `${examId}/answers.${EXT_BY_MIME[aRef.mediaType]}`,
+            ]
+          : [`${examId}/questions.${EXT_BY_MIME[qRef.mediaType]}`]
+      );
     await supabase.from("exams").delete().eq("id", examId);
   }
 
-  // --- 4. Upload 2 file gốc vào bucket riêng tư (author-only). -------------
+  // --- 4. Upload file gốc vào bucket riêng tư (author-only): 2 file khi đáp
+  //        án ở file riêng, 1 file khi đáp án nằm trong đề. ------------------
   stageT = log.now();
-  log.stage(4, "Tải 2 file gốc lên Storage (bucket exam-uploads, riêng tư)");
+  log.stage(
+    4,
+    `Tải ${separateKey ? 2 : 1} file gốc lên Storage (bucket exam-uploads, riêng tư)`
+  );
   const questionPath = `${examId}/questions.${EXT_BY_MIME[qRef.mediaType]}`;
-  const answerPath = `${examId}/answers.${EXT_BY_MIME[aRef.mediaType]}`;
-  for (const [path, ref] of [
-    [questionPath, qRef],
-    [answerPath, aRef],
-  ] as const) {
+  // null khi đáp án nằm trong đề: `exams.answer_file_path` là text nullable,
+  // và một path trỏ vào chính file đề sẽ nói dối rằng có file đáp án riêng.
+  const answerPath = separateKey ? `${examId}/answers.${EXT_BY_MIME[aRef.mediaType]}` : null;
+  const uploads: readonly (readonly [string, typeof qRef])[] = answerPath
+    ? [
+        [questionPath, qRef],
+        [answerPath, aRef],
+      ]
+    : [[questionPath, qRef]];
+  for (const [path, ref] of uploads) {
     // BỌC Blob — CÙNG một lỗi hỏng dữ liệu đã đo được ở `cropImages.ts`
     // (commit 3263419): body không phải Blob thì storage-js gán thẳng nó vào
     // fetch, và ở đó byte nhị phân bị ép qua chuỗi. PNG cắt ra (một Buffer) về
@@ -319,7 +354,7 @@ export async function extractAndAssemble(formData: FormData): Promise<UgcActionF
       return failure("server", "File upload failed. Try again.");
     }
   }
-  log.ok(4, "upload", "2 file gốc đã lưu", stageT);
+  log.ok(4, "upload", `${uploads.length} file gốc đã lưu`, stageT);
 
   // --- 5. AI extraction (server-only, song song — v2.2 thêm call metadata
   //        NON-FATAL ở chế độ Automatic; không thêm độ trễ wall-clock). -------
@@ -347,9 +382,12 @@ export async function extractAndAssemble(formData: FormData): Promise<UgcActionF
     })(),
     (async () => {
       const t = log.now();
-      const r = await extractAnswers(aRef);
-      if (r.ok) log.ok(5, "extractAnswers (đáp án)", `${r.value.length} đáp án`, t);
-      else log.fail(5, "extractAnswers (đáp án)", r.errors[0]?.code ?? "?", t);
+      // Đáp án trong đề: cùng file với extractQuestions, prompt khác — chỉ đọc
+      // phần đáp án in sẵn, không có thì trả rỗng (assembler báo ANSWER_MISSING).
+      const label = separateKey ? "extractAnswers (đáp án)" : "extractAnswers (đáp án trong đề)";
+      const r = await extractAnswers(aRef, { source: answerSource });
+      if (r.ok) log.ok(5, label, `${r.value.length} đáp án`, t);
+      else log.fail(5, label, r.errors[0]?.code ?? "?", t);
       return r;
     })(),
     (async () => {

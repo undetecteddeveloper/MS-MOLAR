@@ -16,7 +16,7 @@ import {
   sdkErrorDetail,
 } from "./gemini";
 import { recordUsage } from "./quotaTracker";
-import type { ChoiceId, ExtractedAnswer, Result, SubItemId } from "./types";
+import type { AnswerSource, ChoiceId, ExtractedAnswer, Result, SubItemId } from "./types";
 import type { FileRef } from "./fileRef";
 import { toGeminiPart } from "./fileRef";
 
@@ -90,9 +90,16 @@ const ANSWERS_SCHEMA = {
   additionalProperties: false,
 } as const;
 
-const PROMPT = `Read the attached answer-key file for a Vietnamese secondary-school exam and transcribe the answers.
+/** Mở đầu cho FILE ĐÁP ÁN RIÊNG (hành vi v2.0–v2.2). */
+const INTRO_SEPARATE = `Read the attached answer-key file for a Vietnamese secondary-school exam and transcribe the answers.`;
 
-Structure rules:
+/** Mở đầu khi ĐÁP ÁN NẰM TRONG FILE ĐỀ (2026-09-13): cùng một file đi vào cả
+ *  extractQuestions (bị CẤM đánh dấu đáp án) lẫn đây; ở đây model chỉ được đọc
+ *  phần đáp án in sẵn, và không có phần ấy thì trả rỗng — assembler sẽ báo
+ *  ANSWER_MISSING để tác giả điền ở màn soát, không bao giờ tự đoán. */
+const INTRO_IN_EXAM = `The attached file is a Vietnamese secondary-school EXAM PAPER that also carries its own answer key — usually a section near the end titled "ĐÁP ÁN", "HƯỚNG DẪN CHẤM", "BẢNG ĐÁP ÁN" or similar (for essay questions it may be a marking guide). Transcribe ONLY the answers printed in that answer-key section and ignore the question stems themselves. If the file has NO answer-key section at all, return {"answers": []} — never derive an answer from a question.`;
+
+const PROMPT_BODY = `Structure rules:
 - National-format answer keys (from 2025) list answers per PART ("PHẦN I", "PHẦN II", "PHẦN III") and question numbers RESTART from 1 in each part. Set "part" accordingly. If the key has no part structure, use part = 1 for every entry.
 - One entry per (part, question number) found in the file.
 
@@ -108,6 +115,10 @@ Answer forms:
 
 Rules:
 - Only READ the file. Do NOT solve any question, do NOT invent answers for numbers not present in the file.`;
+
+function promptFor(source: AnswerSource): string {
+  return `${source === "in-exam" ? INTRO_IN_EXAM : INTRO_SEPARATE}\n\n${PROMPT_BODY}`;
+}
 
 function isChoiceId(v: unknown): v is ChoiceId {
   return v === "A" || v === "B" || v === "C" || v === "D";
@@ -157,16 +168,18 @@ export function mapAnswersPayload(payload: unknown): ExtractedAnswer[] | null {
   return out;
 }
 
-/** File đáp án → ExtractedAnswer[] (một call Gemini, server-only). */
+/** File đáp án (hoặc chính file đề khi `source: "in-exam"`) → ExtractedAnswer[]
+ *  (một call Gemini, server-only). */
 export async function extractAnswers(
   file: FileRef,
+  options: { source?: AnswerSource } = {},
 ): Promise<Result<ExtractedAnswer[]>> {
   const startedAt = Date.now();
   const deadline = makeDeadlineSignal(FATAL_CALL_DEADLINE_MS);
   try {
     const response = await generateContent({
       model: ANSWER_MODEL,
-      contents: [toGeminiPart(file), { text: PROMPT }],
+      contents: [toGeminiPart(file), { text: promptFor(options.source ?? "separate") }],
       config: {
         abortSignal: deadline.signal,
         maxOutputTokens: 16000,

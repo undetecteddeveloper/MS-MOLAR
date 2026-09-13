@@ -306,12 +306,21 @@ export const copy = {
 
   // --- Phân tích ----------------------------------------------------------
   "analytics.title": "Thống kê",
-  "analytics.subtitle": "Theo dõi số câu đúng/sai theo môn và tần suất luyện tập.",
+  "analytics.subtitle": "Theo dõi kết quả theo môn và tần suất luyện tập.",
   "analytics.noData": "Chưa có dữ liệu",
   "analytics.noDataHint": "Hoàn thành một lượt làm bài đã nộp trong khoảng này để xem thống kê.",
   "analytics.timeRangeFilter": "Lọc theo khoảng thời gian",
-  "analytics.barTitle": "Đúng và sai theo môn",
+  // 2026-09-13: thẻ gộp hai cách đọc — đúng/sai cho môn chấm tự động, điểm
+  // trung bình cho Ngữ văn/Tiếng Anh — nên tên thẻ không còn nói "đúng và sai".
+  "analytics.barTitle": "Kết quả theo môn",
   "analytics.needsReview": "Cần ôn lại",
+  "analytics.essayBadge": "Tự luận",
+  "analytics.gradingBadge": "Đang chấm",
+  "analytics.outOfTen": "/ 10",
+  "analytics.avgNote": "Điểm trung bình các lượt đã chấm",
+  "analytics.blankEssays": "{count} câu tự luận bỏ trống tính 0 điểm",
+  "analytics.mcqCorrect": "{correct}/{total} câu trắc nghiệm đúng",
+  "analytics.gradingNote": "Chưa có điểm — còn lượt đang chấm tự luận",
   "analytics.donutTitle": "Thời gian luyện theo môn",
   "analytics.donutAlt": "Thời gian làm bài theo từng môn",
   "analytics.timeTotal": "tổng",
@@ -341,20 +350,36 @@ export const copy = {
 
   // --- Tải đề lên (UGC) ---------------------------------------------------
   "upload.title": "Tải đề lên",
-  "upload.intro":
-    "Tải đề và đáp án lên hệ thống. Chọn chế độ tự động để AI quét tài liệu, hoặc nhập thủ công nếu bạn muốn kiểm soát kỹ hơn.",
+  "upload.intro": "Ba chặng: đề thi, đáp án, thông tin đề. Bạn soát lại mọi thứ trước khi xuất bản.",
+  // Ba chặng (2026-09-13, hướng A "Ba chặng" engineer chọn từ prototype).
+  "upload.stepLabel": "{title}",
+  "upload.stepExam": "Đề thi",
+  "upload.stepAnswers": "Đáp án",
+  "upload.stepDetails": "Thông tin đề",
+  "upload.stepRequired": "bắt buộc",
+  "upload.stepDone": "đã có",
+  "upload.stepStateDone": "đã xong",
+  "upload.stepStateCurrent": "đang làm",
+  "upload.answerInExam": "Nằm trong file đề",
+  "upload.answerSeparate": "File riêng",
+  "upload.answerInExamNote":
+    "Hệ thống tìm phần đáp án ở cuối file đề. Không thấy thì bạn thêm đáp án ở bước soát đề — AI không bao giờ tự đoán.",
+  "upload.answerSeparateNote": "Đáp án luôn lấy từ file đáp án của bạn — AI không bao giờ tự đoán.",
+  "upload.answerSourceHint":
+    "Đáp án nằm trong file đề hay ở file riêng — bạn chọn ở chặng 2. AI không bao giờ tự đoán đáp án.",
+  "upload.dragDropAnswer": "Kéo thả file đáp án vào đây, hoặc nhấp để chọn",
   "upload.leaveEmptyHint":
     "Cứ để trống — chúng tôi sẽ đọc từ file của bạn. Bạn sửa lại được mọi thứ trước khi xuất bản. Nội dung bạn tự gõ ở đây sẽ được ưu tiên hơn AI.",
   "upload.entryMode": "Chế độ nhập",
-  "upload.automatic": "Tự động",
-  "upload.manual": "Thủ công",
+  // Chặng 3 (2026-09-13): tên nói rõ việc — "Tự đọc từ file" / "Tự nhập" thay
+  // "Tự động" / "Thủ công", vốn không nói tự động CÁI GÌ.
+  "upload.automatic": "Tự đọc từ file",
+  "upload.manual": "Tự nhập",
   "upload.instructionsTitle": "Hướng dẫn tải lên",
   "upload.supportedFormats": "Định dạng hỗ trợ: PNG, JPEG, WebP hoặc PDF.",
   "upload.choose": "Chọn",
   "upload.automaticHint": "để AI quét và bóc tách đề — không phải nhập tay.",
   "upload.manualHint": "để tự điền thông tin đề.",
-  "upload.answersNeverGuessed":
-    "Đáp án luôn lấy từ file đáp án của bạn — AI không bao giờ tự đoán.",
   "upload.fromYourFile": "lấy từ file của bạn",
   "upload.schoolYear": "Năm học",
   "upload.minutes": "phút",

@@ -1,9 +1,13 @@
 "use client";
 
-// FileUploadFields — 2 ô thả file (đề + đáp án) (UI Spec §FileUploadFields /
-// Task 6.2). Hiện tên + dung lượng file đã chọn, nút Bỏ; hint loại/kích
-// thước/số trang. Controlled bởi UploadForm (giữ selection khi lỗi). Cả 2
-// file bắt buộc. Hỗ trợ kéo thả thật, không chỉ nhấp để chọn.
+// Dropzone — MỘT ô thả file (đề, hoặc đáp án) của trang Tải đề lên. Hiện tên +
+// dung lượng file đã chọn, nút Gỡ; hint loại/kích thước/số trang. Controlled
+// bởi UploadForm (giữ selection khi lỗi). Hỗ trợ kéo thả thật, không chỉ nhấp
+// để chọn.
+//
+// Trước 2026-09-13 file này là `FileUploadFields` — cặp hai ô cố định (đề +
+// đáp án, cả hai bắt buộc). Hướng A "Ba chặng" đặt mỗi ô vào một chặng riêng và
+// ô đáp án chỉ hiện khi đáp án ở file riêng, nên cặp cứng ấy bỏ; chỉ còn ô đơn.
 //
 // Theme "Sân trường" (2026-09-09): ô bo 18px viền NÉT ĐỨT màu `--input` (đủ
 // 3:1 — đây là ranh giới của một ô nhập, WCAG 1.4.11), icon tải lên + dòng chữ
@@ -23,6 +27,11 @@ import { cn } from "@/lib/utils";
 const MAX_MB = Math.round(LIMITS.MAX_FILE_BYTES / (1024 * 1024));
 const ACCEPT = LIMITS.ALLOWED_MIME.join(",");
 
+/** Hint chung của mọi ô: loại/kích thước/số trang — đọc từ LIMITS, không chép số. */
+export function fileHint(): string {
+  return t("upload.fileHint", { mb: MAX_MB, pages: LIMITS.MAX_PDF_PAGES });
+}
+
 /** "1,2 MB" / "340 KB" — đủ để tác giả biết mình vừa chọn đúng file. */
 function formatBytes(bytes: number): string {
   if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1).replace(".", ",")} MB`;
@@ -31,7 +40,12 @@ function formatBytes(bytes: number): string {
 
 interface DropzoneProps {
   id: string;
+  /** Nhãn khả truy cập của ô. Ẩn mắt khi chặng đã có tiêu đề riêng
+   *  (`labelHidden`) — hai dòng "Đề thi" chồng nhau là chữ thừa. */
   label: string;
+  labelHidden?: boolean;
+  /** Chữ hướng dẫn trong ô khi chưa có file. Mặc định câu chung. */
+  dragLabel?: string;
   hint: string;
   file: File | null;
   onSelect: (file: File | null) => void;
@@ -39,7 +53,17 @@ interface DropzoneProps {
   error?: string;
 }
 
-function Dropzone({ id, label, hint, file, onSelect, disabled, error }: DropzoneProps) {
+export function Dropzone({
+  id,
+  label,
+  labelHidden = false,
+  dragLabel,
+  hint,
+  file,
+  onSelect,
+  disabled,
+  error,
+}: DropzoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const labelId = `${id}-label`;
@@ -61,7 +85,10 @@ function Dropzone({ id, label, hint, file, onSelect, disabled, error }: Dropzone
 
   return (
     <div>
-      <span id={labelId} className="text-foreground mb-1.5 block text-sm font-medium">
+      <span
+        id={labelId}
+        className={cn("text-foreground mb-1.5 block text-sm font-medium", labelHidden && "sr-only")}
+      >
         {label}
       </span>
 
@@ -100,7 +127,7 @@ function Dropzone({ id, label, hint, file, onSelect, disabled, error }: Dropzone
           <Upload aria-hidden className="text-muted-foreground size-6" />
         )}
         <span className="max-w-full truncate text-sm font-medium">
-          {file ? file.name : t("upload.dragDrop")}
+          {file ? file.name : (dragLabel ?? t("upload.dragDrop"))}
         </span>
         {file && (
           <span className="text-muted-foreground text-xs tabular-nums">
@@ -144,50 +171,6 @@ function Dropzone({ id, label, hint, file, onSelect, disabled, error }: Dropzone
         disabled={disabled}
         onChange={(e) => onSelect(e.target.files?.[0] ?? null)}
         className="sr-only"
-      />
-    </div>
-  );
-}
-
-interface FileUploadFieldsProps {
-  questionFile: File | null;
-  answerFile: File | null;
-  onSelectQuestion: (file: File | null) => void;
-  onSelectAnswer: (file: File | null) => void;
-  disabled?: boolean;
-  questionError?: string;
-  answerError?: string;
-}
-
-export function FileUploadFields({
-  questionFile,
-  answerFile,
-  onSelectQuestion,
-  onSelectAnswer,
-  disabled,
-  questionError,
-  answerError,
-}: FileUploadFieldsProps) {
-  const hint = t("upload.fileHint", { mb: MAX_MB, pages: LIMITS.MAX_PDF_PAGES });
-  return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      <Dropzone
-        id="question-file"
-        label={t("upload.examPaper")}
-        hint={hint}
-        file={questionFile}
-        onSelect={onSelectQuestion}
-        disabled={disabled}
-        error={questionError}
-      />
-      <Dropzone
-        id="answer-file"
-        label={t("upload.answerKey")}
-        hint={hint}
-        file={answerFile}
-        onSelect={onSelectAnswer}
-        disabled={disabled}
-        error={answerError}
       />
     </div>
   );

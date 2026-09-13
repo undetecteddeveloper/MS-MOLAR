@@ -19,7 +19,9 @@ import { cn } from "@/lib/utils";
 const MAX_MB = Math.round(LIMITS.MAX_FILE_BYTES / (1024 * 1024));
 
 export function ImportInstructions() {
-  const [open, setOpen] = useState(true);
+  // Gấp sẵn (2026-09-13): thẻ đứng DƯỚI nút Bắt đầu, ba chặng phía trên đã
+  // nói thứ tự — mở sẵn chỉ để một khối chữ chen vào cuối trang.
+  const [open, setOpen] = useState(false);
 
   return (
     <Card padding="none">
@@ -53,7 +55,7 @@ export function ImportInstructions() {
             {t("upload.choose")} <span className="font-semibold">{t("upload.manual")}</span>{" "}
             {t("upload.manualHint")}
           </li>
-          <li>{t("upload.answersNeverGuessed")}</li>
+          <li>{t("upload.answerSourceHint")}</li>
           <li>{t("upload.maxFileSize", { mb: MAX_MB, pages: LIMITS.MAX_PDF_PAGES })}</li>
         </ul>
       )}
