@@ -1,6 +1,6 @@
 "use client";
 
-// DisplayNameEditor — sửa tên hiển thị ngay trong thẻ (/profile S-04).
+// DisplayNameEditor — sửa tên hiển thị NGAY TRÊN DÒNG TÊN của thẻ /profile (S-04).
 //
 // Gọi `updateProfile` NGUYÊN TRẠNG (PRD D6, AC-046): ba luật (không rỗng, ≤12
 // ký tự, chỉ chữ cái + dấu chấm) chỉ có MỘT bản cài đặt phía server, và file
@@ -11,12 +11,18 @@
 // câu đó được dịch ở client qua resolveDisplayNameError (UI-D9), và một cổng
 // build canh cho bản đồ ấy không trôi (xem __tests__/errorMessages.test.ts).
 //
-// Theme "Sân trường" (2026-09-10): thẻ TRẮNG con trên thẻ surface, tỏ dần bằng
-// `.motion-unfold`; ô nhập là primitive Input/Label; lỗi tô ĐỎ (bản trước tô
-// `text-brand`, mà brand nay là xanh lá — một câu lỗi màu "đúng").
+// Bố cục (engineer 2026-09-13, test trên điện thoại thật): ô nhập đứng ĐÚNG CHỖ
+// cái tên, hai nút Lưu (✓) / Huỷ (✕) 36px kề bên — không phải một thẻ con mọc ra
+// bên dưới cụm danh tính như bản 2026-09-10. Người dùng bấm bút chì cạnh cái tên
+// thì chờ đợi được gõ vào đúng chỗ ấy. Gợi ý và câu lỗi đứng dưới dòng nhập,
+// trong cùng khối form, nên vẫn nối được bằng aria-describedby. Ô nhập 40px
+// (không phải 44px mặc định của Input): nó thay một dòng chữ 28px, cao thêm nữa
+// thì email và ghi chú bên dưới tụt xuống rõ rệt mỗi lần bấm bút chì. Nút 36px
+// là cỡ nút-trong-thẻ đã có (⋯ của Lịch sử), không phải một cỡ mới.
 
 import { useActionState, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Check, X } from "lucide-react";
 // eslint-disable-next-line no-restricted-imports -- rò chéo có sẵn trước B4 (2026-09-03): changeAvatar/updateProfile/changePassword còn nằm chung file với signIn/signUp. Xem ARCHITECTURE.md § Import chéo.
 import { updateProfile, type AuthState } from "@/features/auth/actions";
 import { t } from "@/lib/copy";
@@ -24,7 +30,6 @@ import type { MessageKey } from "@/lib/copy";
 import { DISPLAY_NAME_MAX, filterDisplayNameInput } from "@/lib/profile/displayName";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/input";
 import { resolveDisplayNameError, type ProfileMessage } from "@/features/profile/components/errorMessages";
 
@@ -33,7 +38,7 @@ const HINT_ID = "profile-display-name-hint";
 const ERROR_ID = "profile-display-name-error";
 
 interface DisplayNameEditorProps {
-  /** Đích của `aria-controls` trên nút bút chì, nút đó nằm ở ProfileCard. */
+  /** id của khối form — ProfileCard giữ hằng số này. */
   id: string;
   onClose: () => void;
   displayName: string;
@@ -41,10 +46,10 @@ interface DisplayNameEditorProps {
   onStatus: (message: ProfileMessage | null) => void;
 }
 
-/** Khối sửa tên. Trạng thái mở/đóng và việc trả focus thuộc về ProfileCard —
- *  bút chì nằm cạnh cái tên trong cụm danh tính, tách khỏi khối này trong cây.
- *  ProfileCard GẮN/GỠ component này thay vì truyền `open` xuống: nhờ vậy
- *  `useState(displayName)` tự khởi tạo đúng ở mỗi lần mở. */
+/** Khối sửa tên, đứng thay dòng tên trong cụm danh tính. Trạng thái mở/đóng và
+ *  việc trả focus thuộc về ProfileCard. ProfileCard GẮN/GỠ component này thay
+ *  vì truyền `open` xuống: nhờ vậy `useState(displayName)` tự khởi tạo đúng ở
+ *  mỗi lần mở. */
 export function DisplayNameEditor({
   id,
   onClose,
@@ -100,14 +105,27 @@ export function DisplayNameEditor({
   const saveBlocked = pending || draft.trim().length === 0;
 
   return (
-    <Card id={id} variant="plain" padding="compact" className="motion-unfold mt-4 gap-0">
-      <form action={formAction} onSubmit={handleSubmit}>
-        <Label htmlFor={INPUT_ID}>{t("common.displayName")}</Label>
+    <form
+      id={id}
+      action={formAction}
+      onSubmit={handleSubmit}
+      className="motion-unfold flex min-w-0 flex-1 flex-col gap-1.5"
+    >
+      <div className="flex items-center gap-1">
+        {/* Nhãn sr-only: ô đứng đúng chỗ cái tên và mang chính cái tên làm
+            giá trị, một nhãn nhìn thấy được ở đây là chữ thừa trên một dòng
+            chật. Trình đọc màn hình vẫn có "Tên hiển thị". */}
+        <Label htmlFor={INPUT_ID} className="sr-only">
+          {t("common.displayName")}
+        </Label>
         <Input
           id={INPUT_ID}
           name="displayName"
           value={draft}
           onChange={(e) => setDraft(filterDisplayNameInput(e.target.value))}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") cancel();
+          }}
           maxLength={DISPLAY_NAME_MAX}
           autoFocus
           // readOnly + aria-disabled thay cho `disabled` gốc: người dùng có
@@ -117,38 +135,33 @@ export function DisplayNameEditor({
           aria-disabled={pending}
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? `${HINT_ID} ${ERROR_ID}` : HINT_ID}
+          className="h-10 min-w-0 flex-1 px-3 text-base font-semibold"
         />
-        <p id={HINT_ID} className="text-muted-foreground mt-1.5 text-xs">
-          {t("common.displayNameHint")}
+        <button
+          type="submit"
+          aria-disabled={saveBlocked}
+          aria-label={pending ? t("common.saving") : t("common.save")}
+          className={cn(buttonVariants({ size: "icon-sm" }), "shrink-0 aria-disabled:opacity-60")}
+        >
+          <Check aria-hidden className="size-4" />
+        </button>
+        <button
+          type="button"
+          onClick={cancel}
+          aria-label={t("common.cancel")}
+          className={cn(buttonVariants({ variant: "plain", size: "icon-sm" }), "shrink-0")}
+        >
+          <X aria-hidden className="size-4" />
+        </button>
+      </div>
+      <p id={HINT_ID} className="text-muted-foreground text-xs">
+        {t("common.displayNameHint")}
+      </p>
+      {error && (
+        <p id={ERROR_ID} role="alert" className="text-destructive text-sm">
+          {t(error.key, error.values)}
         </p>
-        {error && (
-          <p id={ERROR_ID} role="alert" className="text-destructive mt-1.5 text-sm">
-            {t(error.key, error.values)}
-          </p>
-        )}
-        {/* Căn TRÁI (§3 "căn trái toàn bộ"), không phải căn phải như hàng nút
-            của một hộp thoại: đây là khối inline trong thẻ, không phải hộp
-            thoại. Và có lý do đo được — nút hỗ trợ nổi ở góc dưới phải (z-45):
-            với hàng nút căn phải, "Lưu" nằm 252–312 × 586–622 ở 360×740 còn nút
-            hỗ trợ 288–344 × 608–664, tức góc phải nút Lưu bị đè 24×14px. Căn
-            trái thì "Huỷ"/"Lưu" kết thúc ở x≈180, cách nút hỗ trợ hơn 100px. */}
-        <div className="mt-4 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={cancel}
-            className={buttonVariants({ variant: "secondary", size: "sm" })}
-          >
-            {t("common.cancel")}
-          </button>
-          <button
-            type="submit"
-            aria-disabled={saveBlocked}
-            className={cn(buttonVariants({ size: "sm" }), "aria-disabled:opacity-60")}
-          >
-            {pending ? t("common.saving") : t("common.save")}
-          </button>
-        </div>
-      </form>
-    </Card>
+      )}
+    </form>
   );
 }

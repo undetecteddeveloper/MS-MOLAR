@@ -13,7 +13,7 @@
 // dưới 768px và phải đưa bút chì ra khỏi dòng chảy bằng `absolute` để phép căn
 // giữa không lệch 23px — nay không còn gì để lệch.
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Pencil } from "lucide-react";
 import type { CurrentUserProfile } from "@/lib/auth/getCurrentUser";
 import { t } from "@/lib/copy";
@@ -31,8 +31,9 @@ import { PasswordRow } from "@/features/profile/components/PasswordRow";
 import { SignOutButton } from "@/features/profile/components/SignOutButton";
 import { profileMessage, type ProfileMessage } from "@/features/profile/components/errorMessages";
 
-/** Nút mở và khối sửa nằm ở hai chỗ khác nhau trong cây, nên `aria-controls`
- *  là thứ duy nhất nối chúng lại cho trình đọc màn hình. */
+/** Nút mở và khối xem trước ảnh nằm ở hai chỗ khác nhau trong cây, nên
+ *  `aria-controls` là thứ duy nhất nối chúng lại cho trình đọc màn hình. Khối
+ *  sửa tên thì đứng ĐÚNG CHỖ dòng tên (2026-09-13), id chỉ để định danh form. */
 const AVATAR_PANEL_ID = "profile-avatar-panel";
 const NAME_PANEL_ID = "profile-name-panel";
 /** Ô chọn tệp ảnh sống ở ĐÂY (cạnh nhãn của nó) chứ không trong AvatarUploader:
@@ -71,13 +72,24 @@ export function ProfileCard({ user }: ProfileCardProps) {
   // còn lý do tồn tại nào khác ngoài việc xem trước một tệp cụ thể.
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
-  // Cùng lý do với avatar: bút chì nằm trong cụm danh tính, khối sửa nằm dưới.
+  // Khối sửa tên đứng THAY dòng tên + bút chì (2026-09-13), nên bút chì rời
+  // cây trong lúc sửa và không thể nhận focus ngay trong closeName() — lúc đó
+  // nó chưa được gắn lại. Cờ ref đánh dấu "vừa đóng", effect dưới đợi lượt
+  // render gắn lại bút chì rồi mới trả focus (mọi đường đóng: Huỷ, Escape,
+  // lưu thành công). Ref chứ không phải state: không có gì để render lại.
   const [nameOpen, setNameOpen] = useState(false);
   const nameTriggerRef = useRef<HTMLButtonElement>(null);
+  const returnFocusToPencilRef = useRef(false);
+
+  useEffect(() => {
+    if (nameOpen || !returnFocusToPencilRef.current) return;
+    returnFocusToPencilRef.current = false;
+    nameTriggerRef.current?.focus();
+  }, [nameOpen]);
 
   function closeName() {
+    returnFocusToPencilRef.current = true;
     setNameOpen(false);
-    nameTriggerRef.current?.focus();
   }
 
   function handleAvatarPick(e: React.ChangeEvent<HTMLInputElement>) {
@@ -143,29 +155,43 @@ export function ProfileCard({ user }: ProfileCardProps) {
             còn lại đứng trên nền TRẮNG nên giữ nguyên mặc định. */}
         <Avatar src={user.avatarUrl} name={user.displayName} size={96} className="bg-card" />
         <div className="min-w-0">
+          {/* Dòng tên: lúc nghỉ là tên + bút chì; lúc sửa, khối DisplayNameEditor
+              đứng THAY cả hai (ô nhập ở đúng chỗ cái tên, ✓/✕ ở chỗ bút chì).
+              GẮN/GỠ chứ không truyền `open` xuống: bản nháp tên và lỗi tự khởi
+              tạo lại mỗi lần mở, không cần effect nào đồng bộ chúng. */}
           <div className="flex items-center gap-1">
-            {/* <p>, KHÔNG phải heading: đây là DỮ LIỆU, không phải cấu trúc
-                tài liệu. */}
-            <p className="text-foreground truncate text-xl font-semibold">{user.displayName}</p>
-            {/* Bút chì ĐỨNG CẠNH cái tên nó sửa. `size-11` = sàn chạm 44px;
-                `-my-2` nuốt phần cao thừa để hàng tên không cao thêm vì một cái
-                nút. Ghost trên surface không đổi gì khi rê chuột (hover của
-                ghost là surface), nên hover/đang mở tô TRẮNG như thẻ con.
-                aria-label bắt buộc: nút chỉ có biểu tượng. */}
-            <button
-              ref={nameTriggerRef}
-              type="button"
-              aria-label={t("profile.name.change")}
-              aria-expanded={nameOpen}
-              aria-controls={NAME_PANEL_ID}
-              onClick={() => (nameOpen ? closeName() : setNameOpen(true))}
-              className={cn(
-                buttonVariants({ variant: "ghost", size: "icon" }),
-                "text-muted-foreground hover:bg-card aria-expanded:bg-card -my-2"
-              )}
-            >
-              <Pencil aria-hidden className="size-4" />
-            </button>
+            {nameOpen ? (
+              <DisplayNameEditor
+                id={NAME_PANEL_ID}
+                onClose={closeName}
+                displayName={user.displayName}
+                onSuccess={reportSuccess}
+                onStatus={setStatus}
+              />
+            ) : (
+              <>
+                {/* <p>, KHÔNG phải heading: đây là DỮ LIỆU, không phải cấu trúc
+                    tài liệu. */}
+                <p className="text-foreground truncate text-xl font-semibold">{user.displayName}</p>
+                {/* Bút chì ĐỨNG CẠNH cái tên nó sửa. `size-11` = sàn chạm 44px;
+                    `-my-2` nuốt phần cao thừa để hàng tên không cao thêm vì một
+                    cái nút. Ghost trên surface không đổi gì khi rê chuột (hover
+                    của ghost là surface), nên hover tô TRẮNG như thẻ con.
+                    aria-label bắt buộc: nút chỉ có biểu tượng. */}
+                <button
+                  ref={nameTriggerRef}
+                  type="button"
+                  aria-label={t("profile.name.change")}
+                  onClick={() => setNameOpen(true)}
+                  className={cn(
+                    buttonVariants({ variant: "ghost", size: "icon" }),
+                    "text-muted-foreground hover:bg-card -my-2"
+                  )}
+                >
+                  <Pencil aria-hidden className="size-4" />
+                </button>
+              </>
+            )}
           </div>
           <p className="text-muted-foreground truncate text-sm">
             <span className="sr-only">{t("profile.email.label")}: </span>
@@ -203,19 +229,8 @@ export function ProfileCard({ user }: ProfileCardProps) {
         </div>
       </div>
 
-      {/* GẮN/GỠ chứ không truyền `open` xuống: state bên trong (bản nháp tên,
-          tệp đã chọn, lỗi) tự khởi tạo lại mỗi lần mở, nên không cần effect nào
-          đồng bộ chúng. */}
-      {nameOpen && (
-        <DisplayNameEditor
-          id={NAME_PANEL_ID}
-          onClose={closeName}
-          displayName={user.displayName}
-          onSuccess={reportSuccess}
-          onStatus={setStatus}
-        />
-      )}
-
+      {/* GẮN/GỠ chứ không truyền `open` xuống: state bên trong (tệp đã chọn,
+          lỗi) tự khởi tạo lại mỗi lần mở, nên không cần effect nào đồng bộ. */}
       {avatarFile && (
         <AvatarUploader
           id={AVATAR_PANEL_ID}
