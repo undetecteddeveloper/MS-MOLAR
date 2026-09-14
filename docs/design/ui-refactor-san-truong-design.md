@@ -224,3 +224,15 @@ Cách đang dùng chỉ thêm `fillRect` — cùng một phép vẽ máy đã l�
 - `app/global-error.tsx` — màn hình lỗi root layout, không chắc `globals.css` đã nạp.
 - `app/opengraph-image.tsx` — ảnh chia sẻ link; Satori không đọc biến CSS, và không ai trong sản phẩm thấy được nó để phát hiện lệch.
 - `app/layout.tsx` `viewport.themeColor` — màu thanh địa chỉ Android.
+
+### Deploy: TD-024 tái diễn LẦN THỨ TƯ, và cách chữa cũ đã hết tác dụng
+
+Lượt deploy production đầu tiên của theme này (commit `efe1883`, 2026-09-14) ra **HTML mới kèm CSS cũ**. `verify:deployed` báo thiếu 16/622 token — và 16 token thiếu đúng là những cái MỚI: `--sun-on-solid`, `--logo-plate`, cả họ `--glow-*`, các class `.glow-*` và `.card-linked*`. Đọc thẳng file CSS production phục vụ thì rõ: **không có một mã màu nền tối nào**, còn nguyên `#117a45`, `#eef7f1`, `#ffc531`, `#14291c`.
+
+**Cách chữa đã ghi trong TECH-DEBT ("đổi thật nội dung globals.css rồi push") KHÔNG còn ăn thua.** Lượt này đổi ~300 dòng, thêm hẳn một khối CSS mới, mà build của Vercel vẫn phát ra stylesheet cũ.
+
+Cách chữa THỰC SỰ hiệu quả: đặt biến môi trường project `VERCEL_FORCE_NO_BUILD_CACHE=1` (target `production`), rồi dựng lại production trên đúng commit đó. Build kế tiếp cho 622/622 token, cổng xanh.
+
+**`verify:deployed` có một điểm mù phải biết.** Nó so TÊN biến và TÊN selector, không so GIÁ TRỊ. Một lượt đổi theme chỉ sửa mã màu của các token sẵn có sẽ **qua cổng** trong khi production vẫn phục vụ bảng màu cũ. Lượt này bị bắt chỉ vì có thêm token mang tên mới. Nên sau mỗi lượt đổi theme, ngoài chạy cổng còn phải tải file CSS production về và `grep` một mã màu mới.
+
+Hai chi tiết vận hành: đường dẫn stylesheet production là `/_next/static/immutable/chunks/*.css` (không phải `/_next/static/chunks/`); và Vercel CLI trên máy này chưa đăng nhập (`npx vercel --prod` → `no-credentials-found`), nên đường deploy dùng được là Composio toolkit `vercel`.
