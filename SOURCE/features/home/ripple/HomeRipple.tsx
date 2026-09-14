@@ -14,7 +14,9 @@ import { useEffect, useRef } from "react";
 import { isBackgroundTarget, isTap, type PointerPoint } from "./tap";
 import type { RippleLayer } from "./rippleCanvas";
 
-const FALLBACK_COLOR = "#117a45";
+// Chỉ dùng khi đọc `--primary` ra chuỗi rỗng (CSS chưa nạp). Giá trị phải theo
+// theme HIỆN TẠI — "Đêm hội" (2026-09-14), xanh lá sáng cho nền tối.
+const FALLBACK_COLOR = "#7ff0b0";
 
 export function HomeRipple() {
   const hostRef = useRef<HTMLDivElement>(null);

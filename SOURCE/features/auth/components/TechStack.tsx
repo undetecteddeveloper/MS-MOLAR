@@ -60,12 +60,15 @@ export function TechStack() {
           <TechTile tile={BUILT_WITH} className="hidden sm:col-span-2 sm:flex" />
         </ul>
 
-        {/* Đồng xu (chỉ dưới 640px). Trắng trên nền trắng: phần đè lên khe
-            lưới tan vào nền, phần đè lên bốn góc ô hiện thành hình tròn khoét —
-            không cần viền hay bóng (theme không dùng). */}
+        {/* Đồng xu (chỉ dưới 640px). NỀN TỐI (2026-09-14): đế phải giữ TRẮNG —
+            claude.svg và nextjs.svg là hình đen, đặt thẳng lên nền #070f0c là
+            mất hẳn, mà quy ước là không đổi màu logo thương hiệu. Đổi lại, đồng
+            xu không còn "tan vào nền" như bản nền sáng: nó là một đĩa sáng nằm
+            đúng giao điểm bốn ô, vẫn đọc ra ý "công cụ xây đứng giữa những thứ
+            nó ghép lại", chỉ nổi hơn trước. */}
         <span
           aria-hidden
-          className="bg-card absolute top-1/2 left-1/2 grid size-14 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full sm:hidden"
+          className="bg-logo-plate absolute top-1/2 left-1/2 grid size-14 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full sm:hidden"
         >
           {/* eslint-disable-next-line @next/next/no-img-element -- SVG tĩnh trong public/ */}
           <img src={BUILT_WITH.logo} alt="" width={28} height={28} className="size-7" />
@@ -87,13 +90,15 @@ function TechTile({ tile, className = "" }: { tile: Tile; className?: string }) 
     // 124px bề ngang ô thay vì chỉ phần còn lại cạnh logo. Từ 640px: một hàng
     // ngang, tên trên vai trò dưới (bố cục desktop đã duyệt).
     <li
-      className={`bg-surface rounded-card flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:gap-3 sm:p-4 ${className}`}
+      className={`bg-surface rounded-card glow-card flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:gap-3 sm:p-4 ${className}`}
     >
       <span className="flex items-center gap-2 sm:contents">
-        {/* Hộp trắng cố định để năm logo có tỉ lệ khác nhau vẫn đứng cùng một
+        {/* Hộp TRẮNG cố định để năm logo có tỉ lệ khác nhau vẫn đứng cùng một
             cỡ: 36px trên điện thoại (chừa 80px cho tên — "Supabase" rộng 70px,
-            tên dài nhất trong bốn ô, đo 2026-09-05), 44px từ 640px. */}
-        <span className="bg-card grid size-9 shrink-0 place-items-center rounded-xl sm:size-11">
+            tên dài nhất trong bốn ô, đo 2026-09-05), 44px từ 640px. Trên nền
+            tối hộp này giữ trắng (`--logo-plate`) chứ không đi theo `--card`:
+            logo Next.js và Claude là hình đen. */}
+        <span className="bg-logo-plate grid size-9 shrink-0 place-items-center rounded-xl sm:size-11">
           {/* eslint-disable-next-line @next/next/no-img-element -- SVG tĩnh trong public/, không có gì để next/image tối ưu; alt rỗng vì tên thương hiệu đứng ngay cạnh */}
           <img src={tile.logo} alt="" width={24} height={24} className="size-6" />
         </span>

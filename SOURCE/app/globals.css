@@ -11,6 +11,7 @@
   --color-brand-foreground: var(--brand-foreground);
   --color-brand-on-dark: var(--brand-on-dark);
   --color-surface: var(--surface);
+  --color-logo-plate: var(--logo-plate);
   --color-sun: var(--sun);
   --color-sun-soft: var(--sun-soft);
   --color-success: var(--success);
@@ -80,76 +81,116 @@
 }
 
 /* ============================================================
-   THEME "SÂN TRƯỜNG" (2026-09-04) — thay "Mực & Sơn mài".
-   Engineer chọn hướng này trong ba prototype vì "vừa đơn giản vừa
-   cuốn hút màu sắc hơn". Nguồn giá trị là FILE NÀY; quy tắc và lý do ở
+   THEME "ĐÊM HỘI" (2026-09-14) — NỀN TỐI, thay bản nền sáng của
+   "Sân trường". Engineer chọn hướng C trong ba hướng nền tối
+   (Bảng đen / Đèn sân / Đêm hội) vì nó nổi bật nhất. Nguồn giá trị là
+   FILE NÀY; quy tắc và lý do ở
    docs/design/ui-refactor-san-truong-design.md.
 
-   Bốn màu làm việc: trắng (nền), xanh lá đậm (hành động), vàng nắng
-   (trạng thái đang chọn, nền nhấn), đỏ phượng (sai, xoá). Chữ xanh
-   đen. Phẳng: không gradient, không đổ bóng — phân lớp bằng NỀN TÔ
-   (surface xanh nhạt) thay vì viền. Nút hành động là viên thuốc bo
-   tròn tuyệt đối; thẻ nội dung bo 18px.
+   KHÔNG CÓ CHẾ ĐỘ SÁNG. Đây là theme DUY NHẤT của site: không có
+   block `.dark`, không có nút chuyển, không một class `dark:` nào
+   trong repo. Ai muốn thêm chế độ sáng sau này phải dựng lại cả hai
+   bảng tương phản, không phải chỉ bật một biến thể.
 
-   Tương phản đã tính (WCAG 2.2 AA):
-   - --primary #117a45 trên trắng 5,4:1, trên surface 4,9:1 → chữ trắng
-     trên nút xanh đạt 4,5:1 ở mọi cỡ. (#158a4e của prototype chỉ 4,4:1.)
-   - --muted-foreground #4f6656 trên trắng 6,2:1, trên surface 5,6:1.
-   - --destructive #c43e2a trên trắng 5,1:1 — dùng cho CHỮ đỏ. Sắc đỏ
-     phượng tươi #e4573d (3,7:1) chỉ dành cho khối/điểm số cỡ lớn.
-   - --input #6f8d78 trên trắng 3,6:1 (WCAG 1.4.11 cho viền ô nhập).
-   - Vàng nắng #ffc531 trên trắng chỉ 1,6:1 → KHÔNG BAO GIỜ là ranh giới
-     thông tin một mình: thanh tiến độ tô xanh (3,9:1 trên track), vàng
-     chỉ đứng sau icon/chữ đen hoặc kèm viền đậm.
+   Bốn màu làm việc giữ nguyên VAI TRÒ của bản sáng, chỉ nâng độ
+   sáng để đọc được trên nền tối: xanh đêm (nền), xanh lá sáng
+   (hành động), vàng nắng (trạng thái đang chọn, nền nhấn), đỏ cam
+   (sai, xoá). Chữ trắng ngả xanh.
+
+   PHÂN LỚP BẰNG ÁNH SÁNG, không còn "phẳng tuyệt đối" như bản sáng:
+   nền tô (`--surface`) vẫn là lớp nền, nhưng mỗi khối thêm một gờ
+   sáng ở mép trên và một quầng sáng màu để tách khỏi nền. Từ vựng
+   ánh sáng là khối `ÁNH SÁNG` cuối file — call site dùng class
+   `.glow-*`, KHÔNG tự viết box-shadow. Vẫn không gradient.
+
+   Tương phản đã tính (WCAG 2.2 AA) trên nền #070f0c và surface
+   #101e18:
+   - --primary #7ff0b0 trên nền 13,8:1, trên surface 12,3:1. Chữ
+     #04140b trên nút xanh 13,5:1 → đạt AA ở mọi cỡ.
+   - --muted-foreground #a6c2b0 trên nền 10,1:1, trên surface 9,0:1, trên
+     lớp `card` 7,3:1.
+   - --destructive #ff9c82 trên nền 9,5:1, trên surface 8,5:1 — dùng
+     cho CHỮ đỏ lẫn khối lớn; nền tối không cần tách hai sắc đỏ như
+     bản sáng.
+   - --input #6e9a82 trên nền 6,1:1, trên surface 5,4:1 (WCAG 1.4.11 cho
+     viền ô nhập).
+   - Vàng nắng #ffd65c trên nền 13,9:1 — ĐỦ tương phản trên nền tối,
+     khác hẳn bản sáng (1,6:1 trên trắng). Nhưng quy tắc giữ nguyên:
+     vàng luôn kèm CHỮ/ICON MÀU ĐEN (#14291c) khi làm nền khối, vì
+     chữ sáng trên vàng chỉ 1,3:1.
    ============================================================ */
 :root {
-  --background: #ffffff;
-  --foreground: #14291c;
-  --card: #ffffff;
-  --card-foreground: #14291c;
-  /* Bề mặt xanh nhạt: thẻ, chip, khối phụ. Đây là "viền" của theme này. */
-  --surface: #eef7f1;
-  --popover: #ffffff;
-  --popover-foreground: #14291c;
-  --brand: #117a45;
-  --brand-foreground: #ffffff;
-  /* Xanh lá sáng cho nền tối (toast, overlay) — giữ tên biến cũ. */
-  --brand-on-dark: #7fd3a3;
-  --primary: #117a45;
-  --primary-foreground: #ffffff;
-  --secondary: #eef7f1;
-  --secondary-foreground: #14291c;
-  --muted: #eef7f1;
-  --muted-foreground: #4f6656;
-  /* Vàng nắng: `--sun` cho khối nhấn, `--sun-soft` cho nền tô nhẹ. `--accent`
-     của shadcn trỏ về bản nhẹ để hover/menu tự ăn theo. */
-  --sun: #ffc531;
-  --sun-soft: #fff3cf;
-  --accent: #fff3cf;
-  --accent-foreground: #14291c;
-  --success: #117a45;
-  --wrong: #c43e2a;
-  --destructive: #c43e2a;
-  --border: #cfe3d6;
-  --input: #6f8d78;
-  --ring: #117a45;
-  --chart-1: #117a45;
-  --chart-2: #ffc531;
-  --chart-3: #c43e2a;
-  --chart-4: #14291c;
-  --chart-5: #cfe3d6;
+  /* BA NẤC ĐỘ SÁNG, giữ đúng vai trò của bản nền sáng — chỉ đảo chiều:
+     ở đó "lên một nấc" là đi tới TRẮNG, ở đây là đi tới SÁNG HƠN.
+       --background  nền trang
+       --surface     lớp thứ nhất: thẻ, chip, khối phụ (bản sáng: xanh nhạt)
+       --card        lớp thứ hai, nổi TRÊN surface: badge `plain`, thẻ trong
+                     thẻ, ô điểm, avatar (bản sáng: trắng)
+     Nhờ giữ nguyên cặp tên surface/card mà hơn 20 call site `bg-card` sẵn có
+     vẫn đúng nghĩa "sáng hơn khối đang đứng trên", không phải sửa một dòng.
+     Chênh lệch giữa hai nấc rất mỏng — đo trên trình duyệt 2026-09-14:
+     surface/background 1,1:1, card/surface 1,2:1. Bản nền sáng cũng mỏng
+     như vậy (#eef7f1 trên trắng), nhưng ở đó mắt còn bắt được SẮC xanh
+     nhạt trên trắng; trên nền tối cùng một chênh lệch đọc ra gần như
+     không có gì. Nên nền tô một mình KHÔNG còn tách được lớp: mọi khối
+     đều đi kèm một class `.glow-*`. */
+  --background: #070f0c;
+  --foreground: #f0fbf3;
+  --surface: #101e18;
+  --card: #1a3125;
+  --card-foreground: #f0fbf3;
+  /* Menu/popover nổi trên cả trang lẫn trên thẻ → cùng nấc với `card`. */
+  --popover: #1a3125;
+  --popover-foreground: #f0fbf3;
+  --brand: #7ff0b0;
+  --brand-foreground: #04140b;
+  /* Giữ tên biến cũ (không còn call site nào, xoá được khi dọn). */
+  --brand-on-dark: #7ff0b0;
+  --primary: #7ff0b0;
+  --primary-foreground: #04140b;
+  --secondary: #101e18;
+  --secondary-foreground: #f0fbf3;
+  --muted: #101e18;
+  --muted-foreground: #a6c2b0;
+  /* Vàng nắng: `--sun` cho khối nhấn, `--sun-soft` cho nền tô nhẹ —
+     trên nền tối bản nhẹ là hổ phách SẪM, không phải kem nhạt.
+     `--accent` của shadcn trỏ về bản nhẹ để hover/menu tự ăn theo. */
+  --sun: #ffd65c;
+  --sun-soft: #3b2e0e;
+  /* MỰC ĐEN cố định để đặt LÊN khối vàng đặc (`bg-sun`): viên đang chọn của
+     BottomNav, ô trang đang xem, chặng đang làm. KHÔNG dùng `--foreground` cho
+     việc này nữa — trên nền tối foreground là màu SÁNG, và chữ sáng trên vàng
+     chỉ đạt 1,3:1. Giá trị là mực xanh đen của bản nền sáng: 11:1 trên vàng. */
+  --sun-on-solid: #14291c;
+  --accent: #3b2e0e;
+  --accent-foreground: #f0fbf3;
+  --success: #7ff0b0;
+  --wrong: #ff9c82;
+  --destructive: #ff9c82;
+  --border: #2f5544;
+  --input: #6e9a82;
+  --ring: #7ff0b0;
+  --chart-1: #7ff0b0;
+  --chart-2: #ffd65c;
+  --chart-3: #ff9c82;
+  --chart-4: #f0fbf3;
+  --chart-5: #2f5544;
   /* Bán kính gốc 14px: sm 8 / md 11 / lg 14 / xl 20 / 2xl 25. Thẻ dùng
      `rounded-card` (18px); nút hành động và chip dùng `rounded-full`. */
   --radius: 0.875rem;
   --radius-card: 1.125rem;
-  --sidebar: #ffffff;
-  --sidebar-foreground: #14291c;
-  --sidebar-primary: #117a45;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #eef7f1;
-  --sidebar-accent-foreground: #14291c;
-  --sidebar-border: #cfe3d6;
-  --sidebar-ring: #117a45;
+  /* Đế TRẮNG cố định cho logo thương hiệu bên thứ ba (TechStack). Logo
+     Next.js và Claude là hình ĐEN: đặt thẳng lên nền tối là mất hẳn.
+     Quy ước "không đổi màu logo" nên đế phải sáng, không phải logo. */
+  --logo-plate: #ffffff;
+  --sidebar: #070f0c;
+  --sidebar-foreground: #f0fbf3;
+  --sidebar-primary: #7ff0b0;
+  --sidebar-primary-foreground: #04140b;
+  --sidebar-accent: #101e18;
+  --sidebar-accent-foreground: #f0fbf3;
+  --sidebar-border: #2f5544;
+  --sidebar-ring: #7ff0b0;
 }
 
 /* ============================================================
@@ -171,16 +212,22 @@
   --leading-display: 1.1;
   --tracking-display: -0.01em;
 
-  /* Bảng màu biểu đồ "ngủ đông": 8 màu chỉ thức trong biểu đồ/sơ đồ dữ liệu.
-     Mọi giá trị ≥ 3:1 trên trắng lẫn surface (WCAG 1.4.11). */
-  --dormant-clay: #b4522f;
-  --dormant-sky: #3d6fa3;
-  --dormant-cactus: #4f6b51;
-  --dormant-fig: #7d4a5f;
-  --dormant-olive: #6b6833;
-  --dormant-heather: #6f6490;
-  --dormant-kelp: #2f6f68;
-  --dormant-slate: #566878;
+  /* Bảng màu biểu đồ "ngủ đông": 8 màu chỉ thức trong biểu đồ/sơ đồ dữ liệu
+     (lib/analytics/constants.ts gán mỗi môn một màu).
+
+     THEME "ĐÊM HỘI" (2026-09-14): tám giá trị CŨ là bản đậm dành cho nền
+     trắng — trên nền #070f0c chúng tụt xuống dưới 3:1 và thanh biểu đồ
+     biến mất vào nền. Đã thay bằng bản sáng CÙNG SẮC (cùng thứ tự môn,
+     nên không có môn nào đổi màu nhận diện), mọi giá trị ≥ 3:1 trên CẢ
+     nền lẫn surface (WCAG 1.4.11). */
+  --dormant-clay: #e8875e;
+  --dormant-sky: #7fb4e8;
+  --dormant-cactus: #9cc79e;
+  --dormant-fig: #e093ae;
+  --dormant-olive: #c8c36a;
+  --dormant-heather: #b5a9e0;
+  --dormant-kelp: #6fcfc2;
+  --dormant-slate: #a9bece;
 }
 
 /* ============================================================
@@ -252,10 +299,13 @@
 
 /* ============================================================
    SCROLLBAR — mảnh, bo tròn, hoà vào nền.
+   Nền tối (2026-09-14): con trượt là SÁNG mờ, không còn là mực đen mờ —
+   mực đen trên nền #070f0c là một dải vô hình, người dùng không biết
+   trang còn cuộn được nữa.
    ============================================================ */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgb(20 41 28 / 0.25) transparent;
+  scrollbar-color: rgb(240 251 243 / 0.22) transparent;
 }
 
 *::-webkit-scrollbar {
@@ -268,12 +318,12 @@
 }
 
 *::-webkit-scrollbar-thumb {
-  background-color: rgb(20 41 28 / 0.25);
+  background-color: rgb(240 251 243 / 0.22);
   border-radius: 999px;
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background-color: rgb(20 41 28 / 0.4);
+  background-color: rgb(240 251 243 / 0.38);
 }
 
 *::-webkit-scrollbar-corner {
@@ -286,10 +336,13 @@
    chuyển đổi; giá trị đã theo theme mới.
    ============================================================ */
 :root {
-  --nav-bg: rgb(255 255 255 / 0.96);
-  --nav-border: #cfe3d6;
-  --nav-fg: #14291c;
-  --nav-fg-muted: #4f6656;
+  /* Nền thanh điều hướng: ĐỤC 94% chứ không trong suốt hoàn toàn. Cả
+     SiteHeader lẫn BottomNav đều `backdrop-blur`, nhưng trên nền tối một
+     lớp trong hơn sẽ để nội dung sáng cuộn qua và đọc thành vệt sáng. */
+  --nav-bg: rgb(7 15 12 / 0.94);
+  --nav-border: #2f5544;
+  --nav-fg: #f0fbf3;
+  --nav-fg-muted: #a6c2b0;
   --block-bg: var(--surface);
   --block-fg: var(--foreground);
   --block-fg-muted: var(--muted-foreground);
@@ -441,10 +494,13 @@
    `bg-surface` của Card như một biến thể utility thường.
    ------------------------------------------------------------ */
 .card-linked {
-  transition: background-color 150ms var(--ease-out-strong);
+  transition:
+    background-color 150ms var(--ease-out-strong),
+    box-shadow 150ms var(--ease-out-strong);
 }
 .card-linked:has(> .card-link:active) {
   background-color: color-mix(in oklch, var(--surface), var(--foreground) 7%);
+  box-shadow: var(--glow-card-hot);
 }
 .card-linked-title {
   transition: color 150ms var(--ease-out-strong);
@@ -452,9 +508,96 @@
 @media (hover: hover) {
   .card-linked:has(> .card-link:hover) {
     background-color: color-mix(in oklch, var(--surface), var(--foreground) 4%);
+    box-shadow: var(--glow-card-hot);
   }
   .card-linked:has(> .card-link:hover) .card-linked-title {
     color: var(--primary);
+  }
+}
+
+/* ============================================================
+   ÁNH SÁNG (2026-09-14) — từ vựng dùng chung cho toàn site, song song
+   với khối CHUYỂN ĐỘNG bên dưới. Quy tắc và lý do ở
+   docs/design/ui-refactor-san-truong-design.md §4.
+
+   Theme nền sáng "Sân trường" phân lớp bằng NỀN TÔ và cấm hẳn đổ bóng.
+   Trên nền tối cách đó hết tác dụng: chênh lệch giữa nền #070f0c và
+   surface #101e18 chỉ còn 1,1:1 (đo trên trình duyệt 2026-09-14), mắt gần
+   như không tách được hai lớp.
+   Theme "Đêm hội" thay bằng ÁNH SÁNG — mỗi khối có một gờ sáng ở mép
+   trên (như vật thể được chiếu từ trên xuống) và một quầng sáng màu.
+
+   LUẬT:
+   - Call site KHÔNG tự viết `box-shadow`. Dùng một trong bốn class
+     dưới đây, hoặc thêm một class mới VÀO ĐÂY nếu thật sự thiếu.
+   - Bóng luôn là ÁNH SÁNG MÀU (xanh hành động, vàng đang chọn), không
+     phải bóng đen: nền đã tối, bóng đen không thêm được chiều sâu nào.
+   - Mỗi khối nhiều nhất HAI lớp shadow ở trạng thái nghỉ; lớp thứ ba
+     chỉ xuất hiện khi hover/nhấn. Danh sách đề có thể dài 30–50 thẻ,
+     và box-shadow nhiều lớp là chi phí repaint trên Android tầm trung
+     — đây là lý do bản dựng không dùng đúng ba lớp của prototype.
+   - `.glow-action` và `.glow-sun` chỉ dành cho ĐÍCH CHẠM (nút, viên
+     đang chọn). Một khối tĩnh phát sáng như nút bấm là nói dối người
+     dùng về việc bấm được.
+   ============================================================ */
+:root {
+  /* Thẻ nội dung lúc nghỉ: gờ sáng mép trên + viền sáng mảnh. */
+  --glow-card:
+    inset 0 1px 0 rgb(255 255 255 / 0.09), 0 0 0 1px rgb(127 240 176 / 0.1);
+  /* Thẻ đang được hover/nhấn: viền xanh rõ + quầng xanh toả ra. */
+  --glow-card-hot:
+    inset 0 1px 0 rgb(255 255 255 / 0.12), 0 0 0 1px rgb(127 240 176 / 0.42),
+    0 0 26px -6px rgb(127 240 176 / 0.4);
+  /* Nút hành động: viền xanh + quầng gần. */
+  --glow-action:
+    0 0 0 1px rgb(127 240 176 / 0.4), 0 0 22px -4px rgb(127 240 176 / 0.55);
+  --glow-action-hot:
+    0 0 0 1px rgb(127 240 176 / 0.55), 0 0 22px -4px rgb(127 240 176 / 0.7),
+    0 14px 34px -12px rgb(127 240 176 / 0.85);
+  /* Khối vàng đang chọn: viên BottomNav, chip lọc đang bật. */
+  --glow-sun:
+    0 0 0 1px rgb(255 214 92 / 0.45), 0 0 20px -2px rgb(255 214 92 / 0.6);
+  /* Gờ sáng mảnh, không quầng — chip, badge, ô nhập, khối phụ. */
+  --glow-rim: inset 0 1px 0 rgb(255 255 255 / 0.07);
+}
+
+.glow-card {
+  box-shadow: var(--glow-card);
+}
+.glow-action {
+  box-shadow: var(--glow-action);
+}
+.glow-sun {
+  box-shadow: var(--glow-sun);
+}
+.glow-rim {
+  box-shadow: var(--glow-rim);
+}
+
+/* Nút hành động sáng mạnh thêm khi ngón tay/chuột đặt lên.
+
+   KHÔNG khai `transition` ở đây — có chủ đích. Khối này nằm NGOÀI mọi
+   `@layer`, nên nó thắng mọi utility của Tailwind (vốn ở `@layer
+   utilities`), kể cả khi utility đứng sau trong file. Một dòng
+   `transition: box-shadow` ở đây sẽ NUỐT nguyên cụm
+   `transition-[color,background-color,border-color,scale]` của Button —
+   nút mất luôn cú co 3% lúc nhấn, và không có lỗi nào báo. Nơi gọi tự
+   thêm `box-shadow` vào danh sách transition của nó. */
+.glow-action:active {
+  box-shadow: var(--glow-action-hot);
+}
+@media (hover: hover) {
+  .glow-action:hover {
+    box-shadow: var(--glow-action-hot);
+  }
+}
+
+/* Người tắt hiệu ứng vẫn cần THẤY được lớp và đích chạm: ánh sáng ở đây
+   là thông tin tĩnh, không phải chuyển động, nên KHÔNG tắt quầng — chỉ
+   bỏ phần chuyển tiếp. */
+@media (prefers-reduced-motion: reduce) {
+  .card-linked {
+    transition: none;
   }
 }
 

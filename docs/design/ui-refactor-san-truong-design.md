@@ -3,6 +3,12 @@
 **Ngày:** 2026-09-04 · **Nhánh:** `design/ui-refactor-san-truong` · **Row Notion:** "Refactor UI/UX toàn site — hướng B"
 **Trạng thái:** đang thực hiện. Nguồn giá trị token là `SOURCE/app/globals.css`; file này là quy tắc và lý do.
 
+> **CẬP NHẬT 2026-09-14 — site đã chuyển sang NỀN TỐI ("Đêm hội").** Bảng màu ở
+> §2 và luật "không đổ bóng" ở §4/§5 là của bản NỀN SÁNG và KHÔNG còn hiệu lực;
+> chúng giữ lại ở đây làm lịch sử, vì mọi quyết định về bố cục, chữ, hình dạng,
+> khoảng cách và chuyển động bên dưới vẫn nguyên giá trị. **Giá trị đang chạy ở
+> §8.** Đọc §8 trước khi dùng bất kỳ mã màu nào trong file này.
+
 ## 1. Brief (engineer chốt 2026-09-04)
 
 - Layout cũ tự nghĩ hoặc lấy từ template đơn giản nên không nổi bật. Giao toàn quyền tái thiết kế theo hướng **chuyên nghiệp, nhất quán, ưu tiên điện thoại** (học sinh lớp 6–12, Android tầm trung).
@@ -14,7 +20,7 @@
 
 ## 2. Token
 
-### Màu (6 màu làm việc)
+### Màu (6 màu làm việc) — BẢN NỀN SÁNG, đã thay bởi §8
 
 | Vai trò | Giá trị | Ghi chú tương phản |
 |---|---|---|
@@ -95,7 +101,7 @@ Không in hoa nhãn, không dấu chấm giữa nối meta, không mũi tên sau
 ## 4. Nguyên tắc
 
 1. **Một chỗ táo bạo**: vàng nắng. Mọi thứ khác im lặng (trắng, xanh nhạt, chữ xanh đen).
-2. **Nền tô thay viền**: khối nào cần tách thì tô `surface`; viền chỉ còn ở ô nhập (bắt buộc theo WCAG) và kẻ chia trong danh sách.
+2. **Nền tô thay viền**: khối nào cần tách thì tô `surface`; viền chỉ còn ở ô nhập (bắt buộc theo WCAG) và kẻ chia trong danh sách. — *Từ 2026-09-14 (§8): trên nền tối, nền tô một mình KHÔNG đủ tách lớp; mỗi khối thêm một class `.glow-*`.*
 3. **Trạng thái bằng hình lẫn màu**: đang chọn có viền + nền, đúng/sai có chấm + chữ, không dựa vào màu đơn thuần.
 4. **Chữ là lời của sản phẩm**: xưng "bạn", câu ngắn, nút nói đúng việc xảy ra ("Làm đề", "Nộp bài", "Làm lại đề").
 5. **Điện thoại trước**: mọi thứ dựng ở 360px rồi mới nới lên; vùng chạm ≥ 44px; không cuộn ngang; thanh đáy giữ nguyên 5 ô.
@@ -108,7 +114,7 @@ Không in hoa nhãn, không dấu chấm giữa nối meta, không mũi tên sau
 | Nhãn in hoa giãn chữ | Có (`.eyebrow`, nav) | Bỏ; nhãn chữ thường 12px/600 |
 | Dấu chấm giữa nối meta | Có (`0.0/10 · 31/08 · 43s`) | Tách bằng khoảng cách hoặc dấu phẩy |
 | Mũi tên sau chữ nút/liên kết | Có (`RATE →`, `Tiếp →`) | Bỏ |
-| Cùng một bo góc và bóng cho mọi khối | Có (rounded-lg) | Bo theo vai trò: pill / 18px / 14px; không bóng |
+| Cùng một bo góc và bóng cho mọi khối | Có (rounded-lg) | Bo theo vai trò: pill / 18px / 14px; không bóng — *từ 2026-09-14 (§8): có bóng, nhưng là ÁNH SÁNG MÀU theo vai trò, lấy từ bốn class `.glow-*`, không phải một bóng xám dùng chung* |
 | Tô màu một cụm từ trong tiêu đề | Prototype B lần 1 | Bỏ ở lần soát 1 |
 | Xám trung tính không chọn lọc | — | Xám ngả xanh `#4F6656` / `#CFE3D6` |
 
@@ -139,7 +145,7 @@ Không làm, và vì sao:
 
 - **Không fade/stagger nội dung trang lúc tải** (lưới đề, danh sách lịch sử). Đo 2026-08-22: bỏ fade giảm LCP 348ms. Người dùng mở các trang này hàng chục lần một ngày — chuyển động ở đây là thuế, không phải quà.
 - **Không animate chuyển câu trong màn làm bài** (40 lượt/bài, phần lớn bằng bàn phím). Chỉ còn phản hồi bấm.
-- **Không bóng, không gradient, không blur** — theme phẳng; hiệu ứng chỉ dùng `opacity`, `scale`, `translate` (không layout/paint, chạy ngoài luồng chính).
+- **Không gradient, không blur**; hiệu ứng chỉ dùng `opacity`, `scale`, `translate` (không layout/paint, chạy ngoài luồng chính). *Vế "không bóng" của bản nền sáng đã bỏ từ 2026-09-14 — xem §8. Nhưng bóng ở theme mới là trạng thái TĨNH: chỉ `.card-linked` và `.glow-action` chuyển `box-shadow`, đều ở 150ms và đều do một cú chạm/hover gây ra, không có khối nào tự phát sáng nhấp nháy.*
 - **Không `transition-all`** ở đâu nữa: Tabs (đã xoá 2026-09-09), SuccessToast, HomeStage, RatingRubric đã ghi đúng thuộc tính. `ease-in` ở chiều ra của toast đổi sang `ease-out` (khởi đầu chậm = cảm giác ì).
 
 Đường cong: `--ease-out` và `--ease-in-out` của Tailwind được trỏ sang bản mạnh (`cubic-bezier(0.23,1,0.32,1)`, `cubic-bezier(0.77,0,0.175,1)`) trong `@theme`, nên mọi `ease-out` có sẵn trong repo (Progress, HomeStage, UploadForm…) tự ăn theo — đường cong mặc định của trình duyệt quá yếu để chuyển động trông có chủ ý.
@@ -147,3 +153,74 @@ Không làm, và vì sao:
 Giảm chuyển động (`prefers-reduced-motion`): giữ mờ/tỏ 150ms, bỏ mọi `translate`/`scale`, tắt bốn keyframe; `usePresence` gỡ phần tử ngay (không giữ thêm khoảng đóng).
 
 Đo (Playwright, dev, 2026-09-08): xem bảng số trong Notion row "Chuyển động toàn site" và commit message.
+
+## 8. Nền tối "Đêm hội" (2026-09-14)
+
+Engineer chốt: **đổi hẳn sang nền tối**, thêm **glow cho sóng ripple** và **hiệu ứng ánh sáng cho các element** để tạo nổi bật và chiều sâu. Chọn hướng **C "Đêm hội"** trong ba hướng nền tối dựng trên canvas (A Bảng đen — nền sâu nhất, ánh sáng tiết chế; B Đèn sân — cân bằng; C Đêm hội — nền tối nhất, ánh sáng mạnh nhất). File dựng: `SCREENSHOT/temporary_screenshot/prototype/dark-theme/`.
+
+**Không có chế độ sáng.** Đây là theme duy nhất: không block `.dark`, không nút chuyển, không một class `dark:` nào trong repo. Thêm chế độ sáng sau này là dựng lại cả hai bảng tương phản, không phải bật một biến thể.
+
+### Màu đang chạy
+
+Giá trị gốc ở `SOURCE/app/globals.css` `:root`. Tương phản tính trên nền `#070F0C` và bề mặt `#101E18`.
+
+| Vai trò | Giá trị | Ghi chú tương phản |
+|---|---|---|
+| Nền trang | `#070F0C` | |
+| Bề mặt, lớp 1 (thẻ, chip, khối phụ) | `#101E18` | Chỉ **1,1:1** so với nền (đo 2026-09-14) → **không tự tách lớp được**, luôn kèm `.glow-*` |
+| Lớp 2, nổi trên lớp 1 (`--card`) | `#1A3125` | 1,2:1 so với lớp 1. Giữ nguyên cặp tên `surface`/`card` của bản nền sáng, nên 20+ call site `bg-card` sẵn có vẫn đúng nghĩa "sáng hơn khối đang đứng trên" |
+| Chữ | `#F0FBF3` | 18,3:1 trên nền |
+| Chữ phụ | `#A6C2B0` | 10,1:1 trên nền, 9,0:1 trên lớp 1, 7,3:1 trên lớp 2 |
+| Hành động (primary) | `#7FF0B0` | 13,8:1 trên nền, 12,3:1 trên lớp 1; chữ `#04140B` trên nút xanh 13,5:1 |
+| Vàng nắng | `#FFD65C` / nền nhẹ `#3B2E0E` | 13,9:1 trên nền — **đủ** tương phản, khác bản sáng. Nhưng làm NỀN KHỐI thì luôn kèm chữ/icon **đen** `--sun-on-solid` `#14291C` (11:1); chữ sáng trên vàng chỉ 1,3:1 |
+| Sai / xoá | `#FF9C82` | 9,5:1 trên nền — một sắc cho cả chữ lẫn khối lớn, nền tối không cần tách hai sắc đỏ như bản sáng |
+| Viền ô nhập | `#6E9A82` | 6,1:1 trên nền, 5,4:1 trên lớp 1 (WCAG 1.4.11) |
+| Kẻ trang trí | `#2F5544` | không chịu ngưỡng |
+| Đế logo (`--logo-plate`) | `#FFFFFF` | Cố định trắng: `nextjs.svg` và `claude.svg` là hình ĐEN, quy ước là không đổi màu logo bên thứ ba nên đế phải sáng |
+
+Mọi tỉ số trên đo bằng Playwright trên chính trang đang chạy (2026-09-14), không tính tay: 22/22 cặp đạt ngưỡng.
+
+Bảng "ngủ đông" 8 màu biểu đồ đã thay bằng bản SÁNG cùng sắc (cùng thứ tự môn, không môn nào đổi màu nhận diện); bản đậm cũ tụt dưới 3:1 trên nền tối và thanh biểu đồ biến mất vào nền.
+
+### Ánh sáng — từ vựng dùng chung
+
+Nguồn giá trị: khối `ÁNH SÁNG` trong `app/globals.css`, song song với khối `CHUYỂN ĐỘNG`. **Call site không tự viết `box-shadow`** — dùng một trong bốn class, hoặc thêm class mới vào chính khối đó.
+
+| Class | Dùng cho | Nội dung |
+|---|---|---|
+| `.glow-card` | Thẻ nội dung (mọi biến thể Card trừ `outline`) | Gờ sáng mép trên + viền sáng mảnh |
+| `.glow-action` | Nút hành động chính | Viền xanh + quầng gần; mạnh thêm khi hover/nhấn |
+| `.glow-sun` | Khối vàng đang chọn: viên BottomNav, ô câu đang làm, chặng đang ở, chấm đầu dòng | Viền vàng + quầng |
+| `.glow-rim` | Chip nghỉ, badge `surface`, nút phụ | Chỉ gờ sáng, không quầng |
+
+Luật:
+
+1. **Bóng là ÁNH SÁNG MÀU, không phải bóng đen.** Nền đã tối, bóng đen không thêm được chiều sâu nào.
+2. **Tối đa hai lớp shadow lúc nghỉ**, lớp thứ ba chỉ khi hover/nhấn. Prototype hướng C vẽ ba lớp trên mọi thẻ; bản dựng hạ xuống hai vì danh sách đề dài 30–50 thẻ và `box-shadow` nhiều lớp là chi phí repaint trên Android tầm trung.
+3. **Chỉ ĐÍCH CHẠM mới được phát quầng** (`.glow-action`, `.glow-sun`). Một khối tĩnh sáng như nút bấm là nói dối người dùng về việc bấm được. Nút `outline`/`ghost`/`destructive`/`link` không phát sáng.
+4. **`prefers-reduced-motion` KHÔNG tắt quầng** — ánh sáng ở đây là thông tin tĩnh (lớp, đích chạm), không phải chuyển động; chỉ bỏ phần chuyển tiếp.
+5. Khối `ÁNH SÁNG` nằm **ngoài mọi `@layer`** nên thắng utility Tailwind. Vì vậy nó **không khai `transition`**: một dòng `transition: box-shadow` ở đó sẽ nuốt nguyên cụm `transition-[…,scale]` của Button và nút mất cú co 3% lúc nhấn, không có lỗi nào báo. Nơi gọi tự thêm `box-shadow` vào danh sách transition của nó.
+
+### Sóng ripple phát sáng
+
+`features/home/ripple/rippleCanvas.ts`. Mỗi ô của vành sóng không còn là một hình vuông đặc mà là **ba hình vuông đồng tâm vẽ chồng ở chế độ cộng ánh sáng** (`globalCompositeOperation = "lighter"`): quầng ngoài +10px ×0,18 · quầng trong +4px ×0,28 · lõi ×0,72. Quầng của hai ô cạnh nhau (cách 34px, quầng rộng ±10px) chồng lên nhau nên vành sóng liền thành một dải sáng thay vì một hàng ô rời. Toán của sóng (`wave.ts`) không đổi.
+
+Đã cân nhắc và bỏ, vì máy đích là Android tầm trung:
+
+- `ctx.shadowBlur` / `ctx.filter = blur()` — canvas 2D tính lại mờ cho **từng** `fillRect`, vài trăm lần mỗi khung hình.
+- `filter: drop-shadow()` trên chính thẻ `<canvas>` — bắt GPU làm một lượt mờ cả màn hình mỗi khung hình, trong khi lớp này đổi nội dung liên tục.
+
+Cách đang dùng chỉ thêm `fillRect` — cùng một phép vẽ máy đã làm tốt, và vẫn nằm trong hộp bao ±3 sigma của vành.
+
+### Hai chỗ CỐ Ý không đi theo nền tối
+
+- **`components/pdf/AttemptPdfTemplate.tsx`** giữ nguyên bảng màu nền SÁNG. Nó in ra giấy: nền tối là đổ mực kín một tờ A4 cho phiếu điểm học sinh in ra nộp. Giá trị trong file đó là bản sao ĐÓNG BĂNG của theme cũ, không phải bản lỗi thời — đừng "sửa cho khớp" `globals.css`.
+- **Chip lọc đang chọn** giữ phép đảo `bg-foreground text-background` (viên sáng chữ tối), không đổi sang vàng như prototype hướng C vẽ. Vàng trong theme này đã mang nghĩa "vị trí hiện tại" (viên BottomNav, ô câu đang làm, chặng đang ở); một màu hai nghĩa là mất cả hai.
+
+### Ba chỗ màu chép tay, phải sửa cùng lượt với `globals.css`
+
+Đổi token mà quên ba file này thì hỏng IM LẶNG — không lỗi, không cảnh báo:
+
+- `app/global-error.tsx` — màn hình lỗi root layout, không chắc `globals.css` đã nạp.
+- `app/opengraph-image.tsx` — ảnh chia sẻ link; Satori không đọc biến CSS, và không ai trong sản phẩm thấy được nó để phát hiện lệch.
+- `app/layout.tsx` `viewport.themeColor` — màu thanh địa chỉ Android.

@@ -12,6 +12,11 @@
 // mài" (kem/nâu đen/đỏ son) và viết toàn tiếng Anh. Cả hai đều là màn hình
 // THẬT của sản phẩm — hiếm gặp không có nghĩa là không tính.
 //
+// Theme "Đêm hội" (2026-09-14): đổi nền tối. Đây là màn hình DUY NHẤT của site
+// mà một lượt đổi token trong globals.css KHÔNG chạm tới — nó không chắc đã nạp
+// được file đó. Đổi bảng màu là phải sửa TAY ở đây, nếu không người dùng gặp
+// lỗi nặng nhất sẽ thấy một trang trắng lạc lõng giữa một site nền tối.
+//
 // `t()` dùng được ở đây: nó chỉ tra một object hằng trong lib/copy.ts, không
 // cần provider nào — đúng thứ file này cần, vì mọi provider của root layout
 // đều đã mất.
@@ -19,11 +24,16 @@
 import { useEffect } from "react";
 import { t } from "@/lib/copy";
 
-const WHITE = "#ffffff";
-const INK = "#14291c";
-const MUTED = "#4f6656";
-const PRIMARY = "#117a45";
-const DESTRUCTIVE = "#c43e2a";
+// Theme "Đêm hội" (2026-09-14): chép tay bảng màu NỀN TỐI của globals.css.
+// `PAGE`/`ON_PRIMARY` thay cho hằng `WHITE` cũ — trên theme này không còn chỗ
+// nào là trắng, và một hằng tên WHITE mang giá trị #070f0c là bẫy cho lượt sửa
+// sau.
+const PAGE = "#070f0c";
+const INK = "#f0fbf3";
+const MUTED = "#a6c2b0";
+const PRIMARY = "#7ff0b0";
+const ON_PRIMARY = "#04140b";
+const DESTRUCTIVE = "#ff9c82";
 
 // Lexend đứng đầu để dùng lại bản trình duyệt đã cache từ những lượt vào
 // trước; không có thì rơi về font hệ thống. KHÔNG serif: theme này một họ chữ.
@@ -54,7 +64,7 @@ export default function GlobalError({
           alignItems: "center",
           justifyContent: "center",
           padding: "2rem 1.5rem",
-          background: WHITE,
+          background: PAGE,
           color: INK,
           fontFamily: SANS,
           textAlign: "center",
@@ -98,12 +108,16 @@ export default function GlobalError({
               border: 0,
               borderRadius: "9999px",
               background: PRIMARY,
-              color: WHITE,
+              color: ON_PRIMARY,
               padding: "0.625rem 1.5rem",
               fontFamily: "inherit",
               fontSize: "0.9375rem",
               fontWeight: 600,
               cursor: "pointer",
+              // Quầng sáng của `.glow-action` (globals.css), chép tay: nền tối
+              // không có Tailwind ở màn hình này.
+              boxShadow:
+                "0 0 0 1px rgb(127 240 176 / 0.4), 0 0 22px -4px rgb(127 240 176 / 0.55)",
             }}
           >
             {t("error.reload")}

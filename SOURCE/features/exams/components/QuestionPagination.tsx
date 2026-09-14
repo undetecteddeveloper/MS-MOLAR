@@ -108,11 +108,14 @@ export function QuestionPagination({
                     compact ? "text-xs" : "text-sm"
                   } ${
                     isCurrent
-                      ? "bg-sun text-foreground"
+                      ? // Mực ĐEN trên vàng (globals.css `--sun-on-solid`): trên
+                        // nền tối `--foreground` là màu sáng, chữ sáng trên vàng
+                        // chỉ đạt 1,4:1.
+                        "glow-sun bg-sun text-[color:var(--sun-on-solid)]"
                       : isAnswered
                         ? "bg-primary text-primary-foreground hover:bg-[color-mix(in_oklch,var(--primary),black_10%)]"
                         : popover
-                          ? // Thẻ trắng: ô "chưa làm" tô surface để còn thấy ô.
+                          ? // Ô "chưa làm" trong bảng thả xuống: tô surface để còn thấy ô.
                             "bg-surface text-muted-foreground hover:text-foreground"
                           : "bg-card text-muted-foreground hover:text-foreground"
                   }`}

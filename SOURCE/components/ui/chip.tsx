@@ -21,9 +21,16 @@ const chipVariants = cva(
   {
     variants: {
       active: {
+        // Nền tối (2026-09-14): phép đảo vẫn đứng — chip đang chọn là viên SÁNG
+        // chữ tối, vẫn là tương phản mạnh nhất trên hàng. KHÔNG đổi sang vàng dù
+        // prototype hướng C vẽ vậy: vàng trong theme này đã mang nghĩa "vị trí
+        // hiện tại" (viên BottomNav, ô câu đang làm, chặng đang ở). Một màu hai
+        // nghĩa là mất cả hai.
         true: "bg-foreground text-background",
+        // `glow-rim` cho chip NGHỈ: surface #101e18 trên nền #070f0c chỉ chênh
+        // 1,1:1, không có gờ sáng thì cả hàng chip loang thành một mảng.
         false:
-          "bg-surface text-foreground hover:bg-[color-mix(in_oklch,var(--surface),var(--foreground)_7%)]",
+          "glow-rim bg-surface text-foreground hover:bg-[color-mix(in_oklch,var(--surface),var(--foreground)_7%)]",
       },
     },
     defaultVariants: { active: false },

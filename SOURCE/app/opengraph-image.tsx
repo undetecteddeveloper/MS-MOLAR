@@ -21,12 +21,17 @@ export const alt = t("meta.ogAlt");
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
+// Theme "Đêm hội" (2026-09-14): đổi sang nền tối cùng lượt với globals.css.
+// Ảnh chia sẻ đi lệch theme là kiểu hỏng KHÔNG AI BÁO — người mở link thấy một
+// tấm trắng, bấm vào lại ra một site tối, và không có màn hình nào trong sản
+// phẩm để đối chiếu mà phát hiện.
+//
 // Token của globals.css chép tay sang: Satori không đọc được biến CSS.
-const WHITE = "#ffffff";
-const INK = "#14291c";
-const MUTED = "#4f6656";
-const PRIMARY = "#117a45";
-const SUN = "#ffc531";
+const PAGE = "#070f0c";
+const INK = "#f0fbf3";
+const MUTED = "#a6c2b0";
+const PRIMARY = "#7ff0b0";
+const SUN = "#ffd65c";
 
 export default function OpengraphImage() {
   return new ImageResponse(
@@ -39,9 +44,10 @@ export default function OpengraphImage() {
           flexDirection: "column",
           justifyContent: "center",
           padding: "0 96px",
-          background: WHITE,
-          // Hai vệt xanh sát mép trên/dưới — phẳng, không đổ bóng, không
-          // gradient, đúng tinh thần của globals.css.
+          background: PAGE,
+          // Hai vệt xanh sát mép trên/dưới. Satori không dựng được box-shadow
+          // nên ảnh chia sẻ KHÔNG có quầng sáng như giao diện thật — hai vệt
+          // xanh sáng trên nền tối đã tự làm xong việc "phát sáng" ở cỡ ảnh này.
           borderTop: `18px solid ${PRIMARY}`,
           borderBottom: `18px solid ${PRIMARY}`,
         }}

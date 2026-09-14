@@ -68,10 +68,15 @@ export function BottomNav({ signedIn = false }: { signedIn?: boolean }) {
               >
                 {/* Viên vàng: `motion-pill-in` chỉ gắn khi đang chọn nên animation
                     chạy đúng lúc ô này TRỞ THÀNH đang chọn (đổi trang); co 10%
-                    khi ngón tay đang đè lên ô (group-active). */}
+                    khi ngón tay đang đè lên ô (group-active).
+                    Nền tối (2026-09-14): thêm `glow-sun` — quầng vàng là thứ nói
+                    "đang ở đây" từ khoé mắt, trên nền #070f0c một mảng vàng đặc
+                    không quầng đọc như một hình dán. Màu icon xử lý bên dưới. */}
                 <span
-                  className={`flex h-7 w-11 items-center justify-center rounded-full transition-[background-color,scale] ease-out motion-safe:group-active:scale-90 ${
-                    active ? "bg-sun motion-pill-in" : ""
+                  className={`flex h-7 w-11 items-center justify-center rounded-full transition-[background-color,box-shadow,scale] ease-out motion-safe:group-active:scale-90 ${
+                    active
+                      ? "bg-sun glow-sun motion-pill-in text-[color:var(--sun-on-solid)]"
+                      : ""
                   }`}
                 >
                   {Icon && <Icon aria-hidden className="size-[22px] shrink-0" strokeWidth={1.9} />}

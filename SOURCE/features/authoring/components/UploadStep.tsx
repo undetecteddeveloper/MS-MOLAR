@@ -35,7 +35,9 @@ export function UploadStep({ number, title, state, meta, last = false, children 
           className={cn(
             "flex size-7 shrink-0 items-center justify-center rounded-full text-[13px] font-bold sm:size-8 sm:text-sm",
             state === "done" && "bg-primary text-primary-foreground",
-            state === "current" && "bg-sun text-foreground",
+            // Mực ĐEN trên vàng, không phải `--foreground` (nền tối ⇒ foreground
+            // là màu sáng, chữ sáng trên vàng chỉ 1,4:1). Xem globals.css.
+            state === "current" && "glow-sun bg-sun text-[color:var(--sun-on-solid)]",
             state === "upcoming" && "bg-surface text-muted-foreground"
           )}
         >

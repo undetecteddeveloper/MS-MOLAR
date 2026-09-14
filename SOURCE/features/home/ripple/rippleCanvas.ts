@@ -9,6 +9,19 @@
 //     ô ngoài dải bằng một phép so khoảng cách trước khi fillRect.
 //   - rAF chỉ chạy khi còn sóng; tab ẩn thì trình duyệt tự ngừng rAF.
 //   - Tối đa MAX_RIPPLES sóng cùng lúc.
+//
+// PHÁT SÁNG (theme "Đêm hội", 2026-09-14): mỗi ô không còn là một hình vuông
+// đặc mà là ba hình vuông đồng tâm vẽ chồng ở chế độ CỘNG ÁNH SÁNG
+// (`globalCompositeOperation = "lighter"`): quầng ngoài mờ, quầng trong đậm
+// hơn, lõi sắc nét. Quầng của hai ô cạnh nhau (cách 34px, quầng rộng ±10px)
+// chồng lên nhau nên vành sóng liền thành một dải sáng thay vì một hàng ô rời.
+//
+// Đã cân nhắc và BỎ hai cách làm glow rẻ hơn về mã nhưng đắt hơn về máy:
+//   - `ctx.shadowBlur`/`ctx.filter = blur()`: canvas 2D tính lại mờ cho TỪNG
+//     fillRect, vài trăm lần mỗi khung hình — đúng thứ máy đích chịu không nổi.
+//   - `filter: drop-shadow()` trên chính thẻ <canvas>: bắt GPU làm một lượt mờ
+//     cả màn hình mỗi khung hình, trong khi lớp này đổi nội dung liên tục.
+// Cách đang dùng chỉ thêm fillRect — cùng một phép vẽ máy đã làm tốt.
 import {
   BAND,
   CELL,
@@ -26,6 +39,16 @@ import {
 } from "./wave";
 
 const DPR_CAP = 1.5;
+
+/** Ba vòng của một ô phát sáng: `grow` là số px nở ra mỗi phía, `mul` là hệ số
+ *  alpha. Tổng hệ số 1,18 — nhỉnh hơn 1 có chủ đích: cộng ánh sáng phải sáng
+ *  hơn một mảng đặc, nếu không thì không gọi là phát sáng. Lõi hạ xuống 0,72
+ *  để tổng không vọt quá xa PEAK_ALPHA. */
+const GLOW_RINGS = [
+  { grow: 10, mul: 0.18 },
+  { grow: 4, mul: 0.28 },
+  { grow: 0, mul: 0.72 },
+] as const;
 
 type Ripple = { x: number; y: number; start: number; maxRadius: number };
 
@@ -75,6 +98,10 @@ export function createRippleLayer(host: HTMLElement, color: string): RippleLayer
     raf = 0;
     if (!ctx) return;
     ctx.clearRect(0, 0, width, height);
+    // Cộng ánh sáng: ba vòng của một ô, và quầng của các ô cạnh nhau, cộng dồn
+    // thành dải sáng. Đặt LẠI mỗi khung hình vì `size()` tạo context mới khi
+    // đổi kích thước cửa sổ. (`clearRect` không chịu ảnh hưởng của chế độ này.)
+    ctx.globalCompositeOperation = "lighter";
     const cols = Math.ceil(width / PITCH);
     const rows = Math.ceil(height / PITCH);
     const alive: Ripple[] = [];
@@ -99,12 +126,17 @@ export function createRippleLayer(host: HTMLElement, color: string): RippleLayer
           if (d < rMin || d > rMax) continue;
           const a = crestIntensity(d, radius, BAND) * fade * cellJitter(col, row);
           if (a < MIN_ALPHA) continue;
-          ctx.globalAlpha = a;
-          ctx.fillRect(col * PITCH, row * PITCH, CELL, CELL);
+          const x = col * PITCH;
+          const y = row * PITCH;
+          for (const ring of GLOW_RINGS) {
+            ctx.globalAlpha = a * ring.mul;
+            ctx.fillRect(x - ring.grow, y - ring.grow, CELL + ring.grow * 2, CELL + ring.grow * 2);
+          }
         }
       }
     }
     ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = "source-over";
     ripples = alive;
     if (ripples.length > 0) raf = requestAnimationFrame(frame);
     else detach();

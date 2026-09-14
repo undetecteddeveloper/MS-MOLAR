@@ -74,9 +74,11 @@ export const metadata: Metadata = {
   },
 };
 
-// Màu thanh địa chỉ trên mobile — trắng, khớp navbar.
+// Màu thanh địa chỉ trên mobile — khớp navbar. Theme "Đêm hội" (2026-09-14):
+// nền tối #070f0c. Để sót giá trị trắng ở đây thì trên Android thanh địa chỉ
+// sáng trắng dính ngay trên một trang tối — vệt duy nhất phá cả màn hình.
 export const viewport: Viewport = {
-  themeColor: "#ffffff",
+  themeColor: "#070f0c",
   // `viewport-fit=cover` — BẮT BUỘC để `env(safe-area-inset-*)` trả giá trị
   // thật. Thiếu nó thì mọi safe-area inset luôn bằng 0 và thanh điều hướng đáy
   // (BottomNav) sẽ nằm lọt dưới thanh Home ảo của iPhone: người dùng thấy nút

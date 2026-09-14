@@ -14,6 +14,15 @@
 // `#ffc531` as the short rule under the eyebrow. Change a token in globals.css
 // → change the twin literal here.
 //
+// DELIBERATELY NOT FOLLOWING the dark theme (2026-09-14, "Đêm hội"). The rest
+// of the site is now dark; this file stays on the LIGHT palette above and is
+// the one place that must not be swept along. It renders onto PAPER: a dark
+// page means the printer floods a whole A4 with ink for a result sheet a
+// student prints to hand in. The values above are therefore a FROZEN copy of
+// the old light theme, not a stale one — do not "fix" them to match
+// globals.css. The rule that still binds: layering by tinted fill, no borders,
+// and the same Lexend face.
+//
 // Font: the page's own Lexend via the CSS variable next/font sets on <html>
 // (`--font-lexend`, app/layout.tsx). The container is mounted under
 // document.body, so the variable is inherited and getComputedStyle — which is

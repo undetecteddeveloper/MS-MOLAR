@@ -3,7 +3,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
 
-// Button — theme "Sân trường" (docs/design/ui-refactor-san-truong-design.md §2).
+// Button — theme "Đêm hội" (docs/design/ui-refactor-san-truong-design.md §2).
 //
 // Hình dạng mặc định là VIÊN THUỐC (`shape: pill`): nút hành động bo tròn
 // tuyệt đối đặt cạnh thẻ nội dung bo 18px — chính sự đối lập hình học đó kéo
@@ -14,29 +14,37 @@ import { cn } from "@/lib/utils";
 // đây Button cao 32px và mọi đích chạm trong repo phải tự override. `lg` 52px
 // cho hành động chính DUY NHẤT của một màn hình. `sm` 36px cho nút trong thẻ.
 //
-// Trạng thái: hover/active đổi NỀN (tối thêm 8%), không đổi hình, không bóng.
+// Trạng thái: hover/active đổi NỀN (tối thêm 8%), không đổi hình.
 // Phản hồi bấm (2026-09-08): co 3% trong 150ms lúc `:active` — giao diện
 // "nghe thấy" cú bấm ngay cả khi mạng chưa trả lời. `link` không co: chữ
 // gạch chân co lại trông như lỗi. Tắt khi giảm chuyển động (motion-safe).
+//
+// ÁNH SÁNG (nền tối, 2026-09-14): nút chính mang `.glow-action` — quầng xanh
+// mạnh thêm khi hover/nhấn; nút vàng mang `.glow-sun`; nút `secondary` chỉ có
+// gờ sáng `.glow-rim` vì nó KHÔNG phải hành động chính. `outline`, `ghost`,
+// `destructive`, `link` không phát sáng: quầng sáng ở theme này là dấu hiệu
+// "đây là việc chính để làm", rải lên mọi nút thì nó hết nói được gì. Bóng lấy
+// từ TỪ VỰNG ÁNH SÁNG trong globals.css, không viết box-shadow ở đây.
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center gap-2 border border-transparent bg-clip-padding font-semibold whitespace-nowrap transition-[color,background-color,border-color,scale] ease-out outline-none select-none focus-visible:ring-3 focus-visible:ring-ring/40 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/button inline-flex shrink-0 items-center justify-center gap-2 border border-transparent bg-clip-padding font-semibold whitespace-nowrap transition-[color,background-color,border-color,box-shadow,scale] ease-out outline-none select-none focus-visible:ring-3 focus-visible:ring-ring/40 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground hover:bg-[color-mix(in_oklch,var(--primary),black_10%)] active:bg-[color-mix(in_oklch,var(--primary),black_16%)]",
+          "glow-action bg-primary text-primary-foreground hover:bg-[color-mix(in_oklch,var(--primary),black_10%)] active:bg-[color-mix(in_oklch,var(--primary),black_16%)]",
         secondary:
-          "bg-surface text-foreground hover:bg-[color-mix(in_oklch,var(--surface),var(--foreground)_7%)] aria-expanded:bg-[color-mix(in_oklch,var(--surface),var(--foreground)_7%)]",
+          "glow-rim bg-surface text-foreground hover:bg-[color-mix(in_oklch,var(--surface),var(--foreground)_7%)] aria-expanded:bg-[color-mix(in_oklch,var(--surface),var(--foreground)_7%)]",
         outline:
           "border-border bg-background text-foreground hover:bg-surface aria-expanded:bg-surface",
-        // Trắng — cho nút nằm TRÊN một khối đã tô (thẻ surface, thẻ vàng): cùng
-        // vai trò với `plain` của Card và Badge.
+        // Một nấc sáng hơn surface (`--card`) — cho nút nằm TRÊN một khối đã tô
+        // (thẻ surface, thẻ vàng): cùng vai trò với `plain` của Card và Badge.
         plain:
           "bg-card text-foreground hover:bg-[color-mix(in_oklch,var(--card),var(--foreground)_6%)] aria-expanded:bg-[color-mix(in_oklch,var(--card),var(--foreground)_6%)]",
         ghost: "text-foreground hover:bg-surface aria-expanded:bg-surface",
-        // Vàng nắng — MỘT nút mỗi màn hình, và luôn kèm chữ đen (vàng không đủ
-        // tương phản để tự nó mang thông tin).
-        sun: "bg-sun text-foreground hover:bg-[color-mix(in_oklch,var(--sun),black_8%)]",
+        // Vàng nắng — MỘT nút mỗi màn hình, và luôn kèm chữ đen (chữ sáng trên
+        // vàng chỉ 1,3:1). `--sun-on-solid` là mực đen cố định, KHÔNG phải
+        // `--foreground`: trên nền tối foreground là màu SÁNG.
+        sun: "glow-sun bg-sun text-[color:var(--sun-on-solid)] hover:bg-[color-mix(in_oklch,var(--sun),black_8%)]",
         destructive:
           "bg-destructive/10 text-destructive hover:bg-destructive/15 focus-visible:ring-destructive/25",
         link: "text-primary h-auto px-0 underline-offset-4 hover:underline",

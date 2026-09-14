@@ -63,9 +63,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ a
 
   return (
     // `relative isolate`: tạo stacking context riêng để lớp sóng ô vuông
-    // (HomeRipple, z âm) nằm TRÊN nền trắng của chính div này nhưng DƯỚI mọi
-    // nội dung. Thiếu `isolate`, z âm rơi xuống dưới cả nền trắng và không bao
-    // giờ thấy được.
+    // (HomeRipple, z âm) nằm TRÊN nền của chính div này nhưng DƯỚI mọi nội
+    // dung. Thiếu `isolate`, z âm rơi xuống dưới cả nền và không bao giờ thấy
+    // được.
     // `data-ripple-root`: mốc dừng khi HomeRipple dò ngược từ điểm chạm lên
     // xem có đè lên khối có nền tô hay chữ không (features/home/ripple/tap.ts).
     <div data-ripple-root className="bg-background relative isolate min-h-dvh">
@@ -102,7 +102,10 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ a
                 <ul className="text-foreground flex max-w-prose flex-col gap-3 text-base">
                   {(["home.point1", "home.point2", "home.point3"] as const).map((key) => (
                     <li key={key} className="flex items-start gap-3">
-                      <span aria-hidden className="bg-sun mt-2 size-2.5 shrink-0 rounded-full" />
+                      <span
+                        aria-hidden
+                        className="bg-sun glow-sun mt-2 size-2.5 shrink-0 rounded-full"
+                      />
                       <span>{t(key)}</span>
                     </li>
                   ))}
