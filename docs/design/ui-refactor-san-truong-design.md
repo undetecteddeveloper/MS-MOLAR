@@ -231,8 +231,10 @@ Lượt deploy production đầu tiên của theme này (commit `efe1883`, 2026-
 
 **Cách chữa đã ghi trong TECH-DEBT ("đổi thật nội dung globals.css rồi push") KHÔNG còn ăn thua.** Lượt này đổi ~300 dòng, thêm hẳn một khối CSS mới, mà build của Vercel vẫn phát ra stylesheet cũ.
 
-Cách chữa THỰC SỰ hiệu quả: đặt biến môi trường project `VERCEL_FORCE_NO_BUILD_CACHE=1` (target `production`), rồi dựng lại production trên đúng commit đó. Build kế tiếp cho 622/622 token, cổng xanh.
+Chữa tạm ngay trong ngày: biến môi trường project `VERCEL_FORCE_NO_BUILD_CACHE=1` rồi dựng lại cùng commit — build kế tiếp cho 622/622 token.
 
-**`verify:deployed` có một điểm mù phải biết.** Nó so TÊN biến và TÊN selector, không so GIÁ TRỊ. Một lượt đổi theme chỉ sửa mã màu của các token sẵn có sẽ **qua cổng** trong khi production vẫn phục vụ bảng màu cũ. Lượt này bị bắt chỉ vì có thêm token mang tên mới. Nên sau mỗi lượt đổi theme, ngoài chạy cổng còn phải tải file CSS production về và `grep` một mã màu mới.
+**Chữa gốc (2026-09-15): `experimental.turbopackFileSystemCacheForBuild: false` trong `SOURCE/next.config.ts`.** Next 16.3.0 bật mặc định bộ nhớ đệm biên dịch của Turbopack cho cả `next build`, cất ở `.next/cache/turbopack` — đúng thư mục Vercel khôi phục trước mỗi lượt build, nên kết quả biên dịch của commit trước bị mang sang commit sau. Cờ nằm trong repo thay cho biến môi trường: có lịch sử và lý do ngay tại chỗ, chỉ tắt đúng phần gây lỗi (cache npm của Vercel vẫn dùng), và không thể bị gỡ nhầm trong một lượt dọn cài đặt project. Biến môi trường tạm được gỡ TRƯỚC lượt deploy mang cờ này, để chính lượt đó build trong đúng điều kiện từng gây lỗi (Vercel khôi phục cache) — đó mới là phép thử của cách chữa, không phải một build sạch cache.
+
+**`verify:deployed` từng có điểm mù — đã vá cùng lượt.** Bản cũ chỉ so TÊN biến và TÊN selector; một lượt đổi theme chỉ sửa mã màu sẽ qua cổng trong khi production phục vụ bảng màu cũ (lượt 2026-09-14 bị bắt chỉ vì tình cờ thêm token tên mới). Nay cổng so cả GIÁ TRỊ của mọi biến CSS (`SOURCE/scripts/lib/cssTokens.mjs` → `varValueDrift`), nên không cần `grep` tay một mã màu nữa.
 
 Hai chi tiết vận hành: đường dẫn stylesheet production là `/_next/static/immutable/chunks/*.css` (không phải `/_next/static/chunks/`); và Vercel CLI trên máy này chưa đăng nhập (`npx vercel --prod` → `no-credentials-found`), nên đường deploy dùng được là Composio toolkit `vercel`.

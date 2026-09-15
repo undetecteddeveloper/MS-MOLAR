@@ -89,6 +89,35 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: `${Math.ceil((2 * LIMITS.MAX_FILE_BYTES) / (1024 * 1024)) + 2}mb`,
     },
+    // TẮT bộ nhớ đệm hệ thống tệp của Turbopack cho `next build` — gốc của
+    // TD-024 ("HTML mới, CSS cũ" trên production).
+    //
+    // Next 16.3.0 bật mặc định cờ này (node_modules/next/dist/docs/01-app/
+    // 03-api-reference/05-config/01-next-config-js/turbopackFileSystemCache.md,
+    // bảng Version History: "v16.3.0 — FileSystem caching is enabled by default
+    // for builds"). Cache nằm ở `.next/cache/turbopack`, và Vercel KHÔI PHỤC
+    // `.next/cache` trước mỗi lượt build — nên kết quả biên dịch của lượt trước
+    // được mang sang lượt sau. package-lock đã khoá next 16.3.0 từ 2026-08-07,
+    // trước cả lần đầu TD-024.
+    //
+    // Bốn lần production phục vụ CSS của commit trước (2026-08-17, 09-10, 09-11,
+    // 09-14). Log build lần 09-11 mở đầu bằng "Restored build cache from previous
+    // deployment" và biên dịch xong trong 3,8 giây (cục bộ ~20 giây). Cách chữa
+    // cũ — sửa thật nội dung globals.css cho cache hết thứ tái dùng — hết tác
+    // dụng ở lần 09-14: ~300 dòng CSS đổi mà bundle vẫn là bảng màu cũ. Tức không
+    // thể dựa vào việc đổi nội dung để né cache.
+    //
+    // Vì sao tắt Ở ĐÂY chứ không bằng biến môi trường VERCEL_FORCE_NO_BUILD_CACHE
+    // (dùng tạm 2026-09-14): cờ nằm trong repo — có lịch sử, có lý do, ai mở cấu
+    // hình cũng thấy — và chỉ tắt đúng phần gây lỗi. Biến môi trường tắt TOÀN BỘ
+    // cache build của Vercel (cả cache npm vô hại), lại sống ngoài repo, nên một
+    // lượt dọn cài đặt project có thể gỡ nó mà không biết mình vừa mở lại con bọ.
+    //
+    // Chi phí: build trên Vercel không còn "ấm", biên dịch lại từ đầu mỗi lượt.
+    // Đổi lấy việc CSS trên production luôn là CSS của đúng commit đã deploy.
+    // `turbopackFileSystemCacheForDev` giữ mặc định: nó chỉ phục vụ dev server
+    // trên máy, không có gì từ đó lên production.
+    turbopackFileSystemCacheForBuild: false,
   },
 };
 

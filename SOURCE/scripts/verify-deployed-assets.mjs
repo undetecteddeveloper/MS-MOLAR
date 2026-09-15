@@ -34,14 +34,26 @@
 // THỨ BA — nạp một phần — chính là hình dạng của TD-024, và nó là thứ duy nhất
 // cổng này báo đỏ.
 //
+// SO CẢ GIÁ TRỊ, KHÔNG CHỈ TÊN (thêm 2026-09-15, sau TD-024 lần 4). Bản đầu của
+// cổng chỉ hỏi "biến/selector này CÓ MẶT không". Lượt đổi sang theme nền tối ra
+// production với CSS của theme nền sáng cũ — gần như mọi tên biến y hệt, chỉ mã
+// màu khác — và cổng bắt được CHỈ vì lượt đó tình cờ thêm vài biến tên mới. Một
+// lượt chỉ sửa mã màu sẽ đi qua. Nay mỗi biến build cục bộ khai phải có mặt với
+// ĐÚNG giá trị ấy trong bản deploy (scripts/lib/cssTokens.mjs → varValueDrift).
+//
 // CHẠY KHI NÀO: sau MỖI lần ship UI có đụng `globals.css` hoặc thêm asset tĩnh
 // mới. `npm run verify:deployed -- https://ms-molar.vercel.app`
 // (hoặc URL preview). Cần `.next-build` của ĐÚNG commit đang deploy — chạy
 // `npm run build` trước, nếu không cổng này so với một quá khứ nào đó.
+//
+// Gốc của TD-024 đã chữa ở next.config.ts (`turbopackFileSystemCacheForBuild:
+// false`). Cổng này VẪN chạy sau mỗi lượt ship: nó là thứ duy nhất nhìn vào
+// production thật, và một cách chữa gốc chưa bao giờ là lý do để gỡ lưới.
 
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { classSelectors, declaredVarValues, declaredVars, varValueDrift } from "./lib/cssTokens.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DIST = path.join(ROOT, ".next-build");
@@ -76,22 +88,9 @@ function walk(dir) {
   });
 }
 
-/** Tên biến CSS được KHAI BÁO (`--foo: value`), không tính chỗ ĐỌC (`var(--foo)`).
- *  Phân biệt này quan trọng: một bundle thiếu khối khai báo vẫn còn đầy chỗ đọc,
- *  nên đếm cả hai sẽ không thấy gì bất thường. */
-function declaredVars(css) {
-  const out = new Set();
-  for (const m of css.matchAll(/(^|[;{\s])(--[a-zA-Z0-9_-]+)\s*:/g)) out.add(m[2]);
-  return out;
-}
-
-/** Selector class (`.foo`). Đủ để bắt một khối CSS thuần biến mất; cố ý KHÔNG
- *  parse toàn bộ ngữ pháp CSS — cổng này cần đáng tin, không cần hoàn hảo. */
-function classSelectors(css) {
-  const out = new Set();
-  for (const m of css.matchAll(/\.(-?[_a-zA-Z][\w-]*)(?=[\s,{:>.[)])/g)) out.add(m[1]);
-  return out;
-}
+// declaredVars / declaredVarValues / classSelectors / varValueDrift sống ở
+// scripts/lib/cssTokens.mjs — tách ra để kiểm được chính cổng này bằng một đoạn
+// CSS lưu sẵn, không cần gọi mạng.
 
 async function main() {
   const rawArg = process.argv[2] || "";
@@ -151,6 +150,7 @@ async function main() {
     return {
       name: path.relative(DIST, f),
       vars: declaredVars(css),
+      varValues: declaredVarValues(css),
       classes: classSelectors(css),
     };
   });
@@ -213,6 +213,7 @@ async function main() {
 
   // --- 3. So NỘI DUNG, một phía: mọi thứ build cục bộ khai, bản deploy phải có.
   const deployedVars = declaredVars(deployedCss);
+  const deployedVarValues = declaredVarValues(deployedCss);
   const deployedClasses = classSelectors(deployedCss);
 
   const missingCritical = CRITICAL_VARS.filter((v) => !deployedVars.has(v));
@@ -256,8 +257,30 @@ async function main() {
       continue;
     }
     if (coverage >= LOADED_MIN && missing.length === 0) {
+      // Tên đủ rồi — giờ tới GIÁ TRỊ (xem khối đầu file). File đã nạp thì mọi
+      // giá trị biến nó khai cũng phải khớp TUYỆT ĐỐI, cùng lý do với độ phủ:
+      // bảng màu cũ của TD-024 lần 4 là đúng tên, sai giá trị.
+      const drift = varValueDrift(f.varValues, deployedVarValues);
+      if (drift.length > 0) {
+        fail(
+          `${f.name}: đủ tên nhưng LỆCH GIÁ TRỊ — ${drift.length} giá trị biến khác build cục bộ.\n` +
+            drift
+              .slice(0, 12)
+              .map(
+                (d) =>
+                  `   ${d.name}: build "${d.local}" · deploy "${d.deployed.join(" | ") || "(không khai)"}"`
+              )
+              .join("\n") +
+            (drift.length > 12 ? "\n   …" : "") +
+            "\n   Bản deploy đang chạy CSS của một commit KHÁC — đúng hình dạng TD-024 lần 4\n" +
+            "   (HTML mới, bảng màu cũ)."
+        );
+        continue;
+      }
       filesLoaded++;
-      console.log(`  ✓ ${f.name}: có mặt ĐỦ ${tokens.length}/${tokens.length} token`);
+      console.log(
+        `  ✓ ${f.name}: có mặt ĐỦ ${tokens.length}/${tokens.length} token, ${f.varValues.size} biến đúng giá trị`
+      );
       continue;
     }
 
