@@ -987,6 +987,28 @@ thay đổi CSS thuần) vẫn CHƯA xác định được, đúng như TD-025 c
 PHÁT HIỆN, không phải bản vá. Nó biến một sự cố vô hình thành một sự cố nhìn
 thấy được — nó không sửa gì cả.
 
+*(Cập nhật 2026-09-15: nguyên nhân gốc ĐÃ xác định và đã chữa — cache build mặc
+định của Turbopack trong Next 16.3.0, xem cuối mục [[TD-024]].)*
+
+**Điểm mù thứ ba — phát hiện 2026-09-14, vá 2026-09-15: cổng mù GIÁ TRỊ.** Bản
+trên chỉ hỏi "tên biến/selector này CÓ MẶT không". Lần tái diễn thứ 4 của TD-024
+(đổi sang nền tối) ra production với CSS bảng màu nền SÁNG cũ — gần như MỌI tên
+biến y hệt (`--background`, `--primary`…), chỉ mã màu khác. Cổng bắt được CHỈ vì
+lượt đó tình cờ thêm 16 token tên mới; một lượt chỉ sửa mã màu sẽ qua cổng xanh
+trong khi production phục vụ bảng màu cũ.
+
+Nay cổng so cả GIÁ TRỊ của mọi biến CSS mà build cục bộ khai (một chiều: cục bộ ⊆
+deploy). Phép đọc CSS tách sang `SOURCE/scripts/lib/cssTokens.mjs`
+(`varValueDrift`) để kiểm được chính cổng bằng CSS lưu sẵn, không cần mạng.
+
+**Verify cả hai chiều:** bundle hỏng của lần 4 → **59 giá trị lệch**
+(`--background` build `#070f0c` / deploy `#fff`…); CSS production đúng → **0**,
+không báo nhầm. Không chuẩn hoá cú pháp màu (`#fff` vs `#ffffff`): hai phía đi
+qua cùng bộ nén CSS của cùng phiên bản Next khoá trong package-lock, nên cùng đầu
+vào ra cùng một chuỗi. Hai chi tiết vận hành: stylesheet production nằm ở
+`/_next/static/immutable/chunks/*.css`; Vercel CLI trên máy này chưa đăng nhập,
+nên deploy bằng push lên `main`.
+
 ### ~~TD-026 — Không có phân trang thật~~
 **Trả:** 2026-08-27 (phần QUYẾT ĐỊNH + phân trang cho `/exams`)
 **Verify:** `lib/exams/__tests__/paginate.test.ts` — 12 case, ghim cả phép số
@@ -1089,6 +1111,44 @@ check:bundle) ĐỀU XANH trước khi ship — không cổng nào phát hiện 
 này vì tất cả chỉ kiểm cục bộ, không cổng nào hỏi "CSS/JS đã lên Vercel thật
 có khớp bản build không". Phần lỗ hổng quy trình này CHƯA trả, tách thành
 [[TD-025]].
+
+**⚠ Cách "trả" ngày 2026-08-17 ở trên KHÔNG phải cách chữa gốc — bug tái diễn
+thêm ba lần.** Đổi nội dung `globals.css` chỉ né được cache ở lượt build đó:
+
+| Lần | Ngày | Hình dạng trên production |
+|---|---|---|
+| 1 | 2026-08-17 | Thiếu khối `.route-loading` (overlay kẹt, mục này) |
+| 2 | 2026-09-10 | Deploy đầu nhánh refactor: HTML mới, CSS bảng màu "Mực & Sơn mài" cũ — thiếu 33 token |
+| 3 | 2026-09-11 | CSS còn `.route-loading-mark` (ảnh cũ), thiếu `.route-loading-dot` (ba chấm mới). Log build: "Restored build cache from previous deployment", biên dịch 3,8 giây (cục bộ ~20 giây) |
+| 4 | 2026-09-14 | Đổi sang nền tối: HTML mới, CSS vẫn bảng màu nền sáng (0 mã màu nền tối). **Đổi ~300 dòng `globals.css` mà vẫn ra CSS cũ** — cách chữa cũ hết tác dụng |
+
+**Nguyên nhân gốc (xác định 2026-09-15):** Next 16.3.0 bật MẶC ĐỊNH
+`experimental.turbopackFileSystemCacheForBuild` — Turbopack cất kết quả biên
+dịch vào `.next/cache/turbopack`, đúng thư mục Vercel khôi phục trước mỗi lượt
+build, nên CSS đã biên dịch của commit trước bị mang sang commit sau. Nguồn:
+`SOURCE/node_modules/next/dist/docs/01-app/03-api-reference/05-config/01-next-config-js/turbopackFileSystemCache.md`,
+bảng Version History: "v16.3.0 — FileSystem caching is enabled by default for
+builds". `package-lock.json` đã khoá next 16.3.0 từ 2026-08-07 — trước cả lần 1.
+
+**Chữa gốc 2026-09-15 (commit `0296fd8`):** `turbopackFileSystemCacheForBuild:
+false` trong `SOURCE/next.config.ts`, lý do viết ngay tại cờ. Chữa tạm của lần 4
+— biến môi trường Vercel `VERCEL_FORCE_NO_BUILD_CACHE=1` — đã GỠ: nó tắt toàn bộ
+cache build của Vercel (cả cache npm vô hại) và sống ngoài repo, nên một lượt dọn
+cài đặt project có thể gỡ nó mà không biết mình vừa mở lại bug.
+
+**Verify chữa gốc — ở đúng điều kiện từng gây lỗi** (biến môi trường gỡ TRƯỚC khi
+push, để lượt build production CÓ khôi phục cache):
+- Log build `dpl_C7DununNHF2JhW2M3heckiStrtqJ`: `Restored build cache from
+  previous deployment` — cache có được khôi phục.
+- Cùng log: `⨯ turbopackFileSystemCacheForBuild` (cờ tắt) và `Compiled
+  successfully in 18.9s` — biên dịch thật, không phải 3,8 giây như lần 3.
+- `verify:deployed` trên production: 623/623 token, 198 biến ĐÚNG GIÁ TRỊ.
+- Cục bộ: sau `npm run build`, file mới nhất trong `.next-build/cache/turbopack`
+  vẫn là của hôm trước — build không còn ghi cache.
+
+**Cái sẽ nổ nếu quên:** bật lại cache này "cho build nhanh", hoặc một lần nâng
+Next đổi tên/mặc định của cờ, là mở lại đúng bug này. Đọc lại mục này trước khi
+đồng ý.
 
 ### ~~TD-019 — `extractAndAssemble` không có rate limit, vét sạch hạn ngạch AI dùng chung~~
 **Từ:** 2026-08-17 (rà bảo mật toàn repo; Semgrep 117 rule/769 file ra 0 finding,
