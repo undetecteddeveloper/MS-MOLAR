@@ -744,13 +744,10 @@ export const copy = {
   "tutor.busy": "Đang lấy gợi ý…",
   "tutor.error": "Chưa lấy được gợi ý. Bạn thử lại nhé.",
   "tutor.hintEyebrow": "Gợi ý",
-  // Nút thu gọn bảng gợi ý (2026-09-15). Chữ hiển thị ngắn vì nút đứng ngay cạnh
-  // nhãn "Gợi ý"; tên đầy đủ cho trình đọc màn hình bắt đầu bằng đúng chữ hiển
-  // thị (WCAG 2.5.3 — người dùng khẩu lệnh nói "Ẩn" vẫn trúng nút).
+  // Tên của nút thu gọn bảng gợi ý (2026-09-15). Nút chỉ có mũi tên, không chữ
+  // hiển thị, nên hai chuỗi này là tên DUY NHẤT trình đọc màn hình đọc được.
   "tutor.hideHint": "Ẩn gợi ý",
   "tutor.showHint": "Hiện gợi ý",
-  "tutor.hideHintShort": "Ẩn",
-  "tutor.showHintShort": "Hiện",
 
   // --- Gói Premium kỳ trả trước (payOS) — UI Spec S-01..S-04 ----------------
   // Ngữ điệu theo đúng bộ chuỗi sẵn có: xưng "bạn", câu ngắn, em-dash để ngắt

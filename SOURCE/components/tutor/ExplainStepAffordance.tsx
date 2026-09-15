@@ -142,9 +142,12 @@ export function ExplainStepAffordance({
         <Card>
           {/* Hàng tiêu đề: nhãn bên trái, nút Ẩn/Hiện bên phải (2026-09-15).
               Nút này KHÔNG phải "lối gọi gia sư lần nữa" mà D5 cấm — nó chỉ thu
-              gọn bảng đã có. `size="sm"` (36px) là cỡ nút trong thẻ của theme;
-              `-my-2` giữ hàng tiêu đề không cao thêm vì nút, `-mr-2` đưa chữ
-              sát mép thẻ. */}
+              gọn bảng đã có.
+              CHỈ MŨI TÊN, không chữ (engineer 2026-09-15, xem trên điện thoại
+              thật: chữ "Ẩn/Hiện" thừa khi mũi tên đã nói đủ). Vì không còn chữ
+              hiển thị, `aria-label` là tên DUY NHẤT của nút — không được gỡ.
+              `icon-sm` (36px) là cỡ nút trong thẻ của theme; `-my-2` giữ hàng
+              tiêu đề không cao thêm vì nút, `-mr-2` đưa mũi tên sát mép thẻ. */}
           <div className="flex items-center justify-between gap-3">
             <span className="eyebrow flex items-center gap-1.5">
               <Lightbulb aria-hidden className="size-3.5" />
@@ -153,7 +156,7 @@ export function ExplainStepAffordance({
             <Button
               type="button"
               variant="ghost"
-              size="sm"
+              size="icon-sm"
               onClick={toggleCollapsed}
               aria-expanded={!collapsed}
               aria-controls={hintBodyId}
@@ -161,7 +164,6 @@ export function ExplainStepAffordance({
               className="-my-2 -mr-2"
             >
               {collapsed ? <ChevronDown aria-hidden /> : <ChevronUp aria-hidden />}
-              {collapsed ? t("tutor.showHintShort") : t("tutor.hideHintShort")}
             </Button>
           </div>
           {/* `hidden` chứ không gỡ khỏi cây: `aria-controls` phải trỏ tới một
