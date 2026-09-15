@@ -1,20 +1,24 @@
 "use client";
 
 // QuestionPaletteDock — bảng câu hỏi của màn làm bài trên ĐIỆN THOẠI: một nút
-// bật/tắt đứng trong dải dính đỉnh (cạnh đồng hồ) + bảng thả xuống ở góc phải,
-// ngay dưới cụm tiêu đề/đồng hồ (engineer 2026-09-13, test trên điện thoại
-// thật: bảng câu hỏi nằm DƯỚI thẻ câu hỏi nên mỗi lần muốn nhảy câu là một lần
-// lướt xuống rồi lướt lên). Từ 768px không dùng — ở đó bảng là cột phải dính
-// theo cuộn (ExamPlayer).
+// bật/tắt + bảng thả xuống ở góc phải ngay dưới nút. Từ 768px không dùng — ở
+// đó bảng là cột phải dính theo cuộn (ExamPlayer).
+//
+// Chỗ đứng của nút đã đổi hai lần, cả hai theo test trên điện thoại thật:
+//   - 2026-09-13: từ DƯỚI thẻ câu hỏi lên dải dính đỉnh cạnh đồng hồ — mỗi lần
+//     nhảy câu từng là một lần lướt xuống rồi lướt lên.
+//   - 2026-09-15: từ dải dính đỉnh xuống HÀNG NHÃN PHẦN ("I. Phần đọc hiểu")
+//     ngay trên thẻ câu hỏi — ở 360px mũi tên + tên đề + đồng hồ + nút này làm
+//     tên đề cụt còn vài chữ. Đổi lại nút không còn dính đỉnh.
 //
 // Cùng khuôn với HeaderProfile: `usePresence` cho chiều đóng của `.motion-pop`,
 // scrim là một nút trong suốt phủ màn để chạm ra ngoài thì đóng. Scrim đi qua
-// portal ra <body>: dải dính đỉnh có `backdrop-blur`, tức là một containing
-// block cho `fixed` — scrim đặt bên trong nó chỉ phủ đúng dải ấy. Scrim z-10
-// nằm DƯỚI dải dính đỉnh (z-20) nên bảng nổi trên scrim còn thẻ câu hỏi bị
-// che; dải dính đáy (z-20) vẫn bấm được — bấm "Câu sau" khi bảng đang mở là
-// chuyện bình thường. Chọn một câu thì bảng ĐÓNG: nó phủ lên chính câu hỏi
-// người dùng vừa nhảy tới.
+// portal ra <body>: bất kỳ tổ tiên nào có `backdrop-blur`/`transform` là một
+// containing block cho `fixed` — scrim đặt bên trong nó chỉ phủ đúng khối ấy
+// (bài học từ lúc nút còn ở dải dính đỉnh mờ nền). Scrim z-10 nằm dưới bảng
+// (z-20) nên bảng nổi trên scrim còn thẻ câu hỏi bị che; hai dải dính đỉnh/đáy
+// (z-20) vẫn bấm được — bấm "Câu sau" khi bảng đang mở là chuyện bình thường.
+// Chọn một câu thì bảng ĐÓNG: nó phủ lên chính câu hỏi người dùng vừa nhảy tới.
 
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";

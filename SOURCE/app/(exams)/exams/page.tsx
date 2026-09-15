@@ -89,7 +89,6 @@ export default async function ExamsPage({ searchParams }: { searchParams: Search
         semesters={facets.semesters}
         selected={{ subject, grade, school, year, semester, level }}
         sort={sort}
-        dir={dir}
         query={q}
       />
 

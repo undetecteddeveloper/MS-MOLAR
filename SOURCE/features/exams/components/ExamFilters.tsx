@@ -5,21 +5,24 @@ import type { MessageKey } from "@/lib/copy";
 // ExamFilters — thanh lọc của Kho đề (theme "Sân trường", 2026-09-04).
 //
 // Một hàng CHIP ngay dưới tiêu đề trang: [Bộ lọc (n)] [Mới nhất] [Cũ nhất]
-// [Khó nhất] [chiều sắp xếp] [Xoá lọc]. Bấm "Bộ lọc" mở bảng chọn — vỏ bảng
+// [Khó nhất] [Xoá lọc]. Bấm "Bộ lọc" mở bảng chọn — vỏ bảng
 // (bottom sheet dưới 768px / thả xuống từ 768px, scrim, phần đầu) là
 // `FilterSheet`, mỗi hàng chọn là `FilterRow`; cả hai ở components/shared vì
 // Lịch sử dùng cùng khuôn (2026-09-07), chỉ khác danh mục hàng bên trong.
 //
 // State lọc ở URL searchParams → Server Component re-query. Rating System
 // (D002): Level lọc thật; Newest/Oldest/Hardest là MỘT trục ?sort= loại trừ
-// nhau, kèm ?dir= đảo chiều.
+// nhau. Nút đảo chiều "Tăng dần / Giảm dần" đã gỡ (engineer 2026-09-15: không
+// cần thiết lắm) — "Mới nhất" và "Cũ nhất" vốn đã là hai chiều của cùng một
+// trục thời gian, nút đó phần lớn chỉ lặp lại chúng. Queries vẫn hiểu `?dir=`
+// để link cũ không vỡ; bấm bất kỳ chip sắp xếp nào sẽ xoá nó khỏi URL.
 //
 // Rail dọc "*Filter" + 3 checkbox `absolute right-0` của bản cũ đã bỏ: cụm đó
 // render ở left:-46px (ngoài màn hình) ở mọi bề rộng dưới 1244px.
 
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
-import { ArrowDownWideNarrow, ArrowUpNarrowWide, Search, SlidersHorizontal, X } from "lucide-react";
+import { Search, SlidersHorizontal, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { chipVariants } from "@/components/ui/chip";
 import { FilterRow } from "@/components/shared/FilterRow";
@@ -29,8 +32,6 @@ import { subjectLabel } from "@/lib/ugc/subjects";
 /** Rating System — khớp ExamSort (queries) + ExamLevel lowercase slug (IP-6). */
 type ExamSort = "newest" | "oldest" | "hardest";
 type ExamLevel = "easy" | "medium" | "hard";
-/** Direction toggle — đảo chiều trục `sort` đang chọn (queries SortDirection). */
-type SortDirection = "asc" | "desc";
 
 interface ExamFiltersProps {
   subjects: string[];
@@ -47,17 +48,9 @@ interface ExamFiltersProps {
     level?: ExamLevel;
   };
   sort?: ExamSort;
-  dir?: SortDirection;
   /** Từ khoá đang tìm (`?q=`, ADR-0020) — hiện thành chip có nút bỏ ở đầu hàng. */
   query?: string;
 }
-
-/** Chiều mặc định của mỗi trục khi không có `dir` — khớp queries. */
-const DEFAULT_ASCENDING: Record<ExamSort, boolean> = {
-  newest: false,
-  oldest: true,
-  hardest: false,
-};
 
 // Lọc nhanh — 3 chip CÙNG trục ?sort= (D002): chọn 1 tự loại trừ 2 cái còn
 // lại (bấm lại chính nó → bỏ sort).
@@ -82,7 +75,6 @@ export function ExamFilters({
   semesters,
   selected,
   sort,
-  dir,
   query,
 }: ExamFiltersProps) {
   const router = useRouter();
@@ -117,7 +109,8 @@ export function ExamFilters({
     });
   }
 
-  // Đổi trục sort → luôn bỏ `dir` cũ, trục mới bắt đầu ở chiều mặc định của nó.
+  // Đổi trục sort → bỏ luôn `?dir=` còn sót trong link cũ: không còn nút nào hiện
+  // chiều đó, để nó lại là để lưới xếp theo một thứ tự người dùng không nhìn thấy.
   function setSort(value: ExamSort) {
     const params = new URLSearchParams(searchParams.toString());
     if (sort === value) params.delete("sort");
@@ -129,14 +122,6 @@ export function ExamFilters({
         scroll: false,
       });
     });
-  }
-
-  // Chiều hiệu lực của trục đang chọn — undefined khi chưa chọn trục nào.
-  const ascending = sort ? (dir ? dir === "asc" : DEFAULT_ASCENDING[sort]) : undefined;
-
-  function toggleDirection() {
-    if (!sort || ascending === undefined) return;
-    setParam("dir", ascending ? "desc" : "asc");
   }
 
   function clearAll() {
@@ -216,22 +201,6 @@ export function ExamFilters({
             </button>
           );
         })}
-
-        <button
-          type="button"
-          onClick={toggleDirection}
-          disabled={!sort}
-          aria-label={t("exams.toggleSortDirection")}
-          title={t("exams.toggleSortDirection")}
-          className={chipVariants()}
-        >
-          {ascending ? (
-            <ArrowUpNarrowWide aria-hidden className="size-4" />
-          ) : (
-            <ArrowDownWideNarrow aria-hidden className="size-4" />
-          )}
-          {ascending ? t("exams.ascending") : t("exams.descending")}
-        </button>
 
         {canClear && (
           <Button type="button" variant="link" size="sm" onClick={clearAll} className="shrink-0">

@@ -58,6 +58,23 @@ const QUESTION_ID = "question-fixture-222";
 const IDLE_LABEL = "Gợi ý cho câu này"; // tutor.explainThisStep (en)
 const RETRY_LABEL = "Thử lại"; // common.retry (en), reused per ActionButton's LABEL_KEY precedent
 const ERROR_COPY = "Chưa lấy được gợi ý. Bạn thử lại nhé."; // tutor.error (en) — ONE generic copy for all 4 backend codes
+const HIDE_HINT_LABEL = "Ẩn gợi ý"; // tutor.hideHint — tên của nút thu gọn khi bảng đang mở
+const SHOW_HINT_LABEL = "Hiện gợi ý"; // tutor.showHint — tên của nút khi bảng đang thu gọn
+
+/** Phần tử mà nút Ẩn/Hiện `aria-controls`, tìm TRONG `container`.
+ *  Tìm theo thuộc tính `[id="…"]`, KHÔNG theo `#id`: file này không dọn DOM giữa
+ *  các ca (xem khối đầu file), nên cùng một id sống nhiều lần trong document, và
+ *  bộ chọn `#id` của jsdom đi tắt qua getElementById — lấy bản của lần render
+ *  TRƯỚC (ngoài container) rồi trả null. Đo 2026-09-15: ca này xanh khi chạy
+ *  riêng, đỏ khi chạy sau các ca khác. Cùng cái bẫy chú thích `hintRef` trong
+ *  component đã mô tả. Đi qua `aria-controls` còn chứng minh luôn nó trỏ trúng. */
+function controlledBody(container: HTMLElement, toggle: HTMLElement): HTMLElement {
+  const id = toggle.getAttribute("aria-controls");
+  expect(id).toBeTruthy();
+  const body = container.querySelector<HTMLElement>(`[id="${id}"]`);
+  expect(body).not.toBeNull();
+  return body!;
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -127,7 +144,11 @@ describe("ExplainStepAffordance", () => {
     expect(button.getAttribute("aria-busy")).toBe("true");
 
     resolveExplain({ hint: "gợi ý sau khi mở khoá" });
-    await waitFor(() => expect(within(container).queryByRole("button")).toBeNull());
+    // Chờ NÚT GỌI GIA SƯ biến mất, không chờ "hết sạch nút": từ 2026-09-15 bảng
+    // gợi ý có một nút Ẩn/Hiện — nó không gọi gia sư, nên không phải thứ D5 cấm.
+    await waitFor(() =>
+      expect(within(container).queryByRole("button", { name: IDLE_LABEL })).toBeNull()
+    );
     expect(mockExplainStep.mock.calls.length).toBe(1); // still 1 after the busy window closes
   });
 
@@ -218,7 +239,9 @@ describe("ExplainStepAffordance", () => {
     );
     fireEvent.click(within(container).getByRole("button", { name: IDLE_LABEL }));
 
-    await waitFor(() => expect(within(container).queryByRole("button")).toBeNull());
+    await waitFor(() =>
+      expect(within(container).queryByRole("button", { name: IDLE_LABEL })).toBeNull()
+    );
 
     // RichText nạp ĐỘNG từ TD-021 (chunk markdown+KaTeX 122.5 KB gzip không được
     // nằm trong bundle đầu của trang này). Nút biến mất NGAY khi hint về, nhưng
@@ -244,12 +267,18 @@ describe("ExplainStepAffordance", () => {
     expect(container.querySelector("strong")?.textContent).toBe("định luật bảo toàn");
     expect(container.textContent).not.toContain("**"); // not a raw/plain-text render path
 
-    // D5: no control to re-invoke the tutor exists in this state, for this
-    // question, in this render.
-    expect(within(container).queryByRole("button")).toBeNull();
+    // D5: no control to re-invoke the TUTOR exists in this state, for this
+    // question, in this render. Since 2026-09-15 exactly ONE button remains —
+    // the show/hide toggle of the hint panel. It never calls the tutor (proved
+    // in the toggle case below), so it is pinned by WHAT it is — expanded state
+    // and the "Ẩn gợi ý" name — rather than merely counted, so a re-invoke
+    // control slipping back in as "the one button" still fails here.
     expect(within(container).queryByRole("button", { name: IDLE_LABEL })).toBeNull();
     expect(within(container).queryByRole("button", { name: RETRY_LABEL })).toBeNull();
-    expect(container.querySelectorAll("button").length).toBe(0);
+    const buttons = container.querySelectorAll("button");
+    expect(buttons.length).toBe(1);
+    expect(buttons[0].getAttribute("aria-label")).toBe(HIDE_HINT_LABEL);
+    expect(buttons[0].getAttribute("aria-expanded")).toBe("true");
     expect(container.textContent).toContain("Gợi ý"); // tutor.hintEyebrow
 
     // Hồi quy Phase 5 Task 19 (đo bằng bàn phím trên trình duyệt thật, không
@@ -263,6 +292,62 @@ describe("ExplainStepAffordance", () => {
     expect(panel).not.toBeNull();
     expect(document.activeElement).toBe(panel);
     expect(panel!.textContent).toContain("định luật bảo toàn");
+  });
+
+  // ===========================================================================
+  // Nút Ẩn/Hiện của bảng gợi ý (engineer 2026-09-15: "để đỡ phải vuốt lên
+  // xuống" — bảng gợi ý đứng giữa đề bài và khu vực trả lời).
+  // ===========================================================================
+  // Primary failure modes: (1) the toggle is wired to the tutor call — every
+  //   collapse/expand silently spends a rate-limited Gemini round trip; (2) the
+  //   body is unmounted instead of hidden, so `aria-controls` points at nothing
+  //   while collapsed; (3) the parent is never told, so a collapsed hint springs
+  //   open again on returning to that question.
+  it("2026-09-15: Ẩn/Hiện thu gọn bảng gợi ý, báo trạng thái lên cha, và KHÔNG gọi gia sư", () => {
+    const onCollapsedChange = vi.fn();
+    const { container } = render(
+      <ExplainStepAffordance
+        questionId={QUESTION_ID}
+        attemptId={ATTEMPT_ID}
+        hint="Gợi ý đã nhận từ trước"
+        onHintCollapsedChange={onCollapsedChange}
+      />
+    );
+    const hide = within(container).getByRole("button", { name: HIDE_HINT_LABEL });
+    const body = controlledBody(container, hide);
+    expect(body.hidden).toBe(false);
+    fireEvent.click(hide);
+
+    expect(body.hidden).toBe(true);
+    expect(onCollapsedChange).toHaveBeenLastCalledWith(true);
+    const show = within(container).getByRole("button", { name: SHOW_HINT_LABEL });
+    expect(show.getAttribute("aria-expanded")).toBe("false");
+    // Vẫn trong cây khi thu gọn: aria-controls của nút (đã đổi nhãn) vẫn trỏ
+    // trúng CÙNG phần tử, không phải một phần tử đã bị gỡ.
+    expect(controlledBody(container, show)).toBe(body);
+
+    fireEvent.click(show);
+    expect(body.hidden).toBe(false);
+    expect(onCollapsedChange).toHaveBeenLastCalledWith(false);
+
+    // Thu gọn chỉ là thu gọn — không bao giờ là một lượt gọi gia sư.
+    expect(mockExplainStep).not.toHaveBeenCalled();
+  });
+
+  it("2026-09-15: trạng thái thu gọn cha truyền xuống thắng trạng thái nội bộ — quay lại câu đã thu gọn thì vẫn gọn", () => {
+    const { container } = render(
+      <ExplainStepAffordance
+        questionId={QUESTION_ID}
+        attemptId={ATTEMPT_ID}
+        hint="Gợi ý đã nhận từ trước"
+        hintCollapsed
+      />
+    );
+    const toggle = within(container).getByRole("button", { name: SHOW_HINT_LABEL });
+    const body = controlledBody(container, toggle);
+    expect(body.hidden).toBe(true);
+    const show = within(container).getByRole("button", { name: SHOW_HINT_LABEL });
+    expect(show.getAttribute("aria-expanded")).toBe("false");
   });
 
   // ===========================================================================

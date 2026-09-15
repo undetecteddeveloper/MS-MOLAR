@@ -70,6 +70,11 @@ export function ExamPlayer({
   // đổi câu (key=question.id) nên state của nó không giữ được; giữ ở đây để
   // quay lại câu đã hỏi vẫn thấy lời gia sư thay vì một cái nút tốn thêm lượt.
   const [hints, setHints] = useState<Record<string, string>>({});
+  // Gợi ý đang THU GỌN, cũng theo câu (2026-09-15): thẻ gợi ý đứng giữa đề bài
+  // và khu vực trả lời nên đẩy các lựa chọn xuống — đọc xong thì thu lại cho
+  // khỏi vuốt lên xuống. Giữ ở đây cùng lý do với `hints`: quay lại một câu đã
+  // thu gọn thì nó vẫn gọn, không bung ra đẩy đáp án xuống thêm lần nữa.
+  const [collapsedHints, setCollapsedHints] = useState<Record<string, boolean>>({});
 
   // S#28: cảnh báo rời trang khi đang làm bài — chặn click nav trong app
   // (modal tuỳ biến) + refresh/đóng tab (beforeunload). Tắt khi đang submit
@@ -216,20 +221,6 @@ export function ExamPlayer({
                 `aria-label` của đồng hồ; định dạng MM:SS + icon đã tự nói nó là
                 đồng hồ. */}
             <ExamTimer durationMinutes={durationMinutes} onTimeUp={submit} />
-            {/* Bảng câu hỏi — CHỈ dưới 768px, trong chính dải dính đỉnh này
-                (engineer 2026-09-13, test điện thoại thật): bản trước bảng
-                nằm dưới thẻ câu hỏi, mỗi lần nhảy câu là một lần lướt xuống
-                rồi lướt lên. Nút mang tiến độ "đã làm/tổng"; bảng thả xuống
-                góc phải ngay dưới cụm tiêu đề/đồng hồ. Từ 768px bảng là cột
-                phải dính theo cuộn (bên dưới). */}
-            <QuestionPaletteDock
-              className="md:hidden"
-              current={current}
-              total={questions.length}
-              answeredIndices={answeredIndices}
-              flaggedIndices={flaggedIndices}
-              onJump={goto}
-            />
             {/* Ẩn trên mobile: bản Nộp bài của mobile nằm trong dải dính ĐÁY
                 (Vùng Xanh của ngón cái, §4.2). Hai nút cùng chức năng trên một
                 màn hình sẽ khiến người dùng phải đoán chúng có khác nhau không.
@@ -261,14 +252,38 @@ export function ExamPlayer({
                 Đo ở 390px với nhãn phần dài nhất (đoạn 3 câu): ~119px kể cả lề
                 dưới — chỗ tốn nằm ở LINE-HEIGHT của 4 dòng chữ thường, không
                 nằm ở đệm, nên không bó thêm được mà không phá phần dễ đọc. */}
-            {currentPartTitle && (
-              <p
-                className="border-primary text-foreground mb-3 border-l-2 py-0.5 pl-3 text-sm leading-relaxed text-pretty sm:mb-4 sm:pl-3.5"
-                aria-live="polite"
-              >
-                {currentPartTitle}
-              </p>
-            )}
+            {/* Hàng nhãn PHẦN + nút bảng câu hỏi của điện thoại (engineer
+                2026-09-15). Nút trước đó đứng trong dải dính đỉnh cạnh đồng hồ,
+                và ở 360px mũi tên + tên đề + đồng hồ + nút làm tên đề cụt còn
+                vài chữ ("ĐỀ KIỂM TRA CU…"). Bên phải nhãn phần có sẵn chỗ trống,
+                nên nút xuống đây mà không tốn thêm dòng nào. Đánh đổi: nút không
+                còn dính đỉnh — cuộn qua một bài đọc dài thì nó cuộn theo.
+                Nhãn giữ `flex-1 min-w-0` để đoạn hướng dẫn dài 3 câu vẫn xuống
+                dòng trong phần của nó, không đẩy nút ra khỏi màn hình.
+                Đề không có nhãn phần: trên điện thoại hàng vẫn ở đó, chỉ có nút,
+                căn phải (`justify-end`) — nút không được biến mất theo dữ liệu
+                đề. Từ 768px nút ẩn (bảng là cột phải bên dưới), nên đề không có
+                nhãn thì cả hàng ẩn luôn, không để lại một khoảng trống. */}
+            <div
+              className={`mb-3 flex items-center justify-end gap-3 sm:mb-4 ${currentPartTitle ? "" : "md:hidden"}`}
+            >
+              {currentPartTitle && (
+                <p
+                  className="border-primary text-foreground min-w-0 flex-1 border-l-2 py-0.5 pl-3 text-sm leading-relaxed text-pretty sm:pl-3.5"
+                  aria-live="polite"
+                >
+                  {currentPartTitle}
+                </p>
+              )}
+              <QuestionPaletteDock
+                className="shrink-0 md:hidden"
+                current={current}
+                total={questions.length}
+                answeredIndices={answeredIndices}
+                flaggedIndices={flaggedIndices}
+                onJump={goto}
+              />
+            </div>
             <QuestionRenderer
               index={current + 1}
               total={questions.length}
@@ -303,6 +318,10 @@ export function ExamPlayer({
                   draftAnswer={answers[question.id] ?? ""}
                   hint={hints[question.id] ?? null}
                   onHint={(hint) => setHints((prev) => ({ ...prev, [question.id]: hint }))}
+                  hintCollapsed={collapsedHints[question.id] ?? false}
+                  onHintCollapsedChange={(collapsed) =>
+                    setCollapsedHints((prev) => ({ ...prev, [question.id]: collapsed }))
+                  }
                 />
               }
             />
@@ -358,8 +377,8 @@ export function ExamPlayer({
             </div>
           </div>
 
-          {/* Cột phải — CHỈ từ 768px (dưới đó bảng sống trong dải dính đỉnh,
-              QuestionPaletteDock ở trên). DÍNH theo cuộn dưới navbar
+          {/* Cột phải — CHỈ từ 768px (dưới đó bảng là nút QuestionPaletteDock ở
+              hàng nhãn phần, phía trên thẻ câu hỏi). DÍNH theo cuộn dưới navbar
               (`top-[4.5rem]` = navbar 60px + 12px; navbar hiện từ 768px trên
               route này) để bảng luôn trong tầm với khi thẻ câu hỏi dài hơn
               một màn — engineer 2026-09-13. Bề rộng 216px ở 768–1023 là con

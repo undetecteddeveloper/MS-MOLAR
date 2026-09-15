@@ -21,9 +21,9 @@
 // aria-disabled + aria-busy + aria-describedby nói thay trạng thái, còn chốt
 // chặn nháy đúp thật sự là busyRef đồng bộ trong hook.
 
-import { Lightbulb, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Lightbulb, Loader2 } from "lucide-react";
 import dynamic from "next/dynamic";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useEntitlement } from "@/lib/billing/entitlement";
@@ -57,6 +57,11 @@ export interface ExplainStepAffordanceProps {
   hint?: string | null;
   /** Báo lên cha khi nhận được gợi ý, để cha giữ theo câu. */
   onHint?: (hint: string) => void;
+  /** Bảng gợi ý đang THU GỌN (chỉ còn hàng tiêu đề). Cha giữ theo câu, cùng lý
+   *  do với `hint`; không truyền thì component tự giữ. */
+  hintCollapsed?: boolean;
+  /** Báo lên cha khi người dùng bấm thu gọn / mở rộng. */
+  onHintCollapsedChange?: (collapsed: boolean) => void;
 }
 
 export function ExplainStepAffordance({
@@ -65,6 +70,8 @@ export function ExplainStepAffordance({
   draftAnswer = "",
   hint: storedHint = null,
   onHint,
+  hintCollapsed,
+  onHintCollapsedChange,
 }: ExplainStepAffordanceProps) {
   const { phase, hint: freshHint, run } = useTutorAction(attemptId, questionId, onHint);
   const { tutor } = useEntitlement();
@@ -73,6 +80,20 @@ export function ExplainStepAffordance({
   // questionId đã là key của chính danh sách câu hỏi nên tự nó duy nhất trong
   // một trang — không cần thêm prop idPrefix (Minimal Surface Element 3).
   const reasonId = `tutor-${questionId}-reason`;
+
+  // Nút Ẩn/Hiện của bảng gợi ý (2026-09-15, engineer: "để đỡ phải vuốt lên
+  // xuống"). Bảng gợi ý đứng giữa đề bài và khu vực trả lời, nên một lời gia sư
+  // dài đẩy các lựa chọn khỏi màn hình. Có kiểm soát từ cha khi cha truyền
+  // `hintCollapsed` (ExamPlayer giữ theo câu); không truyền thì tự giữ. Khai ở
+  // đây, TRƯỚC mọi nhánh return sớm bên dưới — luật hook.
+  const [ownCollapsed, setOwnCollapsed] = useState(false);
+  const collapsed = hintCollapsed ?? ownCollapsed;
+  const hintBodyId = `tutor-${questionId}-hint`;
+  function toggleCollapsed() {
+    const next = !collapsed;
+    if (hintCollapsed === undefined) setOwnCollapsed(next);
+    onHintCollapsedChange?.(next);
+  }
 
   // Bắt lại focus khi bảng gợi ý THAY THẾ nút (Phase 5 Task 19, đo trên trình
   // duyệt thật): D5 buộc nút biến mất hẳn, mà nút đó chính là phần tử đang giữ
@@ -119,11 +140,35 @@ export function ExplainStepAffordance({
         className="focus-visible:outline-ring rounded-card focus-visible:outline-2 focus-visible:outline-offset-2"
       >
         <Card>
-          <span className="eyebrow flex items-center gap-1.5">
-            <Lightbulb aria-hidden className="size-3.5" />
-            {t("tutor.hintEyebrow")}
-          </span>
-          <RichText text={hint} className="text-foreground text-base leading-relaxed" />
+          {/* Hàng tiêu đề: nhãn bên trái, nút Ẩn/Hiện bên phải (2026-09-15).
+              Nút này KHÔNG phải "lối gọi gia sư lần nữa" mà D5 cấm — nó chỉ thu
+              gọn bảng đã có. `size="sm"` (36px) là cỡ nút trong thẻ của theme;
+              `-my-2` giữ hàng tiêu đề không cao thêm vì nút, `-mr-2` đưa chữ
+              sát mép thẻ. */}
+          <div className="flex items-center justify-between gap-3">
+            <span className="eyebrow flex items-center gap-1.5">
+              <Lightbulb aria-hidden className="size-3.5" />
+              {t("tutor.hintEyebrow")}
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={toggleCollapsed}
+              aria-expanded={!collapsed}
+              aria-controls={hintBodyId}
+              aria-label={collapsed ? t("tutor.showHint") : t("tutor.hideHint")}
+              className="-my-2 -mr-2"
+            >
+              {collapsed ? <ChevronDown aria-hidden /> : <ChevronUp aria-hidden />}
+              {collapsed ? t("tutor.showHintShort") : t("tutor.hideHintShort")}
+            </Button>
+          </div>
+          {/* `hidden` chứ không gỡ khỏi cây: `aria-controls` phải trỏ tới một
+              phần tử có thật, và RichText không phải dựng lại mỗi lần mở. */}
+          <div id={hintBodyId} hidden={collapsed}>
+            <RichText text={hint} className="text-foreground text-base leading-relaxed" />
+          </div>
         </Card>
       </div>
     );
