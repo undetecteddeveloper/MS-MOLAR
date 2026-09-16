@@ -97,9 +97,9 @@ tức thẻ ấy chỉ lặp lại biểu đồ theo môn và còn in khoá ti�
 ### F. Việc ngoài lề
 - [x] Gắn logo mới vào ô Wordmark (`components/layout/Wordmark.tsx`, `public/images/ms-molar-logo.png`).
 
-### G. Cổng verify (trong `SOURCE/`)
-- [ ] `npx tsc --noEmit` · `npx eslint --max-warnings 0` · `npx vitest run` (biết trước: `rateLimit.test.ts` đỏ sẵn, không liên quan) · `npm run build` · `npm run test:fixture` · `npm run test:localdb`.
-- [ ] `verify:schema`: KHÔNG chạy — không có thay đổi schema (D1).
+### G. Cổng verify (trong `SOURCE/`, 2026-09-16 18:30–18:45)
+- [x] `npx tsc --noEmit` sạch · `npx eslint --max-warnings 0` sạch · `npx vitest run` **2050 passed / 10 skipped / 1 failed** — ca đỏ duy nhất là `lib/security/rateLimit.test.ts` "keeps ONE account's whole daily Gemini budget" (đỏ sẵn từ commit ed40315, không liên quan; lần chạy song song với eslint còn thêm `ExplainStepAffordance.test.tsx` timeout 5s — chạy riêng 7/7 xanh, là nghẽn CPU chứ không phải hồi quy) · `npm run build` xanh, không warning · `npm run test:fixture` 4/4 · `npm run test:localdb` 19/19.
+- [x] `verify:schema`: KHÔNG chạy — không có thay đổi schema (D1); fingerprint prod = code = `187d3ed24f0c`.
 
 ### H. Đóng vòng
 - [ ] Notion MS-MOLAR: một row tổng kết (số node/môn, coverage, chỗ tin cậy thấp, nhắc `rateLimit.test.ts` đỏ).
