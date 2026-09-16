@@ -85,9 +85,10 @@ tức thẻ ấy chỉ lặp lại biểu đồ theo môn và còn in khoá ti�
 - [x] `WeakTopicsCard` đổi nguồn (D4); xoá `lib/analytics/weakTopics.ts` + test cũ (`TopicWeakness`, `MIN_TOPIC_QUESTIONS`, `MAX_WEAK_TOPICS` chuyển sang `skillBreakdown.ts`).
 
 ### D. Tagger
-- [ ] `--subject`, `--batch`, `--from-report`, guard key riêng; report có `meta`.
-- [ ] Test phần thuần (`lib/adaptive/tagBatch.ts`: dựng prompt lô, parse phản hồi lô, đọc report).
-- [ ] `.env.local.skill-tagging` (prod creds + `GEMINI_API_KEY=` chờ điền), `.env.local.skill-tagging-dev`.
+- [x] `--subject` (bắt buộc, canonical), `--batch` (mặc định 10), `--apply --from-report=<file>` (0 request), `--key-file` (mặc định `.env.local.skill-tagging`), guard từ chối key trùng app (`--allow-shared-key` để cố ý vượt); dừng khi 429; report `{meta, entries}` có thêm `modelSkillNodeId` (đề xuất thô của model, kể cả khi bị từ chối).
+- [x] Test phần thuần `lib/adaptive/tagBatch.ts` (16 ca): prompt lô + chỉ dẫn theo môn, parse phản hồi lô (thiếu/lặp/lạ/JSON hỏng → classification-error, không đoán), đọc report cũ/mới, so key.
+- [x] Smoke trên DEV không gọi Gemini (`--from-report` rỗng): Physics 5 câu → 5 classification-error, 0 ghi; Math 55 câu → 38 already-tagged + 17 classification-error, 0 ghi; chạy không có key riêng → từ chối đúng thông điệp TD-019 (exit 1).
+- [x] Key riêng: script đọc `GEMINI_API_KEY` từ `SOURCE/.env.local.skill-tagging` (file MỘT dòng, gitignored theo `.env*`) — không sao chép credential Supabase sang file thứ hai; Supabase vẫn lấy từ `SCHEMA_ENV_FILE`. Chưa có file này (chờ key).
 
 ### E. Gắn thẻ (cần key riêng — xem "Chờ product owner")
 - [ ] Dry-run từng môn trên PROD (Biology, Physics, Chemistry, Literature, Math) → đọc report → `--apply --from-report` → spot-check.
@@ -107,8 +108,15 @@ tức thẻ ấy chỉ lặp lại biểu đồ theo môn và còn in khoá ti�
 ## Chờ product owner (STOP conditions đã chạm)
 
 1. **Key Gemini riêng cho gắn thẻ** — tạo tại aistudio.google.com/apikey bằng một
-   Google project MỚI (không dùng project của key app), dán vào
-   `SOURCE/.env.local.skill-tagging` (dòng `GEMINI_API_KEY=`) và
-   `SOURCE/.env.local.skill-tagging-dev`. Tôi không tự tạo được (cần đăng nhập Google).
+   Google project MỚI (không dùng project của key app), rồi tạo file
+   `SOURCE/.env.local.skill-tagging` với đúng một dòng `GEMINI_API_KEY=<key mới>`.
+   Tôi không tự tạo được (cần đăng nhập Google). Script tự từ chối nếu key trùng key app.
+   Lệnh sau đó (trong `SOURCE/`, dry-run rồi apply từ report đã đọc):
+   ```
+   SCHEMA_ENV_FILE=.env.local.prod-backup npx tsx supabase/tagQuestionSkills.ts --subject=Biology
+   SCHEMA_ENV_FILE=.env.local.prod-backup npx tsx supabase/tagQuestionSkills.ts --subject=Biology --apply --from-report=supabase/skill-tagging-report-pebjdlbgbmizgfpuptjl-biology-<ISO>.json
+   ```
+   lặp cho Physics, Chemistry, Literature, Math (English prod: 0 câu có subject — bỏ, xem tổng kết).
+   Ước lượng request: Sinh 4 + Lý 3 + Hoá 2 + Văn 1 + Toán 1 = 11 (lô 10 câu) — vừa một ngày hạn ngạch 20.
 2. **Deploy nhánh này trước khi seed prod** (D6), rồi chạy seed prod + tag prod
    theo lệnh ở mục E.
