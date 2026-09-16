@@ -4,6 +4,8 @@
 // rồi chỉnh lại khi có dữ liệu thật. Giữ ở đây thành hằng số có tên, KHÔNG rải
 // literal khắp nơi, đúng vì lý do đó: chỉnh sau là diff một dòng.
 
+import type { Subject } from "@/lib/analytics/constants";
+
 /**
  * Tỉ lệ đúng (correctCount / totalCount) từ mức này trở lên thì coi như một
  * node kỹ năng đã "qua" — dùng làm cổng tiên quyết trong `recommendNextSkill()`
@@ -16,6 +18,24 @@
  * Final-Phase Task 27 ghi lại giá trị thực sự ship/chỉnh lại.
  */
 export const MASTERY_CLEARED_THRESHOLD = 0.7;
+
+/**
+ * Môn DUY NHẤT mà định tuyến "Nên luyện gì tiếp theo" (`recommendNextSkill()`
+ * qua `getSkillRecommendation()`) xét — quyết định D2, 2026-09-16, khi cây kỹ
+ * năng mở rộng ra 7 môn.
+ *
+ * Vì sao vẫn Toán, có chủ ý chứ không phải chưa kịp làm: (1) thẻ vàng mang
+ * một hành động cố định "Tìm đề Toán" và câu cold start "luyện một đề Toán" —
+ * gợi ý môn khác với nút ấy là gợi ý sai; (2) heuristic dựa vào ratio 0 cho
+ * node CHƯA đụng, nên không lọc thì ngay khi seed môn mới, node chưa đụng của
+ * môn khác thắng tie theo id (`anh-…` đứng đầu bảng chữ cái) và mọi học sinh
+ * Toán được bảo đi luyện "Ngữ âm"; (3) cạnh tiên quyết — thứ làm heuristic
+ * này khác một phép sort — chỉ có nghĩa ở các môn STEM, Văn/Sử ship 0 cạnh.
+ * Mở rộng sang môn khác là quyết định SẢN PHẨM (nút/copy theo môn, có thể
+ * một thẻ mỗi môn), không phải một hằng số khác. Thống kê "% đúng theo dạng
+ * bài" KHÔNG đi qua hằng này — nó hiện đủ 7 môn.
+ */
+export const ROUTING_SUBJECT: Subject = "Math";
 
 /**
  * Ngưỡng tin cậy tối thiểu để `tagQuestionSkills.ts` GHI `questions.skill_node_id`

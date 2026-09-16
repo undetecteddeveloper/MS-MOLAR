@@ -1,6 +1,7 @@
-// Seed cây kỹ năng Toán (Engine 1 Adaptive AI & Feedback, PRD R1) — đẩy dữ
-// liệu đã duyệt ở lib/adaptive/skillTaxonomy.ts vào skill_nodes /
-// skill_prerequisites. Dùng service_role key (bypass RLS), CHỈ chạy local.
+// Seed cây kỹ năng 7 MÔN (Engine 1 Adaptive AI & Feedback, PRD R1; mở rộng
+// từ Toán 2026-09-16) — đẩy dữ liệu ở lib/adaptive/skillTaxonomy.ts vào
+// skill_nodes / skill_prerequisites. Dùng service_role key (bypass RLS), CHỈ
+// chạy local.
 //
 // Cách chạy (sau khi đã apply §9b của schema.sql trong Supabase SQL Editor):
 //   cd SOURCE
@@ -10,15 +11,23 @@
 // Idempotent (upsert theo khoá chính) — chạy lại không sinh dòng trùng. Mượn
 // nguyên pattern nạp env + tạo client của supabase/seed.ts.
 //
+// ⚠ THỨ TỰ DEPLOY (D2/D6, docs/plans/20260916-feature-skill-taxonomy-all-
+// subjects.md): app đang chạy phải là bản ĐÃ lọc định tuyến theo
+// ROUTING_SUBJECT trước khi seed thêm môn mới vào DB của nó. Bản cũ đọc MỌI
+// node làm ứng viên gợi ý, nên seed trước là thẻ "Nên luyện gì tiếp theo" gợi
+// một dạng bài Tiếng Anh kèm nút "Tìm đề Toán" cho tới khi deploy.
+//
 // Phạm vi: CHỈ taxonomy. Không đụng questions.skill_node_id — việc gắn thẻ câu
-// hỏi là của supabase/tagQuestionSkills.ts (backend-task-06).
+// hỏi là của supabase/tagQuestionSkills.ts.
 
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createClient } from "@supabase/supabase-js";
+import { SUBJECT_ORDER } from "../lib/analytics/constants";
 import {
   SKILL_NODES,
   SKILL_PREREQUISITES,
+  SKILL_TAXONOMY,
   validateDag,
 } from "../lib/adaptive/skillTaxonomy";
 
@@ -51,7 +60,8 @@ async function main() {
   // Chặn TRƯỚC khi ghi: một DAG hỏng (chu trình / cạnh treo) mà lọt xuống DB
   // thì recommendNextSkill() sẽ đọc nó như dữ liệu tin cậy được — Data Contract
   // của hàm đó nói rõ nó KHÔNG tự validate lại mỗi lần gọi vì lý do hiệu năng,
-  // và coi cổng chặn chính là chỗ này (AC-001/002).
+  // và coi cổng chặn chính là chỗ này (AC-001/002). Chạy trên bản GỘP 7 môn:
+  // đó là tập dòng thật sự được ghi.
   const dag = validateDag(SKILL_NODES, SKILL_PREREQUISITES);
   if (!dag.valid) {
     throw new Error(
@@ -77,6 +87,18 @@ async function main() {
   // (upsert vào DB nào cũng "thành công"), nên thứ duy nhất phân biệt được hai
   // lần chạy là dòng log này.
   console.log(`Env: ${ENV_FILE} → ${new URL(url).host}`);
+  console.log(
+    "Node theo môn: " +
+      SUBJECT_ORDER.map(
+        (s) => `${s} ${SKILL_TAXONOMY[s].nodes.length}/${SKILL_TAXONOMY[s].edges.length}`,
+      ).join(" · ") +
+      " (node/cạnh)",
+  );
+
+  // Đếm TRƯỚC khi ghi để log nói được lần chạy này thêm gì — số này là bằng
+  // chứng cho cảnh báo thứ tự deploy ở đầu file.
+  const before = await supabase.from("skill_nodes").select("*", { count: "exact", head: true });
+  if (before.error) throw before.error;
 
   const nodeRows = SKILL_NODES.map((n) => ({ id: n.id, label_vi: n.labelVi }));
   const edgeRows = SKILL_PREREQUISITES.map((e) => ({
@@ -113,12 +135,20 @@ async function main() {
 
   console.log(
     `→ Trong DB sau khi seed: ${nodeCount.count} node / ${edgeCount.count} cạnh ` +
-      `(kỳ vọng ${nodeRows.length} / ${edgeRows.length}).`,
+      `(kỳ vọng ${nodeRows.length} / ${edgeRows.length}; trước khi seed: ${before.count} node).`,
   );
 
   if (nodeCount.count !== nodeRows.length || edgeCount.count !== edgeRows.length) {
     throw new Error(
       "Số dòng trong DB lệch so với dữ liệu seed — có dòng thừa/thiếu, kiểm tra trước khi chạy tagQuestionSkills.ts.",
+    );
+  }
+
+  if ((before.count ?? 0) < nodeRows.length) {
+    console.log(
+      `ℹ Lần chạy này THÊM ${nodeRows.length - (before.count ?? 0)} node mới. ` +
+        "App đang đọc DB này phải là bản đã lọc định tuyến theo ROUTING_SUBJECT (D2), " +
+        "nếu không thẻ \"Nên luyện gì tiếp theo\" sẽ gợi sai môn cho tới khi deploy.",
     );
   }
 
