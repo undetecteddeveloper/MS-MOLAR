@@ -102,8 +102,8 @@ tức thẻ ấy chỉ lặp lại biểu đồ theo môn và còn in khoá ti�
 - [x] `verify:schema`: KHÔNG chạy — không có thay đổi schema (D1); fingerprint prod = code = `187d3ed24f0c`.
 
 ### H. Đóng vòng
-- [ ] Notion MS-MOLAR: một row tổng kết (số node/môn, coverage, chỗ tin cậy thấp, nhắc `rateLimit.test.ts` đỏ).
-- [ ] Commit theo từng bước (không gộp một commit cuối).
+- [x] Notion MS-MOLAR: row "Cây kỹ năng (dạng bài) 7 môn + % đúng theo dạng bài ở Thống kê" (page `3dd78ba6-ae12-810c-9f16-c78a2130c490`, trạng thái Đang thực hiện) — số đo, quyết định D1–D6, cổng verify, việc chờ, chỗ tin cậy thấp. Cập nhật coverage + chuyển Hoàn tất sau khi tag prod.
+- [x] Commit theo từng bước: 5c5c13b logo · 29f074c taxonomy · efafb4f analytics · 5c82318 tagger · 3836366 dry-run trước seed · 3dfcf29 plan.
 
 ## Chờ product owner (STOP conditions đã chạm)
 
