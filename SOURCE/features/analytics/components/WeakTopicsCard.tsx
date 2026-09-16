@@ -1,10 +1,13 @@
 // WeakTopicsCard — trả lời "cần sửa CÁI GÌ", không phải "môn nào đang kém".
 //
 // Biểu đồ ngay bên trên dừng ở mức môn: nó gắn cờ "Cần ôn lại" cho cả Hoá học
-// rồi để người đọc tự đoán phải ôn phần nào. Thẻ này đi xuống một mức, tới đúng
-// chủ đề `computeScore()` đã chấm ở từng câu. Khác SkillRecommendationCard
-// (Engine 1) ở chỗ nó KHÔNG cần taxonomy kỹ năng, nên chạy cho cả 7 môn chứ
-// không riêng Toán.
+// rồi để người đọc tự đoán phải ôn phần nào. Thẻ này đi xuống một mức, tới
+// DẠNG BÀI của từng câu (`questions.skill_node_id`, cây kỹ năng 7 môn —
+// lib/adaptive/skillTaxonomy.ts). Bản trước (tới 2026-09-16) đọc
+// `exam_results.topic_breakdown`, nhưng `topic := subject` cho mọi câu UGC
+// (ADR-0004) nên thẻ chỉ lặp lại biểu đồ và in khoá tiếng Anh ("Math") ra màn
+// hình. Khác SkillRecommendationCard (chỉ Toán, D2) ở chỗ thẻ này hiện cả 7
+// môn — dữ liệu suy từ cùng bộ gộp với SkillBreakdownCard ngay dưới nó.
 //
 // Nằm trong AnalyticsDashboard (đảo client) và đổi theo cùng chip khoảng thời
 // gian với biểu đồ — một thẻ đứng yên khi biểu đồ đổi khoảng là hai con số mâu
@@ -21,7 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { t } from "@/lib/copy";
-import { MIN_TOPIC_QUESTIONS, type TopicWeakness } from "@/lib/analytics/weakTopics";
+import { MIN_TOPIC_QUESTIONS, type TopicWeakness } from "@/lib/analytics/skillBreakdown";
 import { SUBJECT_LABELS } from "@/lib/ugc/subjects";
 
 export function WeakTopicsCard({ topics }: { topics: TopicWeakness[] }) {

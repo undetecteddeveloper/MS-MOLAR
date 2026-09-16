@@ -7,14 +7,23 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { readBounded } from "@/lib/supabase/boundedRead";
 import { aggregateAttemptsByRange, type AttemptRow } from "@/lib/analytics/aggregateAttempts";
-import { rankWeakTopicsByRange, type TopicWeakness } from "@/lib/analytics/weakTopics";
+import {
+  aggregateSkillsByRange,
+  rankWeakSkillsByRange,
+  type SkillAttemptRow,
+  type SubjectSkillBreakdown,
+  type TopicWeakness,
+} from "@/lib/analytics/skillBreakdown";
 import { deriveEssayView } from "@/lib/scoring/essayLifecycle";
 import type { PerQuestionResult } from "@/types/result";
-import { MASTERY_CLEARED_THRESHOLD } from "@/lib/adaptive/constants";
+import { MASTERY_CLEARED_THRESHOLD, ROUTING_SUBJECT } from "@/lib/adaptive/constants";
 import { recommendNextSkill } from "@/lib/adaptive/route";
+import { subjectOfSkillNodeId } from "@/lib/adaptive/skillTaxonomy";
 import { buildTelemetryPayload } from "@/lib/tutor/telemetry";
 import { NEEDS_REVIEW_THRESHOLD, type SubjectStats, type TimeRange } from "@/lib/analytics/constants";
 import type { SkillRecommendation } from "@/types/adaptive";
+
+type Supabase = Awaited<ReturnType<typeof createClient>>;
 
 // PostgREST embedded shape: exam_results -> exam_attempts (!inner, to-one) ->
 // exams (!inner, to-one). Both FKs are many-to-one, so each embed is an
@@ -27,7 +36,6 @@ type EmbeddedRow = {
   per_question: PerQuestionResult[] | null;
   /** Mốc suy vòng đời tự luận (pending quá hạn → failed). */
   created_at: string;
-  topic_breakdown: { topic: string; correct: number; total: number }[] | null;
   exam_attempts: {
     started_at: string;
     submitted_at: string | null;
@@ -36,9 +44,57 @@ type EmbeddedRow = {
   };
 };
 
+type QuestionSkillRow = { id: string; skill_node_id: string | null };
+
 export interface AnalyticsPageData {
   statsByRange: Record<TimeRange, SubjectStats[]>;
+  /** "% đúng theo dạng bài" cho mọi môn — thẻ Kết quả theo dạng bài. */
+  skillBreakdownByRange: Record<TimeRange, SubjectSkillBreakdown[]>;
+  /** Suy từ `skillBreakdownByRange` (cùng một bộ gộp) — thẻ Cần sửa chỗ nào. */
   weakTopicsByRange: Record<TimeRange, TopicWeakness[]>;
+}
+
+/**
+ * Số id câu hỏi tối đa trong MỘT lệnh `.in("id", …)`. PostgREST nhận bộ lọc
+ * qua query string của GET, nên một danh sách vài nghìn id là một URL vài chục
+ * KB — thứ proxy/CDN cắt mà không báo. 100 id × ~45 ký tự ≈ 5 KB, dưới mọi
+ * trần thường gặp (8 KB) với dư địa; các lô chạy song song nên không đổi độ
+ * trễ theo số lô.
+ */
+const QUESTION_ID_CHUNK = 100;
+
+/**
+ * `questions.id → skill_node_id` cho đúng tập câu học sinh đã làm. Đọc theo
+ * lô qua `readBounded` (P3): mỗi lô ≤ QUESTION_ID_CHUNK dòng nên không bao giờ
+ * chạm trần, nhưng vẫn đi qua cùng một cửa để log/biên là một chỗ.
+ *
+ * Câu không còn trong `questions` (đề đã xoá) hay không đọc được qua RLS đơn
+ * giản là vắng mặt trong map → reducer coi như chưa phân loại. Không ném.
+ */
+async function readQuestionSkills(
+  supabase: Supabase,
+  questionIds: readonly string[],
+): Promise<Map<string, string | null>> {
+  const chunks: string[][] = [];
+  for (let i = 0; i < questionIds.length; i += QUESTION_ID_CHUNK) {
+    chunks.push(questionIds.slice(i, i + QUESTION_ID_CHUNK));
+  }
+
+  const results = (await Promise.all(
+    chunks.map(
+      (chunk, index) =>
+        readBounded(
+          `getAnalyticsByRange.questions#${index}`,
+          supabase.from("questions").select("id, skill_node_id").in("id", chunk),
+        ) as Promise<QuestionSkillRow[]>,
+    ),
+  )) as QuestionSkillRow[][];
+
+  const map = new Map<string, string | null>();
+  for (const rows of results) {
+    for (const row of rows) map.set(row.id, row.skill_node_id);
+  }
+  return map;
 }
 
 export async function getAnalyticsByRange(): Promise<AnalyticsPageData> {
@@ -48,24 +104,25 @@ export async function getAnalyticsByRange(): Promise<AnalyticsPageData> {
   // sách thiếu dòng: đầu ra của hàm này là SỐ LIỆU TỔNG HỢP, nên dữ liệu thiếu
   // không hiện ra thành chỗ trống mà thành một con số SAI nhìn hoàn toàn hợp lý.
   //
-  // `topic_breakdown` đi kèm trong CHÍNH lệnh đọc này chứ không phải một lệnh
-  // thứ hai: hai bộ số liệu rút ra từ cùng một tập dòng, tách ra đọc lại là
-  // thêm một round-trip cho dữ liệu đã nằm sẵn trong tay.
-  // `total_score` + `per_question` + `created_at` đi kèm (2026-09-13) cho hàng
-  // Ngữ văn/Tiếng Anh: điểm trung bình thay đúng/sai — cùng lệnh đọc.
+  // `per_question` đi kèm trong CHÍNH lệnh đọc này chứ không phải một lệnh thứ
+  // hai: nó nuôi cả hàng Ngữ văn/Tiếng Anh (điểm trung bình, 2026-09-13) lẫn
+  // thống kê theo dạng bài (2026-09-16) — hai bộ số liệu rút ra từ cùng một
+  // tập dòng, tách ra đọc lại là thêm một round-trip cho dữ liệu đã nằm sẵn
+  // trong tay. `topic_breakdown` KHÔNG còn được đọc: `topic := subject` cho mọi
+  // câu UGC (ADR-0004) nên cột ấy không nói được gì ngoài tên môn.
   const embedded = (await readBounded(
     "getAnalyticsByRange",
     supabase
       .from("exam_results")
       .select(
-        "correct, total, total_score, per_question, created_at, topic_breakdown, exam_attempts!inner(started_at, submitted_at, status, exams!inner(subject, duration_minutes))"
+        "correct, total, total_score, per_question, created_at, exam_attempts!inner(started_at, submitted_at, status, exams!inner(subject, duration_minutes))"
       )
       .eq("exam_attempts.status", "submitted")
   )) as EmbeddedRow[];
 
-  // Cùng mốc `now` cho cả hai reducer VÀ cho phép suy vòng đời tự luận — hai
-  // lượt `new Date()` riêng có thể rơi vào hai phía của một biên range và làm
-  // biểu đồ mâu thuẫn với danh sách ngay bên cạnh nó.
+  // Cùng mốc `now` cho mọi reducer VÀ cho phép suy vòng đời tự luận — hai lượt
+  // `new Date()` riêng có thể rơi vào hai phía của một biên range và làm biểu
+  // đồ mâu thuẫn với danh sách ngay bên cạnh nó.
   const now = new Date();
 
   const rows: AttemptRow[] = embedded.map((row) => {
@@ -93,18 +150,53 @@ export async function getAnalyticsByRange(): Promise<AnalyticsPageData> {
     };
   });
 
-  const topicRows = embedded.map((row) => ({
+  // --- Theo dạng bài (2026-09-16) ------------------------------------------
+  // Hai lệnh đọc THÊM, chạy song song, và chỉ khi có câu để tra: bảng tra
+  // `questions.id → skill_node_id` (đúng tập câu đã làm) và nhãn `skill_nodes`
+  // (bảng tham chiếu, ~91 dòng). Tính lúc đọc thay vì đọc `user_skill_mastery`
+  // vì mastery chỉ ghi lúc nộp theo thẻ có tại thời điểm đó và không có mốc
+  // thời gian — xem đầu lib/analytics/skillBreakdown.ts.
+  const questionIds = [
+    ...new Set(embedded.flatMap((row) => (row.per_question ?? []).map((q) => q.questionId))),
+  ];
+
+  let questionSkills = new Map<string, string | null>();
+  let nodeLabels = new Map<string, string>();
+  if (questionIds.length > 0) {
+    const [skillsMap, nodeRows] = await Promise.all([
+      readQuestionSkills(supabase, questionIds),
+      readBounded(
+        "getAnalyticsByRange.skillNodes",
+        supabase.from("skill_nodes").select("id, label_vi"),
+      ) as Promise<SkillNodeRow[]>,
+    ]);
+    questionSkills = skillsMap;
+    nodeLabels = new Map(nodeRows.map((n) => [n.id, n.label_vi]));
+  }
+
+  const skillRows: SkillAttemptRow[] = embedded.map((row) => ({
     subject: row.exam_attempts.exams.subject,
     submittedAt: row.exam_attempts.submitted_at,
-    topicBreakdown: row.topic_breakdown ?? [],
+    perQuestion: (row.per_question ?? []).map((q) => ({
+      questionId: q.questionId,
+      isCorrect: q.isCorrect,
+      scored: q.scored,
+    })),
   }));
 
+  const skillBreakdownByRange = aggregateSkillsByRange(
+    skillRows,
+    { questionSkills, nodeLabels },
+    now,
+  );
+
   // Dùng LẠI ngưỡng "NEEDS REVIEW" của biểu đồ: nếu một môn bị gắn cờ theo mốc
-  // 75% mà danh sách chủ đề lại lọc theo mốc khác, người đọc sẽ thấy một môn
-  // "cần ôn" không có chủ đề nào bên dưới nó, và không có gì giải thích vì sao.
+  // 75% mà danh sách dạng bài lại lọc theo mốc khác, người đọc sẽ thấy một môn
+  // "cần ôn" không có dạng bài nào bên dưới nó, và không có gì giải thích vì sao.
   return {
     statsByRange: aggregateAttemptsByRange(rows, now),
-    weakTopicsByRange: rankWeakTopicsByRange(topicRows, now, NEEDS_REVIEW_THRESHOLD),
+    skillBreakdownByRange,
+    weakTopicsByRange: rankWeakSkillsByRange(skillBreakdownByRange, NEEDS_REVIEW_THRESHOLD),
   };
 }
 
@@ -132,7 +224,7 @@ type MasteryRow = {
  * start không có dòng mastery nào, mà đó lại đúng là ca cần đếm nhất.
  */
 async function recordRouteTelemetry(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: Supabase,
   userId: string | null,
   skillNodeId: string | null,
 ): Promise<void> {
@@ -165,11 +257,12 @@ export async function getSkillRecommendation(): Promise<SkillRecommendation> {
   const supabase = await createClient();
 
   // Biên tường minh (P3). `skill_nodes`/`skill_prerequisites` là dữ liệu THAM
-  // CHIẾU (taxonomy — 20 node/15 cạnh lúc đo 2026-08-17), nên chúng lớn theo tốc
-  // độ người ta mở rộng taxonomy chứ không theo lưu lượng. Vẫn đặt biên, vì cắt
-  // cụt một DAG thì tệ hơn cắt cụt một danh sách: mất một CẠNH tiên quyết làm
-  // `recommendNextSkill` gợi ý một kỹ năng mà học sinh chưa đủ nền để học, và
-  // không có gì trong đầu ra nói rằng nó đã tính trên đồ thị thiếu.
+  // CHIẾU (taxonomy — 91 node/49 cạnh cho 7 môn từ 2026-09-16), nên chúng lớn
+  // theo tốc độ người ta mở rộng taxonomy chứ không theo lưu lượng. Vẫn đặt
+  // biên, vì cắt cụt một DAG thì tệ hơn cắt cụt một danh sách: mất một CẠNH
+  // tiên quyết làm `recommendNextSkill` gợi ý một kỹ năng mà học sinh chưa đủ
+  // nền để học, và không có gì trong đầu ra nói rằng nó đã tính trên đồ thị
+  // thiếu.
   //
   // `readBounded` NÉM lỗi hạ tầng nên ba nhánh `if (...Res.error) throw` cũ
   // không còn cần thiết — Promise.all lan exception ra ngoài y như cũ; thứ đổi
@@ -194,21 +287,35 @@ export async function getSkillRecommendation(): Promise<SkillRecommendation> {
     ) as Promise<MasteryRow[]>,
   ]);
 
+  // D2 (2026-09-16): định tuyến chỉ xét ROUTING_SUBJECT. Lọc CẢ BA — node, cạnh,
+  // mastery — trước khi gọi heuristic, vì mỗi thứ lọt qua hỏng một kiểu khác:
+  // node môn khác (ratio 0, chưa đụng) thắng tie theo id; cạnh treo sang node
+  // đã lọc làm prerequisite-gate đi vào chỗ không có; dòng mastery môn khác làm
+  // một học sinh chỉ mới luyện Lý hết "cold start" và nhận gợi ý Toán như thể
+  // đã có dữ liệu Toán. Lọc theo tiền tố id (subjectOfSkillNodeId) chứ không
+  // đối chiếu SKILL_NODES: DB là nguồn sự thật của tập id, code chỉ biết quy ước.
+  const routedNodes = nodes.filter((n) => subjectOfSkillNodeId(n.id) === ROUTING_SUBJECT);
+  const routedIds = new Set(routedNodes.map((n) => n.id));
+
   const recommendation = recommendNextSkill({
-    nodes: nodes.map((n) => ({
+    nodes: routedNodes.map((n) => ({
       id: n.id,
       labelVi: n.label_vi,
     })),
-    edges: edges.map((e) => ({
-      skillNodeId: e.skill_node_id,
-      prerequisiteNodeId: e.prerequisite_node_id,
-    })),
-    mastery: mastery.map((m) => ({
-      skillNodeId: m.skill_node_id,
-      correctCount: m.correct_count,
-      totalCount: m.total_count,
-      lastWrongAt: m.last_wrong_at,
-    })),
+    edges: edges
+      .filter((e) => routedIds.has(e.skill_node_id) && routedIds.has(e.prerequisite_node_id))
+      .map((e) => ({
+        skillNodeId: e.skill_node_id,
+        prerequisiteNodeId: e.prerequisite_node_id,
+      })),
+    mastery: mastery
+      .filter((m) => routedIds.has(m.skill_node_id))
+      .map((m) => ({
+        skillNodeId: m.skill_node_id,
+        correctCount: m.correct_count,
+        totalCount: m.total_count,
+        lastWrongAt: m.last_wrong_at,
+      })),
     threshold: MASTERY_CLEARED_THRESHOLD,
   });
 

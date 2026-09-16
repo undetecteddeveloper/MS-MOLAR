@@ -33,10 +33,8 @@ export default async function DashboardPage() {
   // Ngữ nghĩa lỗi giữ nguyên như trước: một lệnh đọc hỏng thì cả trang đi vào
   // xử lý lỗi cấp trang — đúng thứ `await getAnalyticsByRange()` trần vẫn làm,
   // và đúng điều UI Spec đã chốt cho thẻ gợi ý (không có UI lỗi riêng cho nó).
-  const [{ statsByRange, weakTopicsByRange }, recommendation] = await Promise.all([
-    getAnalyticsByRange(),
-    getSkillRecommendation(),
-  ]);
+  const [{ statsByRange, weakTopicsByRange, skillBreakdownByRange }, recommendation] =
+    await Promise.all([getAnalyticsByRange(), getSkillRecommendation()]);
 
   return (
     // `full` (72rem): từ 1024px trang chia hai cột và mép nội dung thẳng hàng
@@ -50,7 +48,11 @@ export default async function DashboardPage() {
       <PageHeader title={t("analytics.title")} description={t("analytics.subtitle")} />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
-        <AnalyticsDashboard dataByRange={statsByRange} weakTopicsByRange={weakTopicsByRange} />
+        <AnalyticsDashboard
+          dataByRange={statsByRange}
+          weakTopicsByRange={weakTopicsByRange}
+          skillBreakdownByRange={skillBreakdownByRange}
+        />
         <SkillRecommendationCard recommendation={recommendation} className="lg:sticky lg:top-20" />
       </div>
     </PageContainer>
