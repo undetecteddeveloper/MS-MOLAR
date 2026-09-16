@@ -90,9 +90,18 @@ tức thẻ ấy chỉ lặp lại biểu đồ theo môn và còn in khoá ti�
 - [x] Smoke trên DEV không gọi Gemini (`--from-report` rỗng): Physics 5 câu → 5 classification-error, 0 ghi; Math 55 câu → 38 already-tagged + 17 classification-error, 0 ghi; chạy không có key riêng → từ chối đúng thông điệp TD-019 (exit 1).
 - [x] Key riêng: script đọc `GEMINI_API_KEY` từ `SOURCE/.env.local.skill-tagging` (file MỘT dòng, gitignored theo `.env*`) — không sao chép credential Supabase sang file thứ hai; Supabase vẫn lấy từ `SCHEMA_ENV_FILE`. Chưa có file này (chờ key).
 
-### E. Gắn thẻ (cần key riêng — xem "Chờ product owner")
-- [ ] Dry-run từng môn trên PROD (Biology, Physics, Chemistry, Literature, Math) → đọc report → `--apply --from-report` → spot-check.
-- [ ] Dry-run DEV (Physics, Chemistry, English, Math còn lại) nếu còn hạn ngạch.
+### E. Gắn thẻ (key riêng đã có 2026-09-16 18:50, sha256 `6910ecbe`; product owner chọn: dry-run prod đêm nay, deploy → seed → apply sáng mai)
+- [x] Dry-run PROD, 11 request Gemini, đọc 100% dòng tagged (AC-008): **Văn 7/7** (4 đọc hiểu thơ, 1 tiếng Việt, 1 NLVH, 1 NLXH — trùng rà tay) · **Lý 23/23** (14 từ trường–cảm ứng, 9 quang hình; toàn bộ confidence 1.00) · **Sinh 40/40** (13 học thuyết–nhân tố, 12 loài–hình thành loài, 11 di truyền quần thể, 4 bằng chứng; 7 câu ở 0.90, trong đó 3 câu p1q8/p1q38/p1q39 ranh giới nhân tố ↔ hình thành loài — cả hai đều trong Tiến hoá) · **Hoá 18/18** (6 cấu tạo nguyên tử, 6 oxi hoá–khử, 4 liên kết, 2 bảng tuần hoàn; hai câu tự luận đọc full text để xác nhận) · **Toán 4 already-tagged + 5 no-matching-node** (5 câu lớp 8, model tự trả rỗng với confidence 1.00 — đúng thiết kế). Không tìm thấy dòng sai. Coverage prod sau apply sẽ là 92/97 = 94.8% trên 5 môn có câu (Toán 44% vì 5/9 câu ngoài THPT).
+- [ ] **Sáng mai, sau deploy + seed prod** — apply từ đúng các report đã duyệt (0 request Gemini), trong `SOURCE/`:
+  ```
+  SCHEMA_ENV_FILE=.env.local.prod-backup npx tsx supabase/tagQuestionSkills.ts --subject=Biology    --apply --from-report=supabase/skill-tagging-report-pebjdlbgbmizgfpuptjl-biology-2026-09-16T11-52-07-994Z.json
+  SCHEMA_ENV_FILE=.env.local.prod-backup npx tsx supabase/tagQuestionSkills.ts --subject=Physics    --apply --from-report=supabase/skill-tagging-report-pebjdlbgbmizgfpuptjl-physics-2026-09-16T11-51-44-950Z.json
+  SCHEMA_ENV_FILE=.env.local.prod-backup npx tsx supabase/tagQuestionSkills.ts --subject=Chemistry  --apply --from-report=supabase/skill-tagging-report-pebjdlbgbmizgfpuptjl-chemistry-2026-09-16T11-52-19-797Z.json
+  SCHEMA_ENV_FILE=.env.local.prod-backup npx tsx supabase/tagQuestionSkills.ts --subject=Literature --apply --from-report=supabase/skill-tagging-report-pebjdlbgbmizgfpuptjl-literature-2026-09-16T11-51-05-697Z.json
+  ```
+  Toán không cần apply (0 dòng sẽ ghi). Kiểm sau apply (Composio, prod): `select subject, count(*), count(skill_node_id) from public.questions group by subject` → Biology 40/40, Physics 23/23, Chemistry 18/18, Literature 7/7, Math 9/4.
+- [x] DEV: dry-run + apply Physics 5/5, Chemistry 5/5 (2 request; đã đọc từng dòng) — để `/me/dashboard` dev có dữ liệu 3 môn cho thẻ mới (tài khoản test có 24 lượt Lý, 12 lượt Hoá).
+- [ ] DEV còn lại (chưa chạy, giữ hạn ngạch: đã dùng 13/20 trong ngày Pacific): Math 17 câu chưa thẻ (2 request), English 40 câu (4 request). Chạy sau 14:00 VN 17/09 (reset hạn ngạch) nếu muốn.
 
 ### F. Việc ngoài lề
 - [x] Gắn logo mới vào ô Wordmark (`components/layout/Wordmark.tsx`, `public/images/ms-molar-logo.png`).
