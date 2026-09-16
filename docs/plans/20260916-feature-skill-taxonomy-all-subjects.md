@@ -1,11 +1,13 @@
 # Cây kỹ năng (dạng bài) cho cả 7 môn + % đúng theo dạng bài ở Thống kê
 
-> **Trạng thái:** đang thực hiện 2026-09-16 (phiên tự hành qua đêm, product
-> owner đã duyệt trước phạm vi — không dừng chờ duyệt từng môn; một bản tổng
-> kết cuối phiên ghi ở Notion MS-MOLAR để duyệt một lượt).
+> **Trạng thái:** HOÀN TẤT 2026-09-16 21:05 VN — PROD đã seed 91 node / 49 cạnh và
+> gắn thẻ 4 môn (Sinh/Lý/Hoá/Văn) từ report đã duyệt; số liệu đọc lại từ prod ở mục E.
+> Việc còn mở duy nhất là tag DEV phần còn lại (mục E), ngoài phạm vi.
 >
-> **Nhánh:** `design/ui-refactor-san-truong` (không commit lên `main`).
-> **Không deploy, không push** — quyết định của product owner buổi sáng.
+> **Nhánh:** `design/ui-refactor-san-truong`. Tối 2026-09-16 product owner đổi quyết
+> định buổi sáng: đẩy thẳng nhánh lên `origin/main` bằng
+> `git push origin design/ui-refactor-san-truong:main` (HEAD `d0336f1`), Vercel production
+> READY/PROMOTED (`dpl_HMr3d6eCW6QDnWygdG2zveq7dFZh`) — rồi mới seed + apply (đúng D6).
 >
 > Đánh dấu `[x]` khi xong để phiên sau nối tiếp được nếu phiên này đứt.
 
@@ -76,7 +78,7 @@ tức thẻ ấy chỉ lặp lại biểu đồ theo môn và còn in khoá ti�
 
 ### B. Seed
 - [x] Seed DEV 2026-09-16 18:15: 20 → 91 node, 15 → 49 cạnh; chạy lần 2: 91/91, 0 dòng mới (idempotent).
-- [ ] Seed PROD — **CHỜ** (D6): `SCHEMA_ENV_FILE=.env.local.prod-backup npx tsx supabase/seedSkillTaxonomy.ts` sau khi D2 deploy.
+- [x] Seed PROD 2026-09-16 21:03 VN (sau khi `d0336f1` READY/PROMOTED trên production — D6 thoả): `SCHEMA_ENV_FILE=.env.local.prod-backup npx tsx supabase/seedSkillTaxonomy.ts` → 20 → **91 node**, 15 → **49 cạnh**, script báo "THÊM 71 node mới". Đọc lại qua Composio (ref `pebjdlbgbmizgfpuptjl`): 91 node / 49 cạnh, 0 node thiếu `label_vi`.
 
 ### C. Thống kê (UI + query)
 - [x] `lib/analytics/skillBreakdown.ts` (reducer thuần: `aggregateSkillsByRange`, `rankWeakSkills`) + 13 ca test.
@@ -92,7 +94,7 @@ tức thẻ ấy chỉ lặp lại biểu đồ theo môn và còn in khoá ti�
 
 ### E. Gắn thẻ (key riêng đã có 2026-09-16 18:50, sha256 `6910ecbe`; product owner chọn: dry-run prod đêm nay, deploy → seed → apply sáng mai)
 - [x] Dry-run PROD, 11 request Gemini, đọc 100% dòng tagged (AC-008): **Văn 7/7** (4 đọc hiểu thơ, 1 tiếng Việt, 1 NLVH, 1 NLXH — trùng rà tay) · **Lý 23/23** (14 từ trường–cảm ứng, 9 quang hình; toàn bộ confidence 1.00) · **Sinh 40/40** (13 học thuyết–nhân tố, 12 loài–hình thành loài, 11 di truyền quần thể, 4 bằng chứng; 7 câu ở 0.90, trong đó 3 câu p1q8/p1q38/p1q39 ranh giới nhân tố ↔ hình thành loài — cả hai đều trong Tiến hoá) · **Hoá 18/18** (6 cấu tạo nguyên tử, 6 oxi hoá–khử, 4 liên kết, 2 bảng tuần hoàn; hai câu tự luận đọc full text để xác nhận) · **Toán 4 already-tagged + 5 no-matching-node** (5 câu lớp 8, model tự trả rỗng với confidence 1.00 — đúng thiết kế). Không tìm thấy dòng sai. Coverage prod sau apply sẽ là 92/97 = 94.8% trên 5 môn có câu (Toán 44% vì 5/9 câu ngoài THPT).
-- [ ] **Sáng mai, sau deploy + seed prod** — apply từ đúng các report đã duyệt (0 request Gemini), trong `SOURCE/`:
+- [x] **Apply PROD 2026-09-16 21:04–21:05 VN** (ngay sau seed, không đợi sáng) — từ đúng các report đã duyệt (0 request Gemini), trong `SOURCE/`:
   ```
   SCHEMA_ENV_FILE=.env.local.prod-backup npx tsx supabase/tagQuestionSkills.ts --subject=Biology    --apply --from-report=supabase/skill-tagging-report-pebjdlbgbmizgfpuptjl-biology-2026-09-16T11-52-07-994Z.json
   SCHEMA_ENV_FILE=.env.local.prod-backup npx tsx supabase/tagQuestionSkills.ts --subject=Physics    --apply --from-report=supabase/skill-tagging-report-pebjdlbgbmizgfpuptjl-physics-2026-09-16T11-51-44-950Z.json
@@ -100,6 +102,9 @@ tức thẻ ấy chỉ lặp lại biểu đồ theo môn và còn in khoá ti�
   SCHEMA_ENV_FILE=.env.local.prod-backup npx tsx supabase/tagQuestionSkills.ts --subject=Literature --apply --from-report=supabase/skill-tagging-report-pebjdlbgbmizgfpuptjl-literature-2026-09-16T11-51-05-697Z.json
   ```
   Toán không cần apply (0 dòng sẽ ghi). Kiểm sau apply (Composio, prod): `select subject, count(*), count(skill_node_id) from public.questions group by subject` → Biology 40/40, Physics 23/23, Chemistry 18/18, Literature 7/7, Math 9/4.
+  **Kết quả thật:** 4 lệnh đều in `request Gemini: 0` và `✅ Đã apply.` — Sinh ghi 40 dòng, Lý 23, Hoá 18, Văn 7 (88 dòng; mọi dòng `at-or-above-threshold`, coverage 100% mỗi môn). Report apply: `…-biology-2026-09-16T14-04-31-835Z` · `…-physics-…T14-04-40-461Z` · `…-chemistry-…T14-04-48-014Z` · `…-literature-…T14-04-52-975Z`.
+  **Đọc lại từ PROD** (Composio `SUPABASE_RUN_READ_ONLY_QUERY`, ref `pebjdlbgbmizgfpuptjl`): **Biology 40/40 · Physics 23/23 · Chemistry 18/18 · Literature 7/7 · Math 9/4** (không đổi) · subject rỗng 40/0 (đề Anh `status=failed`, ngoài phạm vi) — khớp 100% kỳ vọng. Toàn vẹn: 0 thẻ trỏ node không tồn tại, 0 node thiếu `label_vi`, 17/91 node đang được dùng; coverage 5 môn có câu = 92/97 = 94,8%.
+  **Spot-check UI PROD: CHƯA kiểm bằng mắt** — phiên tự hành không đăng nhập được tài khoản test (auto-mode chặn mọi hình thức đăng nhập Playwright). Dữ liệu nền: PROD có 18 lượt đã nộp (Lý 6 · Sinh 5 · Toán 4 · Hoá 2 · Văn 1); tài khoản `+rlstesta` có đúng 1 lượt Sinh (2026-08-28) → mở `/me/dashboard` bằng tài khoản đó sẽ thấy thẻ "Kết quả theo dạng bài" cho môn Sinh. Engineer nhìn một lần để đóng hẳn.
 - [x] DEV: dry-run + apply Physics 5/5, Chemistry 5/5 (2 request; đã đọc từng dòng) — để `/me/dashboard` dev có dữ liệu 3 môn cho thẻ mới (tài khoản test có 24 lượt Lý, 12 lượt Hoá).
 - [ ] DEV còn lại (chưa chạy, giữ hạn ngạch: đã dùng 13/20 trong ngày Pacific): Math 17 câu chưa thẻ (2 request), English 40 câu (4 request). Chạy sau 14:00 VN 17/09 (reset hạn ngạch) nếu muốn.
 
@@ -112,9 +117,12 @@ tức thẻ ấy chỉ lặp lại biểu đồ theo môn và còn in khoá ti�
 
 ### H. Đóng vòng
 - [x] Notion MS-MOLAR: row "Cây kỹ năng (dạng bài) 7 môn + % đúng theo dạng bài ở Thống kê" (page `3dd78ba6-ae12-810c-9f16-c78a2130c490`, trạng thái Đang thực hiện) — số đo, quyết định D1–D6, cổng verify, việc chờ, chỗ tin cậy thấp. Cập nhật coverage + chuyển Hoàn tất sau khi tag prod.
-- [x] Commit theo từng bước: 5c5c13b logo · 29f074c taxonomy · efafb4f analytics · 5c82318 tagger · 3836366 dry-run trước seed · 3dfcf29 plan.
+- [x] 2026-09-16 tối: row Notion chuyển **Hoàn tất** + khối "Đóng vòng" ghi số liệu cuối (seed 91/49, apply 88 dòng, số đọc lại từ prod, spot-check UI chưa làm bằng mắt).
+- [x] Commit theo từng bước: 5c5c13b logo · 29f074c taxonomy · efafb4f analytics · 5c82318 tagger · 3836366 dry-run trước seed · 3dfcf29 plan · 87b3540 + d0336f1 dry-run prod & checklist · commit đóng vòng này (seed + apply PROD) — tất cả đã lên `origin/main`.
 
-## Chờ product owner (STOP conditions đã chạm)
+## Chờ product owner (STOP conditions đã chạm) — ĐÃ GIẢI QUYẾT 2026-09-16 tối
+
+> Cả hai điều kiện đã xong: key riêng có từ 18:50 (mục E); deploy `d0336f1` READY/PROMOTED rồi seed + apply lúc 21:03–21:05 VN. Phần dưới giữ làm lịch sử.
 
 1. **Key Gemini riêng cho gắn thẻ** — tạo tại aistudio.google.com/apikey bằng một
    Google project MỚI (không dùng project của key app), rồi tạo file
