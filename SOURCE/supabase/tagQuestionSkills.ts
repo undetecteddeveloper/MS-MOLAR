@@ -277,9 +277,19 @@ async function main() {
   }
   const subjectNodes = skillNodesForSubject(subject);
   const missing = subjectNodes.filter((n) => !dbNodeIds.has(n.id)).map((n) => n.id);
-  if (missing.length > 0) {
+  if (missing.length > 0 && apply) {
     throw new Error(
       `DB (${projectRef}) thiếu node ${subject} so với lib/adaptive/skillTaxonomy.ts: ${missing.join(", ")} — seed lại trước.`,
+    );
+  }
+  if (missing.length > 0) {
+    // Dry-run KHÔNG ghi nên không đụng khoá ngoại; cho phép chạy trước khi seed
+    // để có report duyệt sớm (prod chỉ được seed sau khi deploy bản lọc định
+    // tuyến — D6). Tập id hợp lệ vẫn là node của môn trong code; --apply với
+    // cùng report sẽ fail ở nhánh trên cho tới khi seed.
+    console.warn(
+      `⚠ DB (${projectRef}) chưa có ${missing.length}/${subjectNodes.length} node ${subject} — ` +
+        "dry-run vẫn chạy với danh mục trong code; phải seed trước khi --apply.",
     );
   }
   const knownNodeIds = new Set(subjectNodes.map((n) => n.id));
