@@ -925,6 +925,28 @@ export const copy = {
   "about.phone": "Số điện thoại liên hệ",
   "about.placeholderNotice":
     "Thông tin liên hệ ở trên là dữ liệu tạm, sẽ được thay bằng thông tin thật trước khi ra mắt.",
+
+  // --- Bài giải cộng đồng ---------------------------------------------------
+  // Nguyên văn UI Spec § "Chuỗi tiếng Việt cần thêm"; nhóm S-01…O-02 mang tiền
+  // tố `solutions.` (Frontend DD v1.2 § Vietnamese Copy Keys, quy tắc namespace).
+  // Công tắc cài đặt (C-12): chữ trạng thái hiện rõ cạnh rãnh, không chỉ màu.
+  "solutions.switch.on": "Bật",
+  "solutions.switch.off": "Tắt",
+  // Hộp thoại đóng tấm trượt khi còn thay đổi chưa lưu (C-32, AC-104).
+  "solutions.dirty.title": "Bạn có thay đổi chưa lưu",
+  "solutions.dirty.body": "Lưu lại trước khi đóng?",
+  "solutions.dirty.save": "Lưu",
+  "solutions.dirty.discard": "Bỏ",
+  "solutions.dirty.stay": "Ở lại",
+
+  // --- Thời gian tương đối (lib/format/relativeTime.ts) ---------------------
+  // Dùng ở danh sách bài giải, màn xem và tab Bình luận của hồ sơ; quá 30 ngày
+  // thì hiện ngày tháng của formatDate thay cho các câu này.
+  "time.justNow": "Vừa xong",
+  "time.minutesAgo": "{count} phút trước",
+  "time.hoursAgo": "{count} giờ trước",
+  "time.yesterday": "Hôm qua",
+  "time.daysAgo": "{count} ngày trước",
 } satisfies Record<string, string>;
 
 export type Dictionary = typeof copy;

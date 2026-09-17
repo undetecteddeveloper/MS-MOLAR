@@ -22,4 +22,19 @@ describe("SupportWidgetTrigger", () => {
     rerender(<SupportWidgetTrigger onOpen={onOpen} />);
     expect(onOpen).not.toHaveBeenCalled();
   });
+
+  // UI-D28: the trigger (z-45) hides while a FilterSheet (`data-filter-sheet`)
+  // or an OverlaySheet (`data-app-overlay`) is open. jsdom does not build
+  // Tailwind's CSS, so `display: none` cannot be measured here; what can be
+  // proven is that the `:has()` variant class for each marker sits on the
+  // button — without that class Tailwind emits no rule and the trigger stays
+  // visible over the overlay.
+  it.each([
+    ["data-filter-sheet", "FilterSheet"],
+    ["data-app-overlay", "OverlaySheet"],
+  ])("carries the [body:has([%s])_&]:hidden class (%s)", (marker) => {
+    render(<SupportWidgetTrigger onOpen={() => {}} />);
+    const button = screen.getByRole("button", { name: "Gửi phản hồi" });
+    expect(button.className.split(/\s+/)).toContain(`[body:has([${marker}])_&]:hidden`);
+  });
 });

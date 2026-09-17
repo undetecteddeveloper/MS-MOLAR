@@ -35,14 +35,16 @@ export function SupportWidgetTrigger({ onOpen }: SupportWidgetTriggerProps) {
       // size lớn cỡ này.
       // Ẩn khi một bảng lọc (`FilterSheet`, mốc `data-filter-sheet`) đang mở:
       // nút này (z-45) nằm TRÊN bottom sheet (z-30) nên ở 360px từng che ô
-      // nhập cuối của bảng lọc Kho đề lẫn Lịch sử (engineer 2026-09-08). Chỉ
-      // bảng lọc, không phải mọi dialog — hộp thoại hỗ trợ của chính nó cần
-      // nút này còn trong DOM để trả tiêu điểm về khi đóng (UI-D7).
+      // nhập cuối của bảng lọc Kho đề lẫn Lịch sử (engineer 2026-09-08). Cũng
+      // ẩn khi một tấm trượt `OverlaySheet` (mốc `data-app-overlay`) đang mở —
+      // scrim chỉ mờ 20% nên nút vẫn trông như bấm được (UI-D28). Chỉ hai mốc
+      // đó, không phải mọi dialog — hộp thoại hỗ trợ của chính nó cần nút này
+      // còn trong DOM để trả tiêu điểm về khi đóng (UI-D7).
       // Nhấc lên khi trang có thanh hành động dính đáy (`data-bottom-bar`, hiện
       // là PublishBar ở màn rà soát đề, 2026-09-09): thanh cao ~68px nằm đúng
       // chỗ nút này, và ở 360px lẫn 768px nút che mất nút Xuất bản. Không ẩn
       // như với bảng lọc — thanh có mặt suốt trang, ẩn là mất hẳn kênh hỗ trợ.
-      className="fixed right-4 bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom,0px)+1rem)] z-[45] size-14 md:right-6 md:bottom-6 [body:has([data-bottom-bar])_&]:bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom,0px)+5.5rem)] md:[body:has([data-bottom-bar])_&]:bottom-24 [body:has([data-filter-sheet])_&]:hidden"
+      className="fixed right-4 bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom,0px)+1rem)] z-[45] size-14 md:right-6 md:bottom-6 [body:has([data-app-overlay])_&]:hidden [body:has([data-bottom-bar])_&]:bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom,0px)+5.5rem)] md:[body:has([data-bottom-bar])_&]:bottom-24 [body:has([data-filter-sheet])_&]:hidden"
     >
       <MessageCircle aria-hidden className="size-6" strokeWidth={1.75} />
     </Button>
