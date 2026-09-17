@@ -111,7 +111,7 @@ describe("HistoryRowMenu", () => {
 
     const menu = screen.getByRole("menu");
     expect(within(menu).getByRole("menuitem", { name: /Lưu/ })).toBeTruthy();
-    expect(within(menu).getByRole("menuitem", { name: /Chia sẻ/ })).toBeTruthy();
+    expect(within(menu).getByRole("menuitem", { name: /Xuất PDF/ })).toBeTruthy();
     const link = within(menu).getByRole("menuitem", { name: "Xem chi tiết" });
     expect(link.getAttribute("href")).toBe("/exams/exam-1/attempt/attempt-1/result");
   });
@@ -136,7 +136,7 @@ describe("HistoryRowMenu", () => {
 
     const { container } = renderMenu();
     fireEvent.click(within(container).getByRole("button", { name: /Thao tác khác cho/ }));
-    fireEvent.click(screen.getByRole("menuitem", { name: /Chia sẻ/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Xuất PDF/ }));
 
     await waitFor(() => expect(navigator.share).toHaveBeenCalledWith({ files: [file] }));
     await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
@@ -149,7 +149,7 @@ describe("HistoryRowMenu", () => {
 
     const { container } = renderMenu();
     fireEvent.click(within(container).getByRole("button", { name: /Thao tác khác cho/ }));
-    fireEvent.click(screen.getByRole("menuitem", { name: /Chia sẻ/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Xuất PDF/ }));
 
     await waitFor(() => expect(mockDownload).toHaveBeenCalledWith(file));
     const status = await screen.findByRole("status");

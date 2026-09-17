@@ -244,7 +244,7 @@ export const copy = {
   "result.essay.retryBudgetOut":
     "Hôm nay hệ thống đã dùng hết lượt chấm tự động. Bạn thử lại vào ngày mai.",
   "result.essay.retryAlreadyGraded": "Câu này đã có điểm rồi.",
-  "result.essay.pdfBlocked": "Đang chấm tự luận. Lưu và chia sẻ PDF sẽ mở lại khi chấm xong.",
+  "result.essay.pdfBlocked": "Đang chấm tự luận. Lưu và xuất PDF sẽ mở lại khi chấm xong.",
   "result.essay.pdfIncomplete":
     "Đề này có câu tự luận không được chấm tự động. Điểm trong tệp chưa bao gồm phần tự luận.",
   "result.essay.pollStopped": "Trang đã ngừng tự cập nhật.",
@@ -471,7 +471,6 @@ export const copy = {
   "auth.notYourAccount": "Không phải tài khoản của bạn?",
   "auth.newPassword": "Mật khẩu mới",
   "auth.confirmNewPassword": "Nhập lại mật khẩu mới",
-  "history.shareUnsupported": "Đã tải về — trình duyệt này không hỗ trợ chia sẻ.",
 
   "error.somethingBroke": "Có gì đó hỏng rồi",
   "error.couldntLoad": "Chúng tôi không tải được trang này",
@@ -496,7 +495,7 @@ export const copy = {
   "common.all": "Tất cả",
   "common.subject": "Môn học",
   "common.grade": "Lớp",
-  "common.share": "Chia sẻ",
+  "common.share": "Xuất PDF",
   "common.active": "đang bật",
 
   // --- Bộ lọc & độ khó ----------------------------------------------------
@@ -532,7 +531,7 @@ export const copy = {
   "rating.errServer": "Chưa lưu được đánh giá lúc này. Bạn thử lại nhé.",
 
   // --- Lịch sử (bổ sung) --------------------------------------------------
-  "history.sharing": "Đang chia sẻ…",
+  "history.sharing": "Đang xuất PDF…",
   "history.moreActionsFor": "Thao tác khác cho {title}",
   // Nhãn PDF viết thường (2026-09-13): mẫu PDF theo theme "Sân trường" dùng
   // eyebrow không in hoa — nhãn in hoa khó đọc với dấu tiếng Việt (§5).

@@ -128,7 +128,7 @@ describe("ActionButton", () => {
     shareMock.mockResolvedValue(undefined);
 
     const { container } = render(<ActionButton action="share" pdfInput={PDF_INPUT} idPrefix="b" blockedReason={null} />);
-    const button = within(container).getByRole("button", { name: "Chia sẻ" });
+    const button = within(container).getByRole("button", { name: "Xuất PDF" });
 
     fireEvent.click(button);
     expect(button.getAttribute("aria-busy")).toBe("true");
@@ -151,7 +151,7 @@ describe("ActionButton", () => {
     const { container, rerender } = render(
       <ActionButton action="share" pdfInput={PDF_INPUT} idPrefix="c" blockedReason={null} />
     );
-    const button = within(container).getByRole("button", { name: "Chia sẻ" });
+    const button = within(container).getByRole("button", { name: "Xuất PDF" });
 
     fireEvent.click(button);
     await waitFor(() => expect(mockDownload).toHaveBeenCalledTimes(1));
@@ -180,7 +180,7 @@ describe("ActionButton", () => {
     shareMock.mockRejectedValue(new DOMException("User cancelled the share", "AbortError"));
 
     const { container } = render(<ActionButton action="share" pdfInput={PDF_INPUT} idPrefix="d" blockedReason={null} />);
-    const button = within(container).getByRole("button", { name: "Chia sẻ" });
+    const button = within(container).getByRole("button", { name: "Xuất PDF" });
 
     fireEvent.click(button);
     await waitFor(() => expect(button.getAttribute("aria-busy")).toBe("false"));
@@ -270,7 +270,7 @@ describe("ActionButton", () => {
       const { container } = render(
         <ActionButton action="share" pdfInput={PDF_INPUT} idPrefix="f-fallback" blockedReason={null} />
       );
-      const button = within(container).getByRole("button", { name: "Chia sẻ" });
+      const button = within(container).getByRole("button", { name: "Xuất PDF" });
       fireEvent.click(button);
       await within(container).findByRole("status");
 
@@ -292,7 +292,7 @@ describe("ActionButton", () => {
       const shareRender = render(
         <ActionButton action="share" pdfInput={PDF_INPUT} idPrefix="g-share" blockedReason={null} />
       );
-      const shareButton = within(shareRender.container).getByRole("button", { name: "Chia sẻ" });
+      const shareButton = within(shareRender.container).getByRole("button", { name: "Xuất PDF" });
       fireEvent.click(shareButton);
       await waitFor(() => expect(shareButton.getAttribute("aria-busy")).toBe("false"));
 
@@ -301,7 +301,7 @@ describe("ActionButton", () => {
       const fallbackRender = render(
         <ActionButton action="share" pdfInput={PDF_INPUT} idPrefix="g-fallback" blockedReason={null} />
       );
-      fireEvent.click(within(fallbackRender.container).getByRole("button", { name: "Chia sẻ" }));
+      fireEvent.click(within(fallbackRender.container).getByRole("button", { name: "Xuất PDF" }));
       await within(fallbackRender.container).findByRole("status");
 
       // Save branch.
@@ -378,7 +378,7 @@ describe("ActionButton", () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe("ActionButton — trạng thái BỊ CHẶN (AC-058)", () => {
-  const REASON = "Đang chấm tự luận. Lưu và chia sẻ PDF sẽ mở lại khi chấm xong.";
+  const REASON = "Đang chấm tự luận. Lưu và xuất PDF sẽ mở lại khi chấm xong.";
 
   it("bị chặn ⇒ KHÔNG gọi generateAttemptPdfFile, và KHÔNG pha bận nào", () => {
     const { container } = render(
@@ -400,7 +400,7 @@ describe("ActionButton — trạng thái BỊ CHẶN (AC-058)", () => {
     const { container } = render(
       <ActionButton action="share" pdfInput={PDF_INPUT} idPrefix="blk2" blockedReason={REASON} />
     );
-    const button = within(container).getByRole("button", { name: /Chia sẻ/ });
+    const button = within(container).getByRole("button", { name: /Xuất PDF/ });
 
     // `disabled` gỡ phần tử khỏi thứ tự tab VÀ đẩy lý do ra ngoài tầm với của
     // trình đọc màn hình — đúng hai thứ AC-058 muốn có.
