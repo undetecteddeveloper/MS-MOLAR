@@ -19,21 +19,37 @@
 // (z-20) nên bảng nổi trên scrim còn thẻ câu hỏi bị che; hai dải dính đỉnh/đáy
 // (z-20) vẫn bấm được — bấm "Câu sau" khi bảng đang mở là chuyện bình thường.
 // Chọn một câu thì bảng ĐÓNG: nó phủ lên chính câu hỏi người dùng vừa nhảy tới.
+//
+// Màn viết/màn xem bài giải cộng đồng dùng lại bảng này ở MỌI bề rộng qua bốn
+// prop tuỳ chọn (cells, triggerLabel, panelTitle, panelMeta). Chúng chỉ CỘNG
+// thêm: trang làm bài không truyền nên render đúng như trước, kể cả chip 40px.
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { LayoutGrid } from "lucide-react";
 import { t } from "@/lib/copy";
 import { cn } from "@/lib/utils";
 import { chipVariants } from "@/components/ui/chip";
 import { POP_EXIT_MS, usePresence } from "@/components/shared/usePresence";
-import { QuestionPagination } from "@/features/exams/components/QuestionPagination";
+import { QuestionPagination, type QuestionCell } from "@/components/shared/QuestionPagination";
 
 interface QuestionPaletteDockProps {
   current: number;
   total: number;
-  answeredIndices: number[];
-  flaggedIndices: number[];
+  /** Bỏ qua khi có `cells`. */
+  answeredIndices?: number[];
+  /** Bỏ qua khi có `cells`. */
+  flaggedIndices?: number[];
+  /** Trạng thái + tên trợ năng theo ô (UI-D26). Nơi gọi có `cells` là màn bài
+   *  giải, nên nút mở cũng lên sàn chạm 44px (UI-D4) — `className` ở đây thuộc
+   *  khối bọc, không tới được nút; trang làm bài không truyền nên giữ 40px. */
+  cells?: QuestionCell[];
+  /** Chữ trên nút (UI-D9). Mặc định "{đã làm}/{tổng}". */
+  triggerLabel?: ReactNode;
+  /** Tiêu đề hiện trong bảng (AC-049). Không truyền thì bảng không có tiêu đề riêng. */
+  panelTitle?: string;
+  /** Dòng phụ cạnh tiêu đề, vd "40 câu" (AC-049). */
+  panelMeta?: string;
   onJump: (index: number) => void;
   className?: string;
 }
@@ -41,8 +57,12 @@ interface QuestionPaletteDockProps {
 export function QuestionPaletteDock({
   current,
   total,
-  answeredIndices,
-  flaggedIndices,
+  answeredIndices = [],
+  flaggedIndices = [],
+  cells,
+  triggerLabel,
+  panelTitle,
+  panelMeta,
   onJump,
   className,
 }: QuestionPaletteDockProps) {
@@ -50,6 +70,9 @@ export function QuestionPaletteDock({
   const { present, closing } = usePresence(open, POP_EXIT_MS);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelId = useId();
+  const answeredCount = cells
+    ? cells.filter((cell) => cell.state === "answered").length
+    : answeredIndices.length;
 
   // Escape đóng bảng và trả focus về nút — không đụng tới phím ← → của
   // ExamPlayer (bộ nghe đó bỏ qua Escape).
@@ -81,11 +104,15 @@ export function QuestionPaletteDock({
         aria-controls={panelId}
         aria-label={t("common.questionPalette")}
         onClick={() => setOpen((v) => !v)}
-        className={cn(chipVariants({ active: open }), "gap-1.5 px-3 tabular-nums")}
+        className={cn(chipVariants({ active: open }), "gap-1.5 px-3 tabular-nums", cells && "h-11")}
       >
         <LayoutGrid aria-hidden className="size-4" />
         <span>
-          {answeredIndices.length}/{total}
+          {triggerLabel ?? (
+            <>
+              {answeredCount}/{total}
+            </>
+          )}
         </span>
       </button>
 
@@ -119,6 +146,9 @@ export function QuestionPaletteDock({
             total={total}
             answeredIndices={answeredIndices}
             flaggedIndices={flaggedIndices}
+            cells={cells}
+            panelTitle={panelTitle}
+            panelMeta={panelMeta}
             onJump={jump}
           />
         </section>

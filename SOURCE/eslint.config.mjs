@@ -4,7 +4,7 @@ import nextTs from "eslint-config-next/typescript";
 
 /** Danh sách tính năng dưới features/ — thêm thư mục mới thì thêm tên vào đây,
  *  nếu không luật B4 bên dưới không bảo vệ thư mục đó. */
-const FEATURES = ["admin", "analytics", "auth", "authoring", "billing", "exams", "history", "profile"];
+const FEATURES = ["admin", "analytics", "auth", "authoring", "billing", "exams", "history", "profile", "solutions"];
 
 const eslintConfig = defineConfig([
   ...nextVitals,

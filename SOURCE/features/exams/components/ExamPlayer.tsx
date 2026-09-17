@@ -23,8 +23,8 @@ import { ExplainStepAffordance } from "@/components/tutor/ExplainStepAffordance"
 import { ExamTimer } from "@/features/exams/components/ExamTimer";
 import { LeaveExamDialog } from "@/features/exams/components/LeaveExamDialog";
 import { QuestionRenderer } from "@/features/exams/components/QuestionRenderer";
-import { QuestionPagination } from "@/features/exams/components/QuestionPagination";
-import { QuestionPaletteDock } from "@/features/exams/components/QuestionPaletteDock";
+import { QuestionPagination } from "@/components/shared/QuestionPagination";
+import { QuestionPaletteDock } from "@/components/shared/QuestionPaletteDock";
 import { useExamPlayer } from "@/hooks/useExamPlayer";
 import { useLeaveGuard } from "@/hooks/useLeaveGuard";
 import { useSwipe } from "@/hooks/useSwipe";
