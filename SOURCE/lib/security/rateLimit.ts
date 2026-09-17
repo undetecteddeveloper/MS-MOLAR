@@ -237,6 +237,41 @@ export const RATE_LIMITS = {
   // 10 * GROQ_CALLS_PER_ESSAY = 30 request Groq/ngay — mot phan nho cua
   // GROQ_BUDGET_DAILY_LIMIT, thu ma budget.ts cuong che doc lap va fail-closed.
   retryEssayGrading: { limit: 10, windowMs: 24 * 60 * 60 * 1000 },
+  // Bài giải cộng đồng (backend DD § Rate-limit entries, AC-100/S16). CÙNG HỌ
+  // với khối đầu: cả mười một action chỉ tốn Postgres của CHÍNH ta qua RPC,
+  // không tiêu hạn ngạch bên thứ ba và không nhận credential, nên chúng thuộc
+  // DB_COST_ACTIONS và chịu sàn `limit >= 15`, `windowMs >= 60_000`
+  // (rateLimit.test.ts). Mỗi hành động ghi một khoá riêng, không mượn khoá cũ.
+  //
+  // Lưu ghi chú/nháp: người viết lưu lặp lại khi soạn tới ~50 câu một lượt.
+  communitySolutionSave: { limit: 60, windowMs: 60 * 60 * 1000 },
+  // Đăng/gỡ về nháp hiếm và có chủ đích; sàn 15 đã dư cho mức dùng thật.
+  communitySolutionStatus: { limit: 15, windowMs: 60 * 60 * 1000 },
+  // Hữu ích lấy đúng trần 40 của rateExam, vì một phiên đọc có thể đánh dấu
+  // nhiều bài giải khác nhau.
+  communitySolutionHelpful: { limit: 40, windowMs: 60 * 60 * 1000 },
+  // Gửi bình luận: trần 30 như submitExam, một lượt ghi DB tần suất vừa phải.
+  communitySolutionComment: { limit: 30, windowMs: 60 * 60 * 1000 },
+  // Xoá bình luận của chính mình là việc sửa sai, hiếm hơn gửi nên đặt ở sàn.
+  communitySolutionCommentDelete: { limit: 15, windowMs: 60 * 60 * 1000 },
+  // Báo cáo bài giải là anh em của reportExam (mỗi người một báo cáo cho mỗi
+  // đích), nên dùng lại đúng trần 15 của nó.
+  communitySolutionReport: { limit: 15, windowMs: 60 * 60 * 1000 },
+  // Báo cáo bình luận là nhánh đích-bình-luận của cùng bảng
+  // community_content_reports, nên cùng trần 15.
+  communityCommentReport: { limit: 15, windowMs: 60 * 60 * 1000 },
+  // Ghim chỉ tác giả đề gọi được và hiếm dùng, nhưng "hiếm" không phải lý do
+  // của nhóm chặn-lạm-dụng, nên vẫn nằm ở sàn tốn-DB.
+  communitySolutionPin: { limit: 15, windowMs: 60 * 60 * 1000 },
+  // Đánh dấu đã đọc có thể bắn mỗi lần mở tab "Bình luận" trong một phiên, nên
+  // chung trần cao nhất với communitySolutionSave.
+  communityCommentsMarkRead: { limit: 60, windowMs: 60 * 60 * 1000 },
+  // Admin ẩn/khôi phục/xoá hẳn bài giải: 30 đủ để một admin dọn một hàng đợi
+  // kiểm duyệt dày trong một lượt duyệt.
+  communityAdminModerateSolution: { limit: 30, windowMs: 60 * 60 * 1000 },
+  // Kiểm duyệt bình luận là song sinh của communityAdminModerateSolution: cùng
+  // người gọi, cùng lý do, cùng trần.
+  communityAdminModerateComment: { limit: 30, windowMs: 60 * 60 * 1000 },
 } as const;
 
 /** Cửa sổ dài nhất đang cấu hình — mốc "chắc chắn hết hiệu lực" của `pruneOldest`. */

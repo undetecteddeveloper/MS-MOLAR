@@ -107,6 +107,26 @@ describe("guard", () => {
   // Hai danh sách dưới đây liệt kê tường minh, không suy ra từ nhau: thêm action
   // mới vào RATE_LIMITS mà quên xếp nhóm sẽ làm case "phân loại" đỏ, thay vì
   // lọt qua cả hai nhánh mà không ai quyết định nó thuộc nhóm nào.
+  //
+  // Bài giải cộng đồng (backend DD § Rate-limit entries, AC-100/S16): mỗi hành
+  // động ghi của tính năng một khoá riêng, và cả mười một đều thuộc nhóm
+  // tốn-DB — chúng chỉ tốn Postgres của CHÍNH ta qua RPC, không tiêu hạn ngạch
+  // bên thứ ba, không nhận credential. Khai MỘT lần ở đây rồi trải vào
+  // DB_COST_ACTIONS, để case phân loại và case sàn bên dưới phủ luôn cả mười
+  // một mà không chép lại.
+  const COMMUNITY_SOLUTIONS_ACTIONS = [
+    "communitySolutionSave",
+    "communitySolutionStatus",
+    "communitySolutionHelpful",
+    "communitySolutionComment",
+    "communitySolutionCommentDelete",
+    "communitySolutionReport",
+    "communityCommentReport",
+    "communitySolutionPin",
+    "communityCommentsMarkRead",
+    "communityAdminModerateSolution",
+    "communityAdminModerateComment",
+  ] as const satisfies readonly (keyof typeof RATE_LIMITS)[];
   const DB_COST_ACTIONS: readonly (keyof typeof RATE_LIMITS)[] = [
     "submitExam",
     "rateExam",
@@ -123,6 +143,7 @@ describe("guard", () => {
     // ta, không hạn ngạch bên thứ ba, không nhận credential. Cửa sổ phút (60_000)
     // đúng bằng sàn của nhóm này.
     "searchExams",
+    ...COMMUNITY_SOLUTIONS_ACTIONS,
   ];
   // `uploadExam` thuộc nhóm này chứ KHÔNG phải nhóm tốn-DB, dù nó cũng ghi DB và
   // cũng nhận file: thứ giới hạn nó là hạn ngạch Gemini, y như explainStep, và
@@ -170,6 +191,25 @@ describe("guard", () => {
       ...GROQ_CAPPED_ACTIONS,
     ].sort();
     expect(classified).toEqual(Object.keys(RATE_LIMITS).sort());
+  });
+
+  it("gives each community-solutions write action its own key, classified exactly once", () => {
+    // S16: không action nào dùng chung khoá với action có sẵn. Một tên trùng
+    // khoá cũ sẽ xuất hiện HAI lần trong các nhóm gộp dưới đây, nên case này
+    // đỏ ngay tại đúng tên đó thay vì chỉ báo hai danh sách lệch nhau.
+    const classified = [
+      ...DB_COST_ACTIONS,
+      ...SUPPLIER_CAPPED_ACTIONS,
+      ...ABUSE_CAPPED_ACTIONS,
+      ...GROQ_CAPPED_ACTIONS,
+    ];
+    const configured = Object.keys(RATE_LIMITS);
+
+    expect(new Set(COMMUNITY_SOLUTIONS_ACTIONS).size).toBe(11);
+    for (const action of COMMUNITY_SOLUTIONS_ACTIONS) {
+      expect(configured).toContain(action);
+      expect(classified.filter((listed) => listed === action)).toEqual([action]);
+    }
   });
 
   it("keeps every DB-cost limit generous enough not to hit a real user", () => {
