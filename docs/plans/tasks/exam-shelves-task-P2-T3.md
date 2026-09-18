@@ -13,8 +13,8 @@ Metadata:
 Create `SOURCE/features/exams/components/ExamShelf.tsx` (`ExamShelf` async server component, module-local `SHELF` map, module-local `ExamShelfTile`, exported `shelfSubtitle()`). Create `SOURCE/features/exams/components/__tests__/ExamShelf.test.tsx`.
 
 ## Target Files
-- [ ] `SOURCE/features/exams/components/ExamShelf.tsx` (new)
-- [ ] `SOURCE/features/exams/components/__tests__/ExamShelf.test.tsx` (new)
+- [x] `SOURCE/features/exams/components/ExamShelf.tsx` (new)
+- [x] `SOURCE/features/exams/components/__tests__/ExamShelf.test.tsx` (new)
 
 ## Investigation Targets
 - `docs/design/exam-shelves-frontend-design.md` (§ Data flow "Facts → strings", § Shelf composition table — SHELF map)
@@ -54,19 +54,32 @@ Design-to-Plan Traceability marks "§ Data contracts — ExamShelf 5-prop contra
 - **shared-state dependency**: `ExamShelf`'s duplicated eligibility predicate consuming the ONE `submittedExamIds` set (see Proof Obligations).
 
 ## Investigation Notes
-_(Record here: confirmation the practice/hot/explore `viewAllHref` values match the templates exactly; confirmation `subjectLabel()` is used, not a raw code; confirmation of the positive-assertion-before-empty-tree-check pattern used in the tests.)_
+- All Investigation Targets read in full: frontend DD (§ Data flow, § Data contracts — `ExamShelf` 5-prop / `SHELF` map / guarantee table, § Minimal Surface Alternatives Element 3, § Rendering/performance/motion), backend DD (§ SQL objects for context, § Query layer `ExamShelves`/`HotExamList` contracts — `features/exams/queries/shelves.ts` confirmed **not yet created**, see below), UI Spec (§ Component: ExamShelf / ExamShelfTile, § Shelf composition, § Layout and scroll, § Copy Keys), `renderServerTree.tsx` (empty-tree hazard: `null`-returning async component ⇒ `container.innerHTML === ""`, confirmed by the `AuthorByline` precedent cited in the frontend DD), `lib/adaptive/examShelves.ts` (P1-T4, landed — exports `HotRung` used directly), `lib/copy.ts` (P1-T2, landed — see key-name finding below), `ExamCard.tsx`/`ExamRibbon.tsx` (P2-T2/P2-T1, landed, composed here), `ExamBrowser.tsx` (source of the `eligibilityFor` 2-line predicate duplicated here per UI Spec), `RateButton.tsx` (`RateEligibility` type location), `lib/ugc/subjects.ts` (`subjectLabel`), `lib/exams/attemptSource.ts` (`AttemptSource` type), `lib/exams/browseParams.ts` (context only, not consumed here), `app/page.tsx:119-130` (header-link class string copied whole + `whitespace-nowrap`).
+
+- **Unimplemented dependency (Unimplemented Dependency Handling applied)**: the frontend DD's `Contract: ExamShelf` section types `shelf: ShelfKind` and its own `shelfSubtitle(kind, data)` code sample against `ShelfKind`/`ExamShelves` declared in `features/exams/queries/shelves.ts` (backend DD, "New" — confirmed absent via `Glob` on `SOURCE/features/exams/queries/*.ts`: only `catalogue.ts, index.ts, player.ts, ranking.ts, result.ts, rows.ts, search.ts` exist). Local, reversible construct chosen: `ShelfKind` (`"practice"|"hot"|"explore"`) and a local `ShelfData` union (structurally mirroring `ExamShelves["practice"|"hot"|"explore"]` member shapes verbatim from the backend DD's `Contract: listExamShelves()` block) are declared and exported from `ExamShelf.tsx` itself, scoped to this Target File. `HotRung` is NOT re-declared — it already exists and is imported from `@/lib/adaptive/examShelves` (P1-T4, landed). **Integration handoff for whichever task creates `features/exams/queries/shelves.ts`**: reconcile the two declarations (either that file imports `ShelfKind`/re-exports from `ExamShelf.tsx`, or `ExamShelf.tsx` switches its import to the new canonical source) — both are structurally identical today, so no runtime behavior depends on which wins.
+
+- **Copy-key naming finding (affects Reference Contracts row 3)**: the frontend DD's `Facts → strings` code sample shows a **renamed** `HOT_SUBTITLE` map (`grade-recent → exams.shelfHotGradeRecent`, `grade-30d → exams.shelfHotGrade30d`, `site-recent → exams.shelfHotSiteRecent`, `site-30d → exams.shelfHotSite30d`), with a note that the rename happens "here" (i.e., is this task's to perform). However `lib/copy.ts` was already landed by P1-T2 using the **original** UI-Spec key names — confirmed via `Grep`: `exams.shelfHotGradeWeek`, `exams.shelfHotGradeMonth`, `exams.shelfHotGradeAll`, `exams.shelfHotSiteWeek`, `exams.shelfHotSiteMonth`, `exams.shelfHotSiteAll` (no `GradeRecent`/`Grade30d`/`SiteRecent`/`Site30d` keys exist in `copy.ts`, and P1-T2's own Reference Contracts table names the mapping by rung→literal, never by the renamed key). Since `copy.ts` is a landed, out-of-scope dependency (not in this task's Target Files) and `MessageKey = keyof typeof copy` would make a reference to the DD's renamed keys a `tsc` error, `HOT_SUBTITLE` in `ExamShelf.tsx` maps to the **actual existing** `copy.ts` keys, not the DD's stale renamed sample. This is a safe concretization to the real, already-decided dependency contract (P1-T2), not a design deviation — the rung→Vietnamese-literal mapping itself (the thing every AC and the UI Spec actually pin) is unaffected and matches exactly.
+
+- Reference Contracts re-evaluated against the final implementation:
+  - Row 1 (`viewAllHref` templates + explore 0 header links): **Y** — `SHELF.practice.viewAllHref = (exams) => \`/exams?subject=${encodeURIComponent(exams[0].subject)}\``, `SHELF.hot.viewAllHref = () => "/exams?sort=hot"`, `SHELF.explore.viewAllHref = null` ⇒ header renders a `<Link>` only when `viewAllHref` is non-null, so explore renders 0 header links. Covered by `ExamShelf.test.tsx` cases for AC-050/AC-035/AC-004.
+  - Row 2 (AC-012 `subjectLabel()`, not raw code/shorthand): **Y** — `shelfSubtitle("practice", data)` calls `subjectLabel(data.subject)` before interpolating `{subject}`; test asserts `shelfSubtitle("practice", {subject:"Chemistry",...})` contains "Hóa học", never "Chemistry" or "Hoá". Note: `subtitle` itself is a pre-interpolated **prop** on `<ExamShelf>` (the component never re-derives it from `exam` data) — `shelfSubtitle()` is the exported helper the future page caller (P5-T1) will use to build that prop.
+  - Row 3 (6 `HOT_SUBTITLE` rung mappings): **Y** — see copy-key naming finding above; all 6 rungs map to the real `copy.ts` keys and produce the exact literals P1-T2 already verified byte-for-byte. Covered by 6 `shelfSubtitle("hot", ...)` cases, one per `HotRung`.
+  - Row 4 (AC-026 exactly 1 ribbon at rank 1): **Y** — `ribbon={spec.ribbonOnFirst && i === 0 ? t("exams.hotRibbon") : undefined}` inside the `.map`, copied verbatim from the DD's own guarantee-table expression. Covered by a hot-shelf test with 3+ exams asserting ribbon count = 1 and its position = first `<li>`.
+  - Row 5 (AC-032 tile last `<li>`, explore only, ≤10 cards + tile): **Y** — `spec.trailingTile && <ExamShelfTile />` appended after the `.map()`, only `explore` sets the flag. Residual: the ≤10-card cap on `exams` itself is a caller (producer/query-layer) guarantee per the `ExamShelf` Data Contract ("Ranked then cut to ≤10 in Node before it arrives") — out of this component's proof scope, matching AC-002/AC-006's ownership.
+
+- Empty-tree / positive-assertion-before-absence pattern (same hazard as `ExamCard`): `ExamShelf.test.tsx`'s first test is a positive-shape assertion (icon + `h2` + subtitle + link present) so `renderServerTree` producing an empty/broken tree fails loudly there first; the AC-051 empty-input case (`exams: []` ⇒ `container.innerHTML === ""`) is ordered after it in the file, mirroring `ExamCard.snapshot.test.tsx`'s positive-`h3`-before-snapshot ordering.
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
-- [ ] Read all Investigation Targets and record key observations
-- [ ] Write failing cases for: AC-004 (icon+h2+subtitle+link per SHELF, no link on explore), AC-026 (1 ribbon at index 0, 0 at 1..9), AC-032 (tile last `<li>` on explore only), AC-035 (hot shelf header link = `/exams?sort=hot`, mirroring the AC-050 practice-shelf assertion), AC-039 (every card href carries the shelf's `?from=`), AC-051 (`exams: []` ⇒ returns `null`), AC-047 (every card a focusable link in DOM order, row has no `tabIndex`/`role`)
-- [ ] Confirm each fails because the component does not yet exist
+- [x] Read all Investigation Targets and record key observations
+- [x] Write failing cases for: AC-004 (icon+h2+subtitle+link per SHELF, no link on explore), AC-026 (1 ribbon at index 0, 0 at 1..9), AC-032 (tile last `<li>` on explore only), AC-035 (hot shelf header link = `/exams?sort=hot`, mirroring the AC-050 practice-shelf assertion), AC-039 (every card href carries the shelf's `?from=`), AC-051 (`exams: []` ⇒ returns `null`), AC-047 (every card a focusable link in DOM order, row has no `tabIndex`/`role`)
+- [x] Confirm each fails because the component does not yet exist
 ### 2. Green Phase
-- [ ] Implement `ExamShelf.tsx`: the module-local `SHELF` map, `ExamShelfTile`, exported `shelfSubtitle()`, and the async server component itself
-- [ ] Run tests and confirm all pass
+- [x] Implement `ExamShelf.tsx`: the module-local `SHELF` map, `ExamShelfTile`, exported `shelfSubtitle()`, and the async server component itself
+- [x] Run tests and confirm all pass
 ### 3. Refactor Phase
-- [ ] Confirm a positive assertion (a real shelf title/card) precedes every negative/absence assertion in the test file (same empty-tree hazard as `ExamCard`)
-- [ ] Confirm 0 client fetches, literal `key` usage (no array-index keys), `motion-safe:scroll-smooth` class present, 0 edits to `globals.css`
+- [x] Confirm a positive assertion (a real shelf title/card) precedes every negative/absence assertion in the test file (same empty-tree hazard as `ExamCard`)
+- [x] Confirm 0 client fetches, literal `key` usage (no array-index keys), `motion-safe:scroll-smooth` class present, 0 edits to `globals.css`
 
 ## Quality Assurance Mechanisms
 - `npx tsc --noEmit` — Config: `SOURCE/tsconfig.json` (project-wide)
@@ -103,9 +116,9 @@ _(Record here: confirmation the practice/hot/explore `viewAllHref` values match 
   - **Residual**: full end-to-end proof that only ONE attempt read feeds all 3 shelves is P3-T2's Proof Obligation, not this component's; this task only proves the component's prop contract doesn't invite a second, parallel computation.
 
 ## Completion Criteria
-- [ ] All added tests pass, covering the full AC list above
-- [ ] Every Reference Contract's Compliance Check evaluates to `Y`
-- [ ] Gates 1-6 green
+- [x] All added tests pass, covering the full AC list above
+- [x] Every Reference Contract's Compliance Check evaluates to `Y`
+- [x] Gates 1-6 green
 
 ## Notes
 - Impact scope: `ExamShelf.tsx` (new, incl. module-local `ExamShelfTile`), its test file (new). `ExamBrowser` is explicitly **not** touched (Minimal Surface Alternatives Element 3 — byte-untouched).
