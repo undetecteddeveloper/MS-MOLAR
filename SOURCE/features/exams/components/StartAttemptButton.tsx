@@ -14,8 +14,17 @@ import { startAttempt } from "@/features/exams/actions";
 import { t } from "@/lib/copy";
 import { StartAttemptSubmit } from "@/features/exams/components/StartAttemptSubmit";
 
-export async function StartAttemptButton({ examId }: { examId: string }) {
-  const start = startAttempt.bind(null, examId, undefined);
+export async function StartAttemptButton({
+  examId,
+  source,
+}: {
+  examId: string;
+  /** `?from=` đọc thô từ `[id]/page.tsx` (P6-T1) — untrusted, chưa qua
+   *  whitelist. `toAttemptSource()` là điểm chuẩn hoá DUY NHẤT, và nó sống ở
+   *  `startAttempt` (server-action boundary), không phải ở đây. */
+  source?: string;
+}) {
+  const start = startAttempt.bind(null, examId, source);
 
   return (
     <form action={start}>

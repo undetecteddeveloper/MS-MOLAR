@@ -27,8 +27,17 @@ import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 
-export default async function ExamDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+export default async function ExamDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  /** `?from=` — kệ nguồn (Kho đề theo kệ, P6-T1). Đọc thô, không kiểu hoá
+   *  bằng union: bất kỳ ai cũng gõ được URL này, và `toAttemptSource()` ở
+   *  `startAttempt` mới là điểm chuẩn hoá duy nhất, không phải ở đây. */
+  searchParams: Promise<{ from?: string }>;
+}) {
+  const [{ id }, { from }] = await Promise.all([params, searchParams]);
   const exam = await getExam(id);
 
   if (!exam) {
@@ -124,7 +133,7 @@ export default async function ExamDetailPage({ params }: { params: Promise<{ id:
               })}
             </p>
           </div>
-          <StartAttemptButton examId={exam.id} />
+          <StartAttemptButton examId={exam.id} source={from} />
         </Card>
       </div>
 
