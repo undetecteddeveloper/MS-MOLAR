@@ -198,7 +198,14 @@ create table if not exists public.exam_attempts (
   exam_id      text not null references public.exams (id) on delete cascade,
   status       text not null default 'in_progress',  -- 'in_progress' | 'submitted'
   started_at   timestamptz not null default now(),
-  submitted_at timestamptz
+  submitted_at timestamptz,
+  -- Kệ đã đưa học sinh tới lượt làm bài này: 'practice' | 'hot' | 'explore' |
+  -- 'none' (không rõ / gõ thẳng URL, hoặc giá trị lạ đã bị chuẩn hoá về đây —
+  -- xem lib/exams/attemptSource.ts). Bảng dựng MỚI nhận cột qua đây; hai
+  -- database đã tồn tại nhận qua cặp alter idempotent ở §20a bên dưới — cùng
+  -- logic `user_id` phía trên dùng cho §15.
+  source       text not null default 'none'
+               check (source in ('practice', 'hot', 'explore', 'none'))
 );
 
 create table if not exists public.attempt_answers (
@@ -2552,6 +2559,87 @@ create index if not exists exams_author_idx
 -- thì mỗi câu bị xoá là một lần quét toàn bảng attempt_answers.
 create index if not exists attempt_answers_question_idx
   on public.attempt_answers (question_id);
+
+-- ----------------------------------------------------------------------------
+-- 20. Kho đề theo kệ — nguồn gốc lượt làm bài + đếm nóng liên người dùng
+--     (2026-09-18, ADR-0021).
+--
+--     ĐẶT SAU §19 (khối chỉ mục, kết thúc ngay phía trên) và TRƯỚC §17
+--     (schema_version, ngay phía dưới): thân hàm exam_hot_counts() gọi
+--     public.is_author_banned() (§18a), public.exams và public.exam_attempts,
+--     nên thứ tự phụ thuộc đặt khối này sau cả ba; §17 luôn phải là câu lệnh
+--     CUỐI CÙNG của file vì khối vân tay ở đó phải là thứ ghi sau chót. Số thứ
+--     tự các mục trong file này là lịch sử, không phải vị trí.
+-- ----------------------------------------------------------------------------
+
+-- 20a. `source` đã inline ở `create table if not exists public.exam_attempts`
+--      phía trên; đây là cặp alter idempotent cho hai database ĐANG CHẠY sẵn,
+--      vì `create table if not exists` là no-op trên cả hai. Postgres tự đặt
+--      tên CHECK inline đúng bằng `exam_attempts_source_check` — tên cặp
+--      drop/add dưới đây dùng — nên khai hai lần vẫn ra MỘT ràng buộc. Vế drop
+--      đứng trước vế add chỉ để idempotent khi áp lại lần hai; không ràng
+--      buộc tên đó tồn tại trên database nào hiện nay.
+alter table public.exam_attempts add column if not exists source text not null default 'none';
+alter table public.exam_attempts drop constraint if exists exam_attempts_source_check;
+alter table public.exam_attempts add constraint exam_attempts_source_check
+  check (source in ('practice', 'hot', 'explore', 'none'));
+
+-- 20b. Chỉ mục cửa sổ hot cần: lọc theo trạng thái, sắp theo thời điểm nộp
+--      bài — cột lọc trước, cột sắp xếp sau, đúng quy ước §19. Ở số dòng hiện
+--      tại planner vẫn chọn Seq Scan (lý do đã ghi ở §19); chỉ mục có sẵn để
+--      khi bảng lớn theo người dùng thật không ai phải nhớ thêm nó đúng lúc.
+create index if not exists exam_attempts_status_submitted_idx
+  on public.exam_attempts (status, submitted_at desc);
+
+-- 20c. Đếm nóng liên người dùng. `attempts_select_own` chỉ cho user đọc đúng
+--      lượt của chính mình, nên "đề này bao nhiêu học sinh đã nộp" không đọc
+--      được kiểu nào khác — SECURITY DEFINER là đường duy nhất. Một hàm
+--      definer không chạy dưới RLS, nên vị từ bên trong LẶP LẠI đúng những gì
+--      `exams_select_visible` (§18b) áp: published + tác giả không bị ban;
+--      không lặp lại nghĩa là mở khả kiến rộng hơn bảng xếp hạng phẳng, một
+--      cách âm thầm. Không tham số user id nào — hàm chỉ nhận biên cửa sổ thời
+--      gian và một trần hàng.
+create or replace function public.exam_hot_counts(
+  p_since_recent timestamptz,
+  p_since_wide   timestamptz,
+  p_max_rows     int default 500
+)
+returns table (
+  exam_id      text,
+  recent_count bigint,
+  wide_count   bigint,
+  total_count  bigint
+)
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  -- date_trunc chặn CẢ HAI biên caller gửi lên về đúng giờ, phía server: thiếu
+  -- dòng này thì một JWT có thể chia đôi trục thời gian tới khi số đếm nhích
+  -- lên, định vị lượt nộp bài của người khác chính xác tới giây. Chặn theo giờ
+  -- không tốn gì của một bậc thang 7/30 ngày.
+  select a.exam_id,
+         count(*) filter (where a.submitted_at >= date_trunc('hour', p_since_recent))::bigint,
+         count(*) filter (where a.submitted_at >= date_trunc('hour', p_since_wide))::bigint,
+         count(*)::bigint
+    from public.exam_attempts a
+    join public.exams e on e.id = a.exam_id
+   where a.status = 'submitted'
+     and e.status = 'published'
+     and not public.is_author_banned(e.author_id)
+   group by a.exam_id
+   order by 4 desc, 2 desc, 1
+   limit least(greatest(coalesce(p_max_rows, 500), 1), 1000)
+$$;
+
+-- Cấp theo hình dạng search_exams (§ Tìm đề theo tên, :185-186), KHÔNG theo
+-- exam_rating_aggregate (:1566-1567): exam_rating_aggregate cấp cho anon vì
+-- một view security_invoker gọi nó THAY MẶT anon và nếu không sẽ 42501 thay vì
+-- trả rỗng; không gì vô danh gọi hàm này, và `/exams` không nằm trong
+-- PUBLIC_PATHS.
+revoke all on function public.exam_hot_counts(timestamptz, timestamptz, int) from public, anon;
+grant execute on function public.exam_hot_counts(timestamptz, timestamptz, int) to authenticated, service_role;
 
 -- ----------------------------------------------------------------------------
 -- 17. Phiên bản schema — DB tự khai nó đang chạy bản nào (2026-08-07).
