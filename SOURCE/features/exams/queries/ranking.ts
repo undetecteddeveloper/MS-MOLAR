@@ -13,14 +13,49 @@ import {
   EXAM_RANK_RECENCY_WEIGHT,
   EXAM_RANK_SUBJECT_WEAKNESS_WEIGHT,
 } from "@/lib/adaptive/constants";
+import { orderIdsByHotCount, type HotCounts, type ShelfCandidate } from "@/lib/adaptive/examShelves";
 import { rankExamIds } from "@/lib/adaptive/rankExams";
 import { createClient } from "@/lib/supabase/server";
 import { readBounded } from "@/lib/supabase/boundedRead";
 import { paginateExams } from "@/lib/exams/paginate";
 import type { Exam } from "@/types/exam";
-import { toExam } from "./rows";
+import { toExam, type ExamRow } from "./rows";
 import { fetchExamRows, type ExamFilters } from "./catalogue";
 import { readMyAttemptRows, submittedExamIdsOf, toShelfAttempts } from "./attempts";
+import { readHotCounts } from "./hotCounts";
+
+/**
+ * `ExamRow[]` → `ShelfCandidate[]`, riêng cho nhánh `?sort=hot` bên dưới —
+ * `orderIdsByHotCount` (P1-T4, `lib/adaptive/examShelves.ts`) chỉ thật sự đọc
+ * field `id`, nhưng đòi kiểu `ShelfCandidate[]` đầy đủ.
+ *
+ * Bản sao CỤC BỘ của `candidatesFromRows` trong `shelves.ts` — hàm đó KHÔNG
+ * export và nằm ngoài Target Files của task này (P4-T2). Rule of Three: đây là
+ * lần thứ 2 của phép ánh xạ 5 trường thuần cấu trúc này (lần 1 phục vụ 2 nơi
+ * gọi ngay trong `shelves.ts`); hợp nhất bị hoãn lại, không bắt buộc ở lần 2.
+ */
+function hotCandidatesFromRows(rows: readonly ExamRow[]): ShelfCandidate[] {
+  return rows.map((row) => ({
+    id: row.id,
+    grade: row.grade,
+    subject: row.subject,
+    school: row.school,
+    createdAt: row.created_at,
+  }));
+}
+
+/**
+ * Đề trong đúng thứ tự "Nổi nhất" phẳng (`total_count DESC, id ASC`, AC-018) —
+ * id không còn nằm trong `rows` (hiếm) bị bỏ, cùng quy ước "rơi khỏi rowById
+ * thì bị bỏ" mà nhánh xếp hạng cá nhân hoá bên dưới đã dùng.
+ */
+function applyHotOrder(rows: readonly ExamRow[], hotCounts: ReadonlyMap<string, HotCounts>): ExamRow[] {
+  const rowById = new Map(rows.map((row) => [row.id, row]));
+  return orderIdsByHotCount(hotCandidatesFromRows(rows), hotCounts).flatMap((id) => {
+    const row = rowById.get(id);
+    return row ? [row] : [];
+  });
+}
 
 // --- Xếp hạng cá nhân hoá cho /exams (ADR-0015) -----------------------------
 
@@ -68,18 +103,28 @@ export async function listExamsRanked(
   page = 1
 ): Promise<RankedExamList> {
   const supabase = await createClient();
+  // Đồng hồ đọc ĐÚNG MỘT LẦN mỗi lượt gọi (ADR-0021 D4) — kể cả trên đường
+  // không phải `?sort=hot`, cùng quy ước `shelves.ts` đã dùng cho `now`.
+  const now = new Date();
 
   // Hai lệnh đọc dưới đây lớn theo hoạt động của MỘT người (RLS khoá về
   // auth.uid()), nên chậm chạm trần hơn hẳn catalog. Vẫn đặt biên: chạm trần ở
   // đây làm tín hiệu xếp hạng bị tính trên dữ liệu thiếu, và thứ tự sai thì
   // không có cách nào nhìn ra bằng mắt — nó chỉ là một thứ tự khác.
-  const [rows, attemptRows, resultRows] = await Promise.all([
+  //
+  // Thành viên thứ 4: `?sort=hot` là trục DUY NHẤT cần cửa sổ đếm cross-user
+  // (backend DD § The ?sort=hot axis). Mọi đường khác giữ nguyên ngân sách 3
+  // lượt đọc — nhánh else là một Promise ĐÃ RESOLVE, 0 lượt gọi mạng thêm.
+  const [rows, attemptRows, resultRows, hotCounts] = await Promise.all([
     fetchExamRows(filters),
     readMyAttemptRows(supabase, "listExamsRanked.attempts"),
     readBounded(
       "listExamsRanked.results",
       supabase.from("exam_results").select("attempt_id, total_score")
     ) as Promise<{ attempt_id: string; total_score: number | string }[]>,
+    filters?.sort === "hot"
+      ? readHotCounts(supabase, "listExamsRanked.hotCounts", now)
+      : Promise.resolve<Map<string, HotCounts>>(new Map()),
   ]);
 
   const submittedExamIds = submittedExamIdsOf(attemptRows);
@@ -94,9 +139,15 @@ export async function listExamsRanked(
 
   const attempts = toShelfAttempts(attemptRows, scoreByAttempt);
 
-  // `?sort` tường minh thắng cá nhân hoá — trả thẳng thứ tự DB-side.
+  // `?sort` tường minh thắng cá nhân hoá — trả thẳng thứ tự DB-side, TRỪ
+  // `"hot"`: trục đó không có thứ tự DB-side thật (catalogue.ts chỉ
+  // `.order("id")` để cấp đầu vào tất định) — thứ tự thật dựng ở ĐÂY, Node-side,
+  // bằng `orderIdsByHotCount` trên cửa sổ đếm cross-user vừa đọc ở trên
+  // (AC-018/AC-034). `?dir` không được đọc ở nhánh này — vẫn được CHẤP NHẬN
+  // (không throw/400) nhưng không có hiệu lực, đúng Proof Obligation của task.
   if (filters?.sort) {
-    return { ...paginateExams(rows.map(toExam), page), submittedExamIds };
+    const orderedRows = filters.sort === "hot" ? applyHotOrder(rows, hotCounts) : rows;
+    return { ...paginateExams(orderedRows.map(toExam), page), submittedExamIds };
   }
 
   const orderedIds = rankExamIds({

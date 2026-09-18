@@ -13,8 +13,8 @@ Metadata:
 In `SOURCE/features/exams/queries/ranking.ts`, add the `sort === "hot"` branch — a 4th `Promise.all` member that is `Promise.resolve([])` unless `filters.sort === "hot"`, in which case it calls `readHotCounts` (Phase 3) and reorders the fetched exams via `orderIdsByHotCount` (Phase 1) before `paginateExams`.
 
 ## Target Files
-- [ ] `SOURCE/features/exams/queries/ranking.ts`
-- [ ] `SOURCE/features/exams/queries/index.ts` (re-export, if needed)
+- [x] `SOURCE/features/exams/queries/ranking.ts`
+- [x] `SOURCE/features/exams/queries/index.ts` (re-export, if needed) — not needed: `listExamsRanked`'s signature and exports are unchanged (`ExamFilters.sort` already admits `"hot"` since P4-T1), so `index.ts:29`'s existing `export { listExamsRanked } from "./ranking";` covers it verbatim. 0 lines changed.
 
 ## Investigation Targets
 - `docs/design/exam-shelves-backend-design.md` (§ The `?sort=hot` axis — full pseudocode)
@@ -30,17 +30,32 @@ In `SOURCE/features/exams/queries/ranking.ts`, add the `sort === "hot"` branch �
 | docs/prd/exam-shelves-prd.md (§ AC-018) | structure-order | "submitted attempt count DESC, exam id ASC, where the count includes attempts by all students, not only the caller" | Does the `?sort=hot` branch order the flat-grid results using `orderIdsByHotCount`'s cross-user total, with 0 fallback to a per-caller count? |
 
 ## Investigation Notes
-_(Record here: confirmation `readHotCounts` and `orderIdsByHotCount` are imported and reused, not duplicated; confirmation `?dir` is accepted but has no ordering effect on this axis.)_
+
+**Investigation Targets read:**
+- `docs/design/exam-shelves-backend-design.md` § The `?sort=hot` axis (:468-489) — the exact pseudocode: `listExamsRanked` "keeps its three and adds a fourth member that is `Promise.resolve([])` unless `filters.sort === "hot"`" (:380). The real ordering is applied AFTER the fetch, Node-side: `orderIdsByHotCount(candidates, counts)` then `paginateExams`. `?dir` has no effect on this axis but is still accepted (not rejected) — no code path may reject/throw on it.
+- `docs/design/exam-shelves-backend-design.md` § Logging and Monitoring (:584) — the only new log is `readBounded`'s existing `console.error` with label `listExamsRanked.hotCounts` (alongside `listExamShelves.hotCounts`); no new log carries a user id/attempt id/source value. Confirms the label string to pass to `readHotCounts`.
+- `SOURCE/features/exams/queries/ranking.ts` — current 3-member `Promise.all` (`fetchExamRows`, `readMyAttemptRows`, `exam_results` read). The `filters?.sort` branch at :98-100 returns DB-side order via `rows.map(toExam)` unchanged for non-hot explicit sorts; this is where the hot reorder must be inserted.
+- `SOURCE/features/exams/queries/hotCounts.ts` — `readHotCounts(supabase, label, now): Promise<Map<string, HotCounts>>`, single RPC call site, label forwarded verbatim into `readBounded`. Imported, not re-implemented.
+- `SOURCE/lib/adaptive/examShelves.ts` — `orderIdsByHotCount(candidates: readonly ShelfCandidate[], counts: ReadonlyMap<string, HotCounts>): string[]` sorts by `counts.get(c.id)?.total ?? 0` DESC, `c.id` ASC (0 fallback, cross-user `total` field — matches the Reference Contract row). Imported, not re-implemented. Only `c.id` is read at runtime, but the parameter type is the full `ShelfCandidate` shape (`id, grade, subject, school, createdAt`).
+
+**Confirmations:**
+- `readHotCounts` and `orderIdsByHotCount` are imported from `./hotCounts` and `@/lib/adaptive/examShelves` respectively and called directly — not re-implemented in `ranking.ts`.
+- `?dir` is accepted (not validated/rejected anywhere in `ranking.ts`) but has no ordering effect on the hot axis: the hot branch never reads `filters.dir`, matching `orderIdsByHotCount`'s single-directional (`total DESC, id ASC`) order.
+- `shelves.ts`'s private `candidatesFromRows(rows): ShelfCandidate[]` helper (not exported, not a Target File of this task) performs the identical `ExamRow -> ShelfCandidate` structural mapping this task also needs to satisfy `orderIdsByHotCount`'s parameter type. Rather than expand scope to export it from `shelves.ts` (out of Target Files), this task defines a local, unexported equivalent in `ranking.ts` — a trivial 5-field structural passthrough with no business logic/branching. Rule of Three: this is the 2nd occurrence of the mapping (1st in `shelves.ts`, serving 2 call sites internally); consolidation is deferred, not mandatory, per `ai-development-guide` Rule of Three table ("2nd time: consider future consolidation"). Flagged here for a future refactor task if a 3rd occurrence appears.
+
+**Reference Contract evaluation (AC-018 row):** Planned approach — the hot branch computes `hotCounts` via the 4th `Promise.all` member (`readHotCounts` when `sort==="hot"`, else a pre-resolved empty `Map`), then reorders the full fetched candidate set with `orderIdsByHotCount(candidates, hotCounts)` before `paginateExams`. `orderIdsByHotCount` sorts by `counts.get(c.id)?.total ?? 0` DESC, id ASC, where `counts` is the RPC's cross-user aggregate (not any per-caller count) and the fallback for an exam absent from the aggregate is a literal `0`, not a per-caller substitute. Compliance Check ("Does the branch order using `orderIdsByHotCount`'s cross-user total, with 0 fallback to a per-caller count?") = **Y** — `readHotCounts` is the sole RPC call site (`exam_hot_counts`, cross-user by definition, RLS-independent `security definer`), and the 0 fallback is `orderIdsByHotCount`'s own `?? 0`, never a locally-computed per-caller count.
+
+**Type-safety note (implementation detail, not a design deviation):** the 4th `Promise.all` member's non-hot branch is typed `Promise.resolve<Map<string, HotCounts>>(new Map())` rather than a literal `Promise.resolve([])` — both are "0 extra calls, empty/no-op result" at runtime; the `Map` type keeps the ternary's two branches structurally identical (`Promise<Map<string, HotCounts>>`) so `orderIdsByHotCount`'s `ReadonlyMap<string, HotCounts>` parameter type-checks without a cast or a runtime `Array.isArray` guard. Behavior (0 extra network calls on every non-hot path) is unchanged from the DD's literal wording.
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
-- [ ] Read all Investigation Targets and record key observations
-- [ ] Write/extend integration-test cases (in coordination with P4-T3's fill-in scope, or as a preliminary local check) confirming: for `sort !== "hot"`, the 4th `Promise.all` member resolves `Promise.resolve([])` and issues 0 extra calls; for `sort === "hot"`, it calls `readHotCounts` and the result feeds `orderIdsByHotCount` before `paginateExams`
+- [x] Read all Investigation Targets and record key observations
+- [x] Write/extend integration-test cases (in coordination with P4-T3's fill-in scope, or as a preliminary local check) confirming: for `sort !== "hot"`, the 4th `Promise.all` member resolves `Promise.resolve([])` and issues 0 extra calls; for `sort === "hot"`, it calls `readHotCounts` and the result feeds `orderIdsByHotCount` before `paginateExams` — done as a **preliminary local check** (`ranking.hot.local.test.ts`, temporary, not a Target File — the officially tracked assertions with independently-computed literal expected order are P4-T3's scope per `it.todo` at `rating.int.test.ts:825-832`, not duplicated here). Confirmed RED before the Green phase edit, GREEN after, then deleted so the final diff stays within Target Files.
 ### 2. Green Phase
-- [ ] Add the 4th `Promise.all` member per the DD pseudocode
-- [ ] Wire `readHotCounts` → `orderIdsByHotCount` → `paginateExams` for the hot branch
+- [x] Add the 4th `Promise.all` member per the DD pseudocode — `ranking.ts:118-128`, guarded on `filters?.sort === "hot"`, `Promise.resolve<Map<string, HotCounts>>(new Map())` on every other path (see Investigation Notes' type-safety note for why `Map` rather than a literal `[]`)
+- [x] Wire `readHotCounts` → `orderIdsByHotCount` → `paginateExams` for the hot branch — `applyHotOrder()` (`ranking.ts:47-58`) reorders the fetched `ExamRow[]` via `orderIdsByHotCount`, called from the `filters.sort === "hot"` branch at `ranking.ts:148-151`, then `paginateExams` as before
 ### 3. Refactor Phase
-- [ ] Confirm `?dir` is still accepted (not rejected) on the hot axis even though it has no ordering effect — an old bookmarked link with `?dir=` must keep working
+- [x] Confirm `?dir` is still accepted (not rejected) on the hot axis even though it has no ordering effect — an old bookmarked link with `?dir=` must keep working. Verified: `ranking.ts` never reads `filters.dir` anywhere; `fetchExamRows`/`catalogue.ts` (P4-T1, unmodified by this task) already accepts `?dir` unconditionally for every sort value including `"hot"` with no rejection path. No new validation was added.
 
 ## Quality Assurance Mechanisms
 - `npx tsc --noEmit` — Config: `SOURCE/tsconfig.json` (project-wide)
@@ -64,10 +79,10 @@ _(Record here: confirmation `readHotCounts` and `orderIdsByHotCount` are importe
   - **Residual**: the literal expected hot-order array (independently computed) is P4-T3's proof obligation, not this task's — this task proves the branch is wired correctly; P4-T3 proves its output is correct.
 
 ## Completion Criteria
-- [ ] 4th `Promise.all` member added, guarded correctly on `filters.sort === "hot"`
-- [ ] `readHotCounts` and `orderIdsByHotCount` reused (not reimplemented)
-- [ ] Every Reference Contract's Compliance Check evaluates to `Y`
-- [ ] Gates 1-6 green
+- [x] 4th `Promise.all` member added, guarded correctly on `filters.sort === "hot"`
+- [x] `readHotCounts` and `orderIdsByHotCount` reused (not reimplemented)
+- [x] Every Reference Contract's Compliance Check evaluates to `Y`
+- [x] Gates 1-6 green — `tsc --noEmit` clean; `eslint --max-warnings 0` clean on `ranking.ts`; `vitest run features/exams` 272 passed/2 todo (P4-T3's reserved `it.todo`s); `npm run build` succeeds; `npm run check:bundle` PASS. One pre-existing, unrelated failure noted: `lib/security/rateLimit.test.ts` ("keeps ONE account's whole daily Gemini budget under the project quota") fails on this worktree with no files of this task touching `lib/security/` — out of this task's scope, not introduced by this change.
 
 ## Notes
 - Impact scope: `ranking.ts` (1 new `Promise.all` member + hot-branch wiring), `index.ts` (re-export only, if needed).
