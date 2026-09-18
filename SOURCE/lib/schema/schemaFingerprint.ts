@@ -20,8 +20,11 @@
 //
 // ⚠ Đây KHÔNG phải migration tool. Nó không có thứ tự áp, không rollback, không
 // biết đi từ bản A sang bản B — nó chỉ trả lời được đúng một câu: "DB này có
-// đang chạy đúng file schema.sql trong git không?". Trả nợ trọn vẹn vẫn là
-// Supabase CLI migrations. Xem TECH-DEBT TD-005.
+// đang chạy đúng file schema.sql trong git không?". Từ 2026-08-31 đã có QUY
+// TRÌNH migration (schema:plan → file migration → CLI apply trên dev, xem
+// Migration Procedure trong backend design doc), nhưng file NÀY vẫn không phải
+// công cụ chạy quy trình đó: nó không tự phát hiện prod lệch bản, và áp lên
+// prod vẫn là thao tác tay, từng câu lệnh một. Xem TECH-DEBT TD-005.
 //
 // Vì sao là VÂN TAY nội dung chứ không phải số phiên bản người tự tăng: số tự
 // tăng vẫn quên được, và quên chính là hình dạng của bug này. Vân tay không
@@ -38,7 +41,7 @@ import { createHash } from "node:crypto";
  * `__tests__/schemaFingerprint.test.ts` đối chiếu ba bên (hằng số ↔ giá trị khai
  * trong schema.sql ↔ giá trị tính lại từ nội dung) và FAIL nếu lệch bất kỳ đâu.
  */
-export const SCHEMA_FINGERPRINT = "187d3ed24f0c";
+export const SCHEMA_FINGERPRINT = "340bab74ca57";
 
 /** Đánh dấu khối KHÔNG tính vào vân tay — chính là khối chứa vân tay (§17). */
 const EXCLUDED_BLOCK_RE =

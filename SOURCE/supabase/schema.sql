@@ -2680,7 +2680,7 @@ revoke all on public.schema_version from anon, authenticated;
 -- nó — xem lib/schema/schemaFingerprint.ts).
 -- @schema-fingerprint-begin
 insert into public.schema_version (id, fingerprint)
-values (1, '187d3ed24f0c')
+values (1, '340bab74ca57')
 on conflict (id) do update
   set fingerprint = excluded.fingerprint,
       applied_at  = now();
