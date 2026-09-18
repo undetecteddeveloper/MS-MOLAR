@@ -744,3 +744,89 @@ describe("listExams — q lọc theo tên qua cột title_search (ADR-0020)", ()
     }
   });
 });
+
+// =============================================================================
+// Kho đề theo kệ [integration] — candidate 3/3 of this feature's integration
+// budget (candidates 1-2 live in the sibling file shelves.int.test.ts)
+// =============================================================================
+// Design Docs: docs/design/exam-shelves-backend-design.md (v1.2, § Test Boundaries
+//   and Placement :619, "?sort=garbage = 3 + 0 rpc (flat grid, F-005)")
+// PRD: docs/prd/exam-shelves-prd.md (v1.2, AC-009, AC-010, AC-018, AC-034)
+// Generated: 2026-09-18 | Budget used: integration 1/3 (this file's contribution;
+//   feature total 3/3 across this file + shelves.int.test.ts)
+//
+// FILE STATUS: skeleton-only (`it.todo`). This describe block is APPENDED to the
+// existing file above — none of the Rating System content above it is edited, per
+// backend DD's own instruction that "the AC-016/AC-017 cases at :319-457 pass
+// UNMODIFIED". It reuses this file's own `fromMock` / `createQueryBuilder` /
+// `mockTables`-style helpers already defined above (no re-import needed — same
+// module scope), plus `listExamsRanked` already imported at the top of this file.
+// The `sort: "hot"` codepath and the `rpc` branch inside `listExamsRanked` DO NOT
+// EXIST YET (backend DD Implementation Plan step 6) — `it.todo` avoids depending on
+// unwritten behaviour while still registering a real vitest task in this file.
+//
+// AC-009: "...ordering is exactly today's SQL ordering with no personalisation, and
+//   the query-construction assertions in rating.int.test.ts:317-440 pass unmodified."
+// AC-010: "...or an unrecognised ?sort= value, when the page renders, then the flat
+//   grid renders in today's personalised order...and 0 shelves appear."
+// AC-018: "...the hot order is computed...submitted attempt count DESC, exam id ASC,
+//   where the count includes attempts by all students, not only the caller."
+// AC-034: "...the flat grid renders ordered by the same cross-user count as AC-018."
+// Backend DD Test Boundaries and Placement: "Composition budget: shelves = 4,
+//   filtered = 3 + 0 rpc, ?sort=hot = 3 + 1 rpc, ?sort=garbage = 3 + 0 rpc (flat
+//   grid, F-005)."
+// ROI: 64 (BV:8 x Freq:7 + Legal:0 + Defect:8)
+//   BV 8 — protects Success Criteria #5 ("rating.int.test.ts:317-440 passes
+//     unmodified") and the round-trip budget the Risks table names as a standing
+//     regression surface.
+//   Freq 7 — every explicit ?sort=hot chip tap, plus every malformed/garbage ?sort=
+//     value that must still fall back to the flat-grid contract (a URL a user can
+//     hand-edit or bookmark).
+//   Defect 8 — F-005's specific failure mode (a garbage sort value accidentally
+//     matching the "hot" branch, or the hot branch firing an rpc call the budget
+//     assertion does not expect) has no visible on-screen symptom other than a
+//     silently wrong order — the same "no error, just wrong" shape as every other
+//     round-trip-budget risk in this feature.
+// Behavior: listExamsRanked({ sort: "hot" }) is called against the mocked Supabase
+//   client boundary -> exactly 3 .from(...) calls + 1 .rpc("exam_hot_counts", ...)
+//   call, and the returned exams are ordered by the mocked rpc's total_count desc,
+//   exam id asc -> listExamsRanked({ sort: "garbage-value-not-in-ExamSort" }) is
+//   called -> exactly 3 .from(...) calls and 0 .rpc(...) calls, i.e. the same
+//   budget as every other explicit-sort call already proven above.
+// @category: core-functionality
+// @lane: integration
+// @dependency: SOURCE/features/exams/queries/ranking.ts (listExamsRanked, sort==="hot"
+//   branch not yet implemented) + mocked Supabase client ({ from, rpc })
+// @complexity: medium
+// @real-dependency: none — same mocked-client boundary as every other describe in
+//   this file; RLS/grant correctness for exam_hot_counts is proven in the
+//   service-integration-e2e lane, not here.
+// Primary failure mode: an unrecognised ?sort= value (e.g. one a hand-edited URL or
+//   a stale bookmark supplies) is compared loosely enough that it matches the "hot"
+//   branch and fires an unwanted rpc call against a value AC-010 requires to fall
+//   through to the ordinary flat-grid path; OR the "hot" branch's Node-side order
+//   silently reverts to `.order("id")`'s DB-side order because the rpc result was
+//   never actually consulted.
+// Proof obligation — what the implemented test must assert:
+//   (a) listExamsRanked({ sort: "hot" }) issues exactly 3 .from(...) calls (the same
+//       3 tables as every other explicit-sort case above) PLUS exactly 1
+//       .rpc("exam_hot_counts", ...) call — 4 total, not 3 and not 5;
+//   (b) the returned `exams` array order matches `total_count DESC, exam id ASC`
+//       computed from the mocked rpc response — a literal expected array computed
+//       independently of the implementation, not merely "differs from .order(id)";
+//   (c) listExamsRanked({ sort: "garbage-not-a-real-value" as ExamSort }) issues
+//       exactly 3 .from(...) calls and 0 .rpc(...) calls (F-005) — the same shape as
+//       the existing "?sort tường minh thắng cá nhân hoá" case above, so a value
+//       outside the whitelist never silently reaches the hot branch;
+//   (d) REGRESSION GUARD, not a new obligation: this describe block does not modify
+//       or re-run the AC-016/AC-017 cases at the top of this file — it only adds
+//       cases; the implementer must confirm those cases still pass unmodified in the
+//       same commit that adds this block's real assertions (Success Criteria #5).
+describe("listExamsRanked — ?sort=hot / ?sort=garbage composition budget (AC-009, AC-010, AC-018, AC-034, F-005)", () => {
+  it.todo(
+    '?sort=hot issues exactly 3 .from(...) calls + 1 .rpc("exam_hot_counts", ...) call, and orders exams by the mocked rpc\'s total_count DESC, exam id ASC (AC-018/AC-034, obligations a+b)'
+  );
+  it.todo(
+    "?sort=<value not in ExamSort> issues exactly 3 .from(...) calls and 0 .rpc(...) calls — same budget as every other explicit-sort case (AC-009/AC-010, F-005, obligation c)"
+  );
+});
