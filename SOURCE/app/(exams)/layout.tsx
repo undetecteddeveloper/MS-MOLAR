@@ -1,5 +1,5 @@
 // Layout route group (exams) — khung chung cho MỌI trang Layer 2.
-// Theme dùng thẳng root "Mực & Sơn mài" (globals.css, S#17) — không còn scope
+// Theme dùng thẳng root "Đêm hội" (globals.css, S#17) — không còn scope
 // .theme-l2 riêng; navbar đen sơn mài lấy từ biến --nav-* mặc định.
 //
 // SiteHeader render Ở ĐÂY (1 lần cho mọi trang L2) thay vì lặp lại trong từng

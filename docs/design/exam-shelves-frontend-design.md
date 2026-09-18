@@ -418,12 +418,12 @@ Slice 5 is the integration point: the first task that makes the whole UI operati
 
 ## Open Items and Risks
 
-No open escalations. Both cross-layer items are settled; one docs-only cleanup is carried to the work plan.
+No open escalations. All items below are settled.
 
 | ID | Item | Owner | Status |
 |---|---|---|---|
 | O-1 | `listHotExams(limit)` returns `{ exams, submittedExamIds }`. Raised here as a predicted regression, confirmed by cross-layer verification, and fixed in the backend contract in the same pass | Backend DD | **Closed** — see Assumed Behaviors; R-1 stays as a recorded risk |
-| O-2 | The two stale theme-name comments at `SOURCE/app/(exams)/layout.tsx:2` and `SOURCE/components/layout/AppShell.tsx:15` still say "Mực & Sơn mài"; `globals.css` ships "Đêm hội". `docs/project-context/external-resources.md` itself was already corrected in a separate pass | Engineer | **Open** — docs-only cleanup, carry into the work plan |
+| O-2 | The two stale theme-name comments at `SOURCE/app/(exams)/layout.tsx:2` and `SOURCE/components/layout/AppShell.tsx:15` still say "Mực & Sơn mài"; `globals.css` ships "Đêm hội". `docs/project-context/external-resources.md` itself was already corrected in a separate pass | Engineer | **Closed** — both comments corrected to "Đêm hội" in P0-T7 |
 | O-3 | UI Spec TBD-02 — the `/exams` round-trip budget assertion (`rating.int.test.ts:663-674`) once the hot aggregate lands. Out of this document's scope: the shelves branch issues no `listExamsRanked` call | Backend DD | **Closed** — owned and handled there |
 
 | Risk | Impact | Prob. | Mitigation |
