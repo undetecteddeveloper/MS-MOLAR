@@ -13,14 +13,19 @@
 // =============================================================================
 // FILE STATUS — read before editing
 // =============================================================================
-// BOTH CANDIDATES BELOW ARE SKELETONS (`it.todo`). `features/exams/queries/shelves.ts`,
-// `hotCounts.ts` and `attempts.ts` DO NOT EXIST YET (backend DD Implementation Path
-// Mapping — all three rows say "New"). Nothing here imports them: an import of a
-// not-yet-existing module would fail `tsc --noEmit`/`eslint`/`build` the moment this
-// skeleton is committed, and this file must stay green under all three gates until the
-// implementing task adds the imports, the mocks and the assertions in the same commit
-// that adds `shelves.ts` (Red→Green in one task, per the backend DD's Vertical Slice
-// plan, step 5 — "the integration point").
+// Both candidates converted to real vitest (P3-T2, `features/exams/queries/shelves.ts`
+// landed in the same commit) — same "skeleton → real test in the implementing task's
+// commit" convention `rating.int.test.ts`'s own header uses. The paragraph below is
+// preserved as written at generation time; its rationale for why this file imported
+// nothing is now historical, not current status.
+//
+// `features/exams/queries/shelves.ts`, `hotCounts.ts` and `attempts.ts` DID NOT EXIST YET
+// at generation time (backend DD Implementation Path Mapping — all three rows said
+// "New"). Nothing here imported them: an import of a not-yet-existing module would fail
+// `tsc --noEmit`/`eslint`/`build` the moment this skeleton was committed, and this file
+// had to stay green under all three gates until the implementing task added the imports,
+// the mocks and the assertions in the same commit that added `shelves.ts` (Red→Green in
+// one task, per the backend DD's Vertical Slice plan, step 5 — "the integration point").
 //
 // HOW THIS LANE RUNS: default `npx vitest run` (`vitest.config.ts:26` collects
 // `features/**/*.test.{ts,tsx}`), environment `node` (no DOM needed — this file proves
@@ -83,7 +88,126 @@
 //       `lib/exams/__tests__/attemptSource.test.ts`, CI lane, plus the real-CHECK
 //       proof HS-g in `supabase/test-rls.ts` (manual).
 
-import { describe, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { fromMock, rpcMock } = vi.hoisted(() => ({ fromMock: vi.fn(), rpcMock: vi.fn() }));
+
+// shelves.ts (and its attempts.ts/hotCounts.ts/catalogue.ts dependencies) import
+// "server-only" (throws outside a Next server/react-server bundle) → stub, same
+// pattern as rating.int.test.ts:24.
+vi.mock("server-only", () => ({}));
+
+// Mock boundary: Supabase client only ({ from, rpc }), per the file-level Mock
+// Boundary note above — proves JS call construction and object shape, never real
+// Postgres/RLS/grant behaviour.
+vi.mock("@/lib/supabase/server", () => ({
+  createClient: vi.fn(async () => ({ from: fromMock, rpc: rpcMock })),
+}));
+
+const { listExamShelves, listHotExams } = await import("@/features/exams/queries/shelves");
+const { LIST_ROW_CEILING } = await import("@/lib/supabase/boundedRead");
+
+// --- Fixture builders --------------------------------------------------------
+
+/** Một dòng `exams_with_difficulty` thô — cùng hình dạng `ExamRow` (rows.ts). */
+function examRow(
+  id: string,
+  grade: number,
+  subject: string,
+  createdAt: string,
+  school: string | null = null
+) {
+  return {
+    id,
+    title: `Đề ${id}`,
+    question_ids: ["q1"],
+    duration_minutes: 45,
+    subject,
+    grade,
+    school,
+    school_year: null,
+    semester: null,
+    author_display_name: null,
+    parts: null,
+    passages: null,
+    rating_count: 0,
+    avg_overall: null,
+    created_at: createdAt,
+  };
+}
+
+/** Một dòng `exam_attempts` thô kèm embed `exams!inner(grade, subject, school)`. */
+function attemptRow(
+  id: string,
+  examId: string,
+  submittedAt: string | null,
+  embed: { grade: number; subject: string; school: string | null }
+) {
+  return { id, exam_id: examId, submitted_at: submittedAt, exams: embed };
+}
+
+/** Một dòng `exam_hot_counts()` thô. */
+function hotRow(examId: string, recent: number, wide: number, total: number) {
+  return { exam_id: examId, recent_count: recent, wide_count: wide, total_count: total };
+}
+
+/** Chainable + awaitable fake khớp bề mặt query builder mà shelves.ts dùng
+ *  (`select`/`eq`/`ilike`/`order`/`limit`), rồi resolve NGAY với `data`. */
+function createResolvedBuilder(data: unknown[]) {
+  const builder: Record<string, unknown> = {};
+  for (const method of ["select", "eq", "ilike", "order", "limit"]) {
+    builder[method] = () => builder;
+  }
+  builder.then = (onFulfilled: (value: { data: unknown[]; error: null }) => unknown) =>
+    Promise.resolve({ data, error: null }).then(onFulfilled);
+  return builder;
+}
+
+/** Cùng builder trên nhưng CHƯA resolve — chỉ resolve khi `gate` tự nó resolve.
+ *  Kỹ thuật "deferred-resolution gate" của `rating.int.test.ts:676-706`, dùng lại
+ *  nguyên vẹn để chứng minh 4 lượt đọc của `listExamShelves()` được PHÁT hết
+ *  trước khi lượt nào kịp resolve (obligation b). */
+function createDeferredBuilder(gate: Promise<void>, data: unknown[]) {
+  const builder: Record<string, unknown> = {};
+  for (const method of ["select", "eq", "ilike", "order", "limit"]) {
+    builder[method] = () => builder;
+  }
+  builder.then = (onFulfilled: (value: { data: unknown[]; error: null }) => unknown) =>
+    gate.then(() => onFulfilled({ data, error: null }));
+  return builder;
+}
+
+type TableFixtures = {
+  exams_with_difficulty?: unknown[];
+  exam_attempts?: unknown[];
+  exam_results?: unknown[];
+  hotRows?: unknown[];
+};
+
+/**
+ * Nối `fromMock`/`rpcMock` vào một map theo TÊN BẢNG/rpc — khác hẳn dùng
+ * chung một builder cho mọi lượt đọc: dùng chung thì `exam_attempts` có thể
+ * nhận nhầm dòng đề của `exams_with_difficulty` mà test vẫn XANH trong khi
+ * đang đo sai thứ (cùng cảnh báo `rating.int.test.ts:548-563`).
+ *
+ * Trả về `issued: string[]` — tên bảng/rpc theo đúng thứ tự lệnh gọi thật,
+ * để các test ngân sách đếm `from()`+`rpc()` cộng lại (obligation ADR-0021 D3).
+ */
+function mockBoundary(fixtures: TableFixtures) {
+  const { hotRows = [], ...byTable } = fixtures;
+  const issued: string[] = [];
+
+  fromMock.mockImplementation((table: string) => {
+    issued.push(table);
+    return createResolvedBuilder((byTable as Record<string, unknown[]>)[table] ?? []);
+  });
+  rpcMock.mockImplementation((fnName: string) => {
+    issued.push(fnName);
+    return createResolvedBuilder(hotRows);
+  });
+
+  return issued;
+}
 
 // =============================================================================
 // Candidate 1 — Composition budget & concurrency + RPC argument shape
@@ -139,15 +263,69 @@ import { describe, it } from "vitest";
 //       site) — a mismatched label makes a future truncation log point at the wrong
 //       composition when `console.error` fires.
 describe("listExamShelves() — composition budget, concurrency, RPC argument shape (AC-006, AC-028)", () => {
-  it.todo(
-    "issues exactly 4 boundary calls (exams_with_difficulty, exam_attempts, exam_results, rpc exam_hot_counts), all before any settles, obligation (a)+(b)"
-  );
-  it.todo(
-    "rpc exam_hot_counts is called with p_max_rows === imported LIST_ROW_CEILING + 1, not a hand-copied literal (AC-028, obligation c)"
-  );
-  it.todo(
-    'the hotCounts read at this call site is labelled exactly "listExamShelves.hotCounts" for readBounded (obligation d)'
-  );
+  beforeEach(() => {
+    fromMock.mockReset();
+    rpcMock.mockReset();
+  });
+
+  it("issues exactly 4 boundary calls (exams_with_difficulty, exam_attempts, exam_results, rpc exam_hot_counts), all before any settles, obligation (a)+(b)", async () => {
+    // Hồi quy thực sự sẽ xảy ra: ai đó chèn một `await` giữa hai lượt đọc và
+    // biến 4 lượt song song thành tuần tự. Mock hoãn resolve để "cả 4 được
+    // PHÁT trước khi lượt nào kịp resolve" trở thành một câu kiểm chứng được,
+    // offline — kỹ thuật của rating.int.test.ts:676-706, 4-lượt sibling.
+    const issued: string[] = [];
+    let settle: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      settle = resolve;
+    });
+
+    fromMock.mockImplementation((table: string) => {
+      issued.push(table);
+      return createDeferredBuilder(gate, []);
+    });
+    rpcMock.mockImplementation((fnName: string) => {
+      issued.push(fnName);
+      return createDeferredBuilder(gate, []);
+    });
+
+    const pending = listExamShelves();
+    // Nhường microtask cho cả 4 nhánh của Promise.all được phát đi.
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(issued).toHaveLength(4);
+    expect(new Set(issued)).toEqual(
+      new Set(["exams_with_difficulty", "exam_attempts", "exam_results", "exam_hot_counts"])
+    );
+
+    settle();
+    await pending;
+  });
+
+  it("rpc exam_hot_counts is called with p_max_rows === imported LIST_ROW_CEILING + 1, not a hand-copied literal (AC-028, obligation c)", async () => {
+    mockBoundary({});
+
+    await listExamShelves();
+
+    expect(rpcMock).toHaveBeenCalledTimes(1);
+    const [fnName, args] = rpcMock.mock.calls[0] as [string, Record<string, unknown>];
+    expect(fnName).toBe("exam_hot_counts");
+    expect(args.p_max_rows).toBe(LIST_ROW_CEILING + 1);
+  });
+
+  it('the hotCounts read at this call site is labelled exactly "listExamShelves.hotCounts" for readBounded (obligation d)', async () => {
+    // Kỹ thuật duy nhất quan sát được `label` truyền vào readBounded: kích
+    // dòng mồi (LIST_ROW_CEILING + 1 dòng) rồi soi thông điệp console.error —
+    // đúng cơ chế boundedRead.ts:124-130 mô tả.
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const overflow = Array.from({ length: LIST_ROW_CEILING + 1 }, (_, i) => hotRow(`e${i}`, 0, 0, 1));
+    mockBoundary({ hotRows: overflow });
+
+    await listExamShelves();
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining("listExamShelves.hotCounts"));
+    consoleErrorSpy.mockRestore();
+  });
 });
 
 // =============================================================================
@@ -216,13 +394,115 @@ describe("listExamShelves() — composition budget, concurrency, RPC argument sh
 //       call, so a stray `exam_attempts` read introduced elsewhere in the same
 //       composition is also caught.
 describe("listExamShelves() / listHotExams() — 0-card shelf is null, and the guarded home fetch issues 0 calls for an anonymous visitor (AC-051, AC-024, AC-038, F-001)", () => {
-  it.todo(
-    "a shelf whose selection yields 0 candidate ids is exactly null on the ExamShelves object, not an empty-array shape (AC-051/AC-013/AC-024, obligation a)"
-  );
-  it.todo(
-    "listHotExams(limit) issues exactly 3 boundary calls and returns a populated submittedExamIds sourced from that same attempt read (frontend DD O-1/R-1, obligation b)"
-  );
-  it.todo(
-    "the guarded home-fetch call site issues 0 Supabase calls of any kind when the current user is null (F-001, obligation c)"
-  );
+  beforeEach(() => {
+    fromMock.mockReset();
+    rpcMock.mockReset();
+  });
+
+  it("a shelf whose selection yields 0 candidate ids is exactly null on the ExamShelves object, not an empty-array shape (AC-051/AC-013/AC-024, obligation a)", async () => {
+    // Kịch bản 1 — Cần luyện: học sinh có một lượt đã nộp nhưng KHÔNG có dòng
+    // exam_results nào cho lượt đó → buildSubjectWeakness không có lượt đại
+    // diện CÓ ĐIỂM nào → trả null → weakest === null (AC-013).
+    mockBoundary({
+      exams_with_difficulty: [examRow("exam-a", 10, "Toán", "2026-01-01T00:00:00.000Z")],
+      exam_attempts: [
+        attemptRow("att-1", "exam-a", "2026-05-01T00:00:00.000Z", {
+          grade: 10,
+          subject: "Toán",
+          school: null,
+        }),
+      ],
+      exam_results: [],
+      hotRows: [],
+    });
+
+    const withoutScore = await listExamShelves();
+
+    expect(withoutScore.practice).toBeNull();
+    expect("practice" in withoutScore).toBe(true);
+
+    fromMock.mockReset();
+    rpcMock.mockReset();
+
+    // Kịch bản 2 — Nổi nhất: 0 lượt đã nộp trên TOÀN site (AC-024) — RPC trả
+    // 0 dòng, nên pool của MỌI bậc thang đều rỗng, kể cả bậc terminal.
+    mockBoundary({
+      exams_with_difficulty: [examRow("exam-b", 10, "Toán", "2026-01-01T00:00:00.000Z")],
+      exam_attempts: [],
+      exam_results: [],
+      hotRows: [],
+    });
+
+    const withoutHotCount = await listExamShelves();
+
+    expect(withoutHotCount.hot).toBeNull();
+    expect("hot" in withoutHotCount).toBe(true);
+  });
+
+  it("listHotExams(limit) issues exactly 3 boundary calls and returns a populated submittedExamIds sourced from that same attempt read (frontend DD O-1/R-1, obligation b)", async () => {
+    const issued = mockBoundary({
+      exams_with_difficulty: [examRow("h1", 10, "Toán", "2026-01-01T00:00:00.000Z")],
+      exam_attempts: [
+        attemptRow("att-1", "submitted-1", "2026-05-01T00:00:00.000Z", {
+          grade: 10,
+          subject: "Toán",
+          school: null,
+        }),
+      ],
+      hotRows: [hotRow("h1", 1, 1, 1)],
+    });
+
+    const result = await listHotExams(3);
+
+    expect(issued).toHaveLength(3);
+    expect(new Set(issued)).toEqual(new Set(["exams_with_difficulty", "exam_attempts", "exam_hot_counts"]));
+    expect(issued.includes("exam_results")).toBe(false);
+    expect(result.submittedExamIds).toEqual(new Set(["submitted-1"]));
+  });
+
+  it("the guard PATTERN (user ? await listHotExams(...) : null) issues 0 Supabase calls when evaluated with a null user — proves the pattern in isolation only, obligation c", async () => {
+    mockBoundary({});
+    // `currentUser` là literal `null` CỐ ĐỊNH, không phải kết quả của một
+    // lượt lookup thật (`getCurrentUser`/`getCurrentUserProfile`) — nên
+    // nhánh truthy của ternary KHÔNG THỂ nào được vào, và assertion dưới đây
+    // không thể đỏ bất kể một guard thật ở app/page.tsx có tồn tại hay đúng
+    // hay không. Test này chỉ chứng minh biểu thức GUARD `user ? await
+    // listHotExams(...) : null` (frontend DD § Home block) là đúng CÚ PHÁP
+    // khi tự nó được đánh giá — KHÔNG chứng minh app/page.tsx's call site
+    // thật có tồn tại hay dùng đúng guard này. Việc đó thuộc về P7-T1
+    // (chưa build call site thật), và là một Completion Criterion RÀNG BUỘC
+    // rõ ràng trên task file của P7-T1, không chỉ ngụ ý qua "wiring".
+    const currentUser: { id: string } | null = null;
+    const hot = currentUser ? await listHotExams(3) : null;
+
+    expect(hot).toBeNull();
+    expect(fromMock).not.toHaveBeenCalled();
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  // AC-049/D13 (additional obligation beyond the skeleton's own text — see this
+  // task's Proof Obligations): "an exam that qualifies for BOTH the weakest-
+  // subject pool AND a qualifying hot count appears in BOTH practice.exams and
+  // hot.exams of the SAME listExamShelves() result" — closes the gap the plan
+  // review identified (shelves are not mutually exclusive, unlike Khám phá's
+  // dedup against the other two).
+  it("AC-049/D13: an exam qualifying for both practice and hot appears in BOTH shelves of the same listExamShelves() result (cross-shelf overlap is allowed, not deduped)", async () => {
+    mockBoundary({
+      exams_with_difficulty: [examRow("ex-overlap", 10, "Toán", "2026-01-01T00:00:00.000Z")],
+      exam_attempts: [
+        attemptRow("att-1", "other-exam", "2026-05-01T00:00:00.000Z", {
+          grade: 10,
+          subject: "Toán",
+          school: null,
+        }),
+      ],
+      exam_results: [{ attempt_id: "att-1", total_score: 2 }],
+      hotRows: [hotRow("ex-overlap", 1, 1, 1)],
+    });
+
+    const shelves = await listExamShelves();
+
+    expect(shelves.practice?.exams.map((e) => e.id)).toContain("ex-overlap");
+    expect(shelves.hot?.exams.map((e) => e.id)).toContain("ex-overlap");
+  });
 });

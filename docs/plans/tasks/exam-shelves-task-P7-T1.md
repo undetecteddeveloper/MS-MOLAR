@@ -45,7 +45,7 @@ _(Record here: confirmation the guard is a ternary at the call site, not a try/c
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
 - [ ] Read all Investigation Targets and record key observations
-- [ ] Write/extend a test (integration or fixture-lane, coordinated with existing home-page test coverage if any) confirming: anonymous (`user === null`) render issues 0 `.from`/`.rpc` calls of any kind; signed-in render with 0 submitted attempts site-wide renders the whole section absent (not an empty frame)
+- [ ] Write/extend a test (integration or fixture-lane, coordinated with existing home-page test coverage if any) confirming: anonymous (`user === null`) render issues 0 `.from`/`.rpc` calls of any kind; signed-in render with 0 submitted attempts site-wide renders the whole section absent (not an empty frame). Must exercise the REAL `app/page.tsx` `Home` composition (mocked user-lookup + mocked Supabase client) — a hardcoded literal `user`/`currentUser` variable evaluated against a re-declared guard expression does not satisfy this (see the binding Completion Criterion below)
 ### 2. Green Phase
 - [ ] Replace the data-fetch call with the guarded ternary `user ? await listHotExams(HOME_EXAM_COUNT) : null`
 - [ ] Swap the label to `t("home.hotExams")`
@@ -82,6 +82,7 @@ _(Record here: confirmation the guard is a ternary at the call site, not a try/c
   - **Residual**: none.
 
 ## Completion Criteria
+- [ ] **Binding — closes a P3-T2 residual (integration-test-reviewer finding, 2026-09-18)**: a real, executable test asserts 0 Supabase calls of any kind when `getCurrentUser`/`getCurrentUserProfile` resolves `null`, exercised through the ACTUAL `app/page.tsx` `Home` composition (real import, mocked user-lookup + mocked Supabase client) — not a local/hardcoded literal `user`/`currentUser` variable evaluated in isolation. `P3-T2`'s `shelves.int.test.ts` only proved the ternary guard pattern (`user ? await listHotExams(...) : null`) is syntactically correct against a hardcoded literal `null`; because that variable can never take the other branch, that test cannot fail regardless of what this task's real call site does, and therefore does not close this obligation on its own. This criterion is not satisfied by "wiring the guard in" alone — the test must import and invoke the real `Home` composition (or the smallest real slice that includes the actual `user ? await listHotExams(...) : null` expression), not re-declare the guard inline.
 - [ ] Guarded ternary call site confirmed (not a post-hoc discard)
 - [ ] Label swapped to `home.hotExams`
 - [ ] Empty guard widened correctly; whole section absent (not empty frame) when appropriate

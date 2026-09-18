@@ -5,6 +5,7 @@ import type { MessageKey } from "@/lib/copy";
 import type { Exam } from "@/types/exam";
 import type { AttemptSource } from "@/lib/exams/attemptSource";
 import type { HotRung } from "@/lib/adaptive/examShelves";
+import type { ExamShelves } from "@/features/exams/queries/shelves";
 import { Card } from "@/components/ui/card";
 import { ExamCard } from "@/features/exams/components/ExamCard";
 import type { RateEligibility } from "@/features/exams/components/rating/RateButton";
@@ -17,18 +18,21 @@ import { subjectLabel } from "@/lib/ugc/subjects";
 // được (Design Doc: "Everything that differs between the three shelves is an
 // entry; the component reads it, the page cannot override it").
 //
-// `ShelfKind` và `ShelfData` lẽ ra thuộc `features/exams/queries/shelves.ts`
-// (backend Design Doc's `Contract: listExamShelves()`), nhưng file đó CHƯA
-// tồn tại ở thời điểm task này chạy (Glob xác nhận). Khai cục bộ ở đây —
-// mirror đúng hình dạng backend DD mô tả cho từng kệ — là bản dựng cục bộ,
-// khả nghịch: khi `shelves.ts` ra đời, một trong hai phía import phía kia,
-// không có hành vi runtime nào phụ thuộc bên nào thắng.
+// `ExamShelves` (backend DD's `Contract: listExamShelves()`) giờ có thật ở
+// `features/exams/queries/shelves.ts` (P3-T2) — `ShelfData` KHÔNG còn là bản
+// dựng cục bộ của P2-T3 nữa (khi đó `shelves.ts` chưa tồn tại, Glob xác
+// nhận). Nó suy trực tiếp từ kiểu thật, đúng cách frontend DD § Data flow
+// "Facts → strings" viết: `type ShelfData = NonNullable<ExamShelves["practice"]
+// | ExamShelves["hot"] | ExamShelves["explore"]>`.
+//
+// `ShelfKind` VẪN khai cục bộ, có chủ ý chứ không phải sót lại: backend DD
+// không export nó — ba tên kệ là một khái niệm của TRANG (`SHELF_ORDER` ở
+// `/exams/page.tsx`, P5-T1) và của component này, không phải một phần hợp
+// đồng mà `listExamShelves()` trả về (`ExamShelves` không có field nào tên
+// `kind`, chỉ có ba key `practice`/`hot`/`explore` cố định).
 export type ShelfKind = "practice" | "hot" | "explore";
 
-type ShelfData =
-  | { subject: string; exams: Exam[] } // practice
-  | { rung: HotRung; grade: number | null; exams: Exam[] } // hot
-  | { exams: Exam[] }; // explore
+type ShelfData = NonNullable<ExamShelves["practice"] | ExamShelves["hot"] | ExamShelves["explore"]>;
 
 interface ShelfSpec {
   icon: LucideIcon;
