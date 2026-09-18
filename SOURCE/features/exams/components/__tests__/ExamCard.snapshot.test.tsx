@@ -32,13 +32,43 @@ const EXAM: Exam = {
 
 describe("ExamCard — containment baseline (AC-043)", () => {
   it("thẻ trần (0 prop mới) render giữ nguyên", async () => {
-    const { container } = await renderServerTree(
-      <ExamCard exam={EXAM} eligibility="eligible" />
-    );
+    const { container } = await renderServerTree(<ExamCard exam={EXAM} eligibility="eligible" />);
 
     // Khẳng định dương trước: bắt cây rỗng/vỡ trước khi nó lọt tới snapshot.
     expect(container.querySelector("h3")?.textContent).toBe(EXAM.title);
 
     expect(container.innerHTML).toMatchSnapshot();
+  });
+});
+
+describe("ExamCard — from prop appends ?from= to the stretched-link href (AC-039)", () => {
+  it('from="hot" renders the stretched link href as /exams/{id}?from=hot', async () => {
+    const { container } = await renderServerTree(
+      <ExamCard exam={EXAM} eligibility="eligible" from="hot" />
+    );
+
+    const stretchedLink = container.querySelector(".card-link");
+    expect(stretchedLink?.getAttribute("href")).toBe(`/exams/${EXAM.id}?from=hot`);
+  });
+});
+
+describe("ExamCard — ribbon prop renders ExamRibbon as the last child, never a stray falsy node (AC-026, AC-044)", () => {
+  it('ribbon="Hot nhất" renders exactly 1 ribbon slot, aria-hidden count = bare + 1, stretched link untouched', async () => {
+    const { container: bare } = await renderServerTree(
+      <ExamCard exam={EXAM} eligibility="eligible" />
+    );
+    const { container: ribboned } = await renderServerTree(
+      <ExamCard exam={EXAM} eligibility="eligible" ribbon="Hot nhất" />
+    );
+
+    const ribbonSlots = ribboned.querySelectorAll('[data-slot="ribbon"]');
+    expect(ribbonSlots).toHaveLength(1);
+
+    const bareAriaHiddenCount = bare.querySelectorAll("[aria-hidden]").length;
+    const ribbonedAriaHiddenCount = ribboned.querySelectorAll("[aria-hidden]").length;
+    expect(ribbonedAriaHiddenCount).toBe(bareAriaHiddenCount + 1);
+
+    const card = ribboned.querySelector('[data-slot="card"]');
+    expect(card?.firstElementChild?.classList.contains("card-link")).toBe(true);
   });
 });

@@ -1,18 +1,29 @@
 import Link from "next/link";
 import { t } from "@/lib/copy";
+import { cn } from "@/lib/utils";
 import type { Exam } from "@/types/exam";
+import type { AttemptSource } from "@/lib/exams/attemptSource";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { AuthorByline } from "@/components/shared/AuthorByline";
 import { DifficultyBadge } from "@/components/rating/DifficultyBadge";
 import { RateButton, type RateEligibility } from "@/features/exams/components/rating/RateButton";
 import { subjectLabel } from "@/lib/ugc/subjects";
+import { ExamRibbon } from "@/features/exams/components/ExamRibbon";
 
 interface ExamCardProps {
   exam: Exam;
   /** Rating System (R4) — 1 trong 3 trạng thái nút Chấm điểm, tính 1 lần/trang
    *  từ tập id đã nộp (ExamBrowser), KHÔNG per-card query (NFR Performance). */
   eligibility: RateEligibility;
+  /** Nhãn ruy băng. Chỉ ExamShelf truyền, chỉ ở hạng 1 kệ Nổi nhất (AC-026). */
+  ribbon?: string;
+  /** Kệ nguồn; gắn vào href dạng ?from= (AC-039). Vắng mặt ⇒ href hôm nay,
+   *  không có query string. */
+  from?: AttemptSource;
+  /** Class bề rộng từ hàng kệ — một rule `[&>li]:w-80` trên cha sẽ dính luôn
+   *  vào ô trong cùng hàng, nên bề rộng phải đi qua prop này. */
+  className?: string;
 }
 
 // ExamCard — thẻ đề (theme "Sân trường"): nhãn môn + lớp, tên đề, tác giả,
@@ -30,11 +41,13 @@ interface ExamCardProps {
 // (bug 2026-08). Phản hồi hover là đổi nền + đổi màu tiêu đề — qua `.card-linked`
 // (globals.css), tức chỉ khi hover/nhấn CHÍNH liên kết phủ: `active:bg-*` đặt
 // thẳng trên thẻ từng làm cả thẻ đổi nền khi chỉ chạm nút chấm sao (2026-09-13).
-export async function ExamCard({ exam, eligibility }: ExamCardProps) {
+export async function ExamCard({ exam, eligibility, ribbon, from, className }: ExamCardProps) {
+  const href = from ? `/exams/${exam.id}?from=${from}` : `/exams/${exam.id}`;
+
   return (
-    <Card as="li" className="card-linked relative h-full">
+    <Card as="li" className={cn("card-linked relative h-full", className)}>
       <Link
-        href={`/exams/${exam.id}`}
+        href={href}
         aria-label={exam.title}
         className="card-link rounded-card focus-visible:ring-ring/40 absolute inset-0 z-0 focus-visible:ring-3 focus-visible:outline-none"
       />
@@ -46,9 +59,7 @@ export async function ExamCard({ exam, eligibility }: ExamCardProps) {
         <Badge variant="plain">{t("exams.gradeValue", { grade: exam.grade })}</Badge>
       </div>
 
-      <h3 className="card-linked-title text-lg leading-snug font-semibold">
-        {exam.title}
-      </h3>
+      <h3 className="card-linked-title text-lg leading-snug font-semibold">{exam.title}</h3>
 
       {/* Byline UGC — chỉ hiện với đề có tác giả; đề seed bỏ qua. */}
       <AuthorByline name={exam.authorDisplayName} />
@@ -75,6 +86,8 @@ export async function ExamCard({ exam, eligibility }: ExamCardProps) {
           </span>
         </div>
       </div>
+
+      {ribbon ? <ExamRibbon label={ribbon} /> : null}
     </Card>
   );
 }
