@@ -13,8 +13,8 @@ Metadata:
 Create `SOURCE/features/exams/queries/hotCounts.ts` (`hotWindows(now)`, `readHotCounts(supabase, label, now)`) — the single RPC call site and single window computation, shared by `shelves.ts`, `ranking.ts`'s hot branch (Phase 4), and home's `listHotExams` (Phase 7).
 
 ## Target Files
-- [ ] `SOURCE/features/exams/queries/hotCounts.ts` (new)
-- [ ] `SOURCE/features/exams/queries/__tests__/hotCounts.test.ts` (new — unit test with a mocked Supabase client, proving the window computation and RPC call shape)
+- [x] `SOURCE/features/exams/queries/hotCounts.ts` (new)
+- [x] `SOURCE/features/exams/queries/__tests__/hotCounts.test.ts` (new — unit test with a mocked Supabase client, proving the window computation and RPC call shape)
 
 ## Investigation Targets
 - `docs/design/exam-shelves-backend-design.md` (§ Query layer "hotCounts.ts")
@@ -28,18 +28,27 @@ Create `SOURCE/features/exams/queries/hotCounts.ts` (`hotWindows(now)`, `readHot
 - **Boundary**: Node query layer → Postgres RPC `exam_hot_counts`. Owner left (this task): `features/exams/queries/hotCounts.ts`. Owner right: `supabase/schema.sql` §20c function (P0-T1). Expected signal: response rows are `(exam_id, recent_count, wide_count, total_count)`; `anon` gets 42501. This task owns the **left-side call site** — the single place in the codebase that calls this RPC.
 
 ## Investigation Notes
-_(Record here: confirmation `hotWindows(now)` takes `now` as a parameter, not `Date.now()` internally; confirmation `p_max_rows` is `LIST_ROW_CEILING + 1` via import, not a literal; the exact `readBounded` label string used.)_
+
+- **Backend DD § Query layer "hotCounts.ts"** (`:338-392`): exact signatures `hotWindows(now: Date): { sinceRecent: string; sinceWide: string }` and `readHotCounts(supabase, label, now): Promise<Map<string, HotCounts>>`. `readHotCounts` computes both boundaries via `hotWindows(now)` and calls `readBounded(label, supabase.rpc("exam_hot_counts", { p_since_recent, p_since_wide, p_max_rows: LIST_ROW_CEILING + 1 }))`. The `date_trunc('hour', …)` snap happens **server-side inside the SQL function** (`schema.sql` §20c), not in `hotWindows()` — Node only subtracts `HOT_WINDOW_RECENT_DAYS`/`HOT_WINDOW_WIDE_DAYS` days from `now` and returns ISO strings via `toISOString()`. Confirmed `hotWindows(now)` takes `now` as a parameter, never reads `Date.now()`/`new Date()` internally.
+- **Backend DD § Logging** (`:584`, the section is titled "Error Handling" with an inline "**Logging**:" paragraph, not a separate "Logging and Monitoring" heading): the only new log is `readBounded`'s existing `console.error`, with labels `listExamShelves.hotCounts` / `listExamsRanked.hotCounts` (and by the same convention `listHotExams.hotCounts`, named in the Query layer code comment at `:384`). Confirmed: the label string is **passed in by the caller** as `readHotCounts`'s `label` parameter — `hotCounts.ts` itself does not compute or hardcode a label; it only forwards whatever string the caller passes straight into `readBounded`.
+- **ADR-0021 D4** (`:78-82`): the ladder is evaluated in a pure `lib/adaptive` helper; the clock is read ONCE per render/composition, in the query layer (`createClient()`'s impure boundary), never inside `lib/adaptive`. `hotCounts.ts` is exactly that query-layer clock-reading site — `now: Date` arrives as a caller-supplied parameter, so a second clock read never happens inside this module.
+- **`SOURCE/lib/adaptive/constants.ts:217, :233`**: `HOT_WINDOW_RECENT_DAYS = 7` and `HOT_WINDOW_WIDE_DAYS = 30` (P1-T4, already landed) — imported, not re-declared.
+- **`SOURCE/features/exams/queries/attempts.ts`** (structural precedent, P2-T4): labeled `readBounded` call convention — `type SupabaseClient = Awaited<ReturnType<typeof createClient>>;` declared locally, `readBounded(label, supabase.from(...)...)` pattern, `"server-only"` import at top, Vietnamese header comment recording extraction history and cross-consumer sharing rationale. `hotCounts.ts` follows the same shape: local `SupabaseClient` type alias, `"server-only"` import, header comment.
+- **`SOURCE/lib/supabase/boundedRead.ts:74, :84-89, :113`**: `LIST_ROW_CEILING = 500` (imported, never hand-copied per this task's Completion Criteria); `readBounded(label: string, query: BoundedListQuery): Promise<unknown[]>` expects a query object with only a `.limit()` method — `supabase.rpc(...)` (a `PostgrestFilterBuilder`) satisfies this shape, confirmed by the DD's own code sample at `:386-390` and by `rating.int.test.ts:791` ("client boundary -> exactly 3 .from(...) calls + 1 .rpc(...) call").
+- **Data Contract / Field Propagation Map** (`:518-527, :550`): RPC output rows are `(exam_id text, recent_count bigint, wide_count bigint, total_count bigint)`; bigint "may arrive as number" over PostgREST — propagation rule is `Number(...)`, non-finite ⇒ `0`. Same defensive-coercion pattern already used for `exam_results.total_score` in `ranking.ts:87-92` (`numeric` arrives as `number | string`, coerced via `Number(...)`, `Number.isFinite` guards). `hotCounts.ts` applies the identical coercion to all three count columns when building the returned `Map<string, HotCounts>`.
+- **`SOURCE/lib/adaptive/examShelves.ts:33-37`**: `HotCounts` is already exported there (`{ recent: number; wide: number; total: number }`) — `hotCounts.ts` imports this type rather than redeclaring it, per the DD's "declared once, in the module whose helpers consume them" rule (`:328-336`).
+- No Reference Contracts / Binding Decisions section present in this task file — those pre-implementation checks are not applicable.
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
-- [ ] Read all Investigation Targets and record key observations
-- [ ] Write failing cases: `hotWindows(now)` computes `p_since_recent`/`p_since_wide` correctly for a fixed `now` (hour-snapped per the backend DD); `readHotCounts` calls `.rpc("exam_hot_counts", {...})` exactly once per invocation with `p_max_rows = LIST_ROW_CEILING + 1`
+- [x] Read all Investigation Targets and record key observations
+- [x] Write failing cases: `hotWindows(now)` computes `p_since_recent`/`p_since_wide` correctly for a fixed `now` (hour-snapped per the backend DD); `readHotCounts` calls `.rpc("exam_hot_counts", {...})` exactly once per invocation with `p_max_rows = LIST_ROW_CEILING + 1`
 ### 2. Green Phase
-- [ ] Implement `hotWindows(now)` and `readHotCounts(supabase, label, now)`
-- [ ] Run tests and confirm all pass
+- [x] Implement `hotWindows(now)` and `readHotCounts(supabase, label, now)`
+- [x] Run tests and confirm all pass
 ### 3. Refactor Phase
-- [ ] Confirm 0 `Date.now()`/`new Date()` calls exist anywhere else in this module besides the single `now` parameter's use
-- [ ] Confirm `p_max_rows` is derived from the imported `LIST_ROW_CEILING`, not a hand-copied literal
+- [x] Confirm 0 `Date.now()`/`new Date()` calls exist anywhere else in this module besides the single `now` parameter's use
+- [x] Confirm `p_max_rows` is derived from the imported `LIST_ROW_CEILING`, not a hand-copied literal
 
 ## Quality Assurance Mechanisms
 - `npx tsc --noEmit` — Config: `SOURCE/tsconfig.json` (project-wide)
@@ -69,10 +78,10 @@ _(Record here: confirmation `hotWindows(now)` takes `now` as a parameter, not `D
   - **Residual**: the actual clamp behavior against a real row-ceiling-exceeding dataset is P8-T4's obligation (d) (row-ceiling clamp).
 
 ## Completion Criteria
-- [ ] All added tests pass
-- [ ] Confirmed 0 `Date.now()`/`new Date()` calls anywhere in `lib/adaptive/**`
-- [ ] `p_max_rows` confirmed to import `LIST_ROW_CEILING`, not hand-copy it
-- [ ] Gates 1-6 green
+- [x] All added tests pass
+- [x] Confirmed 0 `Date.now()`/`new Date()` calls anywhere in `lib/adaptive/**`
+- [x] `p_max_rows` confirmed to import `LIST_ROW_CEILING`, not hand-copy it
+- [x] Gates 1-6 green (gates 1-5 run directly: `tsc --noEmit`, `eslint --max-warnings 0`, `vitest run`, `npm run build`, `check:bundle` all pass; gate 6 `test:localdb` needs the dev database and is out of this task's L2 scope — the RPC itself landed on dev in Phase 0 per the task's context note. One pre-existing, unrelated failure in `lib/security/rateLimit.test.ts` — a Gemini budget/quota test untouched by this change — was observed in the full `vitest run` and is not part of this task's scope.)
 
 ## Notes
 - Impact scope: `hotCounts.ts` (new), its test file (new).
