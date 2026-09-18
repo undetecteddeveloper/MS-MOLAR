@@ -46,9 +46,11 @@
 // "Mock boundary" row, verbatim decision)
 // -----------------------------------------------------------------------------
 // MOCKED — `listExamShelves`, `listExamFacets`, `getCurrentUser` (hand-built
-//   fixtures, per frontend DD); `features/exams/actions` (no attempt is ever
-//   started from this lane — clicking is not available under `renderServerTree()`
-//   anyway, see hazard note below).
+//   fixtures, per frontend DD).
+// UNREACHED — `features/exams/actions` (no attempt is ever started from this
+//   lane — clicking is not available under `renderServerTree()` anyway, see
+//   hazard note below; the composed render tree never reaches this module, so
+//   it is not mocked).
 // REAL — `lib/copy.ts` and every dictionary lookup (assertions read resolved
 //   Vietnamese strings, e.g. `copy["exams.shelfHotTitle"]`, never a raw key or an
 //   English literal); `ExamShelf`, `ExamCard`, `ExamRibbon`, `ExamFilters`, both
@@ -97,7 +99,157 @@
 //       pass (keyboard + TalkBack); this repo has no axe dependency and none is
 //       added (frontend DD Quality Assurance Mechanisms).
 
-import { describe, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// =============================================================================
+// MOCK BOUNDARY (implementation) — data sources per the frontend DD's Test Plan
+// declaration, plus the framework shims and the two Server Action modules
+// reached (never invoked — no click is possible under `renderServerTree()`) via
+// SiteHeader's/SupportWidget's static imports. Same composition shape as
+// `essay-auto-scoring.fixture.e2e.test.ts`, the one other case in this lane
+// that actually executes today (D005) — mirrored closely rather than
+// reinvented, since it is the sole proven precedent for RootLayout -> (exams)
+// layout -> page in this repo.
+// =============================================================================
+
+vi.mock("server-only", () => ({}));
+vi.mock("next/headers", () => ({
+  cookies: async () => ({ get: () => undefined }),
+}));
+vi.mock("next/font/google", () => {
+  const font = (options: { variable?: string }) => ({
+    variable: options.variable ?? "",
+    className: "",
+  });
+  return { Lexend: font };
+});
+vi.mock("@vercel/analytics/next", () => ({ Analytics: () => null }));
+// `ExamFilters` (client, renders on BOTH branches) and `SiteHeader`/`BottomNav`/
+// `SupportWidget` (AppShell) all read these hooks at mount.
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/exams",
+  useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), back: vi.fn() }),
+}));
+// SkipLink is an async Server Component — stubbed for the same reason
+// `(exams)/__tests__/layout.test.tsx` and `essay-auto-scoring.fixture.e2e.test.ts`
+// stub it (outside any assertion this file makes; it sits before the navbar).
+vi.mock("@/components/shared/SkipLink", () => ({ SkipLink: () => null }));
+// Reached only via SiteHeader's static import of HeaderProfile and
+// SupportWidget's static import of SupportWidgetDialog. `SupportWidget` itself
+// returns `null` for a signed-out user (`user === null` guard,
+// `SupportWidget.tsx:40`), so neither module's export is ever called here.
+vi.mock("@/features/auth/actions", () => ({ signOut: vi.fn() }));
+vi.mock("@/lib/support/actions", () => ({ submitSupportTicket: vi.fn() }));
+
+const {
+  listExamShelvesMock,
+  listExamsRankedMock,
+  listExamFacetsMock,
+  getCurrentUserMock,
+  getCurrentUserProfileMock,
+} = vi.hoisted(() => ({
+  listExamShelvesMock: vi.fn(),
+  listExamsRankedMock: vi.fn(),
+  listExamFacetsMock: vi.fn(),
+  getCurrentUserMock: vi.fn(),
+  getCurrentUserProfileMock: vi.fn(),
+}));
+
+vi.mock("@/features/exams/queries/shelves", () => ({
+  listExamShelves: listExamShelvesMock,
+}));
+vi.mock("@/features/exams/queries", () => ({
+  listExamsRanked: listExamsRankedMock,
+  listExamFacets: listExamFacetsMock,
+}));
+// `getCurrentUser` (page.tsx) and `getCurrentUserProfile` (AppShell) share one
+// module — both stubbed to a signed-out user so the real, UNMOCKED
+// `readEntitlement(null)` takes its zero-I/O fast path (`readEntitlement.ts:61`)
+// instead of reaching Supabase/Redis, keeping this lane's NO DATABASE/NO
+// NETWORK promise without a third mock. `readEntitlement`/`AppShell` stay REAL
+// per the frontend DD's Mock boundary ("both layouts").
+vi.mock("@/lib/auth/getCurrentUser", () => ({
+  getCurrentUser: getCurrentUserMock,
+  getCurrentUserProfile: getCurrentUserProfileMock,
+}));
+
+import { renderServerTree } from "@/tests/helpers/renderServerTree";
+import RootLayout from "@/app/layout";
+import Layer2Layout from "@/app/(exams)/layout";
+import ExamsPage from "@/app/(exams)/exams/page";
+import { copy } from "@/lib/copy";
+import type { Exam } from "@/types/exam";
+
+function makeExam(overrides: Partial<Exam> & { id: string }): Exam {
+  return {
+    title: `Đề ${overrides.id}`,
+    questionIds: ["q1"],
+    durationMinutes: 45,
+    subject: "Math",
+    grade: 10,
+    ...overrides,
+  };
+}
+
+const FACETS = { subjects: [], grades: [], schools: [], years: [], semesters: [] };
+
+/** Candidate 1's cold-open fixture — all three shelves qualify. */
+const THREE_SHELVES_FIXTURE = {
+  practice: {
+    subject: "Chemistry",
+    exams: [makeExam({ id: "practice-1", subject: "Chemistry" })],
+  },
+  hot: {
+    rung: "grade-recent" as const,
+    grade: 10,
+    exams: [makeExam({ id: "hot-1" }), makeExam({ id: "hot-2" })],
+  },
+  explore: {
+    exams: [makeExam({ id: "explore-1" }), makeExam({ id: "explore-2" })],
+  },
+  submittedExamIds: new Set<string>(),
+};
+
+/** Candidate 2's cold-start fixture — the SAME hot/explore shelves as
+ *  Candidate 1 (skeleton's own "Behavior" note: "the same route-tree
+ *  composition as Candidate 1 is rendered, this time with listExamShelves
+ *  stubbed to a fixture where the practice shelf's data is null ... while hot
+ *  and explore both qualify"); only `practice` differs. */
+const COLD_START_FIXTURE = { ...THREE_SHELVES_FIXTURE, practice: null };
+
+/** `pageCount: 2` is load-bearing — `ExamPagination` returns `null` when
+ *  `pageCount <= 1` (`ExamPagination.tsx:62`), and obligation (g) requires the
+ *  flat-grid case to prove the `<nav>` pagination element is ACTUALLY present,
+ *  not merely never asserted against because it never rendered. */
+const RANKED_FIXTURE = {
+  exams: [makeExam({ id: "ranked-1" }), makeExam({ id: "ranked-2" })],
+  page: 1,
+  pageCount: 2,
+  total: 12,
+  submittedExamIds: new Set<string>(),
+};
+
+/** Every shelf `<section>` in the tree, in DOM order. */
+function shelfSections(container: HTMLElement): Element[] {
+  return Array.from(container.querySelectorAll("section[aria-labelledby^='shelf-']"));
+}
+
+/** The PAGINATION `<nav>` specifically — `container.querySelector("nav")`
+ *  alone is meaningless in this composed route tree: `SiteHeader` carries its
+ *  own permanent `<nav aria-label="Điều hướng phụ">` and `BottomNav` its own
+ *  `<nav aria-label="...">`, both present on every render regardless of
+ *  branch. Only `ExamPagination`'s `<nav>` carries this resolved label. */
+function paginationNav(container: HTMLElement): Element | null {
+  return container.querySelector(`nav[aria-label="${copy["exams.pagination"]}"]`);
+}
+
+async function renderExamsRoute(searchParams: Record<string, string | undefined>) {
+  const page = await ExamsPage({ searchParams: Promise.resolve(searchParams) });
+  return renderServerTree(
+    await RootLayout({ children: await Layer2Layout({ children: page }) })
+  );
+}
 
 // =============================================================================
 // Candidate 1 — RESERVED SLOT (journey). Bare /exams renders three shelves in
@@ -189,11 +341,85 @@ import { describe, it } from "vitest";
 //       cases a locals-based predicate would get wrong while a raw-key-presence
 //       predicate gets right.
 describe("Bare /exams renders three shelves; any listed URL parameter renders the flat grid instead, including parsed-to-undefined values (AC-001-004, AC-007-010, AC-026, AC-032, AC-033, R-3)", () => {
-  it.todo(
-    "bare /exams (0 searchParams): 3 <section> shelves in DOM order practice→hot→explore, 0 flat-grid list, 0 pagination <nav>, <=10 cards/row, exactly 1 ribbon page-wide on hot rank 1, Khám phá tile only as the last <li> of its own row, chip row has 4 chips incl. Nổi nhất (obligations a-f)"
-  );
-  it.todo(
-    '?sort=hot, ?sort=garbage, ?page=abc and ?dir=asc each render 0 shelf <section> elements and the flat-grid + pagination tree instead — the parsed-to-undefined R-3 regression guard (obligation g)'
+  it("bare /exams (0 searchParams): 3 <section> shelves in DOM order practice→hot→explore, 0 flat-grid list, 0 pagination <nav>, <=10 cards/row, exactly 1 ribbon page-wide on hot rank 1, Khám phá tile only as the last <li> of its own row, chip row has 4 chips incl. Nổi nhất (obligations a-f)", async () => {
+    listExamShelvesMock.mockResolvedValue(THREE_SHELVES_FIXTURE);
+    listExamsRankedMock.mockResolvedValue(RANKED_FIXTURE);
+    listExamFacetsMock.mockResolvedValue(FACETS);
+    getCurrentUserMock.mockResolvedValue(null);
+    getCurrentUserProfileMock.mockResolvedValue(null);
+
+    const { container } = await renderExamsRoute({});
+
+    // (a) POSITIVE FIRST (empty-tree hazard): a real shelf title actually
+    // resolved and rendered, before any negative assertion is trusted.
+    expect(container.textContent).toContain(copy["exams.shelfHotTitle"]);
+
+    // (b) exactly 3 shelves, DOM order practice -> hot -> explore (AC-003).
+    const sections = shelfSections(container);
+    expect(sections.map((s) => s.getAttribute("aria-labelledby"))).toEqual([
+      "shelf-practice",
+      "shelf-hot",
+      "shelf-explore",
+    ]);
+    const [practiceSection, hotSection, exploreSection] = sections;
+
+    // (c) 0 flat-grid list container, 0 pagination <nav> anywhere (AC-001).
+    expect(container.querySelector("ul.grid")).toBeNull();
+    expect(paginationNav(container)).toBeNull();
+
+    // (d) <=10 cards per shelf row (AC-002); exactly 1 ribbon page-wide, on
+    // the hot shelf's first card (AC-026).
+    for (const section of sections) {
+      expect(section.querySelectorAll("ul > li").length).toBeLessThanOrEqual(10);
+    }
+    expect(container.querySelectorAll('[data-slot="ribbon"]')).toHaveLength(1);
+    const hotCards = hotSection.querySelectorAll("ul > li");
+    expect(hotCards[0].querySelector('[data-slot="ribbon"]')).not.toBeNull();
+
+    // (e) the Khám phá row's last <li> is the "Xem toàn bộ kho đề" tile, and
+    // no other shelf's row contains it (AC-032).
+    const exploreCards = exploreSection.querySelectorAll("ul > li");
+    const lastExploreCard = exploreCards[exploreCards.length - 1];
+    expect(lastExploreCard.querySelector('a[href="/exams?page=1"]')).not.toBeNull();
+    expect(lastExploreCard.textContent).toContain(copy["exams.shelfViewAllStore"]);
+    expect(container.querySelectorAll('a[href="/exams?page=1"]')).toHaveLength(1);
+    expect(practiceSection.querySelector('a[href="/exams?page=1"]')).toBeNull();
+    expect(hotSection.querySelector('a[href="/exams?page=1"]')).toBeNull();
+
+    // (f) the chip row carries exactly 4 sort chips, incl. Nổi nhất (AC-033).
+    const sortChips = container.querySelectorAll("button[aria-pressed]");
+    expect(sortChips).toHaveLength(4);
+    expect(
+      Array.from(sortChips).some((chip) => chip.textContent === copy["exams.sortHot"])
+    ).toBe(true);
+  });
+
+  it.each([
+    { name: "?sort=hot", params: { sort: "hot" } },
+    { name: "?sort=garbage", params: { sort: "garbage" } },
+    { name: "?page=abc", params: { page: "abc" } },
+    { name: "?dir=asc", params: { dir: "asc" } },
+  ])(
+    "$name renders 0 shelf <section> elements and the flat-grid + pagination tree instead — the parsed-to-undefined R-3 regression guard (obligation g)",
+    async ({ params }) => {
+      listExamShelvesMock.mockResolvedValue(THREE_SHELVES_FIXTURE);
+      listExamsRankedMock.mockResolvedValue(RANKED_FIXTURE);
+      listExamFacetsMock.mockResolvedValue(FACETS);
+      getCurrentUserMock.mockResolvedValue(null);
+      getCurrentUserProfileMock.mockResolvedValue(null);
+
+      const { container } = await renderExamsRoute(params);
+
+      // POSITIVE FIRST (empty-tree hazard): the flat-grid tree is actually
+      // present with real content, not merely "not the shelves".
+      const grid = container.querySelector("ul.grid");
+      expect(grid).not.toBeNull();
+      expect(grid?.textContent).toContain(RANKED_FIXTURE.exams[0].title);
+      expect(paginationNav(container)).not.toBeNull();
+
+      // Obligation (g): 0 shelf <section> elements anywhere (R-3 guard).
+      expect(shelfSections(container)).toHaveLength(0);
+    }
   );
 });
 
@@ -260,7 +486,51 @@ describe("Bare /exams renders three shelves; any listed URL parameter renders th
 //       hot and explore fixtures' card counts, so a stray placeholder card would
 //       be caught by the count even if it carries no obviously-named class.
 describe("A shelf whose selection yields 0 cards is entirely absent from the rendered page — no header, no subtitle, no placeholder (AC-051, AC-013, cold-start user story)", () => {
-  it.todo(
-    "cold-start fixture (practice shelf data = null): 0 nodes reference shelf-practice, exactly 2 <section> shelves render in order hot→explore, and the total card count equals exactly the hot+explore fixtures' card counts (obligations a-d)"
-  );
+  it("cold-start fixture (practice shelf data = null): 0 nodes reference shelf-practice, exactly 2 <section> shelves render in order hot→explore, and the total card count equals exactly the hot+explore fixtures' card counts (obligations a-d)", async () => {
+    listExamShelvesMock.mockResolvedValue(COLD_START_FIXTURE);
+    listExamsRankedMock.mockResolvedValue(RANKED_FIXTURE);
+    listExamFacetsMock.mockResolvedValue(FACETS);
+    getCurrentUserMock.mockResolvedValue(null);
+    getCurrentUserProfileMock.mockResolvedValue(null);
+
+    const { container } = await renderExamsRoute({});
+
+    // (a) POSITIVE FIRST (empty-tree hazard): both remaining shelf titles are
+    // actually found before any negative assertion is trusted.
+    expect(container.textContent).toContain(copy["exams.shelfHotTitle"]);
+    expect(container.textContent).toContain(copy["exams.shelfExploreTitle"]);
+
+    // (b) 0 nodes referencing shelf-practice anywhere — id, aria-labelledby,
+    // or the resolved copy strings.
+    expect(container.querySelector("#shelf-practice")).toBeNull();
+    expect(container.querySelector('[aria-labelledby="shelf-practice"]')).toBeNull();
+    expect(container.textContent).not.toContain(copy["exams.shelfPracticeTitle"]);
+    // The subtitle template carries a `{subject}` interpolation that is never
+    // even computed — `page.tsx`'s `data && (...)` narrowing skips the whole
+    // `ExamShelf`/`shelfSubtitle` call when practice is null — so the stable
+    // trailing clause is enough to prove the string never lands anywhere.
+    expect(container.textContent).not.toContain(
+      "đang là môn điểm trung bình thấp nhất của bạn"
+    );
+
+    // (c) exactly 2 shelves, DOM order hot then explore (D8).
+    const sections = shelfSections(container);
+    expect(sections.map((s) => s.getAttribute("aria-labelledby"))).toEqual([
+      "shelf-hot",
+      "shelf-explore",
+    ]);
+
+    // (d) 0 placeholder/dashed card in place of the missing shelf: the total
+    // <li> count under the two remaining shelves' rows equals exactly the
+    // fixtures' card counts plus the one Khám phá row always carries (the
+    // "Xem toàn bộ kho đề" tile) — a stray element is caught by the count
+    // regardless of whether it carries an obviously-named class.
+    const totalListItems = sections.reduce(
+      (sum, section) => sum + section.querySelectorAll("ul > li").length,
+      0
+    );
+    const expectedListItems =
+      COLD_START_FIXTURE.hot.exams.length + COLD_START_FIXTURE.explore.exams.length + 1;
+    expect(totalListItems).toBe(expectedListItems);
+  });
 });

@@ -13,7 +13,7 @@ Metadata:
 Fill in `SOURCE/tests/e2e/fixture/exam-shelves.fixture.e2e.test.ts` (already committed as `it.todo`, Candidates 1 & 2) — replace with real `it` assertions using `renderServerTree`.
 
 ## Target Files
-- [ ] `SOURCE/tests/e2e/fixture/exam-shelves.fixture.e2e.test.ts` (fill-in — pre-committed skeleton)
+- [x] `SOURCE/tests/e2e/fixture/exam-shelves.fixture.e2e.test.ts` (fill-in — pre-committed skeleton)
 
 ## Investigation Targets
 - `SOURCE/tests/e2e/fixture/exam-shelves.fixture.e2e.test.ts` (the full pre-committed skeleton — read every `Proof obligation`/`Primary failure mode` comment block before writing any assertion)
@@ -33,18 +33,33 @@ Fill in `SOURCE/tests/e2e/fixture/exam-shelves.fixture.e2e.test.ts` (already com
 - **Boundary**: Ten AC-008 listed URL params → `hasBrowseParam(sp)`. This task provides the **systematic, table-driven proof** of the expected signal ("`?sort=garbage`/`?page=abc`/`?dir=asc` all render the flat grid despite normalising to `undefined`") that P5-T1 wires but does not exhaustively test itself.
 
 ## Investigation Notes
-_(Record here: confirmation this is genuinely the first green run of this fixture-e2e file — per the frontend DD D005 note, treat the green run as new evidence, not a formality; the exact card counts observed for the cold-start fixture.)_
+
+**Investigation Targets read**: skeleton file (every comment block, incl. Selection/Mock boundary/Hazard/Proof obligation sections); frontend DD § Test Plan (Mock boundary row :417, D005 note); UI Spec § Page State Matrix (row #5 confirms Candidate 2's cold-start shape: practice absent, hot→explore order); `app/(exams)/exams/page.tsx` (P5-T1's landed branch — `hasBrowseParam(sp)` read off raw `sp`, `SHELF_ORDER.map` + `data && <ExamShelf/>` narrowing, `ExamPagination` early-returns `null` when `pageCount <= 1`); `vitest.fixture.config.ts:36-54` (glob + 6-file exclude list, this file not among them); `tests/helpers/renderServerTree.tsx` (server renderer, detached container, no cleanup needed).
+
+**Baseline before this task**: ran `npx vitest run --config vitest.fixture.config.ts` before writing any assertion — 1 file passed (`essay-auto-scoring.fixture.e2e.test.ts`, 4 real `it`s) + 1 file skipped (this one, 3 `it.todo`), confirming the skeleton was genuinely still `it.todo` and the lane's only executing file today is a DIFFERENT feature's fixture-e2e case. `essay-auto-scoring.fixture.e2e.test.ts` is the sole proven precedent in this repo for the RootLayout -> (exams) layout -> page composition shape this skeleton requires (its own header comment says the same); its mock set (server-only, next/headers, next/font/google, @vercel/analytics/next, next/navigation, SkipLink, two Server Action modules) was mirrored closely rather than reinvented, then adapted to this feature's actual data sources (`listExamShelves`/`listExamsRanked`/`listExamFacets`/`getCurrentUser`+`getCurrentUserProfile`).
+
+**Deviation found and fixed during implementation**: `container.querySelector("nav")` is NOT a valid "0 pagination nav" check in this composed tree — `SiteHeader` (`aria-label="Điều hướng phụ"`) and `BottomNav` both carry their own permanent `<nav>`, present on every render regardless of branch (unlike P5-T1's `page.test.tsx`, which renders `<ExamsPage/>` directly with no layout, so a bare `nav` selector was safe there). Fixed with a `paginationNav()` helper scoped to `ExamPagination`'s own resolved `aria-label` (`copy["exams.pagination"]` = "Các trang danh sách đề"). This matches the skeleton's own more precise wording ("0 ExamPagination `<nav>`", "0 `<nav>` pagination element"), not a redesign of the obligation.
+
+**readEntitlement**: left REAL/unmocked, per the frontend DD's Mock boundary ("both layouts" real). `getCurrentUser`/`getCurrentUserProfile` both stubbed to a signed-out user (`null`), so `readEntitlement(null)` takes its documented zero-I/O fast path (`readEntitlement.ts:61`) — confirmed by inspection, not by adding a third mock — keeping the lane's NO DATABASE/NO NETWORK promise intact.
+
+**Reference Contract compliance (AC-051 row)**: Y — Candidate 2's test asserts exactly 2 `<section>` elements in DOM order `["shelf-hot", "shelf-explore"]` and 0 nodes referencing `shelf-practice` (by `id`, by `aria-labelledby`, and by both resolved copy strings — the title literal and the subtitle's stable trailing clause, since the subtitle is never computed at all for a null shelf).
+
+**Card counts observed (cold-start fixture, Candidate 2)**: hot = 2 exams, explore = 2 exams -> total `<li>` under the 2 rendered shelf rows = 5 (4 `ExamCard`s + 1 always-present "Xem toàn bộ kho đề" tile in the Khám phá row), asserted via `hot.exams.length + explore.exams.length + 1`.
+
+**Green run**: `npx vitest run --config vitest.fixture.config.ts` — 2 files passed, 10/10 tests passed (4 essay + 6 here: 1 bare-/exams + 4 table-driven `it.each` cases + 1 cold-start). This is genuinely the first green run of this feature's fixture-e2e case — treated as new evidence per D005, not a formality: it exercises the real composed route tree (RootLayout -> AppShell -> ExamsPage) for the first time under any lane, catching the `nav` selector issue above that no other lane's test shape would have surfaced.
+
+**Binding Decisions / further Reference Contracts**: task file has no Binding Decisions section; the single Reference Contracts row is evaluated above.
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
-- [ ] Read all Investigation Targets and record key observations, including every comment block in the pre-committed skeleton
-- [ ] Confirm both candidates currently run as `it.todo`
-- [ ] Confirm the skeleton's POSITIVE-FIRST rule is honored: a real shelf title text must be found before any negative assertion, in both candidates
+- [x] Read all Investigation Targets and record key observations, including every comment block in the pre-committed skeleton
+- [x] Confirm both candidates currently run as `it.todo`
+- [x] Confirm the skeleton's POSITIVE-FIRST rule is honored: a real shelf title text must be found before any negative assertion, in both candidates
 ### 2. Green Phase
-- [ ] Replace `it.todo` with real `it` assertions per the skeleton's comment blocks for Candidate 1 (bare `/exams` + table-driven re-render for `{sort:"hot"}`, `{sort:"garbage"}`, `{page:"abc"}`, `{dir:"asc"}`) and Candidate 2 (cold-start fixture)
-- [ ] Run `npm run test:fixture` and confirm green
+- [x] Replace `it.todo` with real `it` assertions per the skeleton's comment blocks for Candidate 1 (bare `/exams` + table-driven re-render for `{sort:"hot"}`, `{sort:"garbage"}`, `{page:"abc"}`, `{dir:"asc"}`) and Candidate 2 (cold-start fixture)
+- [x] Run `npm run test:fixture` and confirm green
 ### 3. Refactor Phase
-- [ ] Confirm this is the first meaningful run of gate 5 for this feature per the plan's own note — do not treat a first green run as routine
+- [x] Confirm this is the first meaningful run of gate 5 for this feature per the plan's own note — do not treat a first green run as routine
 
 ## Quality Assurance Mechanisms
 - `npm run test:fixture` — Enforces: fixture-e2e server-tree composition tests, 0-client-fetch proof — Config: `SOURCE/vitest.fixture.config.ts:36-54`; Covered: `SOURCE/tests/e2e/fixture/exam-shelves.fixture.e2e.test.ts`
@@ -76,10 +91,10 @@ _(Record here: confirmation this is genuinely the first green run of this fixtur
   - **Residual**: none.
 
 ## Completion Criteria
-- [ ] Both candidates converted from `it.todo` to `it`, all skeleton assertions pass
-- [ ] `npm run test:fixture` green
-- [ ] Every Reference Contract's Compliance Check evaluates to `Y`
-- [ ] Gates 1-5 green (gate 6 continues per its Phase-position rule — meaningful from Phase 0 onward but no feature-specific localdb cases exist until Phase 8)
+- [x] Both candidates converted from `it.todo` to `it`, all skeleton assertions pass
+- [x] `npm run test:fixture` green
+- [x] Every Reference Contract's Compliance Check evaluates to `Y`
+- [x] Gates 1-5 green (gate 6 continues per its Phase-position rule — meaningful from Phase 0 onward but no feature-specific localdb cases exist until Phase 8). Verified: `eslint . --max-warnings 0` (gate 1) clean repo-wide; `tsc --noEmit` clean repo-wide; `npx vitest run` (gate 3, default lane) — 1 PRE-EXISTING, UNRELATED failure in `lib/security/rateLimit.test.ts` ("keeps ONE account's whole daily Gemini budget under the project quota", `worstCasePerUser` 33 > `SUPPLIER_DAILY_QUOTA` 20) — confirmed pre-existing via `git status` (only this task's two files are modified in the worktree); out of this task's Impact scope (Notes section), not touched or caused by this change, and not fixed here; `npx vitest run --config vitest.fixture.config.ts` (gate 5) green, 2/2 files, 10/10 tests.
 
 ## Notes
 - Impact scope: `exam-shelves.fixture.e2e.test.ts` fill-in only — the skeleton's structure/comments are not this task's to redesign, only to satisfy.
