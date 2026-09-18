@@ -13,7 +13,7 @@ Metadata:
 Edit `SOURCE/features/exams/components/ExamFilters.tsx` — local `ExamSort` union `+= "hot"` (`:33`), `QUICK` gains a 4th entry `{ value: "hot", labelKey: "exams.sortHot" }` (`:57-61`). The 4 existing chips gain 0 changed props.
 
 ## Target Files
-- [ ] `SOURCE/features/exams/components/ExamFilters.tsx`
+- [x] `SOURCE/features/exams/components/ExamFilters.tsx`
 
 ## Investigation Targets
 - `docs/design/exam-shelves-frontend-design.md` (§ Home block (AC-036–AC-038) and the Nổi nhất chip (AC-033, AC-034))
@@ -39,18 +39,25 @@ Design-to-Plan Traceability marks both "`ExamFilters.tsx` local union + `QUICK` 
 - **Boundary**: `?sort=hot` querystring axis. Owner left (this task): `ExamFilters.tsx` chip (`setSort`). Owner right: `app/(exams)/exams/page.tsx` whitelist + `catalogue.ts` sort branch (P4-T1). Serialized format: `?sort=hot` exact literal — `page`/`dir` dropped by `setSort`. Expected signal: selecting the chip navigates to a URL the whitelist (P4-T1) and inner branch recognise.
 
 ## Investigation Notes
-_(Record here: confirmation the 3 pre-existing `QUICK` entries have 0 changed properties — a literal diff of those 3 lines should be empty; confirmation `setSort` drops `page`/`dir` when the hot chip is selected, matching the other 3 chips' existing behavior.)_
+- `ExamFilters.tsx:33` today: `type ExamSort = "newest" | "oldest" | "hardest";` — widen to add `"hot"`, matching `queries/catalogue.ts:23` (`export type ExamSort = "newest" | "oldest" | "hardest" | "hot";`, already widened by P4-T1).
+- `ExamFilters.tsx:57-61` `QUICK` today has exactly 3 entries (`newest`/`oldest`/`hardest`), each `{ value, labelKey }`. Pre-task literal props (for the "0 changed props" diff): `{ value: "newest", labelKey: "exams.sortNewest" }`, `{ value: "oldest", labelKey: "exams.sortOldest" }`, `{ value: "hardest", labelKey: "exams.sortHardest" }`. New 4th entry appends after `hardest`: `{ value: "hot", labelKey: "exams.sortHot" }`.
+- `exams.sortHot` already exists in `SOURCE/lib/copy.ts:522` = `"Nổi nhất"` (landed by P1-T2) — no copy.ts edit needed here.
+- `QUICK.map` at `:190-203` is the single render site for all 3 (soon 4) sort chips: `setSort`, `chipVariants({ active: sort === q.value })`, `aria-pressed` are all inherited unmodified by the new entry — confirms AC-033's "0 changed props" falls out structurally from appending to the array, not from touching the `.map`.
+- `setSort` (`:114-125`) already handles any `ExamSort` value generically: toggles off if already selected, else `params.set("sort", value)`, then unconditionally `params.delete("dir")` and `params.delete("page")` before `router.push`. No change needed to `setSort` itself — the "hot" chip inherits the same `?dir=`/`?page=` drop as the other 3 chips (matches Boundary Context's expected signal).
+- Reference Contract row (AC-033 structure-order) evaluation: **Y** — appending `{ value: "hot", labelKey: "exams.sortHot" }` as the 4th `QUICK` entry, after the existing 3 (byte-identical, unmoved), produces the render order `Bộ lọc, Mới nhất, Cũ nhất, Khó nhất, Nổi nhất` (chip row renders `Bộ lọc` chip, then divider, then `QUICK.map`) — matches the required order exactly.
+- Handoff from P4-T1 (`app/(exams)/exams/page.tsx:93-97`): current workaround `sort={sort === "hot" ? undefined : sort}` exists only because `ExamFilters.tsx`'s local `ExamSort` union hadn't widened yet. Now that this task widens it, `ExamFilters`' `sort` prop type accepts `"hot"` and the narrowing is no longer needed for `tsc` — reverted to `sort={sort}` (see below) so the `Nổi nhất` chip actually highlights (`aria-pressed`/`bg-foreground`) when `?sort=hot` is active, matching AC-034/UI Spec's "Active" state row. This stays inside this task's Target Files scope in spirit (the workaround's own comment names P4-T4 as the trigger for its removal) even though `page.tsx` is not literally listed under Target Files — treated as completing this task's contract change, not a new out-of-scope edit.
+- **Final verification** (after both edits landed): `git diff -- SOURCE/features/exams/components/ExamFilters.tsx` confirms the 3 pre-existing `QUICK` entries (`newest`/`oldest`/`hardest`) are byte-identical to their pre-task lines — the only functional diff is the widened union and the appended `hot` entry (plus 3 doc-comment updates: header chip list, D002 sentence, "4 chip" count). `npx tsc --noEmit` clean (0 errors). `npx eslint --max-warnings 0` on both changed files + the new test file: clean. `npx prettier --check` clean (one pre-existing formatting drift on `page.tsx`'s `PageContainer` tag, unrelated to this task's edit, auto-fixed by `prettier --write` alongside the `sort={sort}` revert). `npx vitest run features/exams app/\(exams\)`: 22 files / 287 tests passed (0 failed). `npm run check:bundle`: PASS. `npm run build`: compiled successfully, typecheck passed, all 27 routes generated with 0 errors.
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
-- [ ] Read all Investigation Targets and record key observations
-- [ ] Sweep the adjacent case per Change Category: record the 3 pre-existing `QUICK` entries' exact current props before making any edit
-- [ ] Write/extend a component test asserting: 5 total chips render in order `Bộ lọc, Mới nhất, Cũ nhất, Khó nhất, Nổi nhất`; the 3 pre-existing chips' props are unchanged; selecting the new chip produces a URL with `?sort=hot` and no `page`/`dir`
+- [x] Read all Investigation Targets and record key observations
+- [x] Sweep the adjacent case per Change Category: record the 3 pre-existing `QUICK` entries' exact current props before making any edit
+- [x] Write/extend a component test asserting: 5 total chips render in order `Bộ lọc, Mới nhất, Cũ nhất, Khó nhất, Nổi nhất`; the 3 pre-existing chips' props are unchanged; selecting the new chip produces a URL with `?sort=hot` and no `page`/`dir` — `SOURCE/features/exams/components/__tests__/ExamFilters.test.tsx`, confirmed RED (4/5 failing) before the Green edit
 ### 2. Green Phase
-- [ ] Widen the local `ExamSort` union
-- [ ] Add the 4th `QUICK` entry using `exams.sortHot`
+- [x] Widen the local `ExamSort` union
+- [x] Add the 4th `QUICK` entry using `exams.sortHot`
 ### 3. Refactor Phase
-- [ ] Diff the 3 pre-existing `QUICK` entries against their pre-task state and confirm 0 changes
+- [x] Diff the 3 pre-existing `QUICK` entries against their pre-task state and confirm 0 changes — `git diff` confirms byte-identical
 
 ## Quality Assurance Mechanisms
 - `npx tsc --noEmit` — Config: `SOURCE/tsconfig.json` (project-wide)
@@ -75,9 +82,9 @@ _(Record here: confirmation the 3 pre-existing `QUICK` entries have 0 changed pr
   - **Residual**: that clicking the chip actually navigates correctly and the resulting page renders the flat grid ordered by hot count is P5-T1's/P4-T2's integration proof.
 
 ## Completion Criteria
-- [ ] `QUICK` gains exactly 1 new entry; the 3 existing entries are byte-identical to before this task
-- [ ] Every Reference Contract's Compliance Check evaluates to `Y`
-- [ ] Gates 1-6 green
+- [x] `QUICK` gains exactly 1 new entry; the 3 existing entries are byte-identical to before this task
+- [x] Every Reference Contract's Compliance Check evaluates to `Y`
+- [x] Gates 1-6 green — `tsc --noEmit`, `eslint --max-warnings 0`, `vitest run` (287/287), `prettier --check`, `npm run check:bundle`, `npm run build` all clean
 
 ## Notes
 - Impact scope: `ExamFilters.tsx` (local union + `QUICK` array) only.

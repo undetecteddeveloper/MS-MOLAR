@@ -80,7 +80,12 @@ export default async function ExamsPage({ searchParams }: { searchParams: Search
     .join("|");
 
   return (
-    <PageContainer as="main" size="full" padding="none" className="flex flex-col gap-5 px-4 py-6 sm:px-6 sm:py-8">
+    <PageContainer
+      as="main"
+      size="full"
+      padding="none"
+      className="flex flex-col gap-5 px-4 py-6 sm:px-6 sm:py-8"
+    >
       <PageHeader title={t("exams.title")} />
 
       <ExamFilters
@@ -90,11 +95,7 @@ export default async function ExamsPage({ searchParams }: { searchParams: Search
         years={facets.years}
         semesters={facets.semesters}
         selected={{ subject, grade, school, year, semester, level }}
-        // `ExamFilters`' local ExamSort (chip row, P4-T4) chưa có "hot" — thu hẹp
-        // về undefined cho riêng prop này để không chip nào sáng, đúng hành vi
-        // hôm nay; `sort` gốc (đủ 4 giá trị) vẫn đi thẳng vào listExamsRanked ở
-        // dưới, không qua thu hẹp này.
-        sort={sort === "hot" ? undefined : sort}
+        sort={sort}
         query={q}
       />
 
