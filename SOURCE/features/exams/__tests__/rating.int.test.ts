@@ -822,11 +822,120 @@ describe("listExams — q lọc theo tên qua cột title_search (ADR-0020)", ()
 //       or re-run the AC-016/AC-017 cases at the top of this file — it only adds
 //       cases; the implementer must confirm those cases still pass unmodified in the
 //       same commit that adds this block's real assertions (Success Criteria #5).
+// `createClient` itself is NEW in this candidate — this describe block's own
+// tests extend the shared mock's returned client with `rpc` for exactly the
+// ONE `createClient()` call `listExamsRanked` makes directly (ranking.ts:105);
+// `mockResolvedValueOnce` below self-reverts after that one call, re-armed
+// fresh per test in `beforeEach`. The SECOND, internal `createClient()` call
+// inside `fetchExamRows` (catalogue.ts:77) still resolves through the
+// untouched default `{ from: fromMock }` from :29-31 — that call site only
+// ever does `.from(...)`, never `.rpc(...)`, so the default is enough for it.
+// This keeps :29-31 itself byte-identical: touching the shared mock factory
+// would touch lines 1-747, and per this task's own Failure response, a
+// passing assertion that requires editing the shared region signals the fix
+// belongs in P4-T2 territory, not here.
+import type { ExamSort } from "@/features/exams/queries";
+const { createClient } = await import("@/lib/supabase/server");
+
 describe("listExamsRanked — ?sort=hot / ?sort=garbage composition budget (AC-009, AC-010, AC-018, AC-034, F-005)", () => {
-  it.todo(
-    '?sort=hot issues exactly 3 .from(...) calls + 1 .rpc("exam_hot_counts", ...) call, and orders exams by the mocked rpc\'s total_count DESC, exam id ASC (AC-018/AC-034, obligations a+b)'
+  const rpcMock = vi.fn();
+
+  beforeEach(() => {
+    fromMock.mockReset();
+    rpcMock.mockReset();
+    vi.mocked(createClient).mockResolvedValueOnce({ from: fromMock, rpc: rpcMock } as never);
+  });
+
+  /** Dòng `exams_with_difficulty` tối giản — chỉ field mà nhánh `?sort=hot`/
+   *  DB-side thật sự đọc (`id`, dùng bởi `orderIdsByHotCount`/`toExam`); cùng
+   *  field set với `examRow` của candidate 1-2 ngay TRONG file này (:531-546). */
+  function hotExamRow(id: string) {
+    return {
+      id,
+      title: `Đề ${id}`,
+      question_ids: ["q1"],
+      duration_minutes: 45,
+      subject: "Toán",
+      grade: 10,
+      school: null,
+      school_year: null,
+      semester: null,
+      author_display_name: null,
+      parts: null,
+      rating_count: 0,
+      avg_overall: null,
+      created_at: "2026-01-01T00:00:00.000Z",
+    };
+  }
+
+  /**
+   * Nối `fromMock`/`rpcMock` vào map theo tên bảng/rpc, builder RIÊNG cho mỗi
+   * bảng — cùng kỹ thuật `mockTables` (:555-563, candidate 1-2 trong CHÍNH file
+   * này) và `mockBoundary` của `shelves.int.test.ts` (cùng feature, cùng ngân
+   * sách D3): dùng chung một builder thì `exam_attempts`/`exam_results` có thể
+   * nhận nhầm dòng đề, và test vẫn XANH trong khi đang đo sai thứ. Trả về
+   * `issued` để assertion ngân sách đếm `from()`+`rpc()` CỘNG LẠI, đúng
+   * Compliance Check của Binding Decision (task file § Binding Decisions).
+   */
+  function mockHotBoundary(byTable: Record<string, unknown[]>, hotRows: unknown[]) {
+    const issued: string[] = [];
+    fromMock.mockImplementation((table: string) => {
+      issued.push(table);
+      const { builder } = createQueryBuilder({ data: byTable[table] ?? [], error: null });
+      return builder;
+    });
+    rpcMock.mockImplementation((fnName: string) => {
+      issued.push(fnName);
+      const { builder } = createQueryBuilder({ data: hotRows, error: null });
+      return builder;
+    });
+    return issued;
+  }
+
+  it(
+    '?sort=hot issues exactly 3 .from(...) calls + 1 .rpc("exam_hot_counts", ...) call, and orders exams by the mocked rpc\'s total_count DESC, exam id ASC (AC-018/AC-034, obligations a+b)',
+    async () => {
+      // total_count DESC, exam id ASC tính TAY từ fixture dưới đây, KHÔNG chạy
+      // implementation trước (xem task file § Investigation Notes):
+      //   a: 5, b: 5 (hoà tổng -> id ASC nên "a" trước "b"), z: 1, m: không có
+      //   dòng hot -> total mặc định 0 (orderIdsByHotCount, examShelves.ts:301-308).
+      // => literal expected: ["a", "b", "z", "m"].
+      const issued = mockHotBoundary(
+        {
+          exams_with_difficulty: [hotExamRow("z"), hotExamRow("a"), hotExamRow("m"), hotExamRow("b")],
+          exam_attempts: [],
+          exam_results: [],
+        },
+        [
+          { exam_id: "a", recent_count: 0, wide_count: 0, total_count: 5 },
+          { exam_id: "b", recent_count: 0, wide_count: 0, total_count: 5 },
+          { exam_id: "z", recent_count: 0, wide_count: 0, total_count: 1 },
+        ]
+      );
+
+      const { exams } = await listExamsRanked({ sort: "hot" });
+
+      expect(issued).toHaveLength(4);
+      expect(new Set(issued)).toEqual(
+        new Set(["exams_with_difficulty", "exam_attempts", "exam_results", "exam_hot_counts"])
+      );
+      expect(exams.map((e) => e.id)).toEqual(["a", "b", "z", "m"]);
+    }
   );
-  it.todo(
-    "?sort=<value not in ExamSort> issues exactly 3 .from(...) calls and 0 .rpc(...) calls — same budget as every other explicit-sort case (AC-009/AC-010, F-005, obligation c)"
+
+  it(
+    "?sort=<value not in ExamSort> issues exactly 3 .from(...) calls and 0 .rpc(...) calls — same budget as every other explicit-sort case (AC-009/AC-010, F-005, obligation c)",
+    async () => {
+      const issued = mockHotBoundary(
+        { exams_with_difficulty: [hotExamRow("a")], exam_attempts: [], exam_results: [] },
+        []
+      );
+
+      await listExamsRanked({ sort: "garbage-not-a-real-value" as ExamSort });
+
+      expect(issued).toHaveLength(3);
+      expect(new Set(issued)).toEqual(new Set(["exams_with_difficulty", "exam_attempts", "exam_results"]));
+      expect(rpcMock).not.toHaveBeenCalled();
+    }
   );
 });
