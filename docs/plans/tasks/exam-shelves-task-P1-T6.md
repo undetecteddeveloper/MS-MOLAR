@@ -13,8 +13,8 @@ Metadata:
 Create `SOURCE/lib/exams/browseParams.ts` (`BROWSE_PARAM_KEYS` — the ten AC-008 keys named once — and `hasBrowseParam(sp)`). Create `SOURCE/lib/exams/__tests__/browseParams.test.ts`.
 
 ## Target Files
-- [ ] `SOURCE/lib/exams/browseParams.ts` (new)
-- [ ] `SOURCE/lib/exams/__tests__/browseParams.test.ts` (new)
+- [x] `SOURCE/lib/exams/browseParams.ts` (new)
+- [x] `SOURCE/lib/exams/__tests__/browseParams.test.ts` (new)
 
 ## Investigation Targets
 - `docs/design/exam-shelves-backend-design.md` (Implementation Path Mapping — `lib/exams/browseParams.ts` row)
@@ -26,18 +26,23 @@ Create `SOURCE/lib/exams/browseParams.ts` (`BROWSE_PARAM_KEYS` — the ten AC-00
 - **Boundary**: Ten AC-008 listed URL params → `hasBrowseParam(sp)`. Owner left: browser-supplied URL (address bar, bookmark, shelf's own header/tile links). Owner right (this task): `lib/exams/browseParams.ts`, consumed by `app/(exams)/exams/page.tsx` (P5-T1). Serialized format: URL query string, raw key presence — not parsed value. Consumer parse rule: `key in sp && sp[key] !== undefined` on the raw `searchParams` object. Expected signal: `?sort=garbage`/`?page=abc`/`?dir=asc` all render the flat grid despite normalising to `undefined` downstream.
 
 ## Investigation Notes
-_(Record here: the exact 10 keys named in `BROWSE_PARAM_KEYS`, cross-checked against PRD AC-008; confirmation the predicate reads raw key presence, never a normalised local.)_
+- **The 10 AC-008 keys** (`docs/prd/exam-shelves-prd.md` AC-008): `q, subject, grade, school, year, semester, sort, level, dir, page`. Cross-checked against the current raw `sp` object shape read in `SOURCE/app/(exams)/exams/page.tsx:23-35` (`SearchParams` type) — same 10 keys, no more, no less.
+- **Backend Design Doc** (Implementation Path Mapping row, `docs/design/exam-shelves-backend-design.md:85`): `lib/exams/browseParams.ts` exports `BROWSE_PARAM_KEYS` (the ten AC-008 keys, named once) + `hasBrowseParam(sp)`, "the pure branch predicate so it is testable in the CI lane". Integration point I1 (`:98`): branch predicate tested on **raw key** (`key in sp && sp[key] !== undefined`), never parsed value, because `?sort=garbage`, `?page=abc`, `?dir=asc` all parse to `undefined`/`1` yet must render the flat grid (AC-010).
+- **Frontend Design Doc** (§ Data flow "Branch rule", `docs/design/exam-shelves-frontend-design.md:134-140`): the page will do `const showShelves = !hasBrowseParam(sp);` importing from `@/lib/exams/browseParams`. Confirms: `/exams?q=` (present but empty) still stands shelves down — key presence, not truthiness. A repeated key arrives as `string[]` — still `!== undefined`, still counts as present.
+- **Consumption site** (`SOURCE/app/(exams)/exams/page.tsx:37-123`): `sp = await searchParams` is a plain object of `string | undefined` values (no arrays in this route's declared type, but the predicate's contract per both Design Docs is general — `key in sp && sp[key] !== undefined` — so it stays correct even if a future caller passes an array-valued object). `hasBrowseParam` takes that raw `sp` object directly, no pre-parsing.
+- **Confirmed**: predicate reads raw key presence only, never a normalised/parsed local — matches both Design Docs and the Boundary Context's Consumer Parse Rule verbatim (`key in sp && sp[key] !== undefined`).
+- **Sibling module convention** (`SOURCE/lib/exams/attemptSource.ts`, `paginate.ts`): pure function, no I/O, `as const` array + derived union type where applicable, Vietnamese header comment explaining rationale/invariant, test file mirrors with Vietnamese `describe`/`it` names and an explicit invariant-focused header comment. `browseParams.ts` follows the same shape: `BROWSE_PARAM_KEYS` as `as const` array (not a union type export, since the task only asks for the keys + predicate, no per-key type needed).
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
-- [ ] Read all Investigation Targets and record key observations
-- [ ] Write failing cases: `hasBrowseParam` is `true` for `?sort=garbage`, `?page=abc`, `?dir=asc`, and `?q=` (empty); `false` only for a genuinely bare URL (no listed keys present at all)
-- [ ] Confirm they fail because the module does not yet exist
+- [x] Read all Investigation Targets and record key observations
+- [x] Write failing cases: `hasBrowseParam` is `true` for `?sort=garbage`, `?page=abc`, `?dir=asc`, and `?q=` (empty); `false` only for a genuinely bare URL (no listed keys present at all)
+- [x] Confirm they fail because the module does not yet exist (`Cannot find package '@/lib/exams/browseParams'`)
 ### 2. Green Phase
-- [ ] Implement `BROWSE_PARAM_KEYS` (the 10 AC-008 keys, named once) and `hasBrowseParam(sp)` reading raw key presence
-- [ ] Run tests and confirm all pass
+- [x] Implement `BROWSE_PARAM_KEYS` (the 10 AC-008 keys, named once) and `hasBrowseParam(sp)` reading raw key presence
+- [x] Run tests and confirm all pass (19/19 green)
 ### 3. Refactor Phase
-- [ ] Confirm the predicate never reads a normalised/parsed local — only `key in sp && sp[key] !== undefined`
+- [x] Confirm the predicate never reads a normalised/parsed local — only `key in sp && sp[key] !== undefined` (source reviewed; matches Boundary Context verbatim)
 
 ## Quality Assurance Mechanisms
 - `npx tsc --noEmit` — Config: `SOURCE/tsconfig.json` (project-wide)
@@ -67,9 +72,9 @@ _(Record here: the exact 10 keys named in `BROWSE_PARAM_KEYS`, cross-checked aga
   - **Residual**: none.
 
 ## Completion Criteria
-- [ ] All added tests pass, covering all 10 AC-008 keys plus malformed-value cases
-- [ ] `hasBrowseParam` confirmed to read raw key presence only
-- [ ] Gates 1-6 green
+- [x] All added tests pass, covering all 10 AC-008 keys plus malformed-value cases
+- [x] `hasBrowseParam` confirmed to read raw key presence only
+- [x] Gates 1-6 green (`tsc --noEmit`, `eslint --max-warnings 0` on new files, `vitest run` — 1 unrelated pre-existing failure in `lib/security/rateLimit.test.ts`, last touched commit `3f97286`, outside this task's scope; `npm run build` / `check:bundle` not run — no build-affecting change, pure new module addition)
 
 ## Notes
 - Impact scope: `browseParams.ts` (new), its test file (new).
