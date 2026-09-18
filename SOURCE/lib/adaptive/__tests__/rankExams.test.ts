@@ -25,7 +25,14 @@ import {
   EXAM_RANK_RECENCY_WEIGHT,
   EXAM_RANK_SUBJECT_WEAKNESS_WEIGHT,
 } from "../constants";
-import { rankExamIds, type RankAttempt, type RankExamCandidate } from "../rankExams";
+import {
+  buildGradeShares,
+  buildRepresentativeAttempts,
+  buildSubjectWeakness,
+  rankExamIds,
+  type RankAttempt,
+  type RankExamCandidate,
+} from "../rankExams";
 
 const WEIGHTS = {
   gradeMatch: EXAM_RANK_GRADE_MATCH_WEIGHT,
@@ -625,5 +632,93 @@ describe("Test 8 — trật tự giữa ba số hạng của affinity", () => {
 
     expect(order).toHaveLength(candidates.length);
     expect([...order].sort()).toEqual(["a", "b", "c", "d"]);
+  });
+});
+
+// =============================================================================
+// Test 9 — P1-T3: buildRepresentativeAttempts/buildGradeShares/buildSubjectWeakness
+// được export, và buildSubjectWeakness rộng ra mang thêm scoredAttempts (AC-015,
+// P1-T4 dùng để tie-break "môn yếu nhất" khi hai môn cùng độ yếu)
+// =============================================================================
+// Primary failure mode: việc rộng kiểu trả về làm rơi mất ngữ nghĩa "chưa biết
+//   ≠ biết là 0" — một môn chưa có lượt nào có điểm bị gán weakness 0 thay vì
+//   vắng mặt khỏi map, hoặc scoredAttempts đếm nhầm số lượt KHÔNG đại diện.
+describe("Test 9 — P1-T3: 3 helper thuần được export, ngữ nghĩa null-vs-0 khi rộng kiểu", () => {
+  it("buildRepresentativeAttempts: đại diện là lượt nộp GẦN NHẤT theo submittedAt, không phải điểm cao/thấp nhất", () => {
+    const representatives = buildRepresentativeAttempts([
+      attempt("exam-a", 12, "2026-01-01T00:00:00.000Z", 1),
+      attempt("exam-a", 12, "2026-05-01T00:00:00.000Z", 9),
+      attempt("exam-a", 12, "2026-03-01T00:00:00.000Z", 4),
+    ]);
+
+    expect(representatives.get("exam-a")?.submittedAt).toBe("2026-05-01T00:00:00.000Z");
+    expect(representatives.get("exam-a")?.totalScore).toBe(9);
+  });
+
+  it("buildRepresentativeAttempts: không sửa mảng đầu vào của caller", () => {
+    const attempts = [
+      attempt("exam-a", 12, "2026-01-01T00:00:00.000Z", 5),
+      attempt("exam-b", 12, "2026-02-01T00:00:00.000Z", 6),
+    ];
+    const snapshot = attempts.map((a) => ({ ...a }));
+
+    buildRepresentativeAttempts(attempts);
+
+    expect(attempts).toEqual(snapshot);
+  });
+
+  it("buildSubjectWeakness: môn chưa có lượt đại diện nào CÓ ĐIỂM không xuất hiện trong map — không phải weakness 0", () => {
+    const representatives = buildRepresentativeAttempts([
+      attempt("exam-math", 12, "2026-02-01T00:00:00.000Z", 9, "Math"),
+      attempt("exam-bio", 12, "2026-01-01T00:00:00.000Z", null, "Biology"),
+    ]);
+
+    const weakness = buildSubjectWeakness(representatives.values());
+
+    expect(weakness).not.toBeNull();
+    expect(weakness?.has("Math")).toBe(true);
+    expect(weakness?.has("Biology")).toBe(false);
+  });
+
+  it("buildSubjectWeakness: 0 lượt đại diện nào có điểm thì trả null cho TOÀN BỘ map, không phải map rỗng", () => {
+    const representatives = buildRepresentativeAttempts([
+      attempt("exam-bio", 12, "2026-01-01T00:00:00.000Z", null, "Biology"),
+    ]);
+
+    expect(buildSubjectWeakness(representatives.values())).toBeNull();
+  });
+
+  it("buildSubjectWeakness: scoredAttempts đếm đúng số lượt đại diện có điểm đã gộp vào trung bình môn", () => {
+    const representatives = buildRepresentativeAttempts([
+      attempt("exam-1", 12, "2026-01-01T00:00:00.000Z", 8, "Math"),
+      attempt("exam-2", 12, "2026-01-02T00:00:00.000Z", 6, "Math"),
+      attempt("exam-3", 12, "2026-01-03T00:00:00.000Z", 4, "Math"),
+    ]);
+
+    const weakness = buildSubjectWeakness(representatives.values());
+
+    expect(weakness?.get("Math")?.scoredAttempts).toBe(3);
+  });
+
+  it("buildSubjectWeakness: scoredAttempts đếm lượt ĐẠI DIỆN, một đề làm lại 5 lần chỉ tính 1", () => {
+    const representatives = buildRepresentativeAttempts([
+      attempt("exam-retake", 12, "2026-01-01T00:00:00.000Z", 0, "Math"),
+      attempt("exam-retake", 12, "2026-01-02T00:00:00.000Z", 1, "Math"),
+      attempt("exam-retake", 12, "2026-01-03T00:00:00.000Z", 0, "Math"),
+      attempt("exam-retake", 12, "2026-01-04T00:00:00.000Z", 2, "Math"),
+      attempt("exam-retake", 12, "2026-01-05T00:00:00.000Z", 10, "Math"),
+    ]);
+
+    const weakness = buildSubjectWeakness(representatives.values());
+
+    expect(weakness?.get("Math")?.scoredAttempts).toBe(1);
+    expect(weakness?.get("Math")?.weakness).toBeCloseTo(0, 10); // lượt đại diện là 10/10
+  });
+
+  it("buildGradeShares: export giữ đúng ngữ nghĩa null-khi-chưa-có-lượt sẵn có", () => {
+    expect(buildGradeShares([])).toBeNull();
+
+    const shares = buildGradeShares([attempt("exam-a", 12, "2026-01-01T00:00:00.000Z", 5)]);
+    expect(shares?.get(12)).toBe(1);
   });
 });

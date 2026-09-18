@@ -13,8 +13,8 @@ Metadata:
 Export 3 helpers from `SOURCE/lib/adaptive/rankExams.ts`: `buildRepresentativeAttempts`, `buildGradeShares`, `buildSubjectWeakness` (widened return `Map<string, SubjectWeakness> | null`). Update the single in-file caller (`:186-187` → `.get(subject)?.weakness ?? 0`). Extend `SOURCE/lib/adaptive/__tests__/rankExams.test.ts` with new cases for the exported helpers (null-vs-0 semantics, `scoredAttempts` counting, representative = latest `submittedAt`, input-array immutability) — **existing cases must pass unmodified**.
 
 ## Target Files
-- [ ] `SOURCE/lib/adaptive/rankExams.ts`
-- [ ] `SOURCE/lib/adaptive/__tests__/rankExams.test.ts`
+- [x] `SOURCE/lib/adaptive/rankExams.ts`
+- [x] `SOURCE/lib/adaptive/__tests__/rankExams.test.ts`
 
 ## Investigation Targets
 - `docs/design/exam-shelves-backend-design.md` (§ Query layer "Changes to rankExams.ts")
@@ -36,20 +36,40 @@ Export 3 helpers from `SOURCE/lib/adaptive/rankExams.ts`: `buildRepresentativeAt
 | docs/adr/ADR-0021-cross-user-hot-aggregate-and-attempt-source.md (§ Decision D2) | dependency_direction | One personalised ranking — `rankExamIds` is reused for Cần luyện, never re-implemented | Does `examShelves.ts` (P1-T4) import and call `rankExamIds`/these exported helpers rather than re-implementing weakness/representative-attempt logic? (Evaluated fully once P1-T4 lands; this task's compliance is exporting the helpers in a form P1-T4 can import without duplication.) |
 
 ## Investigation Notes
-_(Record here: confirmation the in-file caller diff is exactly the `.get(subject)?.weakness ?? 0` change; confirmation `git diff` on pre-existing `rankExams.test.ts` cases is empty; a grep confirming no other file currently imports these 3 helpers.)_
+
+**Investigation Targets read:**
+- `exam-shelves-backend-design.md` § Query layer / Interface Change Matrix / Minimal Surface Alternatives Element 2: `buildSubjectWeakness(...): Map<string, number> | null` (private) widens to `export ... Map<string, SubjectWeakness> | null` where `SubjectWeakness = { weakness: number; scoredAttempts: number }`. Sole in-repo caller (`rankExams.ts:186-187`) updated in the same change to `.get(subject)?.weakness ?? 0`. `buildRepresentativeAttempts` is the loop currently inlined at `:148-154`, extracted+exported so P1-T4's AC-015 tie-break reads the same representative map. `buildGradeShares` exported unchanged (no semantic widening). Selected alternative (d): "one pure module + 3 exported helpers, 2 callers" — rejected alternatives were inlining the selection in `shelves.ts` (duplicate hot order) and recomputing weakness there (fails AC-016, second "weakest" definition).
+- `rankExams.ts` (pre-change): confirmed `buildGradeShares`/`buildSubjectWeakness` were module-private; `buildSubjectWeakness`'s only caller was the local `subjectWeaknessOf` at `:186-187` reading `.get(subject) ?? 0`; the representative-selection loop was inlined directly in `rankExamIds` (no standalone function existed yet — `buildRepresentativeAttempts` needed to be extracted, not merely exported).
+- `rankExams.test.ts`: baseline run before any edit — `31 passed (31)`. Every existing `describe` block (Test 1–8) uses `rankExamIds` only, none imports the 3 helpers directly, so widening could only regress existing behavior through the one in-file caller.
+
+**Implementation:**
+- Extracted the inline representative-selection loop (`:148-154` pre-change) into `export function buildRepresentativeAttempts(attempts: readonly RankAttempt[]): Map<string, RankAttempt>`, called from `rankExamIds` unchanged in effect.
+- Added `export` to `buildGradeShares` — no signature or semantic change.
+- Widened `buildSubjectWeakness` to `export function buildSubjectWeakness(representatives: Iterable<RankAttempt>): Map<string, SubjectWeakness> | null`, added `export interface SubjectWeakness { weakness: number; scoredAttempts: number }`. `null`-when-`sums.size===0` semantics, `clamp01`, and the "skip null subject / null / non-finite score" filter are all unchanged; only the map's value shape widened from a bare number to `{ weakness, scoredAttempts: count }`.
+- Updated the sole in-file caller: `git diff` shows the caller changed from `subjectWeaknessBySubject.get(subject) ?? 0` to `subjectWeaknessBySubject.get(subject)?.weakness ?? 0` (reformatted across 3 lines for the added `?.weakness`, semantically identical to the task's prescribed change) — confirmed via `git diff -- SOURCE/lib/adaptive/rankExams.ts`, no other line in `rankExamIds`'s affinity/band/priorScore logic touched.
+
+**Confirmations:**
+- `git diff -- SOURCE/lib/adaptive/__tests__/rankExams.test.ts`: the only changes are (1) the import statement gaining 3 new named imports (no existing import removed/reordered), and (2) one new `describe("Test 9 — ...")` block appended after the closing brace of Test 8. Zero bytes changed inside Test 1–8's bodies.
+- `grep -rn "from ['\"].*rankExams['\"]" SOURCE`: only `SOURCE/features/exams/queries/ranking.ts:16` (`import { rankExamIds } from "@/lib/adaptive/rankExams"` — unaffected, still imports only `rankExamIds`) and the test file itself. No other file imports `buildSubjectWeakness`/`buildGradeShares`/`buildRepresentativeAttempts` yet, confirming the adjacent-case sweep for this Change Category: P1-T4 will be the second caller.
+- `npx tsc --noEmit -p SOURCE/tsconfig.json`: clean, zero errors — the widened return type does not break any other consumer.
+- `npx vitest run lib/adaptive/__tests__/rankExams.test.ts` (post-change): `38 passed (38)` — 31 pre-existing + 7 new, 0 failed, 0 skipped.
+
+**Binding Decision evaluation** (ADR-0021 § Decision D2, dependency_direction axis — "One personalised ranking — `rankExamIds` is reused for Cần luyện, never re-implemented"):
+- Planned/actual approach: this task only exports the 3 helpers in importable form (`buildRepresentativeAttempts`, `buildGradeShares`, `buildSubjectWeakness` + `SubjectWeakness` type) with `rankExamIds` itself unchanged in behavior; it does not implement `examShelves.ts` or its caller (that is P1-T4).
+- Evaluation: **Y** — the Compliance Check is explicitly scoped by its own text to "this task's compliance is exporting the helpers in a form P1-T4 can import without duplication," which is satisfied: the 3 helpers are now `export`ed with signatures matching the design doc's Interface Change Matrix exactly, and no parallel/duplicate implementation of weakness or representative-attempt logic was introduced anywhere in this change. Full compliance (whether `examShelves.ts` actually imports them instead of re-implementing) is deferred to P1-T4 as the row itself states.
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
-- [ ] Read all Investigation Targets and record key observations
-- [ ] Run `npx vitest run lib/adaptive/__tests__/rankExams.test.ts` and record the current green baseline (pre-change) so the "unmodified" claim can be verified against something concrete
-- [ ] Write new failing test cases for: null-vs-0 semantics of the widened `buildSubjectWeakness` return, `scoredAttempts` counting, representative = latest `submittedAt`, input-array immutability
+- [x] Read all Investigation Targets and record key observations
+- [x] Run `npx vitest run lib/adaptive/__tests__/rankExams.test.ts` and record the current green baseline (pre-change) so the "unmodified" claim can be verified against something concrete — `31 passed (31)`
+- [x] Write new failing test cases for: null-vs-0 semantics of the widened `buildSubjectWeakness` return, `scoredAttempts` counting, representative = latest `submittedAt`, input-array immutability — confirmed RED (`7 failed | 31 passed (38)`, all failures `TypeError: ... is not a function`)
 ### 2. Green Phase
-- [ ] Export the 3 helpers and widen `buildSubjectWeakness`'s return type
-- [ ] Update the single in-file caller at `:186-187`
-- [ ] Run the new cases and confirm they pass
+- [x] Export the 3 helpers and widen `buildSubjectWeakness`'s return type
+- [x] Update the single in-file caller at `:186-187`
+- [x] Run the new cases and confirm they pass
 ### 3. Refactor Phase
-- [ ] Run `git diff` restricted to pre-existing test case line ranges and confirm it is empty
-- [ ] Run the full `rankExams.test.ts` suite and confirm all existing + new cases green
+- [x] Run `git diff` restricted to pre-existing test case line ranges and confirm it is empty
+- [x] Run the full `rankExams.test.ts` suite and confirm all existing + new cases green — `38 passed (38)`
 
 ## Quality Assurance Mechanisms
 - `npx tsc --noEmit` — Config: `SOURCE/tsconfig.json` (project-wide)
@@ -79,10 +99,10 @@ _(Record here: confirmation the in-file caller diff is exactly the `.get(subject
   - **Residual**: none — this is a pure-function contract proof, fully closed by the unit test.
 
 ## Completion Criteria
-- [ ] All added tests pass
-- [ ] `git diff` on pre-existing `rankExams.test.ts` cases is empty
-- [ ] Every Binding Decision's Compliance Check evaluates to `Y` (fully evaluable once P1-T4 lands and imports these helpers)
-- [ ] Gates 1-6 green
+- [x] All added tests pass
+- [x] `git diff` on pre-existing `rankExams.test.ts` cases is empty
+- [x] Every Binding Decision's Compliance Check evaluates to `Y` (fully evaluable once P1-T4 lands and imports these helpers)
+- [x] Gates 1-6 green
 
 ## Notes
 - Impact scope: `rankExams.ts` (export + widen + 1 caller update), `rankExams.test.ts` (additive new cases).

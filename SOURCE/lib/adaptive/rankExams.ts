@@ -141,17 +141,9 @@ export function rankExamIds(input: RankExamsInput): string[] {
   const { candidates, attempts, weights } = input;
 
   // --- Băng + điểm cũ ------------------------------------------------------
-  // Lượt ĐẠI DIỆN của một đề = lượt nộp GẦN NHẤT (PRD U1, chốt ở v1.2). Không
-  // chọn "tốt nhất" (giấu mất một lần tụt) cũng không chọn "tệ nhất" (phạt mãi
-  // một đề học sinh đã làm chủ được): chỉ "gần nhất" mới phản ứng với chính cú
-  // làm lại mà D5 muốn khuyến khích.
-  const representativeByExam = new Map<string, RankAttempt>();
-  for (const attempt of attempts) {
-    const current = representativeByExam.get(attempt.examId);
-    if (!current || isLater(attempt.submittedAt, current.submittedAt)) {
-      representativeByExam.set(attempt.examId, attempt);
-    }
-  }
+  // Lượt ĐẠI DIỆN của mỗi đề quyết định cả băng lẫn priorScore ngay dưới đây —
+  // xem buildRepresentativeAttempts để biết luật chọn đại diện.
+  const representativeByExam = buildRepresentativeAttempts(attempts);
 
   // --- Tín hiệu lớp --------------------------------------------------------
   // Tỉ TRỌNG chứ không phải cờ nhị phân: tỉ lệ số lượt đã nộp của học sinh rơi
@@ -184,7 +176,9 @@ export function rankExamIds(input: RankExamsInput): string[] {
   const subjectWeaknessBySubject = buildSubjectWeakness(representativeByExam.values());
 
   const subjectWeaknessOf = (subject: string): number | null =>
-    subjectWeaknessBySubject === null ? null : (subjectWeaknessBySubject.get(subject) ?? 0);
+    subjectWeaknessBySubject === null
+      ? null
+      : (subjectWeaknessBySubject.get(subject)?.weakness ?? 0);
 
   // --- Tín hiệu mới-cũ -----------------------------------------------------
   // Chuẩn hoá min-max TRONG chính tập ứng viên, KHÔNG so với "bây giờ": hàm này
@@ -255,10 +249,33 @@ function isLater(a: string | null, b: string | null): boolean {
 }
 
 /**
+ * Lượt ĐẠI DIỆN của mỗi đề = lượt nộp GẦN NHẤT (PRD U1, chốt ở v1.2). Không
+ * chọn "tốt nhất" (giấu mất một lần tụt) cũng không chọn "tệ nhất" (phạt mãi
+ * một đề học sinh đã làm chủ được): chỉ "gần nhất" mới phản ứng với chính cú
+ * làm lại mà D5 muốn khuyến khích.
+ *
+ * Export: `examShelves.ts` (P1-T4) đọc cùng map này cho tie-break "nhiều lượt
+ * đại diện có điểm hơn" (AC-015) — ranking cá nhân hoá và kệ Cần luyện không
+ * được phép có hai định nghĩa "đại diện" khác nhau.
+ */
+export function buildRepresentativeAttempts(
+  attempts: readonly RankAttempt[]
+): Map<string, RankAttempt> {
+  const representativeByExam = new Map<string, RankAttempt>();
+  for (const attempt of attempts) {
+    const current = representativeByExam.get(attempt.examId);
+    if (!current || isLater(attempt.submittedAt, current.submittedAt)) {
+      representativeByExam.set(attempt.examId, attempt);
+    }
+  }
+  return representativeByExam;
+}
+
+/**
  * Tỉ trọng lượt-đã-nộp theo lớp, hoặc **null khi học sinh chưa có lượt nào** —
  * "chưa biết" và "biết là 0" là hai chuyện khác nhau và mã phải phân biệt được.
  */
-function buildGradeShares(attempts: readonly RankAttempt[]): Map<number, number> | null {
+export function buildGradeShares(attempts: readonly RankAttempt[]): Map<number, number> | null {
   if (attempts.length === 0) return null;
 
   const counts = new Map<number, number>();
@@ -274,10 +291,28 @@ function buildGradeShares(attempts: readonly RankAttempt[]): Map<number, number>
 }
 
 /**
+ * Một dòng của map trả về bởi `buildSubjectWeakness`.
+ *
+ * `scoredAttempts` tồn tại vì `weakness` một mình không đủ cho tie-break
+ * "môn yếu nhất" của `examShelves.ts` (AC-015, P1-T4): hai môn cùng độ yếu thì
+ * môn có NHIỀU lượt đại diện có điểm hơn đáng tin hơn (trung bình trên ít lượt
+ * hơn dễ lệch). Đây là dữ liệu đọc thêm ra từ đúng phép gộp `buildSubjectWeakness`
+ * đã làm, không phải một lượt tính riêng.
+ */
+export interface SubjectWeakness {
+  /** Độ yếu ∈ [0, 1], 1 = yếu nhất. */
+  weakness: number;
+  /** Số lượt đại diện CÓ ĐIỂM đã gộp vào trung bình của môn này. */
+  scoredAttempts: number;
+}
+
+/**
  * Độ YẾU theo môn ∈ [0, 1] (1 = yếu nhất), hoặc **null khi học sinh chưa có
  * lượt ĐẠI DIỆN nào CÓ ĐIỂM** — cùng ranh giới "chưa biết ≠ biết là 0" mà
  * `buildGradeShares` đã đặt, và cùng lý do: mặc định một học sinh mới thành
  * "yếu mọi môn" là kiểu sai-mà-tự-tin đắt nhất mà project này từng trả giá.
+ * Cùng ranh giới đó áp cho TỪNG môn: một môn không có dòng nào trong `sums`
+ * không xuất hiện trong map trả về — nó KHÔNG được gán `weakness: 0`.
  *
  * Bên trong một môn ĐÃ CÓ điểm, phép tính là trung bình cộng các lượt đại diện
  * có điểm, đảo lại quanh thang điểm. Trung bình cộng chứ không phải min hay
@@ -290,10 +325,13 @@ function buildGradeShares(attempts: readonly RankAttempt[]): Map<number, number>
  * theo) bị KẸP về [0, 1] chứ không được phép sinh ra một số hạng âm — một số
  * hạng âm sẽ đẩy đề xuống dưới cả những đề không có tín hiệu gì, tức là biến
  * một dòng dữ liệu lạ thành một thay đổi thứ tự không ai giải thích được.
+ *
+ * Export: dùng chung với `examShelves.ts` (P1-T4) nên "yếu nhất" chỉ có MỘT
+ * định nghĩa (ADR-0021 D2 — một lượt xếp hạng, không cài lại lần hai).
  */
-function buildSubjectWeakness(
+export function buildSubjectWeakness(
   representatives: Iterable<RankAttempt>
-): Map<string, number> | null {
+): Map<string, SubjectWeakness> | null {
   const sums = new Map<string, { total: number; count: number }>();
   for (const attempt of representatives) {
     if (attempt.subject === null || attempt.totalScore === null) continue;
@@ -305,10 +343,10 @@ function buildSubjectWeakness(
   }
   if (sums.size === 0) return null;
 
-  const weakness = new Map<string, number>();
+  const weakness = new Map<string, SubjectWeakness>();
   for (const [subject, { total, count }] of sums) {
     const mean = total / count;
-    weakness.set(subject, clamp01(1 - mean / SCORE_MAX));
+    weakness.set(subject, { weakness: clamp01(1 - mean / SCORE_MAX), scoredAttempts: count });
   }
   return weakness;
 }
