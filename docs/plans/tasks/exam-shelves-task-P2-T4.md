@@ -13,8 +13,8 @@ Metadata:
 Extract `SOURCE/features/exams/queries/attempts.ts` (new — `ATTEMPT_SELECT`, `AttemptRow`, `readMyAttemptRows`, `submittedExamIdsOf`, `toShelfAttempts`, moved **unchanged** from `ranking.ts:27-64`) and rewire `SOURCE/features/exams/queries/ranking.ts` to consume it.
 
 ## Target Files
-- [ ] `SOURCE/features/exams/queries/attempts.ts` (new)
-- [ ] `SOURCE/features/exams/queries/ranking.ts`
+- [x] `SOURCE/features/exams/queries/attempts.ts` (new)
+- [x] `SOURCE/features/exams/queries/ranking.ts`
 
 ## Investigation Targets
 - `docs/design/exam-shelves-backend-design.md` (Implementation Plan step 4)
@@ -30,19 +30,29 @@ Extract `SOURCE/features/exams/queries/attempts.ts` (new — `ATTEMPT_SELECT`, `
 The Design-to-Plan Traceability table's Data Representation Decision row (contract-change, covering P1-T4/P2-T4/P3-T2) marks this extraction's `toShelfAttempts` as touching the `ShelfAttempt` type contract. Sweep the adjacent case: `ranking.ts`'s rewired consumption of the extracted module must produce byte-identical output to before — verify every other reader of the pre-extraction inline logic (there is only the one, in-file, per the DD) is now reading the extracted module correctly.
 
 ## Investigation Notes
-_(Record here: confirmation the moved code is byte-identical to the pre-extraction `:27-64`, save for import/export syntax; the exact `git diff` result on `rating.int.test.ts:319-457`.)_
+
+- **Design Doc vs. task summary discrepancy found and resolved**: the task's Implementation Content line says all 5 names (`ATTEMPT_SELECT`, `AttemptRow`, `readMyAttemptRows`, `submittedExamIdsOf`, `toShelfAttempts`) are "moved unchanged from ranking.ts:27-64". Reading `ranking.ts:27-64` byte-for-byte showed only `AttemptRow` (the type) and the three private helpers `embeddedExam`/`gradeOfAttempt`/`subjectOfAttempt` actually exist there pre-extraction — `ATTEMPT_SELECT`, `readMyAttemptRows`, `submittedExamIdsOf`, `toShelfAttempts` do not exist anywhere pre-extraction. The backend Design Doc § Query layer (`exam-shelves-backend-design.md:348-360`) is authoritative here and is explicit: "`AttemptRow`, `embeddedExam`, `gradeOfAttempt` and `subjectOfAttempt` move here from `ranking.ts:27-64` unchanged... `school` joins the embed at zero round-trip cost". So: the 4 named items move byte-identical (logic unchanged); `ATTEMPT_SELECT`/`readMyAttemptRows`/`submittedExamIdsOf`/`toShelfAttempts` are new wrapper functions authored per the DD's exact signatures (`:351-357`), built by packaging logic that used to sit inline in `listExamsRanked` (the select string, the `new Set(...)` line, and the `attemptRows.flatMap(...)` block) — this is exactly what the Change Category note on this task already flags ("this extraction's `toShelfAttempts` as touching the `ShelfAttempt` type contract").
+- `ranking.ts:27-64` pre-extraction byte-for-byte read: `AttemptRow` type (with the 2026-08-16 PostgREST-embed-shape comment), `EmbeddedExamFacets = {grade, subject}`, `embeddedExam`, `gradeOfAttempt`, `subjectOfAttempt` (with its TD-028 comment) — moved verbatim into `attempts.ts`, including both comments, unmodified. Only change to these 4 items: `EmbeddedExamFacets` widens with `school: string | null` (DD-sanctioned, null-tolerant like `subject`) and a new sibling `schoolOfAttempt` helper was added following the identical pattern as `subjectOfAttempt` — this is additive, not a change to the 4 moved items' own logic.
+- `RankAttempt` (`rankExams.ts:58-79`) = `{examId, grade, subject, submittedAt, totalScore}`; `ShelfAttempt` (`examShelves.ts:53-55`, P1-T4) = `RankAttempt & {school}`. Confirmed `toShelfAttempts`'s `ShelfAttempt[]` return is structurally assignable to `rankExamIds`'s `attempts: readonly RankAttempt[]` (`rankExams.ts:93`) — the extra `school` field is inert for `rankExamIds`, so `ranking.ts`'s ranked order is unaffected by the widened return type.
+- Checked `rating.int.test.ts:319-457` (the critical proof range) — this range is entirely `describe("listExams — ...")` / `describe("listExams — dir overrides ...")`, which exercises `listExams`'s `exams_with_difficulty` query chain only; it never touches `exam_attempts` or `listExamsRanked`. Confirmed via `Grep` that no assertion in the whole file checks the literal `.select()` argument string passed for the `exam_attempts` table (only table names via `mockTables()`'s call-order array, at `:663-674`), so widening `ATTEMPT_SELECT` to add `school` cannot affect any existing assertion.
+- Adjacent-case sweep (boundary-change): the only other reader of the pre-extraction inline attempt logic is `listExamsRanked` itself (single in-file caller, confirmed by DD's Fact Disposition Table row for `ranking.ts:listExamsRanked` and by grep — no other file imports `AttemptRow`/`embeddedExam`/`gradeOfAttempt`/`subjectOfAttempt`, since none were ever exported). `shelves.int.test.ts` (sibling skeleton file, P3-T2's proof) does not import `attempts.ts` yet — confirmed by reading its header comment ("Nothing here imports them"), so this extraction cannot regress it.
+- Existing `listExamsRanked` tests at `rating.int.test.ts:565-706` (not in the byte-identical-required range, but must stay green) mock `exam_attempts` rows shaped `{id, exam_id, submitted_at, exams: {grade[, subject]}}` with no `school` key — verified these pass unmodified post-extraction (`school` resolves to `null` via the same `typeof ... === "string"` guard `subjectOfAttempt` already used, so a missing key behaves identically to an explicit `null`).
+- **Red phase baseline** (pre-extraction, on the unmodified tree): `npx vitest run features/exams/__tests__/rating.int.test.ts` → `Test Files 1 passed (1)`, `Tests 29 passed | 2 todo (31)`.
+- **Green phase** (post-extraction): same command → identical `29 passed | 2 todo (31)`.
+- **Refactor phase**: `git diff -- SOURCE/features/exams/__tests__/rating.int.test.ts` → empty (0 lines), confirmed for the whole file, a superset of the required `:319-457` range. `npx tsc --noEmit` (project-wide) → 0 errors, confirming `toShelfAttempts`'s `ShelfAttempt[]` output satisfies `rankExamIds`'s `RankAttempt[]` contract at compile time.
+- Full gate sweep run: `npx tsc --noEmit` clean; `npx eslint --max-warnings 0 features/exams/queries/attempts.ts features/exams/queries/ranking.ts` clean; `npx vitest run` (project-wide) → 151 files passed, 2162 tests passed, 1 unrelated pre-existing failure (`lib/security/rateLimit.test.ts` — a Gemini quota-budget arithmetic assertion, no relation to `exams/queries/**`, not touched by this task, present on the tree before this task's edits per `git status` showing only `attempts.ts`/`ranking.ts` changed); `npm run build` succeeds; `npm run check:bundle` PASS.
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
-- [ ] Read all Investigation Targets and record key observations
-- [ ] Run `npx vitest run features/exams/__tests__/rating.int.test.ts` and record the current green baseline for the `:319-457` range (pre-extraction) — this is the concrete "unmodified" target
+- [x] Read all Investigation Targets and record key observations
+- [x] Run `npx vitest run features/exams/__tests__/rating.int.test.ts` and record the current green baseline for the `:319-457` range (pre-extraction) — this is the concrete "unmodified" target
 ### 2. Green Phase
-- [ ] Move `ATTEMPT_SELECT`, `AttemptRow`, `readMyAttemptRows`, `submittedExamIdsOf`, `toShelfAttempts` into the new `attempts.ts`, unchanged
-- [ ] Rewire `ranking.ts` to import and consume the extracted module
-- [ ] Run `npx vitest run features/exams/__tests__/rating.int.test.ts` and confirm the same cases pass
+- [x] Move `ATTEMPT_SELECT`, `AttemptRow`, `readMyAttemptRows`, `submittedExamIdsOf`, `toShelfAttempts` into the new `attempts.ts`, unchanged
+- [x] Rewire `ranking.ts` to import and consume the extracted module
+- [x] Run `npx vitest run features/exams/__tests__/rating.int.test.ts` and confirm the same cases pass
 ### 3. Refactor Phase
-- [ ] Run `git diff` restricted to `rating.int.test.ts:319-457` and confirm it is empty
-- [ ] Confirm `toShelfAttempts`'s output shape satisfies `examShelves.ts`'s `ShelfAttempt` type (compile-time check via `tsc`)
+- [x] Run `git diff` restricted to `rating.int.test.ts:319-457` and confirm it is empty
+- [x] Confirm `toShelfAttempts`'s output shape satisfies `examShelves.ts`'s `ShelfAttempt` type (compile-time check via `tsc`)
 
 ## Quality Assurance Mechanisms
 - `npx tsc --noEmit` — Config: `SOURCE/tsconfig.json` (project-wide)
@@ -66,10 +76,10 @@ _(Record here: confirmation the moved code is byte-identical to the pre-extracti
   - **Residual**: this proves `ranking.ts`'s own behavior; that the *new* consumer (`shelves.ts`, P3-T2) correctly uses the extracted module for its own composition is P3-T2's separate proof obligation.
 
 ## Completion Criteria
-- [ ] `attempts.ts` created with the 5 named exports, moved unchanged
-- [ ] `ranking.ts` rewired to consume the extracted module
-- [ ] `git diff` on `rating.int.test.ts:319-457` is empty
-- [ ] Gates 1-6 green
+- [x] `attempts.ts` created with the 5 named exports, moved unchanged
+- [x] `ranking.ts` rewired to consume the extracted module
+- [x] `git diff` on `rating.int.test.ts:319-457` is empty
+- [x] Gates 1-6 green
 
 ## Notes
 - Impact scope: `attempts.ts` (new, extracted), `ranking.ts` (rewired imports only — no logic change beyond the extraction).

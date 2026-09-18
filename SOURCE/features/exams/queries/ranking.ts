@@ -20,48 +20,9 @@ import { paginateExams } from "@/lib/exams/paginate";
 import type { Exam } from "@/types/exam";
 import { toExam } from "./rows";
 import { fetchExamRows, type ExamFilters } from "./catalogue";
+import { readMyAttemptRows, submittedExamIdsOf, toShelfAttempts } from "./attempts";
 
 // --- Xếp hạng cá nhân hoá cho /exams (ADR-0015) -----------------------------
-
-/** Dòng lượt-làm-bài + lớp của đề, lấy kèm trong CÙNG một round-trip. */
-type AttemptRow = {
-  id: string;
-  exam_id: string;
-  submitted_at: string | null;
-  // ĐÃ ĐO 2026-08-16 (câu hỏi analytics-layer3 để ngỏ, nay đóng lại): PostgREST
-  // trả embed to-one này dưới dạng OBJECT — `{"exams":{"grade":10}}` — kiểm
-  // bằng chính @supabase/supabase-js trên dev (hynwleaxtbtjzkvpjsug, 40 dòng
-  // qua đường anon key + JWT thật, RLS bật). Trên prod (pebjdlbgbmizgfpuptjl)
-  // xác nhận gián tiếp mà chắc chắn: `exam_attempts_exam_id_fkey` là khoá ngoại
-  // MỘT cột `exam_id -> exams`, và chính chiều many-to-one đó là thứ PostgREST
-  // dùng để quyết to-one. Vẫn khai CẢ HAI hình dạng: chi phí bằng 0, còn thứ
-  // được bảo vệ là một giả định về thư viện bên thứ ba có thể đổi khi nâng cấp.
-  exams: EmbeddedExamFacets | EmbeddedExamFacets[] | null;
-};
-
-/** Các facet của đề mà bộ xếp hạng cần, lấy kèm qua embed to-one. */
-type EmbeddedExamFacets = { grade: number; subject: string };
-
-function embeddedExam(row: AttemptRow): EmbeddedExamFacets | undefined {
-  return Array.isArray(row.exams) ? row.exams[0] : (row.exams ?? undefined);
-}
-
-function gradeOfAttempt(row: AttemptRow): number | null {
-  const embedded = embeddedExam(row);
-  return typeof embedded?.grade === "number" ? embedded.grade : null;
-}
-
-/**
- * Môn của đề đã làm, hoặc null khi embed không giao được nó (TD-028).
- *
- * TÁCH KHỎI `gradeOfAttempt` chứ không gộp thành một guard: một embed thiếu MÔN
- * chỉ được phép làm câm tín hiệu môn. Gộp lại thì lượt ấy rơi khỏi cả tín hiệu
- * LỚP — tức một trường thiếu đi sửa thứ tự theo một trục nó không liên quan.
- */
-function subjectOfAttempt(row: AttemptRow): string | null {
-  const embedded = embeddedExam(row);
-  return typeof embedded?.subject === "string" ? embedded.subject : null;
-}
 
 export interface RankedExamList {
   /** Đề của TRANG đang xem (đã cắt), không phải toàn bộ tập khớp bộ lọc. */
@@ -114,20 +75,14 @@ export async function listExamsRanked(
   // không có cách nào nhìn ra bằng mắt — nó chỉ là một thứ tự khác.
   const [rows, attemptRows, resultRows] = await Promise.all([
     fetchExamRows(filters),
-    readBounded(
-      "listExamsRanked.attempts",
-      supabase
-        .from("exam_attempts")
-        .select("id, exam_id, submitted_at, exams!inner(grade, subject)")
-        .eq("status", "submitted")
-    ) as Promise<AttemptRow[]>,
+    readMyAttemptRows(supabase, "listExamsRanked.attempts"),
     readBounded(
       "listExamsRanked.results",
       supabase.from("exam_results").select("attempt_id, total_score")
     ) as Promise<{ attempt_id: string; total_score: number | string }[]>,
   ]);
 
-  const submittedExamIds = new Set(attemptRows.map((row) => row.exam_id));
+  const submittedExamIds = submittedExamIdsOf(attemptRows);
 
   // `total_score` là numeric(4,2) — PostgREST có thể trả về chuỗi. Ép số một
   // lần ở biên thay vì để `rankExamIds` phải biết chuyện đó.
@@ -137,22 +92,7 @@ export async function listExamsRanked(
     if (Number.isFinite(score)) scoreByAttempt.set(row.attempt_id, score);
   }
 
-  // Lượt thiếu lớp (embed lệch hình dạng) bị BỎ khỏi tín hiệu lớp chứ không
-  // được gán một lớp đoán bừa — nhưng vẫn nằm trong `submittedExamIds` ở trên,
-  // nên băng "đã làm" không bao giờ mất đề.
-  const attempts = attemptRows.flatMap((row) => {
-    const grade = gradeOfAttempt(row);
-    if (grade === null) return [];
-    return [
-      {
-        examId: row.exam_id,
-        grade,
-        subject: subjectOfAttempt(row),
-        submittedAt: row.submitted_at,
-        totalScore: scoreByAttempt.get(row.id) ?? null,
-      },
-    ];
-  });
+  const attempts = toShelfAttempts(attemptRows, scoreByAttempt);
 
   // `?sort` tường minh thắng cá nhân hoá — trả thẳng thứ tự DB-side.
   if (filters?.sort) {
