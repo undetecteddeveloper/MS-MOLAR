@@ -41,10 +41,12 @@ export default async function ExamsPage({ searchParams }: { searchParams: Search
   const school = sp.school || undefined;
   const year = sp.year ? Number(sp.year) : undefined;
   const semester = sp.semester || undefined;
-  // MỘT trục ?sort= — newest/oldest/hardest loại trừ nhau. Giá trị lạ →
+  // MỘT trục ?sort= — newest/oldest/hardest/hot loại trừ nhau. Giá trị lạ →
   // undefined (không sort ngoài ý muốn, không crash).
   const sort: ExamSort | undefined =
-    sp.sort === "newest" || sp.sort === "oldest" || sp.sort === "hardest" ? sp.sort : undefined;
+    sp.sort === "newest" || sp.sort === "oldest" || sp.sort === "hardest" || sp.sort === "hot"
+      ? sp.sort
+      : undefined;
   const level: ExamLevel | undefined =
     sp.level === "easy" || sp.level === "medium" || sp.level === "hard" ? sp.level : undefined;
   const dir: SortDirection | undefined = sp.dir === "asc" || sp.dir === "desc" ? sp.dir : undefined;
@@ -88,7 +90,11 @@ export default async function ExamsPage({ searchParams }: { searchParams: Search
         years={facets.years}
         semesters={facets.semesters}
         selected={{ subject, grade, school, year, semester, level }}
-        sort={sort}
+        // `ExamFilters`' local ExamSort (chip row, P4-T4) chưa có "hot" — thu hẹp
+        // về undefined cho riêng prop này để không chip nào sáng, đúng hành vi
+        // hôm nay; `sort` gốc (đủ 4 giá trị) vẫn đi thẳng vào listExamsRanked ở
+        // dưới, không qua thu hẹp này.
+        sort={sort === "hot" ? undefined : sort}
         query={q}
       />
 
