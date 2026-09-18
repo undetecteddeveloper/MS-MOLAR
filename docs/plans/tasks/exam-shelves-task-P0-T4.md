@@ -22,7 +22,7 @@ Then perform the dev read-back with the 5 real queries from backend DD § Migrat
 5. `source` column default/nullability on `exam_attempts` (`not null default 'none'`).
 
 ## Target Files
-- [ ] None (dev database `hynwleaxtbtjzkvpjsug` only — no source files changed by this task)
+- [x] None (dev database `hynwleaxtbtjzkvpjsug` only — no source files changed by this task)
 
 ## Investigation Targets
 - `docs/design/exam-shelves-backend-design.md` (§ Migration Procedure step 6, step 7 — the exact 5 read-back queries)
@@ -30,17 +30,47 @@ Then perform the dev read-back with the 5 real queries from backend DD § Migrat
 - `C:\Users\ASUS\.claude\projects\...\supabase-project-refs.md`-equivalent project context: dev server uses ref `hynwleaxtbtjzkvpjsug` (confirm before running against any other ref — this is dev, not prod)
 
 ## Investigation Notes
-_(Record here: the CLI command's raw output; each of the 5 read-back query results verbatim — never paraphrase "looks fine".)_
+
+**Investigation Targets read:**
+- `docs/design/exam-shelves-backend-design.md` § Migration Procedure (steps 6–7, `:298-322`): step 6 is the one-shot `npx supabase db query --linked --project-ref hynwleaxtbtjzkvpjsug --file …` apply; step 7 lists the exact 5 read-back queries (fingerprint, `pg_proc.proacl`, `pg_constraint`, `pg_indexes`, `information_schema.columns`), explicitly "never the tool's success message."
+- `SOURCE/supabase/migrations/20260918000000_exam_hot_counts_and_attempt_source_340bab74ca57.sql`: 3 statements for §20a (add column `source` if not exists, drop+add `exam_attempts_source_check`), 1 statement for §20b (`exam_attempts_status_submitted_idx`), 3 statements for §20c (`create or replace function exam_hot_counts`, `revoke all … from public, anon`, `grant execute … to authenticated, service_role`), then the `schema_version` upsert to `340bab74ca57`. Header comment carries the same step-7 read-back recipe.
+- Project-ref confirmed: `npx supabase projects list` shows `hynwleaxtbtjzkvpjsug` = "undetecteddeveloper's Project" (dev), distinct from `pebjdlbgbmizgfpuptjl` = "MS-MOLAR-prod". Matches memory note (dev = hynwle…, `.mcp.json` ref = prod). All commands below targeted `hynwleaxtbtjzkvpjsug` only.
+
+**Pre-apply baseline (RED phase):**
+```
+$ npx supabase db query --linked --project-ref hynwleaxtbtjzkvpjsug "select fingerprint from public.schema_version;"
+{"rows": [{"fingerprint": "187d3ed24f0c"}]}   -- NOT 340bab74ca57, confirms pre-apply state
+
+$ npx supabase db query --linked --project-ref hynwleaxtbtjzkvpjsug "select proname from pg_proc where proname = 'exam_hot_counts';"
+{"rows": []}   -- function does not exist yet
+```
+
+**Apply command (GREEN phase):**
+```
+$ cd SOURCE && npx supabase db query --linked --project-ref hynwleaxtbtjzkvpjsug --file supabase/migrations/20260918000000_exam_hot_counts_and_attempt_source_340bab74ca57.sql
+{"rows": []}   -- exit 0, no error rows/statements returned (file contains only DDL/DML, no SELECT)
+```
+
+**5 read-back queries, literal results:**
+1. `select fingerprint from public.schema_version;` → `{"fingerprint": "340bab74ca57"}` — matches `<fp>`. ✓
+2. `select proname, proacl from pg_proc where proname = 'exam_hot_counts';` → `{"proname": "exam_hot_counts", "proacl": "{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}"}` — EXECUTE present for `authenticated` and `service_role` (plus implicit owner `postgres`); no `anon`, no bare `=X/` (public) entry. ✓
+3. `select conname from pg_constraint where conname = 'exam_attempts_source_check';` → `{"conname": "exam_attempts_source_check"}` — 1 row. ✓
+4. `select indexname from pg_indexes where indexname = 'exam_attempts_status_submitted_idx';` → `{"indexname": "exam_attempts_status_submitted_idx"}` — 1 row. ✓
+5. `select column_name, is_nullable, column_default from information_schema.columns where table_name = 'exam_attempts' and column_name = 'source';` → `{"column_name": "source", "is_nullable": "NO", "column_default": "'none'::text"}` — not null, default `'none'`. ✓
+
+**Idempotency re-run (REFACTOR phase):** re-ran the identical `--file` apply command a second time. Result: `{"rows": []}`, exit 0, no error. Post-rerun sanity check: `fingerprint` still `340bab74ca57`; `count(*) from pg_constraint where conname = 'exam_attempts_source_check'` = `1` (no duplication from the drop/add pair). Confirms the idempotent `add column if not exists` / `drop constraint if exists` + `add constraint` / `create index if not exists` / `create or replace function` pattern holds on dev.
+
+All 5 declared success criteria match exactly; no escalation triggered.
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
-- [ ] Read all Investigation Targets and record key observations
-- [ ] Before applying, run read-back query 1 (fingerprint) against dev and confirm it does **not** yet equal `<fp>` — this is the pre-apply baseline that proves the apply actually changed something
+- [x] Read all Investigation Targets and record key observations
+- [x] Before applying, run read-back query 1 (fingerprint) against dev and confirm it does **not** yet equal `<fp>` — this is the pre-apply baseline that proves the apply actually changed something
 ### 2. Green Phase
-- [ ] Run the `npx supabase db query --linked --project-ref hynwleaxtbtjzkvpjsug --file ...` command from `SOURCE/`
-- [ ] Run all 5 read-back queries and record each raw result
+- [x] Run the `npx supabase db query --linked --project-ref hynwleaxtbtjzkvpjsug --file ...` command from `SOURCE/`
+- [x] Run all 5 read-back queries and record each raw result
 ### 3. Refactor Phase
-- [ ] Confirm idempotency: re-running the same migration file a second time does not error (the idempotent `if not exists` / drop-then-add pairs from P0-T1 hold on dev)
+- [x] Confirm idempotency: re-running the same migration file a second time does not error (the idempotent `if not exists` / drop-then-add pairs from P0-T1 hold on dev)
 
 ## Quality Assurance Mechanisms
 - `npm run verify:schema` (extended) — Enforces: live-dev RPC existence/EXECUTE/anon-denial probes — Config: `SOURCE/supabase/verify-schema.ts:448-493` (this task lands the dev state P0-T5 verifies with this tool)
@@ -66,10 +96,10 @@ _(Record here: the CLI command's raw output; each of the 5 read-back query resul
   - **Residual**: anon-specifically-denied (42501) runtime proof is P8-T1/P8-T4's job; this task only confirms the catalogue-level ACL.
 
 ## Completion Criteria
-- [ ] Dev apply command run successfully from `SOURCE/`
-- [ ] All 5 read-back queries executed and their literal results recorded in Investigation Notes
-- [ ] Each of the 5 results matches its declared expectation exactly
-- [ ] If any result fails to match: task is NOT complete — escalate per the Failure response above rather than proceeding
+- [x] Dev apply command run successfully from `SOURCE/`
+- [x] All 5 read-back queries executed and their literal results recorded in Investigation Notes
+- [x] Each of the 5 results matches its declared expectation exactly
+- [x] If any result fails to match: task is NOT complete — escalate per the Failure response above rather than proceeding
 
 ## Notes
 - Impact scope: dev database `hynwleaxtbtjzkvpjsug` only. This is **not** production — confirm the project ref before every call.
