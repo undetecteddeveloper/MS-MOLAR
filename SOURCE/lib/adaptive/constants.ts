@@ -165,3 +165,69 @@ export const EXAM_RANK_RECENCY_WEIGHT = 0.25;
  * một môn chưa từng thử không được coi là yếu, vì không có gì nói nó yếu.
  */
 export const EXAM_RANK_SUBJECT_WEAKNESS_WEIGHT = 0.5;
+
+// --- Kệ đề ở trang /exams và trang chủ (PRD exam-shelves v1.1, ADR-0021 D4) --
+//
+// Bốn hằng số dưới đây là NGƯỠNG, không phải trọng số: không cái nào đi vào
+// `affinityOf` ở trên — chúng định hình BA kệ (Cần luyện / Nổi nhất / Khám
+// phá) chứ không xếp hạng bên trong một kệ. Cùng lý do đặt hằng số chỉnh-được
+// ở file này thay vì rải trong `examShelves.ts`: chỉnh sau là diff một dòng.
+
+/**
+ * Số đề tối thiểu để một bậc trong "thang nới rộng" của kệ Nổi nhất được coi
+ * là đủ đầy — dưới ngưỡng này thì thang nới rộng sang bậc kế (PRD D12/U4,
+ * chốt 2026-09-18).
+ *
+ * 5, không phải 4. Lý do là sản phẩm, không phải kỹ thuật: một hàng 3-4 thẻ
+ * đọc như một dải mỏng chứ không phải một lựa chọn có chủ đích, còn 5 thẻ mới
+ * lấp đủ một hàng ở khổ 1000px (số đo canvas duyệt trước khi chốt U4). 4 là
+ * phương án thay thế mà riêng phép tính gấp hàng ở 1000px ủng hộ, bị bỏ vì lý
+ * do thẩm mỹ trên thắng, không phải vì 4 tính sai.
+ *
+ * So sánh dùng TẠI `examShelves.ts`'s `pickHotShelf` là `pool.length >=
+ * HOT_SHELF_MIN_CARDS` — đúng bằng ngưỡng thì DỪNG nới rộng, không phải nới
+ * thêm một bậc nữa.
+ */
+export const HOT_SHELF_MIN_CARDS = 5;
+
+/**
+ * Số thẻ tối đa mỗi kệ hiển thị, CẮT ở Node sau khi đã xếp hạng đầy đủ — không
+ * bao giờ là một `.limit()`/`.range()` phía SQL (PRD AC-006, ADR-0021 D2 "rank-
+ * then-cut" — khoá cứng kế thừa từ ADR-0015 kill criterion (a)).
+ *
+ * 10 (PRD D6). Ba kệ dùng chung một con số để trang không có ba mật độ khác
+ * nhau; đổi số này không đổi thứ tự bên trong kệ, chỉ đổi điểm cắt.
+ */
+export const SHELF_MAX_CARDS = 10;
+
+/**
+ * Độ dài (ngày) của cửa sổ "gần đây" trong thang nới rộng của kệ Nổi nhất —
+ * bậc ĐẦU TIÊN, hẹp nhất (PRD AC-019, subtitle `Khối {G}, tuần này` /
+ * `Toàn hệ thống, tuần này`).
+ *
+ * 7 ngày, cỡ theo đúng hàng rủi ro "thưa dữ liệu" mà PRD ghi: ~92 lượt nộp
+ * trải trên 7 đề published (đo 2026-08-31) — một cửa sổ 7 ngày trong MỘT lớp
+ * có thể dễ dàng ra 0-2 đề, đó là lý do thang phải NỚI RỘNG chứ không dừng ở
+ * bậc này, và cũng là lý do subtitle luôn nói rõ bậc nào đã tạo ra kệ thay vì
+ * ngầm định "tuần này" cho mọi trường hợp.
+ *
+ * Số này chỉ định hình MỘT bậc của thang, không tự nó quyết định kệ có hiện
+ * hay không — `HOT_SHELF_MIN_CARDS` mới là ngưỡng "đủ đầy" cho từng bậc.
+ */
+export const HOT_WINDOW_RECENT_DAYS = 7;
+
+/**
+ * Độ dài (ngày) của cửa sổ "rộng" trong thang nới rộng của kệ Nổi nhất — bậc
+ * THỨ HAI, sau `HOT_WINDOW_RECENT_DAYS` (PRD AC-020, subtitle `Khối {G}, 30
+ * ngày qua` / `Toàn hệ thống, 30 ngày qua`).
+ *
+ * 30 ngày — cùng cỡ rủi ro thưa dữ liệu mà `HOT_WINDOW_RECENT_DAYS` đã ghi:
+ * một bậc rộng gấp hơn 4 lần bậc "tuần này" vẫn có thể chưa đủ 5 đề với kho
+ * hiện tại, nên thang còn hai bậc nữa (all-time trong lớp, rồi all-time toàn
+ * hệ thống) phía sau nó chứ 30 ngày không phải điểm dừng cuối.
+ *
+ * Tên trường trong `HotCounts` giữ nguyên là `wide` (không phải `wide30`) vì
+ * nó đúng bằng cột `p_since_wide` mà `exam_hot_counts` trả về — đổi tên ở đây
+ * mà không đổi ở RPC sẽ tạo ra một cặp tên lệch nhau không cần thiết.
+ */
+export const HOT_WINDOW_WIDE_DAYS = 30;
