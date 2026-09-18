@@ -15,7 +15,7 @@ import { t } from "@/lib/copy";
 import { StartAttemptSubmit } from "@/features/exams/components/StartAttemptSubmit";
 
 export async function StartAttemptButton({ examId }: { examId: string }) {
-  const start = startAttempt.bind(null, examId);
+  const start = startAttempt.bind(null, examId, undefined);
 
   return (
     <form action={start}>
