@@ -13,7 +13,7 @@ Metadata:
 Add the 16 new copy keys to `SOURCE/lib/copy.ts` at 3 destinations: 14 shelf/ribbon keys near `:132`; `exams.sortHot` after `exams.sortHardest` near `:505`; `home.hotExams` after `home.newExams` near `:81`. All Vietnamese literals must be copied verbatim from the UI Spec.
 
 ## Target Files
-- [ ] `SOURCE/lib/copy.ts`
+- [x] `SOURCE/lib/copy.ts`
 
 ## Investigation Targets
 - `docs/ui-spec/exam-shelves-ui-spec.md` (§ Copy Keys — the full verbatim table of all 16 keys and their Vietnamese literals)
@@ -29,18 +29,26 @@ Add the 16 new copy keys to `SOURCE/lib/copy.ts` at 3 destinations: 14 shelf/rib
 | docs/prd/exam-shelves-prd.md (§ AC-012); docs/ui-spec/exam-shelves-ui-spec.md (§ Page State Matrix) | derived-display | "{subject} đang là môn điểm trung bình thấp nhất của bạn", where `{subject}` = `subjectLabel(subject)` — so `Chemistry` reads `Hóa học`, not the canvas shorthand `Hoá` | Does `copy.ts`'s template literal use the `{subject}` placeholder (interpolated via `subjectLabel()` at the call site in P2-T3), and is the surrounding sentence copied verbatim? |
 
 ## Investigation Notes
-_(Record here: confirmation all 16 keys were copied character-for-character from the UI Spec table, including diacritics; confirmation `npx tsc --noEmit` passes for `MessageKey` exhaustiveness.)_
+- UI Spec § Copy Keys (`docs/ui-spec/exam-shelves-ui-spec.md:248-269`) read in full: table lists exactly 16 keys with Vietnamese literals and insertion locations (14 shelf/ribbon keys under `// --- Danh sách đề ---` at `copy.ts:132`; `exams.sortHot` after `exams.sortHardest` under `// --- Bộ lọc & độ khó ---` near `copy.ts:505`; `home.hotExams` after `home.newExams` near `copy.ts:81`).
+- `SOURCE/lib/copy.ts` investigated: it is a single flat `Record<string, string>` object literal (`export const copy = {...} satisfies Record<string, string>`); `MessageKey = keyof Dictionary` and `Dictionary = typeof copy` are derived automatically, so adding a new `"key": "literal"` entry is sufficient — no separate type/enum to touch. `t(key, values)` does `{name}` interpolation via regex replace and falls back to printing the raw key when a key is missing.
+- Confirmed (grep) none of the 16 new keys pre-existed in `copy.ts` before this change (Red-phase check passed).
+- All 16 keys added at the 3 documented insertion points, preserving existing key order/comments. Verified byte-for-byte against the UI Spec table with a script comparing each `"key": "literal"` pair in `copy.ts` against the spec's markdown table row — 16/16 matched, 0 mismatches, including diacritics (`Nổi nhất`, `Khối {grade}, từ trước tới nay`, `Đề nổi nhất`, etc.).
+- `npx tsc --noEmit` run from `SOURCE/`: exit code 0, no output — `MessageKey` exhaustiveness holds project-wide. `npx eslint lib/copy.ts --max-warnings 0`: exit code 0.
+- Reference Contracts re-evaluated against final implementation:
+  - Row 1 (6 `HOT_SUBTITLE` rung mappings): Y — all 6 literals (`exams.shelfHotGradeWeek/Month/All`, `exams.shelfHotSiteWeek/Month/All`) match the spec's rung→string table exactly.
+  - Row 2 (Explore subtitle AC-031): Y — `exams.shelfExploreSubtitle` = "Đề mới đăng, môn và trường bạn chưa thử", byte-identical.
+  - Row 3 (Practice subtitle `{subject}` placeholder, AC-012): Y — `exams.shelfPracticeSubtitle` = "{subject} đang là môn điểm trung bình thấp nhất của bạn" uses the `{subject}` placeholder verbatim; interpolation via `subjectLabel()` at the P2-T3 call site is out of this task's scope per the Proof Obligations Residual note.
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
-- [ ] Read the UI Spec § Copy Keys table in full and record all 16 key names + literals
-- [ ] Confirm none of the 16 keys already exist in `copy.ts` (no accidental duplicate)
+- [x] Read the UI Spec § Copy Keys table in full and record all 16 key names + literals
+- [x] Confirm none of the 16 keys already exist in `copy.ts` (no accidental duplicate)
 ### 2. Green Phase
-- [ ] Add the 14 shelf/ribbon keys near `:132`
-- [ ] Add `exams.sortHot` after `exams.sortHardest` near `:505`
-- [ ] Add `home.hotExams` after `home.newExams` near `:81`
+- [x] Add the 14 shelf/ribbon keys near `:132`
+- [x] Add `exams.sortHot` after `exams.sortHardest` near `:505`
+- [x] Add `home.hotExams` after `home.newExams` near `:81`
 ### 3. Refactor Phase
-- [ ] Run `npx tsc --noEmit` and confirm no `MessageKey` errors anywhere in the codebase (this key set becomes the exhaustiveness baseline every later `t()` call in this feature checks against)
+- [x] Run `npx tsc --noEmit` and confirm no `MessageKey` errors anywhere in the codebase (this key set becomes the exhaustiveness baseline every later `t()` call in this feature checks against)
 
 ## Quality Assurance Mechanisms
 - `npx tsc --noEmit` — Enforces: type correctness incl. `MessageKey` validity of every new `t()` call — Config: `SOURCE/tsconfig.json` (project-wide)
@@ -63,11 +71,11 @@ _(Record here: confirmation all 16 keys were copied character-for-character from
   - **Residual**: this task proves the literals exist and type-check; that they render correctly in context (e.g. `{subject}` interpolation via `subjectLabel()`) is P2-T3's proof obligation.
 
 ## Completion Criteria
-- [ ] All 16 keys added at the 3 specified locations
-- [ ] Every literal matches the UI Spec § Copy Keys table verbatim
-- [ ] `npx tsc --noEmit` passes (MessageKey exhaustiveness)
-- [ ] Every Reference Contract Compliance Check evaluates to `Y`
-- [ ] Gates 1-6 green
+- [x] All 16 keys added at the 3 specified locations
+- [x] Every literal matches the UI Spec § Copy Keys table verbatim
+- [x] `npx tsc --noEmit` passes (MessageKey exhaustiveness)
+- [x] Every Reference Contract Compliance Check evaluates to `Y`
+- [x] Gates 1-6 green
 
 ## Notes
 - Impact scope: `copy.ts` only — additive, no existing keys edited.
