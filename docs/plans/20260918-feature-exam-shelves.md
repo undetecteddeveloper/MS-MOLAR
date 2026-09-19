@@ -532,7 +532,7 @@ flowchart TB
 **Verification**: L2 on live dev.
 
 #### Tasks
-- [ ] **P8-T1**: Extend `SOURCE/supabase/verify-schema.ts` — the RPC-probe block at `:448-493` gains an existence/EXECUTE probe for `exam_hot_counts` with harmless boundary arguments plus an anon-42501 probe, mirroring `search_exams` at `:478-493`. Same commit: correct the stale header claim (lines ~1-4, "không có migration tool") — a migration **procedure** now exists (schema:plan → migration file → CLI apply on dev) even though prod apply is still manual/statement-by-statement; reword without overclaiming. Target: SOURCE/supabase/verify-schema.ts. AC: AC-027, AC-028. Design ref: backend DD Fact Disposition Table row `verify-schema.ts:rpc-and-fk-probes`. Verify: gates 1-3 for the TS changes; `npm run verify:schema` green on dev.
+- [x] **P8-T1**: Extend `SOURCE/supabase/verify-schema.ts` — the RPC-probe block at `:448-493` gains an existence/EXECUTE probe for `exam_hot_counts` with harmless boundary arguments plus an anon-42501 probe, mirroring `search_exams` at `:478-493`. Same commit: correct the stale header claim (lines ~1-4, "không có migration tool") — a migration **procedure** now exists (schema:plan → migration file → CLI apply on dev) even though prod apply is still manual/statement-by-statement; reword without overclaiming. Target: SOURCE/supabase/verify-schema.ts. AC: AC-027, AC-028. Design ref: backend DD Fact Disposition Table row `verify-schema.ts:rpc-and-fk-probes`. Verify: gates 1-3 for the TS changes; `npm run verify:schema` green on dev.
 
 - [ ] **P8-T2**: Extend `SOURCE/supabase/test-rls.ts` with Phần 10 (cases HS-a through HS-g) per backend DD § Test Boundaries and Placement. Target: SOURCE/supabase/test-rls.ts. AC: AC-027 (all sub-cases). Design ref: backend DD "test-rls.ts Phần 10" (verbatim case list). Proof Obligation (verbatim): HS-a positive control (A sees 0 of B's `exam_attempts` rows post-DDL); HS-b cross-user proof (`total_count>=1` for an exam only B submitted); HS-c leak proof (returned row's key set is EXACTLY the 4 declared columns); HS-d unpublished-exam exclusion; HS-e anon→42501, authenticated→array; HS-f banned-author exclusion + reappearance after unban; HS-g `source='hacked'`→23514, writing on B's `user_id`→refused by `attempts_insert_own`. Verify: `npx tsx supabase/test-rls.ts` run manually against dev, all 7 cases pass.
 
@@ -542,7 +542,7 @@ flowchart TB
 
 #### Phase Completion Criteria (L2 on live dev)
 - [ ] `test-rls.ts` Phần 10 all 7 cases (HS-a..HS-g) pass on dev
-- [ ] `verify:schema` green, including the 2 new `exam_hot_counts` probes
+- [x] `verify:schema` green, including the 2 new `exam_hot_counts` probes
 - [ ] `test:localdb` green, including all 6 obligations of `exam-hot-counts.service.e2e.test.ts`
 - [ ] Gates 1-6 all green for the first time with every feature test file present
 

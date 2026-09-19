@@ -1,8 +1,10 @@
 // Verify schema drift (Security review 2026-08-03, TECH-DEBT TD-001/TD-005).
 //
-// schema.sql được paste tay vào Supabase SQL Editor — không có migration tool,
-// nên KHÔNG có gì bảo đảm DB đang chạy khớp với schema.sql trong git. Script này
-// đóng đúng khoảng hở đó cho phần NHẠY CẢM NHẤT: khoá đáp án (§10).
+// schema.sql là nguồn chân lý duy nhất, áp lên DB bằng tay — trên dev có QUY
+// TRÌNH migration từ 2026-08-31 (schema:plan → file migration → CLI apply, xem
+// Migration Procedure trong backend design doc), còn trên prod vẫn từng câu
+// lệnh một, không công cụ nào tự phát hiện DB lệch khỏi schema.sql trong git.
+// Script này đóng đúng khoảng hở đó cho phần NHẠY CẢM NHẤT: khoá đáp án (§10).
 //
 // Nó KHÔNG đọc DDL từ DB (Supabase không cho client chạy SQL tuỳ ý). Nó so
 // schema.sql — nguồn chân lý duy nhất — với HÀNH VI THẬT của DB, quan sát bằng
@@ -490,6 +492,42 @@ async function main() {
     seAnon === "42501"
       ? "search_exams: anon bị từ chối (42501) — EXECUTE chỉ authenticated/service_role"
       : `search_exams: anon KHÔNG bị từ chối (mã ${describeCode(seAnon)}) — thiếu \`revoke all on function public.search_exams(text, int) from public, anon\``
+  );
+
+  // exam_hot_counts (ADR-0021 D1, §20c) — cùng khuôn revoke/grant search_exams
+  // dùng (authenticated + service_role được EXECUTE, anon + public bị revoke),
+  // nên probe mirror y hệt cấu trúc trên: authenticated gọi được, anon bị
+  // 42501. Đối số là BIÊN VÔ HẠI — `p_max_rows: 1` là biên dưới
+  // `greatest(coalesce(p_max_rows, 500), 1)` trong thân hàm (§20c), và hai mốc
+  // thời gian chỉ đi vào một `count(*) filter` đọc, không câu lệnh nào ghi. Vì
+  // hàm là SECURITY DEFINER đọc xuyên user (khác search_exams, invoker), khẳng
+  // định thêm bằng service_role — không chỉ authenticated — mới chứng minh
+  // đúng cụm quyền ADR-0021 D1 đòi: "authenticated/service_role gọi được".
+  const HOT_COUNTS_ARGS = {
+    p_since_recent: "1970-01-01T00:00:00.000Z",
+    p_since_wide: "1970-01-01T00:00:00.000Z",
+    p_max_rows: 1,
+  };
+  const hc = await probe.rpc("exam_hot_counts", HOT_COUNTS_ARGS);
+  assert(
+    !hc.error && Array.isArray(hc.data),
+    hc.error
+      ? `exam_hot_counts không gọi được: ${hc.error.code ?? ""} ${hc.error.message} — apply schema.sql §20c`
+      : "exam_hot_counts tồn tại và authenticated gọi được"
+  );
+  const hcAdmin = await admin.rpc("exam_hot_counts", HOT_COUNTS_ARGS);
+  assert(
+    !hcAdmin.error && Array.isArray(hcAdmin.data),
+    hcAdmin.error
+      ? `exam_hot_counts KHÔNG gọi được bằng service_role: ${hcAdmin.error.code ?? ""} ${hcAdmin.error.message} — thiếu \`grant execute ... to service_role\` ở §20c`
+      : "exam_hot_counts gọi được bằng service_role"
+  );
+  const hcAnon = (await anonClient.rpc("exam_hot_counts", HOT_COUNTS_ARGS)).error?.code ?? null;
+  assert(
+    hcAnon === "42501",
+    hcAnon === "42501"
+      ? "exam_hot_counts: anon bị từ chối (42501) — EXECUTE chỉ authenticated/service_role"
+      : `exam_hot_counts: anon KHÔNG bị từ chối (mã ${describeCode(hcAnon)}) — thiếu \`revoke all on function public.exam_hot_counts(timestamptz, timestamptz, int) from public, anon\` ở §20c`
   );
   }
 
