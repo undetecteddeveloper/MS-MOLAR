@@ -45,6 +45,18 @@
 //   entitlement không trả tiền (AC-033).
 //   SỐ NHÓM PHẢI BẰNG số đối tượng DDL: thêm một bảng cho khối này thì nhóm
 //   từ chối của nó đi CÙNG thay đổi đó, không bao giờ đi sau.
+// Phần 10 (Kho đề theo kệ, backend Design Doc §Test Boundaries and Placement +
+//   ADR-0021, Work Plan Phase 8 Task P8-T2, cases HS-a…HS-g) — required,
+//   blocking. Chứng minh hàm SECURITY DEFINER exam_hot_counts() (schema.sql
+//   §20c) không làm rò danh tính xuyên người dùng: cách ly bảng exam_attempts
+//   KHÔNG bị cột `source` (§20a) + chỉ mục mới (§20b) làm hỏng (HS-a, positive
+//   control); hàm thật sự đếm xuyên JWT học sinh (HS-b); tập khoá của hàng trả
+//   về đúng CHÍNH XÁC 4 cột khai báo, không thừa cột nào (HS-c — đúng phép thử
+//   ADR-0021 §Implementation Guidance đòi hỏi); đề chưa published (HS-d) và đề
+//   của tác giả bị ban rồi unban (HS-f) vắng mặt/tái xuất hiện đúng lúc; quyền
+//   EXECUTE đúng khuôn search_exams — anon 42501, authenticated mảng (HS-e);
+//   cột `source` không mở thêm bề mặt ghi — CHECK chặn giá trị bịa,
+//   attempts_insert_own chặn user_id mạo danh (HS-g).
 //
 // 2 user test được tạo qua Admin API (service_role, email_confirm=true) để KHÔNG
 // gửi email xác nhận. Việc TEST RLS sau đó chỉ dùng ANON key + đăng nhập thật.
@@ -169,6 +181,50 @@ const SUB_ORDER_MEMO = "[rls-sub] fixture memo — khong phai don that";
 const SUB_ANCHOR_SENTINEL = "2099-01-02T03:04:05.000Z";
 const SUB_EXPIRES_SENTINEL = "2099-02-03T04:05:06.000Z";
 const SUB_PENDING_UNTIL_SENTINEL = "2099-03-04T05:06:07.000Z";
+
+// Fixture Kho đề theo kệ (backend Design Doc §Test Boundaries and Placement,
+// ADR-0021, cases HS-a…HS-g) — id prefix riêng, setup/cleanup idempotent như
+// mọi fixture trên. C là user THỨ BA, riêng cho kịch bản ban/unban tác giả
+// (HS-f): không mượn A/B, để lệnh ban không đụng tới phiên đăng nhập của họ ở
+// các Phần khác trong cùng lượt chạy.
+const HOTCOUNTS_PUBLISHED_EXAM_ID = "rls-hotcounts-published"; // published, tác giả A, B nộp bài (HS-a/HS-b/HS-c/HS-g)
+const HOTCOUNTS_UNPUBLISHED_EXAM_ID = "rls-hotcounts-unpublished"; // status='review', tác giả A, B nộp bài (HS-d)
+const HOTCOUNTS_BANNED_EXAM_ID = "rls-hotcounts-banned"; // published, tác giả C, A nộp bài (HS-f)
+const HOTCOUNTS_EXAM_IDS = [
+  HOTCOUNTS_PUBLISHED_EXAM_ID,
+  HOTCOUNTS_UNPUBLISHED_EXAM_ID,
+  HOTCOUNTS_BANNED_EXAM_ID,
+];
+const EMAIL_C = "smithnguyen247+rlstestc@gmail.com";
+
+// Biên thời gian vô hại cho exam_hot_counts: xa trong quá khứ để MỌI attempt
+// vừa seed đều nằm trong cả hai cửa sổ (recent/wide) — không phụ thuộc đồng hồ
+// máy chạy test vào giờ hiện tại (cùng lý do verify-schema.ts dùng epoch cho
+// probe exam_hot_counts của nó).
+const HOTCOUNTS_ARGS = {
+  p_since_recent: "1970-01-01T00:00:00.000Z",
+  p_since_wide: "1970-01-01T00:00:00.000Z",
+  p_max_rows: 500,
+};
+
+/** Hình dạng một hàng `exam_hot_counts()` trả về — đúng 4 cột khai báo ở
+ *  schema.sql §20c, dùng để đọc lại ở Phần 10 mà không cần Database generic
+ *  (client trong file này được tạo không kèm generic, xem `createClient` ở
+ *  `main()`). */
+interface HotCountsRow {
+  exam_id: string;
+  recent_count: number;
+  wide_count: number;
+  total_count: number;
+}
+
+/** Tìm hàng của một exam id cụ thể trong kết quả `exam_hot_counts()` — dùng
+ *  chung cho HS-b/HS-c/HS-d/HS-f thay vì lặp lại `.find(...)` bốn lần. */
+function findHotCountsRow(rows: unknown, examId: string): HotCountsRow | undefined {
+  return (Array.isArray(rows) ? (rows as HotCountsRow[]) : []).find(
+    (row) => row.exam_id === examId,
+  );
+}
 
 let failures = 0;
 function assert(cond: boolean, msg: string) {
@@ -601,6 +657,85 @@ async function setupSubscriptionFixtures(
     .from("subscriptions")
     .insert(buildFixtureSubscriptionRow(authorBId));
   if (subB.error) throw subB.error;
+}
+
+/** Xóa sạch fixture Kho đề theo kệ (chạy trước VÀ sau để idempotent).
+ *
+ *  Unban C VÔ ĐIỀU KIỆN, kể cả khi lượt chạy này chưa từng ban ai: nếu lượt
+ *  chạy TRƯỚC chết giữa chừng ở HS-f (đã ban, chưa kịp unban vì một assertion
+ *  ném lỗi), lượt sau phải tự sửa lại trạng thái trước khi dùng C, chứ không
+ *  được để C bị ban vĩnh viễn qua các lần chạy. */
+async function cleanupHotCountsFixtures(admin: SupabaseClient, authorCId: string) {
+  await admin.from("exam_attempts").delete().in("exam_id", HOTCOUNTS_EXAM_IDS);
+  await admin.from("exams").delete().in("id", HOTCOUNTS_EXAM_IDS);
+  await admin.auth.admin.updateUserById(authorCId, { ban_duration: "none" });
+}
+
+/** Tạo fixture Kho đề theo kệ qua service_role (bypass RLS): 3 đề (published
+ *  có B nộp bài, chưa published có B nộp bài, published tác giả C có A nộp
+ *  bài) + submitted attempt tương ứng từng đề. */
+async function setupHotCountsFixtures(
+  admin: SupabaseClient,
+  authorAId: string,
+  raterBId: string,
+  authorCId: string,
+) {
+  const baseExam = {
+    duration_minutes: 45,
+    subject: "Toán",
+    grade: 10,
+    question_ids: [] as string[],
+    author_display_name: "RLS Test Author",
+  };
+  const exams = await admin.from("exams").insert([
+    {
+      ...baseExam,
+      id: HOTCOUNTS_PUBLISHED_EXAM_ID,
+      title: "[RLS] Đề hot counts - đã published",
+      author_id: authorAId,
+      status: "published",
+    },
+    {
+      ...baseExam,
+      id: HOTCOUNTS_UNPUBLISHED_EXAM_ID,
+      title: "[RLS] Đề hot counts - chưa published",
+      author_id: authorAId,
+      status: "review",
+    },
+    {
+      ...baseExam,
+      id: HOTCOUNTS_BANNED_EXAM_ID,
+      title: "[RLS] Đề hot counts - tác giả sẽ bị ban",
+      author_id: authorCId,
+      status: "published",
+    },
+  ]);
+  if (exams.error) throw exams.error;
+
+  // B nộp bài trên 2 đề đầu (HS-a positive control + HS-b cross-user proof +
+  // HS-d unpublished-exclusion); A nộp bài trên đề của C để HS-f có gì để đếm
+  // TRƯỚC khi C bị ban.
+  const attempts = await admin.from("exam_attempts").insert([
+    {
+      user_id: raterBId,
+      exam_id: HOTCOUNTS_PUBLISHED_EXAM_ID,
+      status: "submitted",
+      submitted_at: new Date().toISOString(),
+    },
+    {
+      user_id: raterBId,
+      exam_id: HOTCOUNTS_UNPUBLISHED_EXAM_ID,
+      status: "submitted",
+      submitted_at: new Date().toISOString(),
+    },
+    {
+      user_id: authorAId,
+      exam_id: HOTCOUNTS_BANNED_EXAM_ID,
+      status: "submitted",
+      submitted_at: new Date().toISOString(),
+    },
+  ]);
+  if (attempts.error) throw attempts.error;
 }
 
 async function main() {
@@ -2391,6 +2526,109 @@ async function main() {
       (subResidueSubs.data?.length ?? 0) === 0,
     `Phần 9 (hậu kiểm dọn dẹp): không còn dòng fixture nào trong payment_orders/subscriptions (còn lại: ${subResidueOrders.data?.length ?? "?"} đơn / ${subResidueSubs.data?.length ?? "?"} entitlement)`,
   );
+
+  // ==========================================================================
+  // Phần 10 — Kho đề theo kệ: cách ly exam_hot_counts() (HS-a…HS-g)
+  // ==========================================================================
+  console.log("\nKho đề theo kệ — setup fixture (service_role)…");
+  const userCId = await ensureUser(admin, EMAIL_C);
+  await cleanupHotCountsFixtures(admin, userCId);
+  await setupHotCountsFixtures(admin, userAId, userBId, userCId);
+
+  console.log("\nRLS checks (Kho đề theo kệ HS-a…HS-g):");
+
+  // HS-a (positive control). A đọc trực tiếp bảng exam_attempts qua REST, lọc
+  // theo user_id của B — phải thấy 0 dòng: cột `source` mới (§20a) + chỉ mục
+  // mới (§20b) không làm hỏng attempts_select_own.
+  const hsa = await userA.from("exam_attempts").select("id").eq("user_id", userBId);
+  assert(
+    !hsa.error && (hsa.data?.length ?? 0) === 0,
+    `HS-a (positive control): User A KHÔNG thấy dòng exam_attempts nào của B qua bảng trực tiếp sau DDL (nhận: ${hsa.error?.code ?? `${hsa.data?.length ?? 0} dòng`})`,
+  );
+
+  // HS-b/HS-c/HS-d dùng CHUNG một lời gọi RPC (đúng tinh thần "một lần gọi
+  // phục vụ mọi bậc thang" của ADR-0021 D1) rồi soi 2 hàng khác nhau trong đó.
+  const hsRpc = await userA.rpc("exam_hot_counts", HOTCOUNTS_ARGS);
+  const hsbRow = findHotCountsRow(hsRpc.data, HOTCOUNTS_PUBLISHED_EXAM_ID);
+
+  // HS-b. Hàng của đề CHỈ B nộp bài phải có total_count >= 1: hàm thật sự đếm
+  // xuyên người dùng qua JWT học sinh của A.
+  assert(
+    !hsRpc.error && (hsbRow?.total_count ?? 0) >= 1,
+    `HS-b: exam_hot_counts trả total_count >= 1 cho đề chỉ B nộp bài (nhận: ${hsRpc.error?.code ?? hsbRow?.total_count ?? "KHÔNG CÓ HÀNG"})`,
+  );
+
+  // HS-c (the leak proof). Tập khoá của hàng vừa nhận PHẢI đúng CHÍNH XÁC 4
+  // cột khai báo — không thừa user_id/submitted_at/id/total_score. Chỉ kiểm
+  // giá trị thôi sẽ xanh trong khi một cột đã lộ (ADR-0021 §Implementation
+  // Guidance).
+  const hscKeys = hsbRow ? Object.keys(hsbRow).sort() : [];
+  const hscExpectedKeys = ["exam_id", "recent_count", "total_count", "wide_count"];
+  assert(
+    hscKeys.length === hscExpectedKeys.length &&
+      hscKeys.every((k, i) => k === hscExpectedKeys[i]),
+    `HS-c: tập khoá của hàng exam_hot_counts đúng CHÍNH XÁC {exam_id, recent_count, wide_count, total_count} (nhận: ${hscKeys.length > 0 ? hscKeys.join(", ") : "KHÔNG CÓ HÀNG"})`,
+  );
+
+  // HS-d. Đề CHƯA published dù có submitted attempt phải VẮNG MẶT khỏi kết
+  // quả — vị từ §12 được khẳng định lại bên trong hàm definer.
+  const hsdRow = findHotCountsRow(hsRpc.data, HOTCOUNTS_UNPUBLISHED_EXAM_ID);
+  assert(
+    !hsRpc.error && hsdRow === undefined,
+    `HS-d: đề chưa published VẮNG MẶT khỏi exam_hot_counts dù có submitted attempt (nhận: ${hsdRow ? JSON.stringify(hsdRow) : "vắng mặt (đúng)"})`,
+  );
+
+  // HS-e. anon nhận 42501; authenticated nhận mảng — đúng khuôn cấp quyền
+  // search_exams mà §20c chép lại (verify-schema.ts có probe song song).
+  const hseAuth = await userB.rpc("exam_hot_counts", HOTCOUNTS_ARGS);
+  const hseAnon = await anonClient.rpc("exam_hot_counts", HOTCOUNTS_ARGS);
+  assert(
+    !hseAuth.error && Array.isArray(hseAuth.data) && hseAnon.error?.code === "42501",
+    `HS-e: authenticated gọi được exam_hot_counts (mảng); anon bị từ chối 42501 (nhận: authenticated=${hseAuth.error?.code ?? "OK"}, anon=${hseAnon.error?.code ?? "KHÔNG CÓ LỖI"})`,
+  );
+
+  // HS-f. Đề của tác giả bị ban phải VẮNG MẶT khỏi kết quả trong lúc ban, rồi
+  // XUẤT HIỆN LẠI sau khi lệnh ban được gỡ — §18 áp dụng lại bên trong hàm
+  // definer, không cache theo lời gọi.
+  const hsfBefore = await userA.rpc("exam_hot_counts", HOTCOUNTS_ARGS);
+  const hsfBeforeRow = findHotCountsRow(hsfBefore.data, HOTCOUNTS_BANNED_EXAM_ID);
+  const banned = await admin.auth.admin.updateUserById(userCId, { ban_duration: "24h" });
+  if (banned.error) throw banned.error;
+  const hsfDuring = await userA.rpc("exam_hot_counts", HOTCOUNTS_ARGS);
+  const hsfDuringRow = findHotCountsRow(hsfDuring.data, HOTCOUNTS_BANNED_EXAM_ID);
+  const unbanned = await admin.auth.admin.updateUserById(userCId, { ban_duration: "none" });
+  if (unbanned.error) throw unbanned.error;
+  const hsfAfter = await userA.rpc("exam_hot_counts", HOTCOUNTS_ARGS);
+  const hsfAfterRow = findHotCountsRow(hsfAfter.data, HOTCOUNTS_BANNED_EXAM_ID);
+  assert(
+    (hsfBeforeRow?.total_count ?? 0) >= 1 &&
+      hsfDuringRow === undefined &&
+      (hsfAfterRow?.total_count ?? 0) >= 1,
+    `HS-f: đề của tác giả bị ban vắng mặt TRONG LÚC ban, xuất hiện lại SAU KHI unban (trước ban: ${hsfBeforeRow?.total_count ?? "vắng mặt"}, trong lúc ban: ${hsfDuringRow ? JSON.stringify(hsfDuringRow) : "vắng mặt (đúng)"}, sau unban: ${hsfAfterRow?.total_count ?? "vắng mặt"})`,
+  );
+
+  // HS-g. Cột `source` không mở thêm bề mặt ghi. (1) A insert source='hacked'
+  // → CHECK từ chối, mã 23514 (không phải lỗi quyền — cả exam_id lẫn user_id
+  // mặc định đều hợp lệ, chỉ source sai). (2) A insert source hợp lệ nhưng gắn
+  // user_id của B → attempts_insert_own chặn bằng with-check (lỗi quyền, KHÔNG
+  // phải lỗi ràng buộc dữ liệu).
+  const hsgHacked = await userA
+    .from("exam_attempts")
+    .insert({ exam_id: HOTCOUNTS_PUBLISHED_EXAM_ID, source: "hacked" });
+  assert(
+    hsgHacked.error?.code === "23514",
+    `HS-g: source='hacked' bị CHECK từ chối, mã 23514 (nhận: ${hsgHacked.error?.code ?? "KHÔNG CÓ LỖI — đã ghi được dòng cấm"})`,
+  );
+  const hsgForgedUser = await userA
+    .from("exam_attempts")
+    .insert({ exam_id: HOTCOUNTS_PUBLISHED_EXAM_ID, user_id: userBId, source: "hot" });
+  assert(
+    isAuthorizationDenial(hsgForgedUser.error),
+    `HS-g: A KHÔNG insert được attempt mang user_id của B (attempts_insert_own chặn qua with-check; nhận: ${hsgForgedUser.error?.code ?? "KHÔNG CÓ LỖI — đã ghi được dòng mạo danh"})`,
+  );
+
+  // Dọn dẹp fixture Kho đề theo kệ.
+  await cleanupHotCountsFixtures(admin, userCId);
 
   // Dọn dẹp fixture Rating.
   await cleanupRatingFixtures(admin);
