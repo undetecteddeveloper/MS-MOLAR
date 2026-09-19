@@ -38,7 +38,6 @@ interface ShelfSpec {
   icon: LucideIcon;
   titleKey: MessageKey;
   from: AttemptSource;
-  viewAllHref: ((exams: Exam[]) => string) | null;
   ribbonOnFirst: boolean;
   trailingTile: boolean;
 }
@@ -48,7 +47,6 @@ const SHELF = {
     icon: Target,
     titleKey: "exams.shelfPracticeTitle",
     from: "practice",
-    viewAllHref: (exams: Exam[]) => `/exams?subject=${encodeURIComponent(exams[0].subject)}`,
     ribbonOnFirst: false,
     trailingTile: false,
   },
@@ -56,7 +54,6 @@ const SHELF = {
     icon: Flame,
     titleKey: "exams.shelfHotTitle",
     from: "hot",
-    viewAllHref: () => "/exams?sort=hot",
     ribbonOnFirst: true,
     trailingTile: false,
   },
@@ -64,7 +61,6 @@ const SHELF = {
     icon: Compass,
     titleKey: "exams.shelfExploreTitle",
     from: "explore",
-    viewAllHref: null,
     ribbonOnFirst: false,
     trailingTile: true,
   },
@@ -137,28 +133,17 @@ export async function ExamShelf({
   const spec = SHELF[shelf];
   const Icon = spec.icon;
   const headerId = `shelf-${shelf}`;
-  const viewAllHref = spec.viewAllHref ? spec.viewAllHref(exams) : null;
 
   return (
     <section aria-labelledby={headerId} className="flex flex-col gap-3">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-2.5">
-          <Icon aria-hidden className="mt-0.5 size-[22px] shrink-0" strokeWidth={1.9} />
-          <div>
-            <h2 id={headerId} className="text-xl leading-tight font-semibold">
-              {t(spec.titleKey)}
-            </h2>
-            <p className="text-muted-foreground mt-0.5 text-[13px]">{subtitle}</p>
-          </div>
+      <div className="flex items-start gap-2.5">
+        <Icon aria-hidden className="mt-0.5 size-[22px] shrink-0" strokeWidth={1.9} />
+        <div>
+          <h2 id={headerId} className="text-xl leading-tight font-semibold">
+            {t(spec.titleKey)}
+          </h2>
+          <p className="text-muted-foreground mt-0.5 text-[13px]">{subtitle}</p>
         </div>
-        {viewAllHref ? (
-          <Link
-            href={viewAllHref}
-            className="text-primary focus-visible:ring-ring inline-flex min-h-11 items-center rounded-lg text-sm font-semibold whitespace-nowrap underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:outline-none"
-          >
-            {t("exams.shelfViewAll")}
-          </Link>
-        ) : null}
       </div>
 
       <ul className="-mx-4 flex snap-x snap-mandatory scroll-pl-4 [scrollbar-width:none] gap-3 overflow-x-auto px-4 pt-1 pb-1.5 motion-safe:scroll-smooth sm:-mx-6 sm:scroll-pl-6 sm:px-6 lg:gap-4 [&::-webkit-scrollbar]:hidden [&>li]:shrink-0 [&>li]:snap-start">
@@ -169,7 +154,8 @@ export async function ExamShelf({
             eligibility={eligibilityFor(exam.id, submittedExamIds, isLoggedIn)}
             ribbon={spec.ribbonOnFirst && i === 0 ? t("exams.hotRibbon") : undefined}
             from={spec.from}
-            className="w-80 lg:w-84"
+            compact
+            className="h-auto w-80 lg:w-84"
           />
         ))}
         {spec.trailingTile ? <ExamShelfTile /> : null}

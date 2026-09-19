@@ -28,7 +28,7 @@ function makeExam(overrides: Partial<Exam> & { id: string }): Exam {
 }
 
 describe("ExamShelf — hình dạng mặc định theo SHELF map (AC-004)", () => {
-  it("kệ Cần luyện: section/h2/icon/subtitle/link Xem tất cả, 1 thẻ trong ul", async () => {
+  it("kệ Cần luyện: section/h2/icon/subtitle, 1 thẻ trong ul, 0 link Xem tất cả", async () => {
     const exams = [makeExam({ id: "p1", subject: "Chemistry" })];
     const { container } = await renderServerTree(
       <ExamShelf
@@ -52,9 +52,7 @@ describe("ExamShelf — hình dạng mặc định theo SHELF map (AC-004)", () 
       "Hóa học đang là môn điểm trung bình thấp nhất của bạn"
     );
 
-    const headerLink = container.querySelector("section > div > a");
-    expect(headerLink?.getAttribute("href")).toBe("/exams?subject=Chemistry");
-    expect(headerLink?.textContent).toBe("Xem tất cả");
+    expect(container.querySelector("section > div > a")).toBeNull();
 
     const cards = container.querySelectorAll("ul > li");
     expect(cards).toHaveLength(1);
@@ -62,32 +60,28 @@ describe("ExamShelf — hình dạng mặc định theo SHELF map (AC-004)", () 
   });
 });
 
-describe("ExamShelf — Shelf composition table (AC-050/AC-035/AC-004)", () => {
-  it("AC-050: link Cần luyện dùng encodeURIComponent(exams[0].subject)", async () => {
-    const exams = [makeExam({ id: "p1", subject: "Civic Education" })];
-    const { container } = await renderServerTree(
-      <ExamShelf
-        shelf="practice"
-        subtitle="—"
-        exams={exams}
-        submittedExamIds={new Set()}
-        isLoggedIn
-      />
-    );
+// Engineer 2026-09-19 bỏ link "Xem tất cả" ở Cần luyện + Nổi nhất (thay AC-035/AC-050
+// và vế "Xem tất cả" của AC-004). Lối vào lưới đầy đủ còn lại: ô cuối Khám phá và chip
+// "Nổi nhất".
+describe("ExamShelf — tiêu đề kệ không có link nào (thay AC-035/AC-050)", () => {
+  it.each<ShelfKind>(["practice", "hot", "explore"])(
+    "kệ %s: header row chỉ có icon + h2 + subtitle, 0 thẻ <a>",
+    async (shelf) => {
+      const exams = [makeExam({ id: `${shelf}-1` })];
+      const { container } = await renderServerTree(
+        <ExamShelf
+          shelf={shelf}
+          subtitle="—"
+          exams={exams}
+          submittedExamIds={new Set()}
+          isLoggedIn
+        />
+      );
 
-    const headerLink = container.querySelector("section > div > a");
-    expect(headerLink?.getAttribute("href")).toBe("/exams?subject=Civic%20Education");
-  });
-
-  it("AC-035: link Nổi nhất là hằng số /exams?sort=hot, không phụ thuộc exams (như AC-050)", async () => {
-    const exams = [makeExam({ id: "h1" })];
-    const { container } = await renderServerTree(
-      <ExamShelf shelf="hot" subtitle="—" exams={exams} submittedExamIds={new Set()} isLoggedIn />
-    );
-
-    const headerLink = container.querySelector("section > div > a");
-    expect(headerLink?.getAttribute("href")).toBe("/exams?sort=hot");
-  });
+      expect(container.querySelector("h2")).not.toBeNull();
+      expect(container.querySelector("section > div")?.querySelector("a")).toBeNull();
+    }
+  );
 
   it("AC-004: kệ Khám phá có icon/h2/subtitle nhưng 0 link header ở header row", async () => {
     const exams = [makeExam({ id: "e1" })];
@@ -141,6 +135,100 @@ describe("ExamShelf — đúng 1 ruy băng ở hạng 1 kệ Nổi nhất, 0 ở
     );
 
     expect(container.querySelectorAll('[data-slot="ribbon"]')).toHaveLength(0);
+  });
+});
+
+// Engineer 2026-09-19: thẻ trên kệ gọn hơn và cao bằng nhau. Cao bằng nhau do hai
+// thứ cùng nhau: ô đặt trước chỗ (tên đề min 2 dòng, dòng tác giả·trường min 1 dòng)
+// và `h-auto` thay `h-full` — `h-full` (height:100%) chặn flexbox tự kéo giãn, từng làm
+// thẻ 198px cạnh thẻ 229px trong cùng một hàng.
+describe("ExamShelf — thẻ gọn: bỏ thời lượng + số câu, cắt dài bằng '…', cao bằng nhau", () => {
+  const LONG = makeExam({
+    id: "long",
+    title: "Đề luyện Hóa Học 10 — Nguyên tử & Bảng tuần hoàn và rất nhiều chữ nữa cho dài",
+    school: "TRƯỜNG THPT SỐ 1 NGÔ GIA TỰ KHU VỰC PHÍA NAM",
+    authorDisplayName: "kháhay",
+    durationMinutes: 90,
+    questionIds: Array.from({ length: 22 }, (_, i) => `q${i}`),
+  });
+  const SHORT = makeExam({ id: "short", title: "Đề ngắn" });
+
+  it("thẻ kệ không chứa thời lượng lẫn số câu, kể cả khi đề có 90 phút / 22 câu", async () => {
+    const { container } = await renderServerTree(
+      <ExamShelf
+        shelf="hot"
+        subtitle="—"
+        exams={[LONG]}
+        submittedExamIds={new Set()}
+        isLoggedIn
+      />
+    );
+
+    const text = container.querySelector("ul > li")?.textContent ?? "";
+    expect(text).toContain(LONG.title);
+    expect(text).not.toMatch(/90\s*phút/);
+    expect(text).not.toMatch(/22\s*câu/);
+  });
+
+  it("tên đề cắt tối đa 2 dòng; tác giả · trường gộp MỘT dòng cắt '…' — cả hai giữ đủ chữ trong DOM", async () => {
+    const { container } = await renderServerTree(
+      <ExamShelf
+        shelf="hot"
+        subtitle="—"
+        exams={[LONG]}
+        submittedExamIds={new Set()}
+        isLoggedIn
+      />
+    );
+
+    const title = container.querySelector("ul > li h3");
+    expect(title?.className).toContain("line-clamp-2");
+    expect(title?.textContent).toBe(LONG.title);
+
+    const meta = title?.nextElementSibling;
+    expect(meta?.tagName).toBe("P");
+    expect(meta?.className).toContain("truncate");
+    expect(meta?.textContent).toBe(`bởi kháhay · ${LONG.school}`);
+  });
+
+  it("đề không tác giả, không trường: dòng meta VẪN có mặt (giữ chỗ) nên thẻ không thấp hơn thẻ khác", async () => {
+    const { container } = await renderServerTree(
+      <ExamShelf
+        shelf="hot"
+        subtitle="—"
+        exams={[SHORT, LONG]}
+        submittedExamIds={new Set()}
+        isLoggedIn
+      />
+    );
+
+    const cards = Array.from(container.querySelectorAll("ul > li"));
+    const shape = (li: Element) =>
+      Array.from(li.querySelectorAll("h3, h3 + p")).map((el) => el.tagName + "." + el.className);
+    expect(shape(cards[0])).toHaveLength(2);
+    expect(shape(cards[0])).toEqual(shape(cards[1]));
+    expect(cards[0].querySelector("h3 + p")?.textContent).toBe("");
+  });
+
+  it("thẻ kệ dùng h-auto, không h-full — để flex kéo mọi thẻ trong hàng bằng chiều cao thẻ cao nhất", async () => {
+    const { container } = await renderServerTree(
+      <ExamShelf
+        shelf="explore"
+        subtitle="—"
+        exams={[SHORT, LONG]}
+        submittedExamIds={new Set()}
+        isLoggedIn
+      />
+    );
+
+    const cards = Array.from(container.querySelectorAll("ul > li .card-link")).map(
+      (a) => a.parentElement as HTMLElement
+    );
+    expect(cards).toHaveLength(2);
+    for (const li of cards) {
+      expect(li.className).toContain("h-auto");
+      expect(li.className).not.toContain("h-full");
+    }
   });
 });
 

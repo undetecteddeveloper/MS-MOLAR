@@ -4,6 +4,12 @@
 |---|---|---|---|
 | 1.1 | 2026-09-18 | Draft | PRD → **UI Spec** → ADR-0021 → Design Doc → Work Plan |
 
+**Amendment 2026-09-19 (engineer, after the first real render on dev) — wins over every row below that says otherwise:**
+1. **No "Xem tất cả" header link on any shelf.** Supersedes AC-035 and AC-050 and the "Xem tất cả" clause of AC-004; `exams.shelfViewAll` deleted. The way into the full grid is the Khám phá tile and the `Nổi nhất` sort chip.
+2. **Shelf cards are compact** (`ExamCard compact`, passed only by `ExamShelf`): no duration, no question count; title `line-clamp-2`; one meta line `bởi {author} · {school}` cut with `…`; `Card padding="compact"`, title `text-base`. The flat grid and the home block keep today's card (the AC-043 byte-identity baseline is unchanged).
+3. **All cards in a row are the same height** (172px ≤ 639px, 180px above): slots are reserved (title min 2 lines, meta min 1 line) and the shelf passes `h-auto` — `h-full` (`height:100%`) disables flex stretch and had produced 198px next to 229px.
+4. The Hot shelf shows **no attempt count** — the brief ranks by attempts but never asks to display one, and ADR-0021 keeps the aggregate off-screen (not k-anonymous at low volume). Adding one is a separate decision.
+
 Refines HOW for `docs/prd/exam-shelves-prd.md` v1.1 (51 ACs, U1–U4 resolved as that document's defaults). WHAT is settled there; rows below cite an AC instead of restating it. Data selection, the DB-side hot aggregate and the attempt-source write path belong to ADR-0021 and the Design Doc.
 
 **Prototype management** — `docs/ui-spec/assets/exam-shelves/prototype-huong-a.html` (design canvas, direction A; worktree `worktree-parallel-work` @ `f3de797`, untracked) and `EXAM-SHELVES-BRIEF.md` §3 (visual spec in words, 2026-09-17) are attachments; this document is canonical. The canvas re-declares the shipped `SOURCE/app/globals.css` tokens verbatim, so its CSS (lines 95–135) is authoritative for layout; deviations are listed in **Prototype Deltas** and win over the canvas.

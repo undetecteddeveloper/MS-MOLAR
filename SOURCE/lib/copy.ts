@@ -143,7 +143,6 @@ export const copy = {
   "exams.shelfHotSiteAll": "Toàn hệ thống, từ trước tới nay",
   "exams.shelfExploreTitle": "Khám phá",
   "exams.shelfExploreSubtitle": "Đề mới đăng, môn và trường bạn chưa thử",
-  "exams.shelfViewAll": "Xem tất cả",
   "exams.shelfViewAllStore": "Xem toàn bộ kho đề",
   "exams.hotRibbon": "Hot nhất",
   "exams.title": "Kho đề",

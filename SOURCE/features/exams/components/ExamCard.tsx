@@ -24,6 +24,10 @@ interface ExamCardProps {
   /** Class bề rộng từ hàng kệ — một rule `[&>li]:w-80` trên cha sẽ dính luôn
    *  vào ô trong cùng hàng, nên bề rộng phải đi qua prop này. */
   className?: string;
+  /** Thẻ gọn cho hàng kệ: bỏ thời lượng + số câu (xem ở trang đề), tên đề ≤2 dòng,
+   *  tác giả · trường gộp một dòng cắt "…", mọi ô đặt trước chỗ ⇒ mọi thẻ cao bằng nhau.
+   *  Vắng mặt ⇒ markup hôm nay (lưới phẳng, trang chủ). */
+  compact?: boolean;
 }
 
 // ExamCard — thẻ đề (theme "Sân trường"): nhãn môn + lớp, tên đề, tác giả,
@@ -41,11 +45,23 @@ interface ExamCardProps {
 // (bug 2026-08). Phản hồi hover là đổi nền + đổi màu tiêu đề — qua `.card-linked`
 // (globals.css), tức chỉ khi hover/nhấn CHÍNH liên kết phủ: `active:bg-*` đặt
 // thẳng trên thẻ từng làm cả thẻ đổi nền khi chỉ chạm nút chấm sao (2026-09-13).
-export async function ExamCard({ exam, eligibility, ribbon, from, className }: ExamCardProps) {
+export async function ExamCard({
+  exam,
+  eligibility,
+  ribbon,
+  from,
+  className,
+  compact,
+}: ExamCardProps) {
   const href = from ? `/exams/${exam.id}?from=${from}` : `/exams/${exam.id}`;
+  const author = exam.authorDisplayName?.trim();
 
   return (
-    <Card as="li" className={cn("card-linked relative h-full", className)}>
+    <Card
+      as="li"
+      padding={compact ? "compact" : undefined}
+      className={cn("card-linked relative h-full", className)}
+    >
       <Link
         href={href}
         aria-label={exam.title}
@@ -59,20 +75,39 @@ export async function ExamCard({ exam, eligibility, ribbon, from, className }: E
         <Badge variant="plain">{t("exams.gradeValue", { grade: exam.grade })}</Badge>
       </div>
 
-      <h3 className="card-linked-title text-lg leading-snug font-semibold">{exam.title}</h3>
+      {compact ? (
+        <>
+          <h3 className="card-linked-title line-clamp-2 min-h-[2lh] text-base leading-snug font-semibold">
+            {exam.title}
+          </h3>
+          <p className="text-muted-foreground min-h-5 truncate text-sm">
+            {author ? (
+              <>
+                {t("common.by")} <span className="text-foreground font-medium">{author}</span>
+              </>
+            ) : null}
+            {author && exam.school ? " · " : null}
+            {exam.school}
+          </p>
+        </>
+      ) : (
+        <>
+          <h3 className="card-linked-title text-lg leading-snug font-semibold">{exam.title}</h3>
 
-      {/* Byline UGC — chỉ hiện với đề có tác giả; đề seed bỏ qua. */}
-      <AuthorByline name={exam.authorDisplayName} />
+          {/* Byline UGC — chỉ hiện với đề có tác giả; đề seed bỏ qua. */}
+          <AuthorByline name={exam.authorDisplayName} />
 
-      <p className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 text-sm">
-        <span className="tabular-nums">
-          {exam.durationMinutes} {t("exams.minutesShort")}
-        </span>
-        <span className="tabular-nums">
-          {t("exams.questionCount", { count: exam.questionIds.length })}
-        </span>
-        {exam.school && <span>{exam.school}</span>}
-      </p>
+          <p className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 text-sm">
+            <span className="tabular-nums">
+              {exam.durationMinutes} {t("exams.minutesShort")}
+            </span>
+            <span className="tabular-nums">
+              {t("exams.questionCount", { count: exam.questionIds.length })}
+            </span>
+            {exam.school && <span>{exam.school}</span>}
+          </p>
+        </>
+      )}
 
       <div className="mt-auto flex items-center justify-between gap-3 pt-1">
         <DifficultyBadge communityDifficulty={exam.communityDifficulty} variant="card" />

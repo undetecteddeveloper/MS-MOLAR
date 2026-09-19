@@ -262,7 +262,8 @@ async function renderExamsRoute(searchParams: Record<string, string | undefined>
 // AC-003: "...DOM order is Cần luyện → Nổi nhất → Khám phá..."
 // AC-004: "...it carries its lucide icon..., an h2 title, a subtitle line, and —
 //   for Cần luyện and Nổi nhất — a right-aligned Xem tất cả link; the Khám phá
-//   shelf ends with the Xem toàn bộ kho đề tile instead."
+//   shelf ends with the Xem toàn bộ kho đề tile instead." [Engineer 2026-09-19:
+//   the Xem tất cả links were removed; only icon/h2/subtitle + the Khám phá tile remain.]
 // AC-007: "...none of them loses or resizes an element relative to today."
 // AC-008: "Given a request carrying any one of q, subject, grade, school, year,
 //   semester, sort, level, dir, page, when the page renders, then 0 shelf sections
