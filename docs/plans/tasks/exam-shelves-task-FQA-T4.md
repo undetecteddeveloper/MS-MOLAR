@@ -13,7 +13,7 @@ Metadata:
 Security review — confirm ADR-0021's Security Considerations are implemented: `exam_attempts` RLS unweakened (0 policy changes); RPC granted to `authenticated`+`service_role` only; `?from=` normalised before reaching SQL; window boundaries hour-snapped server-side.
 
 ## Target Files
-- [ ] None (verification-only task; no source files changed)
+- [x] None (verification-only task; no source files changed)
 
 ## Investigation Targets
 - `docs/adr/ADR-0021-cross-user-hot-aggregate-and-attempt-source.md` (§ Decision D1, D6; § Consequences; § Implementation Guidance)
@@ -24,16 +24,28 @@ Security review — confirm ADR-0021's Security Considerations are implemented: 
 - `SOURCE/features/exams/queries/hotCounts.ts` (P3-T1 — the single hour-snapped window computation)
 
 ## Investigation Notes
-_(Record here: a checklist confirmation for each of the 4 named security properties, with a pointer to the specific already-landed proof — P8-T1's probe, P8-T2's HS-a/HS-e, P8-T4's obligations (d)/(f) — that established it, rather than re-testing from scratch.)_
+
+security-reviewer sign-off: **approved_with_notes**, 0 required fixes. All 4 named properties confirmed, each cross-referenced against source and an already-landed live-dev proof:
+
+1. **`exam_hot_counts()` security definer, anon revoked, authenticated+service_role granted** — `schema.sql:2602-2642` (`security definer`, `revoke all ... from public, anon`, `grant execute ... to authenticated, service_role`); live-proven by P8-T1's verify-schema probes, P8-T2's HS-e, P8-T4's obligation (f).
+2. **Window boundaries hour-snapped server-side** — `schema.sql:2618-2624` (`date_trunc('hour', ...)` inside the SQL body; Node's `hotWindows()` in `hotCounts.ts:55-60` only subtracts days, never snaps); live-proven by P8-T4's obligation (d) (1s-before/1s-after the boundary).
+3. **0 RLS policy changes on `exam_attempts`** — `git diff 5267fd9^ HEAD -- SOURCE/supabase/schema.sql | grep -n "create policy\|alter policy\|drop policy"` returns 0 matches across the feature's whole diff; cross-referenced against P8-T2's HS-a positive control.
+4. **`?from=` normalised exactly once, server-side** — traced end to end: `[id]/page.tsx` reads raw `searchParams.from` untyped → `StartAttemptButton.tsx` passes it untouched as a bound server-action arg → `actions.ts`'s `startAttempt` calls `toAttemptSource(rawSource)` (`attemptSource.ts:25-28`, the sole normalisation point, whitelist of 4 literals, never throws) — no raw client string reaches `.insert()`. DB-layer second wall: the `exam_attempts_source_check` CHECK constraint, proven by P8-T2's HS-g (23514 on `source='hacked'`).
+
+Also independently checked beyond the task's named 4 properties: `/exams` absent from `PUBLIC_PATHS` (still auth-gated); F-001 home guard confirmed at `app/page.tsx`; all feature reads use the parameterized query builder/`.rpc()` (0 raw SQL concatenation); 0 hardcoded secrets/eval/`dangerouslySetInnerHTML` in the feature's changed files; Next.js pinned past CVE-2025-29927, and even under that CVE class the real authorization boundary is DB-layer RLS, not middleware.
+
+Two non-blocking notes recorded (no fix required):
+- **Hardening (medium confidence)**: `exam_hot_counts()` has no application-level rate limit on the read path (unlike write paths using `guard()`). Acceptable today (authenticated-only, aggregate-only, hour-snapped), but `guard()` could be applied as defense-in-depth later.
+- **Policy (documented trade-off, not a defect)**: ADR-0021 explicitly accepts the aggregate is not k-anonymous at low volumes, with a named revisit trigger ("if the shelf ever shows anything alongside the count") — a deliberate product decision, not a coding gap.
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
-- [ ] Read the ADR's Security Considerations and the backend DD's own § Security Considerations section in full
+- [x] Read the ADR's Security Considerations and the backend DD's own § Security Considerations section in full
 ### 2. Green Phase
-- [ ] For each of the 4 named properties, locate the specific already-landed proof (test case, grant, or code path) that establishes it
-- [ ] Confirm `schema.sql`'s feature diff contains 0 RLS policy statements (grep for `create policy`/`alter policy`/`drop policy` restricted to this feature's changed lines)
+- [x] For each of the 4 named properties, locate the specific already-landed proof (test case, grant, or code path) that establishes it
+- [x] Confirm `schema.sql`'s feature diff contains 0 RLS policy statements (grep for `create policy`/`alter policy`/`drop policy` restricted to this feature's changed lines)
 ### 3. Refactor Phase
-- [ ] N/A — this task changes no source files
+- [x] N/A — this task changes no source files
 
 ## Operation Verification Methods
 - **Verification method**: cross-reference review against already-landed proofs (P8-T1/T2/T4), plus a direct grep of `schema.sql`'s feature diff for policy statements.
@@ -56,9 +68,9 @@ _(Record here: a checklist confirmation for each of the 4 named security propert
   - **Residual**: this is a static/manual code review confirmation; the CHECK constraint (proven by P8-T2's HS-g) is the DB-layer last-line defense if this were ever bypassed.
 
 ## Completion Criteria
-- [ ] All 4 named security properties confirmed, each with a specific proof reference
-- [ ] `schema.sql`'s feature diff confirmed to contain 0 policy statements
-- [ ] Investigation Notes record the full checklist confirmation
+- [x] All 4 named security properties confirmed, each with a specific proof reference
+- [x] `schema.sql`'s feature diff confirmed to contain 0 policy statements
+- [x] Investigation Notes record the full checklist confirmation
 
 ## Notes
 - Impact scope: none — verification only.
