@@ -23,17 +23,39 @@ Run all 6 verify gates from `SOURCE/`, in order, real exit codes. Confirm the on
 - `docs/design/exam-shelves-backend-design.md` (Agreement Checklist — "0 new npm dependencies"); `docs/design/exam-shelves-frontend-design.md` (Agreement Checklist — "0 new dependencies (AC-045)")
 
 ## Investigation Notes
-_(Record here: the 6 gates' real exit codes; the exact `vitest run` failure count and case name, confirmed to match the Phase 0 baseline; the `package.json` diff output, confirmed empty; the exact import line for `Target`/`Flame`/`Compass` in `ExamShelf.tsx`.)_
+- **Work plan § The Six Verify Gates** (line 60-67): order confirmed — 1 `npx tsc --noEmit`, 2 `npx eslint --max-warnings 0`, 3 `npx vitest run`, 4 `npm run build`, 5 `npm run test:fixture`, 6 `npm run test:localdb`, all run from inside `SOURCE/`. Line 69 caveat (gate 6 needs dev DB fingerprint) is moot here — Phase 0 completed long ago (commit history starts well before this task).
+- **Work plan § Known baseline** (line 71): documented Phase 0 baseline for `SOURCE/lib/security/rateLimit.test.ts` — exactly 1 failing case, name `"keeps ONE account's whole daily Gemini budget under the project quota"`, assertion `33 <= 20` (`worstCasePerUser <= SUPPLIER_DAILY_QUOTA`). This is the authoritative baseline record (no separate P0 task file baseline snapshot exists beyond this line); confirmed unrelated to exam-shelves and untouched by any of the 31 phase tasks + FQA-T1.
+- **Branch base check**: `git merge-base main HEAD` = `f65b252e87aed8edc2d166ea52536f8e05cefbb5`, identical to `git log main -1` HEAD — `main` is a direct ancestor of this branch, so `git diff main -- SOURCE/package.json` is the correct, complete diff (no equivalent-base substitution needed).
+
+### 6 Verify Gates — real exit codes (run from `SOURCE/`, in order, 2026-09-19)
+| Gate | Command | Exit code | Result detail |
+|---|---|---|---|
+| 1 | `npx tsc --noEmit` | 0 | clean |
+| 2 | `npx eslint --max-warnings 0` | 0 | clean |
+| 3 | `npx vitest run` | 1 | `Test Files 1 failed \| 158 passed \| 1 skipped (160)`; `Tests 1 failed \| 2207 passed \| 10 skipped (2218)`. Sole failure: `lib/security/rateLimit.test.ts > guard > keeps ONE account's whole daily Gemini budget under the project quota` — `AssertionError: expected 33 to be less than or equal to 20` at `lib/security/rateLimit.test.ts:261:30`. Matches the documented Phase 0 baseline exactly (same file, same case name, same assertion values) — not a regression. |
+| 4 | `npm run build` | 0 | `next build` — "Compiled successfully in 12.8s", TypeScript pass, production build succeeded |
+| 5 | `npm run test:fixture` | 0 | `Test Files 2 passed (2)`, `Tests 10 passed (10)` |
+| 6 | `npm run test:localdb` | 0 | `Test Files 4 passed (4)`, `Tests 25 passed (25)` |
+
+Gates 1/2/4/5/6 exit 0. Gate 3 exits 1 for the pre-existing, documented baseline case only — failure count is exactly 1 (unchanged from Phase 0 baseline), same file, same assertion. No new regressions found across any of the 6 gates.
+
+Additional QA mechanism (listed in this task's own Quality Assurance Mechanisms section, run for completeness): `npm run check:bundle` → exit 0 — "✅ Server-secret bundle check PASS — 8 bí mật server-only không xuống client."
+
+### AC-045 — dependency diff + icon import check
+- `git diff main -- SOURCE/package.json` → empty output, exit code 0. 0 added/removed/changed `dependencies` and `devDependencies` — byte-identical to the branch base.
+- `git diff main --stat -- SOURCE/package-lock.json` → also empty (reinforces 0 new dependencies transitively).
+- `SOURCE/features/exams/components/ExamShelf.tsx:2` — `import { Compass, Flame, Target, type LucideIcon } from "lucide-react";` — all 3 new shelf icons (`Target`, `Flame`, `Compass`) imported from `lucide-react` in a single import statement. Used at lines 48, 56, 64 (per-shelf `icon` config) and 192 (`<Compass>` element in an empty-state).
+- Repo-wide grep for other icon package imports (`react-icons`, `@heroicons`, `@radix-ui/react-icons`, `@tabler/icons`, `phosphor-react`) inside `SOURCE/` → 0 matches. No second icon package introduced anywhere.
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
-- [ ] Re-confirm the Phase 0 baseline recorded for `rateLimit.test.ts` (1 failing case, `33 <= 20`)
+- [x] Re-confirm the Phase 0 baseline recorded for `rateLimit.test.ts` (1 failing case, `33 <= 20`)
 ### 2. Green Phase
-- [ ] Run all 6 gates in order from `SOURCE/`, recording each real exit code
-- [ ] Run `git diff main -- SOURCE/package.json` and confirm 0 added dependencies
-- [ ] Grep `ExamShelf.tsx` for its icon imports and confirm all 3 come from `lucide-react`
+- [x] Run all 6 gates in order from `SOURCE/`, recording each real exit code
+- [x] Run `git diff main -- SOURCE/package.json` and confirm 0 added dependencies
+- [x] Grep `ExamShelf.tsx` for its icon imports and confirm all 3 come from `lucide-react`
 ### 3. Refactor Phase
-- [ ] N/A — this task changes no source files
+- [x] N/A — this task changes no source files
 
 ## Quality Assurance Mechanisms
 - `npx tsc --noEmit`, `npx eslint --max-warnings 0`, `npx vitest run`, `npm run build`, `npm run test:fixture`, `npm run test:localdb` — the 6 gates themselves, run here for their final real-exit-code confirmation
@@ -54,11 +76,11 @@ _(Record here: the 6 gates' real exit codes; the exact `vitest run` failure coun
   - **Residual**: none.
 
 ## Completion Criteria
-- [ ] All 6 gates run with real exit codes recorded
-- [ ] Gate 3's failure count confirmed exactly 1, matching the Phase 0 baseline case
-- [ ] `package.json` diff confirmed empty (0 new dependencies)
-- [ ] All 3 shelf icons confirmed imported from `lucide-react`
-- [ ] Every Proof Obligation's claim confirmed
+- [x] All 6 gates run with real exit codes recorded
+- [x] Gate 3's failure count confirmed exactly 1, matching the Phase 0 baseline case
+- [x] `package.json` diff confirmed empty (0 new dependencies)
+- [x] All 3 shelf icons confirmed imported from `lucide-react`
+- [x] Every Proof Obligation's claim confirmed
 
 ## Notes
 - Impact scope: none — verification only.
