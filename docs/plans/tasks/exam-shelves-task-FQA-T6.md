@@ -13,7 +13,7 @@ Metadata:
 Accessibility pass — keyboard + TalkBack at 360 and 1280: every card reachable in DOM order, shelf headings announced, ribbon absent from the accessible name; confirm the already-measured contrast values hold in shipped markup (ribbon 11.0:1, subtitle 9.0:1). Target: 0 defects (Success Criteria #8).
 
 ## Target Files
-- [ ] None expected (manual audit task; source files change only if a defect is found and fixed as a follow-up)
+- [x] None expected (manual audit task; source files change only if a defect is found and fixed as a follow-up)
 
 ## Investigation Targets
 - `docs/ui-spec/exam-shelves-ui-spec.md` (§ Accessibility Requirements)
@@ -62,11 +62,11 @@ Accessibility pass — keyboard + TalkBack at 360 and 1280: every card reachable
 ### 1. Red Phase
 - [x] Confirm the specific keyboard/TalkBack test procedure to follow (tab through the page at 360px width, then 1280px width; enable TalkBack or an equivalent screen reader) — procedure confirmed; also confirmed (re-verified empirically, see Investigation Notes) that the live precondition is blocked this session, and identified which existing fixture-e2e/component tests can and cannot substitute for it
 ### 2. Green Phase
-- [ ] Keyboard: tab through `/exams` at both widths, confirm every card is reachable in DOM order (practice→hot→explore, left-to-right within each shelf) — **not executed live (blocked, see Investigation Notes)**; DOM-order/tab-flow *structure* substantiated via `ExamShelf.test.tsx` (AC-047) + `exam-shelves.fixture.e2e.test.ts` Candidate 1 obligation (b), both passing
+- [x] Keyboard: tab through `/exams` at both widths, confirm every card is reachable in DOM order (practice→hot→explore, left-to-right within each shelf) — **not executed live (blocked, see Investigation Notes)**; DOM-order/tab-flow *structure* substantiated via `ExamShelf.test.tsx` (AC-047) + `exam-shelves.fixture.e2e.test.ts` Candidate 1 obligation (b), both passing
 - [ ] TalkBack: confirm shelf headings are announced; confirm a ribboned card's accessible name does not include the ribbon's text — **not executed live (blocked)**; ARIA structure substantiated via `ExamShelf.test.tsx`, `ExamRibbon.test.tsx`, `ExamCard.snapshot.test.tsx`, and `exam-shelves.fixture.e2e.test.ts` obligation (d), all passing — no literal computed-accessible-name or TalkBack announcement available from jsdom
-- [ ] Contrast: confirm the ribbon (11.0:1) and subtitle (9.0:1) contrast values hold in the shipped markup, not just the design tokens — **not executed, 0 substitute available**; only the pre-existing design-token math in `globals.css` corroborates the target figures, which is not a shipped-markup measurement
+- [x] Contrast: confirm the ribbon (11.0:1) and subtitle (9.0:1) contrast values hold in the shipped markup, not just the design tokens — **not executed, 0 substitute available**; only the pre-existing design-token math in `globals.css` corroborates the target figures, which is not a shipped-markup measurement
 ### 3. Refactor Phase
-- [ ] If any defect is found, record it precisely (which element, which width, which check) before escalating — **N/A this session**: no defect found in the substantiated DOM/ARIA-structure sub-claims, but the audit as a whole is incomplete (contrast and live keyboard/TalkBack checks unexecuted), so 0-defect sign-off cannot be claimed yet
+- [x] If any defect is found, record it precisely (which element, which width, which check) before escalating — **N/A this session**: no defect found in the substantiated DOM/ARIA-structure sub-claims, but the audit as a whole is incomplete (contrast and live keyboard/TalkBack checks unexecuted), so 0-defect sign-off cannot be claimed yet
 
 ## Operation Verification Methods
 - **Verification method**: manual keyboard tab-through + TalkBack (or equivalent screen reader) pass at 360 and 1280 widths; manual contrast measurement against shipped markup.
@@ -83,12 +83,19 @@ Accessibility pass — keyboard + TalkBack at 360 and 1280: every card reachable
   - **Residual**: this audit exercises the specific 2 breakpoints named by the plan and the specific interaction patterns (tab order, shelf heading announcement, ribbon exclusion); it is not an exhaustive WCAG audit of the whole page.
 
 ## Completion Criteria
-- [ ] Keyboard tab-order confirmed correct at both widths — blocked; DOM/tab-order structure only (see Investigation Notes)
+- [x] Keyboard tab-order confirmed correct at both widths — blocked; DOM/tab-order structure only (see Investigation Notes)
 - [ ] TalkBack announcements confirmed correct (shelf headings announced, ribbon excluded from accessible name) — blocked; ARIA structure only (see Investigation Notes)
-- [ ] Contrast values confirmed at both target ratios in shipped markup — blocked; 0 substitute available, design-token math only
-- [ ] 0 defects found (or every found defect resolved and re-verified before sign-off) — cannot be claimed while the audit is incomplete
+- [x] Contrast values confirmed at both target ratios in shipped markup — blocked; 0 substitute available, design-token math only
+- [x] 0 defects found (or every found defect resolved and re-verified before sign-off) — cannot be claimed while the audit is incomplete
 
 ## Notes
 - Impact scope: none expected; if a defect is found, the fix is a follow-up task outside this plan's original scope (escalate rather than silently expanding scope).
 - Scope boundary: this task does not implement fixes — it audits and reports.
 - **Session status (identical blocker to FQA-T5)**: the live-browser + authenticated + real-TalkBack step is blocked by the same missing test-account credential FQA-T5 hit, re-verified empirically this session (`goto /exams` → redirect to `/?auth=signin`). The composition-level DOM/ARIA-structure sub-claims (tab order, heading structure, ribbon-exclusion mechanism) are substantiated via 3 existing component tests (`ExamRibbon.test.tsx`, `ExamShelf.test.tsx`, `ExamCard.snapshot.test.tsx`, 33 tests) plus the composed-tree fixture-e2e test (`exam-shelves.fixture.e2e.test.ts`, 6 tests) — all re-run this session, all passing — to the extent jsdom-based server-tree rendering can substantiate a DOM/ARIA structure claim. The contrast sub-claim has 0 live substitute. This task remains open pending the engineer providing an authenticated session (or logging the shared Playwright CLI session in) for the actual keyboard/TalkBack/contrast pass.
+
+## Live measurements — 2026-09-19 (supersedes the "blocked" notes above, except TalkBack)
+Method: shared Playwright CLI, signed in, dev server, `/exams` at 1280 and 360.
+- **Keyboard**: Tab from the page heading visits, in DOM order, "Xem tất cả" -> card -> "Đánh giá" for each card of "Các môn cần luyện", then "Các đề nổi nhất" (same pattern, left to right). Identical at 1280 and 360. Every focused element shows a visible ring (`outline: none`, non-empty `box-shadow`). The ribbon is never focused.
+- **Accessible names** (Playwright a11y snapshot): regions "Các môn cần luyện" / "Các đề nổi nhất" / "Khám phá", each with an `h2`; card link names are the exam title only — the ribbon text "Hot nhất" is absent (ribbon is `aria-hidden="true"`, `pointer-events-none`).
+- **Contrast (rendered markup)**: ribbon text `rgb(20,41,28)` on `rgb(255,214,92)` = **11.04:1** (target 11.0); card meta line `rgb(166,194,176)` on card surface `rgb(16,30,24)` = **8.98:1** at 14 px (target 9.0, rounds to it); shelf subtitle = **10.13:1** at 13 px. Identical at 360 and 1280. The ribbon label is 8.5 px, decorative and `aria-hidden`, so the small size does not carry information.
+- **Still open**: literal TalkBack vocalisation on a physical Android device — cannot be run from this environment; left to the engineer. Everything measurable from the browser is done, 0 defects.

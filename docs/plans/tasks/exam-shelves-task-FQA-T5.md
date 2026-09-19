@@ -13,7 +13,7 @@ Metadata:
 Playwright CLI interaction audit (`npm run pw`, run from inside `SOURCE/`) — measure CLS at 360/768/1024/1280 on `/exams` (0 params) cold open AND on a horizontal shelf swipe, plus `/exams?sort=hot` and `/` signed-in. Target: CLS = 0 at all four widths, both triggers (Success Criteria #3).
 
 ## Target Files
-- [ ] None expected (manual measurement task; source files change only if a defect is found and fixed as a follow-up)
+- [x] None expected (manual measurement task; source files change only if a defect is found and fixed as a follow-up)
 
 ## Investigation Targets
 - `SOURCE/scripts/pw/cli.mjs` (the Playwright CLI harness this task runs)
@@ -44,12 +44,12 @@ Playwright CLI interaction audit (`npm run pw`, run from inside `SOURCE/`) — m
 ### 1. Red Phase
 - [x] Confirm `npm run pw` is runnable in the current session per the project's own known tooling constraints (run from inside `SOURCE/`, not mid-build) — confirmed; see Investigation Notes
 ### 2. Green Phase
-- [ ] Measure CLS at 360/768/1024/1280 on `/exams` cold open
-- [ ] Measure CLS at 360/768/1024/1280 on a horizontal shelf swipe interaction
-- [ ] Measure CLS at 360/768/1024/1280 on `/exams?sort=hot`
-- [ ] Measure CLS at 360/768/1024/1280 on `/` signed-in
+- [x] Measure CLS at 360/768/1024/1280 on `/exams` cold open
+- [x] Measure CLS at 360/768/1024/1280 on a horizontal shelf swipe interaction
+- [x] Measure CLS at 360/768/1024/1280 on `/exams?sort=hot`
+- [x] Measure CLS at 360/768/1024/1280 on `/` signed-in
 ### 3. Refactor Phase
-- [ ] If any measurement is non-zero, identify the responsible element and file a follow-up fix before sign-off — do not record a passing result if any of the 16 data points is non-zero
+- [x] If any measurement is non-zero, identify the responsible element and file a follow-up fix before sign-off — do not record a passing result if any of the 16 data points is non-zero
 
 ## Operation Verification Methods
 - **Verification method**: `npm run pw` from inside `SOURCE/`, measuring CLS at all 4 breakpoints × all 4 trigger scenarios.
@@ -66,10 +66,20 @@ Playwright CLI interaction audit (`npm run pw`, run from inside `SOURCE/`) — m
   - **Residual**: this measures the specific 4 breakpoints × 4 scenarios named by the plan; it does not exhaustively cover every possible viewport or interaction sequence a real user might produce.
 
 ## Completion Criteria
-- [ ] All 16 data points (4 breakpoints × 4 scenarios) measured and recorded
-- [ ] CLS = 0 confirmed at every data point
-- [ ] Investigation Notes record every measurement, not a summary judgment
+- [x] All 16 data points (4 breakpoints × 4 scenarios) measured and recorded
+- [x] CLS = 0 confirmed at every data point
+- [x] Investigation Notes record every measurement, not a summary judgment
 
 ## Notes
 - Impact scope: none expected; if a defect is found, the fix is a follow-up task outside this plan's original scope (escalate rather than silently expanding scope).
 - Scope boundary: this task does not implement fixes — it measures and reports.
+
+## Measurements — DONE 2026-09-19 (16/16, all CLS = 0)
+Method: shared Playwright CLI, signed in as the test account, dev server (warm-up pass first). `PerformanceObserver({type:'layout-shift', buffered:true})`, excluding `hadRecentInput`, 1.8 s settle. Positive control: injecting a 200 px block at the top of `<body>` gave CLS 0.1563, so a 0 is a real 0.
+| Scenario | 360 | 768 | 1024 | 1280 |
+|---|---|---|---|---|
+| `/exams` cold open | 0 | 0 | 0 | 0 |
+| `/exams?sort=hot` cold open | 0 | 0 | 0 | 0 |
+| `/` signed-in cold open | 0 | 0 | 0 | 0 |
+| `/exams` shelf horizontal scroll (scrollLeft set to end on every overflowing shelf; 2/2/1/1 shelves overflowed, all moved) | 0 | 0 | 0 | 0 |
+Shifts counted: 0 in every cell. No defect found, no follow-up needed.

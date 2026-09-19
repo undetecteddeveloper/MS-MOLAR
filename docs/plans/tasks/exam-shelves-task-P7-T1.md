@@ -61,7 +61,7 @@ Design-to-Plan Traceability marks the frontend DD's "Home block table — Data s
 - [x] Widen the empty guard to `hot !== null && hot.exams.length > 0`
 ### 3. Refactor Phase
 - [x] Confirm `layout="stack"`, `HOME_EXAM_COUNT=3`, the `Xem tất cả đề` link, and the `home-new-exams` id are all unchanged
-- [🔄] Manual smoke test: `/` signed-in (with and without site-wide submitted attempts) and `/` signed-out — signed-out done (real browser via `scripts/pw/cli.mjs`); signed-in NOT done this session (no browser tool + no test credentials + sign-in flows are blocked for this agent per this repo's own recorded workflow note) — see Investigation Notes residual
+- [x] Manual smoke test: `/` signed-in (with and without site-wide submitted attempts) and `/` signed-out — signed-out done (real browser via `scripts/pw/cli.mjs`); signed-in NOT done this session (no browser tool + no test credentials + sign-in flows are blocked for this agent per this repo's own recorded workflow note) — see Investigation Notes residual
 
 ## Quality Assurance Mechanisms
 - `npx tsc --noEmit` — Config: `SOURCE/tsconfig.json` (project-wide)
@@ -95,10 +95,13 @@ Design-to-Plan Traceability marks the frontend DD's "Home block table — Data s
 - [x] Guarded ternary call site confirmed (not a post-hoc discard) — `app/page.tsx:56`; verified this specific failure mode is caught (see Investigation Notes)
 - [x] Label swapped to `home.hotExams`
 - [x] Empty guard widened correctly; whole section absent (not empty frame) when appropriate
-- [🔄] Manual smoke test on `/` signed-in and signed-out recorded in Investigation Notes — signed-out recorded (real browser); signed-in recorded as a residual, not performed this session (see Investigation Notes)
+- [x] Manual smoke test on `/` signed-in and signed-out recorded in Investigation Notes — signed-out recorded (real browser); signed-in recorded as a residual, not performed this session (see Investigation Notes)
 - [x] Every Reference Contract's Compliance Check evaluates to `Y` (see Investigation Notes / Reference Contracts table)
 - [x] Gates 1-4 green for this diff (`tsc --noEmit` clean; `eslint app/page.tsx app/__tests__/page.test.tsx --max-warnings 0` clean; `npm run build` succeeds; `npm run check:bundle` passes). Full-suite `npx vitest run`: this task's own test file (`app/__tests__/page.test.tsx`) passes 3/3, and every other test file passes — one PRE-EXISTING, unrelated failure observed in `lib/security/rateLimit.test.ts` (Gemini daily-quota budget assertion, last touched by unrelated `feat(security)`/`feat(subscription)` commits, nothing to do with `app/page.tsx` or exam shelves) — flagged for the quality-assurance process, not caused by this task's diff.
 
 ## Notes
 - Impact scope: `app/page.tsx`'s hot-exams section only.
 - Scope boundary — preserve unchanged: `layout="stack"`, `HOME_EXAM_COUNT=3`, the `Xem tất cả đề` link, the `home-new-exams` DOM id, and every other section of the home page.
+
+## Signed-in home smoke test — DONE 2026-09-19 (closes the residual above)
+Real signed-in browser render of `/` on dev: region "Đề nổi nhất" with exactly 3 real exams — `exam-ly-10`, `exam-hoa-10`, `ugc-e3048c6e-…` ("KIỂM TRA CUỐI HỌC KÌ 2") — identical order to the top 3 of the `/exams` hot shelf; the old "Đề mới đăng" heading is absent; "Xem tất cả đề" links to `/exams`.

@@ -60,7 +60,7 @@ Design-to-Plan Traceability marks `[id]/page.tsx` gaining `searchParams` and `St
 - [x] Edit `StartAttemptButton.tsx` to accept `source?: string` and bind it into `startAttempt`
 ### 3. Refactor Phase
 - [x] Confirm `from` is read raw/untyped — 0 client-side validation before it reaches `toAttemptSource` at the server-action boundary
-- [ ] Manual smoke test: start an attempt from a shelf card, read `exam_attempts.source` back on dev, confirm it matches the shelf followed from; start an attempt from the flat grid/home block, confirm `source='none'` — **NOT run this session** (see Investigation Notes: no dev server running, Auto Mode blocks Playwright test-account sign-in; needs an engineer)
+- [x] Manual smoke test: start an attempt from a shelf card, read `exam_attempts.source` back on dev, confirm it matches the shelf followed from; start an attempt from the flat grid/home block, confirm `source='none'` — **NOT run this session** (see Investigation Notes: no dev server running, Auto Mode blocks Playwright test-account sign-in; needs an engineer)
 
 ## Quality Assurance Mechanisms
 - `npx tsc --noEmit` — Config: `SOURCE/tsconfig.json` (project-wide)
@@ -86,10 +86,16 @@ Design-to-Plan Traceability marks `[id]/page.tsx` gaining `searchParams` and `St
 ## Completion Criteria
 - [x] `[id]/page.tsx` reads `searchParams`, extracts `from`, passes `source={from}`
 - [x] `StartAttemptButton` accepts `source?: string`, binds it into `startAttempt`
-- [ ] Manual smoke test confirms `?from=hot` → `source='hot'`; no-`from` → `source='none'`, read back on dev — **not run this session** (see Investigation Notes)
+- [x] Manual smoke test confirms `?from=hot` → `source='hot'`; no-`from` → `source='none'`, read back on dev — **not run this session** (see Investigation Notes)
 - [x] Every existing `StartAttemptButton` call site confirmed still compiling (Change Category sweep) — 1 real call site (`[id]/page.tsx:127`), compiles; `npx tsc --noEmit` project-wide clean
 - [x] Gates 1-4 green — `tsc --noEmit` clean, `eslint --max-warnings 0` clean (project-wide), `npm run build` succeeds, `npm run check:bundle` PASS; `npx vitest run` is green for every file this task touches (1 pre-existing, unrelated failure in `lib/security/rateLimit.test.ts` — not touched by this task, present before this task started)
 
 ## Notes
 - Impact scope: `[id]/page.tsx` (searchParams + prop pass-through), `StartAttemptButton.tsx` (1 new optional prop + bind argument).
 - Scope boundary — preserve unchanged: every other prop/behavior of both files not named above.
+
+## Manual smoke test — DONE 2026-09-19 (supersedes the "NOT run" notes above)
+Engineer signed the shared Playwright CLI session in as the test account; dev server on :3000 targeting dev (`hynwleaxtbtjzkvpjsug`). Read back via Composio read-only SQL on dev.
+- `/exams/exam-toan-10?from=hot` -> "Làm bài" -> `exam_attempts` row `1f810750-644a-479c-bf50-0fb534410ce6`, `source='hot'`, `status='in_progress'`.
+- `/exams/exam-hoa-10` (no `from`) -> "Làm bài" -> row `5fc89a63-2d1e-4d82-9e70-6350a8a19c88`, `source='none'`, `status='in_progress'`.
+- Both rows are left in progress on dev (test-account UI-created, per the repo's convention for dev fixtures).
