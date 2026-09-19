@@ -13,7 +13,7 @@ Metadata:
 Create `SOURCE/tests/e2e/service/examHotCountsFixtures.ts` (companion fixtures module — does not exist yet), following the exact shape of `examSearchFixtures.ts`: re-export `HAS_LIVE_DB`/`adminClient`/`anonClient` from `essayGradeWriteFixtures.ts`; a `SLOT` prefix convention; `setUp(admin, slot)` seeding 2 real users (A, B) plus published/unpublished/banned-author exam rows and `exam_attempts` rows straddling the hour-snapped window boundary; `tearDown(admin, fixture, slot)` idempotent and prefix-scoped; `serviceClient()`/`anonClient()` for grant-boundary probes.
 
 ## Target Files
-- [ ] `SOURCE/tests/e2e/service/examHotCountsFixtures.ts` (new)
+- [x] `SOURCE/tests/e2e/service/examHotCountsFixtures.ts` (new)
 
 ## Investigation Targets
 - `docs/design/exam-shelves-backend-design.md` (§ Test Boundaries and Placement — this file's own row, and the skeleton's own "FIXTURES MODULE" comment inside `exam-hot-counts.service.e2e.test.ts`)
@@ -23,18 +23,25 @@ Create `SOURCE/tests/e2e/service/examHotCountsFixtures.ts` (companion fixtures m
 - `docs/adr/ADR-0021-cross-user-hot-aggregate-and-attempt-source.md` (§ Decision D5, D6 — the exact schema shape the seeded rows must match: `source` CHECK values, `status`/`submitted_at` for the hour-snapped window)
 
 ## Investigation Notes
-_(Record here: confirmation `HAS_LIVE_DB`/`adminClient`/`anonClient` are re-exported, not reimplemented; the exact seeded row shapes for published/unpublished/banned-author exams and the hour-boundary-straddling attempts.)_
+- `examSearchFixtures.ts` structural shape confirmed: re-exports `adminClient`/`anonClient`/`HAS_LIVE_DB` from `essayGradeWriteFixtures.ts` (does not reimplement them), owns a `SLOT`-prefixed constant (`ES_PREFIX`), `setUp` calls `tearDownBySlot` first for idempotency, `tearDown` signs out the fixture's student client(s) then delegates to `tearDownBySlot`, and defines its own `serviceClient()` separate from `adminClient()` "so this test file doesn't depend on the neighbour fixture's export details." `examHotCountsFixtures.ts` follows this exact shape.
+- `essayGradeWriteFixtures.ts` confirmed as the actual owner of `HAS_LIVE_DB`/`adminClient`/`anonClient` (computed boolean from 3 env vars loaded by hand via `loadEnvLocal()`, since vitest does not load `.env.local`) — re-exported, not reimplemented, in the new module.
+- `exam-hot-counts.service.e2e.test.ts` skeleton's "FIXTURES MODULE" comment (lines 53-74) is the authoritative shape contract: `HAS_LIVE_DB` re-exported; a `SLOT` prefix; `setUp(admin, slot)` seeding TWO real users (A, B) plus published/unpublished/banned-author exam rows and `exam_attempts` rows straddling the hour-snapped window boundary, returning both users' authenticated clients; `tearDown(admin, fixture, slot)` idempotent/prefix-scoped; `serviceClient()`/`anonClient()` for grant probes.
+- `schema.sql` confirmed: `exams.status` CHECK allows `('processing','review','draft','published','failed')`; `exams.author_id` is nullable (`on delete set null`) — `is_author_banned(null)` is `false` by construction, so exams left with no `author_id` never trigger the ban predicate. `exam_attempts.status` is `'in_progress'|'submitted'` (no CHECK, per ADR-0021 D6). `exam_hot_counts()` (§20c) predicates: `a.status='submitted'`, `e.status='published'`, `not is_author_banned(e.author_id)`; both window boundaries are `date_trunc('hour', …)`-snapped server-side.
+- `test-rls.ts` Phần 10 (already-committed P8-T2) precedent read for the banned-author scenario shape (`setupHotCountsFixtures`/`cleanupHotCountsFixtures`, HS-f). It uses a THIRD user C, isolated from A/B, specifically so a ban command never touches A/B's sessions used elsewhere in that same manual run. This new module deliberately uses only the TWO users the skeleton's own comment specifies (not test-rls.ts's 3-user shape): user A is the constant RPC *caller* in every obligation (a)-(f) and is never banned; user B is both submitter (on `published`/`unpublished`) and the *author* of `bannedAuthor` — banning B never disrupts A's own session, so this stays safe with 2 users. Verified functionally (see below) that toggling B's ban state does not disturb A's subsequent RPC calls.
+- Seeded row shapes implemented in `setUp`: 4 exams (`published`, `unpublished` [`status:'draft'`], `bannedAuthor` [`author_id: userB.id`], `hourBoundary`) and 6 `exam_attempts` rows: B submitted on `published` (HS-b/HS-c) + A `in_progress` on the same exam (obligation c vế 1, proves in-progress doesn't inflate the count); B submitted on `unpublished` (obligation c vế 2); A submitted on `bannedAuthor` (obligation c vế 3, ban/unban toggled by the test itself via `admin.auth.admin.updateUserById`, not by this fixture's `setUp`); B submitted 1s before and A submitted 1s after a fixed UTC hour boundary on the dedicated `hourBoundary` exam (obligation d) — kept on its own exam so it is not contaminated by the "now"-timestamped attempt on `published`. `hourBoundaryArgs.sinceRecent` is deliberately NOT hour-aligned (37 minutes past the anchor hour) so the test proves the server truncates, not that the client already sent a truncated value; `hourBoundaryArgs.sinceWide` is the epoch floor so `wide_count` always includes both straddling attempts.
+- **Idempotency proof (Proof Obligation)**: ran a one-off script against live dev Postgres (ref `hynwleaxtbtjzkvpjsug`) calling this module's `setUp`/`tearDown` directly: clean baseline (0/0/0) -> `setUp` #1 seeds exactly 4 exams/6 attempts/2 users -> `tearDown` #1 returns to 0/0/0 -> a SECOND `tearDown` call with no `setUp` in between (idempotency case) is a no-op, no error, still 0/0/0 -> `setUp`/`tearDown` cycle #2 seeds the same counts and returns to 0/0/0 again (no accumulation across cycles). All assertions passed.
+- **Functional sanity check** (beyond this task's L3 scope, run only to de-risk P8-T4): exercised the real `exam_hot_counts()` RPC against the seeded fixture with real JWTs — cross-user count (A sees B's exam, `total_count===1`, in-progress attempt does not inflate it), key set exactly `{exam_id, recent_count, wide_count, total_count}`, unpublished exam absent, banned-author exam absent during ban / present before and after, hour boundary `recent_count===1` vs `wide_count===2`, `p_max_rows` lower-clamp, `anon` 42501, `service_role` array — all passed against live dev Postgres. Dev DB confirmed clean of all residual fixture rows afterward.
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
-- [ ] Read all Investigation Targets and record key observations, including `examSearchFixtures.ts`'s exact structure
-- [ ] Confirm the module does not yet exist
+- [x] Read all Investigation Targets and record key observations, including `examSearchFixtures.ts`'s exact structure
+- [x] Confirm the module does not yet exist
 ### 2. Green Phase
-- [ ] Implement the module: re-exports, `SLOT` convention, `setUp`, `tearDown`, `serviceClient()`, `anonClient()`
-- [ ] Seed 2 real users (A, B), published/unpublished/banned-author exams, and attempts straddling the hour-snapped window boundary
+- [x] Implement the module: re-exports, `SLOT` convention, `setUp`, `tearDown`, `serviceClient()`, `anonClient()`
+- [x] Seed 2 real users (A, B), published/unpublished/banned-author exams, and attempts straddling the hour-snapped window boundary
 ### 3. Refactor Phase
-- [ ] Run `tearDown` twice in sequence (idempotency check) and confirm no error and no duplicate rows
-- [ ] Confirm the module compiles (`tsc`) and is importable by P8-T4
+- [x] Run `tearDown` twice in sequence (idempotency check) and confirm no error and no duplicate rows
+- [x] Confirm the module compiles (`tsc`) and is importable by P8-T4
 
 ## Quality Assurance Mechanisms
 - `npx tsc --noEmit` — Config: `SOURCE/tsconfig.json` (project-wide)
@@ -57,10 +64,10 @@ _(Record here: confirmation `HAS_LIVE_DB`/`adminClient`/`anonClient` are re-expo
   - **Residual**: the actual test assertions this fixture data supports (HS-b, HS-c, exclusions, hour-snap boundary, row-ceiling clamp, anon/service_role) are P8-T4's proof obligations, not this module's — this task only proves the fixture *data* is correctly shaped and safely reusable.
 
 ## Completion Criteria
-- [ ] Module created with the full structural shape of `examSearchFixtures.ts`
-- [ ] `setUp`/`tearDown` confirmed idempotent (2-cycle test)
-- [ ] `tsc --noEmit` passes
-- [ ] Gates 1-2, 4 green
+- [x] Module created with the full structural shape of `examSearchFixtures.ts`
+- [x] `setUp`/`tearDown` confirmed idempotent (2-cycle test)
+- [x] `tsc --noEmit` passes
+- [x] Gates 1-2, 4 green
 
 ## Notes
 - Impact scope: this new fixtures module only.
