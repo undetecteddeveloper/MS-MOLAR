@@ -22,11 +22,27 @@ Playwright CLI interaction audit (`npm run pw`, run from inside `SOURCE/`) — m
 - `C:\Users\ASUS\.claude\projects\...\windows-bash-tooling-quirks.md`-equivalent project context: Playwright CLI dies during build; run from inside SOURCE; scope selectors to `main`
 
 ## Investigation Notes
-_(Record here: the measured CLS value at each of the 4 breakpoints, for each of the 4 trigger scenarios (cold open ×2 pages + swipe ×1 + home ×1) — 16 data points total; any non-zero CLS found, with the specific element responsible.)_
+
+**Tooling confirmed runnable** — `npm run pw` (`SOURCE/scripts/pw/cli.mjs`) executed successfully from inside `SOURCE/` in this session: `status`, `goto`, `text`, `snapshot`, `click`, `fill`, `eval` all round-tripped against the shared detached server (`%TEMP%\ms-molar-pw-cli\port`). No `eval`-command has a CLS helper built in — `SOURCE/scripts/pw/server.mjs`'s `eval` handler is a raw `page.evaluate(src => eval(src))`; a working one-liner was validated and ready to use: `performance.getEntriesByType('layout-shift').reduce((s,e)=>s+(e.hadRecentInput?0:e.value),0)` (Chromium-only Layout Instability API, matches how `.claude/skills/ui-audit/scripts/audit.mjs` computes `cls_score` elsewhere in this repo — buffered PerformanceObserver / `getEntriesByType`, sum of non-recent-input `value`s). For the swipe scenario the plan was: snapshot `performance.getEntriesByType('layout-shift').length` before the swipe, perform the drag, then sum only entries past that index — isolating swipe-caused shift from cold-open shift.
+
+**Blocked at the auth precondition — 0/16 data points measured.** All four scenarios (`/exams` cold open, shelf swipe, `/exams?sort=hot`, `/` signed-in) require an authenticated session:
+- `SOURCE/lib/supabase/middleware.ts:44-87` (`PUBLIC_PATHS`) does not list `/exams` — confirmed empirically in this session: `node scripts/pw/cli.mjs goto http://localhost:3000/exams` redirected to `http://localhost:3000/?auth=signin`.
+- `docs/design/exam-shelves-frontend-design.md:43` states outright: "logged-out visitors never reach shelf markup" — `/exams` absent from `PUBLIC_PATHS` is cited as AC-014.
+- `/` signed-in is explicitly the authenticated variant of the home page per the task description; the guest `/` shows the marketing/login view only (confirmed via `text main` — guest copy + `Đăng nhập`/`Đăng ký` panel, no shelf).
+
+**Checked for an existing authenticated session/storageState before assuming blocked (per task instruction):**
+- No `storageState*.json` file exists anywhere in this worktree (`find` across the repo, excluding `node_modules`, returned nothing).
+- The shared CLI server process was already running (`%TEMP%\ms-molar-pw-cli\port`, alive since this session's start) — checked its current page directly rather than starting a fresh one. It was **not** authenticated: `text main` on `/` showed the guest login panel, and `goto /exams` redirected to `/?auth=signin` as above.
+- `.claude/skills/ui-audit/scripts/audit.mjs` accepts a `--storage-state=` path for exactly this purpose, but no such file exists to pass it.
+
+**Attempted the sign-in path once, per instruction not to silently skip it:** clicked the page's `Đăng nhập` control and inspected the form (`snapshot main` — email/password/submit all present, no credential typed). At that point the task hit a harder blocker than the previously-recorded auto-mode denial: **no test-account password is available to this session at all.** Project memory (`auto-mode-blocks-test-signin.md`, 2026-09-10) records the test account as `smithnguyen247+rlstesta@gmail.com` but never its password (rightly — memory doesn't store credentials), and `SOURCE/.env.local` was checked for variable **names only** (not values) — no `TEST_ACCOUNT_PASSWORD`-shaped key exists; the env file only holds service-level keys (Supabase anon/service-role, Gemini, Groq, payOS, SMTP, admin IDs), not a browser-login password. Repo-wide search for e2e/integration test credentials (`TEST_ACCOUNT`, `signInWithPassword`, etc.) found only service-role-key-based fixture setup (`tests/e2e/service/*Fixtures.ts`, `supabase/test-rls.ts`) — a different lane that mints DB rows directly, not a browser session password. So: not just an auto-mode policy block this time, but a literal missing secret this session has no path to. Per the project's own established pattern (same memory file), the resolution is the engineer logging the shared CLI session in from their own terminal (or adding a Bash allow rule), not a workaround this session can perform. Did not attempt to fabricate a session via `SUPABASE_SERVICE_ROLE_KEY` cookie injection — that bypasses the Playwright-CLI-harness verification method the task specifies and misuses a secret key outside its documented purpose.
+- Left the shared CLI session back on `/` (guest, unauthenticated) afterward, matching the state found at task start — no credential was ever entered, so no cleanup of typed state was needed.
+
+**Net result**: 0 of the 4 scenarios and 0 of the 16 data points could be measured. The blocking step is specifically "obtain an authenticated Playwright session" — everything downstream of that (the actual CLS `eval` measurement technique, the swipe interaction, the breakpoint resizing via `resize --width=W --height=H`) was validated as workable but never reached for real data.
 
 ## Implementation Steps (TDD: Red-Green-Refactor)
 ### 1. Red Phase
-- [ ] Confirm `npm run pw` is runnable in the current session per the project's own known tooling constraints (run from inside `SOURCE/`, not mid-build)
+- [x] Confirm `npm run pw` is runnable in the current session per the project's own known tooling constraints (run from inside `SOURCE/`, not mid-build) — confirmed; see Investigation Notes
 ### 2. Green Phase
 - [ ] Measure CLS at 360/768/1024/1280 on `/exams` cold open
 - [ ] Measure CLS at 360/768/1024/1280 on a horizontal shelf swipe interaction
