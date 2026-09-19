@@ -517,12 +517,12 @@ flowchart TB
 **Verification**: L1 — home block shows the hot order for signed-in visitors; 0 RPC calls for anonymous visitors.
 
 #### Tasks
-- [ ] **P7-T1**: Edit `SOURCE/app/page.tsx:52-53,116-138` — `const hot = user ? await listHotExams(HOME_EXAM_COUNT) : null;` (guarded, not a bare swap); label `t("home.newExams")` → `t("home.hotExams")` (Phase 1's new key); empty guard widens to `hot !== null && hot.exams.length > 0`. Frame, `layout="stack"`, `HOME_EXAM_COUNT=3`, `Xem tất cả đề` link, `home-new-exams` id all unchanged. Target: SOURCE/app/page.tsx. AC: AC-036, AC-037, AC-038. Design ref: backend DD Integration Point I5 (F-001 guard rationale); frontend DD § Home block table. Connection Map: home page issues 0 RPC calls when `user === null` — already proven at the data layer by Phase 3's obligation (c); this task proves the CALL SITE uses the guard. Proof Obligation: an anonymous visitor's render issues 0 `.from`/`.rpc` calls of any kind; a signed-in visitor on a site with 0 submitted attempts sees the whole `<section>` absent, not an empty frame (AC-038). Verify: gates 1-4; manual smoke on `/` signed-in and signed-out.
+- [x] **P7-T1**: Edit `SOURCE/app/page.tsx:52-53,116-138` — `const hot = user ? await listHotExams(HOME_EXAM_COUNT) : null;` (guarded, not a bare swap); label `t("home.newExams")` → `t("home.hotExams")` (Phase 1's new key); empty guard widens to `hot !== null && hot.exams.length > 0`. Frame, `layout="stack"`, `HOME_EXAM_COUNT=3`, `Xem tất cả đề` link, `home-new-exams` id all unchanged. Target: SOURCE/app/page.tsx. AC: AC-036, AC-037, AC-038. Design ref: backend DD Integration Point I5 (F-001 guard rationale); frontend DD § Home block table. Connection Map: home page issues 0 RPC calls when `user === null` — already proven at the data layer by Phase 3's obligation (c); this task proves the CALL SITE uses the guard. Proof Obligation: an anonymous visitor's render issues 0 `.from`/`.rpc` calls of any kind; a signed-in visitor on a site with 0 submitted attempts sees the whole `<section>` absent, not an empty frame (AC-038). Verify: gates 1-4; manual smoke on `/` signed-in and signed-out. — Done: real-composition test (`SOURCE/app/__tests__/page.test.tsx`) + real-browser signed-out smoke test; signed-in manual smoke test deferred (see task file Investigation Notes residual).
 
 #### Phase Completion Criteria (L1)
-- [ ] Home right column shows "Đề nổi nhất" + top-3 hot exams for a signed-in visitor with data
-- [ ] Anonymous visitor renders the signed-out hero with 0 RPC calls
-- [ ] Gates 1-4 green
+- [🔄] Home right column shows "Đề nổi nhất" + top-3 hot exams for a signed-in visitor with data — proven by the real-composition automated test (mocked Supabase boundary, real `listHotExams`); NOT yet confirmed by an actual signed-in browser render (residual, see task file)
+- [x] Anonymous visitor renders the signed-out hero with 0 RPC calls — automated test + real-browser smoke test (`scripts/pw/cli.mjs`)
+- [x] Gates 1-4 green for this diff — see task file Completion Criteria for the one pre-existing, unrelated full-suite failure flagged (not caused by this change)
 
 ---
 
