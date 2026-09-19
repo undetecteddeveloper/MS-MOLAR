@@ -15,63 +15,33 @@
 // =============================================================================
 // FILE STATUS — read before editing
 // =============================================================================
-// THE SINGLE CANDIDATE BELOW IS A SKELETON (`it.todo`, one per proof obligation).
-// `public.exam_hot_counts()` DOES NOT EXIST ON DEV YET — it is created by the
-// backend DD's Migration Procedure (schema.sql §20c), and this whole lane is
-// GATED on that migration having been applied: `vitest.localdb.config.ts`'s own
-// header states the precondition in capital letters — "Cổng schema B (npm run
-// verify:schema) PHẢI XANH TRÊN DEV trước khi chạy config này". This file imports
-// NOTHING from a not-yet-existing fixtures module (no `examHotCountsFixtures.ts`
-// import here, and no `HAS_LIVE_DB` import either — see the two notes below), so
-// it stays green under `tsc --noEmit`/`eslint`/`build` and under a normal
-// (non-`test:localdb`) CI run from the moment it is committed, exactly like its
-// siblings in this directory before their own fixtures existed.
+// IMPLEMENTED (P8-T4). All 6 proof obligations below are real `it` cases; the
+// `describe` is wrapped in `describe.skipIf(!HAS_LIVE_DB)`, importing
+// `HAS_LIVE_DB` from `./examHotCountsFixtures` (P8-T3) — the exact shape
+// `exam-search.service.e2e.test.ts:31` already uses. `public.exam_hot_counts()`
+// must exist on the target database (backend DD's Migration Procedure,
+// schema.sql §20c) before this file is run; `HAS_LIVE_DB` only guards for
+// missing credentials, never for the migration having landed — a red run on a
+// database that has not received the DDL looks like a code defect and is not
+// (`vitest.localdb.config.ts`'s own header states the schema-gate precondition
+// in capital letters).
 //
 // HOW THIS LANE RUNS: `npm run test:localdb` (from `SOURCE/`), i.e.
 // `vitest run --config vitest.localdb.config.ts`, which globs the WHOLE directory
 // `tests/e2e/service/**/*.test.{ts,tsx}` with NO exclude list — every file here is
-// collected unconditionally the moment it is committed. A collected file with zero
-// test tasks makes vitest report "No test suite found in file" and exit 1 (the
-// same measured failure mode documented in `vitest.fixture.config.ts`'s header,
-// and equally true of this config), so the candidate below carries real
-// `it.todo(...)` calls, never bare comments. This lane is MANUAL / opt-in — it is
-// deliberately NOT part of `npm test` or the default CI gate (`vitest.localdb.
-// config.ts`'s own header: "CHẠY TAY tại máy dev — cố ý tách khỏi npm test").
+// collected unconditionally. This lane is MANUAL / opt-in — it is deliberately
+// NOT part of `npm test` or the default CI gate (`vitest.localdb.config.ts`'s own
+// header: "CHẠY TAY tại máy dev — cố ý tách khỏi npm test").
 //
-// `HAS_LIVE_DB` NOTE (do not invent an env var here): the repo's precedent
-// (`essayGradeWriteFixtures.ts:20-40`, re-exported by `examSearchFixtures.ts`) is
-// a COMPUTED boolean — true only when `NEXT_PUBLIC_SUPABASE_URL`,
-// `NEXT_PUBLIC_SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are all present
-// after loading `.env.local` by hand (vitest does not load it). There is no bare
-// `process.env.HAS_LIVE_DB`. The `describe` below is deliberately UNGATED in this
-// skeleton (every child is `it.todo`, which never executes regardless of skip
-// state); the implementing task must wrap it as
-// `describe.skipIf(!HAS_LIVE_DB)(...)`, importing `HAS_LIVE_DB` from the new
-// `examHotCountsFixtures.ts` module (see next note) once that module exists —
-// exactly the shape `exam-search.service.e2e.test.ts:31` already uses.
-//
-// FIXTURES MODULE — NOT CREATED BY THIS GENERATION ROUND. Backend DD names
-// `SOURCE/tests/e2e/service/examHotCountsFixtures.ts` as a companion file the
-// implementer must create, following the EXACT shape of the existing precedent
-// `SOURCE/tests/e2e/service/examSearchFixtures.ts` (which itself re-exports
-// `HAS_LIVE_DB`/`adminClient`/`anonClient` from `essayGradeWriteFixtures.ts`):
-//   - `HAS_LIVE_DB: boolean` — re-exported, do not redefine;
-//   - a `SLOT` string prefix convention isolating every row this file seeds
-//     (exam ids, user emails) so a prefix-scoped teardown never touches real data;
-//   - `setUp(admin, slot)` seeding TWO real users (A and B, via
-//     `admin.auth.admin.createUser` + `signInWithPassword`, same as
-//     `examSearchFixtures.ts:37-65`) plus published/unpublished/banned-author exam
-//     rows and `exam_attempts` rows with controlled `status` and `submitted_at`
-//     values straddling the hour-snapped window boundaries (see obligation (d)
-//     below) — returning both users' authenticated `SupabaseClient`s;
-//   - `tearDown(admin, fixture, slot)` — idempotent, prefix-scoped, callable even
-//     after a setup failure (same shape as `examSearchFixtures.ts:68-79`);
-//   - `serviceClient()` / `anonClient()` for the `service_role` and anonymous
-//     grant-boundary probes.
-// This test file's `it.todo` names below describe exactly what that module's
-// fixtures must make possible; the implementer wires both files in the same
-// commit that adds the migration's dev-apply step (backend DD Implementation Plan
-// step 8).
+// FIXTURES MODULE: `SOURCE/tests/e2e/service/examHotCountsFixtures.ts` (P8-T3) —
+// re-exports `HAS_LIVE_DB`/`adminClient`/`anonClient` from
+// `essayGradeWriteFixtures.ts`, adds its own `serviceClient()`, the `HC_PREFIX`
+// isolation prefix, and `setUp`/`tearDown`. `setUp` seeds two real users (A =
+// always the RPC caller, never banned; B = submitter and the author who gets
+// banned/unbanned) and four exams (`published`, `unpublished`, `bannedAuthor`,
+// `hourBoundary`) with `exam_attempts` rows shaped for obligations (a)-(f) below
+// — see that file's own header for exactly what each exam id proves and why A
+// is never reused for the banned-author role.
 //
 // -----------------------------------------------------------------------------
 // MOCK BOUNDARY — the opposite of every other lane in this generation round
@@ -121,8 +91,7 @@
 // @category: core-functionality
 // @lane: service-integration-e2e
 // @dependency: full-system (real dev Postgres, real Supabase Auth, real RLS,
-//   `public.exam_hot_counts()`) + `examHotCountsFixtures.ts` (not yet created —
-//   see note above)
+//   `public.exam_hot_counts()`) + `examHotCountsFixtures.ts`
 // @complexity: high
 // @real-dependency: Postgres (dev, ref hynwleaxtbtjzkvpjsug), exam_attempts, exams,
 //   exam_hot_counts() — see Mock Boundary above; nothing in this file may be mocked
@@ -171,28 +140,193 @@
 //       with `error.code === "42501"`; a `service_role` client's call resolves with
 //       an array and no error (mirrors HS-e).
 
-import { describe, it } from "vitest";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { LIST_ROW_CEILING, POSTGREST_MAX_ROWS } from "@/lib/supabase/boundedRead";
+import {
+  anonClient,
+  HAS_LIVE_DB,
+  HC_PREFIX,
+  serviceClient,
+  setUp,
+  tearDown,
+  type HotCountsFixture,
+} from "./examHotCountsFixtures";
 
-// UNGATED here on purpose (see "HAS_LIVE_DB NOTE" above) — wrap with
-// `describe.skipIf(!HAS_LIVE_DB)` once `examHotCountsFixtures.ts` exists.
-describe(
+const SLOT = "hc1";
+
+describe.skipIf(!HAS_LIVE_DB)(
   "exam_hot_counts() — real Postgres dev: cross-user count, leak-proof column set, exclusion predicates, hour-snapped windows, row-cap clamp, grant boundary (AC-018, AC-025, AC-027, AC-028)",
   () => {
-    it.todo(
-      "user A's authenticated call counts an exam only user B submitted (HS-b, obligation a)"
+    const admin = serviceClient();
+    let fx: HotCountsFixture | undefined;
+
+    beforeAll(async () => {
+      fx = await setUp(admin, SLOT);
+    }, 60_000);
+
+    afterAll(async () => {
+      await tearDown(admin, fx, SLOT);
+    }, 60_000);
+
+    /** Hình dạng một hàng `exam_hot_counts()` trả — khai LOCAL, không import từ
+     *  `hotCounts.ts` (không export ở đó): obligation (b) cần đọc tập khoá THẬT
+     *  của hàng trả về, nên file này không được áp một hình dạng lên nó trước. */
+    type HotCountsRow = {
+      exam_id: string;
+      recent_count: number | string | null;
+      wide_count: number | string | null;
+      total_count: number | string | null;
+    };
+
+    /** Điểm gọi RPC DÙNG CHUNG cho cả sáu obligation — cùng lý do `hotCounts.ts`
+     *  giữ một điểm gọi duy nhất: đối số mặc định (`hourBoundaryArgs` của fixture,
+     *  `p_max_rows: 500`) không tự nó chứng minh gì, `overrides` mới là nơi từng
+     *  ca nói ra đúng đối số đang kiểm. */
+    async function callHotCounts(
+      client: SupabaseClient,
+      overrides: Partial<{ p_since_recent: string; p_since_wide: string; p_max_rows: number }> = {}
+    ): Promise<{ data: HotCountsRow[] | null; error: { code?: string; message: string } | null }> {
+      const { data, error } = await client.rpc("exam_hot_counts", {
+        p_since_recent: fx!.hourBoundaryArgs.sinceRecent,
+        p_since_wide: fx!.hourBoundaryArgs.sinceWide,
+        p_max_rows: 500,
+        ...overrides,
+      });
+      return { data: data as HotCountsRow[] | null, error };
+    }
+
+    it("user A's authenticated call counts an exam only user B submitted (HS-b, obligation a)", async () => {
+      const { data, error } = await callHotCounts(fx!.userA.client);
+      expect(error).toBeNull();
+      const row = data!.find((r) => r.exam_id === fx!.examIds.published);
+      expect(row).toBeDefined();
+      expect(Number(row!.total_count)).toBeGreaterThanOrEqual(1);
+    });
+
+    it(
+      "a returned row's key set is exactly {exam_id, recent_count, wide_count, total_count} — no user_id/submitted_at/id/total_score (HS-c, obligation b)",
+      async () => {
+        const { data, error } = await callHotCounts(fx!.userA.client);
+        expect(error).toBeNull();
+        const row = data!.find((r) => r.exam_id === fx!.examIds.published);
+        expect(row).toBeDefined();
+        expect(Object.keys(row!).sort()).toEqual(["exam_id", "recent_count", "total_count", "wide_count"]);
+      }
     );
-    it.todo(
-      "a returned row's key set is exactly {exam_id, recent_count, wide_count, total_count} — no user_id/submitted_at/id/total_score (HS-c, obligation b)"
+
+    it(
+      "in_progress attempts, unpublished exams and banned-author exams are excluded; a banned author's exam reappears once the ban is lifted (HS-d/HS-f, obligation c)",
+      async () => {
+        const before = await callHotCounts(fx!.userA.client);
+        expect(before.error).toBeNull();
+
+        // published: chỉ attempt SUBMITTED của B được cộng — attempt in_progress
+        // của A trên CHÍNH đề này không được cộng vào total_count.
+        const publishedRow = before.data!.find((r) => r.exam_id === fx!.examIds.published);
+        expect(publishedRow).toBeDefined();
+        expect(Number(publishedRow!.total_count)).toBe(1);
+
+        // unpublished (status='draft'): vắng mặt dù B đã nộp một attempt hợp lệ.
+        expect(before.data!.some((r) => r.exam_id === fx!.examIds.unpublished)).toBe(false);
+
+        // bannedAuthor: có mặt TRƯỚC khi ban.
+        expect(before.data!.some((r) => r.exam_id === fx!.examIds.bannedAuthor)).toBe(true);
+
+        const { error: banErr } = await admin.auth.admin.updateUserById(fx!.userB.userId, {
+          ban_duration: "24h",
+        });
+        expect(banErr).toBeNull();
+
+        const during = await callHotCounts(fx!.userA.client);
+        expect(during.error).toBeNull();
+        expect(during.data!.some((r) => r.exam_id === fx!.examIds.bannedAuthor)).toBe(false);
+
+        const { error: unbanErr } = await admin.auth.admin.updateUserById(fx!.userB.userId, {
+          ban_duration: "none",
+        });
+        expect(unbanErr).toBeNull();
+
+        const after = await callHotCounts(fx!.userA.client);
+        expect(after.error).toBeNull();
+        expect(after.data!.some((r) => r.exam_id === fx!.examIds.bannedAuthor)).toBe(true);
+      },
+      30_000
     );
-    it.todo(
-      "in_progress attempts, unpublished exams and banned-author exams are excluded; a banned author's exam reappears once the ban is lifted (HS-d/HS-f, obligation c)"
+
+    it(
+      "window boundaries snap to the HOUR server-side: an attempt 1s before date_trunc('hour', p_since_recent) is excluded, 1s after is included (obligation d)",
+      async () => {
+        const { data, error } = await callHotCounts(fx!.userA.client);
+        expect(error).toBeNull();
+        const row = data!.find((r) => r.exam_id === fx!.examIds.hourBoundary);
+        expect(row).toBeDefined();
+        // recent_count chỉ đếm attempt gieo 1s SAU mốc chẵn giờ đã date_trunc — cái
+        // gieo 1s TRƯỚC mốc đó bị loại. Nếu server dùng thẳng đối số thô (lệch 37
+        // phút so với mốc chẵn) thay vì date_trunc('hour', ...), CẢ HAI attempt đều
+        // rơi trước ngưỡng thô đó và recent_count sẽ đọc 0, không phải 1.
+        expect(Number(row!.recent_count)).toBe(1);
+        expect(Number(row!.total_count)).toBe(2);
+      }
     );
-    it.todo(
-      "window boundaries snap to the HOUR server-side: an attempt 1s before date_trunc('hour', p_since_recent) is excluded, 1s after is included (obligation d)"
+
+    it(
+      "p_max_rows clamps against the imported LIST_ROW_CEILING/POSTGREST_MAX_ROWS constants, not hand-copied literals (obligation e)",
+      async () => {
+        // Gieo NHIỀU HƠN LIST_ROW_CEILING đề ứng viên thật (published, có attempt
+        // submitted) để trần thật sự phải cắt bớt — không thì phép thử này rỗng.
+        const clampCount = LIST_ROW_CEILING + 20;
+        const clampExamIds = Array.from({ length: clampCount }, (_, i) => `${HC_PREFIX}${SLOT}-clamp-${i}`);
+        const clampExams = clampExamIds.map((id) => ({
+          id,
+          title: `${HC_PREFIX}${SLOT} clamp exam`,
+          question_ids: [] as string[],
+          duration_minutes: 30,
+          subject: "Toán",
+          grade: 10,
+          status: "published",
+        }));
+        const { error: examErr } = await admin.from("exams").insert(clampExams);
+        expect(examErr).toBeNull();
+
+        const clampAttempts = clampExamIds.map((examId) => ({
+          user_id: fx!.userB.userId,
+          exam_id: examId,
+          status: "submitted",
+          submitted_at: new Date().toISOString(),
+        }));
+        const { error: attemptErr } = await admin.from("exam_attempts").insert(clampAttempts);
+        expect(attemptErr).toBeNull();
+        // `${HC_PREFIX}${SLOT}-clamp-*` khớp đúng tiền tố `tearDownBySlot` đã dọn
+        // (`${HC_PREFIX}${slot}-%`) — không cần dọn riêng ở đây.
+
+        // "Trước": một lượt đọc KHÔNG bị cắt (p_max_rows dưới POSTGREST_MAX_ROWS,
+        // nhưng vượt xa số ứng viên vừa gieo) chứng minh tập ứng viên thật trên dev
+        // đã VƯỢT LIST_ROW_CEILING — tiền đề khiến phép cắt dưới đây có ý nghĩa để
+        // quan sát, không rỗng.
+        const unclamped = await callHotCounts(fx!.userA.client, { p_max_rows: 999 });
+        expect(unclamped.error).toBeNull();
+        expect(unclamped.data!.length).toBeGreaterThan(LIST_ROW_CEILING);
+
+        // "Sau": đúng hình dạng lời gọi thật (`hotCounts.ts`'s
+        // `p_max_rows: LIST_ROW_CEILING + 1`) bị cắt ở
+        // min(LIST_ROW_CEILING + 1, POSTGREST_MAX_ROWS) — TÍNH từ hai hằng số NHẬP,
+        // không chép tay, nên một lần chỉnh lại của một trong hai hằng kéo theo kỳ
+        // vọng này thay vì để nó trôi lệch.
+        const clamped = await callHotCounts(fx!.userA.client, { p_max_rows: LIST_ROW_CEILING + 1 });
+        expect(clamped.error).toBeNull();
+        expect(clamped.data!.length).toBe(Math.min(LIST_ROW_CEILING + 1, POSTGREST_MAX_ROWS));
+      },
+      30_000
     );
-    it.todo(
-      "p_max_rows clamps against the imported LIST_ROW_CEILING/POSTGREST_MAX_ROWS constants, not hand-copied literals (obligation e)"
-    );
-    it.todo("anon gets 42501; service_role gets an array (HS-e, obligation f)");
+
+    it("anon gets 42501; service_role gets an array (HS-e, obligation f)", async () => {
+      const anonResult = await callHotCounts(anonClient());
+      expect(anonResult.error?.code).toBe("42501");
+
+      const serviceResult = await callHotCounts(serviceClient());
+      expect(serviceResult.error).toBeNull();
+      expect(Array.isArray(serviceResult.data)).toBe(true);
+    });
   }
 );
