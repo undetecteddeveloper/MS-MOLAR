@@ -13,6 +13,7 @@
 import "server-only";
 
 import {
+  hotCountFieldOf,
   pickDominantGrade,
   pickExploreShelf,
   pickHotShelf,
@@ -60,7 +61,14 @@ export interface ExamShelves {
   /** null => học sinh chưa có lượt đại diện CÓ ĐIỂM nào (AC-013/AC-051). */
   practice: { subject: string; exams: Exam[] } | null;
   /** null => mọi bậc của thang đều 0 đề đạt (AC-024/AC-051). */
-  hot: { rung: HotRung; grade: number | null; exams: Exam[] } | null;
+  hot: {
+    rung: HotRung;
+    grade: number | null;
+    exams: Exam[];
+    /** Số lượt ĐÃ NỘP của mọi học sinh, theo id đề, trong đúng cửa sổ của `rung`
+     *  — chính số đã xếp hạng thẻ, nên giảm dần theo thứ tự `exams`. */
+    attemptCounts: Record<string, number>;
+  } | null;
   /** null => 0 đề còn lại sau khi loại hai kệ kia (kho rất nhỏ). */
   explore: { exams: Exam[] } | null;
   /** Cùng tập mà kệ phẳng `/exams` dùng cho huy hiệu "đã làm" — MỘT lượt đọc
@@ -178,7 +186,14 @@ export async function listExamShelves(): Promise<ExamShelves> {
         : null,
     hot:
       hot !== null
-        ? { rung: hot.rung, grade: dominantGrade, exams: examsFromIds(rows, hot.examIds) }
+        ? {
+            rung: hot.rung,
+            grade: dominantGrade,
+            exams: examsFromIds(rows, hot.examIds),
+            attemptCounts: Object.fromEntries(
+              hot.examIds.map((id) => [id, hotCounts.get(id)?.[hotCountFieldOf(hot.rung)] ?? 0])
+            ),
+          }
         : null,
     explore: exploreIds.length > 0 ? { exams: examsFromIds(rows, exploreIds) } : null,
     submittedExamIds,

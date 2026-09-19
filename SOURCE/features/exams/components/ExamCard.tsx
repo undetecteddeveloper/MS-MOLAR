@@ -24,10 +24,13 @@ interface ExamCardProps {
   /** Class bề rộng từ hàng kệ — một rule `[&>li]:w-80` trên cha sẽ dính luôn
    *  vào ô trong cùng hàng, nên bề rộng phải đi qua prop này. */
   className?: string;
-  /** Thẻ gọn cho hàng kệ: bỏ thời lượng + số câu (xem ở trang đề), tên đề ≤2 dòng,
-   *  tác giả · trường gộp một dòng cắt "…", mọi ô đặt trước chỗ ⇒ mọi thẻ cao bằng nhau.
-   *  Vắng mặt ⇒ markup hôm nay (lưới phẳng, trang chủ). */
+  /** Thẻ gọn cho hàng kệ: bỏ thời lượng + số câu (xem ở trang đề), tên đề MỘT dòng
+   *  cắt "…", tác giả · trường gộp một dòng cắt "…", dòng meta đặt trước chỗ ⇒ mọi
+   *  thẻ cao bằng nhau. Vắng mặt ⇒ markup hôm nay (lưới phẳng, trang chủ). */
   compact?: boolean;
+  /** Số lượt đã nộp, góc trên phải — chỉ có nghĩa cùng `compact`; kệ Nổi nhất
+   *  không truyền cho thẻ hạng 1 vì góc đó là của ruy băng. */
+  attemptCount?: number;
 }
 
 // ExamCard — thẻ đề (theme "Sân trường"): nhãn môn + lớp, tên đề, tác giả,
@@ -52,6 +55,7 @@ export async function ExamCard({
   from,
   className,
   compact,
+  attemptCount,
 }: ExamCardProps) {
   const href = from ? `/exams/${exam.id}?from=${from}` : `/exams/${exam.id}`;
   const author = exam.authorDisplayName?.trim();
@@ -73,11 +77,16 @@ export async function ExamCard({
             với Thống kê và Lịch sử; site chỉ có một ngôn ngữ (engineer 2026-09-08). */}
         <Badge variant="plain">{subjectLabel(exam.subject)}</Badge>
         <Badge variant="plain">{t("exams.gradeValue", { grade: exam.grade })}</Badge>
+        {compact && attemptCount !== undefined ? (
+          <span className="text-muted-foreground ml-auto text-xs font-medium tabular-nums">
+            {t("exams.attemptCount", { count: attemptCount })}
+          </span>
+        ) : null}
       </div>
 
       {compact ? (
         <>
-          <h3 className="card-linked-title line-clamp-2 min-h-[2lh] text-base leading-snug font-semibold">
+          <h3 className="card-linked-title truncate text-base leading-snug font-semibold">
             {exam.title}
           </h3>
           <p className="text-muted-foreground min-h-5 truncate text-sm">

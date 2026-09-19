@@ -28,12 +28,12 @@ function makeExam(overrides: Partial<Exam> & { id: string }): Exam {
 }
 
 describe("ExamShelf — hình dạng mặc định theo SHELF map (AC-004)", () => {
-  it("kệ Cần luyện: section/h2/icon/subtitle, 1 thẻ trong ul, 0 link Xem tất cả", async () => {
+  it("kệ Cần luyện: section/h2/icon, 0 phụ đề, 1 thẻ trong ul, 0 link Xem tất cả", async () => {
     const exams = [makeExam({ id: "p1", subject: "Chemistry" })];
     const { container } = await renderServerTree(
       <ExamShelf
         shelf="practice"
-        subtitle="Hóa học đang là môn điểm trung bình thấp nhất của bạn"
+        subtitle={null}
         exams={exams}
         submittedExamIds={new Set()}
         isLoggedIn
@@ -42,15 +42,13 @@ describe("ExamShelf — hình dạng mặc định theo SHELF map (AC-004)", () 
 
     // Khẳng định dương trước — cây rỗng/vỡ phải đỏ ở đây, không lọt xuống dưới.
     const h2 = container.querySelector("h2");
-    expect(h2?.textContent).toBe("Các môn cần luyện");
+    expect(h2?.textContent).toBe("Cần luyện");
     expect(h2?.id).toBe("shelf-practice");
     expect(container.querySelector("section")?.getAttribute("aria-labelledby")).toBe(
       "shelf-practice"
     );
     expect(container.querySelector("section svg")).not.toBeNull();
-    expect(container.querySelector("p")?.textContent).toBe(
-      "Hóa học đang là môn điểm trung bình thấp nhất của bạn"
-    );
+    expect(container.querySelector("section > div p")).toBeNull(); // header row: 0 phụ đề
 
     expect(container.querySelector("section > div > a")).toBeNull();
 
@@ -83,25 +81,32 @@ describe("ExamShelf — tiêu đề kệ không có link nào (thay AC-035/AC-05
     }
   );
 
-  it("AC-004: kệ Khám phá có icon/h2/subtitle nhưng 0 link header ở header row", async () => {
+  it("phụ đề: có chuỗi thì vẽ một <p> ở header row, null thì header row không có <p> nào", async () => {
     const exams = [makeExam({ id: "e1" })];
-    const { container } = await renderServerTree(
+    const withSubtitle = await renderServerTree(
       <ExamShelf
-        shelf="explore"
-        subtitle="Đề mới đăng, môn và trường bạn chưa thử"
+        shelf="hot"
+        subtitle="Khối 10, tuần này"
         exams={exams}
         submittedExamIds={new Set()}
         isLoggedIn
       />
     );
-
-    const h2 = container.querySelector("h2");
-    expect(h2?.textContent).toBe("Khám phá");
-    expect(container.querySelector("p")?.textContent).toBe(
-      "Đề mới đăng, môn và trường bạn chưa thử"
+    expect(withSubtitle.container.querySelector("section > div p")?.textContent).toBe(
+      "Khối 10, tuần này"
     );
 
-    expect(container.querySelector("section > div > a")).toBeNull();
+    const without = await renderServerTree(
+      <ExamShelf
+        shelf="explore"
+        subtitle={null}
+        exams={exams}
+        submittedExamIds={new Set()}
+        isLoggedIn
+      />
+    );
+    expect(without.container.querySelector("h2")?.textContent).toBe("Khám phá");
+    expect(without.container.querySelector("section > div p")).toBeNull();
   });
 });
 
@@ -139,8 +144,8 @@ describe("ExamShelf — đúng 1 ruy băng ở hạng 1 kệ Nổi nhất, 0 ở
 });
 
 // Engineer 2026-09-19: thẻ trên kệ gọn hơn và cao bằng nhau. Cao bằng nhau do hai
-// thứ cùng nhau: ô đặt trước chỗ (tên đề min 2 dòng, dòng tác giả·trường min 1 dòng)
-// và `h-auto` thay `h-full` — `h-full` (height:100%) chặn flexbox tự kéo giãn, từng làm
+// thứ cùng nhau: tên đề luôn đúng một dòng, dòng tác giả·trường đặt trước chỗ (min 1
+// dòng) và `h-auto` thay `h-full` — `h-full` (height:100%) chặn flexbox tự kéo giãn, từng làm
 // thẻ 198px cạnh thẻ 229px trong cùng một hàng.
 describe("ExamShelf — thẻ gọn: bỏ thời lượng + số câu, cắt dài bằng '…', cao bằng nhau", () => {
   const LONG = makeExam({
@@ -170,7 +175,7 @@ describe("ExamShelf — thẻ gọn: bỏ thời lượng + số câu, cắt dà
     expect(text).not.toMatch(/22\s*câu/);
   });
 
-  it("tên đề cắt tối đa 2 dòng; tác giả · trường gộp MỘT dòng cắt '…' — cả hai giữ đủ chữ trong DOM", async () => {
+  it("tên đề MỘT dòng cắt '…'; tác giả · trường gộp MỘT dòng cắt '…' — cả hai giữ đủ chữ trong DOM", async () => {
     const { container } = await renderServerTree(
       <ExamShelf
         shelf="hot"
@@ -182,7 +187,8 @@ describe("ExamShelf — thẻ gọn: bỏ thời lượng + số câu, cắt dà
     );
 
     const title = container.querySelector("ul > li h3");
-    expect(title?.className).toContain("line-clamp-2");
+    expect(title?.className).toContain("truncate");
+    expect(title?.className).not.toContain("line-clamp");
     expect(title?.textContent).toBe(LONG.title);
 
     const meta = title?.nextElementSibling;
@@ -379,30 +385,107 @@ describe("ExamShelf — exams: [] trả về null (AC-051)", () => {
   );
 });
 
-describe("shelfSubtitle — Facts → strings (AC-012, AC-019–AC-023)", () => {
-  it("practice: nội suy subjectLabel(subject), không phải mã thô hay dạng tắt", () => {
-    expect(shelfSubtitle("practice", { subject: "Chemistry", exams: [] })).toBe(
-      "Hóa học đang là môn điểm trung bình thấp nhất của bạn"
-    );
+// Engineer 2026-09-19: Cần luyện và Khám phá không còn phụ đề; Nổi nhất chỉ mất phụ
+// đề ở bậc "site-all" — năm bậc còn lại giữ nguyên chuỗi.
+describe("shelfSubtitle — Facts → strings (AC-019–AC-022)", () => {
+  it("practice: không có phụ đề (kể cả khi đã biết môn yếu nhất)", () => {
+    expect(shelfSubtitle("practice", { subject: "Chemistry", exams: [] })).toBeNull();
   });
 
-  it("explore: chuỗi cố định, không nội suy", () => {
-    expect(shelfSubtitle("explore", { exams: [] })).toBe("Đề mới đăng, môn và trường bạn chưa thử");
+  it("explore: không có phụ đề", () => {
+    expect(shelfSubtitle("explore", { exams: [] })).toBeNull();
   });
 
-  const HOT_CASES: { rung: HotRung; grade: number | null; expected: string }[] = [
+  const HOT_CASES: { rung: HotRung; grade: number | null; expected: string | null }[] = [
     { rung: "grade-recent", grade: 10, expected: "Khối 10, tuần này" },
     { rung: "grade-30d", grade: 10, expected: "Khối 10, 30 ngày qua" },
     { rung: "grade-all", grade: 10, expected: "Khối 10, từ trước tới nay" },
     { rung: "site-recent", grade: null, expected: "Toàn hệ thống, tuần này" },
     { rung: "site-30d", grade: null, expected: "Toàn hệ thống, 30 ngày qua" },
-    { rung: "site-all", grade: null, expected: "Toàn hệ thống, từ trước tới nay" },
+    { rung: "site-all", grade: null, expected: null },
   ];
 
   it.each(HOT_CASES)(
-    "hot rung $rung -> đúng $expected, 0 fallback chuỗi chung chung",
+    "hot rung $rung -> $expected, 0 fallback chuỗi chung chung",
     ({ rung, grade, expected }) => {
-      expect(shelfSubtitle("hot", { rung, grade, exams: [] })).toBe(expected);
+      expect(shelfSubtitle("hot", { rung, grade, exams: [], attemptCounts: {} })).toBe(expected);
     }
   );
+});
+
+// Engineer 2026-09-19: số lượt ĐÃ NỘP ở góc trên phải thẻ kệ Nổi nhất, trừ thẻ hạng 1
+// (góc đó là của ruy băng). Số do tầng query giao vào `attemptCounts`, component không
+// tự tính.
+describe("ExamShelf — số lượt làm ở góc trên phải thẻ Nổi nhất, trừ thẻ mang ruy băng", () => {
+  const exams = [makeExam({ id: "h1" }), makeExam({ id: "h2" }), makeExam({ id: "h3" })];
+  const attemptCounts = { h1: 40, h2: 12, h3: 1 };
+  const countOf = (li: Element) => li.querySelector("span.ml-auto")?.textContent ?? null;
+
+  it("thẻ hạng 1 (ruy băng) không có số; thẻ còn lại có '{n} lượt làm' đúng số của đề đó", async () => {
+    const { container } = await renderServerTree(
+      <ExamShelf
+        shelf="hot"
+        subtitle={null}
+        exams={exams}
+        attemptCounts={attemptCounts}
+        submittedExamIds={new Set()}
+        isLoggedIn
+      />
+    );
+
+    const cards = Array.from(container.querySelectorAll("ul > li"));
+    expect(cards[0].querySelector('[data-slot="ribbon"]')).not.toBeNull();
+    expect(countOf(cards[0])).toBeNull();
+    expect(countOf(cards[1])).toBe("12 lượt làm");
+    expect(countOf(cards[2])).toBe("1 lượt làm");
+  });
+
+  it("số nằm ở hàng nhãn môn/lớp (đầu thẻ), không phải trong liên kết phủ thẻ", async () => {
+    const { container } = await renderServerTree(
+      <ExamShelf
+        shelf="hot"
+        subtitle={null}
+        exams={exams}
+        attemptCounts={attemptCounts}
+        submittedExamIds={new Set()}
+        isLoggedIn
+      />
+    );
+
+    const count = container.querySelectorAll("ul > li")[1].querySelector("span.ml-auto");
+    expect(count?.parentElement?.firstElementChild?.textContent).toBe("Toán");
+    expect(count?.closest("a")).toBeNull();
+  });
+
+  it.each<ShelfKind>(["practice", "explore"])(
+    "kệ %s không bao giờ hiện số, kể cả khi bị truyền attemptCounts",
+    async (shelf) => {
+      const { container } = await renderServerTree(
+        <ExamShelf
+          shelf={shelf}
+          subtitle={null}
+          exams={exams}
+          attemptCounts={attemptCounts}
+          submittedExamIds={new Set()}
+          isLoggedIn
+        />
+      );
+
+      expect(container.textContent).not.toContain("lượt làm");
+    }
+  );
+
+  it("thiếu attemptCounts (hoặc thiếu id) thì không vẽ số — không vẽ '0 lượt làm' bịa", async () => {
+    const { container } = await renderServerTree(
+      <ExamShelf
+        shelf="hot"
+        subtitle={null}
+        exams={exams}
+        submittedExamIds={new Set()}
+        isLoggedIn
+      />
+    );
+
+    expect(container.textContent).not.toContain("lượt làm");
+  });
 });

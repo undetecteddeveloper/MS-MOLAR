@@ -9,7 +9,6 @@ import type { ExamShelves } from "@/features/exams/queries/shelves";
 import { Card } from "@/components/ui/card";
 import { ExamCard } from "@/features/exams/components/ExamCard";
 import type { RateEligibility } from "@/features/exams/components/rating/RateButton";
-import { subjectLabel } from "@/lib/ugc/subjects";
 
 // ExamShelf — kệ đề cuộn ngang trên /exams (Kho đề theo kệ, UI Spec §
 // Component: ExamShelf; Design Doc § Data contracts). 3 kệ — Cần luyện, Nổi
@@ -39,6 +38,8 @@ interface ShelfSpec {
   titleKey: MessageKey;
   from: AttemptSource;
   ribbonOnFirst: boolean;
+  /** Hiện số lượt đã nộp ở góc trên phải thẻ — trừ thẻ mang ruy băng (cùng góc). */
+  showAttemptCount: boolean;
   trailingTile: boolean;
 }
 
@@ -48,6 +49,7 @@ const SHELF = {
     titleKey: "exams.shelfPracticeTitle",
     from: "practice",
     ribbonOnFirst: false,
+    showAttemptCount: false,
     trailingTile: false,
   },
   hot: {
@@ -55,6 +57,7 @@ const SHELF = {
     titleKey: "exams.shelfHotTitle",
     from: "hot",
     ribbonOnFirst: true,
+    showAttemptCount: true,
     trailingTile: false,
   },
   explore: {
@@ -62,6 +65,7 @@ const SHELF = {
     titleKey: "exams.shelfExploreTitle",
     from: "explore",
     ribbonOnFirst: false,
+    showAttemptCount: false,
     trailingTile: true,
   },
 } as const satisfies Record<ShelfKind, ShelfSpec>;
@@ -70,40 +74,40 @@ const SHELF = {
 // dụ mã của Design Doc (`GradeRecent`/`Grade30d`/`SiteRecent`/`Site30d`), vốn
 // không tồn tại trong `copy.ts` và sẽ vỡ `MessageKey`. Ánh xạ rung → chuỗi
 // tiếng Việt (thứ mọi AC/UI Spec thực sự ràng buộc) không đổi.
+//
+// Engineer 2026-09-19: chỉ kệ Nổi nhất còn phụ đề, và bậc "site-all" ("Toàn hệ
+// thống, từ trước tới nay" — bậc lấp chỗ trống, không cho người đọc biết thêm gì)
+// cũng bỏ: `null` = không vẽ dòng phụ đề.
 const HOT_SUBTITLE = {
   "grade-recent": "exams.shelfHotGradeWeek",
   "grade-30d": "exams.shelfHotGradeMonth",
   "grade-all": "exams.shelfHotGradeAll",
   "site-recent": "exams.shelfHotSiteWeek",
   "site-30d": "exams.shelfHotSiteMonth",
-  "site-all": "exams.shelfHotSiteAll",
-} as const satisfies Record<HotRung, MessageKey>;
+  "site-all": null,
+} as const satisfies Record<HotRung, MessageKey | null>;
 
 /**
- * Fact → chuỗi tiếng Việt cho phụ đề một kệ. `ExamShelf` không tự gọi hàm
- * này — trang (`/exams`) gọi TRƯỚC, rồi truyền kết quả vào prop `subtitle`
- * (đã nội suy sẵn), nên `ExamShelf` không bao giờ tự suy lại rung hay môn
- * yếu nhất (Design Doc § Data flow "Facts → strings").
+ * Fact → chuỗi tiếng Việt cho phụ đề một kệ, hoặc `null` khi kệ không có phụ
+ * đề. `ExamShelf` không tự gọi hàm này — trang (`/exams`) gọi TRƯỚC, rồi truyền
+ * kết quả vào prop `subtitle` (đã nội suy sẵn), nên `ExamShelf` không bao giờ tự
+ * suy lại rung (Design Doc § Data flow "Facts → strings").
  */
-export function shelfSubtitle(kind: ShelfKind, data: ShelfData): string {
-  if (kind === "practice") {
-    return t("exams.shelfPracticeSubtitle", {
-      subject: subjectLabel((data as { subject: string }).subject),
-    });
-  }
-  if (kind === "explore") {
-    return t("exams.shelfExploreSubtitle");
-  }
+export function shelfSubtitle(kind: ShelfKind, data: ShelfData): string | null {
+  if (kind !== "hot") return null;
   const { rung, grade } = data as { rung: HotRung; grade: number | null };
-  return t(HOT_SUBTITLE[rung], { grade: grade ?? "" });
+  const key = HOT_SUBTITLE[rung];
+  return key === null ? null : t(key, { grade: grade ?? "" });
 }
 
 interface ExamShelfProps {
   shelf: ShelfKind;
-  /** Đã nội suy sẵn bởi trang gọi — component không tự tính lại. */
-  subtitle: string;
+  /** Đã nội suy sẵn bởi trang gọi — component không tự tính lại. `null` = không vẽ. */
+  subtitle: string | null;
   /** Đã xếp hạng và cắt về ≤10 ở Node trước khi tới đây (AC-002, AC-006). */
   exams: Exam[];
+  /** Số lượt đã nộp theo id đề — chỉ kệ Nổi nhất đọc (`spec.showAttemptCount`). */
+  attemptCounts?: Record<string, number>;
   /** MỘT tập cho cả trang — eligibility tính một lần, không per-card query. */
   submittedExamIds: Set<string>;
   isLoggedIn: boolean;
@@ -125,6 +129,7 @@ export async function ExamShelf({
   shelf,
   subtitle,
   exams,
+  attemptCounts,
   submittedExamIds,
   isLoggedIn,
 }: ExamShelfProps) {
@@ -142,22 +147,26 @@ export async function ExamShelf({
           <h2 id={headerId} className="text-xl leading-tight font-semibold">
             {t(spec.titleKey)}
           </h2>
-          <p className="text-muted-foreground mt-0.5 text-[13px]">{subtitle}</p>
+          {subtitle ? <p className="text-muted-foreground mt-0.5 text-[13px]">{subtitle}</p> : null}
         </div>
       </div>
 
       <ul className="-mx-4 flex snap-x snap-mandatory scroll-pl-4 [scrollbar-width:none] gap-3 overflow-x-auto px-4 pt-1 pb-1.5 motion-safe:scroll-smooth sm:-mx-6 sm:scroll-pl-6 sm:px-6 lg:gap-4 [&::-webkit-scrollbar]:hidden [&>li]:shrink-0 [&>li]:snap-start">
-        {exams.map((exam, i) => (
-          <ExamCard
-            key={exam.id}
-            exam={exam}
-            eligibility={eligibilityFor(exam.id, submittedExamIds, isLoggedIn)}
-            ribbon={spec.ribbonOnFirst && i === 0 ? t("exams.hotRibbon") : undefined}
-            from={spec.from}
-            compact
-            className="h-auto w-80 lg:w-84"
-          />
-        ))}
+        {exams.map((exam, i) => {
+          const hasRibbon = spec.ribbonOnFirst && i === 0;
+          return (
+            <ExamCard
+              key={exam.id}
+              exam={exam}
+              eligibility={eligibilityFor(exam.id, submittedExamIds, isLoggedIn)}
+              ribbon={hasRibbon ? t("exams.hotRibbon") : undefined}
+              attemptCount={spec.showAttemptCount && !hasRibbon ? attemptCounts?.[exam.id] : undefined}
+              from={spec.from}
+              compact
+              className="h-auto w-80 lg:w-84"
+            />
+          );
+        })}
         {spec.trailingTile ? <ExamShelfTile /> : null}
       </ul>
     </section>

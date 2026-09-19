@@ -21,6 +21,7 @@ import {
   SHELF_MAX_CARDS,
 } from "../constants";
 import {
+  hotCountFieldOf,
   orderIdsByHotCount,
   pickDominantGrade,
   pickExploreShelf,
@@ -686,5 +687,66 @@ describe("Test 10 — hằng số ship đúng giá trị đã chốt (D12/D6/AC-
   });
   it("HOT_WINDOW_WIDE_DAYS = 30", () => {
     expect(HOT_WINDOW_WIDE_DAYS).toBe(30);
+  });
+});
+
+// =============================================================================
+// Test — hotCountFieldOf: con số hiện trên thẻ là ĐÚNG con số đã xếp hạng thẻ đó
+// =============================================================================
+// Primary failure mode: thẻ hiện `total` (hoặc cửa sổ khác) trong khi thứ hạng do
+//   `recent`/`wide` quyết định — người đọc thấy "12, 40, 7" xếp kiểu lộn xộn, và
+//   phụ đề "tuần này" đứng cạnh một con số của "từ trước tới nay".
+describe("Test — hotCountFieldOf: cột đếm của mỗi bậc", () => {
+  const ids = ["a", "b", "c", "d", "e"];
+  // Mỗi kịch bản cho các cột KHÔNG thuộc bậc đích những giá trị nhiễu (đảo thứ tự
+  // hoặc lớn hơn) — dùng nhầm cột thì dãy số đọc ra sẽ khác `expected`.
+  const CASES: {
+    rung: "site-recent" | "site-30d" | "site-all";
+    rows: [number, number, number][];
+    expected: number[];
+  }[] = [
+    {
+      rung: "site-recent",
+      rows: [[9, 1, 50], [7, 40, 5], [7, 30, 6], [3, 20, 7], [1, 10, 8]],
+      expected: [9, 7, 7, 3, 1],
+    },
+    {
+      rung: "site-30d",
+      rows: [[0, 8, 1], [0, 6, 90], [0, 6, 80], [0, 2, 70], [0, 2, 60]],
+      expected: [8, 6, 6, 2, 2],
+    },
+    {
+      rung: "site-all",
+      rows: [[0, 0, 5], [0, 0, 4], [0, 0, 3], [0, 0, 2], [0, 0, 1]],
+      expected: [5, 4, 3, 2, 1],
+    },
+  ];
+
+  it.each(CASES)(
+    "bậc $rung: đọc count qua hotCountFieldOf cho đúng $expected, giảm dần theo thứ tự thẻ",
+    ({ rung, rows, expected }) => {
+      const hotCounts = countsMap(ids.map((id, i) => [id, counts(...rows[i])] as const));
+      const result = pickHotShelf({
+        counts: hotCounts,
+        candidates: ids.map((id) => candidate(id)),
+        dominantGrade: null,
+        minCards: HOT_SHELF_MIN_CARDS,
+        maxCards: SHELF_MAX_CARDS,
+      });
+
+      expect(result?.rung).toBe(rung);
+      const field = hotCountFieldOf(rung);
+      const shown = (result?.examIds ?? []).map((id) => hotCounts.get(id)?.[field]);
+      expect(shown).toEqual(expected);
+    }
+  );
+
+  it("bảng bậc → cột: *-recent → recent, *-30d → wide, *-all → total", () => {
+    expect(hotCountFieldOf("grade-recent")).toBe("recent");
+    expect(hotCountFieldOf("site-recent")).toBe("recent");
+    expect(hotCountFieldOf("grade-30d")).toBe("wide");
+    expect(hotCountFieldOf("site-30d")).toBe("wide");
+    expect(hotCountFieldOf("grade-all")).toBe("total");
+    expect(hotCountFieldOf("site-all")).toBe("total");
   });
 });

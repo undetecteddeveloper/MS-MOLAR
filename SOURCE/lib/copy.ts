@@ -132,17 +132,15 @@ export const copy = {
 
   // --- Danh sách đề -------------------------------------------------------
   // Kệ đề (ExamShelf) — 3 kệ trên trang danh sách đề (docs/ui-spec/exam-shelves-ui-spec.md § Copy Keys).
-  "exams.shelfPracticeTitle": "Các môn cần luyện",
-  "exams.shelfPracticeSubtitle": "{subject} đang là môn điểm trung bình thấp nhất của bạn",
-  "exams.shelfHotTitle": "Các đề nổi nhất",
+  "exams.shelfPracticeTitle": "Cần luyện",
+  "exams.shelfHotTitle": "Nổi nhất",
+  "exams.attemptCount": "{count} lượt làm",
   "exams.shelfHotGradeWeek": "Khối {grade}, tuần này",
   "exams.shelfHotGradeMonth": "Khối {grade}, 30 ngày qua",
   "exams.shelfHotGradeAll": "Khối {grade}, từ trước tới nay",
   "exams.shelfHotSiteWeek": "Toàn hệ thống, tuần này",
   "exams.shelfHotSiteMonth": "Toàn hệ thống, 30 ngày qua",
-  "exams.shelfHotSiteAll": "Toàn hệ thống, từ trước tới nay",
   "exams.shelfExploreTitle": "Khám phá",
-  "exams.shelfExploreSubtitle": "Đề mới đăng, môn và trường bạn chưa thử",
   "exams.shelfViewAllStore": "Xem toàn bộ kho đề",
   "exams.hotRibbon": "Hot nhất",
   "exams.title": "Kho đề",

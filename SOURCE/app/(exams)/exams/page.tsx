@@ -135,6 +135,7 @@ export default async function ExamsPage({ searchParams }: { searchParams: Search
                 shelf={kind}
                 subtitle={shelfSubtitle(kind, data)}
                 exams={data.exams}
+                attemptCounts={"attemptCounts" in data ? data.attemptCounts : undefined}
                 submittedExamIds={shelves.submittedExamIds}
                 isLoggedIn={user !== null}
               />

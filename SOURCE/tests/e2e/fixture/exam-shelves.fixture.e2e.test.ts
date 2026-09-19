@@ -478,8 +478,8 @@ describe("Bare /exams renders three shelves; any listed URL parameter renders th
 //       negative assertion is trusted;
 //   (b) 0 elements with `id="shelf-practice"` or `aria-labelledby="shelf-practice"`
 //       exist anywhere in the document, and the resolved
-//       `exams.shelfPracticeTitle`/`exams.shelfPracticeSubtitle` strings appear
-//       NOWHERE in `container.textContent`;
+//       `exams.shelfPracticeTitle` string appears NOWHERE in
+//       `container.textContent` (the practice subtitle was removed 2026-09-19);
 //   (c) exactly 2 `<section>` shelf elements exist, in DOM order hot then explore
 //       (D8 — "the remaining shelves keep their relative order");
 //   (d) 0 dashed/placeholder card elements exist in place of the missing shelf —
@@ -506,13 +506,6 @@ describe("A shelf whose selection yields 0 cards is entirely absent from the ren
     expect(container.querySelector("#shelf-practice")).toBeNull();
     expect(container.querySelector('[aria-labelledby="shelf-practice"]')).toBeNull();
     expect(container.textContent).not.toContain(copy["exams.shelfPracticeTitle"]);
-    // The subtitle template carries a `{subject}` interpolation that is never
-    // even computed — `page.tsx`'s `data && (...)` narrowing skips the whole
-    // `ExamShelf`/`shelfSubtitle` call when practice is null — so the stable
-    // trailing clause is enough to prove the string never lands anywhere.
-    expect(container.textContent).not.toContain(
-      "đang là môn điểm trung bình thấp nhất của bạn"
-    );
 
     // (c) exactly 2 shelves, DOM order hot then explore (D8).
     const sections = shelfSections(container);

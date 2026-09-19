@@ -109,21 +109,38 @@ interface HotRungStep {
   field: keyof HotCounts;
 }
 
+/** Cột đếm mà mỗi bậc xếp hạng theo — MỘT nguồn cho cả thang (`buildHotRungSteps`)
+ *  lẫn con số hiện trên thẻ (`hotCountFieldOf`), nên số hiển thị luôn là số đã
+ *  quyết định thứ hạng của thẻ. */
+const HOT_RUNG_FIELD: Record<HotRung, keyof HotCounts> = {
+  "grade-recent": "recent",
+  "grade-30d": "wide",
+  "grade-all": "total",
+  "site-recent": "recent",
+  "site-30d": "wide",
+  "site-all": "total",
+};
+
+export function hotCountFieldOf(rung: HotRung): keyof HotCounts {
+  return HOT_RUNG_FIELD[rung];
+}
+
 function buildHotRungSteps(dominantGrade: number | null): readonly HotRungStep[] {
+  const step = (rung: HotRung, gradeScope: number | null): HotRungStep => ({
+    rung,
+    gradeScope,
+    field: HOT_RUNG_FIELD[rung],
+  });
   if (dominantGrade === null) {
     // AC-023 (U3, chốt 2026-09-18): CHỈ 3 bậc phạm vi toàn hệ thống — các bậc
     // trong-lớp bị BỎ QUA hẳn, không đoán một lớp nào cả.
-    return [
-      { rung: "site-recent", gradeScope: null, field: "recent" },
-      { rung: "site-30d", gradeScope: null, field: "wide" },
-      { rung: "site-all", gradeScope: null, field: "total" },
-    ];
+    return [step("site-recent", null), step("site-30d", null), step("site-all", null)];
   }
   return [
-    { rung: "grade-recent", gradeScope: dominantGrade, field: "recent" },
-    { rung: "grade-30d", gradeScope: dominantGrade, field: "wide" },
-    { rung: "grade-all", gradeScope: dominantGrade, field: "total" },
-    { rung: "site-all", gradeScope: null, field: "total" },
+    step("grade-recent", dominantGrade),
+    step("grade-30d", dominantGrade),
+    step("grade-all", dominantGrade),
+    step("site-all", null),
   ];
 }
 
