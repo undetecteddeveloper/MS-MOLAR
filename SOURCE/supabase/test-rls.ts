@@ -55,6 +55,7 @@
 // Cách chạy:  cd SOURCE && npx tsx supabase/test-rls.ts
 
 import { readFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
@@ -169,6 +170,86 @@ const SUB_ORDER_MEMO = "[rls-sub] fixture memo — khong phai don that";
 const SUB_ANCHOR_SENTINEL = "2099-01-02T03:04:05.000Z";
 const SUB_EXPIRES_SENTINEL = "2099-02-03T04:05:06.000Z";
 const SUB_PENDING_UNTIL_SENTINEL = "2099-03-04T05:06:07.000Z";
+
+// Fixture Community Solutions (backend Design Doc v1.9 § Integration
+// Verification Points, task-ownership binding: migration task 03 tested here,
+// task 05 — Early Verification Point of the whole work plan). Một đề published
+// duy nhất, 5 câu, tác giả = User A (cùng quy ước "tác giả = A" dùng lại ở
+// Rating/History phía trên — A vừa là tác giả vừa là người nộp bài, RLS không
+// cấm điều đó). Dùng LẠI đúng exam/solution fixture xuyên suốt mọi case dưới
+// đây để không nhân bản setup — mỗi case chỉ đổi TRẠNG THÁI (đề/attempt/bài
+// giải), không tạo exam mới.
+const CS_EXAM_ID = "rls-cs-exam";
+const CS_QUESTION_IDS = [1, 2, 3, 4, 5].map((n) => `${CS_EXAM_ID}-q${n}`);
+
+/** Sinh đúng `n` từ (đếm bằng khoảng trắng, khớp `count_words`/`countWords`). */
+function csWords(n: number): string {
+  return Array.from({ length: n }, (_, i) => `tu${i + 1}`).join(" ");
+}
+
+/** Xóa sạch fixture Community Solutions (chạy trước VÀ sau để idempotent). */
+async function cleanupCommunitySolutionsFixtures(admin: SupabaseClient) {
+  await admin.from("community_moderation_log").delete().eq("exam_id", CS_EXAM_ID);
+  await admin.from("community_solutions").delete().eq("exam_id", CS_EXAM_ID);
+  await admin.from("exam_attempts").delete().eq("exam_id", CS_EXAM_ID);
+  await admin.from("exams").delete().eq("id", CS_EXAM_ID);
+  await admin.from("questions").delete().in("id", CS_QUESTION_IDS);
+}
+
+/** Tạo fixture Community Solutions qua service_role: 1 đề published, 5 câu, tác
+ *  giả = A. KHÔNG tạo attempt/bài giải ở đây — từng nhóm case tự tạo attempt
+ *  đúng lúc nó cần (case "Writer attempt id" cần đọc trạng thái CHƯA có attempt
+ *  nào trước). */
+async function setupCommunitySolutionsFixtures(admin: SupabaseClient, authorId: string) {
+  const questions = await admin.from("questions").insert(
+    CS_QUESTION_IDS.map((id, i) => ({
+      id,
+      content: `[RLS-CS] Câu ${i + 1} bản gốc`,
+      choices: MCQ_CHOICES,
+      correct_answer: "A",
+      subject: "Toán",
+      grade: 10,
+      topic: "Toán",
+    })),
+  );
+  if (questions.error) throw questions.error;
+
+  const exam = await admin.from("exams").insert({
+    id: CS_EXAM_ID,
+    title: "[RLS] Đề Bài giải cộng đồng",
+    duration_minutes: 45,
+    subject: "Toán",
+    grade: 10,
+    author_id: authorId,
+    author_display_name: "RLS Test Author",
+    question_ids: CS_QUESTION_IDS,
+    status: "published",
+  });
+  if (exam.error) throw exam.error;
+}
+
+/** Tạo một lượt làm ĐÃ NỘP qua service_role, trả về id. `submittedAt` quyết
+ *  định thứ tự "mới nhất" mà `community_solution_for_writer` dùng. */
+async function insertSubmittedAttempt(
+  admin: SupabaseClient,
+  userId: string,
+  examId: string,
+  submittedAt: Date,
+): Promise<string> {
+  const res = await admin
+    .from("exam_attempts")
+    .insert({
+      user_id: userId,
+      exam_id: examId,
+      status: "submitted",
+      started_at: new Date(submittedAt.getTime() - 60_000).toISOString(),
+      submitted_at: submittedAt.toISOString(),
+    })
+    .select("id")
+    .single();
+  if (res.error) throw res.error;
+  return res.data.id as string;
+}
 
 let failures = 0;
 function assert(cond: boolean, msg: string) {
@@ -2391,6 +2472,690 @@ async function main() {
       (subResidueSubs.data?.length ?? 0) === 0,
     `Phần 9 (hậu kiểm dọn dẹp): không còn dòng fixture nào trong payment_orders/subscriptions (còn lại: ${subResidueOrders.data?.length ?? "?"} đơn / ${subResidueSubs.data?.length ?? "?"} entitlement)`,
   );
+
+  // ==========================================================================
+  // Phần 10 — Community Solutions (backend Design Doc v1.9 § Integration
+  // Verification Points; § Verification Strategy Early Verification Point).
+  // ĐÂY LÀ TASK KIỂM CHO migration task 03 (task-ownership binding, v1.9): mọi
+  // case dưới đây thuộc về task 03's DDL/functions, được VIẾT VÀ CHẠY ở task
+  // 05. Cũng là Early Verification Point của TOÀN BỘ work plan — REQUIRED,
+  // BLOCKING: một lượt gate lệch ở đây thì mọi RPC user-write sau này (task 06
+  // trở đi) sao chép lại đúng gate lệch đó (xem Investigation Notes của task
+  // 05 — so sánh predicate exam_answer_key() / save_community_solution()).
+  // ==========================================================================
+  console.log("\nCommunity Solutions — setup fixture (service_role)…");
+  await cleanupCommunitySolutionsFixtures(admin);
+  await setupCommunitySolutionsFixtures(admin, userAId);
+
+  console.log("\nRLS checks (Community Solutions — admin_users / is_admin_user()):");
+
+  // CS-admin (refusal). anon KHÔNG gọi được is_admin_user().
+  const csAdminAnon = await anonClient.rpc("is_admin_user");
+  assert(
+    isAuthorizationDenial(csAdminAnon.error),
+    `CS-admin refusal: anon KHÔNG gọi được is_admin_user() (nhận: ${csAdminAnon.error?.code ?? "KHÔNG CÓ LỖI"})`,
+  );
+  // CS-admin (refusal, table closure). B (authenticated, KHÔNG phải admin)
+  // KHÔNG đọc trực tiếp được bảng admin_users (revoke all + RLS bật, không
+  // policy nào).
+  const csAdminUsersDirect = await userB.from("admin_users").select("user_id");
+  assert(
+    isAuthorizationDenial(csAdminUsersDirect.error) || (csAdminUsersDirect.data?.length ?? 0) === 0,
+    `CS-admin refusal (table closure): B KHÔNG đọc trực tiếp được admin_users (nhận: ${csAdminUsersDirect.error?.code ?? `${csAdminUsersDirect.data?.length ?? 0} dòng`})`,
+  );
+  // CS-admin (success). B — authenticated, KHÔNG phải admin — gọi ĐƯỢC
+  // is_admin_user() (chỉ BẢNG đóng, HÀM mở cho authenticated) và nhận false.
+  const csAdminB = await userB.rpc("is_admin_user");
+  assert(
+    !csAdminB.error && csAdminB.data === false,
+    `CS-admin success: B (không phải admin) gọi được is_admin_user() và nhận false (nhận: ${csAdminB.error?.code ?? csAdminB.data})`,
+  );
+
+  console.log(
+    "\nRLS checks (Community Solutions — table closure community_solutions / community_solution_notes):",
+  );
+
+  // CS-table-closure (refusal). Không client role nào có đường ghi/đọc TRỰC
+  // TIẾP — RLS bật, KHÔNG policy nào, `revoke all from anon, authenticated`.
+  const csDirectInsertSolution = await userA
+    .from("community_solutions")
+    .insert({ exam_id: CS_EXAM_ID, author_id: userAId })
+    .select("id");
+  assert(
+    isAuthorizationDenial(csDirectInsertSolution.error) && (csDirectInsertSolution.data?.length ?? 0) === 0,
+    `CS table closure: A KHÔNG tự INSERT trực tiếp được community_solutions (nhận: ${csDirectInsertSolution.error?.code ?? "KHÔNG CÓ LỖI"})`,
+  );
+  const csDirectSelectSolution = await userA.from("community_solutions").select("id");
+  assert(
+    isAuthorizationDenial(csDirectSelectSolution.error) || (csDirectSelectSolution.data?.length ?? 0) === 0,
+    `CS table closure: A KHÔNG đọc trực tiếp được community_solutions (nhận: ${csDirectSelectSolution.error?.code ?? `${csDirectSelectSolution.data?.length ?? 0} dòng`})`,
+  );
+  const csDirectInsertNote = await userA
+    .from("community_solution_notes")
+    .insert({ solution_id: randomUUID(), question_id: CS_QUESTION_IDS[0], body: "x" })
+    .select();
+  assert(
+    isAuthorizationDenial(csDirectInsertNote.error) && (csDirectInsertNote.data?.length ?? 0) === 0,
+    `CS table closure: A KHÔNG tự INSERT trực tiếp được community_solution_notes (nhận: ${csDirectInsertNote.error?.code ?? "KHÔNG CÓ LỖI"})`,
+  );
+  // Nhóm THÀNH CÔNG cho hai bảng này chứng minh ở các bước RPC ngay dưới đây —
+  // save_community_solution ghi được đúng dòng mà client KHÔNG viết trực tiếp
+  // được, đối chứng độc lập qua chính service_role.
+
+  console.log("\nRLS checks (Community Solutions — Writer attempt id / Writer payload key set):");
+
+  const csAttemptOld = await insertSubmittedAttempt(admin, userAId, CS_EXAM_ID, new Date(Date.now() - 3_600_000));
+  const csAttemptNew = await insertSubmittedAttempt(admin, userAId, CS_EXAM_ID, new Date());
+
+  const writerBeforeSolution = await userA.rpc("community_solution_for_writer", { p_exam_id: CS_EXAM_ID });
+  const writerBeforeRow = writerBeforeSolution.data?.[0] as
+    | { solution_id: string | null; status: string | null; attempt_id: string | null }
+    | undefined;
+  assert(
+    !writerBeforeSolution.error &&
+      writerBeforeSolution.data?.length === 1 &&
+      writerBeforeRow?.solution_id === null &&
+      writerBeforeRow?.status === null &&
+      writerBeforeRow?.attempt_id === csAttemptNew,
+    `Writer attempt id: chưa có bài giải → 1 dòng, solution_id/status null, attempt_id = lượt nộp MỚI NHẤT chứ không phải lượt cũ hơn (nhận: ${JSON.stringify(writerBeforeRow)}, mong đợi attempt_id=${csAttemptNew})`,
+  );
+
+  // csAttemptOld chỉ để chứng minh "không thắng" ở check trên — xoá ngay để
+  // không còn 'submitted' nào khác lẫn vào các bước dưới (nếu còn, nó sẽ
+  // "thắng" khi csAttemptNew bị chuyển in_progress ở bước sau).
+  await admin.from("exam_attempts").delete().eq("id", csAttemptOld);
+
+  const csNotesInitial = [
+    { question_id: CS_QUESTION_IDS[0], body: csWords(15) },
+    { question_id: CS_QUESTION_IDS[1], body: csWords(15) },
+    { question_id: CS_QUESTION_IDS[2], body: csWords(9) },
+  ];
+  const saveInitial = await userA.rpc("save_community_solution", {
+    p_exam_id: CS_EXAM_ID,
+    p_attempt_id: csAttemptNew,
+    p_show_profile: true,
+    p_show_score: false,
+    p_notes: csNotesInitial,
+  });
+  const saveInitialRow = saveInitial.data?.[0] as { solution_id: string; status: string } | undefined;
+  assert(
+    !saveInitial.error && saveInitial.data?.length === 1 && saveInitialRow?.status === "draft",
+    `save_community_solution (lần 1): tạo bài giải draft, không lỗi (nhận: ${saveInitial.error?.code ?? JSON.stringify(saveInitial.data)})`,
+  );
+  const csSolutionId = saveInitialRow!.solution_id;
+
+  // Nhóm THÀNH CÔNG (đối chứng độc lập qua service_role) cho community_solutions
+  // / community_solution_notes — bảng bị đóng với client (kiểm ở trên) nhưng
+  // RPC vừa ghi đúng dòng.
+  const csSolutionRow = await admin
+    .from("community_solutions")
+    .select("id, exam_id, author_id, status")
+    .eq("id", csSolutionId)
+    .single();
+  assert(
+    !csSolutionRow.error && csSolutionRow.data?.exam_id === CS_EXAM_ID && csSolutionRow.data?.author_id === userAId,
+    "CS success: community_solutions có đúng dòng do save_community_solution tạo (exam_id/author_id khớp)",
+  );
+  const csNotesRows = await admin.from("community_solution_notes").select("question_id").eq("solution_id", csSolutionId);
+  assert(
+    !csNotesRows.error && (csNotesRows.data?.length ?? 0) === 3,
+    `CS success: community_solution_notes có đúng 3 dòng ghi chú do RPC tạo (nhận ${csNotesRows.data?.length})`,
+  );
+
+  const writerAfterSave = await userA.rpc("community_solution_for_writer", { p_exam_id: CS_EXAM_ID });
+  const writerAfterSaveRow = writerAfterSave.data?.[0] as Record<string, unknown> | undefined;
+  assert(
+    !writerAfterSave.error &&
+      writerAfterSave.data?.length === 1 &&
+      writerAfterSaveRow?.solution_id === csSolutionId &&
+      writerAfterSaveRow?.status === "draft" &&
+      writerAfterSaveRow?.attempt_id === csAttemptNew,
+    `Writer attempt id: sau save, attempt_id vẫn = attempt mới nhất, qua linked_attempt_id (nhận: ${JSON.stringify(writerAfterSaveRow)})`,
+  );
+  const writerKeys = Object.keys(writerAfterSaveRow ?? {}).sort();
+  const expectedWriterKeys = [
+    "attempt_id",
+    "hidden_reason",
+    "questions",
+    "show_profile",
+    "show_score",
+    "solution_id",
+    "status",
+  ].sort();
+  assert(
+    JSON.stringify(writerKeys) === JSON.stringify(expectedWriterKeys),
+    `Writer payload key set: đúng 7 khoá {solution_id, attempt_id, status, show_profile, show_score, hidden_reason, questions}, set-equal cả hai chiều (nhận: ${JSON.stringify(writerKeys)})`,
+  );
+
+  // Đổi NỘI DUNG câu 1 (KHÔNG đổi ghi chú) → question_content_fingerprint đổi
+  // → has_changed=true cho ĐÚNG một câu (câu 1). Câu 4/5 chưa có ghi chú nên
+  // has_changed của chúng luôn false (n.solution_id is null).
+  const changeQ1Content = await admin
+    .from("questions")
+    .update({ content: "[RLS-CS] Câu 1 ĐÃ SỬA NỘI DUNG" })
+    .eq("id", CS_QUESTION_IDS[0]);
+  if (changeQ1Content.error) throw changeQ1Content.error;
+
+  const writerAfterContentChange = await userA.rpc("community_solution_for_writer", { p_exam_id: CS_EXAM_ID });
+  const questionsPayload = (writerAfterContentChange.data?.[0] as { questions?: Array<{ question_id: string; has_changed: boolean }> } | undefined)
+    ?.questions;
+  const changedCount = (questionsPayload ?? []).filter((q) => q.has_changed).length;
+  const q1HasChanged = questionsPayload?.find((q) => q.question_id === CS_QUESTION_IDS[0])?.has_changed;
+  assert(
+    !writerAfterContentChange.error && changedCount === 1 && q1HasChanged === true,
+    `Writer payload has_changed: đúng 1 câu có has_changed=true (câu 1, nội dung vừa đổi) trong số các câu CÓ ghi chú (nhận: đếm=${changedCount}, câu 1=${q1HasChanged})`,
+  );
+
+  // Attempt quay lại 'in_progress' (KHÔNG còn attempt 'submitted' nào khác của
+  // A trên đề này, vì csAttemptOld đã xoá ở trên) → community_solution_for_writer
+  // trả 0 dòng dù bài giải đã có.
+  const toInProgress = await admin.from("exam_attempts").update({ status: "in_progress" }).eq("id", csAttemptNew);
+  if (toInProgress.error) throw toInProgress.error;
+  const writerWhileInProgress = await userA.rpc("community_solution_for_writer", { p_exam_id: CS_EXAM_ID });
+  assert(
+    !writerWhileInProgress.error && (writerWhileInProgress.data?.length ?? -1) === 0,
+    `Writer attempt id: attempt quay 'in_progress' → 0 dòng dù đã có bài giải (nhận ${writerWhileInProgress.data?.length})`,
+  );
+  const toSubmittedAgain = await admin
+    .from("exam_attempts")
+    .update({ status: "submitted", submitted_at: new Date().toISOString() })
+    .eq("id", csAttemptNew);
+  if (toSubmittedAgain.error) throw toSubmittedAgain.error;
+  const writerResubmitted = await userA.rpc("community_solution_for_writer", { p_exam_id: CS_EXAM_ID });
+  const writerResubmittedRow = writerResubmitted.data?.[0] as Record<string, unknown> | undefined;
+  assert(
+    !writerResubmitted.error &&
+      writerResubmitted.data?.length === 1 &&
+      writerResubmittedRow?.solution_id === csSolutionId &&
+      writerResubmittedRow?.attempt_id === csAttemptNew,
+    "Writer attempt id: nộp lại (submitted) → về đúng dòng như trước",
+  );
+
+  console.log("\nRLS checks (Community Solutions — Publish refusal DETAIL / Early Verification Point):");
+
+  // 5 câu hiện tại: câu 1/2 đủ 15 từ, câu 3 chỉ 9 từ, câu 4/5 chưa có ghi chú
+  // → thiếu đúng 3 câu.
+  const publishMissing3 = await userA.rpc("set_community_solution_status", {
+    p_exam_id: CS_EXAM_ID,
+    p_action: "publish",
+  });
+  assert(
+    publishMissing3.error?.code === "23514" && publishMissing3.error?.details === "3",
+    `Publish refusal DETAIL: thiếu 3 câu (câu 3 chỉ 9 từ + câu 4/5 chưa có ghi chú) → DETAIL đúng bằng chuỗi '3' (nhận: ${JSON.stringify(publishMissing3.error?.details)})`,
+  );
+  const solutionAfterMissing3 = await admin.from("community_solutions").select("status").eq("id", csSolutionId).single();
+  assert(solutionAfterMissing3.data?.status === "draft", "Publish refusal DETAIL: row vẫn 'draft' sau từ chối (DETAIL '3')");
+
+  // Câu 3 lên 15 từ — đang draft nên không bị luật 15-từ chặn ở đây.
+  const fixQ3 = await userA.rpc("save_community_solution", {
+    p_exam_id: CS_EXAM_ID,
+    p_attempt_id: csAttemptNew,
+    p_show_profile: true,
+    p_show_score: false,
+    p_notes: [{ question_id: CS_QUESTION_IDS[2], body: csWords(15) }],
+  });
+  assert(!fixQ3.error, `save_community_solution: nâng ghi chú câu 3 lên 15 từ, không lỗi (nhận ${fixQ3.error?.code})`);
+
+  const publishMissing2 = await userA.rpc("set_community_solution_status", {
+    p_exam_id: CS_EXAM_ID,
+    p_action: "publish",
+  });
+  assert(
+    publishMissing2.error?.code === "23514" && publishMissing2.error?.details === "2",
+    `Publish refusal DETAIL: còn thiếu 2 câu (4/5) → DETAIL đúng bằng chuỗi '2' (nhận: ${JSON.stringify(publishMissing2.error?.details)})`,
+  );
+
+  const fixQ4Q5 = await userA.rpc("save_community_solution", {
+    p_exam_id: CS_EXAM_ID,
+    p_attempt_id: csAttemptNew,
+    p_show_profile: true,
+    p_show_score: false,
+    p_notes: [
+      { question_id: CS_QUESTION_IDS[3], body: csWords(15) },
+      { question_id: CS_QUESTION_IDS[4], body: csWords(15) },
+    ],
+  });
+  assert(!fixQ4Q5.error, `save_community_solution: điền nốt ghi chú câu 4/5, không lỗi (nhận ${fixQ4Q5.error?.code})`);
+
+  const publishSuccess = await userA.rpc("set_community_solution_status", {
+    p_exam_id: CS_EXAM_ID,
+    p_action: "publish",
+  });
+  const publishSuccessRow = publishSuccess.data?.[0] as { status: string } | undefined;
+  assert(
+    !publishSuccess.error && publishSuccess.data?.length === 1 && publishSuccessRow?.status === "published",
+    `Publish refusal DETAIL / Early Verification Point: đủ 5 câu ≥15 từ → publish thành công, status='published', không raise gì (nhận: ${publishSuccess.error?.code ?? JSON.stringify(publishSuccess.data)})`,
+  );
+
+  const draftNeverThrows23514 = await userA.rpc("set_community_solution_status", {
+    p_exam_id: CS_EXAM_ID,
+    p_action: "draft",
+  });
+  assert(
+    !draftNeverThrows23514.error && (draftNeverThrows23514.data?.[0] as { status: string } | undefined)?.status === "draft",
+    "Publish refusal DETAIL: 'draft' không bao giờ bắn 23514 — gate chỉ áp cho publish",
+  );
+  const republishForNextGroups = await userA.rpc("set_community_solution_status", {
+    p_exam_id: CS_EXAM_ID,
+    p_action: "publish",
+  });
+  assert(
+    !republishForNextGroups.error &&
+      (republishForNextGroups.data?.[0] as { status: string } | undefined)?.status === "published",
+    "Publish lại thành công (mọi ghi chú vẫn ≥15 từ) — chuẩn bị bài giải published cho các nhóm AC-004/AC-002 dưới đây",
+  );
+
+  // Early Verification Point, tiêu chí thứ 3: một lời gọi từ người CHƯA nộp bài
+  // (B) bị từ chối 42501 và KHÔNG tạo dòng nào — kiểm bằng đếm độc lập trước/
+  // sau qua service_role (AC-002).
+  //
+  // RED-phase self-check (task file § Implementation Steps, Red Phase): trước
+  // khi chốt bản dưới đây, đã tạm đổi `userB` → `userA` (người ĐÃ nộp bài) ở
+  // lời gọi RPC bên dưới, chạy lại toàn bộ `test-rls.ts`, và xác nhận assertion
+  // này chuyển ĐỎ (userA gọi được — code khác 42501/không phải "not submitted"
+  // của B) trước khi revert về đúng userB. Xem Investigation Notes/báo cáo.
+  const beforeBCount = await admin
+    .from("community_solutions")
+    .select("id", { count: "exact", head: true })
+    .eq("exam_id", CS_EXAM_ID)
+    .eq("author_id", userBId);
+  const saveAsB = await userB.rpc("save_community_solution", {
+    p_exam_id: CS_EXAM_ID,
+    p_attempt_id: null,
+    p_show_profile: true,
+    p_show_score: false,
+    p_notes: [],
+  });
+  const afterBCount = await admin
+    .from("community_solutions")
+    .select("id", { count: "exact", head: true })
+    .eq("exam_id", CS_EXAM_ID)
+    .eq("author_id", userBId);
+  assert(
+    saveAsB.error?.code === "42501" && (beforeBCount.count ?? -1) === 0 && (afterBCount.count ?? -1) === 0,
+    `Early Verification Point (tiêu chí 3): B (chưa nộp bài) gọi save_community_solution bị 42501, KHÔNG tạo dòng nào cho B (nhận: mã=${saveAsB.error?.code}, trước=${beforeBCount.count}, sau=${afterBCount.count})`,
+  );
+
+  console.log("\nRLS checks (Community Solutions — AC-004 gate: đề chuyển draft):");
+
+  const csLog1 = await admin
+    .from("community_moderation_log")
+    .insert({
+      target_type: "solution",
+      target_id: randomUUID(),
+      exam_id: CS_EXAM_ID,
+      target_user_id: userAId,
+      actor_id: userAId,
+      action: "delete",
+      reason: "[RLS-CS] Lý do xoá hẳn #1 (AC-004, đề draft)",
+    })
+    .select("id")
+    .single();
+  if (csLog1.error) throw csLog1.error;
+
+  const snapshotBeforeExamDraft = await admin
+    .from("community_solutions")
+    .select("status, updated_at")
+    .eq("id", csSolutionId)
+    .single();
+  const notesBeforeExamDraft = await admin
+    .from("community_solution_notes")
+    .select("question_id, body")
+    .eq("solution_id", csSolutionId)
+    .order("question_id");
+
+  const examToDraft = await admin.from("exams").update({ status: "draft" }).eq("id", CS_EXAM_ID);
+  if (examToDraft.error) throw examToDraft.error;
+
+  const saveWhileExamDraft = await userA.rpc("save_community_solution", {
+    p_exam_id: CS_EXAM_ID,
+    p_attempt_id: csAttemptNew,
+    p_show_profile: true,
+    p_show_score: false,
+    p_notes: [],
+  });
+  const publishWhileExamDraft = await userA.rpc("set_community_solution_status", {
+    p_exam_id: CS_EXAM_ID,
+    p_action: "publish",
+  });
+  const draftWhileExamDraft = await userA.rpc("set_community_solution_status", {
+    p_exam_id: CS_EXAM_ID,
+    p_action: "draft",
+  });
+  assert(
+    saveWhileExamDraft.error?.code === "42501" &&
+      saveWhileExamDraft.error?.message === "save_community_solution: exam not visible" &&
+      publishWhileExamDraft.error?.code === "42501" &&
+      publishWhileExamDraft.error?.message === "set_community_solution_status: exam not visible" &&
+      draftWhileExamDraft.error?.code === "42501" &&
+      draftWhileExamDraft.error?.message === "set_community_solution_status: exam not visible",
+    `AC-004 gate (đề draft): save/publish/draft đều 42501 '<function>: exam not visible' (nhận: ${saveWhileExamDraft.error?.message} / ${publishWhileExamDraft.error?.message} / ${draftWhileExamDraft.error?.message})`,
+  );
+  const snapshotDuringExamDraft = await admin
+    .from("community_solutions")
+    .select("status, updated_at")
+    .eq("id", csSolutionId)
+    .single();
+  const notesDuringExamDraft = await admin
+    .from("community_solution_notes")
+    .select("question_id, body")
+    .eq("solution_id", csSolutionId)
+    .order("question_id");
+  assert(
+    JSON.stringify(snapshotDuringExamDraft.data) === JSON.stringify(snapshotBeforeExamDraft.data) &&
+      JSON.stringify(notesDuringExamDraft.data) === JSON.stringify(notesBeforeExamDraft.data),
+    "AC-004 gate (đề draft): community_solutions/community_solution_notes KHÔNG đổi dòng nào sau 3 lời gọi bị từ chối",
+  );
+
+  const writerWhileExamDraft = await userA.rpc("community_solution_for_writer", { p_exam_id: CS_EXAM_ID });
+  const resultCardWhileExamDraft = await userA.rpc("community_solution_result_card", { p_exam_id: CS_EXAM_ID });
+  assert(
+    (writerWhileExamDraft.data?.length ?? -1) === 0 && (resultCardWhileExamDraft.data?.length ?? -1) === 0,
+    `AC-004 gate (đề draft): community_solution_for_writer/community_solution_result_card trả 0 dòng (nhận ${writerWhileExamDraft.data?.length}/${resultCardWhileExamDraft.data?.length})`,
+  );
+  const csLog1Unseen = await admin.from("community_moderation_log").select("viewed_at").eq("id", csLog1.data!.id).single();
+  assert(
+    csLog1Unseen.data?.viewed_at === null,
+    "AC-004 gate (đề draft): community_moderation_log #1 vẫn viewed_at=null (result_card không đọc được lúc đề vô hình)",
+  );
+
+  const examRestored1 = await admin.from("exams").update({ status: "published" }).eq("id", CS_EXAM_ID);
+  if (examRestored1.error) throw examRestored1.error;
+  const writerAfterExamRestore1 = await userA.rpc("community_solution_for_writer", { p_exam_id: CS_EXAM_ID });
+  assert(
+    (writerAfterExamRestore1.data?.length ?? 0) === 1,
+    "AC-004 gate: sau khi đề published lại, community_solution_for_writer trả lại đúng dòng",
+  );
+  const resultCardFirstRead1 = await userA.rpc("community_solution_result_card", { p_exam_id: CS_EXAM_ID });
+  const resultCardRow1a = resultCardFirstRead1.data?.[0] as { unseen_deletion_reason: string | null } | undefined;
+  assert(
+    !resultCardFirstRead1.error && resultCardRow1a?.unseen_deletion_reason === "[RLS-CS] Lý do xoá hẳn #1 (AC-004, đề draft)",
+    `AC-004 gate: sau khi đề published lại, result_card trả đúng lý do xoá hẳn LẦN ĐẦU (nhận: ${resultCardRow1a?.unseen_deletion_reason})`,
+  );
+  const resultCardSecondRead1 = await userA.rpc("community_solution_result_card", { p_exam_id: CS_EXAM_ID });
+  const resultCardRow1b = resultCardSecondRead1.data?.[0] as { unseen_deletion_reason: string | null } | undefined;
+  assert(
+    !resultCardSecondRead1.error && resultCardRow1b?.unseen_deletion_reason === null,
+    `AC-004 gate: lần đọc THỨ HAI, lý do xoá hẳn không còn (đã đánh dấu viewed_at — "đúng một lần") (nhận: ${resultCardRow1b?.unseen_deletion_reason})`,
+  );
+
+  console.log("\nRLS checks (Community Solutions — AC-004 gate: tác giả bị ban):");
+
+  const csLog2 = await admin
+    .from("community_moderation_log")
+    .insert({
+      target_type: "solution",
+      target_id: randomUUID(),
+      exam_id: CS_EXAM_ID,
+      target_user_id: userAId,
+      actor_id: userAId,
+      action: "delete",
+      reason: "[RLS-CS] Lý do xoá hẳn #2 (AC-004, tác giả bị ban)",
+    })
+    .select("id")
+    .single();
+  if (csLog2.error) throw csLog2.error;
+
+  const banAuthor = await admin.auth.admin.updateUserById(userAId, { ban_duration: "24h" });
+  if (banAuthor.error) throw banAuthor.error;
+
+  const snapshotBeforeBan = await admin.from("community_solutions").select("status, updated_at").eq("id", csSolutionId).single();
+  const saveWhileBanned = await userA.rpc("save_community_solution", {
+    p_exam_id: CS_EXAM_ID,
+    p_attempt_id: csAttemptNew,
+    p_show_profile: true,
+    p_show_score: false,
+    p_notes: [],
+  });
+  const publishWhileBanned = await userA.rpc("set_community_solution_status", {
+    p_exam_id: CS_EXAM_ID,
+    p_action: "publish",
+  });
+  const draftWhileBanned = await userA.rpc("set_community_solution_status", {
+    p_exam_id: CS_EXAM_ID,
+    p_action: "draft",
+  });
+  assert(
+    saveWhileBanned.error?.code === "42501" &&
+      saveWhileBanned.error?.message === "save_community_solution: exam not visible" &&
+      publishWhileBanned.error?.code === "42501" &&
+      publishWhileBanned.error?.message === "set_community_solution_status: exam not visible" &&
+      draftWhileBanned.error?.code === "42501" &&
+      draftWhileBanned.error?.message === "set_community_solution_status: exam not visible",
+    `AC-004 gate (tác giả bị ban): save/publish/draft đều 42501 '<function>: exam not visible' (nhận: ${saveWhileBanned.error?.message} / ${publishWhileBanned.error?.message} / ${draftWhileBanned.error?.message})`,
+  );
+  const snapshotDuringBan = await admin.from("community_solutions").select("status, updated_at").eq("id", csSolutionId).single();
+  assert(
+    JSON.stringify(snapshotDuringBan.data) === JSON.stringify(snapshotBeforeBan.data),
+    "AC-004 gate (tác giả bị ban): community_solutions KHÔNG đổi dòng sau 3 lời gọi bị từ chối",
+  );
+
+  const writerWhileBanned = await userA.rpc("community_solution_for_writer", { p_exam_id: CS_EXAM_ID });
+  const resultCardWhileBanned = await userA.rpc("community_solution_result_card", { p_exam_id: CS_EXAM_ID });
+  assert(
+    (writerWhileBanned.data?.length ?? -1) === 0 && (resultCardWhileBanned.data?.length ?? -1) === 0,
+    "AC-004 gate (tác giả bị ban): community_solution_for_writer/community_solution_result_card trả 0 dòng",
+  );
+  const csLog2Unseen = await admin.from("community_moderation_log").select("viewed_at").eq("id", csLog2.data!.id).single();
+  assert(
+    csLog2Unseen.data?.viewed_at === null,
+    "AC-004 gate (tác giả bị ban): community_moderation_log #2 vẫn viewed_at=null",
+  );
+
+  const unbanAuthor = await admin.auth.admin.updateUserById(userAId, { ban_duration: "none" });
+  if (unbanAuthor.error) throw unbanAuthor.error;
+
+  const writerAfterUnban = await userA.rpc("community_solution_for_writer", { p_exam_id: CS_EXAM_ID });
+  assert((writerAfterUnban.data?.length ?? 0) === 1, "AC-004 gate: sau khi bỏ ban, community_solution_for_writer trả lại đúng dòng");
+  const resultCardAfterUnbanFirst = await userA.rpc("community_solution_result_card", { p_exam_id: CS_EXAM_ID });
+  const rowUnban1 = resultCardAfterUnbanFirst.data?.[0] as { unseen_deletion_reason: string | null } | undefined;
+  assert(
+    rowUnban1?.unseen_deletion_reason === "[RLS-CS] Lý do xoá hẳn #2 (AC-004, tác giả bị ban)",
+    `AC-004 gate: sau khi bỏ ban, lần đọc đầu trả đúng lý do #2 (nhận ${rowUnban1?.unseen_deletion_reason})`,
+  );
+  const resultCardAfterUnbanSecond = await userA.rpc("community_solution_result_card", { p_exam_id: CS_EXAM_ID });
+  const rowUnban2 = resultCardAfterUnbanSecond.data?.[0] as { unseen_deletion_reason: string | null } | undefined;
+  assert(rowUnban2?.unseen_deletion_reason === null, "AC-004 gate: lần đọc thứ hai sau bỏ ban, lý do xoá hẳn không còn");
+
+  console.log("\nRLS checks (Community Solutions — AC-002 gate):");
+
+  const csLog3 = await admin
+    .from("community_moderation_log")
+    .insert({
+      target_type: "solution",
+      target_id: randomUUID(),
+      exam_id: CS_EXAM_ID,
+      target_user_id: userAId,
+      actor_id: userAId,
+      action: "delete",
+      reason: "[RLS-CS] Lý do xoá hẳn #3 (AC-002)",
+    })
+    .select("id")
+    .single();
+  if (csLog3.error) throw csLog3.error;
+
+  const attemptToInProgress = await admin.from("exam_attempts").update({ status: "in_progress" }).eq("id", csAttemptNew);
+  if (attemptToInProgress.error) throw attemptToInProgress.error;
+
+  const publishWhileInProgress = await userA.rpc("set_community_solution_status", {
+    p_exam_id: CS_EXAM_ID,
+    p_action: "publish",
+  });
+  const draftWhileInProgress = await userA.rpc("set_community_solution_status", {
+    p_exam_id: CS_EXAM_ID,
+    p_action: "draft",
+  });
+  assert(
+    publishWhileInProgress.error?.code === "42501" &&
+      publishWhileInProgress.error?.message === "set_community_solution_status: not submitted" &&
+      draftWhileInProgress.error?.code === "42501" &&
+      draftWhileInProgress.error?.message === "set_community_solution_status: not submitted",
+    `AC-002 gate: publish/draft đều 42501 'set_community_solution_status: not submitted' khi attempt của A đang 'in_progress' (nhận: ${publishWhileInProgress.error?.message} / ${draftWhileInProgress.error?.message})`,
+  );
+  const solutionDuringInProgress = await admin.from("community_solutions").select("status").eq("id", csSolutionId).single();
+  assert(solutionDuringInProgress.data?.status === "published", "AC-002 gate: community_solutions KHÔNG đổi dòng (vẫn 'published')");
+
+  const resultCardWhileInProgress = await userA.rpc("community_solution_result_card", { p_exam_id: CS_EXAM_ID });
+  assert((resultCardWhileInProgress.data?.length ?? -1) === 0, "AC-002 gate: community_solution_result_card trả 0 dòng");
+  const csLog3Unseen = await admin.from("community_moderation_log").select("viewed_at").eq("id", csLog3.data!.id).single();
+  assert(csLog3Unseen.data?.viewed_at === null, "AC-002 gate: community_moderation_log #3 vẫn viewed_at=null");
+
+  const attemptResubmitted = await admin
+    .from("exam_attempts")
+    .update({ status: "submitted", submitted_at: new Date().toISOString() })
+    .eq("id", csAttemptNew);
+  if (attemptResubmitted.error) throw attemptResubmitted.error;
+  const draftAfterResubmit = await userA.rpc("set_community_solution_status", {
+    p_exam_id: CS_EXAM_ID,
+    p_action: "draft",
+  });
+  assert(
+    !draftAfterResubmit.error && (draftAfterResubmit.data?.[0] as { status: string } | undefined)?.status === "draft",
+    "AC-002 gate: sau khi nộp lại (submitted), set_community_solution_status hoạt động bình thường trở lại",
+  );
+
+  const republishForSaveGroup = await userA.rpc("set_community_solution_status", {
+    p_exam_id: CS_EXAM_ID,
+    p_action: "publish",
+  });
+  if (republishForSaveGroup.error) throw republishForSaveGroup.error;
+
+  console.log("\nRLS checks (Community Solutions — Save refusal token):");
+
+  const noteBeforeShortRefusal = await admin
+    .from("community_solution_notes")
+    .select("body")
+    .eq("solution_id", csSolutionId)
+    .eq("question_id", CS_QUESTION_IDS[0])
+    .single();
+  const saveShortNote = await userA.rpc("save_community_solution", {
+    p_exam_id: CS_EXAM_ID,
+    p_attempt_id: csAttemptNew,
+    p_show_profile: true,
+    p_show_score: false,
+    p_notes: [{ question_id: CS_QUESTION_IDS[0], body: csWords(9) }],
+  });
+  assert(
+    saveShortNote.error?.code === "23514" && saveShortNote.error?.details === "below_word_count",
+    `Save refusal token: ghi chú 9 từ trên bài giải PUBLISHED → 23514, DETAIL đúng bằng chuỗi 'below_word_count' (nhận: ${JSON.stringify(saveShortNote.error?.details)})`,
+  );
+  const noteAfterShortRefusal = await admin
+    .from("community_solution_notes")
+    .select("body")
+    .eq("solution_id", csSolutionId)
+    .eq("question_id", CS_QUESTION_IDS[0])
+    .single();
+  assert(
+    noteAfterShortRefusal.data?.body === noteBeforeShortRefusal.data?.body,
+    "Save refusal token: nội dung ghi chú CŨ không đổi sau từ chối 'below_word_count'",
+  );
+
+  const backToDraftForLengthCheck = await userA.rpc("set_community_solution_status", {
+    p_exam_id: CS_EXAM_ID,
+    p_action: "draft",
+  });
+  if (backToDraftForLengthCheck.error) throw backToDraftForLengthCheck.error;
+
+  const saveOverLength = await userA.rpc("save_community_solution", {
+    p_exam_id: CS_EXAM_ID,
+    p_attempt_id: csAttemptNew,
+    p_show_profile: true,
+    p_show_score: false,
+    p_notes: [{ question_id: CS_QUESTION_IDS[0], body: "a".repeat(8001) }],
+  });
+  assert(
+    saveOverLength.error?.code === "23514" && saveOverLength.error?.details !== "below_word_count",
+    `Save refusal token: thân 8001 ký tự trên bài giải DRAFT → 23514 qua CHECK độ dài, DETAIL KHÁC 'below_word_count' (nhận DETAIL: ${JSON.stringify(saveOverLength.error?.details)})`,
+  );
+
+  // SN-1 (work plan § Open Items, chốt 2026-09-20): admin_moderate_community_solution
+  // chưa tồn tại tới migration 32 — harness setup client (service_role) tự đặt
+  // trạng thái 'hidden' + chèn thẳng dòng community_moderation_log 'hide' tương
+  // ứng, thay vì chờ/giả hàm admin. Task 35 chạy lại đúng case này qua RPC
+  // admin thật.
+  const hideSolution = await admin.from("community_solutions").update({ status: "hidden" }).eq("id", csSolutionId);
+  if (hideSolution.error) throw hideSolution.error;
+  const hideLog = await admin.from("community_moderation_log").insert({
+    target_type: "solution",
+    target_id: csSolutionId,
+    exam_id: CS_EXAM_ID,
+    target_user_id: userAId,
+    actor_id: userAId,
+    action: "hide",
+    reason: "[RLS-CS][SN-1] Ẩn để test Save refusal token",
+  });
+  if (hideLog.error) throw hideLog.error;
+
+  const saveWhileHidden = await userA.rpc("save_community_solution", {
+    p_exam_id: CS_EXAM_ID,
+    p_attempt_id: csAttemptNew,
+    p_show_profile: true,
+    p_show_score: false,
+    p_notes: [],
+  });
+  assert(
+    saveWhileHidden.error?.code === "42501" && !saveWhileHidden.error?.details,
+    `Save refusal token: bài giải đã 'hidden' (SN-1 setup) → 42501 KHÔNG có DETAIL (nhận: mã=${saveWhileHidden.error?.code}, DETAIL=${JSON.stringify(saveWhileHidden.error?.details)})`,
+  );
+
+  // Đưa bài giải khỏi 'hidden' (thẳng qua harness — save_community_solution
+  // luôn từ chối một bài giải hidden, không có đường nào khác) để nhóm cuối
+  // (Name-resolution regression) gọi được các hàm ghi bình thường.
+  const unhideForRegression = await admin.from("community_solutions").update({ status: "draft" }).eq("id", csSolutionId);
+  if (unhideForRegression.error) throw unhideForRegression.error;
+
+  console.log("\nRLS checks (Community Solutions — Name-resolution regression, không 42702):");
+
+  const nameRes1 = await userA.rpc("save_community_solution", {
+    p_exam_id: CS_EXAM_ID,
+    p_attempt_id: csAttemptNew,
+    p_show_profile: false,
+    p_show_score: true,
+    p_notes: [{ question_id: CS_QUESTION_IDS[0], body: csWords(15) }],
+  });
+  assert(
+    !nameRes1.error,
+    `Name-resolution regression: save_community_solution lần 1, không lỗi — nhất là không 42702 (nhận ${nameRes1.error?.code})`,
+  );
+  // Lần 2: cả community_solutions (unique exam_id/author_id) LẪN
+  // community_solution_notes (pkey solution_id/question_id) đều đi qua nhánh
+  // `on conflict … do update` — đúng câu chữ Design Doc đòi.
+  const nameRes2 = await userA.rpc("save_community_solution", {
+    p_exam_id: CS_EXAM_ID,
+    p_attempt_id: csAttemptNew,
+    p_show_profile: true,
+    p_show_score: false,
+    p_notes: [{ question_id: CS_QUESTION_IDS[0], body: csWords(16) }],
+  });
+  assert(
+    !nameRes2.error,
+    `Name-resolution regression: save_community_solution lần 2 (cả hai nhánh on conflict do update), không lỗi — nhất là không 42702 (nhận ${nameRes2.error?.code})`,
+  );
+
+  const nameResPublish = await userA.rpc("set_community_solution_status", {
+    p_exam_id: CS_EXAM_ID,
+    p_action: "publish",
+  });
+  assert(
+    !nameResPublish.error,
+    `Name-resolution regression: set_community_solution_status('publish') không lỗi — nhất là không 42702 (nhận ${nameResPublish.error?.code})`,
+  );
+  const nameResDraft = await userA.rpc("set_community_solution_status", {
+    p_exam_id: CS_EXAM_ID,
+    p_action: "draft",
+  });
+  assert(
+    !nameResDraft.error,
+    `Name-resolution regression: set_community_solution_status('draft') không lỗi — nhất là không 42702 (nhận ${nameResDraft.error?.code})`,
+  );
+  const nameResCard = await userA.rpc("community_solution_result_card", { p_exam_id: CS_EXAM_ID });
+  assert(
+    !nameResCard.error,
+    `Name-resolution regression: community_solution_result_card không lỗi — nhất là không 42702 (nhận ${nameResCard.error?.code})`,
+  );
+
+  // Dọn dẹp fixture Community Solutions.
+  await cleanupCommunitySolutionsFixtures(admin);
 
   // Dọn dẹp fixture Rating.
   await cleanupRatingFixtures(admin);
