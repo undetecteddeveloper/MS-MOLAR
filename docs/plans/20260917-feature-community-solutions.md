@@ -28,15 +28,15 @@ Every `Pn-Tm` entry below maps to one or more task files. The task number (01–
 |---|---|---|---|---|
 | 01 | P1-T1 | frontend | 1 | **DONE** `80dc246` |
 | 02 | P1-T2 | backend | 1 | **DONE** `cc685a1` (after `08f8b1f`, which reverted the `uploadExam` cap to 5/day on the engineer's decision) |
-| 03 | P1-T3 | backend | 1 | 🔄 implemented + verified on dev (fingerprint `7cd454572675`), pending commit |
-| 04 | P1-T4 | backend | 1 | 🔄 implemented + verified (`npm test`/`lint`/`tsc` green), pending commit |
-| 05 | P1-T5 | backend | 1 | open |
+| 03 | P1-T3 | backend | 1 | **DONE** `74ba95b`; fingerprint corrected same-day to `8b80e2188cc3` in `4b0ea52` (AC-022 data gap: `community_solution_for_writer` was missing `question_type`/`choices`/`sub_answers`/`essay_answer`, fixed in place — see task file Investigation Notes) |
+| 04 | P1-T4 | backend | 1 | **DONE** `e25e1b6` |
+| 05 | P1-T5 | backend | 1 | **DONE** `c4dfddf` (Early Verification Point) |
 | 06 | P1-T6 | backend | 1 | **DONE** `6d656ef` |
 | 07 | P1-T7 | frontend | 1 | **DONE** `e4b278d` |
-| 08 | P1-T8 | frontend | 1 | DONE (`27d61cd`) — 360px Playwright measurement still BLOCKED on shared CLI sign-in (auto-mode denied the submit click); deferred, must run before task 09/Slice B visual work is declared done, see task file Completion Criteria |
-| 09 | P1-T9 (split 1/2) | frontend | 1 | DONE (`18bd280`) |
-| 10 | P1-T9 (split 2/2) | frontend | 1 | open |
-| 11 | P1-T10 | frontend | 1 | open |
+| 08 | P1-T8 | frontend | 1 | **DONE** `27d61cd` — 360px Playwright measurement still BLOCKED on shared CLI sign-in (auto-mode denied the submit click); deferred, must run before task 09/Slice B visual work is declared done, see task file Completion Criteria |
+| 09 | P1-T9 (split 1/2) | frontend | 1 | **DONE** `18bd280` |
+| 10 | P1-T9 (split 2/2) | frontend | 1 | **DONE** `b2b01fb` — L1 real-browser write→save→publish→re-open flow also deferred (same sign-in block) |
+| 11 | P1-T10 | frontend | 1 | **DONE** `dc309eb` (includes same-day AC-022 follow-up consuming the task-03 fix) |
 | 12 | P1-T11 | frontend | 1 | **DONE** `a5736cf` |
 | 13 | P2-T1 | backend | 2 | open |
 | 14 | P2-T2 | backend | 2 | open |
@@ -1416,7 +1416,7 @@ None re-opens a product decision. **Resolved by the orchestrator on 2026-09-20 (
 
 ## Progress Tracking
 
-- [ ] Phase 1 — task files 01–12 (plan P1-T1 … P1-T11): **5/12 done** — 01 `80dc246`, 02 `cc685a1`, 06 `6d656ef`, 07 `e4b278d`, 12 `a5736cf`; open 03, 04, 05, 08, 09, 10, 11
+- [ ] Phase 1 — task files 01–12 (plan P1-T1 … P1-T11): **5/12 done** — 01 `80dc246`, 02 `cc685a1`, 06 `6d656ef`, 07 `e4b278d`, 12 `a5736cf`; open 03, 04, 05, 08, 09, 10, 11 (NOTE 2026-09-25: this "Progress Tracking" section pre-dates several since-committed tasks — see `docs/plans/community-solutions-HANDOFF.md` for the current, authoritative task count; task 11 was implemented this session, commit hash pending quality-fixer-frontend)
 - [x] U1 resolved (engineer decision 2026-09-17, backend DD v1.2)
 - [ ] Phase 2 — task files 13–24 (plan P2-T1 … P2-T9): 0/12
 - [ ] Phase 3 — task files 25–31 (plan P3-T1, T2, T4, T5, T6, T7, T8): 0/7

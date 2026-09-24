@@ -238,11 +238,11 @@ Phase boundaries are hard: Phase N+1's first task does not start until Phase N's
 
 ## Progress Tracking (updated by the orchestrator after each task commit)
 
-- [ ] Phase 1 — tasks 01–12 (plan P1-T1…P1-T11: 11 entries → 12 files): **10/12 done** — 01 `80dc246`, 02 `cc685a1`, 03 `74ba95b`, 04 `e25e1b6`, 05 `c4dfddf`, 06 `6d656ef`, 07 `e4b278d`, 08 `27d61cd` (360px measurement still deferred, see plan row 08), 09 `18bd280`, 12 `a5736cf`; open 10, 11 — completion file `20260917-feature-community-solutions-phase1-completion.md`
+- [ ] Phase 1 — tasks 01–12 (plan P1-T1…P1-T11: 11 entries → 12 files): **12/12 done** — 01 `80dc246`, 02 `cc685a1`, 03 `74ba95b` (fingerprint corrected `4b0ea52`, AC-022 data gap), 04 `e25e1b6`, 05 `c4dfddf`, 06 `6d656ef`, 07 `e4b278d`, 08 `27d61cd` (360px measurement deferred), 09 `18bd280`, 10 `b2b01fb` (L1 browser flow deferred), 11 `dc309eb`, 12 `a5736cf` — Phase 1 COMPLETE; 2 live-browser measurements still owed before Phase 1 is visually signed off (task 08's 360px, task 10's write→publish flow) — completion file `20260917-feature-community-solutions-phase1-completion.md`
 - [x] U1 resolved (engineer decision 2026-09-17, backend DD v1.2) — no gate
 - [ ] Phase 2 — tasks 13–24 (plan P2-T1…P2-T9: 9 entries → 12 files): 0/12 — `…-phase2-completion.md`
 - [ ] Phase 3 — tasks 25–31 (plan P3-T1, T2, T4, T5, T6, T7, T8 → 7 files): 0/7 — `…-phase3-completion.md`
 - [ ] Phase 4 — tasks 32–39 (plan P4-T1…P4-T8 → 8 files): 0/8 — `…-phase4-completion.md`
 - [x] U2 resolved (engineer decision 2026-09-17, frontend DD v1.2 DD-U1) — no gate
 - [ ] Phase 5 — tasks 40–53 (plan P5-T1…P5-T14 → 14 files): 0/14 — `…-phase5-completion.md`
-- [ ] **Total: 10/53 task files complete (10/49 plan entries)**. Non-task commit `707df1f` (INT-1 quarantine, TD-034, so `npm run test:integration` exits 0) is also on the branch and is not counted.
+- [ ] **Total: 12/53 task files complete (12/49 plan entries)**. Non-task commits also on the branch, not counted: `707df1f` (INT-1 quarantine, TD-034), `4b0ea52` (post-commit fix to task 03's migration, AC-022 data gap).
