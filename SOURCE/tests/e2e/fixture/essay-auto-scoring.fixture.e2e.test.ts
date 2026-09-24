@@ -111,7 +111,7 @@
 //                 component lane per frontend DD § Phân tầng.
 
 import { createElement } from "react";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // =============================================================================
@@ -132,6 +132,7 @@ const {
   listMyHistoryMock,
   refreshMock,
   generatePdfMock,
+  getResultCardSummaryMock,
 } = vi.hoisted(() => ({
   getResultMock: vi.fn(),
   getMyRatingMock: vi.fn(),
@@ -140,6 +141,12 @@ const {
   listMyHistoryMock: vi.fn(),
   refreshMock: vi.fn(),
   generatePdfMock: vi.fn(),
+  // Task 08 — SolutionEntryCard's one additional query on /result. Whole-
+  // module mock per this file's own convention (UI Spec :164, frontend DD
+  // "Fixture lane's getResult/getMyRating mock factory" row): any export the
+  // page imports from a mocked module resolves to `undefined` and throws
+  // unless added here in the SAME change as the page import.
+  getResultCardSummaryMock: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -176,6 +183,13 @@ vi.mock("@/lib/billing/readEntitlement", () => ({ readEntitlement: readEntitleme
 vi.mock("@/features/exams/queries", () => ({ getResult: getResultMock }));
 vi.mock("@/features/exams/actions", () => ({ getMyRating: getMyRatingMock }));
 vi.mock("@/features/history/queries", () => ({ listMyHistory: listMyHistoryMock }));
+// Task 08 — SolutionEntryCard's sole data source (result/page.tsx's single
+// added query, AC-012). `renderResultRoute()` defaults this to `null` so the
+// four essay describes above stay byte-for-byte unaffected (no card, no new
+// node) unless a task-08 case below overrides it per-render.
+vi.mock("@/features/solutions/queries", () => ({
+  getResultCardSummary: getResultCardSummaryMock,
+}));
 // The PDF pipeline is the one thing whose ABSENCE of a call is the assertion.
 vi.mock("@/lib/pdf/generateAttemptPdf", () => ({
   generateAttemptPdfFile: generatePdfMock,
@@ -194,6 +208,7 @@ import { ResultActions } from "@/features/exams/components/ResultActions";
 import { EssayGradingPoller } from "@/features/exams/components/EssayGradingPoller";
 import type { ExamResult } from "@/features/exams/queries";
 import type { MyHistoryEntry } from "@/features/history/queries";
+import type { ResultCardSummary, SolutionStatus } from "@/features/solutions/queries";
 import { copy } from "@/lib/copy";
 import {
   ESSAY_POLL_FAST_INTERVAL_MS,
@@ -345,6 +360,18 @@ function historyEntry(over: Partial<MyHistoryEntry> = {}): MyHistoryEntry {
   } as MyHistoryEntry;
 }
 
+/** Fixture cho `ResultCardSummary` — task 08's SolutionEntryCard. `null` (0
+ *  dong that) khong di qua ham nay, chi bon myStatus + so du lieu duong. */
+function cardSummary(over: Partial<ResultCardSummary> = {}): ResultCardSummary {
+  return {
+    publishedCount: 3,
+    myStatus: null,
+    changedQuestionCount: 0,
+    unseenDeletionReason: null,
+    ...over,
+  };
+}
+
 /** `RootLayout -> (exams)/layout -> /result`, composed the way production
  *  composes it. Nothing here supplies `EntitlementProvider` — it is reached
  *  only because the route-group layout mounts it, which is the one thing a
@@ -362,11 +389,19 @@ function historyEntry(over: Partial<MyHistoryEntry> = {}): MyHistoryEntry {
  *
  *  Da do: cung mot cay, qua `render()` cho 0 ky tu; qua `renderServerTree()`
  *  cho mot cay that. */
-async function renderResultRoute(result: ExamResult) {
+// `cardSummary` mac dinh `null` — 0 dong that (khong du dieu kien), giu FE2E-
+// 1..4 o tren byte-for-byte (SolutionEntryCard khong render gi). Cac ca cua
+// task 08 truyen gia tri rieng qua tham so nay, KHONG set mock truoc/sau lan
+// goi ham nay — tranh dua thu tu voi dong ben duoi.
+async function renderResultRoute(
+  result: ExamResult,
+  cardSummaryValue: ResultCardSummary | null = null
+) {
   getResultMock.mockResolvedValue(result);
   getMyRatingMock.mockResolvedValue(null);
   getProfileMock.mockResolvedValue(PROFILE);
   readEntitlementMock.mockResolvedValue(FREE_ENTITLEMENT);
+  getResultCardSummaryMock.mockResolvedValue(cardSummaryValue);
 
   const page = await ResultPage({
     params: Promise.resolve({ id: EXAM_ID, attemptId: ATTEMPT_ID }),
@@ -930,5 +965,99 @@ describe("A graded essay card does not also claim to be unscored (FE2E-4)", () =
     const legacy = await renderDetailRoute(legacyResult());
     expect(legacy.container.textContent).toContain(DICT["result.notAutoScored"]);
     expect(legacy.container.textContent).not.toContain(DICT["result.essay.state.graded"]);
+  });
+});
+
+// =============================================================================
+// Task 08 — SolutionEntryCard entry point on /result
+//   (Frontend Early Verification Point)
+// =============================================================================
+// AC: PRD AC-010 (Reference Contract Value #1) — exactly one of four labels
+//   per `myStatus`; AC-110 — the one-time hard-deleted-reason line via
+//   ModerationReasonBanner; AC-012 — at most one additional query per render.
+// Also discharges: frontend DD § Data Contracts `ResultCardSummary` "Zero
+//   rows" (null -> no card, no placeholder) and § Test Boundaries "Zero-row
+//   read branches"; backend DD § State Transitions/System Invariants
+//   (`viewed_at` monotonic — the reason text comes from exactly one call, no
+//   client-side cache or second read).
+// Proof Obligations (task file, verbatim claims): label-per-status;
+//   zero-row-null-case; at-most-one-query-per-render call count.
+// @lane: fixture-e2e
+// @dependency: full-UI in-process (RootLayout -> (exams) layout ->
+//   result/page.tsx composing SolutionEntryCard), mocked getResultCardSummary
+//   at the features/solutions/queries module boundary only — page, card and
+//   banner render for real (mirrors this file's existing mock-boundary rule).
+// @real-dependency: none
+describe("SolutionEntryCard — result-page entry point (task 08)", () => {
+  const REASON = "Vi phạm quy định cộng đồng.";
+
+  beforeEach(() => {
+    getResultCardSummaryMock.mockClear();
+  });
+  afterEach(cleanup);
+
+  it.each([
+    ["none (chua co bai)", null, DICT["solutions.entry.write"]],
+    ["draft", "draft", DICT["solutions.entry.continue"]],
+    ["published", "published", DICT["solutions.entry.edit"]],
+    ["hidden", "hidden", DICT["solutions.entry.hidden"]],
+  ] as const)(
+    "myStatus=%s -> primary button label is exactly the Reference Contract string, zero [disabled] nodes",
+    async (_label, myStatus, expectedLabel) => {
+      const { container } = await renderResultRoute(
+        legacyResult(),
+        cardSummary({ myStatus: myStatus as SolutionStatus | null })
+      );
+
+      // POSITIVE FIRST (hazard 1, this file's own rule): the card itself
+      // rendered, not an empty tree.
+      expect(container.textContent).toContain(DICT["solutions.eyebrow"]);
+
+      expect(
+        within(container).getByRole("link", { name: expectedLabel })
+      ).toBeTruthy();
+      expect(disabledNodes(container)).toHaveLength(0);
+    }
+  );
+
+  it("renders the one-time deletion-reason line exactly once via ModerationReasonBanner (role=status)", async () => {
+    const { container } = await renderResultRoute(
+      legacyResult(),
+      cardSummary({ myStatus: null, unseenDeletionReason: REASON })
+    );
+
+    // The route-group layout already carries its own `role="status"` region
+    // (unrelated to this feature — same caveat this file's FE2E-1 records for
+    // `[aria-live="polite"]`), so filter by the reason text rather than
+    // assuming the banner is the only `[role="status"]` node on the page.
+    const reasonBanners = Array.from(
+      container.querySelectorAll('[role="status"]')
+    ).filter((el) => el.textContent?.includes(REASON));
+
+    expect(reasonBanners).toHaveLength(1);
+    expect(reasonBanners[0].textContent).toBe(
+      DICT["solutions.entry.deleted"].replace("{reason}", REASON)
+    );
+  });
+
+  it("renders no SolutionEntryCard and no placeholder when getResultCardSummary resolves null (zero rows), while the rest of the result page still renders", async () => {
+    // Default cardSummaryValue is `null` — the zero-row / not-eligible branch.
+    const { container } = await renderResultRoute(legacyResult());
+
+    // POSITIVE FIRST: the rest of the page is real (hazard 1).
+    expect(container.textContent).toContain(DICT["result.nextTitle"]);
+
+    expect(container.textContent).not.toContain(DICT["solutions.eyebrow"]);
+    expect(
+      within(container).queryByRole("link", { name: DICT["solutions.entry.write"] })
+    ).toBeNull();
+    expect(disabledNodes(container)).toHaveLength(0);
+  });
+
+  it("calls getResultCardSummary exactly once per render, with this page's own examId", async () => {
+    await renderResultRoute(legacyResult(), cardSummary());
+
+    expect(getResultCardSummaryMock).toHaveBeenCalledTimes(1);
+    expect(getResultCardSummaryMock).toHaveBeenCalledWith(EXAM_ID);
   });
 });

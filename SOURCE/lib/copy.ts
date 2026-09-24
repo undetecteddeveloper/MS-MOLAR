@@ -928,6 +928,24 @@ export const copy = {
   // --- Bài giải cộng đồng ---------------------------------------------------
   // Nguyên văn UI Spec § "Chuỗi tiếng Việt cần thêm"; nhóm S-01…O-02 mang tiền
   // tố `solutions.` (Frontend DD v1.2 § Vietnamese Copy Keys, quy tắc namespace).
+  // Chung (S-01…S-07): eyebrow của cả tính năng.
+  "solutions.eyebrow": "Bài giải cộng đồng",
+  // Thẻ cửa vào (S-01, C-01 SolutionEntryCard, task 08) — nguyên văn UI Spec
+  // § "Chuỗi tiếng Việt cần thêm" → "Thẻ cửa vào (S-01)". `entry.hidden` là
+  // NHÃN NÚT (bài của tôi đang bị ẩn) — khác `entry.deleted`, câu của
+  // `ModerationReasonBanner` biến thể "status" khi bài vừa bị xoá hẳn (AC-110).
+  "solutions.entry.count": "{count} bài giải cho đề này",
+  "solutions.entry.empty": "Chưa có bài giải cho đề này",
+  "solutions.entry.body":
+    "Lời giải từng câu do người đã làm đề viết. Bạn cũng có thể viết bài của mình.",
+  "solutions.entry.write": "Viết bài giải",
+  "solutions.entry.continue": "Viết tiếp",
+  "solutions.entry.edit": "Sửa bài giải",
+  "solutions.entry.hidden": "Bài giải của bạn đang bị ẩn",
+  "solutions.entry.viewCount": "Xem {count} bài giải",
+  "solutions.entry.view": "Xem bài giải",
+  "solutions.entry.changed": "{count} câu hỏi đã thay đổi, hãy cập nhật",
+  "solutions.entry.deleted": "Bài giải của bạn đã bị gỡ: {reason}",
   // Công tắc cài đặt (C-12): chữ trạng thái hiện rõ cạnh rãnh, không chỉ màu.
   "solutions.switch.on": "Bật",
   "solutions.switch.off": "Tắt",

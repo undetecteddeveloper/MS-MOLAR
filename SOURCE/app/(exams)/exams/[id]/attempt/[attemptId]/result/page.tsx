@@ -37,6 +37,7 @@ import { PageContainer } from "@/components/layout/PageContainer";
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 import { Card } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
+import { SolutionEntryCard } from "@/features/solutions/components/SolutionEntryCard";
 
 export default async function ResultPage({
   params,
@@ -178,6 +179,13 @@ export default async function ResultPage({
           </Link>
         </div>
       </Card>
+
+      {/* Bài giải cộng đồng — cửa vào duy nhất từ ngoài tính năng (task 08,
+          AC-007). Component tự đọc getResultCardSummary(examId) và tự quyết
+          định không render gì khi người gọi không đủ điều kiện (0 dòng) —
+          trang này không phân nhánh thêm ở đây. `attemptId` của CHÍNH trang
+          này đi thẳng vào liên kết nút chính (AC-010). */}
+      <SolutionEntryCard examId={id} attemptId={attemptId} />
 
       {/* Lưu · Chia sẻ · Về kho đề — ba viên thuốc surface bằng nhau. ActionButton
           giữ hình dạng "một nút trong luồng" nên số ô của lưới không đổi theo
