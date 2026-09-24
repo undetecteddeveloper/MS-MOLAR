@@ -86,6 +86,26 @@ describe("SettingSwitch", () => {
     expect(onCheckedChange).not.toHaveBeenCalled();
   });
 
+  it("có lockReasonId: aria-describedby gồm cả descriptionId lẫn lockReasonId, theo đúng thứ tự", () => {
+    render(
+      <SettingSwitch
+        {...BASE}
+        checked
+        disabled
+        lockReasonId="moderation-reason-banner"
+        onCheckedChange={() => {}}
+      />
+    );
+    const control = screen.getByRole("switch", { name: "Hiện hồ sơ" });
+    expect(control.getAttribute("aria-describedby")).toBe(`${BASE.descriptionId} moderation-reason-banner`);
+  });
+
+  it("không có lockReasonId: aria-describedby đúng bằng descriptionId, không khoảng trắng thừa", () => {
+    render(<SettingSwitch {...BASE} checked onCheckedChange={() => {}} />);
+    const control = screen.getByRole("switch", { name: "Hiện hồ sơ" });
+    expect(control.getAttribute("aria-describedby")).toBe(BASE.descriptionId);
+  });
+
   it("chỉ đọc giữ đủ tương phản và không có hoạt ảnh nào (núm đổi chỗ tức thì)", () => {
     const { container } = render(
       <SettingSwitch {...BASE} checked disabled onCheckedChange={() => {}} />

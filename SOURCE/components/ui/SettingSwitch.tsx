@@ -28,6 +28,12 @@ interface SettingSwitchProps {
   descriptionId: string;
   disabled?: boolean;
   busy?: boolean;
+  /** Id của băng lý do khoá (vd `ModerationReasonBanner`, AC-083) — nơi gọi
+   *  của Bài giải cộng đồng truyền khi hàng đang chỉ đọc. Cộng thêm vào
+   *  `aria-describedby` sau `descriptionId`, không thay thế nó, để dòng phụ
+   *  của chính công tắc vẫn được đọc (frontend DD § Main Components
+   *  "Interface addition (v1.3)"). */
+  lockReasonId?: string;
 }
 
 export function SettingSwitch({
@@ -38,6 +44,7 @@ export function SettingSwitch({
   descriptionId,
   disabled = false,
   busy = false,
+  lockReasonId,
 }: SettingSwitchProps) {
   const labelId = useId();
 
@@ -56,7 +63,7 @@ export function SettingSwitch({
         role="switch"
         aria-checked={checked}
         aria-labelledby={labelId}
-        aria-describedby={descriptionId}
+        aria-describedby={[descriptionId, lockReasonId].filter(Boolean).join(" ")}
         aria-disabled={disabled || undefined}
         aria-busy={busy || undefined}
         onClick={() => {

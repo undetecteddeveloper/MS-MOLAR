@@ -955,6 +955,33 @@ export const copy = {
   "solutions.dirty.save": "Lưu",
   "solutions.dirty.discard": "Bỏ",
   "solutions.dirty.stay": "Ở lại",
+  // Màn viết (S-04, task 09) — SolutionEditorHeader/SolutionSettingsPanel/
+  // NoteQuestionRow/SolutionPublishBar. Nguyên văn UI Spec § "Chuỗi tiếng Việt
+  // cần thêm" → "Màn viết (S-04)".
+  "solutions.emptyExam": "Đề này hiện không còn câu hỏi nào.",
+  "solutions.status.draft": "Nháp",
+  "solutions.status.hidden": "Bị ẩn",
+  "solutions.editor.title": "Bài giải của bạn",
+  "solutions.editor.progress": "{done}/{total} câu đã ghi chú",
+  "solutions.editor.settings": "Cài đặt bài giải",
+  "solutions.editor.settingsSub": "Hiện hồ sơ, hiện điểm và lựa chọn gốc",
+  "solutions.editor.showProfile": "Hiện hồ sơ",
+  "solutions.editor.showProfileSub":
+    "Tắt thì bài hiện là Ẩn danh, không tên, không ảnh. Thay đổi có hiệu lực từ lần tải sau.",
+  "solutions.editor.showScore": "Hiện điểm và lựa chọn gốc",
+  "solutions.editor.showScoreSub": "Điểm và câu trả lời của lần làm bạn mở bài giải từ đó",
+  "solutions.row.noted": "Đã ghi chú",
+  "solutions.row.missing": "Chưa ghi chú",
+  "solutions.row.short": "Chưa đủ 15 từ",
+  "solutions.row.changed": "Câu hỏi đã thay đổi",
+  "solutions.bar.remaining": "Còn {count} câu chưa có ghi chú. Ghi chú đủ {total} câu mới đăng được.",
+  "solutions.bar.ready": "Đủ {total} câu. Bạn có thể đăng.",
+  "solutions.bar.publishedNote": "Bài giải đang hiện với mọi người đã nộp đề.",
+  "solutions.bar.saveDraft": "Lưu nháp",
+  "solutions.bar.publish": "Đăng",
+  "solutions.bar.publishing": "Đang đăng…",
+  "solutions.bar.unpublish": "Gỡ về nháp",
+  "solutions.bar.viewMine": "Xem bài giải",
 
   // --- Thời gian tương đối (lib/format/relativeTime.ts) ---------------------
   // Dùng ở danh sách bài giải, màn xem và tab Bình luận của hồ sơ; quá 30 ngày
