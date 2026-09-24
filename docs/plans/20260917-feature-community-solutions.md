@@ -33,8 +33,8 @@ Every `Pn-Tm` entry below maps to one or more task files. The task number (01–
 | 05 | P1-T5 | backend | 1 | open |
 | 06 | P1-T6 | backend | 1 | **DONE** `6d656ef` |
 | 07 | P1-T7 | frontend | 1 | **DONE** `e4b278d` |
-| 08 | P1-T8 | frontend | 1 | open |
-| 09 | P1-T9 (split 1/2) | frontend | 1 | open |
+| 08 | P1-T8 | frontend | 1 | DONE (`27d61cd`) — 360px Playwright measurement still BLOCKED on shared CLI sign-in (auto-mode denied the submit click); deferred, must run before task 09/Slice B visual work is declared done, see task file Completion Criteria |
+| 09 | P1-T9 (split 1/2) | frontend | 1 | DONE (`18bd280`) |
 | 10 | P1-T9 (split 2/2) | frontend | 1 | open |
 | 11 | P1-T10 | frontend | 1 | open |
 | 12 | P1-T11 | frontend | 1 | **DONE** `a5736cf` |
