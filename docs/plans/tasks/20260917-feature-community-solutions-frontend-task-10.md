@@ -106,6 +106,8 @@ Carried hard constraints that apply to this task:
 - **Generic bar/dialog copy key resolution.** Neither the UI Spec's "Chuỗi tiếng Việt cần thêm" list nor this task's own "Copy keys added here" list names a distinct key for "Đăng"/"Gỡ về nháp" generic failures — the DD's Error Handling row only says "the bar's generic line for a status change" without pinning a literal. Resolution: reuse `solutions.note.saveError` ("Chưa lưu được. Bạn thử lại nhé.") for `saveSolution` generic (Lưu nháp/settings-switch fallback text differs: `solutions.editor.settingsSaveError`) **and** for `setSolutionStatus` generic (Đăng/Gỡ về nháp), consistent with the DD's own framing of it as "the component's own generic key" reused across those three surfaces; per the DD's general owning-task rule ("first task in execution order that renders it"), this task adds `solutions.note.saveError` even though its namespace visually groups with task 11's `NoteSheet` keys — task 11 only consumes it.
 - `common.close` ("Đóng") and `solutions.editor.crumb` ("Bài giải của bạn") are UI-Spec-listed keys with no earlier renderer (task 09's four components never render a breadcrumb or a close button) — added here under the same "first renderer" rule.
 
+- **L1 real-browser verification (post-implementation, 2026-09-25)**: signed in as the shared dev test account, real write→save-draft→publish→re-open flow exercised end to end on `e1mp-exam-lowest` (attempt `b0a11a2d-a511-4ea9-a809-f64eb6020cf5`), including the full publish path (not just the gate check, since the exam's single question made satisfying the ≥15-word gate trivial). Non-optimistic publish confirmed directly (badge stayed "Nháp" and the button read "Đang đăng…" while the request was in flight; only flipped to "Đã đăng" after it resolved). Draft persistence and re-open correctness both confirmed via page reload. No defect found. Full step-by-step evidence recorded in Completion Criteria below.
+
 ### Reference Contract Compliance Check
 | # | Result | Evidence |
 |---|---|---|
@@ -188,7 +190,14 @@ Queries and actions are mocked at the module boundary (`@/features/solutions/que
 
 ## Completion Criteria
 - [x] All added tests pass
-- [~] Operation verified per Operation Verification Methods above — L2 (npm test) done; L1 (real-browser write→save-draft→publish→re-open on dev) blocked on a Playwright sign-in step this session's auto-mode classifier denies, deferred like task 08's 360px measurement (see final report)
+- [x] Operation verified per Operation Verification Methods above — L2 (`npm test`) done; L1 completed 2026-09-25, real-browser flow on dev, signed in as the shared dev test account (AnhPhat), exam `e1mp-exam-lowest` (1 câu), attempt `b0a11a2d-a511-4ea9-a809-f64eb6020cf5`:
+  1. Opened `/exams/e1mp-exam-lowest/attempt/b0a11a2d-a511-4ea9-a809-f64eb6020cf5/solution` (the same URL the result page's `SolutionEntryCard` link points to) — "none" state rendered: 0/1 câu đã ghi chú, no status badge, "Đăng" disabled with "Còn 1 câu chưa có ghi chú. Ghi chú đủ 1 câu mới đăng được."
+  2. Opened the question-1 note dialog, wrote a 48-word note (word counter showed `48/15 từ`, satisfying the publish gate), clicked "Lưu" inside the dialog — note saved, row switched to "Đã ghi chú", 1/1 câu đã ghi chú, "Đăng" became enabled.
+  3. Clicked "Lưu nháp" — button showed the pending `Đang lưu…` (disabled) state, then resolved; status badge became "Nháp". Reloaded the page: note text and "Nháp" badge both persisted unchanged — draft persistence confirmed.
+  4. All notes already satisfied the word-count gate (only 1 question, 48 ≥ 15 words), so exercised the full publish path rather than only the gate: clicked "Đăng". Immediately after the click the badge still read "Nháp" and the button showed "Đang đăng…" (disabled) — confirmed non-optimistic (no instant flip). After the action resolved, the badge became "Đã đăng", the bar switched to "Gỡ về nháp" / "Xem bài giải", with a `status` announcement "Đã đăng bài giải".
+  5. Reloaded the write screen: status still "Đã đăng", the same note text still shown — re-open correctness confirmed.
+  6. Cross-checked from the result page: `SolutionEntryCard` showed the "none" label before writing, "Viết tiếp" after the draft save, and "Sửa bài giải" / "Xem 1 bài giải" after publish — consistent with the writer-state transitions observed above.
+  - No defect found in this flow. Dev data left as-is (one published solution note by AnhPhat on `e1mp-exam-lowest`) per instruction — this is dev, not prod.
 - [x] Each Proof Obligation is met
 - [x] Every Reference Contract Compliance Check evaluates to `Y`, with evidence in Investigation Notes
 
