@@ -48,6 +48,9 @@ export const copy = {
   "common.done": "Xong",
   "common.restore": "Khôi phục",
   "common.loading": "Đang tải",
+  // Bài giải cộng đồng (task 10, giàn giáo ghi chú tối giản) — nguyên văn UI
+  // Spec § "Chuỗi tiếng Việt cần thêm" → "Chung (solutions.*)".
+  "common.close": "Đóng",
 
   // --- Điều hướng ---------------------------------------------------------
   "nav.home": "Trang chủ",
@@ -982,6 +985,29 @@ export const copy = {
   "solutions.bar.publishing": "Đang đăng…",
   "solutions.bar.unpublish": "Gỡ về nháp",
   "solutions.bar.viewMine": "Xem bài giải",
+  // Route S-04 (task 10) — routeError dùng chung cho cả 3 route (SolutionRouteError,
+  // task 10/18/19); editor.crumb là mốc cuối breadcrumb màn viết; hiddenBanner là
+  // nguyên văn biến thể "alert" của ModerationReasonBanner (AC-083); toast.*/
+  // unpublish.* đúng UI Spec § "Chuỗi tiếng Việt cần thêm" → "Màn viết (S-04)".
+  "solutions.routeError": "Không mở được trang này. Bạn thử lại nhé.",
+  "solutions.editor.crumb": "Bài giải của bạn",
+  "solutions.hiddenBanner": "Bài giải của bạn đã bị ẩn bởi quản trị viên. Lý do: {reason}",
+  "solutions.toast.saved": "Đã lưu",
+  "solutions.toast.published": "Đã đăng bài giải",
+  "solutions.unpublish.title": "Gỡ bài giải về nháp?",
+  "solutions.unpublish.body":
+    "Bài sẽ không hiện với ai; Hữu ích và bình luận được giữ; uy tín từ bài này tạm không tính.",
+  // DD-pinned (frontend DD v1.6 § Error Handling "solutions.editor.settingsSaveError").
+  "solutions.editor.settingsSaveError": "Chưa lưu được cài đặt. Bạn thử lại nhé.",
+  // solutions.note.saveError nguyên văn thuộc namespace "Tấm trượt ghi chú" (O-01,
+  // task 11) nhưng render ĐẦU TIÊN ở đây: thanh đáy "Lưu nháp" (saveSolution
+  // generic), "Đăng"/"Gỡ về nháp" generic (không có khoá bar riêng — DD § Error
+  // Handling gộp chung "the component's own generic key"), và giàn giáo ghi chú
+  // tối giản chờ NoteSheet thật (task 11 dùng lại đúng khoá này, không định nghĩa
+  // lại — quy tắc "first task in execution order that renders it", DD :1793).
+  "solutions.note.saveError": "Chưa lưu được. Bạn thử lại nhé.",
+  "solutions.note.tooShortPublished":
+    "Ghi chú phải có ít nhất 15 từ. Muốn để ngắn thì gỡ bài về nháp trước.",
 
   // --- Thời gian tương đối (lib/format/relativeTime.ts) ---------------------
   // Dùng ở danh sách bài giải, màn xem và tab Bình luận của hồ sơ; quá 30 ngày
