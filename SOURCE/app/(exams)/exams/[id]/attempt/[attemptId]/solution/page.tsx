@@ -18,6 +18,7 @@
 import { redirect } from "next/navigation";
 import { getMySolutionForWriter } from "@/features/solutions/queries";
 import { SolutionEditorScreen } from "@/features/solutions/components/SolutionEditorScreen";
+import { renderWriterQuestionNodes } from "@/features/solutions/components/writerQuestionNodes";
 
 export default async function SolutionEditorPage({
   params,
@@ -35,5 +36,10 @@ export default async function SolutionEditorPage({
     redirect(`/exams/${id}`);
   }
 
-  return <SolutionEditorScreen examId={id} initialState={state} />;
+  // UI-D22: đề câu/đáp án đúng/ghi chú-chỉ-đọc dựng ReactNode Ở ĐÂY (Server
+  // Component) rồi mới đi xuống `SolutionEditorScreen` (client, task 11) —
+  // giữ cây phụ thuộc RichText (122,5 KB gzip) ở lại phía server, đúng M12.
+  const questionNodes = renderWriterQuestionNodes(state.questions);
+
+  return <SolutionEditorScreen examId={id} initialState={state} questionNodes={questionNodes} />;
 }

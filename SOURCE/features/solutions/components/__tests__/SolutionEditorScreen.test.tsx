@@ -60,6 +60,8 @@ function question(overrides: Partial<SolutionEditorQuestion> = {}): SolutionEdit
     wordCount: 0,
     hasChanged: false,
     essayPrefillApplied: false,
+    questionType: "mcq",
+    choices: [],
     ...overrides,
   };
 }
@@ -242,6 +244,172 @@ describe("SolutionEditorScreen — non-optimistic publish (row 8, § State Trans
 
     expect(await screen.findByText("Đã đăng")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Xem bài giải" })).toBeTruthy();
+  });
+});
+
+// Task 11 — NoteSheet thật thay giàn giáo task 10 (§ Required Tests #1-5, #7).
+// Mọi test dưới đây mở tấm trượt qua đúng hàng câu (`NoteQuestionRow`), giống
+// hệt cách người dùng thật mở nó — không gọi thẳng NoteSheet.
+
+describe("SolutionEditorScreen — NoteSheet, lỗi belowWordCount (Required Test #1)", () => {
+  it("role=alert đúng chữ, chữ trong ô không mất, tấm trượt vẫn mở", async () => {
+    const state = baseState({
+      solutionId: "s1",
+      status: "published",
+      questions: [question({ questionId: "q1", note: "abc" })],
+    });
+    saveSolutionMock.mockResolvedValue({ ok: false, error: { code: "belowWordCount" } });
+
+    render(<SolutionEditorScreen examId="E1" initialState={state} />);
+    fireEvent.click(screen.getByRole("button", { name: /^Câu 1,/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Lưu" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe(
+      "Ghi chú phải có ít nhất 15 từ. Muốn để ngắn thì gỡ bài về nháp trước."
+    );
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("abc");
+  });
+});
+
+describe("SolutionEditorScreen — NoteSheet, lỗi generic (Required Test #2)", () => {
+  it("role=alert 'Chưa lưu được...', textarea và tấm trượt không đổi", async () => {
+    const state = baseState({
+      solutionId: "s1",
+      status: "draft",
+      questions: [question({ questionId: "q1", note: "abc" })],
+    });
+    saveSolutionMock.mockResolvedValue({ ok: false, error: { code: "generic" } });
+
+    render(<SolutionEditorScreen examId="E1" initialState={state} />);
+    fireEvent.click(screen.getByRole("button", { name: /^Câu 1,/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Lưu" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe("Chưa lưu được. Bạn thử lại nhé.");
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("abc");
+  });
+});
+
+describe("SolutionEditorScreen — NoteSheet, rateLimited (Required Test #3, AC-101)", () => {
+  it("hiện profile.error.rateLimited chứa '42', chữ được giữ", async () => {
+    const state = baseState({
+      solutionId: "s1",
+      status: "draft",
+      questions: [question({ questionId: "q1", note: "abc" })],
+    });
+    saveSolutionMock.mockResolvedValue({ ok: false, error: { code: "rateLimited", seconds: 42 } });
+
+    render(<SolutionEditorScreen examId="E1" initialState={state} />);
+    fireEvent.click(screen.getByRole("button", { name: /^Câu 1,/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Lưu" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe("Thao tác quá nhiều lần. Thử lại sau 42 giây.");
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("abc");
+  });
+});
+
+describe("SolutionEditorScreen — NoteSheet, DD-U5 dirty-close (Required Test #4, Reference Contract #24)", () => {
+  it.each([
+    ["belowWordCount", { code: "belowWordCount" as const }, "Ghi chú phải có ít nhất 15 từ. Muốn để ngắn thì gỡ bài về nháp trước."],
+    ["generic", { code: "generic" as const }, "Chưa lưu được. Bạn thử lại nhé."],
+  ])("Lưu hỏng (%s) trên hộp thoại: hộp thoại vẫn mở, error đúng chữ, textarea không đổi", async (_label, error, text) => {
+    const state = baseState({
+      solutionId: "s1",
+      status: "draft",
+      questions: [question({ questionId: "q1", note: "gốc" })],
+    });
+    saveSolutionMock.mockResolvedValue({ ok: false, error });
+
+    render(<SolutionEditorScreen examId="E1" initialState={state} />);
+    fireEvent.click(screen.getByRole("button", { name: /^Câu 1,/ }));
+    const textarea = screen.getByRole("textbox") as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: "gốc đã sửa" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Đóng" }));
+    // Hai `role="dialog"` cùng tồn tại: panel của `NoteSheet` (OverlaySheet)
+    // VẪN mở phía dưới, và hộp thoại ba lựa chọn nổi lên trên — phân biệt theo
+    // tên (dirty.title), đúng ý DD-U5 "sheet stays open underneath".
+    const dialog = await screen.findByRole("dialog", { name: "Bạn có thay đổi chưa lưu" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Lưu" }));
+
+    expect(await within(dialog).findByText(text)).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "Bạn có thay đổi chưa lưu" })).toBeTruthy();
+    expect(within(dialog).getByRole("button", { name: "Lưu" })).toBeTruthy();
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("gốc đã sửa");
+  });
+});
+
+describe("SolutionEditorScreen — NoteSheet, DD-U5 hồi phục (Required Test #5)", () => {
+  it("Lưu lần hai thành công: đóng cả hộp thoại lẫn tấm trượt", async () => {
+    const state = baseState({
+      solutionId: "s1",
+      status: "draft",
+      questions: [question({ questionId: "q1", note: "gốc" })],
+    });
+    saveSolutionMock
+      .mockResolvedValueOnce({ ok: false, error: { code: "generic" } })
+      .mockResolvedValueOnce({ ok: true, solutionId: "s1", status: "draft" });
+
+    render(<SolutionEditorScreen examId="E1" initialState={state} />);
+    fireEvent.click(screen.getByRole("button", { name: /^Câu 1,/ }));
+    const textarea = screen.getByRole("textbox") as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: "gốc đã sửa" } });
+    fireEvent.click(screen.getByRole("button", { name: "Đóng" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Bạn có thay đổi chưa lưu" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Lưu" }));
+    await within(dialog).findByText("Chưa lưu được. Bạn thử lại nhé.");
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Lưu" }));
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(saveSolutionMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("SolutionEditorScreen — NoteSheet, dưới 15 từ trên nháp/đã đăng (Required Test #7, Failure Mode #3)", () => {
+  it("bài đã đăng + 0 từ: không gọi saveSolution, hiện lỗi, chữ không đổi", async () => {
+    const state = baseState({
+      solutionId: "s1",
+      status: "published",
+      questions: [question({ questionId: "q1", note: "" })],
+    });
+    saveSolutionMock.mockResolvedValue({ ok: false, error: { code: "belowWordCount" } });
+
+    render(<SolutionEditorScreen examId="E1" initialState={state} />);
+    fireEvent.click(screen.getByRole("button", { name: /^Câu 1,/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Lưu" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe(
+      "Ghi chú phải có ít nhất 15 từ. Muốn để ngắn thì gỡ bài về nháp trước."
+    );
+    expect(saveSolutionMock).toHaveBeenCalledTimes(1);
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("");
+  });
+
+  it("bài nháp + 0 từ: gọi saveSolution đúng một lần, lưu thành công", async () => {
+    const state = baseState({
+      solutionId: "s1",
+      status: "draft",
+      questions: [question({ questionId: "q1", note: "" })],
+    });
+    saveSolutionMock.mockResolvedValue({ ok: true, solutionId: "s1", status: "draft" });
+
+    render(<SolutionEditorScreen examId="E1" initialState={state} />);
+    fireEvent.click(screen.getByRole("button", { name: /^Câu 1,/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Lưu" }));
+
+    await screen.findByRole("button", { name: "Câu 1, chưa ghi chú" });
+    expect(saveSolutionMock).toHaveBeenCalledTimes(1);
   });
 });
 

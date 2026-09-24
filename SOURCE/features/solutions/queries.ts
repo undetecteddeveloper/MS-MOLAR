@@ -10,16 +10,28 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
+import type { Choice, SubItemId } from "@/types/question";
 
 export type SolutionStatus = "draft" | "published" | "hidden";
 
+/** Loại câu (UGC v2.0/v2.1) — cột `question_type` của `community_solution_for_writer`
+ *  (migration `8b80e2188cc3`, bổ sung sau khi task 11 phát hiện thiếu dữ liệu
+ *  cho AC-022's "Xem N phương án"/"Đáp án mẫu"). Không set (dòng cũ) → "mcq",
+ *  cùng quy ước fallback với `exam_answer_key()`'s consumer (`features/exams/queries/result.ts`). */
+export type WriterQuestionType = "mcq" | "essay" | "true_false" | "short_answer";
+
 /** Một câu hỏi trong màn viết. `stem`/`correctAnswer`/`myResult` là dữ liệu
  *  THÔ (chưa dựng ReactNode) — dựng markdown/LaTeX thành ReactNode là việc của
- *  trang tiêu thụ (frontend task 10), không phải của lớp query này: không có
- *  Investigation Target, hàng Required-test-list hay Reference Contract nào
- *  của task này chỉ tới việc dựng, và cách dựng dùng chung
- *  (features/exams/components/questionNodes.tsx) thuộc tính năng KHÁC — B4
- *  cấm import chéo. Xem Investigation Notes của task 04. */
+ *  trang tiêu thụ (`writerQuestionNodes.tsx`, UI-D22), không phải của lớp
+ *  query này: cách dựng dùng chung (features/exams/components/questionNodes.tsx)
+ *  thuộc tính năng KHÁC — B4 cấm import chéo.
+ *
+ *  `choices`/`subItems`/`subAnswers`/`essayAnswer` đã có từ migration
+ *  `8b80e2188cc3` (`ak.choices`/`ak.sub_answers`/`ak.essay_answer`, cùng cột
+ *  `exam_answer_key()` đã trả cho màn Chi tiết kết quả) — tách theo
+ *  `questionType` NGAY TẠI mapper này, cùng quy ước `result.ts:295-304`: mcq
+ *  giữ nguyên trong `choices`, true_false chuyển sang `subItems` (cùng cột
+ *  jsonb, khác cách đọc theo loại câu). */
 export interface SolutionEditorQuestion {
   questionId: string;
   stem: unknown;
@@ -29,6 +41,15 @@ export interface SolutionEditorQuestion {
   wordCount: number;
   hasChanged: boolean;
   essayPrefillApplied: boolean;
+  questionType: WriterQuestionType;
+  /** Chỉ có ý nghĩa khi `questionType === "mcq"`; mảng rỗng cho loại câu khác. */
+  choices: Choice[];
+  /** Chỉ có mặt khi `questionType === "true_false"` (nội dung từng ý a-d, KHÔNG kèm đáp án). */
+  subItems?: { id: SubItemId; text: string }[];
+  /** Đáp án Đ/S từng ý của true_false — ground truth, không phải bài làm của người viết. */
+  subAnswers?: Partial<Record<SubItemId, boolean>>;
+  /** Đáp án mẫu (tự luận) / giá trị mong đợi (short_answer) — `undefined` khi đề không có. */
+  essayAnswer?: string;
 }
 
 export interface SolutionEditorState {
@@ -58,6 +79,11 @@ interface RawWriterQuestion {
   word_count: number;
   has_changed: boolean;
   essay_prefill_applied: boolean;
+  question_type: WriterQuestionType | null;
+  /** jsonb — `{id,text}[]`; ý nghĩa của `id` (A-D hay a-d) phụ thuộc `question_type`. */
+  choices: { id: string; text: string }[] | null;
+  sub_answers: Partial<Record<SubItemId, boolean>> | null;
+  essay_answer: string | null;
 }
 
 interface RawWriterRow {
@@ -71,6 +97,8 @@ interface RawWriterRow {
 }
 
 function mapWriterQuestion(row: RawWriterQuestion): SolutionEditorQuestion {
+  const questionType: WriterQuestionType = row.question_type ?? "mcq";
+  const rawChoices = row.choices ?? [];
   return {
     questionId: row.question_id,
     stem: row.stem,
@@ -82,6 +110,16 @@ function mapWriterQuestion(row: RawWriterQuestion): SolutionEditorQuestion {
     wordCount: row.word_count,
     hasChanged: row.has_changed,
     essayPrefillApplied: row.essay_prefill_applied,
+    questionType,
+    // Cùng phép tách của result.ts:295-304: mcq giữ nguyên `choices`, true_false
+    // đổi tên đọc thành `subItems` (cùng cột jsonb `{id,text}[]`, khác nghĩa `id`).
+    choices: questionType === "mcq" ? (rawChoices as Choice[]) : [],
+    subItems:
+      questionType === "true_false"
+        ? (rawChoices as unknown as SolutionEditorQuestion["subItems"])
+        : undefined,
+    subAnswers: row.sub_answers ?? undefined,
+    essayAnswer: row.essay_answer ?? undefined,
   };
 }
 

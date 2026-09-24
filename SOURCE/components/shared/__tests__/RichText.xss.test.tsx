@@ -125,3 +125,26 @@ describe("RichText XSS — KaTeX với trust:false + giới hạn tài nguyên",
     renderBoth("$\\frac{1$ và $\\unknowncommand{2}$");
   });
 });
+
+// Task 11 (M8, ADR-0002) — ghi chú bài giải cộng đồng (NoteEditor/NoteSheet,
+// FormulaPreview) là bề mặt UGC MỚI đi qua ĐÚNG con đường RichText này (S15:
+// "cùng chuỗi vào → cùng kết quả" với màn xem). Nhóm fixture này canh giữ đúng
+// bốn vector task yêu cầu — không phải sanitize path mới, mà XÁC NHẬN sanitize
+// đã có bọc được nội dung ghi chú giống hệt nội dung câu hỏi.
+describe("RichText XSS — ghi chú bài giải cộng đồng (task 11, M8/ADR-0002)", () => {
+  it("<script> trong ghi chú không được render", () => {
+    renderBoth('Giải thích: <script>alert("xss")</script> vì đây là đáp án đúng');
+  });
+
+  it("<img onerror> trong ghi chú không được render với handler", () => {
+    renderBoth('Xem hình <img src="x" onerror="alert(1)"> minh hoạ cách giải');
+  });
+
+  it("link javascript: trong ghi chú bị vô hiệu", () => {
+    renderBoth("Xem thêm [tại đây](javascript:alert(1)) để rõ hơn");
+  });
+
+  it("HTML thô bên trong khối công thức không được diễn giải", () => {
+    renderBoth("Vì $x^2 <script>alert(1)</script> + 1 > 0$ nên bất phương trình đúng");
+  });
+});

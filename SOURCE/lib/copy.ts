@@ -1008,6 +1008,32 @@ export const copy = {
   "solutions.note.saveError": "Chưa lưu được. Bạn thử lại nhé.",
   "solutions.note.tooShortPublished":
     "Ghi chú phải có ít nhất 15 từ. Muốn để ngắn thì gỡ bài về nháp trước.",
+  // Task 11 — NoteSheet/NoteEditor/FormulaPreview (UI Spec § Chuỗi tiếng Việt
+  // cần thêm → "Tấm trượt ghi chú (O-01)", nguyên văn).
+  "solutions.note.placeholder":
+    "Giải thích vì sao đáp án đúng, ít nhất 15 từ. Viết được công thức như $x^2$.",
+  "solutions.note.counter": "{count}/15 từ",
+  "solutions.note.charsLeft": "Còn {remaining} ký tự",
+  "solutions.note.saveNext": "Lưu và sang câu {number}",
+  "solutions.note.preview": "Xem trước công thức",
+  "solutions.note.previewLoading": "Đang mở xem trước…",
+  "solutions.note.previewEmpty": "Chưa có gì để xem trước.",
+  "solutions.note.previewError": "Chưa mở được phần xem trước. Bạn thử lại nhé.",
+  "solutions.note.yourCorrect": "Bạn làm đúng",
+  "solutions.note.yourWrong": "Bạn làm sai",
+  "solutions.note.yourSkipped": "Bạn bỏ trống",
+  // Nút gập/mở danh sách phương án trắc nghiệm (AC-022, AC-060) — dùng chung
+  // cả hai biến thể QuestionAnswerSummary (viết ở đây, xem ở task 20).
+  "solutions.note.choices": "Xem {count} phương án",
+  "solutions.note.choicesHide": "Ẩn phương án",
+  // UI Spec liệt các khoá này dưới "Màn xem (S-05)" (task 20), nhưng
+  // `QuestionAnswerSummary` biến thể NGƯỜI VIẾT (task 11) render nhãn tự luận
+  // này TRƯỚC (cùng chữ, dùng chung cả hai biến thể) — theo đúng "owning-task
+  // rule" của Design Doc (§ Vietnamese Copy Keys): "task ĐẦU TIÊN theo thứ tự
+  // thực thi render nó" là chủ của khoá, không phải màn nào UI Spec liệt kê nó
+  // dưới tên.
+  "solutions.view.essayScored": "Đã chấm: {earned}/{max} điểm",
+  "solutions.view.essayPending": "Chưa chấm",
 
   // --- Thời gian tương đối (lib/format/relativeTime.ts) ---------------------
   // Dùng ở danh sách bài giải, màn xem và tab Bình luận của hồ sơ; quá 30 ngày

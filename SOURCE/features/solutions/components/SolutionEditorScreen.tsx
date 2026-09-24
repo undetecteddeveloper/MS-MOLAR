@@ -14,25 +14,21 @@
 // SAU KHI `setSolutionStatus()` trả `{ ok: true }` (AC-029's all-or-nothing
 // phải NHÌN THẤY được, không phải giả định).
 //
-// GIÀN GIÁO TẠM (Unimplemented Dependency Handling — NoteSheet là task 11,
-// chưa tồn tại lúc file này được viết). `NoteQuestionRow.onOpen` mở một khối
-// sửa ghi chú TỐI GIẢN ngay dưới đây (chỉ `<textarea>` + Lưu/Đóng, không
-// RichText/FormulaPreview/hộp thoại dirty-close AC-104) — đủ để giữ đúng hợp
-// đồng "lưu một ghi chú giữ nguyên chữ khi lỗi" (Reference Contract #7) và
-// "lưu ghi chú i chỉ re-render hàng i" (NFR Hiệu năng proxy) trong lúc chờ
-// task 11. Task 11 thay khối này bằng `<NoteSheet>` thật, dùng lại đúng
-// `state.activeNote`/`saveNote()` bên dưới — không có UI Spec/AC nào tả hình
-// dạng của giàn giáo này vì nó không phải là O-01 thật.
+// TASK 11: giàn giáo tạm task 10 để lại (`NoteEditorScaffold`, một
+// `<textarea>` + Lưu/Đóng nội bộ) đã được thay bằng `<NoteSheet>` THẬT
+// (`components/NoteSheet.tsx`) — dùng lại đúng `state.activeNote`/`saveNote()`
+// bên dưới, không thêm action reducer mới ("Lưu và sang câu k+1" chỉ là gọi
+// `saveNote()` rồi dispatch `OPEN_NOTE` kế tiếp, xem `saveNoteAndAdvance`).
 //
-// `stem`/`correctAnswer`/`myResult` (SolutionEditorQuestion, queries.ts) ở lại
-// dạng `unknown` CHƯA RENDER trong toàn bộ file này — cùng quyết định "scope-
-// narrowing concretization" mà backend task 04's Investigation Notes đã ghi:
-// không Investigation Target/Required test/Reference Contract nào của task 10
-// chạm tới việc dựng ReactNode cho ba trường này (không hàng câu, không giàn
-// giáo ghi chú nào ở đây hiển thị đề câu/đáp án) — việc dựng UI-D22 dời sang
-// task đầu tiên thực sự hiển thị chúng (task 11's `QuestionAnswerSummary`).
+// `stem`/`correctAnswer`/`myResult` (SolutionEditorQuestion, queries.ts) VẪN ở
+// lại dạng `unknown` trong FILE NÀY (task 04's "scope-narrowing
+// concretization" không đổi) — việc dựng ReactNode cho ba trường này
+// (UI-D22) chuyển hẳn sang `writerQuestionNodes.tsx` (Server Component only,
+// gọi từ `SolutionEditorPage`), qua prop MỚI, TÙY CHỌN `questionNodes` (xem
+// ghi chú tại `SolutionEditorScreenProps`) — file này (client) không bao giờ
+// tự gọi `RichText` (M12).
 
-import { memo, useCallback, useId, useMemo, useReducer, useState } from "react";
+import { memo, useCallback, useId, useMemo, useReducer } from "react";
 import { t, type MessageKey } from "@/lib/copy";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
@@ -40,6 +36,7 @@ import { Card } from "@/components/ui/card";
 import { SuccessToast } from "@/components/ui/SuccessToast";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { countWords } from "@/lib/solutions/countWords";
+import { saveErrorText } from "@/features/solutions/lib/saveErrorText";
 import {
   saveSolution,
   setSolutionStatus,
@@ -48,9 +45,11 @@ import {
   type SetSolutionStatusResult,
 } from "@/features/solutions/actions";
 import type { SolutionEditorQuestion, SolutionEditorState, SolutionStatus } from "@/features/solutions/queries";
+import type { WriterQuestionNode } from "@/features/solutions/components/writerQuestionNodes";
 import { SolutionEditorHeader } from "@/features/solutions/components/SolutionEditorHeader";
 import { SolutionSettingsPanel } from "@/features/solutions/components/SolutionSettingsPanel";
 import { NoteQuestionRow, type NoteRowState } from "@/features/solutions/components/NoteQuestionRow";
+import { NoteSheet } from "@/features/solutions/components/NoteSheet";
 import { SolutionPublishBar } from "@/features/solutions/components/SolutionPublishBar";
 import { ModerationReasonBanner } from "@/features/solutions/components/ModerationReasonBanner";
 
@@ -236,17 +235,6 @@ function noteExcerpt(note: string): string | undefined {
   return firstLine ? firstLine : undefined;
 }
 
-function saveErrorText(error: Extract<SaveSolutionResult, { ok: false }>["error"]): string {
-  switch (error.code) {
-    case "belowWordCount":
-      return t("solutions.note.tooShortPublished");
-    case "rateLimited":
-      return t("profile.error.rateLimited", { seconds: error.seconds });
-    case "generic":
-      return t("solutions.note.saveError");
-  }
-}
-
 function settingsErrorText(error: Extract<SaveSolutionResult, { ok: false }>["error"]): string {
   if (error.code === "rateLimited") return t("profile.error.rateLimited", { seconds: error.seconds });
   return t("solutions.editor.settingsSaveError");
@@ -266,66 +254,37 @@ function publishErrorText(
   }
 }
 
-interface NoteEditorScaffoldProps {
-  questionNumber: number;
-  note: string;
-  saving: boolean;
-  error: string | null;
-  onSave: (body: string) => void;
-  onClose: () => void;
-}
-
-/** Giàn giáo tối giản — xem ghi chú đầu file. `key` gắn ở nơi gọi buộc React
- *  gắn state cục bộ (`draft`) LẠI mỗi lần đổi câu đang mở, tránh chữ của câu
- *  trước rò sang câu sau. */
-function NoteEditorScaffold({ questionNumber, note, saving, error, onSave, onClose }: NoteEditorScaffoldProps) {
-  const [draft, setDraft] = useState(note);
-  const textareaId = useId();
-
-  return (
-    <Card padding="compact" className="gap-2">
-      <label htmlFor={textareaId} className="text-sm font-medium">
-        {t("upload.questionLabel", { number: questionNumber })}
-      </label>
-      <textarea
-        id={textareaId}
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        rows={4}
-        className="border-input bg-background focus-visible:ring-ring/40 w-full rounded-lg border p-2 text-sm focus-visible:ring-3 focus-visible:outline-none"
-      />
-      {error && (
-        <p role="alert" className="text-destructive text-xs">
-          {error}
-        </p>
-      )}
-      <div className="flex gap-2">
-        <button
-          type="button"
-          aria-busy={saving || undefined}
-          onClick={() => onSave(draft)}
-          className="bg-primary text-primary-foreground min-h-11 flex-1 rounded-lg text-sm font-medium aria-busy:opacity-60"
-        >
-          {saving ? t("common.saving") : t("common.save")}
-        </button>
-        <button
-          type="button"
-          onClick={onClose}
-          className="border-border min-h-11 flex-1 rounded-lg border text-sm font-medium"
-        >
-          {t("common.close")}
-        </button>
-      </div>
-    </Card>
-  );
-}
+/** Nút chờ khi không có node dựng sẵn (test không truyền `questionNodes` —
+ *  xem ghi chú prop bên dưới). */
+const EMPTY_WRITER_NODE: WriterQuestionNode = {
+  questionId: "",
+  stemNode: null,
+  correctAnswerNode: null,
+  noteNode: null,
+  outcome: null,
+  questionType: "mcq",
+  choiceNodes: [],
+  subItemNodes: [],
+};
 
 export interface SolutionEditorScreenProps {
   examId: string;
   initialState: SolutionEditorState;
+  /**
+   * Đề câu/đáp án đúng/ghi chú-chỉ-đọc đã dựng ReactNode phía SERVER
+   * (`writerQuestionNodes.tsx`, UI-D22) — `SolutionEditorPage` (Server
+   * Component) luôn truyền prop này trong production. TÙY CHỌN chỉ để không
+   * phá vỡ `SolutionEditorScreen.test.tsx` hiện có (task 10, không thuộc
+   * Target Files task 11): test đó dựng `SolutionEditorQuestion` thô
+   * (`stem`/`correctAnswer`/`myResult: unknown`) và không biết
+   * `writerQuestionNodes` — thiếu prop này chỉ khiến `NoteSheet` không có đề
+   * câu/đáp án để hiện, không ảnh hưởng gì tới các assertion (ô nhập, nút Lưu,
+   * hàng câu) mà test đó kiểm tra.
+   */
+  questionNodes?: WriterQuestionNode[];
 }
 
-export function SolutionEditorScreen({ examId, initialState }: SolutionEditorScreenProps) {
+export function SolutionEditorScreen({ examId, initialState, questionNodes }: SolutionEditorScreenProps) {
   const [state, dispatch] = useReducer(solutionEditorReducer, initialState, initEditorState);
   const lockReasonId = useId();
 
@@ -399,7 +358,13 @@ export function SolutionEditorScreen({ examId, initialState }: SolutionEditorScr
     }
   }
 
-  async function saveNote(index: number, body: string) {
+  /** Trả về kết quả (không chỉ dispatch) để `NoteSheet` tự quyết định luồng
+   *  của CHÍNH NÓ — nút "Lưu" thường (đóng nhờ `activeNote` về `null` ở nhánh
+   *  NOTE_SAVE_SUCCESS bên dưới, tự nhiên qua re-render) và hộp thoại
+   *  đóng-khi-còn-thay-đổi (DD-U5: đóng CẢ HAI lớp khi thành công, giữ mở +
+   *  hiện lỗi khi thất bại) đều gọi lại đúng hàm này, không có đường lưu thứ
+   *  hai nào khác. */
+  async function saveNote(index: number, body: string): Promise<SaveSolutionResult> {
     const question = state.questions[index];
     dispatch({ type: "NOTE_SAVE_START", index });
     const patch: SaveSolutionPatch = {
@@ -414,6 +379,19 @@ export function SolutionEditorScreen({ examId, initialState }: SolutionEditorScr
     } else {
       dispatch({ type: "NOTE_SAVE_FAILURE", index, error: saveErrorText(result.error) });
     }
+    return result;
+  }
+
+  /** "Lưu và sang câu k+1" (AC-022) — KHÔNG phải một action reducer mới: gọi
+   *  lại đúng `saveNote()` (đóng qua NOTE_SAVE_SUCCESS như trên) rồi, khi
+   *  thành công, dispatch tiếp `OPEN_NOTE` (đã có từ task 10) cho chỉ số kế —
+   *  hai dispatch trong cùng một handler gộp thành MỘT lượt render, nên
+   *  `activeNote` chuyển thẳng từ k sang k+1, không có khung hình trung gian
+   *  "đóng hẳn" nào lọt ra ngoài. */
+  async function saveNoteAndAdvance(index: number, body: string): Promise<SaveSolutionResult> {
+    const result = await saveNote(index, body);
+    if (result.ok) dispatch({ type: "OPEN_NOTE", index: index + 1 });
+    return result;
   }
 
   const rowStates = state.questions.map(deriveRowState);
@@ -478,17 +456,39 @@ export function SolutionEditorScreen({ examId, initialState }: SolutionEditorScr
         </ol>
       )}
 
-      {state.activeNote !== null && (
-        <NoteEditorScaffold
-          key={state.questions[state.activeNote].questionId}
-          questionNumber={state.activeNote + 1}
-          note={state.questions[state.activeNote].note}
-          saving={state.questions[state.activeNote].savingNote}
-          error={state.questions[state.activeNote].noteError}
-          onSave={(body) => void saveNote(state.activeNote as number, body)}
-          onClose={closeNote}
-        />
-      )}
+      {state.activeNote !== null &&
+        (() => {
+          const index = state.activeNote;
+          const q = state.questions[index];
+          const node = questionNodes?.[index] ?? EMPTY_WRITER_NODE;
+          return (
+            <NoteSheet
+              key={q.questionId}
+              open
+              questionNumber={index + 1}
+              totalCount={totalCount}
+              rowState={rowStates[index]}
+              readOnly={hidden}
+              hiddenReason={state.hiddenReason}
+              note={q.note}
+              essayPrefillApplied={q.essayPrefillApplied}
+              saving={q.savingNote}
+              error={q.noteError}
+              stemNode={node.stemNode}
+              correctAnswerNode={node.correctAnswerNode}
+              noteNode={node.noteNode}
+              outcome={node.outcome}
+              questionType={node.questionType}
+              choiceNodes={node.choiceNodes}
+              subItemNodes={node.subItemNodes}
+              subAnswers={node.subAnswers}
+              essayAnswerNode={node.essayAnswerNode}
+              onSave={(body) => saveNote(index, body)}
+              onSaveAndNext={(body) => saveNoteAndAdvance(index, body)}
+              onClose={closeNote}
+            />
+          );
+        })()}
 
       <SolutionPublishBar
         status={state.status}
