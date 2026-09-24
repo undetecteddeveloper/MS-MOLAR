@@ -72,6 +72,7 @@
 // Cách chạy:  cd SOURCE && npx tsx supabase/verify-schema.ts
 // Chạy khi:   sau mỗi lần apply schema.sql, và trước khi deploy code đụng §10.
 
+import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
@@ -1145,6 +1146,133 @@ async function main() {
         ? `Trần lượt chấm khớp: schema.sql nói ${claimCap[1]}, ESSAY_MAX_ATTEMPTS nói ${ESSAY_MAX_ATTEMPTS}`
         : `TRẦN LƯỢT LỆCH: schema.sql nói ${claimCap[1]}, ESSAY_MAX_ATTEMPTS (lib/scoring/essayLifecycle.ts) nói ${ESSAY_MAX_ATTEMPTS} — UI và SQL đang đếm khác nhau`
   );
+
+  // ==========================================================================
+  // 11. COMMUNITY SOLUTIONS — Phase 1 (backend Design Doc v1.9 § Migration
+  //     Strategy "Probe rule (v1.3)"; work plan task 03).
+  //
+  //     Bảy hàm mới của khối này (is_admin_user, count_words,
+  //     question_content_fingerprint, save_community_solution,
+  //     set_community_solution_status, community_solution_for_writer,
+  //     community_solution_result_card) không có SELECT/GRANT trên bảng nào
+  //     cho anon/authenticated — EXECUTE trên chính các hàm là đường kiểm duy
+  //     nhất. Đọc theo MESSAGE, không theo error.code một mình: 42501 cũng là
+  //     mã của "thiếu grant EXECUTE" lẫn "thân hàm tự raise 42501" — hai
+  //     nguyên nhân khác hẳn nhau mà cùng một mã.
+  // ==========================================================================
+  console.log("\nCOMMUNITY SOLUTIONS Phase 1 (task 03) — probe EXECUTE + message:");
+
+  // Rule 1: anon client → PASS chỉ khi message bắt đầu bằng
+  // "permission denied for function". Bất kỳ kết quả nào khác — kể cả message
+  // riêng của hàm — nghĩa là anon gọi được thân hàm.
+  const CS_RANDOM_EXAM_ID = `__verify_schema_no_such_exam_${randomUUID()}__`;
+  const csAnonProbes: readonly [string, Record<string, unknown>][] = [
+    ["is_admin_user", {}],
+    ["count_words", { p_text: "probe" }],
+    ["question_content_fingerprint", { p_question_id: "probe-missing" }],
+    [
+      "save_community_solution",
+      { p_exam_id: CS_RANDOM_EXAM_ID, p_attempt_id: null, p_show_profile: true, p_show_score: false, p_notes: [] },
+    ],
+    ["set_community_solution_status", { p_exam_id: CS_RANDOM_EXAM_ID, p_action: "publish" }],
+    ["community_solution_for_writer", { p_exam_id: CS_RANDOM_EXAM_ID }],
+    ["community_solution_result_card", { p_exam_id: CS_RANDOM_EXAM_ID }],
+  ];
+  for (const [fn, args] of csAnonProbes) {
+    const r = await anonClient.rpc(fn, args);
+    const msg = r.error?.message ?? "";
+    assert(
+      msg.startsWith("permission denied for function"),
+      msg.startsWith("permission denied for function")
+        ? `anon bị từ chối ${fn} đúng cách ("permission denied for function")`
+        : `anon KHÔNG bị từ chối đúng cách ở ${fn} (mã ${describeCode(r.error?.code ?? null)}, message "${msg}") — thiếu \`revoke ... from anon\` ở khối COMMUNITY SOLUTIONS`
+    );
+  }
+
+  if (!probe)
+    skip("probe user COMMUNITY SOLUTIONS (7 hàm mới) — cần một phiên `authenticated`");
+  else {
+    // Rule 4: question_content_fingerprint là SECURITY INVOKER — §10c vẫn từ
+    // chối authenticated đọc thẳng correct_answer/sub_answers/essay_answer, nên
+    // một CUỘC GỌI THẬT của probe user phải chết ở "permission denied for
+    // table questions", KHÔNG bao giờ trả về md5/null (mới là chỗ §10c còn
+    // đứng vững).
+    const qcf = await probe.rpc("question_content_fingerprint", { p_question_id: "probe-missing" });
+    const qcfMsg = qcf.error?.message ?? "";
+    assert(
+      qcfMsg.startsWith("permission denied for table questions"),
+      qcfMsg.startsWith("permission denied for table questions")
+        ? "question_content_fingerprint: probe user chết đúng chỗ (permission denied for table questions) — §10c vẫn giữ đáp án"
+        : qcf.error?.code === "PGRST202"
+          ? "question_content_fingerprint chưa tồn tại (PGRST202) — apply migration COMMUNITY SOLUTIONS Phase 1"
+          : `question_content_fingerprint LỘ ĐÁP ÁN: probe user gọi được (mã ${describeCode(qcf.error?.code ?? null)}, dữ liệu trả: ${JSON.stringify(qcf.data)}) — §10c đã ngừng chặn`
+    );
+
+    // Rule 2: hai RPC ghi tự raise 42501 với message CỐ ĐỊNH, đúng danh từ
+    // exam đầu tiên gặp phải (random uuid nên chắc chắn không khớp đề nào).
+    const saveCs = await probe.rpc("save_community_solution", {
+      p_exam_id: CS_RANDOM_EXAM_ID,
+      p_attempt_id: null,
+      p_show_profile: true,
+      p_show_score: false,
+      p_notes: [],
+    });
+    assert(
+      saveCs.error?.code === "42501" && saveCs.error?.message === "save_community_solution: exam not visible",
+      saveCs.error?.code === "42501" && saveCs.error?.message === "save_community_solution: exam not visible"
+        ? "save_community_solution: probe user nhận đúng 42501 'save_community_solution: exam not visible'"
+        : saveCs.error?.code === "PGRST202"
+          ? "save_community_solution chưa tồn tại (PGRST202) — apply migration COMMUNITY SOLUTIONS Phase 1"
+          : `save_community_solution SAI kết quả (mong đợi 42501 'exam not visible', nhận mã ${describeCode(saveCs.error?.code ?? null)}, message "${saveCs.error?.message ?? ""}")`
+    );
+
+    const setStatus = await probe.rpc("set_community_solution_status", {
+      p_exam_id: CS_RANDOM_EXAM_ID,
+      p_action: "publish",
+    });
+    assert(
+      setStatus.error?.code === "42501" &&
+        setStatus.error?.message === "set_community_solution_status: exam not visible",
+      setStatus.error?.code === "42501" &&
+        setStatus.error?.message === "set_community_solution_status: exam not visible"
+        ? "set_community_solution_status: probe user nhận đúng 42501 'set_community_solution_status: exam not visible'"
+        : setStatus.error?.code === "PGRST202"
+          ? "set_community_solution_status chưa tồn tại (PGRST202) — apply migration COMMUNITY SOLUTIONS Phase 1"
+          : `set_community_solution_status SAI kết quả (mong đợi 42501 'exam not visible', nhận mã ${describeCode(setStatus.error?.code ?? null)}, message "${setStatus.error?.message ?? ""}")`
+    );
+
+    // Rule 3: is_admin_user/community_solution_for_writer/
+    // community_solution_result_card không bao giờ raise 42501 trong thân —
+    // PASS là có dòng hoặc 0 dòng, KHÔNG có lỗi.
+    const rule3Probes: readonly [string, Record<string, unknown>][] = [
+      ["is_admin_user", {}],
+      ["count_words", { p_text: "probe" }],
+      ["community_solution_for_writer", { p_exam_id: CS_RANDOM_EXAM_ID }],
+      ["community_solution_result_card", { p_exam_id: CS_RANDOM_EXAM_ID }],
+    ];
+    for (const [fn, args] of rule3Probes) {
+      const r = await probe.rpc(fn, args);
+      assert(
+        !r.error,
+        !r.error
+          ? `${fn}: probe user gọi được, không lỗi (${Array.isArray(r.data) ? `${r.data.length} dòng` : JSON.stringify(r.data)})`
+          : r.error.code === "PGRST202"
+            ? `${fn} chưa tồn tại (PGRST202) — apply migration COMMUNITY SOLUTIONS Phase 1`
+            : `${fn} LỖI KHÔNG MONG ĐỢI (mã ${describeCode(r.error.code ?? null)}, message "${r.error.message}") — thân hàm này không được raise gì với một exam id ngẫu nhiên`
+      );
+    }
+
+    // Probe user (signInProbeUser) không được nằm trong admin_users — nếu có
+    // thì is_admin_user() sẽ trả true oan và mọi probe "not an admin" của các
+    // migration sau (task 32) sẽ đọc sai.
+    const isAdmin = await probe.rpc("is_admin_user", {});
+    assert(
+      isAdmin.data === false,
+      isAdmin.data === false
+        ? "probe user (signInProbeUser) KHÔNG nằm trong admin_users — is_admin_user() trả false"
+        : `probe user ĐANG nằm trong admin_users (is_admin_user() trả ${JSON.stringify(isAdmin.data)}) — dọn tay: delete from admin_users where user_id = probe user's id`
+    );
+  }
 
   // Một lượt chạy PHẦN không bao giờ được in ra câu của một lượt chạy ĐỦ. Đó là
   // cả điểm của việc đếm `skipped` tách khỏi `failures`: người đọc log — hoặc
