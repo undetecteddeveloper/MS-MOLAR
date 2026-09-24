@@ -25,7 +25,7 @@
 -- của project dev,
 --   insert into public.admin_users (user_id) values ('<id>');
 -- Đọc lại bằng TRUY VẤN THẬT:
---   select fingerprint from public.schema_version;      -- phải trả 7cd454572675
+--   select fingerprint from public.schema_version;      -- phải trả 8b80e2188cc3
 --   select count(*) from public.admin_users;             -- phải khớp số id dev ADMIN_USER_IDS
 
 -- 20a. admin_users — bản sao trong DB của biến môi trường ADMIN_USER_IDS
@@ -450,6 +450,14 @@ begin
           'question_id', ak.id,
           'stem', ak.content,
           'correct_answer', ak.correct_answer,
+          -- AC-022: note sheet cần đủ dữ liệu để hiện "Xem N phương án" (trắc
+          -- nghiệm) / "Đáp án mẫu" (tự luận) — 4 cột này lấy nguyên từ `ak`
+          -- (exam_answer_key đã join sẵn ở FROM bên dưới), không join thêm
+          -- bảng nào, không đổi cổng vào entitlement.
+          'question_type', ak.question_type,
+          'choices', ak.choices,
+          'sub_answers', ak.sub_answers,
+          'essay_answer', ak.essay_answer,
           -- Kết quả riêng câu này của lượt làm đã gắn — nguồn "Bạn làm đúng/
           -- sai/bỏ trống". per_question lưu nguyên PerQuestionResult[] (khoá
           -- questionId, camelCase — types/result.ts), không transform khi ghi.
@@ -558,7 +566,7 @@ revoke all on function public.community_solution_result_card(text) from public, 
 grant execute on function public.community_solution_result_card(text) to authenticated;
 
 insert into public.schema_version (id, fingerprint)
-values (1, '7cd454572675')
+values (1, '8b80e2188cc3')
 on conflict (id) do update
   set fingerprint = excluded.fingerprint,
       applied_at  = now();
