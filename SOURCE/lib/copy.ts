@@ -1011,6 +1011,9 @@ export const copy = {
   "solutions.row.missing": "Chưa ghi chú",
   "solutions.row.short": "Chưa đủ 15 từ",
   "solutions.row.changed": "Câu hỏi đã thay đổi",
+  // Hàng câu màn xem (task 20, `SolutionQuestionRow`) dùng lại đúng khoá này —
+  // cùng khái niệm "câu chưa có ghi chú" ở cả hai màn, một bảng tra một khoá.
+  "solutions.row.noSolution": "Chưa có lời giải",
   "solutions.bar.remaining": "Còn {count} câu chưa có ghi chú. Ghi chú đủ {total} câu mới đăng được.",
   "solutions.bar.ready": "Đủ {total} câu. Bạn có thể đăng.",
   "solutions.bar.publishedNote": "Bài giải đang hiện với mọi người đã nộp đề.",
@@ -1068,6 +1071,25 @@ export const copy = {
   // dưới tên.
   "solutions.view.essayScored": "Đã chấm: {earned}/{max} điểm",
   "solutions.view.essayPending": "Chưa chấm",
+  // Màn xem (S-05, task 20) — SolutionQuestionRow + QuestionAnswerSummary biến
+  // thể "Người viết" + SolutionNoteBlock (UI-D16, UI-D17, AC-040, AC-041).
+  // `writerChoice` giữ nguyên placeholder `{answer}` dù giá trị truyền vào là
+  // ReactNode (đề câu render sẵn phía server, UI-D22) chứ không phải chuỗi —
+  // `t()` không nội suy được ReactNode, nên nơi gọi tách chuỗi tại `{answer}`
+  // rồi tự chèn node (xem `interpolateNode` trong QuestionAnswerSummary.tsx).
+  "solutions.view.writerChoice": "Người viết chọn {answer}",
+  "solutions.view.writerWrong": "Người viết làm sai",
+  "solutions.view.writerSkipped": "Người viết bỏ trống",
+  "solutions.view.writerAnswer": "Người viết trả lời:",
+  "solutions.view.solutionLabel": "Lời giải",
+  // Khoá thuộc "Tấm trượt bình luận (O-02)" trong UI Spec, nhưng `SolutionQuestionRow`
+  // (task 20) render CHÍNH hai chuỗi này trước — trên nút bình luận của hàng câu
+  // và trên chữ đếm ở đầu hàng — dù tấm trượt thật (`CommentSheet`) tới sau ở
+  // task 28. Theo đúng "owning-task rule" (task ĐẦU TIÊN theo thứ tự thực thi
+  // render nó là chủ của khoá — xem lý giải của `essayScored`/`essayPending` ở
+  // trên): task 20 là chủ, task 28 dùng lại nguyên văn, không định nghĩa lại.
+  "solutions.comments.open": "{count} bình luận",
+  "solutions.comments.openEmpty": "Bình luận",
   // Màn xem (S-05, task 19) — SolutionAuthorCard/HelpfulButton/SolutionMenu.
   "solutions.view.helpful": "Hữu ích",
   "solutions.view.helpfulCount": "{count} hữu ích",

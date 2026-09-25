@@ -24,7 +24,7 @@ import { useId, useState } from "react";
 import type { ReactNode } from "react";
 import { Check, ChevronDown, Minus, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { t } from "@/lib/copy";
+import { t, type MessageKey } from "@/lib/copy";
 import { cn } from "@/lib/utils";
 import {
   outcomeBranch,
@@ -36,7 +36,9 @@ import type { WriterQuestionType } from "@/features/solutions/queries";
 import type { ChoiceNode, SubItemNode } from "@/features/solutions/components/writerQuestionNodes";
 import type { SubItemId } from "@/types/question";
 
-export interface QuestionAnswerSummaryProps {
+interface WriterVariantProps {
+  /** Mặc định (không truyền) = biến thể "Bạn" (task 11) — giữ nguyên hành vi/props cũ. */
+  variant?: "writer";
   stemNode: ReactNode;
   correctAnswerNode: ReactNode;
   outcome: WriterQuestionOutcome;
@@ -48,6 +50,130 @@ export interface QuestionAnswerSummaryProps {
   subAnswers?: Partial<Record<SubItemId, boolean>>;
   /** `undefined` khi đề không có đáp án mẫu (AC-022 "nếu đề có") — không hiện dòng "Đáp án mẫu". */
   essayAnswerNode?: ReactNode;
+}
+
+/** Biến thể "Người viết" (task 20, hàng câu mở ở màn xem — UI-D16, UI-D17,
+ *  Reference Contract Value #19). KHÔNG nhận `outcome`/`questionType`:
+ *  `SolutionDetail` (task 14, `queries.ts`) không mang hai trường đó cho
+ *  người đọc — bốn khoá điểm-có-điều-kiện dưới đây đã LÀ kết quả cuối
+ *  (`result`/`notAutoScored`/`essayScore`, gộp sẵn từ cột `per_question` của
+ *  header), không suy lại qua `outcomeBranch()`/`resultLabel()` lần hai.
+ *
+ *  Vắng CẢ BỐN khoá (`writerChoiceNode`/`result`/`notAutoScored`/`essayScore`)
+ *  nghĩa là người viết đã tắt "Hiện điểm và lựa chọn gốc" (AC-040) — component
+ *  đọc ĐÚNG sự có mặt của từng khoá, không tự kiểm `score` lần nào (đúng quy
+ *  ước mapper: "absent" đồng nghĩa "score bị ẩn", không có giá trị thế chỗ). */
+export interface QuestionAnswerSummaryReaderProps {
+  variant: "reader";
+  stemNode: ReactNode;
+  correctAnswerNode: ReactNode;
+  /** Câu trả lời gốc của người viết — ReactNode render sẵn phía server
+   *  (UI-D22); có mặt khi outcome gốc có `selected`, vắng mặt khi bỏ trống
+   *  hoặc khi bản thân bốn khoá điểm đều vắng (score bị ẩn). */
+  writerChoiceNode?: ReactNode;
+  result?: "correct" | "wrong" | "skipped";
+  notAutoScored?: boolean;
+  essayScore?: { earned: number; max: number };
+}
+
+export type QuestionAnswerSummaryProps = WriterVariantProps | QuestionAnswerSummaryReaderProps;
+
+/** Chèn một ReactNode vào đúng vị trí `{key}` của một khoá `copy.ts` —
+ *  `t()` chỉ nội suy được `string | number` (typescript-rules: Props/State
+ *  React không cần `unknown`, nhưng đây là ReactNode dựng sẵn phía server,
+ *  UI-D22, không phải chuỗi). Gọi `t(messageKey)` KHÔNG kèm `values` trả về
+ *  nguyên bản mẫu (đặc tả riêng của `t()`, `lib/copy.ts`), nên tách chuỗi tại
+ *  literal `{key}` rồi tự chèn node vào giữa — không cần sửa `t()`. */
+function interpolateNode(messageKey: MessageKey, key: string, node: ReactNode): ReactNode {
+  const [prefix, suffix] = t(messageKey).split(`{${key}}`);
+  return (
+    <>
+      {prefix}
+      {node}
+      {suffix}
+    </>
+  );
+}
+
+/** "Đúng" (`success`+`Check`) / "Người viết làm sai" (`wrong`+`X`) / "Người
+ *  viết bỏ trống" (`muted`+`Minus`) — nhãn kết quả màn xem khi bật "Hiện điểm
+ *  và lựa chọn gốc" (UI Spec § QuestionAnswerSummary "Nhãn kết quả — màn xem"). */
+function ReaderResultBadge({ result }: { result: "correct" | "wrong" | "skipped" }) {
+  if (result === "correct") {
+    return (
+      <Badge variant="success" className="w-fit">
+        <Check aria-hidden />
+        {t("common.correct")}
+      </Badge>
+    );
+  }
+  if (result === "wrong") {
+    return (
+      <Badge variant="wrong" className="w-fit">
+        <X aria-hidden />
+        {t("solutions.view.writerWrong")}
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="muted" className="w-fit">
+      <Minus aria-hidden />
+      {t("solutions.view.writerSkipped")}
+    </Badge>
+  );
+}
+
+function ReaderSummary({
+  stemNode,
+  correctAnswerNode,
+  writerChoiceNode,
+  result,
+  notAutoScored,
+  essayScore,
+}: QuestionAnswerSummaryReaderProps) {
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="text-lg leading-relaxed font-medium text-pretty sm:text-xl">{stemNode}</div>
+
+      {/* Đáp án đúng LUÔN hiện — không phụ thuộc score (AC-040's phần bị ẩn
+          chỉ là kết quả/lựa chọn gốc của người viết, không phải đáp án đúng). */}
+      <p className="text-sm">
+        <span className="text-muted-foreground">{t("result.correctAnswerLabel")} </span>
+        <span className="text-success font-medium">{correctAnswerNode}</span>
+      </p>
+
+      {essayScore && (
+        <p className="text-sm font-medium">
+          {t("solutions.view.essayScored", { earned: essayScore.earned, max: essayScore.max })}
+        </p>
+      )}
+
+      {/* UI-D16: true_false / short_answer chưa chấm — cùng bố cục hai dòng
+          của `result/detail/page.tsx:255-265`, chủ ngữ đổi thành "Người viết". */}
+      {!essayScore && notAutoScored && (
+        <div className="flex flex-col gap-1 text-sm">
+          <Badge variant="muted" className="w-fit">
+            {t("result.notAutoScored")}
+          </Badge>
+          <p>
+            <span className="text-muted-foreground">{t("solutions.view.writerAnswer")} </span>
+            <span className="text-foreground">{writerChoiceNode ?? t("result.skipped")}</span>
+          </p>
+        </div>
+      )}
+
+      {!essayScore && !notAutoScored && result && (
+        <div className="flex flex-col gap-1 text-sm">
+          {writerChoiceNode !== undefined && (
+            <p className="text-muted-foreground">
+              {interpolateNode("solutions.view.writerChoice", "answer", writerChoiceNode)}
+            </p>
+          )}
+          <ReaderResultBadge result={result} />
+        </div>
+      )}
+    </div>
+  );
 }
 
 /** Nhãn kết quả "tấm trượt" (UI Spec § QuestionAnswerSummary "Nhãn kết quả —
@@ -151,16 +277,13 @@ function ChoicesDisclosure({ choices }: { choices: ChoiceNode[] }) {
   );
 }
 
-export function QuestionAnswerSummary({
-  stemNode,
-  correctAnswerNode,
-  outcome,
-  questionType,
-  choiceNodes,
-  subItemNodes,
-  subAnswers,
-  essayAnswerNode,
-}: QuestionAnswerSummaryProps) {
+export function QuestionAnswerSummary(props: QuestionAnswerSummaryProps) {
+  if (props.variant === "reader") {
+    return <ReaderSummary {...props} />;
+  }
+
+  const { stemNode, correctAnswerNode, outcome, questionType, choiceNodes, subItemNodes, subAnswers, essayAnswerNode } =
+    props;
   const branch = outcomeBranch(outcome);
   // UI-D16 thắng mọi loại câu: câu true_false/short_answer không có phán
   // quyết đúng/sai đi thẳng vào nhánh "Chưa chấm tự động" bên dưới, không
