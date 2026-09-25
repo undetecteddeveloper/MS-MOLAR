@@ -1,10 +1,10 @@
-# Bàn giao phiên — Bài giải cộng đồng (cập nhật 2026-09-25, PHA IMPLEMENT ĐANG CHẠY, Phase 1 XONG, 16/53 task)
+# Bàn giao phiên — Bài giải cộng đồng (cập nhật 2026-09-25, PHA IMPLEMENT ĐANG CHẠY, Phase 1 XONG, 17/53 task)
 
 > File này là điểm tựa cho phiên Claude Code KẾ TIẾP. Đọc file này trước, rồi
 > đọc row Notion. Toàn bộ tài liệu/kế hoạch đã chốt xong (vòng cập nhật
 > 2026-09-19 → 24); Phase 1 (task 01–12) đã xong và verify cả bằng browser
-> thật; Phase 2 task 13–16 đã xong và verify qua quality-fixer/integration-test-
-> reviewer độc lập. Việc còn lại: VIẾT CODE từ task 17 trở đi. Xoá file này khi
+> thật; Phase 2 task 13–17 đã xong và verify qua quality-fixer/integration-test-
+> reviewer độc lập. Việc còn lại: VIẾT CODE từ task 18 trở đi. Xoá file này khi
 > tính năng đóng (đã ship).
 
 ## Trạng thái ngắn
@@ -12,10 +12,10 @@
 | Mục | Giá trị |
 |---|---|
 | Nhánh | `feat/community-solutions` (tách từ `af05f28` = `origin/main`) |
-| Tiến độ | **Phase 1 HOÀN TẤT — 12/12**. Phase 2: **4/12** (task 13, 14, 15, 16 đã commit). Task tiếp theo: **17** (P2-T5 split 1/2, frontend). |
-| Commit trên nhánh (mới nhất trước, xem `git log af05f28..HEAD` để chắc chắn) | `ac068cf` (task 16, real-DB proof migration 13 — M5/writer self-read/Helpful RPC/pin/AC-004/hidden; qua 2 vòng integration-test-reviewer, 1 vòng required-fix) · `a2a7e36` (task 15, `toggleHelpful`/`setPin` — xem mục "Sự cố đã xử lý" bên dưới cho vụ 23505) · `df6205b`/`ea691e4` (đồng bộ work plan/overview) · `b3492c9` (task 14) · `e74b64a` (task 13, migration Phase 2, fingerprint `c3c344fffc6e`) · `d8826cc` (xác nhận đo 360px task 08 + luồng L1 task 10, qua browser thật) · `9f47dab`/`d77998b` (đồng bộ work plan/overview) · `dc309eb` (task 11) · `4b0ea52` (**sửa lỗi task 03** — xem mục "Sự cố đã xử lý" bên dưới) · `b2b01fb` (task 10) · `18bd280` (task 09) · `27d61cd` (task 08) · `c4dfddf` (task 05, Early Verification Point) · `e25e1b6` (task 04) · `74ba95b` (task 03) · `707df1f` (TD-034, cách ly INT-1, không tính vào 53 task) · 01/02/06/07/12 từ trước |
+| Tiến độ | **Phase 1 HOÀN TẤT — 12/12**. Phase 2: **5/12** (task 13, 14, 15, 16, 17 đã commit). Task tiếp theo: **18** (P2-T5 split 2/2, frontend — `SolutionList` + list route + server guard). |
+| Commit trên nhánh (mới nhất trước, xem `git log af05f28..HEAD` để chắc chắn) | `cbf17de` (task 17, `AuthorIdentity`/`SolutionCard`/`OwnSolutionBlock`) · `ac068cf` (task 16, real-DB proof migration 13 — M5/writer self-read/Helpful RPC/pin/AC-004/hidden; qua 2 vòng integration-test-reviewer, 1 vòng required-fix) · `a2a7e36` (task 15, `toggleHelpful`/`setPin` — xem mục "Sự cố đã xử lý" bên dưới cho vụ 23505) · `df6205b`/`ea691e4` (đồng bộ work plan/overview) · `b3492c9` (task 14) · `e74b64a` (task 13, migration Phase 2, fingerprint `c3c344fffc6e`) · `d8826cc` (xác nhận đo 360px task 08 + luồng L1 task 10, qua browser thật) · `9f47dab`/`d77998b` (đồng bộ work plan/overview) · `dc309eb` (task 11) · `4b0ea52` (**sửa lỗi task 03** — xem mục "Sự cố đã xử lý" bên dưới) · `b2b01fb` (task 10) · `18bd280` (task 09) · `27d61cd` (task 08) · `c4dfddf` (task 05, Early Verification Point) · `e25e1b6` (task 04) · `74ba95b` (task 03) · `707df1f` (TD-034, cách ly INT-1, không tính vào 53 task) · 01/02/06/07/12 từ trước |
 | Row Notion | database MS-MOLAR `3b378ba6-ae12-803c-8500-c572b6fc745f`, page `3de78ba6-ae12-8175-97d7-c6c88cf8c79d` — cần cập nhật lại trạng thái |
-| Bước tiếp theo | Tiếp tục vòng lặp task-executor/task-executor-frontend + quality-fixer/quality-fixer-frontend + commit, bắt đầu từ task 17 (P2-T5 split 1/2, frontend). Sau mỗi 2–3 task, show bảng tiến độ cho engineer. |
+| Bước tiếp theo | Tiếp tục vòng lặp task-executor/task-executor-frontend + quality-fixer/quality-fixer-frontend + commit, bắt đầu từ task 18 (P2-T5 split 2/2, frontend). Sau mỗi 2–3 task, show bảng tiến độ cho engineer. |
 | Phát hiện ngoài phạm vi (không chặn, chưa xử lý) | quality-fixer của task 16 phát hiện 2 test flaky KHÔNG liên quan — `features/solutions/components/__tests__/FormulaPreview.test.tsx`/`FormulaPreview.error.test.tsx` (component từ task 11) timeout `findByRole` khi chạy full-suite song song do tranh CPU, nhưng pass 6/6 khi chạy riêng lẻ. Đề xuất: ghi vào `TECH-DEBT.md` (fixed-timeout `findByRole` dưới tải song song) — nhưng `TECH-DEBT.md` đang có sửa đổi CHƯA COMMIT của kỹ sư, nên phiên này không tự sửa file đó; để kỹ sư quyết định khi rảnh. Cũng có 4 case `test-rls.ts` Rating section (`R-p`/`R-r`/`R-t`/`R-u`) fail từ trước, xác nhận không liên quan Bài giải cộng đồng qua 2 vòng review độc lập, không phải lỗi mới. |
 
 ## Sự cố đã xử lý trong Phase 1 (đọc để tránh lặp lại)
@@ -69,4 +69,4 @@ Các file review/verification JSON cũ (`docs/plans/community-solutions-*.json`)
 
 ## Cách chạy lại (nếu phiên phải khởi động lại recipe)
 
-Gõ `/recipe-fullstack-implement` với nội dung: "Tiếp tục pha implement cho 'Bài giải cộng đồng' — đọc `docs/plans/community-solutions-HANDOFF.md`, Phase 1 (task 01–12) và Phase 2 task 13–16 đã xong và verify (13/14/15/16 qua quality-fixer/integration-test-reviewer độc lập), tiếp tục từ task 17 (P2-T5 split 1/2, frontend — `SolutionCard`/`AuthorIdentity`/`OwnSolutionBlock`) theo `docs/plans/20260917-feature-community-solutions.md` (v1.3) và `docs/plans/tasks/`. Không hỏi lại quyết định đã chốt trong PRD/UI Spec/Design Doc/ADR-0021/work plan — tất cả FINAL. Nếu phát hiện lỗi dữ liệu/thiết kế thật hoặc xung đột giữa quy ước đã commit của một task trước với yêu cầu test của task đang làm (như vụ AC-022 ở task 03, vụ 23505 ở task 15 — cả hai xem mục 'Sự cố đã xử lý'), hỏi engineer trước khi tự quyết định sửa code/migration đã commit."
+Gõ `/recipe-fullstack-implement` với nội dung: "Tiếp tục pha implement cho 'Bài giải cộng đồng' — đọc `docs/plans/community-solutions-HANDOFF.md`, Phase 1 (task 01–12) và Phase 2 task 13–17 đã xong và verify (13/14/15/16/17 qua quality-fixer/integration-test-reviewer độc lập), tiếp tục từ task 18 (P2-T5 split 2/2, frontend — `SolutionList` + list route + server guard) theo `docs/plans/20260917-feature-community-solutions.md` (v1.3) và `docs/plans/tasks/`. Không hỏi lại quyết định đã chốt trong PRD/UI Spec/Design Doc/ADR-0021/work plan — tất cả FINAL. Nếu phát hiện lỗi dữ liệu/thiết kế thật hoặc xung đột giữa quy ước đã commit của một task trước với yêu cầu test của task đang làm (như vụ AC-022 ở task 03, vụ 23505 ở task 15 — cả hai xem mục 'Sự cố đã xử lý'), hỏi engineer trước khi tự quyết định sửa code/migration đã commit."
