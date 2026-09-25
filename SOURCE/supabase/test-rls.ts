@@ -182,6 +182,33 @@ const SUB_PENDING_UNTIL_SENTINEL = "2099-03-04T05:06:07.000Z";
 const CS_EXAM_ID = "rls-cs-exam";
 const CS_QUESTION_IDS = [1, 2, 3, 4, 5].map((n) => `${CS_EXAM_ID}-q${n}`);
 
+// User thứ ba (bền vững, cùng quy ước A/B — không xoá ở cuối) — task 16 (test
+// task migration 13) cần nó cho remove_community_solution_helpful case (a).
+const EMAIL_C = "smithnguyen247+rlstestc@gmail.com";
+
+// Fixture Community Solutions — task 16 (test task của migration 13; backend
+// DD v1.9 § Integration Verification Points / § Test Boundaries "User-write
+// RPC groups"). Đề RIÊNG, KHÔNG dùng lại CS_EXAM_ID ở trên — Phần 10 (task 05)
+// dọn sạch fixture của nó trước khi khối task-16 chạy trong cùng file.
+const CS16_EXAM_ID = "rls-cs16-exam";
+const CS16_QUESTION_IDS = [1, 2, 3, 4, 5].map((n) => `${CS16_EXAM_ID}-q${n}`);
+// Đề THỨ HAI, chỉ để làm mục tiêu refusal của set_community_solution_pin
+// ("một bài giải published của MỘT ĐỀ KHÁC").
+const CS16_OTHER_EXAM_ID = "rls-cs16-exam-other";
+const CS16_OTHER_QUESTION_ID = `${CS16_OTHER_EXAM_ID}-q1`;
+
+/** Xóa sạch fixture Community Solutions của task 16 (chạy trước VÀ sau để
+ *  idempotent). community_solution_notes/comments/helpfuls đều `on delete
+ *  cascade` theo community_solutions, không cần xoá tường minh. */
+async function cleanupCs16Fixtures(admin: SupabaseClient) {
+  const examIds = [CS16_EXAM_ID, CS16_OTHER_EXAM_ID];
+  await admin.from("community_moderation_log").delete().in("exam_id", examIds);
+  await admin.from("community_solutions").delete().in("exam_id", examIds);
+  await admin.from("exam_attempts").delete().in("exam_id", examIds);
+  await admin.from("exams").delete().in("id", examIds);
+  await admin.from("questions").delete().in("id", [...CS16_QUESTION_IDS, CS16_OTHER_QUESTION_ID]);
+}
+
 /** Sinh đúng `n` từ (đếm bằng khoảng trắng, khớp `count_words`/`countWords`). */
 function csWords(n: number): string {
   return Array.from({ length: n }, (_, i) => `tu${i + 1}`).join(" ");
@@ -698,9 +725,14 @@ async function main() {
 
   const userAId = await ensureUser(admin, EMAIL_A);
   const userBId = await ensureUser(admin, EMAIL_B);
+  const userCId = await ensureUser(admin, EMAIL_C);
 
   const userA = await signInAs(url, anon, EMAIL_A); // TÁC GIẢ
   const userB = await signInAs(url, anon, EMAIL_B); // non-author
+  // Task 16 (test task migration 13) — user thứ ba: cần một caller KHÔNG giữ
+  // dòng Helpful gọi remove trong khi một người KHÁC đang giữ dòng, cả hai
+  // đồng thời tồn tại (remove_community_solution_helpful case (a)).
+  const userC = await signInAs(url, anon, EMAIL_C);
   const anonClient = createClient(url, anon, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
@@ -3156,6 +3188,717 @@ async function main() {
 
   // Dọn dẹp fixture Community Solutions.
   await cleanupCommunitySolutionsFixtures(admin);
+
+  // ==========================================================================
+  // Phần 11 — Community Solutions, TEST TASK 16 (migration task 13: backend DD
+  // v1.9 § Integration Verification Points / § Test Boundaries "User-write RPC
+  // groups"). M5 (nửa bài giải) + writer self-read (AC-062), cả hai nhóm RPC
+  // Helpful (kèm table-closure), ghim nguyên tử + refusal mục tiêu, cổng AC-004
+  // cho ghim/list/detail, bình luận trên bài giải nháp/bị ẩn (S7/AC-071/AC-063)
+  // + bình luận bị admin ẩn trong detail (S19/AC-107 — SN-1: admin_moderate_
+  // community_comment/_solution chưa tồn tại tới migration 32, harness setup
+  // client tự đặt trạng thái + chèn thẳng dòng community_moderation_log, đúng
+  // tiền lệ task 05 ở trên), hồi quy tên. U1 (task file § "U1 — resolved"):
+  // Helpful ghi CHỈ qua RPC — không thêm grant/policy nào để một case xanh.
+  //
+  // Bọc trong { } để mọi biến const bên dưới không đụng tên với hàng nghìn
+  // dòng phía trên trong cùng main().
+  // ==========================================================================
+  {
+    console.log("\nCommunity Solutions (task 16) — setup fixture (service_role)…");
+    await cleanupCs16Fixtures(admin);
+
+    const questionsSetup = await admin.from("questions").insert(
+      CS16_QUESTION_IDS.map((id, i) => ({
+        id,
+        content: `[RLS-CS16] Câu ${i + 1} bản gốc`,
+        choices: MCQ_CHOICES,
+        correct_answer: "A",
+        subject: "Toán",
+        grade: 10,
+        topic: "Toán",
+      })),
+    );
+    if (questionsSetup.error) throw questionsSetup.error;
+    const otherQuestionSetup = await admin.from("questions").insert({
+      id: CS16_OTHER_QUESTION_ID,
+      content: "[RLS-CS16] Câu đề khác",
+      choices: MCQ_CHOICES,
+      correct_answer: "A",
+      subject: "Toán",
+      grade: 10,
+      topic: "Toán",
+    });
+    if (otherQuestionSetup.error) throw otherQuestionSetup.error;
+
+    const examSetup = await admin.from("exams").insert({
+      id: CS16_EXAM_ID,
+      title: "[RLS] Đề Bài giải cộng đồng (task 16)",
+      duration_minutes: 45,
+      subject: "Toán",
+      grade: 10,
+      author_id: userAId,
+      author_display_name: "RLS Test Author",
+      question_ids: CS16_QUESTION_IDS,
+      status: "published",
+    });
+    if (examSetup.error) throw examSetup.error;
+    const otherExamSetup = await admin.from("exams").insert({
+      id: CS16_OTHER_EXAM_ID,
+      title: "[RLS] Đề khác (chỉ mục tiêu refusal ghim)",
+      duration_minutes: 45,
+      subject: "Toán",
+      grade: 10,
+      author_id: userBId,
+      author_display_name: "RLS Test Author B",
+      question_ids: [CS16_OTHER_QUESTION_ID],
+      status: "published",
+    });
+    if (otherExamSetup.error) throw otherExamSetup.error;
+
+    const attemptA = await insertSubmittedAttempt(admin, userAId, CS16_EXAM_ID, new Date());
+    const attemptB = await insertSubmittedAttempt(admin, userBId, CS16_EXAM_ID, new Date());
+    await insertSubmittedAttempt(admin, userCId, CS16_EXAM_ID, new Date());
+
+    const resultB = await admin.from("exam_results").insert({
+      attempt_id: attemptB,
+      user_id: userBId,
+      total_score: 7,
+      correct: 1,
+      total: 1,
+      per_question: [],
+      topic_breakdown: [],
+    });
+    if (resultB.error) throw resultB.error;
+
+    // SOL_HELPFUL — tác giả = A (cũng là tác giả đề). Dùng cho hai nhóm
+    // Helpful, cho ghim, cho cổng AC-004 và cho các case bình luận bên dưới.
+    const solHelpfulRow = await admin
+      .from("community_solutions")
+      .insert({
+        exam_id: CS16_EXAM_ID,
+        author_id: userAId,
+        status: "published",
+        show_profile: true,
+        show_score: true,
+        linked_attempt_id: attemptA,
+      })
+      .select("id")
+      .single();
+    if (solHelpfulRow.error) throw solHelpfulRow.error;
+    const SOL_HELPFUL = solHelpfulRow.data!.id as string;
+
+    // SOL_ANON — tác giả = B, show_profile=false + show_score=false. Dùng cho
+    // M5 (nửa bài giải) + writer self-read (AC-062) + vế "B" của Pin atomicity
+    // (AC-054).
+    const solAnonRow = await admin
+      .from("community_solutions")
+      .insert({
+        exam_id: CS16_EXAM_ID,
+        author_id: userBId,
+        status: "published",
+        show_profile: false,
+        show_score: false,
+        linked_attempt_id: attemptB,
+      })
+      .select("id")
+      .single();
+    if (solAnonRow.error) throw solAnonRow.error;
+    const SOL_ANON = solAnonRow.data!.id as string;
+
+    // SOL_DRAFT_C — tác giả = C, KHÔNG bao giờ published. Chỉ để test
+    // set_community_solution_pin('pin', <bài giải NHÁP của chính đề này>).
+    const solDraftCRow = await admin
+      .from("community_solutions")
+      .insert({ exam_id: CS16_EXAM_ID, author_id: userCId, status: "draft" })
+      .select("id")
+      .single();
+    if (solDraftCRow.error) throw solDraftCRow.error;
+    const SOL_DRAFT_C = solDraftCRow.data!.id as string;
+
+    // Bài giải published của MỘT ĐỀ KHÁC — chỉ để test
+    // set_community_solution_pin('pin', <bài giải đề khác>).
+    const solOtherExamRow = await admin
+      .from("community_solutions")
+      .insert({ exam_id: CS16_OTHER_EXAM_ID, author_id: userBId, status: "published" })
+      .select("id")
+      .single();
+    if (solOtherExamRow.error) throw solOtherExamRow.error;
+    const SOL_OTHER_EXAM = solOtherExamRow.data!.id as string;
+
+    async function helpfulCountFor(solutionId: string, userId: string): Promise<number> {
+      const r = await admin
+        .from("community_solution_helpfuls")
+        .select("solution_id", { count: "exact", head: true })
+        .eq("solution_id", solutionId)
+        .eq("user_id", userId);
+      return r.count ?? -1;
+    }
+    async function helpfulTotalFor(solutionId: string): Promise<number> {
+      const r = await admin
+        .from("community_solution_helpfuls")
+        .select("solution_id", { count: "exact", head: true })
+        .eq("solution_id", solutionId);
+      return r.count ?? -1;
+    }
+    async function pinnedRowIdFor(examId: string): Promise<string | null> {
+      const r = await admin.from("community_solutions").select("id").eq("exam_id", examId).eq("is_pinned", true);
+      if ((r.data?.length ?? 0) !== 1) return null;
+      return (r.data![0] as { id: string }).id;
+    }
+    async function readCs16(client: SupabaseClient) {
+      const list = await client.rpc("community_solutions_list", { p_exam_id: CS16_EXAM_ID });
+      const detail = await client.rpc("community_solution_detail", { p_solution_id: SOL_ANON });
+      return {
+        listRow: (list.data as Array<Record<string, unknown>> | null)?.find((r) => r.id === SOL_ANON),
+        detailRow: (detail.data as Array<Record<string, unknown>> | null)?.[0],
+      };
+    }
+
+    console.log("\nRLS checks (Community Solutions task 16 — M5 solution half + writer self-read AC-062):");
+
+    const m5WriterOff1 = await readCs16(userB);
+    const m5ViewerOff1 = await readCs16(userA);
+    assert(
+      m5WriterOff1.listRow?.author_id === null &&
+        m5WriterOff1.listRow?.author_display_name === null &&
+        m5WriterOff1.listRow?.author_avatar_path === null &&
+        m5WriterOff1.listRow?.score === null &&
+        m5WriterOff1.listRow?.score_grading === null &&
+        m5WriterOff1.listRow?.is_mine === true &&
+        m5WriterOff1.detailRow?.author_id === null &&
+        m5WriterOff1.detailRow?.author_display_name === null &&
+        m5WriterOff1.detailRow?.author_avatar_path === null &&
+        m5WriterOff1.detailRow?.score === null &&
+        m5WriterOff1.detailRow?.score_grading === null &&
+        m5WriterOff1.detailRow?.per_question === null &&
+        m5WriterOff1.detailRow?.is_mine === true,
+      `M5 + AC-062 (chính người viết B): show_profile=false/show_score=false → danh tính + score/score_grading (+per_question ở detail) là JSON null, is_mine=true (nhận list=${JSON.stringify(m5WriterOff1.listRow)}, detail=${JSON.stringify(m5WriterOff1.detailRow)})`,
+    );
+    assert(
+      m5ViewerOff1.listRow?.author_id === null &&
+        m5ViewerOff1.listRow?.author_display_name === null &&
+        m5ViewerOff1.listRow?.author_avatar_path === null &&
+        m5ViewerOff1.listRow?.score === null &&
+        m5ViewerOff1.listRow?.score_grading === null &&
+        m5ViewerOff1.listRow?.is_mine === false &&
+        m5ViewerOff1.detailRow?.author_id === null &&
+        m5ViewerOff1.detailRow?.author_display_name === null &&
+        m5ViewerOff1.detailRow?.author_avatar_path === null &&
+        m5ViewerOff1.detailRow?.score === null &&
+        m5ViewerOff1.detailRow?.score_grading === null &&
+        m5ViewerOff1.detailRow?.per_question === null &&
+        m5ViewerOff1.detailRow?.is_mine === false,
+      `M5 + AC-062 (A — người xem khác, không admin/không tác giả): CÙNG giá trị null, is_mine=false (nhận list=${JSON.stringify(m5ViewerOff1.listRow)}, detail=${JSON.stringify(m5ViewerOff1.detailRow)})`,
+    );
+
+    const showProfileOn = await admin.from("community_solutions").update({ show_profile: true }).eq("id", SOL_ANON);
+    if (showProfileOn.error) throw showProfileOn.error;
+    const m5WriterOn = await readCs16(userB);
+    const m5ViewerOn = await readCs16(userA);
+    assert(
+      m5WriterOn.listRow?.author_id === userBId &&
+        m5WriterOn.detailRow?.author_id === userBId &&
+        m5WriterOn.listRow?.is_mine === true &&
+        m5ViewerOn.listRow?.author_id === userBId &&
+        m5ViewerOn.detailRow?.author_id === userBId &&
+        m5ViewerOn.listRow?.is_mine === false,
+      `AC-062: bật show_profile trả lại danh tính THẬT cho CẢ người viết lẫn người xem khác trên lượt đọc kế tiếp (nhận writer.author_id=${m5WriterOn.listRow?.author_id}, viewer.author_id=${m5ViewerOn.listRow?.author_id})`,
+    );
+
+    const showProfileOff = await admin.from("community_solutions").update({ show_profile: false }).eq("id", SOL_ANON);
+    if (showProfileOff.error) throw showProfileOff.error;
+    const m5WriterOff2 = await readCs16(userB);
+    const m5ViewerOff2 = await readCs16(userA);
+    assert(
+      m5WriterOff2.listRow?.author_id === null &&
+        m5WriterOff2.detailRow?.author_id === null &&
+        m5ViewerOff2.listRow?.author_id === null &&
+        m5ViewerOff2.detailRow?.author_id === null,
+      "AC-062: tắt show_profile lại lần nữa, cả hai lại thấy null",
+    );
+
+    console.log("\nRLS checks (Community Solutions task 16 — add_community_solution_helpful group, AC-065):");
+
+    const addByAuthor = await userA.rpc("add_community_solution_helpful", { p_solution_id: SOL_HELPFUL });
+    assert(
+      addByAuthor.error?.code === "42501" && (await helpfulCountFor(SOL_HELPFUL, userAId)) === 0,
+      `AC-065 (a): tác giả của chính bài giải bị 42501, 0 dòng (nhận ${addByAuthor.error?.code})`,
+    );
+
+    const bToInProgress1 = await admin.from("exam_attempts").update({ status: "in_progress" }).eq("id", attemptB);
+    if (bToInProgress1.error) throw bToInProgress1.error;
+    const addNoAttempt = await userB.rpc("add_community_solution_helpful", { p_solution_id: SOL_HELPFUL });
+    assert(
+      addNoAttempt.error?.code === "42501" && (await helpfulCountFor(SOL_HELPFUL, userBId)) === 0,
+      `AC-065 (b): caller chưa nộp bài (attempt 'in_progress') bị 42501, 0 dòng (nhận ${addNoAttempt.error?.code})`,
+    );
+    const bResubmit1 = await admin
+      .from("exam_attempts")
+      .update({ status: "submitted", submitted_at: new Date().toISOString() })
+      .eq("id", attemptB);
+    if (bResubmit1.error) throw bResubmit1.error;
+
+    const solToDraft1 = await admin.from("community_solutions").update({ status: "draft" }).eq("id", SOL_HELPFUL);
+    if (solToDraft1.error) throw solToDraft1.error;
+    const addDraft = await userB.rpc("add_community_solution_helpful", { p_solution_id: SOL_HELPFUL });
+    assert(
+      addDraft.error?.code === "42501" && (await helpfulCountFor(SOL_HELPFUL, userBId)) === 0,
+      `AC-065 (c): bài giải 'draft' bị 42501, 0 dòng (nhận ${addDraft.error?.code})`,
+    );
+    const solRestorePublished1 = await admin.from("community_solutions").update({ status: "published" }).eq("id", SOL_HELPFUL);
+    if (solRestorePublished1.error) throw solRestorePublished1.error;
+
+    const addAnon = await anonClient.rpc("add_community_solution_helpful", { p_solution_id: SOL_HELPFUL });
+    assert(
+      isAuthorizationDenial(addAnon.error) && (await helpfulTotalFor(SOL_HELPFUL)) === 0,
+      `AC-065 (d): anon bị từ chối, 0 dòng (nhận ${addAnon.error?.code})`,
+    );
+
+    const addDirect = await userB
+      .from("community_solution_helpfuls")
+      .insert({ solution_id: SOL_HELPFUL, user_id: userBId })
+      .select();
+    assert(
+      isAuthorizationDenial(addDirect.error) && (addDirect.data?.length ?? 0) === 0,
+      `AC-065 (e) table closure: B (đủ điều kiện) KHÔNG tự INSERT trực tiếp được community_solution_helpfuls (nhận ${addDirect.error?.code ?? "KHÔNG CÓ LỖI"})`,
+    );
+
+    const examToDraft1 = await admin.from("exams").update({ status: "draft" }).eq("id", CS16_EXAM_ID);
+    if (examToDraft1.error) throw examToDraft1.error;
+    const addExamDraft = await userB.rpc("add_community_solution_helpful", { p_solution_id: SOL_HELPFUL });
+    assert(
+      addExamDraft.error?.code === "42501" && (await helpfulCountFor(SOL_HELPFUL, userBId)) === 0,
+      `AC-065 (f) AC-004: đề đang 'draft' → 42501, 0 dòng (nhận ${addExamDraft.error?.code})`,
+    );
+    const examRestore1 = await admin.from("exams").update({ status: "published" }).eq("id", CS16_EXAM_ID);
+    if (examRestore1.error) throw examRestore1.error;
+
+    const ban1 = await admin.auth.admin.updateUserById(userAId, { ban_duration: "24h" });
+    if (ban1.error) throw ban1.error;
+    const addAuthorBanned = await userB.rpc("add_community_solution_helpful", { p_solution_id: SOL_HELPFUL });
+    assert(
+      addAuthorBanned.error?.code === "42501" && (await helpfulCountFor(SOL_HELPFUL, userBId)) === 0,
+      `AC-065 (g) AC-004: tác giả đề bị ban → 42501, 0 dòng (nhận ${addAuthorBanned.error?.code})`,
+    );
+    const unban1 = await admin.auth.admin.updateUserById(userAId, { ban_duration: "none" });
+    if (unban1.error) throw unban1.error;
+
+    const addSuccess1 = await userB.rpc("add_community_solution_helpful", { p_solution_id: SOL_HELPFUL });
+    assert(
+      !addSuccess1.error &&
+        JSON.stringify(addSuccess1.data) === JSON.stringify([{ added: true }]) &&
+        (await helpfulCountFor(SOL_HELPFUL, userBId)) === 1,
+      `AC-065/AC-066/M4 success: B đủ điều kiện → [{ added: true }], đúng 1 dòng (nhận ${JSON.stringify(addSuccess1.data)}, mã lỗi ${addSuccess1.error?.code})`,
+    );
+    const addSuccess2 = await userB.rpc("add_community_solution_helpful", { p_solution_id: SOL_HELPFUL });
+    assert(
+      !addSuccess2.error &&
+        JSON.stringify(addSuccess2.data) === JSON.stringify([{ added: false }]) &&
+        (await helpfulCountFor(SOL_HELPFUL, userBId)) === 1,
+      `AC-066/M4: gọi lại → [{ added: false }], vẫn đúng 1 dòng (nhận ${JSON.stringify(addSuccess2.data)})`,
+    );
+
+    console.log("\nRLS checks (Community Solutions task 16 — remove_community_solution_helpful group):");
+
+    const removeByNonHolder = await userC.rpc("remove_community_solution_helpful", { p_solution_id: SOL_HELPFUL });
+    assert(
+      !removeByNonHolder.error && (await helpfulCountFor(SOL_HELPFUL, userBId)) === 1,
+      `remove (a): C không giữ dòng gọi remove → không lỗi, dòng của B (người khác) vẫn còn (nhận mã lỗi ${removeByNonHolder.error?.code})`,
+    );
+
+    const removeAnon = await anonClient.rpc("remove_community_solution_helpful", { p_solution_id: SOL_HELPFUL });
+    assert(
+      isAuthorizationDenial(removeAnon.error) && (await helpfulCountFor(SOL_HELPFUL, userBId)) === 1,
+      `remove (b): anon bị từ chối, dòng của B vẫn còn (nhận ${removeAnon.error?.code})`,
+    );
+
+    const removeDirect = await userB
+      .from("community_solution_helpfuls")
+      .delete()
+      .eq("solution_id", SOL_HELPFUL)
+      .eq("user_id", userBId)
+      .select();
+    assert(
+      isAuthorizationDenial(removeDirect.error) && (await helpfulCountFor(SOL_HELPFUL, userBId)) === 1,
+      `remove (c) table closure: B KHÔNG tự DELETE trực tiếp được, dòng vẫn còn (nhận ${removeDirect.error?.code ?? "KHÔNG CÓ LỖI"})`,
+    );
+
+    const examToDraft2 = await admin.from("exams").update({ status: "draft" }).eq("id", CS16_EXAM_ID);
+    if (examToDraft2.error) throw examToDraft2.error;
+    const removeExamDraft = await userB.rpc("remove_community_solution_helpful", { p_solution_id: SOL_HELPFUL });
+    assert(
+      removeExamDraft.error?.code === "42501" &&
+        removeExamDraft.error?.message === "remove_community_solution_helpful: not eligible" &&
+        (await helpfulCountFor(SOL_HELPFUL, userBId)) === 1,
+      `remove (f) AC-004: đề 'draft' → 42501 'not eligible', dòng vẫn còn (nhận ${removeExamDraft.error?.message})`,
+    );
+    const examRestore2 = await admin.from("exams").update({ status: "published" }).eq("id", CS16_EXAM_ID);
+    if (examRestore2.error) throw examRestore2.error;
+
+    const ban2 = await admin.auth.admin.updateUserById(userAId, { ban_duration: "24h" });
+    if (ban2.error) throw ban2.error;
+    const removeAuthorBanned = await userB.rpc("remove_community_solution_helpful", { p_solution_id: SOL_HELPFUL });
+    assert(
+      removeAuthorBanned.error?.code === "42501" && (await helpfulCountFor(SOL_HELPFUL, userBId)) === 1,
+      `remove (g) AC-004: tác giả đề bị ban → 42501, dòng vẫn còn (nhận ${removeAuthorBanned.error?.code})`,
+    );
+    const unban2 = await admin.auth.admin.updateUserById(userAId, { ban_duration: "none" });
+    if (unban2.error) throw unban2.error;
+
+    const bToInProgress2 = await admin.from("exam_attempts").update({ status: "in_progress" }).eq("id", attemptB);
+    if (bToInProgress2.error) throw bToInProgress2.error;
+    const removeInProgress = await userB.rpc("remove_community_solution_helpful", { p_solution_id: SOL_HELPFUL });
+    assert(
+      removeInProgress.error?.code === "42501" && (await helpfulCountFor(SOL_HELPFUL, userBId)) === 1,
+      `remove (h) AC-002: attempt của chính B đang 'in_progress' → 42501, dòng vẫn còn (nhận ${removeInProgress.error?.code})`,
+    );
+    const bResubmit2 = await admin
+      .from("exam_attempts")
+      .update({ status: "submitted", submitted_at: new Date().toISOString() })
+      .eq("id", attemptB);
+    if (bResubmit2.error) throw bResubmit2.error;
+
+    const removeSuccess1 = await userB.rpc("remove_community_solution_helpful", { p_solution_id: SOL_HELPFUL });
+    assert(
+      !removeSuccess1.error && (await helpfulCountFor(SOL_HELPFUL, userBId)) === 0,
+      `remove success: dòng của B mất (nhận mã lỗi ${removeSuccess1.error?.code})`,
+    );
+    const removeSuccess2 = await userB.rpc("remove_community_solution_helpful", { p_solution_id: SOL_HELPFUL });
+    assert(
+      !removeSuccess2.error && (await helpfulCountFor(SOL_HELPFUL, userBId)) === 0,
+      `remove success: gọi lại không lỗi, vẫn 0 dòng (nhận mã lỗi ${removeSuccess2.error?.code})`,
+    );
+
+    console.log("\nRLS checks (Community Solutions task 16 — Pin atomicity + target refusals, AC-054/AC-078):");
+
+    const pinA = await userA.rpc("set_community_solution_pin", {
+      p_exam_id: CS16_EXAM_ID,
+      p_action: "pin",
+      p_solution_id: SOL_HELPFUL,
+    });
+    assert(
+      !pinA.error && (await pinnedRowIdFor(CS16_EXAM_ID)) === SOL_HELPFUL,
+      `Pin atomicity: ghim A (SOL_HELPFUL) thành công, đúng 1 dòng is_pinned=true của đề (nhận mã lỗi ${pinA.error?.code})`,
+    );
+
+    const pinB = await userA.rpc("set_community_solution_pin", {
+      p_exam_id: CS16_EXAM_ID,
+      p_action: "pin",
+      p_solution_id: SOL_ANON,
+    });
+    assert(
+      !pinB.error && (await pinnedRowIdFor(CS16_EXAM_ID)) === SOL_ANON,
+      `Pin atomicity: ghim B (SOL_ANON) → đúng 1 dòng is_pinned=true và đó là B, A tự động gỡ (nhận mã lỗi ${pinB.error?.code})`,
+    );
+
+    const listAfterPinB = await userA.rpc("community_solutions_list", { p_exam_id: CS16_EXAM_ID });
+    assert(
+      (listAfterPinB.data as Array<{ id: string }> | null)?.[0]?.id === SOL_ANON,
+      `AC-054: community_solutions_list trả B (bài vừa ghim) đầu tiên (nhận ${(listAfterPinB.data as Array<{ id: string }> | null)?.[0]?.id})`,
+    );
+
+    const handWrittenSecondPin = await admin.from("community_solutions").update({ is_pinned: true }).eq("id", SOL_HELPFUL);
+    assert(
+      handWrittenSecondPin.error?.code === "23505" && (await pinnedRowIdFor(CS16_EXAM_ID)) === SOL_ANON,
+      `Pin atomicity: khoá unique một-phần community_solutions_pinned_per_exam_idx chặn dòng ghim thứ hai viết tay (23505), B vẫn là dòng ghim duy nhất (nhận ${handWrittenSecondPin.error?.code})`,
+    );
+
+    const unpinCall = await userA.rpc("set_community_solution_pin", { p_exam_id: CS16_EXAM_ID, p_action: "unpin" });
+    assert(
+      !unpinCall.error && (await pinnedRowIdFor(CS16_EXAM_ID)) === null,
+      `Pin atomicity: 'unpin' → không còn dòng ghim nào của đề (nhận mã lỗi ${unpinCall.error?.code})`,
+    );
+    const unpinAgain = await userA.rpc("set_community_solution_pin", { p_exam_id: CS16_EXAM_ID, p_action: "unpin" });
+    assert(
+      !unpinAgain.error && (await pinnedRowIdFor(CS16_EXAM_ID)) === null,
+      `Pin atomicity: gọi lại 'unpin' thành công, không đổi dòng nào (nhận mã lỗi ${unpinAgain.error?.code})`,
+    );
+
+    const rePinB = await userA.rpc("set_community_solution_pin", {
+      p_exam_id: CS16_EXAM_ID,
+      p_action: "pin",
+      p_solution_id: SOL_ANON,
+    });
+    if (rePinB.error) throw rePinB.error;
+
+    const pinNull = await userA.rpc("set_community_solution_pin", {
+      p_exam_id: CS16_EXAM_ID,
+      p_action: "pin",
+      p_solution_id: null,
+    });
+    assert(
+      pinNull.error?.code === "22023" && (await pinnedRowIdFor(CS16_EXAM_ID)) === SOL_ANON,
+      `CS-01: pin(null) → 22023, B vẫn là dòng ghim duy nhất (nhận ${pinNull.error?.code})`,
+    );
+    const pinOtherExam = await userA.rpc("set_community_solution_pin", {
+      p_exam_id: CS16_EXAM_ID,
+      p_action: "pin",
+      p_solution_id: SOL_OTHER_EXAM,
+    });
+    assert(
+      pinOtherExam.error?.code === "22023" && (await pinnedRowIdFor(CS16_EXAM_ID)) === SOL_ANON,
+      `pin(<bài giải published của MỘT ĐỀ KHÁC>) → 22023, B vẫn là dòng ghim duy nhất (nhận ${pinOtherExam.error?.code})`,
+    );
+    const pinDraft = await userA.rpc("set_community_solution_pin", {
+      p_exam_id: CS16_EXAM_ID,
+      p_action: "pin",
+      p_solution_id: SOL_DRAFT_C,
+    });
+    assert(
+      pinDraft.error?.code === "22023" && (await pinnedRowIdFor(CS16_EXAM_ID)) === SOL_ANON,
+      `pin(<bài giải NHÁP của chính đề này>) → 22023, B vẫn là dòng ghim duy nhất (nhận ${pinDraft.error?.code})`,
+    );
+
+    console.log("\nRLS checks (Community Solutions task 16 — AC-004 gate: set_community_solution_pin / list / detail):");
+
+    const examToDraft3 = await admin.from("exams").update({ status: "draft" }).eq("id", CS16_EXAM_ID);
+    if (examToDraft3.error) throw examToDraft3.error;
+    const pinWhileExamDraft = await userA.rpc("set_community_solution_pin", {
+      p_exam_id: CS16_EXAM_ID,
+      p_action: "pin",
+      p_solution_id: SOL_HELPFUL,
+    });
+    const unpinWhileExamDraft = await userA.rpc("set_community_solution_pin", { p_exam_id: CS16_EXAM_ID, p_action: "unpin" });
+    assert(
+      pinWhileExamDraft.error?.code === "42501" &&
+        pinWhileExamDraft.error?.message === "set_community_solution_pin: exam not visible" &&
+        unpinWhileExamDraft.error?.code === "42501" &&
+        unpinWhileExamDraft.error?.message === "set_community_solution_pin: exam not visible" &&
+        (await pinnedRowIdFor(CS16_EXAM_ID)) === SOL_ANON,
+      `AC-004 gate (đề draft): 'pin' và 'unpin' đều 42501 'exam not visible', không đổi dòng ghim (nhận: ${pinWhileExamDraft.error?.message} / ${unpinWhileExamDraft.error?.message})`,
+    );
+    const listWhileExamDraft = await userB.rpc("community_solutions_list", { p_exam_id: CS16_EXAM_ID });
+    const detailWhileExamDraft = await userB.rpc("community_solution_detail", { p_solution_id: SOL_ANON });
+    assert(
+      (listWhileExamDraft.data?.length ?? -1) === 0 && (detailWhileExamDraft.data?.length ?? -1) === 0,
+      `AC-004 gate (đề draft): community_solutions_list/community_solution_detail trả 0 dòng (nhận ${listWhileExamDraft.data?.length}/${detailWhileExamDraft.data?.length})`,
+    );
+    const examRestore3 = await admin.from("exams").update({ status: "published" }).eq("id", CS16_EXAM_ID);
+    if (examRestore3.error) throw examRestore3.error;
+    const listAfterGateRestore1 = await userB.rpc("community_solutions_list", { p_exam_id: CS16_EXAM_ID });
+    assert(
+      (listAfterGateRestore1.data as Array<{ id: string }> | null)?.[0]?.id === SOL_ANON,
+      "AC-004 gate: sau khi đề published lại, community_solutions_list trả lại đúng thứ tự (B đầu tiên)",
+    );
+
+    const ban3 = await admin.auth.admin.updateUserById(userAId, { ban_duration: "24h" });
+    if (ban3.error) throw ban3.error;
+    const pinWhileBanned = await userA.rpc("set_community_solution_pin", {
+      p_exam_id: CS16_EXAM_ID,
+      p_action: "pin",
+      p_solution_id: SOL_HELPFUL,
+    });
+    const unpinWhileBanned = await userA.rpc("set_community_solution_pin", { p_exam_id: CS16_EXAM_ID, p_action: "unpin" });
+    assert(
+      pinWhileBanned.error?.code === "42501" &&
+        pinWhileBanned.error?.message === "set_community_solution_pin: exam not visible" &&
+        unpinWhileBanned.error?.code === "42501" &&
+        (await pinnedRowIdFor(CS16_EXAM_ID)) === SOL_ANON,
+      `AC-004 gate (tác giả bị ban): 'pin' và 'unpin' đều 42501 'exam not visible', không đổi dòng ghim (nhận: ${pinWhileBanned.error?.message} / ${unpinWhileBanned.error?.message})`,
+    );
+    const listWhileBanned = await userB.rpc("community_solutions_list", { p_exam_id: CS16_EXAM_ID });
+    const detailWhileBanned = await userB.rpc("community_solution_detail", { p_solution_id: SOL_ANON });
+    assert(
+      (listWhileBanned.data?.length ?? -1) === 0 && (detailWhileBanned.data?.length ?? -1) === 0,
+      "AC-004 gate (tác giả bị ban): community_solutions_list/community_solution_detail trả 0 dòng",
+    );
+    const unban3 = await admin.auth.admin.updateUserById(userAId, { ban_duration: "none" });
+    if (unban3.error) throw unban3.error;
+    const listAfterGateRestore2 = await userB.rpc("community_solutions_list", { p_exam_id: CS16_EXAM_ID });
+    assert(
+      (listAfterGateRestore2.data as Array<{ id: string }> | null)?.[0]?.id === SOL_ANON,
+      "AC-004 gate: sau khi bỏ ban, community_solutions_list trả lại đúng thứ tự (B đầu tiên)",
+    );
+
+    console.log(
+      "\nRLS checks (Community Solutions task 16 — Comments on a draft/hidden solution S7/AC-071/AC-063 + admin-hidden comment S19/AC-107):",
+    );
+
+    const noteQ1 = await admin.from("community_solution_notes").insert({
+      solution_id: SOL_HELPFUL,
+      question_id: CS16_QUESTION_IDS[0],
+      body: csWords(15),
+    });
+    if (noteQ1.error) throw noteQ1.error;
+    const commentB = await admin
+      .from("community_solution_comments")
+      .insert({ solution_id: SOL_HELPFUL, question_id: CS16_QUESTION_IDS[0], author_id: userBId, body: "[RLS-CS16] Bình luận của B" })
+      .select("id")
+      .single();
+    if (commentB.error) throw commentB.error;
+    const commentC = await admin
+      .from("community_solution_comments")
+      .insert({ solution_id: SOL_HELPFUL, question_id: CS16_QUESTION_IDS[0], author_id: userCId, body: "[RLS-CS16] Bình luận của C" })
+      .select("id")
+      .single();
+    if (commentC.error) throw commentC.error;
+    const commentA = await admin
+      .from("community_solution_comments")
+      .insert({
+        solution_id: SOL_HELPFUL,
+        question_id: CS16_QUESTION_IDS[0],
+        author_id: userAId,
+        body: "[RLS-CS16] Bình luận của chính người viết",
+      })
+      .select("id")
+      .single();
+    if (commentA.error) throw commentA.error;
+    const commentBId = commentB.data!.id as string;
+
+    type DetailQuestion = { question_id: string; comment_count: number | null; comments: Array<{ id: string; is_hidden_by_admin: boolean; hidden_reason: string | null; body: string }> };
+    function questionsOf(detail: { data: Array<{ questions: DetailQuestion[] }> | null }): DetailQuestion[] {
+      return detail.data?.[0]?.questions ?? [];
+    }
+    function q1Of(detail: { data: Array<{ questions: DetailQuestion[] }> | null }): DetailQuestion | undefined {
+      return questionsOf(detail).find((q) => q.question_id === CS16_QUESTION_IDS[0]);
+    }
+
+    const detailBaseline = await userA.rpc("community_solution_detail", { p_solution_id: SOL_HELPFUL });
+    const q1Baseline = q1Of(detailBaseline);
+    assert(
+      !detailBaseline.error && q1Baseline?.comment_count === 3 && q1Baseline?.comments.length === 3,
+      `(nền) SOL_HELPFUL published, câu 1 có 3 bình luận hiện, comment_count=3 (nhận ${JSON.stringify(q1Baseline)})`,
+    );
+
+    // Nhánh 'draft' — dùng đúng RPC của chính người viết (set_community_solution_status,
+    // migration task 03, đã tồn tại).
+    const toDraftForComments = await userA.rpc("set_community_solution_status", { p_exam_id: CS16_EXAM_ID, p_action: "draft" });
+    if (toDraftForComments.error) throw toDraftForComments.error;
+    const ownPreviewDraft = await userA.rpc("community_solution_detail", { p_solution_id: SOL_HELPFUL });
+    const questionsDraft = questionsOf(ownPreviewDraft);
+    assert(
+      !ownPreviewDraft.error &&
+        questionsDraft.length > 0 &&
+        questionsDraft.every((q) => q.comment_count === null && q.comments.length === 0),
+      `S7/AC-071/AC-063 (draft): own-preview của chính người viết vẫn đọc được header/questions, nhưng comments rỗng và comment_count null cho MỌI câu (nhận ${JSON.stringify(questionsDraft)})`,
+    );
+    const otherReadsDraft = await userB.rpc("community_solution_detail", { p_solution_id: SOL_HELPFUL });
+    const listDuringDraft = await userB.rpc("community_solutions_list", { p_exam_id: CS16_EXAM_ID });
+    assert(
+      (otherReadsDraft.data?.length ?? -1) === 0 &&
+        !(listDuringDraft.data as Array<{ id: string }> | null)?.some((r) => r.id === SOL_HELPFUL),
+      "S7/AC-071/AC-063 (draft): người khác (kể cả người từng bình luận) không đọc được bài giải này ở list/detail",
+    );
+
+    const restoreFromDraft = await admin.from("community_solutions").update({ status: "published" }).eq("id", SOL_HELPFUL);
+    if (restoreFromDraft.error) throw restoreFromDraft.error;
+    const detailAfterDraftRestore = await userA.rpc("community_solution_detail", { p_solution_id: SOL_HELPFUL });
+    const q1AfterDraftRestore = q1Of(detailAfterDraftRestore);
+    assert(
+      q1AfterDraftRestore?.comment_count === 3 && q1AfterDraftRestore?.comments.length === 3,
+      `S7 (draft → published lại): trả lại đúng comment_count/comments như bản đọc nền (nhận ${JSON.stringify(q1AfterDraftRestore)})`,
+    );
+
+    // Nhánh 'hidden' — SN-1 (đúng tiền lệ task 05 ở trên): admin_moderate_
+    // community_solution chưa tồn tại tới migration 32, harness setup client
+    // tự đặt trạng thái 'hidden' + chèn thẳng dòng community_moderation_log.
+    const hideSolution = await admin.from("community_solutions").update({ status: "hidden" }).eq("id", SOL_HELPFUL);
+    if (hideSolution.error) throw hideSolution.error;
+    const hideSolutionLog = await admin.from("community_moderation_log").insert({
+      target_type: "solution",
+      target_id: SOL_HELPFUL,
+      exam_id: CS16_EXAM_ID,
+      target_user_id: userAId,
+      actor_id: userAId,
+      action: "hide",
+      reason: "[RLS-CS16][SN-1] Ẩn để test S7/AC-071/AC-063",
+    });
+    if (hideSolutionLog.error) throw hideSolutionLog.error;
+
+    const ownPreviewHidden = await userA.rpc("community_solution_detail", { p_solution_id: SOL_HELPFUL });
+    const questionsHidden = questionsOf(ownPreviewHidden);
+    assert(
+      !ownPreviewHidden.error &&
+        questionsHidden.length > 0 &&
+        questionsHidden.every((q) => q.comment_count === null && q.comments.length === 0),
+      `S7/AC-071/AC-063 (hidden): own-preview của người viết — comments rỗng, comment_count null cho mọi câu, kể cả câu có bình luận CỦA CHÍNH họ (nhận ${JSON.stringify(questionsHidden)})`,
+    );
+    const otherReadsHidden = await userC.rpc("community_solution_detail", { p_solution_id: SOL_HELPFUL });
+    assert((otherReadsHidden.data?.length ?? -1) === 0, "S7/AC-071/AC-063 (hidden): người khác không đọc được bài giải này ở detail");
+
+    const restoreFromHidden = await admin.from("community_solutions").update({ status: "published" }).eq("id", SOL_HELPFUL);
+    if (restoreFromHidden.error) throw restoreFromHidden.error;
+    const detailAfterHiddenRestore = await userA.rpc("community_solution_detail", { p_solution_id: SOL_HELPFUL });
+    const q1AfterHiddenRestore = q1Of(detailAfterHiddenRestore);
+    assert(
+      q1AfterHiddenRestore?.comment_count === 3 && q1AfterHiddenRestore?.comments.length === 3,
+      "S7 (hidden → published lại): trả lại đúng comment_count/comments như bản đọc nền, không dòng community_solution_comments nào đổi",
+    );
+
+    // Admin-hidden comment (S19/AC-107) — cùng SN-1: ẩn thẳng comment của B.
+    const hideCommentB = await admin.from("community_solution_comments").update({ status: "hidden" }).eq("id", commentBId);
+    if (hideCommentB.error) throw hideCommentB.error;
+    const hideCommentBLog = await admin.from("community_moderation_log").insert({
+      target_type: "comment",
+      target_id: commentBId,
+      exam_id: CS16_EXAM_ID,
+      target_user_id: userBId,
+      actor_id: userAId,
+      action: "hide",
+      reason: "spam",
+    });
+    if (hideCommentBLog.error) throw hideCommentBLog.error;
+
+    const commentBAuthorReads = await userB.rpc("community_solution_detail", { p_solution_id: SOL_HELPFUL });
+    const hiddenRowForB = q1Of(commentBAuthorReads)?.comments.find((c) => c.id === commentBId);
+    assert(
+      hiddenRowForB?.is_hidden_by_admin === true && hiddenRowForB?.hidden_reason === "spam" && typeof hiddenRowForB?.body === "string",
+      `S19/AC-107: chính tác giả bình luận bị ẩn vẫn đọc được nó, is_hidden_by_admin=true, hidden_reason đúng (nhận ${JSON.stringify(hiddenRowForB)})`,
+    );
+
+    const writerReadsAfterHideComment = await userA.rpc("community_solution_detail", { p_solution_id: SOL_HELPFUL });
+    const q1ForWriter = q1Of(writerReadsAfterHideComment);
+    const thirdReaderReadsAfterHideComment = await userC.rpc("community_solution_detail", { p_solution_id: SOL_HELPFUL });
+    const q1ForThird = q1Of(thirdReaderReadsAfterHideComment);
+    assert(
+      q1ForWriter?.comment_count === 2 &&
+        !q1ForWriter.comments.some((c) => c.id === commentBId) &&
+        q1ForThird?.comment_count === 2 &&
+        !q1ForThird.comments.some((c) => c.id === commentBId),
+      `S19/AC-107: người viết và một người đọc thứ ba khác đều KHÔNG thấy bình luận bị ẩn, comment_count=2 (không đếm nó) (nhận writer=${JSON.stringify(q1ForWriter)}, third=${JSON.stringify(q1ForThird)})`,
+    );
+
+    const secondHideCommentB = await admin.from("community_moderation_log").insert({
+      target_type: "comment",
+      target_id: commentBId,
+      exam_id: CS16_EXAM_ID,
+      target_user_id: userBId,
+      actor_id: userAId,
+      action: "hide",
+      reason: "abuse",
+    });
+    if (secondHideCommentB.error) throw secondHideCommentB.error;
+    const commentBAuthorRereads = await userB.rpc("community_solution_detail", { p_solution_id: SOL_HELPFUL });
+    const hiddenRowForBAgain = q1Of(commentBAuthorRereads)?.comments.find((c) => c.id === commentBId);
+    assert(
+      hiddenRowForBAgain?.hidden_reason === "abuse",
+      `S19/AC-107: một dòng community_moderation_log 'hide' MỚI hơn (lý do khác) → hidden_reason đọc lại đúng lý do MỚI NHẤT (nhận ${JSON.stringify(hiddenRowForBAgain)})`,
+    );
+
+    const restoreCommentB = await admin.from("community_solution_comments").update({ status: "visible" }).eq("id", commentBId);
+    if (restoreCommentB.error) throw restoreCommentB.error;
+
+    console.log("\nRLS checks (Community Solutions task 16 — Name-resolution regression, không 42702):");
+
+    const nameResAdd = await userB.rpc("add_community_solution_helpful", { p_solution_id: SOL_HELPFUL });
+    assert(
+      !nameResAdd.error,
+      `Name-resolution regression: add_community_solution_helpful thành công — nhất là không 42702 (nhận ${nameResAdd.error?.code})`,
+    );
+    const nameResPin = await userA.rpc("set_community_solution_pin", {
+      p_exam_id: CS16_EXAM_ID,
+      p_action: "pin",
+      p_solution_id: SOL_ANON,
+    });
+    assert(
+      !nameResPin.error,
+      `Name-resolution regression: set_community_solution_pin('pin', …) thành công — nhất là không 42702 (nhận ${nameResPin.error?.code})`,
+    );
+
+    // Dọn dẹp fixture Community Solutions (task 16).
+    await cleanupCs16Fixtures(admin);
+  }
 
   // Dọn dẹp fixture Rating.
   await cleanupRatingFixtures(admin);
