@@ -45,7 +45,7 @@ Every `Pn-Tm` entry below maps to one or more task files. The task number (01–
 | 17 | P2-T5 (split 1/2) | frontend | 2 | **DONE** `cbf17de` (`AuthorIdentity`/`SolutionCard`/`OwnSolutionBlock` + tests; quality-fixer-frontend approved, no fixes needed) |
 | 18 | P2-T5 (split 2/2) | frontend | 2 | **DONE** `0526f18` (`SolutionList` + list route + `loading.tsx`/`error.tsx`; quality-fixer-frontend approved, incl. mutation-tested S11 guard + AC-110/S20 never-call rule via integration-test-reviewer) — L1 real-browser check still deferred (same sign-in block as tasks 08/10), must run before Phase 2 is visually signed off |
 | 19 | P2-T6 (split 1/3) | frontend | 2 | **DONE** `daef762` (`SolutionAuthorCard`/`HelpfulButton`/`SolutionMenu` pin-only; quality-fixer-frontend approved, incl. dedicated review of `HelpfulButton`'s AC-064 single-source-of-truth sequencing — no drift risk found) |
-| 20 | P2-T6 (split 2/3) | frontend | 2 | open |
+| 20 | P2-T6 (split 2/3) | frontend | 2 | **DONE** `4c5470d` (`SolutionQuestionRow`/`SolutionNoteBlock` + reader `QuestionAnswerSummary`; writer variant from task 11 verified byte-identical/untouched; quality-fixer-frontend approved) — flagged for task 21/25: reader-side `community_solution_detail` still lacks `question_type`/`choices`/`sub_answers`/`essay_answer` (same class of gap as task 03's AC-022, not yet fixed on the read side per backend DD's own 2026-09-25 addendum) |
 | 21 | P2-T6 (split 3/3) | frontend | 2 | open |
 | 22 | P2-T7 | frontend | 2 | open |
 | 23 | P2-T8 | frontend | 2 | open |
