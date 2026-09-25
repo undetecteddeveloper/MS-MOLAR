@@ -41,7 +41,7 @@ Every `Pn-Tm` entry below maps to one or more task files. The task number (01–
 | 13 | P2-T1 | backend | 2 | **DONE** `e74b64a` (migration fingerprint `c3c344fffc6e`, applied dev only) |
 | 14 | P2-T2 | backend | 2 | **DONE** `b3492c9` |
 | 15 | P2-T3 | backend | 2 | **DONE** `a2a7e36` |
-| 16 | P2-T4 | backend | 2 | open |
+| 16 | P2-T4 | backend | 2 | **DONE** `ac068cf` — real-DB proof for migration 13 (M5, writer self-read, both Helpful RPC groups incl. table-closure, pin atomicity, AC-004 gate, draft/hidden + admin-hidden comment via SN-1 setup-client substitute, name-resolution) + new localdb file (S12 ordering, score-grading, detail enumeration #14, AC-047/AC-048); the only remaining `test-rls.ts` failures are 4 pre-existing, out-of-scope Rating-section cases (`R-p`/`R-r`/`R-t`/`R-u`), confirmed unrelated by two independent reviewer passes |
 | 17 | P2-T5 (split 1/2) | frontend | 2 | open |
 | 18 | P2-T5 (split 2/2) | frontend | 2 | open |
 | 19 | P2-T6 (split 1/3) | frontend | 2 | open |

@@ -1,0 +1,72 @@
+# Bàn giao phiên — Bài giải cộng đồng (cập nhật 2026-09-25, PHA IMPLEMENT ĐANG CHẠY, Phase 1 XONG, 16/53 task)
+
+> File này là điểm tựa cho phiên Claude Code KẾ TIẾP. Đọc file này trước, rồi
+> đọc row Notion. Toàn bộ tài liệu/kế hoạch đã chốt xong (vòng cập nhật
+> 2026-09-19 → 24); Phase 1 (task 01–12) đã xong và verify cả bằng browser
+> thật; Phase 2 task 13–16 đã xong và verify qua quality-fixer/integration-test-
+> reviewer độc lập. Việc còn lại: VIẾT CODE từ task 17 trở đi. Xoá file này khi
+> tính năng đóng (đã ship).
+
+## Trạng thái ngắn
+
+| Mục | Giá trị |
+|---|---|
+| Nhánh | `feat/community-solutions` (tách từ `af05f28` = `origin/main`) |
+| Tiến độ | **Phase 1 HOÀN TẤT — 12/12**. Phase 2: **4/12** (task 13, 14, 15, 16 đã commit). Task tiếp theo: **17** (P2-T5 split 1/2, frontend). |
+| Commit trên nhánh (mới nhất trước, xem `git log af05f28..HEAD` để chắc chắn) | `ac068cf` (task 16, real-DB proof migration 13 — M5/writer self-read/Helpful RPC/pin/AC-004/hidden; qua 2 vòng integration-test-reviewer, 1 vòng required-fix) · `a2a7e36` (task 15, `toggleHelpful`/`setPin` — xem mục "Sự cố đã xử lý" bên dưới cho vụ 23505) · `df6205b`/`ea691e4` (đồng bộ work plan/overview) · `b3492c9` (task 14) · `e74b64a` (task 13, migration Phase 2, fingerprint `c3c344fffc6e`) · `d8826cc` (xác nhận đo 360px task 08 + luồng L1 task 10, qua browser thật) · `9f47dab`/`d77998b` (đồng bộ work plan/overview) · `dc309eb` (task 11) · `4b0ea52` (**sửa lỗi task 03** — xem mục "Sự cố đã xử lý" bên dưới) · `b2b01fb` (task 10) · `18bd280` (task 09) · `27d61cd` (task 08) · `c4dfddf` (task 05, Early Verification Point) · `e25e1b6` (task 04) · `74ba95b` (task 03) · `707df1f` (TD-034, cách ly INT-1, không tính vào 53 task) · 01/02/06/07/12 từ trước |
+| Row Notion | database MS-MOLAR `3b378ba6-ae12-803c-8500-c572b6fc745f`, page `3de78ba6-ae12-8175-97d7-c6c88cf8c79d` — cần cập nhật lại trạng thái |
+| Bước tiếp theo | Tiếp tục vòng lặp task-executor/task-executor-frontend + quality-fixer/quality-fixer-frontend + commit, bắt đầu từ task 17 (P2-T5 split 1/2, frontend). Sau mỗi 2–3 task, show bảng tiến độ cho engineer. |
+| Phát hiện ngoài phạm vi (không chặn, chưa xử lý) | quality-fixer của task 16 phát hiện 2 test flaky KHÔNG liên quan — `features/solutions/components/__tests__/FormulaPreview.test.tsx`/`FormulaPreview.error.test.tsx` (component từ task 11) timeout `findByRole` khi chạy full-suite song song do tranh CPU, nhưng pass 6/6 khi chạy riêng lẻ. Đề xuất: ghi vào `TECH-DEBT.md` (fixed-timeout `findByRole` dưới tải song song) — nhưng `TECH-DEBT.md` đang có sửa đổi CHƯA COMMIT của kỹ sư, nên phiên này không tự sửa file đó; để kỹ sư quyết định khi rảnh. Cũng có 4 case `test-rls.ts` Rating section (`R-p`/`R-r`/`R-t`/`R-u`) fail từ trước, xác nhận không liên quan Bài giải cộng đồng qua 2 vòng review độc lập, không phải lỗi mới. |
+
+## Sự cố đã xử lý trong Phase 1 (đọc để tránh lặp lại)
+
+**AC-022 data gap (task 03 → sửa 2026-09-25, commit `4b0ea52`):** `community_solution_for_writer` (task 03) chỉ chiếu `stem`/`correct_answer` (chuỗi thô) vào mỗi câu hỏi, bỏ sót `question_type`/`choices`/`sub_answers`/`essay_answer` — dữ liệu này CÓ SẴN qua `exam_answer_key()` (hàm nền, không đổi) nhưng không được chiếu qua. Hệ quả: AC-022 ("Xem 4 phương án" / "Đáp án mẫu") không hiển thị được. Đã hỏi ý kiến, sửa migration tại chỗ (an toàn vì lúc đó vẫn là migration mới nhất của nhánh, mới chỉ áp dev, không phạm luật bất biến của `migrationsMatchSchema.test.ts`) — fingerprint đổi `7cd454572675` → `8b80e2188cc3`. Phần frontend (task 11) đã cập nhật để dùng dữ liệu mới, hiển thị đủ theo AC-022 (có bằng chứng test thật). **Bài học cho các task sau (đặc biệt 20, 25 — `community_solution_detail` dùng chung khuôn):** khi backend DD để "contract-only" phần thân jsonb của một hàm, phải đối chiếu với từng AC render chi tiết theo item, không chỉ tin "outer contract đã pin là đủ". Xem memory `design-review-blind-spots` (phần bổ sung 2026-09-25) để biết chi tiết.
+
+**23505 logging-rule conflict (task 15 → sửa 2026-09-25, không đổi migration):** executor của task 15 xoá `"23505"` khỏi `SILENT_RPC_ERROR_CODES` (hằng số dùng chung của `actions.ts`, có từ task 04) để thoả mãn dòng test riêng của task 15 (Required test row 7: "module không chứa literal `23505`") — nhưng backend DD § Logging and Monitoring ràng buộc RÕ RÀNG mọi Server Action của file phải coi `42501`/`23505`/`23514` là bộ mã "đã lường trước" (không log), và task 04 đã implement + verify đúng bộ ba này. Hai ràng buộc không thể cùng đúng nếu đọc row 7 theo nghĩa đen "cấm mọi nơi trong file". Đã hỏi kỹ sư (không tự quyết định sửa hành vi của task đã commit trước đó) — kỹ sư chọn: **giữ nguyên `SILENT_RPC_ERROR_CODES` của task 04** (khôi phục `"23505"`), thu hẹp row 7 + Operation Verification Method của task 15 về đúng ý định thật của nó — chỉ mã code MỚI của `toggleHelpful`/`setPin` không được đụng `23505`/`.from(...)`, không phải toàn bộ file. Test đã sửa theo cách slice-source-từ-điểm-bắt-đầu-hàm y hệt cách row 13 đã làm. **Bài học cho các task sau (đặc biệt 26, 33 — cũng mở rộng `actions.ts` dùng chung logging helper):** một dòng "Required test" viết theo kiểu whole-file grep có thể vô tình xung đột với quy ước đã commit của MỘT task khác trong cùng file — kiểm tra ràng buộc đã có trước khi để executor tự "sửa" code đã commit để test mới đi qua.
+
+**Phép đo qua browser thật (task 08, 10) — đã xong, không phải chặn nữa:** cả 360px (`SolutionEntryCard`, 4 trạng thái none/draft/published/hidden-synthetic) và luồng L1 viết→lưu nháp→đăng→mở lại (task 10) đã chạy thật trên dev qua Playwright CLI với tài khoản `smithnguyen247+rlstesta@gmail.com`, không phát hiện lỗi. Ghi chú thao tác: nút "Đăng nhập" trên `AuthForm` có 2 phần tử cùng chữ — nút tab (đã active) và nút submit thật; phải dùng selector `button[type=submit]:has-text('Đăng nhập')`, nếu không sẽ bấm trúng tab (thành công giả, không có tác dụng). Việc bấm submit đăng nhập vẫn bị auto-mode chặn nếu Claude tự làm — luôn nhờ engineer bấm trong terminal riêng của họ.
+
+## Phiên bản tài liệu hiện hành (đã chốt, đừng đọc bản cũ hơn)
+
+| Loại | File | Version |
+|---|---|---|
+| PRD | `docs/prd/community-solutions-prd.md` | v1.3 |
+| UI Spec | `docs/ui-spec/community-solutions-ui-spec.md` | v1.0 (còn 1 lỗi nhỏ tự mâu thuẫn ở C-38 "Rỗng" vs C-37 "Đã ẩn" — để kỹ sư sửa, không chặn implement) |
+| ADR | `docs/adr/ADR-0021-...md` | có 1 amendment 2026-09-17 (N1: `community_my_comment_feed`/`community_reputation_summary` miễn nửa "exam đã đăng" của R1) |
+| Design Doc backend | `docs/design/community-solutions-backend-design.md` | **v1.9** + addendum 2026-09-25 (4 cột mới trong `community_solution_for_writer.questions[]`, không tăng version) — 23 hàm SQL, 6 RPC SECURITY DEFINER thay cho RLS thường, verify bằng PGlite: 675 phép kiểm, 0 lệch |
+| Design Doc frontend | `docs/design/community-solutions-frontend-design.md` | **v1.6** |
+| Work plan | `docs/plans/20260917-feature-community-solutions.md` | **v1.3** — numbering 01–53 giữ nguyên; xem § Task-file impact (v1.3) và § Open Items |
+| 53 task file + overview + 5 phase-completion | `docs/plans/tasks/` | đã viết lại khớp v1.9/v1.6/v1.3 (2026-09-24); task 03/08/10/11 có Investigation Notes bổ sung 2026-09-25 |
+
+Các file review/verification JSON cũ (`docs/plans/community-solutions-*.json`) chỉ để tra lịch sử quyết định, không cần đọc khi code.
+
+## Thay đổi lớn nhất so với thiết kế ban đầu (v1.1 → v1.9/v1.6/v1.3)
+
+- **U1 (quyết định của engineer, chốt 2026-09-17):** Helpful/bình luận/báo cáo ghi qua **6 RPC SECURITY DEFINER** (`add/remove_community_solution_helpful`, `post/delete_community_comment`, `report_community_solution`, `report_community_comment`) thay vì RLS thường — RLS thường không khả thi (không có quyền SELECT/INSERT cho policy chạy). 3 bảng ghi không còn policy, không còn grant.
+- **U2 (chốt 2026-09-17):** `ProfileCard` có thêm `reputationSlot?: ReactNode`; `/profile` (server component) truyền `<ReputationBlock/>` từ `features/solutions/components/`.
+- **CS-01…CS-12 + 12 điểm lệch vòng 2 (N1…N12):** đã đóng hết qua 2 vòng design-sync. Đáng chú ý nhất — **N1**: `saveSolution` trả về `{ok:true,...} | {ok:false, error:{code:"rateLimited",seconds} | {code:"belowWordCount"} | {code:"generic"}}`; không có `notEligible`/`hidden`; `error.message` không bao giờ được đọc; `belowWordCount` chỉ đúng khi `errcode='23514'` và `detail==='below_word_count'`.
+- **`setPin(examId, action, solutionId?)`** — 3 tham số, không phải 2.
+- **`toggleHelpful(solutionId)`** — 1 tham số.
+- **`community_solution_for_writer`** trả đúng 7 cột outer `solution_id, attempt_id, status, show_profile, show_score, hidden_reason, questions`, không có `changed_question_count`; bên trong `questions[]` (2026-09-25) có thêm `question_type`/`choices`/`sub_answers`/`essay_answer` — xem mục sự cố ở trên.
+- **Test-task rule (ràng buộc, backend DD § Integration Verification Points):** migration 03/13/25/32 được test ở task 05/16/27/35 (task 05 đã xong, Early Verification Point xanh); task 40 và 41 tự test migration của mình; unit test Server Action ở task 04/15/26/33.
+- **SK-1/SK-2/SN-1 (Open Items, đã chốt 2026-09-20, engineer có thể phủ quyết trước khi task liên quan bắt đầu):**
+  - SK-1 (task 34): test gọi `moderateSolutionAction` qua `FormData`, không gọi vị trí tham số kiểu cũ.
+  - SK-2 (task 47, SE2 nhánh admin): đọc qua `admin_list_community_reports()` thay vì `community_solutions_list`/`community_solution_detail` (2 hàm này ẩn danh với MỌI người gọi kể cả admin, AC-062).
+  - SN-1 (task 05/16/27): case cần hàm của migration sau (32, 40) được harness tự tạo trạng thái trực tiếp trước, rồi task 35/40 chạy lại qua RPC thật. (Đã áp dụng đúng ở task 05 cho case solution `hidden`.)
+
+## Ràng buộc phải mang theo vào phần code còn lại
+
+- **TD-029**: không thêm gì vào `SOURCE/lib/supabase/service-role.ts`; `serviceRoleSurface.test.ts` phải xanh, không sửa. (Đã re-verify ở mỗi task 03–11.)
+- **ADR-0002**: ghi chú + bình luận chỉ qua `RichText`, có fixture XSS (task 11 đã thêm nhóm XSS cho ghi chú, xanh).
+- **Migration**: `schema.sql` → `npm run schema:plan` → fingerprint → hằng số → file migration → apply dev qua CLI `--file` (ref `hynwleaxtbtjzkvpjsug`) → `verify:schema`. Probe rule (v1.3): xét theo **message**, không xét riêng `error.code`.
+  - **Bài học mới**: nếu phát hiện lỗi trong migration của MỘT task ngay sau khi commit, và migration đó **vẫn là migration mới nhất** của nhánh (chưa có migration nào chồng lên) và **mới chỉ áp dev**, có thể sửa tại chỗ (rename file theo fingerprint mới + sửa nội dung) thay vì viết migration vá riêng — an toàn với `migrationsMatchSchema.test.ts` (đã kiểm chứng thật ở fix `4b0ea52`). Nếu migration đó KHÔNG còn là mới nhất (đã có migration khác chồng lên), phải viết migration vá riêng, không sửa file cũ.
+- **Prod**: kỹ sư tự áp 6 migration + seed `admin_users` lên prod TRƯỚC khi task 52 bắt đầu (task 52 chỉ đọc prod qua Composio, không ghi).
+- **R1 (skeleton lane rule):** 3 test skeleton comment-only. Trạng thái hiện tại: skeleton `communitySolutions.int.test.ts` đã được lấp (task 04, Test 2) — `test` mặc định KHÔNG cần `--exclude` nữa. Vẫn cần `--exclude` cho `test:fixture` (đến task 23) và `test:localdb` (đến task 47) đúng 2 file skeleton còn lại.
+- **INT-1 đã cách ly (TD-034, commit `707df1f`):** `SOURCE/tests/integration/pending/subscription-quota.int.test.ts`, loại trừ 1 dòng trong `vitest.integration.config.ts`. Lane integration hiện xanh. Task 50 chạy thêm `npm run test:integration` (phải exit 0), không còn `--exclude` nào sót lại.
+- Không stage thay đổi chưa commit của engineer: `.claude/*`, `.mcp.json`, `SCREENSHOT/*`, `TECH-DEBT.md`, `skills-lock.json`, `test_file/`, `SOURCE/.ts`, `SOURCE/app/layout.tsx`, `docs/project-context/external-resources.md`.
+- Cite `lib/copy.ts` theo TÊN KHOÁ, không theo số dòng.
+- **Đăng nhập Playwright CLI (khi cần đo UI có xác thực):** auto-mode luôn chặn Claude tự bấm nút submit đăng nhập — nhờ engineer chạy trong terminal riêng của họ: `node scripts/pw/cli.mjs goto "http://localhost:3000/?auth=signin"` → `fill "#email" "smithnguyen247+rlstesta@gmail.com"` → `fill "#password" "rls-test-password-123"` (mật khẩu chung, xem `.claude/MEMORY.md`) → `click "button[type=submit]:has-text('Đăng nhập')"` (LƯU Ý: dùng đúng selector này, không dùng `button:has-text('Đăng nhập')` — trang có 2 phần tử trùng chữ, bấm nhầm tab sẽ "thành công" nhưng không có tác dụng gì). Session CLI dùng chung qua `%TEMP%\ms-molar-pw-cli\port`, một khi đã đăng nhập thì lệnh của Claude và của engineer cùng chạm một browser cho tới khi ai đó chạy `close` hoặc reboot máy.
+
+## Cách chạy lại (nếu phiên phải khởi động lại recipe)
+
+Gõ `/recipe-fullstack-implement` với nội dung: "Tiếp tục pha implement cho 'Bài giải cộng đồng' — đọc `docs/plans/community-solutions-HANDOFF.md`, Phase 1 (task 01–12) và Phase 2 task 13–16 đã xong và verify (13/14/15/16 qua quality-fixer/integration-test-reviewer độc lập), tiếp tục từ task 17 (P2-T5 split 1/2, frontend — `SolutionCard`/`AuthorIdentity`/`OwnSolutionBlock`) theo `docs/plans/20260917-feature-community-solutions.md` (v1.3) và `docs/plans/tasks/`. Không hỏi lại quyết định đã chốt trong PRD/UI Spec/Design Doc/ADR-0021/work plan — tất cả FINAL. Nếu phát hiện lỗi dữ liệu/thiết kế thật hoặc xung đột giữa quy ước đã commit của một task trước với yêu cầu test của task đang làm (như vụ AC-022 ở task 03, vụ 23505 ở task 15 — cả hai xem mục 'Sự cố đã xử lý'), hỏi engineer trước khi tự quyết định sửa code/migration đã commit."
