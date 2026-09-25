@@ -48,6 +48,7 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 
 const { saveSolution, setSolutionStatus } = await import("@/features/solutions/actions");
+const { listSolutions, getSolutionDetail } = await import("@/features/solutions/queries");
 
 // =============================================================================
 // Test 1 — adminActions.ts: admin moderation never touches service-role.ts;
@@ -254,3 +255,150 @@ describe("saveSolution / setSolutionStatus — word-count validation gate, non-l
 //   - non-masked fixture row -> mapped object has identity keys equal to the
 //     fixture's own values (no transformation drift)
 //   - pass criteria: all four assertions hold within the same test run
+
+describe("listSolutions / getSolutionDetail — reads route only through the masking RPCs, mapper never backfills identity (Test 3)", () => {
+  beforeEach(() => {
+    rpcMock.mockReset();
+  });
+
+  it("listSolutions() -> exactly one .rpc(\"community_solutions_list\", { p_exam_id }), never .from(\"community_solutions\")", async () => {
+    rpcMock.mockResolvedValue({ data: [], error: null });
+
+    await listSolutions("exam-1");
+
+    expect(rpcMock).toHaveBeenCalledTimes(1);
+    expect(rpcMock).toHaveBeenCalledWith("community_solutions_list", { p_exam_id: "exam-1" });
+  });
+
+  it("getSolutionDetail() -> exactly one .rpc(\"community_solution_detail\", { p_solution_id })", async () => {
+    rpcMock.mockResolvedValue({ data: [], error: null });
+
+    await getSolutionDetail("sol-1");
+
+    expect(rpcMock).toHaveBeenCalledTimes(1);
+    expect(rpcMock).toHaveBeenCalledWith("community_solution_detail", { p_solution_id: "sol-1" });
+  });
+
+  it("masked fixture row (author_display_name null) -> mapped object has no identity keys present", async () => {
+    rpcMock.mockResolvedValue({
+      data: [
+        {
+          id: "sol-1",
+          status: "published",
+          is_pinned: false,
+          updated_at: "2026-09-01T00:00:00.000Z",
+          is_mine: false,
+          author_id: null,
+          author_display_name: null,
+          author_avatar_path: null,
+          score: null,
+          score_grading: null,
+          helpful_count: 0,
+          i_marked_helpful: false,
+          comment_count: 0,
+          changed_question_count: 0,
+        },
+      ],
+      error: null,
+    });
+
+    const [item] = await listSolutions("exam-1");
+
+    expect(item.author).toEqual({ kind: "anonymous" });
+    expect("displayName" in item).toBe(false);
+    expect("avatarUrl" in item).toBe(false);
+    expect("authorId" in item).toBe(false);
+  });
+
+  it("non-masked fixture row -> mapped object carries the fixture's own identity values unchanged (no transformation drift)", async () => {
+    rpcMock.mockResolvedValue({
+      data: [
+        {
+          id: "sol-2",
+          status: "published",
+          is_pinned: false,
+          updated_at: "2026-09-01T00:00:00.000Z",
+          is_mine: false,
+          author_id: "author-2",
+          author_display_name: "Trần Thị B",
+          author_avatar_path: "https://example.com/b.png",
+          score: null,
+          score_grading: null,
+          helpful_count: 0,
+          i_marked_helpful: false,
+          comment_count: 0,
+          changed_question_count: 0,
+        },
+      ],
+      error: null,
+    });
+
+    const [item] = await listSolutions("exam-1");
+
+    expect(item.author).toEqual({ kind: "named", displayName: "Trần Thị B", avatarUrl: "https://example.com/b.png" });
+  });
+
+  it("empty RPC result -> getSolutionDetail() returns null and listSolutions() returns [] (never throws, AC-063/S11)", async () => {
+    rpcMock.mockResolvedValue({ data: [], error: null });
+    await expect(getSolutionDetail("missing")).resolves.toBeNull();
+
+    rpcMock.mockReset();
+    rpcMock.mockResolvedValue({ data: [], error: null });
+    await expect(listSolutions("exam-1")).resolves.toEqual([]);
+  });
+
+  it("a nested masked comment row -> mapped comment has no identity keys, identity is exactly {kind:'anonymous'}", async () => {
+    rpcMock.mockResolvedValue({
+      data: [
+        {
+          id: "sol-3",
+          author_id: "author-3",
+          author_display_name: "Tác giả",
+          author_avatar_path: "a.png",
+          is_pinned: false,
+          updated_at: "2026-09-01T00:00:00.000Z",
+          score: null,
+          score_grading: null,
+          per_question: null,
+          is_mine: false,
+          helpful_count: 0,
+          i_marked_helpful: false,
+          i_reported: false,
+          questions: [
+            {
+              question_id: "q1",
+              stem: "stem",
+              correct_answer: "A",
+              has_changed: false,
+              note: "Ghi chú đủ mười lăm từ để mở khoá bề mặt bình luận cho câu hỏi này hôm nay",
+              comment_count: 1,
+              comments: [
+                {
+                  id: "c1",
+                  author_id: null,
+                  author_display_name: null,
+                  author_avatar_path: null,
+                  is_solution_author: false,
+                  is_mine: false,
+                  body: "Bình luận ẩn danh",
+                  is_hidden_by_admin: false,
+                  hidden_reason: null,
+                  i_reported: false,
+                  created_at: "2026-09-01T00:00:00.000Z",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      error: null,
+    });
+
+    const detail = await getSolutionDetail("sol-3");
+
+    const [comment] = detail!.questions[0].comments;
+    expect(comment.author).toEqual({ kind: "anonymous" });
+    expect("displayName" in comment).toBe(false);
+    expect("avatarUrl" in comment).toBe(false);
+  });
+});
