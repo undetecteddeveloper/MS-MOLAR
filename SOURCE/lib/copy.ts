@@ -933,6 +933,14 @@ export const copy = {
   // tố `solutions.` (Frontend DD v1.2 § Vietnamese Copy Keys, quy tắc namespace).
   // Chung (S-01…S-07): eyebrow của cả tính năng.
   "solutions.eyebrow": "Bài giải cộng đồng",
+  // Danh tính ẩn danh (C-07 AuthorIdentity, task 17) — chữ đứng cạnh C-08
+  // AnonymousAvatar ở MỌI bề mặt dùng AuthorIdentity (thẻ danh sách, thẻ đầu
+  // màn xem, hàng bình luận).
+  "solutions.identity.anonymous": "Ẩn danh",
+  // Huy hiệu điểm "đang chấm" (C-06 SolutionCard, task 17) — nguyên văn UI Spec
+  // § "Chuỗi tiếng Việt cần thêm" → "Chung"; `result.outOfTen` (dùng lại,
+  // không đổi giá trị) lo hình dạng còn lại của huy hiệu (AC-041, UI-D3/D47).
+  "solutions.scorePending": "{score} trên 10 · đang chấm",
   // Thẻ cửa vào (S-01, C-01 SolutionEntryCard, task 08) — nguyên văn UI Spec
   // § "Chuỗi tiếng Việt cần thêm" → "Thẻ cửa vào (S-01)". `entry.hidden` là
   // NHÃN NÚT (bài của tôi đang bị ẩn) — khác `entry.deleted`, câu của
@@ -949,6 +957,25 @@ export const copy = {
   "solutions.entry.view": "Xem bài giải",
   "solutions.entry.changed": "{count} câu hỏi đã thay đổi, hãy cập nhật",
   "solutions.entry.deleted": "Bài giải của bạn đã bị gỡ: {reason}",
+  // Danh sách (S-03, C-04 SolutionList / C-05 OwnSolutionBlock / C-06
+  // SolutionCard, task 17) — nguyên văn UI Spec § "Chuỗi tiếng Việt cần thêm"
+  // → "Danh sách (S-03)". `own.*` là khối đầu trang của CHÍNH người xem
+  // (C-05); `card.*` là một thẻ bài giải của NGƯỜI KHÁC hoặc đã đăng (C-06).
+  // Dòng "k câu hỏi đã thay đổi, hãy cập nhật" của khối `own` dùng lại
+  // `solutions.entry.changed` (cùng chữ, không thêm khoá `own.changed`).
+  "solutions.own.title": "Bài giải của bạn",
+  "solutions.own.noted": "Đã ghi chú",
+  "solutions.own.progress": "{done}/{total} câu",
+  "solutions.own.writeCta": "Viết bài giải của bạn",
+  "solutions.own.continue": "Viết tiếp",
+  "solutions.own.hiddenLine": "Bài giải của bạn đã bị ẩn bởi quản trị viên.",
+  "solutions.own.seeReason": "Xem lý do",
+  "solutions.card.mine": "Bài của bạn",
+  "solutions.card.updated": "Cập nhật {time}",
+  "solutions.card.helpfulCount": "{count} hữu ích",
+  "solutions.card.commentCount": "{count} bình luận",
+  "solutions.card.pinned": "Tác giả đề ghim",
+  "solutions.card.openLabel": "Mở bài giải của {name}",
   // Công tắc cài đặt (C-12): chữ trạng thái hiện rõ cạnh rãnh, không chỉ màu.
   "solutions.switch.on": "Bật",
   "solutions.switch.off": "Tắt",
