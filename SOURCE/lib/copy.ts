@@ -963,6 +963,13 @@ export const copy = {
   // (C-05); `card.*` là một thẻ bài giải của NGƯỜI KHÁC hoặc đã đăng (C-06).
   // Dòng "k câu hỏi đã thay đổi, hãy cập nhật" của khối `own` dùng lại
   // `solutions.entry.changed` (cùng chữ, không thêm khoá `own.changed`).
+  // Khung trang danh sách (C-04 SolutionList + route, task 18) — nguyên văn
+  // UI Spec § "Chuỗi tiếng Việt cần thêm" → "Danh sách (S-03)"; đứng trước
+  // `own.*`/`card.*` (task 17) đúng thứ tự UI Spec liệt kê.
+  "solutions.list.crumb": "Bài giải",
+  "solutions.list.title": "Bài giải cho đề này",
+  "solutions.list.description": "{count} bài giải. Chỉ người đã nộp bài mới xem được.",
+  "solutions.list.empty": "Chưa có bài giải nào. Hãy là người đầu tiên.",
   "solutions.own.title": "Bài giải của bạn",
   "solutions.own.noted": "Đã ghi chú",
   "solutions.own.progress": "{done}/{total} câu",

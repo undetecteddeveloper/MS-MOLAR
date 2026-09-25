@@ -43,7 +43,7 @@ Every `Pn-Tm` entry below maps to one or more task files. The task number (01–
 | 15 | P2-T3 | backend | 2 | **DONE** `a2a7e36` |
 | 16 | P2-T4 | backend | 2 | **DONE** `ac068cf` — real-DB proof for migration 13 (M5, writer self-read, both Helpful RPC groups incl. table-closure, pin atomicity, AC-004 gate, draft/hidden + admin-hidden comment via SN-1 setup-client substitute, name-resolution) + new localdb file (S12 ordering, score-grading, detail enumeration #14, AC-047/AC-048); the only remaining `test-rls.ts` failures are 4 pre-existing, out-of-scope Rating-section cases (`R-p`/`R-r`/`R-t`/`R-u`), confirmed unrelated by two independent reviewer passes |
 | 17 | P2-T5 (split 1/2) | frontend | 2 | **DONE** `cbf17de` (`AuthorIdentity`/`SolutionCard`/`OwnSolutionBlock` + tests; quality-fixer-frontend approved, no fixes needed) |
-| 18 | P2-T5 (split 2/2) | frontend | 2 | open |
+| 18 | P2-T5 (split 2/2) | frontend | 2 | 🔄 code complete, task-executor-frontend (`SolutionList` + list route + `loading.tsx`/`error.tsx`, 10 new tests green, `tsc`/lint clean) — L1 real-browser check deferred (same sign-in block as tasks 08/10); pending quality-fixer-frontend + commit |
 | 19 | P2-T6 (split 1/3) | frontend | 2 | open |
 | 20 | P2-T6 (split 2/3) | frontend | 2 | open |
 | 21 | P2-T6 (split 3/3) | frontend | 2 | open |
