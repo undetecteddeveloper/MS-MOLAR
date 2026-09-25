@@ -1274,6 +1274,101 @@ async function main() {
     );
   }
 
+  // ==========================================================================
+  // 12. COMMUNITY SOLUTIONS — Phase 2 (backend Design Doc v1.9 § Migration
+  //     Strategy "Probe rule (v1.3)"; work plan task 13).
+  //
+  //     Năm hàm mới của khối này (community_solutions_list,
+  //     community_solution_detail, set_community_solution_pin,
+  //     add_community_solution_helpful, remove_community_solution_helpful)
+  //     không có SELECT/GRANT trên bảng nào cho anon/authenticated — EXECUTE
+  //     trên chính các hàm là đường kiểm duy nhất. Đọc theo MESSAGE, không
+  //     theo error.code một mình — cùng lý do Phase 1 (§11) đã ghi ở trên.
+  // ==========================================================================
+  console.log("\nCOMMUNITY SOLUTIONS Phase 2 (task 13) — probe EXECUTE + message:");
+
+  // Rule 1: anon client → PASS chỉ khi message bắt đầu bằng
+  // "permission denied for function".
+  const csPhase2AnonProbes: readonly [string, Record<string, unknown>][] = [
+    ["community_solutions_list", { p_exam_id: CS_RANDOM_EXAM_ID }],
+    ["community_solution_detail", { p_solution_id: randomUUID() }],
+    ["set_community_solution_pin", { p_exam_id: CS_RANDOM_EXAM_ID, p_action: "unpin", p_solution_id: null }],
+    ["add_community_solution_helpful", { p_solution_id: randomUUID() }],
+    ["remove_community_solution_helpful", { p_solution_id: randomUUID() }],
+  ];
+  for (const [fn, args] of csPhase2AnonProbes) {
+    const r = await anonClient.rpc(fn, args);
+    const msg = r.error?.message ?? "";
+    assert(
+      msg.startsWith("permission denied for function"),
+      msg.startsWith("permission denied for function")
+        ? `anon bị từ chối ${fn} đúng cách ("permission denied for function")`
+        : `anon KHÔNG bị từ chối đúng cách ở ${fn} (mã ${describeCode(r.error?.code ?? null)}, message "${msg}") — thiếu \`revoke ... from anon\` ở khối COMMUNITY SOLUTIONS Phase 2`
+    );
+  }
+
+  if (!probe)
+    skip("probe user COMMUNITY SOLUTIONS Phase 2 (5 hàm mới) — cần một phiên `authenticated`");
+  else {
+    // set_community_solution_pin('unpin', đề không tồn tại) → 42501 với
+    // message CỐ ĐỊNH, đúng danh từ đầu tiên gặp phải (exam not visible).
+    const pin = await probe.rpc("set_community_solution_pin", {
+      p_exam_id: CS_RANDOM_EXAM_ID,
+      p_action: "unpin",
+      p_solution_id: null,
+    });
+    assert(
+      pin.error?.code === "42501" && pin.error?.message === "set_community_solution_pin: exam not visible",
+      pin.error?.code === "42501" && pin.error?.message === "set_community_solution_pin: exam not visible"
+        ? "set_community_solution_pin: probe user nhận đúng 42501 'set_community_solution_pin: exam not visible'"
+        : pin.error?.code === "PGRST202"
+          ? "set_community_solution_pin chưa tồn tại (PGRST202) — apply migration COMMUNITY SOLUTIONS Phase 2"
+          : `set_community_solution_pin SAI kết quả (mong đợi 42501 'exam not visible', nhận mã ${describeCode(pin.error?.code ?? null)}, message "${pin.error?.message ?? ""}")`
+    );
+
+    const addHelpful = await probe.rpc("add_community_solution_helpful", { p_solution_id: randomUUID() });
+    assert(
+      addHelpful.error?.code === "42501" &&
+        addHelpful.error?.message === "add_community_solution_helpful: not eligible",
+      addHelpful.error?.code === "42501" &&
+        addHelpful.error?.message === "add_community_solution_helpful: not eligible"
+        ? "add_community_solution_helpful: probe user nhận đúng 42501 'add_community_solution_helpful: not eligible'"
+        : addHelpful.error?.code === "PGRST202"
+          ? "add_community_solution_helpful chưa tồn tại (PGRST202) — apply migration COMMUNITY SOLUTIONS Phase 2"
+          : `add_community_solution_helpful SAI kết quả (mong đợi 42501 'not eligible', nhận mã ${describeCode(addHelpful.error?.code ?? null)}, message "${addHelpful.error?.message ?? ""}")`
+    );
+
+    const removeHelpful = await probe.rpc("remove_community_solution_helpful", { p_solution_id: randomUUID() });
+    assert(
+      removeHelpful.error?.code === "42501" &&
+        removeHelpful.error?.message === "remove_community_solution_helpful: not eligible",
+      removeHelpful.error?.code === "42501" &&
+        removeHelpful.error?.message === "remove_community_solution_helpful: not eligible"
+        ? "remove_community_solution_helpful: probe user nhận đúng 42501 'remove_community_solution_helpful: not eligible'"
+        : removeHelpful.error?.code === "PGRST202"
+          ? "remove_community_solution_helpful chưa tồn tại (PGRST202) — apply migration COMMUNITY SOLUTIONS Phase 2"
+          : `remove_community_solution_helpful SAI kết quả (mong đợi 42501 'not eligible', nhận mã ${describeCode(removeHelpful.error?.code ?? null)}, message "${removeHelpful.error?.message ?? ""}")`
+    );
+
+    // Probe rule 3: community_solutions_list/community_solution_detail không
+    // bao giờ raise lỗi trong thân — PASS là có dòng hoặc 0 dòng, KHÔNG lỗi.
+    const rule3Phase2Probes: readonly [string, Record<string, unknown>][] = [
+      ["community_solutions_list", { p_exam_id: CS_RANDOM_EXAM_ID }],
+      ["community_solution_detail", { p_solution_id: randomUUID() }],
+    ];
+    for (const [fn, args] of rule3Phase2Probes) {
+      const r = await probe.rpc(fn, args);
+      assert(
+        !r.error,
+        !r.error
+          ? `${fn}: probe user gọi được, không lỗi (${Array.isArray(r.data) ? `${r.data.length} dòng` : JSON.stringify(r.data)})`
+          : r.error.code === "PGRST202"
+            ? `${fn} chưa tồn tại (PGRST202) — apply migration COMMUNITY SOLUTIONS Phase 2`
+            : `${fn} LỖI KHÔNG MONG ĐỢI (mã ${describeCode(r.error.code ?? null)}, message "${r.error.message}") — thân hàm này không được raise gì với một id ngẫu nhiên`
+      );
+    }
+  }
+
   // Một lượt chạy PHẦN không bao giờ được in ra câu của một lượt chạy ĐỦ. Đó là
   // cả điểm của việc đếm `skipped` tách khỏi `failures`: người đọc log — hoặc
   // người dán log vào một work plan làm bằng chứng — phải thấy ngay rằng cái
