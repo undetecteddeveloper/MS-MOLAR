@@ -1068,6 +1068,23 @@ export const copy = {
   // dưới tên.
   "solutions.view.essayScored": "Đã chấm: {earned}/{max} điểm",
   "solutions.view.essayPending": "Chưa chấm",
+  // Màn xem (S-05, task 19) — SolutionAuthorCard/HelpfulButton/SolutionMenu.
+  "solutions.view.helpful": "Hữu ích",
+  "solutions.view.helpfulCount": "{count} hữu ích",
+  // DD-pinned (frontend DD v1.6 § Error Handling "solutions.view.helpfulError").
+  "solutions.view.helpfulError": "Chưa ghi nhận được lượt Hữu ích. Bạn thử lại nhé.",
+  "solutions.view.more": "Thêm",
+  "solutions.menu.pin": "Ghim bài này",
+  "solutions.menu.unpin": "Bỏ ghim",
+  "solutions.menu.edit": "Sửa bài giải",
+  // DD-pinned (frontend DD v1.6 § Error Handling "solutions.menu.pinError").
+  "solutions.menu.pinError": "Chưa ghim được bài này. Bạn thử lại nhé.",
+  // Ngoại lệ (v1.5): hai khoá này thuộc phạm vi task 36 (ReportDialog), nhưng
+  // task 19 đã render hai nhánh iReported của SolutionMenu nên cần đúng hai
+  // khoá này trước — không thêm gì khác thuộc task 36 (không hộp thoại, không
+  // gọi reportSolution).
+  "solutions.menu.report": "Báo cáo bài giải",
+  "solutions.menu.reported": "Bạn đã báo cáo bài giải này.",
 
   // --- Thời gian tương đối (lib/format/relativeTime.ts) ---------------------
   // Dùng ở danh sách bài giải, màn xem và tab Bình luận của hồ sơ; quá 30 ngày
