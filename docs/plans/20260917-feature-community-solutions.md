@@ -39,7 +39,7 @@ Every `Pn-Tm` entry below maps to one or more task files. The task number (01–
 | 11 | P1-T10 | frontend | 1 | **DONE** `dc309eb` (includes same-day AC-022 follow-up consuming the task-03 fix) |
 | 12 | P1-T11 | frontend | 1 | **DONE** `a5736cf` |
 | 13 | P2-T1 | backend | 2 | **DONE** `e74b64a` (migration fingerprint `c3c344fffc6e`, applied dev only) |
-| 14 | P2-T2 | backend | 2 | open |
+| 14 | P2-T2 | backend | 2 | **DONE** `b3492c9` |
 | 15 | P2-T3 | backend | 2 | open |
 | 16 | P2-T4 | backend | 2 | open |
 | 17 | P2-T5 (split 1/2) | frontend | 2 | open |
