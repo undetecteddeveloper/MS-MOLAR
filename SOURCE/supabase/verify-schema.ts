@@ -1711,6 +1711,42 @@ async function main() {
     await probeCommunityAvatarPolicy(admin, anonClient, probe);
   }
 
+  // ==========================================================================
+  // 16. COMMUNITY SOLUTIONS — Phase 5, uy tín (backend Design Doc v1.9
+  //     § Migration Strategy "Probe rule (v1.3)" rule 1 + rule 3; work plan
+  //     task 41).
+  //
+  //     community_reputation_summary() không tham số và không bao giờ raise
+  //     trong thân → probe user PASS khi trả hàng KHÔNG lỗi; anon PASS chỉ khi
+  //     message bắt đầu bằng "permission denied for function". Hàm chỉ đọc,
+  //     chỉ về chính người gọi — không tạo/đổi/xoá dòng nào.
+  // ==========================================================================
+  console.log("\nCOMMUNITY SOLUTIONS Phase 5 (task 41) — probe EXECUTE community_reputation_summary:");
+
+  const reputationAnon = await anonClient.rpc("community_reputation_summary");
+  const reputationAnonMsg = reputationAnon.error?.message ?? "";
+  assert(
+    reputationAnonMsg.startsWith("permission denied for function"),
+    reputationAnonMsg.startsWith("permission denied for function")
+      ? 'anon bị từ chối community_reputation_summary đúng cách ("permission denied for function")'
+      : `anon KHÔNG bị từ chối đúng cách ở community_reputation_summary (mã ${describeCode(reputationAnon.error?.code ?? null)}, message "${reputationAnonMsg}") — thiếu \`revoke ... from anon\` ở khối COMMUNITY SOLUTIONS Phase 5 (task 41)`
+  );
+
+  if (!probe) skip("probe user community_reputation_summary — cần một phiên `authenticated`");
+  else {
+    const reputationProbe = await probe.rpc("community_reputation_summary");
+    assert(
+      !reputationProbe.error,
+      !reputationProbe.error
+        ? `community_reputation_summary: probe user gọi được, không lỗi (${JSON.stringify(reputationProbe.data)})`
+        : reputationProbe.error.code === "PGRST202"
+          ? "community_reputation_summary chưa tồn tại (PGRST202) — apply migration COMMUNITY SOLUTIONS Phase 5 (task 41)"
+          : reputationProbe.error.message.startsWith("permission denied for function")
+            ? `community_reputation_summary: authenticated THIẾU grant execute (message "${reputationProbe.error.message}") — khối COMMUNITY SOLUTIONS Phase 5 (task 41)`
+            : `community_reputation_summary LỖI KHÔNG MONG ĐỢI (mã ${describeCode(reputationProbe.error.code ?? null)}, message "${reputationProbe.error.message}") — thân hàm này không được raise gì`
+    );
+  }
+
   // Một lượt chạy PHẦN không bao giờ được in ra câu của một lượt chạy ĐỦ. Đó là
   // cả điểm của việc đếm `skipped` tách khỏi `failures`: người đọc log — hoặc
   // người dán log vào một work plan làm bằng chứng — phải thấy ngay rằng cái
