@@ -214,6 +214,31 @@ function csWords(n: number): string {
   return Array.from({ length: n }, (_, i) => `tu${i + 1}`).join(" ");
 }
 
+// Fixture Community Solutions — task 27 (test task của migration 25; backend
+// DD v1.9 § Integration Verification Points / § Test Boundaries "User-write
+// RPC groups"). Đề RIÊNG THỨ BA, KHÔNG dùng lại CS_EXAM_ID/CS16_EXAM_ID ở
+// trên — Phần 11 (task 16) dọn sạch fixture của nó trước khi khối task-27
+// chạy trong cùng file.
+const CS27_EXAM_ID = "rls-cs27-exam";
+const CS27_QUESTION_IDS = [1, 2, 3].map((n) => `${CS27_EXAM_ID}-q${n}`);
+// Câu hỏi KHÔNG nằm trong question_ids của đề — dùng cho case (c) của
+// post_community_comment. Không cần row `questions` cho id này: điều kiện
+// eligibility (`p_question_id = any(e.question_ids)`) chặn TRƯỚC khi RPC chạm
+// tới bảng đó, nên FK không bao giờ được kiểm tới.
+const CS27_OUTSIDE_QUESTION_ID = `${CS27_EXAM_ID}-q-outside`;
+
+/** Xóa sạch fixture Community Solutions của task 27 (chạy trước VÀ sau để
+ *  idempotent). community_solution_notes/comments (và report của comment) đều
+ *  `on delete cascade` theo community_solutions/community_solution_comments,
+ *  không cần xoá tường minh. */
+async function cleanupCs27Fixtures(admin: SupabaseClient) {
+  await admin.from("community_moderation_log").delete().eq("exam_id", CS27_EXAM_ID);
+  await admin.from("community_solutions").delete().eq("exam_id", CS27_EXAM_ID);
+  await admin.from("exam_attempts").delete().eq("exam_id", CS27_EXAM_ID);
+  await admin.from("exams").delete().eq("id", CS27_EXAM_ID);
+  await admin.from("questions").delete().in("id", CS27_QUESTION_IDS);
+}
+
 /** Xóa sạch fixture Community Solutions (chạy trước VÀ sau để idempotent). */
 async function cleanupCommunitySolutionsFixtures(admin: SupabaseClient) {
   await admin.from("community_moderation_log").delete().eq("exam_id", CS_EXAM_ID);
@@ -3898,6 +3923,509 @@ async function main() {
 
     // Dọn dẹp fixture Community Solutions (task 16).
     await cleanupCs16Fixtures(admin);
+  }
+
+  // ==========================================================================
+  // Phần 12 — Community Solutions, TEST TASK 27 (migration task 25: backend DD
+  // v1.9 § Integration Verification Points / § Test Boundaries "User-write RPC
+  // groups"). Nhóm post_/delete_community_comment (kèm table-closure + case
+  // (i) AC-048 + cổng AC-004/AC-002), M5 (nửa bình luận) + S4 (danh tính bình
+  // luận của chính người viết), case ghi cursor
+  // user_profiles.community_comments_last_read_at, cổng AC-002 của
+  // community_my_comment_feed, hồi quy tên cho post_community_comment. U1
+  // (task file § "U1 — resolved"): bình luận ghi CHỈ qua RPC — không thêm
+  // grant/policy nào để một case xanh. Feed columns/Feed unread cursor/
+  // ordering/AC-091 exclusion/AC-047-048 (phần feed) sống ở
+  // `community-solutions-comment-feed.localdb.test.ts` (task file §
+  // Implementation Content), không lặp lại ở đây.
+  //
+  // Bọc trong { } cùng quy ước Phần 11 — biến const bên dưới không đụng tên
+  // với hàng nghìn dòng phía trên trong cùng main().
+  // ==========================================================================
+  {
+    console.log("\nCommunity Solutions (task 27) — setup fixture (service_role)…");
+    await cleanupCs27Fixtures(admin);
+
+    const questionsSetup27 = await admin.from("questions").insert(
+      CS27_QUESTION_IDS.map((id, i) => ({
+        id,
+        content: `[RLS-CS27] Câu ${i + 1} bản gốc`,
+        choices: MCQ_CHOICES,
+        correct_answer: "A",
+        subject: "Toán",
+        grade: 10,
+        topic: "Toán",
+      })),
+    );
+    if (questionsSetup27.error) throw questionsSetup27.error;
+
+    const examSetup27 = await admin.from("exams").insert({
+      id: CS27_EXAM_ID,
+      title: "[RLS] Đề Bài giải cộng đồng (task 27)",
+      duration_minutes: 45,
+      subject: "Toán",
+      grade: 10,
+      author_id: userAId,
+      author_display_name: "RLS Test Author",
+      question_ids: CS27_QUESTION_IDS,
+      status: "published",
+    });
+    if (examSetup27.error) throw examSetup27.error;
+
+    const attemptA27 = await insertSubmittedAttempt(admin, userAId, CS27_EXAM_ID, new Date());
+
+    // SOL27 — tác giả = A, show_profile=false + show_score=false (đúng khuôn
+    // SOL_ANON của task 16, dùng cho M5 nửa bình luận + S4).
+    const sol27Row = await admin
+      .from("community_solutions")
+      .insert({
+        exam_id: CS27_EXAM_ID,
+        author_id: userAId,
+        status: "published",
+        show_profile: false,
+        show_score: false,
+        linked_attempt_id: attemptA27,
+      })
+      .select("id")
+      .single();
+    if (sol27Row.error) throw sol27Row.error;
+    const SOL27 = sol27Row.data!.id as string;
+
+    // Q1 — ghi chú 15 từ, dùng cho hầu hết case; Q2 — KHÔNG có ghi chú (case
+    // (i) AC-048 nhánh "không có ghi chú"); Q3 — ghi chú 14 từ, sau nâng lên
+    // 15 (case (i) AC-048 nhánh "14 từ" rồi "được chấp nhận").
+    const [CS27_Q1, CS27_Q2, CS27_Q3] = CS27_QUESTION_IDS;
+    const noteQ1_27 = await admin
+      .from("community_solution_notes")
+      .insert({ solution_id: SOL27, question_id: CS27_Q1, body: csWords(15) });
+    if (noteQ1_27.error) throw noteQ1_27.error;
+    const noteQ3_27 = await admin
+      .from("community_solution_notes")
+      .insert({ solution_id: SOL27, question_id: CS27_Q3, body: csWords(14) });
+    if (noteQ3_27.error) throw noteQ3_27.error;
+
+    async function commentTotalFor27(solutionId: string): Promise<number> {
+      const r = await admin
+        .from("community_solution_comments")
+        .select("id", { count: "exact", head: true })
+        .eq("solution_id", solutionId);
+      return r.count ?? -1;
+    }
+    async function commentStatusOf27(commentId: string): Promise<string | null> {
+      const r = await admin
+        .from("community_solution_comments")
+        .select("status")
+        .eq("id", commentId)
+        .maybeSingle();
+      return (r.data as { status: string } | null)?.status ?? null;
+    }
+    type CommentRow27 = {
+      id: string;
+      author_id: string | null;
+      author_display_name: string | null;
+      author_avatar_path: string | null;
+      is_solution_author: boolean;
+    };
+    type DetailQuestion27 = { question_id: string; comments: CommentRow27[] };
+    function commentIn27(
+      detail: { data: Array<{ questions: DetailQuestion27[] }> | null },
+      questionId: string,
+      commentId: string,
+    ): CommentRow27 | undefined {
+      return detail.data?.[0]?.questions
+        .find((q) => q.question_id === questionId)
+        ?.comments.find((c) => c.id === commentId);
+    }
+
+    console.log("\nRLS checks (Community Solutions task 27 — post_community_comment group, AC-072/AC-047/AC-048):");
+
+    // (a) caller CHƯA có attempt nào đã nộp trên đề này (B chưa được tạo attempt).
+    const postNoAttempt = await userB.rpc("post_community_comment", {
+      p_solution_id: SOL27,
+      p_question_id: CS27_Q1,
+      p_body: csWords(20),
+      p_is_anonymous: false,
+    });
+    assert(
+      postNoAttempt.error?.code === "42501" &&
+        postNoAttempt.error?.message === "post_community_comment: not eligible" &&
+        (await commentTotalFor27(SOL27)) === 0,
+      `(a) caller chưa nộp bài bị 42501 'not eligible', 0 dòng (nhận ${postNoAttempt.error?.message})`,
+    );
+
+    const attemptB27 = await insertSubmittedAttempt(admin, userBId, CS27_EXAM_ID, new Date());
+
+    // (b) bài giải đang 'draft'.
+    const solToDraft27 = await admin.from("community_solutions").update({ status: "draft" }).eq("id", SOL27);
+    if (solToDraft27.error) throw solToDraft27.error;
+    const postDraft = await userB.rpc("post_community_comment", {
+      p_solution_id: SOL27,
+      p_question_id: CS27_Q1,
+      p_body: csWords(20),
+      p_is_anonymous: false,
+    });
+    assert(
+      postDraft.error?.code === "42501" && (await commentTotalFor27(SOL27)) === 0,
+      `(b) bài giải 'draft' bị 42501, 0 dòng (nhận ${postDraft.error?.code})`,
+    );
+    const solRestore27 = await admin.from("community_solutions").update({ status: "published" }).eq("id", SOL27);
+    if (solRestore27.error) throw solRestore27.error;
+
+    // (c) p_question_id không nằm trong exams.question_ids.
+    const postOutsideQuestion = await userB.rpc("post_community_comment", {
+      p_solution_id: SOL27,
+      p_question_id: CS27_OUTSIDE_QUESTION_ID,
+      p_body: csWords(20),
+      p_is_anonymous: false,
+    });
+    assert(
+      postOutsideQuestion.error?.code === "42501" && (await commentTotalFor27(SOL27)) === 0,
+      `(c) câu hỏi không thuộc question_ids của đề bị 42501, 0 dòng (nhận ${postOutsideQuestion.error?.code})`,
+    );
+
+    // (d) anon.
+    const postAnon = await anonClient.rpc("post_community_comment", {
+      p_solution_id: SOL27,
+      p_question_id: CS27_Q1,
+      p_body: csWords(20),
+      p_is_anonymous: false,
+    });
+    assert(
+      isAuthorizationDenial(postAnon.error) && (await commentTotalFor27(SOL27)) === 0,
+      `(d) anon bị từ chối, 0 dòng (nhận ${postAnon.error?.code})`,
+    );
+
+    // (e) table closure: B (đủ điều kiện) tự INSERT trực tiếp.
+    const postDirect = await userB
+      .from("community_solution_comments")
+      .insert({ solution_id: SOL27, question_id: CS27_Q1, author_id: userBId, body: csWords(20) })
+      .select();
+    assert(
+      isAuthorizationDenial(postDirect.error) &&
+        (postDirect.data?.length ?? 0) === 0 &&
+        (await commentTotalFor27(SOL27)) === 0,
+      `(e) table closure: B (đủ điều kiện) KHÔNG tự INSERT trực tiếp được community_solution_comments (nhận ${postDirect.error?.code ?? "KHÔNG CÓ LỖI"})`,
+    );
+
+    // (i) AC-048 — câu hiện tại KHÔNG có ghi chú (Q2).
+    const postNoNote = await userB.rpc("post_community_comment", {
+      p_solution_id: SOL27,
+      p_question_id: CS27_Q2,
+      p_body: csWords(20),
+      p_is_anonymous: false,
+    });
+    assert(
+      postNoNote.error?.code === "42501" && (await commentTotalFor27(SOL27)) === 0,
+      `(i) AC-048 câu không có ghi chú bị 42501, 0 dòng (nhận ${postNoNote.error?.code})`,
+    );
+
+    // (i) AC-048 — ghi chú 14 từ (Q3, do harness setup client ghi).
+    const postShortNote = await userB.rpc("post_community_comment", {
+      p_solution_id: SOL27,
+      p_question_id: CS27_Q3,
+      p_body: csWords(20),
+      p_is_anonymous: false,
+    });
+    assert(
+      postShortNote.error?.code === "42501" && (await commentTotalFor27(SOL27)) === 0,
+      `(i) AC-048 ghi chú 14 từ bị 42501, 0 dòng (nhận ${postShortNote.error?.code})`,
+    );
+
+    // (i) AC-048 — cùng ghi chú đó nâng đúng 15 từ → được chấp nhận.
+    const bumpNoteQ3_27 = await admin
+      .from("community_solution_notes")
+      .update({ body: csWords(15) })
+      .eq("solution_id", SOL27)
+      .eq("question_id", CS27_Q3);
+    if (bumpNoteQ3_27.error) throw bumpNoteQ3_27.error;
+    const commentQ3 = await userB.rpc("post_community_comment", {
+      p_solution_id: SOL27,
+      p_question_id: CS27_Q3,
+      p_body: csWords(20),
+      p_is_anonymous: false,
+    });
+    const commentQ3Id = (commentQ3.data as Array<{ comment_id: string }> | null)?.[0]?.comment_id;
+    assert(
+      !commentQ3.error &&
+        commentQ3Id !== undefined &&
+        (await commentTotalFor27(SOL27)) === 1 &&
+        (await commentStatusOf27(commentQ3Id as string)) === "visible",
+      `(i) AC-048 ghi chú đúng 15 từ được chấp nhận, trả comment_id, status='visible' (nhận mã lỗi ${commentQ3.error?.code})`,
+    );
+
+    console.log(
+      "\nRLS checks (Community Solutions task 27 — post_community_comment success + M5 nửa bình luận + S4):",
+    );
+
+    const commentBVisible = await userB.rpc("post_community_comment", {
+      p_solution_id: SOL27,
+      p_question_id: CS27_Q1,
+      p_body: "[RLS-CS27] Bình luận không ẩn danh của B",
+      p_is_anonymous: false,
+    });
+    const commentBVisibleId = (commentBVisible.data as Array<{ comment_id: string }> | null)?.[0]?.comment_id;
+    assert(
+      !commentBVisible.error && commentBVisibleId !== undefined && (await commentTotalFor27(SOL27)) === 2,
+      `Success: B đủ điều kiện → trả comment_id, tổng số dòng cộng dồn đúng (nhận mã lỗi ${commentBVisible.error?.code})`,
+    );
+
+    const commentAnonB = await userB.rpc("post_community_comment", {
+      p_solution_id: SOL27,
+      p_question_id: CS27_Q1,
+      p_body: "[RLS-CS27] Bình luận ẩn danh của B",
+      p_is_anonymous: true,
+    });
+    const commentAnonBId = (commentAnonB.data as Array<{ comment_id: string }> | null)?.[0]?.comment_id;
+    assert(
+      !commentAnonB.error && commentAnonBId !== undefined && (await commentTotalFor27(SOL27)) === 3,
+      `Success: p_is_anonymous=true tạo bình luận ẩn danh, đây là fixture cho M5 (nhận mã lỗi ${commentAnonB.error?.code})`,
+    );
+
+    const commentSelfA = await userA.rpc("post_community_comment", {
+      p_solution_id: SOL27,
+      p_question_id: CS27_Q1,
+      p_body: "[RLS-CS27] Bình luận của chính người viết A",
+      p_is_anonymous: false,
+    });
+    const commentSelfAId = (commentSelfA.data as Array<{ comment_id: string }> | null)?.[0]?.comment_id;
+    assert(
+      !commentSelfA.error && commentSelfAId !== undefined && (await commentTotalFor27(SOL27)) === 4,
+      `Success: chính người viết A bình luận không ẩn danh trên bài giải show_profile=false của mình — fixture cho S4 (nhận mã lỗi ${commentSelfA.error?.code})`,
+    );
+
+    // M5 — bình luận ẩn danh: người xem khác đủ điều kiện (A, không phải tác
+    // giả bình luận — tác giả bình luận là B) đọc qua community_solution_detail
+    // → danh tính JSON null, is_solution_author hiện diện (= false vì tác giả
+    // bình luận B khác tác giả bài giải A).
+    const detailForM5 = await userA.rpc("community_solution_detail", { p_solution_id: SOL27 });
+    const anonRowForM5 = commentIn27(detailForM5, CS27_Q1, commentAnonBId as string);
+    assert(
+      anonRowForM5?.author_id === null &&
+        anonRowForM5?.author_display_name === null &&
+        anonRowForM5?.author_avatar_path === null &&
+        anonRowForM5?.is_solution_author === false,
+      `M5 (nửa bình luận): bình luận ẩn danh của B → danh tính JSON null cho người xem khác (A), is_solution_author=false hiện diện (nhận ${JSON.stringify(anonRowForM5)})`,
+    );
+
+    // S4 — bình luận KHÔNG ẩn danh của CHÍNH người viết trên bài giải
+    // show_profile=false của họ: người xem khác (B) đọc → danh tính null,
+    // is_solution_author=true; bật show_profile → danh tính thật; tắt lại →
+    // null lần nữa; bình luận không ẩn danh của B (người khác) giữ nguyên danh
+    // tính xuyên suốt cả ba lượt đọc.
+    const detailForS4Off1 = await userB.rpc("community_solution_detail", { p_solution_id: SOL27 });
+    const selfRowOff1 = commentIn27(detailForS4Off1, CS27_Q1, commentSelfAId as string);
+    const otherRowOff1 = commentIn27(detailForS4Off1, CS27_Q1, commentBVisibleId as string);
+    assert(
+      selfRowOff1?.author_id === null &&
+        selfRowOff1?.author_display_name === null &&
+        selfRowOff1?.author_avatar_path === null &&
+        selfRowOff1?.is_solution_author === true &&
+        otherRowOff1?.author_id === userBId &&
+        otherRowOff1?.is_solution_author === false,
+      `S4 (show_profile=false): bình luận của chính người viết A → danh tính null, is_solution_author=true; bình luận của B (người khác) vẫn giữ danh tính thật (nhận self=${JSON.stringify(selfRowOff1)}, other=${JSON.stringify(otherRowOff1)})`,
+    );
+
+    const showProfileOn27 = await admin.from("community_solutions").update({ show_profile: true }).eq("id", SOL27);
+    if (showProfileOn27.error) throw showProfileOn27.error;
+    const detailForS4On = await userB.rpc("community_solution_detail", { p_solution_id: SOL27 });
+    const selfRowOn = commentIn27(detailForS4On, CS27_Q1, commentSelfAId as string);
+    assert(
+      selfRowOn?.author_id === userAId && selfRowOn?.is_solution_author === true,
+      `S4: bật show_profile → bình luận của chính người viết trả lại danh tính THẬT trên lượt đọc kế tiếp (nhận ${JSON.stringify(selfRowOn)})`,
+    );
+
+    const showProfileOff27 = await admin.from("community_solutions").update({ show_profile: false }).eq("id", SOL27);
+    if (showProfileOff27.error) throw showProfileOff27.error;
+    const detailForS4Off2 = await userB.rpc("community_solution_detail", { p_solution_id: SOL27 });
+    const selfRowOff2 = commentIn27(detailForS4Off2, CS27_Q1, commentSelfAId as string);
+    assert(selfRowOff2?.author_id === null, "S4: tắt show_profile lại lần nữa → danh tính lại null");
+
+    console.log("\nRLS checks (Community Solutions task 27 — delete_community_comment group, AC-070/S19):");
+
+    // (a) người khác — kể cả CHÍNH người viết bài giải — xoá bình luận không
+    // phải của mình (commentBVisible thuộc B).
+    const deleteByWriter = await userA.rpc("delete_community_comment", { p_comment_id: commentBVisibleId });
+    assert(
+      deleteByWriter.error?.code === "42501" &&
+        deleteByWriter.error?.message === "delete_community_comment: not eligible" &&
+        (await commentStatusOf27(commentBVisibleId as string)) === "visible",
+      `(a) người viết A xoá bình luận của B (không phải của mình) bị 42501 'not eligible', dòng còn nguyên (nhận ${deleteByWriter.error?.message})`,
+    );
+
+    // (b) bình luận của chính mình đã bị admin ẩn (S19) — dùng commentSelfA,
+    // đúng tiền lệ SN-1 (task 05/16): admin_moderate_community_comment chưa
+    // tồn tại tới migration 32, harness setup client tự đặt status='hidden'.
+    const hideSelfComment = await admin
+      .from("community_solution_comments")
+      .update({ status: "hidden" })
+      .eq("id", commentSelfAId as string);
+    if (hideSelfComment.error) throw hideSelfComment.error;
+    const deleteOwnHidden = await userA.rpc("delete_community_comment", { p_comment_id: commentSelfAId });
+    assert(
+      deleteOwnHidden.error?.code === "42501" && (await commentStatusOf27(commentSelfAId as string)) === "hidden",
+      `(b) S19: bình luận của chính mình đã bị ẩn → xoá bị 42501, dòng còn nguyên, status='hidden' (nhận ${deleteOwnHidden.error?.code})`,
+    );
+
+    // (c) anon.
+    const deleteAnon = await anonClient.rpc("delete_community_comment", { p_comment_id: commentBVisibleId });
+    assert(
+      isAuthorizationDenial(deleteAnon.error) && (await commentStatusOf27(commentBVisibleId as string)) === "visible",
+      `(c) anon bị từ chối, dòng của B còn nguyên (nhận ${deleteAnon.error?.code})`,
+    );
+
+    // (d) table closure: B (chủ bình luận, đủ điều kiện) tự DELETE trực tiếp.
+    const deleteDirect = await userB
+      .from("community_solution_comments")
+      .delete()
+      .eq("id", commentBVisibleId as string)
+      .select();
+    assert(
+      isAuthorizationDenial(deleteDirect.error) &&
+        (deleteDirect.data?.length ?? 0) === 0 &&
+        (await commentStatusOf27(commentBVisibleId as string)) === "visible",
+      `(d) table closure: B KHÔNG tự DELETE trực tiếp được community_solution_comments, dòng còn nguyên (nhận ${deleteDirect.error?.code ?? "KHÔNG CÓ LỖI"})`,
+    );
+
+    // Fixture riêng cho (f)/(g)/(h)/success — một bình luận MỚI, còn 'visible',
+    // của B, kèm một dòng community_content_reports (do harness ghi — bảng
+    // này cũng đóng hoàn toàn, không policy không grant) để chứng minh cascade
+    // khi xoá thành công.
+    const commentForGates = await userB.rpc("post_community_comment", {
+      p_solution_id: SOL27,
+      p_question_id: CS27_Q1,
+      p_body: "[RLS-CS27] Bình luận dùng cho cổng AC-004/AC-002",
+      p_is_anonymous: false,
+    });
+    if (commentForGates.error) throw commentForGates.error;
+    const commentForGatesId = (commentForGates.data as Array<{ comment_id: string }>)[0].comment_id;
+    const reportOnGatesComment = await admin.from("community_content_reports").insert({
+      comment_id: commentForGatesId,
+      reporter_id: userAId,
+      reason: "[RLS-CS27] báo cáo fixture cho cascade",
+    });
+    if (reportOnGatesComment.error) throw reportOnGatesComment.error;
+
+    // (f) AC-004: đề đang 'draft'.
+    const examToDraft27 = await admin.from("exams").update({ status: "draft" }).eq("id", CS27_EXAM_ID);
+    if (examToDraft27.error) throw examToDraft27.error;
+    const deleteExamDraft = await userB.rpc("delete_community_comment", { p_comment_id: commentForGatesId });
+    assert(
+      deleteExamDraft.error?.code === "42501" &&
+        deleteExamDraft.error?.message === "delete_community_comment: not eligible" &&
+        (await commentStatusOf27(commentForGatesId)) === "visible",
+      `(f) AC-004: đề 'draft' → 42501 'not eligible', dòng còn nguyên (nhận ${deleteExamDraft.error?.message})`,
+    );
+    const examRestore27a = await admin.from("exams").update({ status: "published" }).eq("id", CS27_EXAM_ID);
+    if (examRestore27a.error) throw examRestore27a.error;
+
+    // (g) AC-004: tác giả đề bị ban.
+    const banAuthor27 = await admin.auth.admin.updateUserById(userAId, { ban_duration: "24h" });
+    if (banAuthor27.error) throw banAuthor27.error;
+    const deleteAuthorBanned = await userB.rpc("delete_community_comment", { p_comment_id: commentForGatesId });
+    assert(
+      deleteAuthorBanned.error?.code === "42501" && (await commentStatusOf27(commentForGatesId)) === "visible",
+      `(g) AC-004: tác giả đề bị ban → 42501, dòng còn nguyên (nhận ${deleteAuthorBanned.error?.code})`,
+    );
+    const unbanAuthor27 = await admin.auth.admin.updateUserById(userAId, { ban_duration: "none" });
+    if (unbanAuthor27.error) throw unbanAuthor27.error;
+
+    // (h) AC-002: attempt của CHÍNH B đang 'in_progress'.
+    const bToInProgress27 = await admin.from("exam_attempts").update({ status: "in_progress" }).eq("id", attemptB27);
+    if (bToInProgress27.error) throw bToInProgress27.error;
+    const deleteInProgress = await userB.rpc("delete_community_comment", { p_comment_id: commentForGatesId });
+    assert(
+      deleteInProgress.error?.code === "42501" && (await commentStatusOf27(commentForGatesId)) === "visible",
+      `(h) AC-002: attempt của chính B đang 'in_progress' → 42501, dòng còn nguyên (nhận ${deleteInProgress.error?.code})`,
+    );
+    const bResubmit27 = await admin
+      .from("exam_attempts")
+      .update({ status: "submitted", submitted_at: new Date().toISOString() })
+      .eq("id", attemptB27);
+    if (bResubmit27.error) throw bResubmit27.error;
+
+    console.log("\nRLS checks (Community Solutions task 27 — delete_community_comment success, cascade AC-070):");
+
+    const deleteSuccess = await userB.rpc("delete_community_comment", { p_comment_id: commentForGatesId });
+    const reportsAfterDelete = await admin
+      .from("community_content_reports")
+      .select("id")
+      .eq("comment_id", commentForGatesId);
+    assert(
+      !deleteSuccess.error &&
+        (await commentStatusOf27(commentForGatesId)) === null &&
+        (reportsAfterDelete.data?.length ?? -1) === 0,
+      `Success: bình luận 'visible' của chính B bị xoá, và community_content_reports của nó cũng mất theo cascade (nhận mã lỗi ${deleteSuccess.error?.code}, reports còn lại ${reportsAfterDelete.data?.length})`,
+    );
+
+    console.log("\nRLS checks (Community Solutions task 27 — AC-002 gate: community_my_comment_feed):");
+
+    const aToInProgress27 = await admin.from("exam_attempts").update({ status: "in_progress" }).eq("id", attemptA27);
+    if (aToInProgress27.error) throw aToInProgress27.error;
+    const feedWhileInProgress = await userA.rpc("community_my_comment_feed", { p_page: 1, p_page_size: 20 });
+    const feedRowsForExamDuringInProgress = (feedWhileInProgress.data as Array<{ exam_id: string }> | null)?.filter(
+      (row) => row.exam_id === CS27_EXAM_ID,
+    );
+    assert(
+      !feedWhileInProgress.error && (feedRowsForExamDuringInProgress?.length ?? -1) === 0,
+      `AC-002 gate: attempt của chính người viết A đang 'in_progress' → community_my_comment_feed không trả dòng nào của đề này (nhận ${feedRowsForExamDuringInProgress?.length})`,
+    );
+    const aResubmit27 = await admin
+      .from("exam_attempts")
+      .update({ status: "submitted", submitted_at: new Date().toISOString() })
+      .eq("id", attemptA27);
+    if (aResubmit27.error) throw aResubmit27.error;
+    const feedAfterResubmit = await userA.rpc("community_my_comment_feed", { p_page: 1, p_page_size: 20 });
+    const feedRowsForExamAfterResubmit = (feedAfterResubmit.data as Array<{ exam_id: string }> | null)?.filter(
+      (row) => row.exam_id === CS27_EXAM_ID,
+    );
+    assert(
+      (feedRowsForExamAfterResubmit?.length ?? 0) > 0,
+      "AC-002 gate: sau khi nộp lại (submitted), community_my_comment_feed trả lại đúng dòng của đề này",
+    );
+
+    console.log(
+      "\nRLS checks (Community Solutions task 27 — case ghi cursor user_profiles.community_comments_last_read_at):",
+    );
+
+    const ownerSetsCursor = await userA
+      .from("user_profiles")
+      .update({ community_comments_last_read_at: new Date().toISOString() })
+      .eq("id", userAId)
+      .select("id");
+    assert(
+      !ownerSetsCursor.error && (ownerSetsCursor.data?.length ?? 0) === 1,
+      `Cursor write: chủ tài khoản (A) tự đặt được community_comments_last_read_at của chính mình dưới profiles_update_own không đổi (nhận mã lỗi ${ownerSetsCursor.error?.code})`,
+    );
+    const otherSetsCursor = await userB
+      .from("user_profiles")
+      .update({ community_comments_last_read_at: new Date().toISOString() })
+      .eq("id", userAId)
+      .select("id");
+    assert(
+      !otherSetsCursor.error && (otherSetsCursor.data?.length ?? 0) === 0,
+      `Cursor write: B KHÔNG đặt được cột này cho A — 0 dòng đổi, không lỗi (RLS lọc theo id=auth.uid()) (nhận mã lỗi ${otherSetsCursor.error?.code}, số dòng đổi ${otherSetsCursor.data?.length})`,
+    );
+    const resetCursor27 = await admin
+      .from("user_profiles")
+      .update({ community_comments_last_read_at: null })
+      .eq("id", userAId);
+    if (resetCursor27.error) throw resetCursor27.error;
+
+    console.log("\nRLS checks (Community Solutions task 27 — Name-resolution regression, không 42702):");
+
+    const nameResPost = await userA.rpc("post_community_comment", {
+      p_solution_id: SOL27,
+      p_question_id: CS27_Q1,
+      p_body: "[RLS-CS27] Hồi quy tên — không 42702",
+      p_is_anonymous: false,
+    });
+    assert(
+      !nameResPost.error,
+      `Name-resolution regression: post_community_comment thành công — nhất là không 42702 (nhận ${nameResPost.error?.code})`,
+    );
+
+    // Dọn dẹp fixture Community Solutions (task 27).
+    await cleanupCs27Fixtures(admin);
   }
 
   // Dọn dẹp fixture Rating.
