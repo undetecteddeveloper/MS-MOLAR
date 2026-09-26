@@ -319,7 +319,19 @@ describe.skipIf(!HAS_LIVE_DB)(
       "i_reported",
       "questions",
     ].sort();
-    const QUESTION_KEYS = ["question_id", "stem", "correct_answer", "has_changed", "note", "comment_count", "comments"].sort();
+    const QUESTION_KEYS = [
+      "question_id",
+      "stem",
+      "correct_answer",
+      "question_type",
+      "choices",
+      "sub_answers",
+      "essay_answer",
+      "has_changed",
+      "note",
+      "comment_count",
+      "comments",
+    ].sort();
     const COMMENT_KEYS = [
       "id",
       "author_id",
@@ -409,7 +421,7 @@ describe.skipIf(!HAS_LIVE_DB)(
       await cleanup();
     }, 60_000);
 
-    it("header đúng 14 khoá / mỗi câu đúng 7 khoá / mỗi bình luận đúng 11 khoá — set-equal cả hai chiều, với show_score=true rồi show_score=false (Reference Contract Value #14)", async () => {
+    it("header đúng 14 khoá / mỗi câu đúng 11 khoá / mỗi bình luận đúng 11 khoá — set-equal cả hai chiều, với show_score=true rồi show_score=false (Reference Contract Value #14)", async () => {
       const detailTrue = await reader.client.rpc("community_solution_detail", { p_solution_id: sol });
       expect(detailTrue.error).toBeNull();
       const rowTrue = (detailTrue.data as Array<Record<string, unknown>>)[0];

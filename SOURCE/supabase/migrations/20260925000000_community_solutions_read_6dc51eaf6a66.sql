@@ -29,7 +29,7 @@
 -- toàn bộ tính năng đã xong.
 --
 -- Sau khi áp, đọc lại bằng TRUY VẤN THẬT:
---   select fingerprint from public.schema_version; -- phải trả c3c344fffc6e
+--   select fingerprint from public.schema_version; -- phải trả 6dc51eaf6a66
 
 create table if not exists public.community_solution_helpfuls (
   solution_id uuid not null references public.community_solutions(id) on delete cascade,
@@ -225,6 +225,15 @@ as $$
           'question_id', ak.id,
           'stem', ak.content,
           'correct_answer', ak.correct_answer,
+          -- AC-022: bảng ghi chú cần đủ dữ liệu để hiện "Xem N phương án" (trắc
+          -- nghiệm) / "Đáp án mẫu" (tự luận) ở màn đọc — 4 cột này lấy nguyên từ
+          -- `ak` (exam_answer_key đã join sẵn ở FROM bên dưới), không join thêm
+          -- bảng nào, không đổi cổng R1/quyền đọc (cùng lớp thiếu sót AC-022 mà
+          -- task 03 đã vá ở community_solution_for_writer, commit 4b0ea52).
+          'question_type', ak.question_type,
+          'choices', ak.choices,
+          'sub_answers', ak.sub_answers,
+          'essay_answer', ak.essay_answer,
           'has_changed', (n.solution_id is not null and n.question_content_hash is distinct from public.question_content_fingerprint(ak.id)),
           'note', n.body,
           -- Comment count presence condition (binding, v1.7): null (never 0)
@@ -431,7 +440,7 @@ revoke all on function public.remove_community_solution_helpful(uuid) from publi
 grant execute on function public.remove_community_solution_helpful(uuid) to authenticated;
 
 insert into public.schema_version (id, fingerprint)
-values (1, 'c3c344fffc6e')
+values (1, '6dc51eaf6a66')
 on conflict (id) do update
   set fingerprint = excluded.fingerprint,
       applied_at  = now();

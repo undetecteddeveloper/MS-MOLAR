@@ -307,6 +307,19 @@ export interface SolutionDetailQuestion {
    *  sources the frontend pre-renders into stem_node / correct_answer_node"). */
   stem: unknown;
   correctAnswer: unknown;
+  /** Bốn trường dưới đây (`questionType`/`choices`/`subItems`/`subAnswers`/
+   *  `essayAnswer`) đến từ 4 cột `question_type`/`choices`/`sub_answers`/
+   *  `essay_answer` mà backend DD v1.10 (AC-022) bổ sung vào per-question
+   *  entry của `community_solution_detail`, cùng cột `exam_answer_key()` đã
+   *  trả cho `community_solution_for_writer` — tách theo `questionType` bằng
+   *  đúng phép của `mapWriterQuestion` ở trên. Không set (loại câu vắng) →
+   *  "mcq", cùng quy ước fallback. Không có UI nào tiêu thụ các trường này ở
+   *  bước này — chỉ đưa dữ liệu tới lớp TS an toàn về kiểu. */
+  questionType?: WriterQuestionType;
+  choices?: Choice[];
+  subItems?: SolutionEditorQuestion["subItems"];
+  subAnswers?: Partial<Record<SubItemId, boolean>>;
+  essayAnswer?: string;
   /** Bốn trường này CÙNG gộp từ MỘT cột `per_question` của header — có mặt
    *  khi và chỉ khi `score` có mặt (Reference Contract Value #19); giá trị
    *  RAW của `writerChoiceNode` (chưa dựng ReactNode — cùng quy ước `stem`
@@ -352,6 +365,11 @@ interface RawSolutionDetailQuestion {
   question_id: string;
   stem: unknown;
   correct_answer: unknown;
+  question_type: WriterQuestionType | null;
+  /** jsonb — `{id,text}[]`; ý nghĩa của `id` (A-D hay a-d) phụ thuộc `question_type` (cùng quy ước `RawWriterQuestion.choices`). */
+  choices: { id: string; text: string }[] | null;
+  sub_answers: Partial<Record<SubItemId, boolean>> | null;
+  essay_answer: string | null;
   has_changed: boolean;
   note: string | null;
   comment_count: number | null;
@@ -427,10 +445,22 @@ function mapSolutionDetailQuestion(
   row: RawSolutionDetailQuestion,
   perQuestion: PerQuestionResult[] | null
 ): SolutionDetailQuestion {
+  const questionType: WriterQuestionType = row.question_type ?? "mcq";
+  const rawChoices = row.choices ?? [];
   return {
     questionId: row.question_id,
     stem: row.stem,
     correctAnswer: row.correct_answer,
+    questionType,
+    // Cùng phép tách của mapWriterQuestion trên: mcq giữ nguyên `choices`,
+    // true_false đổi tên đọc thành `subItems` (cùng cột jsonb `{id,text}[]`).
+    choices: questionType === "mcq" ? (rawChoices as Choice[]) : [],
+    subItems:
+      questionType === "true_false"
+        ? (rawChoices as unknown as SolutionEditorQuestion["subItems"])
+        : undefined,
+    subAnswers: row.sub_answers ?? undefined,
+    essayAnswer: row.essay_answer ?? undefined,
     ...mapPerQuestionFields(perQuestion, row.question_id),
     hasChanged: row.has_changed,
     ...(row.note !== null

@@ -3249,7 +3249,7 @@ revoke all on function public.community_solutions_list(text) from public, anon;
 grant execute on function public.community_solutions_list(text) to authenticated;
 
 -- community_solution_detail — Reference Contract Value #14 ghim đúng 14 cột
--- header / 7 cột mỗi câu / 11 cột mỗi bình luận (backend DD v1.9 § Data
+-- header / 11 cột mỗi câu / 11 cột mỗi bình luận (backend DD v1.10 § Data
 -- Contracts, "Output columns"). Hình dạng thân hàm là chi tiết triển khai của
 -- CHÍNH task này (DD để ngỏ có chủ đích — xem đoạn cuối § `community_solution_
 -- detail`); mọi điều kiện che/đếm/hiện dưới đây COPY nguyên các "Invariants"
@@ -3313,6 +3313,15 @@ as $$
           'question_id', ak.id,
           'stem', ak.content,
           'correct_answer', ak.correct_answer,
+          -- AC-022: bảng ghi chú cần đủ dữ liệu để hiện "Xem N phương án" (trắc
+          -- nghiệm) / "Đáp án mẫu" (tự luận) ở màn đọc — 4 cột này lấy nguyên từ
+          -- `ak` (exam_answer_key đã join sẵn ở FROM bên dưới), không join thêm
+          -- bảng nào, không đổi cổng R1/quyền đọc (cùng lớp thiếu sót AC-022 mà
+          -- task 03 đã vá ở community_solution_for_writer, commit 4b0ea52).
+          'question_type', ak.question_type,
+          'choices', ak.choices,
+          'sub_answers', ak.sub_answers,
+          'essay_answer', ak.essay_answer,
           'has_changed', (n.solution_id is not null and n.question_content_hash is distinct from public.question_content_fingerprint(ak.id)),
           'note', n.body,
           -- Comment count presence condition (binding, v1.7): null (never 0)
@@ -3569,7 +3578,7 @@ revoke all on public.schema_version from anon, authenticated;
 -- nó — xem lib/schema/schemaFingerprint.ts).
 -- @schema-fingerprint-begin
 insert into public.schema_version (id, fingerprint)
-values (1, 'c3c344fffc6e')
+values (1, '6dc51eaf6a66')
 on conflict (id) do update
   set fingerprint = excluded.fingerprint,
       applied_at  = now();

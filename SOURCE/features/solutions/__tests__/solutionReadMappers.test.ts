@@ -294,6 +294,96 @@ describe("listSolutions / getSolutionDetail — identity masking, no self-except
   });
 });
 
+describe("getSolutionDetail — question_type/choices/sub_answers/essay_answer (AC-022, backend DD v1.10)", () => {
+  beforeEach(() => {
+    rpcMock.mockReset();
+  });
+
+  it("mcq row: question_type mcq -> choices carried through unchanged, subItems absent", async () => {
+    mockRpc([
+      detailRow({
+        questions: [
+          detailQuestion({
+            question_type: "mcq",
+            choices: [
+              { id: "A", text: "1" },
+              { id: "B", text: "2" },
+            ],
+          }),
+        ],
+      }),
+    ]);
+
+    const detail = await getSolutionDetail("sol-1");
+
+    const [q] = detail!.questions;
+    expect(q.questionType).toBe("mcq");
+    expect(q.choices).toEqual([
+      { id: "A", text: "1" },
+      { id: "B", text: "2" },
+    ]);
+    expect(q.subItems).toBeUndefined();
+  });
+
+  it("true_false row: question_type true_false -> the same raw {id,text}[] is read as subItems, choices empty; sub_answers carried through as subAnswers", async () => {
+    mockRpc([
+      detailRow({
+        questions: [
+          detailQuestion({
+            question_type: "true_false",
+            choices: [
+              { id: "a", text: "Ý a" },
+              { id: "b", text: "Ý b" },
+            ],
+            sub_answers: { a: true, b: false },
+          }),
+        ],
+      }),
+    ]);
+
+    const detail = await getSolutionDetail("sol-1");
+
+    const [q] = detail!.questions;
+    expect(q.questionType).toBe("true_false");
+    expect(q.choices).toEqual([]);
+    expect(q.subItems).toEqual([
+      { id: "a", text: "Ý a" },
+      { id: "b", text: "Ý b" },
+    ]);
+    expect(q.subAnswers).toEqual({ a: true, b: false });
+  });
+
+  it("essay row: essay_answer carried through as essayAnswer", async () => {
+    mockRpc([
+      detailRow({
+        questions: [detailQuestion({ question_type: "essay", choices: [], essay_answer: "Đáp án mẫu" })],
+      }),
+    ]);
+
+    const detail = await getSolutionDetail("sol-1");
+
+    const [q] = detail!.questions;
+    expect(q.questionType).toBe("essay");
+    expect(q.essayAnswer).toBe("Đáp án mẫu");
+  });
+
+  it("question_type SQL null (old row) -> defaults to mcq, same fallback convention as exam_answer_key()'s consumer", async () => {
+    mockRpc([
+      detailRow({
+        questions: [detailQuestion({ question_type: null, choices: null, sub_answers: null, essay_answer: null })],
+      }),
+    ]);
+
+    const detail = await getSolutionDetail("sol-1");
+
+    const [q] = detail!.questions;
+    expect(q.questionType).toBe("mcq");
+    expect(q.choices).toEqual([]);
+    expect(q.subAnswers).toBeUndefined();
+    expect(q.essayAnswer).toBeUndefined();
+  });
+});
+
 describe("listSolutions / getSolutionDetail — ordering and empty result (rows 11-12)", () => {
   beforeEach(() => {
     rpcMock.mockReset();
