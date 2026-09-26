@@ -583,6 +583,26 @@ export const copy = {
   "admin.examRemoved": "Đã gỡ đề khỏi kho.",
   "admin.examRestored": "Đã khôi phục đề về dạng nháp.",
 
+  // --- Kiểm duyệt: Bài giải cộng đồng (UI Spec C-37–C-39) ----------------------
+  "admin.solutions.title": "Bài giải bị báo cáo",
+  "admin.solutions.hiddenPart": "Đã ẩn",
+  "admin.solutions.author": "Người viết",
+  "admin.solutions.anonymousNote": "ẩn danh với người đọc",
+  "admin.solutions.notes": "Ghi chú của bài giải",
+  "admin.solutions.hideAction": "Ẩn bài giải",
+  "admin.solutions.deleteAction": "Xoá hẳn",
+  "admin.solutions.reasonRequired": "Lý do (bắt buộc)",
+  "admin.solutions.reasonOptional": "Lý do khôi phục (không bắt buộc)",
+  "admin.solutions.reasonMissing": "Bạn hãy nhập lý do.",
+  "admin.solutions.deleteTitle": "Xoá hẳn bài giải?",
+  "admin.solutions.deleteBody":
+    "Bài giải, mọi ghi chú và mọi bình luận dưới bài (của mọi người) sẽ mất, không khôi phục được.",
+  "admin.solutions.actionError": "Thao tác chưa thành công. Bạn thử lại nhé.",
+  "admin.comments.hideAction": "Ẩn bình luận",
+  "admin.comments.hiddenGroup": "Bình luận đã ẩn",
+  "admin.comments.deleteTitle": "Xoá hẳn bình luận?",
+  "admin.comments.deleteBody": "Bình luận này sẽ mất, không khôi phục được.",
+
   // --- Tải đề lên (bổ sung) -----------------------------------------------
   "upload.fieldTitle": "Tiêu đề",
   "upload.fieldSubject": "Môn học",

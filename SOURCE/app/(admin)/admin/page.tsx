@@ -13,6 +13,10 @@
 // chuẩn + câu dẫn nói gỡ một đề nghĩa là gì (khoá `admin.intro` có sẵn), hai
 // mục "Chờ xử lý" / "Đã gỡ" với huy hiệu đếm thay tiêu đề in hoa giãn chữ.
 // Trạng thái rỗng là thẻ nét đứt căn giữa, cùng lối với Lịch sử.
+//
+// Bài giải cộng đồng (task 38): thêm mục "Bài giải bị báo cáo" BÊN CẠNH hai mục
+// đề — không thay mục nào. Mục đó ghi qua moderateSolutionAction/
+// moderateCommentAction (RPC trên session client), không qua service-role.
 
 import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
@@ -21,6 +25,16 @@ import { t } from "@/lib/copy";
 import { listReportedExams } from "@/lib/supabase/service-role";
 import type { ModeratableExam } from "@/lib/supabase/service-role";
 import { ModerationRow } from "@/features/admin/components/ModerationRow";
+import { ReportedSolutionsSection } from "@/features/admin/components/ReportedSolutionsSection";
+// B4 (overview R7): features/admin/** không được import features/solutions/**;
+// page là nơi ghép — đọc hàng đợi + ghi chú rồi truyền dữ liệu và hai Server
+// Action xuống qua prop. Mọi lượt ghi đi qua RPC trên session client (TD-029).
+import {
+  getSolutionNotesForAdmin,
+  listCommunityReports,
+  moderateCommentAction,
+  moderateSolutionAction,
+} from "@/features/solutions/adminActions";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge } from "@/components/ui/badge";
@@ -32,9 +46,16 @@ export default async function AdminPage() {
   const user = await getCurrentUser();
   if (!user || !isAdminUserId(user.id)) notFound();
 
-  const exams = await listReportedExams();
+  const [exams, communityRows] = await Promise.all([listReportedExams(), listCommunityReports()]);
   const pending = exams.filter((e) => e.status !== "removed");
   const removed = exams.filter((e) => e.status === "removed");
+  // Một lượt đọc ghi chú cho mỗi hàng (frontend DD Element 11, phương án A):
+  // hàng đợi là tồn đọng kiểm duyệt, không phải danh sách cho người dùng.
+  const communityItems = await Promise.all(
+    communityRows.map(async (row) => ({ row, notes: await getSolutionNotesForAdmin(row.id) }))
+  );
+  // Mốc cố định cho cả lượt render — `hiddenAt` tương đối của bình luận ẩn.
+  const now = new Date();
 
   return (
     <PageContainer
@@ -61,6 +82,13 @@ export default async function AdminPage() {
       </ModerationSection>
 
       {removed.length > 0 && <ModerationSection title={t("admin.removed")} exams={removed} />}
+
+      <ReportedSolutionsSection
+        items={communityItems}
+        now={now}
+        onModerateSolution={moderateSolutionAction}
+        onModerateComment={moderateCommentAction}
+      />
     </PageContainer>
   );
 }
