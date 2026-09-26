@@ -273,6 +273,10 @@ export const copy = {
   "report.reported": "Bạn đã báo cáo đề này.",
   "report.errorEmpty": "Bạn hãy mô tả vấn đề trước khi gửi.",
   "report.errorGeneric": "Chưa gửi được báo cáo. Bạn thử lại sau nhé.",
+  // ReportDialog (task 36/37) — tiêu đề riêng theo `variant`, thay cho
+  // `report.title` chung của ReportExam.
+  "report.solutionTitle": "Báo cáo bài giải",
+  "report.commentTitle": "Báo cáo bình luận",
 
   // --- Ô tìm đề trên header (ADR-0020) ------------------------------------
   "search.label": "Tìm đề",

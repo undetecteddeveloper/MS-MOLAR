@@ -1,10 +1,12 @@
 "use client";
 
 // SolutionMenu (C-25, O-06) — menu "⋯" của một bài giải ở màn xem (AC-058,
-// AC-073, AC-077). Bản dựng của task 19 CHỈ có mục ghim/bỏ ghim + "Sửa bài
-// giải" (edit); ReportDialog thật (mở khi bấm "Báo cáo bài giải") là phạm vi
-// task 36 — file này chỉ dựng ĐÚNG hai nhánh hiển thị của `iReported` và
-// KHÔNG gắn `onClick` mở hộp thoại nào (xem Notes trong task file).
+// AC-073, AC-077). Task 19 dựng khung + hai nhánh hiển thị của `iReported`;
+// task 36 (đây) gắn `ReportDialog` thật đằng sau mục "Báo cáo bài giải" và
+// biến `iReported` thành SEED của một state cục bộ `reported` (frontend DD §
+// Client State Design "Seeded-from-server state") — chỉ lật `true` khi
+// `reportSolution` trả `{ ok: true }` (mọi giá trị `alreadyReported`), không
+// bao giờ suy một mình từ kết quả action hay ghi ngược server.
 //
 // Định vị/portal: cùng khuôn `components/history/HistoryRowMenu.tsx:184-295`
 // (Reference Representativeness — cùng nguy cơ bị `overflow` tổ tiên cắt mất,
@@ -27,7 +29,8 @@ import {
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { MoreHorizontal } from "lucide-react";
-import { setPin, type SetPinAction } from "@/features/solutions/actions";
+import { reportSolution, setPin, type SetPinAction } from "@/features/solutions/actions";
+import { ReportDialog } from "@/features/solutions/components/ReportDialog";
 import { buttonVariants } from "@/components/ui/button";
 import { POP_EXIT_MS, usePresence } from "@/components/shared/usePresence";
 import { t } from "@/lib/copy";
@@ -123,6 +126,11 @@ export function SolutionMenu({
   const [open, setOpen] = useState(false);
   const [pinBusy, setPinBusy] = useState(false);
   const [pinError, setPinError] = useState<string | null>(null);
+  // Seed-from-server (frontend DD § Client State Design): nguồn ban đầu DUY
+  // NHẤT là `iReported` của lượt render này; sau đó chỉ `handleReported` (kết
+  // quả `{ ok: true }`) mới được lật nó — không đường nào khác được ghi vào đây.
+  const [reported, setReported] = useState(iReported);
+  const [reportOpen, setReportOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const { present, closing } = usePresence(open, POP_EXIT_MS);
   const panelStyle = usePanelPosition(present, triggerRef);
@@ -159,6 +167,16 @@ export function SolutionMenu({
         ? t("profile.error.rateLimited", { seconds: result.error.seconds })
         : t("solutions.menu.pinError")
     );
+  }
+
+  function openReport() {
+    setReportOpen(true);
+    close();
+  }
+
+  function handleReported() {
+    setReported(true);
+    setReportOpen(false);
   }
 
   return (
@@ -214,14 +232,25 @@ export function SolutionMenu({
                     {t("solutions.menu.edit")}
                   </Link>
                 )
-              : iReported
+              : reported
                 ? (
-                    <button type="button" role="menuitem" aria-disabled="true" className={ITEM_CLASS}>
+                    // MỘT nhánh DOM duy nhất cho cả hai nguồn "đã báo cáo" — seed
+                    // từ `iReported` lúc mở màn HAY vừa lật trong phiên này
+                    // (frontend DD, in-session flip) — không có nhánh riêng nào
+                    // khác. `aria-live="polite"` báo cho AT khi nó vừa đổi từ mục
+                    // bấm được sang mục trơ; không `onClick`, không `disabled` gốc.
+                    <button
+                      type="button"
+                      role="menuitem"
+                      aria-disabled="true"
+                      aria-live="polite"
+                      className={ITEM_CLASS}
+                    >
                       {t("solutions.menu.reported")}
                     </button>
                   )
                 : (
-                    <button type="button" role="menuitem" className={ITEM_CLASS}>
+                    <button type="button" role="menuitem" onClick={openReport} className={ITEM_CLASS}>
                       {t("solutions.menu.report")}
                     </button>
                   )}
@@ -234,6 +263,14 @@ export function SolutionMenu({
           </div>,
           document.body
         )}
+
+      <ReportDialog
+        open={reportOpen}
+        variant="solution"
+        onSubmit={(reason) => reportSolution(solutionId, reason)}
+        onCancel={() => setReportOpen(false)}
+        onReported={handleReported}
+      />
     </div>
   );
 }
