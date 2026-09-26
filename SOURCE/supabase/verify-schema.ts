@@ -44,7 +44,8 @@
 //
 // Script KHÔNG ĐỂ LẠI DỮ LIỆU, kể cả khi FAIL — và đó là một mệnh đề mạnh hơn
 // "chỉ đọc", vì nó không còn đúng theo nghĩa đen: (5) tạo một đề nháp fixture
-// rồi tự dọn trong `finally`, và (9) PHÁT ra ba lệnh ghi mà mọi lệnh đều PHẢI
+// rồi tự dọn trong `finally` (mục 15 làm y hệt với một đề + bài giải + object
+// avatar fixture), và (9) PHÁT ra ba lệnh ghi mà mọi lệnh đều PHẢI
 // bị từ chối ở tầng quyền, kèm hậu kiểm bằng service_role rằng không dòng nào
 // lọt vào. Nhánh PASS sạch vì không có gì được ghi; nhánh FAIL sạch vì dòng lọt
 // vào bị XOÁ theo marker của chính probe NGAY TRƯỚC khi lời khẳng định được
@@ -341,6 +342,100 @@ async function signInProbeUser(
   });
   if (error) throw error;
   return client;
+}
+
+// Chủ avatar của fixture mục 15 — tài khoản B của test-rls.ts, KHÁC probe user
+// (tài khoản A). Chỉ cần id của nó: không đăng nhập, không đặt password.
+const AVATAR_POLICY_OWNER_EMAIL = "smithnguyen247+rlstestb@gmail.com";
+const AVATAR_POLICY_PROBE_EXAM = "__verify_schema_avatar_policy_probe__";
+const AVATAR_POLICY_PROBE_FILENAME = "__verify_schema_avatar_policy_probe__.png";
+
+/** Id của chủ avatar fixture; tạo tài khoản KHÔNG password nếu chưa có. */
+async function avatarPolicyOwnerId(admin: SupabaseClient): Promise<string> {
+  const created = await admin.auth.admin.createUser({ email: AVATAR_POLICY_OWNER_EMAIL, email_confirm: true });
+  if (!created.error) return created.data.user.id;
+  const list = await admin.auth.admin.listUsers({ perPage: 1000 });
+  if (list.error) throw list.error;
+  const existing = list.data.users.find((u) => u.email === AVATAR_POLICY_OWNER_EMAIL);
+  if (!existing) throw created.error;
+  return existing.id;
+}
+
+async function removeAvatarPolicyFixture(admin: SupabaseClient, objectPath: string): Promise<void> {
+  await admin.storage.from("avatars").remove([objectPath]);
+  // community_solutions cascade theo exams.
+  await admin.from("exams").delete().eq("id", AVATAR_POLICY_PROBE_EXAM);
+}
+
+/**
+ * Mục 15 — policy `avatars_select_community_visible` có mặt VÀ nối đúng vào
+ * `community_avatar_owner_visible`, đo bằng hành vi trên fixture tự dọn:
+ *   1. chủ có một bài giải published, show_profile=true trên một đề published
+ *      → probe user (không phải chủ) KÝ ĐƯỢC avatar của chủ;
+ *   2. tắt show_profile → lượt ký kế tiếp bị từ chối (S14, không cache);
+ *   3. client chưa đăng nhập không bao giờ ký được (Kill Criteria ADR-0016).
+ */
+async function probeCommunityAvatarPolicy(
+  admin: SupabaseClient,
+  anonClient: SupabaseClient,
+  probe: SupabaseClient
+): Promise<void> {
+  const ownerId = await avatarPolicyOwnerId(admin);
+  const objectPath = `${ownerId}/${AVATAR_POLICY_PROBE_FILENAME}`;
+  await removeAvatarPolicyFixture(admin, objectPath);
+  try {
+    const uploaded = await admin.storage
+      .from("avatars")
+      .upload(objectPath, new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), {
+        contentType: "image/png",
+        upsert: true,
+      });
+    if (uploaded.error) throw new Error(`không tạo được object fixture avatar: ${uploaded.error.message}`);
+    const exam = await admin.from("exams").insert({
+      id: AVATAR_POLICY_PROBE_EXAM,
+      title: "[verify-schema] avatar policy probe",
+      question_ids: [],
+      duration_minutes: 45,
+      subject: "Toán",
+      grade: 10,
+      status: "published",
+    });
+    if (exam.error) throw new Error(`không tạo được đề fixture: ${exam.error.message}`);
+    const solution = await admin
+      .from("community_solutions")
+      .insert({ exam_id: AVATAR_POLICY_PROBE_EXAM, author_id: ownerId, status: "published", show_profile: true })
+      .select("id")
+      .single();
+    if (solution.error) throw new Error(`không tạo được bài giải fixture: ${solution.error.message}`);
+
+    const signedVisible = await probe.storage.from("avatars").createSignedUrl(objectPath, 60);
+    assert(
+      !signedVisible.error && typeof signedVisible.data?.signedUrl === "string",
+      !signedVisible.error
+        ? "avatars_select_community_visible có mặt: probe user ký được avatar của một tác giả community-visible KHÁC mình"
+        : `avatars_select_community_visible THIẾU hoặc sai: probe user KHÔNG ký được avatar của tác giả community-visible (message "${signedVisible.error.message}") — apply migration COMMUNITY SOLUTIONS Phase 5 (task 40)`
+    );
+
+    const signedAnon = await anonClient.storage.from("avatars").createSignedUrl(objectPath, 60);
+    assert(
+      signedAnon.error != null,
+      signedAnon.error != null
+        ? "Kill Criteria ADR-0016: client chưa đăng nhập KHÔNG ký được avatar dù chủ đang community-visible"
+        : "Kill Criteria ADR-0016 BỊ VI PHẠM: client chưa đăng nhập ký được avatar — DỪNG, đây là quyết định cần ADR mới"
+    );
+
+    const hidden = await admin.from("community_solutions").update({ show_profile: false }).eq("id", solution.data.id);
+    if (hidden.error) throw new Error(`không tắt được show_profile của fixture: ${hidden.error.message}`);
+    const signedHidden = await probe.storage.from("avatars").createSignedUrl(objectPath, 60);
+    assert(
+      signedHidden.error != null,
+      signedHidden.error != null
+        ? "avatars_select_community_visible nối vào community_avatar_owner_visible: tắt show_profile → lượt ký kế tiếp bị từ chối (S14)"
+        : "Tắt show_profile mà probe user VẪN ký được avatar — policy không đi qua community_avatar_owner_visible, hoặc tài khoản chủ còn nội dung cộng đồng khác trên DB này"
+    );
+  } finally {
+    await removeAvatarPolicyFixture(admin, objectPath);
+  }
 }
 
 // --- Main ------------------------------------------------------------------
@@ -1569,6 +1664,51 @@ async function main() {
               : `${fn} SAI kết quả (mong đợi 42501 '${pinned}', nhận mã ${describeCode(code)}, message "${msg}"${r.error ? "" : `, dữ liệu ${JSON.stringify(r.data)}`})`
       );
     }
+  }
+
+  // ==========================================================================
+  // 15. COMMUNITY SOLUTIONS — Phase 5, avatar (backend Design Doc v1.9
+  //     § Migration Strategy "Probe rule (v1.3)" rule 1 + rule 3; work plan
+  //     task 40).
+  //
+  //     community_avatar_owner_visible(uuid) không bao giờ raise trong thân →
+  //     probe user PASS khi trả boolean KHÔNG lỗi; anon PASS chỉ khi message bắt
+  //     đầu bằng "permission denied for function".
+  //
+  //     Policy Storage avatars_select_community_visible KHÔNG có đường đọc
+  //     catalog nào (schema_foreign_keys() chỉ đọc khoá ngoại, và task này chỉ
+  //     sở hữu đúng 1 hàm + 1 policy), nên sự tồn tại của nó được đo bằng HÀNH
+  //     VI, cùng tiền lệ fixture tự dọn của mục 5: chủ avatar là một tài khoản
+  //     KHÁC probe user, nên avatars_select_own không thể là lý do probe user
+  //     ký được — chỉ policy mới làm được điều đó.
+  // ==========================================================================
+  console.log("\nCOMMUNITY SOLUTIONS Phase 5 (task 40) — probe EXECUTE + policy avatar:");
+
+  const avatarVisibleAnon = await anonClient.rpc("community_avatar_owner_visible", { p_owner_id: randomUUID() });
+  const avatarVisibleAnonMsg = avatarVisibleAnon.error?.message ?? "";
+  assert(
+    avatarVisibleAnonMsg.startsWith("permission denied for function"),
+    avatarVisibleAnonMsg.startsWith("permission denied for function")
+      ? 'anon bị từ chối community_avatar_owner_visible đúng cách ("permission denied for function")'
+      : `anon KHÔNG bị từ chối đúng cách ở community_avatar_owner_visible (mã ${describeCode(avatarVisibleAnon.error?.code ?? null)}, message "${avatarVisibleAnonMsg}") — thiếu \`revoke ... from anon\` ở khối COMMUNITY SOLUTIONS Phase 5`
+  );
+
+  if (!probe)
+    skip("probe user community_avatar_owner_visible + fixture policy avatars_select_community_visible — cần một phiên `authenticated`, và fixture là một lệnh GHI");
+  else {
+    const avatarVisibleProbe = await probe.rpc("community_avatar_owner_visible", { p_owner_id: randomUUID() });
+    assert(
+      !avatarVisibleProbe.error && typeof avatarVisibleProbe.data === "boolean",
+      !avatarVisibleProbe.error
+        ? `community_avatar_owner_visible: probe user gọi được, không lỗi (trả ${JSON.stringify(avatarVisibleProbe.data)})`
+        : avatarVisibleProbe.error.code === "PGRST202"
+          ? "community_avatar_owner_visible chưa tồn tại (PGRST202) — apply migration COMMUNITY SOLUTIONS Phase 5 (task 40)"
+          : avatarVisibleProbe.error.message.startsWith("permission denied for function")
+            ? `community_avatar_owner_visible: authenticated THIẾU grant execute (message "${avatarVisibleProbe.error.message}") — khối COMMUNITY SOLUTIONS Phase 5`
+            : `community_avatar_owner_visible LỖI KHÔNG MONG ĐỢI (mã ${describeCode(avatarVisibleProbe.error.code ?? null)}, message "${avatarVisibleProbe.error.message}")`
+    );
+
+    await probeCommunityAvatarPolicy(admin, anonClient, probe);
   }
 
   // Một lượt chạy PHẦN không bao giờ được in ra câu của một lượt chạy ĐỦ. Đó là

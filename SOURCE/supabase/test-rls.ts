@@ -268,6 +268,25 @@ async function cleanupCs35Fixtures(admin: SupabaseClient) {
   await admin.from("questions").delete().in("id", CS35_EXAM_IDS.flatMap(cs35QuestionIds));
 }
 
+// Fixture Community Solutions — task 40 (migration task tự test chính nó:
+// community_avatar_owner_visible + policy avatars_select_community_visible;
+// backend DD v1.9 § Integration Verification Points "task 40, which tests its
+// own migration"). Một đề RIÊNG, 3 câu, tác giả = A; chủ avatar = B, người xem
+// = C, người bình luận khác = D. Không tạo attempt nào: fixture dựng thẳng
+// bằng setup client, không đi qua RPC ghi.
+const CS40_EXAM_ID = "rls-cs40-avatar";
+const CS40_QUESTION_IDS = [1, 2, 3].map((n) => `${CS40_EXAM_ID}-q${n}`);
+const CS40_AVATAR_FILENAME = "rls-cs40-avatar.png";
+
+/** Xóa sạch fixture Community Solutions của task 40 (chạy trước VÀ sau để
+ *  idempotent). Ghi chú/bình luận cascade theo bài giải. */
+async function cleanupCs40Fixtures(admin: SupabaseClient) {
+  await admin.from("community_moderation_log").delete().eq("exam_id", CS40_EXAM_ID);
+  await admin.from("community_solutions").delete().eq("exam_id", CS40_EXAM_ID);
+  await admin.from("exams").delete().eq("id", CS40_EXAM_ID);
+  await admin.from("questions").delete().in("id", CS40_QUESTION_IDS);
+}
+
 /** Xóa sạch fixture Community Solutions (chạy trước VÀ sau để idempotent). */
 async function cleanupCommunitySolutionsFixtures(admin: SupabaseClient) {
   await admin.from("community_moderation_log").delete().eq("exam_id", CS_EXAM_ID);
@@ -5844,6 +5863,257 @@ async function main() {
         // Đang thoát vì lỗi gốc: chỉ ghi log để lỗi gốc (và stack của nó) được ném tiếp.
         if (part13Completed) throw cleanupError;
         console.error("❌ Phần 13: dọn fixture task 35 thất bại sau lỗi gốc:", cleanupError);
+      }
+    }
+  }
+
+  // ==========================================================================
+  // Phần 14 — Community Solutions, TASK 40 (migration tự test chính nó: backend
+  // DD v1.9 § Data Contracts "avatars_select_community_visible" + § Integration
+  // Verification Points). Người XEM (C) ký avatar của chủ bằng CHÍNH phiên của
+  // mình (`createSignedUrl` — đúng đường của batch signer task 42) sau MỖI lần
+  // đổi trạng thái, và chủ vẫn ký được avatar của chính mình qua
+  // `avatars_select_own` ở MỌI trạng thái: policy mới chỉ nới, không bao giờ
+  // thu hẹp. Mọi đổi trạng thái đi qua setup client rồi được phục hồi ngay sau
+  // khi assert. S4 chạy ở đây chứ không ở task 27 (work plan § Open Items SN-1).
+  //
+  // Bọc trong { } cùng quy ước Phần 11/12/13.
+  // ==========================================================================
+  {
+    console.log("\nCommunity Solutions (task 40) — setup fixture (service_role)…");
+    await cleanupCs40Fixtures(admin);
+    const userDId = await ensureUser(admin, EMAIL_D);
+    const userD = await signInAs(url, anon, EMAIL_D);
+
+    const AVATARS = "avatars";
+    const avatarPathOf = (ownerId: string) => `${ownerId}/${CS40_AVATAR_FILENAME}`;
+    const cs40AvatarBytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    const [CS40_Q1, CS40_Q2] = CS40_QUESTION_IDS;
+
+    // Ban tác giả đề (A) là trạng thái sống 24h trên tài khoản dùng chung: nếu
+    // một assert/setup ném lỗi giữa chừng thì finally PHẢI bỏ ban trước khi dọn.
+    let authorBanned = false;
+    let part14Completed = false;
+    try {
+      for (const path of [avatarPathOf(userBId), avatarPathOf(userDId)]) {
+        const up = await admin.storage.from(AVATARS).upload(path, cs40AvatarBytes, { contentType: "image/png", upsert: true });
+        if (up.error) throw up.error;
+      }
+      const questions = await admin.from("questions").insert(
+        CS40_QUESTION_IDS.map((id, i) => ({
+          id,
+          content: `[RLS-CS40] Câu ${i + 1}`,
+          choices: MCQ_CHOICES,
+          correct_answer: "A",
+          subject: "Toán",
+          grade: 10,
+          topic: "Toán",
+        })),
+      );
+      if (questions.error) throw questions.error;
+      const exam = await admin.from("exams").insert({
+        id: CS40_EXAM_ID,
+        title: "[RLS] Đề Bài giải cộng đồng (task 40 — avatar)",
+        duration_minutes: 45,
+        subject: "Toán",
+        grade: 10,
+        author_id: userAId,
+        author_display_name: "RLS Test Author",
+        question_ids: CS40_QUESTION_IDS,
+        status: "published",
+      });
+      if (exam.error) throw exam.error;
+
+      function mustOk(label: string, res: { error: { code?: string; message?: string } | null }): void {
+        if (res.error) throw new Error(`Phần 14 setup "${label}": ${res.error.code ?? ""} ${res.error.message ?? ""}`);
+      }
+      async function insertCs40Solution(authorId: string, showProfile: boolean): Promise<string> {
+        const row = await admin
+          .from("community_solutions")
+          .insert({ exam_id: CS40_EXAM_ID, author_id: authorId, status: "published", show_profile: showProfile, show_score: false })
+          .select("id")
+          .single();
+        if (row.error) throw row.error;
+        const solutionId = row.data!.id as string;
+        mustOk(
+          "ghi chú 15 từ",
+          await admin
+            .from("community_solution_notes")
+            .insert(CS40_QUESTION_IDS.map((questionId) => ({ solution_id: solutionId, question_id: questionId, body: csWords(15) }))),
+        );
+        return solutionId;
+      }
+      async function insertCs40Comment(solutionId: string, authorId: string, questionId: string): Promise<string> {
+        const row = await admin
+          .from("community_solution_comments")
+          .insert({ solution_id: solutionId, question_id: questionId, author_id: authorId, is_anonymous: false, body: "[RLS-CS40] bình luận" })
+          .select("id")
+          .single();
+        if (row.error) throw row.error;
+        return row.data!.id as string;
+      }
+
+      async function ownerVisible(ownerId: string): Promise<boolean | string> {
+        const r = await userC.rpc("community_avatar_owner_visible", { p_owner_id: ownerId });
+        return r.error ? `LỖI ${r.error.code} ${r.error.message}` : (r.data as boolean);
+      }
+      async function signs(client: SupabaseClient, path: string): Promise<boolean> {
+        const r = await client.storage.from(AVATARS).createSignedUrl(path, 60);
+        return r.error == null && typeof r.data?.signedUrl === "string";
+      }
+      /** Một trạng thái = ba phép đo trên CÙNG thời điểm: giá trị hàm, lượt ký
+       *  của người xem C, và lượt ký của chính chủ (avatars_select_own). */
+      async function expectState(
+        label: string,
+        owner: { id: string; client: SupabaseClient },
+        expected: boolean,
+      ): Promise<void> {
+        const fn = await ownerVisible(owner.id);
+        const viewerSigns = await signs(userC, avatarPathOf(owner.id));
+        const ownerSigns = await signs(owner.client, avatarPathOf(owner.id));
+        assert(
+          fn === expected && viewerSigns === expected && ownerSigns,
+          `${label} → community_avatar_owner_visible=${expected}, C ${expected ? "KÝ ĐƯỢC" : "KHÔNG ký được"} avatar của chủ, chủ vẫn ký được avatar của mình (nhận hàm=${fn}, C ký=${viewerSigns}, chủ ký=${ownerSigns})`,
+        );
+      }
+      const ownerB = { id: userBId, client: userB };
+      const ownerD = { id: userDId, client: userD };
+
+      async function setExamStatus(status: "draft" | "published"): Promise<void> {
+        mustOk(`đề → ${status}`, await admin.from("exams").update({ status }).eq("id", CS40_EXAM_ID));
+      }
+      async function setAuthorBanned(banned: boolean): Promise<void> {
+        const res = await admin.auth.admin.updateUserById(userAId, { ban_duration: banned ? "24h" : "none" });
+        if (res.error) throw res.error;
+        authorBanned = banned;
+      }
+      /** AC-004 cho nội dung duy nhất hiện có của B: đề 'draft' rồi tác giả đề
+       *  bị ban, mỗi trạng thái phục hồi ngay sau khi assert. */
+      async function examGateCases(branch: string): Promise<void> {
+        await setExamStatus("draft");
+        await expectState(`AC-004 (${branch}): đề chuyển 'draft'`, ownerB, false);
+        await setExamStatus("published");
+        await expectState(`AC-004 (${branch}): đề published lại (phục hồi)`, ownerB, true);
+        await setAuthorBanned(true);
+        await expectState(`AC-004 (${branch}): tác giả đề bị ban`, ownerB, false);
+        await setAuthorBanned(false);
+        await expectState(`AC-004 (${branch}): bỏ ban tác giả đề (phục hồi)`, ownerB, true);
+      }
+
+      console.log("\nStorage checks (Community Solutions task 40 — baseline/S14):");
+
+      await expectState("Baseline: B chưa có nội dung cộng đồng nào", ownerB, false);
+
+      const SOL_B = await insertCs40Solution(userBId, true);
+      await expectState("S14: B đăng bài giải published, show_profile=true", ownerB, true);
+
+      assert(
+        !(await signs(anonClient, avatarPathOf(userBId))),
+        "Kill Criteria ADR-0016: client CHƯA đăng nhập KHÔNG ký được avatar của B dù B đang community-visible (policy chỉ `to authenticated`)",
+      );
+
+      mustOk("show_profile → false", await admin.from("community_solutions").update({ show_profile: false }).eq("id", SOL_B));
+      await expectState("S14: B tắt show_profile trên nội dung duy nhất → lượt ký KẾ TIẾP bị từ chối ngay (hàm tính lại mỗi lượt, không cache)", ownerB, false);
+      mustOk("show_profile → true", await admin.from("community_solutions").update({ show_profile: true }).eq("id", SOL_B));
+      await expectState("S14: B bật lại show_profile (phục hồi)", ownerB, true);
+
+      console.log("\nStorage checks (Community Solutions task 40 — AC-004, nhánh bài giải):");
+      await examGateCases("nhánh bài giải");
+
+      console.log("\nStorage checks (Community Solutions task 40 — S4, SN-1 chuyển từ task 27):");
+
+      mustOk("show_profile → false (S4)", await admin.from("community_solutions").update({ show_profile: false }).eq("id", SOL_B));
+      await insertCs40Comment(SOL_B, userBId, CS40_Q1);
+      await expectState(
+        "S4: nội dung của B chỉ còn bài giải show_profile=false + bình luận KHÔNG ẩn danh của CHÍNH B trên bài đó",
+        ownerB,
+        false,
+      );
+      await insertCs40Comment(SOL_B, userDId, CS40_Q1);
+      await expectState("S4: bình luận không ẩn danh của NGƯỜI KHÁC (D) trên cùng bài → avatar của D ký được", ownerD, true);
+      await expectState("S4: sau bình luận của D, avatar của người viết B VẪN không ký được", ownerB, false);
+
+      // Chuyển sang nhánh bình luận: xoá bài của B (cascade cả hai bình luận
+      // trên nó), nội dung duy nhất của B từ đây là MỘT bình luận dưới bài của C.
+      mustOk("xoá bài của B", await admin.from("community_solutions").delete().eq("id", SOL_B));
+      await expectState("Nhánh bình luận: bình luận của D mất theo bài → avatar của D hết ký được", ownerD, false);
+      const SOL_C = await insertCs40Solution(userCId, true);
+      const COMMENT_B = await insertCs40Comment(SOL_C, userBId, CS40_Q2);
+      await expectState(
+        "Nhánh bình luận: nội dung duy nhất của B = bình luận không ẩn danh, visible, dưới bài published, câu hiện hành, ghi chú ≥15 từ",
+        ownerB,
+        true,
+      );
+
+      const setComment = async (values: Record<string, unknown>) =>
+        mustOk(`bình luận ${JSON.stringify(values)}`, await admin.from("community_solution_comments").update(values).eq("id", COMMENT_B));
+      await setComment({ is_anonymous: true });
+      await expectState("AC-039: bình luận của B chuyển ẩn danh", ownerB, false);
+      await setComment({ is_anonymous: false });
+      await expectState("AC-039: bình luận của B hết ẩn danh (phục hồi)", ownerB, true);
+      await setComment({ status: "hidden" });
+      await expectState("S19: bình luận của B bị admin ẩn (status='hidden')", ownerB, false);
+      await setComment({ status: "visible" });
+      await expectState("S19: bình luận của B visible lại (phục hồi)", ownerB, true);
+
+      console.log("\nStorage checks (Community Solutions task 40 — S7):");
+      const setSolutionC = async (status: "draft" | "published" | "hidden") =>
+        mustOk(`bài của C → ${status}`, await admin.from("community_solutions").update({ status }).eq("id", SOL_C));
+      await setSolutionC("draft");
+      await expectState("S7: bình luận duy nhất của B nằm dưới bài giải 'draft'", ownerB, false);
+      await setSolutionC("published");
+      await expectState("S7: bài giải published lại (phục hồi)", ownerB, true);
+      await setSolutionC("hidden");
+      await expectState("S7: bình luận duy nhất của B nằm dưới bài giải 'hidden'", ownerB, false);
+      await setSolutionC("published");
+      await expectState("S7: bài giải hết ẩn (phục hồi)", ownerB, true);
+
+      console.log("\nStorage checks (Community Solutions task 40 — AC-047):");
+      mustOk(
+        "bỏ câu 2 khỏi question_ids",
+        await admin.from("exams").update({ question_ids: CS40_QUESTION_IDS.filter((id) => id !== CS40_Q2) }).eq("id", CS40_EXAM_ID),
+      );
+      await expectState("AC-047: câu của bình luận bị bỏ khỏi exams.question_ids", ownerB, false);
+      mustOk("đưa câu 2 trở lại", await admin.from("exams").update({ question_ids: CS40_QUESTION_IDS }).eq("id", CS40_EXAM_ID));
+      await expectState("AC-047: đưa id câu trở lại question_ids (phục hồi)", ownerB, true);
+
+      console.log("\nStorage checks (Community Solutions task 40 — AC-048):");
+      const setNoteQ2 = async (body: string) =>
+        mustOk(
+          "ghi chú câu 2",
+          await admin.from("community_solution_notes").update({ body }).eq("solution_id", SOL_C).eq("question_id", CS40_Q2),
+        );
+      await setNoteQ2(csWords(14));
+      await expectState("AC-048: ghi chú của câu bình luận rút xuống 14 từ", ownerB, false);
+      await setNoteQ2(csWords(15));
+      await expectState("AC-048: ghi chú đủ 15 từ lại (phục hồi)", ownerB, true);
+      mustOk(
+        "xoá ghi chú câu 2",
+        await admin.from("community_solution_notes").delete().eq("solution_id", SOL_C).eq("question_id", CS40_Q2),
+      );
+      await expectState("AC-048: ghi chú của câu bình luận bị xoá hẳn", ownerB, false);
+      mustOk(
+        "tạo lại ghi chú câu 2",
+        await admin.from("community_solution_notes").insert({ solution_id: SOL_C, question_id: CS40_Q2, body: csWords(15) }),
+      );
+      await expectState("AC-048: tạo lại ghi chú 15 từ (phục hồi)", ownerB, true);
+
+      console.log("\nStorage checks (Community Solutions task 40 — AC-004, nhánh bình luận):");
+      await examGateCases("nhánh bình luận");
+
+      part14Completed = true;
+    } finally {
+      try {
+        if (authorBanned) {
+          const unban = await admin.auth.admin.updateUserById(userAId, { ban_duration: "none" });
+          if (unban.error) throw unban.error;
+        }
+        await admin.storage.from(AVATARS).remove([avatarPathOf(userBId), avatarPathOf(userDId)]);
+        await cleanupCs40Fixtures(admin);
+      } catch (cleanupError) {
+        // Đang thoát vì lỗi gốc: chỉ ghi log để lỗi gốc (và stack của nó) được ném tiếp.
+        if (part14Completed) throw cleanupError;
+        console.error("❌ Phần 14: dọn fixture task 40 thất bại sau lỗi gốc:", cleanupError);
       }
     }
   }
