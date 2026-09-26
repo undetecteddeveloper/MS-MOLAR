@@ -1463,6 +1463,114 @@ async function main() {
     );
   }
 
+  // ==========================================================================
+  // 14. COMMUNITY SOLUTIONS — Phase 4 (backend Design Doc v1.9 § Migration
+  //     Strategy "Probe rule (v1.3)"; work plan task 32).
+  //
+  //     Sáu hàm mới: hai RPC báo cáo + bốn RPC admin. Cả sáu tự raise 42501
+  //     trong thân — CÙNG mã với lỗi thiếu EXECUTE — nên mọi probe đọc MESSAGE.
+  //     Bốn RPC admin: gate is_admin_user() chạy TRƯỚC mọi kiểm tra khác, nên
+  //     probe user (đã được khẳng định KHÔNG nằm trong admin_users ở mục 12)
+  //     phải nhận đúng "<hàm>: not an admin". Id ngẫu nhiên → không probe nào
+  //     tạo/đổi/xoá một dòng.
+  // ==========================================================================
+  console.log("\nCOMMUNITY SOLUTIONS Phase 4 (task 32) — probe EXECUTE + message:");
+
+  const csPhase4Probes: readonly [string, Record<string, unknown>, string][] = [
+    [
+      "report_community_solution",
+      { p_solution_id: randomUUID(), p_reason: "probe" },
+      "report_community_solution: not eligible",
+    ],
+    [
+      "report_community_comment",
+      { p_comment_id: randomUUID(), p_reason: "probe" },
+      "report_community_comment: not eligible",
+    ],
+    [
+      "admin_moderate_community_solution",
+      { p_solution_id: randomUUID(), p_action: "hide", p_reason: "probe" },
+      "admin_moderate_community_solution: not an admin",
+    ],
+    [
+      "admin_moderate_community_comment",
+      { p_comment_id: randomUUID(), p_action: "hide", p_reason: "probe" },
+      "admin_moderate_community_comment: not an admin",
+    ],
+    ["admin_list_community_reports", {}, "admin_list_community_reports: not an admin"],
+    [
+      "admin_get_community_solution_notes",
+      { p_solution_id: randomUUID() },
+      "admin_get_community_solution_notes: not an admin",
+    ],
+  ];
+
+  // Rule 1: anon client → PASS chỉ khi message bắt đầu bằng
+  // "permission denied for function".
+  for (const [fn, args] of csPhase4Probes) {
+    const r = await anonClient.rpc(fn, args);
+    const msg = r.error?.message ?? "";
+    assert(
+      msg.startsWith("permission denied for function"),
+      msg.startsWith("permission denied for function")
+        ? `anon bị từ chối ${fn} đúng cách ("permission denied for function")`
+        : `anon KHÔNG bị từ chối đúng cách ở ${fn} (mã ${describeCode(r.error?.code ?? null)}, message "${msg}") — thiếu \`revoke ... from anon\` ở khối COMMUNITY SOLUTIONS Phase 4`
+    );
+  }
+
+  // 4 probe thứ tự gate — mỗi cặp phủ một kiểm tra 22023 mà is_admin_user()
+  // phải chạy TRƯỚC. Nếu gate bị dời xuống sau kiểm tra đó, probe nhận 22023
+  // thay vì 42501:
+  //   - action 'bogus' → kiểm tra INVALID ACTION.
+  //   - action 'hide' (hợp lệ) + reason null → kiểm tra REASON REQUIRED; với
+  //     'bogus' nhánh này không bao giờ chạm tới (điều kiện chỉ xét hide/delete).
+  // Chỉ chạy ở Rule 2 — anon bị chặn trước thân hàm nên không phân biệt thứ tự.
+  const csPhase4GateOrderProbes: readonly [string, Record<string, unknown>, string][] = [
+    [
+      "admin_moderate_community_solution",
+      { p_solution_id: randomUUID(), p_action: "bogus", p_reason: null },
+      "admin_moderate_community_solution: not an admin",
+    ],
+    [
+      "admin_moderate_community_comment",
+      { p_comment_id: randomUUID(), p_action: "bogus", p_reason: null },
+      "admin_moderate_community_comment: not an admin",
+    ],
+    [
+      "admin_moderate_community_solution",
+      { p_solution_id: randomUUID(), p_action: "hide", p_reason: null },
+      "admin_moderate_community_solution: not an admin",
+    ],
+    [
+      "admin_moderate_community_comment",
+      { p_comment_id: randomUUID(), p_action: "hide", p_reason: null },
+      "admin_moderate_community_comment: not an admin",
+    ],
+  ];
+
+  // Rule 2: probe user → PASS chỉ khi đúng 42501 VÀ message bằng đúng chuỗi
+  // đã ghim trong SQL của hàm (body đã được chạm tới, gate đầu tiên từ chối).
+  if (!probe)
+    skip("probe user COMMUNITY SOLUTIONS Phase 4 (6 hàm mới + 4 probe thứ tự gate) — cần một phiên `authenticated`");
+  else {
+    for (const [fn, args, pinned] of [...csPhase4Probes, ...csPhase4GateOrderProbes]) {
+      const r = await probe.rpc(fn, args);
+      const code = r.error?.code ?? null;
+      const msg = r.error?.message ?? "";
+      const pass = code === "42501" && msg === pinned;
+      assert(
+        pass,
+        pass
+          ? `${fn}: probe user nhận đúng 42501 '${pinned}'`
+          : code === "PGRST202"
+            ? `${fn} chưa tồn tại (PGRST202) — apply migration COMMUNITY SOLUTIONS Phase 4 (task 32)`
+            : msg.startsWith("permission denied for function")
+              ? `${fn}: authenticated THIẾU grant execute (message "${msg}") — khối COMMUNITY SOLUTIONS Phase 4`
+              : `${fn} SAI kết quả (mong đợi 42501 '${pinned}', nhận mã ${describeCode(code)}, message "${msg}"${r.error ? "" : `, dữ liệu ${JSON.stringify(r.data)}`})`
+      );
+    }
+  }
+
   // Một lượt chạy PHẦN không bao giờ được in ra câu của một lượt chạy ĐỦ. Đó là
   // cả điểm của việc đếm `skipped` tách khỏi `failures`: người đọc log — hoặc
   // người dán log vào một work plan làm bằng chứng — phải thấy ngay rằng cái
