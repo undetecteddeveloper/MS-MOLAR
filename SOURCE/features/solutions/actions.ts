@@ -20,6 +20,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { guard } from "@/lib/security/rateLimit";
+import { LIMITS } from "@/lib/ugc/limits";
 import type { SolutionStatus } from "./queries";
 
 export interface SaveSolutionNotePatch {
@@ -464,4 +465,109 @@ export async function markCommentsRead(): Promise<MarkCommentsReadResult> {
   }
 
   return { ok: true };
+}
+
+// ----------------------------------------------------------------------------
+// Phase 4 — báo cáo bài giải / bình luận (task 33). U1 (backend DD v1.2):
+// community_content_reports có RLS bật, KHÔNG policy, KHÔNG grant — đường ghi
+// DUY NHẤT là hai RPC SECURITY DEFINER dưới đây. Không có nhánh bắt lỗi trùng
+// khoá nào ở đây: một báo cáo lặp là một THÀNH CÔNG mà chính RPC tự báo qua
+// `already_reported = true` (chỉ số đó tự nuốt lần lặp qua
+// "on conflict ... do nothing"), không phải một lỗi trùng khoá tới action.
+
+export type ReportResult =
+  | { ok: true; alreadyReported: boolean }
+  | {
+      ok: false;
+      error: { code: "empty" } | { code: "rateLimited"; seconds: number } | { code: "generic" };
+    };
+
+/** Tập mã im lặng của hai action báo cáo: chỉ `42501` (từ chối đã lường
+ *  trước) — cùng quy ước với `COMMENT_SILENT_ERROR_CODES`. Không có `23514`
+ *  trong tập này: đó là CHECK backstop trên `reason` mà validation của chính
+ *  hai action này (rỗng → chặn TRƯỚC RPC; cắt còn `MAX_REPORT_REASON`) khiến
+ *  không nhánh nào chạm tới được — cùng nhóm với "mã khác", nên nó BẤT NGỜ và
+ *  phải log tên RPC + code. */
+const REPORT_SILENT_ERROR_CODES = new Set(["42501"]);
+
+function mapReportError(rpcName: string, error: RpcErrorLike): { code: "generic" } {
+  logUnexpectedRpcError(rpcName, error, REPORT_SILENT_ERROR_CODES);
+  return { code: "generic" };
+}
+
+/** Validation lý do báo cáo dùng chung cho `reportSolution`/`reportComment`
+ *  (Refactor: một luật, không lặp lại) — mô hình từ `reportExam`
+ *  (`features/authoring/lifecycleActions.ts`, không import chéo, B4): trim
+ *  trước, rỗng thì chặn TRƯỚC mọi RPC; hợp lệ thì cắt còn đúng
+ *  `LIMITS.MAX_REPORT_REASON` ký tự, và giá trị ĐÃ CẮT là thứ gửi đi làm
+ *  `p_reason`. */
+function validateReportReason(reason: string): { ok: true; reason: string } | { ok: false } {
+  const trimmed = reason.trim();
+  if (trimmed.length === 0) {
+    return { ok: false };
+  }
+  return { ok: true, reason: trimmed.slice(0, LIMITS.MAX_REPORT_REASON) };
+}
+
+/**
+ * Báo cáo bài giải người khác (AC-073, AC-074, AC-075). Một báo cáo không
+ * đổi gì tới hiển thị/thứ hạng của bài (AC-075) — lời gọi `.rpc` duy nhất mỗi
+ * lần gọi, không trigger, không ghi tiếp `community_solutions`. Lần báo cáo
+ * lặp trên cùng cặp (bài, người báo cáo) là THÀNH CÔNG (`alreadyReported:
+ * true`), copy nguyên từ `already_reported` của RPC — không bao giờ suy ra từ
+ * mã lỗi.
+ */
+export async function reportSolution(solutionId: string, reason: string): Promise<ReportResult> {
+  const { supabase, user } = await requireUser();
+
+  const rl = await guard("communitySolutionReport", user.id);
+  if (!rl.ok) {
+    return { ok: false, error: { code: "rateLimited", seconds: rl.retryAfterSeconds } };
+  }
+
+  const validated = validateReportReason(reason);
+  if (!validated.ok) {
+    return { ok: false, error: { code: "empty" } };
+  }
+
+  const { data, error } = await supabase.rpc("report_community_solution", {
+    p_solution_id: solutionId,
+    p_reason: validated.reason,
+  });
+  if (error) {
+    return { ok: false, error: mapReportError("report_community_solution", error) };
+  }
+
+  const [row] = (data ?? []) as Array<{ already_reported: boolean }>;
+  return { ok: true, alreadyReported: row.already_reported };
+}
+
+/**
+ * Báo cáo bình luận không phải của mình (AC-076, AC-074). Cùng hình dạng với
+ * `reportSolution` — cùng validation, cùng cách đọc `already_reported`, khác
+ * duy nhất RPC đích và tham số `p_comment_id`.
+ */
+export async function reportComment(commentId: string, reason: string): Promise<ReportResult> {
+  const { supabase, user } = await requireUser();
+
+  const rl = await guard("communityCommentReport", user.id);
+  if (!rl.ok) {
+    return { ok: false, error: { code: "rateLimited", seconds: rl.retryAfterSeconds } };
+  }
+
+  const validated = validateReportReason(reason);
+  if (!validated.ok) {
+    return { ok: false, error: { code: "empty" } };
+  }
+
+  const { data, error } = await supabase.rpc("report_community_comment", {
+    p_comment_id: commentId,
+    p_reason: validated.reason,
+  });
+  if (error) {
+    return { ok: false, error: mapReportError("report_community_comment", error) };
+  }
+
+  const [row] = (data ?? []) as Array<{ already_reported: boolean }>;
+  return { ok: true, alreadyReported: row.already_reported };
 }
