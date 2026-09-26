@@ -1099,12 +1099,11 @@ export const copy = {
   "solutions.comments.openEmpty": "Bình luận",
   // Tấm trượt bình luận thật (O-02, task 28) — CommentSheet/CommentItem/
   // CommentComposer. DD-pinned: sendError, deleteError (frontend DD § Error
-  // Handling). Ngoại lệ (v1.5, task 37): "solutions.comments.report" và
-  // "solutions.comments.reported" KHÔNG thuộc task này — chưa render nút Báo
-  // cáo ở đây (task 28 không có phạm vi đó), tránh khai trùng khoá khi task 37
-  // thêm đúng hai khoá đó (MessageKey = keyof typeof copy sẽ báo lỗi tsc nếu
-  // trùng).
+  // Handling). "solutions.comments.report"/"solutions.comments.reported"
+  // thuộc task 37 (nút Báo cáo trên hàng `CommentItem`, không phải task 28).
   "solutions.comments.title": "Bình luận",
+  "solutions.comments.report": "Báo cáo",
+  "solutions.comments.reported": "Bạn đã báo cáo bình luận này.",
   "solutions.comments.writerBadge": "Người viết",
   "solutions.comments.empty": "Chưa có bình luận nào cho câu này.",
   "solutions.comments.loadError": "Chưa tải được bình luận. Bạn thử lại nhé.",

@@ -3,11 +3,16 @@
 // CommentSheet — UI Spec § Component: CommentSheet; frontend DD § Main
 // Components/§ Comment-authoring contract. Required Tests (task 28): #1 (send
 // generic), #4 (lockedAnonymous, hàng lạc quan Ẩn danh), #8 (dirty-close
-// DD-U5, Reference Contract Value #24), #9 (rate limit), #10 (empty body),
-// #12 (không nút Báo cáo).
+// DD-U5, Reference Contract Value #24), #9 (rate limit), #10 (empty body).
+// Required Test #12 (task 28) originally asserted NO report control here —
+// task 28's own file pinned that as a task-37 placeholder ("task 37 adds
+// 'Báo cáo'"); task 37 supersedes it below with the actual rendered branch,
+// proven at the `CommentItem` unit level and re-checked here because
+// `CommentSheet` mounts real `CommentItem` rows.
 //
 // Mock boundary: `@/features/solutions/actions` mocked ở module boundary
-// (postComment/deleteComment) — `identity.ts` và `RichText` chạy THẬT.
+// (postComment/deleteComment/reportComment) — `identity.ts` và `RichText`
+// chạy THẬT.
 
 import type { ComponentProps } from "react";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
@@ -15,14 +20,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SolutionDetailComment } from "@/features/solutions/queries";
 import type { AuthorIdentity } from "@/lib/solutions/identity";
 
-const { postCommentMock, deleteCommentMock } = vi.hoisted(() => ({
+const { postCommentMock, deleteCommentMock, reportCommentMock } = vi.hoisted(() => ({
   postCommentMock: vi.fn(),
   deleteCommentMock: vi.fn(),
+  reportCommentMock: vi.fn(),
 }));
 
 vi.mock("@/features/solutions/actions", () => ({
   postComment: postCommentMock,
   deleteComment: deleteCommentMock,
+  reportComment: reportCommentMock,
 }));
 
 const { CommentSheet } = await import("@/features/solutions/components/CommentSheet");
@@ -31,6 +38,7 @@ afterEach(cleanup);
 beforeEach(() => {
   postCommentMock.mockReset();
   deleteCommentMock.mockReset();
+  reportCommentMock.mockReset();
 });
 
 const NOW = new Date("2026-09-26T10:00:00.000Z");
@@ -60,8 +68,8 @@ async function waitForComposer() {
   return screen.findByPlaceholderText("Viết bình luận cho câu này…");
 }
 
-describe("CommentSheet — tiêu đề + không có nút Báo cáo (Required Test #12)", () => {
-  it("tiêu đề 'Bình luận · Câu 2'; danh sách không hiện Báo cáo dù iReported true", async () => {
+describe("CommentSheet — tiêu đề + trạng thái Báo cáo của hàng bình luận (task 37 thay Required Test #12)", () => {
+  it("tiêu đề 'Bình luận · Câu 2'; iReported: true -> hiện 'Bạn đã báo cáo bình luận này.' trơ, không gọi reportComment", async () => {
     render(
       <CommentSheet
         {...baseProps({
@@ -82,8 +90,13 @@ describe("CommentSheet — tiêu đề + không có nút Báo cáo (Required Tes
 
     expect(await screen.findByRole("heading", { name: "Bình luận · Câu 2" })).toBeTruthy();
     await screen.findByText("Bình luận có sẵn");
-    expect(screen.queryByText(/Báo cáo/)).toBeNull();
-    expect(screen.queryByText(/Bạn đã báo cáo/)).toBeNull();
+    const control = screen.getByText("Bạn đã báo cáo bình luận này.");
+    expect(control.getAttribute("aria-disabled")).toBe("true");
+    expect(screen.queryByRole("button", { name: "Báo cáo" })).toBeNull();
+
+    fireEvent.click(control);
+    expect(screen.queryByRole("dialog", { name: "Báo cáo bình luận" })).toBeNull();
+    expect(reportCommentMock).not.toHaveBeenCalled();
   });
 });
 

@@ -24,15 +24,28 @@
 // hỏng ⇒ hộp thoại đóng, hàng vẫn còn, dòng lỗi + "Thử lại" ngay dưới hàng gọi
 // lại `deleteComment` với ĐÚNG id đó, không mở lại hộp thoại.
 //
-// KHÔNG có nút "Báo cáo" ở đây (phạm vi task 37) — `comment.iReported` được
-// giữ trong kiểu dữ liệu nhưng không component nào ở đây đọc nó, cùng quy ước
-// `AuthorIdentity.isSolutionAuthor` để trống ở task 17.
+// Báo cáo (task 37) — hai nhánh loại trừ nhau, một đường dựng, cùng khuôn với
+// `SolutionMenu` (task 36): "Xoá" (của tôi) HOẶC "Báo cáo" (của người khác),
+// không bao giờ cả hai (UI Spec `C-30`). `canReport = !comment.isMine` đã đủ
+// loại trừ hàng bị admin ẩn của chính mình — backend chỉ gửi hàng đó với
+// `isMine: true` (và `iReported` luôn `false` ở đó, không ai tự báo cáo được
+// bình luận của mình), nên không cần so `isHiddenByAdmin` riêng. `reported`
+// SEED từ `comment.iReported` (frontend DD § Client State Design
+// "Seeded-from-server state") — chỉ `handleReported` (kết quả `{ ok: true }`
+// của `ReportDialog`, mọi giá trị `alreadyReported`) mới lật nó; không bao
+// giờ ghi ngược `comment.iReported`. MỘT nhánh DOM cho cả seed lẫn lật phiên
+// (không nhánh "vừa báo cáo" riêng).
 import { useState } from "react";
 import dynamic from "next/dynamic";
 import { AuthorIdentity } from "@/features/solutions/components/AuthorIdentity";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { ReportDialog } from "@/features/solutions/components/ReportDialog";
 import { Badge } from "@/components/ui/badge";
-import { deleteComment, type DeleteCommentResult } from "@/features/solutions/actions";
+import {
+  deleteComment,
+  reportComment,
+  type DeleteCommentResult,
+} from "@/features/solutions/actions";
 import type { SolutionDetailComment } from "@/features/solutions/queries";
 import { relativeTime } from "@/lib/format/relativeTime";
 import { t } from "@/lib/copy";
@@ -67,6 +80,11 @@ export function CommentItem({ comment, now, onDeleted }: CommentItemProps) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  // Seed-from-server (frontend DD § Client State Design): nguồn ban đầu DUY
+  // NHẤT là `comment.iReported` của lượt render này; sau đó chỉ
+  // `handleReported` mới được lật nó.
+  const [reported, setReported] = useState(comment.iReported);
+  const [reportOpen, setReportOpen] = useState(false);
 
   async function performDelete() {
     setBusy(true);
@@ -91,10 +109,23 @@ export function CommentItem({ comment, now, onDeleted }: CommentItemProps) {
     void performDelete();
   }
 
+  function openReport() {
+    setReportOpen(true);
+  }
+
+  function handleReported() {
+    setReported(true);
+    setReportOpen(false);
+  }
+
   // S19/AC-070: một hàng đang bị admin ẩn không bao giờ có nút "Xoá", kể cả
   // khi isMine — hàng đó chỉ tới với chính tác giả của nó (isMine luôn true ở
   // đây), nhưng backend đã từ chối lệnh xoá cho ca này nên giao diện không mời.
   const canDelete = comment.isMine && !comment.isHiddenByAdmin;
+  // C-30: control loại trừ — hàng của tôi không bao giờ có nút "Báo cáo"
+  // (`!comment.isMine` đã loại luôn hàng bị admin ẩn của chính mình, vốn luôn
+  // có `isMine: true`).
+  const canReport = !comment.isMine;
 
   return (
     <li aria-busy={busy || undefined} className="flex flex-col gap-1.5 py-3">
@@ -128,6 +159,31 @@ export function CommentItem({ comment, now, onDeleted }: CommentItemProps) {
         </button>
       )}
 
+      {canReport &&
+        (reported ? (
+          // MỘT nhánh DOM duy nhất cho cả hai nguồn "đã báo cáo" — seed từ
+          // `comment.iReported` lúc mở tấm trượt HAY vừa lật trong phiên này
+          // (frontend DD, in-session flip) — không có nhánh riêng nào khác.
+          // `aria-live="polite"` báo cho AT khi nó vừa đổi từ nút bấm được
+          // sang nút trơ; không `onClick`, không `disabled` gốc.
+          <button
+            type="button"
+            aria-disabled="true"
+            aria-live="polite"
+            className="text-muted-foreground flex h-11 w-fit items-center text-sm font-medium"
+          >
+            {t("solutions.comments.reported")}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={openReport}
+            className="text-muted-foreground flex h-11 w-fit items-center text-sm font-medium"
+          >
+            {t("solutions.comments.report")}
+          </button>
+        ))}
+
       {deleteError && (
         <div role="alert" className="flex flex-wrap items-center gap-3">
           <p className="text-destructive text-sm">{deleteError}</p>
@@ -150,6 +206,14 @@ export function CommentItem({ comment, now, onDeleted }: CommentItemProps) {
         body={t("solutions.comments.deleteBody")}
         onConfirm={handleConfirm}
         onCancel={() => setConfirmOpen(false)}
+      />
+
+      <ReportDialog
+        open={reportOpen}
+        variant="comment"
+        onSubmit={(reason) => reportComment(comment.id, reason)}
+        onCancel={() => setReportOpen(false)}
+        onReported={handleReported}
       />
     </li>
   );
