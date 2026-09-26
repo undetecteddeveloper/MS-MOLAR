@@ -1369,6 +1369,100 @@ async function main() {
     }
   }
 
+  // ==========================================================================
+  // 13. COMMUNITY SOLUTIONS — Phase 3 (backend Design Doc v1.9 § Migration
+  //     Strategy "Probe rule (v1.3)"; work plan task 25).
+  //
+  //     Ba hàm mới của khối này (post_community_comment, delete_community_comment,
+  //     community_my_comment_feed) không có SELECT/GRANT trên bảng nào cho
+  //     anon/authenticated — EXECUTE trên chính các hàm là đường kiểm duy nhất.
+  //     Đọc theo MESSAGE, không theo error.code một mình — cùng lý do Phase 1/2
+  //     đã ghi ở trên. Cột cộng thêm `user_profiles.community_comments_last_read_at`
+  //     được kiểm tồn tại bằng một lượt SELECT của service_role — không cần
+  //     phiên `authenticated`, không phải hành vi, nên chạy trên MỌI target.
+  // ==========================================================================
+  console.log("\nCOMMUNITY SOLUTIONS Phase 3 (task 25) — probe EXECUTE + message:");
+
+  console.log("\nCột cộng thêm community_comments_last_read_at (task 25):");
+  const commentsLastReadCol = await admin
+    .from("user_profiles")
+    .select("community_comments_last_read_at")
+    .limit(1);
+  assert(
+    !commentsLastReadCol.error,
+    !commentsLastReadCol.error
+      ? "user_profiles.community_comments_last_read_at tồn tại (đọc được qua service_role)"
+      : `user_profiles.community_comments_last_read_at KHÔNG đọc được: ${commentsLastReadCol.error.code ?? ""} ${commentsLastReadCol.error.message} — apply migration COMMUNITY SOLUTIONS Phase 3`
+  );
+
+  // Rule 1: anon client → PASS chỉ khi message bắt đầu bằng
+  // "permission denied for function".
+  const csPhase3AnonProbes: readonly [string, Record<string, unknown>][] = [
+    [
+      "post_community_comment",
+      { p_solution_id: randomUUID(), p_question_id: "probe", p_body: "probe", p_is_anonymous: false },
+    ],
+    ["delete_community_comment", { p_comment_id: randomUUID() }],
+    ["community_my_comment_feed", { p_page: 1, p_page_size: 20 }],
+  ];
+  for (const [fn, args] of csPhase3AnonProbes) {
+    const r = await anonClient.rpc(fn, args);
+    const msg = r.error?.message ?? "";
+    assert(
+      msg.startsWith("permission denied for function"),
+      msg.startsWith("permission denied for function")
+        ? `anon bị từ chối ${fn} đúng cách ("permission denied for function")`
+        : `anon KHÔNG bị từ chối đúng cách ở ${fn} (mã ${describeCode(r.error?.code ?? null)}, message "${msg}") — thiếu \`revoke ... from anon\` ở khối COMMUNITY SOLUTIONS Phase 3`
+    );
+  }
+
+  if (!probe)
+    skip("probe user COMMUNITY SOLUTIONS Phase 3 (3 hàm mới) — cần một phiên `authenticated`");
+  else {
+    // post_community_comment(uuid ngẫu nhiên, 'probe', 'probe', false) → 42501
+    // với message CỐ ĐỊNH, đúng danh từ đầu tiên gặp phải (not eligible).
+    const postComment = await probe.rpc("post_community_comment", {
+      p_solution_id: randomUUID(),
+      p_question_id: "probe",
+      p_body: "probe",
+      p_is_anonymous: false,
+    });
+    assert(
+      postComment.error?.code === "42501" &&
+        postComment.error?.message === "post_community_comment: not eligible",
+      postComment.error?.code === "42501" &&
+        postComment.error?.message === "post_community_comment: not eligible"
+        ? "post_community_comment: probe user nhận đúng 42501 'post_community_comment: not eligible'"
+        : postComment.error?.code === "PGRST202"
+          ? "post_community_comment chưa tồn tại (PGRST202) — apply migration COMMUNITY SOLUTIONS Phase 3"
+          : `post_community_comment SAI kết quả (mong đợi 42501 'not eligible', nhận mã ${describeCode(postComment.error?.code ?? null)}, message "${postComment.error?.message ?? ""}")`
+    );
+
+    const deleteComment = await probe.rpc("delete_community_comment", { p_comment_id: randomUUID() });
+    assert(
+      deleteComment.error?.code === "42501" &&
+        deleteComment.error?.message === "delete_community_comment: not eligible",
+      deleteComment.error?.code === "42501" &&
+        deleteComment.error?.message === "delete_community_comment: not eligible"
+        ? "delete_community_comment: probe user nhận đúng 42501 'delete_community_comment: not eligible'"
+        : deleteComment.error?.code === "PGRST202"
+          ? "delete_community_comment chưa tồn tại (PGRST202) — apply migration COMMUNITY SOLUTIONS Phase 3"
+          : `delete_community_comment SAI kết quả (mong đợi 42501 'not eligible', nhận mã ${describeCode(deleteComment.error?.code ?? null)}, message "${deleteComment.error?.message ?? ""}")`
+    );
+
+    // Probe rule 3: community_my_comment_feed không bao giờ raise lỗi trong
+    // thân — PASS là có dòng hoặc 0 dòng, KHÔNG lỗi.
+    const feed = await probe.rpc("community_my_comment_feed", { p_page: 1, p_page_size: 20 });
+    assert(
+      !feed.error,
+      !feed.error
+        ? `community_my_comment_feed: probe user gọi được, không lỗi (${Array.isArray(feed.data) ? `${feed.data.length} dòng` : JSON.stringify(feed.data)})`
+        : feed.error.code === "PGRST202"
+          ? "community_my_comment_feed chưa tồn tại (PGRST202) — apply migration COMMUNITY SOLUTIONS Phase 3"
+          : `community_my_comment_feed LỖI KHÔNG MONG ĐỢI (mã ${describeCode(feed.error.code ?? null)}, message "${feed.error.message}") — thân hàm này không được raise gì với id ngẫu nhiên`
+    );
+  }
+
   // Một lượt chạy PHẦN không bao giờ được in ra câu của một lượt chạy ĐỦ. Đó là
   // cả điểm của việc đếm `skipped` tách khỏi `failures`: người đọc log — hoặc
   // người dán log vào một work plan làm bằng chứng — phải thấy ngay rằng cái
