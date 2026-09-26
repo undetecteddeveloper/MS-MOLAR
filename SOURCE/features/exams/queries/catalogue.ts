@@ -190,6 +190,38 @@ export async function getExam(id: string): Promise<Exam | null> {
 }
 
 /**
+ * Có phải người gọi hiện tại là TÁC GIẢ ĐỀ (khác tác giả bài giải cộng đồng)
+ * của `examId` hay không — community-solutions task 21 Decision 2: nguồn DUY
+ * NHẤT `SolutionViewPage` dùng để suy `SolutionMenu.isExamAuthor` (gate
+ * ghim/bỏ ghim, AC-077). Không có cột nào trong `SolutionDetail`/`SolutionListItem`
+ * mang tín hiệu này (task 19's Investigation Notes) — route xem bài giải tự
+ * hỏi thẳng bảng `exams`, cùng khuôn `getMyExam()`
+ * (`features/authoring/queries.ts:85-105`): `.eq("id", examId).eq("author_id",
+ * user.id).maybeSingle()`, dựa trên RLS `exams_select_visible` (tác giả đọc
+ * được đề của mình bất kể status). Trả `boolean` thay vì `author_id` thô — gate
+ * này chỉ cần một quyết định có/không, không có lý do gì để lộ `author_id` (một
+ * cột UUID vốn không đi tới client ở bất kỳ đọc nào khác của tính năng này).
+ * Chưa đăng nhập / đề không tồn tại / không phải tác giả ⇒ `false`, không phân
+ * biệt ba trường hợp (không có gì để tiết lộ ở gate này).
+ */
+export async function isExamAuthor(examId: string): Promise<boolean> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return false;
+
+  const { data, error } = await supabase
+    .from("exams")
+    .select("id")
+    .eq("id", examId)
+    .eq("author_id", user.id)
+    .maybeSingle();
+  if (error) throw error;
+  return data !== null;
+}
+
+/**
  * Set các examId mà user hiện tại đã nộp bài (Rating System — bật/tắt nút Rate, R4).
  * Một round-trip, không N+1 mỗi thẻ đề (NFR Performance); rỗng nếu user chưa nộp bài nào.
  */

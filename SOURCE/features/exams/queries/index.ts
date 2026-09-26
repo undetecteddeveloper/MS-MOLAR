@@ -20,6 +20,7 @@ export {
   listExams,
   listExamFacets,
   getExam,
+  isExamAuthor,
   listMySubmittedExamIds,
   type ExamFilters,
   type ExamSort,

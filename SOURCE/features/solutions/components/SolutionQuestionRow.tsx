@@ -122,6 +122,20 @@ export interface SolutionQuestionRowProps {
    *  bình luận; vắng mặt ⇒ không nút, không chữ đếm (Reference Contract #20). */
   note?: { bodyNode: ReactNode; commentCount?: number };
   onOpenComments: (questionId: string) => void;
+  /** Đích cuộn+focus của liên kết sâu `?q=k` (AC-061, task 21) — gắn thẳng lên
+   *  `<li>` gốc, cùng khuôn `QuestionEditor.tsx`/`QuestionJumpDock.tsx`
+   *  (id/tabIndex/scroll-mt-24 baked vào chính thẻ đích, không phải bọc thêm
+   *  lớp nào). Thuần CỘNG THÊM: vắng mặt (mọi caller hiện có, kể cả test task
+   *  20) ⇒ hành vi y hệt trước khi có prop này — không `id`, không `tabIndex`,
+   *  không class mới trên `<li>`. */
+  id?: string;
+  /** Chỉ có ý nghĩa cùng `id` — nhận focus bằng lập trình, không chen vào thứ
+   *  tự Tab (cùng lý do `QuestionEditor.tsx:210-212`). */
+  tabIndex?: number;
+  /** Mở sẵn ngay từ lượt render đầu (liên kết sâu `?q=k`) — CHỈ ảnh hưởng state
+   *  KHỞI TẠO của `useState`, không tự áp lại nếu prop đổi sau khi đã mount
+   *  (đúng ngữ nghĩa "default", cùng quy ước React `defaultValue`). */
+  defaultOpen?: boolean;
 }
 
 export function SolutionQuestionRow({
@@ -136,15 +150,18 @@ export function SolutionQuestionRow({
   essayScore,
   note,
   onOpenComments,
+  id,
+  tabIndex,
+  defaultOpen,
 }: SolutionQuestionRowProps) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen ?? false);
   const panelId = useId();
   const label = selectRowLabel({ hasNote: note !== undefined, hasChanged, result, notAutoScored, essayScore });
   const headerCommentCount =
     note?.commentCount !== undefined && note.commentCount > 0 ? note.commentCount : undefined;
 
   return (
-    <li>
+    <li id={id} tabIndex={tabIndex} className={id !== undefined ? "scroll-mt-24 focus:outline-none" : undefined}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}

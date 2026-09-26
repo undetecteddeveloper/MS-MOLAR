@@ -248,3 +248,37 @@ describe("'Chưa có lời giải' — không note (Required Test #6, AC-048)", 
     expect(screen.queryByRole("button", { name: /bình luận/i })).toBeNull();
   });
 });
+
+// ═══ Required Test 7 — id/tabIndex/scroll-mt-24/defaultOpen cộng thêm (task 21, Decision 1, AC-061) ═══
+
+describe("Additive id/tabIndex/scroll-mt-24/defaultOpen (Required Test #7, AC-061, task 21)", () => {
+  it("không truyền gì (mọi caller task 20 hiện có): <li> gốc không id, không scroll-mt-24, hàng đóng như cũ", () => {
+    const { container } = render(<Row note={{ bodyNode: <span>Ghi chú</span> }} />);
+
+    const li = container.querySelector("li");
+    expect(li?.getAttribute("id")).toBeNull();
+    expect(li?.getAttribute("tabindex")).toBeNull();
+    expect(li?.className ?? "").not.toMatch(/scroll-mt-24/);
+    expect(screen.getByRole("button", { name: /Câu 1/ }).getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("truyền id/tabIndex/defaultOpen: <li> gốc mang id/tabIndex/scroll-mt-24, và hàng mở sẵn ngay từ lượt render đầu (không cần bấm)", () => {
+    const { container } = render(
+      <Row
+        id="solution-question-q1"
+        tabIndex={-1}
+        defaultOpen
+        note={{ bodyNode: <span>Ghi chú</span> }}
+      />
+    );
+
+    const li = container.querySelector("li");
+    expect(li?.id).toBe("solution-question-q1");
+    expect(li?.getAttribute("tabindex")).toBe("-1");
+    expect(li?.className).toMatch(/scroll-mt-24/);
+
+    // Mở sẵn: nội dung panel hiện ngay, không cần fireEvent.click.
+    expect(screen.getByText("Ghi chú")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Câu 1/ }).getAttribute("aria-expanded")).toBe("true");
+  });
+});
