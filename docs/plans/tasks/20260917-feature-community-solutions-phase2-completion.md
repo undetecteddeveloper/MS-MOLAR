@@ -38,7 +38,7 @@ Plan progress: 9/9 plan entries → 12 task files. All 12 committed.
 - [x] View-screen and list-screen component tests for the v1.3 contracts green (tasks 17–22): score-hidden rows render no result label, comment affordance iff `commentCount` present, `iReported` states, list route never calls `getResultCardSummary`, empty palette trigger (DD-U4)
 
 **Known follow-ups carried into Phase 3+ (not exit blockers for Phase 2):**
-- Reader-side `community_solution_detail` still lacks `question_type`/`choices`/`sub_answers`/`essay_answer` per question — same gap class as task 03's AC-022 (writer side), needed for the "Xem N phương án" disclosure on the view screen. **Needs engineer decision before task 25 starts.**
+- ~~Reader-side `community_solution_detail` still lacks `question_type`/`choices`/`sub_answers`/`essay_answer` per question~~ — **RESOLVED 2026-09-26, commit `06b12ed`** (see `community-solutions-HANDOFF.md` § "Sự cố đã xử lý"). Data now reaches `SolutionDetailQuestion` in `queries.ts`; no UI consumes it yet (future task).
 - 3 L1 real-browser walkthroughs still deferred (tasks 08, 10, 18) on the standing Playwright sign-in block — need the engineer to run the shared CLI sign-in before these can close out.
 - `SolutionMenu`'s current-question-highlight reading (task 22: only moves on palette selection, not plain row-header click) needs engineer sign-off.
 - `SolutionEditorScreen`'s `NOTE_SAVE_SUCCESS` reducer case still doesn't apply `result.status` (only `solutionId` was fixed in task 23, since that's what blocked AC-030) — noted, not yet fixed, not currently blocking anything.

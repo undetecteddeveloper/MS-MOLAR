@@ -245,4 +245,4 @@ Phase boundaries are hard: Phase N+1's first task does not start until Phase N's
 - [ ] Phase 4 — tasks 32–39 (plan P4-T1…P4-T8 → 8 files): 0/8 — `…-phase4-completion.md`
 - [x] U2 resolved (engineer decision 2026-09-17, frontend DD v1.2 DD-U1) — no gate
 - [ ] Phase 5 — tasks 40–53 (plan P5-T1…P5-T14 → 14 files): 0/14 — `…-phase5-completion.md`
-- [ ] **Total: 24/53 task files complete (24/49 plan entries)**. Non-task commits also on the branch, not counted: `707df1f` (INT-1 quarantine, TD-034), `4b0ea52` (post-commit fix to task 03's migration, AC-022 data gap).
+- [ ] **Total: 24/53 task files complete (24/49 plan entries)**. Non-task commits also on the branch, not counted: `707df1f` (INT-1 quarantine, TD-034), `4b0ea52` (post-commit fix to task 03's migration, AC-022 data gap), `06b12ed` (post-Phase-2 fix to task 13's migration — `community_solution_detail` had the same AC-022-class gap, engineer-approved after discovering it conflicted with task 16's already-verified 7-key contract; backend DD bumped to v1.10, Reference Contract Value #14 now 11 keys).
