@@ -49,7 +49,7 @@ Every `Pn-Tm` entry below maps to one or more task files. The task number (01–
 | 21 | P2-T6 (split 3/3) | frontend | 2 | **DONE** `d04b245` (`SolutionViewScreen`/route files/`?q`&`?comments` parser; engineer resolved two escalations from a prior attempt: `SolutionQuestionRow.tsx` additive id/tabIndex/scroll-mt-24/defaultOpen props for AC-061, and new `isExamAuthor(examId)` in `features/exams/queries/catalogue.ts` for `SolutionMenu.isExamAuthor`; L2 fully verified, L1 deferred — same standing sign-in constraint as tasks 08/10/18) |
 | 22 | P2-T7 | frontend | 2 | **DONE** `06e8479` (`SolutionViewScreen` current-row highlight via key-remount technique + empty palette trigger; `QuestionPaletteDock.tsx` verified byte-for-byte unchanged; quality-fixer-frontend independently re-analyzed the key-remount logic for sibling-row-state regressions, found none) — note for engineer sign-off: highlight only moves on palette cell selection, not on plain row-header clicks (executor's literal reading of AC-051/059 wording) |
 | 23 | P2-T8 | frontend | 2 | **DONE** `1abbe87` — J1 real suite (`community-solutions.fixture.e2e.test.ts` + `communitySolutionsFixtureData.ts`), `npm run test:fixture` green with no `--exclude` (R1 skeleton lane rule retired here); fixed a `SolutionEditorScreen.tsx` defect J1 exposed (`solutionId` never threaded from `saveSolution()`'s result into client state, leaving "Xem bài giải" pointed at "#" after a fresh-writer publish) — mutation-tested by integration-test-reviewer (reverting the fix reproduces the exact failure) |
-| 24 | P2-T9 | frontend | 2 | open |
+| 24 | P2-T9 | frontend | 2 | **DONE** (pending commit) — S-03/S-05 portions of Test 2 landed (`community-solutions.fixture.e2e.test.ts` + `communitySolutionsFixtureData.ts`); named/anonymous/`show_score=false` trio, DOM-scoped per-row subtree queries, RED-phase discrimination proof performed and reverted before finalizing; `npm run test:fixture` green (14/14, J1 unaffected); O-02 portion remains for task 30 |
 | 25 | P3-T1 | backend | 3 | open |
 | 26 | P3-T2 | backend | 3 | open |
 | 27 | P3-T4 | backend | 3 | open |
@@ -954,17 +954,18 @@ flowchart LR
 
 ---
 
-### P2-T9 (task 24) — fixture-e2e Test 2 (anonymous never renders): list + detail portions
+### P2-T9 (task 24) — fixture-e2e Test 2 (anonymous never renders): list + detail portions — **DONE (pending commit)**
 
-- **Files**: `SOURCE/tests/e2e/fixture/community-solutions.fixture.e2e.test.ts` (Test 2, list/detail portion only — comment-sheet portion added in P3-T7).
+- **Files**: `SOURCE/tests/e2e/fixture/community-solutions.fixture.e2e.test.ts` (Test 2, list/detail portion only — comment-sheet portion added in P3-T7); `SOURCE/tests/e2e/fixture/communitySolutionsFixtureData.ts`.
 - **Depends on**: P2-T5, P2-T6.
 - **Design source**: Test skeleton Test 2 (S-03, S-05 portions; O-02 portion deferred since `CommentSheet` does not exist until Phase 3).
-- **Implementation Complete**: fixture rows including both a NAMED and an ANONYMOUS solution for S-03 (list) and S-05 (detail); DOM query (not props/internal state) for the anonymous row's card/item.
-- **Quality Complete**: zero occurrences of the fixture's real name/avatar/score strings inside the anonymous row's rendered subtree, on S-03 and S-05.
-- **Integration Complete**: named row's DOM shows its own name/avatar/score, proving the assertion is discriminating (not just "nothing renders").
-- **Proof Obligation** (verbatim, skeleton Test 2, S-03/S-05 subset): "S-03 solutions list: anonymous row shows no name/avatar; named row shows both... a `show_score=false` row: no score badge/value rendered anywhere in that row's subtree."
-- **Note**: this test file is not "complete" until P3-T7 adds the O-02 comment-sheet portion in the same file — tracked as one skeleton test split across two landing commits, both required before the file is considered fully implemented.
-- **Acceptance criteria**: AC-039, M5 (browser-level proof, list+detail).
+- **Implementation Complete**: three fixture rows (NAMED, ANONYMOUS, `show_score=false`) for both `listSolutions()` (S-03) and `getSolutionDetail()` (S-05); `.author`/`.score` on every row built by calling the REAL, unmocked `toAuthorIdentity`/`toScoreField` on a `null`-at-the-source input (mirrors the actual masked RPC shape) rather than a hand-typed `{kind:"anonymous"}` literal. DOM query (not props/internal state) for each row's own card/item subtree, found via that row's own accessible name (card-covering link's `aria-label`, S-03; the author card's own `<section>`, S-05) so a leak on a different row cannot satisfy another row's absence check.
+- **Quality Complete**: zero occurrences of the fixture's real (would-be) name/avatar/score strings inside the anonymous/hidden-score row's rendered subtree, on S-03 and S-05; `npm run test:fixture` green (14/14 across both fixture-e2e files); `npx tsc --noEmit` and `npm run lint` clean; `npm test` unaffected (2402 passed).
+- **Integration Complete**: named row's DOM shows its own name/avatar/score in the SAME render, proving the assertion is discriminating (not just "nothing renders"); anonymous row's score stays visible (show_score/show_profile are independent flags) proving masking is identity-specific, not blanket.
+- **RED-phase discrimination proof performed** (task 24 hard requirement, then reverted before finalizing): temporarily built the anonymous row's `.author` as `{kind:"named", displayName: <real>, avatarUrl: <real>}` (bypassing `toAuthorIdentity`) and the hidden-score row's `.score` as a literal real number (bypassing `toScoreField`) — both turned the corresponding S-03/S-05 assertions red (`getElementError`/no-match), confirming the checks are not vacuous; reverted to the real masking calls, confirmed green again.
+- **Proof Obligation** (verbatim, skeleton Test 2, S-03/S-05 subset): "S-03 solutions list: anonymous row shows no name/avatar; named row shows both... a `show_score=false` row: no score badge/value rendered anywhere in that row's subtree." — met.
+- **Note**: this test file is not "complete" until P3-T7 adds the O-02 comment-sheet portion in the same file — tracked as one skeleton test split across two landing commits, both required before the file is considered fully implemented. Test 3's comment block (task 31) was left untouched; J1 (task 23) still passes unmodified.
+- **Acceptance criteria**: AC-039, M5 (browser-level proof, list+detail) — met.
 
 ---
 

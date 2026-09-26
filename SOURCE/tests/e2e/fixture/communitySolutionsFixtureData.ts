@@ -15,11 +15,18 @@ import type {
   SolutionDetailQuestion,
   SolutionEditorQuestion,
   SolutionEditorState,
+  SolutionListItem,
   SolutionStatus,
 } from "@/features/solutions/queries";
 import type { SaveSolutionResult, SetSolutionStatusResult } from "@/features/solutions/actions";
 import type { ExamResult } from "@/features/exams/queries";
 import type { Exam } from "@/types/exam";
+// REAL, unmocked masking functions (task 24 hard constraint: identity.ts never
+// mocked) — this fixture module stands in for the mapping step that
+// `features/solutions/queries.ts` would normally run (that module is fully
+// `vi.mock`ed in the test file), so Test 2's masked rows are still produced by
+// the actual masking code, not a hand-typed `{kind:"anonymous"}` literal.
+import { toAuthorIdentity, toScoreField } from "@/lib/solutions/identity";
 
 export const FIXTURE_EXAM_ID = "exam-fixture-1";
 export const FIXTURE_ATTEMPT_ID = "attempt-fixture-1";
@@ -210,4 +217,159 @@ export function fixtureGetSolutionDetail(store: FixtureStore, solutionId: string
       }),
     ],
   };
+}
+
+// -----------------------------------------------------------------------------
+// Test 2 (task 24) — S-03 (list) + S-05 (detail) anonymity/score-masking rows.
+// -----------------------------------------------------------------------------
+// Three solutions, each isolating exactly ONE property under test: a NAMED
+// row (baseline — proves the query/DOM technique below CAN find a real
+// identity when one is present), an ANONYMOUS row (identity masked, score
+// still visible — show_profile and show_score are independent flags, so
+// anonymity must not also blank a legitimately visible score), and a
+// show_score=false row (identity visible, score masked). `.author`/`.score`
+// on every row is produced by calling the REAL `toAuthorIdentity`/
+// `toScoreField` on a `null`-at-the-source input (author_display_name/
+// author_avatar_url/score all `null`) — mirroring the actual RPC contract,
+// where masking already happened before the row ever reaches the frontend
+// (backend DD § Field Propagation Map; D003).
+
+/** Origin `components/shared/QuestionFigure.ts` `isAllowedImageUrl` allow-lists
+ *  via `NEXT_PUBLIC_SUPABASE_URL` — same fixture origin
+ *  `AuthorIdentity.test.tsx` uses. Test 2 sets this env var so the NAMED row's
+ *  `<img>` is real and observable (not skipped for failing the allowlist),
+ *  which is what makes the ANONYMOUS/hidden-score rows' absence checks
+ *  meaningful rather than vacuously true. */
+export const T2_AVATAR_ORIGIN = "https://test-project.supabase.co";
+
+export const T2_NAMED_SOLUTION_ID = "solution-fixture-t2-named";
+export const T2_ANONYMOUS_SOLUTION_ID = "solution-fixture-t2-anonymous";
+export const T2_HIDDEN_SCORE_SOLUTION_ID = "solution-fixture-t2-hidden-score";
+
+export const T2_NAMED_AUTHOR_DISPLAY_NAME = "Nguyễn Thị Công Khai";
+export const T2_NAMED_AUTHOR_AVATAR_URL = `${T2_AVATAR_ORIGIN}/storage/v1/object/sign/avatars/named/a.png?token=x`;
+const T2_NAMED_AUTHOR_SCORE = 8.5;
+
+/** Anonymous row's score IS shown — show_score/show_profile are independent
+ *  masking flags (backend DD), so this proves anonymity alone does not also
+ *  blank a legitimately visible score. */
+export const T2_ANONYMOUS_AUTHOR_SCORE = 6.0;
+
+/** The real identity behind the ANONYMOUS row — mirrors what this author's
+ *  profile actually is before the RPC masks `author_display_name`/
+ *  `author_avatar_path` to `null` for a `show_profile=false` row (D003). This
+ *  string is NEVER fed into `toAuthorIdentity` for the row actually rendered
+ *  in Test 2 below (only `null` is, matching the true masked RPC shape) — it
+ *  exists so the absence assertions in the test check for a REAL value that
+ *  could have leaked, not a strawman string nothing ever produces (task 24
+ *  hard requirement). It is also the value used for the RED-phase
+ *  discrimination proof (Investigation Notes): temporarily building this
+ *  row's `.author` as `{kind:"named", displayName: T2_ANONYMOUS_REAL_DISPLAY_NAME,
+ *  avatarUrl: T2_ANONYMOUS_REAL_AVATAR_URL}` — bypassing `toAuthorIdentity`,
+ *  the exact class of regression this test guards against — turns the
+ *  absence assertions red; reverting to the `null`-at-source call turns them
+ *  green again. */
+export const T2_ANONYMOUS_REAL_DISPLAY_NAME = "Đặng Văn Giấu Tên Thật";
+export const T2_ANONYMOUS_REAL_AVATAR_URL = `${T2_AVATAR_ORIGIN}/storage/v1/object/sign/avatars/anon/b.png?token=y`;
+
+export const T2_HIDDEN_SCORE_AUTHOR_DISPLAY_NAME = "Lê Văn Ẩn Điểm";
+/** Same rationale as `T2_ANONYMOUS_REAL_DISPLAY_NAME`, for the score-masking
+ *  row: the real score this author actually earned, which `toScoreField` must
+ *  strip to an ABSENT key (never `null`/`0` standing in for it). */
+export const T2_HIDDEN_SCORE_REAL_VALUE = 9.9;
+
+/** Mirrors `mapScoreFields` (`features/solutions/queries.ts`) using the REAL
+ *  `toScoreField` — `score: null` is the masked-at-the-source shape a
+ *  `show_score=false` RPC row actually carries. */
+function t2MapScore(score: number | null): { score?: number } {
+  const scored = toScoreField({ score });
+  return "score" in scored ? { score: scored.score } : {};
+}
+
+function t2ListItem(overrides: Partial<SolutionListItem> = {}): SolutionListItem {
+  return {
+    id: "solution-fixture-t2-base",
+    isPinned: false,
+    updatedAt: "2026-09-20T10:00:00.000Z",
+    isMine: false,
+    author: { kind: "anonymous" },
+    helpfulCount: 1,
+    iMarkedHelpful: false,
+    commentCount: 0,
+    changedQuestionCount: 0,
+    ...overrides,
+  };
+}
+
+/** `listSolutions()` fixture for S-03 — the NAMED/ANONYMOUS/hidden-score trio
+ *  described above. */
+export function fixtureListSolutionsForAnonymityCheck(): SolutionListItem[] {
+  return [
+    t2ListItem({
+      id: T2_NAMED_SOLUTION_ID,
+      author: toAuthorIdentity({
+        author_display_name: T2_NAMED_AUTHOR_DISPLAY_NAME,
+        author_avatar_url: T2_NAMED_AUTHOR_AVATAR_URL,
+      }),
+      ...t2MapScore(T2_NAMED_AUTHOR_SCORE),
+    }),
+    t2ListItem({
+      id: T2_ANONYMOUS_SOLUTION_ID,
+      author: toAuthorIdentity({ author_display_name: null, author_avatar_url: null }),
+      ...t2MapScore(T2_ANONYMOUS_AUTHOR_SCORE),
+    }),
+    t2ListItem({
+      id: T2_HIDDEN_SCORE_SOLUTION_ID,
+      author: toAuthorIdentity({
+        author_display_name: T2_HIDDEN_SCORE_AUTHOR_DISPLAY_NAME,
+        author_avatar_url: null,
+      }),
+      ...t2MapScore(null),
+    }),
+  ];
+}
+
+function t2DetailBase(overrides: Partial<SolutionDetail> = {}): SolutionDetail {
+  return {
+    id: "solution-fixture-t2-base",
+    author: { kind: "anonymous" },
+    isPinned: false,
+    updatedAt: "2026-09-20T10:00:00.000Z",
+    isMine: false,
+    helpfulCount: 1,
+    iMarkedHelpful: false,
+    iReported: false,
+    questions: [],
+    ...overrides,
+  };
+}
+
+const T2_SOLUTION_DETAILS: Record<string, SolutionDetail> = {
+  [T2_NAMED_SOLUTION_ID]: t2DetailBase({
+    id: T2_NAMED_SOLUTION_ID,
+    author: toAuthorIdentity({
+      author_display_name: T2_NAMED_AUTHOR_DISPLAY_NAME,
+      author_avatar_url: T2_NAMED_AUTHOR_AVATAR_URL,
+    }),
+    ...t2MapScore(T2_NAMED_AUTHOR_SCORE),
+  }),
+  [T2_ANONYMOUS_SOLUTION_ID]: t2DetailBase({
+    id: T2_ANONYMOUS_SOLUTION_ID,
+    author: toAuthorIdentity({ author_display_name: null, author_avatar_url: null }),
+    ...t2MapScore(T2_ANONYMOUS_AUTHOR_SCORE),
+  }),
+  [T2_HIDDEN_SCORE_SOLUTION_ID]: t2DetailBase({
+    id: T2_HIDDEN_SCORE_SOLUTION_ID,
+    author: toAuthorIdentity({
+      author_display_name: T2_HIDDEN_SCORE_AUTHOR_DISPLAY_NAME,
+      author_avatar_url: null,
+    }),
+    ...t2MapScore(null),
+  }),
+};
+
+/** `getSolutionDetail()` fixture for S-05 — same trio, keyed by solutionId
+ *  (route param) since the detail screen renders one solution per visit. */
+export function fixtureGetSolutionDetailForAnonymityCheck(solutionId: string): SolutionDetail | null {
+  return T2_SOLUTION_DETAILS[solutionId] ?? null;
 }

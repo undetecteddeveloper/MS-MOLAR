@@ -117,14 +117,28 @@ import {
   FIXTURE_EXAM_ID,
   SERVER_NOTE_PREFIX,
   SHORT_NOTE,
+  T2_ANONYMOUS_AUTHOR_SCORE,
+  T2_ANONYMOUS_REAL_AVATAR_URL,
+  T2_ANONYMOUS_REAL_DISPLAY_NAME,
+  T2_ANONYMOUS_SOLUTION_ID,
+  T2_AVATAR_ORIGIN,
+  T2_HIDDEN_SCORE_AUTHOR_DISPLAY_NAME,
+  T2_HIDDEN_SCORE_REAL_VALUE,
+  T2_HIDDEN_SCORE_SOLUTION_ID,
+  T2_NAMED_AUTHOR_AVATAR_URL,
+  T2_NAMED_AUTHOR_DISPLAY_NAME,
+  T2_NAMED_SOLUTION_ID,
   createFixtureStore,
   fixtureExam,
   fixtureExamResult,
   fixtureGetMySolutionForWriter,
   fixtureGetSolutionDetail,
+  fixtureGetSolutionDetailForAnonymityCheck,
+  fixtureListSolutionsForAnonymityCheck,
   fixtureResultCardSummary,
   fixtureSaveSolution,
   fixtureSetSolutionStatus,
+  fixtureWriterState,
   type FixtureStore,
 } from "./communitySolutionsFixtureData";
 
@@ -135,6 +149,7 @@ const {
   getResultCardSummaryMock,
   getMySolutionForWriterMock,
   getSolutionDetailMock,
+  listSolutionsMock,
   saveSolutionMock,
   setSolutionStatusMock,
   toggleHelpfulMock,
@@ -150,6 +165,7 @@ const {
   getResultCardSummaryMock: vi.fn(),
   getMySolutionForWriterMock: vi.fn(),
   getSolutionDetailMock: vi.fn(),
+  listSolutionsMock: vi.fn(),
   saveSolutionMock: vi.fn(),
   setSolutionStatusMock: vi.fn(),
   toggleHelpfulMock: vi.fn(),
@@ -188,6 +204,7 @@ vi.mock("@/features/solutions/queries", () => ({
   getResultCardSummary: getResultCardSummaryMock,
   getMySolutionForWriter: getMySolutionForWriterMock,
   getSolutionDetail: getSolutionDetailMock,
+  listSolutions: listSolutionsMock,
 }));
 vi.mock("@/features/solutions/actions", () => ({
   saveSolution: saveSolutionMock,
@@ -199,6 +216,7 @@ vi.mock("@/features/solutions/actions", () => ({
 import ResultPage from "@/app/(exams)/exams/[id]/attempt/[attemptId]/result/page";
 import SolutionEditorPage from "@/app/(exams)/exams/[id]/attempt/[attemptId]/solution/page";
 import SolutionViewPage from "@/app/(exams)/exams/[id]/solutions/[solutionId]/page";
+import SolutionsListPage from "@/app/(exams)/exams/[id]/solutions/page";
 import { renderServerTree } from "@/tests/helpers/renderServerTree";
 
 beforeAll(() => {
@@ -222,6 +240,23 @@ afterEach(() => {
  *  rule this task carries (UI-D25: aria-disabled only, never native disabled). */
 function disabledNodes(root: HTMLElement): Element[] {
   return Array.from(root.querySelectorAll("[disabled]"));
+}
+
+/** `<img>` elements in a subtree whose `src` matches an EXACT expected value —
+ *  scoped per-row (Test 2's own subtree-query helper, shared across S-03/S-05)
+ *  so a DIFFERENT row's own avatar can never accidentally satisfy either a
+ *  presence or an absence check made against this one. */
+function imagesWithSrc(root: HTMLElement, src: string): Element[] {
+  return Array.from(root.querySelectorAll(`img[src="${src}"]`));
+}
+
+/** `SolutionAuthorCard`'s own `<section>` (S-05) — the ONLY `<section>` on
+ *  this route (`Breadcrumbs` renders `<nav>`), needed because the author's
+ *  name/label is ALSO echoed into the page breadcrumb, which would otherwise
+ *  make a whole-page `getByText` ambiguous (multiple matches) regardless of
+ *  what the card itself renders. */
+function authorCardSection(container: HTMLElement): HTMLElement {
+  return container.querySelector("section") as HTMLElement;
 }
 
 describe("J1 — write, publish, and open my own published community solution", () => {
@@ -423,6 +458,118 @@ describe("J1 — write, publish, and open my own published community solution", 
 //   - pass criteria: zero occurrences of the fixture's real name/avatar/score
 //     strings inside the anonymous row's rendered subtree, on every screen
 //     checked
+
+// -----------------------------------------------------------------------------
+// REAL FIXTURE DATA (task 24) — Test 2 S-03 (list) + S-05 (detail) portions.
+// The O-02 comment-sheet portion is NOT written here — task 30 (see this
+// task's own Notes section and the residual named in the comment block
+// above).
+// -----------------------------------------------------------------------------
+describe("Test 2 — anonymous author and hidden score never leak into rendered DOM (S-03, S-05)", () => {
+  beforeAll(() => {
+    // `components/shared/QuestionFigure.ts` `isAllowedImageUrl` only lets an
+    // `<img>` render for a URL matching this origin — same fixture origin
+    // `AuthorIdentity.test.tsx` uses. Without this, the NAMED row's own
+    // avatar would ALSO fail to render, making the anonymous row's "no
+    // matching <img>" assertion vacuously true instead of a real proof.
+    process.env.NEXT_PUBLIC_SUPABASE_URL = T2_AVATAR_ORIGIN;
+  });
+
+  beforeEach(() => {
+    getExamMock.mockResolvedValue(fixtureExam());
+    isExamAuthorMock.mockResolvedValue(false);
+    getMySolutionForWriterMock.mockResolvedValue(
+      fixtureWriterState({ solutionId: T2_NAMED_SOLUTION_ID, status: "published" })
+    );
+    listSolutionsMock.mockResolvedValue(fixtureListSolutionsForAnonymityCheck());
+    getSolutionDetailMock.mockImplementation((solutionId: string) =>
+      Promise.resolve(fixtureGetSolutionDetailForAnonymityCheck(solutionId))
+    );
+  });
+
+  it("S-03 solutions list: each row's OWN subtree shows only what that row is allowed to show", async () => {
+    const listJsx = await SolutionsListPage({ params: Promise.resolve({ id: FIXTURE_EXAM_ID }) });
+    render(listJsx);
+
+    // Row boundary (Proof Obligation: query the rendered DOM for "the
+    // anonymous row's card... subtree") — each row's own card-covering link
+    // is found by ITS OWN accessible name, then its `<li>` ancestor is the
+    // subtree every assertion below is scoped to. A leak on a DIFFERENT row
+    // could not accidentally satisfy an absence check made against this one.
+    const namedRow = screen
+      .getByRole("link", { name: t("solutions.card.openLabel", { name: T2_NAMED_AUTHOR_DISPLAY_NAME }) })
+      .closest("li") as HTMLElement;
+    const anonymousRow = screen
+      .getByRole("link", {
+        name: t("solutions.card.openLabel", { name: t("solutions.identity.anonymous") }),
+      })
+      .closest("li") as HTMLElement;
+    const hiddenScoreRow = screen
+      .getByRole("link", {
+        name: t("solutions.card.openLabel", { name: T2_HIDDEN_SCORE_AUTHOR_DISPLAY_NAME }),
+      })
+      .closest("li") as HTMLElement;
+
+    // Named row shows its OWN real identity — proves the technique above is
+    // not vacuous (a row CAN show a name/avatar in this same render).
+    expect(within(namedRow).getByText(T2_NAMED_AUTHOR_DISPLAY_NAME)).toBeTruthy();
+    expect(imagesWithSrc(namedRow, T2_NAMED_AUTHOR_AVATAR_URL)).toHaveLength(1);
+
+    // Anonymous row: "Ẩn danh" present; the REAL name/avatar that could have
+    // leaked (T2_ANONYMOUS_REAL_* — see fixture doc) is absent from THIS
+    // subtree. Score stays visible (show_score is independent of
+    // show_profile) — anonymity alone must not also blank a real score.
+    expect(within(anonymousRow).getByText(t("solutions.identity.anonymous"))).toBeTruthy();
+    expect(within(anonymousRow).queryByText(T2_ANONYMOUS_REAL_DISPLAY_NAME)).toBeNull();
+    expect(imagesWithSrc(anonymousRow, T2_ANONYMOUS_REAL_AVATAR_URL)).toHaveLength(0);
+    expect(
+      within(anonymousRow).getByText(`${T2_ANONYMOUS_AUTHOR_SCORE.toFixed(1)} ${t("result.outOfTen")}`)
+    ).toBeTruthy();
+
+    // Hidden-score row: own name shows normally (identity masking untouched
+    // here); no score badge/value anywhere in ITS subtree.
+    expect(within(hiddenScoreRow).getByText(T2_HIDDEN_SCORE_AUTHOR_DISPLAY_NAME)).toBeTruthy();
+    expect(within(hiddenScoreRow).queryByText(new RegExp(t("result.outOfTen")))).toBeNull();
+    expect(within(hiddenScoreRow).queryByText(String(T2_HIDDEN_SCORE_REAL_VALUE))).toBeNull();
+  });
+
+  it("S-05 solution detail: SolutionAuthorCard subtree repeats the same guarantees, per solution", async () => {
+    const namedJsx = await SolutionViewPage({
+      params: Promise.resolve({ id: FIXTURE_EXAM_ID, solutionId: T2_NAMED_SOLUTION_ID }),
+      searchParams: Promise.resolve({}),
+    });
+    const namedScreen = render(namedJsx);
+    const namedCard = authorCardSection(namedScreen.container);
+    expect(within(namedCard).getByText(T2_NAMED_AUTHOR_DISPLAY_NAME)).toBeTruthy();
+    expect(imagesWithSrc(namedCard, T2_NAMED_AUTHOR_AVATAR_URL)).toHaveLength(1);
+    cleanup();
+
+    const anonymousJsx = await SolutionViewPage({
+      params: Promise.resolve({ id: FIXTURE_EXAM_ID, solutionId: T2_ANONYMOUS_SOLUTION_ID }),
+      searchParams: Promise.resolve({}),
+    });
+    const anonymousScreen = render(anonymousJsx);
+    const anonymousCard = authorCardSection(anonymousScreen.container);
+    expect(within(anonymousCard).getByText(t("solutions.identity.anonymous"))).toBeTruthy();
+    expect(within(anonymousCard).queryByText(T2_ANONYMOUS_REAL_DISPLAY_NAME)).toBeNull();
+    expect(imagesWithSrc(anonymousCard, T2_ANONYMOUS_REAL_AVATAR_URL)).toHaveLength(0);
+    expect(
+      within(anonymousCard).getByText(`${T2_ANONYMOUS_AUTHOR_SCORE.toFixed(1)} ${t("result.outOfTen")}`)
+    ).toBeTruthy();
+    cleanup();
+
+    const hiddenScoreJsx = await SolutionViewPage({
+      params: Promise.resolve({ id: FIXTURE_EXAM_ID, solutionId: T2_HIDDEN_SCORE_SOLUTION_ID }),
+      searchParams: Promise.resolve({}),
+    });
+    const hiddenScoreScreen = render(hiddenScoreJsx);
+    const hiddenScoreCard = authorCardSection(hiddenScoreScreen.container);
+    expect(within(hiddenScoreCard).getByText(T2_HIDDEN_SCORE_AUTHOR_DISPLAY_NAME)).toBeTruthy();
+    expect(within(hiddenScoreCard).queryByText(new RegExp(t("result.outOfTen")))).toBeNull();
+    expect(within(hiddenScoreCard).queryByText(String(T2_HIDDEN_SCORE_REAL_VALUE))).toBeNull();
+    cleanup();
+  });
+});
 
 // =============================================================================
 // Test 3 [additional slot, ROI >= 20] — Malicious note/comment markdown
