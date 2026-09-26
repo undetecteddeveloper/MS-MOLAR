@@ -128,6 +128,16 @@ import {
   T2_NAMED_AUTHOR_AVATAR_URL,
   T2_NAMED_AUTHOR_DISPLAY_NAME,
   T2_NAMED_SOLUTION_ID,
+  T2_COMMENTS_SOLUTION_ID,
+  T2_COMMENT_NAMED_AVATAR_URL,
+  T2_COMMENT_NAMED_BODY,
+  T2_COMMENT_NAMED_DISPLAY_NAME,
+  T2_COMMENT_ANONYMOUS_BODY,
+  T2_COMMENT_ANONYMOUS_REAL_AVATAR_URL,
+  T2_COMMENT_ANONYMOUS_REAL_DISPLAY_NAME,
+  T2_COMMENT_WRITER_BODY,
+  T2_COMMENT_WRITER_REAL_AVATAR_URL,
+  T2_COMMENT_WRITER_REAL_DISPLAY_NAME,
   createFixtureStore,
   fixtureExam,
   fixtureExamResult,
@@ -467,12 +477,10 @@ describe("J1 — write, publish, and open my own published community solution", 
 //     checked
 
 // -----------------------------------------------------------------------------
-// REAL FIXTURE DATA (task 24) — Test 2 S-03 (list) + S-05 (detail) portions.
-// The O-02 comment-sheet portion is NOT written here — task 30 (see this
-// task's own Notes section and the residual named in the comment block
-// above).
+// REAL FIXTURE DATA — Test 2 S-03 (list) + S-05 (detail) portions (task 24),
+// plus O-02 (comment-sheet) portion (task 30) — Test 2 is now complete.
 // -----------------------------------------------------------------------------
-describe("Test 2 — anonymous author and hidden score never leak into rendered DOM (S-03, S-05)", () => {
+describe("Test 2 — anonymous author and hidden score never leak into rendered DOM (S-03, S-05, O-02)", () => {
   beforeAll(() => {
     // `components/shared/QuestionFigure.ts` `isAllowedImageUrl` only lets an
     // `<img>` render for a URL matching this origin — same fixture origin
@@ -577,6 +585,55 @@ describe("Test 2 — anonymous author and hidden score never leak into rendered 
     expect(within(hiddenScoreCard).getByText(T2_HIDDEN_SCORE_AUTHOR_DISPLAY_NAME)).toBeTruthy();
     expect(within(hiddenScoreCard).queryByText(new RegExp(t("result.outOfTen")))).toBeNull();
     expect(within(hiddenScoreCard).queryByText(String(T2_HIDDEN_SCORE_REAL_VALUE))).toBeNull();
+    cleanup();
+  });
+
+  it("O-02 comment sheet: named/anonymous/writer-anonymous comment rows each show only what they are allowed to show", async () => {
+    // Deep link `?q=1&comments=1` (task 21/28) — opens the real screen's
+    // CommentSheet for this solution's only question WITHOUT any button
+    // click, per this task's own "either... or" instruction.
+    const commentsJsx = await SolutionViewPage({
+      params: Promise.resolve({ id: FIXTURE_EXAM_ID, solutionId: T2_COMMENTS_SOLUTION_ID }),
+      searchParams: Promise.resolve({ q: "1", comments: "1" }),
+    });
+    render(commentsJsx);
+
+    // Waiting for the NAMED comment's own body also waits out CommentSheet's
+    // "loading" chunk-state (RichText nạp động, AC-103) — the sheet renders no
+    // comment row at all before this resolves.
+    await screen.findByText(T2_COMMENT_NAMED_BODY);
+    const sheet = screen.getByRole("dialog", { name: `${t("solutions.comments.title")} · ${t("upload.questionLabel", { number: 1 })}` });
+
+    // Row boundary (same technique as S-03/S-05 above): each comment row is
+    // found by its OWN body text, then `.closest("li")` (CommentItem's root
+    // element) is the subtree every assertion below is scoped to.
+    const namedRow = within(sheet).getByText(T2_COMMENT_NAMED_BODY).closest("li") as HTMLElement;
+    const anonymousRow = within(sheet).getByText(T2_COMMENT_ANONYMOUS_BODY).closest("li") as HTMLElement;
+    const writerRow = within(sheet).getByText(T2_COMMENT_WRITER_BODY).closest("li") as HTMLElement;
+
+    // Named row shows its OWN real identity — proves the technique above is
+    // not vacuous, same as the S-03/S-05 baseline.
+    expect(within(namedRow).getByText(T2_COMMENT_NAMED_DISPLAY_NAME)).toBeTruthy();
+    expect(imagesWithSrc(namedRow, T2_COMMENT_NAMED_AVATAR_URL)).toHaveLength(1);
+    expect(within(namedRow).queryByText(t("solutions.comments.writerBadge"))).toBeNull();
+
+    // Anonymous row: "Ẩn danh" present; the REAL name/avatar that could have
+    // leaked (T2_COMMENT_ANONYMOUS_REAL_*) is absent from THIS subtree; no
+    // "Người viết" badge (this commenter is not the solution's writer).
+    expect(within(anonymousRow).getByText(t("solutions.identity.anonymous"))).toBeTruthy();
+    expect(within(anonymousRow).queryByText(T2_COMMENT_ANONYMOUS_REAL_DISPLAY_NAME)).toBeNull();
+    expect(imagesWithSrc(anonymousRow, T2_COMMENT_ANONYMOUS_REAL_AVATAR_URL)).toHaveLength(0);
+    expect(within(anonymousRow).queryByText(t("solutions.comments.writerBadge"))).toBeNull();
+
+    // Writer row: "Người viết" badge renders (AC-105/D42) alongside "Ẩn danh"
+    // — this commenter is BOTH the solution's writer AND anonymous — with no
+    // OTHER identity leak alongside it (the real name/avatar behind THIS row
+    // stays absent too, same as CommentItem.test.tsx Required Test #3, now
+    // proven through the real rendered screen instead of a mocked component).
+    expect(within(writerRow).getByText(t("solutions.identity.anonymous"))).toBeTruthy();
+    expect(within(writerRow).getByText(t("solutions.comments.writerBadge"))).toBeTruthy();
+    expect(within(writerRow).queryByText(T2_COMMENT_WRITER_REAL_DISPLAY_NAME)).toBeNull();
+    expect(imagesWithSrc(writerRow, T2_COMMENT_WRITER_REAL_AVATAR_URL)).toHaveLength(0);
     cleanup();
   });
 });

@@ -12,6 +12,7 @@
 import type {
   ResultCardSummary,
   SolutionDetail,
+  SolutionDetailComment,
   SolutionDetailQuestion,
   SolutionEditorQuestion,
   SolutionEditorState,
@@ -373,3 +374,97 @@ const T2_SOLUTION_DETAILS: Record<string, SolutionDetail> = {
 export function fixtureGetSolutionDetailForAnonymityCheck(solutionId: string): SolutionDetail | null {
   return T2_SOLUTION_DETAILS[solutionId] ?? null;
 }
+
+// -----------------------------------------------------------------------------
+// Test 2 (task 30) — O-02 comment-sheet portion. Same isolation discipline as
+// the S-03/S-05 trio above: a dedicated solution (own author identity is
+// irrelevant here, reused from T2_NAMED_* — this test only asserts on the
+// COMMENT rows, never the solution author card) carrying exactly one question
+// with three comment rows, each isolating ONE property: a NAMED comment
+// (baseline), an ANONYMOUS comment (identity masked), and a comment by the
+// solution's WRITER who ALSO commented anonymously (`is_solution_author: true`
+// + `{kind:"anonymous"}` together — the exact combination task 28's own unit
+// tests (CommentItem.test.tsx Required Test #3) already proved in isolation;
+// this fixture-e2e test proves the SAME combination through the real rendered
+// screen). `.author` on the anonymous/writer rows is produced by the REAL
+// `toAuthorIdentity` called on a `null`-at-source input (same technique as the
+// S-03/S-05 trio) — never a hand-typed `{kind:"anonymous"}` literal.
+// -----------------------------------------------------------------------------
+
+export const T2_COMMENTS_SOLUTION_ID = "solution-fixture-t2-comments";
+export const T2_COMMENTS_QUESTION_ID = "q1";
+
+export const T2_COMMENT_NAMED_ID = "comment-fixture-t2-named";
+export const T2_COMMENT_NAMED_DISPLAY_NAME = "Phạm Thị Bình Luận Công Khai";
+export const T2_COMMENT_NAMED_AVATAR_URL = `${T2_AVATAR_ORIGIN}/storage/v1/object/sign/avatars/comment-named/c.png?token=z`;
+export const T2_COMMENT_NAMED_BODY = "Bình luận có tên hiển thị bình thường.";
+
+export const T2_COMMENT_ANONYMOUS_ID = "comment-fixture-t2-anonymous";
+/** The real identity behind the ANONYMOUS comment — same rationale as
+ *  `T2_ANONYMOUS_REAL_DISPLAY_NAME` above: never fed into `toAuthorIdentity`
+ *  for the row actually rendered (only `null` is); exists so the absence
+ *  assertions check for a REAL value that could have leaked, and doubles as
+ *  the RED-phase discrimination proof's stand-in value (Investigation Notes:
+ *  temporarily building this row's `.author` as
+ *  `{kind:"named", displayName: T2_COMMENT_ANONYMOUS_REAL_DISPLAY_NAME,
+ *  avatarUrl: T2_COMMENT_ANONYMOUS_REAL_AVATAR_URL}` — bypassing
+ *  `toAuthorIdentity` — turns the absence assertions red; reverting to the
+ *  `null`-at-source call turns them green again). */
+export const T2_COMMENT_ANONYMOUS_REAL_DISPLAY_NAME = "Vũ Văn Ẩn Danh Bình Luận";
+export const T2_COMMENT_ANONYMOUS_REAL_AVATAR_URL = `${T2_AVATAR_ORIGIN}/storage/v1/object/sign/avatars/comment-anon/d.png?token=w`;
+export const T2_COMMENT_ANONYMOUS_BODY = "Bình luận ẩn danh của một người dùng khác.";
+
+export const T2_COMMENT_WRITER_ID = "comment-fixture-t2-writer";
+/** Same rationale as `T2_COMMENT_ANONYMOUS_REAL_DISPLAY_NAME`, for the row
+ *  that is BOTH the solution's writer AND anonymous — the real identity that
+ *  must stay absent even though "Người viết" renders alongside "Ẩn danh". */
+export const T2_COMMENT_WRITER_REAL_DISPLAY_NAME = "Đỗ Thị Người Viết Ẩn Danh";
+export const T2_COMMENT_WRITER_REAL_AVATAR_URL = `${T2_AVATAR_ORIGIN}/storage/v1/object/sign/avatars/comment-writer/e.png?token=v`;
+export const T2_COMMENT_WRITER_BODY = "Bình luận ẩn danh của chính người viết bài giải.";
+
+/** Three comment rows for `T2_COMMENTS_SOLUTION_ID`'s only question — old
+ *  first, new last (UI Spec § Component: CommentSheet layout order). */
+function fixtureT2Comments(): SolutionDetailComment[] {
+  return [
+    {
+      id: T2_COMMENT_NAMED_ID,
+      author: toAuthorIdentity({
+        author_display_name: T2_COMMENT_NAMED_DISPLAY_NAME,
+        author_avatar_url: T2_COMMENT_NAMED_AVATAR_URL,
+      }),
+      isSolutionAuthor: false,
+      isMine: false,
+      body: T2_COMMENT_NAMED_BODY,
+      iReported: false,
+      createdAt: "2026-09-20T10:00:00.000Z",
+    },
+    {
+      id: T2_COMMENT_ANONYMOUS_ID,
+      author: toAuthorIdentity({ author_display_name: null, author_avatar_url: null }),
+      isSolutionAuthor: false,
+      isMine: false,
+      body: T2_COMMENT_ANONYMOUS_BODY,
+      iReported: false,
+      createdAt: "2026-09-20T10:01:00.000Z",
+    },
+    {
+      id: T2_COMMENT_WRITER_ID,
+      author: toAuthorIdentity({ author_display_name: null, author_avatar_url: null }),
+      isSolutionAuthor: true,
+      isMine: false,
+      body: T2_COMMENT_WRITER_BODY,
+      iReported: false,
+      createdAt: "2026-09-20T10:02:00.000Z",
+    },
+  ];
+}
+
+T2_SOLUTION_DETAILS[T2_COMMENTS_SOLUTION_ID] = t2DetailBase({
+  id: T2_COMMENTS_SOLUTION_ID,
+  author: toAuthorIdentity({
+    author_display_name: T2_NAMED_AUTHOR_DISPLAY_NAME,
+    author_avatar_url: T2_NAMED_AUTHOR_AVATAR_URL,
+  }),
+  ...t2MapScore(T2_NAMED_AUTHOR_SCORE),
+  questions: [fixtureDetailQuestion({ questionId: T2_COMMENTS_QUESTION_ID, comments: fixtureT2Comments() })],
+});
