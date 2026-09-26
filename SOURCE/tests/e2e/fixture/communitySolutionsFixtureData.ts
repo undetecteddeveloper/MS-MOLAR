@@ -468,3 +468,62 @@ T2_SOLUTION_DETAILS[T2_COMMENTS_SOLUTION_ID] = t2DetailBase({
   ...t2MapScore(T2_NAMED_AUTHOR_SCORE),
   questions: [fixtureDetailQuestion({ questionId: T2_COMMENTS_QUESTION_ID, comments: fixtureT2Comments() })],
 });
+
+// -----------------------------------------------------------------------------
+// Test 3 (task 31) — ONE shared XSS payload applied to BOTH a note fixture
+// (S-05, SolutionNoteBlock's server-direct RichText) and a comment fixture
+// (O-02, CommentItem's dynamically-imported RichText) — the point is proving
+// the SAME payload is inert on both independent render paths, not two
+// independently-chosen payloads. Reuses the SAME `T2_SOLUTION_DETAILS` map/
+// `fixtureGetSolutionDetailForAnonymityCheck` lookup Test 2 already wires
+// through `getSolutionDetailMock` — this task adds one more entry, it does
+// not introduce a second fixture-lookup mechanism.
+//
+// Payload SHAPE mirrors (does not copy) the task 11/28 groups in
+// `RichText.xss.test.tsx`: one <script> vector + one <img onerror> vector,
+// combined into one string.
+// -----------------------------------------------------------------------------
+
+export const XSS_SHARED_PAYLOAD =
+  'Xem hình <img src="x" onerror="alert(1)"> rồi đọc <script>alert("xss")</script> kỹ nhé';
+
+export const T3_XSS_SOLUTION_ID = "solution-fixture-t3-xss";
+export const T3_XSS_QUESTION_ID = "q1";
+export const T3_XSS_COMMENT_ID = "comment-fixture-t3-xss";
+/** Reused as the sole comment's author name — the test locates the O-02
+ *  comment row by THIS name (never by the raw payload string, per this
+ *  task's Proof Obligation: assert on the rendered DOM, not the fixture
+ *  string). */
+export const T3_XSS_COMMENT_AUTHOR_DISPLAY_NAME = T2_COMMENT_NAMED_DISPLAY_NAME;
+
+T2_SOLUTION_DETAILS[T3_XSS_SOLUTION_ID] = t2DetailBase({
+  id: T3_XSS_SOLUTION_ID,
+  author: toAuthorIdentity({
+    author_display_name: T2_NAMED_AUTHOR_DISPLAY_NAME,
+    author_avatar_url: T2_NAMED_AUTHOR_AVATAR_URL,
+  }),
+  ...t2MapScore(T2_NAMED_AUTHOR_SCORE),
+  questions: [
+    fixtureDetailQuestion({
+      questionId: T3_XSS_QUESTION_ID,
+      // S-05 note body — same string as the comment body below.
+      note: { body: XSS_SHARED_PAYLOAD },
+      comments: [
+        {
+          id: T3_XSS_COMMENT_ID,
+          author: toAuthorIdentity({
+            author_display_name: T3_XSS_COMMENT_AUTHOR_DISPLAY_NAME,
+            author_avatar_url: T2_COMMENT_NAMED_AVATAR_URL,
+          }),
+          isSolutionAuthor: false,
+          isMine: false,
+          // O-02 comment body — the SAME string, not an independently
+          // authored second payload.
+          body: XSS_SHARED_PAYLOAD,
+          iReported: false,
+          createdAt: "2026-09-20T10:03:00.000Z",
+        },
+      ],
+    }),
+  ],
+});

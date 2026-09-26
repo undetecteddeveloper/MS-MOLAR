@@ -138,6 +138,8 @@ import {
   T2_COMMENT_WRITER_BODY,
   T2_COMMENT_WRITER_REAL_AVATAR_URL,
   T2_COMMENT_WRITER_REAL_DISPLAY_NAME,
+  T3_XSS_COMMENT_AUTHOR_DISPLAY_NAME,
+  T3_XSS_SOLUTION_ID,
   createFixtureStore,
   fixtureExam,
   fixtureExamResult,
@@ -274,6 +276,27 @@ function imagesWithSrc(root: HTMLElement, src: string): Element[] {
  *  what the card itself renders. */
 function authorCardSection(container: HTMLElement): HTMLElement {
   return container.querySelector("section") as HTMLElement;
+}
+
+/** Test 3's own proof: zero `<script>` elements, zero `on*` attributes,
+ *  anywhere in the given subtree — mirrors `RichText.xss.test.tsx`'s own
+ *  `assertSafe` (unit lane), scoped here to a subtree of the ACTUAL rendered
+ *  route tree instead of an isolated `<RichText/>` render. Asserts on the
+ *  RENDERED DOM only (never the raw fixture string), per this test's own
+ *  Proof Obligation. RED-phase discrimination proof (Investigation Notes):
+ *  temporarily swapping `RichText` for a raw `dangerouslySetInnerHTML` double
+ *  makes this throw on both the note subtree and the comment-row subtree;
+ *  reverting to the real `RichText` makes it pass again. */
+function assertPayloadInert(root: HTMLElement) {
+  expect(root.querySelectorAll("script")).toHaveLength(0);
+  for (const el of Array.from(root.querySelectorAll("*"))) {
+    for (const attr of Array.from(el.attributes)) {
+      expect(
+        attr.name.toLowerCase().startsWith("on"),
+        `thuộc tính ${attr.name} trên <${el.tagName.toLowerCase()}> (Test 3 XSS payload)`
+      ).toBe(false);
+    }
+  }
 }
 
 describe("J1 — write, publish, and open my own published community solution", () => {
@@ -688,3 +711,61 @@ describe("Test 2 — anonymous author and hidden score never leak into rendered 
 //     different render call site than the note body)
 //   - pass criteria: both render paths show zero executable-markup evidence
 //     from the shared payload fixture
+
+// -----------------------------------------------------------------------------
+// REAL DRIVER + FIXTURE DATA (task 31) — Test 3 implementation. Reuses the
+// SAME `getSolutionDetailMock` wiring (`fixtureGetSolutionDetailForAnonymityCheck`)
+// Test 2 already set up — one more solution id (`T3_XSS_SOLUTION_ID`) in the
+// same lookup map, not a second fixture mechanism.
+// -----------------------------------------------------------------------------
+describe("Test 3 — malicious note/comment markdown renders inert through RichText (S-05, O-02)", () => {
+  beforeEach(() => {
+    getExamMock.mockResolvedValue(fixtureExam());
+    isExamAuthorMock.mockResolvedValue(false);
+    getMySolutionForWriterMock.mockResolvedValue(
+      fixtureWriterState({ solutionId: T2_NAMED_SOLUTION_ID, status: "published" })
+    );
+    getSolutionDetailMock.mockImplementation((solutionId: string) =>
+      Promise.resolve(fixtureGetSolutionDetailForAnonymityCheck(solutionId))
+    );
+  });
+
+  it("S-05 note body and O-02 comment body each render the shared payload as inert markup, independently", async () => {
+    // Deep link `?q=1&comments=1` (same technique as Test 2's O-02 case):
+    // row 1 opens WITH its note body already in the tree (`defaultOpen`, no
+    // click needed) AND CommentSheet mounts for the same question, in ONE
+    // render — both surfaces exercised in the SAME driver session, per this
+    // task's own Boundary to exercise ("full route-tree render of S-05 with
+    // O-02 opened").
+    const viewJsx = await SolutionViewPage({
+      params: Promise.resolve({ id: FIXTURE_EXAM_ID, solutionId: T3_XSS_SOLUTION_ID }),
+      searchParams: Promise.resolve({ q: "1", comments: "1" }),
+    });
+    render(viewJsx);
+
+    // S-05: SolutionNoteBlock's own subtree, found by its unique eyebrow label
+    // (`.closest("section")` — NOT the whole-container query Test 2's
+    // `authorCardSection` uses, because THIS render also opens a note block,
+    // which is its own separate `<section>` alongside SolutionAuthorCard's).
+    const noteLabel = screen.getByText(t("solutions.view.solutionLabel"));
+    const noteBlock = noteLabel.closest("section") as HTMLElement;
+    assertPayloadInert(noteBlock);
+
+    // O-02: CommentSheet's dynamically-imported RichText — await the chunk
+    // (same hazard Test 2's O-02 case documents: no comment row exists to
+    // query at all before this resolves) before scoping to the comment row's
+    // own subtree, found by its author name (same subtree-query convention
+    // as Test 2) — never by the raw payload string (Proof Obligation: assert
+    // on the rendered DOM, not the fixture string).
+    const sheet = await screen.findByRole("dialog", {
+      name: `${t("solutions.comments.title")} · ${t("upload.questionLabel", { number: 1 })}`,
+    });
+    await within(sheet).findByText(T3_XSS_COMMENT_AUTHOR_DISPLAY_NAME);
+    const commentRow = within(sheet)
+      .getByText(T3_XSS_COMMENT_AUTHOR_DISPLAY_NAME)
+      .closest("li") as HTMLElement;
+    assertPayloadInert(commentRow);
+
+    cleanup();
+  });
+});
