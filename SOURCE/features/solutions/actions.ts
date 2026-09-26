@@ -299,3 +299,169 @@ export async function setPin(
   const [row] = (data ?? []) as Array<{ pinned_solution_id: string | null }>;
   return { ok: true, pinnedSolutionId: row?.pinned_solution_id ?? null };
 }
+
+// ----------------------------------------------------------------------------
+// Phase 3 — bình luận (task 26). Bảng bình luận cộng đồng có RLS bật, KHÔNG
+// policy, KHÔNG grant (U1): đường ghi DUY NHẤT là hai RPC SECURITY DEFINER
+// dưới đây — không action nào ở đây đọc/ghi trực tiếp bảng đó qua PostgREST.
+// `error.details` không được đọc cho mã nào trên hai action này (khác
+// saveSolution/setSolutionStatus phía trên) — mọi từ chối khác empty/tooLong/
+// rateLimited đều là `generic` (backend DD § Data Contracts "Error signalling").
+
+const COMMENT_BODY_MAX_LENGTH = 2000;
+
+/** Tập mã im lặng RIÊNG của hai action bình luận: chỉ `42501` (từ chối đã
+ *  lường trước) — khác `SILENT_RPC_ERROR_CODES` phía trên (tập đó mang thêm
+ *  một mã trùng khoá, không áp dụng ở đây) và không có `23514` (Required Test
+ *  #5: `23514` PHẢI log tên RPC + code, vì hai action này không có nhánh đọc
+ *  `error.details` nào xử lý nó — nó là backstop CHƯA TỪNG chạm tới, cùng
+ *  nhóm với "mã khác"). */
+const COMMENT_SILENT_ERROR_CODES = new Set(["42501"]);
+
+function mapCommentError(rpcName: string, error: RpcErrorLike): { code: "generic" } {
+  logUnexpectedRpcError(rpcName, error, COMMENT_SILENT_ERROR_CODES);
+  return { code: "generic" };
+}
+
+export interface PostedComment {
+  id: string;
+  createdAt: string;
+  solutionId: string;
+  questionId: string;
+  body: string;
+  isAnonymous: boolean;
+}
+
+export type PostCommentResult =
+  | { ok: true; comment: PostedComment }
+  | {
+      ok: false;
+      error:
+        | { code: "empty" }
+        | { code: "tooLong" }
+        | { code: "rateLimited"; seconds: number }
+        | { code: "generic" };
+    };
+
+export type DeleteCommentResult =
+  | { ok: true }
+  | {
+      ok: false;
+      error: { code: "rateLimited"; seconds: number } | { code: "generic" };
+    };
+
+export type MarkCommentsReadResult =
+  | { ok: true }
+  | { ok: false; error: { code: "rateLimited"; seconds: number } | { code: "generic" } };
+
+/**
+ * Đăng bình luận vào một câu của bài giải người khác (AC-069, AC-091).
+ * Validation (rỗng/quá dài) chạy TRƯỚC bất kỳ RPC nào — không caller nào chạm
+ * DB với một thân rỗng hay vượt 2000 ký tự. `body`/`isAnonymous` KHÔNG bao giờ
+ * bị sửa trên nhánh lỗi (Failure Mode #3).
+ */
+export async function postComment(
+  solutionId: string,
+  questionId: string,
+  body: string,
+  isAnonymous: boolean
+): Promise<PostCommentResult> {
+  if (body.trim().length === 0) {
+    return { ok: false, error: { code: "empty" } };
+  }
+  if (body.length > COMMENT_BODY_MAX_LENGTH) {
+    return { ok: false, error: { code: "tooLong" } };
+  }
+
+  const { supabase, user } = await requireUser();
+
+  const rl = await guard("communitySolutionComment", user.id);
+  if (!rl.ok) {
+    return { ok: false, error: { code: "rateLimited", seconds: rl.retryAfterSeconds } };
+  }
+
+  const { data, error } = await supabase.rpc("post_community_comment", {
+    p_solution_id: solutionId,
+    p_question_id: questionId,
+    p_body: body,
+    p_is_anonymous: isAnonymous,
+  });
+  if (error) {
+    return { ok: false, error: mapCommentError("post_community_comment", error) };
+  }
+
+  const [row] = (data ?? []) as Array<{ comment_id: string; comment_created_at: string }>;
+  return {
+    ok: true,
+    comment: {
+      id: row.comment_id,
+      createdAt: row.comment_created_at,
+      solutionId,
+      questionId,
+      body,
+      isAnonymous,
+    },
+  };
+}
+
+/**
+ * Xoá bình luận của chính người gọi (AC-070). Không có nhánh "xoá 0 dòng"
+ * riêng — RPC tự raise `42501` cho mọi trường hợp không đủ điều kiện (bình
+ * luận của người khác, của chính tác giả bài giải cố xoá bình luận người
+ * khác, hay bình luận của chính mình đã bị ẩn — S19), nên action chỉ có hai
+ * nhánh: thành công (không lỗi) hoặc `generic`.
+ */
+export async function deleteComment(commentId: string): Promise<DeleteCommentResult> {
+  const { supabase, user } = await requireUser();
+
+  const rl = await guard("communitySolutionCommentDelete", user.id);
+  if (!rl.ok) {
+    return { ok: false, error: { code: "rateLimited", seconds: rl.retryAfterSeconds } };
+  }
+
+  const { error } = await supabase.rpc("delete_community_comment", { p_comment_id: commentId });
+  if (error) {
+    return { ok: false, error: mapCommentError("delete_community_comment", error) };
+  }
+
+  return { ok: true };
+}
+
+/**
+ * Đánh dấu "đã đọc" toàn bộ bình luận tới thời điểm gọi — GHI DUY NHẤT của
+ * task này KHÔNG qua RPC: một update thường trên chính hàng
+ * `user_profiles` của người gọi, dưới `profiles_update_own` không đổi (cùng
+ * tiền lệ `updateProfile`, `SOURCE/features/auth/actions.ts:176-210`).
+ * Không đọc/ghi bảng cộng đồng nào.
+ *
+ * An toàn khi không-có-gì-để-đọc (Failure Mode #2): một lượt cập nhật 0 dòng
+ * (không có bình luận nào tồn tại) vẫn là PostgREST update thành công (không
+ * `error`), nên đây luôn là cùng MỘT hình dạng thành công.
+ *
+ * Quy tắc cho phía tiêu thụ (task 45): gọi hàm này khi tab mở, KHÔNG BAO GIỜ
+ * gọi lúc component vừa mount trước khi dữ liệu khiến người dùng ghé qua đã
+ * tải xong — gọi sớm sẽ đánh dấu đã đọc những bình luận người dùng chưa từng
+ * thấy.
+ */
+export async function markCommentsRead(): Promise<MarkCommentsReadResult> {
+  const { supabase, user } = await requireUser();
+
+  const rl = await guard("communityCommentsMarkRead", user.id);
+  if (!rl.ok) {
+    return { ok: false, error: { code: "rateLimited", seconds: rl.retryAfterSeconds } };
+  }
+
+  const { error } = await supabase
+    .from("user_profiles")
+    .update({ community_comments_last_read_at: new Date().toISOString() })
+    .eq("id", user.id);
+  // Không đọc trường message của lỗi (cùng quy ước với hai action trên) — 0
+  // dòng đổi (không có gì để đánh dấu) không sinh `error` (Failure Mode #2),
+  // nên nhánh dưới đây chỉ chạm tới khi update thật sự hỏng (hạ tầng).
+  if (error) {
+    console.error("[markCommentsRead]", error.code);
+    return { ok: false, error: { code: "generic" } };
+  }
+
+  return { ok: true };
+}

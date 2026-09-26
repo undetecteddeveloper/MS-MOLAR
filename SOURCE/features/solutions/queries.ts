@@ -11,6 +11,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import type { Choice, SubItemId } from "@/types/question";
 import { toAuthorIdentity, toScoreField, type AuthorIdentity } from "@/lib/solutions/identity";
+import { countUnreadComments } from "@/lib/solutions/unreadComments";
 import type { PerQuestionResult } from "@/types/result";
 import { outcomeBranch, resultLabel, toWriterQuestionOutcome } from "./lib/questionOutcome";
 
@@ -504,4 +505,124 @@ export async function getSolutionDetail(solutionId: string): Promise<SolutionDet
   if (rows.length === 0) return null;
 
   return mapSolutionDetailRow(rows[0]);
+}
+
+// ----------------------------------------------------------------------------
+// community_my_comment_feed (task 25) — feed "Bình luận của tôi" (S-tab hồ sơ)
+// + công thức đếm chưa đọc dùng chung (task 26, decomposer resolution R6:
+// "one formula, two call sites" — countUnreadComments trong
+// lib/solutions/unreadComments.ts, không lặp lại luật đếm ở đây).
+//
+// Cỡ trang cố định phía server — CAO HƠN hoặc bằng trần 20 mà chính RPC đã tự
+// áp (schema.sql: least(greatest(coalesce(p_page_size,20),1),20)); truyền
+// đúng con số RPC đã dùng làm mặc định, không bịa thêm một trần khác.
+const COMMENT_FEED_PAGE_SIZE = 20;
+
+/** Hàng thô mà `community_my_comment_feed` trả — đúng MƯỜI cột, đúng thứ tự
+ *  (schema.sql §22, backend DD v1.6 § Data Contracts). KHÔNG có cột định danh
+ *  hay ảnh nào khác `author_display_name` — feed này không trả `author_id` và
+ *  không trả đường dẫn ảnh (frontend DD § Data Contracts "Comment feed
+ *  contract": "the feed carries no avatar"). */
+interface RawCommentFeedRow {
+  comment_id: string;
+  solution_id: string;
+  exam_id: string;
+  exam_title: string;
+  question_number: number;
+  comment_body: string;
+  comment_created_at: string;
+  author_display_name: string | null;
+  is_unread: boolean;
+  exam_visible: boolean;
+}
+
+export interface CommentFeedItem {
+  commentId: string;
+  solutionId: string;
+  examId: string;
+  examTitle: string;
+  questionNumber: number;
+  commentBody: string;
+  commentCreatedAt: string;
+  author: AuthorIdentity;
+  isUnread: boolean;
+  examVisible: boolean;
+}
+
+/** `author_avatar_url: null` TƯỜNG MINH — feed không có cột ảnh, nên đây
+ *  không phải một cột bị bỏ đọc mà là hợp đồng: một hàng có tên không bao giờ
+ *  mang `avatarUrl` từ hàm này (frontend DD § Data Contracts "Comment feed
+ *  contract", Proof Obligation "no batch avatar signer wired into this
+ *  function"). */
+function mapCommentFeedRow(row: RawCommentFeedRow): CommentFeedItem {
+  return {
+    commentId: row.comment_id,
+    solutionId: row.solution_id,
+    examId: row.exam_id,
+    examTitle: row.exam_title,
+    questionNumber: row.question_number,
+    commentBody: row.comment_body,
+    commentCreatedAt: row.comment_created_at,
+    author: toAuthorIdentity({ author_display_name: row.author_display_name, author_avatar_url: null }),
+    isUnread: row.is_unread,
+    examVisible: row.exam_visible,
+  };
+}
+
+/**
+ * Một trang bình luận của người khác trên các bài giải ĐÃ ĐĂNG của chính
+ * người gọi (S-tab hồ sơ "Bình luận", AC-091–AC-098). `page` 1-based; cỡ
+ * trang cố định phía server (>= 20, frontend DD § Data Contracts). Quá trang
+ * cuối → mảng rỗng, không lỗi.
+ */
+export async function getMyCommentFeed(page: number): Promise<CommentFeedItem[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("community_my_comment_feed", {
+    p_page: page,
+    p_page_size: COMMENT_FEED_PAGE_SIZE,
+  });
+  if (error) throw error;
+
+  const rows = (data ?? []) as RawCommentFeedRow[];
+  return rows.map(mapCommentFeedRow);
+}
+
+/**
+ * Tổng số bình luận "mới" (AC-091, AC-092) trên mọi bài giải của người gọi —
+ * "k bình luận mới" của chip hồ sơ (task 45) hay của một bài giải cụ thể khi
+ * `opts.solutionId` được truyền (task 29). Dùng CHUNG `countUnreadComments`
+ * (decomposer resolution R6) — không lặp lại luật `isUnread && examVisible` ở
+ * đây.
+ *
+ * Khai thác đúng bảo đảm của chính feed: hàng chưa đọc luôn nằm ở ĐẦU danh
+ * sách mới-nhất-trước (`is_unread` không phụ thuộc `exam_visible` — backend DD
+ * § Data Contracts "community_my_comment_feed"). Vì vậy hàng chưa đọc luôn tạo
+ * thành một TIỀN TỐ liên tục của feed: lấy từng trang, DỪNG ngay khi gặp
+ * trang KHÔNG ĐẦY (đã hết dữ liệu) hoặc trang có chứa một hàng ĐÃ ĐỌC (tiền tố
+ * đã kết thúc giữa trang) — không cần đọc quá trang đó, vì mọi hàng sau nó
+ * (mới hơn... không, CŨ hơn, vì thứ tự giảm dần) đã đọc hoặc không tồn tại.
+ */
+export async function getMyUnreadCommentCount(opts?: { solutionId?: string }): Promise<number> {
+  const supabase = await createClient();
+
+  let total = 0;
+  let page = 1;
+  for (;;) {
+    const { data, error } = await supabase.rpc("community_my_comment_feed", {
+      p_page: page,
+      p_page_size: COMMENT_FEED_PAGE_SIZE,
+    });
+    if (error) throw error;
+
+    const rows = ((data ?? []) as RawCommentFeedRow[]).map(mapCommentFeedRow);
+    total += countUnreadComments(rows, opts);
+
+    const pageIsFull = rows.length === COMMENT_FEED_PAGE_SIZE;
+    const pageHasReadRow = rows.some((row) => !row.isUnread);
+    if (!pageIsFull || pageHasReadRow) break;
+
+    page += 1;
+  }
+
+  return total;
 }
