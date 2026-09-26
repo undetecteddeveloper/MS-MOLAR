@@ -981,6 +981,9 @@ export const copy = {
   "solutions.card.updated": "Cập nhật {time}",
   "solutions.card.helpfulCount": "{count} hữu ích",
   "solutions.card.commentCount": "{count} bình luận",
+  // Chấm chưa đọc trên ĐÚNG thẻ của chính người viết (AC-092, task 29) — chữ
+  // mang thông tin, chấm chỉ là trang trí (aria-hidden).
+  "solutions.card.unreadComments": "{count} bình luận mới",
   "solutions.card.pinned": "Tác giả đề ghim",
   "solutions.card.openLabel": "Mở bài giải của {name}",
   // Công tắc cài đặt (C-12): chữ trạng thái hiện rõ cạnh rãnh, không chỉ màu.

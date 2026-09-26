@@ -4,14 +4,18 @@
 // § Main Components "features/solutions/components/SolutionList.tsx + SolutionCard.tsx".
 //
 // Header (breadcrumb/eyebrow/tiêu đề/mô tả) do route `page.tsx` dựng, KHÔNG
-// phải ở đây: breadcrumb cần tên đề — dữ liệu SolutionList (interface đã chốt
-// `{examId, items, own, now}`, frontend DD §829) không nhận — trong khi
+// phải ở đây: breadcrumb cần tên đề — dữ liệu SolutionList (interface chốt ở
+// frontend DD §829: `{examId, items, own, now}`, `unreadCommentCount` thêm bởi
+// task 29 theo đúng cách `editHref` đã thêm ở v1.4) không nhận — trong khi
 // `page.tsx` đã đọc đề đó cho chính header của nó (AC-052). SolutionList chỉ
 // lo phần "khung danh sách": khối bài của tôi + `ul` các thẻ + trạng thái rỗng.
 //
 // `editHref` dựng MỘT LẦN ở đây từ `own.attemptId`, giao cho ĐÚNG một hàng có
 // `item.isMine === true` — không có nhánh nào trong `SolutionCard` tự kiểm lại
 // `isMine` cho liên kết này (frontend DD § SolutionCard/SolutionList, "editHref (v1.4)").
+// `unreadCommentCount` (task 29) do route tính sẵn (`getMyUnreadCommentCount`,
+// task 26) và chỉ chuyển tiếp ở đây — CÙNG một quy tắc "chỉ hàng isMine" với
+// `editHref`, không tính lại gì.
 import { OwnSolutionBlock, type OwnSolutionSummary } from "@/features/solutions/components/OwnSolutionBlock";
 import { SolutionCard } from "@/features/solutions/components/SolutionCard";
 import { Card } from "@/components/ui/card";
@@ -23,9 +27,14 @@ export interface SolutionListProps {
   items: SolutionListItem[];
   own: OwnSolutionSummary;
   now: Date;
+  /** Số "bình luận mới" của bài published của chính người xem trên đề này
+   *  (AC-091/AC-092, task 29) — route đã tính sẵn qua `getMyUnreadCommentCount`
+   *  (task 26); giao đúng MỘT lần cho hàng `item.isMine === true`, cùng quy
+   *  ước `editHref` ngay dưới đây. */
+  unreadCommentCount?: number;
 }
 
-export function SolutionList({ examId, items, own, now }: SolutionListProps) {
+export function SolutionList({ examId, items, own, now, unreadCommentCount }: SolutionListProps) {
   const editHref = `/exams/${examId}/attempt/${own.attemptId}/solution`;
 
   return (
@@ -47,6 +56,7 @@ export function SolutionList({ examId, items, own, now }: SolutionListProps) {
               examId={examId}
               now={now}
               editHref={item.isMine ? editHref : undefined}
+              unreadCommentCount={item.isMine ? unreadCommentCount : undefined}
             />
           ))}
         </ul>

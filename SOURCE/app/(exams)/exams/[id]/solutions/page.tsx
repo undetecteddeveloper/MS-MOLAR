@@ -4,6 +4,15 @@
 // truy vấn đề mà đầu trang/breadcrumb đã cần cho tên đề (AC-052). Không có
 // truy vấn nào theo từng dòng: trăm bài giải không thêm truy vấn nào (AC-057).
 //
+// Truy vấn thứ tư, CÓ ĐIỀU KIỆN (task 29, AC-091/AC-092): đúng MỘT lời gọi
+// `getMyUnreadCommentCount({ solutionId })`, CHỈ khi bài của chính người xem
+// trên đề này đã "published" (own.status khác "published" ⇒ không gọi, không
+// đếm gì) — scoped theo `solutionId` của chính bài đó, tương đương scoped
+// theo đề này vì mỗi người viết chỉ có MỘT bài giải cho một đề (frontend DD §
+// Data Contracts "Comment feed contract", counting rule). Không tính lại công
+// thức `isUnread && examVisible` ở đây — công thức sống trong
+// `lib/solutions/unreadComments.ts` (task 26), route này chỉ tiêu thụ kết quả.
+//
 // `getResultCardSummary(examId)` KHÔNG BAO GIỜ được gọi ở route này (frontend
 // DD § Data Contracts "Own-solution block contract", AC-110/S20) — đọc nó
 // đánh dấu lý do xoá hẳn một lần duy nhất đã xem, và bề mặt DUY NHẤT được gọi
@@ -17,7 +26,7 @@
 // thẳng vào error.tsx.
 import { notFound, redirect } from "next/navigation";
 import { getExam } from "@/features/exams/queries";
-import { getMySolutionForWriter, listSolutions } from "@/features/solutions/queries";
+import { getMySolutionForWriter, getMyUnreadCommentCount, listSolutions } from "@/features/solutions/queries";
 import { SolutionList } from "@/features/solutions/components/SolutionList";
 import type { OwnSolutionSummary } from "@/features/solutions/components/OwnSolutionBlock";
 import { PageContainer } from "@/components/layout/PageContainer";
@@ -34,7 +43,17 @@ export default async function SolutionsListPage({ params }: { params: Promise<{ 
     redirect(`/exams/${id}`);
   }
 
-  const [exam, items] = await Promise.all([getExam(id), listSolutions(id)]);
+  // `getMyUnreadCommentCount` chỉ gọi khi bài CHÍNH mình trên đề này đã đăng —
+  // `own.status === "published"` kéo theo `own.solutionId !== null` (mapper
+  // rule: status null CHỈ KHI VÀ KHI solutionId null, features/solutions/queries.ts).
+  // Nhánh else không gọi RPC nào (Promise.resolve giữ đúng "MỘT lời gọi").
+  const [exam, items, unreadCommentCount] = await Promise.all([
+    getExam(id),
+    listSolutions(id),
+    own.status === "published" && own.solutionId !== null
+      ? getMyUnreadCommentCount({ solutionId: own.solutionId })
+      : Promise.resolve(undefined),
+  ]);
   if (!exam) {
     notFound();
   }
@@ -75,7 +94,13 @@ export default async function SolutionsListPage({ params }: { params: Promise<{ 
         description={t("solutions.list.description", { count: items.length })}
       />
 
-      <SolutionList examId={id} items={items} own={summary} now={now} />
+      <SolutionList
+        examId={id}
+        items={items}
+        own={summary}
+        now={now}
+        unreadCommentCount={unreadCommentCount}
+      />
     </PageContainer>
   );
 }

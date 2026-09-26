@@ -34,6 +34,14 @@ export interface SolutionCardProps {
    *  có liên kết "Sửa" nào render — không có nhánh nào trong file này tự kiểm
    *  lại `isMine` cho liên kết này (frontend DD § SolutionCard/SolutionList). */
   editHref?: string;
+  /** Số "bình luận mới" (AC-091/AC-092, task 29) — CHA (route, qua
+   *  `getMyUnreadCommentCount`/`countUnreadComments`, task 26) tính sẵn và chỉ
+   *  truyền cho hàng `item.isMine === true`; component này KHÔNG BAO GIỜ tự
+   *  đếm. Dù có được truyền cho một hàng không phải của mình, việc render vẫn
+   *  khoá theo `item.isMine` ngay dưới đây — không có nhánh nào đọc riêng
+   *  `unreadCommentCount` mà bỏ qua `item.isMine` (D38/AC-094, "chỉ hiện trên
+   *  bài của mình"). */
+  unreadCommentCount?: number;
 }
 
 /** Huy hiệu điểm — ĐÚNG hai hình dạng, không có hình thứ ba (Reference
@@ -52,7 +60,7 @@ function ScoreBadge({ score, scoreGrading }: Pick<SolutionListItem, "score" | "s
   );
 }
 
-export function SolutionCard({ item, examId, now, editHref }: SolutionCardProps) {
+export function SolutionCard({ item, examId, now, editHref, unreadCommentCount }: SolutionCardProps) {
   const viewHref = `/exams/${examId}/solutions/${item.id}`;
   const openLabelName =
     item.author.kind === "named" ? item.author.displayName : t("solutions.identity.anonymous");
@@ -92,8 +100,19 @@ export function SolutionCard({ item, examId, now, editHref }: SolutionCardProps)
       </div>
 
       {item.isMine && (
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Badge variant="surface">{t("solutions.card.mine")}</Badge>
+          {/* Khoá kép AC-092/AC-094: `item.isMine` (nhánh cha, dòng trên) VÀ
+           *  count > 0 — chấm là trang trí (`aria-hidden`), chữ mang thông tin
+           *  và là tên trợ năng thật (không phải chỉ chấm). */}
+          {unreadCommentCount !== undefined && unreadCommentCount > 0 && (
+            <span className="inline-flex items-center gap-1.5">
+              <span aria-hidden className="bg-destructive size-2 rounded-full" />
+              <span className="bg-destructive text-primary-foreground rounded-full px-2 py-0.5 text-xs font-semibold">
+                {t("solutions.card.unreadComments", { count: unreadCommentCount })}
+              </span>
+            </span>
+          )}
           {editHref && (
             <Link
               href={editHref}

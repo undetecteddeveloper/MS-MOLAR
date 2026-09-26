@@ -150,6 +150,7 @@ const {
   getMySolutionForWriterMock,
   getSolutionDetailMock,
   listSolutionsMock,
+  getMyUnreadCommentCountMock,
   saveSolutionMock,
   setSolutionStatusMock,
   toggleHelpfulMock,
@@ -166,6 +167,11 @@ const {
   getMySolutionForWriterMock: vi.fn(),
   getSolutionDetailMock: vi.fn(),
   listSolutionsMock: vi.fn(),
+  // task 29 (AC-091/AC-092): S-03's own-card unread badge — this fixture file
+  // never asserts a specific count, so a resolved `undefined` (below) keeps
+  // every existing screenshot/leak assertion unchanged; only its presence as
+  // an export matters here (page.tsx imports it unconditionally).
+  getMyUnreadCommentCountMock: vi.fn(),
   saveSolutionMock: vi.fn(),
   setSolutionStatusMock: vi.fn(),
   toggleHelpfulMock: vi.fn(),
@@ -205,6 +211,7 @@ vi.mock("@/features/solutions/queries", () => ({
   getMySolutionForWriter: getMySolutionForWriterMock,
   getSolutionDetail: getSolutionDetailMock,
   listSolutions: listSolutionsMock,
+  getMyUnreadCommentCount: getMyUnreadCommentCountMock,
 }));
 vi.mock("@/features/solutions/actions", () => ({
   saveSolution: saveSolutionMock,
@@ -485,6 +492,9 @@ describe("Test 2 — anonymous author and hidden score never leak into rendered 
     getSolutionDetailMock.mockImplementation((solutionId: string) =>
       Promise.resolve(fixtureGetSolutionDetailForAnonymityCheck(solutionId))
     );
+    // own.status is "published" above, so page.tsx DOES call this — task 29's
+    // badge is out of scope for this file's leak assertions (0 -> no badge).
+    getMyUnreadCommentCountMock.mockResolvedValue(0);
   });
 
   it("S-03 solutions list: each row's OWN subtree shows only what that row is allowed to show", async () => {

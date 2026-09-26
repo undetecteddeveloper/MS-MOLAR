@@ -145,3 +145,31 @@ describe("SolutionCard — hàng đếm (AC-055)", () => {
     expect(screen.getByText("0 bình luận")).toBeTruthy();
   });
 });
+
+describe("SolutionCard — chấm chưa đọc chỉ trên thẻ của mình (AC-091, AC-092, AC-094, task 29)", () => {
+  it("isMine true + unreadCommentCount=3: hiện '3 bình luận mới' cùng chấm aria-hidden", () => {
+    const { container } = renderCard({
+      item: item({ isMine: true }),
+      unreadCommentCount: 3,
+    });
+    expect(screen.getByText("3 bình luận mới")).toBeTruthy();
+    const dot = container.querySelector("span[aria-hidden].bg-destructive.size-2.rounded-full");
+    expect(dot).toBeTruthy();
+  });
+
+  it("isMine true + unreadCommentCount=0: KHÔNG hiện chữ 'bình luận mới' nào", () => {
+    renderCard({ item: item({ isMine: true }), unreadCommentCount: 0 });
+    expect(screen.queryByText(/bình luận mới/)).toBeNull();
+  });
+
+  it("isMine true, KHÔNG truyền unreadCommentCount: KHÔNG hiện chữ 'bình luận mới' nào", () => {
+    renderCard({ item: item({ isMine: true }) });
+    expect(screen.queryByText(/bình luận mới/)).toBeNull();
+  });
+
+  it("isMine false NHƯNG có unreadCommentCount=5 (giả lập truyền nhầm): KHÔNG hiện chấm/chữ nào (D38/AC-094)", () => {
+    renderCard({ item: item({ isMine: false }), unreadCommentCount: 5 });
+    expect(screen.queryByText(/bình luận mới/)).toBeNull();
+    expect(screen.queryByText("5 bình luận mới")).toBeNull();
+  });
+});

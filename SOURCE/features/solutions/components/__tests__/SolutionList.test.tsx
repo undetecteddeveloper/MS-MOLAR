@@ -103,3 +103,33 @@ describe("SolutionList — editHref dựng một lần, giao đúng hàng isMine
     );
   });
 });
+
+describe("SolutionList — unreadCommentCount chỉ chuyển tiếp cho hàng isMine (task 29, AC-091/AC-092)", () => {
+  it("hàng isMine=true nhận unreadCommentCount=2; hàng isMine=false không hiện 'bình luận mới' nào", () => {
+    render(
+      <SolutionList
+        examId={EXAM_ID}
+        items={[item({ id: "S1", isMine: false }), item({ id: "S2", isMine: true })]}
+        own={summary()}
+        now={NOW}
+        unreadCommentCount={2}
+      />
+    );
+
+    expect(screen.getByText("2 bình luận mới")).toBeTruthy();
+    expect(screen.getAllByText(/bình luận mới/)).toHaveLength(1);
+  });
+
+  it("KHÔNG truyền unreadCommentCount: không thẻ nào hiện 'bình luận mới'", () => {
+    render(
+      <SolutionList
+        examId={EXAM_ID}
+        items={[item({ id: "S1", isMine: true })]}
+        own={summary()}
+        now={NOW}
+      />
+    );
+
+    expect(screen.queryByText(/bình luận mới/)).toBeNull();
+  });
+});
