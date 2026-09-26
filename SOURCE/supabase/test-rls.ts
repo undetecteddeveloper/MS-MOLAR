@@ -239,6 +239,35 @@ async function cleanupCs27Fixtures(admin: SupabaseClient) {
   await admin.from("questions").delete().in("id", CS27_QUESTION_IDS);
 }
 
+// Fixture Community Solutions — task 35 (test task của migration 32; backend
+// DD v1.9 § Integration Verification Points / § Test Boundaries "User-write
+// RPC groups"). Ba đề RIÊNG, mỗi đề 3 câu, tác giả = A: một cho hai nhóm RPC
+// báo cáo + `i_reported`, một cho nhóm admin (kiểm duyệt bài giải/bình luận,
+// AC-084, SN-1), một cho hàng đợi admin + ghi chú cho admin — tách đề để mỗi
+// nhóm đọc đúng trạng thái của riêng nó (hàng đợi là toàn cục).
+const CS35_REPORT_EXAM_ID = "rls-cs35-report";
+const CS35_MOD_EXAM_ID = "rls-cs35-mod";
+const CS35_QUEUE_EXAM_ID = "rls-cs35-queue";
+const CS35_EXAM_IDS = [CS35_REPORT_EXAM_ID, CS35_MOD_EXAM_ID, CS35_QUEUE_EXAM_ID];
+function cs35QuestionIds(examId: string): string[] {
+  return [1, 2, 3].map((n) => `${examId}-q${n}`);
+}
+// User thứ tư (bền vững, cùng quy ước A/B/C) — case `i_reported` cần bốn người
+// khác nhau không phải admin: người viết W, người bình luận Q, người báo cáo R
+// và người thứ ba T chưa báo cáo gì.
+const EMAIL_D = "smithnguyen247+rlstestd@gmail.com";
+
+/** Xóa sạch fixture Community Solutions của task 35 (chạy trước VÀ sau để
+ *  idempotent). Ghi chú/Hữu ích/bình luận/báo cáo cascade theo bài giải;
+ *  community_moderation_log cascade theo exam_id. */
+async function cleanupCs35Fixtures(admin: SupabaseClient) {
+  await admin.from("community_moderation_log").delete().in("exam_id", CS35_EXAM_IDS);
+  await admin.from("community_solutions").delete().in("exam_id", CS35_EXAM_IDS);
+  await admin.from("exam_attempts").delete().in("exam_id", CS35_EXAM_IDS);
+  await admin.from("exams").delete().in("id", CS35_EXAM_IDS);
+  await admin.from("questions").delete().in("id", CS35_EXAM_IDS.flatMap(cs35QuestionIds));
+}
+
 /** Xóa sạch fixture Community Solutions (chạy trước VÀ sau để idempotent). */
 async function cleanupCommunitySolutionsFixtures(admin: SupabaseClient) {
   await admin.from("community_moderation_log").delete().eq("exam_id", CS_EXAM_ID);
@@ -349,6 +378,51 @@ async function signInAs(
   });
   if (error) throw error;
   return client;
+}
+
+/** Phiên Supabase Auth THƯỜNG của admin đã seed trong `admin_users` (task 03:
+ *  seed out-of-band từ ADMIN_USER_IDS của chính project này).
+ *
+ *  TD-029: đây KHÔNG phải service-role client. Setup client chỉ dùng Auth
+ *  Admin API để sinh một token magic-link (không gửi email, không đổi mật khẩu
+ *  tài khoản thật); một anon client MỚI tự đổi token đó lấy JWT
+ *  `authenticated` của đúng user admin — mọi RPC admin sau đó chạy dưới
+ *  `auth.uid()` thật, như phiên A/B/C. Không tìm thấy id nào đã seed thì dừng
+ *  hẳn: đó là thiếu seed (chạy lại seed của task 03), không phải lỗi code. */
+async function signInAsSeededAdmin(
+  admin: SupabaseClient,
+  url: string,
+  anon: string,
+  adminUserIdsEnv: string | undefined,
+): Promise<{ client: SupabaseClient; userId: string }> {
+  const configuredIds = (adminUserIdsEnv ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const seeded = await admin.from("admin_users").select("user_id").in("user_id", configuredIds);
+  if (seeded.error) throw seeded.error;
+  const userId = (seeded.data?.[0] as { user_id: string } | undefined)?.user_id;
+  if (!userId) {
+    throw new Error(
+      "admin_users không chứa id nào của ADMIN_USER_IDS — chạy lại seed out-of-band của task 03, KHÔNG sửa test",
+    );
+  }
+  const user = await admin.auth.admin.getUserById(userId);
+  if (user.error) throw user.error;
+  const email = user.data.user.email;
+  if (!email) throw new Error("User admin đã seed không có email — không đăng nhập bằng magic link được");
+
+  const link = await admin.auth.admin.generateLink({ type: "magiclink", email });
+  if (link.error) throw link.error;
+  const client = createClient(url, anon, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const verified = await client.auth.verifyOtp({
+    token_hash: link.data.properties.hashed_token,
+    type: "magiclink",
+  });
+  if (verified.error) throw verified.error;
+  return { client, userId };
 }
 
 const MCQ_CHOICES = [
@@ -4426,6 +4500,1352 @@ async function main() {
 
     // Dọn dẹp fixture Community Solutions (task 27).
     await cleanupCs27Fixtures(admin);
+  }
+
+  // ==========================================================================
+  // Phần 13 — Community Solutions, TEST TASK 35 (migration task 32: backend DD
+  // v1.9 § Integration Verification Points / § Test Boundaries "User-write RPC
+  // groups" / § Data Contracts "Admin RPCs"). Hai nhóm RPC báo cáo (kèm
+  // table-closure + AC-004), `i_reported` theo từng người gọi, nhóm admin
+  // (từ chối người không phải admin cho CẢ BỐN hàm — AC-085; lý do/chuyển
+  // trạng thái/hành động lạ 22023; AC-084 xoá hẳn cascade + đúng một dòng
+  // log), hình dạng ghi chú cho admin (RCV #16), hàng đợi admin với bình luận
+  // bị ẩn + bài giải bị ẩn luôn còn trong hàng đợi (RCV #26) + hai cờ ẩn danh,
+  // hồi quy tên. SN-1 (work plan § Open Items): các case "bị ẩn" của task
+  // 05/16/27 — trước đây dựng bằng harness setup client — chạy LẠI ở đây qua
+  // RPC admin thật.
+  //
+  // TD-029: phiên admin là phiên Supabase Auth thường (signInAsSeededAdmin),
+  // KHÔNG phải service-role client; setup client chỉ dựng fixture và đọc đối
+  // chứng, đúng như mọi phần trên. U1: bảng community_content_reports đóng
+  // hoàn toàn — không thêm grant/policy nào để một case xanh.
+  //
+  // Bọc trong { } cùng quy ước Phần 11/12.
+  // ==========================================================================
+  {
+    console.log("\nCommunity Solutions (task 35) — setup fixture (service_role) + phiên admin đã seed…");
+    await cleanupCs35Fixtures(admin);
+
+    const userDId = await ensureUser(admin, EMAIL_D);
+    const userD = await signInAs(url, anon, EMAIL_D);
+    const { client: adminSession, userId: adminUserId } = await signInAsSeededAdmin(
+      admin,
+      url,
+      anon,
+      env.ADMIN_USER_IDS,
+    );
+    // Mọi thứ sau khi có phiên admin thật nằm trong try/finally: phiên này là
+    // magic-link trên tài khoản admin dev, nên PHẢI được thu hồi kể cả khi một
+    // assert/setup ném lỗi giữa chừng.
+    let part13Completed = false;
+    try {
+      const adminGate = await adminSession.rpc("is_admin_user");
+      if (adminGate.error || adminGate.data !== true) {
+        throw new Error(
+          `Phiên admin đã seed không qua is_admin_user() (nhận ${adminGate.error?.code ?? adminGate.data}) — chạy lại seed admin_users của task 03, KHÔNG sửa test`,
+        );
+      }
+
+      const profiles = await admin.from("user_profiles").select("id, display_name").in("id", [userAId, userBId, userCId]);
+      if (profiles.error) throw profiles.error;
+      const displayNameOf = new Map(
+        (profiles.data ?? []).map((p) => [p.id as string, (p.display_name as string | null) ?? null]),
+      );
+      const nameA = displayNameOf.get(userAId) ?? null;
+      const nameB = displayNameOf.get(userBId) ?? null;
+      const nameC = displayNameOf.get(userCId) ?? null;
+      if (!nameA || !nameB || !nameC) {
+        throw new Error("user_profiles.display_name của A/B/C rỗng — các case 'tên thật' sẽ không chứng minh được gì");
+      }
+
+      type RpcResult = { data: unknown; error: { code?: string; message?: string; details?: string } | null };
+
+      /** Một đề published 3 câu, tác giả A, mỗi user A/B/C/D một lượt đã nộp.
+       *  Admin KHÔNG có lượt nào (AC-081: admin không cần đã nộp đề). */
+      async function setupCs35Exam(examId: string): Promise<Record<string, string>> {
+        const questionIds = cs35QuestionIds(examId);
+        const questions = await admin.from("questions").insert(
+          questionIds.map((id, i) => ({
+            id,
+            content: `[RLS-CS35] ${examId} câu ${i + 1}`,
+            choices: MCQ_CHOICES,
+            correct_answer: "A",
+            subject: "Toán",
+            grade: 10,
+            topic: "Toán",
+          })),
+        );
+        if (questions.error) throw questions.error;
+        const exam = await admin.from("exams").insert({
+          id: examId,
+          title: `[RLS] Đề Bài giải cộng đồng (task 35) ${examId}`,
+          duration_minutes: 45,
+          subject: "Toán",
+          grade: 10,
+          author_id: userAId,
+          author_display_name: "RLS Test Author",
+          question_ids: questionIds,
+          status: "published",
+        });
+        if (exam.error) throw exam.error;
+        const attempts: Record<string, string> = {};
+        for (const userId of [userAId, userBId, userCId, userDId]) {
+          attempts[userId] = await insertSubmittedAttempt(admin, userId, examId, new Date());
+        }
+        return attempts;
+      }
+
+      async function insertCs35Solution(spec: {
+        examId: string;
+        authorId: string;
+        status: "draft" | "published";
+        showProfile: boolean;
+        attemptId: string;
+        notes: Array<{ questionId: string; body: string }>;
+      }): Promise<string> {
+        const row = await admin
+          .from("community_solutions")
+          .insert({
+            exam_id: spec.examId,
+            author_id: spec.authorId,
+            status: spec.status,
+            show_profile: spec.showProfile,
+            show_score: false,
+            linked_attempt_id: spec.attemptId,
+          })
+          .select("id")
+          .single();
+        if (row.error) throw row.error;
+        const solutionId = row.data!.id as string;
+        if (spec.notes.length > 0) {
+          const notes = await admin.from("community_solution_notes").insert(
+            spec.notes.map((note) => ({ solution_id: solutionId, question_id: note.questionId, body: note.body })),
+          );
+          if (notes.error) throw notes.error;
+        }
+        return solutionId;
+      }
+      function fullNotes(examId: string): Array<{ questionId: string; body: string }> {
+        return cs35QuestionIds(examId).map((questionId) => ({ questionId, body: csWords(15) }));
+      }
+
+      /** Bình luận tạo qua CHÍNH RPC của người bình luận (DD: bình luận ẩn danh
+       *  phải đi qua post_community_comment của phiên người đó). */
+      async function postCs35Comment(
+        client: SupabaseClient,
+        target: { solutionId: string; questionId: string; body: string; isAnonymous: boolean },
+      ): Promise<string> {
+        const res = await client.rpc("post_community_comment", {
+          p_solution_id: target.solutionId,
+          p_question_id: target.questionId,
+          p_body: target.body,
+          p_is_anonymous: target.isAnonymous,
+        });
+        if (res.error) throw res.error;
+        return (res.data as Array<{ comment_id: string }>)[0].comment_id;
+      }
+      async function mustSucceed(label: string, call: PromiseLike<RpcResult>): Promise<void> {
+        const res = await call;
+        if (res.error) throw new Error(`${label}: ${res.error.code} ${res.error.message}`);
+      }
+
+      async function reportsOnSolution(solutionId: string): Promise<number> {
+        const r = await admin
+          .from("community_content_reports")
+          .select("id", { count: "exact", head: true })
+          .eq("solution_id", solutionId);
+        return r.count ?? -1;
+      }
+      async function reportsOnComment(commentId: string): Promise<number> {
+        const r = await admin
+          .from("community_content_reports")
+          .select("id", { count: "exact", head: true })
+          .eq("comment_id", commentId);
+        return r.count ?? -1;
+      }
+      async function solutionStatusOf(solutionId: string): Promise<string | null> {
+        const r = await admin.from("community_solutions").select("status").eq("id", solutionId).maybeSingle();
+        return (r.data as { status: string } | null)?.status ?? null;
+      }
+      async function commentStatusOf(commentId: string): Promise<string | null> {
+        const r = await admin.from("community_solution_comments").select("status").eq("id", commentId).maybeSingle();
+        return (r.data as { status: string } | null)?.status ?? null;
+      }
+      type LogRow = {
+        target_type: string;
+        exam_id: string | null;
+        target_user_id: string | null;
+        actor_id: string | null;
+        action: string;
+        reason: string | null;
+        created_at: string;
+      };
+      async function logRowsFor(targetId: string): Promise<LogRow[]> {
+        const r = await admin
+          .from("community_moderation_log")
+          .select("target_type, exam_id, target_user_id, actor_id, action, reason, created_at")
+          .eq("target_id", targetId)
+          .order("created_at");
+        if (r.error) throw r.error;
+        return r.data as LogRow[];
+      }
+      /** Toàn bộ trạng thái một đề fixture (bài giải, ghi chú, Hữu ích, bình
+       *  luận, báo cáo, dòng log) — so trước/sau một lời gọi bị từ chối để chứng
+       *  minh "không dòng nào, không dòng log nào đổi". */
+      async function worldOf(examId: string): Promise<string> {
+        const solutions = await admin
+          .from("community_solutions")
+          .select("id, status, updated_at, is_pinned, show_profile")
+          .eq("exam_id", examId)
+          .order("id");
+        if (solutions.error) throw solutions.error;
+        const solutionIds = (solutions.data ?? []).map((s) => s.id as string);
+        const notes = await admin
+          .from("community_solution_notes")
+          .select("solution_id, question_id, body")
+          .in("solution_id", solutionIds)
+          .order("solution_id")
+          .order("question_id");
+        const helpfuls = await admin
+          .from("community_solution_helpfuls")
+          .select("solution_id, user_id")
+          .in("solution_id", solutionIds)
+          .order("solution_id")
+          .order("user_id");
+        const comments = await admin
+          .from("community_solution_comments")
+          .select("id, status, body")
+          .in("solution_id", solutionIds)
+          .order("id");
+        const commentIds = (comments.data ?? []).map((c) => c.id as string);
+        const solutionReports = await admin.from("community_content_reports").select("id").in("solution_id", solutionIds).order("id");
+        const commentReports = await admin.from("community_content_reports").select("id").in("comment_id", commentIds).order("id");
+        const logs = await admin.from("community_moderation_log").select("id").eq("exam_id", examId).order("id");
+        for (const r of [notes, helpfuls, comments, solutionReports, commentReports, logs]) if (r.error) throw r.error;
+        return JSON.stringify({
+          solutions: solutions.data,
+          notes: notes.data,
+          helpfuls: helpfuls.data,
+          comments: comments.data,
+          solutionReports: solutionReports.data,
+          commentReports: commentReports.data,
+          logs: logs.data,
+        });
+      }
+      async function assertRefusedUnchanged(
+        label: string,
+        examId: string,
+        call: () => PromiseLike<RpcResult>,
+        isExpectedRefusal: (res: RpcResult) => boolean,
+      ): Promise<void> {
+        const before = await worldOf(examId);
+        const res = await call();
+        const after = await worldOf(examId);
+        assert(
+          isExpectedRefusal(res) && after === before,
+          `${label} — không dòng nào, không dòng log nào đổi (nhận: ${res.error?.code ?? "KHÔNG CÓ LỖI"} ${res.error?.message ?? ""}, trạng thái ${after === before ? "không đổi" : "ĐÃ ĐỔI"})`,
+        );
+      }
+      function refusedNotEligible(fn: string): (res: RpcResult) => boolean {
+        return (res) =>
+          isAuthorizationDenial(res.error) && res.error?.code === "42501" && res.error?.message === `${fn}: not eligible`;
+      }
+      function refusedNotAdmin(fn: string): (res: RpcResult) => boolean {
+        return (res) =>
+          isAuthorizationDenial(res.error) &&
+          res.error?.code === "42501" &&
+          res.error?.message === `${fn}: not an admin` &&
+          res.data === null;
+      }
+      function rejected22023(message: string): (res: RpcResult) => boolean {
+        return (res) => res.error?.code === "22023" && res.error?.message === message;
+      }
+      function sameInstant(a: string | null | undefined, b: string | null | undefined): boolean {
+        return typeof a === "string" && typeof b === "string" && Date.parse(a) === Date.parse(b);
+      }
+
+      const moderateSolution = (client: SupabaseClient, solutionId: string, action: string, reason: string | null) =>
+        client.rpc("admin_moderate_community_solution", { p_solution_id: solutionId, p_action: action, p_reason: reason });
+      const moderateComment = (client: SupabaseClient, commentId: string, action: string, reason: string | null) =>
+        client.rpc("admin_moderate_community_comment", { p_comment_id: commentId, p_action: action, p_reason: reason });
+
+      type DetailComment = {
+        id: string;
+        is_hidden_by_admin: boolean;
+        hidden_reason: string | null;
+        body: string;
+        i_reported: boolean;
+      };
+      type DetailQuestion = { question_id: string; comment_count: number | null; comments: DetailComment[] };
+      type DetailRow = { i_reported: boolean; questions: DetailQuestion[] };
+      async function detailOf(client: SupabaseClient, solutionId: string) {
+        const d = await client.rpc("community_solution_detail", { p_solution_id: solutionId });
+        const rows = d.data as DetailRow[] | null;
+        return { error: d.error, rowCount: rows?.length ?? -1, row: rows?.[0], questions: rows?.[0]?.questions ?? [] };
+      }
+      function questionIn(questions: DetailQuestion[], questionId: string): DetailQuestion | undefined {
+        return questions.find((q) => q.question_id === questionId);
+      }
+
+      type QueueReportedComment = {
+        id: string;
+        question_number: number | null;
+        body: string;
+        commenter_display_name: string | null;
+        commenter_is_anonymous_to_readers: boolean;
+        report_count: number;
+        report_reasons: string[];
+      };
+      type QueueHiddenComment = {
+        id: string;
+        question_number: number | null;
+        body: string;
+        commenter_display_name: string | null;
+        commenter_is_anonymous_to_readers: boolean;
+        hidden_reason: string | null;
+        hidden_at: string | null;
+        report_count: number;
+      };
+      type QueueRow = {
+        id: string;
+        exam_id: string;
+        exam_title: string;
+        author_display_name: string | null;
+        author_is_anonymous_to_readers: boolean;
+        status: string;
+        report_count: number;
+        report_reasons: string[];
+        reported_comments: QueueReportedComment[];
+        hidden_comments: QueueHiddenComment[];
+      };
+      /** Hàng đợi đọc bằng phiên admin. Nhóm admin_list_community_reports
+       *  success kiểm lỗi của lượt đọc đầu tiên; các lượt sau lỗi thì dừng hẳn. */
+      async function readQueue(): Promise<QueueRow[]> {
+        const r = await adminSession.rpc("admin_list_community_reports");
+        if (r.error) throw new Error(`admin_list_community_reports: ${r.error.code} ${r.error.message}`);
+        return r.data as QueueRow[];
+      }
+      async function queueRowFor(solutionId: string): Promise<QueueRow | undefined> {
+        return (await readQueue()).find((row) => row.id === solutionId);
+      }
+
+      // ------------------------------------------------------------------------
+      // Nhóm RPC báo cáo — đề rls-cs35-report. W = A (người viết, cũng là tác giả
+      // đề), Q = B (người bình luận), R = C (người báo cáo), T = D (chưa báo cáo).
+      // ------------------------------------------------------------------------
+      const attemptsR = await setupCs35Exam(CS35_REPORT_EXAM_ID);
+      const [R_Q1] = cs35QuestionIds(CS35_REPORT_EXAM_ID);
+      const SOL_R = await insertCs35Solution({
+        examId: CS35_REPORT_EXAM_ID,
+        authorId: userAId,
+        status: "published",
+        showProfile: true,
+        attemptId: attemptsR[userAId],
+        notes: fullNotes(CS35_REPORT_EXAM_ID),
+      });
+      const COMMENT_Q = await postCs35Comment(userB, {
+        solutionId: SOL_R,
+        questionId: R_Q1,
+        body: "[RLS-CS35] Bình luận của Q (B)",
+        isAnonymous: false,
+      });
+      const reportSolutionR = (client: SupabaseClient, reason = "[RLS-CS35] báo cáo bài giải") =>
+        client.rpc("report_community_solution", { p_solution_id: SOL_R, p_reason: reason });
+      const reportCommentQ = (client: SupabaseClient, reason = "[RLS-CS35] báo cáo bình luận") =>
+        client.rpc("report_community_comment", { p_comment_id: COMMENT_Q, p_reason: reason });
+      const notEligibleSolution = refusedNotEligible("report_community_solution");
+      const notEligibleComment = refusedNotEligible("report_community_comment");
+
+      console.log("\nRLS checks (Community Solutions task 35 — report_community_solution / report_community_comment refusal groups):");
+
+      // (a) nội dung của chính mình.
+      const reportOwnSolution = await reportSolutionR(userA);
+      assert(
+        notEligibleSolution(reportOwnSolution) && (await reportsOnSolution(SOL_R)) === 0,
+        `report_community_solution (a): người viết A báo cáo bài giải của chính mình → 42501 'not eligible', 0 dòng (nhận ${reportOwnSolution.error?.message})`,
+      );
+      const reportOwnComment = await reportCommentQ(userB);
+      assert(
+        notEligibleComment(reportOwnComment) && (await reportsOnComment(COMMENT_Q)) === 0,
+        `report_community_comment (a): B báo cáo bình luận của chính mình → 42501 'not eligible', 0 dòng (nhận ${reportOwnComment.error?.message})`,
+      );
+
+      // (b) caller chưa có lượt nào đã nộp (lượt duy nhất của D quay 'in_progress').
+      const dToInProgress = await admin.from("exam_attempts").update({ status: "in_progress" }).eq("id", attemptsR[userDId]);
+      if (dToInProgress.error) throw dToInProgress.error;
+      const reportSolutionNoAttempt = await reportSolutionR(userD);
+      const reportCommentNoAttempt = await reportCommentQ(userD);
+      assert(
+        notEligibleSolution(reportSolutionNoAttempt) && (await reportsOnSolution(SOL_R)) === 0,
+        `report_community_solution (b): caller chưa nộp bài → 42501, 0 dòng (nhận ${reportSolutionNoAttempt.error?.message})`,
+      );
+      assert(
+        notEligibleComment(reportCommentNoAttempt) && (await reportsOnComment(COMMENT_Q)) === 0,
+        `report_community_comment (b): caller chưa nộp bài → 42501, 0 dòng (nhận ${reportCommentNoAttempt.error?.message})`,
+      );
+      const dResubmit = await admin
+        .from("exam_attempts")
+        .update({ status: "submitted", submitted_at: new Date().toISOString() })
+        .eq("id", attemptsR[userDId]);
+      if (dResubmit.error) throw dResubmit.error;
+
+      // (c) bài giải 'draft' / bình luận dưới bài giải 'draft'.
+      const solRToDraft = await admin.from("community_solutions").update({ status: "draft" }).eq("id", SOL_R);
+      if (solRToDraft.error) throw solRToDraft.error;
+      const reportSolutionDraft = await reportSolutionR(userC);
+      const reportCommentDraft = await reportCommentQ(userC);
+      assert(
+        notEligibleSolution(reportSolutionDraft) && (await reportsOnSolution(SOL_R)) === 0,
+        `report_community_solution (c): bài giải 'draft' → 42501, 0 dòng (nhận ${reportSolutionDraft.error?.message})`,
+      );
+      assert(
+        notEligibleComment(reportCommentDraft) && (await reportsOnComment(COMMENT_Q)) === 0,
+        `report_community_comment (c): bình luận dưới bài giải 'draft' → 42501, 0 dòng (nhận ${reportCommentDraft.error?.message})`,
+      );
+      const solRRepublish = await admin.from("community_solutions").update({ status: "published" }).eq("id", SOL_R);
+      if (solRRepublish.error) throw solRRepublish.error;
+
+      // (d) anon.
+      const reportSolutionAnon = await reportSolutionR(anonClient);
+      const reportCommentAnon = await reportCommentQ(anonClient);
+      assert(
+        isAuthorizationDenial(reportSolutionAnon.error) && (await reportsOnSolution(SOL_R)) === 0,
+        `report_community_solution (d): anon bị từ chối, 0 dòng (nhận ${reportSolutionAnon.error?.code})`,
+      );
+      assert(
+        isAuthorizationDenial(reportCommentAnon.error) && (await reportsOnComment(COMMENT_Q)) === 0,
+        `report_community_comment (d): anon bị từ chối, 0 dòng (nhận ${reportCommentAnon.error?.code})`,
+      );
+
+      // (e) table closure: C (đủ điều kiện) tự INSERT trực tiếp.
+      const directReportSolution = await userC
+        .from("community_content_reports")
+        .insert({ solution_id: SOL_R, reporter_id: userCId, reason: "[RLS-CS35] insert trực tiếp" })
+        .select();
+      assert(
+        isAuthorizationDenial(directReportSolution.error) &&
+          (directReportSolution.data?.length ?? 0) === 0 &&
+          (await reportsOnSolution(SOL_R)) === 0,
+        `report_community_solution (e) table closure: C KHÔNG tự INSERT trực tiếp được community_content_reports (solution_id) (nhận ${directReportSolution.error?.code ?? "KHÔNG CÓ LỖI"})`,
+      );
+      const directReportComment = await userC
+        .from("community_content_reports")
+        .insert({ comment_id: COMMENT_Q, reporter_id: userCId, reason: "[RLS-CS35] insert trực tiếp" })
+        .select();
+      assert(
+        isAuthorizationDenial(directReportComment.error) &&
+          (directReportComment.data?.length ?? 0) === 0 &&
+          (await reportsOnComment(COMMENT_Q)) === 0,
+        `report_community_comment (e) table closure: C KHÔNG tự INSERT trực tiếp được community_content_reports (comment_id) (nhận ${directReportComment.error?.code ?? "KHÔNG CÓ LỖI"})`,
+      );
+
+      // (f) AC-004: đề đang 'draft'.
+      const examRToDraft = await admin.from("exams").update({ status: "draft" }).eq("id", CS35_REPORT_EXAM_ID);
+      if (examRToDraft.error) throw examRToDraft.error;
+      const reportSolutionExamDraft = await reportSolutionR(userC);
+      const reportCommentExamDraft = await reportCommentQ(userC);
+      assert(
+        notEligibleSolution(reportSolutionExamDraft) && (await reportsOnSolution(SOL_R)) === 0,
+        `report_community_solution (f) AC-004: đề 'draft' → 42501, 0 dòng (nhận ${reportSolutionExamDraft.error?.message})`,
+      );
+      assert(
+        notEligibleComment(reportCommentExamDraft) && (await reportsOnComment(COMMENT_Q)) === 0,
+        `report_community_comment (f) AC-004: đề 'draft' → 42501, 0 dòng (nhận ${reportCommentExamDraft.error?.message})`,
+      );
+      const examRRepublish = await admin.from("exams").update({ status: "published" }).eq("id", CS35_REPORT_EXAM_ID);
+      if (examRRepublish.error) throw examRRepublish.error;
+
+      // (g) AC-004: tác giả đề bị ban.
+      const banAuthor35 = await admin.auth.admin.updateUserById(userAId, { ban_duration: "24h" });
+      if (banAuthor35.error) throw banAuthor35.error;
+      const reportSolutionBanned = await reportSolutionR(userC);
+      const reportCommentBanned = await reportCommentQ(userC);
+      assert(
+        notEligibleSolution(reportSolutionBanned) && (await reportsOnSolution(SOL_R)) === 0,
+        `report_community_solution (g) AC-004: tác giả đề bị ban → 42501, 0 dòng (nhận ${reportSolutionBanned.error?.message})`,
+      );
+      assert(
+        notEligibleComment(reportCommentBanned) && (await reportsOnComment(COMMENT_Q)) === 0,
+        `report_community_comment (g) AC-004: tác giả đề bị ban → 42501, 0 dòng (nhận ${reportCommentBanned.error?.message})`,
+      );
+      const unbanAuthor35 = await admin.auth.admin.updateUserById(userAId, { ban_duration: "none" });
+      if (unbanAuthor35.error) throw unbanAuthor35.error;
+
+      console.log("\nRLS checks (Community Solutions task 35 — i_reported arrives from the read + report success, AC-073–AC-076/M4):");
+
+      async function reportedFlagsOf(client: SupabaseClient) {
+        const detail = await detailOf(client, SOL_R);
+        const comment = questionIn(detail.questions, R_Q1)?.comments.find((c) => c.id === COMMENT_Q);
+        return { error: detail.error, header: detail.row?.i_reported, comment: comment?.i_reported };
+      }
+
+      const flagsRBefore = await reportedFlagsOf(userC);
+      assert(
+        !flagsRBefore.error && flagsRBefore.header === false && flagsRBefore.comment === false,
+        `i_reported: R (C) đọc trước khi báo cáo → header false, bình luận của Q false (nhận ${JSON.stringify(flagsRBefore)})`,
+      );
+
+      const reportSolutionFirst = await reportSolutionR(userC, "x");
+      assert(
+        !reportSolutionFirst.error &&
+          JSON.stringify(reportSolutionFirst.data) === JSON.stringify([{ already_reported: false }]) &&
+          (await reportsOnSolution(SOL_R)) === 1,
+        `report_community_solution success: R đủ điều kiện → [{ already_reported: false }], đúng 1 dòng (nhận ${JSON.stringify(reportSolutionFirst.data)}, mã lỗi ${reportSolutionFirst.error?.code})`,
+      );
+      const flagsRAfterSolution = await reportedFlagsOf(userC);
+      assert(
+        !flagsRAfterSolution.error && flagsRAfterSolution.header === true && flagsRAfterSolution.comment === false,
+        `i_reported: R đọc lại sau report_community_solution → header TRUE (từ chính lượt đọc), bình luận của Q vẫn false (nhận ${JSON.stringify(flagsRAfterSolution)})`,
+      );
+
+      const reportCommentFirst = await reportCommentQ(userC, "y");
+      assert(
+        !reportCommentFirst.error &&
+          JSON.stringify(reportCommentFirst.data) === JSON.stringify([{ already_reported: false }]) &&
+          (await reportsOnComment(COMMENT_Q)) === 1,
+        `report_community_comment success: R đủ điều kiện → [{ already_reported: false }], đúng 1 dòng (nhận ${JSON.stringify(reportCommentFirst.data)}, mã lỗi ${reportCommentFirst.error?.code})`,
+      );
+      const flagsRAfterComment = await reportedFlagsOf(userC);
+      assert(
+        !flagsRAfterComment.error && flagsRAfterComment.header === true && flagsRAfterComment.comment === true,
+        `i_reported: R đọc lại sau report_community_comment → cả header lẫn bình luận của Q đều true (nhận ${JSON.stringify(flagsRAfterComment)})`,
+      );
+
+      const flagsT = await reportedFlagsOf(userD);
+      assert(
+        !flagsT.error && flagsT.header === false && flagsT.comment === false,
+        `i_reported (AC-075): người thứ ba T (D), chưa báo cáo gì → false/false — cờ theo TỪNG người gọi, không phải "đã có ai báo cáo" (nhận ${JSON.stringify(flagsT)})`,
+      );
+      const flagsW = await reportedFlagsOf(userA);
+      assert(
+        !flagsW.error && flagsW.header === false && flagsW.comment === false,
+        `i_reported: chính người viết W (A) đọc bài giải của mình → header false, bình luận của Q false (nhận ${JSON.stringify(flagsW)})`,
+      );
+
+      const reportSolutionAgain = await reportSolutionR(userC, "x");
+      assert(
+        !reportSolutionAgain.error &&
+          JSON.stringify(reportSolutionAgain.data) === JSON.stringify([{ already_reported: true }]) &&
+          (await reportsOnSolution(SOL_R)) === 1,
+        `report_community_solution (AC-074/M4): gọi lại → [{ already_reported: true }], vẫn đúng 1 dòng (nhận ${JSON.stringify(reportSolutionAgain.data)})`,
+      );
+      const reportCommentAgain = await reportCommentQ(userC, "y");
+      assert(
+        !reportCommentAgain.error &&
+          JSON.stringify(reportCommentAgain.data) === JSON.stringify([{ already_reported: true }]) &&
+          (await reportsOnComment(COMMENT_Q)) === 1,
+        `report_community_comment (AC-076/M4): gọi lại → [{ already_reported: true }], vẫn đúng 1 dòng (nhận ${JSON.stringify(reportCommentAgain.data)})`,
+      );
+
+      // ------------------------------------------------------------------------
+      // Nhóm admin — đề rls-cs35-mod. SOL_M (tác giả B, published, có Hữu ích,
+      // bình luận, ghim), SOL_M_DRAFT (C, nháp), SOL_M_DEL_PUB (D, published —
+      // AC-084), SOL_M_DEL_HID (A, published → ẩn → xoá hẳn).
+      // ------------------------------------------------------------------------
+      console.log("\nCommunity Solutions (task 35) — fixture nhóm admin (đề rls-cs35-mod)…");
+      const attemptsM = await setupCs35Exam(CS35_MOD_EXAM_ID);
+      const [M_Q1] = cs35QuestionIds(CS35_MOD_EXAM_ID);
+      const SOL_M = await insertCs35Solution({
+        examId: CS35_MOD_EXAM_ID,
+        authorId: userBId,
+        status: "published",
+        showProfile: true,
+        attemptId: attemptsM[userBId],
+        notes: fullNotes(CS35_MOD_EXAM_ID),
+      });
+      const SOL_M_DRAFT = await insertCs35Solution({
+        examId: CS35_MOD_EXAM_ID,
+        authorId: userCId,
+        status: "draft",
+        showProfile: true,
+        attemptId: attemptsM[userCId],
+        notes: [],
+      });
+      const SOL_M_DEL_PUB = await insertCs35Solution({
+        examId: CS35_MOD_EXAM_ID,
+        authorId: userDId,
+        status: "published",
+        showProfile: true,
+        attemptId: attemptsM[userDId],
+        notes: fullNotes(CS35_MOD_EXAM_ID),
+      });
+      const SOL_M_DEL_HID = await insertCs35Solution({
+        examId: CS35_MOD_EXAM_ID,
+        authorId: userAId,
+        status: "published",
+        showProfile: true,
+        attemptId: attemptsM[userAId],
+        notes: fullNotes(CS35_MOD_EXAM_ID),
+      });
+
+      await mustSucceed("C Hữu ích SOL_M", userC.rpc("add_community_solution_helpful", { p_solution_id: SOL_M }));
+      await mustSucceed("D Hữu ích SOL_M", userD.rpc("add_community_solution_helpful", { p_solution_id: SOL_M }));
+      const COMMENT_MC = await postCs35Comment(userC, {
+        solutionId: SOL_M,
+        questionId: M_Q1,
+        body: "[RLS-CS35] Bình luận của C trên SOL_M",
+        isAnonymous: false,
+      });
+      const COMMENT_MD = await postCs35Comment(userD, {
+        solutionId: SOL_M,
+        questionId: M_Q1,
+        body: "[RLS-CS35] Bình luận của D trên SOL_M",
+        isAnonymous: false,
+      });
+      await postCs35Comment(userB, {
+        solutionId: SOL_M,
+        questionId: M_Q1,
+        body: "[RLS-CS35] Bình luận của chính người viết B",
+        isAnonymous: false,
+      });
+      await mustSucceed(
+        "A ghim SOL_M",
+        userA.rpc("set_community_solution_pin", { p_exam_id: CS35_MOD_EXAM_ID, p_action: "pin", p_solution_id: SOL_M }),
+      );
+
+      await mustSucceed("B Hữu ích SOL_M_DEL_PUB", userB.rpc("add_community_solution_helpful", { p_solution_id: SOL_M_DEL_PUB }));
+      const COMMENT_DEL_PUB = await postCs35Comment(userC, {
+        solutionId: SOL_M_DEL_PUB,
+        questionId: M_Q1,
+        body: "[RLS-CS35] Bình luận trên bài giải sẽ bị xoá hẳn",
+        isAnonymous: false,
+      });
+      await mustSucceed(
+        "B báo cáo SOL_M_DEL_PUB",
+        userB.rpc("report_community_solution", { p_solution_id: SOL_M_DEL_PUB, p_reason: "[RLS-CS35] báo cáo trước khi xoá hẳn" }),
+      );
+      await mustSucceed(
+        "B báo cáo bình luận trên SOL_M_DEL_PUB",
+        userB.rpc("report_community_comment", { p_comment_id: COMMENT_DEL_PUB, p_reason: "[RLS-CS35] báo cáo trước khi xoá hẳn" }),
+      );
+
+      async function listRowFor(client: SupabaseClient, solutionId: string) {
+        const l = await client.rpc("community_solutions_list", { p_exam_id: CS35_MOD_EXAM_ID });
+        const row = (
+          l.data as Array<{ id: string; helpful_count: number; comment_count: number; is_pinned: boolean }> | null
+        )?.find((r) => r.id === solutionId);
+        return { error: l.error, row };
+      }
+      const listBeforeHideM = await listRowFor(userC, SOL_M);
+      assert(
+        !listBeforeHideM.error &&
+          listBeforeHideM.row?.helpful_count === 2 &&
+          listBeforeHideM.row?.comment_count === 3 &&
+          listBeforeHideM.row?.is_pinned === true,
+        `(nền) SOL_M published: helpful_count=2, comment_count=3, is_pinned=true (nhận ${JSON.stringify(listBeforeHideM.row)})`,
+      );
+
+      console.log("\nRLS checks (Community Solutions task 35 — admin group: non-admin refusal cho cả bốn hàm, AC-085):");
+
+      await assertRefusedUnchanged(
+        "AC-085: B (không phải admin) gọi admin_list_community_reports → 42501 'admin_list_community_reports: not an admin', không dữ liệu",
+        CS35_MOD_EXAM_ID,
+        () => userB.rpc("admin_list_community_reports"),
+        refusedNotAdmin("admin_list_community_reports"),
+      );
+      await assertRefusedUnchanged(
+        "AC-085: B gọi admin_get_community_solution_notes → 42501 'admin_get_community_solution_notes: not an admin', không dữ liệu",
+        CS35_MOD_EXAM_ID,
+        () => userB.rpc("admin_get_community_solution_notes", { p_solution_id: SOL_M }),
+        refusedNotAdmin("admin_get_community_solution_notes"),
+      );
+      // RED-phase discrimination proof (task file § Implementation Steps, Red
+      // Phase): trước khi chốt, đã tạm đổi `userB` → `adminSession` ở lời gọi
+      // ngay dưới đây, chạy lại toàn bộ test-rls.ts và xác nhận assertion này
+      // chuyển ĐỎ (phiên admin thật thì ẩn được SOL_M: không lỗi, trạng thái
+      // ĐÃ ĐỔI), rồi revert về đúng userB. Xem Investigation Notes của task 35.
+      await assertRefusedUnchanged(
+        "AC-085: B gọi admin_moderate_community_solution('hide', lý do) → 42501 'admin_moderate_community_solution: not an admin'",
+        CS35_MOD_EXAM_ID,
+        () => moderateSolution(userB, SOL_M, "hide", "[RLS-CS35] B thử ẩn"),
+        refusedNotAdmin("admin_moderate_community_solution"),
+      );
+      await assertRefusedUnchanged(
+        "AC-085: B gọi admin_moderate_community_solution('hide') với lý do RỖNG → vẫn 42501 'not an admin' (cổng admin chạy trước kiểm lý do)",
+        CS35_MOD_EXAM_ID,
+        () => moderateSolution(userB, SOL_M, "hide", ""),
+        refusedNotAdmin("admin_moderate_community_solution"),
+      );
+      await assertRefusedUnchanged(
+        "AC-085: B gọi admin_moderate_community_comment('hide', lý do) → 42501 'admin_moderate_community_comment: not an admin'",
+        CS35_MOD_EXAM_ID,
+        () => moderateComment(userB, COMMENT_MC, "hide", "[RLS-CS35] B thử ẩn"),
+        refusedNotAdmin("admin_moderate_community_comment"),
+      );
+      await assertRefusedUnchanged(
+        "AC-085: B gọi admin_moderate_community_solution('delete', lý do) → 42501 'admin_moderate_community_solution: not an admin', bài giải không bị xoá",
+        CS35_MOD_EXAM_ID,
+        () => moderateSolution(userB, SOL_M, "delete", "[RLS-CS35] B thử xoá"),
+        refusedNotAdmin("admin_moderate_community_solution"),
+      );
+      await assertRefusedUnchanged(
+        "AC-085: B gọi admin_moderate_community_comment('delete', lý do) → 42501 'admin_moderate_community_comment: not an admin', bình luận không bị xoá",
+        CS35_MOD_EXAM_ID,
+        () => moderateComment(userB, COMMENT_MC, "delete", "[RLS-CS35] B thử xoá"),
+        refusedNotAdmin("admin_moderate_community_comment"),
+      );
+
+      console.log(
+        "\nRLS checks (Community Solutions task 35 — admin_moderate_community_solution: lý do / chuyển trạng thái / hành động lạ, AC-017/AC-082/AC-106):",
+      );
+
+      const solutionReasonRequired = rejected22023("admin_moderate_community_solution: reason required");
+      const solutionInvalidTransition = rejected22023("admin_moderate_community_solution: invalid transition");
+      for (const action of ["hide", "delete"]) {
+        for (const reason of ["", "   ", null]) {
+          await assertRefusedUnchanged(
+            `admin_moderate_community_solution('${action}') với lý do ${JSON.stringify(reason)} → 22023 'reason required'`,
+            CS35_MOD_EXAM_ID,
+            () => moderateSolution(adminSession, SOL_M, action, reason),
+            solutionReasonRequired,
+          );
+        }
+      }
+      await assertRefusedUnchanged(
+        "admin_moderate_community_solution('restore') trên bài giải PUBLISHED → 22023 'invalid transition'",
+        CS35_MOD_EXAM_ID,
+        () => moderateSolution(adminSession, SOL_M, "restore", null),
+        solutionInvalidTransition,
+      );
+      await assertRefusedUnchanged(
+        "admin_moderate_community_solution('purge') → 22023 'invalid action'",
+        CS35_MOD_EXAM_ID,
+        () => moderateSolution(adminSession, SOL_M, "purge", "[RLS-CS35] hành động lạ"),
+        rejected22023("admin_moderate_community_solution: invalid action"),
+      );
+      await assertRefusedUnchanged(
+        "AC-017: admin_moderate_community_solution('hide') trên bài giải NHÁP → 22023 'invalid transition'",
+        CS35_MOD_EXAM_ID,
+        () => moderateSolution(adminSession, SOL_M_DRAFT, "hide", "[RLS-CS35] ẩn nháp"),
+        solutionInvalidTransition,
+      );
+      await assertRefusedUnchanged(
+        "AC-017: admin_moderate_community_solution('restore') trên bài giải NHÁP → 22023 'invalid transition'",
+        CS35_MOD_EXAM_ID,
+        () => moderateSolution(adminSession, SOL_M_DRAFT, "restore", null),
+        solutionInvalidTransition,
+      );
+      await assertRefusedUnchanged(
+        "AC-017: admin_moderate_community_solution('delete') trên bài giải NHÁP → 22023 'invalid transition'",
+        CS35_MOD_EXAM_ID,
+        () => moderateSolution(adminSession, SOL_M_DRAFT, "delete", "[RLS-CS35] xoá nháp"),
+        solutionInvalidTransition,
+      );
+
+      console.log("\nRLS checks (Community Solutions task 35 — admin_moderate_community_solution success + SN-1 re-run task 05/16):");
+
+      const logsBeforeHideM = (await logRowsFor(SOL_M)).length;
+      const hideM = await moderateSolution(adminSession, SOL_M, "hide", "[RLS-CS35] Ẩn SOL_M");
+      const logsAfterHideM = await logRowsFor(SOL_M);
+      const hideMLog = logsAfterHideM[logsAfterHideM.length - 1];
+      assert(
+        !hideM.error &&
+          JSON.stringify(hideM.data) === JSON.stringify([{ status: "hidden" }]) &&
+          (await solutionStatusOf(SOL_M)) === "hidden" &&
+          logsAfterHideM.length === logsBeforeHideM + 1 &&
+          hideMLog?.target_type === "solution" &&
+          hideMLog?.action === "hide" &&
+          hideMLog?.exam_id === CS35_MOD_EXAM_ID &&
+          hideMLog?.target_user_id === userBId &&
+          hideMLog?.actor_id === adminUserId &&
+          hideMLog?.reason === "[RLS-CS35] Ẩn SOL_M",
+        `admin_moderate_community_solution('hide', lý do) → [{ status: 'hidden' }], đúng MỘT dòng log target_type='solution' (người viết, đề, admin, lý do) (nhận ${JSON.stringify(hideM.data)} / log ${logsBeforeHideM}→${logsAfterHideM.length} ${JSON.stringify(hideMLog)})`,
+      );
+
+      // SN-1 — task 05: save_community_solution trên bài giải bị admin ẩn THẬT.
+      const saveWhileHiddenM = await userB.rpc("save_community_solution", {
+        p_exam_id: CS35_MOD_EXAM_ID,
+        p_attempt_id: attemptsM[userBId],
+        p_show_profile: true,
+        p_show_score: false,
+        p_notes: [],
+      });
+      assert(
+        saveWhileHiddenM.error?.code === "42501" &&
+          !saveWhileHiddenM.error?.details &&
+          (await solutionStatusOf(SOL_M)) === "hidden",
+        `SN-1 (task 05, qua RPC admin thật): bài giải bị admin_moderate_community_solution ẩn → save_community_solution 42501 KHÔNG có DETAIL, vẫn 'hidden' (nhận: mã=${saveWhileHiddenM.error?.code}, DETAIL=${JSON.stringify(saveWhileHiddenM.error?.details)})`,
+      );
+
+      // SN-1 — task 16 (S7/AC-071/AC-063, nhánh hidden).
+      const ownPreviewHiddenM = await detailOf(userB, SOL_M);
+      assert(
+        !ownPreviewHiddenM.error &&
+          ownPreviewHiddenM.questions.length > 0 &&
+          ownPreviewHiddenM.questions.every((q) => q.comment_count === null && q.comments.length === 0),
+        `SN-1 (task 16 S7/AC-071/AC-063, qua RPC admin thật): own-preview của người viết B — comments rỗng, comment_count null cho MỌI câu, kể cả câu có bình luận CỦA CHÍNH B (nhận ${JSON.stringify(ownPreviewHiddenM.questions.map((q) => [q.comment_count, q.comments.length]))})`,
+      );
+      const otherReadsHiddenM = await detailOf(userC, SOL_M);
+      assert(
+        otherReadsHiddenM.rowCount === 0,
+        `SN-1 (task 16 S7): người khác (C) không đọc được bài giải bị ẩn ở detail (nhận ${otherReadsHiddenM.rowCount} dòng)`,
+      );
+
+      await assertRefusedUnchanged(
+        "admin_moderate_community_solution('hide') trên bài giải đã HIDDEN → 22023 'invalid transition'",
+        CS35_MOD_EXAM_ID,
+        () => moderateSolution(adminSession, SOL_M, "hide", "[RLS-CS35] ẩn lần hai"),
+        solutionInvalidTransition,
+      );
+
+      const logsBeforeRestoreM = (await logRowsFor(SOL_M)).length;
+      const restoreM = await moderateSolution(adminSession, SOL_M, "restore", null);
+      const logsAfterRestoreM = await logRowsFor(SOL_M);
+      const restoreMLog = logsAfterRestoreM[logsAfterRestoreM.length - 1];
+      assert(
+        !restoreM.error &&
+          JSON.stringify(restoreM.data) === JSON.stringify([{ status: "published" }]) &&
+          (await solutionStatusOf(SOL_M)) === "published" &&
+          logsAfterRestoreM.length === logsBeforeRestoreM + 1 &&
+          restoreMLog?.target_type === "solution" &&
+          restoreMLog?.action === "restore" &&
+          restoreMLog?.reason === null,
+        `admin_moderate_community_solution('restore') KHÔNG lý do → [{ status: 'published' }], đúng MỘT dòng log (reason null) (nhận ${JSON.stringify(restoreM.data)}, mã lỗi ${restoreM.error?.code}, log ${logsBeforeRestoreM}→${logsAfterRestoreM.length})`,
+      );
+      const listAfterRestoreM = await listRowFor(userC, SOL_M);
+      assert(
+        !listAfterRestoreM.error &&
+          listAfterRestoreM.row?.helpful_count === listBeforeHideM.row?.helpful_count &&
+          listAfterRestoreM.row?.comment_count === listBeforeHideM.row?.comment_count &&
+          listAfterRestoreM.row?.is_pinned === listBeforeHideM.row?.is_pinned,
+        `AC-082: sau 'hide' → 'restore', community_solutions_list trả lại ĐÚNG helpful_count/comment_count/is_pinned như trước khi ẩn (nhận ${JSON.stringify(listAfterRestoreM.row)}, trước ${JSON.stringify(listBeforeHideM.row)})`,
+      );
+      const writerAfterRestoreM = await detailOf(userB, SOL_M);
+      const writerQ1AfterRestoreM = questionIn(writerAfterRestoreM.questions, M_Q1);
+      assert(
+        writerQ1AfterRestoreM?.comment_count === 3 && writerQ1AfterRestoreM?.comments.length === 3,
+        `SN-1 (task 16 S7, hidden → 'restore' thật): người viết đọc lại đúng comment_count/comments như trước (nhận ${JSON.stringify(writerQ1AfterRestoreM?.comment_count)} / ${writerQ1AfterRestoreM?.comments.length})`,
+      );
+
+      console.log(
+        "\nRLS checks (Community Solutions task 35 — admin_moderate_community_comment: lý do / chuyển trạng thái / success + SN-1 re-run task 16/27, AC-107/AC-108):",
+      );
+
+      const commentReasonRequired = rejected22023("admin_moderate_community_comment: reason required");
+      const commentInvalidTransition = rejected22023("admin_moderate_community_comment: invalid transition");
+      for (const action of ["hide", "delete"]) {
+        for (const reason of ["", "   ", null]) {
+          await assertRefusedUnchanged(
+            `admin_moderate_community_comment('${action}') với lý do ${JSON.stringify(reason)} → 22023 'reason required'`,
+            CS35_MOD_EXAM_ID,
+            () => moderateComment(adminSession, COMMENT_MC, action, reason),
+            commentReasonRequired,
+          );
+        }
+      }
+      await assertRefusedUnchanged(
+        "admin_moderate_community_comment('restore') trên bình luận VISIBLE → 22023 'invalid transition'",
+        CS35_MOD_EXAM_ID,
+        () => moderateComment(adminSession, COMMENT_MC, "restore", null),
+        commentInvalidTransition,
+      );
+      await assertRefusedUnchanged(
+        "admin_moderate_community_comment('purge') → 22023 'invalid action'",
+        CS35_MOD_EXAM_ID,
+        () => moderateComment(adminSession, COMMENT_MC, "purge", "[RLS-CS35] hành động lạ"),
+        rejected22023("admin_moderate_community_comment: invalid action"),
+      );
+
+      async function moderateCommentLogged(action: string, commentId: string, reason: string | null) {
+        const before = (await logRowsFor(commentId)).length;
+        const res = await moderateComment(adminSession, commentId, action, reason);
+        const logs = await logRowsFor(commentId);
+        return { res, logDelta: logs.length - before, lastLog: logs[logs.length - 1] };
+      }
+      function commentLogMatches(log: LogRow | undefined, action: string, commenterId: string): boolean {
+        return (
+          log?.target_type === "comment" &&
+          log?.action === action &&
+          log?.target_user_id === commenterId &&
+          log?.exam_id === CS35_MOD_EXAM_ID &&
+          log?.actor_id === adminUserId
+        );
+      }
+
+      const hideMC = await moderateCommentLogged("hide", COMMENT_MC, "spam");
+      assert(
+        !hideMC.res.error &&
+          JSON.stringify(hideMC.res.data) === JSON.stringify([{ status: "hidden" }]) &&
+          (await commentStatusOf(COMMENT_MC)) === "hidden" &&
+          hideMC.logDelta === 1 &&
+          commentLogMatches(hideMC.lastLog, "hide", userCId) &&
+          hideMC.lastLog?.reason === "spam",
+        `admin_moderate_community_comment('hide', 'spam') → [{ status: 'hidden' }], đúng MỘT dòng log target_type='comment', target_user_id = người bình luận C, exam_id = đề của bài giải (nhận ${JSON.stringify(hideMC.res.data)}, log +${hideMC.logDelta} ${JSON.stringify(hideMC.lastLog)})`,
+      );
+
+      // SN-1 — task 16 (S19/AC-107): bình luận bị admin ẩn THẬT trong detail.
+      const commenterReadsHidden = await detailOf(userC, SOL_M);
+      const hiddenRowForCommenter = questionIn(commenterReadsHidden.questions, M_Q1)?.comments.find((c) => c.id === COMMENT_MC);
+      assert(
+        hiddenRowForCommenter?.is_hidden_by_admin === true &&
+          hiddenRowForCommenter?.hidden_reason === "spam" &&
+          typeof hiddenRowForCommenter?.body === "string",
+        `SN-1 (task 16 S19/AC-107, qua RPC admin thật): tác giả bình luận (C) vẫn đọc được nó, is_hidden_by_admin=true, hidden_reason='spam' (nhận ${JSON.stringify(hiddenRowForCommenter)})`,
+      );
+      const writerReadsHiddenComment = questionIn((await detailOf(userB, SOL_M)).questions, M_Q1);
+      const thirdReadsHiddenComment = questionIn((await detailOf(userD, SOL_M)).questions, M_Q1);
+      assert(
+        writerReadsHiddenComment?.comment_count === 2 &&
+          !writerReadsHiddenComment.comments.some((c) => c.id === COMMENT_MC) &&
+          thirdReadsHiddenComment?.comment_count === 2 &&
+          !thirdReadsHiddenComment.comments.some((c) => c.id === COMMENT_MC),
+        `SN-1 (task 16 S19/AC-107): người viết (B) và người đọc thứ ba (D) KHÔNG thấy bình luận bị ẩn, comment_count=2 (nhận writer=${writerReadsHiddenComment?.comment_count}, third=${thirdReadsHiddenComment?.comment_count})`,
+      );
+
+      // SN-1 — task 27 (S19): bình luận của chính mình đã bị admin ẩn THẬT.
+      const deleteOwnHiddenMC = await userC.rpc("delete_community_comment", { p_comment_id: COMMENT_MC });
+      assert(
+        deleteOwnHiddenMC.error?.code === "42501" && (await commentStatusOf(COMMENT_MC)) === "hidden",
+        `SN-1 (task 27 (b) S19, qua RPC admin thật): C xoá bình luận của chính mình đã bị ẩn → 42501, dòng còn nguyên, status='hidden' (nhận ${deleteOwnHiddenMC.error?.code})`,
+      );
+
+      await assertRefusedUnchanged(
+        "admin_moderate_community_comment('hide') trên bình luận đã HIDDEN → 22023 'invalid transition'",
+        CS35_MOD_EXAM_ID,
+        () => moderateComment(adminSession, COMMENT_MC, "hide", "[RLS-CS35] ẩn lần hai"),
+        commentInvalidTransition,
+      );
+
+      const restoreMC = await moderateCommentLogged("restore", COMMENT_MC, null);
+      assert(
+        !restoreMC.res.error &&
+          JSON.stringify(restoreMC.res.data) === JSON.stringify([{ status: "visible" }]) &&
+          (await commentStatusOf(COMMENT_MC)) === "visible" &&
+          restoreMC.logDelta === 1 &&
+          commentLogMatches(restoreMC.lastLog, "restore", userCId) &&
+          restoreMC.lastLog?.reason === null,
+        `admin_moderate_community_comment('restore') KHÔNG lý do → [{ status: 'visible' }], đúng MỘT dòng log (nhận ${JSON.stringify(restoreMC.res.data)}, log +${restoreMC.logDelta})`,
+      );
+      const rehideMC = await moderateCommentLogged("hide", COMMENT_MC, "abuse");
+      const commenterRereads = await detailOf(userC, SOL_M);
+      const rehiddenRow = questionIn(commenterRereads.questions, M_Q1)?.comments.find((c) => c.id === COMMENT_MC);
+      assert(
+        !rehideMC.res.error && rehideMC.logDelta === 1 && rehiddenRow?.hidden_reason === "abuse",
+        `SN-1 (task 16 S19): 'restore' rồi 'hide' lần hai với lý do 'abuse' (RPC thật) → hidden_reason đọc lại đúng lý do MỚI NHẤT (nhận ${JSON.stringify(rehiddenRow)})`,
+      );
+      const finalRestoreMC = await moderateCommentLogged("restore", COMMENT_MC, null);
+      if (finalRestoreMC.res.error) throw new Error(`restore COMMENT_MC: ${finalRestoreMC.res.error.message}`);
+      const everyoneAfterRestore = await Promise.all([userB, userC, userD].map((client) => detailOf(client, SOL_M)));
+      assert(
+        everyoneAfterRestore.every((d) => {
+          const q1 = questionIn(d.questions, M_Q1);
+          const row = q1?.comments.find((c) => c.id === COMMENT_MC);
+          return q1?.comment_count === 3 && row?.is_hidden_by_admin === false && row?.hidden_reason === null;
+        }),
+        `S19/AC-107: sau 'restore' cuối, mọi người đọc đủ điều kiện (B/C/D) đều thấy bình luận, is_hidden_by_admin=false, hidden_reason=null, comment_count=3`,
+      );
+
+      await mustSucceed(
+        "C báo cáo bình luận của D",
+        userC.rpc("report_community_comment", { p_comment_id: COMMENT_MD, p_reason: "[RLS-CS35] báo cáo trước khi xoá" }),
+      );
+      const reportsOnMDBefore = await reportsOnComment(COMMENT_MD);
+      const deleteMD = await moderateCommentLogged("delete", COMMENT_MD, "[RLS-CS35] Xoá bình luận của D");
+      assert(
+        !deleteMD.res.error &&
+          JSON.stringify(deleteMD.res.data) === JSON.stringify([{ status: "deleted" }]) &&
+          (await commentStatusOf(COMMENT_MD)) === null &&
+          reportsOnMDBefore === 1 &&
+          (await reportsOnComment(COMMENT_MD)) === 0 &&
+          deleteMD.logDelta === 1 &&
+          commentLogMatches(deleteMD.lastLog, "delete", userDId),
+        `admin_moderate_community_comment('delete', lý do) → [{ status: 'deleted' }], dòng bình luận mất, community_content_reports của nó mất (${reportsOnMDBefore}→0), dòng log (comment, người bình luận D, đề) VẪN còn, đúng một dòng (nhận ${JSON.stringify(deleteMD.res.data)}, log +${deleteMD.logDelta} ${JSON.stringify(deleteMD.lastLog)})`,
+      );
+
+      console.log("\nRLS checks (Community Solutions task 35 — admin_moderate_community_solution('delete'): AC-084 cascade + log):");
+
+      async function dependentsOf(solutionId: string, commentId: string) {
+        const count = async (table: string, column: string, value: string) =>
+          (await admin.from(table).select("*", { count: "exact", head: true }).eq(column, value)).count ?? -1;
+        return {
+          solution: await count("community_solutions", "id", solutionId),
+          notes: await count("community_solution_notes", "solution_id", solutionId),
+          helpfuls: await count("community_solution_helpfuls", "solution_id", solutionId),
+          comments: await count("community_solution_comments", "solution_id", solutionId),
+          solutionReports: await count("community_content_reports", "solution_id", solutionId),
+          commentReports: await count("community_content_reports", "comment_id", commentId),
+        };
+      }
+      const dependentsBefore = await dependentsOf(SOL_M_DEL_PUB, COMMENT_DEL_PUB);
+      const deletePub = await moderateSolution(adminSession, SOL_M_DEL_PUB, "delete", "[RLS-CS35] Xoá hẳn (AC-084)");
+      const dependentsAfter = await dependentsOf(SOL_M_DEL_PUB, COMMENT_DEL_PUB);
+      const deletePubLogs = await logRowsFor(SOL_M_DEL_PUB);
+      assert(
+        JSON.stringify(dependentsBefore) ===
+          JSON.stringify({ solution: 1, notes: 3, helpfuls: 1, comments: 1, solutionReports: 1, commentReports: 1 }),
+        `AC-084 (trước): bài giải published có đủ ghi chú/Hữu ích/bình luận/báo cáo (nhận ${JSON.stringify(dependentsBefore)})`,
+      );
+      assert(
+        !deletePub.error &&
+          JSON.stringify(deletePub.data) === JSON.stringify([{ status: "deleted" }]) &&
+          Object.values(dependentsAfter).every((n) => n === 0),
+        `AC-084: admin_moderate_community_solution('delete') trên bài giải PUBLISHED → [{ status: 'deleted' }], bài giải + MỌI ghi chú/Hữu ích/bình luận/báo cáo phụ thuộc đều mất (nhận ${JSON.stringify(deletePub.data)}, mã lỗi ${deletePub.error?.code}, sau ${JSON.stringify(dependentsAfter)})`,
+      );
+      assert(
+        deletePubLogs.length === 1 &&
+          deletePubLogs[0].target_type === "solution" &&
+          deletePubLogs[0].action === "delete" &&
+          deletePubLogs[0].exam_id === CS35_MOD_EXAM_ID &&
+          deletePubLogs[0].target_user_id === userDId &&
+          deletePubLogs[0].reason === "[RLS-CS35] Xoá hẳn (AC-084)",
+        `AC-084: đúng MỘT dòng community_moderation_log cho bài giải đã xoá, exam_id và target_user_id KHÔNG null (chụp trước khi xoá) (nhận ${JSON.stringify(deletePubLogs)})`,
+      );
+
+      const hideBeforeDelete = await moderateSolution(adminSession, SOL_M_DEL_HID, "hide", "[RLS-CS35] Ẩn trước khi xoá");
+      const deleteHidden = await moderateSolution(adminSession, SOL_M_DEL_HID, "delete", "[RLS-CS35] Xoá hẳn bài đã ẩn");
+      const deleteHiddenLogs = await logRowsFor(SOL_M_DEL_HID);
+      assert(
+        !hideBeforeDelete.error &&
+          !deleteHidden.error &&
+          JSON.stringify(deleteHidden.data) === JSON.stringify([{ status: "deleted" }]) &&
+          (await solutionStatusOf(SOL_M_DEL_HID)) === null &&
+          deleteHiddenLogs.length === 2 &&
+          deleteHiddenLogs.map((l) => l.action).join(",") === "hide,delete" &&
+          deleteHiddenLogs.every((l) => l.target_type === "solution" && l.exam_id === CS35_MOD_EXAM_ID && l.target_user_id === userAId),
+        `AC-106: admin_moderate_community_solution('delete') trên bài giải HIDDEN → [{ status: 'deleted' }], dòng mất; đúng một dòng log cho MỖI lời gọi được chấp nhận (hide, delete) (nhận ${JSON.stringify(deleteHidden.data)}, mã lỗi ${deleteHidden.error?.code}, log ${JSON.stringify(deleteHiddenLogs.map((l) => l.action))})`,
+      );
+
+      // ------------------------------------------------------------------------
+      // Hàng đợi admin + ghi chú cho admin — đề rls-cs35-queue. SOL_Q (A,
+      // show_profile=true), SOL_H (B, show_profile=false), SOL_NR (C, chưa bao
+      // giờ bị báo cáo), SOL_N (D, nháp, ghi chú câu 1 và 3).
+      // ------------------------------------------------------------------------
+      console.log("\nCommunity Solutions (task 35) — fixture hàng đợi admin (đề rls-cs35-queue)…");
+      const attemptsQ = await setupCs35Exam(CS35_QUEUE_EXAM_ID);
+      const [X3_Q1, X3_Q2, X3_Q3] = cs35QuestionIds(CS35_QUEUE_EXAM_ID);
+      const NOTE_BODY_Q1 = `[RLS-CS35] ghi chú câu 1 — ${csWords(15)}`;
+      const NOTE_BODY_Q3 = `[RLS-CS35] ghi chú câu 3 — ${csWords(15)}`;
+      const SOL_N = await insertCs35Solution({
+        examId: CS35_QUEUE_EXAM_ID,
+        authorId: userDId,
+        status: "draft",
+        showProfile: true,
+        attemptId: attemptsQ[userDId],
+        notes: [
+          { questionId: X3_Q1, body: NOTE_BODY_Q1 },
+          { questionId: X3_Q3, body: NOTE_BODY_Q3 },
+        ],
+      });
+      const SOL_Q = await insertCs35Solution({
+        examId: CS35_QUEUE_EXAM_ID,
+        authorId: userAId,
+        status: "published",
+        showProfile: true,
+        attemptId: attemptsQ[userAId],
+        notes: fullNotes(CS35_QUEUE_EXAM_ID),
+      });
+      const SOL_H = await insertCs35Solution({
+        examId: CS35_QUEUE_EXAM_ID,
+        authorId: userBId,
+        status: "published",
+        showProfile: false,
+        attemptId: attemptsQ[userBId],
+        notes: fullNotes(CS35_QUEUE_EXAM_ID),
+      });
+      const SOL_NR = await insertCs35Solution({
+        examId: CS35_QUEUE_EXAM_ID,
+        authorId: userCId,
+        status: "published",
+        showProfile: true,
+        attemptId: attemptsQ[userCId],
+        notes: fullNotes(CS35_QUEUE_EXAM_ID),
+      });
+
+      console.log("\nRLS checks (Community Solutions task 35 — Admin notes shape, RCV #16 / AC-081):");
+
+      const adminAttemptsOnQueueExam = await admin
+        .from("exam_attempts")
+        .select("id", { count: "exact", head: true })
+        .eq("exam_id", CS35_QUEUE_EXAM_ID)
+        .eq("user_id", adminUserId);
+      const adminNotes = await adminSession.rpc("admin_get_community_solution_notes", { p_solution_id: SOL_N });
+      const adminNoteRows = (adminNotes.data as Array<Record<string, unknown>> | null) ?? [];
+      const expectedNoteKeys = JSON.stringify(["body", "question_id", "question_number"]);
+      assert(
+        !adminNotes.error &&
+          adminNoteRows.length === 2 &&
+          adminNoteRows.every((row) => JSON.stringify(Object.keys(row).sort()) === expectedNoteKeys),
+        `Admin notes shape (RCV #16): đúng 2 dòng, khoá mỗi dòng ĐÚNG BẰNG {question_number, question_id, body} — set-equal cả hai chiều (nhận ${adminNotes.error?.code ?? JSON.stringify(adminNoteRows.map((r) => Object.keys(r)))})`,
+      );
+      assert(
+        JSON.stringify(adminNoteRows.map((row) => row.question_number)) === JSON.stringify([1, 3]) &&
+          adminNoteRows[0]?.question_id === X3_Q1 &&
+          adminNoteRows[1]?.question_id === X3_Q3 &&
+          adminNoteRows[0]?.body === NOTE_BODY_Q1 &&
+          adminNoteRows[1]?.body === NOTE_BODY_Q3,
+        `Admin notes shape (RCV #16): question_number = [1, 3] ĐÚNG THỨ TỰ (không có câu 2), question_id là id câu ở đúng vị trí, body là nguyên văn ghi chú (nhận ${JSON.stringify(adminNoteRows)})`,
+      );
+      assert(
+        adminAttemptsOnQueueExam.count === 0,
+        `Admin notes shape (AC-081): admin KHÔNG có lượt làm nào trên đề này mà vẫn đọc được (nhận ${adminAttemptsOnQueueExam.count} lượt)`,
+      );
+      await assertRefusedUnchanged(
+        "Admin notes shape: B (không phải admin) → 42501 'admin_get_community_solution_notes: not an admin'",
+        CS35_QUEUE_EXAM_ID,
+        () => userB.rpc("admin_get_community_solution_notes", { p_solution_id: SOL_N }),
+        refusedNotAdmin("admin_get_community_solution_notes"),
+      );
+
+      console.log("\nRLS checks (Community Solutions task 35 — Admin queue hidden comments, AC-047/AC-081/AC-107/AC-108/R17/S5/S19):");
+
+      const QC1_BODY = "[RLS-CS35] Bình luận 1 (B) — bị báo cáo, vẫn hiện";
+      const QC2_BODY = "[RLS-CS35] Bình luận 2 (C) — hai người báo cáo, sẽ bị ẩn";
+      const QC1 = await postCs35Comment(userB, { solutionId: SOL_Q, questionId: X3_Q1, body: QC1_BODY, isAnonymous: false });
+      const QC2 = await postCs35Comment(userC, { solutionId: SOL_Q, questionId: X3_Q3, body: QC2_BODY, isAnonymous: false });
+      await mustSucceed("C báo cáo QC1", userC.rpc("report_community_comment", { p_comment_id: QC1, p_reason: "[RLS-CS35] qc1" }));
+      await mustSucceed("B báo cáo QC2", userB.rpc("report_community_comment", { p_comment_id: QC2, p_reason: "[RLS-CS35] qc2 b" }));
+      await mustSucceed("D báo cáo QC2", userD.rpc("report_community_comment", { p_comment_id: QC2, p_reason: "[RLS-CS35] qc2 d" }));
+      await mustSucceed("D báo cáo SOL_Q", userD.rpc("report_community_solution", { p_solution_id: SOL_Q, p_reason: "[RLS-CS35] sol q" }));
+
+      const queueFirstRead = await adminSession.rpc("admin_list_community_reports");
+      const rowQBefore = (queueFirstRead.data as QueueRow[] | null)?.find((row) => row.id === SOL_Q);
+      assert(
+        !queueFirstRead.error &&
+          rowQBefore?.status === "published" &&
+          rowQBefore?.report_count === 1 &&
+          rowQBefore?.exam_id === CS35_QUEUE_EXAM_ID &&
+          rowQBefore?.reported_comments.some((c) => c.id === QC1) === true &&
+          rowQBefore?.reported_comments.some((c) => c.id === QC2) === true &&
+          rowQBefore?.hidden_comments.length === 0,
+        `admin_list_community_reports success (phiên admin): SOL_Q ở "Chờ xử lý" (published), report_count=1, cả hai bình luận bị báo cáo trong reported_comments, hidden_comments=[] (nhận ${queueFirstRead.error?.code ?? JSON.stringify(rowQBefore)})`,
+      );
+
+      const hideQC2Spam = await moderateComment(adminSession, QC2, "hide", "spam");
+      if (hideQC2Spam.error) throw new Error(`hide QC2: ${hideQC2Spam.error.message}`);
+      const hideQC2SpamLog = (await logRowsFor(QC2)).filter((l) => l.action === "hide").pop();
+      const rowQAfterHide = await queueRowFor(SOL_Q);
+      const qc2EntriesAfterHide = rowQAfterHide?.hidden_comments.filter((h) => h.id === QC2) ?? [];
+      const qc2Entry = qc2EntriesAfterHide[0];
+      assert(
+        rowQAfterHide?.status === "published" &&
+          rowQAfterHide?.report_count === rowQBefore?.report_count &&
+          rowQAfterHide?.reported_comments.some((c) => c.id === QC1) === true &&
+          rowQAfterHide?.reported_comments.some((c) => c.id === QC2) === false,
+        `Admin queue: sau khi ẩn QC2, SOL_Q VẪN ở "Chờ xử lý" với CÙNG report_count cấp hàng, QC1 vẫn trong reported_comments, QC2 không còn ở đó (nhận ${JSON.stringify(rowQAfterHide && { status: rowQAfterHide.status, report_count: rowQAfterHide.report_count, reported: rowQAfterHide.reported_comments.map((c) => c.id) })})`,
+      );
+      assert(
+        qc2EntriesAfterHide.length === 1 &&
+          qc2Entry?.question_number === 3 &&
+          qc2Entry?.body === QC2_BODY &&
+          qc2Entry?.commenter_display_name === nameC &&
+          qc2Entry?.commenter_is_anonymous_to_readers === false &&
+          qc2Entry?.hidden_reason === "spam" &&
+          sameInstant(qc2Entry?.hidden_at, hideQC2SpamLog?.created_at) &&
+          qc2Entry?.report_count === 2,
+        `Admin queue: QC2 xuất hiện ĐÚNG MỘT lần trong hidden_comments — id, question_number=3 (thứ tự hiện tại của đề), body, tên THẬT người bình luận, hidden_reason='spam', hidden_at = created_at của dòng log 'hide', report_count=2 (nhận ${JSON.stringify(qc2EntriesAfterHide)}, log ${hideQC2SpamLog?.created_at})`,
+      );
+
+      const restoreQC2 = await moderateComment(adminSession, QC2, "restore", null);
+      const hideQC2Abuse = await moderateComment(adminSession, QC2, "hide", "abuse");
+      if (restoreQC2.error || hideQC2Abuse.error) throw new Error("restore/hide QC2 thất bại");
+      const hideQC2AbuseLog = (await logRowsFor(QC2)).filter((l) => l.action === "hide").pop();
+      const qc2EntryAbuse = (await queueRowFor(SOL_Q))?.hidden_comments.filter((h) => h.id === QC2);
+      assert(
+        qc2EntryAbuse?.length === 1 &&
+          qc2EntryAbuse[0].hidden_reason === "abuse" &&
+          sameInstant(qc2EntryAbuse[0].hidden_at, hideQC2AbuseLog?.created_at) &&
+          Date.parse(qc2EntryAbuse[0].hidden_at ?? "") > Date.parse(qc2Entry?.hidden_at ?? ""),
+        `Admin queue: 'restore' rồi 'hide' lần hai với 'abuse' → entry mang 'abuse' và hidden_at MỚI hơn (nhận ${JSON.stringify(qc2EntryAbuse)}, trước ${qc2Entry?.hidden_at})`,
+      );
+
+      const dropQC1Report = await admin.from("community_content_reports").delete().eq("comment_id", QC1);
+      const dropSolQReport = await admin.from("community_content_reports").delete().eq("solution_id", SOL_Q);
+      if (dropQC1Report.error || dropSolQReport.error) throw new Error("xoá báo cáo fixture thất bại");
+      const openReportsOnlyOnQC2 =
+        (await reportsOnComment(QC1)) === 0 && (await reportsOnSolution(SOL_Q)) === 0 && (await reportsOnComment(QC2)) === 2;
+      const rowQOnlyHiddenReported = await queueRowFor(SOL_Q);
+      assert(
+        openReportsOnlyOnQC2 &&
+          rowQOnlyHiddenReported?.status === "published" &&
+          rowQOnlyHiddenReported?.report_count === 0 &&
+          rowQOnlyHiddenReported?.reported_comments.length === 0 &&
+          rowQOnlyHiddenReported?.hidden_comments.filter((h) => h.id === QC2).length === 1,
+        `Admin queue (AC-107/R17): báo cáo MỞ duy nhất nằm trên bình luận ĐÃ ẨN → hàng vẫn được trả, "Chờ xử lý", kèm tiểu mục hidden_comments (nhận ${JSON.stringify(rowQOnlyHiddenReported && { status: rowQOnlyHiddenReported.status, report_count: rowQOnlyHiddenReported.report_count, hidden: rowQOnlyHiddenReported.hidden_comments.map((h) => h.id) })})`,
+      );
+
+      const qc2EntryBeforeReorder = rowQOnlyHiddenReported?.hidden_comments.find((h) => h.id === QC2);
+      const dropQ3FromExam = await admin.from("exams").update({ question_ids: [X3_Q1, X3_Q2] }).eq("id", CS35_QUEUE_EXAM_ID);
+      if (dropQ3FromExam.error) throw dropQ3FromExam.error;
+      const qc2EntryWithoutQ3 = (await queueRowFor(SOL_Q))?.hidden_comments.find((h) => h.id === QC2);
+      const putQ3Back = await admin.from("exams").update({ question_ids: [X3_Q1, X3_Q2, X3_Q3] }).eq("id", CS35_QUEUE_EXAM_ID);
+      if (putQ3Back.error) throw putQ3Back.error;
+      assert(
+        qc2EntryWithoutQ3 !== undefined &&
+          qc2EntryWithoutQ3.question_number === null &&
+          JSON.stringify({ ...qc2EntryWithoutQ3, question_number: 3 }) === JSON.stringify(qc2EntryBeforeReorder),
+        `Admin queue (AC-047): bỏ câu của QC2 khỏi exams.question_ids → entry VẪN còn, question_number=null, mọi trường khác không đổi (nhận ${JSON.stringify(qc2EntryWithoutQ3)}, trước ${JSON.stringify(qc2EntryBeforeReorder)})`,
+      );
+
+      const restoreQC2Final = await moderateComment(adminSession, QC2, "restore", null);
+      if (restoreQC2Final.error) throw new Error(`restore QC2: ${restoreQC2Final.error.message}`);
+      const rowQAfterRestore = await queueRowFor(SOL_Q);
+      const qc2Visible = rowQAfterRestore?.reported_comments.find((c) => c.id === QC2);
+      assert(
+        rowQAfterRestore?.hidden_comments.some((h) => h.id === QC2) === false &&
+          qc2Visible?.report_count === 2 &&
+          qc2Visible?.report_reasons.length === 2,
+        `Admin queue: 'restore' đưa QC2 về danh sách bình luận HIỆN bị báo cáo, kèm đủ 2 báo cáo (nhận ${JSON.stringify(qc2Visible)})`,
+      );
+
+      // Một báo cáo bài giải mới để hàng còn trong hàng đợi sau khi QC2 (mang
+      // mọi báo cáo bình luận còn lại) bị xoá hẳn — nhờ vậy "entry biến mất" đọc
+      // được trên CHÍNH hàng đó chứ không phải do cả hàng rời hàng đợi.
+      await mustSucceed("D báo cáo lại SOL_Q", userD.rpc("report_community_solution", { p_solution_id: SOL_Q, p_reason: "[RLS-CS35] sol q 2" }));
+      const deleteQC2 = await moderateComment(adminSession, QC2, "delete", "[RLS-CS35] Xoá QC2");
+      const rowQAfterDelete = await queueRowFor(SOL_Q);
+      assert(
+        !deleteQC2.error &&
+          rowQAfterDelete !== undefined &&
+          rowQAfterDelete.reported_comments.some((c) => c.id === QC2) === false &&
+          rowQAfterDelete.hidden_comments.some((h) => h.id === QC2) === false &&
+          (await reportsOnComment(QC2)) === 0,
+        `Admin queue: 'delete' xoá entry QC2 khỏi cả hai danh sách và xoá luôn báo cáo của nó (nhận mã lỗi ${deleteQC2.error?.code}, hàng ${rowQAfterDelete ? "còn" : "MẤT"})`,
+      );
+
+      console.log(
+        "\nRLS checks (Community Solutions task 35 — A hidden solution stays in the queue (RCV #26) + anonymity flags, AC-081/AC-082/AC-108/AC-109/R17/S5):",
+      );
+
+      const H1 = await postCs35Comment(userC, {
+        solutionId: SOL_H,
+        questionId: X3_Q1,
+        body: "[RLS-CS35] Bình luận ẨN DANH của C trên SOL_H",
+        isAnonymous: true,
+      });
+      const H2 = await postCs35Comment(userC, {
+        solutionId: SOL_H,
+        questionId: X3_Q2,
+        body: "[RLS-CS35] Bình luận KHÔNG ẩn danh của C trên SOL_H",
+        isAnonymous: false,
+      });
+      await mustSucceed("D báo cáo H1", userD.rpc("report_community_comment", { p_comment_id: H1, p_reason: "[RLS-CS35] h1" }));
+      const rowHPublished = await queueRowFor(SOL_H);
+      assert(
+        rowHPublished?.status === "published" && (await reportsOnSolution(SOL_H)) === 0,
+        `(nền) SOL_H ở "Chờ xử lý" chỉ nhờ báo cáo trên bình luận H1 — không có báo cáo nào trên chính bài giải (nhận ${rowHPublished?.status})`,
+      );
+      const hideH1 = await moderateComment(adminSession, H1, "hide", "[RLS-CS35] ẩn H1");
+      const hideH2 = await moderateComment(adminSession, H2, "hide", "[RLS-CS35] ẩn H2");
+      const hideH = await moderateSolution(adminSession, SOL_H, "hide", "[RLS-CS35] ẩn SOL_H");
+      if (hideH1.error || hideH2.error || hideH.error) throw new Error("ẩn H1/H2/SOL_H thất bại");
+
+      const queueAnonymityRead = await readQueue();
+      const rowHHidden = queueAnonymityRead.find((row) => row.id === SOL_H);
+      const rowQSameRead = queueAnonymityRead.find((row) => row.id === SOL_Q);
+      const h1Entry = rowHHidden?.hidden_comments.find((h) => h.id === H1);
+      const h2Entry = rowHHidden?.hidden_comments.find((h) => h.id === H2);
+      assert(
+        h1Entry?.commenter_display_name === nameC &&
+          h1Entry?.commenter_is_anonymous_to_readers === true &&
+          h2Entry?.commenter_display_name === nameC &&
+          h2Entry?.commenter_is_anonymous_to_readers === false,
+        `Anonymity flag (S5): bình luận ẩn danh bị ẩn → tên THẬT của C + commenter_is_anonymous_to_readers=true; bình luận không ẩn danh → CÙNG tên thật + cờ false (nhận h1=${JSON.stringify(h1Entry)}, h2=${JSON.stringify(h2Entry)})`,
+      );
+      assert(
+        rowHHidden?.author_is_anonymous_to_readers === true &&
+          rowHHidden?.author_display_name === nameB &&
+          rowQSameRead?.author_is_anonymous_to_readers === false &&
+          rowQSameRead?.author_display_name === nameA,
+        `Anonymity flag (S5, cùng một lượt đọc): author_is_anonymous_to_readers = not show_profile — true cho SOL_H (show_profile=false), false cho SOL_Q; author_display_name là tên THẬT ở cả hai (nhận H=${JSON.stringify(rowHHidden && [rowHHidden.author_is_anonymous_to_readers, rowHHidden.author_display_name])}, Q=${JSON.stringify(rowQSameRead && [rowQSameRead.author_is_anonymous_to_readers, rowQSameRead.author_display_name])})`,
+      );
+      assert(
+        rowHHidden?.status === "hidden" && rowHHidden?.report_count === 0 && rowHHidden?.hidden_comments.length === 2,
+        `(nền RCV #26) SOL_H ở "Đã ẩn", report_count=0, hidden_comments có 2 entry (nhận ${JSON.stringify(rowHHidden && { status: rowHHidden.status, report_count: rowHHidden.report_count, hidden: rowHHidden.hidden_comments.length })})`,
+      );
+
+      const deleteH1 = await moderateComment(adminSession, H1, "delete", "[RLS-CS35] Xoá hẳn H1 (AC-108)");
+      const rowHAfterDeleteH1 = await queueRowFor(SOL_H);
+      assert(
+        !deleteH1.error &&
+          (await reportsOnComment(H1)) === 0 &&
+          (await commentStatusOf(H1)) === null &&
+          rowHAfterDeleteH1?.status === "hidden" &&
+          rowHAfterDeleteH1?.report_count === 0 &&
+          rowHAfterDeleteH1?.hidden_comments.length === 1 &&
+          rowHAfterDeleteH1?.hidden_comments[0]?.id === H2,
+        `RCV #26 (AC-082/AC-108): ẩn bài giải rồi xoá hẳn bình luận mang báo cáo mở CUỐI CÙNG → hàng VẪN được trả ở "Đã ẩn", report_count=0, hidden_comments ngắn đi đúng một entry — "Khôi phục" vẫn có chỗ (nhận ${rowHAfterDeleteH1 ? JSON.stringify({ status: rowHAfterDeleteH1.status, report_count: rowHAfterDeleteH1.report_count, hidden: rowHAfterDeleteH1.hidden_comments.map((h) => h.id) }) : "HÀNG MẤT"})`,
+      );
+
+      const restoreHNoReport = await moderateSolution(adminSession, SOL_H, "restore", null);
+      assert(
+        !restoreHNoReport.error &&
+          JSON.stringify(restoreHNoReport.data) === JSON.stringify([{ status: "published" }]) &&
+          (await queueRowFor(SOL_H)) === undefined,
+        `RCV #26: 'restore' khi KHÔNG còn báo cáo nào (bài giải lẫn bình luận) → published và RỜI hàng đợi (nhận ${JSON.stringify(restoreHNoReport.data)})`,
+      );
+
+      await mustSucceed("D báo cáo SOL_H", userD.rpc("report_community_solution", { p_solution_id: SOL_H, p_reason: "[RLS-CS35] sol h" }));
+      const rehideH = await moderateSolution(adminSession, SOL_H, "hide", "[RLS-CS35] ẩn SOL_H lần hai");
+      const rowHRehidden = await queueRowFor(SOL_H);
+      const restoreHWithReport = await moderateSolution(adminSession, SOL_H, "restore", null);
+      const rowHRestoredWithReport = await queueRowFor(SOL_H);
+      assert(
+        !rehideH.error &&
+          rowHRehidden?.status === "hidden" &&
+          rowHRehidden?.report_count === 1 &&
+          !restoreHWithReport.error &&
+          rowHRestoredWithReport?.status === "published" &&
+          rowHRestoredWithReport?.report_count === 1,
+        `RCV #26: 'restore' khi CÒN một báo cáo → hàng ở lại, chuyển về "Chờ xử lý" (nhận ẩn=${rowHRehidden?.status}, sau restore=${rowHRestoredWithReport?.status ?? "HÀNG MẤT"})`,
+      );
+
+      const neverReportedBefore = await queueRowFor(SOL_NR);
+      const hideNR = await moderateSolution(adminSession, SOL_NR, "hide", "[RLS-CS35] ẩn SOL_NR");
+      const rowNRHidden = await queueRowFor(SOL_NR);
+      const restoreNR = await moderateSolution(adminSession, SOL_NR, "restore", null);
+      const rowNRRestored = await queueRowFor(SOL_NR);
+      const rehideNR = await moderateSolution(adminSession, SOL_NR, "hide", "[RLS-CS35] ẩn SOL_NR lần hai");
+      const rowNRRehidden = await queueRowFor(SOL_NR);
+      const deleteNR = await moderateSolution(adminSession, SOL_NR, "delete", "[RLS-CS35] xoá hẳn SOL_NR");
+      const rowNRDeleted = await queueRowFor(SOL_NR);
+      assert(
+        neverReportedBefore === undefined &&
+          !hideNR.error &&
+          rowNRHidden?.status === "hidden" &&
+          rowNRHidden?.report_count === 0 &&
+          !restoreNR.error &&
+          rowNRRestored === undefined &&
+          !rehideNR.error &&
+          rowNRRehidden?.status === "hidden" &&
+          !deleteNR.error &&
+          rowNRDeleted === undefined &&
+          (await reportsOnSolution(SOL_NR)) === 0,
+        `RCV #26 (AC-109): bài giải CHƯA TỪNG bị báo cáo — ngoài hàng đợi → 'hide' vào "Đã ẩn" ngay → 'restore' rời hàng đợi → 'hide' lại vào → 'delete' rời hàng đợi (nhận trước=${neverReportedBefore ? "CÓ" : "không"}, ẩn=${rowNRHidden?.status}, restore=${rowNRRestored ? "CÒN" : "rời"}, ẩn lại=${rowNRRehidden?.status}, xoá=${rowNRDeleted ? "CÒN" : "rời"})`,
+      );
+
+      console.log("\nRLS checks (Community Solutions task 35 — Name-resolution regression, không 42702):");
+
+      const nameResolutionCalls: Array<[string, RpcResult]> = [
+        ["admin_moderate_community_solution('hide')", hideM],
+        ["admin_moderate_community_solution('restore')", restoreM],
+        ["admin_moderate_community_solution('delete')", deletePub],
+        ["admin_moderate_community_comment('hide')", hideMC.res],
+        ["admin_moderate_community_comment('restore')", restoreMC.res],
+        ["admin_moderate_community_comment('delete')", deleteMD.res],
+        ["report_community_solution", reportSolutionFirst],
+        ["report_community_comment", reportCommentFirst],
+      ];
+      for (const [label, res] of nameResolutionCalls) {
+        assert(
+          res.error === null,
+          `Name-resolution regression: ${label} chạy đường thành công không lỗi — nhất là không 42702 (nhận ${res.error?.code ?? "không lỗi"})`,
+        );
+      }
+
+      part13Completed = true;
+    } finally {
+      // Thu hồi RIÊNG phiên admin này trước (scope 'local' — không đăng xuất các
+      // phiên khác của tài khoản admin); dọn fixture chỉ dùng setup client.
+      const adminSignOut = await adminSession.auth.signOut({ scope: "local" });
+      if (adminSignOut.error) console.error("❌ Phần 13: thu hồi phiên admin thất bại:", adminSignOut.error.message);
+      try {
+        await cleanupCs35Fixtures(admin);
+      } catch (cleanupError) {
+        // Đang thoát vì lỗi gốc: chỉ ghi log để lỗi gốc (và stack của nó) được ném tiếp.
+        if (part13Completed) throw cleanupError;
+        console.error("❌ Phần 13: dọn fixture task 35 thất bại sau lỗi gốc:", cleanupError);
+      }
+    }
   }
 
   // Dọn dẹp fixture Rating.
