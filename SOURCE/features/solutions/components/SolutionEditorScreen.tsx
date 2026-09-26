@@ -86,7 +86,7 @@ interface EditorState {
 
 type EditorAction =
   | { type: "SAVE_DRAFT_START" }
-  | { type: "SAVE_DRAFT_SUCCESS"; status: SolutionStatus }
+  | { type: "SAVE_DRAFT_SUCCESS"; status: SolutionStatus; solutionId: string }
   | { type: "SAVE_DRAFT_FAILURE"; error: string }
   | { type: "PUBLISH_START" }
   | { type: "PUBLISH_SUCCESS" }
@@ -101,7 +101,7 @@ type EditorAction =
   | { type: "OPEN_NOTE"; index: number }
   | { type: "CLOSE_NOTE" }
   | { type: "NOTE_SAVE_START"; index: number }
-  | { type: "NOTE_SAVE_SUCCESS"; index: number; note: string }
+  | { type: "NOTE_SAVE_SUCCESS"; index: number; note: string; solutionId: string }
   | { type: "NOTE_SAVE_FAILURE"; index: number; error: string };
 
 function initEditorState(initial: SolutionEditorState): EditorState {
@@ -139,6 +139,10 @@ export function solutionEditorReducer(state: EditorState, action: EditorAction):
         ...state,
         saving: false,
         status: action.status,
+        // Server-DERIVED — the first successful save is what creates the row
+        // (`save_community_solution`'s upsert); this is the only place client
+        // state learns the id it must later use for "Xem bài giải" (AC-030).
+        solutionId: action.solutionId,
         toastKey: "solutions.toast.saved",
         toastTrigger: state.toastTrigger + 1,
         liveMessage: t("solutions.toast.saved"),
@@ -199,6 +203,11 @@ export function solutionEditorReducer(state: EditorState, action: EditorAction):
       return {
         ...state,
         activeNote: null,
+        // Same reason as SAVE_DRAFT_SUCCESS above — a note saved from a fresh
+        // (solutionId: null) writer state is equally the first write that
+        // creates the row; without this the publish bar's "Xem bài giải" link
+        // stays pointed at "#" forever for anyone who never used "Lưu nháp".
+        solutionId: action.solutionId,
         toastKey: "solutions.toast.saved",
         toastTrigger: state.toastTrigger + 1,
         liveMessage: t("solutions.toast.saved"),
@@ -310,7 +319,7 @@ export function SolutionEditorScreen({ examId, initialState, questionNodes }: So
     };
     const result = await saveSolution(examId, patch);
     if (result.ok) {
-      dispatch({ type: "SAVE_DRAFT_SUCCESS", status: result.status });
+      dispatch({ type: "SAVE_DRAFT_SUCCESS", status: result.status, solutionId: result.solutionId });
     } else {
       dispatch({ type: "SAVE_DRAFT_FAILURE", error: saveErrorText(result.error) });
     }
@@ -375,7 +384,7 @@ export function SolutionEditorScreen({ examId, initialState, questionNodes }: So
     };
     const result = await saveSolution(examId, patch);
     if (result.ok) {
-      dispatch({ type: "NOTE_SAVE_SUCCESS", index, note: body });
+      dispatch({ type: "NOTE_SAVE_SUCCESS", index, note: body, solutionId: result.solutionId });
     } else {
       dispatch({ type: "NOTE_SAVE_FAILURE", index, error: saveErrorText(result.error) });
     }
