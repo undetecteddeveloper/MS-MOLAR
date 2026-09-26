@@ -55,7 +55,7 @@ Every `Pn-Tm` entry below maps to one or more task files. The task number (01–
 | 27 | P3-T4 | backend | 3 | **DONE** `8fab6aa` — `post_community_comment`/`delete_community_comment` refusal+success groups (incl. table-closure + AC-048 case (i) + AC-004/AC-002 gates) and the cursor write case in `supabase/test-rls.ts` (Phần 12); M5 comment half + S4 identity sweep; feed columns/unread cursor/ordering/AC-091 exclusion proof/AC-047-048 in new `community-solutions-comment-feed.localdb.test.ts`; found+fixed a real clock-skew race in the "feed unread cursor" test (client `Date()` vs server `now()` comparison — cursor now server-sourced), caught by integration-test-reviewer across 2 review rounds; **flagged, not fixed (out of scope)**: production `markCommentsRead()` may share the same latent client/server-timestamp hazard |
 | 28 | P3-T5 | frontend | 3 | **DONE** `584730c` (`CommentSheet`/`CommentItem`/`CommentComposer` + XSS fixture group; mounted into `SolutionViewScreen`/`page.tsx` with additive optional fields; masked-own-row, `lockedAnonymous`, DD-U3 non-optimistic delete, DD-U5 dirty-close all mutation-verified by integration-test-reviewer across 2 rounds; L1 deferred, same standing sign-in block) |
 | 29 | P3-T6 | frontend | 3 | **DONE** `90a2f69` — `SolutionCard.tsx`/`SolutionList.tsx`/route `page.tsx` extended with `unreadCommentCount` prop threading (`SolutionList.tsx` not in original task Target Files but required as pass-through plumbing, same pattern as `editHref`); `getMyUnreadCommentCount` call scoped to `own.solutionId`, gated on `own.status === "published"`; count-derivation test genuinely wired to the real `countUnreadComments` formula (task 26), not a hand-typed number, confirmed by quality-fixer; task 27's real-DB exclusion proof re-confirmed green twice more |
-| 30 | P3-T7 | frontend | 3 | open |
+| 30 | P3-T7 | frontend | 3 | **DONE** `e71b258` — O-02 comment-sheet portion added to Test 2 in `community-solutions.fixture.e2e.test.ts` + 3 comment fixture rows (named/anonymous/writer-anonymous) in `communitySolutionsFixtureData.ts`, reusing task 24's `imagesWithSrc()` subtree helper; opened via `?q=1&comments=1` deep link (no button click needed); RED-phase discrimination proof independently re-run by integration-test-reviewer; `npm run test:fixture` green (4/4: J1, S-03, S-05, O-02) — **skeleton Test 2 (S-03/S-05/O-02) now fully closed** |
 | 31 | P3-T8 | frontend | 3 | open |
 | 32 | P4-T1 | backend | 4 | open |
 | 33 | P4-T2 | backend | 4 | open |
@@ -964,7 +964,7 @@ flowchart LR
 - **Integration Complete**: named row's DOM shows its own name/avatar/score in the SAME render, proving the assertion is discriminating (not just "nothing renders"); anonymous row's score stays visible (show_score/show_profile are independent flags) proving masking is identity-specific, not blanket.
 - **RED-phase discrimination proof performed** (task 24 hard requirement, then reverted before finalizing): temporarily built the anonymous row's `.author` as `{kind:"named", displayName: <real>, avatarUrl: <real>}` (bypassing `toAuthorIdentity`) and the hidden-score row's `.score` as a literal real number (bypassing `toScoreField`) — both turned the corresponding S-03/S-05 assertions red (`getElementError`/no-match), confirming the checks are not vacuous; reverted to the real masking calls, confirmed green again.
 - **Proof Obligation** (verbatim, skeleton Test 2, S-03/S-05 subset): "S-03 solutions list: anonymous row shows no name/avatar; named row shows both... a `show_score=false` row: no score badge/value rendered anywhere in that row's subtree." — met.
-- **Note**: this test file is not "complete" until P3-T7 adds the O-02 comment-sheet portion in the same file — tracked as one skeleton test split across two landing commits, both required before the file is considered fully implemented. Test 3's comment block (task 31) was left untouched; J1 (task 23) still passes unmodified.
+- **Note**: P3-T7 (task 30) has since added the O-02 comment-sheet portion to this same file — skeleton Test 2 (S-03/S-05/O-02) is now fully implemented across the two landing tasks. Test 3's comment block (task 31) remains untouched; J1 (task 23) still passes unmodified.
 - **Acceptance criteria**: AC-039, M5 (browser-level proof, list+detail) — met.
 
 ---
@@ -1056,12 +1056,12 @@ flowchart LR
 
 ### P3-T7 (task 30) — fixture-e2e Test 2 finalize: comment-sheet portion (O-02)
 
-- **Files**: `SOURCE/tests/e2e/fixture/community-solutions.fixture.e2e.test.ts` (Test 2, O-02 portion added — file now covers S-03/S-05/O-02 in full).
+- **Files**: `SOURCE/tests/e2e/fixture/community-solutions.fixture.e2e.test.ts` (Test 2, O-02 portion added — file now covers S-03/S-05/O-02 in full); `SOURCE/tests/e2e/fixture/communitySolutionsFixtureData.ts` (dedicated `T2_COMMENTS_SOLUTION_ID` solution + 3 comment fixture rows).
 - **Depends on**: P2-T9, P3-T5.
 - **Design source**: Test skeleton Test 2, O-02 portion.
-- **Implementation Complete**: comment-sheet fixture rows for a named and an anonymous comment, including the "is the solution's writer" boolean badge rendering correctly with no other identity leak alongside it.
-- **Quality Complete**: zero occurrences of the fixture's real name/avatar string inside the anonymous comment's rendered subtree.
-- **Integration Complete**: this completes the skeleton file's Test 2 — all three checkpoints (S-03, S-05, O-02) now verified in one file.
+- **Implementation Complete**: comment-sheet fixture rows for a NAMED comment, an ANONYMOUS comment, and a comment by the solution's WRITER who is ALSO anonymous (`is_solution_author: true` + `{kind:"anonymous"}` together) — the "Người viết" badge renders alongside "Ẩn danh" with no other identity leak, mirroring `CommentItem.test.tsx` Required Test #3 now proven through the real rendered screen. Sheet opened via the real `?q=1&comments=1` deep link (task 21/28's own mechanism), not a button click.
+- **Quality Complete**: zero occurrences of any of the three comments' real name/avatar strings inside their own (or any other) rendered comment subtree; `tsc --noEmit`/`eslint --max-warnings 0`/`npm test` (2464 passed) all clean; RED-phase discrimination proof re-run (bypassing `toAuthorIdentity` on the anonymous comment) confirmed the assertion actually discriminates before reverting to green.
+- **Integration Complete**: this completes the skeleton file's Test 2 — all three checkpoints (S-03, S-05, O-02) now verified in one file; `npm run test:fixture` green (4/4 — J1, S-03, S-05, O-02).
 - **Proof Obligation** (verbatim, skeleton Test 2, O-02 subset): "S-05 detail / O-02 comment sheet: same for an anonymous comment, plus the 'is the solution's writer' boolean badge renders when applicable, with no other identity leak alongside it."
 - **Acceptance criteria**: AC-105, M5 (comment-sheet browser-level proof, closes the file).
 
