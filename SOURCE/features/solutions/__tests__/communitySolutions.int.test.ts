@@ -26,29 +26,46 @@
 // service-integration-e2e file, not here. This file proves Server Action /
 // query-wrapper business logic, call construction, and error mapping only.
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// queries.ts imports "server-only" (throws outside a Next server/react-server
-// bundle) — same stub as rating.int.test.ts / getResult.int.test.ts. Test 1
-// (adminActions.ts) and Test 3 (queries.ts listSolutions/getSolutionDetail)
-// stay comment-only skeletons — their own implementing tasks add their real
-// imports later; this file's shared mock setup only wires what Test 2 needs.
+// queries.ts and lib/auth/admin.ts import "server-only" (throws outside a
+// Next server/react-server bundle) — same stub as rating.int.test.ts /
+// getResult.int.test.ts.
 vi.mock("server-only", () => ({}));
 
-const { getUserMock, rpcMock } = vi.hoisted(() => ({
+const { getUserMock, rpcMock, fromMock, isAdminUserIdMock } = vi.hoisted(() => ({
   getUserMock: vi.fn(),
   rpcMock: vi.fn(),
+  // Test 1 (b): a spy, so "zero .from(...) calls" is an assertion on a
+  // recorded call log rather than on a TypeError from a missing method.
+  fromMock: vi.fn(),
+  isAdminUserIdMock: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(async () => ({
     auth: { getUser: getUserMock },
     rpc: rpcMock,
+    from: fromMock,
   })),
 }));
 
+// adminActions.ts's app-layer pre-check (Test 1 + the admin rows below).
+vi.mock("@/lib/auth/admin", () => ({ isAdminUserId: isAdminUserIdMock }));
+
+// adminActions.ts revalidates /admin after an accepted moderation; outside a
+// Next request the real revalidatePath has no store to write to.
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+
 const { saveSolution, setSolutionStatus } = await import("@/features/solutions/actions");
 const { listSolutions, getSolutionDetail } = await import("@/features/solutions/queries");
+const { listCommunityReports, getSolutionNotesForAdmin, moderateSolutionAction, moderateCommentAction } =
+  await import("@/features/solutions/adminActions");
+
+const ADMIN_ACTIONS_SOURCE_PATH = fileURLToPath(new URL("../adminActions.ts", import.meta.url));
+const ADMIN_ACTION_ERROR_KEY = "admin.solutions.actionError";
 
 // =============================================================================
 // Test 1 — adminActions.ts: admin moderation never touches service-role.ts;
@@ -101,6 +118,461 @@ const { listSolutions, getSolutionDetail } = await import("@/features/solutions/
 //     in features/solutions/adminActions.ts's source
 //   - pass criteria: all three checks hold; the test fails if any admin
 //     write path bypasses the RPC or imports service-role.ts
+// SK-1 (plan § Open Items, resolved 2026-09-20): the declared signature is
+//   (prevState, formData), so the call above is made with a FormData carrying
+//   the id, "hide" and the reason — no positional-argument overload exists.
+
+let adminUidCounter = 0;
+/** A fresh admin id per test: the real guard() keeps a per-user in-memory
+ *  counter, so reusing one id across many moderation calls could trip the
+ *  30/hour limit and turn an unrelated assertion red. */
+function signInFreshAdmin() {
+  adminUidCounter += 1;
+  const id = `admin-actions-admin-${adminUidCounter}`;
+  getUserMock.mockResolvedValue({ data: { user: { id } } });
+  isAdminUserIdMock.mockImplementation((userId: string | null | undefined) => userId === id);
+  return id;
+}
+
+function signInNonAdmin() {
+  getUserMock.mockResolvedValue({ data: { user: { id: "admin-actions-not-an-admin" } } });
+  isAdminUserIdMock.mockReturnValue(false);
+}
+
+function moderationForm(idField: "solutionId" | "commentId", id: string, action: string, reason?: string) {
+  const formData = new FormData();
+  formData.set(idField, id);
+  formData.set("action", action);
+  if (reason !== undefined) formData.set("reason", reason);
+  return formData;
+}
+
+function readAdminActionsSource() {
+  return readFileSync(ADMIN_ACTIONS_SOURCE_PATH, "utf8");
+}
+
+function resetAdminMocks() {
+  getUserMock.mockReset();
+  rpcMock.mockReset();
+  fromMock.mockReset();
+  isAdminUserIdMock.mockReset();
+}
+
+describe("adminActions.ts — admin moderation writes flow only through session-client RPCs, never service-role.ts (Test 1)", () => {
+  beforeEach(() => {
+    resetAdminMocks();
+    signInFreshAdmin();
+  });
+
+  it("(b) moderateSolutionAction(undefined, FormData{solutionId, 'hide', reason}) -> exactly one .rpc('admin_moderate_community_solution'), zero .from(...) calls", async () => {
+    rpcMock.mockResolvedValueOnce({ data: [{ status: "hidden" }], error: null });
+
+    const result = await moderateSolutionAction(
+      null,
+      moderationForm("solutionId", "solution-t1", "hide", "Nội dung sai lệch")
+    );
+
+    expect(rpcMock).toHaveBeenCalledTimes(1);
+    expect(rpcMock).toHaveBeenCalledWith("admin_moderate_community_solution", {
+      p_solution_id: "solution-t1",
+      p_action: "hide",
+      p_reason: "Nội dung sai lệch",
+    });
+    expect(fromMock).not.toHaveBeenCalled();
+    expect(result).toEqual({ ok: true, status: "hidden" });
+  });
+
+  it("(b) moderateCommentAction(undefined, FormData{commentId, 'hide', reason}) -> exactly one .rpc('admin_moderate_community_comment'), zero .from(...) calls", async () => {
+    rpcMock.mockResolvedValueOnce({ data: [{ status: "hidden" }], error: null });
+
+    const result = await moderateCommentAction(
+      null,
+      moderationForm("commentId", "comment-t1", "hide", "Xúc phạm người khác")
+    );
+
+    expect(rpcMock).toHaveBeenCalledTimes(1);
+    expect(rpcMock).toHaveBeenCalledWith("admin_moderate_community_comment", {
+      p_comment_id: "comment-t1",
+      p_action: "hide",
+      p_reason: "Xúc phạm người khác",
+    });
+    expect(fromMock).not.toHaveBeenCalled();
+    expect(result).toEqual({ ok: true, status: "hidden" });
+  });
+
+  it("(a)/(c) static check: adminActions.ts contains zero 'service-role' import paths (serviceRoleSurface.test.ts is the complementary repo-wide proof)", () => {
+    const source = readAdminActionsSource();
+
+    expect(source).not.toMatch(/service-role/);
+    expect(source).not.toMatch(/\.from\(/);
+  });
+});
+
+describe("adminActions.ts — Required test list rows 4-8 (validation, admin pre-check, error mapping)", () => {
+  beforeEach(() => {
+    resetAdminMocks();
+    signInFreshAdmin();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("row 4: a crafted action outside {hide, restore, delete} is rejected before any call, for both actions", async () => {
+    const solutionResult = await moderateSolutionAction(
+      null,
+      moderationForm("solutionId", "solution-r4", "purge", "lý do")
+    );
+    const commentResult = await moderateCommentAction(
+      null,
+      moderationForm("commentId", "comment-r4", "purge", "lý do")
+    );
+
+    expect(rpcMock).toHaveBeenCalledTimes(0);
+    expect(solutionResult).toEqual({ error: ADMIN_ACTION_ERROR_KEY });
+    expect(commentResult).toEqual({ error: ADMIN_ACTION_ERROR_KEY });
+  });
+
+  it("row 5: 'hide' or 'delete' with an empty / whitespace-only / missing reason -> .rpc count 0 and { error: key } (AC-082, AC-106)", async () => {
+    const results = [
+      await moderateSolutionAction(null, moderationForm("solutionId", "solution-r5", "hide", "")),
+      await moderateSolutionAction(null, moderationForm("solutionId", "solution-r5", "delete", "   \n\t ")),
+      await moderateSolutionAction(null, moderationForm("solutionId", "solution-r5", "hide")),
+      await moderateCommentAction(null, moderationForm("commentId", "comment-r5", "hide", "  ")),
+      await moderateCommentAction(null, moderationForm("commentId", "comment-r5", "delete", "")),
+    ];
+
+    expect(rpcMock).toHaveBeenCalledTimes(0);
+    expect(results).toEqual(Array(5).fill({ error: ADMIN_ACTION_ERROR_KEY }));
+  });
+
+  it("row 6: 'restore' with no reason is accepted — the RPC is called for both actions", async () => {
+    rpcMock
+      .mockResolvedValueOnce({ data: [{ status: "published" }], error: null })
+      .mockResolvedValueOnce({ data: [{ status: "visible" }], error: null });
+
+    const solutionResult = await moderateSolutionAction(null, moderationForm("solutionId", "solution-r6", "restore"));
+    const commentResult = await moderateCommentAction(null, moderationForm("commentId", "comment-r6", "restore"));
+
+    expect(rpcMock).toHaveBeenCalledTimes(2);
+    expect(rpcMock).toHaveBeenNthCalledWith(1, "admin_moderate_community_solution", {
+      p_solution_id: "solution-r6",
+      p_action: "restore",
+      p_reason: "",
+    });
+    expect(rpcMock).toHaveBeenNthCalledWith(2, "admin_moderate_community_comment", {
+      p_comment_id: "comment-r6",
+      p_action: "restore",
+      p_reason: "",
+    });
+    expect(solutionResult).toEqual({ ok: true, status: "published" });
+    expect(commentResult).toEqual({ ok: true, status: "visible" });
+  });
+
+  it("row 7: isAdminUserId -> false refuses all four functions with .rpc count 0 (AC-085)", async () => {
+    signInNonAdmin();
+
+    const solutionResult = await moderateSolutionAction(
+      null,
+      moderationForm("solutionId", "solution-r7", "hide", "lý do")
+    );
+    const commentResult = await moderateCommentAction(
+      null,
+      moderationForm("commentId", "comment-r7", "hide", "lý do")
+    );
+    await expect(listCommunityReports()).rejects.toThrow();
+    await expect(getSolutionNotesForAdmin("solution-r7")).rejects.toThrow();
+
+    expect(solutionResult).toEqual({ error: ADMIN_ACTION_ERROR_KEY });
+    expect(commentResult).toEqual({ error: ADMIN_ACTION_ERROR_KEY });
+    expect(rpcMock).toHaveBeenCalledTimes(0);
+    expect(fromMock).toHaveBeenCalledTimes(0);
+  });
+
+  it("row 7 (signed out): no session user is refused the same way, with .rpc count 0", async () => {
+    getUserMock.mockResolvedValue({ data: { user: null } });
+    isAdminUserIdMock.mockReturnValue(false);
+
+    const solutionResult = await moderateSolutionAction(
+      null,
+      moderationForm("solutionId", "solution-r7b", "hide", "lý do")
+    );
+    await expect(listCommunityReports()).rejects.toThrow();
+
+    expect(solutionResult).toEqual({ error: ADMIN_ACTION_ERROR_KEY });
+    expect(rpcMock).toHaveBeenCalledTimes(0);
+  });
+
+  it.each([
+    {
+      code: "42501",
+      expectedLogCalls: [
+        ["[admin_moderate_community_solution]", "42501"],
+        ["[admin_moderate_community_comment]", "42501"],
+      ],
+    },
+    { code: "22023", expectedLogCalls: [] },
+    { code: "P0002", expectedLogCalls: [] },
+  ])(
+    "row 8: RPC error $code -> both moderation actions return the fixed key; error.message is never read nor forwarded; only 42501 is logged (RPC name + code)",
+    async ({ code, expectedLogCalls }) => {
+      const databaseMessage = `admin_moderate_community_x: leaked detail for ${code}`;
+      let messageReads = 0;
+      const rpcError = {
+        code,
+        get message() {
+          messageReads += 1;
+          return databaseMessage;
+        },
+      };
+      rpcMock.mockResolvedValue({ data: null, error: rpcError });
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const solutionResult = await moderateSolutionAction(
+        null,
+        moderationForm("solutionId", "solution-r8", "hide", "lý do kiểm duyệt riêng tư")
+      );
+      const commentResult = await moderateCommentAction(
+        null,
+        moderationForm("commentId", "comment-r8", "hide", "lý do kiểm duyệt riêng tư")
+      );
+
+      expect(solutionResult).toEqual({ error: ADMIN_ACTION_ERROR_KEY });
+      expect(commentResult).toEqual({ error: ADMIN_ACTION_ERROR_KEY });
+      expect(messageReads).toBe(0);
+      expect(JSON.stringify([solutionResult, commentResult])).not.toContain("leaked detail");
+      expect(errorSpy.mock.calls).toEqual(expectedLogCalls);
+      for (const call of errorSpy.mock.calls) {
+        expect(call.map(String).join(" ")).not.toContain("lý do kiểm duyệt riêng tư");
+      }
+    }
+  );
+
+  it("row 8 (source): adminActions.ts never reads error.message", () => {
+    expect(readAdminActionsSource()).not.toMatch(/error\.message|\.message\b/);
+  });
+});
+
+/** A queue row in the RPC's snake_case shape (migration task 32), unmasked (S5). */
+function queueRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "solution-q1",
+    exam_id: "exam-q1",
+    exam_title: "Đề thi thử THPT 2026",
+    author_display_name: "Nguyễn Văn A",
+    author_is_anonymous_to_readers: false,
+    status: "published",
+    report_count: 2,
+    report_reasons: ["spam", "sai đáp án"],
+    reported_comments: [],
+    hidden_comments: [],
+    ...overrides,
+  };
+}
+
+describe("listCommunityReports / getSolutionNotesForAdmin — Required test list rows 9-16 (unmasked admin mappers)", () => {
+  beforeEach(() => {
+    resetAdminMocks();
+    signInFreshAdmin();
+  });
+
+  it("row 9: author_is_anonymous_to_readers = true keeps the real name; AdminReportedAuthor has exactly {displayName, isAnonymousToReaders}", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: [queueRow({ author_display_name: "Trần Thị Bích", author_is_anonymous_to_readers: true })],
+      error: null,
+    });
+
+    const [row] = await listCommunityReports();
+
+    expect(rpcMock).toHaveBeenCalledTimes(1);
+    expect(rpcMock).toHaveBeenCalledWith("admin_list_community_reports");
+    expect(row.author.isAnonymousToReaders).toBe(true);
+    expect(row.author.displayName).toBe("Trần Thị Bích");
+    expect(row.author.displayName).not.toBe("Ẩn danh");
+    expect("avatarUrl" in row.author).toBe(false);
+    expect(Object.keys(row.author).sort()).toEqual(["displayName", "isAnonymousToReaders"]);
+    expect(row).toEqual({
+      id: "solution-q1",
+      examId: "exam-q1",
+      examTitle: "Đề thi thử THPT 2026",
+      author: { displayName: "Trần Thị Bích", isAnonymousToReaders: true },
+      status: "published",
+      reportCount: 2,
+      reportReasons: ["spam", "sai đáp án"],
+      reportedComments: [],
+      hiddenComments: [],
+    });
+  });
+
+  it("row 10: a hidden_comments entry with question_number null -> questionNumber: null (key present), commenter unmasked", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: [
+        queueRow({
+          hidden_comments: [
+            {
+              id: "comment-h1",
+              question_number: null,
+              body: "Bình luận **thô**",
+              commenter_display_name: "Lê Văn C",
+              commenter_is_anonymous_to_readers: true,
+              hidden_reason: "Xúc phạm",
+              hidden_at: "2026-09-20T10:00:00+00:00",
+              report_count: 0,
+            },
+          ],
+        }),
+      ],
+      error: null,
+    });
+
+    const [row] = await listCommunityReports();
+    const [hidden] = row.hiddenComments;
+
+    expect("questionNumber" in hidden).toBe(true);
+    expect(hidden.questionNumber).toBeNull();
+    expect(hidden).toEqual({
+      id: "comment-h1",
+      questionNumber: null,
+      body: "Bình luận **thô**",
+      commenter: { displayName: "Lê Văn C", isAnonymousToReaders: true },
+      hiddenReason: "Xúc phạm",
+      hiddenAt: "2026-09-20T10:00:00+00:00",
+      reportCount: 0,
+    });
+  });
+
+  it("row 11: a reported_comments entry with question_number null -> questionNumber: null (the visible half is nullable too)", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: [
+        queueRow({
+          reported_comments: [
+            {
+              id: "comment-v1",
+              question_number: null,
+              body: "Bình luận đang hiện",
+              commenter_display_name: "Phạm Thị D",
+              commenter_is_anonymous_to_readers: false,
+              report_count: 3,
+              report_reasons: ["spam", "spam", "quấy rối"],
+            },
+            {
+              id: "comment-v2",
+              question_number: 4,
+              body: "Bình luận câu 4",
+              commenter_display_name: "Hoàng Văn E",
+              commenter_is_anonymous_to_readers: true,
+              report_count: 1,
+              report_reasons: ["spam"],
+            },
+          ],
+        }),
+      ],
+      error: null,
+    });
+
+    const [row] = await listCommunityReports();
+
+    expect("questionNumber" in row.reportedComments[0]).toBe(true);
+    expect(row.reportedComments).toEqual([
+      {
+        id: "comment-v1",
+        questionNumber: null,
+        body: "Bình luận đang hiện",
+        commenter: { displayName: "Phạm Thị D", isAnonymousToReaders: false },
+        reportCount: 3,
+        reportReasons: ["spam", "spam", "quấy rối"],
+      },
+      {
+        id: "comment-v2",
+        questionNumber: 4,
+        body: "Bình luận câu 4",
+        commenter: { displayName: "Hoàng Văn E", isAnonymousToReaders: true },
+        reportCount: 1,
+        reportReasons: ["spam"],
+      },
+    ]);
+  });
+
+  it("row 12: a hidden row with report_count 0, no reasons, no reported comments and one hidden comment is returned, not filtered out (Reference Contract Value #26)", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: [
+        queueRow({
+          id: "solution-hidden",
+          status: "hidden",
+          report_count: 0,
+          report_reasons: [],
+          reported_comments: [],
+          hidden_comments: [
+            {
+              id: "comment-h2",
+              question_number: 2,
+              body: "Đã ẩn",
+              commenter_display_name: "Võ Thị F",
+              commenter_is_anonymous_to_readers: false,
+              hidden_reason: "Spam",
+              hidden_at: "2026-09-21T08:30:00+00:00",
+              report_count: 0,
+            },
+          ],
+        }),
+      ],
+      error: null,
+    });
+
+    const rows = await listCommunityReports();
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].id).toBe("solution-hidden");
+    expect(rows[0].status).toBe("hidden");
+    expect(rows[0].reportCount).toBe(0);
+    expect(rows[0].reportReasons).toEqual([]);
+    expect(rows[0].reportedComments).toEqual([]);
+    expect(rows[0].hiddenComments).toHaveLength(1);
+  });
+
+  it("row 13: a row with no hidden comment maps hiddenComments to [] (never null or absent)", async () => {
+    rpcMock.mockResolvedValueOnce({ data: [queueRow({ hidden_comments: [] })], error: null });
+
+    const [row] = await listCommunityReports();
+
+    expect("hiddenComments" in row).toBe(true);
+    expect(row.hiddenComments).toEqual([]);
+  });
+
+  it("row 14: no admin row passes through a masking mapper — adminActions.ts references neither toAuthorIdentity nor toScoreField", () => {
+    const source = readAdminActionsSource();
+
+    expect(source).not.toContain("toAuthorIdentity");
+    expect(source).not.toContain("toScoreField");
+    expect(source).not.toMatch(/lib\/solutions\/identity/);
+  });
+
+  it("row 15: getSolutionNotesForAdmin(S) maps notes for positions 1 and 3 in array order, body kept as the raw string", async () => {
+    const rawBody = "Ta có $x^2 = 4$ nên **x = ±2**.\n\n- bước 1\n- bước 2";
+    rpcMock.mockResolvedValueOnce({
+      data: [
+        { question_number: 1, question_id: "q-1", body: rawBody },
+        { question_number: 3, question_id: "q-3", body: "Câu 3: chọn C" },
+      ],
+      error: null,
+    });
+
+    const notes = await getSolutionNotesForAdmin("solution-n1");
+
+    expect(rpcMock).toHaveBeenCalledTimes(1);
+    expect(rpcMock).toHaveBeenCalledWith("admin_get_community_solution_notes", { p_solution_id: "solution-n1" });
+    expect(notes).toEqual([
+      { questionNumber: 1, questionId: "q-1", body: rawBody },
+      { questionNumber: 3, questionId: "q-3", body: "Câu 3: chọn C" },
+    ]);
+  });
+
+  it("row 16: getSolutionNotesForAdmin(S) with an empty RPC result returns [] as a legal, non-error state", async () => {
+    rpcMock.mockResolvedValueOnce({ data: [], error: null });
+
+    await expect(getSolutionNotesForAdmin("solution-empty")).resolves.toEqual([]);
+  });
+});
 
 // =============================================================================
 // Test 2 — saveSolution / setSolutionStatus: word-count validation gate runs
