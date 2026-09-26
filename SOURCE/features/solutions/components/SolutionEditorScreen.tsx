@@ -409,7 +409,12 @@ export function SolutionEditorScreen({ examId, initialState, questionNodes }: So
   // từ, không theo "đã thay đổi" (SolutionPublishBar's own doc comment: "chỉ
   // là gương phía client của luật server (phòng thủ, không phải nguồn thật)").
   const incompleteCount = state.questions.filter((q) => q.wordCount < 15).length;
-  const hidden = state.status === "hidden";
+  // MỘT cờ suy ra đúng MỘT lần (task 39, AC-083) — truyền xuống mọi con
+  // (băng lý do, hai công tắc cài đặt, `NoteSheet`), không lặp lại
+  // `state.status === "hidden"` ở nơi khác trong file này. `SolutionPublishBar`
+  // vẫn tự giữ nhánh `status === "hidden" → null` của riêng nó (ma trận trạng
+  // thái riêng của component đó, không phải bản sao của cờ này).
+  const isReadOnly = state.status === "hidden";
 
   return (
     <PageContainer as="main" size="small" padding="none" className="flex flex-col gap-5 px-4 py-6 sm:px-6 sm:py-8">
@@ -418,7 +423,7 @@ export function SolutionEditorScreen({ examId, initialState, questionNodes }: So
         items={[{ label: t("nav.exams"), href: "/exams" }, { label: t("solutions.editor.crumb") }]}
       />
 
-      {hidden && state.hiddenReason && (
+      {isReadOnly && state.hiddenReason && (
         <ModerationReasonBanner variant="alert" reason={state.hiddenReason} id={lockReasonId} />
       )}
 
@@ -438,7 +443,7 @@ export function SolutionEditorScreen({ examId, initialState, questionNodes }: So
         onShowProfileChange={(next) => void handleSwitchChange("showProfile", next)}
         onShowScoreChange={(next) => void handleSwitchChange("showScore", next)}
         busy={state.settingsSaving}
-        lockReasonId={hidden ? lockReasonId : undefined}
+        lockReasonId={isReadOnly ? lockReasonId : undefined}
       />
       {state.settingsError && (
         <p role="alert" className="text-destructive text-xs">
@@ -477,7 +482,7 @@ export function SolutionEditorScreen({ examId, initialState, questionNodes }: So
               questionNumber={index + 1}
               totalCount={totalCount}
               rowState={rowStates[index]}
-              readOnly={hidden}
+              readOnly={isReadOnly}
               hiddenReason={state.hiddenReason}
               note={q.note}
               essayPrefillApplied={q.essayPrefillApplied}

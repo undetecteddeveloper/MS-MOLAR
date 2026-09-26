@@ -17,6 +17,7 @@ import type { ComponentProps } from "react";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SolutionEditorQuestion, SolutionEditorState } from "@/features/solutions/queries";
+import type { WriterQuestionNode } from "@/features/solutions/components/writerQuestionNodes";
 
 const { saveSolutionMock, setSolutionStatusMock, renderCounts } = vi.hoisted(() => ({
   saveSolutionMock: vi.fn(),
@@ -410,6 +411,88 @@ describe("SolutionEditorScreen — NoteSheet, dưới 15 từ trên nháp/đã �
 
     await screen.findByRole("button", { name: "Câu 1, chưa ghi chú" });
     expect(saveSolutionMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+// Task 39 (P4-T8) — bài của chính người viết bị admin ẩn (AC-083): toàn màn
+// chỉ đọc, băng lý do ở đầu, mở một hàng vẫn xem được ghi chú nhưng không có
+// ô nhập/nút lưu nào. Boundary: `SolutionEditorScreen` + fixture `hidden` +
+// `actions.ts` mocked (không gọi thật) — DB đã từ chối 42501 ở task 03, đây
+// chỉ là phòng thủ UI khớp với guarantee đó.
+function hiddenQuestionNodes(note: string): WriterQuestionNode[] {
+  return [
+    {
+      questionId: "q1",
+      stemNode: <p>Đề câu 1</p>,
+      correctAnswerNode: <>A</>,
+      // Bản render CHỈ ĐỌC của ghi chú — trong production đây là
+      // `<RichText text={q.note} />` (writerQuestionNodes.tsx); ở đây một
+      // node tối giản là đủ vì test chỉ xác nhận nó HIỆN RA, không xác nhận
+      // cách RichText dựng markdown/LaTeX (việc đó thuộc test riêng của
+      // RichText).
+      noteNode: <p>{note}</p>,
+      outcome: null,
+      questionType: "mcq",
+      choiceNodes: [],
+      subItemNodes: [],
+    },
+  ];
+}
+
+describe("SolutionEditorScreen — bị ẩn: toàn màn chỉ đọc (task 39, AC-083)", () => {
+  it("không có nút Lưu nháp/Đăng/Gỡ về nháp; băng role=alert hiện đúng lý do", () => {
+    const state = baseState({
+      solutionId: "s1",
+      status: "hidden",
+      hiddenReason: "Nội dung vi phạm quy định cộng đồng",
+      questions: [question({ questionId: "q1", note: "ghi chú của tôi" })],
+    });
+
+    render(
+      <SolutionEditorScreen
+        examId="E1"
+        initialState={state}
+        questionNodes={hiddenQuestionNodes("ghi chú của tôi")}
+      />
+    );
+
+    expect(screen.queryByRole("button", { name: "Lưu nháp" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Đăng" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Gỡ về nháp" })).toBeNull();
+
+    const alert = screen.getByRole("alert");
+    expect(alert.textContent).toBe(
+      "Bài giải của bạn đã bị ẩn bởi quản trị viên. Lý do: Nội dung vi phạm quy định cộng đồng"
+    );
+  });
+
+  it("mở một hàng câu: vẫn xem được ghi chú, KHÔNG có textarea, KHÔNG có nút lưu nào", () => {
+    const state = baseState({
+      solutionId: "s1",
+      status: "hidden",
+      hiddenReason: "Nội dung vi phạm quy định cộng đồng",
+      questions: [question({ questionId: "q1", note: "ghi chú của tôi" })],
+    });
+
+    render(
+      <SolutionEditorScreen
+        examId="E1"
+        initialState={state}
+        questionNodes={hiddenQuestionNodes("ghi chú của tôi")}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /^Câu 1,/ }));
+
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText("ghi chú của tôi")).toBeTruthy();
+    expect(within(dialog).queryByRole("textbox")).toBeNull();
+    expect(within(dialog).queryByRole("button", { name: "Lưu" })).toBeNull();
+    expect(within(dialog).queryByRole("button", { name: /^Lưu và sang câu/ })).toBeNull();
+    // Băng lý do cũng lặp lại bên trong tấm trượt (NoteSheet, đã có từ task 11).
+    expect(within(dialog).getByRole("alert").textContent).toBe(
+      "Bài giải của bạn đã bị ẩn bởi quản trị viên. Lý do: Nội dung vi phạm quy định cộng đồng"
+    );
   });
 });
 
