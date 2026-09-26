@@ -18,9 +18,33 @@
 // task file § Notes "Sequencing") — không bề mặt nào tiêu thụ nó ở task này;
 // chữ ký prop giữ nguyên (required, không optional/không default) để task 28
 // không phải đổi call site của `page.tsx`.
-import { useEffect, useId, type ReactNode } from "react";
+//
+// Bảng câu hỏi (task 22, DD-U4, AC-049/AC-051): `QuestionPaletteDock` dùng lại
+// NGUYÊN VẸN (không sửa file đó) — `currentIndex` là MỘT state duy nhất của
+// màn này ("ô câu đang mở gần nhất", theo đúng chữ AC-051: chỉ ĐỔI khi người
+// dùng CHỌN một ô ở bảng, không đổi khi bấm thẳng vào đầu hàng — AC-059 nói rõ
+// bấm một hàng không tự gập/ảnh hưởng hàng khác nên cũng không tự thành "vị
+// trí hiện tại"). `SolutionQuestionRow` KHÔNG có prop `open` (uncontrolled by
+// design, không thuộc Target Files task 22) nên "mở hàng k tại chỗ" khi chọn ô
+// k dùng đúng mánh `key` đổi để remount đúng MỘT hàng với `defaultOpen` mới
+// (`openTokens`, tăng dần theo từng lần chọn CHÍNH hàng đó) — hàng khác giữ
+// nguyên `key`, không remount, không mất trạng thái gập/mở người dùng tự bấm.
+// `jumpSignal` tách hẳn khỏi effect liên kết sâu phía dưới (mảng phụ thuộc
+// rỗng, chỉ chạy lúc mount): effect cuộn+focus của "chọn ô" chỉ chạy khi CHÍNH
+// người dùng chọn một ô, không chạy ở lượt render đầu.
+//
+// 0 câu hiện hành (UI Spec `C-21` "Rỗng"): không mount `QuestionPaletteDock` —
+// nút tĩnh cùng khuôn `SolutionEditorHeader.tsx` (task 09, đọc trước khi viết
+// hàng này) để hai màn đọc giống nhau; `aria-describedby` trỏ đúng `emptyTextId`
+// của câu "Đề này hiện không còn câu hỏi nào." mà thẻ nét đứt bên dưới hiện.
+import { useEffect, useId, useState, type ReactNode } from "react";
+import { LayoutGrid } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { t } from "@/lib/copy";
+import { cn } from "@/lib/utils";
+import { chipVariants } from "@/components/ui/chip";
+import { QuestionPaletteDock } from "@/components/shared/QuestionPaletteDock";
+import type { QuestionCell } from "@/components/shared/QuestionPagination";
 import {
   SolutionAuthorCard,
   type SolutionAuthorCardHeader,
@@ -78,6 +102,22 @@ export function SolutionViewScreen({
 }: SolutionViewScreenProps) {
   const emptyTextId = useId();
 
+  // "Ô câu đang mở gần nhất" (AC-051) — MỘT state duy nhất (Refactor phase task
+  // 22); khởi tạo theo liên kết sâu nếu có, sau đó chỉ đổi khi chọn một ô ở
+  // bảng câu hỏi (xem ghi chú đầu file).
+  const [currentIndex, setCurrentIndex] = useState<number | null>(
+    initialOpenQuestion !== undefined ? initialOpenQuestion - 1 : null
+  );
+  // Đếm số lần MỖI hàng từng được buộc mở qua bảng câu hỏi — dùng làm một phần
+  // `key` để remount đúng hàng đó với `defaultOpen` mới; hàng không có trong
+  // map này giữ `key` ổn định vĩnh viễn, kể cả sau khi không còn là "hiện tại".
+  const [openTokens, setOpenTokens] = useState<Record<number, number>>(() =>
+    initialOpenQuestion !== undefined ? { [initialOpenQuestion - 1]: 0 } : {}
+  );
+  // Tăng đúng một lần mỗi khi CHỌN một ô — tách biệt effect cuộn/focus bên dưới
+  // khỏi effect liên kết sâu (mảng phụ thuộc rỗng, chỉ chạy lúc mount).
+  const [jumpSignal, setJumpSignal] = useState(0);
+
   useEffect(() => {
     if (initialOpenQuestion === undefined) return;
     const target = questionNodes[initialOpenQuestion - 1];
@@ -91,6 +131,30 @@ export function SolutionViewScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- liên kết sâu chỉ áp dụng MỘT LẦN ở lượt tải đầu (URL đọc-một-lần, § Client State Design "URL state"), không áp lại nếu questionNodes/initialOpenQuestion đổi tham chiếu sau mount
   }, []);
 
+  // Chọn ô k (AC-051): cuộn + focus đúng hàng k, SAU KHI hàng đó remount mở
+  // (currentIndex/openTokens đã cập nhật ở handleJump, cùng lượt render).
+  useEffect(() => {
+    if (jumpSignal === 0 || currentIndex === null) return;
+    const target = questionNodes[currentIndex];
+    if (!target) return;
+    const el = document.getElementById(deepLinkRowId(target.questionId));
+    el?.scrollIntoView({ block: "start" });
+    el?.focus({ preventScroll: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ phản ứng với jumpSignal (một lần mỗi lần chọn ô); questionNodes/currentIndex đọc tại thời điểm gọi
+  }, [jumpSignal]);
+
+  function handleJump(index: number) {
+    setCurrentIndex(index);
+    setOpenTokens((prev) => ({ ...prev, [index]: (prev[index] ?? -1) + 1 }));
+    setJumpSignal((s) => s + 1);
+  }
+
+  const cells: QuestionCell[] = questionNodes.map((_, index) => ({
+    index,
+    state: index === currentIndex ? "current" : "idle",
+    label: t("upload.questionLabel", { number: index + 1 }),
+  }));
+
   return (
     <div className="flex flex-col gap-5">
       <SolutionAuthorCard
@@ -101,6 +165,33 @@ export function SolutionViewScreen({
         editHref={editHref}
       />
 
+      <div className="flex justify-end">
+        {questionNodes.length === 0 ? (
+          // Rỗng (DD-U4): không mount QuestionPaletteDock — nút tĩnh cùng
+          // khuôn SolutionEditorHeader.tsx (task 09), mô tả trỏ đúng câu Rỗng
+          // mà thẻ nét đứt bên dưới hiện (`emptyTextId`).
+          <button
+            type="button"
+            aria-disabled="true"
+            aria-describedby={emptyTextId}
+            className={cn(chipVariants({ active: false }), "gap-1.5 px-3 tabular-nums h-11")}
+          >
+            <LayoutGrid aria-hidden className="size-4" />
+            <span>{t("common.questionPalette")}</span>
+          </button>
+        ) : (
+          <QuestionPaletteDock
+            current={currentIndex ?? -1}
+            total={questionNodes.length}
+            cells={cells}
+            triggerLabel={t("common.questionPalette")}
+            panelTitle={t("common.questionPalette")}
+            panelMeta={t("exams.questionCount", { count: questionNodes.length })}
+            onJump={handleJump}
+          />
+        )}
+      </div>
+
       {questionNodes.length === 0 ? (
         <Card variant="outline" padding="compact" className="border-dashed text-sm">
           <p id={emptyTextId}>{t("solutions.emptyExam")}</p>
@@ -108,11 +199,15 @@ export function SolutionViewScreen({
       ) : (
         <ol className="divide-border flex flex-col divide-y">
           {questionNodes.map((q, index) => {
-            const questionNumber = index + 1;
-            const isDeepLinkTarget = initialOpenQuestion === questionNumber;
+            // Hàng "hiện tại" (AC-051): chỉ đổi khi chọn ô ở bảng câu hỏi —
+            // xem ghi chú đầu file. openTokens[index] xác định (thay vì suy ra
+            // từ isCurrent) để hàng KHÔNG remount khi currentIndex chuyển sang
+            // hàng khác — chỉ hàng vừa được chọn mới remount, với key riêng.
+            const isCurrent = currentIndex === index;
+            const openToken = openTokens[index];
             return (
               <SolutionQuestionRow
-                key={q.questionId}
+                key={openToken !== undefined ? `${q.questionId}:${openToken}` : q.questionId}
                 questionId={q.questionId}
                 index={index}
                 stemNode={q.stemNode}
@@ -125,9 +220,9 @@ export function SolutionViewScreen({
                 note={q.note}
                 // Sheet bình luận thật là task 28 — chưa có nơi nhận sự kiện này.
                 onOpenComments={() => {}}
-                id={isDeepLinkTarget ? deepLinkRowId(q.questionId) : undefined}
-                tabIndex={isDeepLinkTarget ? -1 : undefined}
-                defaultOpen={isDeepLinkTarget}
+                id={isCurrent ? deepLinkRowId(q.questionId) : undefined}
+                tabIndex={isCurrent ? -1 : undefined}
+                defaultOpen={openToken !== undefined}
               />
             );
           })}

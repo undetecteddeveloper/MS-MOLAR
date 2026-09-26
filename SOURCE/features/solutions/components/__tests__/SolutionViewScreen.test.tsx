@@ -9,7 +9,7 @@
 
 import type { ComponentProps } from "react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import type { SolutionAuthorCardHeader } from "@/features/solutions/components/SolutionAuthorCard";
 
 const { toggleHelpfulMock, setPinMock } = vi.hoisted(() => ({
@@ -142,6 +142,88 @@ describe("SolutionViewScreen — Rỗng (đề không còn câu hiện hành nà
 
     const text = screen.getByText("Đề này hiện không còn câu hỏi nào.");
     expect(text.id).toBeTruthy();
+  });
+});
+
+// ═══ Nút "Bảng câu hỏi" bị chặn khi 0 câu hiện hành (DD-U4, frontend DD §
+// Test Boundaries "Empty palette trigger tests" — cùng khẳng định task 09) ═══
+
+describe("SolutionViewScreen — nút Bảng câu hỏi bị chặn khi 0 câu hiện hành (DD-U4)", () => {
+  it("không mount QuestionPaletteDock: nút tĩnh, aria-disabled, không disabled gốc, mở không panel nào", () => {
+    renderScreen({ questionNodes: [] });
+
+    const trigger = screen.getByRole("button", { name: "Bảng câu hỏi" });
+    expect(trigger.getAttribute("aria-disabled")).toBe("true");
+    expect(trigger.hasAttribute("disabled")).toBe(false);
+    expect(trigger.hasAttribute("aria-expanded")).toBe(false);
+    expect(trigger.hasAttribute("aria-controls")).toBe(false);
+
+    const describedById = trigger.getAttribute("aria-describedby");
+    expect(describedById).toBeTruthy();
+    expect(document.getElementById(describedById!)?.textContent).toBe(
+      "Đề này hiện không còn câu hỏi nào."
+    );
+
+    fireEvent.click(trigger);
+    expect(screen.queryByRole("region", { name: "Bảng câu hỏi" })).toBeNull();
+  });
+});
+
+// ═══ Ô "hiện tại" của bảng câu hỏi (AC-051) — chọn ô k đặt lại "vị trí hiện
+// tại" và mở đúng hàng k tại chỗ; chọn ô khác chuyển aria-current sang ô mới,
+// không để lại hai ô cùng mang aria-current ═══
+
+describe("SolutionViewScreen — ô hiện tại của bảng câu hỏi (AC-051)", () => {
+  const FIVE_QUESTIONS: ComponentProps<typeof SolutionViewScreen>["questionNodes"] = Array.from(
+    { length: 5 },
+    (_, i) => ({
+      questionId: `q${i + 1}`,
+      stemNode: <span>{`Đề ${i + 1}`}</span>,
+      correctAnswerNode: <span>Đáp án {i + 1}</span>,
+      hasChanged: false,
+    })
+  );
+
+  function openPalette() {
+    fireEvent.click(screen.getByRole("button", { name: "Bảng câu hỏi" }));
+  }
+
+  function panel() {
+    return screen.getByRole("region", { name: "Bảng câu hỏi" });
+  }
+
+  function chooseCell(number: number) {
+    fireEvent.click(within(panel()).getByRole("button", { name: `Câu ${number}` }));
+  }
+
+  it("chọn ô 2 rồi ô 5: đúng một ô mang aria-current, ô cũ mất aria-current khi ô mới được chọn", () => {
+    renderScreen({ questionNodes: FIVE_QUESTIONS });
+
+    openPalette();
+    chooseCell(2);
+
+    openPalette();
+    expect(within(panel()).getByRole("button", { name: "Câu 2" }).getAttribute("aria-current")).toBe(
+      "true"
+    );
+    expect(within(panel()).getByRole("button", { name: "Câu 1" }).getAttribute("aria-current")).toBeNull();
+    chooseCell(5);
+
+    openPalette();
+    expect(within(panel()).getByRole("button", { name: "Câu 5" }).getAttribute("aria-current")).toBe(
+      "true"
+    );
+    expect(within(panel()).getByRole("button", { name: "Câu 2" }).getAttribute("aria-current")).toBeNull();
+  });
+
+  it("chọn ô 4: bảng đóng, hàng 4 mở tại chỗ", () => {
+    renderScreen({ questionNodes: FIVE_QUESTIONS });
+
+    openPalette();
+    chooseCell(4);
+
+    expect(screen.queryByRole("region", { name: "Bảng câu hỏi" })).toBeNull();
+    expect(screen.getByRole("button", { name: /Câu 4/ }).getAttribute("aria-expanded")).toBe("true");
   });
 });
 
