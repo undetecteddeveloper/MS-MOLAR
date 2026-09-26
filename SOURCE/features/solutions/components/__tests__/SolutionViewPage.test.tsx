@@ -26,6 +26,9 @@ const {
   redirectMock,
   toggleHelpfulMock,
   setPinMock,
+  postCommentMock,
+  deleteCommentMock,
+  getCurrentUserProfileMock,
 } = vi.hoisted(() => ({
   getSolutionDetailMock: vi.fn(),
   getMySolutionForWriterMock: vi.fn(),
@@ -36,6 +39,11 @@ const {
   }),
   toggleHelpfulMock: vi.fn(),
   setPinMock: vi.fn(),
+  // task 28 — page.tsx now also reads the viewer's own profile to build the
+  // optimistic identity CommentSheet needs; not exercised by these tests.
+  postCommentMock: vi.fn(),
+  deleteCommentMock: vi.fn(),
+  getCurrentUserProfileMock: vi.fn(),
 }));
 
 vi.mock("@/features/solutions/queries", () => ({
@@ -47,7 +55,10 @@ vi.mock("next/navigation", () => ({ redirect: redirectMock }));
 vi.mock("@/features/solutions/actions", () => ({
   toggleHelpful: toggleHelpfulMock,
   setPin: setPinMock,
+  postComment: postCommentMock,
+  deleteComment: deleteCommentMock,
 }));
+vi.mock("@/lib/auth/getCurrentUser", () => ({ getCurrentUserProfile: getCurrentUserProfileMock }));
 
 const { default: SolutionViewPage, parseSolutionDeepLink } = await import(
   "@/app/(exams)/exams/[id]/solutions/[solutionId]/page"
@@ -67,7 +78,11 @@ beforeEach(() => {
   redirectMock.mockClear();
   toggleHelpfulMock.mockReset();
   setPinMock.mockReset();
+  postCommentMock.mockReset();
+  deleteCommentMock.mockReset();
+  getCurrentUserProfileMock.mockReset();
 
+  getCurrentUserProfileMock.mockResolvedValue(null);
   getMySolutionForWriterMock.mockResolvedValue({
     solutionId: "S1",
     attemptId: "A1",

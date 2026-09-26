@@ -14,10 +14,11 @@
 // đó tự mở sẵn (`defaultOpen`), rồi component này cuộn+focus một lần khi mount
 // (mảng phụ thuộc rỗng có chủ ý: URL đọc-một-lần, không áp lại nếu prop đổi).
 //
-// `initialCommentsOpen` được GIỮ CHỖ cho tấm trượt bình luận thật (task 28,
-// task file § Notes "Sequencing") — không bề mặt nào tiêu thụ nó ở task này;
-// chữ ký prop giữ nguyên (required, không optional/không default) để task 28
-// không phải đổi call site của `page.tsx`.
+// `initialCommentsOpen` (task 28): kết hợp `initialOpenQuestion` để mở sẵn
+// `CommentSheet` thật của đúng câu đó (AC-068, deep link `?q=k&comments=1`).
+// `CommentSheet`/`CommentItem`/`CommentComposer` mounted CÓ ĐIỀU KIỆN — cùng
+// khuôn `NoteSheet`/`activeNote` bên `SolutionEditorScreen` — nên "đóng" là gỡ
+// hẳn khỏi cây, không chuyển `open` sang false tại chỗ.
 //
 // Bảng câu hỏi (task 22, DD-U4, AC-049/AC-051): `QuestionPaletteDock` dùng lại
 // NGUYÊN VẸN (không sửa file đó) — `currentIndex` là MỘT state duy nhất của
@@ -50,6 +51,9 @@ import {
   type SolutionAuthorCardHeader,
 } from "@/features/solutions/components/SolutionAuthorCard";
 import { SolutionQuestionRow } from "@/features/solutions/components/SolutionQuestionRow";
+import { CommentSheet } from "@/features/solutions/components/CommentSheet";
+import type { SolutionDetailComment } from "@/features/solutions/queries";
+import type { AuthorIdentity } from "@/lib/solutions/identity";
 
 /** Một câu đã dựng sẵn ReactNode phía server — twin của `SolutionDetailQuestion`
  *  (`queries.ts`) sau khi `page.tsx` chạy qua bộ dựng node (UI-D22). */
@@ -68,6 +72,12 @@ export interface SolutionViewQuestionNode {
    *  NGUYÊN VẸN từ `SolutionDetailQuestion.note.commentCount` — màn này không
    *  tự thêm/bớt gì (Reference Contract #20). */
   note?: { bodyNode: ReactNode; commentCount?: number };
+  /** Bình luận THÔ của câu này (`SolutionDetailQuestion.comments`, task 28) —
+   *  đi tới `CommentSheet` khi mở, không qua bất kỳ phép dựng ReactNode nào ở
+   *  đây (khác `stemNode`/`note.bodyNode`): thân bình luận render qua RichText
+   *  NẠP ĐỘNG bên trong `CommentItem`, không phải server-prerendered (M12).
+   *  Vắng mặt (vd fixture/test cũ chưa truyền) ⇒ coi như `[]`. */
+  comments?: SolutionDetailComment[];
 }
 
 export interface SolutionViewScreenProps {
@@ -83,8 +93,15 @@ export interface SolutionViewScreenProps {
    *  lệ (AC-061 note: "mở trang bình thường, không báo lỗi") — component này
    *  không phân biệt "câu đích còn tồn tại" khỏi "câu đích đã đổi vị trí". */
   initialOpenQuestion?: number;
-  /** Giữ chỗ cho `CommentSheet` thật (task 28) — xem ghi chú đầu file. */
+  /** `?comments=1` (task 21) kết hợp `initialOpenQuestion` — mở sẵn
+   *  `CommentSheet` của đúng câu đó (AC-068). Vô nghĩa khi
+   *  `initialOpenQuestion` vắng mặt (không có câu đích nào để mở). */
   initialCommentsOpen: boolean;
+  /** Danh tính THẬT của người xem hiện tại (task 28) — chỉ dùng để dựng hàng
+   *  bình luận lạc quan (không ẩn danh) trong `CommentSheet`; không ảnh hưởng
+   *  gì tới phần còn lại của màn. Optional + mặc định ẩn danh: các test/nơi
+   *  gọi cũ (task 20-22) không cần đổi để vẫn biên dịch được. */
+  viewerIdentity?: AuthorIdentity;
 }
 
 function deepLinkRowId(questionId: string): string {
@@ -99,8 +116,27 @@ export function SolutionViewScreen({
   editHref,
   questionNodes,
   initialOpenQuestion,
+  initialCommentsOpen,
+  viewerIdentity = { kind: "anonymous" },
 }: SolutionViewScreenProps) {
   const emptyTextId = useId();
+
+  // S4: khoá ô "Ẩn danh" của CommentComposer khi người xem là tác giả bài giải
+  // VÀ bài đang ẩn danh — tính từ `solution` sẵn có (isMine/author), không bao
+  // giờ từ tên hiển thị của người xem (header ẩn danh không mang tên).
+  const lockedAnonymous = solution.isMine && solution.author.kind === "anonymous";
+
+  // Câu đang mở CommentSheet (AC-068) — id câu, không phải chỉ số, vì
+  // `SolutionQuestionRow.onOpenComments` phát questionId. `null` = tấm trượt
+  // đóng; component này KHÔNG mount CommentSheet khi giá trị là `null`
+  // (giống hệt `NoteSheet`/`activeNote` bên `SolutionEditorScreen`), nên đóng
+  // là gỡ hẳn khỏi cây, không chuyển `open` sang false tại chỗ.
+  const [openCommentsQuestionId, setOpenCommentsQuestionId] = useState<string | null>(() => {
+    if (!initialCommentsOpen || initialOpenQuestion === undefined) return null;
+    return questionNodes[initialOpenQuestion - 1]?.questionId ?? null;
+  });
+  const openCommentsIndex = questionNodes.findIndex((q) => q.questionId === openCommentsQuestionId);
+  const openCommentsNode = openCommentsIndex >= 0 ? questionNodes[openCommentsIndex] : undefined;
 
   // "Ô câu đang mở gần nhất" (AC-051) — MỘT state duy nhất (Refactor phase task
   // 22); khởi tạo theo liên kết sâu nếu có, sau đó chỉ đổi khi chọn một ô ở
@@ -218,8 +254,7 @@ export function SolutionViewScreen({
                 notAutoScored={q.notAutoScored}
                 essayScore={q.essayScore}
                 note={q.note}
-                // Sheet bình luận thật là task 28 — chưa có nơi nhận sự kiện này.
-                onOpenComments={() => {}}
+                onOpenComments={setOpenCommentsQuestionId}
                 id={isCurrent ? deepLinkRowId(q.questionId) : undefined}
                 tabIndex={isCurrent ? -1 : undefined}
                 defaultOpen={openToken !== undefined}
@@ -227,6 +262,21 @@ export function SolutionViewScreen({
             );
           })}
         </ol>
+      )}
+
+      {openCommentsNode && (
+        <CommentSheet
+          key={openCommentsNode.questionId}
+          solutionId={solution.id}
+          questionId={openCommentsNode.questionId}
+          questionNumber={openCommentsIndex + 1}
+          comments={openCommentsNode.comments ?? []}
+          lockedAnonymous={lockedAnonymous}
+          viewerIdentity={viewerIdentity}
+          viewerIsSolutionAuthor={solution.isMine}
+          now={now}
+          onClose={() => setOpenCommentsQuestionId(null)}
+        />
       )}
     </div>
   );

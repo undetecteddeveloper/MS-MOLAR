@@ -1090,6 +1090,29 @@ export const copy = {
   // trên): task 20 là chủ, task 28 dùng lại nguyên văn, không định nghĩa lại.
   "solutions.comments.open": "{count} bình luận",
   "solutions.comments.openEmpty": "Bình luận",
+  // Tấm trượt bình luận thật (O-02, task 28) — CommentSheet/CommentItem/
+  // CommentComposer. DD-pinned: sendError, deleteError (frontend DD § Error
+  // Handling). Ngoại lệ (v1.5, task 37): "solutions.comments.report" và
+  // "solutions.comments.reported" KHÔNG thuộc task này — chưa render nút Báo
+  // cáo ở đây (task 28 không có phạm vi đó), tránh khai trùng khoá khi task 37
+  // thêm đúng hai khoá đó (MessageKey = keyof typeof copy sẽ báo lỗi tsc nếu
+  // trùng).
+  "solutions.comments.title": "Bình luận",
+  "solutions.comments.writerBadge": "Người viết",
+  "solutions.comments.empty": "Chưa có bình luận nào cho câu này.",
+  "solutions.comments.loadError": "Chưa tải được bình luận. Bạn thử lại nhé.",
+  "solutions.comments.hiddenByAdmin": "Bình luận đã bị ẩn bởi quản trị viên. Lý do: {reason}",
+  "solutions.comments.deleteTitle": "Xoá bình luận này?",
+  "solutions.comments.deleteBody": "Mọi người sẽ không thấy nó nữa.",
+  "solutions.comments.deleteError": "Chưa xoá được bình luận. Bạn thử lại nhé.",
+  "solutions.comments.sendError": "Chưa gửi được bình luận. Bạn thử lại nhé.",
+  "solutions.comments.emptyError": "Bạn hãy viết nội dung trước khi gửi.",
+  "solutions.comments.tooLongError": "Bình luận quá dài. Bạn rút ngắn bớt rồi gửi lại nhé.",
+  "solutions.comments.anonymousLabel": "Ẩn danh",
+  "solutions.comments.anonymousLocked":
+    "Bài giải của bạn đang ẩn danh nên bình luận của bạn cũng hiện là Ẩn danh.",
+  "solutions.comments.placeholder": "Viết bình luận cho câu này…",
+  "solutions.comments.send": "Gửi",
   // Màn xem (S-05, task 19) — SolutionAuthorCard/HelpfulButton/SolutionMenu.
   "solutions.view.helpful": "Hữu ích",
   "solutions.view.helpfulCount": "{count} hữu ích",

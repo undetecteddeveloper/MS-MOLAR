@@ -148,3 +148,27 @@ describe("RichText XSS — ghi chú bài giải cộng đồng (task 11, M8/ADR-
     renderBoth("Vì $x^2 <script>alert(1)</script> + 1 > 0$ nên bất phương trình đúng");
   });
 });
+
+// Task 28 (M8, ADR-0002) — bình luận Bài giải cộng đồng (`CommentItem`) là bề
+// mặt UGC MỚI đi qua ĐÚNG con đường RichText này, nạp ĐỘNG phía client (M12)
+// thay vì server-prerendered như stem/note — nhóm fixture này canh giữ đúng
+// bốn vector task yêu cầu, cùng hình dạng với nhóm "ghi chú" ở trên (task 11):
+// không phải một sanitize path mới, mà XÁC NHẬN sanitize đã có bọc được nội
+// dung bình luận giống hệt nội dung câu hỏi/ghi chú.
+describe("RichText XSS — bình luận Bài giải cộng đồng (task 28, M8/ADR-0002)", () => {
+  it("<script> trong bình luận không được render", () => {
+    renderBoth('Mình nghĩ đáp án đúng vì <script>alert("xss")</script> lý do sau');
+  });
+
+  it("<img onerror> trong bình luận không được render với handler", () => {
+    renderBoth('Xem hình <img src="x" onerror="alert(1)"> mình chụp lại đề');
+  });
+
+  it("link javascript: trong bình luận bị vô hiệu", () => {
+    renderBoth("Bạn xem [link này](javascript:alert(1)) sẽ rõ hơn nhé");
+  });
+
+  it("HTML thô bên trong khối công thức của bình luận không được diễn giải", () => {
+    renderBoth("Theo mình $x^2 <script>alert(1)</script> - 1 = 0$ nên có hai nghiệm");
+  });
+});

@@ -21,6 +21,8 @@ import { RichText } from "@/components/shared/RichText";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 import { t } from "@/lib/copy";
+import { getCurrentUserProfile } from "@/lib/auth/getCurrentUser";
+import type { AuthorIdentity } from "@/lib/solutions/identity";
 
 const CONTENT_CLASS = "text-lg leading-relaxed font-medium text-pretty sm:text-xl";
 const ANSWER_CLASS = "text-foreground text-base leading-relaxed";
@@ -86,6 +88,9 @@ function buildQuestionNode(question: SolutionDetailQuestion): SolutionViewQuesti
           commentCount: question.note.commentCount,
         }
       : undefined,
+    // Bình luận THÔ (task 28) — CommentSheet render qua RichText nạp động phía
+    // client (M12), khác note.bodyNode ở trên (server-prerendered, UI-D22).
+    comments: question.comments,
   };
 }
 
@@ -112,12 +117,24 @@ export default async function SolutionViewPage({
   // Ba lượt đọc dưới đây CHẮC CHẮN có dữ liệu — community_solution_detail đã
   // tự tái lập đúng rào R1 ở trên (đề published + tác giả không bị ban + người
   // xem đã nộp bài), nên `getExam`/`getMySolutionForWriter` không cần rào
-  // riêng ở route này.
-  const [examAuthor, own, exam] = await Promise.all([
+  // riêng ở route này. `getCurrentUserProfile()` đã được layout route-group
+  // gọi trước (`cache()` gộp lượt, xem `lib/auth/getCurrentUser.ts`) — lượt
+  // gọi lại ở đây không tốn thêm round-trip nào; chỉ dùng để dựng hàng bình
+  // luận LẠC QUAN (task 28, CommentSheet) khi người xem gửi một bình luận
+  // không ẩn danh.
+  const [examAuthor, own, exam, viewerProfile] = await Promise.all([
     isExamAuthor(id),
     getMySolutionForWriter(id),
     getExam(id),
+    getCurrentUserProfile(),
   ]);
+  const viewerIdentity: AuthorIdentity = viewerProfile
+    ? {
+        kind: "named",
+        displayName: viewerProfile.displayName,
+        ...(viewerProfile.avatarUrl ? { avatarUrl: viewerProfile.avatarUrl } : {}),
+      }
+    : { kind: "anonymous" };
 
   const editHref =
     solution.isMine && own ? `/exams/${id}/attempt/${own.attemptId}/solution` : undefined;
@@ -148,6 +165,7 @@ export default async function SolutionViewPage({
         questionNodes={solution.questions.map(buildQuestionNode)}
         initialOpenQuestion={q}
         initialCommentsOpen={commentsOpen}
+        viewerIdentity={viewerIdentity}
       />
     </PageContainer>
   );

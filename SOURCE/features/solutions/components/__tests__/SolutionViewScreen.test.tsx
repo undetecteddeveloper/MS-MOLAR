@@ -12,14 +12,21 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import type { SolutionAuthorCardHeader } from "@/features/solutions/components/SolutionAuthorCard";
 
-const { toggleHelpfulMock, setPinMock } = vi.hoisted(() => ({
+const { toggleHelpfulMock, setPinMock, postCommentMock, deleteCommentMock } = vi.hoisted(() => ({
   toggleHelpfulMock: vi.fn(),
   setPinMock: vi.fn(),
+  // task 28 — CommentSheet/CommentItem (mounted via the `?comments=1` deep
+  // link tests below) import postComment/deleteComment from this same
+  // module; neither is exercised by the pre-existing tests in this file.
+  postCommentMock: vi.fn(),
+  deleteCommentMock: vi.fn(),
 }));
 
 vi.mock("@/features/solutions/actions", () => ({
   toggleHelpful: toggleHelpfulMock,
   setPin: setPinMock,
+  postComment: postCommentMock,
+  deleteComment: deleteCommentMock,
 }));
 
 const { SolutionViewScreen } = await import("@/features/solutions/components/SolutionViewScreen");
@@ -260,5 +267,120 @@ describe("SolutionViewScreen — liên kết sâu ?q=k (AC-061)", () => {
       expect(screen.getByRole("button", { name: label }).getAttribute("aria-expanded")).toBe("false");
     }
     expect(document.activeElement).toBe(document.body);
+  });
+});
+
+// ═══ Task 28 mount — CommentSheet wired from the row callback and from the
+// parsed `?comments=1` flag (Required Tests #7, #11) ═══
+
+describe("SolutionViewScreen — mount CommentSheet (task 28, Required Test #11)", () => {
+  it("?comments=1 + ?q=2: mở sẵn CommentSheet của đúng câu 2 (AC-068)", async () => {
+    renderScreen({
+      questionNodes: [
+        { questionId: "q1", stemNode: <span>Đề 1</span>, correctAnswerNode: <span>A</span>, hasChanged: false },
+        {
+          questionId: "q2",
+          stemNode: <span>Đề 2</span>,
+          correctAnswerNode: <span>B</span>,
+          hasChanged: false,
+          note: { bodyNode: <span>Ghi chú 2</span>, commentCount: 1 },
+          comments: [
+            {
+              id: "c1",
+              author: { kind: "named", displayName: "Nguyễn Văn A" },
+              isSolutionAuthor: false,
+              isMine: false,
+              body: "Bình luận sẵn có",
+              iReported: false,
+              createdAt: "2026-09-20T10:00:00.000Z",
+            },
+          ],
+        },
+      ],
+      initialOpenQuestion: 2,
+      initialCommentsOpen: true,
+    });
+
+    expect(await screen.findByRole("heading", { name: "Bình luận · Câu 2" })).toBeTruthy();
+    expect(await screen.findByText("Bình luận sẵn có")).toBeTruthy();
+  });
+
+  it("bấm nút bình luận của một hàng: mở CommentSheet của đúng hàng đó", async () => {
+    renderScreen({
+      questionNodes: [
+        {
+          questionId: "q1",
+          stemNode: <span>Đề 1</span>,
+          correctAnswerNode: <span>A</span>,
+          hasChanged: false,
+          note: { bodyNode: <span>Ghi chú</span>, commentCount: 0 },
+          comments: [],
+        },
+      ],
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Câu 1/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Bình luận" }));
+
+    expect(await screen.findByRole("heading", { name: "Bình luận · Câu 1" })).toBeTruthy();
+  });
+});
+
+describe("SolutionViewScreen — đếm bình luận đọc commentCount, không đọc comments.length (Required Test #7)", () => {
+  it("note.commentCount: 3 trong khi comments.length: 4 ⇒ hiện '3 bình luận'", () => {
+    renderScreen({
+      questionNodes: [
+        {
+          questionId: "q1",
+          stemNode: <span>Đề 1</span>,
+          correctAnswerNode: <span>A</span>,
+          hasChanged: false,
+          note: { bodyNode: <span>Ghi chú</span>, commentCount: 3 },
+          comments: [
+            {
+              id: "c1",
+              author: { kind: "named", displayName: "A" },
+              isSolutionAuthor: false,
+              isMine: false,
+              body: "1",
+              iReported: false,
+              createdAt: "2026-09-20T10:00:00.000Z",
+            },
+            {
+              id: "c2",
+              author: { kind: "named", displayName: "B" },
+              isSolutionAuthor: false,
+              isMine: false,
+              body: "2",
+              iReported: false,
+              createdAt: "2026-09-20T10:00:00.000Z",
+            },
+            {
+              id: "c3",
+              author: { kind: "named", displayName: "C" },
+              isSolutionAuthor: false,
+              isMine: false,
+              body: "3",
+              iReported: false,
+              createdAt: "2026-09-20T10:00:00.000Z",
+            },
+            {
+              id: "c4",
+              author: { kind: "named", displayName: "D" },
+              isSolutionAuthor: true,
+              isMine: true,
+              body: "4",
+              isHiddenByAdmin: true,
+              hiddenReason: "…",
+              iReported: false,
+              createdAt: "2026-09-20T10:00:00.000Z",
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(screen.getByText("3 bình luận")).toBeTruthy();
+    expect(screen.queryByText("4 bình luận")).toBeNull();
   });
 });
