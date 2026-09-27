@@ -50,8 +50,11 @@ describe("OwnSolutionBlock — status: draft (AC-053, AC-045, AC-027)", () => {
     expect(bar.getAttribute("aria-valuenow")).toBe("3");
     expect(bar.getAttribute("aria-valuemax")).toBe("12");
     expect(screen.getByText("Nháp")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Viết tiếp" }).getAttribute("href")).toBe(HREF);
+    const continueBtn = screen.getByRole("button", { name: "Viết tiếp" });
+    expect(continueBtn.getAttribute("href")).toBe(HREF);
     expect(screen.queryByText(/đã thay đổi/)).toBeNull();
+    // Sàn chạm 44px: nút không được ép size="sm" (h-9), phải giữ h-11 mặc định.
+    expect(continueBtn.className).toContain("h-11");
   });
 
   it("changedQuestionCount: 2 → hiện dòng '2 câu hỏi đã thay đổi, hãy cập nhật'", () => {
@@ -72,8 +75,11 @@ describe("OwnSolutionBlock — status: hidden (AC-053, AC-083)", () => {
 
     expect(screen.getByText("Bị ẩn")).toBeTruthy();
     expect(screen.getByText("Bài giải của bạn đã bị ẩn bởi quản trị viên.")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Xem lý do" }).getAttribute("href")).toBe(HREF);
+    const seeReason = screen.getByRole("button", { name: "Xem lý do" });
+    expect(seeReason.getAttribute("href")).toBe(HREF);
     expect(screen.queryByRole("progressbar")).toBeNull();
+    // Sàn chạm 44px: nút không được ép size="sm" (h-9), phải giữ h-11 mặc định.
+    expect(seeReason.className).toContain("h-11");
   });
 });
 

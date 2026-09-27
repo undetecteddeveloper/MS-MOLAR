@@ -66,7 +66,7 @@ export function OwnSolutionBlock({ summary, examId }: { summary: OwnSolutionSumm
       {isHidden ? (
         <>
           <p className="text-muted-foreground text-sm">{t("solutions.own.hiddenLine")}</p>
-          <Button render={<Link href={href} />} nativeButton={false} size="sm" className="w-fit">
+          <Button render={<Link href={href} />} nativeButton={false} className="w-fit">
             {t("solutions.own.seeReason")}
           </Button>
         </>
@@ -81,7 +81,7 @@ export function OwnSolutionBlock({ summary, examId }: { summary: OwnSolutionSumm
               {t("solutions.entry.changed", { count: summary.changedQuestionCount })}
             </p>
           )}
-          <Button render={<Link href={href} />} nativeButton={false} size="sm" className="w-fit">
+          <Button render={<Link href={href} />} nativeButton={false} className="w-fit">
             {t("solutions.own.continue")}
           </Button>
         </>

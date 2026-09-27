@@ -116,7 +116,7 @@ export function SolutionCard({ item, examId, now, editHref, unreadCommentCount }
           {editHref && (
             <Link
               href={editHref}
-              className="text-primary focus-visible:ring-ring/40 relative z-10 w-fit text-sm font-medium underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:outline-none"
+              className="text-primary focus-visible:ring-ring/40 relative z-10 inline-flex min-h-11 w-fit items-center text-sm font-medium underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:outline-none"
             >
               {t("common.edit")}
             </Link>

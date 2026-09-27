@@ -111,6 +111,8 @@ describe("SolutionCard — sở hữu chỉ từ isMine/editHref (AC-053, AC-062
     expect(screen.getByText("Bài của bạn")).toBeTruthy();
     const editLink = screen.getByRole("link", { name: "Sửa" });
     expect(editLink.getAttribute("href")).toBe("/exams/E1/attempt/A1/solution");
+    // Sàn chạm 44px: liên kết chữ "Sửa" phải giữ min-h-11 dù nội dung 1 dòng tự nhiên thấp hơn.
+    expect(editLink.className).toContain("min-h-11");
   });
 
   it("isMine true, KHÔNG có editHref: 'Bài của bạn' vẫn hiện, không có liên kết 'Sửa'", () => {
