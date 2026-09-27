@@ -35,13 +35,22 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // getResult.int.test.ts.
 vi.mock("server-only", () => ({}));
 
-const { getUserMock, rpcMock, fromMock, isAdminUserIdMock } = vi.hoisted(() => ({
+const { getUserMock, rpcMock, fromMock, isAdminUserIdMock, createSignedUrlsMock } = vi.hoisted(() => ({
   getUserMock: vi.fn(),
   rpcMock: vi.fn(),
   // Test 1 (b): a spy, so "zero .from(...) calls" is an assertion on a
   // recorded call log rather than on a TypeError from a missing method.
   fromMock: vi.fn(),
   isAdminUserIdMock: vi.fn(),
+  // Test 3 (task 42 integration handoff, see task 14's Investigation Notes):
+  // listSolutions/getSolutionDetail now batch-sign every named row's
+  // author_avatar_path before toAuthorIdentity. Echoes a deterministic signed
+  // value per path — the batching/fail-closed Storage contract itself is
+  // proven in features/solutions/__tests__/avatarSigner.test.ts (task 42).
+  createSignedUrlsMock: vi.fn(async (paths: string[]) => ({
+    data: paths.map((path) => ({ path, signedUrl: `signed:${path}`, error: null })),
+    error: null,
+  })),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -49,6 +58,7 @@ vi.mock("@/lib/supabase/server", () => ({
     auth: { getUser: getUserMock },
     rpc: rpcMock,
     from: fromMock,
+    storage: { from: () => ({ createSignedUrls: createSignedUrlsMock }) },
   })),
 }));
 
@@ -782,7 +792,7 @@ describe("listSolutions / getSolutionDetail — reads route only through the mas
     expect("authorId" in item).toBe(false);
   });
 
-  it("non-masked fixture row -> mapped object carries the fixture's own identity values unchanged (no transformation drift)", async () => {
+  it("non-masked fixture row -> displayName equals the fixture's own, unchanged; avatarUrl is the signed URL for the fixture's path (task 42 batch signer)", async () => {
     rpcMock.mockResolvedValue({
       data: [
         {
@@ -807,7 +817,11 @@ describe("listSolutions / getSolutionDetail — reads route only through the mas
 
     const [item] = await listSolutions("exam-1");
 
-    expect(item.author).toEqual({ kind: "named", displayName: "Trần Thị B", avatarUrl: "https://example.com/b.png" });
+    expect(item.author).toEqual({
+      kind: "named",
+      displayName: "Trần Thị B",
+      avatarUrl: "signed:https://example.com/b.png",
+    });
   });
 
   it("empty RPC result -> getSolutionDetail() returns null and listSolutions() returns [] (never throws, AC-063/S11)", async () => {

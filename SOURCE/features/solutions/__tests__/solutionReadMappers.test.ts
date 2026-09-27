@@ -11,10 +11,24 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // communitySolutions.int.test.ts.
 vi.mock("server-only", () => ({}));
 
-const { rpcMock } = vi.hoisted(() => ({ rpcMock: vi.fn() }));
+const { rpcMock, createSignedUrlsMock } = vi.hoisted(() => ({
+  rpcMock: vi.fn(),
+  createSignedUrlsMock: vi.fn(async (paths: string[]) =>
+    // Task 42 integration handoff (see task 14's Investigation Notes): every
+    // named row's author_avatar_path is now signed in one Storage call
+    // before toAuthorIdentity. This mapper-test file only cares about the
+    // mapping shape, so the mock just echoes a deterministic signed value per
+    // path (task 42's own avatarSigner.test.ts proves the batching/fail-closed
+    // Storage contract itself).
+    ({ data: paths.map((path) => ({ path, signedUrl: `signed:${path}`, error: null })), error: null })
+  ),
+}));
 
 vi.mock("@/lib/supabase/server", () => ({
-  createClient: vi.fn(async () => ({ rpc: rpcMock })),
+  createClient: vi.fn(async () => ({
+    rpc: rpcMock,
+    storage: { from: () => ({ createSignedUrls: createSignedUrlsMock }) },
+  })),
 }));
 
 const { listSolutions, getSolutionDetail } = await import("@/features/solutions/queries");
@@ -249,7 +263,7 @@ describe("listSolutions / getSolutionDetail — identity masking, no self-except
     expect(detail!.isMine).toBe(true);
   });
 
-  it("row 9: non-masked row -> identity values equal the fixture's own, unchanged (no transformation drift)", async () => {
+  it("row 9: non-masked row -> displayName equals the fixture's own, unchanged; avatarUrl is the signed URL for the fixture's path (task 42 batch signer)", async () => {
     mockRpc([
       { ...listRowBase, author_id: "author-9", author_display_name: "Nguyễn Văn A", author_avatar_path: "https://example.com/avatar-9.png" },
     ]);
@@ -259,7 +273,7 @@ describe("listSolutions / getSolutionDetail — identity masking, no self-except
     expect(item.author).toEqual({
       kind: "named",
       displayName: "Nguyễn Văn A",
-      avatarUrl: "https://example.com/avatar-9.png",
+      avatarUrl: "signed:https://example.com/avatar-9.png",
     });
   });
 

@@ -8,12 +8,14 @@
 // import lạc.
 import "server-only";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import type { Choice, SubItemId } from "@/types/question";
 import { toAuthorIdentity, toScoreField, type AuthorIdentity } from "@/lib/solutions/identity";
 import { countUnreadComments } from "@/lib/solutions/unreadComments";
 import type { PerQuestionResult } from "@/types/result";
 import { outcomeBranch, resultLabel, toWriterQuestionOutcome } from "./lib/questionOutcome";
+import { AVATARS_BUCKET, AVATAR_SIGNED_URL_TTL_SECONDS } from "@/lib/profile/avatarStorage";
 
 export type SolutionStatus = "draft" | "published" | "hidden";
 
@@ -201,9 +203,71 @@ export async function getResultCardSummary(examId: string): Promise<ResultCardSu
 // Guidance: mọi cột định danh phải qua đúng phép chiếu che, không có ngoại lệ).
 //
 // author_avatar_path → author (AuthorIdentity): cột RPC lưu nguyên
-// user_profiles.avatar_url; KÝ thành URL có hạn là việc của bộ ký hàng loạt
-// task 42 thêm vào module này sau (xem Investigation Notes task 14) — cho tới
-// lúc đó giá trị đi thẳng vào toAuthorIdentity không qua bước ký nào.
+// user_profiles.avatar_url, một PATH object trong bucket private `avatars`
+// (không phải URL — khác exam-images, xem resolveAuthorAvatarUrls dưới đây).
+// KÝ thành URL có hạn (task 42, tích hợp handoff mà task 14 để lại) chạy
+// TRƯỚC khi gọi vào toAuthorIdentity, cho MỌI hàng có tên trong CÙNG một lượt
+// đọc — hàng ẩn danh không bao giờ vào danh sách ký.
+
+/**
+ * Ký CẢ LOẠT avatar của người viết/người bình luận trong MỘT lượt gọi Storage
+ * (`createSignedUrls`, bucket `avatars`) — cùng khuôn `resolveSignedImageUrls`
+ * (`lib/ugc/imageUrl.ts:59-95`), khác ở chỗ `author_avatar_path` đã là PATH
+ * sẵn (như `resolveAvatarUrl`, `lib/auth/getCurrentUser.ts:128-145`), không
+ * phải URL cần bóc path.
+ *
+ * Chỉ ký path của hàng CÓ TÊN — gọi nơi này truyền vào đúng tập path đã lọc
+ * theo `author_display_name !== null` (không tự lọc lại ở đây, vì hàm này
+ * không biết display name của từng path; ranh giới ẩn danh nằm ở chỗ gọi).
+ *
+ * FAIL CLOSED ở MỌI tầng, y hệt `resolveSignedImageUrls`: path rỗng/trùng bị
+ * loại trước khi gọi Storage; một mục ký hỏng (per-item `error`) chỉ mục đó
+ * `undefined`, mục khác vẫn có URL; cả lô hỏng (Storage trả `error` toàn cục
+ * hoặc ném) → MỌI mục `undefined`, KHÔNG ném tiếp — một avatar vỡ không được
+ * phép làm hỏng cả trang.
+ *
+ * Ký bằng client PHIÊN NGƯỜI GỌI (TD-029 — không import service-role), nên
+ * RLS `avatars_select_community_visible` vẫn là tầng cưỡng chế cho lượt đọc
+ * xuyên người dùng này.
+ */
+async function resolveAuthorAvatarUrls(
+  supabase: SupabaseClient,
+  paths: ReadonlyArray<string | null | undefined>
+): Promise<Map<string, string>> {
+  const signedByPath = new Map<string, string>();
+  const uniquePaths = [...new Set(paths.filter((path): path is string => Boolean(path)))];
+  if (uniquePaths.length === 0) return signedByPath;
+
+  try {
+    const { data, error } = await supabase.storage
+      .from(AVATARS_BUCKET)
+      .createSignedUrls(uniquePaths, AVATAR_SIGNED_URL_TTL_SECONDS);
+    if (error) {
+      console.warn("[resolveAuthorAvatarUrls] ký cả lô hỏng:", error.message);
+    } else {
+      for (const item of data ?? []) {
+        if (item.path && item.signedUrl && !item.error) {
+          signedByPath.set(item.path, item.signedUrl);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("[resolveAuthorAvatarUrls] Storage không kết nối được:", err);
+  }
+  return signedByPath;
+}
+
+/** `author_avatar_path` → giá trị đưa vào `toAuthorIdentity`'s `author_avatar_url`:
+ *  `null` cho hàng ẩn danh (không tra bảng ký) hoặc khi ký vắng/hỏng — cả hai
+ *  đều rơi về initials ở `Avatar.tsx`, không phân biệt (fail-closed). */
+function resolvedAvatarUrl(
+  displayName: string | null,
+  path: string | null,
+  signedByPath: Map<string, string>
+): string | null {
+  if (displayName === null || !path) return null;
+  return signedByPath.get(path) ?? null;
+}
 
 /** Gộp score/score_grading vào MỘT quyết định vắng-mặt duy nhất (toScoreField
  *  là nơi DUY NHẤT tự kiểm null cho `score`); `scoreGrading` không tự kiểm
@@ -253,7 +317,7 @@ interface RawSolutionListRow {
   changed_question_count: number;
 }
 
-function mapSolutionListRow(row: RawSolutionListRow): SolutionListItem {
+function mapSolutionListRow(row: RawSolutionListRow, signedByPath: Map<string, string>): SolutionListItem {
   return {
     id: row.id,
     isPinned: row.is_pinned,
@@ -261,7 +325,7 @@ function mapSolutionListRow(row: RawSolutionListRow): SolutionListItem {
     isMine: row.is_mine,
     author: toAuthorIdentity({
       author_display_name: row.author_display_name,
-      author_avatar_url: row.author_avatar_path,
+      author_avatar_url: resolvedAvatarUrl(row.author_display_name, row.author_avatar_path, signedByPath),
     }),
     ...mapScoreFields(row),
     helpfulCount: row.helpful_count,
@@ -285,7 +349,13 @@ export async function listSolutions(examId: string): Promise<SolutionListItem[]>
   if (error) throw error;
 
   const rows = (data ?? []) as RawSolutionListRow[];
-  return rows.map(mapSolutionListRow);
+  // Ký MỘT lượt cho cả màn hình (Proof Obligation 1) — chỉ path của hàng có
+  // tên vào danh sách ký (Proof Obligation 3, anonymity).
+  const signedByPath = await resolveAuthorAvatarUrls(
+    supabase,
+    rows.filter((row) => row.author_display_name !== null).map((row) => row.author_avatar_path)
+  );
+  return rows.map((row) => mapSolutionListRow(row, signedByPath));
 }
 
 export interface SolutionDetailComment {
@@ -394,12 +464,15 @@ interface RawSolutionDetailRow {
   questions: RawSolutionDetailQuestion[];
 }
 
-function mapSolutionDetailComment(row: RawSolutionDetailComment): SolutionDetailComment {
+function mapSolutionDetailComment(
+  row: RawSolutionDetailComment,
+  signedByPath: Map<string, string>
+): SolutionDetailComment {
   return {
     id: row.id,
     author: toAuthorIdentity({
       author_display_name: row.author_display_name,
-      author_avatar_url: row.author_avatar_path,
+      author_avatar_url: resolvedAvatarUrl(row.author_display_name, row.author_avatar_path, signedByPath),
     }),
     isSolutionAuthor: row.is_solution_author,
     isMine: row.is_mine,
@@ -444,7 +517,8 @@ function mapPerQuestionFields(
 
 function mapSolutionDetailQuestion(
   row: RawSolutionDetailQuestion,
-  perQuestion: PerQuestionResult[] | null
+  perQuestion: PerQuestionResult[] | null,
+  signedByPath: Map<string, string>
 ): SolutionDetailQuestion {
   const questionType: WriterQuestionType = row.question_type ?? "mcq";
   const rawChoices = row.choices ?? [];
@@ -467,16 +541,29 @@ function mapSolutionDetailQuestion(
     ...(row.note !== null
       ? { note: { body: row.note, ...(row.comment_count !== null ? { commentCount: row.comment_count } : {}) } }
       : {}),
-    comments: row.comments.map(mapSolutionDetailComment),
+    comments: row.comments.map((comment) => mapSolutionDetailComment(comment, signedByPath)),
   };
 }
 
-function mapSolutionDetailRow(row: RawSolutionDetailRow): SolutionDetail {
+/** Mọi `author_avatar_path` có tên trong MỘT hàng detail — header VÀ từng
+ *  bình luận của mọi câu — gộp lại để ký chung MỘT lượt (Proof Obligation 1:
+ *  "detail with 3 comments -> 1 call covering header + comments"). */
+function collectNamedDetailAvatarPaths(row: RawSolutionDetailRow): (string | null)[] {
+  const headerPath = row.author_display_name === null ? null : row.author_avatar_path;
+  const commentPaths = row.questions.flatMap((question) =>
+    question.comments
+      .filter((comment) => comment.author_display_name !== null)
+      .map((comment) => comment.author_avatar_path)
+  );
+  return [headerPath, ...commentPaths];
+}
+
+function mapSolutionDetailRow(row: RawSolutionDetailRow, signedByPath: Map<string, string>): SolutionDetail {
   return {
     id: row.id,
     author: toAuthorIdentity({
       author_display_name: row.author_display_name,
-      author_avatar_url: row.author_avatar_path,
+      author_avatar_url: resolvedAvatarUrl(row.author_display_name, row.author_avatar_path, signedByPath),
     }),
     isPinned: row.is_pinned,
     updatedAt: row.updated_at,
@@ -485,7 +572,7 @@ function mapSolutionDetailRow(row: RawSolutionDetailRow): SolutionDetail {
     helpfulCount: row.helpful_count,
     iMarkedHelpful: row.i_marked_helpful,
     iReported: row.i_reported,
-    questions: row.questions.map((q) => mapSolutionDetailQuestion(q, row.per_question)),
+    questions: row.questions.map((q) => mapSolutionDetailQuestion(q, row.per_question, signedByPath)),
   };
 }
 
@@ -504,7 +591,11 @@ export async function getSolutionDetail(solutionId: string): Promise<SolutionDet
   const rows = (data ?? []) as RawSolutionDetailRow[];
   if (rows.length === 0) return null;
 
-  return mapSolutionDetailRow(rows[0]);
+  const row = rows[0];
+  // Ký MỘT lượt cho cả header lẫn mọi bình luận lồng trong hàng này (Proof
+  // Obligation 1: "detail with 3 comments -> 1 call covering header + comments").
+  const signedByPath = await resolveAuthorAvatarUrls(supabase, collectNamedDetailAvatarPaths(row));
+  return mapSolutionDetailRow(row, signedByPath);
 }
 
 // ----------------------------------------------------------------------------
