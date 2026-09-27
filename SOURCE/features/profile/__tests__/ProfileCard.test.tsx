@@ -17,6 +17,9 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 
 import { AVATAR_LIMITS } from "@/lib/profile/limits";
 import { ProfileCard } from "@/features/profile/components/ProfileCard";
+// Cho phép ở đây vì B4 bỏ qua **/__tests__/** (SOURCE/eslint.config.mjs:42) —
+// task 44, ca "reputationSlot".
+import { ReputationBlock } from "@/features/solutions/components/ReputationBlock";
 
 const USER = {
   id: "u1",
@@ -186,6 +189,36 @@ describe("vòng focus của hộp thoại — việc của CHA (AC-050)", () => 
     });
 
     expect(document.activeElement).toBe(trigger);
+  });
+});
+
+describe("reputationSlot (task 44) — vị trí và ranh giới B4", () => {
+  it("có slot: không heading, chỉ input file, 'Điểm uy tín' hiện, đứng TRƯỚC nút Đổi mật khẩu", () => {
+    const { container } = render(
+      <ProfileCard
+        user={USER}
+        reputationSlot={
+          <ReputationBlock totalScore={32} publishedCount={2} helpfulCount={6} pinnedCount={0} />
+        }
+      />
+    );
+
+    expect(screen.queryByRole("heading")).toBeNull();
+    const inputs = Array.from(container.querySelectorAll("input"));
+    expect(inputs.map((i) => i.type)).toEqual(["file"]);
+
+    const reputationNode = screen.getByText("Điểm uy tín");
+    const passwordButton = screen.getByRole("button", { name: "Đổi mật khẩu" });
+    const position = reputationNode.compareDocumentPosition(passwordButton);
+    expect(Boolean(position & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+  });
+
+  it("không có slot: không 'Điểm uy tín'; Đổi mật khẩu và Đăng xuất vẫn còn", () => {
+    render(<ProfileCard user={USER} />);
+
+    expect(screen.queryByText("Điểm uy tín")).toBeNull();
+    expect(screen.getByRole("button", { name: "Đổi mật khẩu" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Đăng xuất" })).toBeDefined();
   });
 });
 

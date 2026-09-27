@@ -13,7 +13,7 @@
 // dưới 768px và phải đưa bút chì ra khỏi dòng chảy bằng `absolute` để phép căn
 // giữa không lệch 23px — nay không còn gì để lệch.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Pencil } from "lucide-react";
 import type { CurrentUserProfile } from "@/lib/auth/getCurrentUser";
 import { t } from "@/lib/copy";
@@ -56,9 +56,18 @@ const FILE_PICKER_CLS = cn(
 
 interface ProfileCardProps {
   user: CurrentUserProfile;
+  /**
+   * Khối uy tín (`ReputationBlock`, `features/solutions`) — trang cha DỰNG
+   * phần tử này (gọi `getMyReputation()`, tự quyết `undefined` khi lỗi) và
+   * đưa xuống nguyên vẹn; thẻ này CHỈ đặt nó đúng chỗ, không biết nó là gì,
+   * không import bất cứ thứ gì từ `@/features/solutions/**` (B4; frontend DD
+   * § UI Spec Deviations DD-U1). Vắng mặt → DOM giống hệt trước khi có prop
+   * này (AC-096).
+   */
+  reputationSlot?: ReactNode;
 }
 
-export function ProfileCard({ user }: ProfileCardProps) {
+export function ProfileCard({ user, reputationSlot }: ProfileCardProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   // MỘT bộ đếm cho BA nguồn thành công (đổi mật khẩu / đổi ảnh / đổi tên).
   // `n: 0` nghĩa là "chưa bắn lần nào" và phải giữ đúng 0 cho tới lần thành
@@ -240,6 +249,8 @@ export function ProfileCard({ user }: ProfileCardProps) {
           onStatus={setStatus}
         />
       )}
+
+      {reputationSlot}
 
       <div className="border-border mt-5 border-t pt-4">
         <PasswordRow onOpen={() => setDialogOpen(true)} triggerRef={passwordTriggerRef} />

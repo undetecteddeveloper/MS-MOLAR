@@ -906,11 +906,13 @@ export const copy = {
   "profile.password.errorSameAsCurrent": "Mật khẩu mới phải khác mật khẩu hiện tại.",
 
   // --- /profile — giao diện; xem chú thích tương ứng trong en.ts -----------
-  "profile.tab.info": "Thông tin",
-  "profile.tab.usage": "Mức dùng",
-  "profile.eyebrow": "Tài khoản",
+  // `profile.tab.info`/`profile.tab.usage`/`profile.eyebrow` XOÁ (task 44,
+  // UI Spec § "Đổi giá trị / xoá") — khoá chết từ trước khi có `ProfileTabs`,
+  // không nơi nào gọi.
   "profile.title": "Hồ sơ của bạn",
-  "profile.description": "Tài khoản này gồm những gì, và những phần bạn đổi được.",
+  // Giá trị mới (task 44) — bản cũ "Tài khoản này gồm những gì, và những phần
+  // bạn đổi được." không còn đúng: trang nay có thêm uy tín và bình luận.
+  "profile.description": "Tài khoản, uy tín và bình luận về bài giải của bạn.",
   "profile.email.label": "Email đăng ký",
   "profile.email.readOnly": "Không thể thay đổi",
   "profile.name.change": "Đổi tên",
@@ -940,6 +942,25 @@ export const copy = {
   "profile.avatar.uploading": "Đang tải ảnh lên…",
   "profile.avatar.saved": "Đã cập nhật ảnh đại diện.",
   "profile.error.network": "Mất kết nối trước khi xong. Hãy thử lại.",
+
+  // --- Hồ sơ (S-06) — ProfileTabs + ReputationBlock (task 44) --------------
+  // Nguyên văn UI Spec § "Chuỗi tiếng Việt cần thêm" → "Hồ sơ (S-06, profile.*)".
+  "profile.tabs.label": "Mục hồ sơ",
+  "profile.tabs.account": "Tài khoản",
+  "profile.tabs.comments": "Bình luận",
+  // Dùng khi số bình luận mới k > 0 (chip "Bình luận") — nối chưa xong ở task
+  // 44 (đếm chưa đọc là việc của task 45); khoá đặt sẵn theo bảng khoá task 44
+  // sở hữu ("profile.tabs.*").
+  "profile.tabs.commentsA11y": "Bình luận, {count} bình luận mới",
+  "profile.reputation.label": "Điểm uy tín",
+  "profile.reputation.published": "{count} bài giải đã đăng",
+  "profile.reputation.helpful": "{count} lượt hữu ích",
+  "profile.reputation.none": "Chưa có bài giải nào đã đăng",
+  "profile.reputation.tier1": "Mở đường",
+  "profile.reputation.tier2": "Dẫn lối",
+  "profile.reputation.tier3": "Trụ cột",
+  "profile.reputation.tierGoal": "{count} bài giải",
+  "profile.reputation.tierLocked": "còn {count} bài",
 
   // /about — xem chú thích tương ứng trong en.ts.
   "about.eyebrow": "Giới thiệu",
