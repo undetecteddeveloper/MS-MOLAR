@@ -693,6 +693,62 @@ export async function getMyCommentFeed(page: number): Promise<CommentFeedItem[]>
  * đã kết thúc giữa trang) — không cần đọc quá trang đó, vì mọi hàng sau nó
  * (mới hơn... không, CŨ hơn, vì thứ tự giảm dần) đã đọc hoặc không tồn tại.
  */
+// ----------------------------------------------------------------------------
+// community_reputation_summary (task 41) — the caller's OWN reputation, for
+// ReputationBlock (task 44). Deliberately does NOT follow the throw-on-error
+// convention every other function in this file uses: the frontend DD's
+// "ProfileCard reputation insertion" boundary contract requires a RETURNED
+// failure result on RPC error (page renders no block, no log at this layer —
+// only an unrelated thrown exception is the page's console.error case,
+// frontend DD § Data Flow), not an exception from this function.
+
+export interface ReputationSummary {
+  totalScore: number;
+  publishedCount: number;
+  helpfulCount: number;
+  pinnedCount: number;
+}
+
+export type ReputationResult = ({ ok: true } & ReputationSummary) | { ok: false };
+
+interface RawReputationRow {
+  total_score: number;
+  published_count: number;
+  helpful_count: number;
+  pinned_count: number;
+}
+
+function mapReputationRow(row: RawReputationRow): ReputationSummary {
+  return {
+    // AC-086: the RPC computes this fresh every call; no recomputation here.
+    totalScore: row.total_score,
+    publishedCount: row.published_count,
+    helpfulCount: row.helpful_count,
+    pinnedCount: row.pinned_count,
+  };
+}
+
+/**
+ * Uy tín của CHÍNH người gọi (S-tab hồ sơ, AC-086–AC-090). Không tham số —
+ * RPC chỉ đọc `auth.uid()` (AC-089). Lỗi RPC → kết quả thất bại, KHÔNG ném,
+ * để `ProfilePage` không render khối uy tín mà cũng không lỗi cả trang
+ * (frontend DD "ReputationBlock" "Lỗi: khối không render").
+ */
+export async function getMyReputation(): Promise<ReputationResult> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("community_reputation_summary");
+  if (error) return { ok: false };
+
+  const rows = (data ?? []) as RawReputationRow[];
+  // Contract guarantee (schema.sql: aggregate with no group by): always
+  // exactly one row, all-zero fields when the caller has 0 published
+  // solutions (AC-090) — never zero rows. Defensive fallback kept minimal.
+  const row = rows[0];
+  if (!row) return { ok: false };
+
+  return { ok: true, ...mapReputationRow(row) };
+}
+
 export async function getMyUnreadCommentCount(opts?: { solutionId?: string }): Promise<number> {
   const supabase = await createClient();
 
