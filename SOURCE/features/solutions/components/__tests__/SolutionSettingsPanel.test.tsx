@@ -26,6 +26,8 @@ describe("SolutionSettingsPanel", () => {
     expect(screen.queryByRole("switch")).toBeNull();
     const toggle = screen.getByRole("button", { name: /Cài đặt bài giải/ });
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    // Sàn chạm 44px (AC-011): nút disclosure phải giữ min-h-11 dù nội dung 2 dòng tự nhiên thấp hơn.
+    expect(toggle.className).toContain("min-h-11");
   });
 
   it("bấm mở: hiện đúng hai công tắc đúng mặc định bài mới (Hiện hồ sơ bật, Hiện điểm tắt)", () => {

@@ -51,7 +51,7 @@ export function SolutionSettingsPanel({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-controls={panelId}
-        className="focus-visible:ring-ring/40 flex w-full items-center justify-between gap-2 rounded-lg text-left focus-visible:ring-3 focus-visible:outline-none"
+        className="focus-visible:ring-ring/40 flex min-h-11 w-full items-center justify-between gap-2 rounded-lg text-left focus-visible:ring-3 focus-visible:outline-none"
       >
         <span className="flex flex-col gap-0.5">
           <span className="text-foreground text-sm font-medium">{t("solutions.editor.settings")}</span>
