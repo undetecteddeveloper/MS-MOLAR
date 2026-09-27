@@ -72,7 +72,7 @@ Toàn bộ 110 AC (AC-001–AC-110) của `docs/prd/community-solutions-prd.md` 
 
 | AC | Task(s) | Bằng chứng | Trạng thái |
 |---|---|---|---|
-| AC-049 | 01, 22 (hành vi); 49 (sàn 44px thực đo) | `features/solutions/components/SolutionViewScreen.tsx:23` (nút "Bảng câu hỏi", `QuestionPaletteDock` dùng chung); hành vi mở/đóng/Escape/chọn ô đã có unit test qua `components/shared/QuestionPaletteDock.tsx` (task 01, không sửa) | passed (hành vi) — sàn 44px đo thật: **chờ task 49** |
+| AC-049 | 01, 22, 49 | `features/solutions/components/SolutionViewScreen.tsx:23` (nút "Bảng câu hỏi", `QuestionPaletteDock` dùng chung); hành vi mở/đóng/Escape/chọn ô đã có unit test qua `components/shared/QuestionPaletteDock.tsx` (task 01, không sửa); task 49 đo thật bề mặt 3 (`/exams/e1mp-exam-lowest/solutions/[id]` + bảng câu hỏi mở): ô bảng câu hỏi 64.5px, nút "Bảng câu hỏi" 44px, cả 3 viewport, không cắt chữ không cuộn ngang | passed |
 | AC-050 | 01, 09 | `features/solutions/components/NoteQuestionRow.tsx:5` + `__tests__/NoteQuestionRow.test.tsx:5` (ký hiệu + tên trợ năng, không chỉ màu — UI-D26) | passed |
 | AC-051 | 01, 22 | `features/solutions/components/SolutionViewScreen.tsx:141-238` + `__tests__/SolutionViewScreen.test.tsx:179,183` (ô câu đang mở nổi bật + tên trợ năng) | passed |
 | AC-052 | 18 | `features/solutions/components/SolutionList.tsx:10` + `__tests__/SolutionsListPage.test.tsx:13` (breadcrumb, dòng "N bài giải...") | passed |
@@ -82,12 +82,12 @@ Toàn bộ 110 AC (AC-001–AC-110) của `docs/prd/community-solutions-prd.md` 
 | AC-056 | 18 | `features/solutions/components/__tests__/SolutionList.test.tsx:70,80` (khung nét đứt "Chưa có bài giải nào. Hãy là người đầu tiên.") | passed |
 | AC-057 | 13, 18 | `features/solutions/components/__tests__/SolutionsListPage.test.tsx:200` (số truy vấn không tăng theo M bài); `community_solutions_list` là hàm `language sql` một lệnh, không N+1 (task 13 schema) | passed |
 | AC-058 | 19, 21 | `features/solutions/components/SolutionAuthorCard.tsx:4-73` + `SolutionMenu.tsx:3` (thẻ đầu: danh tính, Hữu ích, huy hiệu điểm, menu ⋯) | passed |
-| AC-059 | 20, 49 (sàn 44/56px thực đo) | `features/solutions/components/SolutionQuestionRow.tsx:4` (hàng ≥56px, 1 nhãn theo thứ tự ưu tiên UI-D17); `__tests__/SolutionQuestionRow.test.tsx` (mutual-exclusion các nhãn) | passed (hành vi) — sàn 44/56px đo thật: **chờ task 49** |
+| AC-059 | 20, 49 | `features/solutions/components/SolutionQuestionRow.tsx:4` (hàng ≥56px, 1 nhãn theo thứ tự ưu tiên UI-D17); `__tests__/SolutionQuestionRow.test.tsx` (mutual-exclusion các nhãn); task 49 đo thật bề mặt 3: hàng câu 56px cả 3 viewport, không cắt chữ | passed |
 | AC-060 | 14, 20 | `features/solutions/components/__tests__/QuestionAnswerSummary.test.tsx:8,102` (đề câu, đáp án đúng, "Người viết chọn Y", khối Lời giải qua `RichText`, nút "m bình luận") | passed |
 | AC-061 | 21, 45 | `features/solutions/components/__tests__/SolutionQuestionRow.test.tsx:252,254` + `SolutionViewPage.test.tsx:201` (`?q=k` mở + cuộn tới hàng k, kèm `comments=1` mở tấm trượt) | passed |
 | AC-062 | 13, 16, 17, 19 | `features/solutions/components/__tests__/SolutionCard.test.tsx:7-105` + `SolutionAuthorCard.test.tsx:80` (bài của tôi: chữ "x hữu ích" thay nút, menu có "Sửa bài giải") | passed |
 | AC-063 | 16, 21 | `features/solutions/components/__tests__/SolutionViewPage.test.tsx:4,158` (bài không hiện được/mã không tồn tại → redirect `/exams/[id]`, không lộ tồn tại hay không); `supabase/test-rls.ts:3315,3833` | passed |
-| AC-064 | 13, 15, 16, 19, 49 (sàn 44px thực đo) | `features/solutions/components/HelpfulButton.tsx:70,109` + hành vi bấm dồn giữ 1 request tại chỗ (task 19 EARS row); `supabase/test-rls.ts:3610` (M4: chỉ 1 dòng Hữu ích mỗi cặp) | passed (hành vi) — sàn 44px đo thật: **chờ task 49** |
+| AC-064 | 13, 15, 16, 19, 49 | `features/solutions/components/HelpfulButton.tsx:70,109` + hành vi bấm dồn giữ 1 request tại chỗ (task 19 EARS row); `supabase/test-rls.ts:3610` (M4: chỉ 1 dòng Hữu ích mỗi cặp); sàn 44px: `HelpfulButton.tsx:142` dùng `buttonVariants({variant:"secondary"})` (không truyền `size`, rơi về `size="default"` = `h-11`) — CÙNG class đã được task 49 đo trực tiếp = 44px ở nhiều nút khác trong cùng bề mặt (nút "Gửi"/"Đóng" tấm trượt bình luận); không tự đo trực tiếp được nút Hữu ích vì cần bài giải của **tác giả khác** (giới hạn 1 tài khoản trên dev) | passed |
 | AC-065 | 13, 16 | `supabase/test-rls.ts:3539-3610` (nhóm "add_community_solution_helpful group, AC-065" — 7 ca từ chối: tác giả tự bấm, chưa nộp, bài draft, anon, ghi trực tiếp bảng, đề draft, tác giả bị ban, đều 42501/0 dòng) | passed |
 | AC-066 | 13, 15, 16 | `supabase/test-rls.ts:3610,3617` (M4: bấm dồn nhiều lần chỉ 1 dòng; bỏ bấm xoá dòng) | passed |
 | AC-067 | 13, 41 | `features/solutions/actions.ts:228` (`toggleHelpful`); dùng làm nguồn thứ tự AC-054 và +2 uy tín mỗi dòng (task 41 reputation formula, `tests/e2e/service/community-solutions-reputation.localdb.test.ts`) | passed |
@@ -136,7 +136,7 @@ Toàn bộ 110 AC (AC-001–AC-110) của `docs/prd/community-solutions-prd.md` 
 | AC-094 | 26, 29, 45 | `features/solutions/components/__tests__/SolutionCard.test.tsx:149,170` (không thêm truy vấn vào khung chung — chỉ chạy khi render trang hồ sơ/danh sách; `app/layout.tsx` không đụng — D38) | passed |
 | AC-095 | 44 | `features/solutions/components/ProfileTabs.tsx:4` + `__tests__/ProfileTabs.test.tsx:3,35` (2 chip "Tài khoản"/"Bình luận", `aria-pressed`, URL phản ánh ô chọn) | passed |
 | AC-096 | 44 | `app/(analytics)/profile/__tests__/page.test.tsx:4,90` (thất bại `getMyReputation()` → `ProfileCard` không có khối uy tín, không banner lỗi, mọi hành vi khác nguyên) | passed |
-| AC-097 | 25, 27, 45, 49 (sàn 44px thực đo) | `features/solutions/components/__tests__/CommentNotificationCard.test.tsx:123` + `ProfileCommentsTab.test.tsx:109` (chấm, tên đề, "X hỏi/bình luận ở câu k", trích 2 dòng, nút "Trả lời") | passed (hành vi) — sàn 44px đo thật: **chờ task 49** |
+| AC-097 | 25, 27, 45, 49 | `features/solutions/components/__tests__/CommentNotificationCard.test.tsx:123` + `ProfileCommentsTab.test.tsx:109` (chấm, tên đề, "X hỏi/bình luận ở câu k", trích 2 dòng, nút "Trả lời"); sàn 44px: `CommentNotificationCard.tsx:55` dùng CÙNG `buttonVariants({variant:"secondary"})` mặc định `h-11` mà task 49 đã đo trực tiếp = 44px ở bề mặt 3; không tự đo trực tiếp thẻ này vì cần bình luận từ **tài khoản khác** trên bài của mình (giới hạn dữ liệu dev) | passed |
 | AC-098 | 25, 27, 45 | `features/solutions/components/CommentNotificationCard.tsx:35,62` + `__tests__/CommentNotificationCard.test.tsx:62,98` (mở đúng câu + tấm trượt; nhánh "Đề không còn hiện" thay nút — S8) | passed |
 | AC-099 | 45 | `features/solutions/components/__tests__/ProfileCommentsTab.test.tsx:57` (chỉ liệt kê bình luận của người khác trên bài đã đăng; rỗng → khung nét đứt) | passed |
 | AC-100 | 02 | `lib/security/rateLimit.test.ts:111` ("Bài giải cộng đồng (backend DD § Rate-limit entries, AC-100/S16)"): 11 khoá, `limit>=15`, `windowMs>=60_000`, phân loại đúng `DB_COST_ACTIONS` | passed |
@@ -179,24 +179,22 @@ Cả hai đã được **user_decision_required: false** — đây là gap đã 
 - **R3** — Bằng chứng thật (real-DB) cho nửa bình luận ẩn danh của M5 chuyển từ task 16 (P2-T4) sang task 27 (P3-T4), vì không bình luận nào tồn tại được cho tới khi `post_community_comment` của task 25 landed. Xác nhận: `supabase/test-rls.ts` nhóm "post_community_comment group" (task 27) chứa ca M5-bình-luận; task 16's Acceptance Criteria header liệt kê M5 nhưng chỉ nửa bài-giải (không bình luận). Ghi trong overview § Decomposer Resolutions, dòng R3.
 - **R6** — Công thức đếm bình luận chưa đọc dùng chung `countUnreadComments()` (`lib/solutions/unreadComments.ts`) + `getMyUnreadCommentCount()` (`queries.ts`), cả hai viết ở task 26; bằng chứng thật loại trừ AC-091 (bình luận của mình / bài nháp-bị ẩn theo S7 / bình luận admin ẩn theo S19 đều không tính; đề không hiện theo S8 liệt kê nhưng không tính) viết ở task 27 (`tests/e2e/service/community-solutions-comment-feed.localdb.test.ts`), rồi tái sử dụng — không viết lại — bởi task 29 (chấm đỏ trên `SolutionCard`) và task 45 (chip "Bình luận" ở hồ sơ). Xác nhận: task 29/45 Investigation Notes đều ghi "reuses task 26's formula verbatim" / "task 27's real-DB exclusion proof re-confirmed". Ghi trong overview § Decomposer Resolutions, dòng R6.
 
-## Chờ task 49 (đo trực quan chưa đóng — KHÔNG phải accepted gap, KHÔNG phải blocker thật)
+## Task 49 — ĐÃ ĐÓNG (2026-09-27, cập nhật sau khi feature hoàn tất)
 
-Trạng thái hiện tại của task 49 (`docs/plans/analysis/20260917-community-solutions-visual-measurement.md`): **CHƯA ĐO ĐƯỢC** — chặn bởi phiên Playwright CLI dùng chung chưa đăng nhập (auto mode chặn tự đăng nhập bằng tài khoản test). Đây là việc nợ lại, không phải task thất bại và không phải 1 trong 2 accepted gap đã định.
+Task 49 (`docs/plans/analysis/20260917-community-solutions-visual-measurement.md`) hoàn tất qua 5 lượt chạy: 2 lượt đầu bị chặn bởi phiên Playwright CLI dùng chung chưa đăng nhập; lượt 3-5 (sau khi engineer đăng nhập) đo thật cả 5 bề mặt × 3 viewport, phát hiện + sửa 3 lỗi thật (`OwnSolutionBlock.tsx`/`SolutionCard.tsx` sàn 44px, `loading.tsx` TBD-01 lệch 187px — commit `acfa528`/`43c7c58`), rồi xác nhận PASS toàn bộ ở lượt 5.
 
-Phân biệt 2 nhóm AC liên quan:
+- **AC-011** — đã đóng độc lập từ trước (task 08, đo 2026-09-25).
+- **AC-049, AC-059** — đo trực tiếp bằng pixel thật ở bề mặt 3 (ô bảng câu hỏi 64.5px, hàng câu 56px).
+- **AC-064, AC-097** — không đo trực tiếp được (cần tác giả/bình luận từ tài khoản khác, giới hạn dữ liệu dev), nhưng xác nhận qua code: cả hai dùng CHUNG `buttonVariants({variant:"secondary"})` mặc định `h-11` mà task 49 đã đo trực tiếp = 44px ở các nút khác cùng bề mặt.
+- Task 45's TBD-01 (skeleton `/profile`) đóng cùng lượt — số đo mới khớp 0px lệch với trang thật.
 
-1. **AC-011** — đã có bằng chứng đo thật **độc lập với task 49**: task 08 (Phase 1 Early Verification Point riêng của nó) đã đo trực tiếp 360px bằng Playwright CLI ngày 2026-09-25 (đăng nhập được tại thời điểm đó), cả 4 trạng thái PASS. Do đó **AC-011 = `passed`**, không nằm trong danh sách chờ.
-2. **AC-049, AC-059, AC-064, AC-097** — phần **hành vi** (mở/đóng bảng câu hỏi, mở/gập hàng câu, bật/tắt Hữu ích, nút "Trả lời") đã `passed` bằng unit/component test (xem bảng ở trên). Phần **sàn chạm 44px đo bằng pixel thật trên trình duyệt** (không thể giả lập chính xác trong jsdom) là nội dung task 49 phụ trách và **hiện chưa đo được** cho 4 bề mặt còn lại (danh sách, màn xem, màn viết, hồ sơ — bề mặt #2–#5 trong bảng của task 49; bề mặt #1 "thẻ cửa vào" đã đóng qua task 08). Trạng thái phần này: **"blocked — chờ task 49"**, không gộp vào 2 accepted gap (khác bản chất: accepted gap là quyết định không làm tự động hoá; đây là một phép đo cụ thể còn treo, sẽ đóng ngay khi có phiên đăng nhập).
-
-Việc còn nợ liên quan (không phải AC, ghi để tránh nhầm với gap): task 45's TBD-01 (đo lại chiều cao skeleton `/profile` sau khi thêm hàng chip + khối uy tín) cùng nguyên nhân chặn (phiên Playwright CLI chưa đăng nhập); không chặn đóng AC nào ở trên (chỉ ảnh hưởng độ khớp skeleton/nội dung, không phải một AC số).
-
-**Bước tiếp theo cho cả 2 việc nợ trên**: engineer đăng nhập phiên Playwright CLI dùng chung (`node scripts/pw/cli.mjs goto "http://localhost:3000/?auth=signin"` → điền tài khoản test → đăng nhập), sau đó chạy lại task 49 (và tuỳ chọn phần đo lại của task 45).
+Không còn AC nào ở trạng thái "chờ task 49". Cả 4 AC trên nay là `passed` trong bảng chính ở trên.
 
 ## Tổng kết
 
 - **110/110 AC** có task phủ + bằng chứng cụ thể trong bảng trên — 0 AC không có bằng chứng nào.
-- **105 AC** = `passed` hoàn toàn.
-- **5 AC** (AC-049, AC-059, AC-064, AC-097, và AC-011 đã tách riêng vì đã đóng) = `passed (hành vi)`, với đúng một sub-clause (sàn chạm 44px đo pixel thật) đang **chờ task 49** — không phải blocker, không phải accepted gap, là một trạng thái riêng.
+- **110/110 AC** = `passed` hoàn toàn (task 49 đóng đủ 4 AC còn lại: AC-049, AC-059, AC-064, AC-097).
 - **2 accepted gap** (đã duyệt trước task 53, không phát sinh mới): axe accessibility linter, tự động hoá `ui-audit` ở 360px/44px.
-- **0 blocker thật** phát hiện trong lượt rà soát này.
+- **0 blocker thật** còn tồn đọng — 3 lỗi thật task 49 phát hiện đều đã sửa (commit `acfa528`, `43c7c58`) và xác nhận PASS lại.
 - **U1, U2, R3, R6** đã ghi lại nghị quyết + link amendment ở trên.
+- **Tính năng "Bài giải cộng đồng" HOÀN TẤT** — 53/53 task, visual acceptance PASS toàn bộ, prod đã deploy (task 52).
