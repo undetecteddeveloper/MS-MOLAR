@@ -17,8 +17,10 @@ import { EXAM_COLUMNS, toExam, type ExamRow } from "./rows";
 
 // --- Reads ----------------------------------------------------------------
 
-/** Sort cho Exam Browser: theo created_at, hoặc "hardest" theo avg_overall (Rating System). */
-export type ExamSort = "newest" | "oldest" | "hardest";
+/** Sort cho Exam Browser: theo created_at, "hardest" theo avg_overall (Rating System),
+ *  hoặc "hot" theo tổng lượt nộp bài toàn site (Exam Shelves — thứ tự dựng ở
+ *  `listExamsRanked` qua `orderIdsByHotCount`, nhánh dưới chỉ cấp đầu vào ổn định). */
+export type ExamSort = "newest" | "oldest" | "hardest" | "hot";
 
 /** Bucket độ khó cộng đồng cho Level filter (khớp lowercase slug FE — IP-6). */
 export type ExamLevel = "easy" | "medium" | "hard";
@@ -28,11 +30,14 @@ export type ExamLevel = "easy" | "medium" | "hard";
 export type SortDirection = "asc" | "desc";
 
 /** Chiều mặc định của mỗi trục sort khi không truyền `dir` — khớp hành vi cũ
- *  trước khi có direction toggle (Newest=desc, Oldest=asc, Hardest=desc). */
+ *  trước khi có direction toggle (Newest=desc, Oldest=asc, Hardest=desc). `hot`
+ *  không có ý nghĩa chiều (thứ tự dựng ở Node, một chiều — xem nhánh dưới) nên
+ *  giá trị này chỉ để thoả `Record<ExamSort, boolean>`, không được đọc. */
 const DEFAULT_ASCENDING: Record<ExamSort, boolean> = {
   newest: false,
   oldest: true,
   hardest: false,
+  hot: false,
 };
 
 // Ranh giới avg_overall theo bucket (nửa-mở, khớp SOURCE/lib/rating's bucket()):
@@ -109,6 +114,12 @@ export async function fetchExamRows(filters?: ExamFilters): Promise<ExamRow[]> {
         .order("avg_overall", { ascending, nullsFirst: false })
         .order("created_at")
         .order("id");
+    } else if (filters.sort === "hot") {
+      // `hot` không sort DB-side ở đây — `listExamsRanked` dựng lại thứ tự
+      // bằng orderIdsByHotCount trên tập ứng viên (Node-side, một chiều, bỏ
+      // qua `dir`). .order("id") chỉ cấp một đầu vào tất định cho bước đó,
+      // giống hệt nhánh không-sort bên dưới (Exam Shelves, ?sort=hot axis).
+      query = query.order("id");
     } else {
       query = query.order("created_at", { ascending });
     }

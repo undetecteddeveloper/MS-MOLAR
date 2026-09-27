@@ -6,7 +6,7 @@ import { HomeStage, type AuthMode } from "@/features/auth/components/HomeStage";
 import { TechStack } from "@/features/auth/components/TechStack";
 import { HomeRipple } from "@/features/home/ripple/HomeRipple";
 import { ExamBrowser } from "@/features/exams/components/ExamBrowser";
-import { listExamsRanked } from "@/features/exams/queries";
+import { listHotExams } from "@/features/exams/queries/shelves";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { SiteHeader } from "@/components/layout/SiteHeader";
@@ -25,8 +25,10 @@ import { buildHomeJsonLd, serializeJsonLd } from "@/lib/seo/jsonLd";
 //   - khách  → TechStack (bốn công nghệ website chạy trên + công cụ đã xây nó,
 //              logo màu chính thức). Kho đề nằm sau đăng nhập (RLS `to
 //              authenticated`) nên KHÔNG có thẻ đề thật nào để hiện cho khách.
-//   - đã vào → ba đề mới nhất, thẻ thật, bấm được. Người đã đăng nhập mở trang
-//              chủ là để làm đề, nên đường tới đề ngắn nhất có thể.
+//   - đã vào → ba đề NỔI NHẤT toàn site (F-001, kệ Nổi nhất thu gọn — xem
+//              docs/design/exam-shelves-backend-design.md § Integration Point
+//              I5), thẻ thật, bấm được. Người đã đăng nhập mở trang chủ là để
+//              làm đề, nên đường tới đề ngắn nhất có thể.
 // Dưới 1024px cả hai rơi xuống dưới khối chữ theo đúng thứ tự DOM.
 //
 // KHÔNG dùng AppShell: trang này công khai và có redirect riêng, còn AppShell
@@ -47,10 +49,11 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ a
   // Đã đăng nhập mà mở form auth → vào thẳng /exams (parity với /login cũ).
   if (user && authMode) redirect("/exams");
 
-  // Ba đề đầu của bảng xếp hạng cá nhân hoá (ADR-0015) — cùng nguồn với /exams
-  // nên "đã làm" trên thẻ ở đây và ở kho đề không thể lệch nhau.
-  const ranked = await listExamsRanked({}, 1);
-  const exams = ranked.exams.slice(0, HOME_EXAM_COUNT);
+  // Ba đề đầu của kệ Nổi nhất (F-001) — GUARD bằng `user`: RPC `exam_hot_counts`
+  // thu hồi quyền `anon`, nên một lượt gọi không canh sẽ 42501 và thay hero cho
+  // khách bằng trang lỗi (backend DD § Integration Point I5). Khách chưa đăng
+  // nhập không bao giờ chạm lượt đọc này — 0 lượt `.from`/`.rpc` phát ra.
+  const hot = user ? await listHotExams(HOME_EXAM_COUNT) : null;
 
   // Nonce CSP của lượt request này (proxy.ts sinh, middleware đặt lên header
   // request `x-nonce`). Next chỉ tự gắn nonce vào script của CHÍNH nó; khối
@@ -115,11 +118,11 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ a
 
             {showAside &&
               (user ? (
-                exams.length > 0 && (
+                hot !== null && hot.exams.length > 0 && (
                   <section aria-labelledby="home-new-exams" className="flex flex-col gap-3">
                     <div className="flex items-baseline justify-between gap-4">
                       <h2 id="home-new-exams" className="text-xl font-semibold">
-                        {t("home.newExams")}
+                        {t("home.hotExams")}
                       </h2>
                       <Link
                         href="/exams"
@@ -129,8 +132,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ a
                       </Link>
                     </div>
                     <ExamBrowser
-                      exams={exams}
-                      submittedExamIds={ranked.submittedExamIds}
+                      exams={hot.exams}
+                      submittedExamIds={hot.submittedExamIds}
                       isLoggedIn
                       layout="stack"
                     />

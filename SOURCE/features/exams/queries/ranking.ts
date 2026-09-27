@@ -13,55 +13,51 @@ import {
   EXAM_RANK_RECENCY_WEIGHT,
   EXAM_RANK_SUBJECT_WEAKNESS_WEIGHT,
 } from "@/lib/adaptive/constants";
+import { orderIdsByHotCount, type HotCounts, type ShelfCandidate } from "@/lib/adaptive/examShelves";
 import { rankExamIds } from "@/lib/adaptive/rankExams";
 import { createClient } from "@/lib/supabase/server";
 import { readBounded } from "@/lib/supabase/boundedRead";
 import { paginateExams } from "@/lib/exams/paginate";
 import type { Exam } from "@/types/exam";
-import { toExam } from "./rows";
+import { toExam, type ExamRow } from "./rows";
 import { fetchExamRows, type ExamFilters } from "./catalogue";
+import { readMyAttemptRows, submittedExamIdsOf, toShelfAttempts } from "./attempts";
+import { readHotCounts } from "./hotCounts";
 
-// --- Xếp hạng cá nhân hoá cho /exams (ADR-0015) -----------------------------
-
-/** Dòng lượt-làm-bài + lớp của đề, lấy kèm trong CÙNG một round-trip. */
-type AttemptRow = {
-  id: string;
-  exam_id: string;
-  submitted_at: string | null;
-  // ĐÃ ĐO 2026-08-16 (câu hỏi analytics-layer3 để ngỏ, nay đóng lại): PostgREST
-  // trả embed to-one này dưới dạng OBJECT — `{"exams":{"grade":10}}` — kiểm
-  // bằng chính @supabase/supabase-js trên dev (hynwleaxtbtjzkvpjsug, 40 dòng
-  // qua đường anon key + JWT thật, RLS bật). Trên prod (pebjdlbgbmizgfpuptjl)
-  // xác nhận gián tiếp mà chắc chắn: `exam_attempts_exam_id_fkey` là khoá ngoại
-  // MỘT cột `exam_id -> exams`, và chính chiều many-to-one đó là thứ PostgREST
-  // dùng để quyết to-one. Vẫn khai CẢ HAI hình dạng: chi phí bằng 0, còn thứ
-  // được bảo vệ là một giả định về thư viện bên thứ ba có thể đổi khi nâng cấp.
-  exams: EmbeddedExamFacets | EmbeddedExamFacets[] | null;
-};
-
-/** Các facet của đề mà bộ xếp hạng cần, lấy kèm qua embed to-one. */
-type EmbeddedExamFacets = { grade: number; subject: string };
-
-function embeddedExam(row: AttemptRow): EmbeddedExamFacets | undefined {
-  return Array.isArray(row.exams) ? row.exams[0] : (row.exams ?? undefined);
-}
-
-function gradeOfAttempt(row: AttemptRow): number | null {
-  const embedded = embeddedExam(row);
-  return typeof embedded?.grade === "number" ? embedded.grade : null;
+/**
+ * `ExamRow[]` → `ShelfCandidate[]`, riêng cho nhánh `?sort=hot` bên dưới —
+ * `orderIdsByHotCount` (P1-T4, `lib/adaptive/examShelves.ts`) chỉ thật sự đọc
+ * field `id`, nhưng đòi kiểu `ShelfCandidate[]` đầy đủ.
+ *
+ * Bản sao CỤC BỘ của `candidatesFromRows` trong `shelves.ts` — hàm đó KHÔNG
+ * export và nằm ngoài Target Files của task này (P4-T2). Rule of Three: đây là
+ * lần thứ 2 của phép ánh xạ 5 trường thuần cấu trúc này (lần 1 phục vụ 2 nơi
+ * gọi ngay trong `shelves.ts`); hợp nhất bị hoãn lại, không bắt buộc ở lần 2.
+ */
+function hotCandidatesFromRows(rows: readonly ExamRow[]): ShelfCandidate[] {
+  return rows.map((row) => ({
+    id: row.id,
+    grade: row.grade,
+    subject: row.subject,
+    school: row.school,
+    createdAt: row.created_at,
+  }));
 }
 
 /**
- * Môn của đề đã làm, hoặc null khi embed không giao được nó (TD-028).
- *
- * TÁCH KHỎI `gradeOfAttempt` chứ không gộp thành một guard: một embed thiếu MÔN
- * chỉ được phép làm câm tín hiệu môn. Gộp lại thì lượt ấy rơi khỏi cả tín hiệu
- * LỚP — tức một trường thiếu đi sửa thứ tự theo một trục nó không liên quan.
+ * Đề trong đúng thứ tự "Nổi nhất" phẳng (`total_count DESC, id ASC`, AC-018) —
+ * id không còn nằm trong `rows` (hiếm) bị bỏ, cùng quy ước "rơi khỏi rowById
+ * thì bị bỏ" mà nhánh xếp hạng cá nhân hoá bên dưới đã dùng.
  */
-function subjectOfAttempt(row: AttemptRow): string | null {
-  const embedded = embeddedExam(row);
-  return typeof embedded?.subject === "string" ? embedded.subject : null;
+function applyHotOrder(rows: readonly ExamRow[], hotCounts: ReadonlyMap<string, HotCounts>): ExamRow[] {
+  const rowById = new Map(rows.map((row) => [row.id, row]));
+  return orderIdsByHotCount(hotCandidatesFromRows(rows), hotCounts).flatMap((id) => {
+    const row = rowById.get(id);
+    return row ? [row] : [];
+  });
 }
+
+// --- Xếp hạng cá nhân hoá cho /exams (ADR-0015) -----------------------------
 
 export interface RankedExamList {
   /** Đề của TRANG đang xem (đã cắt), không phải toàn bộ tập khớp bộ lọc. */
@@ -107,27 +103,31 @@ export async function listExamsRanked(
   page = 1
 ): Promise<RankedExamList> {
   const supabase = await createClient();
+  // Đồng hồ đọc ĐÚNG MỘT LẦN mỗi lượt gọi (ADR-0021 D4) — kể cả trên đường
+  // không phải `?sort=hot`, cùng quy ước `shelves.ts` đã dùng cho `now`.
+  const now = new Date();
 
   // Hai lệnh đọc dưới đây lớn theo hoạt động của MỘT người (RLS khoá về
   // auth.uid()), nên chậm chạm trần hơn hẳn catalog. Vẫn đặt biên: chạm trần ở
   // đây làm tín hiệu xếp hạng bị tính trên dữ liệu thiếu, và thứ tự sai thì
   // không có cách nào nhìn ra bằng mắt — nó chỉ là một thứ tự khác.
-  const [rows, attemptRows, resultRows] = await Promise.all([
+  //
+  // Thành viên thứ 4: `?sort=hot` là trục DUY NHẤT cần cửa sổ đếm cross-user
+  // (backend DD § The ?sort=hot axis). Mọi đường khác giữ nguyên ngân sách 3
+  // lượt đọc — nhánh else là một Promise ĐÃ RESOLVE, 0 lượt gọi mạng thêm.
+  const [rows, attemptRows, resultRows, hotCounts] = await Promise.all([
     fetchExamRows(filters),
-    readBounded(
-      "listExamsRanked.attempts",
-      supabase
-        .from("exam_attempts")
-        .select("id, exam_id, submitted_at, exams!inner(grade, subject)")
-        .eq("status", "submitted")
-    ) as Promise<AttemptRow[]>,
+    readMyAttemptRows(supabase, "listExamsRanked.attempts"),
     readBounded(
       "listExamsRanked.results",
       supabase.from("exam_results").select("attempt_id, total_score")
     ) as Promise<{ attempt_id: string; total_score: number | string }[]>,
+    filters?.sort === "hot"
+      ? readHotCounts(supabase, "listExamsRanked.hotCounts", now)
+      : Promise.resolve<Map<string, HotCounts>>(new Map()),
   ]);
 
-  const submittedExamIds = new Set(attemptRows.map((row) => row.exam_id));
+  const submittedExamIds = submittedExamIdsOf(attemptRows);
 
   // `total_score` là numeric(4,2) — PostgREST có thể trả về chuỗi. Ép số một
   // lần ở biên thay vì để `rankExamIds` phải biết chuyện đó.
@@ -137,26 +137,17 @@ export async function listExamsRanked(
     if (Number.isFinite(score)) scoreByAttempt.set(row.attempt_id, score);
   }
 
-  // Lượt thiếu lớp (embed lệch hình dạng) bị BỎ khỏi tín hiệu lớp chứ không
-  // được gán một lớp đoán bừa — nhưng vẫn nằm trong `submittedExamIds` ở trên,
-  // nên băng "đã làm" không bao giờ mất đề.
-  const attempts = attemptRows.flatMap((row) => {
-    const grade = gradeOfAttempt(row);
-    if (grade === null) return [];
-    return [
-      {
-        examId: row.exam_id,
-        grade,
-        subject: subjectOfAttempt(row),
-        submittedAt: row.submitted_at,
-        totalScore: scoreByAttempt.get(row.id) ?? null,
-      },
-    ];
-  });
+  const attempts = toShelfAttempts(attemptRows, scoreByAttempt);
 
-  // `?sort` tường minh thắng cá nhân hoá — trả thẳng thứ tự DB-side.
+  // `?sort` tường minh thắng cá nhân hoá — trả thẳng thứ tự DB-side, TRỪ
+  // `"hot"`: trục đó không có thứ tự DB-side thật (catalogue.ts chỉ
+  // `.order("id")` để cấp đầu vào tất định) — thứ tự thật dựng ở ĐÂY, Node-side,
+  // bằng `orderIdsByHotCount` trên cửa sổ đếm cross-user vừa đọc ở trên
+  // (AC-018/AC-034). `?dir` không được đọc ở nhánh này — vẫn được CHẤP NHẬN
+  // (không throw/400) nhưng không có hiệu lực, đúng Proof Obligation của task.
   if (filters?.sort) {
-    return { ...paginateExams(rows.map(toExam), page), submittedExamIds };
+    const orderedRows = filters.sort === "hot" ? applyHotOrder(rows, hotCounts) : rows;
+    return { ...paginateExams(orderedRows.map(toExam), page), submittedExamIds };
   }
 
   const orderedIds = rankExamIds({

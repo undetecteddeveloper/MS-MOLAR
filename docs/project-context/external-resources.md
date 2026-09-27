@@ -1,17 +1,17 @@
 # External Resources
 
-Last updated: 2026-08-16 (diff-only refresh — added **Payment Gateway (payOS)**, the project's first payment external resource, for the Subscription feature; everything else unchanged since the 2026-08-08 refresh, which itself diffed the 2026-08-06 baseline in `docs/plans/` git history)
+Last updated: 2026-09-18 (drift-only correction — theme name, migration flow and the two-environment split brought back in line with the repo; no new resources, nothing else re-verified since the 2026-08-16 refresh)
 
 This file records the external resources available to this project and how to access them. AI agents and contributors consult this file when work depends on resources outside the repository. Feature-specific identifiers belong in the consuming UI Spec or Design Doc, not here — this file holds environment-stable facts only.
 
-> Environment summary: MS-MOLAR is a Next.js 16 (App Router) + Supabase app, **deployed on Vercel** (region `sin1`/Singapore, region choice is deliberate — colocated with Supabase prod and VN users, not a default). Production branch is `main`; feature branches get automatic Preview deploys. **Two Supabase projects**: a dedicated prod project (`Production` env scope) and a separate dev project (`Preview` + local env scope) — deliberately split so preview deploys and local dev never touch real user data. DDL is still applied by hand (`schema.sql` pasted into each project's SQL Editor); there is no migration framework (TD-005, open). GitHub Actions CI (`.github/workflows/ci.yml`) blocks merge on lint (`eslint --max-warnings 0`), `tsc --noEmit`, and `npm test` (TD-010, closed 2026-08-04) — Vercel's own build does not run these.
+> Environment summary: MS-MOLAR is a Next.js 16 (App Router) + Supabase app, **deployed on Vercel** (region `sin1`/Singapore, region choice is deliberate — colocated with Supabase prod and VN users, not a default). Production branch is `main`; feature branches get automatic Preview deploys. **Two Supabase projects**: a dedicated prod project (`Production` env scope) and a separate dev project (`Preview` + local env scope) — deliberately split so preview deploys and local dev never touch real user data. DDL ships as Supabase CLI migrations in `SOURCE/supabase/migrations/` with `schema.sql` canonical (TD-005 closed 2026-08-31 — see Migration History). GitHub Actions CI (`.github/workflows/ci.yml`) blocks merge on lint (`eslint --max-warnings 0`), `tsc --noEmit`, and `npm test` (TD-010, closed 2026-08-04) — Vercel's own build does not run these.
 
 ## Frontend
 
 ### Design Origin
 - Status: present
 - Source type: token file in the repository (no separate spec doc)
-- Location: `SOURCE/app/globals.css` — the sole source of truth for the "Ink & Lacquer" / "Mực & Sơn Mài" theme since `PROJECT_OVERVIEW.md §2` (repo root) was **deleted 2026-08-06** (deliberate — see `.claude/MEMORY.md` §3). Design rationale/history is recorded in `.claude/MEMORY.md` §3, not in a repo file.
+- Location: `SOURCE/app/globals.css` — the sole source of truth for the tokens of the **"Đêm hội"** theme (dark, shipped 2026-09-14). There is **no light mode**: the file states it outright — no `.dark` block, no toggle, no `dark:` class in the repo; adding one later means building a second contrast table, not flipping a variant. ("Mực & Sơn Mài" is an earlier, replaced palette.) `PROJECT_OVERVIEW.md §2` (repo root) was **deleted 2026-08-06** (deliberate — see `.claude/MEMORY.md` §3); design rationale/history lives in `.claude/MEMORY.md` §3 and `docs/design/ui-refactor-san-truong-design.md`, not in a repo file.
 - Access method: file read (`globals.css` for tokens; `.claude/MEMORY.md` for rationale/hard rules)
 
 ### Design System
@@ -28,8 +28,9 @@ This file records the external resources available to this project and how to ac
 
 ### Visual Verification Environment
 - Status: present
-- Tool type: local dev server + browser automation MCP + manual inspection
-- Entry: `npm run dev` (Next.js local dev server); Playwright MCP server named `playwright` (declared in `.mcp.json`) for automated browser inspection/screenshots
+- Tool type: local dev server + browser automation CLI + manual inspection
+- Entry: `npm run dev` (Next.js local dev server); UI audits drive the **Playwright CLI from inside `SOURCE/`** — `npm run pw` (`SOURCE/scripts/pw/cli.mjs`), the project convention recorded in `.claude/MEMORY.md` §"Pha 3" item 2, *not* the MCP server
+- Known gap (not fixed here): the `playwright` MCP server declared in `.mcp.json` writes to `--output-dir E:/StemWeb_project/MS-MOLAR/…`, a path that is not this checkout. Left as-is deliberately — `.mcp.json` is engineer-owned.
 
 ## Backend
 
@@ -37,13 +38,14 @@ This file records the external resources available to this project and how to ac
 - Status: present
 - Source type: schema file in the repository (no database MCP)
 - Location: `SOURCE/supabase/schema.sql` — tables `exams`, `questions`, `user_profiles`, RLS policies
-- Access method: file read for the canonical source; the live database is inspected/modified manually via the Supabase dashboard **SQL Editor**
+- Access method: file read for the canonical source; DDL reaches a live database only through the migration flow below (see Migration History), not by ad-hoc SQL Editor edits
 
 ### Migration History
-- Status: present (no migration tool)
-- Tool: none — a single idempotent `schema.sql` is the source of truth
-- Location: `SOURCE/supabase/schema.sql`
-- Apply trigger: **manual** — the engineer pastes/re-runs the idempotent `schema.sql` in the Supabase SQL Editor
+- Status: present
+- Tool: **Supabase CLI migrations** (landed 2026-08-31 on both databases; TD-005 closed — `TECH-DEBT.md`). `SOURCE/supabase/schema.sql` stays **canonical** — it is what a human writes and the only place the schema is explained; `SOURCE/supabase/migrations/` is the **apply mechanism**, answering "how far has this database run", which an idempotent file cannot.
+- Location: `SOURCE/supabase/migrations/` — 8 files named `<timestamp>_<description>_<12-hex fingerprint>.sql`, the fingerprint being `schema.sql`'s value **after** that migration (head: `20260913000000_attempt_answer_ceiling_8000_187d3ed24f0c.sql`). Drift gate: `SOURCE/lib/schema/__tests__/migrationsMatchSchema.test.ts` goes red both ways — `schema.sql` edited without a migration, or a migration written without updating `schema.sql`.
+- Apply trigger: **manual, one statement at a time.** `npm run schema:plan` (`SOURCE/scripts/schema-plan.ts`) splits `schema.sql` into a numbered statement list (`-- --emit <dir>` writes one file each) and refuses when the declared fingerprint differs from the computed one; the migration file replays those statements verbatim; then `npm run verify:schema` (`SOURCE/supabase/verify-schema.ts`) reads the fingerprint back with a real query. One statement per apply is the *unit*, not extra caution: the tooling has been observed to run the first half of a `revoke …; grant …;` pair, swallow the second, and still report success.
+- Still **not a full migration framework**: no rollback/down-migration, and the drift gate is syntactic rather than SQL-semantic (proving "baseline + migrations = schema.sql" needs a shadow DB via `supabase db diff`, i.e. Docker, unavailable on this machine).
 
 ### Secret Store
 - Status: present
@@ -86,7 +88,7 @@ This file records the external resources available to this project and how to ac
 
 ### Schema Change Process
 - Status: present
-- Process: edit the idempotent `SOURCE/supabase/schema.sql` and re-apply it in the Supabase SQL Editor; verify RLS with `SOURCE/supabase/test-rls.ts` (`cd SOURCE && npx tsx supabase/test-rls.ts`)
+- Process: edit `SOURCE/supabase/schema.sql` (canonical) and move its fingerprint in the same change (`schema.sql` §17 + `SOURCE/lib/schema/schemaFingerprint.ts`); `npm run schema:plan` for the numbered statement list; add a file under `SOURCE/supabase/migrations/` that replays those statements verbatim and carries the new fingerprint in its name; apply **one statement at a time** to each database; then `npm run verify:schema`, and verify RLS with `SOURCE/supabase/test-rls.ts` (`cd SOURCE && npx tsx supabase/test-rls.ts`)
 
 ## Infrastructure
 
@@ -95,8 +97,8 @@ This file records the external resources available to this project and how to ac
 
 ### Environment Configuration
 - Status: present
-- Mechanism: single shared configuration (one `.env.local`)
-- Environments: one — local development against a single Supabase project. Pre-launch: no staging/production split.
+- Mechanism: per-environment configuration — `SOURCE/.env.local` locally, Vercel Environment Variables scoped `Production` vs `Preview` when deployed (see Secret Store and Deployment Trigger)
+- Environments: two Supabase projects — **production** `pebjdlbgbmizgfpuptjl` ("MS-MOLAR-prod"), behind the Vercel `Production` scope, and **dev/preview** `hynwleaxtbtjzkvpjsug`, behind the `Preview` scope and local dev. Both databases confirmed at schema fingerprint `187d3ed24f0c` on 2026-09-18.
 
 ### Secrets in Infrastructure
 - Status: not applicable — no IaC (see Secret Store for runtime/script secrets)
@@ -113,4 +115,4 @@ Free-form list captured during the self-declaration phase. Each entry: name, pur
 - RLS verification harness: verifies database-level data isolation and pending-content non-leak (supports the UGC PRD's zero-leak success metric) — `SOURCE/supabase/test-rls.ts` — `cd SOURCE && npx tsx supabase/test-rls.ts` (reads `.env.local`)
 - Seed script: loads sample exams into Supabase for local dev (idempotent upsert, uses `service_role`) — `SOURCE/supabase/seed.ts` — `cd SOURCE && npx tsx supabase/seed.ts`
 - Third-party AI service — Google Gemini API (`@google/genai`): used for UGC exam extraction (OCR/parsing PDF uploads) today, and is the integration Engine 1 (Adaptive AI & Feedback) reuses for skill auto-tagging and the Socratic tutor. Server-only client, singleton, SDK retry enabled (3 attempts) — `SOURCE/lib/ugc/gemini.ts`. Models are pinned by empirical necessity, not preference (comment in that file records the originally-chosen model line becoming uncallable for new API keys): `QUESTION_MODEL = "gemini-3.5-flash"`, `ANSWER_MODEL = "gemini-3.1-flash-lite"`. No quota-remaining API exists; `SOURCE/lib/ugc/quotaTracker.ts` self-counts calls (dev-only visibility unless `UGC_QUOTA_LOG=1`). Key: `GEMINI_API_KEY` (see Secret Store).
-- Schema version fingerprint: `public.schema_version` (schema.sql §17) + `SOURCE/lib/schema/schemaFingerprint.ts` — detects (does not prevent) dev/prod DDL drift given there is still no migration tool (TD-005). Any new DDL change must update the fingerprint constant in the same change or `SOURCE/lib/schema/__tests__/schemaFingerprint.test.ts` fails CI.
+- Schema version fingerprint: `public.schema_version` (schema.sql §17) + `SOURCE/lib/schema/schemaFingerprint.ts` — detects (does not prevent) dev/prod DDL drift by answering the one question migrations alone cannot — "is this database running the `schema.sql` that is in git?" (TD-005). Any new DDL change must update the fingerprint constant in the same change or `SOURCE/lib/schema/__tests__/schemaFingerprint.test.ts` fails CI.

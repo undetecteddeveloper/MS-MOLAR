@@ -82,6 +82,7 @@ export const copy = {
   "home.cta": "Bắt đầu luyện đề",
   "home.browse": "Xem kho đề",
   "home.newExams": "Đề mới đăng",
+  "home.hotExams": "Đề nổi nhất",
   // Khối công nghệ cạnh hero cho khách (TechStack). Mỗi dòng là VAI TRÒ thật
   // của công nghệ đó trong repo, không phải khẩu hiệu — Gemini đọc đề (ADR-0006)
   // và gợi ý gia sư (Engine 1), Groq chấm tự luận (ADR-0018).
@@ -133,6 +134,18 @@ export const copy = {
   "auth.orSignUpWith": "Hoặc đăng ký bằng",
 
   // --- Danh sách đề -------------------------------------------------------
+  // Kệ đề (ExamShelf) — 3 kệ trên trang danh sách đề (docs/ui-spec/exam-shelves-ui-spec.md § Copy Keys).
+  "exams.shelfPracticeTitle": "Cần luyện",
+  "exams.shelfHotTitle": "Nổi nhất",
+  "exams.attemptCount": "{count} lượt làm",
+  "exams.shelfHotGradeWeek": "Khối {grade}, tuần này",
+  "exams.shelfHotGradeMonth": "Khối {grade}, 30 ngày qua",
+  "exams.shelfHotGradeAll": "Khối {grade}, từ trước tới nay",
+  "exams.shelfHotSiteWeek": "Toàn hệ thống, tuần này",
+  "exams.shelfHotSiteMonth": "Toàn hệ thống, 30 ngày qua",
+  "exams.shelfExploreTitle": "Khám phá",
+  "exams.shelfViewAllStore": "Xem toàn bộ kho đề",
+  "exams.hotRibbon": "Hot nhất",
   "exams.title": "Kho đề",
   "exams.noMatch": "Không có đề nào khớp",
   "exams.noMatchHint": "Thử bỏ bớt bộ lọc để thấy nhiều đề hơn.",
@@ -509,6 +522,7 @@ export const copy = {
   "exams.sortNewest": "Mới nhất",
   "exams.sortOldest": "Cũ nhất",
   "exams.sortHardest": "Khó nhất",
+  "exams.sortHot": "Nổi nhất",
   "exams.levelEasy": "Dễ",
   "exams.levelMedium": "Trung bình",
   "exams.levelHard": "Khó",

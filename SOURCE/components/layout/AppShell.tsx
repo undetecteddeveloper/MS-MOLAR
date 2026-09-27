@@ -12,7 +12,7 @@
 // (bỏ `min-h-dvh` — khung này gánh min-h-dvh, tránh cộng dồn chiều cao với
 // header 56px gây scrollbar thừa, giống bug đã gặp ở M3.3 homepage).
 //
-// Theme dùng thẳng root "Mực & Sơn mài" (globals.css, S#17) — không còn scope
+// Theme dùng thẳng root "Đêm hội" (globals.css, S#17) — không còn scope
 // .theme-l2 riêng; navbar đen sơn mài lấy từ biến --nav-* mặc định.
 
 import { getCurrentUserProfile } from "@/lib/auth/getCurrentUser";

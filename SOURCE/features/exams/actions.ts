@@ -12,13 +12,19 @@ import { guard } from "@/lib/security/rateLimit";
 import { isValidPartScore } from "@/lib/rating";
 import { computeScore } from "@/lib/scoring/computeScore";
 import { maxAttemptAnswerFor } from "@/lib/ugc/limits";
+import { toAttemptSource } from "@/lib/exams/attemptSource";
 import type { ChoiceId, Question } from "@/types/question";
 
 /**
  * Tạo attempt mới cho đề → trả attemptId thật từ DB (thay crypto.randomUUID GĐ 1).
  * user_id tự gán = auth.uid() (default cột + RLS). Redirect thẳng vào player.
+ *
+ * `rawSource` là `?from=` đi qua href rồi bound server-action argument
+ * (Kho đề theo kệ, ADR-0021 D5) — client-controlled, KHÔNG BAO GIỜ ghi thẳng
+ * vào cột `source`. `toAttemptSource` là điểm chuẩn hoá duy nhất; thiếu tham
+ * số (flat grid, home block — AC-039) đi qua cùng đường và cho ra `'none'`.
  */
-export async function startAttempt(examId: string) {
+export async function startAttempt(examId: string, rawSource?: string) {
   const supabase = await createClient();
 
   // Đề phải ĐANG PUBLISHED mới cho bắt đầu làm (Security review 2026-08-03 Low).
@@ -41,7 +47,7 @@ export async function startAttempt(examId: string) {
 
   const { data, error } = await supabase
     .from("exam_attempts")
-    .insert({ exam_id: examId })
+    .insert({ exam_id: examId, source: toAttemptSource(rawSource) })
     .select("id")
     .single();
   if (error) throw error;

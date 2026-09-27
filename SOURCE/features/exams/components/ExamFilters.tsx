@@ -5,17 +5,18 @@ import type { MessageKey } from "@/lib/copy";
 // ExamFilters — thanh lọc của Kho đề (theme "Sân trường", 2026-09-04).
 //
 // Một hàng CHIP ngay dưới tiêu đề trang: [Bộ lọc (n)] [Mới nhất] [Cũ nhất]
-// [Khó nhất] [Xoá lọc]. Bấm "Bộ lọc" mở bảng chọn — vỏ bảng
+// [Khó nhất] [Nổi nhất] [Xoá lọc]. Bấm "Bộ lọc" mở bảng chọn — vỏ bảng
 // (bottom sheet dưới 768px / thả xuống từ 768px, scrim, phần đầu) là
 // `FilterSheet`, mỗi hàng chọn là `FilterRow`; cả hai ở components/shared vì
 // Lịch sử dùng cùng khuôn (2026-09-07), chỉ khác danh mục hàng bên trong.
 //
 // State lọc ở URL searchParams → Server Component re-query. Rating System
-// (D002): Level lọc thật; Newest/Oldest/Hardest là MỘT trục ?sort= loại trừ
-// nhau. Nút đảo chiều "Tăng dần / Giảm dần" đã gỡ (engineer 2026-09-15: không
-// cần thiết lắm) — "Mới nhất" và "Cũ nhất" vốn đã là hai chiều của cùng một
-// trục thời gian, nút đó phần lớn chỉ lặp lại chúng. Queries vẫn hiểu `?dir=`
-// để link cũ không vỡ; bấm bất kỳ chip sắp xếp nào sẽ xoá nó khỏi URL.
+// (D002): Level lọc thật; Newest/Oldest/Hardest/Hot là MỘT trục ?sort= loại
+// trừ nhau (Hot thêm ở Phase 4 exam-shelves, đọc `exam_hot_counts`). Nút đảo
+// chiều "Tăng dần / Giảm dần" đã gỡ (engineer 2026-09-15: không cần thiết
+// lắm) — "Mới nhất" và "Cũ nhất" vốn đã là hai chiều của cùng một trục thời
+// gian, nút đó phần lớn chỉ lặp lại chúng. Queries vẫn hiểu `?dir=` để link cũ
+// không vỡ; bấm bất kỳ chip sắp xếp nào sẽ xoá nó khỏi URL.
 //
 // Rail dọc "*Filter" + 3 checkbox `absolute right-0` của bản cũ đã bỏ: cụm đó
 // render ở left:-46px (ngoài màn hình) ở mọi bề rộng dưới 1244px.
@@ -30,7 +31,7 @@ import { FilterSheet } from "@/components/shared/FilterSheet";
 import { subjectLabel } from "@/lib/ugc/subjects";
 
 /** Rating System — khớp ExamSort (queries) + ExamLevel lowercase slug (IP-6). */
-type ExamSort = "newest" | "oldest" | "hardest";
+type ExamSort = "newest" | "oldest" | "hardest" | "hot";
 type ExamLevel = "easy" | "medium" | "hard";
 
 interface ExamFiltersProps {
@@ -52,12 +53,13 @@ interface ExamFiltersProps {
   query?: string;
 }
 
-// Lọc nhanh — 3 chip CÙNG trục ?sort= (D002): chọn 1 tự loại trừ 2 cái còn
+// Lọc nhanh — 4 chip CÙNG trục ?sort= (D002): chọn 1 tự loại trừ 3 cái còn
 // lại (bấm lại chính nó → bỏ sort).
 const QUICK: { value: ExamSort; labelKey: MessageKey }[] = [
   { value: "newest", labelKey: "exams.sortNewest" },
   { value: "oldest", labelKey: "exams.sortOldest" },
   { value: "hardest", labelKey: "exams.sortHardest" },
+  { value: "hot", labelKey: "exams.sortHot" },
 ];
 
 const LEVEL_OPTIONS: { value: ExamLevel | ""; labelKey: MessageKey }[] = [
@@ -158,7 +160,7 @@ export function ExamFilters({
           hàng không có state riêng nên dựng lại là vô hại. */}
       <div
         key={query ?? ""}
-        className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:-mx-6 sm:px-6 [&::-webkit-scrollbar]:hidden"
+        className="-mx-4 flex [scrollbar-width:none] items-center gap-2 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:px-6 [&::-webkit-scrollbar]:hidden"
       >
         {/* Chip từ khoá đứng ĐẦU hàng: nó là điều kiện hẹp nhất đang áp lên lưới,
             và bấm vào là bỏ đúng nó (giữ nguyên các bộ lọc khác). */}
@@ -289,10 +291,7 @@ export function ExamFilters({
           label={t("exams.level")}
           selectedLabel={
             selected.level !== undefined
-              ? t(
-                  LEVEL_OPTIONS.find((o) => o.value === selected.level)?.labelKey ??
-                    "common.all"
-                )
+              ? t(LEVEL_OPTIONS.find((o) => o.value === selected.level)?.labelKey ?? "common.all")
               : undefined
           }
           currentValue={selected.level ?? ""}

@@ -1,18 +1,36 @@
 import Link from "next/link";
 import { t } from "@/lib/copy";
+import { cn } from "@/lib/utils";
 import type { Exam } from "@/types/exam";
+import type { AttemptSource } from "@/lib/exams/attemptSource";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { AuthorByline } from "@/components/shared/AuthorByline";
 import { DifficultyBadge } from "@/components/rating/DifficultyBadge";
 import { RateButton, type RateEligibility } from "@/features/exams/components/rating/RateButton";
 import { subjectLabel } from "@/lib/ugc/subjects";
+import { ExamRibbon } from "@/features/exams/components/ExamRibbon";
 
 interface ExamCardProps {
   exam: Exam;
   /** Rating System (R4) — 1 trong 3 trạng thái nút Chấm điểm, tính 1 lần/trang
    *  từ tập id đã nộp (ExamBrowser), KHÔNG per-card query (NFR Performance). */
   eligibility: RateEligibility;
+  /** Nhãn ruy băng. Chỉ ExamShelf truyền, chỉ ở hạng 1 kệ Nổi nhất (AC-026). */
+  ribbon?: string;
+  /** Kệ nguồn; gắn vào href dạng ?from= (AC-039). Vắng mặt ⇒ href hôm nay,
+   *  không có query string. */
+  from?: AttemptSource;
+  /** Class bề rộng từ hàng kệ — một rule `[&>li]:w-80` trên cha sẽ dính luôn
+   *  vào ô trong cùng hàng, nên bề rộng phải đi qua prop này. */
+  className?: string;
+  /** Thẻ gọn cho hàng kệ: bỏ thời lượng + số câu (xem ở trang đề), tên đề MỘT dòng
+   *  cắt "…", tác giả · trường gộp một dòng cắt "…", dòng meta đặt trước chỗ ⇒ mọi
+   *  thẻ cao bằng nhau. Vắng mặt ⇒ markup hôm nay (lưới phẳng, trang chủ). */
+  compact?: boolean;
+  /** Số lượt đã nộp, góc trên phải — chỉ có nghĩa cùng `compact`; kệ Nổi nhất
+   *  không truyền cho thẻ hạng 1 vì góc đó là của ruy băng. */
+  attemptCount?: number;
 }
 
 // ExamCard — thẻ đề (theme "Sân trường"): nhãn môn + lớp, tên đề, tác giả,
@@ -30,11 +48,26 @@ interface ExamCardProps {
 // (bug 2026-08). Phản hồi hover là đổi nền + đổi màu tiêu đề — qua `.card-linked`
 // (globals.css), tức chỉ khi hover/nhấn CHÍNH liên kết phủ: `active:bg-*` đặt
 // thẳng trên thẻ từng làm cả thẻ đổi nền khi chỉ chạm nút chấm sao (2026-09-13).
-export async function ExamCard({ exam, eligibility }: ExamCardProps) {
+export async function ExamCard({
+  exam,
+  eligibility,
+  ribbon,
+  from,
+  className,
+  compact,
+  attemptCount,
+}: ExamCardProps) {
+  const href = from ? `/exams/${exam.id}?from=${from}` : `/exams/${exam.id}`;
+  const author = exam.authorDisplayName?.trim();
+
   return (
-    <Card as="li" className="card-linked relative h-full">
+    <Card
+      as="li"
+      padding={compact ? "compact" : undefined}
+      className={cn("card-linked relative h-full", className)}
+    >
       <Link
-        href={`/exams/${exam.id}`}
+        href={href}
         aria-label={exam.title}
         className="card-link rounded-card focus-visible:ring-ring/40 absolute inset-0 z-0 focus-visible:ring-3 focus-visible:outline-none"
       />
@@ -44,24 +77,46 @@ export async function ExamCard({ exam, eligibility }: ExamCardProps) {
             với Thống kê và Lịch sử; site chỉ có một ngôn ngữ (engineer 2026-09-08). */}
         <Badge variant="plain">{subjectLabel(exam.subject)}</Badge>
         <Badge variant="plain">{t("exams.gradeValue", { grade: exam.grade })}</Badge>
+        {compact && attemptCount !== undefined ? (
+          <span className="text-muted-foreground ml-auto text-xs font-medium tabular-nums">
+            {t("exams.attemptCount", { count: attemptCount })}
+          </span>
+        ) : null}
       </div>
 
-      <h3 className="card-linked-title text-lg leading-snug font-semibold">
-        {exam.title}
-      </h3>
+      {compact ? (
+        <>
+          <h3 className="card-linked-title truncate text-base leading-snug font-semibold">
+            {exam.title}
+          </h3>
+          <p className="text-muted-foreground min-h-5 truncate text-sm">
+            {author ? (
+              <>
+                {t("common.by")} <span className="text-foreground font-medium">{author}</span>
+              </>
+            ) : null}
+            {author && exam.school ? " · " : null}
+            {exam.school}
+          </p>
+        </>
+      ) : (
+        <>
+          <h3 className="card-linked-title text-lg leading-snug font-semibold">{exam.title}</h3>
 
-      {/* Byline UGC — chỉ hiện với đề có tác giả; đề seed bỏ qua. */}
-      <AuthorByline name={exam.authorDisplayName} />
+          {/* Byline UGC — chỉ hiện với đề có tác giả; đề seed bỏ qua. */}
+          <AuthorByline name={exam.authorDisplayName} />
 
-      <p className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 text-sm">
-        <span className="tabular-nums">
-          {exam.durationMinutes} {t("exams.minutesShort")}
-        </span>
-        <span className="tabular-nums">
-          {t("exams.questionCount", { count: exam.questionIds.length })}
-        </span>
-        {exam.school && <span>{exam.school}</span>}
-      </p>
+          <p className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 text-sm">
+            <span className="tabular-nums">
+              {exam.durationMinutes} {t("exams.minutesShort")}
+            </span>
+            <span className="tabular-nums">
+              {t("exams.questionCount", { count: exam.questionIds.length })}
+            </span>
+            {exam.school && <span>{exam.school}</span>}
+          </p>
+        </>
+      )}
 
       <div className="mt-auto flex items-center justify-between gap-3 pt-1">
         <DifficultyBadge communityDifficulty={exam.communityDifficulty} variant="card" />
@@ -75,6 +130,8 @@ export async function ExamCard({ exam, eligibility }: ExamCardProps) {
           </span>
         </div>
       </div>
+
+      {ribbon ? <ExamRibbon label={ribbon} /> : null}
     </Card>
   );
 }
