@@ -948,9 +948,9 @@ export const copy = {
   "profile.tabs.label": "Mục hồ sơ",
   "profile.tabs.account": "Tài khoản",
   "profile.tabs.comments": "Bình luận",
-  // Dùng khi số bình luận mới k > 0 (chip "Bình luận") — nối chưa xong ở task
-  // 44 (đếm chưa đọc là việc của task 45); khoá đặt sẵn theo bảng khoá task 44
-  // sở hữu ("profile.tabs.*").
+  // Dùng khi số bình luận mới k > 0 (chip "Bình luận") — khoá đặt sẵn ở task 44
+  // ("profile.tabs.*"), nối vào `ProfileTabs` ở task 45 (đếm chưa đọc,
+  // `getMyUnreadCommentCount()`).
   "profile.tabs.commentsA11y": "Bình luận, {count} bình luận mới",
   "profile.reputation.label": "Điểm uy tín",
   "profile.reputation.published": "{count} bài giải đã đăng",
@@ -961,6 +961,17 @@ export const copy = {
   "profile.reputation.tier3": "Trụ cột",
   "profile.reputation.tierGoal": "{count} bài giải",
   "profile.reputation.tierLocked": "còn {count} bài",
+
+  // --- Hồ sơ (S-06) — ProfileCommentsTab + CommentNotificationCard (task 45) ---
+  // Nguyên văn UI Spec § Component ProfileCommentsTab/CommentNotificationCard.
+  "profile.comments.asked": "{name} hỏi ở câu {questionNumber}",
+  "profile.comments.commented": "{name} bình luận ở câu {questionNumber}",
+  "profile.comments.reply": "Trả lời",
+  "profile.comments.examHidden": "Đề không còn hiện",
+  "profile.comments.empty": "Chưa có bình luận nào về bài giải của bạn.",
+  "profile.comments.emptyHowTo": "Vào một đề bạn đã nộp rồi bấm Viết bài giải ở trang kết quả.",
+  "profile.comments.more": "Xem thêm",
+  "profile.comments.loadError": "Chưa tải được bình luận. Bạn thử lại nhé.",
 
   // /about — xem chú thích tương ứng trong en.ts.
   "about.eyebrow": "Giới thiệu",

@@ -59,6 +59,31 @@ describe("ProfileTabs — AC-095, URL và aria-pressed đổi cùng lúc", () =>
   });
 });
 
+describe("ProfileTabs — commentCount đổi tên trợ năng của chip (task 45, AC-091/AC-092)", () => {
+  it("commentCount=3: tên trợ năng 'Bình luận, 3 bình luận mới', kèm chấm aria-hidden", () => {
+    markCommentsReadMock.mockResolvedValue({ ok: true });
+    const { container } = render(<ProfileTabs activeTab="account" commentCount={3} />);
+
+    expect(screen.getByRole("button", { name: "Bình luận, 3 bình luận mới" })).toBeTruthy();
+    const dot = container.querySelector("button[aria-label] span[aria-hidden].bg-destructive.size-2.rounded-full");
+    expect(dot).toBeTruthy();
+  });
+
+  it("commentCount=0: tên trợ năng giữ nguyên 'Bình luận', không chấm", () => {
+    markCommentsReadMock.mockResolvedValue({ ok: true });
+    render(<ProfileTabs activeTab="account" commentCount={0} />);
+
+    expect(screen.getByRole("button", { name: "Bình luận" })).toBeTruthy();
+  });
+
+  it("không truyền commentCount: tên trợ năng giữ nguyên 'Bình luận', không chấm (hành vi cũ của task 44 không đổi)", () => {
+    markCommentsReadMock.mockResolvedValue({ ok: true });
+    render(<ProfileTabs activeTab="account" />);
+
+    expect(screen.getByRole("button", { name: "Bình luận" })).toBeTruthy();
+  });
+});
+
 describe("ProfileTabs — markCommentsRead là side-effect nền im lặng", () => {
   it("bấm Bình luận gọi markCommentsRead đúng một lần", () => {
     markCommentsReadMock.mockResolvedValue({ ok: true });

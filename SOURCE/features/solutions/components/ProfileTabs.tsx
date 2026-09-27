@@ -21,9 +21,16 @@ import type { ProfileTab } from "@/features/solutions/lib/profileTab";
 
 interface ProfileTabsProps {
   activeTab: ProfileTab;
+  /** Số "bình luận mới" cấp hồ sơ (AC-091/AC-092, task 45) — CHA (`page.tsx`,
+   *  qua `getMyUnreadCommentCount()`, KHÔNG lọc theo bài) tính sẵn đúng MỘT
+   *  lần mỗi lượt render; component này không tự đếm. `undefined`/`0` ⇒ tên
+   *  trợ năng giữ nguyên "Bình luận", không chấm — cùng khoá kép với
+   *  `SolutionCard`'s `unreadCommentCount` (D38/AC-094: chấm là trang trí,
+   *  con số nằm trong TÊN TRỢ NĂNG, không phải một khối văn bản riêng). */
+  commentCount?: number;
 }
 
-export function ProfileTabs({ activeTab }: ProfileTabsProps) {
+export function ProfileTabs({ activeTab, commentCount }: ProfileTabsProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -68,8 +75,20 @@ export function ProfileTabs({ activeTab }: ProfileTabsProps) {
       <Chip active={tab === "account"} className="h-11" onClick={() => selectTab("account")}>
         {t("profile.tabs.account")}
       </Chip>
-      <Chip active={tab === "comments"} className="h-11" onClick={() => selectTab("comments")}>
+      <Chip
+        active={tab === "comments"}
+        className="h-11"
+        onClick={() => selectTab("comments")}
+        aria-label={
+          commentCount !== undefined && commentCount > 0
+            ? t("profile.tabs.commentsA11y", { count: commentCount })
+            : undefined
+        }
+      >
         {t("profile.tabs.comments")}
+        {commentCount !== undefined && commentCount > 0 && (
+          <span aria-hidden className="bg-destructive size-2 rounded-full" />
+        )}
       </Chip>
     </div>
   );

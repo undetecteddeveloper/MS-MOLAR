@@ -29,8 +29,13 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { ProfileCard } from "@/features/profile/components/ProfileCard";
 import { ProfileTabs } from "@/features/solutions/components/ProfileTabs";
 import { ReputationBlock } from "@/features/solutions/components/ReputationBlock";
+import { ProfileCommentsTab } from "@/features/solutions/components/ProfileCommentsTab";
 import { parseProfileTab } from "@/features/solutions/lib/profileTab";
-import { getMyReputation, type ReputationResult } from "@/features/solutions/queries";
+import {
+  getMyReputation,
+  getMyUnreadCommentCount,
+  type ReputationResult,
+} from "@/features/solutions/queries";
 
 // KHÔNG khai `alternates.canonical` — khác /terms và /about một cách có chủ ý:
 // trang này bị robots.ts chặn (nội dung của nó là dữ liệu cá nhân), nên một
@@ -39,10 +44,19 @@ export const metadata: Metadata = {
   title: "Hồ sơ",
 };
 
-type SearchParams = Promise<{ tab?: string }>;
+type SearchParams = Promise<{ tab?: string; cpage?: string }>;
 
 interface ProfilePageProps {
   searchParams: SearchParams;
+}
+
+/** `?cpage=` — trang CAO NHẤT của tab "Bình luận" cần hiện (task 45, "Xem
+ *  thêm" nối thêm — `ProfileCommentsTab` tự đọc cộng dồn từ trang 1 tới đây).
+ *  Không parse được / < 1 ⇒ 1 — không lỗi, không trang trắng, cùng quy ước
+ *  `parseProfileTab`. */
+function parseCommentFeedPage(raw: string | undefined): number {
+  const parsed = raw !== undefined ? Number.parseInt(raw, 10) : NaN;
+  return Number.isFinite(parsed) && parsed >= 1 ? parsed : 1;
 }
 
 /** Bọc `getMyReputation()` — hàm tự trả `{ ok: false }` khi RPC lỗi, nhưng
@@ -67,13 +81,24 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
 
   const sp = await searchParams;
   const tab = parseProfileTab(sp.tab);
+  const commentFeedPage = parseCommentFeedPage(sp.cpage);
 
   // AC-096: `getMyReputation()` thất bại HOẶC ném — cả hai đều nghĩa là
   // "không có slot", không băng lỗi, không chặn phần còn lại của thẻ tài
   // khoản (frontend DD § UI Error State Design, hàng `ReputationBlock`). Chỉ
   // gọi RPC trong try/catch — dựng JSX ở NGOÀI, react-hooks/error-boundaries
   // cấm dựng JSX bên trong try/catch (lỗi khi render không bị bắt ở đó).
-  const reputation = tab === "account" ? await tryGetMyReputation() : null;
+  //
+  // `getMyUnreadCommentCount()` (task 45, AC-091/AC-092) — KHÔNG lọc theo
+  // bài, đúng MỘT lần mỗi lượt render, BẤT KỂ tab đang mở (chip "Bình luận"
+  // luôn cần con số này, kể cả khi đang đứng ở ô "Tài khoản"). Không bọc
+  // try/catch riêng ở đây — cùng tiền lệ route `/exams/[id]/solutions`'s lời
+  // gọi hàm này (task 29): lỗi hạ tầng thật rơi xuống `error.tsx`, không có
+  // AC nào đòi chip này phải "thất bại êm" như `ReputationBlock`.
+  const [reputation, commentCount] = await Promise.all([
+    tab === "account" ? tryGetMyReputation() : Promise.resolve(null),
+    getMyUnreadCommentCount(),
+  ]);
   const reputationSlot: ReactNode =
     reputation?.ok === true ? (
       <ReputationBlock
@@ -92,13 +117,11 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
       className="flex flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8"
     >
       <PageHeader title={t("profile.title")} description={t("profile.description")} />
-      <ProfileTabs activeTab={tab} />
+      <ProfileTabs activeTab={tab} commentCount={commentCount} />
       {tab === "account" ? (
         <ProfileCard user={user} reputationSlot={reputationSlot} />
       ) : (
-        // Nội dung ô "Bình luận" (`ProfileCommentsTab`, task 45) chèn ở đây —
-        // task 44 chỉ dựng khung chuyển tab, chưa có nội dung của ô này.
-        null
+        <ProfileCommentsTab page={commentFeedPage} />
       )}
     </PageContainer>
   );
