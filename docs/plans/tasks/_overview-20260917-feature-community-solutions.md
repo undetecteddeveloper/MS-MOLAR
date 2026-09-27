@@ -137,20 +137,20 @@ Filename prefix for every row: `20260917-feature-community-solutions`. **Status*
 | 37 | `…-frontend-task-37.md` | frontend | P4-T6 | 4 | 28, 33, 36 | open | |
 | 38 | `…-frontend-task-38.md` | frontend | P4-T7 | 4 | 32, 34 | open | |
 | 39 | `…-frontend-task-39.md` | frontend | P4-T8 | 4 | 10, 32 | done | AC-083 read-only already existed from tasks 10/11; task 39 added the proof test + `isReadOnly` rename |
-| 40 | `…-backend-task-40.md` | backend | P5-T1 | 5 | 13, 25 | open | Owns migration 40 and tests it (avatar cases for AC-004, S4, S7, AC-047, AC-048) |
-| 41 | `…-backend-task-41.md` | backend | P5-T2 | 5 | 03, 13, 32 | open | Owns migration 41 and tests it (fixed vector, AC-088) |
-| 42 | `…-backend-task-42.md` | backend | P5-T3 | 5 | 40 | open | Signer covers `listSolutions` and `getSolutionDetail` only |
-| 43 | `…-backend-task-43.md` | backend | P5-T4 | 5 | 41 | open | |
-| 44 | `…-frontend-task-44.md` | frontend | P5-T5 | 5 | 43 (+ 26) | open | `reputationSlot?: ReactNode` |
-| 45 | `…-frontend-task-45.md` | frontend | P5-T6 | 5 | 26, 27, 44 | open | |
-| 46 | `…-frontend-task-46.md` | frontend | P5-T7 | 5 | 40, 42 | open | |
-| 47 | `…-backend-task-47.md` | backend | P5-T8 | 5 | 03, 13, 25, 32, 40, 41 | open | R1 localdb exclude ends; SK-2 |
-| 48 | `…-frontend-task-48.md` | frontend | P5-T9 | 5 | 23, 30, 31 | open | |
-| 49 | `…-frontend-task-49.md` | frontend | P5-T10 | 5 | all UI tasks (01, 07–12, 17–22, 28, 29, 36–39, 44–46) | open | R10 |
-| 50 | `…-backend-task-50.md` | backend | P5-T11 | 5 | 01–49 | open | Also runs `npm run test:integration` (must exit 0; INT-1 stays quarantined, TD-034); no `--exclude` flags left |
-| 51 | `…-backend-task-51.md` | backend | P5-T12 | 5 | 02, 32, 34 (after 50) | open | Diff base `af05f28` |
-| 52 | `…-backend-task-52.md` | backend | P5-T13 | 5 | 03, 13, 25, 32, 40, 41 and the `admin_users` seed applied to PROD by the engineer; 47 | open | Composio MCP (read-only) |
-| 53 | `…-backend-task-53.md` | backend | P5-T14 | 5 | 01–52 | open | |
+| 40 | `…-backend-task-40.md` | backend | P5-T1 | 5 | 13, 25 | done | `43dbed8` — 32 real-DB Storage cases, quality-fixer (Opus) zero fix |
+| 41 | `…-backend-task-41.md` | backend | P5-T2 | 5 | 03, 13, 32 | done | `d1e221a` — fixed vector 84→104→74→104→54→104→74, quality-fixer (Opus) zero fix |
+| 42 | `…-backend-task-42.md` | backend | P5-T3 | 5 | 40 | done | `0546961` — signer covers `listSolutions`/`getSolutionDetail` only, `getMyCommentFeed` untouched |
+| 43 | `…-backend-task-43.md` | backend | P5-T4 | 5 | 41 | done | `1ac17cd` |
+| 44 | `…-frontend-task-44.md` | frontend | P5-T5 | 5 | 43 (+ 26) | done | `5bde174` — `reputationSlot?: ReactNode`; L1 owed to engineer sign-in |
+| 45 | `…-frontend-task-45.md` | frontend | P5-T6 | 5 | 26, 27, 44 | done | `db6816e` — TBD-01 skeleton re-measure still owed (session not signed in) |
+| 46 | `…-frontend-task-46.md` | frontend | P5-T7 | 5 | 40, 42 | done | `1eae903` — verification-only, no component code change needed |
+| 47 | `…-backend-task-47.md` | backend | P5-T8 | 5 | 03, 13, 25, 32, 40, 41 | done | `7c385ff` — R1 localdb exclude ends here; SK-2 resolved as designed |
+| 48 | `…-frontend-task-48.md` | frontend | P5-T9 | 5 | 23, 30, 31 | done | `51f3ab5` — 3 new routes 56-72KB gzip, well under ~170KB budget |
+| 49 | `…-frontend-task-49.md` | frontend | P5-T10 | 5 | all UI tasks (01, 07–12, 17–22, 28, 29, 36–39, 44–46) | **blocked** | R10 — shared Playwright CLI session not signed in; deliverable written, no fabricated numbers |
+| 50 | `…-backend-task-50.md` | backend | P5-T11 | 5 | 01–49 | done | `324cb3a` — all 9 gates green first try, 0 regression, ~258s |
+| 51 | `…-backend-task-51.md` | backend | P5-T12 | 5 | 02, 32, 34 (after 50) | done | `8b5aac5` — diff base `af05f28` empty, TD-029 closed clean |
+| 52 | `…-backend-task-52.md` | backend | P5-T13 | 5 | 03, 13, 25, 32, 40, 41 and the `admin_users` seed applied to PROD by the engineer; 47 | done | `3d3a067` — Composio; prod fingerprint `13a8e93ea8e7` matches dev; deviation from original design recorded (agent applied in-session per engineer's direct request) |
+| 53 | `…-backend-task-53.md` | backend | P5-T14 | 5 | 01–52 | done | `308d29b` — 110/110 AC covered, 0 real blocker, 4 AC pending task 49 |
 
 Non-task commit on the branch: `707df1f` — the INT-1 quota tests moved to `SOURCE/tests/integration/pending/subscription-quota.int.test.ts` and excluded by name in `SOURCE/vitest.integration.config.ts` (TD-034), so `npm run test:integration` exits 0. No task re-enables INT-1 or edits that config.
 
