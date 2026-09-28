@@ -1,18 +1,22 @@
-# Bàn giao phiên — Bài giải cộng đồng (cập nhật 2026-09-27, TOÀN BỘ 53/53 TASK ĐÃ COMMIT, CHỈ CÒN NỢ ĐO TRỰC QUAN TASK 49)
+# Bàn giao phiên — Bài giải cộng đồng (cập nhật 2026-09-27, TÍNH NĂNG HOÀN TẤT — 53/53 TASK, 110/110 AC, PROD ĐÃ DEPLOY)
 
-> File này là điểm tựa cho phiên Claude Code KẾ TIẾP. Đọc file này trước, rồi
-> đọc row Notion (đã cập nhật 2026-09-27). Toàn bộ 53 task của kế hoạch đã
-> commit trên nhánh, Phase 1-5 đều HOÀN TẤT. **6 migration đã áp lên PROD**
-> (`MS-MOLAR-prod`, task 52) và fingerprint khớp dev. Bảng đóng AC-001–AC-110
-> (task 53) xác nhận 110/110 AC có bằng chứng, 0 blocker thật.
+> File này là điểm tựa cho phiên Claude Code KẾ TIẾP — nhưng có lẽ sẽ không
+> cần nữa: tính năng đã HOÀN TẤT TRỌN VẸN. Đọc file này trước, rồi đọc row
+> Notion (đã cập nhật 2026-09-27). Toàn bộ 53 task của kế hoạch đã commit trên
+> nhánh, Phase 1-5 đều HOÀN TẤT. **6 migration đã áp lên CẢ dev VÀ PROD**
+> (`MS-MOLAR-prod`, task 52), fingerprint khớp (`326b68fea8a3` sau khi merge
+> thêm nhánh `main` "Kho đề theo kệ"). Bảng đóng AC-001–AC-110 (task 53, cập
+> nhật lại sau task 49) xác nhận **110/110 AC `passed`**, 0 blocker thật.
 >
-> **VIỆC DUY NHẤT CÒN LẠI**: task 49 (đo trực quan 5 bề mặt × 3 viewport, sàn
-> 44px) đang BỊ CHẶN vì session Playwright CLI dùng chung chưa đăng nhập —
-> KHÔNG chặn code, chỉ chặn phần đo pixel thật cuối cùng cho 4 AC
-> (AC-049/AC-059/AC-064/AC-097). Sau khi engineer đăng nhập session CLI dùng
-> chung, chạy lại task 49 rồi cập nhật `docs/plans/analysis/20260917-community-
-> solutions-ac-closure.md` cho 4 AC đó. Sau đó tính năng có thể tuyên bố xong
-> và **xoá file HANDOFF này** (theo đúng chỉ dẫn gốc của nó).
+> **Task 49 (đo trực quan)** — hoàn tất qua 5 lượt chạy: engineer đăng nhập
+> session Playwright CLI dùng chung, đo thật 5 bề mặt × 3 viewport, phát hiện
+> + sửa 3 lỗi thật (`OwnSolutionBlock.tsx`/`SolutionCard.tsx` sàn 44px,
+> `loading.tsx` TBD-01 lệch 187px — commit `acfa528`/`43c7c58`), lượt 5 xác
+> nhận PASS toàn bộ. AC-011/AC-049/AC-059/AC-064/AC-097 đóng đủ.
+>
+> **Việc duy nhất còn lại**: engineer xác nhận đã ship, rồi **xoá file
+> HANDOFF này** (theo đúng chỉ dẫn gốc của nó) — không còn việc kỹ thuật nào
+> khác.
 
 ## Trạng thái ngắn
 
@@ -87,23 +91,16 @@ Các file review/verification JSON cũ (`docs/plans/community-solutions-*.json`)
 - Cite `lib/copy.ts` theo TÊN KHOÁ, không theo số dòng.
 - **Đăng nhập Playwright CLI (khi cần đo UI có xác thực):** auto-mode luôn chặn Claude tự bấm nút submit đăng nhập — nhờ engineer chạy trong terminal riêng của họ: `node scripts/pw/cli.mjs goto "http://localhost:3000/?auth=signin"` → `fill "#email" "smithnguyen247+rlstesta@gmail.com"` → `fill "#password" "rls-test-password-123"` (mật khẩu chung, xem `.claude/MEMORY.md`) → `click "button[type=submit]:has-text('Đăng nhập')"` (LƯU Ý: dùng đúng selector này, không dùng `button:has-text('Đăng nhập')` — trang có 2 phần tử trùng chữ, bấm nhầm tab sẽ "thành công" nhưng không có tác dụng gì). Session CLI dùng chung qua `%TEMP%\ms-molar-pw-cli\port`, một khi đã đăng nhập thì lệnh của Claude và của engineer cùng chạm một browser cho tới khi ai đó chạy `close` hoặc reboot máy.
 
-## Cách chạy lại (nếu phiên phải khởi động lại recipe)
+## Trạng thái cuối — không còn việc kỹ thuật nào để "chạy lại"
 
-Toàn bộ code/migration/prod đã xong — việc duy nhất còn lại là task 49
-(đo trực quan), phụ thuộc 100% vào đăng nhập session Playwright CLI dùng
-chung. Gõ `/recipe-fullstack-implement` với nội dung: "Bài giải cộng đồng —
-53/53 task đã commit, Phase 1-5 HOÀN TẤT, 6 migration đã áp lên CẢ dev VÀ
-PROD (fingerprint `13a8e93ea8e7` khớp, task 52 xong), bảng đóng AC-001–AC-110
-(task 53) xác nhận 110/110 AC có bằng chứng, 0 blocker thật. Việc duy nhất
-còn lại: task 49 (đo trực quan 5 bề mặt × 3 viewport, sàn 44px cho
-AC-049/AC-059/AC-064/AC-097) đang chờ engineer đăng nhập session Playwright
-CLI dùng chung — [xác nhận đã đăng nhập rồi / chưa đăng nhập, chờ tiếp].
-Nếu đã đăng nhập: chạy lại task 49 theo `docs/plans/tasks/20260917-feature-
-community-solutions-frontend-task-49.md`, đo thật 5 bề mặt × 3 viewport, ghi
-vào `docs/plans/analysis/20260917-community-solutions-visual-measurement.md`,
-đo gộp luôn TBD-01 của task 45 (`SOURCE/app/(analytics)/profile/loading.tsx`),
-rồi cập nhật 4 dòng AC-049/AC-059/AC-064/AC-097 trong `docs/plans/analysis/
-20260917-community-solutions-ac-closure.md` từ 'chờ task 49' sang 'passed'.
-Sau đó tính năng xong hoàn toàn, xoá `docs/plans/community-solutions-
-HANDOFF.md`. Không hỏi lại quyết định đã chốt trong PRD/UI Spec/Design
-Doc/ADR-0021/work plan — tất cả FINAL."
+Tính năng đã HOÀN TẤT TRỌN VẸN (2026-09-27): 53/53 task commit, 110/110 AC
+`passed` (task 53, cập nhật lại sau task 49), 6 migration trên cả dev VÀ
+PROD (fingerprint `326b68fea8a3` khớp cả hai, sau khi merge thêm "Kho đề
+theo kệ" từ `main`), task 49 PASS toàn bộ visual acceptance qua 5 lượt đo
+(3 lỗi thật phát hiện+sửa: `acfa528`/`43c7c58`).
+
+Nếu phiên sau cần resume vì lý do khác (vd tiếp tục QUA feature tiếp theo,
+hoặc engineer phát hiện vấn đề mới sau khi dùng thật) — đọc phần "Trạng thái
+ngắn" và "Commit trên nhánh" ở đầu file này để biết chính xác đã làm gì,
+đừng tự suy diễn lại từ đầu. Việc còn lại DUY NHẤT: engineer xác nhận đã
+ship xong thì **xoá file HANDOFF này** (theo chỉ dẫn gốc ở đầu file).

@@ -146,7 +146,7 @@ Filename prefix for every row: `20260917-feature-community-solutions`. **Status*
 | 46 | `…-frontend-task-46.md` | frontend | P5-T7 | 5 | 40, 42 | done | `1eae903` — verification-only, no component code change needed |
 | 47 | `…-backend-task-47.md` | backend | P5-T8 | 5 | 03, 13, 25, 32, 40, 41 | done | `7c385ff` — R1 localdb exclude ends here; SK-2 resolved as designed |
 | 48 | `…-frontend-task-48.md` | frontend | P5-T9 | 5 | 23, 30, 31 | done | `51f3ab5` — 3 new routes 56-72KB gzip, well under ~170KB budget |
-| 49 | `…-frontend-task-49.md` | frontend | P5-T10 | 5 | all UI tasks (01, 07–12, 17–22, 28, 29, 36–39, 44–46) | **blocked** | R10 — shared Playwright CLI session not signed in; deliverable written, no fabricated numbers |
+| 49 | `…-frontend-task-49.md` | frontend | P5-T10 | 5 | all UI tasks (01, 07–12, 17–22, 28, 29, 36–39, 44–46) | done | R10 — `96a5930`, 5 runs; found+fixed 3 real bugs (`acfa528`/`43c7c58`); PASS all 5 surfaces × 3 viewports |
 | 50 | `…-backend-task-50.md` | backend | P5-T11 | 5 | 01–49 | done | `324cb3a` — all 9 gates green first try, 0 regression, ~258s |
 | 51 | `…-backend-task-51.md` | backend | P5-T12 | 5 | 02, 32, 34 (after 50) | done | `8b5aac5` — diff base `af05f28` empty, TD-029 closed clean |
 | 52 | `…-backend-task-52.md` | backend | P5-T13 | 5 | 03, 13, 25, 32, 40, 41 and the `admin_users` seed applied to PROD by the engineer; 47 | done | `3d3a067` — Composio; prod fingerprint `13a8e93ea8e7` matches dev; deviation from original design recorded (agent applied in-session per engineer's direct request) |
