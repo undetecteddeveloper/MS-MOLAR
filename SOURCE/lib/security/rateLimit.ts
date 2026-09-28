@@ -195,6 +195,33 @@ export const RATE_LIMITS = {
   // đó là một ngân sách mức PROJECT (đếm chung mọi user, mọi đường gọi Gemini) —
   // chưa có, còn nợ, xem TD-019.
   uploadExam: { limit: 5, windowMs: 24 * 60 * 60 * 1000 },
+  // Biến thể ADMIN của mục trên, cho đúng một tình huống: chủ dự án tự tay
+  // nạp hàng loạt đề vào kho qua UI Layer 4 (không phải mở khoá cho người dùng
+  // thường, và KHÔNG đi qua `GEMINI_PAID_TIER_ENABLED` — cờ đó là công tắc RA
+  // MẮT bán Premium (PRD R14, AC-048/049/054) và kéo theo TD-034 (khôi phục
+  // `consumeQuota("upload", …)`); việc này không phải ra mắt gì cả, không nên
+  // mượn cùng một cờ). Uỷ quyền qua đúng cơ chế admin sẵn có của dự án —
+  // `ADMIN_USER_IDS` allowlist (lib/auth/admin.ts, ADR-0001: không có cột
+  // role trong DB) — call site (`uploadActions.ts`) chọn key này thay vì
+  // `uploadExam` khi `isAdminUserId(user.id)`.
+  //
+  // KHÔNG áp bất biến SUPPLIER_DAILY_QUOTA (20) cho biến thể này — đúng lý do
+  // paid-tier variant của explainStep đã nêu: 20 là trần của bậc MIỄN PHÍ, còn
+  // key Gemini của dự án nay đã xác nhận Tier 1 — Prepay (billing thật, verify
+  // 2026-09-28), nên constraint 20/ngày dùng chung không còn đúng cho request
+  // administrator phát ra. Tách RIÊNG một key thay vì nới thẳng `uploadExam`
+  // để: (a) người dùng thường vẫn giữ nguyên trần 5 bảo vệ hạn ngạch dùng
+  // chung — chưa có ngân sách mức project (TD-019) nên trần công khai không
+  // nên đổi theo trạng thái billing riêng của admin; (b) danh sách phân loại
+  // dưới (rateLimit.test.ts) buộc phải khai action này TƯỜNG MINH, không lọt
+  // qua bất biến ≤20 của nhóm SUPPLIER_CAPPED_ACTIONS trong im lặng.
+  //
+  // 50: cùng con số "trần rộng nhưng vẫn là trần" mà explainStep dùng cho
+  // nhánh trả phí — đủ cho một đợt nạp "vài chục đề" thật, không mở vô hạn vì
+  // publish sau extract vẫn qua tay người (một lượt bấm/đề ở
+  // `/me/exams/[id]`), nên một tài khoản không có động cơ thật để cần hơn 50
+  // upload/ngày; số này vẫn chặn được một vòng lặp tự động gọi nhầm action.
+  uploadExamAdmin: { limit: 50, windowMs: 24 * 60 * 60 * 1000 },
   // Đổi mật khẩu (/profile — PRD profile-and-about AC-023). CHẶT HƠN HẲN mọi
   // mục trên, và vì một lý do KHÁC CẢ HAI HỌ TRÊN. Khối đầu tốn một dòng DB của
   // CHÍNH ta; explainStep/uploadExam tiêu vào hạn ngạch của bên thứ ba. Mục này

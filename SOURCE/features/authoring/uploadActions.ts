@@ -13,6 +13,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { isAdminUserId } from "@/lib/auth/admin";
 import { guard } from "@/lib/security/rateLimit";
 import { assembleExamLenient, validateAssembledExam } from "@/lib/ugc/assembleExam";
 import { cropImagesLenient } from "@/lib/ugc/cropImages";
@@ -69,7 +70,12 @@ export async function extractAndAssemble(formData: FormData): Promise<UgcActionF
   // validate file thì mất nửa tác dụng: chính việc đọc/parse file mới là phần
   // tốn CPU, và một vòng lặp gửi rác vẫn bắt server làm hết việc đó rồi mới bị
   // từ chối. Ngay sau requireUser là điểm SỚM NHẤT còn có khoá để đếm.
-  const rl = await guard("uploadExam", user.id);
+  //
+  // Admin (ADMIN_USER_IDS — chủ dự án tự nạp hàng loạt đề) đi qua key riêng
+  // `uploadExamAdmin` (trần 50/ngày thay vì 5) — xem lý do đầy đủ ở
+  // RATE_LIMITS.uploadExamAdmin (rateLimit.ts). Người dùng thường không đổi
+  // hành vi.
+  const rl = await guard(isAdminUserId(user.id) ? "uploadExamAdmin" : "uploadExam", user.id);
   if (!rl.ok) {
     return failure(
       "server",

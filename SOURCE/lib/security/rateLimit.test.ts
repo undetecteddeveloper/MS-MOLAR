@@ -156,6 +156,18 @@ describe("guard", () => {
     "explainStep",
     "uploadExam",
   ] as const satisfies readonly (keyof typeof RATE_LIMITS)[];
+  // `uploadExamAdmin` (2026-09-28): biến thể ADMIN của `uploadExam`, chọn qua
+  // `isAdminUserId(user.id)` ở call site chứ không qua `GEMINI_PAID_TIER_ENABLED`
+  // — xem lý do đầy đủ ở comment của chính key này trong rateLimit.ts. Tiêu
+  // CÙNG hạn ngạch Gemini với SUPPLIER_CAPPED_ACTIONS nên cũng là supplier-
+  // capped, nhưng KHÔNG chịu bất biến ≤20 (SUPPLIER_DAILY_QUOTA) của nhóm đó:
+  // trần 20 mô tả bậc MIỄN PHÍ, còn key Gemini của dự án đã xác nhận billing
+  // Tier 1 thật — áp trần bậc miễn phí lên yêu cầu của admin là kiểm sai thứ.
+  // Nhóm RIÊNG để giữ được bất biến "cửa sổ khớp NGÀY" (worst-case Gemini)
+  // như nhóm anh em, mà không kéo case ≤20 theo sai chủ.
+  const ADMIN_SUPPLIER_CAPPED_ACTIONS = [
+    "uploadExamAdmin",
+  ] as const satisfies readonly (keyof typeof RATE_LIMITS)[];
   // Hai action của /profile. `changePassword` NHẬN VÀO một credential (phải kiểm
   // mật khẩu hiện tại), nên mỗi lần gọi trả lời "chuỗi này có đúng không" — trần
   // ở đây đo TỐC ĐỘ DÒ chứ không đo chi phí. `uploadAvatar` cùng nhóm vì lý do
@@ -187,6 +199,7 @@ describe("guard", () => {
     const classified = [
       ...DB_COST_ACTIONS,
       ...SUPPLIER_CAPPED_ACTIONS,
+      ...ADMIN_SUPPLIER_CAPPED_ACTIONS,
       ...ABUSE_CAPPED_ACTIONS,
       ...GROQ_CAPPED_ACTIONS,
     ].sort();
@@ -200,6 +213,7 @@ describe("guard", () => {
     const classified = [
       ...DB_COST_ACTIONS,
       ...SUPPLIER_CAPPED_ACTIONS,
+      ...ADMIN_SUPPLIER_CAPPED_ACTIONS,
       ...ABUSE_CAPPED_ACTIONS,
       ...GROQ_CAPPED_ACTIONS,
     ];
@@ -245,6 +259,22 @@ describe("guard", () => {
     for (const action of SUPPLIER_CAPPED_ACTIONS) {
       expect(RATE_LIMITS[action].windowMs).toBe(ONE_DAY_MS);
       expect(RATE_LIMITS[action].limit).toBeLessThanOrEqual(SUPPLIER_DAILY_QUOTA);
+    }
+  });
+
+  // `uploadExamAdmin` KHÔNG chịu SUPPLIER_DAILY_QUOTA (xem comment tại chỗ khai
+  // nhóm) — nhưng vẫn phải là một TRẦN thật, không phải một số bất kỳ đọc
+  // nhầm thành "không giới hạn". Sàn ở đây là một mốc lành mạnh độc lập với
+  // bậc miễn phí: dưới 200 request Gemini/ngày (worst-case Automatic, nhân 3)
+  // cho MỘT tài khoản admin vẫn còn rất xa mọi hạn mức Tier-1 thực tế của nhà
+  // cung cấp, nên vẫn là một con số có ý nghĩa để canh vòng lặp tự động.
+  it("keeps the admin-only supplier-capped limit on its day unit and still a real ceiling", () => {
+    for (const action of ADMIN_SUPPLIER_CAPPED_ACTIONS) {
+      expect(RATE_LIMITS[action].windowMs).toBe(ONE_DAY_MS);
+      expect(RATE_LIMITS[action].limit).toBeGreaterThan(0);
+      expect(RATE_LIMITS[action].limit * GEMINI_CALLS_PER_OPERATION.uploadAutomatic).toBeLessThanOrEqual(
+        200
+      );
     }
   });
 
