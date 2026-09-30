@@ -153,13 +153,13 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ a
               (user ? (
                 hot !== null && hot.exams.length > 0 && (
                   <section aria-labelledby="home-new-exams" className="flex flex-col gap-3">
-                    <div className="flex items-baseline justify-between gap-4">
-                      <h2 id="home-new-exams" className="text-xl font-semibold">
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                      <h2 id="home-new-exams" className="min-w-0 text-xl font-semibold">
                         {t("home.hotExams")}
                       </h2>
                       <Link
                         href="/exams"
-                        className="text-primary focus-visible:ring-ring inline-flex min-h-11 items-center rounded-lg text-sm font-semibold underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:outline-none"
+                        className="text-primary focus-visible:ring-ring inline-flex min-h-11 shrink-0 items-center rounded-lg text-sm font-semibold underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:outline-none"
                       >
                         {t("home.viewAllExams")}
                       </Link>

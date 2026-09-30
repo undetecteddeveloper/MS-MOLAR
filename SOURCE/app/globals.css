@@ -269,9 +269,22 @@
      (tab, anchor, scrollIntoView) để tiêu điểm không bị navbar che (WCAG 2.4.11). */
   html {
     scroll-padding-top: 4.5rem;
+    /* Chặn cuộn ngang Ở CẤP TRANG (2026-09-30, lỗi tràn mobile trang chủ sau
+       F-041) — trước đây KHÔNG có dòng nào trong toàn bộ globals.css giữ
+       viewport khỏi giãn ngang, nên MỘT phần tử con lỡ rộng hơn màn hình (vd
+       một hàng flex không cho phép co, không bọc dòng) làm CẢ TRANG bị trình
+       duyệt trong ứng dụng (Zalo/Messenger/Facebook webview) thu nhỏ zoom để
+       vừa bề ngang — chữ nhỏ tí, mọi thẻ bị cắt mép phải, dù mỗi khối RIÊNG
+       LẺ không có gì sai. Đặt ở CẢ html lẫn body (không phải một cha trung
+       gian) nên KHÔNG phá `position: sticky` của SiteHeader. Không ảnh hưởng
+       kệ cuộn ngang NỘI BỘ (ExamShelf `overflow-x-auto` trên chính nó vẫn
+       cuộn bình thường — đây là chặn tràn ở biên NGOÀI CÙNG, không phải cấm
+       cuộn ngang mọi nơi). */
+    overflow-x: hidden;
   }
   body {
     @apply bg-background text-foreground font-sans;
+    overflow-x: hidden;
     font-feature-settings:
       "liga" 1,
       "calt" 1;

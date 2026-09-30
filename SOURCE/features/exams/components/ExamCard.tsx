@@ -118,7 +118,13 @@ export async function ExamCard({
         </>
       )}
 
-      <div className="mt-auto flex items-center justify-between gap-3 pt-1">
+      {/* `flex-wrap` (2026-09-30, lỗi tràn mobile trang chủ): trước đây hàng
+          này không cho phép co/xuống dòng — bên trong kệ cuộn ngang
+          (ExamShelf, thẻ rộng cố định `w-80`) không lộ ra vì tràn ngang được
+          `overflow-x-auto` của chính kệ đó âm thầm hấp thụ. Trang chủ (F-041)
+          lần đầu đặt thẻ `compact` này vào một cột dọc KHÔNG cuộn ngang — cùng
+          hàng đó, nếu từng chật, giờ đẩy tràn thẳng ra biên trang. */}
+      <div className="mt-auto flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 pt-1">
         <DifficultyBadge communityDifficulty={exam.communityDifficulty} variant="card" />
         <div className="flex items-center gap-1">
           <RateButton examId={exam.id} eligibility={eligibility} />
