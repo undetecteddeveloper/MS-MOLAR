@@ -818,3 +818,45 @@
     animation: none;
   }
 }
+
+/* ============================================================
+   TRANG CHỦ SỐNG ĐỘNG (2026-09-30, F-041 tiếp nối) — CỐ Ý không thêm nhánh
+   `prefers-reduced-motion` cho khối này (yêu cầu rõ của engineer, bỏ qua rào
+   cản accessibility riêng cho lượt này — khác mọi vocabulary khác ở trên).
+
+   - `.motion-hero-item` — hero KHÔNG remount lúc tải trang (server render sẵn
+     trạng thái hiện), nên `@starting-style` áp đúng cho LƯỢT SƠN ĐẦU TIÊN của
+     tài liệu, không cần JS "đã mount". Dùng cho lead/CTA/ba điểm — KHÔNG BAO
+     GIỜ cho tiêu đề h1 (ứng viên LCP), giữ nguyên quy tắc đã đo 2026-08-22 (bỏ
+     fade nội dung trang lúc tải tiết kiệm 348ms LCP).
+   - `.motion-reveal` — cuộn vào khung nhìn MỘT LẦN (ScrollRevealGroup,
+     components/shared/ScrollRevealGroup.tsx bật `data-visible` qua
+     IntersectionObserver rồi ngắt quan sát ngay). An toàn cho nội dung DƯỚI
+     màn hình đầu — không phải ứng viên LCP.
+   - Cả hai dùng chung quy ước so le `--motion-i` với `.motion-grow-x` ở trên.
+   ============================================================ */
+.motion-hero-item {
+  transition:
+    opacity 300ms var(--ease-out-strong),
+    translate 300ms var(--ease-out-strong);
+  transition-delay: calc(var(--motion-i, 0) * 40ms);
+}
+@starting-style {
+  .motion-hero-item {
+    opacity: 0;
+    translate: 0 8px;
+  }
+}
+
+.motion-reveal {
+  opacity: 0;
+  translate: 0 8px;
+  transition:
+    opacity 300ms var(--ease-out-strong),
+    translate 300ms var(--ease-out-strong);
+  transition-delay: calc(var(--motion-i, 0) * 60ms);
+}
+[data-visible] .motion-reveal {
+  opacity: 1;
+  translate: 0 0;
+}

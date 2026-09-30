@@ -17,6 +17,7 @@ import {
   pickDominantGrade,
   pickExploreShelf,
   pickHotShelf,
+  pickTopSubject,
   pickWeakestSubject,
   type HotRung,
   type ShelfCandidate,
@@ -84,6 +85,12 @@ export interface HotExamList {
   rung: HotRung | null;
   grade: number | null;
   submittedExamIds: Set<string>;
+  /** Dải tiến độ cá nhân trang chủ (F-041) — tính lại từ CHÍNH `attemptRows`
+   *  đã đọc bên dưới cho kệ Nổi nhất, KHÔNG thêm lượt đọc DB nào. */
+  totalSubmittedCount: number;
+  /** Môn luyện nhiều nhất trong toàn bộ lịch sử, hoặc `null` khi chưa có lượt
+   *  nộp nào giao được môn (`pickTopSubject`, cold start). */
+  topSubject: string | null;
 }
 
 /** `ExamRow[]` (catalogue thô) → `ShelfCandidate[]` — tập ứng viên DUY NHẤT
@@ -241,5 +248,7 @@ export async function listHotExams(limit: number): Promise<HotExamList> {
     rung: hot?.rung ?? null,
     grade: hot !== null ? dominantGrade : null,
     submittedExamIds,
+    totalSubmittedCount: submittedExamIds.size,
+    topSubject: pickTopSubject(attempts),
   };
 }

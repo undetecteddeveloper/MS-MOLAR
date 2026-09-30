@@ -13,8 +13,13 @@ interface ExamBrowserProps {
   exams: Exam[];
   submittedExamIds: Set<string>;
   isLoggedIn: boolean;
-  /** `grid` (mặc định) = lưới 1→2→3 cột của /exams. `stack` = một cột dọc, cho
-   *  cột hẹp bên phải hero ở trang chủ. */
+  /** `grid` (mặc định) = lưới 1→2→3 cột của /exams, thẻ ĐẦY ĐỦ. `stack` = một
+   *  cột dọc cho trang chủ (cột hẹp cạnh hero khi có, dải "Đề nổi nhất" full-
+   *  width khi đã đăng nhập) — LUÔN kéo theo thẻ GỌN (`compact`, cùng hình
+   *  dạng `ExamShelf` dùng cho kệ cuộn ngang trên /exams), vì `stack` chỉ có
+   *  ĐÚNG một nơi gọi (trang chủ) nên không cần một cờ `compact` tách rời chỉ
+   *  để hai nơi gọi nhớ truyền cùng nhau (engineer 2026-09-30, phản hồi kèm
+   *  ảnh chụp: thẻ đầy đủ trên trang chủ "không nhỏ gọn"). */
   layout?: "grid" | "stack";
   /** Từ khoá đang tìm (`?q=`, ADR-0020) — trạng thái rỗng nhắc lại đúng từ
    *  khoá để người dùng biết vì sao lưới trống. */
@@ -41,12 +46,12 @@ export async function ExamBrowser({
     );
   }
 
+  const compact = layout === "stack";
+
   return (
     <ul
       className={
-        layout === "stack"
-          ? "flex flex-col gap-3"
-          : "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+        compact ? "flex flex-col gap-3" : "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
       }
     >
       {exams.map((exam) => (
@@ -54,6 +59,7 @@ export async function ExamBrowser({
           key={exam.id}
           exam={exam}
           eligibility={eligibilityFor(exam.id, submittedExamIds, isLoggedIn)}
+          compact={compact}
         />
       ))}
     </ul>

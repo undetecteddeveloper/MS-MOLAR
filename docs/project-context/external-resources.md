@@ -1,6 +1,6 @@
 # External Resources
 
-Last updated: 2026-09-18 (drift-only correction — theme name, migration flow and the two-environment split brought back in line with the repo; no new resources, nothing else re-verified since the 2026-08-16 refresh)
+Last updated: 2026-09-17 (diff-only refresh for the Community Solutions feature — engineer confirmed "no other external resources". Changed axes: Design Origin (theme is now dark-only "Đêm hội"; design canvases on claude.ai are the approved mockup source), Design System (current primitive inventory), Visual Verification (Playwright **CLI**, not the MCP server), Migration History + Schema Change Process (migration flow exists since 2026-08-31, TD-005 closed), Deployment Trigger (Composio `vercel` toolkit), Additional Resources (Composio MCP for the Notion progress log + PROD Supabase read-only queries). Previous refresh: 2026-08-16 (payOS).)
 
 This file records the external resources available to this project and how to access them. AI agents and contributors consult this file when work depends on resources outside the repository. Feature-specific identifiers belong in the consuming UI Spec or Design Doc, not here — this file holds environment-stable facts only.
 
@@ -11,13 +11,14 @@ This file records the external resources available to this project and how to ac
 ### Design Origin
 - Status: present
 - Source type: token file in the repository (no separate spec doc)
-- Location: `SOURCE/app/globals.css` — the sole source of truth for the tokens of the **"Đêm hội"** theme (dark, shipped 2026-09-14). There is **no light mode**: the file states it outright — no `.dark` block, no toggle, no `dark:` class in the repo; adding one later means building a second contrast table, not flipping a variant. ("Mực & Sơn Mài" is an earlier, replaced palette.) `PROJECT_OVERVIEW.md §2` (repo root) was **deleted 2026-08-06** (deliberate — see `.claude/MEMORY.md` §3); design rationale/history lives in `.claude/MEMORY.md` §3 and `docs/design/ui-refactor-san-truong-design.md`, not in a repo file.
-- Access method: file read (`globals.css` for tokens; `.claude/MEMORY.md` for rationale/hard rules)
+- Location: `SOURCE/app/globals.css` — the sole source of truth for the tokens. **Theme since 2026-09-14 is dark-only "Đêm hội"** (no light mode, no `dark:` classes); rules and rationale in `docs/design/ui-refactor-san-truong-design.md` §8 (colors, "ánh sáng" glow classes) and §2–§5 (type, shape, layout), motion in §7. Older names "Ink & Lacquer" / "Sân trường" in file headers are stale labels.
+- Approved page mockups: **design canvases published as claude.ai Artifacts** (Claude Design canvas editor, `.dc.html` artboards). The engineer approves directions on the canvas; each feature's UI Spec records the canvas URL and which artboards are approved. Read with the `Artifact` tool (`action: read`) or from the artboard source files kept with the feature docs.
+- Access method: file read (`globals.css` for tokens; design doc for rules); Artifact tool / canvas URL for mockups
 
 ### Design System
 - Status: present
 - Source type: internal package / ad-hoc in-repo components (no external catalog, no Storybook)
-- Location: `SOURCE/features/exams/components/`, `SOURCE/features/auth/components/`, base primitives in `SOURCE/components/ui/` (base-ui + cva); design tokens in `SOURCE/app/globals.css`
+- Location: `SOURCE/features/*/components/`, base primitives in `SOURCE/components/ui/` (8 files: button, badge, card, chip, input/textarea/select/label, progress, tooltip, SuccessToast — base-ui + cva), shared pieces in `SOURCE/components/shared/` (RichText, Avatar, FilterSheet bottom sheet, usePresence), layout shell in `SOURCE/components/layout/` (AppShell, SiteHeader, BottomNav, PageContainer, PageHeader); design tokens in `SOURCE/app/globals.css`. No Tabs / Dialog / Switch primitive — dialogs and sheets are hand-rolled per `FilterSheet` / `ReportExam`.
 - Access method: file read / import within the repo
 
 ### Guidelines
@@ -28,9 +29,8 @@ This file records the external resources available to this project and how to ac
 
 ### Visual Verification Environment
 - Status: present
-- Tool type: local dev server + browser automation CLI + manual inspection
-- Entry: `npm run dev` (Next.js local dev server); UI audits drive the **Playwright CLI from inside `SOURCE/`** — `npm run pw` (`SOURCE/scripts/pw/cli.mjs`), the project convention recorded in `.claude/MEMORY.md` §"Pha 3" item 2, *not* the MCP server
-- Known gap (not fixed here): the `playwright` MCP server declared in `.mcp.json` writes to `--output-dir E:/StemWeb_project/MS-MOLAR/…`, a path that is not this checkout. Left as-is deliberately — `.mcp.json` is engineer-owned.
+- Tool type: local dev server + Playwright **CLI** + manual inspection
+- Entry: `npm run dev` (Next.js local dev server); `npx playwright` (v1.62, Chromium installed) run from inside `SOURCE/` for screenshots and the `ui-audit` measurement workflow (`.claude/skills/ui-audit/`). The Playwright MCP server in `.mcp.json` is NOT used for audits (project convention `.claude/CONVENTIONS.md` §3). Auto mode blocks automated sign-in as the test account — the engineer logs the shared CLI session in when a page needs auth.
 
 ## Backend
 
@@ -41,11 +41,10 @@ This file records the external resources available to this project and how to ac
 - Access method: file read for the canonical source; DDL reaches a live database only through the migration flow below (see Migration History), not by ad-hoc SQL Editor edits
 
 ### Migration History
-- Status: present
-- Tool: **Supabase CLI migrations** (landed 2026-08-31 on both databases; TD-005 closed — `TECH-DEBT.md`). `SOURCE/supabase/schema.sql` stays **canonical** — it is what a human writes and the only place the schema is explained; `SOURCE/supabase/migrations/` is the **apply mechanism**, answering "how far has this database run", which an idempotent file cannot.
-- Location: `SOURCE/supabase/migrations/` — 8 files named `<timestamp>_<description>_<12-hex fingerprint>.sql`, the fingerprint being `schema.sql`'s value **after** that migration (head: `20260913000000_attempt_answer_ceiling_8000_187d3ed24f0c.sql`). Drift gate: `SOURCE/lib/schema/__tests__/migrationsMatchSchema.test.ts` goes red both ways — `schema.sql` edited without a migration, or a migration written without updating `schema.sql`.
-- Apply trigger: **manual, one statement at a time.** `npm run schema:plan` (`SOURCE/scripts/schema-plan.ts`) splits `schema.sql` into a numbered statement list (`-- --emit <dir>` writes one file each) and refuses when the declared fingerprint differs from the computed one; the migration file replays those statements verbatim; then `npm run verify:schema` (`SOURCE/supabase/verify-schema.ts`) reads the fingerprint back with a real query. One statement per apply is the *unit*, not extra caution: the tooling has been observed to run the first half of a `revoke …; grant …;` pair, swallow the second, and still report success.
-- Still **not a full migration framework**: no rollback/down-migration, and the drift gate is syntactic rather than SQL-semantic (proving "baseline + migrations = schema.sql" needs a shadow DB via `supabase db diff`, i.e. Docker, unavailable on this machine).
+- Status: present — migration flow added 2026-08-31 (TD-005 closed)
+- Tool: idempotent `SOURCE/supabase/schema.sql` remains the source of truth; per-change migration files in `SOURCE/supabase/migrations/<timestamp>_<slug>_<fingerprint>.sql` (statements copied verbatim; `SOURCE/lib/schema/__tests__/migrationsMatchSchema.test.ts` checks they match `schema.sql`)
+- Fingerprint: `npm run schema:plan` prints the new fingerprint → update `SCHEMA_FINGERPRINT` in `SOURCE/lib/schema/schemaFingerprint.ts` and the `schema_version` upsert (schema.sql §17) in the same change
+- Apply trigger: **dev** — Supabase CLI linked to the dev project: `npx supabase db query --linked --project-ref hynwleaxtbtjzkvpjsug --file supabase/migrations/<file>.sql`, then `npm run verify:schema`. **Prod** — applied separately by the engineer; before a feature with new DDL counts as done, compare `select fingerprint from public.schema_version` on PROD via Composio `SUPABASE_RUN_READ_ONLY_QUERY` (TD-005 history: prod drift bit four times).
 
 ### Secret Store
 - Status: present
@@ -88,7 +87,7 @@ This file records the external resources available to this project and how to ac
 
 ### Schema Change Process
 - Status: present
-- Process: edit `SOURCE/supabase/schema.sql` (canonical) and move its fingerprint in the same change (`schema.sql` §17 + `SOURCE/lib/schema/schemaFingerprint.ts`); `npm run schema:plan` for the numbered statement list; add a file under `SOURCE/supabase/migrations/` that replays those statements verbatim and carries the new fingerprint in its name; apply **one statement at a time** to each database; then `npm run verify:schema`, and verify RLS with `SOURCE/supabase/test-rls.ts` (`cd SOURCE && npx tsx supabase/test-rls.ts`)
+- Process: edit `SOURCE/supabase/schema.sql` → `npm run schema:plan` → fingerprint constant → migration file → apply to dev via Supabase CLI `--file` → `npm run verify:schema` (add probes for new RPCs) → RLS cases in `SOURCE/supabase/test-rls.ts` (`cd SOURCE && npx tsx supabase/test-rls.ts`) and service tests in `SOURCE/tests/e2e/service/`. Prod applied separately; fingerprint compared via Composio before closing the feature.
 
 ## Infrastructure
 
@@ -105,12 +104,15 @@ This file records the external resources available to this project and how to ac
 
 ### Deployment Trigger
 - Status: present — added between the 2026-08-06 baseline and now
-- Mechanism: `git push` to `main` → Vercel builds and deploys to Production automatically; any other branch push → automatic Preview deploy on its own URL. GitHub Actions CI (`.github/workflows/ci.yml`) runs on push-to-main and on every PR, gating merge on lint/types/tests — independent of and in addition to Vercel's own build (which does not run tests). Root Directory is `SOURCE` (app is not at repo root); function region is pinned `sin1` in `SOURCE/vercel.json` (deliberate — colocated with Supabase and VN users, not Vercel's default).
+- Mechanism: `git push` to `main` → Vercel builds and deploys to Production automatically; any other branch push → automatic Preview deploy on its own URL. Manual deploys/promotions go through the Composio MCP `vercel` toolkit (the local Vercel CLI is not logged in; when it is, run `npx vercel` from the repo root, not from `SOURCE/`, because Root Directory is `SOURCE`). Turbopack build cache is disabled in `SOURCE/next.config.ts` (TD-024: stale CSS shipped four times); `npm run verify:deployed` compares deployed CSS token values with the local build. GitHub Actions CI (`.github/workflows/ci.yml`) runs on push-to-main and on every PR, gating merge on lint/types/tests — independent of and in addition to Vercel's own build (which does not run tests). Root Directory is `SOURCE` (app is not at repo root); function region is pinned `sin1` in `SOURCE/vercel.json` (deliberate — colocated with Supabase and VN users, not Vercel's default).
 - Caveat inherited from the deleted `docs/DEPLOYMENT.md` (content preserved in git history, commit `6d1a6d1`): `Preview` env scope points at the **dev** Supabase project, `Production` scope at a separate **prod** project — never copy prod keys into the `Preview` scope. `ADMIN_USER_IDS` has historically drifted to `Production`-only scope (TD-014, open) — `/admin` on any Preview deploy 404s for everyone until that's fixed.
 
 ## Additional Resources
 
 Free-form list captured during the self-declaration phase. Each entry: name, purpose, location, access method.
+
+- Composio MCP (claude.ai connector; toolkits `notion`, `supabase`, `vercel`, `googledrive`): progress log = Notion database **MS-MOLAR** `3b378ba6-ae12-803c-8500-c572b6fc745f` (one row per feature/session; body records measurements and reasons); PROD Supabase read-only queries (`SUPABASE_RUN_READ_ONLY_QUERY`, project ref from `SUPABASE_LIST_ALL_PROJECTS`); Vercel deploys. Access: MCP tools `COMPOSIO_SEARCH_TOOLS` → `COMPOSIO_MULTI_EXECUTE_TOOL`. The Composio CLI does not run on this Windows machine (a PreToolUse hook blocks it). Registration is per project path in `~/.claude.json`; moving the repo folder drops it (happened 2026-09-17).
+- Supabase MCP server `supabase` in `.mcp.json`: bound to ONE fixed project ref (dev/preview); it cannot see prod.
 
 - RLS verification harness: verifies database-level data isolation and pending-content non-leak (supports the UGC PRD's zero-leak success metric) — `SOURCE/supabase/test-rls.ts` — `cd SOURCE && npx tsx supabase/test-rls.ts` (reads `.env.local`)
 - Seed script: loads sample exams into Supabase for local dev (idempotent upsert, uses `service_role`) — `SOURCE/supabase/seed.ts` — `cd SOURCE && npx tsx supabase/seed.ts`

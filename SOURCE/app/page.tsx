@@ -5,8 +5,11 @@ import { AboutPrompt } from "@/features/auth/components/AboutPrompt";
 import { HomeStage, type AuthMode } from "@/features/auth/components/HomeStage";
 import { TechStack } from "@/features/auth/components/TechStack";
 import { HomeRipple } from "@/features/home/ripple/HomeRipple";
+import { LatestSolutionsSpotlight } from "@/features/home/components/LatestSolutionsSpotlight";
+import { PersonalProgressStrip } from "@/features/home/components/PersonalProgressStrip";
 import { ExamBrowser } from "@/features/exams/components/ExamBrowser";
 import { listHotExams } from "@/features/exams/queries/shelves";
+import { listLatestSolutionsForHome } from "@/features/solutions/queries";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { SiteHeader } from "@/components/layout/SiteHeader";
@@ -31,9 +34,20 @@ import { buildHomeJsonLd, serializeJsonLd } from "@/lib/seo/jsonLd";
 //              làm đề, nên đường tới đề ngắn nhất có thể.
 // Dưới 1024px cả hai rơi xuống dưới khối chữ theo đúng thứ tự DOM.
 //
+// BA KHỐI FULL-WIDTH thêm bên dưới lưới hai cột, CHỈ đã đăng nhập (F-041,
+// 2026-09-30 — trang chủ "bớt đơn điệu" sau khi kho đề chuyển hẳn sau đăng
+// nhập): dải tiến độ cá nhân (PersonalProgressStrip, tính lại KHÔNG tốn lượt
+// đọc thêm), kệ lời giải cộng đồng mới nhất (LatestSolutionsSpotlight, RPC
+// riêng schema.sql §26 — cá nhân hoá theo eligibility, không phải feed chung),
+// rồi TechStack (dời từ cột phải-chỉ-cho-khách sang một dải chung cho MỌI
+// người đã đăng nhập).
+//
 // KHÔNG dùng AppShell: trang này công khai và có redirect riêng, còn AppShell
 // đọc entitlement cho người đã đăng nhập — hai lý do đủ để khung tự dựng.
 const HOME_EXAM_COUNT = 3;
+
+/** Số bài giải hiện trong LatestSolutionsSpotlight — xem khối comment F-041 ở trên. */
+const HOME_SOLUTIONS_COUNT = 3;
 
 export default async function Home({ searchParams }: { searchParams: Promise<{ auth?: string }> }) {
   // Đọc cookie auth mỗi request → `/` là dynamic (ƒ), đánh đổi hợp lý cho cá
@@ -49,16 +63,29 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ a
   // Đã đăng nhập mà mở form auth → vào thẳng /exams (parity với /login cũ).
   if (user && authMode) redirect("/exams");
 
-  // Ba đề đầu của kệ Nổi nhất (F-001) — GUARD bằng `user`: RPC `exam_hot_counts`
-  // thu hồi quyền `anon`, nên một lượt gọi không canh sẽ 42501 và thay hero cho
-  // khách bằng trang lỗi (backend DD § Integration Point I5). Khách chưa đăng
-  // nhập không bao giờ chạm lượt đọc này — 0 lượt `.from`/`.rpc` phát ra.
-  const hot = user ? await listHotExams(HOME_EXAM_COUNT) : null;
+  // Ba đề đầu của kệ Nổi nhất (F-001) + kệ lời giải cộng đồng mới nhất (F-041)
+  // — GUARD bằng `user` CẢ HAI: RPC `exam_hot_counts` và
+  // `community_solutions_latest_for_home` đều thu hồi quyền `anon` (backend DD
+  // § Integration Point I5; schema.sql §26), nên một lượt gọi không canh sẽ
+  // 42501/lỗi quyền và thay hero cho khách bằng trang lỗi. Khách chưa đăng
+  // nhập không bao giờ chạm hai lượt đọc này — chạy SONG SONG (không phụ thuộc
+  // nhau) khi đã có `user`.
+  const [hot, latestSolutions] = user
+    ? await Promise.all([
+        listHotExams(HOME_EXAM_COUNT),
+        listLatestSolutionsForHome(HOME_SOLUTIONS_COUNT),
+      ])
+    : [null, null];
 
   // Nonce CSP của lượt request này (proxy.ts sinh, middleware đặt lên header
   // request `x-nonce`). Next chỉ tự gắn nonce vào script của CHÍNH nó; khối
   // JSON-LD thiếu nonce sẽ bị trình duyệt chặn thẳng ở production.
   const nonce = requestHeaders.get("x-nonce") ?? undefined;
+
+  // Một mốc cho cả lượt render (relativeTime trong LatestSolutionsSpotlight) —
+  // hai lần gọi `new Date()` khác nhau ở server và lúc hydrate sẽ in ra hai
+  // chuỗi khác nhau (cùng quy ước SolutionCard).
+  const now = new Date();
 
   // Cột phải chỉ hiện khi vùng hero đang ở trạng thái GIỚI THIỆU. Lúc form đăng
   // nhập mở, mắt chỉ nên còn đúng một việc để làm.
@@ -100,11 +127,17 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ a
               <HomeStage auth={authMode} signedIn={user !== null} />
 
               {/* Ba câu nói rõ sản phẩm làm gì, cho khách. Không đánh số: đây
-                  không phải một trình tự. */}
+                  không phải một trình tự. `.motion-hero-item` nối tiếp lead
+                  (0) + CTA (1) của HomeStage — chỉ số 2/3/4 (F-041,
+                  2026-09-30). */}
               {!user && showAside && (
                 <ul className="text-foreground flex max-w-prose flex-col gap-3 text-base">
-                  {(["home.point1", "home.point2", "home.point3"] as const).map((key) => (
-                    <li key={key} className="flex items-start gap-3">
+                  {(["home.point1", "home.point2", "home.point3"] as const).map((key, index) => (
+                    <li
+                      key={key}
+                      className="motion-hero-item flex items-start gap-3"
+                      style={{ "--motion-i": index + 2 } as React.CSSProperties}
+                    >
                       <span
                         aria-hidden
                         className="bg-sun glow-sun mt-2 size-2.5 shrink-0 rounded-full"
@@ -147,6 +180,26 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ a
                 </div>
               ))}
           </div>
+
+          {/* Ba khối full-width, chỉ đã đăng nhập (F-041) — dưới lưới hai cột,
+              trên dòng chân trang. Tiến độ của bạn → Lời giải cộng đồng mới
+              nhất → TechStack: hành động trước, thông tin nền sau. */}
+          {user && hot && (
+            <PersonalProgressStrip totalCompleted={hot.totalSubmittedCount} topSubject={hot.topSubject} />
+          )}
+
+          {user && latestSolutions && latestSolutions.length > 0 && (
+            <LatestSolutionsSpotlight items={latestSolutions} now={now} />
+          )}
+
+          {/* `max-w-2xl mx-auto`: TechStack dựng cho cột hẹp cạnh hero (guest) —
+              thả thẳng vào PageContainer size="full" (max-w-6xl) sẽ kéo bốn ô
+              vận hành rộng quá khổ. Giữ nguyên bề rộng gốc, chỉ đổi chỗ đứng. */}
+          {user && (
+            <div className="mx-auto w-full max-w-2xl">
+              <TechStack />
+            </div>
+          )}
 
           {/* justify-center: engineer 2026-09-06, liên kết chân trang căn giữa
               — ngoại lệ có chủ đích của quy tắc "căn trái toàn bộ" (design doc

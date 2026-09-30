@@ -5,7 +5,7 @@
       "args": [
         "@playwright/mcp@latest",
         "--viewport-size", "1280x720",
-        "--output-dir", "E:/StemWeb_project/MS-MOLAR/SCREENSHOT/temporary_screenshot"
+        "--output-dir", "E:/WebApp-project/MS-MOLAR/SCREENSHOT/temporary_screenshot"
       ]
     },
     "supabase": {

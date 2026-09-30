@@ -26,6 +26,7 @@ import {
   pickDominantGrade,
   pickExploreShelf,
   pickHotShelf,
+  pickTopSubject,
   pickWeakestSubject,
   type HotCounts,
   type ShelfAttempt,
@@ -407,6 +408,54 @@ describe("Test 5 — pickWeakestSubject: tie-break AC-015", () => {
     ];
     const first = pickWeakestSubject(new Map(entries));
     expect(pickWeakestSubject(new Map(shuffled(entries)))).toBe(first);
+  });
+});
+
+// =============================================================================
+// Test 5b — F-041: pickTopSubject: tie-break "môn luyện nhiều nhất" (dải tiến
+// độ cá nhân trang chủ)
+// =============================================================================
+describe("Test 5b — pickTopSubject: tie-break F-041", () => {
+  it("số lượt khác nhau: môn có NHIỀU lượt hơn thắng", () => {
+    const attempts = [
+      shelfAttempt({ subject: "Math" }),
+      shelfAttempt({ subject: "Biology" }),
+      shelfAttempt({ subject: "Biology" }),
+    ];
+    expect(pickTopSubject(attempts)).toBe("Biology");
+  });
+
+  it("số lượt bằng nhau: tie-break theo tên môn A→Z", () => {
+    const attempts = [shelfAttempt({ subject: "Physics" }), shelfAttempt({ subject: "Chemistry" })];
+    expect(pickTopSubject(attempts)).toBe("Chemistry");
+  });
+
+  it("môn thiếu (embed không giao được) không được đếm, không làm crash", () => {
+    const attempts = [
+      shelfAttempt({ subject: null }),
+      shelfAttempt({ subject: null }),
+      shelfAttempt({ subject: "Math" }),
+    ];
+    expect(pickTopSubject(attempts)).toBe("Math");
+  });
+
+  it("mảng rỗng: trả null (cold start)", () => {
+    expect(pickTopSubject([])).toBeNull();
+  });
+
+  it("mọi lượt đều thiếu môn: trả null, không phải một môn ngẫu nhiên", () => {
+    expect(pickTopSubject([shelfAttempt({ subject: null })])).toBeNull();
+  });
+
+  it("tất định khi đảo thứ tự các lượt", () => {
+    const attempts = [
+      shelfAttempt({ subject: "Physics" }),
+      shelfAttempt({ subject: "Chemistry" }),
+      shelfAttempt({ subject: "Math" }),
+      shelfAttempt({ subject: "Math" }),
+    ];
+    const first = pickTopSubject(attempts);
+    expect(pickTopSubject(shuffled(attempts))).toBe(first);
   });
 });
 

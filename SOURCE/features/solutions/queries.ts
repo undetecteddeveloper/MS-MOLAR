@@ -773,3 +773,70 @@ export async function getMyUnreadCommentCount(opts?: { solutionId?: string }): P
 
   return total;
 }
+
+// =============================================================================
+// Kệ "Lời giải cộng đồng mới nhất" — trang chủ (F-041, 2026-09-30)
+// =============================================================================
+
+export interface HomeSolutionTeaser {
+  id: string;
+  examId: string;
+  examSubject: string;
+  examGrade: number;
+  updatedAt: string;
+  author: AuthorIdentity;
+  helpfulCount: number;
+}
+
+interface RawHomeSolutionRow {
+  id: string;
+  exam_id: string;
+  exam_subject: string;
+  exam_grade: number;
+  updated_at: string;
+  author_display_name: string | null;
+  author_avatar_path: string | null;
+  helpful_count: number;
+}
+
+function mapHomeSolutionRow(
+  row: RawHomeSolutionRow,
+  signedByPath: Map<string, string>
+): HomeSolutionTeaser {
+  return {
+    id: row.id,
+    examId: row.exam_id,
+    examSubject: row.exam_subject,
+    examGrade: row.exam_grade,
+    updatedAt: row.updated_at,
+    author: toAuthorIdentity({
+      author_display_name: row.author_display_name,
+      author_avatar_url: resolvedAvatarUrl(row.author_display_name, row.author_avatar_path, signedByPath),
+    }),
+    helpfulCount: row.helpful_count,
+  };
+}
+
+/**
+ * N bài giải cộng đồng mới nhất XUYÊN NHIỀU đề, cho trang chủ (F-041) — RPC
+ * `community_solutions_latest_for_home` (schema.sql §26) tự lọc theo eligibility
+ * (đã nộp đúng đề đó) NÊN kết quả CÁ NHÂN HOÁ theo người gọi, không phải một
+ * feed giống nhau cho mọi người.
+ *
+ * Lỗi RPC → mảng rỗng, KHÔNG ném: khối này là trang trí trên trang chủ, cùng
+ * triết lý `getMyReputation` ở trên — trang chủ không được vỡ vì một khối phụ.
+ */
+export async function listLatestSolutionsForHome(limit: number): Promise<HomeSolutionTeaser[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("community_solutions_latest_for_home", {
+    p_limit: limit,
+  });
+  if (error) return [];
+
+  const rows = (data ?? []) as RawHomeSolutionRow[];
+  const signedByPath = await resolveAuthorAvatarUrls(
+    supabase,
+    rows.filter((row) => row.author_display_name !== null).map((row) => row.author_avatar_path)
+  );
+  return rows.map((row) => mapHomeSolutionRow(row, signedByPath));
+}

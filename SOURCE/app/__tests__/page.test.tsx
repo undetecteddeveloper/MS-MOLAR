@@ -65,6 +65,8 @@ vi.mock("@/lib/supabase/server", () => ({
 
 import Home from "@/app/page";
 import { ExamBrowser } from "@/features/exams/components/ExamBrowser";
+import { LatestSolutionsSpotlight } from "@/features/home/components/LatestSolutionsSpotlight";
+import { PersonalProgressStrip } from "@/features/home/components/PersonalProgressStrip";
 
 // --- React-element tree helpers ----------------------------------------------
 // `Home(...)` returns an UN-RENDERED element tree (plain {type, props} objects,
@@ -161,6 +163,28 @@ function hotRow(examId: string, recent: number, wide: number, total: number) {
   return { exam_id: examId, recent_count: recent, wide_count: wide, total_count: total };
 }
 
+/** Hàng thô của `community_solutions_latest_for_home` (schema.sql §26, F-041) —
+ *  cùng hình dạng `RawHomeSolutionRow` (features/solutions/queries.ts). */
+function homeSolutionRow(
+  id: string,
+  examId: string,
+  subject: string,
+  grade: number,
+  updatedAt: string,
+  helpfulCount: number
+) {
+  return {
+    id,
+    exam_id: examId,
+    exam_subject: subject,
+    exam_grade: grade,
+    updated_at: updatedAt,
+    author_display_name: null,
+    author_avatar_path: null,
+    helpful_count: helpfulCount,
+  };
+}
+
 function createResolvedBuilder(data: unknown[]) {
   const builder: Record<string, unknown> = {};
   for (const method of ["select", "eq", "ilike", "order", "limit"]) {
@@ -175,17 +199,23 @@ type TableFixtures = {
   exams_with_difficulty?: unknown[];
   exam_attempts?: unknown[];
   hotRows?: unknown[];
+  /** Hàng `community_solutions_latest_for_home` (F-041) — RPC THỨ HAI cùng đi
+   *  qua `rpcMock`, định tuyến theo TÊN hàm (không phải theo builder dùng
+   *  chung) để không lẫn hình dạng với `hotRows`. */
+  latestSolutionRows?: unknown[];
 };
 
 /** Nối `fromMock`/`rpcMock` theo TÊN BẢNG/rpc — cùng kỹ thuật
  *  `shelves.int.test.ts`'s `mockBoundary` dùng, tránh một builder dùng chung
  *  trả nhầm hình dạng bảng cho nhau. */
 function mockSupabaseBoundary(fixtures: TableFixtures) {
-  const { hotRows = [], ...byTable } = fixtures;
+  const { hotRows = [], latestSolutionRows = [], ...byTable } = fixtures;
   fromMock.mockImplementation((table: string) =>
     createResolvedBuilder((byTable as Record<string, unknown[]>)[table] ?? [])
   );
-  rpcMock.mockImplementation(() => createResolvedBuilder(hotRows));
+  rpcMock.mockImplementation((fn: string) =>
+    createResolvedBuilder(fn === "community_solutions_latest_for_home" ? latestSolutionRows : hotRows)
+  );
 }
 
 const SIGNED_IN_USER = {
@@ -225,8 +255,10 @@ describe("Home (app/page.tsx) — guarded hot-exams call site, real composition 
 
     // Differs from the anonymous case above: the fetch DOES fire for a signed-in
     // visitor — the absence comes from an empty result, never from skipping the call.
+    // 2 lượt .rpc(): exam_hot_counts (F-001) + community_solutions_latest_for_home
+    // (F-041) — cả hai chạy song song trong CÙNG một Promise.all khi có `user`.
     expect(fromMock).toHaveBeenCalled();
-    expect(rpcMock).toHaveBeenCalledTimes(1);
+    expect(rpcMock).toHaveBeenCalledTimes(2);
     expect(findAllByProp(element, "aria-labelledby", "home-new-exams")).toHaveLength(0);
   });
 
@@ -275,5 +307,59 @@ describe("Home (app/page.tsx) — guarded hot-exams call site, real composition 
     expect(props.layout).toBe("stack");
     expect(props.isLoggedIn).toBe(true);
     expect(props.submittedExamIds).toEqual(new Set(["h1"]));
+  });
+
+  it("signed-in visitor: PersonalProgressStrip gets the tie-broken top subject + total count from `exam_attempts`, LatestSolutionsSpotlight gets the RPC rows verbatim (F-041)", async () => {
+    getCurrentUserProfileMock.mockResolvedValue(SIGNED_IN_USER);
+    mockSupabaseBoundary({
+      exams_with_difficulty: [],
+      // 2 lượt "Toán", 1 lượt "Physics" -> topSubject = "Toán" (nhiều lượt hơn);
+      // 3 exam_id khác nhau -> totalCompleted = 3.
+      exam_attempts: [
+        attemptRow("att-1", "h1", "2026-05-01T00:00:00.000Z", { grade: 10, subject: "Toán", school: null }),
+        attemptRow("att-2", "h2", "2026-05-02T00:00:00.000Z", { grade: 10, subject: "Toán", school: null }),
+        attemptRow("att-3", "h3", "2026-05-03T00:00:00.000Z", {
+          grade: 10,
+          subject: "Physics",
+          school: null,
+        }),
+      ],
+      hotRows: [],
+      latestSolutionRows: [
+        homeSolutionRow("sol-1", "h1", "Toán", 10, "2026-05-01T00:00:00.000Z", 2),
+        homeSolutionRow("sol-2", "h2", "Physics", 10, "2026-05-02T00:00:00.000Z", 0),
+      ],
+    });
+
+    const element = await Home({ searchParams: Promise.resolve({}) });
+
+    const progress = findByType(element, PersonalProgressStrip);
+    expect(progress).toHaveLength(1);
+    expect((progress[0].props as { totalCompleted: number }).totalCompleted).toBe(3);
+    expect((progress[0].props as { topSubject: string | null }).topSubject).toBe("Toán");
+
+    const spotlight = findByType(element, LatestSolutionsSpotlight);
+    expect(spotlight).toHaveLength(1);
+    const items = (spotlight[0].props as { items: { id: string }[] }).items;
+    expect(items.map((item) => item.id)).toEqual(["sol-1", "sol-2"]);
+  });
+
+  it("signed-in visitor, 0 lời giải đủ điều kiện: LatestSolutionsSpotlight vắng mặt, không phải một khối rỗng (cùng ranh giới AC-038 của kệ Nổi nhất)", async () => {
+    getCurrentUserProfileMock.mockResolvedValue(SIGNED_IN_USER);
+    mockSupabaseBoundary({
+      exams_with_difficulty: [],
+      exam_attempts: [],
+      hotRows: [],
+      latestSolutionRows: [],
+    });
+
+    const element = await Home({ searchParams: Promise.resolve({}) });
+
+    expect(findByType(element, LatestSolutionsSpotlight)).toHaveLength(0);
+    // Dải tiến độ vẫn hiện dù 0 đề đã hoàn thành (component's own doc: "vắng
+    // mặt hẳn thì không ai biết trang chủ có theo dõi tiến độ").
+    const progress = findByType(element, PersonalProgressStrip);
+    expect(progress).toHaveLength(1);
+    expect((progress[0].props as { totalCompleted: number }).totalCompleted).toBe(0);
   });
 });

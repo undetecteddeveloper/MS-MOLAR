@@ -1785,6 +1785,40 @@ async function main() {
     );
   }
 
+  // ==========================================================================
+  // 17. COMMUNITY SOLUTIONS — kệ "Lời giải cộng đồng mới nhất" trang chủ
+  //     (schema.sql §26, F-041). Cùng khuôn probe với §16 ở trên
+  //     (community_reputation_summary): anon bị từ chối bằng "permission
+  //     denied for function", probe user gọi được không lỗi. Hàm chỉ đọc.
+  // ==========================================================================
+  console.log(
+    "\nCOMMUNITY SOLUTIONS §26 (F-041) — probe EXECUTE community_solutions_latest_for_home:"
+  );
+
+  const latestHomeAnon = await anonClient.rpc("community_solutions_latest_for_home", { p_limit: 3 });
+  const latestHomeAnonMsg = latestHomeAnon.error?.message ?? "";
+  assert(
+    latestHomeAnonMsg.startsWith("permission denied for function"),
+    latestHomeAnonMsg.startsWith("permission denied for function")
+      ? 'anon bị từ chối community_solutions_latest_for_home đúng cách ("permission denied for function")'
+      : `anon KHÔNG bị từ chối đúng cách ở community_solutions_latest_for_home (mã ${describeCode(latestHomeAnon.error?.code ?? null)}, message "${latestHomeAnonMsg}") — thiếu \`revoke ... from anon\` ở schema.sql §26`
+  );
+
+  if (!probe) skip("probe user community_solutions_latest_for_home — cần một phiên `authenticated`");
+  else {
+    const latestHomeProbe = await probe.rpc("community_solutions_latest_for_home", { p_limit: 3 });
+    assert(
+      !latestHomeProbe.error,
+      !latestHomeProbe.error
+        ? `community_solutions_latest_for_home: probe user gọi được, không lỗi (${(latestHomeProbe.data as unknown[] | null)?.length ?? 0} dòng)`
+        : latestHomeProbe.error.code === "PGRST202"
+          ? "community_solutions_latest_for_home chưa tồn tại (PGRST202) — apply migration schema.sql §26"
+          : latestHomeProbe.error.message.startsWith("permission denied for function")
+            ? `community_solutions_latest_for_home: authenticated THIẾU grant execute (message "${latestHomeProbe.error.message}") — schema.sql §26`
+            : `community_solutions_latest_for_home LỖI KHÔNG MONG ĐỢI (mã ${describeCode(latestHomeProbe.error.code ?? null)}, message "${latestHomeProbe.error.message}") — thân hàm này không được raise gì`
+    );
+  }
+
   // Một lượt chạy PHẦN không bao giờ được in ra câu của một lượt chạy ĐỦ. Đó là
   // cả điểm của việc đếm `skipped` tách khỏi `failures`: người đọc log — hoặc
   // người dán log vào một work plan làm bằng chứng — phải thấy ngay rằng cái

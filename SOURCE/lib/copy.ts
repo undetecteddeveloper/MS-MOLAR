@@ -98,6 +98,13 @@ export const copy = {
   "home.point3": "Thống kê theo môn để bạn biết mình còn yếu chỗ nào.",
   "home.viewAllExams": "Xem tất cả đề",
   "home.about": "Về MS-MOLAR",
+  // Dải tiến độ cá nhân + kệ lời giải cộng đồng, chỉ hiện khi đã đăng nhập
+  // (F-041, 2026-09-30) — bớt đơn điệu cho trang chủ.
+  "home.progress.title": "Tiến độ của bạn",
+  "home.progress.completedCount": "{count} đề đã hoàn thành",
+  "home.progress.topSubject": "Luyện nhiều nhất: {subject}",
+  "home.progress.cta": "Xem hồ sơ",
+  "home.solutions.title": "Lời giải cộng đồng mới nhất",
 
   // --- Băng chuyền trang chủ (HomeCarousel) -------------------------------
   "home.carouselLabel": "Điểm nổi bật của nền tảng",

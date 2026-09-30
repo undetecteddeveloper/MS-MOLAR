@@ -211,6 +211,36 @@ export function pickWeakestSubject(weakness: ReadonlyMap<string, SubjectWeakness
 }
 
 // =============================================================================
+// pickTopSubject — môn LUYỆN NHIỀU NHẤT, cho dải tiến độ cá nhân trang chủ
+// (F-041, 2026-09-30)
+// =============================================================================
+
+/**
+ * Môn có nhiều lượt ĐÃ NỘP nhất trong toàn bộ lịch sử của học sinh. KHÁC
+ * `pickWeakestSubject`: chỉ đếm lượt, không cần điểm số — nên gọi hàm này
+ * không kéo theo lượt đọc `exam_results` nào (trang chủ cố tình không xếp
+ * hạng cá nhân hoá theo điểm, xem `shelves.ts` § `listHotExams`).
+ *
+ * `null` khi chưa có lượt nộp nào giao được môn (cold start, hoặc mọi embed
+ * đều thiếu môn — "chưa biết ≠ biết là 0", cùng ranh giới `pickWeakestSubject`).
+ *
+ * Tie-break: nhiều lượt hơn thắng; bằng nhau thì tên môn A→Z thắng (tất định).
+ */
+export function pickTopSubject(attempts: readonly ShelfAttempt[]): string | null {
+  const counts = new Map<string, number>();
+  for (const attempt of attempts) {
+    if (attempt.subject === null) continue;
+    counts.set(attempt.subject, (counts.get(attempt.subject) ?? 0) + 1);
+  }
+  if (counts.size === 0) return null;
+
+  const [top] = [...counts.entries()].sort(([subjectA, a], [subjectB, b]) =>
+    a !== b ? b - a : compareIdsAscending(subjectA, subjectB)
+  );
+  return top[0];
+}
+
+// =============================================================================
 // pickDominantGrade — lớp áp đảo, quyết định phạm vi trong-lớp của thang
 // =============================================================================
 

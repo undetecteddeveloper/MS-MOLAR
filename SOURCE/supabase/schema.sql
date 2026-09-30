@@ -4328,6 +4328,72 @@ revoke all on function public.community_reputation_summary() from public, anon;
 grant execute on function public.community_reputation_summary() to authenticated;
 
 -- ----------------------------------------------------------------------------
+-- 26. COMMUNITY SOLUTIONS — kệ "Lời giải cộng đồng mới nhất" cho trang chủ
+--     (F-041, engineer 2026-09-30). RPC RIÊNG, không mở rộng
+--     community_solutions_list: hàm đó lọc theo ĐÚNG MỘT p_exam_id và không
+--     nhận limit; kệ trang chủ cần N bài mới nhất XUYÊN NHIỀU đề.
+--
+--     Cùng cổng "đủ điều kiện" với community_solutions_list (S-03/R2): một bài
+--     giải chỉ lọt vào feed của NGƯỜI GỌI nếu người đó đã NỘP đúng đề đó — feed
+--     vì thế CÁ NHÂN HOÁ theo eligibility, không phải một feed giống nhau cho
+--     mọi người. Thiếu cổng này thì một học sinh CHƯA làm đề sẽ thấy preview
+--     lời giải của đề đó ngay trên trang chủ — lộ đáp án trước khi làm, đúng
+--     rủi ro mà community_solutions_list đã chặn.
+--
+--     Danh tính che theo show_profile — không ngoại lệ, kể cả chính người viết
+--     (AC-062/AC-039, cùng quy tắc community_solutions_list). Hình dạng trả về
+--     CỐ Ý gọn hơn community_solutions_list (không comment_count/score/
+--     is_mine/changed_question_count): đây là một tấm thẻ GIỚI THIỆU trên
+--     trang chủ, bấm vào mới sang màn xem đầy đủ.
+-- ----------------------------------------------------------------------------
+drop function if exists public.community_solutions_latest_for_home(int);
+create function public.community_solutions_latest_for_home(p_limit int)
+returns table (
+  id uuid,
+  exam_id text,
+  exam_subject text,
+  exam_grade int,
+  updated_at timestamptz,
+  author_display_name text,
+  author_avatar_path text,
+  helpful_count bigint
+)
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select
+    cs.id,
+    cs.exam_id,
+    e.subject,
+    e.grade,
+    cs.updated_at,
+    case when cs.show_profile then up.display_name end,
+    case when cs.show_profile then up.avatar_url end,
+    coalesce(h.helpful_count, 0)
+  from public.community_solutions cs
+  join public.exams e on e.id = cs.exam_id
+  left join public.user_profiles up on up.id = cs.author_id
+  left join (
+    select solution_id, count(*) as helpful_count
+    from public.community_solution_helpfuls
+    group by solution_id
+  ) h on h.solution_id = cs.id
+  where cs.status = 'published'
+    and e.status = 'published'
+    and not public.is_author_banned(e.author_id)
+    and exists (
+      select 1 from public.exam_attempts a
+      where a.exam_id = cs.exam_id and a.user_id = auth.uid() and a.status = 'submitted'
+    )
+  order by cs.updated_at desc, cs.id
+  limit greatest(p_limit, 0);
+$$;
+revoke all on function public.community_solutions_latest_for_home(int) from public, anon;
+grant execute on function public.community_solutions_latest_for_home(int) to authenticated;
+
+-- ----------------------------------------------------------------------------
 -- 17. Phiên bản schema — DB tự khai nó đang chạy bản nào (2026-08-07).
 --
 --     Vì sao có phần này (TECH-DEBT TD-005): file này được paste TAY vào SQL
@@ -4366,7 +4432,7 @@ revoke all on public.schema_version from anon, authenticated;
 -- nó — xem lib/schema/schemaFingerprint.ts).
 -- @schema-fingerprint-begin
 insert into public.schema_version (id, fingerprint)
-values (1, '326b68fea8a3')
+values (1, 'cc59e441b53f')
 on conflict (id) do update
   set fingerprint = excluded.fingerprint,
       applied_at  = now();

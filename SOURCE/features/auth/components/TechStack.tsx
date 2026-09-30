@@ -1,9 +1,19 @@
 import { t } from "@/lib/copy";
 import type { MessageKey } from "@/lib/copy";
+import { ScrollRevealGroup } from "@/components/shared/ScrollRevealGroup";
 
-// TechStack — khối cạnh tiêu đề trang chủ cho KHÁCH chưa đăng nhập: bốn công
-// nghệ website đang chạy trên, và công cụ đã xây dựng nó (engineer 2026-09-05,
-// thay hình phiếu trả lời vẽ bằng CSS).
+// TechStack — bốn công nghệ website đang chạy trên, và công cụ đã xây dựng nó
+// (engineer 2026-09-05, thay hình phiếu trả lời vẽ bằng CSS). Hai chỗ đứng
+// (app/page.tsx): cạnh tiêu đề (cột phải) cho KHÁCH chưa đăng nhập; một dải
+// full-width riêng, dưới lưới hai cột, cho người ĐÃ đăng nhập (F-041,
+// 2026-09-30 — component không đổi, chỉ đổi khung bọc bên ngoài).
+//
+// SỐ LE VÀO KHUNG NHÌN (2026-09-30, F-041 tiếp nối) — `ScrollRevealGroup`
+// thay chính `<section>` (polymorphic `as`, không thêm div thừa), mỗi
+// `TechTile` mang `.motion-reveal` + `--motion-i` riêng (app/globals.css §
+// TRANG CHỦ SỐNG ĐỘNG). Đồng xu + chú thích mobile (hiện thân KHÁC của cùng
+// ô Claude Code, `hidden`/`sm:hidden`) dùng CHUNG chỉ số với ô Claude Code
+// desktop — chúng không bao giờ cùng hiện một lúc nên trùng độ trễ không va.
 //
 // Logo là tài sản thương hiệu của bên thứ ba: dùng ĐÚNG file SVG màu chính thức
 // (public/logos/, lấy từ bộ svgl — Groq, Gemini, Supabase, Claude, Next.js),
@@ -40,7 +50,7 @@ const BUILT_WITH: Tile = {
 
 export function TechStack() {
   return (
-    <section aria-labelledby="home-tech" className="flex w-full flex-col gap-3">
+    <ScrollRevealGroup as="section" aria-labelledby="home-tech" className="flex w-full flex-col gap-3">
       <h2 id="home-tech" className="eyebrow">
         {t("home.tech.title")}
       </h2>
@@ -54,10 +64,14 @@ export function TechStack() {
           và đồng xu không còn nằm đúng giao điểm. */}
       <div className="relative">
         <ul className="grid auto-rows-fr grid-cols-2 gap-5 sm:gap-3">
-          {RUNTIME.map((tile) => (
-            <TechTile key={tile.name} tile={tile} />
+          {RUNTIME.map((tile, index) => (
+            <TechTile key={tile.name} tile={tile} index={index} />
           ))}
-          <TechTile tile={BUILT_WITH} className="hidden sm:col-span-2 sm:flex" />
+          <TechTile
+            tile={BUILT_WITH}
+            index={RUNTIME.length}
+            className="hidden sm:col-span-2 sm:flex"
+          />
         </ul>
 
         {/* Đồng xu (chỉ dưới 640px). NỀN TỐI (2026-09-14): đế phải giữ TRẮNG —
@@ -65,34 +79,66 @@ export function TechStack() {
             mất hẳn, mà quy ước là không đổi màu logo thương hiệu. Đổi lại, đồng
             xu không còn "tan vào nền" như bản nền sáng: nó là một đĩa sáng nằm
             đúng giao điểm bốn ô, vẫn đọc ra ý "công cụ xây đứng giữa những thứ
-            nó ghép lại", chỉ nổi hơn trước. */}
+            nó ghép lại", chỉ nổi hơn trước.
+
+            HAI LỚP SPAN (2026-09-30, F-041, sửa lỗi đo được): `.motion-reveal`
+            và `-translate-x-1/2 -translate-y-1/2` CÙNG ghi thuộc tính CSS
+            `translate` — gộp chung một span thì lớp SAU (motion-reveal) ĐÈ
+            LUÔN lượt căn giữa, đồng xu trôi khỏi tâm lưới (đo bằng zoom
+            screenshot: đồng xu biến mất khỏi giao điểm 4 ô ở mobile). Tách
+            span NGOÀI chỉ lo định vị + căn giữa (không động vào), span TRONG
+            chỉ lo hình dạng + `.motion-reveal` — hai transform không còn cùng
+            ghi một thuộc tính. */}
         <span
           aria-hidden
-          className="bg-logo-plate absolute top-1/2 left-1/2 grid size-14 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full sm:hidden"
+          className="absolute top-1/2 left-1/2 size-14 -translate-x-1/2 -translate-y-1/2 sm:hidden"
         >
-          {/* eslint-disable-next-line @next/next/no-img-element -- SVG tĩnh trong public/ */}
-          <img src={BUILT_WITH.logo} alt="" width={28} height={28} className="size-7" />
+          <span
+            className="bg-logo-plate motion-reveal grid size-full place-items-center rounded-full"
+            style={{ "--motion-i": RUNTIME.length } as React.CSSProperties}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element -- SVG tĩnh trong public/ */}
+            <img src={BUILT_WITH.logo} alt="" width={28} height={28} className="size-7" />
+          </span>
         </span>
       </div>
 
       {/* Chú thích của đồng xu (chỉ dưới 640px), căn giữa ngay dưới tâm lưới. */}
-      <p className="flex flex-col items-center gap-0.5 text-center sm:hidden">
+      <p
+        className="motion-reveal flex flex-col items-center gap-0.5 text-center sm:hidden"
+        style={{ "--motion-i": RUNTIME.length } as React.CSSProperties}
+      >
         <span className="text-foreground text-sm font-semibold">{BUILT_WITH.name}</span>
         <span className="text-muted-foreground text-xs leading-snug">{t(BUILT_WITH.roleKey)}</span>
       </p>
-    </section>
+    </ScrollRevealGroup>
   );
 }
 
-function TechTile({ tile, className = "" }: { tile: Tile; className?: string }) {
+function TechTile({ tile, index, className = "" }: { tile: Tile; index: number; className?: string }) {
+  // Cột PHẢI trong lưới 2 cột MOBILE (index lẻ — Supabase=1, Groq=3) — căn
+  // PHẢI đoạn vai trò để chữ toả ra hai bên đối xứng qua khe giữa, thay vì cả
+  // hai cột cùng dựa mép TRÁI của chính ô mình (= sát khe giữa với cột phải)
+  // và dồn chữ vào giữa nhìn "dính chùm" (engineer 2026-09-30, phản hồi kèm
+  // ảnh chụp mobile — CHỈ mobile, engineer từ chối áp dụng cho desktop ngay
+  // sau đó). Ô Claude Code (index chẵn, `sm:col-span-2`) không thuộc cột nào
+  // nên không bị ảnh hưởng.
+  const isRightColumn = index % 2 === 1;
+
   return (
     // Dưới 640px: hàng đầu (logo + tên) rồi vai trò xuống dòng dưới, dùng hết
     // 124px bề ngang ô thay vì chỉ phần còn lại cạnh logo. Từ 640px: một hàng
     // ngang, tên trên vai trò dưới (bố cục desktop đã duyệt).
+    // `motion-reveal` + `--motion-i`: so le theo thứ tự ô (F-041, 2026-09-30).
     <li
-      className={`bg-surface rounded-card glow-card flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:gap-3 sm:p-4 ${className}`}
+      className={`bg-surface rounded-card glow-card motion-reveal flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:gap-3 sm:p-4 ${className}`}
+      style={{ "--motion-i": index } as React.CSSProperties}
     >
-      <span className="flex items-center gap-2 sm:contents">
+      {/* `flex-row-reverse` (cột phải, mobile — `sm:contents` vô hiệu hoá nó từ
+          640px nên không đụng desktop): đảo thứ tự hiển thị thành [tên, logo]
+          rồi gói dựa mép PHẢI — logo đứng bên phải, đối xứng gương với cột
+          trái (logo bên trái). Cùng yêu cầu với đoạn vai trò bên dưới. */}
+      <span className={`flex items-center gap-2 sm:contents ${isRightColumn ? "flex-row-reverse" : ""}`}>
         {/* Hộp TRẮNG cố định để năm logo có tỉ lệ khác nhau vẫn đứng cùng một
             cỡ: 36px trên điện thoại (chừa 80px cho tên — "Supabase" rộng 70px,
             tên dài nhất trong bốn ô, đo 2026-09-05), 44px từ 640px. Trên nền
@@ -104,13 +150,18 @@ function TechTile({ tile, className = "" }: { tile: Tile; className?: string }) 
         </span>
         <span className="text-foreground text-sm font-semibold sm:hidden">{tile.name}</span>
       </span>
+      {/* Desktop KHÔNG đổi (engineer 2026-09-30 rút lại yêu cầu cho desktop) —
+          khối tên+vai trò giữ nguyên căn trái như cũ. */}
       <span className="hidden min-w-0 flex-col sm:flex">
         <span className="text-foreground text-sm font-semibold">{tile.name}</span>
         <span className="text-muted-foreground text-xs leading-snug">{t(tile.roleKey)}</span>
       </span>
       {/* `text-balance`: chia đều hai dòng thay vì để dòng cuối trơ một chữ
-          ("Giao diện và máy / chủ"). */}
-      <span className="text-muted-foreground text-xs leading-snug text-balance sm:hidden">
+          ("Giao diện và máy / chủ"). `text-right` (cột phải): chữ toả về mép
+          phải của Ô thay vì mép trái sát khe giữa lưới. */}
+      <span
+        className={`text-muted-foreground text-xs leading-snug text-balance sm:hidden ${isRightColumn ? "text-right" : ""}`}
+      >
         {t(tile.roleKey)}
       </span>
     </li>

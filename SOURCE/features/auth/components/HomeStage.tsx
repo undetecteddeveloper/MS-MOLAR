@@ -44,10 +44,19 @@ export function HomeStage({ auth, signedIn }: { auth: AuthMode; signedIn: boolea
         <h1 id="home-title" className="text-display max-w-[16ch] font-bold">
           {t("home.title")}
         </h1>
-        <p className="text-muted-foreground max-w-[36ch] text-base leading-relaxed sm:text-lg">
+        {/* `.motion-hero-item`: vào lúc tải trang qua `@starting-style`, KHÔNG
+            áp cho h1 phía trên (ứng viên LCP) — app/globals.css § TRANG CHỦ
+            SỐNG ĐỘNG (F-041, 2026-09-30). */}
+        <p
+          className="motion-hero-item text-muted-foreground max-w-[36ch] text-base leading-relaxed sm:text-lg"
+          style={{ "--motion-i": 0 } as React.CSSProperties}
+        >
           {t("home.lead")}
         </p>
-        <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-5">
+        <div
+          className="motion-hero-item flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-5"
+          style={{ "--motion-i": 1 } as React.CSSProperties}
+        >
           {/* Khách → mở form đăng nhập tại chỗ; đã đăng nhập → vào thẳng kho đề. */}
           <Button
             render={<Link href={signedIn ? "/exams" : "/?auth=signup"} />}

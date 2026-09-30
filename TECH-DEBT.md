@@ -17,7 +17,54 @@ MS-MOLAR), còn sổ nợ này CHỈ ghi nội dung nợ như tiêu đề file �
 còn nơi nào khác giữ lịch sử nợ ngoài chính file này.)*
 
 ---
+## Mục do engineer thêm vào
+### Pha 3.5 — Kiểm DB prod TRƯỚC khi launch (TD-005, đã nổ 4 lần)
 
+Deploy Vercel **không đụng gì tới database**. "Code đã live trên prod" và "DB
+prod có đủ bảng/cột cho code đó chạy" là hai trạng thái ĐỘC LẬP — CI (`tsc`,
+`vitest`, `next build`) chỉ so khớp fingerprint **cục bộ trong repo**, không
+hỏi database thật. Từng nổ 4 lần (TD-005, gần nhất 2026-08-15: prod thiếu
+nguyên schema Support System + Engine 1 — 6 bảng — vì bước "apply schema.sql
+lên prod trước launch" chỉ tồn tại dưới dạng câu ghi chú trong work plan,
+không phải checklist item có ai tick).
+
+**Bắt buộc TRƯỚC khi coi một feature có bảng/cột mới là "xong" trên production**
+(không phải chỉ khi deploy code — ngay cả khi chỉ nghi ngờ, hoặc trước khi
+đóng row Notion sang "Hoàn tất"):
+
+1. So fingerprint: `select fingerprint from public.schema_version` trên prod
+   (qua Composio `SUPABASE_RUN_READ_ONLY_QUERY`, ref lấy từ
+   `SUPABASE_LIST_ALL_PROJECTS`) đối chiếu với literal ở cuối
+   `SOURCE/supabase/schema.sql` (khối `insert into public.schema_version`).
+   Lệch = prod đang tụt lại, bất kể code đã deploy hay chưa.
+2. Nếu lệch: xác nhận với engineer trước khi apply DDL lên prod (dữ liệu thật,
+   không tự quyết một mình) — kiểm trước `drop table`/`truncate`/`delete`/
+   `update` nào chạm dữ liệu hiện có, rồi hậu kiểm bằng truy vấn thật (đếm
+   bảng, thử insert/select qua phiên user thật) — đừng tin mỗi thông báo
+   "success".
+3. **MỖI LƯỢT APPLY ĐÚNG MỘT CÂU LỆNH.** Chạy `npm run schema:plan` trước để
+   lấy danh sách có SỐ (`scripts/schema-plan.ts` cắt `schema.sql` theo ranh
+   giới câu lệnh, tôn trọng `$$...$$`, chuỗi và comment) rồi apply từng câu
+   theo đúng thứ tự đó.
+
+   ⚠️ **Vì sao là quy tắc chứ không phải lời khuyên (đo 2026-08-31, hai lần
+   trong một phiên):** gửi nhiều câu lệnh trong MỘT chuỗi thì công cụ apply
+   chạy câu ĐẦU, bỏ phần còn lại, và trả về `successful: true` kèm tên của
+   đúng câu đầu ấy — `revoke ...; grant ...;` → `"command": "REVOKE"`;
+   `drop policy ...; create policy ...;` → `"command": "DROP POLICY"`. Lượt
+   apply TRÔNG NHƯ đã xong. Hệ quả lần đó: một RLS policy vừa tạo ra đã gọi
+   tới một hàm mà `authenticated` không có quyền chạy, và không có gì đỏ ở
+   đâu cả.
+
+   Hậu kiểm phải đọc CATALOG, không đọc `information_schema`: quyền trên hàm
+   đọc ở `pg_proc.proacl`, policy đọc ở `pg_policies`.
+   `information_schema.routine_privileges` trả RỖNG dưới
+   `supabase_read_only_user` và trông y hệt "grant chưa có" — một dương tính
+   giả theo chiều ngược lại.
+4. Không đợi "trước khi launch" như một lời hứa mơ hồ — kiểm ngay khi
+   `schema.sql` đổi trong cùng phiên đó, cho MỌI project Supabase đang connect
+   (dev lẫn prod), không chỉ project đang test.
+   
 ## Đang mở
 
 > **2026-08-31 — phiên trả nợ diện rộng.** TD-005, TD-013, TD-028, TD-030,
@@ -244,6 +291,65 @@ một trong hai file vượt ~40 KB gzip), HOẶC Next có cơ chế preload chu
 **Verify khi trả:** `grep -l "Sign in" .next-build/static/chunks/*.js | xargs
 grep -l "Đăng nhập"` trả về RỖNG, và bấm nút đổi ngôn ngữ trên `/exams` ghi hình
 không có khung nào thiếu chữ.
+
+### TD-034 — 8 ca INT-1 bị CÁCH LY khỏi làn integration vì cổng hạn mức upload đã bị TẮT có chủ đích
+**Từ:** 2026-09-18 (làn `npm run test:integration` đỏ liên tục trên
+`origin/main` từ 2026-09-03; engineer chọn "tách riêng, giữ nguyên văn" khi
+được hỏi thẳng)
+**Loại:** kiểm thử — một cổng CHẠY TAY trả MÃ THOÁT SAI, nên nó không còn phát
+hiện được hồi quy nào khác trong chính làn của nó
+
+**Nguyên nhân, không phải triệu chứng:** commit `a77e03d` (2026-09-03) CỐ Ý gỡ
+lời gọi `consumeQuota("upload", …)` khỏi `extractAndAssemble`. Cổng ấy khoá MỌI
+người dùng Free vào 3 lượt upload mỗi kỳ 30 ngày (`PLAN_LIMITS.free.upload`)
+trong khi `GEMINI_PAID_TIER_ENABLED` còn TẮT và KHÔNG có đường mua nào để mở
+khoá — nó chặn người dùng thật mà không bán được gì. Chính commit đó đã nói
+trước 8 ca sẽ đỏ và gọi đó là "mâu thuẫn thiết kế có ý, theo yêu cầu người
+dùng". Nên 8 ca ấy là test ĐÚNG canh một cổng CỐ Ý vắng mặt: không được sửa kỳ
+vọng, không được `skip`, không được xoá.
+
+**Đo được (2026-09-18):** trước — `Tests 8 failed | 23 passed (31)`, exit 1, và
+làn ở trạng thái đó từ 2026-09-03 nên mọi hồi quy THẬT của INT-2/INT-3 đều lẫn
+vào cùng một màu đỏ. Sau — `Tests 21 passed (21)`, exit 0. File đã tách chạy
+riêng: `Tests 8 failed | 2 passed (10)`, đúng 8 ca cũ với đúng thông điệp cũ.
+
+**Đã làm:** khối INT-1 (10 ca: 8 đỏ + 2 xanh của đường GIA SƯ, đi cùng vì cả
+mười ca dùng chung một ảnh chụp `beforeAll`) chuyển NGUYÊN VĂN sang
+`SOURCE/tests/integration/pending/subscription-quota.int.test.ts`, loại khỏi làn
+bằng đúng MỘT dòng trong `test.exclude` của `SOURCE/vitest.integration.config.ts`
+— cùng lối `vitest.fixture.config.ts` đã dùng cho sáu driver script. File vẫn
+nằm trong `**/*.ts` của `SOURCE/tsconfig.json`, nên `npx tsc --noEmit` và
+`next build` vẫn soi nó: nó bị loại khỏi LÀN CHẠY chứ không bị bỏ khỏi cây mã,
+và không thể mục trong im lặng.
+
+Kèm theo, sửa `INT1_ACTIONS_PATH` từ `features/authoring/actions.ts` (sau
+`54c3079` chỉ còn là barrel re-export, không có thân hàm nào) sang
+`features/authoring/uploadActions.ts`, nơi `extractAndAssemble` thật sự sống.
+Đây không phải dọn dẹp cho đẹp: đọc nhầm file thì ca (d) chết ở khẳng định CÓ
+MẶT, còn `expect(source).not.toContain("MAX_UPLOADS_PER_DAY")` của nó XANH VÔ
+NGHĨA vì barrel dĩ nhiên không chứa chuỗi ấy — đúng thứ âm tính giả mà comment
+của chính ca đó cảnh báo. Sau khi sửa, ca (d) đỏ ở khẳng định THẬT: không tìm
+thấy `consumeQuota("upload", user.id, ent, …)` trong `uploadActions.ts`.
+
+**Cái gì nổ nếu quên:** làn nay thoát 0, nên một hồi quy thật của INT-2/INT-3 sẽ
+nhìn thấy được — đó là cái được. Cái mất: 8 ca kia không còn chạy ở ĐÂU CẢ. Nếu
+Subscription ship mà không ai đọc mục này, cổng hạn mức có thể quay lại SAI CHỖ
+(sau nhánh rẽ, tức Gemini đã tiêu tiền trước khi bị chặn) hoặc đếm SỐ DÒNG thay
+vì SỐ THAO TÁC (nhánh chạy lại không tạo dòng nào nên không tính phí) mà không
+có gì đỏ ở đâu.
+
+**Điều kiện lấy lại:** `consumeQuota("upload", user.id, ent, …)` quay lại
+`features/authoring/uploadActions.ts` khi Subscription ship — tức khi đã có
+đường mua thật và `GEMINI_PAID_TIER_ENABLED` bật.
+
+**Verify khi trả:** xoá đúng dòng
+`"tests/integration/pending/subscription-quota.int.test.ts",` trong
+`test.exclude` của `SOURCE/vitest.integration.config.ts`, rồi
+`npm run test:integration` phải trả về `31 passed (31)` và exit 0 mà KHÔNG sửa
+một khẳng định nào trong file đã tách. Lưu ý: filter đường dẫn trên CLI KHÔNG
+chạy được file đang bị `exclude` (đo: "No test files found", exit 1) và
+`--exclude` của CLI thì CỘNG THÊM chứ không ghi đè — xoá dòng trong config là
+bước duy nhất.
 
 ---
 
