@@ -4,6 +4,7 @@
 // contract"; § Required Tests rows 1-4. Mock boundary (task file): only
 // `@/features/solutions/actions` is mocked; nothing else.
 
+import { StrictMode } from "react";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ToggleHelpfulResult } from "@/features/solutions/actions";
@@ -116,5 +117,28 @@ describe("HelpfulButton — Required Test 4 (hợp đồng một tham số)", ()
     for (const call of toggleHelpfulMock.mock.calls) {
       expect(call).toEqual(["S9"]);
     }
+  });
+});
+
+describe("HelpfulButton — chạy dưới React StrictMode (dev gắn → gỡ → gắn lại)", () => {
+  it("phản hồi của máy chủ vẫn được áp: nút hết aria-busy và số đếm cập nhật, bấm tiếp vẫn gọi máy chủ", async () => {
+    toggleHelpfulMock.mockResolvedValue({ ok: true, on: true });
+
+    render(
+      <StrictMode>
+        <HelpfulButton solutionId="S1" initialPressed={false} initialCount={5} onError={vi.fn()} />
+      </StrictMode>
+    );
+    const button = screen.getByRole("button");
+
+    fireEvent.click(button);
+    await waitFor(() => expect(button.getAttribute("aria-busy")).not.toBe("true"));
+    expect(button.getAttribute("aria-pressed")).toBe("true");
+    expect(button.textContent).toContain("6");
+
+    toggleHelpfulMock.mockResolvedValueOnce({ ok: true, on: false });
+    fireEvent.click(button);
+    await waitFor(() => expect(toggleHelpfulMock).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(button.getAttribute("aria-pressed")).toBe("false"));
   });
 });

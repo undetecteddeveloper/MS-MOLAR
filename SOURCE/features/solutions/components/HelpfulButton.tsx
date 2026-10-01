@@ -73,7 +73,12 @@ function helpfulReducer(state: HelpfulState, action: HelpfulAction): HelpfulStat
   }
 }
 
-export function HelpfulButton({ solutionId, initialPressed, initialCount, onError }: HelpfulButtonProps) {
+export function HelpfulButton({
+  solutionId,
+  initialPressed,
+  initialCount,
+  onError,
+}: HelpfulButtonProps) {
   const initial: HelpfulState = {
     desiredOn: initialPressed,
     confirmedOn: initialPressed,
@@ -84,6 +89,9 @@ export function HelpfulButton({ solutionId, initialPressed, initialCount, onErro
   const [renderState, setRenderState] = useState<HelpfulState>(initial);
   const mountedRef = useRef(true);
   useEffect(() => {
+    // Đặt lại `true` MỖI lần gắn: React StrictMode (dev) gắn → gỡ → gắn lại, và chỉ
+    // đặt `false` ở lúc gỡ thì cờ kẹt `false` mãi — mọi phản hồi bị bỏ, nút kẹt `aria-busy`.
+    mountedRef.current = true;
     return () => {
       mountedRef.current = false;
     };
