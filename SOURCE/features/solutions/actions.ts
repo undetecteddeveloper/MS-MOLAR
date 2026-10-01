@@ -331,6 +331,10 @@ export interface PostedComment {
   questionId: string;
   body: string;
   isAnonymous: boolean;
+  /** Gốc của mạch và câu được trả lời — lấy từ RPC (server suy ra gốc khi trả
+   *  lời một câu trả lời), không bao giờ tự suy ở client. `null` = bình luận gốc. */
+  parentId: string | null;
+  replyToId: string | null;
 }
 
 export type PostCommentResult =
@@ -365,7 +369,8 @@ export async function postComment(
   solutionId: string,
   questionId: string,
   body: string,
-  isAnonymous: boolean
+  isAnonymous: boolean,
+  replyToId?: string
 ): Promise<PostCommentResult> {
   if (body.trim().length === 0) {
     return { ok: false, error: { code: "empty" } };
@@ -386,12 +391,18 @@ export async function postComment(
     p_question_id: questionId,
     p_body: body,
     p_is_anonymous: isAnonymous,
+    ...(replyToId !== undefined ? { p_reply_to_id: replyToId } : {}),
   });
   if (error) {
     return { ok: false, error: mapCommentError("post_community_comment", error) };
   }
 
-  const [row] = (data ?? []) as Array<{ comment_id: string; comment_created_at: string }>;
+  const [row] = (data ?? []) as Array<{
+    comment_id: string;
+    comment_created_at: string;
+    comment_parent_id: string | null;
+    comment_reply_to_id: string | null;
+  }>;
   return {
     ok: true,
     comment: {
@@ -401,6 +412,8 @@ export async function postComment(
       questionId,
       body,
       isAnonymous,
+      parentId: row.comment_parent_id ?? null,
+      replyToId: row.comment_reply_to_id ?? null,
     },
   };
 }

@@ -91,6 +91,33 @@ describe("postComment — Required test list rows 1-6, 9", () => {
     expect(rpcMock).not.toHaveBeenCalled();
   });
 
+  it("reply: postComment(..., replyToId) sends p_reply_to_id and returns the server-derived parentId/replyToId", async () => {
+    mockUser(freshUserId());
+    allowGuard();
+    rpcMock.mockResolvedValueOnce({
+      data: [
+        {
+          comment_id: "c2",
+          comment_created_at: "2026-09-26T00:00:00.000Z",
+          comment_parent_id: "root-1",
+          comment_reply_to_id: "reply-1",
+        },
+      ],
+      error: null,
+    });
+
+    const result = await postComment("solution-3", "q1", "@A trả lời", false, "reply-1");
+
+    expect(result).toMatchObject({ ok: true, comment: { id: "c2", parentId: "root-1", replyToId: "reply-1" } });
+    expect(rpcMock).toHaveBeenCalledWith("post_community_comment", {
+      p_solution_id: "solution-3",
+      p_question_id: "q1",
+      p_body: "@A trả lời",
+      p_is_anonymous: false,
+      p_reply_to_id: "reply-1",
+    });
+  });
+
   it("row 3: postComment(S, Q, body, true) -> RPC [{comment_id:'c1', comment_created_at}] -> the returned comment carries c1 and that timestamp, plus the action's own inputs; one .rpc call with the exact args", async () => {
     mockUser(freshUserId());
     allowGuard();
@@ -110,6 +137,8 @@ describe("postComment — Required test list rows 1-6, 9", () => {
         questionId: "q1",
         body: "Nội dung bình luận",
         isAnonymous: true,
+        parentId: null,
+        replyToId: null,
       },
     });
     expect(rpcMock).toHaveBeenCalledTimes(1);
@@ -297,6 +326,9 @@ describe("getMyCommentFeed — Required test list rows 12-13", () => {
       author_display_name: "Lan",
       is_unread: true,
       exam_visible: true,
+      thread_root_id: "comment-1",
+      is_reply_to_me: false,
+      reply_to_body: null,
       ...overrides,
     };
   }
@@ -318,6 +350,9 @@ describe("getMyCommentFeed — Required test list rows 12-13", () => {
         author: { kind: "named", displayName: "Lan" },
         isUnread: true,
         examVisible: true,
+        threadRootId: "comment-1",
+        isReplyToMe: false,
+        replyToBody: null,
       },
     ]);
     expect(Object.keys(items[0])).toEqual([
@@ -331,8 +366,22 @@ describe("getMyCommentFeed — Required test list rows 12-13", () => {
       "author",
       "isUnread",
       "examVisible",
+      "threadRootId",
+      "isReplyToMe",
+      "replyToBody",
     ]);
     expect("avatarUrl" in items[0].author).toBe(false);
+  });
+
+  it("reply row: is_reply_to_me + reply_to_body + thread_root_id are mapped to camelCase", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: [rawFeedRow({ thread_root_id: "root-9", is_reply_to_me: true, reply_to_body: "Câu hỏi của tôi" })],
+      error: null,
+    });
+
+    const items = await getMyCommentFeed(1);
+
+    expect(items[0]).toMatchObject({ threadRootId: "root-9", isReplyToMe: true, replyToBody: "Câu hỏi của tôi" });
   });
 
   it("row 13: the same row with author_display_name: null -> author = { kind: 'anonymous' }", async () => {

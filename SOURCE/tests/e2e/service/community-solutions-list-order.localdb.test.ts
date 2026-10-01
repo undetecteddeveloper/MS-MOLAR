@@ -344,6 +344,9 @@ describe.skipIf(!HAS_LIVE_DB)(
       "hidden_reason",
       "i_reported",
       "created_at",
+      "parent_id",
+      "reply_to_id",
+      "placeholder",
     ].sort();
 
     async function cleanup() {

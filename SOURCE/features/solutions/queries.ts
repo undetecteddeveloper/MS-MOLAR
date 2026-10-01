@@ -368,6 +368,12 @@ export interface SolutionDetailComment {
   hiddenReason?: string;
   iReported: boolean;
   createdAt: string;
+  /** Gốc của mạch; null = bản thân là bình luận gốc (trả lời một cấp). */
+  parentId?: string | null;
+  /** Bình luận cụ thể được trả lời (có thể là một câu trả lời); null nếu là gốc. */
+  replyToId?: string | null;
+  /** Dòng mờ của gốc đã xoá / bị ẩn mà còn trả lời — không danh tính, không nội dung. */
+  placeholder?: "deleted" | "hidden";
 }
 
 export interface SolutionDetailQuestion {
@@ -425,11 +431,14 @@ interface RawSolutionDetailComment {
   author_avatar_path: string | null;
   is_solution_author: boolean;
   is_mine: boolean;
-  body: string;
+  body: string | null;
   is_hidden_by_admin: boolean;
   hidden_reason: string | null;
   i_reported: boolean;
   created_at: string;
+  parent_id: string | null;
+  reply_to_id: string | null;
+  placeholder: "deleted" | "hidden" | null;
 }
 
 interface RawSolutionDetailQuestion {
@@ -476,11 +485,14 @@ function mapSolutionDetailComment(
     }),
     isSolutionAuthor: row.is_solution_author,
     isMine: row.is_mine,
-    body: row.body,
+    body: row.body ?? "",
     ...(row.is_hidden_by_admin ? { isHiddenByAdmin: row.is_hidden_by_admin } : {}),
     ...(row.hidden_reason !== null ? { hiddenReason: row.hidden_reason } : {}),
     iReported: row.i_reported,
     createdAt: row.created_at,
+    parentId: row.parent_id ?? null,
+    replyToId: row.reply_to_id ?? null,
+    ...(row.placeholder ? { placeholder: row.placeholder } : {}),
   };
 }
 
@@ -625,6 +637,9 @@ interface RawCommentFeedRow {
   author_display_name: string | null;
   is_unread: boolean;
   exam_visible: boolean;
+  thread_root_id: string;
+  is_reply_to_me: boolean;
+  reply_to_body: string | null;
 }
 
 export interface CommentFeedItem {
@@ -638,6 +653,12 @@ export interface CommentFeedItem {
   author: AuthorIdentity;
   isUnread: boolean;
   examVisible: boolean;
+  /** Gốc của mạch chứa bình luận này — đích `?thread=` của nút "Xem trả lời". */
+  threadRootId?: string;
+  /** Bình luận này trả lời một bình luận CỦA TÔI (không phải chỉ nằm dưới bài của tôi). */
+  isReplyToMe?: boolean;
+  /** Nội dung bình luận của tôi được trả lời (dòng trích "Bạn: …"); null khi không phải trả lời tôi. */
+  replyToBody?: string | null;
 }
 
 /** `author_avatar_url: null` TƯỜNG MINH — feed không có cột ảnh, nên đây
@@ -657,6 +678,9 @@ function mapCommentFeedRow(row: RawCommentFeedRow): CommentFeedItem {
     author: toAuthorIdentity({ author_display_name: row.author_display_name, author_avatar_url: null }),
     isUnread: row.is_unread,
     examVisible: row.exam_visible,
+    threadRootId: row.thread_root_id,
+    isReplyToMe: row.is_reply_to_me,
+    replyToBody: row.reply_to_body ?? null,
   };
 }
 

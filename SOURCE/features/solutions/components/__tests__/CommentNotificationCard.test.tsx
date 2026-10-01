@@ -35,9 +35,8 @@ vi.mock("@/features/solutions/actions", () => ({
   deleteComment: vi.fn(),
 }));
 
-const { parseSolutionDeepLink } = await import(
-  "@/app/(exams)/exams/[id]/solutions/[solutionId]/page"
-);
+const { parseSolutionDeepLink } =
+  await import("@/app/(exams)/exams/[id]/solutions/[solutionId]/page");
 
 const NOW = new Date("2026-09-27T10:00:00.000Z");
 
@@ -69,7 +68,9 @@ describe("CommentNotificationCard — S8: đề không còn hiện (Required Tes
 
     expect(screen.getByText("Đề không còn hiện")).toBeTruthy();
     expect(screen.queryByRole("link", { name: /Trả lời/ })).toBeNull();
-    expect(container.querySelector("span[aria-hidden].bg-destructive.size-2.rounded-full")).toBeNull();
+    expect(
+      container.querySelector("span[aria-hidden].bg-destructive.size-2.rounded-full")
+    ).toBeNull();
   });
 });
 
@@ -81,7 +82,9 @@ describe("CommentNotificationCard — hàng được tính là mới (Required T
       </ul>
     );
 
-    expect(container.querySelector("span[aria-hidden].bg-destructive.size-2.rounded-full")).toBeTruthy();
+    expect(
+      container.querySelector("span[aria-hidden].bg-destructive.size-2.rounded-full")
+    ).toBeTruthy();
   });
 
   it("isUnread:false → KHÔNG chấm dù examVisible:true", () => {
@@ -91,7 +94,9 @@ describe("CommentNotificationCard — hàng được tính là mới (Required T
       </ul>
     );
 
-    expect(container.querySelector("span[aria-hidden].bg-destructive.size-2.rounded-full")).toBeNull();
+    expect(
+      container.querySelector("span[aria-hidden].bg-destructive.size-2.rounded-full")
+    ).toBeNull();
   });
 });
 
@@ -125,7 +130,11 @@ describe("CommentNotificationCard — dòng ẩn danh (Required Test #5, AC-097,
     render(
       <ul>
         <CommentNotificationCard
-          item={item({ author: { kind: "anonymous" }, commentBody: "Câu này đáp án là gì?", questionNumber: 4 })}
+          item={item({
+            author: { kind: "anonymous" },
+            commentBody: "Câu này đáp án là gì?",
+            questionNumber: 4,
+          })}
           now={NOW}
         />
       </ul>
@@ -138,7 +147,11 @@ describe("CommentNotificationCard — dòng ẩn danh (Required Test #5, AC-097,
     render(
       <ul>
         <CommentNotificationCard
-          item={item({ author: { kind: "anonymous" }, commentBody: "Mình cũng làm giống vậy.", questionNumber: 2 })}
+          item={item({
+            author: { kind: "anonymous" },
+            commentBody: "Mình cũng làm giống vậy.",
+            questionNumber: 2,
+          })}
           now={NOW}
         />
       </ul>
@@ -153,7 +166,10 @@ describe("CommentNotificationCard — chỉ tên, KHÔNG avatar (Required Test #
     const { container } = render(
       <ul>
         <CommentNotificationCard
-          item={item({ author: { kind: "named", displayName: "Nguyễn Văn A" }, commentBody: "Cảm ơn bạn nhé" })}
+          item={item({
+            author: { kind: "named", displayName: "Nguyễn Văn A" },
+            commentBody: "Cảm ơn bạn nhé",
+          })}
           now={NOW}
         />
       </ul>
@@ -161,5 +177,72 @@ describe("CommentNotificationCard — chỉ tên, KHÔNG avatar (Required Test #
 
     expect(screen.getByText("Nguyễn Văn A bình luận ở câu 3")).toBeTruthy();
     expect(container.querySelector("img")).toBeNull();
+  });
+});
+
+describe("CommentNotificationCard — thẻ 'trả lời bạn' (AC-R7, AC-R8)", () => {
+  it("isReplyToMe: dòng 'X trả lời bạn ở câu k', trích 'Bạn: …', nút 'Xem trả lời' trỏ ?thread=<gốc>", () => {
+    render(
+      <ul>
+        <CommentNotificationCard
+          item={item({
+            commentId: "r1",
+            commentBody: "Vì mẫu bằng 0 khi x = 2",
+            isReplyToMe: true,
+            replyToBody: "Sao mẫu số khác 0 thì x khác 2 ạ?",
+            threadRootId: "root-1",
+          })}
+          now={NOW}
+        />
+      </ul>
+    );
+
+    expect(screen.getByText("Nguyễn Văn A trả lời bạn ở câu 3")).toBeTruthy();
+    expect(screen.getByText("Bạn: Sao mẫu số khác 0 thì x khác 2 ạ?")).toBeTruthy();
+    const link = screen.getByRole("link", { name: "Xem trả lời" });
+    expect(link.getAttribute("href")).toBe("/exams/E1/solutions/sol1?q=3&comments=1&thread=root-1");
+    expect(screen.queryByText(/hỏi ở câu|bình luận ở câu/)).toBeNull();
+  });
+
+  it("người trả lời ẩn danh → 'Ẩn danh trả lời bạn ở câu k'", () => {
+    render(
+      <ul>
+        <CommentNotificationCard
+          item={item({
+            author: { kind: "anonymous" },
+            isReplyToMe: true,
+            replyToBody: "Câu hỏi",
+            threadRootId: "root-1",
+          })}
+          now={NOW}
+        />
+      </ul>
+    );
+
+    expect(screen.getByText("Ẩn danh trả lời bạn ở câu 3")).toBeTruthy();
+  });
+
+  it("bình luận gốc dưới bài của tôi giữ thẻ cũ và liên kết cũ; một câu trả lời (không phải gửi tôi) mở đúng mạch", () => {
+    const { unmount } = render(
+      <ul>
+        <CommentNotificationCard item={item({ commentId: "c1", threadRootId: "c1" })} now={NOW} />
+      </ul>
+    );
+    expect(screen.getByRole("link", { name: "Trả lời" }).getAttribute("href")).toBe(
+      "/exams/E1/solutions/sol1?q=3&comments=1"
+    );
+    unmount();
+
+    render(
+      <ul>
+        <CommentNotificationCard
+          item={item({ commentId: "r2", threadRootId: "root-7" })}
+          now={NOW}
+        />
+      </ul>
+    );
+    expect(screen.getByRole("link", { name: "Trả lời" }).getAttribute("href")).toBe(
+      "/exams/E1/solutions/sol1?q=3&comments=1&thread=root-7"
+    );
   });
 });

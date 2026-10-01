@@ -41,6 +41,7 @@ import { AuthorIdentity } from "@/features/solutions/components/AuthorIdentity";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { ReportDialog } from "@/features/solutions/components/ReportDialog";
 import { Badge } from "@/components/ui/badge";
+import { ChevronRight, Reply } from "lucide-react";
 import {
   deleteComment,
   reportComment,
@@ -68,6 +69,12 @@ export interface CommentItemProps {
   /** Gọi SAU KHI server xác nhận xoá thành công — `CommentSheet` gỡ hàng khỏi
    *  danh sách của nó, component này không tự gỡ mình. */
   onDeleted: (commentId: string) => void;
+  /** Có prop này thì hàng có nút "Trả lời" (không có ở dòng mờ). Màn danh sách
+   *  truyền để mở mạch; màn mạch truyền để đặt đích trả lời + điền `@Tên`. */
+  onReply?: (comment: SolutionDetailComment) => void;
+  /** Số trả lời đang hiện của gốc này; > 0 kèm `onOpenThread` thì có nút "N trả lời ›". */
+  replyCount?: number;
+  onOpenThread?: (rootId: string) => void;
 }
 
 function deleteErrorText(error: Extract<DeleteCommentResult, { ok: false }>["error"]): string {
@@ -76,7 +83,14 @@ function deleteErrorText(error: Extract<DeleteCommentResult, { ok: false }>["err
     : t("solutions.comments.deleteError");
 }
 
-export function CommentItem({ comment, now, onDeleted }: CommentItemProps) {
+export function CommentItem({
+  comment,
+  now,
+  onDeleted,
+  onReply,
+  replyCount = 0,
+  onOpenThread,
+}: CommentItemProps) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -127,6 +141,33 @@ export function CommentItem({ comment, now, onDeleted }: CommentItemProps) {
   // có `isMine: true`).
   const canReport = !comment.isMine;
 
+  const threadButton =
+    onOpenThread && replyCount > 0 ? (
+      <button
+        type="button"
+        onClick={() => onOpenThread(comment.id)}
+        className="border-border bg-surface text-foreground flex min-h-11 w-full items-center justify-between gap-2 rounded-xl border px-3 text-sm font-medium"
+      >
+        {t("solutions.comments.replyCount", { count: replyCount })}
+        <ChevronRight aria-hidden className="size-4" />
+      </button>
+    ) : null;
+
+  // Dòng mờ của gốc đã xoá / bị ẩn mà còn trả lời (R3-R5): không danh tính, không
+  // nội dung, không nút nào ngoài "N trả lời ›".
+  if (comment.placeholder) {
+    return (
+      <li className="flex flex-col gap-2 py-3">
+        <div className="border-border text-foreground/60 rounded-lg border border-dashed p-3 text-sm">
+          {comment.placeholder === "deleted"
+            ? t("solutions.comments.deletedPlaceholder")
+            : t("solutions.comments.hiddenPlaceholder")}
+        </div>
+        {threadButton}
+      </li>
+    );
+  }
+
   return (
     <li aria-busy={busy || undefined} className="flex flex-col gap-1.5 py-3">
       <div className="flex flex-wrap items-center gap-1.5">
@@ -134,7 +175,9 @@ export function CommentItem({ comment, now, onDeleted }: CommentItemProps) {
         {comment.isSolutionAuthor && (
           <Badge variant="surface">{t("solutions.comments.writerBadge")}</Badge>
         )}
-        <span className="text-muted-foreground text-xs">{relativeTime(comment.createdAt, now)}</span>
+        <span className="text-muted-foreground text-xs">
+          {relativeTime(comment.createdAt, now)}
+        </span>
       </div>
 
       {comment.isHiddenByAdmin ? (
@@ -149,40 +192,55 @@ export function CommentItem({ comment, now, onDeleted }: CommentItemProps) {
         <LazyRichText text={comment.body} className="text-sm" />
       )}
 
-      {canDelete && (
-        <button
-          type="button"
-          onClick={() => setConfirmOpen(true)}
-          className="text-destructive flex h-11 w-fit items-center text-sm font-medium"
-        >
-          {t("common.delete")}
-        </button>
-      )}
+      <div className="flex flex-wrap items-center gap-x-5">
+        {onReply && (
+          <button
+            type="button"
+            onClick={() => onReply(comment)}
+            className="text-foreground flex h-11 w-fit items-center gap-1.5 text-sm font-medium"
+          >
+            <Reply aria-hidden className="size-4" />
+            {t("solutions.comments.replyAction")}
+          </button>
+        )}
 
-      {canReport &&
-        (reported ? (
-          // MỘT nhánh DOM duy nhất cho cả hai nguồn "đã báo cáo" — seed từ
-          // `comment.iReported` lúc mở tấm trượt HAY vừa lật trong phiên này
-          // (frontend DD, in-session flip) — không có nhánh riêng nào khác.
-          // `aria-live="polite"` báo cho AT khi nó vừa đổi từ nút bấm được
-          // sang nút trơ; không `onClick`, không `disabled` gốc.
+        {canDelete && (
           <button
             type="button"
-            aria-disabled="true"
-            aria-live="polite"
-            className="text-muted-foreground flex h-11 w-fit items-center text-sm font-medium"
+            onClick={() => setConfirmOpen(true)}
+            className="text-destructive flex h-11 w-fit items-center text-sm font-medium"
           >
-            {t("solutions.comments.reported")}
+            {t("common.delete")}
           </button>
-        ) : (
-          <button
-            type="button"
-            onClick={openReport}
-            className="text-muted-foreground flex h-11 w-fit items-center text-sm font-medium"
-          >
-            {t("solutions.comments.report")}
-          </button>
-        ))}
+        )}
+
+        {canReport &&
+          (reported ? (
+            // MỘT nhánh DOM duy nhất cho cả hai nguồn "đã báo cáo" — seed từ
+            // `comment.iReported` lúc mở tấm trượt HAY vừa lật trong phiên này
+            // (frontend DD, in-session flip) — không có nhánh riêng nào khác.
+            // `aria-live="polite"` báo cho AT khi nó vừa đổi từ nút bấm được
+            // sang nút trơ; không `onClick`, không `disabled` gốc.
+            <button
+              type="button"
+              aria-disabled="true"
+              aria-live="polite"
+              className="text-muted-foreground flex h-11 w-fit items-center text-sm font-medium"
+            >
+              {t("solutions.comments.reported")}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={openReport}
+              className="text-muted-foreground flex h-11 w-fit items-center text-sm font-medium"
+            >
+              {t("solutions.comments.report")}
+            </button>
+          ))}
+      </div>
+
+      {threadButton}
 
       {deleteError && (
         <div role="alert" className="flex flex-wrap items-center gap-3">

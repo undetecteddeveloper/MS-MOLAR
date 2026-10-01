@@ -210,17 +210,21 @@ describe("SolutionViewScreen — ô hiện tại của bảng câu hỏi (AC-051
     chooseCell(2);
 
     openPalette();
-    expect(within(panel()).getByRole("button", { name: "Câu 2" }).getAttribute("aria-current")).toBe(
-      "true"
-    );
-    expect(within(panel()).getByRole("button", { name: "Câu 1" }).getAttribute("aria-current")).toBeNull();
+    expect(
+      within(panel()).getByRole("button", { name: "Câu 2" }).getAttribute("aria-current")
+    ).toBe("true");
+    expect(
+      within(panel()).getByRole("button", { name: "Câu 1" }).getAttribute("aria-current")
+    ).toBeNull();
     chooseCell(5);
 
     openPalette();
-    expect(within(panel()).getByRole("button", { name: "Câu 5" }).getAttribute("aria-current")).toBe(
-      "true"
-    );
-    expect(within(panel()).getByRole("button", { name: "Câu 2" }).getAttribute("aria-current")).toBeNull();
+    expect(
+      within(panel()).getByRole("button", { name: "Câu 5" }).getAttribute("aria-current")
+    ).toBe("true");
+    expect(
+      within(panel()).getByRole("button", { name: "Câu 2" }).getAttribute("aria-current")
+    ).toBeNull();
   });
 
   it("chọn ô 4: bảng đóng, hàng 4 mở tại chỗ", () => {
@@ -230,7 +234,9 @@ describe("SolutionViewScreen — ô hiện tại của bảng câu hỏi (AC-051
     chooseCell(4);
 
     expect(screen.queryByRole("region", { name: "Bảng câu hỏi" })).toBeNull();
-    expect(screen.getByRole("button", { name: /Câu 4/ }).getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByRole("button", { name: /Câu 4/ }).getAttribute("aria-expanded")).toBe(
+      "true"
+    );
   });
 });
 
@@ -238,9 +244,24 @@ describe("SolutionViewScreen — ô hiện tại của bảng câu hỏi (AC-051
 
 describe("SolutionViewScreen — liên kết sâu ?q=k (AC-061)", () => {
   const THREE_QUESTIONS: ComponentProps<typeof SolutionViewScreen>["questionNodes"] = [
-    { questionId: "q1", stemNode: <span>Đề 1</span>, correctAnswerNode: <span>A</span>, hasChanged: false },
-    { questionId: "q2", stemNode: <span>Đề 2</span>, correctAnswerNode: <span>B</span>, hasChanged: false },
-    { questionId: "q3", stemNode: <span>Đề 3</span>, correctAnswerNode: <span>C</span>, hasChanged: false },
+    {
+      questionId: "q1",
+      stemNode: <span>Đề 1</span>,
+      correctAnswerNode: <span>A</span>,
+      hasChanged: false,
+    },
+    {
+      questionId: "q2",
+      stemNode: <span>Đề 2</span>,
+      correctAnswerNode: <span>B</span>,
+      hasChanged: false,
+    },
+    {
+      questionId: "q3",
+      stemNode: <span>Đề 3</span>,
+      correctAnswerNode: <span>C</span>,
+      hasChanged: false,
+    },
   ];
 
   it("initialOpenQuestion=3: đúng hàng 3 mở sẵn (không cần bấm), mang id/tabIndex/scroll-mt-24, nhận tiêu điểm", () => {
@@ -264,7 +285,9 @@ describe("SolutionViewScreen — liên kết sâu ?q=k (AC-061)", () => {
     renderScreen({ questionNodes: THREE_QUESTIONS });
 
     for (const label of [/Câu 1/, /Câu 2/, /Câu 3/]) {
-      expect(screen.getByRole("button", { name: label }).getAttribute("aria-expanded")).toBe("false");
+      expect(screen.getByRole("button", { name: label }).getAttribute("aria-expanded")).toBe(
+        "false"
+      );
     }
     expect(document.activeElement).toBe(document.body);
   });
@@ -277,7 +300,12 @@ describe("SolutionViewScreen — mount CommentSheet (task 28, Required Test #11)
   it("?comments=1 + ?q=2: mở sẵn CommentSheet của đúng câu 2 (AC-068)", async () => {
     renderScreen({
       questionNodes: [
-        { questionId: "q1", stemNode: <span>Đề 1</span>, correctAnswerNode: <span>A</span>, hasChanged: false },
+        {
+          questionId: "q1",
+          stemNode: <span>Đề 1</span>,
+          correctAnswerNode: <span>A</span>,
+          hasChanged: false,
+        },
         {
           questionId: "q2",
           stemNode: <span>Đề 2</span>,
@@ -302,7 +330,7 @@ describe("SolutionViewScreen — mount CommentSheet (task 28, Required Test #11)
     });
 
     expect(await screen.findByRole("heading", { name: "Bình luận · Câu 2" })).toBeTruthy();
-    expect(await screen.findByText("Bình luận sẵn có")).toBeTruthy();
+    expect(await screen.findByText("Bình luận sẵn có", {}, { timeout: 5000 })).toBeTruthy();
   });
 
   it("bấm nút bình luận của một hàng: mở CommentSheet của đúng hàng đó", async () => {

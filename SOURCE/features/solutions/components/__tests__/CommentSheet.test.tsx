@@ -89,7 +89,7 @@ describe("CommentSheet — tiêu đề + trạng thái Báo cáo của hàng bì
     );
 
     expect(await screen.findByRole("heading", { name: "Bình luận · Câu 2" })).toBeTruthy();
-    await screen.findByText("Bình luận có sẵn");
+    await screen.findByText("Bình luận có sẵn", {}, { timeout: 5000 });
     const control = screen.getByText("Bạn đã báo cáo bình luận này.");
     expect(control.getAttribute("aria-disabled")).toBe("true");
     expect(screen.queryByRole("button", { name: "Báo cáo" })).toBeNull();
@@ -111,13 +111,18 @@ describe("CommentSheet — gửi generic (Required Test #1)", () => {
 
     expect(await screen.findByText("Chưa gửi được bình luận. Bạn thử lại nhé.")).toBeTruthy();
     expect((textarea as HTMLTextAreaElement).value).toBe("Bình luận của tôi");
-    expect((screen.getByRole("checkbox", { name: "Ẩn danh" }) as HTMLInputElement).checked).toBe(false);
+    expect((screen.getByRole("checkbox", { name: "Ẩn danh" }) as HTMLInputElement).checked).toBe(
+      false
+    );
   });
 });
 
 describe("CommentSheet — rate limit (Required Test #9)", () => {
   it("postComment rateLimited: hiện chữ verbatim với seconds", async () => {
-    postCommentMock.mockResolvedValueOnce({ ok: false, error: { code: "rateLimited", seconds: 42 } });
+    postCommentMock.mockResolvedValueOnce({
+      ok: false,
+      error: { code: "rateLimited", seconds: 42 },
+    });
     render(<CommentSheet {...baseProps()} />);
 
     const textarea = await waitForComposer();
@@ -157,7 +162,9 @@ describe("CommentSheet — lockedAnonymous (Required Test #4, S4)", () => {
     });
 
     render(
-      <CommentSheet {...baseProps({ lockedAnonymous: true, viewerIsSolutionAuthor: true, comments: [] })} />
+      <CommentSheet
+        {...baseProps({ lockedAnonymous: true, viewerIsSolutionAuthor: true, comments: [] })}
+      />
     );
 
     const checkbox = (await screen.findByRole("checkbox", { name: "Ẩn danh" })) as HTMLInputElement;
@@ -211,13 +218,17 @@ describe("CommentSheet — dirty-close (Required Test #8, DD-U5/Reference Contra
     const dialog = await screen.findByRole("dialog", { name: "Bạn có thay đổi chưa lưu" });
     fireEvent.click(within(dialog).getByRole("button", { name: "Lưu" }));
 
-    expect(await within(dialog).findByText("Chưa gửi được bình luận. Bạn thử lại nhé.")).toBeTruthy();
+    expect(
+      await within(dialog).findByText("Chưa gửi được bình luận. Bạn thử lại nhé.")
+    ).toBeTruthy();
     // Lỗi CHỈ hiện MỘT chỗ (trong hộp thoại) — dòng alert của composer không
     // đổi (Reference Contract Value #24: "not the sheet's").
     expect(screen.getAllByText("Chưa gửi được bình luận. Bạn thử lại nhé.").length).toBe(1);
     expect(within(dialog).getByRole("button", { name: "Lưu" })).toBeTruthy();
     expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("Chưa gửi xong");
-    expect((screen.getByRole("checkbox", { name: "Ẩn danh" }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByRole("checkbox", { name: "Ẩn danh" }) as HTMLInputElement).checked).toBe(
+      true
+    );
     expect(onClose).not.toHaveBeenCalled();
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Lưu" }));

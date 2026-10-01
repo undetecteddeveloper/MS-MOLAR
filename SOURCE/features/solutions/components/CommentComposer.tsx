@@ -11,7 +11,7 @@
 // `lockedAnonymous` (S4/UI-D12): ô luôn hiện CHECKED + `aria-disabled="true"`
 // (KHÔNG `disabled` gốc — UI-D12), và `onChange` bỏ qua mọi thao tác khi bị
 // khoá — giá trị gửi đi luôn `true` bất kể người dùng bấm gì vào ô đã khoá.
-import { useId } from "react";
+import { useEffect, useId, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/input";
 import { t } from "@/lib/copy";
@@ -28,6 +28,10 @@ export interface CommentComposerProps {
   /** Dòng `role="alert"` — cùng ô hiển thị cho generic/rateLimited/empty/tooLong. */
   error: string | null;
   onSend: () => void;
+  /** Chữ mờ của ô nhập; mặc định là chữ của bình luận gốc. Màn mạch trả lời (hướng C) truyền chữ riêng. */
+  placeholder?: string;
+  /** Đổi giá trị này (số tăng dần) để đưa tiêu điểm vào ô nhập — dùng khi bấm "Trả lời". 0/undefined: không làm gì. */
+  focusKey?: number;
 }
 
 export function CommentComposer({
@@ -39,20 +43,31 @@ export function CommentComposer({
   sending,
   error,
   onSend,
+  placeholder,
+  focusKey,
 }: CommentComposerProps) {
   const textareaId = useId();
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (focusKey) {
+      const el = textareaRef.current;
+      el?.focus();
+      el?.setSelectionRange(el.value.length, el.value.length);
+    }
+  }, [focusKey]);
   const errorId = useId();
   const lockedDescId = useId();
 
   const checked = lockedAnonymous || isAnonymous;
 
   return (
-    <div className="sticky bottom-0 flex flex-col gap-2 bg-background pt-2">
+    <div className="bg-background sticky bottom-0 flex flex-col gap-2 pt-2">
       <Textarea
         id={textareaId}
+        ref={textareaRef}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={t("solutions.comments.placeholder")}
+        placeholder={placeholder ?? t("solutions.comments.placeholder")}
         disabled={sending}
         aria-invalid={!!error || undefined}
         aria-describedby={error ? errorId : undefined}

@@ -34,7 +34,18 @@ export function CommentNotificationCard({ item, now }: CommentNotificationCardPr
   // isUnread && examVisible — không viết lại luật riêng ở đây, chỉ áp cho MỘT
   // hàng thay vì một mảng (AC-091, AC-098: đề không hiện ⇒ không chấm).
   const isNew = item.isUnread && item.examVisible;
-  const lineKey = item.commentBody.includes("?") ? "profile.comments.asked" : "profile.comments.commented";
+  const isReplyToMe = item.isReplyToMe === true;
+  const lineKey = isReplyToMe
+    ? "profile.comments.repliedToYou"
+    : item.commentBody.includes("?")
+      ? "profile.comments.asked"
+      : "profile.comments.commented";
+  // Một câu trả lời (của bất kỳ ai) mở thẳng mạch của gốc (hướng C, AC-R8); bình luận gốc mở danh sách như cũ.
+  const threadRootId = item.threadRootId;
+  const threadParam =
+    threadRootId !== undefined && (isReplyToMe || threadRootId !== item.commentId)
+      ? `&thread=${threadRootId}`
+      : "";
 
   return (
     <Card as="li" variant="tint" className="gap-2">
@@ -48,15 +59,21 @@ export function CommentNotificationCard({ item, now }: CommentNotificationCardPr
 
       <p className="text-sm">{t(lineKey, { name, questionNumber: item.questionNumber })}</p>
 
+      {isReplyToMe && item.replyToBody && (
+        <p className="text-muted-foreground border-border truncate border-l-2 pl-2.5 text-[13px]">
+          {t("profile.comments.replyQuote", { body: item.replyToBody })}
+        </p>
+      )}
+
       <RichText text={item.commentBody} className="line-clamp-2 text-sm text-muted-foreground" />
 
       {item.examVisible ? (
         <Link
-          href={`/exams/${item.examId}/solutions/${item.solutionId}?q=${item.questionNumber}&comments=1`}
+          href={`/exams/${item.examId}/solutions/${item.solutionId}?q=${item.questionNumber}&comments=1${threadParam}`}
           className={cn(buttonVariants({ variant: "secondary" }), "w-fit")}
         >
           <Reply aria-hidden />
-          {t("profile.comments.reply")}
+          {t(isReplyToMe ? "profile.comments.viewReply" : "profile.comments.reply")}
         </Link>
       ) : (
         // Đề không còn hiện (S8/AC-098) — KHÔNG BAO GIỜ một liên kết gãy: thay

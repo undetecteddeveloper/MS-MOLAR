@@ -25,7 +25,7 @@
 // `performSend` không tự set state lỗi nào, người gọi tự quyết định đặt vào
 // đâu, nên hai đường không bao giờ hiện trùng lặp.
 import { useEffect, useId, useState } from "react";
-import { X } from "lucide-react";
+import { ChevronLeft, X } from "lucide-react";
 import { OverlaySheet } from "@/components/shared/OverlaySheet";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Button } from "@/components/ui/button";
@@ -63,7 +63,19 @@ export interface CommentSheetProps {
   viewerIsSolutionAuthor: boolean;
   now: Date;
   onClose: () => void;
+  /** Mở thẳng mạch của bình luận gốc này (`?thread=<id>` từ thẻ "trả lời bạn" ở hồ sơ, AC-R8).
+   *  Không khớp bình luận gốc nào đang hiện thì bỏ qua, mở danh sách như thường. */
+  initialThreadId?: string;
 }
+
+/** Tên để điền `@Tên` và đặt chữ mờ ô trả lời — danh tính đã được che phía server. */
+function displayNameOf(comment: SolutionDetailComment): string {
+  return comment.author.kind === "named"
+    ? comment.author.displayName
+    : t("solutions.identity.anonymous");
+}
+
+type SheetMode = "list" | "thread";
 
 function postErrorText(error: Extract<PostCommentResult, { ok: false }>["error"]): string {
   switch (error.code) {
@@ -88,6 +100,7 @@ export function CommentSheet({
   viewerIsSolutionAuthor,
   now,
   onClose,
+  initialThreadId,
 }: CommentSheetProps) {
   const titleId = useId();
 
@@ -99,9 +112,25 @@ export function CommentSheet({
   const [dirtyOpen, setDirtyOpen] = useState(false);
   const [dirtyError, setDirtyError] = useState<string | null>(null);
   const [chunkState, setChunkState] = useState<ChunkState>("loading");
+  // Hướng C: tầng 1 = danh sách bình luận gốc, tầng 2 = mạch trả lời của MỘT gốc.
+  // Mỗi tầng giữ bản nháp riêng để quay lại không làm mất chữ đang gõ.
+  const [openThreadId, setOpenThreadId] = useState<string | null>(() =>
+    initialThreadId !== undefined && comments.some((c) => c.id === initialThreadId && !c.parentId)
+      ? initialThreadId
+      : null
+  );
+  const [threadText, setThreadText] = useState("");
+  const [replyTarget, setReplyTarget] = useState<SolutionDetailComment | null>(null);
+  const [focusKey, setFocusKey] = useState(0);
 
   const effectiveAnonymous = lockedAnonymous || isAnonymous;
-  const isDirty = text.trim() !== "";
+  const mode: SheetMode = openThreadId !== null ? "thread" : "list";
+  const rootComment = commentsList.find((c) => c.id === openThreadId) ?? null;
+  const roots = commentsList.filter((c) => !c.parentId);
+  const repliesOf = (rootId: string) => commentsList.filter((c) => c.parentId === rootId);
+  // Đích trả lời hiện tại của ô nhập ở màn mạch: câu được bấm "Trả lời", mặc định là gốc.
+  const activeReplyTarget = replyTarget ?? rootComment;
+  const isDirty = text.trim() !== "" || threadText.trim() !== "";
 
   useEffect(() => {
     let cancelled = false;
@@ -129,17 +158,24 @@ export function CommentSheet({
       .catch(() => setChunkState("error"));
   }
 
-  async function performSend(): Promise<{ ok: true } | { ok: false; message: string }> {
-    const trimmed = text.trim();
+  async function performSend(
+    key: SheetMode = mode
+  ): Promise<{ ok: true } | { ok: false; message: string }> {
+    const body = key === "thread" ? threadText : text;
+    const trimmed = body.trim();
     if (trimmed === "") {
       return { ok: false, message: t("solutions.comments.emptyError") };
     }
-    if (text.length > COMMENT_MAX_LENGTH) {
+    if (body.length > COMMENT_MAX_LENGTH) {
       return { ok: false, message: t("solutions.comments.tooLongError") };
     }
 
     setSending(true);
-    const result = await postComment(solutionId, questionId, text, effectiveAnonymous);
+    const replyToId = key === "thread" ? activeReplyTarget?.id : undefined;
+    const result =
+      replyToId !== undefined
+        ? await postComment(solutionId, questionId, body, effectiveAnonymous, replyToId)
+        : await postComment(solutionId, questionId, body, effectiveAnonymous);
     setSending(false);
 
     if (!result.ok) {
@@ -158,20 +194,28 @@ export function CommentSheet({
       body: posted.body,
       iReported: false,
       createdAt: posted.createdAt,
+      parentId: posted.parentId,
+      replyToId: posted.replyToId,
     };
     setCommentsList((prev) => [...prev, optimistic]);
-    setText("");
+    if (key === "thread") {
+      setThreadText("");
+      setReplyTarget(null);
+    } else {
+      setText("");
+    }
     setIsAnonymous(false);
     return { ok: true };
   }
 
   async function handleSendClick() {
     if (sending) return;
-    const result = await performSend();
+    const result = await performSend(mode);
     setSendError(result.ok ? null : result.message);
   }
 
-  function requestClose(): "closed" | "kept" {
+  // Đóng hẳn tấm trượt (nút X): chưa lưu thì hỏi.
+  function requestFullClose(): "closed" | "kept" {
     if (!isDirty) {
       onClose();
       return "closed";
@@ -180,8 +224,49 @@ export function CommentSheet({
     return "kept";
   }
 
+  // Escape / chạm scrim: ở màn mạch chỉ lùi một tầng về danh sách (AC-R9), ở
+  // danh sách mới đóng.
+  function requestClose(): "closed" | "kept" {
+    if (mode === "thread") {
+      backToList();
+      return "kept";
+    }
+    return requestFullClose();
+  }
+
+  function openThread(rootId: string, focus = false) {
+    setOpenThreadId(rootId);
+    setReplyTarget(null);
+    if (focus) setFocusKey((k) => k + 1);
+  }
+
+  function backToList() {
+    setOpenThreadId(null);
+    setReplyTarget(null);
+  }
+
+  // "Trả lời" ở danh sách → mở mạch của gốc; ở màn mạch → đặt đích. Trả lời một
+  // câu trả lời thì điền sẵn `@Tên` (R1); trả lời chính gốc thì không cần.
+  function handleReply(comment: SolutionDetailComment) {
+    if (mode === "list") {
+      openThread(comment.id, true);
+      return;
+    }
+    const isRoot = comment.id === openThreadId;
+    setReplyTarget(isRoot ? null : comment);
+    if (!isRoot) setThreadText(`@${displayNameOf(comment)} `);
+    setFocusKey((k) => k + 1);
+  }
+
   async function confirmDirtySave() {
-    const result = await performSend();
+    // Gửi bản nháp của tầng đang xem; nếu tầng đó trống thì gửi bản nháp của tầng kia.
+    const key: SheetMode =
+      (mode === "thread" ? threadText : text).trim() !== ""
+        ? mode
+        : mode === "thread"
+          ? "list"
+          : "thread";
+    const result = await performSend(key);
     if (result.ok) {
       setDirtyOpen(false);
       setDirtyError(null);
@@ -194,7 +279,32 @@ export function CommentSheet({
   }
 
   function handleDeleted(commentId: string) {
-    setCommentsList((prev) => prev.filter((c) => c.id !== commentId));
+    setCommentsList((prev) => {
+      const target = prev.find((c) => c.id === commentId);
+      const hasReplies =
+        target !== undefined && !target.parentId && prev.some((c) => c.parentId === commentId);
+      // Gốc còn trả lời → thành dòng mờ tại chỗ (R3), khớp với cách server xử lý.
+      if (hasReplies) {
+        return prev.map((c) =>
+          c.id === commentId
+            ? {
+                ...c,
+                placeholder: "deleted" as const,
+                body: "",
+                isMine: false,
+                iReported: false,
+                author: { kind: "anonymous" as const },
+                isSolutionAuthor: false,
+              }
+            : c
+        );
+      }
+      return prev.filter((c) => c.id !== commentId);
+    });
+    if (commentId === openThreadId) {
+      // Gốc vừa xoá mà không còn trả lời → mạch không còn gì để hiện.
+      if (!commentsList.some((c) => c.parentId === commentId)) backToList();
+    }
   }
 
   return (
@@ -202,15 +312,29 @@ export function CommentSheet({
       <OverlaySheet open onRequestClose={requestClose} titleId={titleId}>
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between gap-3">
-            <h2 id={titleId} className="text-foreground text-lg font-semibold">
-              {t("solutions.comments.title")} · {t("upload.questionLabel", { number: questionNumber })}
+            {mode === "thread" && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={t("solutions.comments.thread.back")}
+                onClick={backToList}
+              >
+                <ChevronLeft aria-hidden />
+              </Button>
+            )}
+            <h2 id={titleId} className="text-foreground flex-1 text-lg font-semibold">
+              {mode === "thread"
+                ? t("solutions.comments.thread.title")
+                : t("solutions.comments.title")}{" "}
+              · {t("upload.questionLabel", { number: questionNumber })}
             </h2>
             <Button
               type="button"
               variant="ghost"
               size="icon"
               aria-label={t("common.close")}
-              onClick={() => requestClose()}
+              onClick={() => requestFullClose()}
             >
               <X aria-hidden />
             </Button>
@@ -236,21 +360,57 @@ export function CommentSheet({
           )}
 
           {chunkState === "shown" &&
-            (commentsList.length === 0 ? (
+            mode === "list" &&
+            (roots.length === 0 ? (
               <p className="text-muted-foreground py-4 text-center text-sm">
                 {t("solutions.comments.empty")}
               </p>
             ) : (
               <ul className="divide-border flex flex-col divide-y">
-                {commentsList.map((comment) => (
-                  <CommentItem key={comment.id} comment={comment} now={now} onDeleted={handleDeleted} />
+                {roots.map((comment) => (
+                  <CommentItem
+                    key={comment.id}
+                    comment={comment}
+                    now={now}
+                    onDeleted={handleDeleted}
+                    onReply={handleReply}
+                    replyCount={repliesOf(comment.id).length}
+                    onOpenThread={openThread}
+                  />
                 ))}
               </ul>
             ))}
 
+          {chunkState === "shown" && mode === "thread" && rootComment && (
+            <>
+              <ul className="border-border bg-surface rounded-xl border px-3">
+                <CommentItem comment={rootComment} now={now} onDeleted={handleDeleted} />
+              </ul>
+              <ul className="divide-border border-border ml-4 flex flex-col divide-y border-l-2 pl-3">
+                {repliesOf(rootComment.id).map((comment) => (
+                  <CommentItem
+                    key={comment.id}
+                    comment={comment}
+                    now={now}
+                    onDeleted={handleDeleted}
+                    onReply={handleReply}
+                  />
+                ))}
+              </ul>
+            </>
+          )}
+
           <CommentComposer
-            value={text}
-            onChange={setText}
+            value={mode === "thread" ? threadText : text}
+            onChange={mode === "thread" ? setThreadText : setText}
+            placeholder={
+              mode === "thread"
+                ? rootComment && !rootComment.placeholder
+                  ? t("solutions.comments.replyPlaceholder", { name: displayNameOf(rootComment) })
+                  : t("solutions.comments.replyPlaceholderGeneric")
+                : undefined
+            }
+            focusKey={focusKey}
             isAnonymous={isAnonymous}
             onAnonymousChange={setIsAnonymous}
             lockedAnonymous={lockedAnonymous}

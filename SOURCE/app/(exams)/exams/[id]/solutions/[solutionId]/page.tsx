@@ -99,7 +99,7 @@ export default async function SolutionViewPage({
   searchParams,
 }: {
   params: Promise<{ id: string; solutionId: string }>;
-  searchParams: Promise<{ q?: string; comments?: string }>;
+  searchParams: Promise<{ q?: string; comments?: string; thread?: string }>;
 }) {
   const { id, solutionId } = await params;
 
@@ -165,6 +165,7 @@ export default async function SolutionViewPage({
         questionNodes={solution.questions.map(buildQuestionNode)}
         initialOpenQuestion={q}
         initialCommentsOpen={commentsOpen}
+        initialThreadId={sp.thread}
         viewerIdentity={viewerIdentity}
       />
     </PageContainer>

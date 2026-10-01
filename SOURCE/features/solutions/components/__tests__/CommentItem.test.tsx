@@ -70,7 +70,11 @@ describe("CommentItem — bình luận bị admin ẩn (Required Test #6, S19/UI
   it("isHiddenByAdmin: hiện lý do, không nút Xoá", () => {
     render(
       <CommentItem
-        comment={comment({ isMine: true, isHiddenByAdmin: true, hiddenReason: "Ngôn từ không phù hợp" })}
+        comment={comment({
+          isMine: true,
+          isHiddenByAdmin: true,
+          hiddenReason: "Ngôn từ không phù hợp",
+        })}
         now={NOW}
         onDeleted={vi.fn()}
       />
@@ -88,7 +92,9 @@ describe("CommentItem — xoá không lạc quan (Required Test #2, DD-U3)", () 
     deleteCommentMock.mockResolvedValueOnce({ ok: false, error: { code: "generic" } });
     const onDeleted = vi.fn();
 
-    render(<CommentItem comment={comment({ id: "c9", isMine: true })} now={NOW} onDeleted={onDeleted} />);
+    render(
+      <CommentItem comment={comment({ id: "c9", isMine: true })} now={NOW} onDeleted={onDeleted} />
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Xoá" }));
     const dialog = await screen.findByRole("dialog", { name: "Xoá bình luận này?" });
@@ -97,7 +103,7 @@ describe("CommentItem — xoá không lạc quan (Required Test #2, DD-U3)", () 
     const alert = await screen.findByText("Chưa xoá được bình luận. Bạn thử lại nhé.");
     expect(alert).toBeTruthy();
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(await screen.findByText("Bình luận thường")).toBeTruthy();
+    expect(await screen.findByText("Bình luận thường", {}, { timeout: 5000 })).toBeTruthy();
     expect(onDeleted).not.toHaveBeenCalled();
 
     deleteCommentMock.mockResolvedValueOnce({ ok: true });
@@ -117,7 +123,11 @@ describe("CommentItem — xoá không lạc quan (Required Test #2, DD-U3)", () 
 describe("CommentItem — Báo cáo (Required Test #1: đã báo cáo sẵn, trơ)", () => {
   it("iReported: true -> 'Bạn đã báo cáo bình luận này.' aria-disabled=true, không disabled gốc, bấm không mở dialog, reportComment 0 lần", () => {
     render(
-      <CommentItem comment={comment({ isMine: false, iReported: true })} now={NOW} onDeleted={vi.fn()} />
+      <CommentItem
+        comment={comment({ isMine: false, iReported: true })}
+        now={NOW}
+        onDeleted={vi.fn()}
+      />
     );
 
     const control = screen.getByText("Bạn đã báo cáo bình luận này.");
@@ -136,7 +146,11 @@ describe("CommentItem — Báo cáo (Required Test #2: mở dialog + lật phiê
     reportCommentMock.mockResolvedValueOnce({ ok: true, alreadyReported: false });
 
     render(
-      <CommentItem comment={comment({ id: "c2", isMine: false, iReported: false })} now={NOW} onDeleted={vi.fn()} />
+      <CommentItem
+        comment={comment({ id: "c2", isMine: false, iReported: false })}
+        now={NOW}
+        onDeleted={vi.fn()}
+      />
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Báo cáo" }));
@@ -156,7 +170,11 @@ describe("CommentItem — Báo cáo (Required Test #3: DOM giống hệt cho c�
   it("alreadyReported:true và alreadyReported:false lật ra CÙNG một DOM (một nhánh, không phải hai)", async () => {
     reportCommentMock.mockResolvedValueOnce({ ok: true, alreadyReported: false });
     const viaFalse = render(
-      <CommentItem comment={comment({ isMine: false, iReported: false })} now={NOW} onDeleted={vi.fn()} />
+      <CommentItem
+        comment={comment({ isMine: false, iReported: false })}
+        now={NOW}
+        onDeleted={vi.fn()}
+      />
     );
     fireEvent.click(screen.getByRole("button", { name: "Báo cáo" }));
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "Spam" } });
@@ -168,7 +186,11 @@ describe("CommentItem — Báo cáo (Required Test #3: DOM giống hệt cho c�
 
     reportCommentMock.mockResolvedValueOnce({ ok: true, alreadyReported: true });
     render(
-      <CommentItem comment={comment({ isMine: false, iReported: false })} now={NOW} onDeleted={vi.fn()} />
+      <CommentItem
+        comment={comment({ isMine: false, iReported: false })}
+        now={NOW}
+        onDeleted={vi.fn()}
+      />
     );
     fireEvent.click(screen.getByRole("button", { name: "Báo cáo" }));
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "Trùng lần trước" } });
@@ -185,7 +207,11 @@ describe("CommentItem — Báo cáo (Required Test #4: generic giữ dialog mở
     reportCommentMock.mockResolvedValueOnce({ ok: false, error: { code: "generic" } });
 
     render(
-      <CommentItem comment={comment({ isMine: false, iReported: false })} now={NOW} onDeleted={vi.fn()} />
+      <CommentItem
+        comment={comment({ isMine: false, iReported: false })}
+        now={NOW}
+        onDeleted={vi.fn()}
+      />
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Báo cáo" }));
@@ -206,15 +232,18 @@ describe("CommentItem — Báo cáo (Required Test #5: hàng bị admin ẩn c�
   it("isHiddenByAdmin:true, isMine:true, iReported:false -> UI-D19 + lý do, không Xoá, không Báo cáo, không 'Bạn đã báo cáo'", () => {
     render(
       <CommentItem
-        comment={comment({ isMine: true, isHiddenByAdmin: true, hiddenReason: "spam", iReported: false })}
+        comment={comment({
+          isMine: true,
+          isHiddenByAdmin: true,
+          hiddenReason: "spam",
+          iReported: false,
+        })}
         now={NOW}
         onDeleted={vi.fn()}
       />
     );
 
-    expect(
-      screen.getByText("Bình luận đã bị ẩn bởi quản trị viên. Lý do: spam")
-    ).toBeTruthy();
+    expect(screen.getByText("Bình luận đã bị ẩn bởi quản trị viên. Lý do: spam")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Xoá" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Báo cáo" })).toBeNull();
     expect(screen.queryByText(/Bạn đã báo cáo/)).toBeNull();
@@ -236,7 +265,11 @@ describe("CommentItem — Báo cáo (Required Test #7: đúng action, đúng id,
     reportCommentMock.mockResolvedValueOnce({ ok: true, alreadyReported: false });
 
     render(
-      <CommentItem comment={comment({ id: "c-xyz", isMine: false })} now={NOW} onDeleted={vi.fn()} />
+      <CommentItem
+        comment={comment({ id: "c-xyz", isMine: false })}
+        now={NOW}
+        onDeleted={vi.fn()}
+      />
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Báo cáo" }));

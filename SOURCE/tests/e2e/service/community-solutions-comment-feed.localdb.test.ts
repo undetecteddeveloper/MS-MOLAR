@@ -92,6 +92,9 @@ type RawFeedRow = {
   author_display_name: string | null;
   is_unread: boolean;
   exam_visible: boolean;
+  thread_root_id: string;
+  is_reply_to_me: boolean;
+  reply_to_body: string | null;
 };
 
 const FEED_ROW_KEYS = [
@@ -104,7 +107,10 @@ const FEED_ROW_KEYS = [
   "exam_visible",
   "is_unread",
   "question_number",
+  "reply_to_body",
   "solution_id",
+  "thread_root_id",
+  "is_reply_to_me",
 ].sort();
 
 /** Map hàng thô sang hình dạng `countUnreadComments` (task 26) cần — không

@@ -97,6 +97,9 @@ export interface SolutionViewScreenProps {
    *  `CommentSheet` của đúng câu đó (AC-068). Vô nghĩa khi
    *  `initialOpenQuestion` vắng mặt (không có câu đích nào để mở). */
   initialCommentsOpen: boolean;
+  /** `?thread=<id>` (hướng C) — mở thẳng mạch trả lời của bình luận gốc này trong `CommentSheet`
+   *  vừa mở sẵn; chỉ dùng MỘT lần, đóng tấm trượt là bỏ. */
+  initialThreadId?: string;
   /** Danh tính THẬT của người xem hiện tại (task 28) — chỉ dùng để dựng hàng
    *  bình luận lạc quan (không ẩn danh) trong `CommentSheet`; không ảnh hưởng
    *  gì tới phần còn lại của màn. Optional + mặc định ẩn danh: các test/nơi
@@ -117,9 +120,11 @@ export function SolutionViewScreen({
   questionNodes,
   initialOpenQuestion,
   initialCommentsOpen,
+  initialThreadId,
   viewerIdentity = { kind: "anonymous" },
 }: SolutionViewScreenProps) {
   const emptyTextId = useId();
+  const [pendingThreadId, setPendingThreadId] = useState(initialThreadId);
 
   // S4: khoá ô "Ẩn danh" của CommentComposer khi người xem là tác giả bài giải
   // VÀ bài đang ẩn danh — tính từ `solution` sẵn có (isMine/author), không bao
@@ -210,7 +215,7 @@ export function SolutionViewScreen({
             type="button"
             aria-disabled="true"
             aria-describedby={emptyTextId}
-            className={cn(chipVariants({ active: false }), "gap-1.5 px-3 tabular-nums h-11")}
+            className={cn(chipVariants({ active: false }), "h-11 gap-1.5 px-3 tabular-nums")}
           >
             <LayoutGrid aria-hidden className="size-4" />
             <span>{t("common.questionPalette")}</span>
@@ -275,7 +280,11 @@ export function SolutionViewScreen({
           viewerIdentity={viewerIdentity}
           viewerIsSolutionAuthor={solution.isMine}
           now={now}
-          onClose={() => setOpenCommentsQuestionId(null)}
+          initialThreadId={pendingThreadId}
+          onClose={() => {
+            setPendingThreadId(undefined);
+            setOpenCommentsQuestionId(null);
+          }}
         />
       )}
     </div>

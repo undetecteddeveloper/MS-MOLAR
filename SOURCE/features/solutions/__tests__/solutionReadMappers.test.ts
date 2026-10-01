@@ -66,6 +66,9 @@ const baseComment = {
   hidden_reason: null as string | null,
   i_reported: false,
   created_at: "2026-09-01T00:00:00.000Z",
+  parent_id: null as string | null,
+  reply_to_id: null as string | null,
+  placeholder: null as "deleted" | "hidden" | null,
 };
 
 function detailQuestion(overrides: Record<string, unknown> = {}) {
@@ -237,6 +240,61 @@ describe("getSolutionDetail — iReported and hidden-comment columns (rows 5-7)"
     const [comment] = detail!.questions[0].comments;
     expect(comment.isHiddenByAdmin).toBe(true);
     expect(comment.hiddenReason).toBe("spam");
+  });
+});
+
+describe("getSolutionDetail — trả lời một cấp (parent_id / reply_to_id / placeholder)", () => {
+  beforeEach(() => {
+    rpcMock.mockReset();
+  });
+
+  it("a reply keeps parentId and replyToId; a root has both null", async () => {
+    mockRpc([
+      detailRow({
+        questions: [
+          detailQuestion({
+            comments: [
+              { ...baseComment, id: "root" },
+              { ...baseComment, id: "rep", parent_id: "root", reply_to_id: "root" },
+            ],
+          }),
+        ],
+      }),
+    ]);
+
+    const [root, rep] = (await getSolutionDetail("sol-1"))!.questions[0].comments;
+
+    expect(root).toMatchObject({ id: "root", parentId: null, replyToId: null });
+    expect("placeholder" in root).toBe(false);
+    expect(rep).toMatchObject({ id: "rep", parentId: "root", replyToId: "root" });
+  });
+
+  it("a placeholder row (null identity, null body) maps to an anonymous author, empty body and the placeholder kind", async () => {
+    mockRpc([
+      detailRow({
+        questions: [
+          detailQuestion({
+            comments: [
+              {
+                ...baseComment,
+                author_id: null,
+                author_display_name: null,
+                author_avatar_path: null,
+                body: null,
+                placeholder: "deleted",
+              },
+            ],
+          }),
+        ],
+      }),
+    ]);
+
+    const [comment] = (await getSolutionDetail("sol-1"))!.questions[0].comments;
+
+    expect(comment.placeholder).toBe("deleted");
+    expect(comment.body).toBe("");
+    expect(comment.author).toEqual({ kind: "anonymous" });
+    expect(comment.isMine).toBe(false);
   });
 });
 
