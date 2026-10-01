@@ -95,11 +95,6 @@ export function PointsPanel({ questions, parts, onApply, disabled = false }: Poi
   const [rangeFrom, setRangeFrom] = useState("");
   const [rangeTo, setRangeTo] = useState("");
   const [totalInput, setTotalInput] = useState("");
-  // Trọng số theo khoá `part:number`. Vắng khoá = trọng số 1 (chia đều). Giữ
-  // thưa như vậy để "chia đều" không phải là một mảng số 1 phải đồng bộ mỗi
-  // lần phạm vi đổi — nó là trạng thái KHÔNG có gì cả.
-  const [weights, setWeights] = useState<Record<string, string>>({});
-  const [showWeights, setShowWeights] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const examTotal = sumPoints(questions.map((q) => q.points));
@@ -115,8 +110,6 @@ export function PointsPanel({ questions, parts, onApply, disabled = false }: Poi
         ? partQuestions.filter((q) => q.number >= from && q.number <= to)
         : [];
 
-  const keyOf = (q: { part: number; number: number }) => `${q.part}:${q.number}`;
-
   function apply() {
     setError(null);
     // `,` → `.`: bàn phím Việt gõ "2,5" là chuyện thường, và prompt trích xuất
@@ -130,13 +123,12 @@ export function PointsPanel({ questions, parts, onApply, disabled = false }: Poi
       setError(t("upload.pointsPanelEmptyScope"));
       return;
     }
-    const w = scoped.map((q) => {
-      const raw = weights[keyOf(q)];
-      if (raw === undefined || raw.trim() === "") return 1;
-      const n = Number(raw.replace(",", "."));
-      return Number.isFinite(n) && n >= 0 ? n : 1;
-    });
-    const distributed = distributePoints(total, w);
+    // Chỉ chia ĐỀU (trọng số 1 cho mọi câu). Câu nào đáng khác đi thì sửa tay ở
+    // ô điểm trên thẻ câu sau khi áp — panel không giữ bảng tỉ lệ riêng.
+    const distributed = distributePoints(
+      total,
+      scoped.map(() => 1)
+    );
     // Rỗng = luật chia từ chối vì kết quả sẽ có câu ≤ 0 — đúng thứ cổng publish
     // chặn. Báo ra thay vì ghi một biểu điểm mà tác giả sẽ phải tự đi tìm lỗi.
     if (distributed.length === 0) {
@@ -214,27 +206,30 @@ export function PointsPanel({ questions, parts, onApply, disabled = false }: Poi
             {/* Phạm vi — phần, hoặc dãy câu trong phần đó. Dãy câu LUÔN nằm
                 trong một phần vì danh tính câu ở layer 4 là cặp (part, number)
                 (ADR-0005): "câu 5 đến 12" không có nghĩa nếu không nói phần nào. */}
-            <div className="flex items-center gap-2">
-              <Select
-                value={scopePart}
-                onChange={(e) => setScopePart(Number(e.target.value))}
-                disabled={disabled}
-                aria-label={t("upload.pointsPanelPartLabel")}
-                // `min-w-0` trên vỏ: chiều rộng tối thiểu mặc định của <select>
-                // là option DÀI NHẤT, và tiêu đề phần đề gốc ("PHẦN I. Câu trắc
-                // nghiệm nhiều phương án lựa chọn.") dài hơn cả panel — không có
-                // nó thì `flex-1` không co được và nút đổi phạm vi bị đẩy ra
-                // ngoài mép panel.
-                wrapperClassName="min-w-0 flex-1"
-                className={FIELD}
-              >
-                {partNumbers.map((pn) => (
-                  <option key={pn} value={pn}>
-                    {parts.find((p) => p.number === pn)?.title ??
-                      t("upload.partLabel", { part: pn })}
-                  </option>
-                ))}
-              </Select>
+            {/* `min-w-0` trên vỏ: chiều rộng tối thiểu mặc định của <select> là
+                option DÀI NHẤT, và tiêu đề phần đề gốc ("PHẦN I. Câu trắc
+                nghiệm nhiều phương án lựa chọn.") dài hơn cả panel. */}
+            <Select
+              value={scopePart}
+              onChange={(e) => setScopePart(Number(e.target.value))}
+              disabled={disabled}
+              aria-label={t("upload.pointsPanelPartLabel")}
+              wrapperClassName="min-w-0"
+              className={FIELD}
+            >
+              {partNumbers.map((pn) => (
+                <option key={pn} value={pn}>
+                  {parts.find((p) => p.number === pn)?.title ??
+                    t("upload.partLabel", { part: pn })}
+                </option>
+              ))}
+            </Select>
+
+            {/* Tóm tắt phạm vi và nút đổi phạm vi chung MỘT hàng: select độc chiếm
+                bề ngang ở trên (tiêu đề phần đọc được nhiều hơn), còn hàng này
+                không còn ô trống bên phải như khi link nằm cạnh select. */}
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-muted-foreground min-w-0 text-sm">{scopeSummary}</p>
               <Button
                 type="button"
                 variant="link"
@@ -258,7 +253,7 @@ export function PointsPanel({ questions, parts, onApply, disabled = false }: Poi
                   onChange={(e) => setRangeFrom(e.target.value)}
                   disabled={disabled}
                   aria-label={t("upload.pointsPanelFromLabel")}
-                  className={cn(FIELD, "w-24")}
+                  className={cn(FIELD, "min-w-0 flex-1")}
                 />
                 <span className="text-muted-foreground text-sm">
                   {t("upload.pointsPanelRangeTo")}
@@ -270,17 +265,17 @@ export function PointsPanel({ questions, parts, onApply, disabled = false }: Poi
                   onChange={(e) => setRangeTo(e.target.value)}
                   disabled={disabled}
                   aria-label={t("upload.pointsPanelToLabel")}
-                  className={cn(FIELD, "w-24")}
+                  className={cn(FIELD, "min-w-0 flex-1")}
                 />
               </div>
             )}
 
-            <p className="text-muted-foreground text-sm">{scopeSummary}</p>
-
-            {/* `flex-wrap`: ở 360px panel rộng 264px (đứng cạnh nút hỗ trợ), ba
-                thứ trên một hàng không vừa — nút Chia điểm xuống dòng, vẫn căn
-                phải nhờ `ml-auto`. */}
-            <div className="flex flex-wrap items-center gap-2">
+            {/* Ô nhập `flex-1`: nó nhận hết bề ngang còn lại giữa chữ "điểm" và
+                nút, nên hàng luôn kín từ mép trái tới mép phải — không còn
+                khoảng trống giữa ô và nút như khi ô cố định `w-28` + nút
+                `ml-auto`. Không `flex-wrap`: ở 360px (panel 264px, trừ đệm còn
+                232px) nút ~90px + chữ ~35px + khe 16px vẫn chừa ô ~90px. */}
+            <div className="flex items-center gap-2">
               <Input
                 type="number"
                 inputMode="decimal"
@@ -291,61 +286,13 @@ export function PointsPanel({ questions, parts, onApply, disabled = false }: Poi
                 disabled={disabled}
                 placeholder={t("upload.pointsPanelTotalPlaceholder")}
                 aria-label={t("upload.pointsPanelTotalLabel")}
-                className={cn(FIELD, "w-28")}
+                className={cn(FIELD, "min-w-0 flex-1")}
               />
               <span className="text-muted-foreground text-sm">{t("upload.pointsSuffix")}</span>
-              <Button
-                type="button"
-                size="sm"
-                onClick={apply}
-                disabled={disabled}
-                className="ml-auto"
-              >
+              <Button type="button" size="sm" onClick={apply} disabled={disabled}>
                 {t("upload.pointsPanelApply")}
               </Button>
             </div>
-
-            {/* Trọng số — mặc định ĐÓNG. Chia đều là thứ tác giả muốn ở đại đa
-                số lượt dùng; mở sẵn 40 ô trọng số biến thao tác một dòng thành
-                một bảng tính. */}
-            <Button
-              type="button"
-              variant="link"
-              size="sm"
-              onClick={() => setShowWeights((v) => !v)}
-              aria-expanded={showWeights}
-              className="self-start px-0"
-            >
-              {showWeights ? t("upload.pointsPanelHideRatio") : t("upload.pointsPanelShowRatio")}
-            </Button>
-
-            {showWeights && scoped.length > 0 && (
-              <div className="bg-surface motion-unfold max-h-40 overflow-y-auto rounded-xl p-3">
-                <p className="text-muted-foreground mb-2 text-sm">
-                  {t("upload.pointsPanelRatioHint")}
-                </p>
-                <ul className="flex flex-col gap-1.5">
-                  {scoped.map((q) => (
-                    <li key={keyOf(q)} className="flex items-center justify-between gap-2">
-                      <span className="text-sm">
-                        {t("upload.questionLabel", { number: q.number })}
-                      </span>
-                      <Input
-                        type="number"
-                        min={0}
-                        step="any"
-                        value={weights[keyOf(q)] ?? ""}
-                        onChange={(e) => setWeights((w) => ({ ...w, [keyOf(q)]: e.target.value }))}
-                        disabled={disabled}
-                        placeholder="1"
-                        aria-label={t("upload.pointsPanelRatioLabel", { number: q.number })}
-                        className="h-9 w-20 px-3 text-right text-sm"
-                      />
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
 
             {error && (
               <p role="alert" className="text-destructive text-sm">

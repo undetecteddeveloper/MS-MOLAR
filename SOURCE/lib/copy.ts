@@ -450,10 +450,6 @@ export const copy = {
   "upload.pointsPanelTotalLabel": "Tổng điểm cho phạm vi đã chọn",
   "upload.pointsPanelTotalPlaceholder": "vd 3",
   "upload.pointsPanelApply": "Chia điểm",
-  "upload.pointsPanelShowRatio": "Chỉnh tỉ lệ từng câu",
-  "upload.pointsPanelHideRatio": "Ẩn tỉ lệ",
-  "upload.pointsPanelRatioHint": "Để trống là chia đều. Số lớn hơn = câu đó nặng điểm hơn.",
-  "upload.pointsPanelRatioLabel": "Tỉ lệ điểm câu {number}",
   "upload.pointsPanelInvalidTotal": "Nhập tổng điểm lớn hơn 0.",
   "upload.pointsPanelEmptyScope": "Chọn phần hoặc dãy câu có ít nhất một câu.",
   "upload.pointsPanelCannotSplit":

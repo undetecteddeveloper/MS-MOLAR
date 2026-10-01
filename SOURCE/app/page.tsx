@@ -120,8 +120,14 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ a
           {/* Hai cột chỉ khi cột phải có mặt. Lúc form đăng nhập mở, cột phải
               ẩn mà lưới vẫn hai cột thì form bị dồn sang trái nửa màn hình —
               engineer 2026-09-06: form phải nằm giữa. */}
+          {/* `grid-cols-1` (= minmax(0,1fr)) là lớp CHẶN TRÀN mobile, không phải
+              trang trí: lưới không khai cột thì cột ngầm là `auto`, và `auto`
+              không co dưới min-content của con — tiêu đề thẻ đề `truncate`
+              (nowrap) có min-content bằng cả tên đề, nên cột phình rộng hơn màn
+              hình và kéo mọi thẻ ra khỏi mép phải. `overflow-x: hidden` ở
+              globals.css chỉ che thanh cuộn, không trả lại bề rộng. */}
           <div
-            className={`grid items-center gap-10 ${showAside ? "lg:grid-cols-2 lg:gap-12" : ""}`}
+            className={`grid grid-cols-1 items-center gap-10 ${showAside ? "lg:grid-cols-2 lg:gap-12" : ""}`}
           >
             <div className="flex flex-col gap-6">
               <HomeStage auth={authMode} signedIn={user !== null} />
