@@ -219,6 +219,33 @@ describe("CommentSheet — mạch trả lời (AC-R1, AC-R2, AC-R9)", () => {
   });
 });
 
+describe("CommentSheet — tiêu điểm khi đổi tầng (AC-R9)", () => {
+  it('vào mạch → tiêu điểm ở nút ←; lùi về danh sách → tiêu điểm trở lại đúng nút "N trả lời" vừa bấm', async () => {
+    render(<CommentSheet {...baseProps()} />);
+    await screen.findByText("Sao đỉnh lại là (2; −1) vậy ạ?", {}, { timeout: 5000 });
+
+    fireEvent.click(screen.getByRole("button", { name: /^2 trả lời/ }));
+    const back = await screen.findByRole("button", { name: "Về danh sách bình luận" });
+    await vi.waitFor(() => expect(document.activeElement).toBe(back));
+
+    fireEvent.click(back);
+    const threadButton = await screen.findByRole("button", { name: /^2 trả lời/ });
+    await vi.waitFor(() => expect(document.activeElement).toBe(threadButton));
+  });
+
+  it("bấm Trả lời ở danh sách → tiêu điểm ở ô nhập (không bị nút ← giành lại)", async () => {
+    render(<CommentSheet {...baseProps()} />);
+    const other = (await screen.findByText("Một bình luận khác", {}, { timeout: 5000 })).closest(
+      "li"
+    ) as HTMLElement;
+
+    fireEvent.click(within(other).getByRole("button", { name: "Trả lời" }));
+
+    const box = await screen.findByPlaceholderText("Trả lời Lê Hoàng…");
+    await vi.waitFor(() => expect(document.activeElement).toBe(box));
+  });
+});
+
 describe("CommentSheet — xoá gốc còn trả lời (AC-R4, AC-R6)", () => {
   it("gốc của tôi còn trả lời → thành dòng mờ không nút, trả lời còn nguyên; gốc không còn trả lời → biến mất", async () => {
     deleteCommentMock.mockResolvedValue({ ok: true });

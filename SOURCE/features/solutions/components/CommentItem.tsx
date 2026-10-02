@@ -154,6 +154,7 @@ export function CommentItem({
     onOpenThread && replyCount > 0 ? (
       <button
         type="button"
+        data-thread-button={comment.id}
         onClick={() => onOpenThread(comment.id)}
         className="border-border bg-surface text-foreground flex min-h-11 w-full items-center justify-between gap-2 rounded-xl border px-3 text-sm font-medium"
       >

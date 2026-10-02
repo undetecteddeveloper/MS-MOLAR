@@ -24,7 +24,7 @@
 // hiện lỗi TRONG hộp thoại (`dirtyError`, Reference Contract Value #24) —
 // `performSend` không tự set state lỗi nào, người gọi tự quyết định đặt vào
 // đâu, nên hai đường không bao giờ hiện trùng lặp.
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { ChevronLeft, X } from "lucide-react";
 import { OverlaySheet } from "@/components/shared/OverlaySheet";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -122,6 +122,13 @@ export function CommentSheet({
   const [threadText, setThreadText] = useState("");
   const [replyTarget, setReplyTarget] = useState<SolutionDetailComment | null>(null);
   const [focusKey, setFocusKey] = useState(0);
+  // Tiêu điểm theo người dùng khi đổi tầng: vào mạch → nút ←; lùi về danh sách → đúng nút "N trả lời"
+  // vừa bấm (phần tử cũ bị gỡ khỏi cây nên trình duyệt thả tiêu điểm ra body). Bấm "Trả lời" ở danh
+  // sách đã chủ động đưa tiêu điểm vào ô nhập nên không giành lại.
+  const backButtonRef = useRef<HTMLButtonElement>(null);
+  const shownMode = useRef<SheetMode>(openThreadId !== null ? "thread" : "list");
+  const lastThreadId = useRef<string | null>(openThreadId);
+  const composerOwnsFocus = useRef(false);
 
   const effectiveAnonymous = lockedAnonymous || isAnonymous;
   const mode: SheetMode = openThreadId !== null ? "thread" : "list";
@@ -171,6 +178,19 @@ export function CommentSheet({
       .then(() => setChunkState("shown"))
       .catch(() => setChunkState("error"));
   }
+
+  useEffect(() => {
+    if (shownMode.current === mode) return;
+    shownMode.current = mode;
+    if (mode === "thread") {
+      if (!composerOwnsFocus.current) backButtonRef.current?.focus();
+      composerOwnsFocus.current = false;
+    } else if (lastThreadId.current !== null) {
+      document
+        .querySelector<HTMLElement>(`[data-thread-button="${lastThreadId.current}"]`)
+        ?.focus();
+    }
+  }, [mode]);
 
   async function performSend(
     key: SheetMode = mode
@@ -249,6 +269,8 @@ export function CommentSheet({
   }
 
   function openThread(rootId: string, focus = false) {
+    lastThreadId.current = rootId;
+    composerOwnsFocus.current = focus;
     setOpenThreadId(rootId);
     setReplyTarget(null);
     if (focus) setFocusKey((k) => k + 1);
@@ -331,6 +353,7 @@ export function CommentSheet({
                 type="button"
                 variant="ghost"
                 size="icon"
+                ref={backButtonRef}
                 aria-label={t("solutions.comments.thread.back")}
                 onClick={backToList}
               >
