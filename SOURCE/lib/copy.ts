@@ -1194,6 +1194,7 @@ export const copy = {
   // Trả lời một cấp (hướng C) — docs/design/community-solutions-comment-replies.md.
   "solutions.comments.replyAction": "Trả lời",
   "solutions.comments.replyCount": "{count} trả lời",
+  "solutions.comments.replyLatest": "mới nhất {time}",
   "solutions.comments.thread.title": "Trả lời",
   "solutions.comments.thread.back": "Về danh sách bình luận",
   "solutions.comments.deletedPlaceholder": "Bình luận đã bị xoá.",

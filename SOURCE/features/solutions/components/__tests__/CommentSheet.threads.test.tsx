@@ -90,12 +90,30 @@ describe("CommentSheet — danh sách chỉ hiện bình luận gốc (AC-R1)", 
     ).toBeTruthy();
     expect(screen.getByText("Một bình luận khác")).toBeTruthy();
     expect(screen.queryByText("Thay x = 2 vào nhé")).toBeNull();
-    expect(
-      screen
-        .getAllByRole("button", { name: /trả lời$/ })
-        .filter((b) => /^\d+ trả lời/.test(b.textContent ?? ""))
-    ).toHaveLength(1);
-    expect(screen.getByRole("button", { name: "2 trả lời" })).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: /^\d+ trả lời/ })).toHaveLength(1);
+    expect(screen.getByRole("button", { name: /^2 trả lời/ })).toBeTruthy();
+  });
+});
+
+describe('CommentSheet — xem nhanh mạch trên nút "N trả lời"', () => {
+  it("hiện avatar của người trả lời CÓ TÊN (không chỗ giữ ảnh cho người ẩn danh) + thời điểm trả lời mới nhất", async () => {
+    render(<CommentSheet {...baseProps()} />);
+    await screen.findByText("Sao đỉnh lại là (2; −1) vậy ạ?", {}, { timeout: 5000 });
+
+    const button = screen.getByRole("button", { name: /^2 trả lời/ });
+    expect(button.textContent).toContain("mới nhất");
+    // ReplyA có tên (AnhPhat), ReplyB ẩn danh → đúng MỘT avatar (chữ cái đầu), không có avatar ẩn danh.
+    expect(within(button).getAllByText("A")).toHaveLength(1);
+    expect(button.querySelectorAll("svg").length).toBe(1); // chỉ mũi tên ›
+  });
+
+  it("mọi người trả lời đều ẩn danh → không có avatar nào, vẫn có số và thời điểm", async () => {
+    render(<CommentSheet {...baseProps({ comments: [ROOT, REPLY_B] })} />);
+    await screen.findByText("Sao đỉnh lại là (2; −1) vậy ạ?", {}, { timeout: 5000 });
+
+    const button = screen.getByRole("button", { name: /^1 trả lời/ });
+    expect(button.querySelector("[aria-hidden=true] span, img")).toBeNull();
+    expect(button.textContent).toContain("mới nhất");
   });
 });
 
@@ -104,7 +122,7 @@ describe("CommentSheet — mạch trả lời (AC-R1, AC-R2, AC-R9)", () => {
     render(<CommentSheet {...baseProps()} />);
     await screen.findByText("Sao đỉnh lại là (2; −1) vậy ạ?");
 
-    fireEvent.click(screen.getByRole("button", { name: "2 trả lời" }));
+    fireEvent.click(screen.getByRole("button", { name: /^2 trả lời/ }));
 
     expect(await screen.findByRole("heading", { name: "Trả lời · Câu 2" })).toBeTruthy();
     expect(await screen.findByText("Thay x = 2 vào nhé")).toBeTruthy();
@@ -130,7 +148,7 @@ describe("CommentSheet — mạch trả lời (AC-R1, AC-R2, AC-R9)", () => {
     });
     render(<CommentSheet {...baseProps()} />);
     await screen.findByText("Sao đỉnh lại là (2; −1) vậy ạ?");
-    fireEvent.click(screen.getByRole("button", { name: "2 trả lời" }));
+    fireEvent.click(screen.getByRole("button", { name: /^2 trả lời/ }));
 
     fireEvent.change(await screen.findByPlaceholderText("Trả lời Lê Hoàng…"), {
       target: { value: "Cảm ơn bạn" },
@@ -157,7 +175,7 @@ describe("CommentSheet — mạch trả lời (AC-R1, AC-R2, AC-R9)", () => {
     });
     render(<CommentSheet {...baseProps()} />);
     await screen.findByText("Sao đỉnh lại là (2; −1) vậy ạ?");
-    fireEvent.click(screen.getByRole("button", { name: "2 trả lời" }));
+    fireEvent.click(screen.getByRole("button", { name: /^2 trả lời/ }));
     const mine = await screen.findByText("Mình cũng nhầm chỗ này");
 
     const row = mine.closest("li") as HTMLElement;
@@ -176,14 +194,14 @@ describe("CommentSheet — mạch trả lời (AC-R1, AC-R2, AC-R9)", () => {
     const onClose = vi.fn();
     render(<CommentSheet {...baseProps({ onClose })} />);
     await screen.findByText("Sao đỉnh lại là (2; −1) vậy ạ?");
-    fireEvent.click(screen.getByRole("button", { name: "2 trả lời" }));
+    fireEvent.click(screen.getByRole("button", { name: /^2 trả lời/ }));
     await screen.findByRole("heading", { name: "Trả lời · Câu 2" });
 
     fireEvent.keyDown(document, { key: "Escape" });
     expect(await screen.findByRole("heading", { name: "Bình luận · Câu 2" })).toBeTruthy();
     expect(onClose).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole("button", { name: "2 trả lời" }));
+    fireEvent.click(screen.getByRole("button", { name: /^2 trả lời/ }));
     fireEvent.click(await screen.findByRole("button", { name: "Về danh sách bình luận" }));
     expect(await screen.findByRole("heading", { name: "Bình luận · Câu 2" })).toBeTruthy();
 
@@ -228,7 +246,7 @@ describe("CommentSheet — xoá gốc còn trả lời (AC-R4, AC-R6)", () => {
     expect(within(placeholderRow).queryByRole("button", { name: "Trả lời" })).toBeNull();
     expect(within(placeholderRow).queryByRole("button", { name: "Xoá" })).toBeNull();
     expect(within(placeholderRow).queryByRole("button", { name: "Báo cáo" })).toBeNull();
-    expect(within(placeholderRow).getByRole("button", { name: "1 trả lời" })).toBeTruthy();
+    expect(within(placeholderRow).getByRole("button", { name: /^1 trả lời/ })).toBeTruthy();
 
     const soloRow = screen.getByText("Gốc không ai trả lời").closest("li") as HTMLElement;
     fireEvent.click(within(soloRow).getByRole("button", { name: "Xoá" }));
@@ -250,7 +268,7 @@ describe("CommentSheet — xoá gốc còn trả lời (AC-R4, AC-R6)", () => {
     );
 
     expect(await screen.findByText("Bình luận đã bị ẩn bởi quản trị viên.")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "1 trả lời" }));
+    fireEvent.click(screen.getByRole("button", { name: /^1 trả lời/ }));
     expect(await screen.findByText("Thay x = 2 vào nhé")).toBeTruthy();
     expect(screen.getByPlaceholderText("Viết câu trả lời…")).toBeTruthy();
   });

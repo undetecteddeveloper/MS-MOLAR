@@ -42,6 +42,7 @@ import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { ReportDialog } from "@/features/solutions/components/ReportDialog";
 import { Badge } from "@/components/ui/badge";
 import { ChevronRight, Reply } from "lucide-react";
+import { Avatar } from "@/components/shared/Avatar";
 import {
   deleteComment,
   reportComment,
@@ -50,6 +51,7 @@ import {
 import type { SolutionDetailComment } from "@/features/solutions/queries";
 import { relativeTime } from "@/lib/format/relativeTime";
 import { t } from "@/lib/copy";
+import { cn } from "@/lib/utils";
 
 const LazyRichText = dynamic(() => import("@/components/shared/RichText").then((m) => m.RichText), {
   ssr: false,
@@ -74,6 +76,12 @@ export interface CommentItemProps {
   onReply?: (comment: SolutionDetailComment) => void;
   /** Số trả lời đang hiện của gốc này; > 0 kèm `onOpenThread` thì có nút "N trả lời ›". */
   replyCount?: number;
+  /** Xem nhanh mạch trên nút "N trả lời ›": avatar của người trả lời CÓ TÊN (người ẩn danh
+   *  không hiện gì, kể cả chỗ giữ ảnh) + thời điểm trả lời mới nhất. */
+  replyPreview?: {
+    avatars: Array<{ displayName: string; avatarUrl?: string | null }>;
+    latestAt: string;
+  };
   onOpenThread?: (rootId: string) => void;
 }
 
@@ -89,6 +97,7 @@ export function CommentItem({
   onDeleted,
   onReply,
   replyCount = 0,
+  replyPreview,
   onOpenThread,
 }: CommentItemProps) {
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -148,8 +157,33 @@ export function CommentItem({
         onClick={() => onOpenThread(comment.id)}
         className="border-border bg-surface text-foreground flex min-h-11 w-full items-center justify-between gap-2 rounded-xl border px-3 text-sm font-medium"
       >
-        {t("solutions.comments.replyCount", { count: replyCount })}
-        <ChevronRight aria-hidden className="size-4" />
+        <span className="flex min-w-0 items-center gap-2">
+          {replyPreview && replyPreview.avatars.length > 0 && (
+            <span aria-hidden className="flex shrink-0 items-center">
+              {replyPreview.avatars.map((a, i) => (
+                <Avatar
+                  key={`${a.displayName}-${i}`}
+                  src={a.avatarUrl ?? null}
+                  name={a.displayName}
+                  size={24}
+                  className={cn("bg-card ring-surface ring-2", i > 0 && "-ml-2")}
+                />
+              ))}
+            </span>
+          )}
+          <span className="truncate">
+            {t("solutions.comments.replyCount", { count: replyCount })}
+            {replyPreview && (
+              <span className="text-muted-foreground font-normal">
+                {" · "}
+                {t("solutions.comments.replyLatest", {
+                  time: relativeTime(replyPreview.latestAt, now),
+                })}
+              </span>
+            )}
+          </span>
+        </span>
+        <ChevronRight aria-hidden className="size-4 shrink-0" />
       </button>
     ) : null;
 

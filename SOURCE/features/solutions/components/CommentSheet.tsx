@@ -128,6 +128,20 @@ export function CommentSheet({
   const rootComment = commentsList.find((c) => c.id === openThreadId) ?? null;
   const roots = commentsList.filter((c) => !c.parentId);
   const repliesOf = (rootId: string) => commentsList.filter((c) => c.parentId === rootId);
+  // Avatar chỉ của người trả lời CÓ TÊN (tối đa 3, mới nhất trước, bỏ trùng tên); ẩn danh bỏ qua hẳn.
+  const replyPreviewOf = (rootId: string) => {
+    const replies = repliesOf(rootId);
+    if (replies.length === 0) return undefined;
+    const avatars: Array<{ displayName: string; avatarUrl?: string | null }> = [];
+    for (const r of [...replies].reverse()) {
+      if (r.author.kind !== "named" || avatars.length >= 3) continue;
+      const named = r.author;
+      if (!avatars.some((a) => a.displayName === named.displayName)) {
+        avatars.push({ displayName: named.displayName, avatarUrl: named.avatarUrl ?? null });
+      }
+    }
+    return { avatars, latestAt: replies[replies.length - 1].createdAt };
+  };
   // Đích trả lời hiện tại của ô nhập ở màn mạch: câu được bấm "Trả lời", mặc định là gốc.
   const activeReplyTarget = replyTarget ?? rootComment;
   const isDirty = text.trim() !== "" || threadText.trim() !== "";
@@ -375,6 +389,7 @@ export function CommentSheet({
                     onDeleted={handleDeleted}
                     onReply={handleReply}
                     replyCount={repliesOf(comment.id).length}
+                    replyPreview={replyPreviewOf(comment.id)}
                     onOpenThread={openThread}
                   />
                 ))}
