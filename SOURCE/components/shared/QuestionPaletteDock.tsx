@@ -31,7 +31,11 @@ import { t } from "@/lib/copy";
 import { cn } from "@/lib/utils";
 import { chipVariants } from "@/components/ui/chip";
 import { POP_EXIT_MS, usePresence } from "@/components/shared/usePresence";
-import { QuestionPagination, type QuestionCell } from "@/components/shared/QuestionPagination";
+import {
+  QuestionPagination,
+  type QuestionCell,
+  type QuestionGroup,
+} from "@/components/shared/QuestionPagination";
 
 interface QuestionPaletteDockProps {
   current: number;
@@ -50,6 +54,10 @@ interface QuestionPaletteDockProps {
   panelTitle?: string;
   /** Dòng phụ cạnh tiêu đề, vd "40 câu" (AC-049). */
   panelMeta?: string;
+  /** Chia mục theo PHẦN của đề (≥ 2 mục mới có tác dụng). */
+  groups?: QuestionGroup[];
+  /** `bottom` (mặc định): bảng thả xuống dưới nút. `top`: bảng mở LÊN trên nút — dùng khi nút nằm sát đáy trang/khung nhìn. */
+  placement?: "bottom" | "top";
   onJump: (index: number) => void;
   className?: string;
 }
@@ -63,6 +71,8 @@ export function QuestionPaletteDock({
   triggerLabel,
   panelTitle,
   panelMeta,
+  groups,
+  placement = "bottom",
   onJump,
   className,
 }: QuestionPaletteDockProps) {
@@ -137,8 +147,11 @@ export function QuestionPaletteDock({
           aria-label={t("common.questionPalette")}
           data-closing={closing ? "" : undefined}
           inert={closing || undefined}
-          style={{ transformOrigin: "top right" }}
-          className="motion-pop border-border bg-popover absolute top-full right-0 z-20 mt-2 w-[min(20rem,calc(100vw-2rem))] rounded-xl border p-1.5"
+          style={{ transformOrigin: placement === "top" ? "bottom right" : "top right" }}
+          className={cn(
+            "motion-pop border-border bg-popover absolute right-0 z-20 w-[min(20rem,calc(100vw-2rem))] rounded-xl border p-3",
+            placement === "top" ? "bottom-full mb-2" : "top-full mt-2"
+          )}
         >
           <QuestionPagination
             variant="popover"
@@ -149,6 +162,7 @@ export function QuestionPaletteDock({
             cells={cells}
             panelTitle={panelTitle}
             panelMeta={panelMeta}
+            groups={groups}
             onJump={jump}
           />
         </section>

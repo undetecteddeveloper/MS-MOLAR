@@ -30,4 +30,5 @@ export {
 export { listExamsRanked } from "./ranking";
 export { searchExamTitles, SEARCH_SUGGESTION_LIMIT, type ExamSearchHit } from "./search";
 export { getExamForPlayer } from "./player";
+export { getQuestionPartNumbers } from "./parts";
 export { getResult, type ExamResult, type ResultQuestion } from "./result";

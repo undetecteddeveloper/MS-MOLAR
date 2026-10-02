@@ -45,7 +45,7 @@ import { t } from "@/lib/copy";
 import { cn } from "@/lib/utils";
 import { chipVariants } from "@/components/ui/chip";
 import { QuestionPaletteDock } from "@/components/shared/QuestionPaletteDock";
-import type { QuestionCell } from "@/components/shared/QuestionPagination";
+import type { QuestionCell, QuestionGroup } from "@/components/shared/QuestionPagination";
 import {
   SolutionAuthorCard,
   type SolutionAuthorCardHeader,
@@ -100,6 +100,8 @@ export interface SolutionViewScreenProps {
   /** `?thread=<id>` (hướng C) — mở thẳng mạch trả lời của bình luận gốc này trong `CommentSheet`
    *  vừa mở sẵn; chỉ dùng MỘT lần, đóng tấm trượt là bỏ. */
   initialThreadId?: string;
+  /** Mục theo PHẦN của bảng câu hỏi (đề ≥ 2 phần); vắng = lưới phẳng. */
+  paletteGroups?: QuestionGroup[];
   /** Danh tính THẬT của người xem hiện tại (task 28) — chỉ dùng để dựng hàng
    *  bình luận lạc quan (không ẩn danh) trong `CommentSheet`; không ảnh hưởng
    *  gì tới phần còn lại của màn. Optional + mặc định ẩn danh: các test/nơi
@@ -121,6 +123,7 @@ export function SolutionViewScreen({
   initialOpenQuestion,
   initialCommentsOpen,
   initialThreadId,
+  paletteGroups,
   viewerIdentity = { kind: "anonymous" },
 }: SolutionViewScreenProps) {
   const emptyTextId = useId();
@@ -206,33 +209,6 @@ export function SolutionViewScreen({
         editHref={editHref}
       />
 
-      <div className="flex justify-end">
-        {questionNodes.length === 0 ? (
-          // Rỗng (DD-U4): không mount QuestionPaletteDock — nút tĩnh cùng
-          // khuôn SolutionEditorHeader.tsx (task 09), mô tả trỏ đúng câu Rỗng
-          // mà thẻ nét đứt bên dưới hiện (`emptyTextId`).
-          <button
-            type="button"
-            aria-disabled="true"
-            aria-describedby={emptyTextId}
-            className={cn(chipVariants({ active: false }), "h-11 gap-1.5 px-3 tabular-nums")}
-          >
-            <LayoutGrid aria-hidden className="size-4" />
-            <span>{t("common.questionPalette")}</span>
-          </button>
-        ) : (
-          <QuestionPaletteDock
-            current={currentIndex ?? -1}
-            total={questionNodes.length}
-            cells={cells}
-            triggerLabel={t("common.questionPalette")}
-            panelTitle={t("common.questionPalette")}
-            panelMeta={t("exams.questionCount", { count: questionNodes.length })}
-            onJump={handleJump}
-          />
-        )}
-      </div>
-
       {questionNodes.length === 0 ? (
         <Card variant="outline" padding="compact" className="border-dashed text-sm">
           <p id={emptyTextId}>{t("solutions.emptyExam")}</p>
@@ -268,6 +244,40 @@ export function SolutionViewScreen({
           })}
         </ol>
       )}
+
+      {/* Nút bảng câu hỏi nằm DƯỚI danh sách, căn phải (engineer 2026-10-02) — hàng riêng
+          phía trên danh sách từng để một khoảng trống. Đề dài thì nút `sticky` ở đáy khung
+          nhìn, đặt CAO HƠN nút hỗ trợ (fixed, 56px) để hai nút không đè nhau: điện thoại =
+          thanh đáy 3.75rem + khe 1rem + nút 3.5rem + thở 0.75rem = 9rem; từ 768px (không có
+          thanh đáy, nút hỗ trợ ở bottom-6) = 6rem. `mb-[4.5rem]` kéo đáy khối chứa lên để KHI
+          CUỘN TỚI CUỐI nút vẫn nằm trên vùng của nút hỗ trợ. Bảng mở LÊN trên nút. */}
+      <div className="sticky bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom,0px)+5.25rem)] z-20 mb-[4.5rem] flex justify-end md:bottom-24">
+        {questionNodes.length === 0 ? (
+          // Rỗng (DD-U4): không mount QuestionPaletteDock — nút tĩnh cùng
+          // khuôn SolutionEditorHeader.tsx (task 09), mô tả trỏ đúng câu Rỗng
+          // mà thẻ nét đứt bên dưới hiện (`emptyTextId`).
+          <button
+            type="button"
+            aria-disabled="true"
+            aria-describedby={emptyTextId}
+            className={cn(chipVariants({ active: false }), "h-11 gap-1.5 px-3 tabular-nums")}
+          >
+            <LayoutGrid aria-hidden className="size-4" />
+            <span>{t("common.questionPalette")}</span>
+          </button>
+        ) : (
+          <QuestionPaletteDock
+            current={currentIndex ?? -1}
+            total={questionNodes.length}
+            cells={cells}
+            triggerLabel={t("common.questionPalette")}
+            panelMeta={t("exams.questionCount", { count: questionNodes.length })}
+            groups={paletteGroups}
+            placement="top"
+            onJump={handleJump}
+          />
+        )}
+      </div>
 
       {openCommentsNode && (
         <CommentSheet

@@ -21,8 +21,11 @@ import { Badge, badgeVariants } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { chipVariants } from "@/components/ui/chip";
 import { QuestionPaletteDock } from "@/components/shared/QuestionPaletteDock";
-import type { QuestionCell } from "@/components/shared/QuestionPagination";
-import { noteRowCellLabel, type NoteRowState } from "@/features/solutions/components/NoteQuestionRow";
+import type { QuestionCell, QuestionGroup } from "@/components/shared/QuestionPagination";
+import {
+  noteRowCellLabel,
+  type NoteRowState,
+} from "@/features/solutions/components/NoteQuestionRow";
 
 export type SolutionEditorStatus = "draft" | "published" | "hidden";
 
@@ -42,10 +45,17 @@ interface SolutionEditorHeaderProps {
    *  nguồn dựng `cells[]` của `QuestionPaletteDock` (UI-D26). Rỗng = 0 câu
    *  hiện hành (DD-U4). */
   questionStates: NoteRowState[];
+  /** Mục theo PHẦN của bảng câu hỏi (đề ≥ 2 phần); vắng = lưới phẳng. */
+  paletteGroups?: QuestionGroup[];
   onJump: (index: number) => void;
 }
 
-export function SolutionEditorHeader({ status, questionStates, onJump }: SolutionEditorHeaderProps) {
+export function SolutionEditorHeader({
+  status,
+  questionStates,
+  paletteGroups,
+  onJump,
+}: SolutionEditorHeaderProps) {
   const progressId = useId();
   const emptyId = useId();
   const total = questionStates.length;
@@ -66,7 +76,7 @@ export function SolutionEditorHeader({ status, questionStates, onJump }: Solutio
             type="button"
             aria-disabled="true"
             aria-describedby={emptyId}
-            className={cn(chipVariants({ active: false }), "gap-1.5 px-3 tabular-nums h-11")}
+            className={cn(chipVariants({ active: false }), "h-11 gap-1.5 px-3 tabular-nums")}
           >
             <LayoutGrid aria-hidden className="size-4" />
             <span>{t("common.questionPalette")}</span>
@@ -77,6 +87,8 @@ export function SolutionEditorHeader({ status, questionStates, onJump }: Solutio
             total={total}
             cells={cells}
             triggerLabel={t("common.questionPalette")}
+            panelMeta={t("exams.questionCount", { count: total })}
+            groups={paletteGroups}
             onJump={onJump}
           />
         )}
@@ -85,7 +97,7 @@ export function SolutionEditorHeader({ status, questionStates, onJump }: Solutio
         {total > 0 ? (
           <>
             <Progress value={noted} max={total} aria-labelledby={progressId} className="flex-1" />
-            <span id={progressId} className="text-xs tabular-nums whitespace-nowrap">
+            <span id={progressId} className="text-xs whitespace-nowrap tabular-nums">
               {t("solutions.editor.progress", { done: noted, total })}
             </span>
           </>

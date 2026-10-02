@@ -4,9 +4,14 @@
 // màn viết và màn xem bài giải (Frontend DD § Component Props Change Matrix,
 // UI Spec C-21 / UI-D9 / UI-D26).
 //
+// CẬP NHẬT 2026-10-02 (engineer thống nhất mọi bảng câu hỏi về một cấu trúc phẳng:
+// bỏ thẻ lồng thẻ ở bản popover, ô nhỏ 5 cột, chia mục theo PHẦN) — hai ảnh chụp
+// markup bên dưới được chụp lại có chủ đích; mọi thay đổi trong đó đều thuộc đợt
+// đó (khung bọc phẳng, `text-xs`, `grid-cols-5`, khung cuộn) và không gì khác.
+//
 // Hai nghĩa vụ chứng minh, cùng một file vì cùng một ranh giới props:
 // 1. Nơi gọi CŨ — chỉ answeredIndices/flaggedIndices, đúng như ExamPlayer.tsx
-//    gọi — render y hệt trước khi mở rộng. Ảnh chụp markup dưới đây được chụp
+//    gọi — render đúng cấu trúc thống nhất, không prop mới nào lọt vào. Ảnh chụp markup dưới đây được chụp
 //    từ component TRƯỚC khi chuyển thư mục và thêm prop, nên một prop mới vô
 //    tình đổi lớp, nhãn, chấm đánh dấu hay chữ trên nút của trang làm bài là đỏ.
 // 2. Nhánh `cells[]` — mỗi trạng thái UI-D26 có đúng cặp ký hiệu + tên trợ năng,
@@ -94,52 +99,56 @@ describe("nơi gọi cũ (ExamPlayer.tsx) — markup không đổi sau khi mở 
       </svg>
       <span>3/11</span>
       </button>
-      <section id="ID" aria-label="Bảng câu hỏi" style="transform-origin: top right;" class="motion-pop border-border bg-popover absolute top-full right-0 z-20 mt-2 w-[min(20rem,calc(100vw-2rem))] rounded-xl border p-1.5">
-      <div data-slot="card" class="flex flex-col rounded-card bg-card text-card-foreground glow-card gap-3 p-3">
+      <section id="ID" aria-label="Bảng câu hỏi" style="transform-origin: top right;" class="motion-pop border-border bg-popover absolute right-0 z-20 w-[min(20rem,calc(100vw-2rem))] rounded-xl border p-3 top-full mt-2">
+      <div class="flex flex-col gap-3">
       <div class="flex items-baseline justify-between gap-3">
       <span class="text-sm font-semibold">Câu hỏi</span>
       <span class="text-muted-foreground text-xs tabular-nums" aria-live="polite">Đã làm 3/11</span>
       </div>
       <nav>
-      <ol class="grid max-h-[min(50vh,22rem)] grid-cols-5 gap-2 overflow-y-auto pr-1">
+      <div class="flex flex-col gap-3 max-h-[min(50vh,22rem)] overflow-y-auto pr-1">
+      <div>
+      <ol class="grid grid-cols-5 gap-2">
       <li>
-      <button type="button" data-q="0" aria-label="Câu 1 (đã làm)" class="focus-visible:ring-ring/40 relative flex aspect-square w-full items-center justify-center rounded-full font-semibold tabular-nums transition-[color,background-color,scale] ease-out motion-safe:active:scale-90 focus-visible:ring-3 focus-visible:outline-none text-xs bg-primary text-primary-foreground hover:bg-[color-mix(in_oklch,var(--primary),black_10%)]">1</button>
+      <button type="button" data-q="0" aria-label="Câu 1 (đã làm)" class="focus-visible:ring-ring/40 relative flex aspect-square w-full items-center justify-center rounded-full text-xs font-semibold tabular-nums transition-[color,background-color,scale] ease-out focus-visible:ring-3 focus-visible:outline-none motion-safe:active:scale-90 bg-primary text-primary-foreground hover:bg-[color-mix(in_oklch,var(--primary),black_10%)]">1</button>
       </li>
       <li>
-      <button type="button" data-q="1" aria-label="Câu 2" class="focus-visible:ring-ring/40 relative flex aspect-square w-full items-center justify-center rounded-full font-semibold tabular-nums transition-[color,background-color,scale] ease-out motion-safe:active:scale-90 focus-visible:ring-3 focus-visible:outline-none text-xs bg-surface text-muted-foreground hover:text-foreground">2</button>
+      <button type="button" data-q="1" aria-label="Câu 2" class="focus-visible:ring-ring/40 relative flex aspect-square w-full items-center justify-center rounded-full text-xs font-semibold tabular-nums transition-[color,background-color,scale] ease-out focus-visible:ring-3 focus-visible:outline-none motion-safe:active:scale-90 bg-surface text-muted-foreground hover:text-foreground">2</button>
       </li>
       <li>
-      <button type="button" data-q="2" aria-label="Câu 3 (đã làm) (Đã đánh dấu)" class="focus-visible:ring-ring/40 relative flex aspect-square w-full items-center justify-center rounded-full font-semibold tabular-nums transition-[color,background-color,scale] ease-out motion-safe:active:scale-90 focus-visible:ring-3 focus-visible:outline-none text-xs bg-primary text-primary-foreground hover:bg-[color-mix(in_oklch,var(--primary),black_10%)]">3<span aria-hidden="true" class="bg-foreground ring-surface absolute top-0 right-0 size-2.5 rounded-full ring-2">
+      <button type="button" data-q="2" aria-label="Câu 3 (đã làm) (Đã đánh dấu)" class="focus-visible:ring-ring/40 relative flex aspect-square w-full items-center justify-center rounded-full text-xs font-semibold tabular-nums transition-[color,background-color,scale] ease-out focus-visible:ring-3 focus-visible:outline-none motion-safe:active:scale-90 bg-primary text-primary-foreground hover:bg-[color-mix(in_oklch,var(--primary),black_10%)]">3<span aria-hidden="true" class="bg-foreground ring-surface absolute top-0 right-0 size-2.5 rounded-full ring-2">
       </span>
       </button>
       </li>
       <li>
-      <button type="button" data-q="3" aria-current="true" aria-label="Câu 4 (đã làm)" class="focus-visible:ring-ring/40 relative flex aspect-square w-full items-center justify-center rounded-full font-semibold tabular-nums transition-[color,background-color,scale] ease-out motion-safe:active:scale-90 focus-visible:ring-3 focus-visible:outline-none text-xs glow-sun bg-sun text-[color:var(--sun-on-solid)]">4</button>
+      <button type="button" data-q="3" aria-current="true" aria-label="Câu 4 (đã làm)" class="focus-visible:ring-ring/40 relative flex aspect-square w-full items-center justify-center rounded-full text-xs font-semibold tabular-nums transition-[color,background-color,scale] ease-out focus-visible:ring-3 focus-visible:outline-none motion-safe:active:scale-90 glow-sun bg-sun text-[color:var(--sun-on-solid)]">4</button>
       </li>
       <li>
-      <button type="button" data-q="4" aria-label="Câu 5" class="focus-visible:ring-ring/40 relative flex aspect-square w-full items-center justify-center rounded-full font-semibold tabular-nums transition-[color,background-color,scale] ease-out motion-safe:active:scale-90 focus-visible:ring-3 focus-visible:outline-none text-xs bg-surface text-muted-foreground hover:text-foreground">5</button>
+      <button type="button" data-q="4" aria-label="Câu 5" class="focus-visible:ring-ring/40 relative flex aspect-square w-full items-center justify-center rounded-full text-xs font-semibold tabular-nums transition-[color,background-color,scale] ease-out focus-visible:ring-3 focus-visible:outline-none motion-safe:active:scale-90 bg-surface text-muted-foreground hover:text-foreground">5</button>
       </li>
       <li>
-      <button type="button" data-q="5" aria-label="Câu 6" class="focus-visible:ring-ring/40 relative flex aspect-square w-full items-center justify-center rounded-full font-semibold tabular-nums transition-[color,background-color,scale] ease-out motion-safe:active:scale-90 focus-visible:ring-3 focus-visible:outline-none text-xs bg-surface text-muted-foreground hover:text-foreground">6</button>
+      <button type="button" data-q="5" aria-label="Câu 6" class="focus-visible:ring-ring/40 relative flex aspect-square w-full items-center justify-center rounded-full text-xs font-semibold tabular-nums transition-[color,background-color,scale] ease-out focus-visible:ring-3 focus-visible:outline-none motion-safe:active:scale-90 bg-surface text-muted-foreground hover:text-foreground">6</button>
       </li>
       <li>
-      <button type="button" data-q="6" aria-label="Câu 7" class="focus-visible:ring-ring/40 relative flex aspect-square w-full items-center justify-center rounded-full font-semibold tabular-nums transition-[color,background-color,scale] ease-out motion-safe:active:scale-90 focus-visible:ring-3 focus-visible:outline-none text-xs bg-surface text-muted-foreground hover:text-foreground">7</button>
+      <button type="button" data-q="6" aria-label="Câu 7" class="focus-visible:ring-ring/40 relative flex aspect-square w-full items-center justify-center rounded-full text-xs font-semibold tabular-nums transition-[color,background-color,scale] ease-out focus-visible:ring-3 focus-visible:outline-none motion-safe:active:scale-90 bg-surface text-muted-foreground hover:text-foreground">7</button>
       </li>
       <li>
-      <button type="button" data-q="7" aria-label="Câu 8 (Đã đánh dấu)" class="focus-visible:ring-ring/40 relative flex aspect-square w-full items-center justify-center rounded-full font-semibold tabular-nums transition-[color,background-color,scale] ease-out motion-safe:active:scale-90 focus-visible:ring-3 focus-visible:outline-none text-xs bg-surface text-muted-foreground hover:text-foreground">8<span aria-hidden="true" class="bg-foreground ring-surface absolute top-0 right-0 size-2.5 rounded-full ring-2">
+      <button type="button" data-q="7" aria-label="Câu 8 (Đã đánh dấu)" class="focus-visible:ring-ring/40 relative flex aspect-square w-full items-center justify-center rounded-full text-xs font-semibold tabular-nums transition-[color,background-color,scale] ease-out focus-visible:ring-3 focus-visible:outline-none motion-safe:active:scale-90 bg-surface text-muted-foreground hover:text-foreground">8<span aria-hidden="true" class="bg-foreground ring-surface absolute top-0 right-0 size-2.5 rounded-full ring-2">
       </span>
       </button>
       </li>
       <li>
-      <button type="button" data-q="8" aria-label="Câu 9" class="focus-visible:ring-ring/40 relative flex aspect-square w-full items-center justify-center rounded-full font-semibold tabular-nums transition-[color,background-color,scale] ease-out motion-safe:active:scale-90 focus-visible:ring-3 focus-visible:outline-none text-xs bg-surface text-muted-foreground hover:text-foreground">9</button>
+      <button type="button" data-q="8" aria-label="Câu 9" class="focus-visible:ring-ring/40 relative flex aspect-square w-full items-center justify-center rounded-full text-xs font-semibold tabular-nums transition-[color,background-color,scale] ease-out focus-visible:ring-3 focus-visible:outline-none motion-safe:active:scale-90 bg-surface text-muted-foreground hover:text-foreground">9</button>
       </li>
       <li>
-      <button type="button" data-q="9" aria-label="Câu 10" class="focus-visible:ring-ring/40 relative flex aspect-square w-full items-center justify-center rounded-full font-semibold tabular-nums transition-[color,background-color,scale] ease-out motion-safe:active:scale-90 focus-visible:ring-3 focus-visible:outline-none text-xs bg-surface text-muted-foreground hover:text-foreground">10</button>
+      <button type="button" data-q="9" aria-label="Câu 10" class="focus-visible:ring-ring/40 relative flex aspect-square w-full items-center justify-center rounded-full text-xs font-semibold tabular-nums transition-[color,background-color,scale] ease-out focus-visible:ring-3 focus-visible:outline-none motion-safe:active:scale-90 bg-surface text-muted-foreground hover:text-foreground">10</button>
       </li>
       <li>
-      <button type="button" data-q="10" aria-label="Câu 11" class="focus-visible:ring-ring/40 relative flex aspect-square w-full items-center justify-center rounded-full font-semibold tabular-nums transition-[color,background-color,scale] ease-out motion-safe:active:scale-90 focus-visible:ring-3 focus-visible:outline-none text-xs bg-surface text-muted-foreground hover:text-foreground">11</button>
+      <button type="button" data-q="10" aria-label="Câu 11" class="focus-visible:ring-ring/40 relative flex aspect-square w-full items-center justify-center rounded-full text-xs font-semibold tabular-nums transition-[color,background-color,scale] ease-out focus-visible:ring-3 focus-visible:outline-none motion-safe:active:scale-90 bg-surface text-muted-foreground hover:text-foreground">11</button>
       </li>
       </ol>
+      </div>
+      </div>
       </nav>
       </div>
       </section>
@@ -167,25 +176,29 @@ describe("nơi gọi cũ (ExamPlayer.tsx) — markup không đổi sau khi mở 
       <span class="text-sm font-semibold">Câu hỏi</span>
       </div>
       <nav>
-      <ol class="grid grid-cols-4 gap-2">
+      <div class="flex flex-col gap-3">
+      <div>
+      <ol class="grid grid-cols-5 gap-2">
       <li>
-      <button type="button" data-q="0" aria-label="Câu 1 (đã làm)" class="focus-visible:ring-ring/40 relative flex aspect-square w-full items-center justify-center rounded-full font-semibold tabular-nums transition-[color,background-color,scale] ease-out motion-safe:active:scale-90 focus-visible:ring-3 focus-visible:outline-none text-sm bg-primary text-primary-foreground hover:bg-[color-mix(in_oklch,var(--primary),black_10%)]">1</button>
+      <button type="button" data-q="0" aria-label="Câu 1 (đã làm)" class="focus-visible:ring-ring/40 relative flex aspect-square w-full items-center justify-center rounded-full text-xs font-semibold tabular-nums transition-[color,background-color,scale] ease-out focus-visible:ring-3 focus-visible:outline-none motion-safe:active:scale-90 bg-primary text-primary-foreground hover:bg-[color-mix(in_oklch,var(--primary),black_10%)]">1</button>
       </li>
       <li>
-      <button type="button" data-q="1" aria-current="true" aria-label="Câu 2 (đã làm)" class="focus-visible:ring-ring/40 relative flex aspect-square w-full items-center justify-center rounded-full font-semibold tabular-nums transition-[color,background-color,scale] ease-out motion-safe:active:scale-90 focus-visible:ring-3 focus-visible:outline-none text-sm glow-sun bg-sun text-[color:var(--sun-on-solid)]">2</button>
+      <button type="button" data-q="1" aria-current="true" aria-label="Câu 2 (đã làm)" class="focus-visible:ring-ring/40 relative flex aspect-square w-full items-center justify-center rounded-full text-xs font-semibold tabular-nums transition-[color,background-color,scale] ease-out focus-visible:ring-3 focus-visible:outline-none motion-safe:active:scale-90 glow-sun bg-sun text-[color:var(--sun-on-solid)]">2</button>
       </li>
       <li>
-      <button type="button" data-q="2" aria-label="Câu 3" class="focus-visible:ring-ring/40 relative flex aspect-square w-full items-center justify-center rounded-full font-semibold tabular-nums transition-[color,background-color,scale] ease-out motion-safe:active:scale-90 focus-visible:ring-3 focus-visible:outline-none text-sm bg-card text-muted-foreground hover:text-foreground">3</button>
+      <button type="button" data-q="2" aria-label="Câu 3" class="focus-visible:ring-ring/40 relative flex aspect-square w-full items-center justify-center rounded-full text-xs font-semibold tabular-nums transition-[color,background-color,scale] ease-out focus-visible:ring-3 focus-visible:outline-none motion-safe:active:scale-90 bg-card text-muted-foreground hover:text-foreground">3</button>
       </li>
       <li>
-      <button type="button" data-q="3" aria-label="Câu 4" class="focus-visible:ring-ring/40 relative flex aspect-square w-full items-center justify-center rounded-full font-semibold tabular-nums transition-[color,background-color,scale] ease-out motion-safe:active:scale-90 focus-visible:ring-3 focus-visible:outline-none text-sm bg-card text-muted-foreground hover:text-foreground">4</button>
+      <button type="button" data-q="3" aria-label="Câu 4" class="focus-visible:ring-ring/40 relative flex aspect-square w-full items-center justify-center rounded-full text-xs font-semibold tabular-nums transition-[color,background-color,scale] ease-out focus-visible:ring-3 focus-visible:outline-none motion-safe:active:scale-90 bg-card text-muted-foreground hover:text-foreground">4</button>
       </li>
       <li>
-      <button type="button" data-q="4" aria-label="Câu 5 (Đã đánh dấu)" class="focus-visible:ring-ring/40 relative flex aspect-square w-full items-center justify-center rounded-full font-semibold tabular-nums transition-[color,background-color,scale] ease-out motion-safe:active:scale-90 focus-visible:ring-3 focus-visible:outline-none text-sm bg-card text-muted-foreground hover:text-foreground">5<span aria-hidden="true" class="bg-foreground ring-surface absolute top-0 right-0 size-2.5 rounded-full ring-2">
+      <button type="button" data-q="4" aria-label="Câu 5 (Đã đánh dấu)" class="focus-visible:ring-ring/40 relative flex aspect-square w-full items-center justify-center rounded-full text-xs font-semibold tabular-nums transition-[color,background-color,scale] ease-out focus-visible:ring-3 focus-visible:outline-none motion-safe:active:scale-90 bg-card text-muted-foreground hover:text-foreground">5<span aria-hidden="true" class="bg-foreground ring-surface absolute top-0 right-0 size-2.5 rounded-full ring-2">
       </span>
       </button>
       </li>
       </ol>
+      </div>
+      </div>
       </nav>
       </div>
       </div>"
@@ -342,5 +355,107 @@ describe("nhánh cells[] — ô đang mở gần nhất (màn xem)", () => {
     );
 
     expect(screen.getByRole("button", { name: "Bảng câu hỏi" }).textContent).toBe("2/3");
+  });
+});
+
+describe("cấu trúc thống nhất (2026-10-02): mục theo PHẦN, ô tuỳ số, câu lỗi, mở lên trên", () => {
+  const GROUPS = [
+    { title: "PHẦN I. Trắc nghiệm", indices: [0, 1, 2] },
+    { title: "PHẦN II. Đúng sai", indices: [3, 4] },
+  ];
+
+  it("có ≥ 2 mục → mỗi mục một nhãn nhỏ phía trên và một lưới 5 cột; ô vẫn đánh số theo thứ tự câu", () => {
+    render(
+      <QuestionPaletteDock
+        current={0}
+        total={5}
+        groups={GROUPS}
+        panelMeta="5 câu"
+        onJump={() => {}}
+      />
+    );
+    openPalette();
+
+    const panel = screen.getByRole("region", { name: "Bảng câu hỏi" });
+    expect(within(panel).getByText("PHẦN I. Trắc nghiệm")).toBeTruthy();
+    expect(within(panel).getByText("PHẦN II. Đúng sai")).toBeTruthy();
+    expect(within(panel).getAllByRole("list")).toHaveLength(2);
+    expect(
+      within(panel)
+        .getAllByRole("button")
+        .map((b) => b.textContent)
+    ).toEqual(["1", "2", "3", "4", "5"]);
+    expect(within(panel).getByText("5 câu")).toBeTruthy();
+  });
+
+  it("chỉ một mục (hoặc không truyền groups) → lưới phẳng, không nhãn mục", () => {
+    render(
+      <QuestionPaletteDock
+        current={0}
+        total={3}
+        groups={[{ title: "PHẦN I", indices: [0, 1, 2] }]}
+        onJump={() => {}}
+      />
+    );
+    openPalette();
+
+    const panel = screen.getByRole("region", { name: "Bảng câu hỏi" });
+    expect(within(panel).queryByText("PHẦN I")).toBeNull();
+    expect(within(panel).getAllByRole("list")).toHaveLength(1);
+  });
+
+  it("bấm ô trong mục thứ hai nhảy tới ĐÚNG index toàn cục", () => {
+    const onJump = vi.fn();
+    render(<QuestionPaletteDock current={0} total={5} groups={GROUPS} onJump={onJump} />);
+    openPalette();
+
+    fireEvent.click(
+      within(screen.getByRole("region", { name: "Bảng câu hỏi" })).getByRole("button", {
+        name: "Câu 5",
+      })
+    );
+
+    expect(onJump).toHaveBeenCalledWith(4);
+  });
+
+  it("placement='top' mở bảng LÊN trên nút (bottom-full), mặc định thả xuống dưới (top-full)", () => {
+    const { unmount } = render(<QuestionPaletteDock current={0} total={3} onJump={() => {}} />);
+    openPalette();
+    expect(screen.getByRole("region", { name: "Bảng câu hỏi" }).className).toContain("top-full");
+    unmount();
+
+    render(<QuestionPaletteDock current={0} total={3} placement="top" onJump={() => {}} />);
+    openPalette();
+    const panel = screen.getByRole("region", { name: "Bảng câu hỏi" });
+    expect(panel.className).toContain("bottom-full");
+    expect(panel.className).not.toContain("top-full");
+  });
+
+  it("QuestionPagination popover: ô số tuỳ (cell.number), câu lỗi đỏ + ký hiệu, dòng phụ đỏ; không còn thẻ lồng thẻ", () => {
+    const cells: QuestionCell[] = [
+      { index: 0, state: "idle", label: "Câu 1", number: 1 },
+      { index: 1, state: "error", label: "Câu 1 (Cần sửa)", number: 1 },
+    ];
+    const { container } = render(
+      <QuestionPagination
+        variant="popover"
+        current={-1}
+        total={2}
+        cells={cells}
+        groups={[
+          { title: "PHẦN I", indices: [0] },
+          { title: "PHẦN II", indices: [1] },
+        ]}
+        panelMeta="1 câu cần sửa"
+        panelMetaDanger
+        onJump={() => {}}
+      />
+    );
+
+    const bad = screen.getByRole("button", { name: "Câu 1 (Cần sửa)" });
+    expect(bad.className).toContain("bg-destructive");
+    expect(bad.querySelector("svg")).not.toBeNull();
+    expect(screen.getByText("1 câu cần sửa").className).toContain("text-destructive");
+    expect(container.querySelector("[data-slot=card]")).toBeNull();
   });
 });

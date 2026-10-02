@@ -50,7 +50,11 @@ vi.mock("@/features/solutions/queries", () => ({
   getSolutionDetail: getSolutionDetailMock,
   getMySolutionForWriter: getMySolutionForWriterMock,
 }));
-vi.mock("@/features/exams/queries", () => ({ getExam: getExamMock, isExamAuthor: isExamAuthorMock }));
+vi.mock("@/features/exams/queries", () => ({
+  getExam: getExamMock,
+  isExamAuthor: isExamAuthorMock,
+  getQuestionPartNumbers: vi.fn().mockResolvedValue(new Map()),
+}));
 vi.mock("next/navigation", () => ({ redirect: redirectMock }));
 vi.mock("@/features/solutions/actions", () => ({
   toggleHelpful: toggleHelpfulMock,

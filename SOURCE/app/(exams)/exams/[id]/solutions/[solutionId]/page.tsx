@@ -13,9 +13,17 @@
 // request") — `SolutionViewScreen` chỉ nhận kết quả đã clamp/whitelist sẵn.
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
-import { getSolutionDetail, getMySolutionForWriter, type SolutionDetailQuestion } from "@/features/solutions/queries";
-import { getExam, isExamAuthor } from "@/features/exams/queries";
-import { SolutionViewScreen, type SolutionViewQuestionNode } from "@/features/solutions/components/SolutionViewScreen";
+import {
+  getSolutionDetail,
+  getMySolutionForWriter,
+  type SolutionDetailQuestion,
+} from "@/features/solutions/queries";
+import { getExam, getQuestionPartNumbers, isExamAuthor } from "@/features/exams/queries";
+import { groupQuestionsByPart } from "@/lib/exams/questionGroups";
+import {
+  SolutionViewScreen,
+  type SolutionViewQuestionNode,
+} from "@/features/solutions/components/SolutionViewScreen";
 import { SolutionNoteBlock } from "@/features/solutions/components/SolutionNoteBlock";
 import { RichText } from "@/components/shared/RichText";
 import { PageContainer } from "@/components/layout/PageContainer";
@@ -54,7 +62,9 @@ export function parseSolutionDeepLink(
 ): { q?: number; commentsOpen: boolean } {
   const parsed = rawQ !== undefined ? Number.parseInt(rawQ, 10) : NaN;
   const q =
-    questionCount > 0 && !Number.isNaN(parsed) ? Math.min(Math.max(parsed, 1), questionCount) : undefined;
+    questionCount > 0 && !Number.isNaN(parsed)
+      ? Math.min(Math.max(parsed, 1), questionCount)
+      : undefined;
   return { q, commentsOpen: rawComments === "1" };
 }
 
@@ -74,7 +84,9 @@ function buildQuestionNode(question: SolutionDetailQuestion): SolutionViewQuesti
   return {
     questionId: question.questionId,
     stemNode: <RichText text={toText(question.stem)} className={CONTENT_CLASS} />,
-    correctAnswerNode: <RichText text={toText(question.correctAnswer)} inline className={ANSWER_CLASS} />,
+    correctAnswerNode: (
+      <RichText text={toText(question.correctAnswer)} inline className={ANSWER_CLASS} />
+    ),
     writerChoiceNode,
     result: question.result,
     notAutoScored: question.notAutoScored,
@@ -83,7 +95,10 @@ function buildQuestionNode(question: SolutionDetailQuestion): SolutionViewQuesti
     note: question.note
       ? {
           bodyNode: (
-            <SolutionNoteBlock text={question.note.body} titleId={`solution-note-title-${question.questionId}`} />
+            <SolutionNoteBlock
+              text={question.note.body}
+              titleId={`solution-note-title-${question.questionId}`}
+            />
           ),
           commentCount: question.note.commentCount,
         }
@@ -122,12 +137,18 @@ export default async function SolutionViewPage({
   // gọi lại ở đây không tốn thêm round-trip nào; chỉ dùng để dựng hàng bình
   // luận LẠC QUAN (task 28, CommentSheet) khi người xem gửi một bình luận
   // không ẩn danh.
-  const [examAuthor, own, exam, viewerProfile] = await Promise.all([
+  const [examAuthor, own, exam, viewerProfile, partNumbers] = await Promise.all([
     isExamAuthor(id),
     getMySolutionForWriter(id),
     getExam(id),
     getCurrentUserProfile(),
+    getQuestionPartNumbers(solution.questions.map((q) => q.questionId)),
   ]);
+  // Bảng câu hỏi chia mục theo PHẦN khi đề có ≥ 2 phần (cùng cấu trúc mọi màn).
+  const paletteGroups = groupQuestionsByPart(
+    solution.questions.map((q) => ({ partNumber: partNumbers.get(q.questionId) })),
+    exam?.parts
+  );
   const viewerIdentity: AuthorIdentity = viewerProfile
     ? {
         kind: "named",
@@ -140,11 +161,18 @@ export default async function SolutionViewPage({
     solution.isMine && own ? `/exams/${id}/attempt/${own.attemptId}/solution` : undefined;
   const resultHref = own ? `/exams/${id}/attempt/${own.attemptId}/result` : `/exams/${id}`;
   const authorLabel =
-    solution.author.kind === "named" ? solution.author.displayName : t("solutions.identity.anonymous");
+    solution.author.kind === "named"
+      ? solution.author.displayName
+      : t("solutions.identity.anonymous");
   const now = new Date();
 
   return (
-    <PageContainer as="main" size="small" padding="none" className="flex flex-col gap-5 px-4 py-6 sm:px-6 sm:py-8">
+    <PageContainer
+      as="main"
+      size="small"
+      padding="none"
+      className="flex flex-col gap-5 px-4 py-6 sm:px-6 sm:py-8"
+    >
       <Breadcrumbs
         className="text-xs"
         items={[
@@ -166,6 +194,7 @@ export default async function SolutionViewPage({
         initialOpenQuestion={q}
         initialCommentsOpen={commentsOpen}
         initialThreadId={sp.thread}
+        paletteGroups={paletteGroups}
         viewerIdentity={viewerIdentity}
       />
     </PageContainer>

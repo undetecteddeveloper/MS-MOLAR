@@ -17,6 +17,8 @@
 //     `SolutionEditorScreen`, phân biệt trong chính state (không phải ở đây).
 import { redirect } from "next/navigation";
 import { getMySolutionForWriter } from "@/features/solutions/queries";
+import { getExam, getQuestionPartNumbers } from "@/features/exams/queries";
+import { groupQuestionsByPart } from "@/lib/exams/questionGroups";
 import { SolutionEditorScreen } from "@/features/solutions/components/SolutionEditorScreen";
 import { renderWriterQuestionNodes } from "@/features/solutions/components/writerQuestionNodes";
 
@@ -41,5 +43,22 @@ export default async function SolutionEditorPage({
   // giữ cây phụ thuộc RichText (122,5 KB gzip) ở lại phía server, đúng M12.
   const questionNodes = renderWriterQuestionNodes(state.questions);
 
-  return <SolutionEditorScreen examId={id} initialState={state} questionNodes={questionNodes} />;
+  // Bảng câu hỏi chia mục theo PHẦN khi đề có ≥ 2 phần.
+  const [exam, partNumbers] = await Promise.all([
+    getExam(id),
+    getQuestionPartNumbers(state.questions.map((q) => q.questionId)),
+  ]);
+  const paletteGroups = groupQuestionsByPart(
+    state.questions.map((q) => ({ partNumber: partNumbers.get(q.questionId) })),
+    exam?.parts
+  );
+
+  return (
+    <SolutionEditorScreen
+      examId={id}
+      initialState={state}
+      questionNodes={questionNodes}
+      paletteGroups={paletteGroups}
+    />
+  );
 }

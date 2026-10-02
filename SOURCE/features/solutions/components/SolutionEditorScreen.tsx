@@ -44,11 +44,19 @@ import {
   type SaveSolutionResult,
   type SetSolutionStatusResult,
 } from "@/features/solutions/actions";
-import type { SolutionEditorQuestion, SolutionEditorState, SolutionStatus } from "@/features/solutions/queries";
+import type {
+  SolutionEditorQuestion,
+  SolutionEditorState,
+  SolutionStatus,
+} from "@/features/solutions/queries";
 import type { WriterQuestionNode } from "@/features/solutions/components/writerQuestionNodes";
+import type { QuestionGroup } from "@/components/shared/QuestionPagination";
 import { SolutionEditorHeader } from "@/features/solutions/components/SolutionEditorHeader";
 import { SolutionSettingsPanel } from "@/features/solutions/components/SolutionSettingsPanel";
-import { NoteQuestionRow, type NoteRowState } from "@/features/solutions/components/NoteQuestionRow";
+import {
+  NoteQuestionRow,
+  type NoteRowState,
+} from "@/features/solutions/components/NoteQuestionRow";
 import { NoteSheet } from "@/features/solutions/components/NoteSheet";
 import { SolutionPublishBar } from "@/features/solutions/components/SolutionPublishBar";
 import { ModerationReasonBanner } from "@/features/solutions/components/ModerationReasonBanner";
@@ -97,7 +105,12 @@ type EditorAction =
   | { type: "UNPUBLISH_FAILURE"; error: string }
   | { type: "SETTINGS_CHANGE_START"; field: "showProfile" | "showScore"; next: boolean }
   | { type: "SETTINGS_CHANGE_SUCCESS" }
-  | { type: "SETTINGS_CHANGE_FAILURE"; error: string; prevShowProfile: boolean; prevShowScore: boolean }
+  | {
+      type: "SETTINGS_CHANGE_FAILURE";
+      error: string;
+      prevShowProfile: boolean;
+      prevShowScore: boolean;
+    }
   | { type: "OPEN_NOTE"; index: number }
   | { type: "CLOSE_NOTE" }
   | { type: "NOTE_SAVE_START"; index: number }
@@ -213,7 +226,13 @@ export function solutionEditorReducer(state: EditorState, action: EditorAction):
         liveMessage: t("solutions.toast.saved"),
         questions: state.questions.map((q, i) =>
           i === action.index
-            ? { ...q, note: action.note, wordCount: countWords(action.note), savingNote: false, noteError: null }
+            ? {
+                ...q,
+                note: action.note,
+                wordCount: countWords(action.note),
+                savingNote: false,
+                noteError: null,
+              }
             : q
         ),
       };
@@ -245,7 +264,8 @@ function noteExcerpt(note: string): string | undefined {
 }
 
 function settingsErrorText(error: Extract<SaveSolutionResult, { ok: false }>["error"]): string {
-  if (error.code === "rateLimited") return t("profile.error.rateLimited", { seconds: error.seconds });
+  if (error.code === "rateLimited")
+    return t("profile.error.rateLimited", { seconds: error.seconds });
   return t("solutions.editor.settingsSaveError");
 }
 
@@ -291,9 +311,16 @@ export interface SolutionEditorScreenProps {
    * hàng câu) mà test đó kiểm tra.
    */
   questionNodes?: WriterQuestionNode[];
+  /** Mục theo PHẦN của bảng câu hỏi (đề ≥ 2 phần); vắng = lưới phẳng. */
+  paletteGroups?: QuestionGroup[];
 }
 
-export function SolutionEditorScreen({ examId, initialState, questionNodes }: SolutionEditorScreenProps) {
+export function SolutionEditorScreen({
+  examId,
+  initialState,
+  questionNodes,
+  paletteGroups,
+}: SolutionEditorScreenProps) {
   const [state, dispatch] = useReducer(solutionEditorReducer, initialState, initEditorState);
   const lockReasonId = useId();
 
@@ -319,7 +346,11 @@ export function SolutionEditorScreen({ examId, initialState, questionNodes }: So
     };
     const result = await saveSolution(examId, patch);
     if (result.ok) {
-      dispatch({ type: "SAVE_DRAFT_SUCCESS", status: result.status, solutionId: result.solutionId });
+      dispatch({
+        type: "SAVE_DRAFT_SUCCESS",
+        status: result.status,
+        solutionId: result.solutionId,
+      });
     } else {
       dispatch({ type: "SAVE_DRAFT_FAILURE", error: saveErrorText(result.error) });
     }
@@ -331,7 +362,10 @@ export function SolutionEditorScreen({ examId, initialState, questionNodes }: So
     if (result.ok) {
       dispatch({ type: "PUBLISH_SUCCESS" });
     } else {
-      dispatch({ type: "PUBLISH_FAILURE", error: publishErrorText(result.error, state.questions.length) });
+      dispatch({
+        type: "PUBLISH_FAILURE",
+        error: publishErrorText(result.error, state.questions.length),
+      });
     }
   }
 
@@ -340,7 +374,10 @@ export function SolutionEditorScreen({ examId, initialState, questionNodes }: So
     if (result.ok) {
       dispatch({ type: "UNPUBLISH_SUCCESS" });
     } else {
-      dispatch({ type: "UNPUBLISH_FAILURE", error: publishErrorText(result.error, state.questions.length) });
+      dispatch({
+        type: "UNPUBLISH_FAILURE",
+        error: publishErrorText(result.error, state.questions.length),
+      });
     }
   }
 
@@ -417,7 +454,12 @@ export function SolutionEditorScreen({ examId, initialState, questionNodes }: So
   const isReadOnly = state.status === "hidden";
 
   return (
-    <PageContainer as="main" size="small" padding="none" className="flex flex-col gap-5 px-4 py-6 sm:px-6 sm:py-8">
+    <PageContainer
+      as="main"
+      size="small"
+      padding="none"
+      className="flex flex-col gap-5 px-4 py-6 sm:px-6 sm:py-8"
+    >
       <Breadcrumbs
         className="text-xs"
         items={[{ label: t("nav.exams"), href: "/exams" }, { label: t("solutions.editor.crumb") }]}
@@ -430,6 +472,7 @@ export function SolutionEditorScreen({ examId, initialState, questionNodes }: So
       <SolutionEditorHeader
         status={state.status}
         questionStates={rowStates}
+        paletteGroups={paletteGroups}
         onJump={(index) => {
           const target = document.getElementById(`solution-editor-row-${index}`);
           target?.scrollIntoView({ block: "nearest" });
@@ -531,7 +574,10 @@ export function SolutionEditorScreen({ examId, initialState, questionNodes }: So
       <div role="status" aria-live="polite" className="sr-only">
         {state.liveMessage}
       </div>
-      <SuccessToast message={state.toastKey ? t(state.toastKey) : ""} trigger={state.toastTrigger} />
+      <SuccessToast
+        message={state.toastKey ? t(state.toastKey) : ""}
+        trigger={state.toastTrigger}
+      />
     </PageContainer>
   );
 }

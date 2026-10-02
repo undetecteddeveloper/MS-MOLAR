@@ -29,6 +29,11 @@ vi.mock("@/features/solutions/queries", () => ({
 // → the real `server-only` package, which throws under jsdom regardless of
 // this file's own mocks. Neither action is ever called by these tests (no
 // save/publish interaction), so a bare stub is enough.
+// Bảng câu hỏi chia mục theo phần: trang gọi `getExam` + `getQuestionPartNumbers`.
+vi.mock("@/features/exams/queries", () => ({
+  getExam: vi.fn().mockResolvedValue({ parts: [] }),
+  getQuestionPartNumbers: vi.fn().mockResolvedValue(new Map()),
+}));
 vi.mock("@/features/solutions/actions", () => ({
   saveSolution: vi.fn(),
   setSolutionStatus: vi.fn(),

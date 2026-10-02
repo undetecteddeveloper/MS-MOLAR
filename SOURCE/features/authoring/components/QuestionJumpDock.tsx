@@ -23,6 +23,11 @@ import { t } from "@/lib/copy";
 import { cn } from "@/lib/utils";
 import { chipVariants } from "@/components/ui/chip";
 import { POP_EXIT_MS, usePresence } from "@/components/shared/usePresence";
+import {
+  QuestionPagination,
+  type QuestionCell,
+  type QuestionGroup,
+} from "@/components/shared/QuestionPagination";
 import { partNumbersOf } from "@/features/authoring/components/AssembledQuestionList";
 
 interface QuestionJumpDockProps {
@@ -57,7 +62,26 @@ export function QuestionJumpDock({ title, questions, parts, errorKeys }: Questio
   const titleByPart = new Map(parts.map((p) => [p.number, p.title]));
   const errorCount = errorKeys.size;
 
-  function jumpTo(part: number, number: number) {
+  // Cùng bảng với mọi màn khác (QuestionPagination): ô theo index trong `questions`,
+  // số hiện trên ô là số câu TRONG PHẦN, câu có lỗi đỏ + ký hiệu.
+  const cells: QuestionCell[] = questions.map((q, index) => {
+    const hasError = errorKeys.has(`${q.part}:${q.number}`);
+    return {
+      index,
+      number: q.number,
+      state: hasError ? "error" : "idle",
+      label:
+        t("upload.questionLabel", { number: q.number }) +
+        (hasError ? ` (${t("status.needsFixing")})` : ""),
+    };
+  });
+  const groups: QuestionGroup[] = partNumbers.map((pn) => ({
+    title: titleByPart.get(pn) ?? t("upload.partLabel", { part: pn }),
+    indices: questions.flatMap((q, index) => (q.part === pn ? [index] : [])),
+  }));
+
+  function jumpTo(index: number) {
+    const { part, number } = questions[index];
     setOpen(false);
     const el = document.getElementById(`p${part}q${number}`);
     if (!el) return;
@@ -107,52 +131,18 @@ export function QuestionJumpDock({ title, questions, parts, errorKeys }: Questio
             style={{ transformOrigin: "top right" }}
             className="motion-pop border-border bg-popover absolute top-full right-0 z-20 mt-2 w-[min(20rem,calc(100vw-2rem))] rounded-xl border p-3"
           >
-            <div className="flex items-baseline justify-between gap-3">
-              <span className="text-sm font-semibold">{t("common.questions")}</span>
-              {errorCount > 0 && (
-                <span className="text-destructive text-xs font-semibold">
-                  {t("status.needsFixingCount", { count: errorCount })}
-                </span>
-              )}
-            </div>
-            <div className="mt-3 flex max-h-[min(50vh,22rem)] flex-col gap-3 overflow-y-auto pr-1">
-              {partNumbers.map((pn) => (
-                <div key={pn}>
-                  {partNumbers.length > 1 && (
-                    <p className="eyebrow mb-1.5 truncate">
-                      {titleByPart.get(pn) ?? t("upload.partLabel", { part: pn })}
-                    </p>
-                  )}
-                  <ol className="grid grid-cols-5 gap-2">
-                    {questions
-                      .filter((q) => q.part === pn)
-                      .map((q) => {
-                        const hasError = errorKeys.has(`${q.part}:${q.number}`);
-                        return (
-                          <li key={q.number}>
-                            <button
-                              type="button"
-                              onClick={() => jumpTo(q.part, q.number)}
-                              aria-label={
-                                t("upload.questionLabel", { number: q.number }) +
-                                (hasError ? ` (${t("status.needsFixing")})` : "")
-                              }
-                              className={cn(
-                                "focus-visible:ring-ring/40 flex aspect-square w-full items-center justify-center rounded-full text-xs font-semibold tabular-nums transition-[color,background-color,scale] ease-out motion-safe:active:scale-90 focus-visible:ring-3 focus-visible:outline-none",
-                                hasError
-                                  ? "bg-destructive text-primary-foreground"
-                                  : "bg-surface text-muted-foreground hover:text-foreground"
-                              )}
-                            >
-                              {q.number}
-                            </button>
-                          </li>
-                        );
-                      })}
-                  </ol>
-                </div>
-              ))}
-            </div>
+            <QuestionPagination
+              variant="popover"
+              current={-1}
+              total={questions.length}
+              cells={cells}
+              groups={groups}
+              panelMeta={
+                errorCount > 0 ? t("status.needsFixingCount", { count: errorCount }) : undefined
+              }
+              panelMetaDanger
+              onJump={jumpTo}
+            />
           </section>
         )}
       </div>

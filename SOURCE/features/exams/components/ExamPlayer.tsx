@@ -27,6 +27,7 @@ import { QuestionPagination } from "@/components/shared/QuestionPagination";
 import { QuestionPaletteDock } from "@/components/shared/QuestionPaletteDock";
 import { useExamPlayer } from "@/hooks/useExamPlayer";
 import { useLeaveGuard } from "@/hooks/useLeaveGuard";
+import { groupQuestionsByPart } from "@/lib/exams/questionGroups";
 import { useSwipe } from "@/hooks/useSwipe";
 import type { PublicQuestion } from "@/types/question";
 import type { QuestionNodes } from "@/features/exams/components/questionNodes.types";
@@ -116,6 +117,10 @@ export function ExamPlayer({
     ? (parts?.find((p) => p.number === (question.partNumber ?? 1))?.title ??
       `Phần ${question.partNumber ?? 1}`)
     : null;
+
+  // Bảng câu hỏi chia mục theo PHẦN khi đề có ≥ 2 phần (cùng cấu trúc ở bảng thả
+  // xuống trên điện thoại và cột phải desktop).
+  const paletteGroups = groupQuestionsByPart(questions, parts);
 
   const answeredIndices = questions.map((q, i) => (answers[q.id] ? i : -1)).filter((i) => i >= 0);
   const flaggedIndices = questions.map((q, i) => (flags[q.id] ? i : -1)).filter((i) => i >= 0);
@@ -281,6 +286,7 @@ export function ExamPlayer({
                 total={questions.length}
                 answeredIndices={answeredIndices}
                 flaggedIndices={flaggedIndices}
+                groups={paletteGroups}
                 onJump={goto}
               />
             </div>
@@ -391,6 +397,7 @@ export function ExamPlayer({
               total={questions.length}
               answeredIndices={answeredIndices}
               flaggedIndices={flaggedIndices}
+              groups={paletteGroups}
               onJump={goto}
             />
           </div>
