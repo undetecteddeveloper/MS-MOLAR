@@ -998,6 +998,21 @@ export const copy = {
   "about.title": "Về chúng tôi",
   "about.intro":
     "MS-MOLAR là nền tảng luyện đề thi dành cho học sinh THCS và THPT. Bạn có thể liên hệ trực tiếp với chúng tôi theo thông tin dưới đây.",
+  "about.name.title": "Vì sao tên MS-MOLAR?",
+  "about.name.intro":
+    "MS-MOLAR là chữ viết tắt của Multi-Subject, Multi-level Online Learning, Analytics & Repository — website luyện đề đa môn, đa cấp học, có phân tích dựa trên dấu chân kĩ thuật số của chính người học và cho phép cộng đồng tạo sinh nội dung ngay trên trang.",
+  "about.name.ms.term": "Multi-Subject",
+  "about.name.ms.meaning": "Đa môn: Toán, Lý, Hóa, Sinh… cùng nằm ở một nơi.",
+  "about.name.m.term": "Multi-level",
+  "about.name.m.meaning": "Đa cấp học: từ THCS đến THPT.",
+  "about.name.ol.term": "Online Learning",
+  "about.name.ol.meaning": "Luyện đề trực tuyến: làm bài có đồng hồ, chấm điểm tức thì.",
+  "about.name.a.term": "Analytics",
+  "about.name.a.meaning":
+    "Phân tích dựa trên dấu chân kĩ thuật số: mỗi lượt làm bài được lưu lại để chỉ ra bạn đang yếu chỗ nào.",
+  "about.name.r.term": "Repository",
+  "about.name.r.meaning":
+    "Kho nội dung mở: đề thi và bài giải do cộng đồng cùng tạo sinh và đóng góp.",
   "about.owner": "Chủ sở hữu website",
   "about.email": "Email liên hệ",
   "about.phone": "Số điện thoại liên hệ",

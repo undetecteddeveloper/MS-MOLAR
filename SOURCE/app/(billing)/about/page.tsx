@@ -19,6 +19,7 @@
 
 import type { Metadata } from "next";
 import { LegalDocument } from "@/components/billing/LegalDocument";
+import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { t } from "@/lib/copy";
 
@@ -51,6 +52,8 @@ export default async function AboutPage() {
   return (
     <LegalDocument title={t("about.title")}>
       <p>{t("about.intro")}</p>
+
+      <NameMeaning />
 
       {/* <dl> chứ không phải bảng: đây là các cặp nhãn–giá trị, không phải dữ
           liệu hai chiều. Trình đọc màn hình thông báo đúng quan hệ nhãn/giá trị
@@ -91,16 +94,44 @@ export default async function AboutPage() {
   );
 }
 
+/** Các chữ cái của tên MS-MOLAR và nghĩa của từng chữ — bảng thuần chữ, không
+ *  dữ liệu, nên khai ngay tại đây thay vì thêm một module riêng. */
+const NAME_PARTS = [
+  { letters: "MS", key: "ms" },
+  { letters: "M", key: "m" },
+  { letters: "O · L", key: "ol" },
+  { letters: "A", key: "a" },
+  { letters: "R", key: "r" },
+] as const;
+
+function NameMeaning() {
+  return (
+    <Card as="section" aria-labelledby="about-name-heading" className="gap-4">
+      <h2 id="about-name-heading" className="text-foreground text-lg font-semibold">
+        {t("about.name.title")}
+      </h2>
+      <p className="text-muted-foreground">{t("about.name.intro")}</p>
+      <ul className="flex flex-col gap-3">
+        {NAME_PARTS.map(({ letters, key }) => (
+          <li key={key} className="flex items-start gap-3">
+            <Badge className="mt-0.5 min-w-12 justify-center font-semibold tabular-nums">
+              {letters}
+            </Badge>
+            <div className="min-w-0">
+              <p className="text-foreground font-medium">{t(`about.name.${key}.term`)}</p>
+              <p className="text-muted-foreground text-sm leading-relaxed">
+                {t(`about.name.${key}.meaning`)}
+              </p>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
 /** Một dòng nhãn–giá trị: nhãn nhỏ chữ thường (`.eyebrow`), giá trị 16px. */
-function ContactRow({
-  label,
-  value,
-  href,
-}: {
-  label: string;
-  value: string;
-  href?: string;
-}) {
+function ContactRow({ label, value, href }: { label: string; value: string; href?: string }) {
   return (
     <div className="flex flex-col gap-0.5">
       <dt className="eyebrow">{label}</dt>
