@@ -275,8 +275,8 @@
        một hàng flex không cho phép co, không bọc dòng) làm CẢ TRANG bị trình
        duyệt trong ứng dụng (Zalo/Messenger/Facebook webview) thu nhỏ zoom để
        vừa bề ngang — chữ nhỏ tí, mọi thẻ bị cắt mép phải, dù mỗi khối RIÊNG
-       LẺ không có gì sai. Đặt ở CẢ html lẫn body (không phải một cha trung
-       gian) nên KHÔNG phá `position: sticky` của SiteHeader. Không ảnh hưởng
+       LẺ không có gì sai. Đặt ở html (hidden) và body (clip, xem ghi chú ở
+       body) để KHÔNG phá `position: sticky` của SiteHeader. Không ảnh hưởng
        kệ cuộn ngang NỘI BỘ (ExamShelf `overflow-x-auto` trên chính nó vẫn
        cuộn bình thường — đây là chặn tràn ở biên NGOÀI CÙNG, không phải cấm
        cuộn ngang mọi nơi). */
@@ -284,7 +284,12 @@
   }
   body {
     @apply bg-background text-foreground font-sans;
-    overflow-x: hidden;
+    /* `clip`, KHÔNG `hidden` (2026-10-02): `hidden` trên body biến nó thành khung cuộn, và
+       mọi `position: sticky` bên trong (SiteHeader, cột phải trang làm bài, nút bảng câu hỏi)
+       tính theo body — vốn cao bằng cả trang — nên không bao giờ dính. Đo: cuộn 200px thì
+       SiteHeader trượt lên y=-200. `clip` cắt tràn ngang y như `hidden` nhưng không tạo khung
+       cuộn; việc chặn ở viewport do `html` (hidden) đảm nhiệm. */
+    overflow-x: clip;
     font-feature-settings:
       "liga" 1,
       "calt" 1;
