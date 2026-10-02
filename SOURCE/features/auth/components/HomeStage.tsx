@@ -35,18 +35,12 @@ export function HomeStage({ auth, signedIn }: { auth: AuthMode; signedIn: boolea
       <section
         inert={showAuth || undefined}
         aria-labelledby="home-title"
-        className={`isolate flex flex-col gap-5 transition-[opacity,translate] duration-500 ease-out motion-reduce:transition-none ${
+        className={`flex flex-col gap-5 transition-[opacity,translate] duration-500 ease-out motion-reduce:transition-none ${
           showAuth
             ? "pointer-events-none absolute inset-x-0 top-0 -translate-x-6 opacity-0"
             : "relative translate-x-0 opacity-100"
         }`}
       >
-        {/* Trang trí thuần: lưới caro ôm khoảng trống bên phải nút chính ở khổ hẹp. */}
-        <div
-          aria-hidden
-          data-testid="hero-grid"
-          className="hero-grid pointer-events-none absolute -inset-x-4 -top-3 -bottom-4 -z-10 sm:hidden"
-        />
         <h1 id="home-title" className="text-display max-w-[16ch] font-bold">
           {t("home.title")}
         </h1>

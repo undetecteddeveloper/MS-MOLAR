@@ -877,13 +877,14 @@
     linear-gradient(to right, var(--hero-grid-line) 1px, transparent 1px),
     linear-gradient(to bottom, var(--hero-grid-line) 1px, transparent 1px);
   background-size: 24px 24px;
-  -webkit-mask-image: radial-gradient(
-    ellipse 72% 60% at 78% 82%,
-    #000 0%,
-    rgb(0 0 0 / 0.6) 36%,
-    transparent 100%
-  );
-  mask-image: radial-gradient(ellipse 72% 60% at 78% 82%, #000 0%, rgb(0 0 0 / 0.6) 36%, transparent 100%);
+  /* Hai lớp mặt nạ cộng lại: (1) vầng đậm quanh khoảng trống cạnh nút chính; (2) vầng
+     MỜ HƠN (tối đa 50%) tràn xuống cụm tiêu đề "Đề nổi nhất" ngay bên dưới. Toạ độ dọc
+     tính bằng px từ đỉnh khối nên không phụ thuộc chiều cao khối bao. */
+  --hero-grid-mask:
+    radial-gradient(ellipse 72% 215px at 78% 290px, #000 0%, rgb(0 0 0 / 0.6) 36%, transparent 100%),
+    radial-gradient(ellipse 90% 230px at 62% 420px, rgb(0 0 0 / 0.5) 0%, rgb(0 0 0 / 0.26) 45%, transparent 100%);
+  -webkit-mask-image: var(--hero-grid-mask);
+  mask-image: var(--hero-grid-mask);
 }
 
 .motion-reveal {

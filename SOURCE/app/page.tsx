@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AboutPrompt } from "@/features/auth/components/AboutPrompt";
 import { HomeStage, type AuthMode } from "@/features/auth/components/HomeStage";
+import { HeroGrid } from "@/features/auth/components/HeroGrid";
 import { TechStack } from "@/features/auth/components/TechStack";
 import { HomeRipple } from "@/features/home/ripple/HomeRipple";
 import { LatestSolutionsSpotlight } from "@/features/home/components/LatestSolutionsSpotlight";
@@ -127,8 +128,11 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ a
               hình và kéo mọi thẻ ra khỏi mép phải. `overflow-x: hidden` ở
               globals.css chỉ che thanh cuộn, không trả lại bề rộng. */}
           <div
-            className={`grid grid-cols-1 items-center gap-10 ${showAside ? "lg:grid-cols-2 lg:gap-12" : ""}`}
+            className={`relative isolate grid grid-cols-1 items-center gap-10 ${showAside ? "lg:grid-cols-2 lg:gap-12" : ""}`}
           >
+            {/* Lưới caro nền (chỉ điện thoại): ôm khoảng trống cạnh nút chính và tràn xuống
+                cụm "Đề nổi nhất", nét ở đó mờ hơn. Ẩn khi form đăng nhập đang mở. */}
+            {authMode === null && <HeroGrid />}
             <div className="flex flex-col gap-6">
               <HomeStage auth={authMode} signedIn={user !== null} />
 
@@ -157,7 +161,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ a
 
             {showAside &&
               (user ? (
-                hot !== null && hot.exams.length > 0 && (
+                hot !== null &&
+                hot.exams.length > 0 && (
                   <section aria-labelledby="home-new-exams" className="flex flex-col gap-3">
                     <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                       <h2 id="home-new-exams" className="min-w-0 text-xl font-semibold">
@@ -191,7 +196,10 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ a
               trên dòng chân trang. Tiến độ của bạn → Lời giải cộng đồng mới
               nhất → TechStack: hành động trước, thông tin nền sau. */}
           {user && hot && (
-            <PersonalProgressStrip totalCompleted={hot.totalSubmittedCount} topSubject={hot.topSubject} />
+            <PersonalProgressStrip
+              totalCompleted={hot.totalSubmittedCount}
+              topSubject={hot.topSubject}
+            />
           )}
 
           {user && latestSolutions && latestSolutions.length > 0 && (

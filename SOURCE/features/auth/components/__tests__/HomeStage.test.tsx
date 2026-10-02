@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-// HomeStage — lưới caro nền hero (2026-10-02): chỉ trang trí, ẩn với trình đọc
-// màn hình, chỉ hiện ở khổ hẹp (`sm:hidden`) và không chặn thao tác.
+// HomeStage — nội dung hero (tiêu đề, nút chính, liên kết phụ). Lưới caro nền nay do
+// HeroGrid đảm nhiệm (HeroGrid.test.tsx), HomeStage không còn mang phần tử trang trí nào.
 
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -12,24 +12,13 @@ const { HomeStage } = await import("@/features/auth/components/HomeStage");
 
 afterEach(cleanup);
 
-describe("HomeStage — lưới caro nền hero", () => {
-  it("có một khối trang trí aria-hidden, chỉ ở khổ hẹp, không bắt chuột, nằm sau nội dung", () => {
-    render(<HomeStage auth={null} signedIn={false} />);
-
-    const grid = screen.getByTestId("hero-grid");
-    expect(grid.getAttribute("aria-hidden")).toBe("true");
-    expect(grid.className).toContain("hero-grid");
-    expect(grid.className).toContain("sm:hidden");
-    expect(grid.className).toContain("pointer-events-none");
-    expect(grid.className).toContain("-z-10");
-    expect(grid.textContent).toBe("");
-  });
-
-  it("không đụng tới nội dung hero: tiêu đề và nút chính vẫn là phần tử bấm được/đọc được", () => {
+describe("HomeStage — nội dung hero", () => {
+  it("tiêu đề, nút chính và liên kết phụ là phần tử đọc được/bấm được; không có khối trang trí", () => {
     render(<HomeStage auth={null} signedIn={false} />);
 
     expect(screen.getByRole("heading", { level: 1 })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Bắt đầu luyện đề/ })).toBeTruthy();
     expect(screen.getByRole("link", { name: /Xem kho đề/ })).toBeTruthy();
+    expect(screen.queryByTestId("hero-grid")).toBeNull();
   });
 });
