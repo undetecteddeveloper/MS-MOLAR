@@ -861,6 +861,26 @@
   }
 }
 
+/* Lưới caro nền hero (2026-10-02, chỉ điện thoại/cửa sổ hẹp — `sm:hidden` ở nơi
+   dùng). Ở khổ hẹp nút chính và liên kết xếp dọc, bên phải để trống; lưới đậm
+   nhất đúng quanh khoảng trống đó (tâm mặt nạ ở góc dưới-phải của hero) rồi mờ
+   dần ra xa. Tĩnh, chỉ CSS — không JS, không ảnh, không chạm tới h1 (LCP). Màu
+   lấy từ --primary nên đổi theme là đổi theo. */
+.hero-grid {
+  --hero-grid-line: color-mix(in oklch, var(--primary) 28%, transparent);
+  background-image:
+    linear-gradient(to right, var(--hero-grid-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--hero-grid-line) 1px, transparent 1px);
+  background-size: 24px 24px;
+  -webkit-mask-image: radial-gradient(
+    ellipse 72% 60% at 78% 82%,
+    #000 0%,
+    rgb(0 0 0 / 0.6) 36%,
+    transparent 100%
+  );
+  mask-image: radial-gradient(ellipse 72% 60% at 78% 82%, #000 0%, rgb(0 0 0 / 0.6) 36%, transparent 100%);
+}
+
 .motion-reveal {
   opacity: 0;
   translate: 0 8px;
