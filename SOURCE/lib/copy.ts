@@ -96,7 +96,6 @@ export const copy = {
   "home.point1": "Đề thật từ các trường và các kỳ thi, do cộng đồng đóng góp.",
   "home.point2": "Nộp bài là có điểm ngay, kèm đáp án từng câu.",
   "home.point3": "Thống kê theo môn để bạn biết mình còn yếu chỗ nào.",
-  "home.viewAllExams": "Xem tất cả đề",
   "home.about": "Về MS-MOLAR",
   // Dải tiến độ cá nhân + kệ lời giải cộng đồng, chỉ hiện khi đã đăng nhập
   // (F-041, 2026-09-30) — bớt đơn điệu cho trang chủ.
