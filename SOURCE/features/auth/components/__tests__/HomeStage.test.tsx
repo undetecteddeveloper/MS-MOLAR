@@ -29,7 +29,7 @@ describe("HomeStage — lưới caro nền hero", () => {
     render(<HomeStage auth={null} signedIn={false} />);
 
     expect(screen.getByRole("heading", { level: 1 })).toBeTruthy();
-    expect(screen.getByRole("link", { name: /Bắt đầu luyện đề/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Bắt đầu luyện đề/ })).toBeTruthy();
     expect(screen.getByRole("link", { name: /Xem kho đề/ })).toBeTruthy();
   });
 });
