@@ -54,10 +54,12 @@ export function HomeStage({ auth, signedIn }: { auth: AuthMode; signedIn: boolea
           {t("home.lead")}
         </p>
         <div
-          className="motion-hero-item flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-5"
+          className="motion-hero-item flex items-start"
           style={{ "--motion-i": 1 } as React.CSSProperties}
         >
-          {/* Khách → mở form đăng nhập tại chỗ; đã đăng nhập → vào thẳng kho đề. */}
+          {/* Khách → mở form đăng nhập tại chỗ; đã đăng nhập → vào thẳng kho đề.
+              Hết liên kết phụ "Xem kho đề" (2026-10-03): nút chính đã dẫn tới
+              /exams cho người đã đăng nhập, và là cổng đăng ký cho khách. */}
           <Button
             render={<Link href={signedIn ? "/exams" : "/?auth=signup"} />}
             size="lg"
@@ -65,12 +67,6 @@ export function HomeStage({ auth, signedIn }: { auth: AuthMode; signedIn: boolea
           >
             {t("home.cta")}
           </Button>
-          <Link
-            href="/exams"
-            className="text-primary focus-visible:ring-ring inline-flex min-h-11 items-center rounded-lg font-semibold underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:outline-none"
-          >
-            {t("home.browse")}
-          </Link>
         </div>
       </section>
 

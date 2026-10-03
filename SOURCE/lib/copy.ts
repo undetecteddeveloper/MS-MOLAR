@@ -80,7 +80,6 @@ export const copy = {
   "home.lead":
     "Kho đề THCS và THPT cập nhật liên tục. Làm bài có đồng hồ, chấm điểm tức thì, thống kê theo từng môn.",
   "home.cta": "Bắt đầu luyện đề",
-  "home.browse": "Xem kho đề",
   "home.newExams": "Đề mới đăng",
   "home.hotExams": "Đề nổi nhất",
   // Khối công nghệ cạnh hero cho khách (TechStack). Mỗi dòng là VAI TRÒ thật
