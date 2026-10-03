@@ -41,7 +41,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Bash|PowerShell|mcp__playwright__.*|mcp__supabase__.*",
+        "matcher": "Bash|PowerShell|mcp__.*(playwright|supabase|vercel).*",
         "hooks": [
           {
             "type": "command",

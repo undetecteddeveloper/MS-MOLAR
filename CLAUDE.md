@@ -52,7 +52,7 @@ Người dùng sửa cùng một lỗi lần thứ hai → Claude sửa luật c
 
 ## 8. Bản đồ và công cụ
 - Tiến độ: `PROGRESS.md` (chỉ việc đang mở và vừa xong, ≤60 dòng, Claude tự cắt mục cũ — lịch sử đã có trong git log). Nợ kỹ thuật: `TECH-DEBT.md` — rất dài, KHÔNG đọc cả file, tra bằng Grep theo mã `TD-xxx` hoặc từ khoá. Quyết định cũ: `docs/` và git log.
-- Supabase, Vercel, Drive: qua Composio MCP (`COMPOSIO_SEARCH_TOOLS` → `COMPOSIO_MULTI_EXECUTE_TOOL`). Supabase dev còn có `npx supabase db query --project-ref <dev>` và `npx tsx supabase/*.ts`. KHÔNG gọi CLI `composio` (không chạy trên Windows, hook chặn).
-- Trình duyệt: Playwright CLI `node scripts/pw/cli.mjs` (alias `npm run pw` trong `SOURCE/`). KHÔNG dùng Playwright MCP hay Supabase MCP trực tiếp (hook chặn).
+- Dịch vụ ngoài (Supabase, Vercel, Drive…): CHỈ qua Composio MCP (`COMPOSIO_SEARCH_TOOLS` → `COMPOSIO_MULTI_EXECUTE_TOOL`). KHÔNG dùng CLI `supabase`, `vercel`, `composio`, và KHÔNG gọi MCP của Supabase/Vercel trực tiếp (hook chặn hết). Script nằm trong repo (`npm run verify:schema`, `npx tsx supabase/*.ts`) là code của project, vẫn chạy bình thường.
+- Trình duyệt: Playwright CLI `node scripts/pw/cli.mjs` (alias `npm run pw` trong `SOURCE/`). KHÔNG dùng Playwright MCP (hook chặn).
 - Hai recipe còn lại, do người dùng gõ: `/recipe-fullstack-implement` (feature.md), `/recipe-diagnose` (bug.md).
 - Ứng dụng nằm trong `SOURCE/` (Next.js bản mới — đọc `SOURCE/AGENTS.md` trước khi viết code).

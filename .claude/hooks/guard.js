@@ -1,9 +1,8 @@
 // PreToolUse hook — chặn CỨNG những thứ máy kiểm được (luật bằng chữ dễ bị quên):
-//   - CLI `composio` qua shell (không chạy trên Windows; dùng MCP COMPOSIO_*);
-//   - `supabase db push` (project linked của CLI là PROD);
-//   - `git push` và `vercel deploy/--prod` khi lượt nhắn gần nhất của người dùng không có ý đó
-//     (cờ do prompt-reminder.js ghi);
-//   - Playwright MCP và Supabase MCP gọi trực tiếp (dùng Playwright CLI, Composio, supabase CLI).
+//   - dịch vụ ngoài (Supabase, Vercel) CHỈ đi qua Composio MCP: chặn CLI `supabase`, `vercel`,
+//     `composio` qua shell, và mọi MCP Supabase/Vercel gọi trực tiếp (ngoài mcp__composio__*);
+//   - Playwright MCP (dùng Playwright CLI: node scripts/pw/cli.mjs);
+//   - `git push` khi lượt nhắn gần nhất của người dùng không có ý đó (cờ do prompt-reminder.js ghi).
 // Hook tự hỏng thì lệnh vẫn đi qua (không chặn oan) nhưng báo lỗi ra stderr để người dùng thấy.
 const fs = require("fs");
 const os = require("os");
@@ -31,17 +30,10 @@ function pushIntent() {
 const stripQuoted = (cmd) => cmd.replace(/'[^']*'|"(?:[^"\\]|\\.)*"/g, '""');
 const segments = (cmd) => stripQuoted(cmd).split(/&&|\|\||[;&|\r\n]/).map((s) => s.trim()).filter(Boolean);
 const GIT_PUSH = /^git\s+(?:(?:-C|-c)\s+\S+\s+|--[\w-]+(?:=\S+)?\s+)*push(?:\s|$)/i;
-const SUPABASE_DB_PUSH = /^(?:npx\s+(?:-y\s+)?)?supabase\s+db\s+push(?:\s|$)/i;
-const COMPOSIO_CLI = /^composio(?:\s|$)/i;
-const VERCEL = /^(?:npx\s+(?:-y\s+)?)?vercel(?:\s+(.*))?$/i;
+const EXTERNAL_CLI = /^(?:npx\s+(?:-y\s+)?)?(supabase|vercel|composio)(?:\s|$)/i;
 
-function vercelDeploys(seg) {
-  const m = VERCEL.exec(seg);
-  if (!m) return false;
-  const args = (m[1] || "").trim().split(/\s+/).filter(Boolean);
-  const first = args.find((a) => !a.startsWith("-"));
-  return args.includes("--prod") || !first || ["deploy", "promote", "rollback", "redeploy"].includes(first);
-}
+const VIA_COMPOSIO =
+  "Dịch vụ ngoài (Supabase, Vercel…) CHỈ đi qua Composio MCP: COMPOSIO_SEARCH_TOOLS → COMPOSIO_MULTI_EXECUTE_TOOL (CLAUDE.md §8; tên công cụ và cách dùng: .claude/workflow/ops-db.md, ops-env.md). Nếu công cụ Composio không có trong phiên: báo THIẾU cho người dùng (CLAUDE.md §4), không dùng đường khác. ";
 
 let data = "";
 process.stdin.on("data", (c) => (data += c));
@@ -50,28 +42,21 @@ process.stdin.on("end", () => {
     const input = JSON.parse(data.replace(/^﻿/, ""));
     const tool = String(input.tool_name || "");
 
-    if (tool.startsWith("mcp__playwright__") || tool.startsWith("mcp__supabase__")) {
-      deny(
-        "Không dùng Playwright MCP / Supabase MCP trực tiếp (CLAUDE.md §8). Trình duyệt: `node scripts/pw/cli.mjs` (Playwright CLI). Supabase: Composio (SUPABASE_*) hoặc `npx supabase db query --project-ref <ref dev>` (xem .claude/workflow/ops-db.md)."
-      );
+    if (tool.startsWith("mcp__playwright__")) {
+      deny("Không dùng Playwright MCP (CLAUDE.md §8). Trình duyệt: `node scripts/pw/cli.mjs` (Playwright CLI).");
+    } else if (tool.startsWith("mcp__") && !tool.startsWith("mcp__composio__") && /supabase|vercel/i.test(tool)) {
+      deny(VIA_COMPOSIO + "MCP Supabase/Vercel gọi trực tiếp bị chặn.");
     } else {
       const cmd = String((input.tool_input && input.tool_input.command) || "");
       for (const seg of segments(cmd)) {
-        if (COMPOSIO_CLI.test(seg)) {
-          deny(
-            "CLI `composio` không chạy trên Windows ở máy này. Dùng MCP COMPOSIO_SEARCH_TOOLS → COMPOSIO_MULTI_EXECUTE_TOOL. Nếu công cụ MCP không có trong phiên: báo THIẾU cho người dùng (CLAUDE.md §4, .claude/workflow/ops-env.md), không bỏ qua bước."
-          );
+        const cli = EXTERNAL_CLI.exec(seg);
+        if (cli) {
+          deny(VIA_COMPOSIO + `CLI \`${cli[1].toLowerCase()}\` bị chặn.`);
           break;
         }
-        if (SUPABASE_DB_PUSH.test(seg)) {
+        if (GIT_PUSH.test(seg) && !pushIntent()) {
           deny(
-            "`supabase db push` bị chặn: project linked của CLI là PROD. Dùng quy trình migration trong .claude/workflow/ops-db.md (áp dev bằng `db query --project-ref`; prod chỉ qua Composio khi người dùng yêu cầu rõ)."
-          );
-          break;
-        }
-        if ((GIT_PUSH.test(seg) || vercelDeploys(seg)) && !pushIntent()) {
-          deny(
-            'Chưa có yêu cầu push/deploy trong lượt nhắn gần nhất của người dùng. Luật (CLAUDE.md §6): xong việc thì commit trên nhánh rồi DỪNG. Báo người dùng đã commit xong và nói họ nhắn "push" (hoặc "deploy") nếu muốn đưa lên.'
+            'Chưa có yêu cầu push trong lượt nhắn gần nhất của người dùng. Luật (CLAUDE.md §6): xong việc thì commit trên nhánh rồi DỪNG. Báo người dùng đã commit xong và nói họ nhắn "push" nếu muốn đưa lên.'
           );
           break;
         }
