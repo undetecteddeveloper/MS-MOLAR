@@ -864,3 +864,66 @@ export async function listLatestSolutionsForHome(limit: number): Promise<HomeSol
   );
   return rows.map((row) => mapHomeSolutionRow(row, signedByPath));
 }
+
+// =============================================================================
+// Tab "Bài giải" của hồ sơ (2026-10-03)
+// =============================================================================
+
+export interface MySolutionItem {
+  solutionId: string;
+  examId: string;
+  examTitle: string;
+  /** Khoá canonical ("Math") — nơi hiển thị tra `subjectLabel()`. */
+  examSubject: string;
+  examGrade: number;
+  status: SolutionStatus;
+  /** Lượt làm mà URL trang viết đòi khớp; null khi không còn lượt nộp nào. */
+  attemptId: string | null;
+  updatedAt: string;
+  helpfulCount: number;
+  /** Đề đang published và tác giả đề không bị ban — false thì trang viết/xem
+   *  redirect, nên frontend không dựng liên kết nào. */
+  examVisible: boolean;
+}
+
+interface RawMySolutionRow {
+  solution_id: string;
+  exam_id: string;
+  exam_title: string;
+  exam_subject: string;
+  exam_grade: number;
+  status: SolutionStatus;
+  attempt_id: string | null;
+  updated_at: string;
+  helpful_count: number;
+  exam_visible: boolean;
+}
+
+function mapMySolutionRow(row: RawMySolutionRow): MySolutionItem {
+  return {
+    solutionId: row.solution_id,
+    examId: row.exam_id,
+    examTitle: row.exam_title,
+    examSubject: row.exam_subject,
+    examGrade: row.exam_grade,
+    status: row.status,
+    attemptId: row.attempt_id,
+    updatedAt: row.updated_at,
+    helpfulCount: row.helpful_count,
+    examVisible: row.exam_visible,
+  };
+}
+
+/**
+ * MỌI bài giải của CHÍNH người gọi (nháp, đã đăng, bị ẩn), mới cập nhật nhất
+ * trước, tối đa 100 — RPC `community_my_solutions` (schema.sql §28), không tham
+ * số nên không tra được bài của người khác. Lỗi RPC → ném (tab tự dựng băng lỗi
+ * cục bộ, tab Tài khoản vẫn dùng được — cùng quy ước `getMyCommentFeed`).
+ */
+export async function getMySolutions(): Promise<MySolutionItem[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("community_my_solutions");
+  if (error) throw error;
+
+  return ((data ?? []) as RawMySolutionRow[]).map(mapMySolutionRow);
+}

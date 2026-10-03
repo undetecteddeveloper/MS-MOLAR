@@ -922,7 +922,7 @@ export const copy = {
   "profile.title": "Hồ sơ của bạn",
   // Giá trị mới (task 44) — bản cũ "Tài khoản này gồm những gì, và những phần
   // bạn đổi được." không còn đúng: trang nay có thêm uy tín và bình luận.
-  "profile.description": "Tài khoản, uy tín và bình luận về bài giải của bạn.",
+  "profile.description": "Tài khoản, uy tín, bài giải và bình luận của bạn.",
   "profile.email.label": "Email đăng ký",
   "profile.email.readOnly": "Không thể thay đổi",
   "profile.name.change": "Đổi tên",
@@ -957,6 +957,7 @@ export const copy = {
   // Nguyên văn UI Spec § "Chuỗi tiếng Việt cần thêm" → "Hồ sơ (S-06, profile.*)".
   "profile.tabs.label": "Mục hồ sơ",
   "profile.tabs.account": "Tài khoản",
+  "profile.tabs.solutions": "Bài giải",
   "profile.tabs.comments": "Bình luận",
   // Dùng khi số bình luận mới k > 0 (chip "Bình luận") — khoá đặt sẵn ở task 44
   // ("profile.tabs.*"), nối vào `ProfileTabs` ở task 45 (đếm chưa đọc,
@@ -985,6 +986,19 @@ export const copy = {
   "profile.comments.emptyHowTo": "Vào một đề bạn đã nộp rồi bấm Viết bài giải ở trang kết quả.",
   "profile.comments.more": "Xem thêm",
   "profile.comments.loadError": "Chưa tải được bình luận. Bạn thử lại nhé.",
+
+  // --- Hồ sơ (S-06) — ProfileSolutionsTab (2026-10-03): mọi bài giải của tôi --
+  "profile.solutions.statusDraft": "Nháp",
+  "profile.solutions.statusPublished": "Đã đăng",
+  "profile.solutions.statusHidden": "Bị ẩn",
+  "profile.solutions.view": "Xem",
+  // Tên trợ năng của nút trên thẻ — nhiều thẻ cùng có "Sửa bài giải", nên tên
+  // phải kèm đề để người dùng đọc màn hình phân biệt được.
+  "profile.solutions.openLabel": "{action}, đề {title}",
+  "profile.solutions.examHidden": "Đề không còn hiện",
+  "profile.solutions.empty": "Bạn chưa viết bài giải nào.",
+  "profile.solutions.emptyHowTo": "Vào một đề bạn đã nộp rồi bấm Viết bài giải ở trang kết quả.",
+  "profile.solutions.loadError": "Chưa tải được bài giải của bạn. Bạn thử lại nhé.",
 
   // /about — xem chú thích tương ứng trong en.ts.
   "about.eyebrow": "Giới thiệu",

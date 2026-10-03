@@ -28,6 +28,7 @@ const {
   getMyUnreadCommentCountMock,
   markCommentsReadMock,
   profileCommentsTabMock,
+  profileSolutionsTabMock,
 } = vi.hoisted(() => ({
   getCurrentUserProfileMock: vi.fn(),
   getMyReputationMock: vi.fn(),
@@ -36,6 +37,7 @@ const {
   profileCommentsTabMock: vi.fn((props: { page: number }) => (
     <div data-testid="profile-comments-tab" data-page={props.page} />
   )),
+  profileSolutionsTabMock: vi.fn(() => <div data-testid="profile-solutions-tab" />),
 }));
 
 vi.mock("@/lib/auth/getCurrentUser", () => ({
@@ -50,6 +52,11 @@ vi.mock("@/features/solutions/actions", () => ({
 }));
 vi.mock("@/features/solutions/components/ProfileCommentsTab", () => ({
   ProfileCommentsTab: profileCommentsTabMock,
+}));
+// Cùng lý do với ProfileCommentsTab: Server Component async, hành vi thật có bộ
+// test riêng (`ProfileSolutionsTab.test.tsx`).
+vi.mock("@/features/solutions/components/ProfileSolutionsTab", () => ({
+  ProfileSolutionsTab: profileSolutionsTabMock,
 }));
 // ProfileCard (rendered on the account tab) imports these at module top level.
 vi.mock("@/features/auth/actions", () => ({
@@ -83,6 +90,7 @@ beforeEach(() => {
   getMyUnreadCommentCountMock.mockReset();
   markCommentsReadMock.mockReset();
   profileCommentsTabMock.mockClear();
+  profileSolutionsTabMock.mockClear();
   getCurrentUserProfileMock.mockResolvedValue(USER);
   getMyUnreadCommentCountMock.mockResolvedValue(0);
 });
@@ -192,5 +200,30 @@ describe("ProfilePage — ô 'Bình luận' render ProfileCommentsTab với đú
     render(jsx);
 
     expect(profileCommentsTabMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("ProfilePage — ô 'Bài giải' render ProfileSolutionsTab (2026-10-03)", () => {
+  it("tab=solutions: render ProfileSolutionsTab, KHÔNG render ProfileCard/ProfileCommentsTab, không đọc uy tín", async () => {
+    const jsx = await ProfilePage({ searchParams: Promise.resolve({ tab: "solutions" }) });
+    render(jsx);
+
+    expect(profileSolutionsTabMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("profile-solutions-tab")).toBeTruthy();
+    expect(profileCommentsTabMock).not.toHaveBeenCalled();
+    expect(getMyReputationMock).not.toHaveBeenCalled();
+    expect(screen.queryByText("an.nguyen")).toBeNull();
+    // Chip "Bình luận" vẫn cần số chưa đọc dù đang ở ô khác.
+    expect(getMyUnreadCommentCountMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("tab='account' và tab='comments': ProfileSolutionsTab KHÔNG được gọi", async () => {
+    getMyReputationMock.mockResolvedValue({ ok: false });
+
+    render(await ProfilePage({ searchParams: Promise.resolve({}) }));
+    cleanup();
+    render(await ProfilePage({ searchParams: Promise.resolve({ tab: "comments" }) }));
+
+    expect(profileSolutionsTabMock).not.toHaveBeenCalled();
   });
 });

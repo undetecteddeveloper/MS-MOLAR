@@ -3,7 +3,7 @@
 // Phải khớp CHÍNH XÁC size + padding của page.tsx (`small`, cùng nhịp đệm):
 // lệch một nấc thì nội dung giật lên/xuống đúng lúc skeleton được thay bằng dữ
 // liệu thật. BA khối theo đúng thứ tự trang: tiêu đề + mô tả → hàng chip
-// `ProfileTabs` → thẻ hồ sơ (hàng chip + khối uy tín trong thẻ do task 44
+// `ProfileTabs` (ba chip từ 2026-10-03) → thẻ hồ sơ (hàng chip + khối uy tín trong thẻ do task 44
 // thêm sau lần đo đầu 2026-09-10 — TBD-01, đóng lại ở đây).
 //
 // Chiều cao ĐO LẠI trên dev 2026-09-27 (Playwright CLI, tài khoản test có 1
@@ -44,6 +44,7 @@ export default function Loading() {
 
       <div className="flex gap-2">
         <div className="bg-surface h-11 w-28 animate-pulse rounded-full" />
+        <div className="bg-surface h-11 w-24 animate-pulse rounded-full" />
         <div className="bg-surface h-11 w-32 animate-pulse rounded-full" />
       </div>
 

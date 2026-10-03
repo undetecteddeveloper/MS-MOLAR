@@ -1,6 +1,6 @@
 "use client";
 
-// ProfileTabs — hai ô "Tài khoản" / "Bình luận" ngay dưới tiêu đề trang hồ sơ
+// ProfileTabs — ba ô "Tài khoản" / "Bài giải" / "Bình luận" ngay dưới tiêu đề trang hồ sơ
 // (UI Spec § Component ProfileTabs, UI-D15, AC-095). Đặt ở `features/solutions`
 // chứ không `features/profile` (B4): bấm "Bình luận" gọi `markCommentsRead()`
 // của tính năng này (frontend DD § UI Spec Deviations, đoạn "work plan already
@@ -52,11 +52,14 @@ export function ProfileTabs({ activeTab, commentCount }: ProfileTabsProps) {
     setTab(next);
 
     const params = new URLSearchParams(searchParams.toString());
-    if (next === "comments") {
-      params.set("tab", "comments");
-    } else {
+    if (next === "account") {
       params.delete("tab");
+    } else {
+      params.set("tab", next);
     }
+    // `cpage` chỉ có nghĩa ở ô Bình luận; rời ô đó thì bỏ, khỏi kéo một tham số
+    // thừa sang URL của ô khác.
+    if (next !== "comments") params.delete("cpage");
     startTransition(() => {
       router.push(params.toString() ? `${pathname}?${params}` : pathname, { scroll: false });
     });
@@ -74,6 +77,9 @@ export function ProfileTabs({ activeTab, commentCount }: ProfileTabsProps) {
     <div role="group" aria-label={t("profile.tabs.label")} className="flex flex-wrap gap-2">
       <Chip active={tab === "account"} className="h-11" onClick={() => selectTab("account")}>
         {t("profile.tabs.account")}
+      </Chip>
+      <Chip active={tab === "solutions"} className="h-11" onClick={() => selectTab("solutions")}>
+        {t("profile.tabs.solutions")}
       </Chip>
       <Chip
         active={tab === "comments"}

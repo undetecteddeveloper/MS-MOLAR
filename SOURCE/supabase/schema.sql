@@ -4802,6 +4802,76 @@ revoke all on function public.community_solution_detail(uuid) from public, anon;
 grant execute on function public.community_solution_detail(uuid) to authenticated;
 
 -- ----------------------------------------------------------------------------
+-- 28. COMMUNITY SOLUTIONS — "Bài giải của tôi" cho tab Hồ sơ (2026-10-03,
+--     docs/plans/20261003-feature-profile-solutions-tab.md).
+--
+--     Không hàm nào có sẵn liệt kê bài giải của CHÍNH người gọi xuyên nhiều
+--     đề: community_solution_for_writer / _result_card nhận đúng MỘT p_exam_id,
+--     community_solutions_list cũng vậy, còn bảng community_solutions bị
+--     `revoke all` với authenticated. Hàm này là đường đọc duy nhất cho tab.
+--
+--     Không tham số: chỉ auth.uid(), nên không lượt gọi nào xem được bài của
+--     người khác (cùng quy ước community_reputation_summary). Trả MỌI trạng
+--     thái của bài (nháp, đã đăng, bị ẩn) — đây là bài CỦA người gọi, không
+--     phải feed công khai nên không cần cổng "đã nộp đề" để che đáp án.
+--
+--     attempt_id dùng ĐÚNG công thức community_solution_for_writer
+--     (coalesce(linked_attempt_id, lượt nộp mới nhất)): URL trang viết đòi
+--     attemptId khớp giá trị đó, sai thì trang redirect. NULL khi không còn lượt
+--     nộp nào (lượt bị xoá) — khi đó frontend không dựng nút Sửa.
+--
+--     exam_visible = đề đang published và tác giả đề không bị ban — cùng biểu
+--     thức community_my_comment_feed. Frontend dùng nó để không bao giờ dựng
+--     liên kết tới đề đã ẩn (trang viết/xem sẽ redirect).
+--
+--     Trần 100 dòng, mới cập nhật nhất trước: mỗi người tối đa một bài mỗi đề.
+-- ----------------------------------------------------------------------------
+drop function if exists public.community_my_solutions();
+create function public.community_my_solutions()
+returns table (
+  solution_id uuid,
+  exam_id text,
+  exam_title text,
+  exam_subject text,
+  exam_grade int,
+  status text,
+  attempt_id uuid,
+  updated_at timestamptz,
+  helpful_count int,
+  exam_visible boolean
+)
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select
+    cs.id,
+    cs.exam_id,
+    e.title,
+    e.subject,
+    e.grade,
+    cs.status,
+    coalesce(cs.linked_attempt_id, (
+      select a.id
+        from public.exam_attempts a
+       where a.exam_id = cs.exam_id and a.user_id = auth.uid() and a.status = 'submitted'
+       order by a.submitted_at desc nulls last, a.started_at desc
+       limit 1
+    )),
+    cs.updated_at,
+    (select count(*)::int from public.community_solution_helpfuls hf where hf.solution_id = cs.id),
+    (e.status = 'published' and not public.is_author_banned(e.author_id))
+  from public.community_solutions cs
+  join public.exams e on e.id = cs.exam_id
+  where cs.author_id = auth.uid()
+  order by cs.updated_at desc, cs.id
+  limit 100;
+$$;
+revoke all on function public.community_my_solutions() from public, anon;
+grant execute on function public.community_my_solutions() to authenticated;
+
+-- ----------------------------------------------------------------------------
 -- 17. Phiên bản schema — DB tự khai nó đang chạy bản nào (2026-08-07).
 --
 --     Vì sao có phần này (TECH-DEBT TD-005): file này được paste TAY vào SQL
@@ -4840,7 +4910,7 @@ revoke all on public.schema_version from anon, authenticated;
 -- nó — xem lib/schema/schemaFingerprint.ts).
 -- @schema-fingerprint-begin
 insert into public.schema_version (id, fingerprint)
-values (1, '90dadbd4e453')
+values (1, 'b9f0a4ee8211')
 on conflict (id) do update
   set fingerprint = excluded.fingerprint,
       applied_at  = now();

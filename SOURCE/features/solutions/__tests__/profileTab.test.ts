@@ -10,6 +10,15 @@ describe("parseProfileTab", () => {
     expect(parseProfileTab("comments")).toBe("comments");
   });
 
+  it("'solutions' → tab bài giải", () => {
+    expect(parseProfileTab("solutions")).toBe("solutions");
+  });
+
+  it("so khớp CHÍNH XÁC: hoa/thường hay khoảng trắng đều rơi về tab tài khoản", () => {
+    expect(parseProfileTab("Solutions")).toBe("account");
+    expect(parseProfileTab(" solutions")).toBe("account");
+  });
+
   it("giá trị lạ → tab tài khoản, không bao giờ trắng trang", () => {
     expect(parseProfileTab("xyz")).toBe("account");
   });

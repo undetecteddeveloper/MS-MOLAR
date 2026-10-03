@@ -1819,6 +1819,38 @@ async function main() {
     );
   }
 
+  // ==========================================================================
+  // 18. COMMUNITY SOLUTIONS — "Bài giải của tôi" cho tab Hồ sơ (schema.sql §28,
+  //     2026-10-03). Cùng khuôn probe với §16/§17: anon bị từ chối bằng
+  //     "permission denied for function", probe user gọi được không lỗi. Hàm
+  //     không tham số, chỉ đọc, chỉ về chính người gọi.
+  // ==========================================================================
+  console.log("\nCOMMUNITY SOLUTIONS §28 (tab Hồ sơ) — probe EXECUTE community_my_solutions:");
+
+  const mySolutionsAnon = await anonClient.rpc("community_my_solutions");
+  const mySolutionsAnonMsg = mySolutionsAnon.error?.message ?? "";
+  assert(
+    mySolutionsAnonMsg.startsWith("permission denied for function"),
+    mySolutionsAnonMsg.startsWith("permission denied for function")
+      ? 'anon bị từ chối community_my_solutions đúng cách ("permission denied for function")'
+      : `anon KHÔNG bị từ chối đúng cách ở community_my_solutions (mã ${describeCode(mySolutionsAnon.error?.code ?? null)}, message "${mySolutionsAnonMsg}") — thiếu \`revoke ... from anon\` ở schema.sql §28`
+  );
+
+  if (!probe) skip("probe user community_my_solutions — cần một phiên `authenticated`");
+  else {
+    const mySolutionsProbe = await probe.rpc("community_my_solutions");
+    assert(
+      !mySolutionsProbe.error,
+      !mySolutionsProbe.error
+        ? `community_my_solutions: probe user gọi được, không lỗi (${(mySolutionsProbe.data as unknown[] | null)?.length ?? 0} dòng)`
+        : mySolutionsProbe.error.code === "PGRST202"
+          ? "community_my_solutions chưa tồn tại (PGRST202) — apply migration schema.sql §28"
+          : mySolutionsProbe.error.message.startsWith("permission denied for function")
+            ? `community_my_solutions: authenticated THIẾU grant execute (message "${mySolutionsProbe.error.message}") — schema.sql §28`
+            : `community_my_solutions LỖI KHÔNG MONG ĐỢI (mã ${describeCode(mySolutionsProbe.error.code ?? null)}, message "${mySolutionsProbe.error.message}") — thân hàm này không được raise gì`
+    );
+  }
+
   // Một lượt chạy PHẦN không bao giờ được in ra câu của một lượt chạy ĐỦ. Đó là
   // cả điểm của việc đếm `skipped` tách khỏi `failures`: người đọc log — hoặc
   // người dán log vào một work plan làm bằng chứng — phải thấy ngay rằng cái

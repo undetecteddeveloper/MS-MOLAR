@@ -41,7 +41,7 @@ import { createHash } from "node:crypto";
  * `__tests__/schemaFingerprint.test.ts` đối chiếu ba bên (hằng số ↔ giá trị khai
  * trong schema.sql ↔ giá trị tính lại từ nội dung) và FAIL nếu lệch bất kỳ đâu.
  */
-export const SCHEMA_FINGERPRINT = "90dadbd4e453";
+export const SCHEMA_FINGERPRINT = "b9f0a4ee8211";
 
 /** Đánh dấu khối KHÔNG tính vào vân tay — chính là khối chứa vân tay (§17). */
 const EXCLUDED_BLOCK_RE =

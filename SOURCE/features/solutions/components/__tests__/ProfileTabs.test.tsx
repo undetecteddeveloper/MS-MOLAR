@@ -112,3 +112,29 @@ describe("ProfileTabs — markCommentsRead là side-effect nền im lặng", () 
     );
   });
 });
+
+describe("ProfileTabs — chip Bài giải (2026-10-03)", () => {
+  it("bấm Bài giải → router.push('...?tab=solutions'), chip aria-pressed=true, KHÔNG gọi markCommentsRead", () => {
+    render(<ProfileTabs activeTab="account" />);
+
+    const solutionsChip = screen.getByRole("button", { name: "Bài giải" });
+    expect(solutionsChip.getAttribute("aria-pressed")).toBe("false");
+
+    act(() => {
+      solutionsChip.click();
+    });
+
+    expect(pushMock).toHaveBeenCalledWith("/profile?tab=solutions", { scroll: false });
+    expect(solutionsChip.getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("button", { name: "Tài khoản" }).getAttribute("aria-pressed")).toBe("false");
+    expect(markCommentsReadMock).not.toHaveBeenCalled();
+  });
+
+  it("activeTab='solutions': chỉ chip Bài giải được chọn; thứ tự chip là Tài khoản, Bài giải, Bình luận", () => {
+    render(<ProfileTabs activeTab="solutions" />);
+
+    const chips = screen.getAllByRole("button");
+    expect(chips.map((c) => c.textContent)).toEqual(["Tài khoản", "Bài giải", "Bình luận"]);
+    expect(chips.map((c) => c.getAttribute("aria-pressed"))).toEqual(["false", "true", "false"]);
+  });
+});

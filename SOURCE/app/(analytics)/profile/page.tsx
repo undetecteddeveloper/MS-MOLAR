@@ -12,8 +12,8 @@
 //
 // ProfileTabs + ReputationBlock (task 44, frontend DD v1.6 § UI Spec
 // Deviations DD-U1, UI-D15): trang là NƠI GHÉP duy nhất — nó phân tích `?tab=`
-// (whitelist, `parseProfileTab`), server-render CHỈ nội dung của tab đang
-// chọn, và ở tab "account" gọi `getMyReputation()` để dựng `ReputationBlock`
+// (whitelist, `parseProfileTab`: account / solutions / comments), server-render
+// CHỈ nội dung của tab đang chọn, và ở tab "account" gọi `getMyReputation()` để dựng `ReputationBlock`
 // rồi đưa xuống `ProfileCard` qua `reputationSlot`. `ProfileCard` (client,
 // `features/profile`) không được import gì từ `@/features/solutions/**` (B4)
 // — trang này (app/, không thuộc tính năng nào) là chỗ duy nhất được phép nối
@@ -30,6 +30,7 @@ import { ProfileCard } from "@/features/profile/components/ProfileCard";
 import { ProfileTabs } from "@/features/solutions/components/ProfileTabs";
 import { ReputationBlock } from "@/features/solutions/components/ReputationBlock";
 import { ProfileCommentsTab } from "@/features/solutions/components/ProfileCommentsTab";
+import { ProfileSolutionsTab } from "@/features/solutions/components/ProfileSolutionsTab";
 import { parseProfileTab } from "@/features/solutions/lib/profileTab";
 import {
   getMyReputation,
@@ -120,6 +121,8 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
       <ProfileTabs activeTab={tab} commentCount={commentCount} />
       {tab === "account" ? (
         <ProfileCard user={user} reputationSlot={reputationSlot} />
+      ) : tab === "solutions" ? (
+        <ProfileSolutionsTab />
       ) : (
         <ProfileCommentsTab page={commentFeedPage} />
       )}
