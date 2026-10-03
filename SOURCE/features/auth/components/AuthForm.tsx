@@ -19,10 +19,20 @@ import { t } from "@/lib/copy";
 import { PASSWORD_MIN_LENGTH } from "@/lib/auth/passwordPolicy";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
+import { VerifyCodeForm } from "@/features/auth/components/VerifyCodeForm";
 
-type Mode = "signin" | "signup";
+// "verify" = view nhập mã xác minh email sau đăng ký (VerifyCodeForm): không
+// tab nào sáng, đổi tab là thoát view.
+type Mode = "signin" | "signup" | "verify";
 
-export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
+export function AuthForm({
+  initialMode = "signin",
+  initialEmail = "",
+}: {
+  initialMode?: Mode;
+  /** Email điền sẵn cho view "verify" (từ `?email=` sau khi đăng ký). */
+  initialEmail?: string;
+}) {
   const [mode, setMode] = useState<Mode>(initialMode);
   // View reset mật khẩu — đè lên form sign in/up; tab nào bấm cũng thoát reset.
   const [resetOpen, setResetOpen] = useState(false);
@@ -38,6 +48,7 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
   );
 
   const isSignup = mode === "signup";
+  const isVerify = mode === "verify";
 
   return (
     <div className="bg-surface rounded-card flex w-full flex-col gap-5 p-5 sm:p-7">
@@ -46,7 +57,7 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
           điều khiển hai panel riêng. */}
       <div className="bg-background flex rounded-full p-1" role="group" aria-label={t("auth.signIn")}>
         <TabButton
-          active={!isSignup && !resetOpen}
+          active={mode === "signin" && !resetOpen}
           onClick={() => {
             setMode("signin");
             setResetOpen(false);
@@ -64,11 +75,19 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
       </div>
 
       <h1 className="text-2xl font-bold">
-        {resetOpen ? t("auth.resetPassword") : isSignup ? t("auth.signUp") : t("auth.signIn")}
+        {isVerify
+          ? t("auth.verify.title")
+          : resetOpen
+            ? t("auth.resetPassword")
+            : isSignup
+              ? t("auth.signUp")
+              : t("auth.signIn")}
       </h1>
 
       <AutoHeightPanel measureKey={resetOpen ? "reset" : mode}>
-        {resetOpen ? (
+        {isVerify ? (
+          <VerifyCodeForm initialEmail={initialEmail} onChangeEmail={() => setMode("signup")} />
+        ) : resetOpen ? (
           <div className="animate-in fade-in slide-in-from-right-3 flex flex-col gap-4 duration-300 motion-reduce:animate-none">
             <p className="text-muted-foreground text-sm leading-relaxed">{t("auth.resetIntro")}</p>
             <form action={resetAction} className="flex flex-col gap-4">

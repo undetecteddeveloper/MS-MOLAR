@@ -244,6 +244,15 @@ export const RATE_LIMITS = {
   // không phải một câu trả lời về credential. 10/giờ đủ cho người thử vài tấm
   // rồi đổi ý, và vẫn chặn vòng lặp bơm file.
   uploadAvatar: { limit: 10, windowMs: 60 * 60 * 1000 },
+  // Trang nhập mã xác minh đăng ký (`/?auth=verify`). Khoá là EMAIL đã chuẩn
+  // hoá chứ không phải userId: người gọi CHƯA đăng nhập. Cùng nhóm chặn LẠM DỤNG
+  // với changePassword — `verifySignupCode` nhận vào một credential (mã 6–8 số),
+  // nên trần đo TỐC ĐỘ DÒ: 8 lần/giờ đủ cho người gõ nhầm, vô dụng cho vòng lặp
+  // thử 10^6 mã. `resendSignupCode` mỗi lần là MỘT MAIL gửi đi (Supabase mặc định
+  // chỉ 2 mail/giờ cho cả project), nên 5/giờ. Đánh đổi đã biết: ai biết email
+  // người khác có thể gọi dồn để khoá việc xác minh của họ tới hết giờ.
+  verifySignupCode: { limit: 8, windowMs: 60 * 60 * 1000 },
+  resendSignupCode: { limit: 5, windowMs: 60 * 60 * 1000 },
   // Cham lai tu luan (ADR-0018 / AC-072). CUNG HO tieu-han-ngach-ben-thu-ba voi
   // explainStep/uploadExam, nhung o mot NHA CUNG CAP KHAC: no tieu ngan sach
   // GROQ, khong phai Gemini. Do la ly do no khong the nhap vao

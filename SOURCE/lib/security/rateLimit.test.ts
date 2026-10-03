@@ -178,6 +178,10 @@ describe("guard", () => {
   const ABUSE_CAPPED_ACTIONS: readonly (keyof typeof RATE_LIMITS)[] = [
     "changePassword",
     "uploadAvatar",
+    // Trang nhập mã đăng ký: nhận một credential (mã) / bắn một mail — cùng lý
+    // do chặn lạm dụng, trần 8 và 5 đều dưới sàn 15 của nhóm tốn-DB.
+    "verifySignupCode",
+    "resendSignupCode",
   ];
   // NHOM THU TU (2026-08-30, ADR-0018). Cung ho "tieu han ngach ben thu ba" voi
   // SUPPLIER_CAPPED_ACTIONS, nhung o mot NHA CUNG CAP KHAC — Groq, khong phai

@@ -9,6 +9,7 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { validatePassword } from "@/lib/auth/passwordPolicy";
 import { RECOVERY_COOKIE } from "@/lib/auth/recovery";
+import { isValidCode, mapVerifyError, normalizeCode, normalizeEmail } from "@/lib/auth/verifyCode";
 import { guard } from "@/lib/security/rateLimit";
 import { AVATARS_BUCKET } from "@/lib/profile/avatarStorage";
 import { extensionForMime } from "@/lib/profile/imageExtension";
@@ -48,15 +49,74 @@ export async function signUp(
   if (error) return { error: error.message };
 
   // Project bật "Confirm email" → chưa có session ngay sau signUp: user phải
-  // bấm link xác nhận trong mail trước. KHÔNG redirect /exams (middleware sẽ
-  // bounce ngược vì chưa auth) — hiện hướng dẫn tại chỗ.
+  // nhập mã trong mail trước. KHÔNG redirect /exams (middleware sẽ bounce ngược
+  // vì chưa auth) — sang trang nhập mã, email điền sẵn. Email trên URL là đánh
+  // đổi có chủ đích (người dùng chọn "tự điền email"); nó không phải bí mật và
+  // trang chỉ dùng nó để gửi lại/nhập mã. Email đã đăng ký rồi cũng đi đường này
+  // (Supabase không báo lỗi) — không có chỗ nào cho người lạ dò email tồn tại.
   if (!data.session) {
-    return {
-      info: "Account created. Check your email to confirm your address, then sign in.",
-    };
+    redirect(`/?auth=verify&email=${encodeURIComponent(normalizeEmail(email))}`);
   }
 
   redirect("/exams");
+}
+
+/**
+ * Nhập mã xác minh email sau khi đăng ký — `/?auth=verify`. Mã đúng → Supabase
+ * cấp session (cookie) và vào thẳng /exams, không bắt gõ lại mật khẩu.
+ *
+ * TRẢ KHOÁ BẢNG NHÃN, không trả câu: xem ghi chú đầu khối /profile bên dưới.
+ * Người gọi CHƯA đăng nhập nên rate limit theo email chuẩn hoá. KHÔNG log mã
+ * hay email.
+ */
+export async function verifySignupCode(
+  _prev: AuthState,
+  formData: FormData,
+): Promise<AuthState> {
+  const email = normalizeEmail(String(formData.get("email") ?? ""));
+  const code = normalizeCode(String(formData.get("code") ?? ""));
+  if (!email) return { error: "auth.verify.error.emailRequired" };
+  if (!isValidCode(code)) return { error: "auth.verify.error.invalid" };
+
+  // TRƯỚC khi hỏi Supabase, cùng lý do với changePassword: guard đặt sau bước
+  // kiểm thì không còn chặn được tốc độ dò mã.
+  const rl = await guard("verifySignupCode", email);
+  if (!rl.ok) return { error: rateLimitedKey(rl.retryAfterSeconds) };
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.verifyOtp({ email, token: code, type: "signup" });
+  if (error) {
+    console.warn("[verifySignupCode] verifyOtp bị từ chối, status:", error.status ?? 0);
+    return { error: mapVerifyError(error) };
+  }
+
+  redirect("/exams");
+}
+
+/**
+ * Gửi lại mã xác minh. Luôn trả kết quả CHUNG bất kể email có tồn tại hay đã
+ * xác minh chưa (không làm oracle dò email). Đếm ngược 60 giây nằm ở client;
+ * ở đây là rate limit theo email chặn vòng lặp bắn mail.
+ */
+export async function resendSignupCode(
+  _prev: AuthState,
+  formData: FormData,
+): Promise<AuthState> {
+  const email = normalizeEmail(String(formData.get("email") ?? ""));
+  if (!email) return { error: "auth.verify.error.emailRequired" };
+
+  const rl = await guard("resendSignupCode", email);
+  if (!rl.ok) return { error: rateLimitedKey(rl.retryAfterSeconds) };
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.resend({ type: "signup", email });
+  if (error) {
+    // Lỗi gửi mail thật (vd trần 2 mail/giờ của SMTP mặc định) chỉ log server.
+    console.warn("[resendSignupCode] resend bị từ chối, status:", error.status ?? 0);
+    return { error: error.status === 429 ? "auth.verify.error.mailLimit" : "auth.verify.error.generic" };
+  }
+
+  return { info: "auth.verify.resent" };
 }
 
 /**

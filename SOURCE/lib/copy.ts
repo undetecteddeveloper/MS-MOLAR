@@ -137,6 +137,20 @@ export const copy = {
   "auth.backToSignIn": "Quay lại đăng nhập",
   "auth.orSignInWith": "Hoặc đăng nhập bằng",
   "auth.orSignUpWith": "Hoặc đăng ký bằng",
+  // Trang nhập mã xác minh email sau khi đăng ký (`/?auth=verify`).
+  "auth.verify.title": "Xác minh email",
+  "auth.verify.intro": "Chúng tôi đã gửi mã xác minh tới {email}. Nhập mã đó để hoàn tất đăng ký.",
+  "auth.verify.introNoEmail": "Nhập email bạn đã đăng ký và mã xác minh trong thư.",
+  "auth.verify.code": "Mã xác minh",
+  "auth.verify.submit": "Xác minh",
+  "auth.verify.resend": "Gửi lại mã",
+  "auth.verify.resendIn": "Gửi lại mã sau {seconds} giây",
+  "auth.verify.resent": "Đã gửi mã mới. Nếu chưa thấy, hãy xem cả thư mục thư rác.",
+  "auth.verify.changeEmail": "Đổi email",
+  "auth.verify.error.invalid": "Mã sai hoặc đã hết hạn. Hãy kiểm tra lại, hoặc bấm Gửi lại mã.",
+  "auth.verify.error.generic": "Chưa xác minh được. Hãy thử lại sau ít phút.",
+  "auth.verify.error.emailRequired": "Hãy nhập email bạn đã đăng ký.",
+  "auth.verify.error.mailLimit": "Hệ thống đang gửi quá nhiều thư. Hãy thử lại sau ít phút.",
 
   // --- Danh sách đề -------------------------------------------------------
   // Kệ đề (ExamShelf) — 3 kệ trên trang danh sách đề (docs/ui-spec/exam-shelves-ui-spec.md § Copy Keys).

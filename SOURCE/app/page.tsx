@@ -49,16 +49,33 @@ const HOME_EXAM_COUNT = 3;
 /** Số bài giải hiện trong LatestSolutionsSpotlight — xem khối comment F-041 ở trên. */
 const HOME_SOLUTIONS_COUNT = 3;
 
-export default async function Home({ searchParams }: { searchParams: Promise<{ auth?: string }> }) {
+/** Trần độ dài email hợp lệ (RFC 5321) — chặn chuỗi dài bất thường trên URL. */
+const EMAIL_PARAM_MAX = 254;
+
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ auth?: string; email?: string }>;
+}) {
   // Đọc cookie auth mỗi request → `/` là dynamic (ƒ), đánh đổi hợp lý cho cá
   // nhân hoá (ô tài khoản, băng xếp hạng "đã làm").
-  const [{ auth }, user, requestHeaders] = await Promise.all([
+  const [{ auth, email }, user, requestHeaders] = await Promise.all([
     searchParams,
     getCurrentUserProfile(),
     headers(),
   ]);
 
-  const authMode: AuthMode = auth === "signup" ? "signup" : auth === "signin" ? "signin" : null;
+  const authMode: AuthMode =
+    auth === "signup"
+      ? "signup"
+      : auth === "signin"
+        ? "signin"
+        : auth === "verify"
+          ? "verify"
+          : null;
+  // Email điền sẵn cho trang nhập mã (`?auth=verify&email=…`). Chỉ là gợi ý điền
+  // ô: không dùng để tra cứu hay quyết định gì ở server.
+  const verifyEmail = typeof email === "string" ? email.trim().slice(0, EMAIL_PARAM_MAX) : "";
 
   // Đã đăng nhập mà mở form auth → vào thẳng /exams (parity với /login cũ).
   if (user && authMode) redirect("/exams");
@@ -133,7 +150,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ a
                 cụm "Đề nổi nhất", nét ở đó mờ hơn. Ẩn khi form đăng nhập đang mở. */}
             {authMode === null && <HeroGrid />}
             <div className="flex flex-col gap-6">
-              <HomeStage auth={authMode} signedIn={user !== null} />
+              <HomeStage auth={authMode} signedIn={user !== null} verifyEmail={verifyEmail} />
 
               {/* Ba câu nói rõ sản phẩm làm gì, cho khách. Không đánh số: đây
                   không phải một trình tự. `.motion-hero-item` nối tiếp lead

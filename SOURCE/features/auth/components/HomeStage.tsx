@@ -16,9 +16,18 @@ import { t } from "@/lib/copy";
 import { AuthForm } from "@/features/auth/components/AuthForm";
 import { Button } from "@/components/ui/button";
 
-export type AuthMode = "signin" | "signup" | null;
+export type AuthMode = "signin" | "signup" | "verify" | null;
 
-export function HomeStage({ auth, signedIn }: { auth: AuthMode; signedIn: boolean }) {
+export function HomeStage({
+  auth,
+  signedIn,
+  verifyEmail = "",
+}: {
+  auth: AuthMode;
+  signedIn: boolean;
+  /** Email điền sẵn cho `?auth=verify` (từ `?email=`). */
+  verifyEmail?: string;
+}) {
   const showAuth = auth !== null;
 
   return (
@@ -90,7 +99,11 @@ export function HomeStage({ auth, signedIn }: { auth: AuthMode; signedIn: boolea
         </Link>
         {/* key theo mode: deep-link ?auth=signup mở đúng tab (AuthForm giữ mode
             trong state nội bộ, chỉ đọc initialMode lúc mount). */}
-        <AuthForm key={auth ?? "signin"} initialMode={auth ?? "signin"} />
+        <AuthForm
+          key={auth ?? "signin"}
+          initialMode={auth ?? "signin"}
+          initialEmail={verifyEmail}
+        />
       </section>
     </div>
   );
