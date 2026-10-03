@@ -12,6 +12,12 @@ import {
   type SkillAttemptRow,
   type SubjectSkillBreakdown,
 } from "@/lib/analytics/skillBreakdown";
+import {
+  suggestWeakSkills,
+  weakSkillIds,
+  type SubjectSuggestion,
+} from "@/lib/analytics/weakSkillSuggestions";
+import { readExamsBySkill } from "@/lib/exams/skillExams";
 import { deriveEssayView } from "@/lib/scoring/essayLifecycle";
 import type { PerQuestionResult } from "@/types/result";
 import { MASTERY_CLEARED_THRESHOLD, ROUTING_SUBJECT } from "@/lib/adaptive/constants";
@@ -48,6 +54,8 @@ export interface AnalyticsPageData {
   statsByRange: Record<TimeRange, SubjectStats[]>;
   /** "% đúng theo dạng bài" cho mọi môn — thẻ Kết quả theo dạng bài. */
   skillBreakdownByRange: Record<TimeRange, SubjectSkillBreakdown[]>;
+  /** Thẻ vàng "Nên luyện gì tiếp theo": đủ 7 môn, toàn thời gian (không theo chip). */
+  suggestions: SubjectSuggestion[];
 }
 
 /**
@@ -189,7 +197,45 @@ export async function getAnalyticsByRange(): Promise<AnalyticsPageData> {
   return {
     statsByRange: aggregateAttemptsByRange(rows, now),
     skillBreakdownByRange,
+    suggestions: await readWeakSkillSuggestions(supabase, skillBreakdownByRange.all),
   };
+}
+
+/**
+ * Thẻ vàng (2026-10-03): từ bảng kê "toàn thời gian" chọn dạng yếu của từng môn,
+ * rồi tra đề nào chứa chúng và đề nào học sinh đã nộp.
+ *
+ * Hai lệnh đọc THÊM, song song và chỉ khi có ít nhất một dạng yếu — học sinh làm
+ * tốt hết (hoặc chưa làm gì) tốn đúng 0 round-trip. `readExamsBySkill` là phép nối
+ * mà lưới Kho đề `?skill=` cũng dùng, và "đã nộp" đọc cùng bảng/điều kiện với
+ * `listMySubmittedExamIds` (features/exams — luật B4 cấm import chéo), nên số "đề
+ * chưa làm" trên thẻ khớp số thẻ chưa làm khi bấm "Tìm đề" (AC-05).
+ */
+async function readWeakSkillSuggestions(
+  supabase: Supabase,
+  breakdownAll: SubjectSkillBreakdown[],
+): Promise<SubjectSuggestion[]> {
+  const weakIds = weakSkillIds(breakdownAll, MASTERY_CLEARED_THRESHOLD);
+  const [examsBySkill, doneExamIds] =
+    weakIds.length === 0
+      ? [new Map<string, { id: string; subject: string }[]>(), new Set<string>()]
+      : await Promise.all([readExamsBySkill(supabase, weakIds), readSubmittedExamIds(supabase)]);
+
+  return suggestWeakSkills({
+    breakdown: breakdownAll,
+    examsBySkill,
+    doneExamIds,
+    threshold: MASTERY_CLEARED_THRESHOLD,
+  });
+}
+
+/** Id các đề người gọi đã nộp (RLS khoá về auth.uid()) — "đề đã làm" của thẻ vàng. */
+async function readSubmittedExamIds(supabase: Supabase): Promise<Set<string>> {
+  const rows = (await readBounded(
+    "getAnalyticsByRange.submittedExams",
+    supabase.from("exam_attempts").select("exam_id").eq("status", "submitted"),
+  )) as { exam_id: string }[];
+  return new Set(rows.map((row) => row.exam_id));
 }
 
 // --- Engine 1: gợi ý kỹ năng nên luyện tiếp (PRD R3) ------------------------

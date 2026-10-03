@@ -28,7 +28,7 @@ export {
   type SortDirection,
 } from "./catalogue";
 export { listExamsRanked } from "./ranking";
-export { getSkillLabel, readExamsBySkill, type SkillExam } from "./skill";
+export { getSkillLabel } from "./skill";
 export { searchExamTitles, SEARCH_SUGGESTION_LIMIT, type ExamSearchHit } from "./search";
 export { getExamForPlayer } from "./player";
 export { getQuestionPartNumbers } from "./parts";

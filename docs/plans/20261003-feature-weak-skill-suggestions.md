@@ -30,7 +30,8 @@ Mỗi dạng có tối đa 1 đề. Vì dạng yếu luôn là dạng đã làm,
 **Đề chứa dạng X**: `questions.skill_node_id = X` → `exams.question_ids && {id câu}` (`status = 'published'`), nối trong Node bằng 2–3 lượt đọc song song (không RPC/migration; `question_ids` là mảng, không có `exam_id` trên `questions`). Câu id chia lô 100 (cùng `QUESTION_ID_CHUNK`) để URL PostgREST không quá dài.
 
 **Chữ ký**
-- `features/exams/queries/skill.ts` (mới, server-only): `readExamsBySkill(supabase, skillIds): Promise<Map<skillId, {id; subject}[]>>`; `listExamIdsBySkill(supabase, skillId): Promise<string[]>`; `getSkillLabel(skillId): Promise<string | null>`.
+- `lib/exams/skillExams.ts` (mới; ở lib/ vì luật B4 cấm tính năng import nhau, mà cả `features/analytics` lẫn `features/exams` cần): `readExamsBySkill(supabase, skillIds): Promise<Map<skillId, {id; subject}[]>>`.
+- `features/exams/queries/skill.ts` (mới, server-only): `listExamIdsBySkill(supabase, skillId): Promise<string[]>`; `getSkillLabel(skillId): Promise<string | null>`.
 - `lib/analytics/weakSkillSuggestions.ts` (mới, thuần): `suggestWeakSkills(breakdownAll, examsBySkill, doneExamIds): SubjectSuggestion[]` — luôn đủ 7 phần tử theo `SUBJECT_ORDER`.
   `SubjectSuggestion` = `{kind:"suggest", subject, skillNodeId, skillLabel, correct, total, openExamCount}` | `{kind:"none", subject, reason:"no-data"|"no-weak"}` | `{kind:"none", subject, reason:"all-done"|"no-exam", skillLabel, correct, total}`.
   Luật: dạng yếu xếp yếu nhất trước (thứ tự sẵn của reducer); chọn dạng yếu ĐẦU TIÊN có ≥1 đề published CÙNG MÔN chưa nộp; không dạng nào có → `all-done` nếu có dạng yếu nào có đề (nhãn = dạng yếu nhất có đề), còn không `no-exam` (nhãn = dạng yếu nhất).
