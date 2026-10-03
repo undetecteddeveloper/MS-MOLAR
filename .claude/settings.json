@@ -1,129 +1,30 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git push *)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git show*)",
+      "Bash(git branch*)",
+      "Bash(git add *)",
       "Bash(git commit *)",
-      "Bash(cd /e/StemWeb_project/TrangNguyenDigi/SOURCE && find app -type d | sort && echo \"---components.json---\" && cat components.json 2>/dev/null && echo \"---components/ui---\" && ls components/ui 2>/dev/null)",
-      "Read(//e/e/StemWeb_project/TrangNguyenDigi/SOURCE/**)",
-      "Bash(echo \"=== TSC EXIT: $? ===\")",
-      "Bash(npx tsx *)",
-      "Bash(echo \"=== EXIT: $? ===\")",
-      "Bash(echo \"=== PUSH EXIT: $? ===\")",
-      "Bash(npm list *)",
+      "Bash(npx tsc *)",
+      "Bash(npx eslint *)",
+      "Bash(npx vitest *)",
       "Bash(npx next *)",
-      "Skill(update-config)",
-      "Skill(update-config:*)",
-      "Bash(Get-ChildItem \"e:\\\\StemWeb_project\\\\TrangNguyenDigi\\\\ASSETS\" -Recurse)",
-      "Bash(Select-Object FullName, Length)",
-      "Bash(Format-Table -AutoSize)",
-      "Bash(Get-ChildItem \"e:\\\\StemWeb_project\\\\TrangNguyenDigi\\\\TEMPLATE\" -Recurse)",
-      "PowerShell(New-Item -ItemType Directory -Force \"e:\\\\StemWeb_project\\\\TrangNguyenDigi\\\\SOURCE\\\\public\\\\fonts\")",
-      "PowerShell(Copy-Item \"e:\\\\StemWeb_project\\\\TrangNguyenDigi\\\\ASSETS\\\\fonts\\\\Merriweather-VariableFont_opsz,wdth,wght.ttf\" -Destination \"e:\\\\StemWeb_project\\\\TrangNguyenDigi\\\\SOURCE\\\\public\\\\fonts\\\\\")",
-      "PowerShell(Set-Location \"e:\\\\StemWeb_project\\\\TrangNguyenDigi\\\\SOURCE\"; npx tsc --noEmit; Write-Host \"EXIT=$LASTEXITCODE\")",
-      "PowerShell(Set-Location \"e:\\\\StemWeb_project\\\\TrangNguyenDigi\\\\SOURCE\"; npx next build 2>&1 | Select-Object -Last 45; Write-Host \"EXIT=$LASTEXITCODE\")",
-      "mcp__playwright__browser_navigate",
-      "mcp__playwright__browser_snapshot",
-      "mcp__playwright__browser_fill_form",
-      "mcp__playwright__browser_click",
-      "mcp__playwright__browser_take_screenshot",
-      "mcp__playwright__browser_console_messages",
-      "PowerShell(Set-Location \"e:\\\\StemWeb_project\\\\TrangNguyenDigi\\\\SOURCE\"; npx tsc --noEmit; Write-Host \"TSC_EXIT=$LASTEXITCODE\")",
-      "PowerShell(Set-Location \"e:\\\\StemWeb_project\\\\TrangNguyenDigi\\\\SOURCE\"; if \\(Test-Path \".next\"\\) { Remove-Item -Recurse -Force \".next\" }; npx next build 2>&1 | Select-Object -Last 25; Write-Host \"BUILD_EXIT=$LASTEXITCODE\")",
-      "mcp__playwright__browser_resize",
-      "Bash(grep -q \"Ready\\\\|Local:\" \"C:\\\\\\\\Users\\\\\\\\ASUS\\\\\\\\AppData\\\\\\\\Local\\\\\\\\Temp\\\\\\\\claude\\\\\\\\e--StemWeb-project-TrangNguyenDigi\\\\\\\\93005030-c5f2-432b-aa00-4d1346fead94\\\\\\\\tasks\\\\\\\\bxxtozb2r.output\")",
-      "Bash(break)",
-      "Bash(cat \"C:\\\\\\\\Users\\\\\\\\ASUS\\\\\\\\AppData\\\\\\\\Local\\\\\\\\Temp\\\\\\\\claude\\\\\\\\e--StemWeb-project-TrangNguyenDigi\\\\\\\\93005030-c5f2-432b-aa00-4d1346fead94\\\\\\\\tasks\\\\\\\\bxxtozb2r.output\")",
-      "mcp__playwright__browser_evaluate",
-      "Bash(grep -q \"Ready\" \"C:\\\\\\\\Users\\\\\\\\ASUS\\\\\\\\AppData\\\\\\\\Local\\\\\\\\Temp\\\\\\\\claude\\\\\\\\e--StemWeb-project-TrangNguyenDigi\\\\\\\\93005030-c5f2-432b-aa00-4d1346fead94\\\\\\\\tasks\\\\\\\\bu22792nj.output\")",
-      "Bash(echo \"EXIT=$?\")",
-      "Bash(echo \"TSC_EXIT=$?\")",
-      "mcp__playwright__browser_type",
-      "PowerShell(New-Item -ItemType Directory -Force \"e:\\\\StemWeb_project\\\\TrangNguyenDigi\\\\SOURCE\\\\public\\\\models\")",
-      "PowerShell(Copy-Item \"e:\\\\StemWeb_project\\\\TrangNguyenDigi\\\\ASSETS\\\\models\\\\AIO_PC\\\\source\\\\all_in_one_pc.glb\" \"e:\\\\StemWeb_project\\\\TrangNguyenDigi\\\\SOURCE\\\\public\\\\models\\\\\")",
-      "PowerShell(Copy-Item \"e:\\\\StemWeb_project\\\\TrangNguyenDigi\\\\ASSETS\\\\models\\\\BOOK\\\\source\\\\stack_of_books.glb\" \"e:\\\\StemWeb_project\\\\TrangNguyenDigi\\\\SOURCE\\\\public\\\\models\\\\\")",
-      "PowerShell(Copy-Item \"e:\\\\StemWeb_project\\\\TrangNguyenDigi\\\\ASSETS\\\\models\\\\PENCIL\\\\source\\\\Pencil.glb\" \"e:\\\\StemWeb_project\\\\TrangNguyenDigi\\\\SOURCE\\\\public\\\\models\\\\\")",
-      "Bash(node -e \"const t=require\\('./tsconfig.json'\\); console.log\\(JSON.stringify\\(t.compilerOptions.paths\\)\\)\")",
-      "Bash(node -e \"const b=require\\('fs'\\).readFileSync\\('ASSETS/images/computer.png'\\);console.log\\('w',b.readUInt32BE\\(16\\),'h',b.readUInt32BE\\(20\\)\\);\")",
-      "Bash(mkdir -p SOURCE/public/images)",
-      "Bash(cp ASSETS/images/computer.png SOURCE/public/images/computer.png)",
-      "Bash(sed -E 's/=\\(.{6}\\).*/=\\\\1****\\(masked\\)/' .env.local)",
-      "Bash(curl -s -o /dev/null -w \"project host -> HTTP %{http_code} | %{time_total}s\\\\n\" --max-time 15 \"https://hynwleaxtbtjzkvpjsug.supabase.co\")",
-      "Bash(nslookup hynwleaxtbtjzkvpjsug.supabase.co 8.8.8.8)",
-      "Bash(node -e 'let d=\"\";process.stdin.on\\(\"data\",c=>d+=c\\).on\\(\"end\",\\(\\)=>{try{const u=JSON.parse\\(d\\).users||[];console.log\\(\"Tổng user:\",u.length\\);u.forEach\\(x=>console.log\\(\"-\",x.email,\"| confirmed:\",!!x.email_confirmed_at\\)\\)}catch\\(e\\){console.log\\(\"raw:\",d.slice\\(0,300\\)\\)}}\\)')",
-      "PowerShell($c = Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue; if \\($c\\) { $c.OwningProcess | Select-Object -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }; Write-Output \"dev server stopped\" } else { Write-Output \"no listener on 3000\" })",
-      "PowerShell($c = Get-NetTCPConnection -LocalPort 3001 -State Listen -ErrorAction SilentlyContinue; if \\($c\\) { $c.OwningProcess | Select-Object -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue } }; Remove-Item -Force \"E:\\\\StemWeb_project\\\\TrangNguyenDigi\\\\verify-exams.png\" -ErrorAction SilentlyContinue; Write-Output \"cleaned\")",
-      "Bash(git commit -m ' *)",
-      "Bash(tasklist //FI \"PID eq 15796\" //FO CSV)",
-      "Bash(taskkill //PID 15796 //F)",
-      "Bash(python -)",
-      "Bash(taskkill //PID 9504 //F)",
-      "Bash(curl -s -o /dev/null -w \"GET / -> %{http_code}\\\\n\" http://localhost:3000/)",
-      "Bash(curl -s -o /dev/null -w \"GET /exams -> %{http_code} \\(redirect khi guest la dung\\)\\\\n\" http://localhost:3000/exams)",
-      "Bash(git commit -m 'feat\\(layer1-2/theme\\): merge auth into homepage with in-place transition, sync Ink & Lacquer theme site-wide, drop 3D homepage *)",
-      "PowerShell($conns = Get-NetTCPConnection -LocalPort 3000,3001,3002 -State Listen -ErrorAction SilentlyContinue; if \\($conns\\) { $conns | Select-Object LocalPort, OwningProcess | ForEach-Object { $p = Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue; \"$\\($_.LocalPort\\) -> PID $\\($_.OwningProcess\\) \\($\\($p.ProcessName\\)\\)\" } } else { \"no dev server listening\" })",
-      "PowerShell(Set-Location e:\\\\StemWeb_project\\\\MS-MOLAR\\\\SOURCE; npx tsc --noEmit; \"tsc exit: $LASTEXITCODE\")",
-      "PowerShell(Set-Location e:\\\\StemWeb_project\\\\MS-MOLAR\\\\SOURCE; npm run build; \"build exit: $LASTEXITCODE\")",
-      "PowerShell(try { $r = Invoke-WebRequest -Uri \"http://localhost:3000/exams\" -MaximumRedirection 0 -ErrorAction Stop; \"status: $\\($r.StatusCode\\)\" } catch { $resp = $_.Exception.Response; if \\($resp\\) { \"status: $\\([int]$resp.StatusCode\\)\" } else { \"error: $\\($_.Exception.Message\\)\" } })",
-      "PowerShell($conns = Get-NetTCPConnection -LocalPort 3000,3001,3002 -State Listen -ErrorAction SilentlyContinue; if \\($conns\\) { $conns | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue; \"killed PID $\\($_.OwningProcess\\) on port $\\($_.LocalPort\\)\" } } else { \"no dev server running\" })",
-      "PowerShell(Set-Location e:\\\\StemWeb_project\\\\MS-MOLAR\\\\SOURCE; npx tsc --noEmit; \"tsc exit: $LASTEXITCODE\"; if \\($LASTEXITCODE -eq 0\\) { npm run build; \"build exit: $LASTEXITCODE\" })",
-      "PowerShell(Start-Sleep -Seconds 4; try { $r = Invoke-WebRequest -Uri \"http://localhost:3000/\" -MaximumRedirection 0 -ErrorAction Stop; \"GET / -> $\\($r.StatusCode\\)\" } catch { $resp = $_.Exception.Response; if \\($resp\\) { \"GET / -> $\\([int]$resp.StatusCode\\)\" } else { \"error: $\\($_.Exception.Message\\)\" } })",
-      "PowerShell(Remove-Item -Force \"e:\\\\StemWeb_project\\\\MS-MOLAR\\\\SOURCE\\\\lib\\\\random\\\\shuffle.ts\"; if \\(-not \\(Get-ChildItem \"e:\\\\StemWeb_project\\\\MS-MOLAR\\\\SOURCE\\\\lib\\\\random\" -ErrorAction SilentlyContinue\\)\\) { Remove-Item -Force \"e:\\\\StemWeb_project\\\\MS-MOLAR\\\\SOURCE\\\\lib\\\\random\" }; \"deleted\")",
-      "PowerShell($conns = Get-NetTCPConnection -LocalPort 3000,3001,3002 -State Listen -ErrorAction SilentlyContinue; if \\($conns\\) { $conns | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { try { Stop-Process -Id $_ -Force -Confirm:$false; \"killed PID $_\" } catch { \"fail PID $_\" } } } else { \"no dev server running\" })",
-      "PowerShell(Set-Location e:\\\\StemWeb_project\\\\MS-MOLAR\\\\SOURCE; npm run build 2>&1 | Select-Object -Last 25; \"build exit: $LASTEXITCODE\")",
-      "Bash(git ls-tree *)",
-      "Bash(echo \"EXIT:$?\")",
-      "Bash(echo \"ESLINT_EXIT:$?\")",
-      "Bash(rm -rf .playwright-mcp/)",
-      "Bash(rm -f dap_an.png prompt.txt)",
-      "Bash(grep -iE \"C:\\\\\\\\\\\\\\\\|/Users/|key|token|secret|password\" .claude/settings.json)",
-      "Bash(git commit -q -m 'chore\\(repo\\): remove legacy templates/docs, add tooling config, tidy gitignore *)",
-      "Bash(awk '{print $1}')",
-      "Bash(git commit -q -m 'feat\\(layer4/ugc\\): AI-assisted exam upload — multi-part national format + Gemini *)",
-      "Bash(rm -rf \"app/\\(layer4\\)/admin\")",
-      "Bash(rm -f \"app/\\(layer4\\)/_components/ImportContentManagement.tsx\")",
-      "Bash(echo \"TSC_EXIT:$?\")",
-      "Bash(echo \"TSC:$?\")",
-      "Bash(cd /e/StemWeb_project/MS-MOLAR/SOURCE && npx vitest run lib/adaptive 2>&1 | tail -6 && rm -f supabase/skill-tagging-report-*.json && npx tsx supabase/tagQuestionSkills.ts 2>&1 | tail -6)",
-      "Bash(cp components/tutor/useTutorAction.ts /tmp/useTutorAction.bak.ts)",
-      "Bash(sed -i 's/await explainStep\\(attemptId, questionId\\)/await explainStep\\(questionId, attemptId\\)/' components/tutor/useTutorAction.ts)",
-      "Bash(cd \"e:/StemWeb_project/MS-MOLAR/SOURCE\" && sed -i 's/if \\(busyRef.current\\) return; \\\\/\\\\/ AC-025 — kiểm TRƯỚC mọi cập nhật state/if \\(phase === \"busy\"\\) return;/' components/tutor/useTutorAction.ts && grep -n 'phase === \"busy\"' components/tutor/useTutorAction.ts && npx vitest run components/tutor/ExplainStepAffordance.test.tsx 2>&1 | grep -E \"×|Tests \" | head -8; cp /tmp/useTutorAction.bak.ts components/tutor/useTutorAction.ts)",
-      "Bash(cd \"e:/StemWeb_project/MS-MOLAR/SOURCE\" && sed -i 's/if \\(busyRef.current\\) return; \\\\/\\\\/ AC-025 — kiểm TRƯỚC mọi cập nhật state/if \\(phase === \"busy\"\\) return;/' components/tutor/useTutorAction.ts && npx vitest run components/tutor/ExplainStepAffordance.test.tsx 2>&1 | grep -E \"×|Tests \" | head -8; cp /tmp/useTutorAction.bak.ts components/tutor/useTutorAction.ts && npx vitest run components/tutor/ExplainStepAffordance.test.tsx 2>&1 | grep -E \"Tests |Test Files\")",
-      "Bash(cp components/tutor/ExplainStepAffordance.tsx /tmp/ESA.bak.tsx)",
-      "Bash(sed -i 's|        onClick={run}|        onClick={run}\\\\n        disabled={phase === \"error\"}|' components/tutor/ExplainStepAffordance.tsx)",
-      "Bash(rm components/tutor/__mutcheck.tmp.test.tsx)",
-      "Bash(mv components/tutor/useTutorAction.ts.orig components/tutor/useTutorAction.ts)",
-      "Bash(perl -i.orig -pe 's/await explainStep\\\\\\(attemptId, questionId\\\\\\)/await explainStep\\(questionId, attemptId\\)/' components/tutor/useTutorAction.ts)",
-      "Bash(perl -i.orig -pe 's|<RichText text=\\\\{hint\\\\}.*|<p>{hint}</p>|' components/tutor/ExplainStepAffordance.tsx)",
-      "Bash(mv components/tutor/ExplainStepAffordance.tsx.orig components/tutor/ExplainStepAffordance.tsx)",
-      "Bash(perl -i.orig -pe 's|\\(<RichText text=\\\\{hint\\\\}.*\\)|$1\\\\n        <Button type=\"button\" onClick={run}>{t\\(\"tutor.explainThisStep\"\\)}</Button>|' components/tutor/ExplainStepAffordance.tsx)",
-      "Bash(perl -i.orig -pe 's|\\(\\\\s+\\)onClick=\\\\{run\\\\}|$1onClick={run}\\\\n        disabled={phase === \"error\"}|' components/tutor/ExplainStepAffordance.tsx)",
-      "Bash(perl -i.orig -pe 's|<p role=\"alert\" className|<p className|' components/tutor/ExplainStepAffordance.tsx)",
-      "Bash(perl -i.orig -pe 's|^\\\\s+busyRef\\\\.current = false;|      // MUTATION: lock never released|' components/tutor/useTutorAction.ts)",
-      "Bash(perl -i.orig -pe 's|^  attemptId: string;|  attemptId: string;\\\\n  skillNodeId?: string \\\\| null;|; s|export function ExplainStepAffordance\\\\\\(\\\\{ questionId, attemptId \\\\}|export function ExplainStepAffordance\\({ questionId, attemptId, skillNodeId }|; s|\\\\{phase === \"error\" \\\\? t\\\\\\(\"common.retry\"\\\\\\) : t\\\\\\(\"tutor.explainThisStep\"\\\\\\)\\\\}|{phase === \"error\" ? t\\(\"common.retry\"\\) : skillNodeId ? t\\(\"tutor.explainThisStep\"\\) : t\\(\"tutor.explainThisStep\"\\)}|' components/tutor/ExplainStepAffordance.tsx)",
-      "Bash(cp components/tutor/useTutorAction.ts /tmp/uta.bak.ts)",
-      "Bash(sed -i 's/if \\(busyRef.current\\) return; \\\\/\\\\/ AC-025 — kiểm TRƯỚC mọi cập nhật state/if \\(phase === \"busy\"\\) return;/' components/tutor/useTutorAction.ts)",
-      "Bash(cp \"app/\\(layer3\\)/_components/SkillRecommendationCard.tsx\" /tmp/src.bak)",
-      "Bash(sed -i 's/\"recently-wrong\": \"analytics.recommendReasonRecentlyWrong\"/\"recently-wrong\": \"analytics.recommendReasonLowestMastery\"/' \"app/\\(layer3\\)/_components/SkillRecommendationCard.tsx\")",
-      "Bash(cp /tmp/src.bak \"app/\\(layer3\\)/_components/SkillRecommendationCard.tsx\")",
-      "Bash(rm /tmp/src.bak)",
-      "Bash(perl -i -pe 's/\"analytics\\\\.recommendWhy\": \"Why this skill\\\\?\"/\"analytics.recommendWhy\": \"Why?\"/' \"lib/i18n/dictionaries/en.ts\")"
-    ],
-    "additionalDirectories": [
-      "E:\\StemWeb_project\\MS-MOLAR\\supabase",
-      "\\tmp"
+      "Bash(npx tsx *)",
+      "Bash(npm run *)",
+      "Bash(node scripts/pw/cli.mjs *)"
     ]
   },
-  "enabledMcpjsonServers": [
-    "playwright"
-  ],
+  "enabledMcpjsonServers": [],
   "hooks": {
-    "PreToolUse": [
+    "SessionStart": [
       {
-        "matcher": "Bash|PowerShell",
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/block-composio-cli.js"
+            "command": "node -e \"require((process.env.CLAUDE_PROJECT_DIR||process.cwd())+'/.claude/hooks/session-start.js')\""
           }
         ]
       }
@@ -133,7 +34,18 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/inject-conventions.js"
+            "command": "node -e \"require((process.env.CLAUDE_PROJECT_DIR||process.cwd())+'/.claude/hooks/prompt-reminder.js')\""
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell|mcp__playwright__.*|mcp__supabase__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"require((process.env.CLAUDE_PROJECT_DIR||process.cwd())+'/.claude/hooks/guard.js')\""
           }
         ]
       }

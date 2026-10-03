@@ -176,4 +176,4 @@ còn trỏ đường dẫn cũ sẽ làm `tsc` đỏ oan cho tới khi build l�
   Tài liệu trong `docs/` đã được cập nhật theo tên nhóm route mới ngày 2026-09-03;
   16 đường dẫn còn trỏ vào file không tồn tại là tên component từng lên kế hoạch
   mà chưa bao giờ được dựng — hồ sơ lịch sử, cố ý không sửa.
-- `.claude/MEMORY.md` — quy trình 3 pha, tài khoản test, Notion ghi tiến độ.
+- `CLAUDE.md` — luật làm việc; `.claude/workflow/` — 4 đường làm việc + ghi chú vùng (tài khoản test ở `ops-ui.md`); `PROGRESS.md` — tiến độ.

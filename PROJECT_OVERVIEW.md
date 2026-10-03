@@ -5,7 +5,8 @@
 > để nó tồn tại song song với sự thật (rà soát 2026-08-06: đã bỏ toàn bộ phần mô
 > tả tầm nhìn 3D ban đầu — xem §10; 2026-08-07: `PROCESS.md` — nhật ký từng phiên
 > — đã bị xoá, nợ kỹ thuật còn mở đã chuyển hết sang `TECH-DEBT.md`; tiến độ theo
-> phiên nay ghi ở Notion, xem `.claude/MEMORY.md`).
+> phiên nay ghi ở `PROGRESS.md`; luật làm việc ở `CLAUDE.md` — 2026-10-03 đã bỏ
+> Notion và `.claude/MEMORY.md`).
 
 ---
 
@@ -17,7 +18,7 @@
 | **Repo** | `github.com/undetecteddeveloper/TrangNguyenDigi.git` |
 | **Giao tiếp agent ↔ engineer** | Tiếng Việt |
 | **Solo hay team** | Solo (1 engineer) |
-| **Tài liệu liên quan** | `ARCHITECTURE.md` (code ở đâu), §2 dưới đây (design token), `TECH-DEBT.md`, `docs/adr/`. Tiến độ từng phiên: Notion (xem `.claude/MEMORY.md`) |
+| **Tài liệu liên quan** | `ARCHITECTURE.md` (code ở đâu), §2 dưới đây (design token), `TECH-DEBT.md`, `docs/adr/`. Luật làm việc: `CLAUDE.md` + `.claude/workflow/`. Tiến độ: `PROGRESS.md` |
 
 ---
 

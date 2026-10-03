@@ -24,13 +24,13 @@ This file records the external resources available to this project and how to ac
 ### Guidelines
 - Status: present
 - Source type: project files
-- Location: `SOURCE/app/globals.css` + `.claude/MEMORY.md` §3 (visual rules — see Design Origin above), plus `PROJECT_OVERVIEW.md` (repo root) for process conventions. Session progress: Notion (see `.claude/MEMORY.md`); technical debt: `TECH-DEBT.md` (repo root, moved from `docs/` 2026-08-08)
+- Location: `SOURCE/app/globals.css` + `.claude/workflow/ops-ui.md` (visual rules — see Design Origin above), plus `PROJECT_OVERVIEW.md` (repo root) and `CLAUDE.md` for process conventions. Session progress: `PROGRESS.md`; technical debt: `TECH-DEBT.md` (repo root, moved from `docs/` 2026-08-08)
 - Access method: file read
 
 ### Visual Verification Environment
 - Status: present
 - Tool type: local dev server + Playwright **CLI** + manual inspection
-- Entry: `npm run dev` (Next.js local dev server); `npx playwright` (v1.62, Chromium installed) run from inside `SOURCE/` for screenshots and the `ui-audit` measurement workflow (`.claude/skills/ui-audit/`). The Playwright MCP server in `.mcp.json` is NOT used for audits (project convention `.claude/CONVENTIONS.md` §3). Auto mode blocks automated sign-in as the test account — the engineer logs the shared CLI session in when a page needs auth.
+- Entry: `npm run dev` (Next.js local dev server); `npx playwright` (v1.62, Chromium installed) run from inside `SOURCE/` for screenshots and the `ui-audit` measurement workflow (`.claude/skills/ui-audit/`). The Playwright MCP server in `.mcp.json` is NOT used for audits (project convention: `CLAUDE.md` §8, enforced by `.claude/hooks/guard.js`). Auto mode blocks automated sign-in as the test account — the engineer logs the shared CLI session in when a page needs auth.
 
 ## Backend
 
