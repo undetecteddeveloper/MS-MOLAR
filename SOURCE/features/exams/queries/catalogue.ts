@@ -14,6 +14,7 @@ import { BUCKET_HARD_MIN, BUCKET_MEDIUM_MIN, RATING_MIN } from "@/lib/rating";
 import { toSearchTerm } from "@/lib/search/normalize";
 import type { Exam } from "@/types/exam";
 import { EXAM_COLUMNS, toExam, type ExamRow } from "./rows";
+import { listExamIdsBySkill } from "./skill";
 
 // --- Reads ----------------------------------------------------------------
 
@@ -63,6 +64,9 @@ export interface ExamFilters {
   /** Từ khoá tìm theo TÊN đề, chuỗi thô từ `?q=` (ADR-0020). Chuẩn hoá ở đây
    *  bằng `toSearchTerm`; rỗng/quá ngắn sau chuẩn hoá = không lọc. */
   q?: string;
+  /** `skill_nodes.id` từ `?skill=` — chỉ đề published chứa ít nhất một câu thuộc
+   *  dạng bài này. Chỗ gọi đã kiểm dạng id (`parseSkillParam`). */
+  skill?: string;
 }
 
 /**
@@ -87,6 +91,14 @@ export async function fetchExamRows(filters?: ExamFilters): Promise<ExamRow[]> {
   // LIKE (`%`, `_`, `\`) hay của bộ lọc PostgREST (`,`, `(`, `)`).
   const term = toSearchTerm(filters?.q);
   if (term) query = query.ilike("title_search", `%${term}%`);
+  // Dạng bài (2026-10-03): hẹp tập ứng viên về các đề chứa dạng đó, DB-side và
+  // TRƯỚC xếp hạng như `q` — không đổi thứ tự (ADR-0015). Không đề nào chứa →
+  // trả rỗng luôn, khỏi gọi `.in("id", [])` (PostgREST đọc thành "không lọc").
+  if (filters?.skill) {
+    const examIds = await listExamIdsBySkill(supabase, filters.skill);
+    if (examIds.length === 0) return [];
+    query = query.in("id", examIds);
+  }
   if (filters?.subject) query = query.eq("subject", filters.subject);
   if (filters?.grade !== undefined && !Number.isNaN(filters.grade)) {
     query = query.eq("grade", filters.grade);

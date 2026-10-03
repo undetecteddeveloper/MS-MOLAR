@@ -51,6 +51,10 @@ interface ExamFiltersProps {
   sort?: ExamSort;
   /** Từ khoá đang tìm (`?q=`, ADR-0020) — hiện thành chip có nút bỏ ở đầu hàng. */
   query?: string;
+  /** Dạng bài đang lọc (`?skill=`, nút "Tìm đề" ở Thống kê) — chip có nút bỏ cạnh chip từ khoá. */
+  skill?: string;
+  /** Nhãn tiếng Việt của `skill`; vắng khi id không đọc được (chip nói chung chung, không in id thô). */
+  skillLabel?: string;
 }
 
 // Lọc nhanh — 4 chip CÙNG trục ?sort= (D002): chọn 1 tự loại trừ 3 cái còn
@@ -78,6 +82,8 @@ export function ExamFilters({
   selected,
   sort,
   query,
+  skill,
+  skillLabel,
 }: ExamFiltersProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -140,9 +146,9 @@ export function ExamFilters({
     selected.level,
   ].filter((v) => v !== undefined).length;
   const hasFilters = activeCount > 0;
-  // Từ khoá không đếm vào "Bộ lọc (n)" (nó có chip riêng) nhưng vẫn là thứ
-  // "Xoá lọc" phải xoá được.
-  const canClear = hasFilters || query !== undefined;
+  // Từ khoá và dạng bài không đếm vào "Bộ lọc (n)" (mỗi cái có chip riêng) nhưng
+  // vẫn là thứ "Xoá lọc" phải xoá được.
+  const canClear = hasFilters || query !== undefined || skill !== undefined;
 
   // Môn hiện bằng NHÃN tiếng Việt và xếp theo nhãn ("Hóa học, Tiếng Anh, Toán,
   // Vật lý") — giá trị URL vẫn là khoá canonical ("Math") vì đó là giá trị DB
@@ -159,7 +165,7 @@ export function ExamFilters({
           sang ngang, và vì tới sau cửa sổ 500ms nên bị tính CLS (đo 2026-09-08);
           hàng không có state riêng nên dựng lại là vô hại. */}
       <div
-        key={query ?? ""}
+        key={`${query ?? ""}|${skill ?? ""}`}
         className="-mx-4 flex [scrollbar-width:none] items-center gap-2 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:px-6 [&::-webkit-scrollbar]:hidden"
       >
         {/* Chip từ khoá đứng ĐẦU hàng: nó là điều kiện hẹp nhất đang áp lên lưới,
@@ -173,6 +179,28 @@ export function ExamFilters({
           >
             <Search aria-hidden className="size-4" />
             <span className="max-w-48 truncate">{t("exams.searchChip", { query })}</span>
+            <X aria-hidden className="size-4" />
+          </button>
+        )}
+
+        {/* Chip dạng bài: cho học sinh thấy VÌ SAO lưới chỉ còn vài đề (nút "Tìm đề"
+            ở Thống kê dẫn tới đây) và cho cách bỏ đúng điều kiện đó. */}
+        {skill !== undefined && (
+          <button
+            type="button"
+            onClick={() => setParam("skill", "")}
+            aria-label={
+              skillLabel !== undefined
+                ? t("exams.skillChipRemove", { label: skillLabel })
+                : t("exams.skillChipRemoveUnknown")
+            }
+            className={chipVariants({ active: true })}
+          >
+            <span className="max-w-56 truncate">
+              {skillLabel !== undefined
+                ? t("exams.skillChip", { label: skillLabel })
+                : t("exams.skillChipUnknown")}
+            </span>
             <X aria-hidden className="size-4" />
           </button>
         )}

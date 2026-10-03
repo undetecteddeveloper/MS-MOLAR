@@ -171,6 +171,12 @@ export const copy = {
   // Tìm đề theo tên (ADR-0020).
   "exams.searchChip": "Tìm: “{query}”",
   "exams.searchChipRemove": "Bỏ từ khoá “{query}”",
+  // Chip dạng bài (nút "Tìm đề" ở Thống kê, 2026-10-03). `…Unknown` khi id không
+  // đọc được nhãn (dạng đã xoá, hoặc phiên khách chưa đăng nhập).
+  "exams.skillChip": "Dạng bài: {label}",
+  "exams.skillChipRemove": "Bỏ lọc dạng bài {label}",
+  "exams.skillChipUnknown": "Theo dạng bài",
+  "exams.skillChipRemoveUnknown": "Bỏ lọc theo dạng bài",
   "exams.noSearchMatch": "Không tìm thấy đề nào cho “{query}”",
   "exams.noSearchMatchHint": "Thử từ khoá ngắn hơn, hoặc bỏ bớt bộ lọc.",
   // Phân trang (TD-026).

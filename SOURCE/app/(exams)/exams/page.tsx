@@ -5,6 +5,7 @@
 // mọi trạng thái lọc đều là một URL chia sẻ được.
 
 import {
+  getSkillLabel,
   listExamsRanked,
   listExamFacets,
   type ExamSort,
@@ -17,7 +18,7 @@ import { ExamFilters } from "@/features/exams/components/ExamFilters";
 import { ExamPagination } from "@/features/exams/components/ExamPagination";
 import { ExamShelf, shelfSubtitle } from "@/features/exams/components/ExamShelf";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
-import { hasBrowseParam } from "@/lib/exams/browseParams";
+import { hasBrowseParam, parseSkillParam } from "@/lib/exams/browseParams";
 import { t } from "@/lib/copy";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -40,6 +41,8 @@ type SearchParams = Promise<{
   page?: string;
   /** Từ khoá tìm theo tên (ADR-0020) — chuỗi thô, Kho đề tự chuẩn hoá. */
   q?: string;
+  /** Dạng bài (`skill_nodes.id`) — nút "Tìm đề" của thẻ gợi ý ở Thống kê. */
+  skill?: string;
 }>;
 
 export default async function ExamsPage({ searchParams }: { searchParams: SearchParams }) {
@@ -74,6 +77,8 @@ export default async function ExamsPage({ searchParams }: { searchParams: Search
   // Cắt về trần TRƯỚC khi đưa đi bất cứ đâu — chip hiển thị, bộ lọc, link phân
   // trang đều nhận cùng một chuỗi; chuẩn hoá thật nằm trong fetchExamRows.
   const q = sp.q?.trim() ? sp.q.trim().slice(0, SEARCH_MAX_LENGTH) : undefined;
+  // Dị dạng → coi như không lọc dạng bài (khoá thô vẫn đưa trang xuống lưới phẳng).
+  const skill = parseSkillParam(sp.skill);
 
   // ADR-0015: `listExamsRanked` tự sở hữu lượt đọc `exam_attempts` và trả luôn
   // tập id đã nộp, nên băng xếp hạng "đã làm" và nút Chấm điểm dùng CHUNG một
@@ -86,16 +91,18 @@ export default async function ExamsPage({ searchParams }: { searchParams: Search
   // unused slot of the pair always resolves to `null`, contributing 0 network
   // calls; `listExamFacets()`/`getCurrentUser()` are unconditional, so they run
   // on BOTH branches (the chip row renders on the shelves view too, AC-033).
-  const [shelves, ranked, facets, user] = await Promise.all([
+  const [shelves, ranked, facets, user, skillLabel] = await Promise.all([
     showShelves ? listExamShelves() : null,
     showShelves
       ? null
       : listExamsRanked(
-          { subject, grade, school, schoolYear: year, semester, sort, level, dir, q },
+          { subject, grade, school, schoolYear: year, semester, sort, level, dir, q, skill },
           Number.isFinite(page) ? page : 1
         ),
     listExamFacets(),
     getCurrentUser(),
+    // Nhãn cho chip "Dạng bài: …"; chỉ đọc khi có `?skill=` (0 lượt gọi thêm còn lại).
+    skill ? getSkillLabel(skill) : null,
   ]);
 
   const filterBar = (
@@ -110,6 +117,8 @@ export default async function ExamsPage({ searchParams }: { searchParams: Search
         selected={{ subject, grade, school, year, semester, level }}
         sort={sort}
         query={q}
+        skill={skill}
+        skillLabel={skillLabel ?? undefined}
       />
     </>
   );
@@ -155,7 +164,7 @@ export default async function ExamsPage({ searchParams }: { searchParams: Search
   // Enter từ ô tìm: thẻ còn lại dịch chỗ sau round-trip (> 500ms) nên trình
   // duyệt TÍNH vào CLS — 0,49 ở 360px, 0,29 ở 768, 0,19 ở 1024, 0,13 ở 1280.
   // Cùng bệnh và cùng cách sửa với danh sách Lịch sử (history/page.tsx).
-  const gridKey = [subject, grade, school, year, semester, sort, level, dir, q, currentPage]
+  const gridKey = [subject, grade, school, year, semester, sort, level, dir, q, skill, currentPage]
     .map((v) => v ?? "")
     .join("|");
 
@@ -191,6 +200,7 @@ export default async function ExamsPage({ searchParams }: { searchParams: Search
             level: sp.level,
             dir: sp.dir,
             q,
+            skill,
           }}
         />
       </div>

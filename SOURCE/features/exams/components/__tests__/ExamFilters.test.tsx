@@ -89,3 +89,53 @@ describe("ExamFilters — hàng chip", () => {
     expect(push).toHaveBeenCalledWith("/exams?sort=newest", { scroll: false });
   });
 });
+
+describe("ExamFilters — chip dạng bài (?skill=, brief 20261003 AC-06)", () => {
+  it("không có skill → không có chip dạng bài, không có nút Xoá lọc", () => {
+    render(<ExamFilters {...BASE_PROPS} />);
+
+    expect(screen.queryByText(/Dạng bài/)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Xoá lọc" })).toBeNull();
+  });
+
+  it("có skill + nhãn → chip 'Dạng bài: <nhãn>' đứng ĐẦU hàng, có nút Xoá lọc", () => {
+    render(<ExamFilters {...BASE_PROPS} skill="ham-so-bac-hai" skillLabel="Hàm số bậc hai" />);
+
+    const labels = screen.getAllByRole("button").map((b) => b.textContent);
+    expect(labels[0]).toBe("Dạng bài: Hàm số bậc hai");
+    expect(screen.getByRole("button", { name: "Xoá lọc" })).not.toBeNull();
+  });
+
+  it("bấm chip → bỏ ĐÚNG skill, giữ subject, xoá page", () => {
+    search = "subject=Math&skill=ham-so-bac-hai&page=2";
+    render(
+      <ExamFilters
+        {...BASE_PROPS}
+        selected={{ subject: "Math" }}
+        skill="ham-so-bac-hai"
+        skillLabel="Hàm số bậc hai"
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Bỏ lọc dạng bài Hàm số bậc hai" }));
+
+    expect(push).toHaveBeenCalledWith("/exams?subject=Math", { scroll: false });
+  });
+
+  it("nhãn không đọc được → chip nói chung chung, KHÔNG in id thô lên màn hình", () => {
+    render(<ExamFilters {...BASE_PROPS} skill="ham-so-bac-hai" />);
+
+    const chip = screen.getByRole("button", { name: "Bỏ lọc theo dạng bài" });
+    expect(chip.textContent).toBe("Theo dạng bài");
+    expect(document.body.textContent).not.toContain("ham-so-bac-hai");
+  });
+
+  it("Xoá lọc → về /exams trần (xoá cả skill)", () => {
+    search = "skill=ham-so-bac-hai";
+    render(<ExamFilters {...BASE_PROPS} skill="ham-so-bac-hai" skillLabel="Hàm số bậc hai" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Xoá lọc" }));
+
+    expect(push).toHaveBeenCalledWith("/exams", { scroll: false });
+  });
+});

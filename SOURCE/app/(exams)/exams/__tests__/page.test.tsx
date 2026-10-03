@@ -41,13 +41,19 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), back: vi.fn() }),
 }));
 
-const { listExamShelvesMock, listExamsRankedMock, listExamFacetsMock, getCurrentUserMock } =
-  vi.hoisted(() => ({
-    listExamShelvesMock: vi.fn(),
-    listExamsRankedMock: vi.fn(),
-    listExamFacetsMock: vi.fn(),
-    getCurrentUserMock: vi.fn(),
-  }));
+const {
+  listExamShelvesMock,
+  listExamsRankedMock,
+  listExamFacetsMock,
+  getCurrentUserMock,
+  getSkillLabelMock,
+} = vi.hoisted(() => ({
+  listExamShelvesMock: vi.fn(),
+  listExamsRankedMock: vi.fn(),
+  listExamFacetsMock: vi.fn(),
+  getCurrentUserMock: vi.fn(),
+  getSkillLabelMock: vi.fn(),
+}));
 
 vi.mock("@/features/exams/queries/shelves", () => ({
   listExamShelves: listExamShelvesMock,
@@ -55,6 +61,7 @@ vi.mock("@/features/exams/queries/shelves", () => ({
 vi.mock("@/features/exams/queries", () => ({
   listExamsRanked: listExamsRankedMock,
   listExamFacets: listExamFacetsMock,
+  getSkillLabel: getSkillLabelMock,
 }));
 vi.mock("@/lib/auth/getCurrentUser", () => ({
   getCurrentUser: getCurrentUserMock,
@@ -104,6 +111,7 @@ beforeEach(() => {
   listExamsRankedMock.mockResolvedValue(RANKED_FIXTURE);
   listExamFacetsMock.mockResolvedValue(FACETS);
   getCurrentUserMock.mockResolvedValue(null);
+  getSkillLabelMock.mockResolvedValue(null);
 });
 
 describe("ExamsPage — showShelves = !hasBrowseParam(sp), read from the RAW searchParams (AC-001, AC-008)", () => {
@@ -154,6 +162,42 @@ describe("ExamsPage — listExamFacets()/getCurrentUser() run on BOTH branches (
     await renderServerTree(<ExamsPage searchParams={Promise.resolve({ sort: "newest" })} />);
     expect(listExamFacetsMock).toHaveBeenCalledTimes(2);
     expect(getCurrentUserMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("ExamsPage — ?skill= (nút Tìm đề của thẻ gợi ý dạng bài yếu, brief 20261003 AC-05/06/07)", () => {
+  it("skill hợp lệ: chuyển nguyên id vào bộ lọc của listExamsRanked, đọc nhãn một lần, hiện chip có nhãn", async () => {
+    getSkillLabelMock.mockResolvedValue("Hàm số bậc hai");
+
+    const { container } = await renderServerTree(
+      <ExamsPage searchParams={Promise.resolve({ subject: "Math", skill: "ham-so-bac-hai" })} />
+    );
+
+    expect(listExamsRankedMock).toHaveBeenCalledTimes(1);
+    expect(listExamsRankedMock.mock.calls[0][0]).toMatchObject({
+      subject: "Math",
+      skill: "ham-so-bac-hai",
+    });
+    expect(getSkillLabelMock).toHaveBeenCalledWith("ham-so-bac-hai");
+    expect(shelfSections(container)).toEqual([]);
+    expect(container.textContent).toContain("Dạng bài: Hàm số bậc hai");
+  });
+
+  it("skill dị dạng (?skill=A%20B): xuống lưới phẳng nhưng KHÔNG lọc, không đọc nhãn", async () => {
+    const { container } = await renderServerTree(
+      <ExamsPage searchParams={Promise.resolve({ skill: "A B; drop" })} />
+    );
+
+    expect(listExamsRankedMock).toHaveBeenCalledTimes(1);
+    expect(listExamsRankedMock.mock.calls[0][0].skill).toBeUndefined();
+    expect(getSkillLabelMock).not.toHaveBeenCalled();
+    expect(shelfSections(container)).toEqual([]);
+  });
+
+  it("không có ?skill=: không đọc nhãn dạng bài (0 lượt gọi thêm)", async () => {
+    await renderServerTree(<ExamsPage searchParams={Promise.resolve({ sort: "newest" })} />);
+
+    expect(getSkillLabelMock).not.toHaveBeenCalled();
   });
 });
 

@@ -13,10 +13,10 @@
 // @dependency: none — hàm thuần, không I/O
 
 import { describe, expect, it } from "vitest";
-import { BROWSE_PARAM_KEYS, hasBrowseParam } from "@/lib/exams/browseParams";
+import { BROWSE_PARAM_KEYS, hasBrowseParam, parseSkillParam } from "@/lib/exams/browseParams";
 
 describe("BROWSE_PARAM_KEYS", () => {
-  it("đúng 10 khoá của AC-008, khớp với SearchParams của exams/page.tsx", () => {
+  it("10 khoá của AC-008 + `skill` (2026-10-03), khớp với SearchParams của exams/page.tsx", () => {
     expect(BROWSE_PARAM_KEYS).toEqual([
       "q",
       "subject",
@@ -28,8 +28,25 @@ describe("BROWSE_PARAM_KEYS", () => {
       "level",
       "dir",
       "page",
+      "skill",
     ]);
   });
+});
+
+describe("parseSkillParam — chỉ cho id dạng bài hợp lệ đi vào truy vấn", () => {
+  it.each(["ham-so-bac-hai", "ly-dong-luc-hoc", "a", "sinh-di-truyen-quan-the-2"])(
+    "'%s' hợp lệ → giữ nguyên",
+    (id) => {
+      expect(parseSkillParam(id)).toBe(id);
+    },
+  );
+
+  it.each([undefined, "", "HAM-SO", "ham so", "ham_so", "a;b", "x".repeat(65), "ham-số"])(
+    "%j dị dạng hoặc vắng → undefined",
+    (raw) => {
+      expect(parseSkillParam(raw)).toBeUndefined();
+    },
+  );
 });
 
 describe("hasBrowseParam — bare URL (0 khoá nào hiện diện)", () => {
@@ -42,7 +59,7 @@ describe("hasBrowseParam — bare URL (0 khoá nào hiện diện)", () => {
   });
 });
 
-describe("hasBrowseParam — mỗi khoá trong 10 khoá AC-008, hiện diện với giá trị hợp lệ -> true", () => {
+describe("hasBrowseParam — mỗi khoá trong danh sách, hiện diện với giá trị hợp lệ -> true", () => {
   it.each(BROWSE_PARAM_KEYS)("khoá '%s' hiện diện -> true", (key) => {
     expect(hasBrowseParam({ [key]: "anything" })).toBe(true);
   });

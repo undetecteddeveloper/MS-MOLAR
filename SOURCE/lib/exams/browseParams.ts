@@ -1,8 +1,9 @@
 // Dự đoán nhánh render của /exams (Kho đề theo kệ) — bare URL (0 tham số) ra
-// 3 kệ; bất kỳ tham số nào trong 10 khoá AC-008 hiện diện thì xuống lưới
-// phẳng như hôm nay (D2/AC-008/AC-010).
+// 3 kệ; bất kỳ tham số nào trong 11 khoá (10 của AC-008 + `skill`, thêm
+// 2026-10-03 cho nút "Tìm đề" của thẻ gợi ý dạng bài yếu) hiện diện thì xuống
+// lưới phẳng như hôm nay (D2/AC-008/AC-010).
 //
-// `BROWSE_PARAM_KEYS` là DUY NHẤT nơi khai 10 khoá này — `exams/page.tsx`
+// `BROWSE_PARAM_KEYS` là DUY NHẤT nơi khai các khoá này — `exams/page.tsx`
 // import thẳng thay vì giữ một bản sao thứ hai có thể lệch (Boundary Context,
 // work plan Connection Map).
 //
@@ -24,10 +25,24 @@ export const BROWSE_PARAM_KEYS = [
   "level",
   "dir",
   "page",
+  "skill",
 ] as const;
 
+/** `skill_nodes.id` là slug chữ thường, số và gạch ngang (lib/adaptive/skillTaxonomy.ts). */
+const SKILL_PARAM_PATTERN = /^[a-z0-9-]{1,64}$/;
+
 /**
- * `true` khi `sp` mang bất kỳ khoá nào trong 10 khoá AC-008 với giá trị
+ * `?skill=` đã kiểm: id dạng bài hợp lệ, hoặc `undefined` khi vắng/dị dạng.
+ * Chỉ để chặn chuỗi lạ đi vào truy vấn — id có tồn tại thật hay không là việc
+ * của DB (không có đề nào chứa → lưới rỗng thường). Khác `hasBrowseParam`: ở
+ * đây ĐỌC giá trị, vì dị dạng phải rơi về "không lọc theo dạng bài".
+ */
+export function parseSkillParam(raw: string | undefined): string | undefined {
+  return raw !== undefined && SKILL_PARAM_PATTERN.test(raw) ? raw : undefined;
+}
+
+/**
+ * `true` khi `sp` mang bất kỳ khoá nào trong các khoá trên với giá trị
  * `!== undefined` — kể cả chuỗi rỗng (`?q=`) hoặc mảng (khoá lặp lại nhiều
  * lần trên URL). `false` chỉ khi không khoá nào trong danh sách hiện diện —
  * bare URL đích thực.
