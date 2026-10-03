@@ -363,13 +363,8 @@ export const copy = {
   "analytics.recommendReasonLowestMastery": "Đây là kỹ năng bạn đang yếu nhất lúc này.",
   "analytics.recommendReasonRecentlyWrong": "Bạn vừa làm sai kỹ năng này gần đây.",
 
-  // WeakTopicsCard — từ 2026-09-16 "chủ đề" là DẠNG BÀI (cây kỹ năng 7 môn),
-  // không còn là `topic_breakdown` (cột ấy chỉ chứa tên môn, ADR-0004).
-  "analytics.weakTopicsTitle": "Cần sửa chỗ nào",
-  "analytics.weakTopicsHint": "Những dạng bài bạn làm đúng ít nhất trong khoảng này.",
-  "analytics.weakTopicsEmpty": "Chưa có chỗ nào nổi lên rõ rệt.",
-  "analytics.weakTopicsEmptyHint":
-    "Bạn làm thêm vài đề nữa nhé — một dạng bài cần ít nhất {min} câu đã làm mới xuất hiện ở đây.",
+  // "Đúng a/b" của từng hàng dạng bài trong SkillBreakdownCard. Tên khoá còn
+  // `weakTopic…` từ thẻ "Cần sửa chỗ nào" đã bỏ 2026-10-03.
   "analytics.weakTopicCorrect": "Đúng {correct}/{total}",
 
   // SkillBreakdownCard — bảng kê đủ mọi dạng bài đã làm, theo môn (2026-09-16).

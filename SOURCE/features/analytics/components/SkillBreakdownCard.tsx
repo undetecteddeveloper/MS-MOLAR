@@ -1,11 +1,10 @@
 // SkillBreakdownCard — "Kết quả theo dạng bài": tỉ lệ đúng của TỪNG dạng bài
 // học sinh đã làm, xếp theo môn, cho cả 7 môn (2026-09-16).
 //
-// Khác WeakTopicsCard ngay trên nó: thẻ kia trả lời "sửa gì TRƯỚC" (tối đa 3
-// dòng, đủ bằng chứng, dưới ngưỡng); thẻ này là bảng kê ĐỦ — mọi dạng bài đã
-// chạm tới, kể cả dạng đang làm tốt, để học sinh thấy mình đứng đâu chứ không
-// chỉ thấy chỗ hỏng. Cả hai đọc từ CÙNG một bộ gộp (lib/analytics/
-// skillBreakdown.ts) nên không thể nói hai con số khác nhau về một dạng bài.
+// Là bảng kê ĐỦ — mọi dạng bài đã chạm tới, kể cả dạng đang làm tốt, để học
+// sinh thấy mình đứng đâu chứ không chỉ thấy chỗ hỏng; dạng yếu nhất của mỗi
+// môn đứng đầu mục. (Thẻ "Cần sửa chỗ nào" từng đứng ngay trên thẻ này đã bỏ
+// 2026-10-03 vì chỉ lặp lại phần đầu của chính bảng này.)
 //
 // Ô "Chưa phân loại": câu chưa được gắn dạng bài (chưa chạy tagger, hoặc
 // model không đủ tin cậy nên để NULL — quy ước "trống còn hơn sai" của Engine
@@ -15,8 +14,7 @@
 //
 // Theme "Sân trường": thẻ surface, mỗi môn một mục có tiêu đề nhỏ, mỗi dạng
 // bài một hàng — nhãn, bên phải là % đúng và "Đúng a/b", dưới là thanh Progress
-// 4px tô xanh theo % — cùng ngôn ngữ hàng với WeakTopicsCard, để mắt đọc hai
-// thẻ như một. Không có tương tác, không "use client": chỉ render dữ liệu server
+// 4px tô xanh theo %. Không có tương tác, không "use client": chỉ render dữ liệu server
 // đã tính sẵn cho cả ba khoảng thời gian.
 
 import { Card } from "@/components/ui/card";

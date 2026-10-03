@@ -6,8 +6,8 @@
 // Bố cục theo theme "Sân trường" (2026-09-06, design plan §3 "Thống kê"):
 // PageHeader (tiêu đề "Thống kê" hiện rõ + một câu nói trang này để làm gì —
 // bản trước giấu tiêu đề sr-only và mở trang bằng một thẻ kẻ viền không đầu)
-// → hàng chip Tuần / Tháng / Toàn thời gian → thẻ biểu đồ (dải Cột / Tròn ở đầu
-// thẻ) → "Cần sửa chỗ nào" → thẻ VÀNG "Nên luyện gì tiếp theo" mang nút tới
+// → hàng chip Tuần / Tháng / Toàn thời gian → thẻ biểu đồ (Kết quả theo môn,
+// Thời gian luyện, Kết quả theo dạng bài) → thẻ VÀNG "Nên luyện gì tiếp theo" mang nút tới
 // kho đề Toán. Thẻ vàng đứng CUỐI trên điện thoại: người mở "Thống kê" là để
 // xem mình đang ở đâu, việc nên làm tiếp đến sau con số — cùng thứ tự với thẻ
 // "Tiếp theo" đứng sau điểm ở trang kết quả. Từ 1024px thẻ vàng sang cột phải
@@ -33,7 +33,7 @@ export default async function DashboardPage() {
   // Ngữ nghĩa lỗi giữ nguyên như trước: một lệnh đọc hỏng thì cả trang đi vào
   // xử lý lỗi cấp trang — đúng thứ `await getAnalyticsByRange()` trần vẫn làm,
   // và đúng điều UI Spec đã chốt cho thẻ gợi ý (không có UI lỗi riêng cho nó).
-  const [{ statsByRange, weakTopicsByRange, skillBreakdownByRange }, recommendation] =
+  const [{ statsByRange, skillBreakdownByRange }, recommendation] =
     await Promise.all([getAnalyticsByRange(), getSkillRecommendation()]);
 
   return (
@@ -50,7 +50,6 @@ export default async function DashboardPage() {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
         <AnalyticsDashboard
           dataByRange={statsByRange}
-          weakTopicsByRange={weakTopicsByRange}
           skillBreakdownByRange={skillBreakdownByRange}
         />
         <SkillRecommendationCard recommendation={recommendation} className="lg:sticky lg:top-20" />

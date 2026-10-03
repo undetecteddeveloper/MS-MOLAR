@@ -1,5 +1,5 @@
 // lib/analytics/constants — hằng số/helper thuần cho Thống kê (Layer 3), dùng
-// bởi SubjectBarChart/SubjectTimeDonut/WeakTopicsCard/AnalyticsDashboard
+// bởi SubjectBarChart/SubjectTimeDonut/SkillBreakdownCard/AnalyticsDashboard
 // (docs/design/analytics-layer3-design.md component plan #6). Union 7 môn (khác
 // SUBJECTS 10 môn của lib/ugc/subjects.ts — Geography/Informatics/Civic
 // Education nằm ngoài phạm vi Thống kê theo

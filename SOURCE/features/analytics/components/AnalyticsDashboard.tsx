@@ -11,14 +11,15 @@
 //    đã là của tuần ("hidden feature #1") — điều khiển nói khác với thứ đang
 //    hiện. Chip "Tuần" tô đậm ngay từ đầu, nên trạng thái `filterTouched` không
 //    còn lý do tồn tại.
-//  - BỐN THẺ xếp dọc, cùng theo chip: "Kết quả theo môn" (thanh ngang) →
-//    "Thời gian luyện theo môn" (vòng tròn) → "Cần sửa chỗ nào" (dạng bài yếu)
-//    → "Kết quả theo dạng bài" (bảng kê đủ, 2026-09-16). Bản
-//    trước gom cột và tròn vào một thẻ có dải Cột/Tròn; engineer bỏ (2026-09-06):
-//    một dải chuyển đổi chỉ hợp khi hai hình là hai cách trình bày CÙNG một
-//    dữ liệu, còn ở đây cột nói đúng/sai, tròn nói thời gian — hai câu hỏi
-//    khác nhau thì là hai thẻ, không giấu nhau sau một nút. Hai thẻ theo môn
-//    đứng trước, thẻ theo chủ đề đi sau vì nó đi sâu thêm một mức.
+//  - BA THẺ xếp dọc, cùng theo chip: "Kết quả theo môn" (thanh ngang) →
+//    "Thời gian luyện theo môn" (vòng tròn) → "Kết quả theo dạng bài" (bảng kê
+//    đủ, 2026-09-16). Thẻ "Cần sửa chỗ nào" (3 dạng bài yếu nhất) đã bỏ
+//    2026-10-03: bảng kê đủ đã xếp dạng yếu nhất lên đầu mỗi môn nên nó chỉ lặp
+//    lại. Bản trước gom cột và tròn vào một thẻ có dải Cột/Tròn; engineer bỏ
+//    (2026-09-06): một dải chuyển đổi chỉ hợp khi hai hình là hai cách trình
+//    bày CÙNG một dữ liệu, còn ở đây cột nói đúng/sai, tròn nói thời gian — hai
+//    câu hỏi khác nhau thì là hai thẻ, không giấu nhau sau một nút. Hai thẻ theo
+//    môn đứng trước, thẻ theo dạng bài đi sau vì nó đi sâu thêm một mức.
 //  - Khoảng không có dữ liệu (data-logic decision #5): MỘT thẻ viền nét đứt căn
 //    giữa thay cho cả ba thẻ — không gọi biểu đồ với mảng rỗng (vòng tròn chia
 //    cho tổng 0). Chip vẫn bấm được để đổi sang khoảng có dữ liệu mà không tải
@@ -30,9 +31,8 @@ import { Chip } from "@/components/ui/chip";
 import { t, type MessageKey } from "@/lib/copy";
 import { SubjectBarChart } from "@/features/analytics/components/SubjectBarChart";
 import { SubjectTimeDonut } from "@/features/analytics/components/SubjectTimeDonut";
-import { WeakTopicsCard } from "@/features/analytics/components/WeakTopicsCard";
 import { SkillBreakdownCard } from "@/features/analytics/components/SkillBreakdownCard";
-import type { SubjectSkillBreakdown, TopicWeakness } from "@/lib/analytics/skillBreakdown";
+import type { SubjectSkillBreakdown } from "@/lib/analytics/skillBreakdown";
 import {
   DEFAULT_RANGE,
   RANGE_ORDER,
@@ -48,17 +48,14 @@ const RANGE_LABEL_KEY: Record<TimeRange, MessageKey> = {
 
 export function AnalyticsDashboard({
   dataByRange,
-  weakTopicsByRange,
   skillBreakdownByRange,
 }: {
   dataByRange: Record<TimeRange, SubjectStats[]>;
-  weakTopicsByRange: Record<TimeRange, TopicWeakness[]>;
   skillBreakdownByRange: Record<TimeRange, SubjectSkillBreakdown[]>;
 }) {
   const [range, setRange] = useState<TimeRange>(DEFAULT_RANGE);
 
   const data = dataByRange[range];
-  const weakTopics = weakTopicsByRange[range];
   const skillBreakdown = skillBreakdownByRange[range];
 
   return (
@@ -100,11 +97,8 @@ export function AnalyticsDashboard({
             <SubjectTimeDonut data={data} />
           </Card>
 
-          <WeakTopicsCard topics={weakTopics} />
-
-          {/* Bảng kê đủ theo dạng bài đứng SAU "Cần sửa chỗ nào" (2026-09-16):
-              thẻ trên là ba việc nên làm trước, thẻ này là toàn cảnh — cùng
-              thứ tự "việc trước, số sau" mà cả trang đang theo. */}
+          {/* Bảng kê đủ theo dạng bài: dạng yếu nhất đã nằm đầu mỗi môn, nên không
+              cần thêm thẻ "việc nên sửa trước" riêng (bỏ 2026-10-03). */}
           <SkillBreakdownCard breakdown={skillBreakdown} />
         </>
       )}

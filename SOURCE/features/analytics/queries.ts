@@ -9,10 +9,8 @@ import { readBounded } from "@/lib/supabase/boundedRead";
 import { aggregateAttemptsByRange, type AttemptRow } from "@/lib/analytics/aggregateAttempts";
 import {
   aggregateSkillsByRange,
-  rankWeakSkillsByRange,
   type SkillAttemptRow,
   type SubjectSkillBreakdown,
-  type TopicWeakness,
 } from "@/lib/analytics/skillBreakdown";
 import { deriveEssayView } from "@/lib/scoring/essayLifecycle";
 import type { PerQuestionResult } from "@/types/result";
@@ -20,7 +18,7 @@ import { MASTERY_CLEARED_THRESHOLD, ROUTING_SUBJECT } from "@/lib/adaptive/const
 import { recommendNextSkill } from "@/lib/adaptive/route";
 import { subjectOfSkillNodeId } from "@/lib/adaptive/skillTaxonomy";
 import { buildTelemetryPayload } from "@/lib/tutor/telemetry";
-import { NEEDS_REVIEW_THRESHOLD, type SubjectStats, type TimeRange } from "@/lib/analytics/constants";
+import type { SubjectStats, TimeRange } from "@/lib/analytics/constants";
 import type { SkillRecommendation } from "@/types/adaptive";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
@@ -50,8 +48,6 @@ export interface AnalyticsPageData {
   statsByRange: Record<TimeRange, SubjectStats[]>;
   /** "% đúng theo dạng bài" cho mọi môn — thẻ Kết quả theo dạng bài. */
   skillBreakdownByRange: Record<TimeRange, SubjectSkillBreakdown[]>;
-  /** Suy từ `skillBreakdownByRange` (cùng một bộ gộp) — thẻ Cần sửa chỗ nào. */
-  weakTopicsByRange: Record<TimeRange, TopicWeakness[]>;
 }
 
 /**
@@ -190,13 +186,9 @@ export async function getAnalyticsByRange(): Promise<AnalyticsPageData> {
     now,
   );
 
-  // Dùng LẠI ngưỡng "NEEDS REVIEW" của biểu đồ: nếu một môn bị gắn cờ theo mốc
-  // 75% mà danh sách dạng bài lại lọc theo mốc khác, người đọc sẽ thấy một môn
-  // "cần ôn" không có dạng bài nào bên dưới nó, và không có gì giải thích vì sao.
   return {
     statsByRange: aggregateAttemptsByRange(rows, now),
     skillBreakdownByRange,
-    weakTopicsByRange: rankWeakSkillsByRange(skillBreakdownByRange, NEEDS_REVIEW_THRESHOLD),
   };
 }
 
