@@ -9,6 +9,7 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { validatePassword } from "@/lib/auth/passwordPolicy";
 import { RECOVERY_COOKIE } from "@/lib/auth/recovery";
+import { mapAuthError } from "@/lib/auth/authErrors";
 import { isValidCode, mapVerifyError, normalizeCode, normalizeEmail } from "@/lib/auth/verifyCode";
 import { guard } from "@/lib/security/rateLimit";
 import { AVATARS_BUCKET } from "@/lib/profile/avatarStorage";
@@ -46,7 +47,7 @@ export async function signUp(
     options: { data: { display_name: displayName || email } },
   });
 
-  if (error) return { error: error.message };
+  if (error) return { error: mapAuthError(error) };
 
   // Project bật "Confirm email" → chưa có session ngay sau signUp: user phải
   // nhập mã trong mail trước. KHÔNG redirect /exams (middleware sẽ bounce ngược
@@ -144,7 +145,7 @@ export async function signInWithOAuth(
   });
 
   if (error || !data.url) {
-    return { error: error?.message ?? "OAuth sign-in failed. Try again." };
+    return { error: error ? mapAuthError(error) : "auth.error.oauthFailed" };
   }
   redirect(data.url);
 }
@@ -161,7 +162,7 @@ export async function requestPasswordReset(
   formData: FormData,
 ): Promise<AuthState> {
   const email = String(formData.get("email") ?? "").trim();
-  if (!email) return { error: "Enter your email address" };
+  if (!email) return { error: "auth.verify.error.emailRequired" };
 
   const origin = await requestOrigin();
   const supabase = await createClient();
@@ -171,7 +172,7 @@ export async function requestPasswordReset(
   if (error) console.warn("[requestPasswordReset]", error.message);
 
   return {
-    info: "If an account exists for that email, a password reset link has been sent.",
+    info: "auth.resetSent",
   };
 }
 
@@ -187,11 +188,11 @@ export async function updatePassword(
   const confirm = String(formData.get("confirm") ?? "");
   const passwordError = validatePassword(password);
   if (passwordError) return { error: passwordError };
-  if (password !== confirm) return { error: "Passwords do not match" };
+  if (password !== confirm) return { error: "auth.error.passwordMismatch" };
 
   const supabase = await createClient();
   const { error } = await supabase.auth.updateUser({ password });
-  if (error) return { error: error.message };
+  if (error) return { error: mapAuthError(error) };
 
   // Mật khẩu mới đã vào ⇒ phiên này hết là phiên khôi phục: gỡ cờ để
   // middleware thôi ép về /reset-password (lib/auth/recovery.ts).
@@ -216,7 +217,7 @@ export async function signIn(
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
-  if (error) return { error: error.message };
+  if (error) return { error: mapAuthError(error) };
   redirect("/exams");
 }
 

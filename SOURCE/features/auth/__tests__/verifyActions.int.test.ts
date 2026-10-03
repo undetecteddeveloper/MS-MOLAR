@@ -99,8 +99,16 @@ describe("signUp → trang nhập mã", () => {
   it("does not redirect to verify when Supabase rejects the sign-up", async () => {
     makeClient({ signUpError: { message: "boom" } });
     const result = await signUp(null, formDataOf({ email: EMAIL, password: PASSWORD }));
-    expect(result).toEqual({ error: "boom" });
+    expect(result).toEqual({ error: "auth.error.generic" });
     expect(redirectMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("lỗi của Supabase không bao giờ chảy ra client (đăng ký / đăng nhập)", () => {
+  it("maps the SMTP failure on sign-up to the sendFailed key", async () => {
+    makeClient({ signUpError: { message: "Error sending confirmation email", status: 500 } as never });
+    const result = await signUp(null, formDataOf({ email: EMAIL, password: PASSWORD }));
+    expect(result).toEqual({ error: "auth.error.sendFailed" });
   });
 });
 

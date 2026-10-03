@@ -20,6 +20,7 @@ import { PASSWORD_MIN_LENGTH } from "@/lib/auth/passwordPolicy";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { VerifyCodeForm } from "@/features/auth/components/VerifyCodeForm";
+import { authMessage } from "@/features/auth/components/authMessage";
 
 // "verify" = view nhập mã xác minh email sau đăng ký (VerifyCodeForm): không
 // tab nào sáng, đổi tab là thoát view.
@@ -94,12 +95,12 @@ export function AuthForm({
               <Field id="reset-email" name="email" type="email" label={t("auth.email")} required />
               {resetState?.error && (
                 <p role="alert" className="text-destructive text-sm">
-                  {resetState.error}
+                  {authMessage(resetState.error)}
                 </p>
               )}
               {resetState?.info && (
                 <p role="status" className="text-muted-foreground text-sm">
-                  {resetState.info}
+                  {authMessage(resetState.info)}
                 </p>
               )}
               <Button type="submit" size="lg" disabled={resetPending} className="w-full">
@@ -153,12 +154,12 @@ export function AuthForm({
 
               {state?.error && (
                 <p role="alert" className="text-destructive text-sm">
-                  {state.error}
+                  {authMessage(state.error)}
                 </p>
               )}
               {state?.info && (
                 <p role="status" className="text-muted-foreground text-sm">
-                  {state.info}
+                  {authMessage(state.info)}
                 </p>
               )}
 
@@ -201,7 +202,7 @@ export function AuthForm({
               </div>
               {oauthState?.error && (
                 <p role="alert" className="text-destructive text-sm">
-                  {oauthState.error}
+                  {authMessage(oauthState.error)}
                 </p>
               )}
             </form>

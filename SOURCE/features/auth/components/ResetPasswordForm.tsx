@@ -14,6 +14,7 @@ import { useActionState, useId, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { updatePassword, type AuthState } from "@/features/auth/actions";
 import { t } from "@/lib/copy";
+import { authMessage } from "@/features/auth/components/authMessage";
 import { PASSWORD_MIN_LENGTH } from "@/lib/auth/passwordPolicy";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -35,7 +36,7 @@ export function ResetPasswordForm() {
 
         {state?.error && (
           <p role="alert" className="text-destructive text-sm">
-            {state.error}
+            {authMessage(state.error)}
           </p>
         )}
 

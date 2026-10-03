@@ -18,15 +18,10 @@ import {
   type AuthState,
 } from "@/features/auth/actions";
 import { RESEND_COOLDOWN_SECONDS, VERIFY_CODE_MAX_LENGTH } from "@/lib/auth/verifyCode";
-import { t, type MessageKey } from "@/lib/copy";
+import { t } from "@/lib/copy";
+import { authMessage } from "@/features/auth/components/authMessage";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
-
-/** `auth.verify.error.x` → câu; `profile.error.rateLimited:12` → câu với {seconds}. */
-function messageFor(raw: string): string {
-  const [key, seconds] = raw.split(":");
-  return t(key as MessageKey, seconds ? { seconds } : undefined);
-}
 
 export function VerifyCodeForm({
   initialEmail,
@@ -104,7 +99,7 @@ export function VerifyCodeForm({
 
         {verifyState?.error && (
           <p role="alert" className="text-destructive text-sm">
-            {messageFor(verifyState.error)}
+            {authMessage(verifyState.error)}
           </p>
         )}
 
@@ -117,12 +112,12 @@ export function VerifyCodeForm({
         <input type="hidden" name="email" value={email} />
         {resendState?.error && (
           <p role="alert" className="text-destructive text-sm">
-            {messageFor(resendState.error)}
+            {authMessage(resendState.error)}
           </p>
         )}
         {resendState?.info && (
           <p role="status" className="text-muted-foreground text-sm">
-            {messageFor(resendState.info)}
+            {authMessage(resendState.info)}
           </p>
         )}
         <Button

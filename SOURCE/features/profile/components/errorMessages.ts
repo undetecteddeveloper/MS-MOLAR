@@ -23,6 +23,7 @@
 import { copy } from "@/lib/copy";
 import type { MessageKey, TranslateValues } from "@/lib/copy";
 import { PASSWORD_MAX_BYTES, PASSWORD_MIN_LENGTH } from "@/lib/auth/passwordPolicy";
+import { PASSWORD_POLICY_KEYS } from "@/lib/auth/passwordPolicyKeys";
 import { DISPLAY_NAME_MAX } from "@/lib/profile/displayName";
 import { AVATAR_LIMITS } from "@/lib/profile/limits";
 
@@ -56,15 +57,7 @@ export function profileMessage(key: MessageKey, extra?: TranslateValues): Profil
  * passwordPolicy.ts là hai bên đổi cùng lúc. Đổi CÂU CHỮ thì không — đó là việc
  * của cổng build trong __tests__/errorMessages.test.ts.
  */
-export const PASSWORD_POLICY_KEYS: Record<string, MessageKey> = {
-  [`Password must be at least ${PASSWORD_MIN_LENGTH} characters`]:
-    "profile.password.errorTooShort",
-  [`Password is too long (max ${PASSWORD_MAX_BYTES} bytes; accented characters count as more than one)`]:
-    "profile.password.errorTooLong",
-  "Password cannot be only spaces": "profile.password.errorOnlySpaces",
-  "This password is too common — please choose a different one":
-    "profile.password.errorTooCommon",
-};
+export { PASSWORD_POLICY_KEYS };
 
 /** NĂM câu của updateProfile (features/auth/actions.ts:167-195) → khoá. Câu thứ
  *  năm (rate limit) mang một con số nên đi bằng regex, ngay bên dưới. */

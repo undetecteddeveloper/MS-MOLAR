@@ -137,6 +137,19 @@ export const copy = {
   "auth.backToSignIn": "Quay lại đăng nhập",
   "auth.orSignInWith": "Hoặc đăng nhập bằng",
   "auth.orSignUpWith": "Hoặc đăng ký bằng",
+  // Lỗi/thông báo của các action đăng nhập, đăng ký, đặt lại mật khẩu — action trả
+  // khoá, client dịch (lib/auth/authErrors.ts). Không bao giờ hiện câu của Supabase.
+  "auth.error.generic": "Có lỗi xảy ra. Hãy thử lại sau ít phút.",
+  "auth.error.invalidCredentials": "Email hoặc mật khẩu chưa đúng.",
+  "auth.error.emailNotConfirmed":
+    "Email này chưa được xác minh. Hãy bấm Đăng ký lại với email này để nhận mã mới.",
+  "auth.error.rateLimited": "Thao tác quá nhiều lần. Hãy thử lại sau ít phút.",
+  "auth.error.sendFailed": "Chưa gửi được thư xác minh. Hãy thử lại sau ít phút.",
+  "auth.error.passwordMismatch": "Hai ô mật khẩu không khớp nhau.",
+  "auth.error.weakPassword": "Mật khẩu này chưa đủ mạnh. Hãy chọn mật khẩu khác.",
+  "auth.error.oauthFailed": "Chưa đăng nhập được bằng tài khoản này. Hãy thử lại.",
+  "auth.resetSent":
+    "Nếu email này có tài khoản, chúng tôi đã gửi liên kết đặt lại mật khẩu.",
   // Trang nhập mã xác minh email sau khi đăng ký (`/?auth=verify`).
   "auth.verify.title": "Xác minh email",
   "auth.verify.intro": "Chúng tôi đã gửi mã xác minh tới {email}. Nhập mã đó để hoàn tất đăng ký.",
