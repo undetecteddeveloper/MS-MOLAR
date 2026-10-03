@@ -32,6 +32,7 @@ import {
   EXAM_RANK_GRADE_MATCH_WEIGHT,
   EXAM_RANK_RECENCY_WEIGHT,
   EXAM_RANK_SUBJECT_WEAKNESS_WEIGHT,
+  HOT_SHELF_MAX_CARDS,
   HOT_SHELF_MIN_CARDS,
   SHELF_MAX_CARDS,
 } from "@/lib/adaptive/constants";
@@ -173,7 +174,7 @@ export async function listExamShelves(): Promise<ExamShelves> {
     candidates,
     dominantGrade,
     minCards: HOT_SHELF_MIN_CARDS,
-    maxCards: SHELF_MAX_CARDS,
+    maxCards: HOT_SHELF_MAX_CARDS,
   });
 
   // `pickHotShelf`/`rankExamIds` không nhận `excludeIds` nào — nên "Cần

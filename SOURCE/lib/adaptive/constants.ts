@@ -201,6 +201,18 @@ export const HOT_SHELF_MIN_CARDS = 5;
 export const SHELF_MAX_CARDS = 10;
 
 /**
+ * Số đề của kệ Nổi nhất trên `/exams` — HAI, không phải `SHELF_MAX_CARDS`
+ * (yêu cầu sản phẩm 2026-10-03: hàng "Nổi nhất" chỉ giữ đúng hai đề có số lượt
+ * nộp lớn nhất). Cắt ở Node sau khi xếp hạng đầy đủ, như `SHELF_MAX_CARDS`.
+ *
+ * Chỉ đổi điểm CẮT, không đổi thang nới rộng: `HOT_SHELF_MIN_CARDS` vẫn quyết
+ * định bậc nào đủ dữ liệu (cửa sổ tuần/30 ngày/từ trước tới nay), rồi hai đề
+ * đầu của bậc ấy được giữ — con số trên thẻ vẫn là số của đúng bậc đã xếp hạng.
+ * Trang chủ có giới hạn riêng (`listHotExams(limit)`), không đọc hằng số này.
+ */
+export const HOT_SHELF_MAX_CARDS = 2;
+
+/**
  * Độ dài (ngày) của cửa sổ "gần đây" trong thang nới rộng của kệ Nổi nhất —
  * bậc ĐẦU TIÊN, hẹp nhất (PRD AC-019, subtitle `Khối {G}, tuần này` /
  * `Toàn hệ thống, tuần này`).

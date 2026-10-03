@@ -104,7 +104,8 @@ interface ExamShelfProps {
   shelf: ShelfKind;
   /** Đã nội suy sẵn bởi trang gọi — component không tự tính lại. `null` = không vẽ. */
   subtitle: string | null;
-  /** Đã xếp hạng và cắt về ≤10 ở Node trước khi tới đây (AC-002, AC-006). */
+  /** Đã xếp hạng và cắt ở Node trước khi tới đây (AC-002, AC-006): ≤10 đề,
+   *  riêng kệ Nổi nhất đúng ≤2 (`HOT_SHELF_MAX_CARDS`). */
   exams: Exam[];
   /** Số lượt đã nộp theo id đề — chỉ kệ Nổi nhất đọc (`spec.showAttemptCount`). */
   attemptCounts?: Record<string, number>;

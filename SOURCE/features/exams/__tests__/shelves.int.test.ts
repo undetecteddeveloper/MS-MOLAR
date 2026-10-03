@@ -480,6 +480,51 @@ describe("listExamShelves() / listHotExams() — 0-card shelf is null, and the g
     expect(rpcMock).not.toHaveBeenCalled();
   });
 
+  // Kệ Nổi nhất của /exams chỉ giữ HAI đề nộp nhiều nhất (yêu cầu 2026-10-03):
+  // cắt ở Node sau khi xếp hạng, nên đề thứ ba trở đi — dù có lượt nộp — không
+  // lọt vào kệ; attemptCounts chỉ mang đúng hai id ấy, giảm dần.
+  it("kệ hot của listExamShelves() chỉ có đúng 2 đề có lượt nộp nhiều nhất (HOT_SHELF_MAX_CARDS), cả khi 6 đề cùng đạt bậc 'tuần này'", async () => {
+    mockBoundary({
+      exams_with_difficulty: ["h1", "h2", "h3", "h4", "h5", "h6"].map((id) =>
+        examRow(id, 10, "Toán", "2026-01-01T00:00:00.000Z")
+      ),
+      exam_attempts: [],
+      exam_results: [],
+      // recent_count: h4=9, h2=7, h6=5, h1=3, h5=2, h3=1 — 6 đề đạt bậc site-recent
+      // (>= HOT_SHELF_MIN_CARDS) nên thang dừng ngay ở đó.
+      hotRows: [
+        hotRow("h1", 3, 3, 3),
+        hotRow("h2", 7, 7, 7),
+        hotRow("h3", 1, 1, 1),
+        hotRow("h4", 9, 9, 9),
+        hotRow("h5", 2, 2, 2),
+        hotRow("h6", 5, 5, 5),
+      ],
+    });
+
+    const shelves = await listExamShelves();
+
+    expect(shelves.hot?.rung).toBe("site-recent");
+    expect(shelves.hot?.exams.map((e) => e.id)).toEqual(["h4", "h2"]);
+    expect(shelves.hot?.attemptCounts).toEqual({ h4: 9, h2: 7 });
+  });
+
+  it("kệ hot chỉ có 3 đề đạt ở mọi bậc: vẫn chỉ giữ 2 đề đầu của bậc cuối (từ trước tới nay), không nới thêm để lấp thẻ", async () => {
+    mockBoundary({
+      exams_with_difficulty: ["a1", "a2", "a3"].map((id) =>
+        examRow(id, 10, "Toán", "2026-01-01T00:00:00.000Z")
+      ),
+      exam_attempts: [],
+      exam_results: [],
+      hotRows: [hotRow("a1", 0, 0, 4), hotRow("a2", 0, 0, 12), hotRow("a3", 0, 0, 8)],
+    });
+
+    const shelves = await listExamShelves();
+
+    expect(shelves.hot?.rung).toBe("site-all");
+    expect(shelves.hot?.exams.map((e) => e.id)).toEqual(["a2", "a3"]);
+  });
+
   // AC-049/D13 (additional obligation beyond the skeleton's own text — see this
   // task's Proof Obligations): "an exam that qualifies for BOTH the weakest-
   // subject pool AND a qualifying hot count appears in BOTH practice.exams and

@@ -15,6 +15,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  HOT_SHELF_MAX_CARDS,
   HOT_SHELF_MIN_CARDS,
   HOT_WINDOW_RECENT_DAYS,
   HOT_WINDOW_WIDE_DAYS,
@@ -701,6 +702,21 @@ describe("Test 9 — cắt về đúng SHELF_MAX_CARDS sau khi xếp hạng đ�
     expect(result?.examIds).toEqual(["e0", "e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8", "e9"]);
   });
 
+  it("pickHotShelf với HOT_SHELF_MAX_CARDS: 14 đề đạt chỉ trả về ĐÚNG hai đề count cao nhất, đúng thứ tự", () => {
+    const candidates = Array.from({ length: 15 }, (_, i) => candidate(`e${i}`, { grade: 12 }));
+    const hotCounts = countsMap(candidates.map((c, i) => [c.id, counts(14 - i, 14 - i, 14 - i)] as const));
+
+    const result = pickHotShelf({
+      counts: hotCounts,
+      candidates,
+      dominantGrade: 12,
+      minCards: HOT_SHELF_MIN_CARDS,
+      maxCards: HOT_SHELF_MAX_CARDS,
+    });
+
+    expect(result?.examIds).toEqual(["e0", "e1"]);
+  });
+
   it("pickExploreShelf: 15 ứng viên chưa-thử-môn chỉ trả về 10 (SHELF_MAX_CARDS), mới nhất trước", () => {
     const candidates = Array.from({ length: 15 }, (_, i) =>
       candidate(`e${i}`, {
@@ -730,6 +746,9 @@ describe("Test 10 — hằng số ship đúng giá trị đã chốt (D12/D6/AC-
   });
   it("SHELF_MAX_CARDS = 10", () => {
     expect(SHELF_MAX_CARDS).toBe(10);
+  });
+  it("HOT_SHELF_MAX_CARDS = 2 (kệ Nổi nhất của /exams)", () => {
+    expect(HOT_SHELF_MAX_CARDS).toBe(2);
   });
   it("HOT_WINDOW_RECENT_DAYS = 7", () => {
     expect(HOT_WINDOW_RECENT_DAYS).toBe(7);
