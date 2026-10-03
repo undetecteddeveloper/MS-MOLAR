@@ -357,16 +357,22 @@ export const copy = {
   "analytics.rangeAll": "Toàn thời gian",
   "analytics.donutSubtitle":
     "Cộng dồn thời gian làm các lượt đã nộp, mỗi lượt tối đa bằng thời lượng đề.",
-  // SkillRecommendationCard (Engine 1) — đặt cùng vị trí tương đối với en.ts.
+  // SkillRecommendationCard — thẻ vàng "Nên luyện gì tiếp theo" cho 7 môn (2026-10-03).
+  // Bốn câu `recommendNo…` là LÝ DO của trạng thái "Không có gì để luyện": mỗi ca
+  // một câu riêng, vì học sinh cần biết vì sao không có nút.
   "analytics.recommendTitle": "Nên luyện gì tiếp theo",
-  "analytics.recommendColdStart":
-    "Chưa đủ dữ liệu — bạn luyện một đề Toán để nhận gợi ý đầu tiên nhé.",
-  "analytics.recommendWhy": "Vì sao là kỹ năng này?",
-  "analytics.recommendAction": "Tìm đề Toán",
-  "analytics.recommendReasonPrerequisiteGate":
-    "Có một kỹ năng nền bạn chưa nắm vững đứng trước kỹ năng này.",
-  "analytics.recommendReasonLowestMastery": "Đây là kỹ năng bạn đang yếu nhất lúc này.",
-  "analytics.recommendReasonRecentlyWrong": "Bạn vừa làm sai kỹ năng này gần đây.",
+  "analytics.recommendSubjects": "Chọn môn",
+  "analytics.recommendStats": "Đúng {correct}/{total} câu ({percent}%) · Còn {open} đề chưa làm",
+  "analytics.recommendAction": "Tìm đề dạng này",
+  "analytics.recommendNoneTitle": "Không có gì để luyện",
+  "analytics.recommendNoWeak": "Mọi dạng bài bạn đã làm ở môn này đều đúng từ {percent}% trở lên.",
+  "analytics.recommendAllDone":
+    "Dạng “{skill}” còn yếu (đúng {correct}/{total} câu), nhưng bạn đã làm hết các đề có dạng này. Khi có đề mới chứa dạng này, nó sẽ hiện ở đây.",
+  "analytics.recommendNoExam":
+    "Dạng “{skill}” còn yếu (đúng {correct}/{total} câu), nhưng hiện chưa có đề nào chứa dạng này.",
+  "analytics.recommendNoData":
+    "Bạn chưa làm câu nào đã gắn dạng bài ở môn này, nên chưa biết dạng nào còn yếu.",
+  "analytics.recommendViewExams": "Xem đề {subject}",
 
   // "Đúng a/b" của từng hàng dạng bài trong SkillBreakdownCard. Tên khoá còn
   // `weakTopic…` từ thẻ "Cần sửa chỗ nào" đã bỏ 2026-10-03.

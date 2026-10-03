@@ -103,6 +103,30 @@ export function weakSkillIds(
   return [...ids];
 }
 
+/**
+ * Link vào Kho đề lọc sẵn: môn, và nếu có thì cả dạng bài (`skill` là khoá thật
+ * của /exams, lib/exams/browseParams.ts). Một chỗ dựng link để thẻ vàng và test
+ * không mỗi nơi tự ghép chuỗi một kiểu.
+ */
+export function examsHref(subject: Subject, skillNodeId?: string): string {
+  const params = new URLSearchParams({ subject });
+  if (skillNodeId !== undefined) params.set("skill", skillNodeId);
+  return `/exams?${params.toString()}`;
+}
+
+/**
+ * Môn thẻ vàng mở sẵn khi vào trang (AC-01): môn đầu tiên CÓ VIỆC để làm; không
+ * có thì môn đầu tiên đã có dữ liệu dạng bài (cho học sinh thấy lý do "không có
+ * gì để luyện" của môn mình thật sự đã làm); không có nữa thì môn đầu danh sách.
+ * Mở vào một môn rỗng khi môn khác có việc là để học sinh phải đoán chip nào bấm.
+ */
+export function defaultSuggestionSubject(suggestions: readonly SubjectSuggestion[]): Subject {
+  const firstSuggest = suggestions.find((s) => s.kind === "suggest");
+  if (firstSuggest) return firstSuggest.subject;
+  const firstWithData = suggestions.find((s) => s.kind === "none" && s.reason !== "no-data");
+  return firstWithData?.subject ?? SUBJECT_ORDER[0];
+}
+
 export interface SuggestWeakSkillsInput {
   /** `skillBreakdownByRange.all` — "% đúng theo dạng bài" cộng dồn mọi thời gian. */
   breakdown: readonly SubjectSkillBreakdown[];

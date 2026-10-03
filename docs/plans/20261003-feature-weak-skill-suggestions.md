@@ -39,7 +39,9 @@ Mỗi dạng có tối đa 1 đề. Vì dạng yếu luôn là dạng đã làm,
 - `AnalyticsPageData.suggestions: SubjectSuggestion[]`; trang dashboard bỏ `getSkillRecommendation`.
 - `BROWSE_PARAM_KEYS` thêm `"skill"` (11 khoá). `skill` hợp lệ khi khớp `/^[a-z0-9-]{1,64}$/`, sai → bỏ như không có.
 
-**Bỏ engine cũ khỏi trang**: xoá `getSkillRecommendation`, `recordRouteTelemetry`, `SkillRecommendation` (types/adaptive.ts), `ROUTING_SUBJECT`, test int tương ứng; `lib/adaptive/route.ts` (+ test) không còn nơi gọi → ghi TECH-DEBT. Hệ quả nhìn thấy: sự kiện telemetry `adaptive_route` ngừng ghi; lời giải thích "Vì sao là kỹ năng này?" (3 mã lý do) thay bằng một dòng số: "Đúng a/b câu (p%) ở dạng này".
+**Bỏ engine cũ khỏi trang**: trang không còn gọi `getSkillRecommendation`. Mã chết (`getSkillRecommendation`, `recordRouteTelemetry`, `SkillRecommendation`, `ROUTING_SUBJECT`, test int của nó) **chưa xoá** — lệnh xoá bằng shell bị chặn, Claude không lách; ghi **TD-035** với cách đóng. `lib/adaptive/route.ts` (+ test) còn `seedManualPassEngine1.ts` dùng nên giữ. Hệ quả nhìn thấy: telemetry `adaptive_route` ngừng ghi; lời giải thích "Vì sao là kỹ năng này?" (3 mã lý do) thay bằng một dòng số: "Đúng a/b câu (p%) · Còn n đề chưa làm".
+
+**Giao diện (prototype 3 hướng, người dùng chọn 2026-10-03)**: hướng **B "Vàng chỉ khi có việc"** — thẻ `sun` khi môn đang chọn có gợi ý, `plain` trung tính khi không; 7 chip xuống dòng, không chấm báo việc, chip cao 44px (`h-11`). Trạng thái `no-data` có thêm một liên kết chữ nhỏ "Xem đề <môn>" → `/exams?subject=<Môn>` (người dùng chọn giữ).
 
 ## Tiêu chí chấp nhận
 - **AC-01** Hàng chip đủ 7 môn (nhãn tiếng Việt, thứ tự `SUBJECT_ORDER`); mặc định chọn môn đầu tiên ở trạng thái gợi ý, không có thì môn đầu tiên có dạng yếu/đã có dữ liệu, không có thì Toán.

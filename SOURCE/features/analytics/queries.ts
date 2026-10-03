@@ -239,6 +239,9 @@ async function readSubmittedExamIds(supabase: Supabase): Promise<Set<string>> {
 }
 
 // --- Engine 1: gợi ý kỹ năng nên luyện tiếp (PRD R3) ------------------------
+//
+// ⚠ KHÔNG CÒN NƠI GỌI từ 2026-10-03: thẻ vàng giờ dùng `suggestWeakSkills()` (xem
+// `readWeakSkillSuggestions` phía trên). Giữ lại chờ xoá — TECH-DEBT TD-035.
 
 type SkillNodeRow = { id: string; label_vi: string };
 type SkillEdgeRow = { skill_node_id: string; prerequisite_node_id: string };

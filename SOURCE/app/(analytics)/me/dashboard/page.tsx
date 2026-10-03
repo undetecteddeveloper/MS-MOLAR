@@ -7,8 +7,9 @@
 // PageHeader (tiêu đề "Thống kê" hiện rõ + một câu nói trang này để làm gì —
 // bản trước giấu tiêu đề sr-only và mở trang bằng một thẻ kẻ viền không đầu)
 // → hàng chip Tuần / Tháng / Toàn thời gian → thẻ biểu đồ (Kết quả theo môn,
-// Thời gian luyện, Kết quả theo dạng bài) → thẻ VÀNG "Nên luyện gì tiếp theo" mang nút tới
-// kho đề Toán. Thẻ vàng đứng CUỐI trên điện thoại: người mở "Thống kê" là để
+// Thời gian luyện, Kết quả theo dạng bài) → thẻ VÀNG "Nên luyện gì tiếp theo": hàng chip
+// 7 môn, mỗi môn một dạng bài yếu kèm nút tới Kho đề lọc đúng dạng đó (hoặc lý do
+// chưa có gì để luyện; thẻ chỉ vàng khi có việc). Thẻ vàng đứng CUỐI trên điện thoại: người mở "Thống kê" là để
 // xem mình đang ở đâu, việc nên làm tiếp đến sau con số — cùng thứ tự với thẻ
 // "Tiếp theo" đứng sau điểm ở trang kết quả. Từ 1024px thẻ vàng sang cột phải
 // 20rem và dính theo cuộn; thứ tự DOM (thống kê trước, gợi ý sau) trùng thứ tự
@@ -17,7 +18,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { t } from "@/lib/copy";
-import { getAnalyticsByRange, getSkillRecommendation } from "@/features/analytics/queries";
+import { getAnalyticsByRange } from "@/features/analytics/queries";
 import { AnalyticsDashboard } from "@/features/analytics/components/AnalyticsDashboard";
 import { SkillRecommendationCard } from "@/features/analytics/components/SkillRecommendationCard";
 import { PageContainer } from "@/components/layout/PageContainer";
@@ -27,14 +28,11 @@ export default async function DashboardPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/?auth=signin");
 
-  // Song song chứ không nối tiếp: hai lệnh đọc độc lập nhau, để nối tiếp thì
-  // gợi ý kỹ năng phải xếp hàng sau toàn bộ dữ liệu biểu đồ và làm trang chậm
-  // đi đúng bằng thời gian của lệnh đọc kia (frontend DD § Constraints).
-  // Ngữ nghĩa lỗi giữ nguyên như trước: một lệnh đọc hỏng thì cả trang đi vào
-  // xử lý lỗi cấp trang — đúng thứ `await getAnalyticsByRange()` trần vẫn làm,
-  // và đúng điều UI Spec đã chốt cho thẻ gợi ý (không có UI lỗi riêng cho nó).
-  const [{ statsByRange, skillBreakdownByRange }, recommendation] =
-    await Promise.all([getAnalyticsByRange(), getSkillRecommendation()]);
+  // MỘT lệnh đọc nuôi cả ba thẻ biểu đồ lẫn thẻ gợi ý: gợi ý tính từ chính bảng
+  // kê "Kết quả theo dạng bài" (toàn thời gian) nên hai thẻ không thể lệch số.
+  // Lệnh đọc hỏng thì cả trang đi vào xử lý lỗi cấp trang (không có UI lỗi riêng
+  // cho thẻ gợi ý — UI Spec Engine 1).
+  const { statsByRange, skillBreakdownByRange, suggestions } = await getAnalyticsByRange();
 
   return (
     // `full` (72rem): từ 1024px trang chia hai cột và mép nội dung thẳng hàng
@@ -52,7 +50,7 @@ export default async function DashboardPage() {
           dataByRange={statsByRange}
           skillBreakdownByRange={skillBreakdownByRange}
         />
-        <SkillRecommendationCard recommendation={recommendation} className="lg:sticky lg:top-20" />
+        <SkillRecommendationCard suggestions={suggestions} className="lg:sticky lg:top-20" />
       </div>
     </PageContainer>
   );

@@ -5,6 +5,8 @@ import { describe, expect, it } from "vitest";
 import { SUBJECT_ORDER } from "@/lib/analytics/constants";
 import type { SkillBucket, SubjectSkillBreakdown } from "@/lib/analytics/skillBreakdown";
 import {
+  defaultSuggestionSubject,
+  examsHref,
   suggestWeakSkills,
   weakSkillIds,
   type ExamRef,
@@ -202,6 +204,40 @@ describe("no-exam — không đề published nào chứa dạng yếu", () => {
     const result = suggest([subjectOf("Math", bucket("a", "Dạng A", 0, 5))], { a: [] });
 
     expect(mathOf(result)).toMatchObject({ reason: "no-exam" });
+  });
+});
+
+describe("examsHref", () => {
+  it("có dạng bài: lọc cả môn lẫn dạng (AC-05)", () => {
+    expect(examsHref("Math", "ham-so-bac-hai")).toBe("/exams?subject=Math&skill=ham-so-bac-hai");
+  });
+
+  it("không dạng bài: chỉ lọc môn (liên kết 'Xem đề <môn>')", () => {
+    expect(examsHref("Literature")).toBe("/exams?subject=Literature");
+  });
+});
+
+describe("defaultSuggestionSubject — môn mở sẵn (AC-01)", () => {
+  it("môn đầu tiên CÓ gợi ý, dù môn đứng trước đã có dữ liệu", () => {
+    const result = suggest(
+      [
+        subjectOf("Math", bucket("a", "A", 10, 10)),
+        subjectOf("Chemistry", bucket("hoa-a", "HA", 1, 5)),
+      ],
+      { "hoa-a": [{ id: "E1", subject: "Chemistry" }] },
+    );
+
+    expect(defaultSuggestionSubject(result)).toBe("Chemistry");
+  });
+
+  it("không môn nào có gợi ý → môn đầu tiên đã có dữ liệu dạng bài (bỏ qua no-data)", () => {
+    const result = suggest([subjectOf("Biology", bucket("sinh-a", "SA", 9, 10))]);
+
+    expect(defaultSuggestionSubject(result)).toBe("Biology");
+  });
+
+  it("chưa có dữ liệu ở môn nào → Toán (đầu danh sách)", () => {
+    expect(defaultSuggestionSubject(suggest([]))).toBe("Math");
   });
 });
 

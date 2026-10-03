@@ -1,176 +1,214 @@
 // @vitest-environment jsdom
 
-// SkillRecommendationCard [integration]
-// Design Doc: docs/design/engine1-adaptive-ai-frontend-design.md (v1.0) §
-//   Main Components (SkillRecommendationCard), § Assumed Behaviors
-// UI Spec: docs/ui-spec/engine1-adaptive-ai-ui-spec.md (v1.0) — S-02/D3/D6
-// PRD: docs/prd/engine1-adaptive-ai-prd.md (v1.0, AC-028, AC-031)
+// SkillRecommendationCard [component] — thẻ vàng "Nên luyện gì tiếp theo" cho 7 môn
+// (brief docs/plans/20261003-feature-weak-skill-suggestions.md, AC-01/02/04/05/08/10;
+// hướng B "Vàng chỉ khi có việc" do người dùng chọn từ prototype).
 //
-// Async Server Component render technique (no prior precedent in this repo's
-// suite — ExamCard/ExamBrowser have zero coverage): `render(await
-// SkillRecommendationCard({ recommendation }))`, mirroring DifficultyBadge's
-// render-assertion style. Probed on a minimal case before this suite was
-// written; it works under React 19 / RTL 16 / vitest 4 / jsdom once the two
-// server-runtime imports below are stubbed, so the documented
-// manual/Playwright-only fallback was NOT needed.
-//
-// Mock boundary (frontend DD Test Boundaries — Mock Boundary Decisions):
-//   getSkillRecommendation — N/A; the component receives `recommendation` as an
-//   already-resolved prop and never imports the query (DashboardPage's own
-//   Promise.all wiring is verified by the manual/Playwright pass instead).
-//   BentoCell — No, real render. getTranslate() — No, real call, so the
-//   assertions below run against the REAL dictionary; only the two things it
-//   needs from the Next server runtime are stubbed: the `server-only` marker
-//   (established precedent, getSkillRecommendation.int.test.ts:27) and
-//   next/headers' `cookies()`, which throws outside a request scope
-//   (established precedent, tickets/__tests__/actions.int.test.ts:86). Absent
-//   cookie => DEFAULT_LOCALE ("en"), so the expected copy below is English.
-//
-//   This repo's vitest.config.ts wires no @testing-library/jest-dom setup file,
-//   so this file reads raw DOM properties/attributes directly, and render() does
-//   not auto-cleanup between tests — every query is scoped to its own render()'s
-//   `container` (ActionButton.test.tsx / ExplainStepAffordance.test.tsx
-//   precedent).
-//
-// Generated: 2026-08-08 | Budget Used: integration 2/3 (frontend sub-budget)
+// Không mock gì: thẻ nhận `suggestions` đã tính sẵn (reducer thuần có test riêng ở
+// lib/analytics/__tests__/weakSkillSuggestions.test.ts), `t()` và Chip/Card/Button
+// là thật. Câu chữ kỳ vọng viết TAY ở đây, độc lập với từ điển, để một lần sửa
+// copy.ts lặng lẽ không tự kéo test theo.
 
-import { render } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
-import type { SkillRecommendation } from "@/types/adaptive";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
+import { SUBJECT_ORDER } from "@/lib/analytics/constants";
+import type { SubjectSuggestion } from "@/lib/analytics/weakSkillSuggestions";
+import { SkillRecommendationCard } from "./SkillRecommendationCard";
 
-vi.mock("server-only", () => ({}));
-vi.mock("next/headers", () => ({
-  cookies: async () => ({ get: () => undefined }),
-}));
+afterEach(cleanup);
 
-import { SkillRecommendationCard } from "@/features/analytics/components/SkillRecommendationCard";
+const CHIP_LABELS = ["Toán", "Vật lý", "Hóa học", "Sinh học", "Ngữ văn", "Tiếng Anh", "Lịch sử"];
 
-// Expected copy authored here independently of the dictionary file, so a silent
-// edit to en.ts fails these tests instead of being re-derived into agreement.
-const EYEBROW = "Nên luyện gì tiếp theo"; // analytics.recommendTitle (en)
-const WHY_LABEL = "Vì sao là kỹ năng này?"; // analytics.recommendWhy (en)
-const COLD_START =
-  "Chưa đủ dữ liệu — bạn luyện một đề Toán để nhận gợi ý đầu tiên nhé."; // analytics.recommendColdStart (en)
-const REASON_COPY = {
-  "prerequisite-gate": "Có một kỹ năng nền bạn chưa nắm vững đứng trước kỹ năng này.",
-  "lowest-mastery": "Đây là kỹ năng bạn đang yếu nhất lúc này.",
-  "recently-wrong": "Bạn vừa làm sai kỹ năng này gần đây.",
-} as const;
+function none(subject: SubjectSuggestion["subject"]): SubjectSuggestion {
+  return { kind: "none", subject, reason: "no-data" };
+}
 
-const SKILL_LABEL = "Lũy thừa"; // curriculum content, never routed through i18n
+/** Bảy môn: mặc định `no-data`, môn nào cần thì ghi đè. */
+function suggestions(overrides: Partial<Record<SubjectSuggestion["subject"], SubjectSuggestion>> = {}) {
+  return SUBJECT_ORDER.map((subject) => overrides[subject] ?? none(subject));
+}
 
-describe("SkillRecommendationCard", () => {
-  // ===========================================================================
-  // Test 1 — AC-031: populated state renders eyebrow, plain-text skillLabel
-  // (verbatim, never re-derived/re-bucketed), and a closed-by-default <details>
-  // ===========================================================================
-  // ROI: 48 (BV:6 x Freq:7 + Legal:0 + Defect:6)
-  // Behavior: render SkillRecommendationCard with recommendation =
-  //   { skillLabel: "Lũy thừa", reasonCode: "lowest-mastery" } -> assert the
-  //   rendered output contains the literal string "Lũy thừa" VERBATIM (proving the
-  //   component renders the server-provided label as-is, never re-bucketing or
-  //   re-deriving it — mirrors DifficultyBadge's own "never re-buckets" contract),
-  //   the eyebrow/title text, and a <details> element that is closed by default
-  //   (no `open` attribute) containing a <summary>.
-  // @category: core-functionality
-  // @lane: integration
-  // @dependency: SOURCE/features/analytics/components/SkillRecommendationCard.tsx +
-  //   real getTranslate() + real BentoCell
-  // @complexity: medium
-  // @real-dependency: none beyond getTranslate()'s own next/headers call
-  // Primary failure mode: the component re-derives or re-buckets the label
-  // instead of rendering skillLabel verbatim, silently diverging from whatever
-  // the backend computed; or <details> defaults to OPEN, immediately exposing
-  // reason text the UI Spec intends to be a deliberate, user-initiated
-  // disclosure.
-  it("AC-031: populated state renders eyebrow, plain-text skillLabel (verbatim), closed-by-default <details>", async () => {
-    const recommendation: SkillRecommendation = {
-      skillLabel: SKILL_LABEL,
-      reasonCode: "lowest-mastery",
-    };
+const HOA_SUGGEST: SubjectSuggestion = {
+  kind: "suggest",
+  subject: "Chemistry",
+  skillNodeId: "hoa-can-bang-phan-ung",
+  skillLabel: "Cân bằng phương trình phản ứng",
+  correct: 1,
+  total: 5,
+  openExamCount: 2,
+};
 
-    const { container } = render(await SkillRecommendationCard({ recommendation }));
+const LY_ALL_DONE: SubjectSuggestion = {
+  kind: "none",
+  subject: "Physics",
+  reason: "all-done",
+  skillLabel: "Động học chất điểm",
+  correct: 2,
+  total: 6,
+};
 
-    expect(container.textContent).toContain(SKILL_LABEL);
-    expect(container.textContent).toContain(EYEBROW);
+const SINH_NO_EXAM: SubjectSuggestion = {
+  kind: "none",
+  subject: "Biology",
+  reason: "no-exam",
+  skillLabel: "Di truyền quần thể",
+  correct: 0,
+  total: 3,
+};
 
-    const details = container.querySelector("details");
-    expect(details).not.toBeNull();
-    // Closed by default: neither the `open` property nor the attribute is set.
-    expect(details?.open).toBe(false);
-    expect(details?.hasAttribute("open")).toBe(false);
+const TOAN_NO_WEAK: SubjectSuggestion = { kind: "none", subject: "Math", reason: "no-weak" };
 
-    const summary = details?.querySelector("summary");
-    expect(summary).not.toBeNull();
-    expect(summary?.textContent).toContain(WHY_LABEL);
+function chip(label: string) {
+  return screen.getByRole("button", { name: label });
+}
+
+function card() {
+  return screen.getByRole("region", { name: "Nên luyện gì tiếp theo" });
+}
+
+describe("SkillRecommendationCard — hàng chip môn (AC-01)", () => {
+  it("đủ 7 chip, nhãn tiếng Việt, đúng thứ tự SUBJECT_ORDER, vùng chạm cao 44px", () => {
+    render(<SkillRecommendationCard suggestions={suggestions()} />);
+
+    const chips = screen.getAllByRole("button");
+    expect(chips.map((c) => c.textContent)).toEqual(CHIP_LABELS);
+    // h-11 = 44px (Chip mặc định 40px thấp hơn sàn vùng chạm của repo).
+    for (const c of chips) expect(c.className).toContain("h-11");
   });
 
-  // ===========================================================================
-  // Test 2 — AC-031: all three reasonCode values resolve to their own distinct
-  // localized reason text inside the disclosure
-  // ===========================================================================
-  // ROI: 45 (BV:6 x Freq:6 + Legal:0 + Defect:6)
-  // Behavior: render SkillRecommendationCard three times, once per reasonCode
-  //   ("prerequisite-gate" | "lowest-mastery" | "recently-wrong") -> assert each
-  //   render's disclosure body text is DISTINCT from the other two and matches
-  //   the reasonCode-specific i18n key's expected literal value.
-  // @category: edge-case
-  // @lane: integration
-  // @dependency: same as Test 1
-  // @complexity: low
-  // @real-dependency: none
-  // Primary failure mode: the REASON_KEY lookup is missing a member or maps two
-  // different reasonCode values to the same i18n key, silently showing the
-  // student the wrong (or an identical, uninformative) explanation.
-  it("AC-031: reasonCode-to-copy mapping — 3 reasonCode values resolve to 3 distinct localized texts", async () => {
-    const rendered: string[] = [];
+  it("mở sẵn môn đầu tiên CÓ gợi ý, không phải môn đầu danh sách", () => {
+    render(
+      <SkillRecommendationCard suggestions={suggestions({ Math: TOAN_NO_WEAK, Chemistry: HOA_SUGGEST })} />,
+    );
 
-    for (const reasonCode of ["prerequisite-gate", "lowest-mastery", "recently-wrong"] as const) {
-      const { container } = render(
-        await SkillRecommendationCard({ recommendation: { skillLabel: SKILL_LABEL, reasonCode } })
-      );
+    expect(chip("Hóa học").getAttribute("aria-pressed")).toBe("true");
+    expect(chip("Toán").getAttribute("aria-pressed")).toBe("false");
+  });
 
-      const details = container.querySelector("details");
-      const summaryText = details?.querySelector("summary")?.textContent ?? "";
-      // Disclosure body = the <details> text minus its <summary> label.
-      const bodyText = (details?.textContent ?? "").replace(summaryText, "").trim();
+  it("không môn nào có gợi ý → mở môn đầu tiên đã có dữ liệu; chưa có gì → Toán", () => {
+    const { unmount } = render(
+      <SkillRecommendationCard suggestions={suggestions({ Biology: SINH_NO_EXAM })} />,
+    );
+    expect(chip("Sinh học").getAttribute("aria-pressed")).toBe("true");
+    unmount();
 
-      expect(bodyText).toBe(REASON_COPY[reasonCode]);
-      rendered.push(bodyText);
+    render(<SkillRecommendationCard suggestions={suggestions()} />);
+    expect(chip("Toán").getAttribute("aria-pressed")).toBe("true");
+  });
+});
+
+describe("SkillRecommendationCard — có gợi ý (AC-04, AC-05)", () => {
+  it("in NGUYÊN VĂN nhãn dạng yếu, đúng a/b, phần trăm, số đề chưa làm", () => {
+    render(<SkillRecommendationCard suggestions={suggestions({ Chemistry: HOA_SUGGEST })} />);
+
+    expect(card().textContent).toContain("Cân bằng phương trình phản ứng");
+    expect(card().textContent).toContain("Đúng 1/5 câu (20%) · Còn 2 đề chưa làm");
+  });
+
+  it("nút 'Tìm đề dạng này' dẫn tới Kho đề lọc CẢ môn lẫn dạng bài", () => {
+    render(<SkillRecommendationCard suggestions={suggestions({ Chemistry: HOA_SUGGEST })} />);
+
+    const link = screen.getByRole("link", { name: "Tìm đề dạng này" });
+    expect(link.getAttribute("href")).toBe("/exams?subject=Chemistry&skill=hoa-can-bang-phan-ung");
+  });
+
+  it("thẻ VÀNG khi có việc (hướng B)", () => {
+    render(<SkillRecommendationCard suggestions={suggestions({ Chemistry: HOA_SUGGEST })} />);
+
+    expect(card().className).toContain("bg-sun-soft");
+  });
+});
+
+describe("SkillRecommendationCard — không có gì để luyện (AC-02)", () => {
+  it("đã làm hết đề: nêu dạng yếu và lý do, KHÔNG có nút, thẻ đổi sang trung tính", () => {
+    render(<SkillRecommendationCard suggestions={suggestions({ Physics: LY_ALL_DONE })} />);
+
+    expect(card().textContent).toContain("Không có gì để luyện");
+    expect(card().textContent).toContain(
+      "Dạng “Động học chất điểm” còn yếu (đúng 2/6 câu), nhưng bạn đã làm hết các đề có dạng này. Khi có đề mới chứa dạng này, nó sẽ hiện ở đây.",
+    );
+    expect(screen.queryByRole("link")).toBeNull();
+    expect(card().className).not.toContain("bg-sun-soft");
+    expect(card().className).toContain("bg-card");
+  });
+
+  it("không có đề nào chứa dạng yếu: lý do riêng, khác 'đã làm hết', không nút", () => {
+    render(<SkillRecommendationCard suggestions={suggestions({ Biology: SINH_NO_EXAM })} />);
+
+    expect(card().textContent).toContain(
+      "Dạng “Di truyền quần thể” còn yếu (đúng 0/3 câu), nhưng hiện chưa có đề nào chứa dạng này.",
+    );
+    expect(card().textContent).not.toContain("đã làm hết");
+    expect(screen.queryByRole("link")).toBeNull();
+  });
+
+  it("không yếu dạng nào: nói ngưỡng 70% lấy từ hằng số, không nút", () => {
+    render(<SkillRecommendationCard suggestions={suggestions({ Math: TOAN_NO_WEAK })} />);
+
+    expect(card().textContent).toContain(
+      "Mọi dạng bài bạn đã làm ở môn này đều đúng từ 70% trở lên.",
+    );
+    expect(screen.queryByRole("link")).toBeNull();
+  });
+
+  it("chưa có dữ liệu: lý do + MỘT liên kết chữ tới đề của môn, không phải nút lớn", () => {
+    render(<SkillRecommendationCard suggestions={suggestions()} />);
+
+    expect(card().textContent).toContain(
+      "Bạn chưa làm câu nào đã gắn dạng bài ở môn này, nên chưa biết dạng nào còn yếu.",
+    );
+    const link = screen.getByRole("link", { name: "Xem đề Toán" });
+    expect(link.getAttribute("href")).toBe("/exams?subject=Math");
+    expect(link.className).toContain("min-h-11");
+    expect(screen.queryByRole("link", { name: "Tìm đề dạng này" })).toBeNull();
+  });
+});
+
+describe("SkillRecommendationCard — bấm chip đổi môn tại chỗ", () => {
+  it("chuyển trạng thái, chip, màu thẻ theo môn vừa chọn; bấm lại môn cũ trả nội dung cũ", () => {
+    render(
+      <SkillRecommendationCard
+        suggestions={suggestions({ Chemistry: HOA_SUGGEST, Physics: LY_ALL_DONE })}
+      />,
+    );
+    expect(card().textContent).toContain("Cân bằng phương trình phản ứng");
+    expect(card().className).toContain("bg-sun-soft");
+
+    fireEvent.click(chip("Vật lý"));
+    expect(chip("Vật lý").getAttribute("aria-pressed")).toBe("true");
+    expect(chip("Hóa học").getAttribute("aria-pressed")).toBe("false");
+    expect(card().textContent).toContain("Không có gì để luyện");
+    expect(card().textContent).not.toContain("Cân bằng phương trình phản ứng");
+    expect(card().className).not.toContain("bg-sun-soft");
+
+    fireEvent.click(chip("Hóa học"));
+    expect(card().textContent).toContain("Cân bằng phương trình phản ứng");
+    expect(card().className).toContain("bg-sun-soft");
+  });
+
+  it("vùng nội dung là aria-live=polite để trình đọc màn hình nghe được môn mới", () => {
+    render(<SkillRecommendationCard suggestions={suggestions()} />);
+
+    expect(card().querySelector("[aria-live='polite']")).not.toBeNull();
+  });
+});
+
+describe("SkillRecommendationCard — không lộ khoá kỹ thuật (AC-10)", () => {
+  it("bảy môn ở cả bảy trạng thái: màn hình không có khoá môn tiếng Anh, id dạng bài hay khoá copy", () => {
+    const all = suggestions({
+      Math: TOAN_NO_WEAK,
+      Physics: LY_ALL_DONE,
+      Chemistry: HOA_SUGGEST,
+      Biology: SINH_NO_EXAM,
+    });
+    render(<SkillRecommendationCard suggestions={all} />);
+
+    for (const label of CHIP_LABELS) {
+      fireEvent.click(chip(label));
+      const text = card().textContent ?? "";
+      expect(text).not.toMatch(/Math|Physics|Chemistry|Biology|Literature|English|History/);
+      expect(text).not.toContain("hoa-can-bang-phan-ung");
+      expect(text).not.toContain("analytics.");
     }
-
-    expect(new Set(rendered).size).toBe(3);
-  });
-
-  // ===========================================================================
-  // Test 3 — AC-028: cold start renders an honest "not enough data yet" message
-  // — never blank, never a crash, never a partially-populated fallback
-  // ===========================================================================
-  // ROI: 48 (BV:6 x Freq:7 + Legal:0 + Defect:6)
-  // Behavior: render SkillRecommendationCard with recommendation = null -> the
-  //   component does not throw, and the rendered container contains the
-  //   analytics.recommendColdStart copy (a real, human-readable sentence, not an
-  //   empty string or a raw i18n key literal).
-  // @category: edge-case
-  // @lane: integration
-  // @dependency: same as Test 1
-  // @complexity: low
-  // @real-dependency: none
-  // Primary failure mode: `recommendation === null` causes an unhandled property
-  // access and the component throws, breaking DashboardPage's render for every
-  // brand-new/cold-start user — the single highest-frequency real-world case.
-  it("AC-028: cold start renders an honest 'not enough data yet' message — never throws, never blank", async () => {
-    const element = await SkillRecommendationCard({ recommendation: null });
-    const { container } = render(element);
-
-    expect(container.textContent).toContain(COLD_START);
-    expect(container.textContent).toContain(EYEBROW);
-
-    // Populated-only elements are absent: this is a genuinely different render,
-    // not a partially-populated fallback.
-    expect(container.querySelector("details")).toBeNull();
-    expect(container.querySelector("summary")).toBeNull();
-    expect(container.textContent).not.toContain(SKILL_LABEL);
-    expect(container.textContent).not.toContain(WHY_LABEL);
   });
 });

@@ -351,6 +351,30 @@ chạy được file đang bị `exclude` (đo: "No test files found", exit 1) v
 `--exclude` của CLI thì CỘNG THÊM chứ không ghi đè — xoá dòng trong config là
 bước duy nhất.
 
+### TD-035 — `getSkillRecommendation()` và telemetry `adaptive_route` không còn nơi gọi
+**Từ:** 2026-10-03 (thẻ vàng "Nên luyện gì tiếp theo" viết lại cho 7 môn, brief
+`docs/plans/20261003-feature-weak-skill-suggestions.md`)
+**Loại:** mã chết — vô hại về hành vi nhưng nói sai về hệ thống
+
+Thẻ vàng giờ tính từ `suggestWeakSkills()` (bảng kê "Kết quả theo dạng bài") chứ
+không còn đọc `user_skill_mastery` qua `getSkillRecommendation()` →
+`recommendNextSkill()`. Hệ quả nhìn thấy: sự kiện telemetry `adaptive_route`
+NGỪNG được ghi. Còn lại, không ai gọi: `getSkillRecommendation` +
+`recordRouteTelemetry` (`SOURCE/features/analytics/queries.ts`), kiểu
+`SkillRecommendation` (`SOURCE/types/adaptive.ts`), hằng `ROUTING_SUBJECT`,
+`SOURCE/features/analytics/__tests__/getSkillRecommendation.int.test.ts`.
+`lib/adaptive/route.ts` + test của nó vẫn có người dùng
+(`SOURCE/supabase/seedManualPassEngine1.ts`) nên KHÔNG xoá.
+
+**Vì sao chưa xoá:** lệnh cắt khối cuối `queries.ts` bằng shell bị chặn (xoá cục
+bộ), nên Claude để nguyên và ghi sổ thay vì lách. Xoá là việc cơ học.
+
+**Cách đóng:** xoá các mục trên rồi bỏ import thừa ở đầu `queries.ts` (dòng
+`ROUTING_SUBJECT`, `recommendNextSkill`, `subjectOfSkillNodeId`,
+`buildTelemetryPayload`, `SkillRecommendation`); giữ `type SkillNodeRow` —
+`getAnalyticsByRange` còn dùng. Xong thì `npx tsc --noEmit` và
+`npx vitest run` phải exit 0.
+
 ---
 
 ## Đã trả
