@@ -184,7 +184,10 @@ export async function listExamShelves(): Promise<ExamShelves> {
     candidates,
     attempts,
     excludeIds: new Set([...practiceIds, ...(hot?.examIds ?? [])]),
-    maxCards: SHELF_MAX_CARDS,
+    // Khám phá là kệ CUỐI và trên điện thoại xếp dọc hiện hết đề (2026-10-04), nên
+    // KHÔNG cắt ở `SHELF_MAX_CARDS`: lấy cả pool còn lại, đã xếp theo AC-048. Hàng
+    // cuộn ngang từ `sm` trở lên tự giữ 10 đề đầu (ExamShelf).
+    maxCards: rows.length,
   });
 
   return {
