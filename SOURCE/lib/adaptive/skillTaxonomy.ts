@@ -82,8 +82,9 @@ function edgesOf(rows: readonly EdgeRow[]): SkillPrerequisiteEdge[] {
 }
 
 // ---------------------------------------------------------------------------
-// Toán — 20 node, lớp 10 (6, nền tảng) + lớp 12 (14, trọng tâm ôn thi). Đã
-// duyệt: docs/plans/analysis/engine1-math-skill-dag-draft.md. KHÔNG đổi id.
+// Toán — 25 node, lớp 10 (11, nền tảng) + lớp 12 (14, trọng tâm ôn thi). 20
+// node gốc đã duyệt; 5 node lớp 10 thêm 2026-10-04 theo yêu cầu của chủ dự án:
+// docs/plans/analysis/engine1-math-skill-dag-draft.md. KHÔNG đổi id đã có.
 // ---------------------------------------------------------------------------
 const MATH: SubjectTaxonomy = {
   nodes: nodesOf("Math", [
@@ -94,6 +95,13 @@ const MATH: SubjectTaxonomy = {
     ["bpt-bac-hai-mot-an", "Bất phương trình bậc hai một ẩn"],
     ["he-thuc-luong-tam-giac", "Hệ thức lượng trong tam giác"],
     ["thong-ke-xs-lop10", "Thống kê và xác suất cơ bản"],
+    // --- Lớp 10 bổ sung 2026-10-04: 117 câu Toán 10 mới nạp (đề học kì 1) rơi
+    // vào năm dạng chưa có node (no-matching-node 115/201 câu Toán). ---
+    ["ham-so-do-thi", "Hàm số và đồ thị hàm số"],
+    ["pt-he-phuong-trinh", "Phương trình và hệ phương trình"],
+    ["vecto-phep-toan", "Vectơ và các phép toán trên vectơ"],
+    ["toa-do-vecto-diem", "Tọa độ của vectơ và của điểm trong mặt phẳng"],
+    ["tich-vo-huong", "Tích vô hướng của hai vectơ"],
     // --- Lớp 12 (trọng tâm ôn thi) ---
     ["tinh-don-dieu-cuc-tri", "Tính đơn điệu và cực trị của hàm số"],
     ["gtln-gtnn-tiem-can", "Giá trị lớn nhất, giá trị nhỏ nhất và tiệm cận của hàm số"],
@@ -113,9 +121,15 @@ const MATH: SubjectTaxonomy = {
     ["pp-toa-do-khong-gian", "Phương pháp tọa độ trong không gian Oxyz"],
     ["xac-suat-co-dieu-kien", "Xác suất có điều kiện"],
   ]),
-  // 5 node gốc: menh-de-tap-hop, bpt-bac-nhat-hai-an, ham-so-bac-hai,
-  // he-thuc-luong-tam-giac, thong-ke-xs-lop10.
+  // 6 node gốc: menh-de-tap-hop, bpt-bac-nhat-hai-an, ham-so-bac-hai,
+  // he-thuc-luong-tam-giac, thong-ke-xs-lop10, vecto-phep-toan. Năm node bổ sung
+  // 2026-10-04 chỉ thêm cạnh CỦA CHÍNH CHÚNG: không đụng cạnh nào của node cũ, vì
+  // thêm tiên quyết cho node đã có mastery sẽ chặn gợi ý của nó vô cớ.
   edges: edgesOf([
+    ["ham-so-do-thi", "menh-de-tap-hop"],
+    ["pt-he-phuong-trinh", "ham-so-do-thi"],
+    ["toa-do-vecto-diem", "vecto-phep-toan"],
+    ["tich-vo-huong", "toa-do-vecto-diem"],
     ["bpt-bac-hai-mot-an", "ham-so-bac-hai"],
     ["tinh-don-dieu-cuc-tri", "ham-so-bac-hai"],
     ["gtln-gtnn-tiem-can", "tinh-don-dieu-cuc-tri"],

@@ -19,6 +19,18 @@ Nguồn: khung chương trình Toán THPT theo Chương trình GDPT 2018 (Bộ G
 | `he-thuc-luong-tam-giac` | Hệ thức lượng trong tam giác | 10 |
 | `thong-ke-xs-lop10` | Thống kê và xác suất cơ bản | 10 |
 
+### Lớp 10 bổ sung 2026-10-04 (5 node — theo yêu cầu của chủ dự án)
+
+Lý do: sau khi nạp 9 đề Toán 10 học kì 1 (117 câu), 115/201 câu Toán không có node phù hợp (coverage gắn thẻ 39,3%). Năm dạng bài dưới đây là phần thiếu của chương trình lớp 10. Chỉ thêm cạnh của chính năm node này, không đổi cạnh của node cũ.
+
+| id | labelVi | Lớp |
+|---|---|---|
+| `ham-so-do-thi` | Hàm số và đồ thị hàm số | 10 |
+| `pt-he-phuong-trinh` | Phương trình và hệ phương trình | 10 |
+| `vecto-phep-toan` | Vectơ và các phép toán trên vectơ | 10 |
+| `toa-do-vecto-diem` | Tọa độ của vectơ và của điểm trong mặt phẳng | 10 |
+| `tich-vo-huong` | Tích vô hướng của hai vectơ | 10 |
+
 ### Lớp 12 (14 node — trọng tâm ôn thi, tương ứng 32 câu hỏi lớp 12 trong corpus)
 
 | id | labelVi | Lớp |
@@ -44,6 +56,10 @@ Nguồn: khung chương trình Toán THPT theo Chương trình GDPT 2018 (Bộ G
 
 | `skill_node_id` | `prerequisite_node_id` |
 |---|---|
+| `ham-so-do-thi` | `menh-de-tap-hop` |
+| `pt-he-phuong-trinh` | `ham-so-do-thi` |
+| `toa-do-vecto-diem` | `vecto-phep-toan` |
+| `tich-vo-huong` | `toa-do-vecto-diem` |
 | `bpt-bac-hai-mot-an` | `ham-so-bac-hai` |
 | `tinh-don-dieu-cuc-tri` | `ham-so-bac-hai` |
 | `gtln-gtnn-tiem-can` | `tinh-don-dieu-cuc-tri` |
@@ -60,11 +76,11 @@ Nguồn: khung chương trình Toán THPT theo Chương trình GDPT 2018 (Bộ G
 | `pp-toa-do-khong-gian` | `mat-non-mat-tru-mat-cau` |
 | `xac-suat-co-dieu-kien` | `thong-ke-xs-lop10` |
 
-Node không có tiên quyết (root node trong DAG): `menh-de-tap-hop`, `bpt-bac-nhat-hai-an`, `ham-so-bac-hai`, `he-thuc-luong-tam-giac`, `thong-ke-xs-lop10`.
+Node không có tiên quyết (root node trong DAG): `menh-de-tap-hop`, `bpt-bac-nhat-hai-an`, `ham-so-bac-hai`, `he-thuc-luong-tam-giac`, `thong-ke-xs-lop10`, `vecto-phep-toan`.
 
 ## Kiểm tra nhanh (thủ công, không thay cho `validateDag()`)
 
-- Số node: 20 — nằm trong khoảng 15–25 (AC-003). ✓
+- Số node: 25 (20 gốc + 5 bổ sung 2026-10-04) — nằm trong khoảng 15–25 (AC-003), đúng mốc trên. ✓
 - Phủ đúng 2 khối lớp corpus có (10 và 12). ✓
 - Mỗi node đều có `labelVi` tiếng Việt (AC-004). ✓
 - Không có cạnh tự tham chiếu (`skill_node_id ≠ prerequisite_node_id` ở mọi dòng). ✓

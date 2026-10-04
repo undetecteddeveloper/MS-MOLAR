@@ -46,7 +46,7 @@ const HAS_VIETNAMESE_DIACRITIC =
  * cả draft lẫn số này, có chủ ý.
  */
 const EXPECTED_NODE_COUNT: Record<Subject, number> = {
-  Math: 20,
+  Math: 25,
   Physics: 15,
   Chemistry: 15,
   Biology: 16,
@@ -56,7 +56,7 @@ const EXPECTED_NODE_COUNT: Record<Subject, number> = {
 };
 
 const EXPECTED_EDGE_COUNT: Record<Subject, number> = {
-  Math: 15,
+  Math: 19,
   Physics: 10,
   Chemistry: 12,
   Biology: 9,
@@ -199,11 +199,11 @@ describe("AC-002 — 100% cạnh tiên quyết trỏ tới node tồn tại (0 c
 });
 
 describe("AC-003 — số node theo môn đúng bản draft đã rà", () => {
-  it("Toán giữ nguyên 20 node trong khoảng [15, 25] của AC-003 (không đổi id đã có mastery)", () => {
+  it("Toán có 25 node (20 gốc + 5 lớp 10 bổ sung), trong khoảng [15, 25] của AC-003, không đổi id đã có mastery", () => {
     const math = skillNodesForSubject("Math");
     expect(math.length).toBeGreaterThanOrEqual(15);
     expect(math.length).toBeLessThanOrEqual(25);
-    expect(math.length).toBe(20);
+    expect(math.length).toBe(25);
   });
 
   it.each(SUBJECT_ORDER)("%s có đúng số node/cạnh của draft", (subject) => {
