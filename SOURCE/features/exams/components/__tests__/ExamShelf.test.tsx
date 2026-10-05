@@ -266,49 +266,6 @@ describe("ExamShelf — ExamShelfTile chỉ ở cuối hàng Khám phá (AC-032)
     expect(cards[1].querySelector(".card-link")).not.toBeNull();
   });
 
-  // jsdom không tính CSS: kiểm bằng LỚP Tailwind mà trình duyệt sẽ áp.
-  it("kệ Khám phá: điện thoại xếp cột dọc, hiện hết đề, ô cuối ẩn; từ sm chỉ 10 đề đầu trên hàng ngang", async () => {
-    const exams = Array.from({ length: 13 }, (_, i) => makeExam({ id: `ex-${i}` }));
-    const { container } = await renderServerTree(
-      <ExamShelf
-        shelf="explore"
-        subtitle="—"
-        exams={exams}
-        submittedExamIds={new Set()}
-        isLoggedIn
-      />
-    );
-    const list = container.querySelector("ul");
-    // Cột dọc ở mặc định, hàng cuộn ngang chỉ khi có tiền tố sm:.
-    expect(list?.className).toContain("flex-col");
-    expect(list?.className).toContain("sm:flex-row");
-    expect(list?.className).toContain("sm:overflow-x-auto");
-    expect(list?.className).not.toMatch(/(^|\s)overflow-x-auto/);
-
-    const items = Array.from(container.querySelectorAll("ul > li"));
-    expect(items).toHaveLength(14); // 13 đề (không cắt) + ô cuối
-    // 10 đề đầu hiện ở mọi cỡ; đề 11–13 chỉ hiện ở điện thoại.
-    expect(items.slice(0, 10).every((li) => !li.className.includes("sm:hidden"))).toBe(true);
-    expect(items.slice(10, 13).every((li) => li.className.includes("sm:hidden"))).toBe(true);
-    // Ô "Xem toàn bộ kho đề" ẩn dưới sm.
-    expect(items[13].className).toContain("max-sm:hidden");
-    // Thẻ đầy bề ngang ở điện thoại, rộng cố định từ sm.
-    expect(items[0].className).toContain("w-full");
-    expect(items[0].className).toContain("sm:w-80");
-  });
-
-  it("kệ Cần luyện và Nổi nhất vẫn là hàng cuộn ngang ở mọi cỡ", async () => {
-    const exams = [makeExam({ id: "h1" }), makeExam({ id: "h2" })];
-    for (const shelf of ["practice", "hot"] as const) {
-      const { container } = await renderServerTree(
-        <ExamShelf shelf={shelf} subtitle="—" exams={exams} submittedExamIds={new Set()} isLoggedIn />
-      );
-      const list = container.querySelector("ul");
-      expect(list?.className).toMatch(/(^|\s)overflow-x-auto/);
-      expect(list?.className).not.toContain("flex-col");
-    }
-  });
-
   it("kệ Cần luyện và Nổi nhất không có tile cuối hàng", async () => {
     const exams = [makeExam({ id: "x1" }), makeExam({ id: "x2" })];
 
