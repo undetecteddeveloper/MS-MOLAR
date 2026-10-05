@@ -117,6 +117,47 @@ export function onPageNavigationIndicatorStart(listener: IndicatorListener): () 
   return () => indicatorListeners.delete(listener);
 }
 
+// ============================================================================
+// Điều hướng hoàn tất mà URL KHÔNG đổi
+// ============================================================================
+// Khách chưa đăng nhập đang ở `/?auth=signin` bấm một mục navbar: proxy đá về
+// đúng `/?auth=signin`. URL cuối == URL đầu nên mọi tín hiệu dựa trên "URL mới
+// đã commit" đều câm, và lớp phủ đứng hết hẹn giờ chặn trên (bug prod
+// 2026-10-05). Next vẫn ghi lượt đó vào history (đo trên trình duyệt thật: một
+// lần `replaceState` với URL cũ khi hoàn tất), nên nghe chính hai hàm ghi
+// history là cách duy nhất còn lại để biết "đã tới nơi".
+//
+// Không dùng `navigation` API: chỉ Chromium. Không hỏi Next: không có sự kiện
+// công khai nào cho "điều hướng xong".
+
+/**
+ * Gọi `listener` MỖI KHI có ai ghi history (`pushState`/`replaceState`) — gồm cả
+ * Next lúc commit một lượt điều hướng. Listener chạy SAU hàm gốc và được hoãn
+ * bằng `queueMicrotask`: Next ghi history trong `useInsertionEffect`, nơi React
+ * cấm đặt state, mà listener của lớp phủ thì đúng là đặt state.
+ * Trả hàm huỷ; hàm huỷ chỉ trả hàm gốc về khi hàm bọc của mình còn đứng ngoài
+ * cùng — nếu bên khác đã bọc chồng lên thì để nguyên, tránh gỡ nhầm của họ.
+ */
+export function onHistoryWrite(listener: () => void): () => void {
+  const methods = ["pushState", "replaceState"] as const;
+  const restores: Array<() => void> = [];
+  for (const method of methods) {
+    const original = window.history[method];
+    const wrapped: History[typeof method] = function (this: History, ...args) {
+      const result = original.apply(this, args);
+      queueMicrotask(listener);
+      return result;
+    };
+    window.history[method] = wrapped;
+    restores.push(() => {
+      if (window.history[method] === wrapped) window.history[method] = original;
+    });
+  }
+  return () => {
+    for (const restore of restores) restore();
+  };
+}
+
 /** `true` khi cú bấm sẽ đưa người dùng sang một PATH khác trong cùng site. */
 export function startsPageNavigation(intent: NavIntent): boolean {
   if (intent.button !== 0 || intent.modifierKey) return false;

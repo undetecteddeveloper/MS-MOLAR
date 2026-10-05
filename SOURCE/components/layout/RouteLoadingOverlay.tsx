@@ -28,14 +28,18 @@
 // giờ chặn trên. Redirect về chính path cũ là chuyện thường của guard đăng nhập,
 // không phải ca hiếm.
 //
-// BA đường tắt, vì "không bao giờ tắt được" là kiểu hỏng tệ nhất mà một lớp
-// phủ toàn màn hình có thể mắc:
+// BỐN đường tắt, vì "không bao giờ tắt được" là kiểu hỏng tệ nhất mà một lớp
+// phủ toàn màn hình có thể mắc (đường 4 thêm 2026-10-05, xem dưới):
 //   1. URL mới commit — đường thường.
 //   2. popstate / pageshow — nút Back/Forward và bfcache không đi qua click
 //      handler nào, và bfcache còn khôi phục nguyên trạng thái DOM cũ.
 //   3. Hẹn giờ chặn trên — người dùng bấm Stop, mạng chết giữa chừng: không có
 //      route nào commit, cũng không có sự kiện nào bắn. Sau ngần này mili giây
 //      thì trả màn hình lại cho người dùng, thà mất chỉ báo còn hơn khoá cứng.
+//   4. Next ghi history (`pushState`/`replaceState`) khi hoàn tất một lượt điều
+//      hướng. Cần cho ca khách ĐANG ở `/?auth=signin` bấm một mục navbar: guard
+//      đá về đúng URL đó, đường 1 câm vì khoá vị trí không đổi, và trước đây
+//      lớp phủ đứng trọn 12 giây (lib/nav/pageNavigation.ts, onHistoryWrite).
 //
 // Lớp phủ LUÔN nằm trong DOM (ẩn bằng `visibility`), CỐ Ý: không phải dựng cây
 // DOM vào đúng khoảnh khắc trình duyệt đang bận điều hướng. Phần fade-in trễ
@@ -54,6 +58,7 @@ import { useEffect, useRef, useState } from "react";
 import { t } from "@/lib/copy";
 import {
   isNavigationGuarded,
+  onHistoryWrite,
   onPageNavigationIndicatorStart,
   startsPageNavigation,
 } from "@/lib/nav/pageNavigation";
@@ -131,11 +136,15 @@ export function RouteLoadingOverlay() {
     // Điều hướng bằng `router.push()` không có cú bấm nào để bắt — bên gọi tự
     // báo (useLeaveGuard khi người dùng xác nhận "Rời trang").
     const unsubscribe = onPageNavigationIndicatorStart(showOverlay);
+    // Đường tắt 4: Next ghi history khi một lượt điều hướng hoàn tất — kể cả khi
+    // guard đá về ĐÚNG URL đang đứng (khoá vị trí không đổi, đường 1 câm).
+    const unsubscribeHistory = onHistoryWrite(clear);
     return () => {
       document.removeEventListener("click", onClick, true);
       window.removeEventListener("popstate", clear);
       window.removeEventListener("pageshow", clear);
       unsubscribe();
+      unsubscribeHistory();
       if (safetyTimer.current !== null) clearTimeout(safetyTimer.current);
     };
   }, []);

@@ -134,6 +134,45 @@ describe("RouteLoadingOverlay", () => {
     expect(isPending()).toBe(false);
   });
 
+  // Bug prod 2026-10-05: khách ĐANG đứng ở form đăng nhập (`/?auth=signin`) bấm
+  // một mục navbar → guard đá về đúng `/?auth=signin`. URL cuối == URL đầu nên
+  // khoá vị trí không đổi và lớp phủ đứng hết hẹn giờ 12 giây. Next vẫn gọi
+  // `history.replaceState` với URL đó khi lượt điều hướng hoàn tất (đo trên
+  // trình duyệt thật) — đó là tín hiệu "tới nơi" duy nhất còn lại.
+  it("redirect VỀ CHÍNH URL đang đứng (khách ở /?auth=signin bấm Kho đề) tắt nhờ history.replaceState của Next", async () => {
+    setLocation("/?auth=signin");
+    render(<RouteLoadingOverlay />);
+
+    await clickLink(anchor("/exams"));
+    expect(isPending()).toBe(true);
+
+    // Next commit lượt điều hướng bị đá về chỗ cũ: URL không đổi, nhưng nó
+    // vẫn ghi lại vào history. Không đổi pathname/search nên không có rerender.
+    await act(async () => {
+      window.history.replaceState({}, "", "/?auth=signin");
+    });
+    expect(isPending()).toBe(false);
+  });
+
+  it("history.replaceState khi KHÔNG có lượt chờ nào thì không làm gì và không hỏng", async () => {
+    setLocation("/?auth=signin");
+    render(<RouteLoadingOverlay />);
+
+    await act(async () => {
+      window.history.replaceState({}, "", "/?auth=signin");
+    });
+    expect(isPending()).toBe(false);
+  });
+
+  it("gỡ component thì trả history.pushState/replaceState về nguyên bản", () => {
+    const pushBefore = window.history.pushState;
+    const replaceBefore = window.history.replaceState;
+    const { unmount } = render(<RouteLoadingOverlay />);
+    unmount();
+    expect(window.history.pushState).toBe(pushBefore);
+    expect(window.history.replaceState).toBe(replaceBefore);
+  });
+
   it("bấm vào chữ BÊN TRONG liên kết vẫn tính (leo cây qua closest)", async () => {
     render(<RouteLoadingOverlay />);
     const a = anchor("/history");
