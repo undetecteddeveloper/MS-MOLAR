@@ -9,6 +9,13 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { validatePassword } from "@/lib/auth/passwordPolicy";
 import { RECOVERY_COOKIE } from "@/lib/auth/recovery";
+import {
+  POST_AUTH_COOKIE,
+  POST_AUTH_COOKIE_MAX_AGE_SECONDS,
+  postAuthPath,
+  safeNextPath,
+} from "@/lib/auth/guestPaths";
+import { SESSION_COOKIE_OPTIONS } from "@/lib/supabase/cookieOptions";
 import { mapAuthError } from "@/lib/auth/authErrors";
 import { isValidCode, mapVerifyError, normalizeCode, normalizeEmail } from "@/lib/auth/verifyCode";
 import { guard } from "@/lib/security/rateLimit";
@@ -33,6 +40,9 @@ export async function signUp(
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
   const displayName = String(formData.get("displayName") ?? "");
+  // `next`: trang khách đang xem trước khi bấm đăng ký (brief 20261012 T7).
+  // Chuẩn hoá MỘT lần ở biên — giá trị lạ thành null, đích rơi về /exams.
+  const next = safeNextPath(String(formData.get("next") ?? ""));
 
   // Trước đây signUp KHÔNG kiểm gì, thả cho mặc định 6 ký tự của Supabase —
   // lỏng hơn cả updatePassword (Security review 2026-08-03, Low). Nay cả hai
@@ -56,10 +66,15 @@ export async function signUp(
   // trang chỉ dùng nó để gửi lại/nhập mã. Email đã đăng ký rồi cũng đi đường này
   // (Supabase không báo lỗi) — không có chỗ nào cho người lạ dò email tồn tại.
   if (!data.session) {
-    redirect(`/?auth=verify&email=${encodeURIComponent(normalizeEmail(email))}`);
+    // `next` đi tiếp sang view nhập mã để đích không rơi mất giữa chừng.
+    redirect(
+      `/?auth=verify&email=${encodeURIComponent(normalizeEmail(email))}${
+        next ? `&next=${encodeURIComponent(next)}` : ""
+      }`
+    );
   }
 
-  redirect("/exams");
+  redirect(postAuthPath(next));
 }
 
 /**
@@ -91,7 +106,7 @@ export async function verifySignupCode(
     return { error: mapVerifyError(error) };
   }
 
-  redirect("/exams");
+  redirect(postAuthPath(String(formData.get("next") ?? "")));
 }
 
 /**
@@ -139,6 +154,22 @@ export async function signInWithOAuth(
 
   const origin = await requestOrigin();
   const supabase = await createClient();
+
+  // Đích sau OAuth đi bằng cookie, không bằng query của redirectTo (lý do ở
+  // POST_AUTH_COOKIE). Không có `next` hợp lệ thì GỠ cookie cũ: một lượt OAuth
+  // bỏ dở hôm trước không được kéo người dùng về trang đã quên.
+  const next = safeNextPath(String(formData.get("next") ?? ""));
+  const cookieStore = await cookies();
+  if (next) {
+    cookieStore.set(POST_AUTH_COOKIE, next, {
+      ...SESSION_COOKIE_OPTIONS,
+      path: "/",
+      maxAge: POST_AUTH_COOKIE_MAX_AGE_SECONDS,
+    });
+  } else {
+    cookieStore.set(POST_AUTH_COOKIE, "", { path: "/", maxAge: 0 });
+  }
+
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider,
     options: { redirectTo: `${origin}/auth/callback?next=/exams` },
@@ -218,7 +249,7 @@ export async function signIn(
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) return { error: mapAuthError(error) };
-  redirect("/exams");
+  redirect(postAuthPath(String(formData.get("next") ?? "")));
 }
 
 /** Đăng xuất, quay về homepage với form đăng nhập mở. Gỡ luôn cờ khôi phục

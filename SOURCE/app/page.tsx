@@ -16,6 +16,7 @@ import { SiteHeader } from "@/components/layout/SiteHeader";
 import { SkipLink } from "@/components/shared/SkipLink";
 import { SupportWidget } from "@/components/support/SupportWidget";
 import { getCurrentUserProfile } from "@/lib/auth/getCurrentUser";
+import { postAuthPath, safeNextPath } from "@/lib/auth/guestPaths";
 import { t } from "@/lib/copy";
 import { buildHomeJsonLd, serializeJsonLd } from "@/lib/seo/jsonLd";
 
@@ -55,11 +56,11 @@ const EMAIL_PARAM_MAX = 254;
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ auth?: string; email?: string }>;
+  searchParams: Promise<{ auth?: string; email?: string; next?: string }>;
 }) {
   // Đọc cookie auth mỗi request → `/` là dynamic (ƒ), đánh đổi hợp lý cho cá
   // nhân hoá (ô tài khoản, băng xếp hạng "đã làm").
-  const [{ auth, email }, user, requestHeaders] = await Promise.all([
+  const [{ auth, email, next: nextParam }, user, requestHeaders] = await Promise.all([
     searchParams,
     getCurrentUserProfile(),
     headers(),
@@ -77,8 +78,13 @@ export default async function Home({
   // ô: không dùng để tra cứu hay quyết định gì ở server.
   const verifyEmail = typeof email === "string" ? email.trim().slice(0, EMAIL_PARAM_MAX) : "";
 
-  // Đã đăng nhập mà mở form auth → vào thẳng /exams (parity với /login cũ).
-  if (user && authMode) redirect("/exams");
+  // Trang khách đang xem trước khi bấm đăng nhập (brief 20261012 T7). Chuẩn hoá
+  // ở ĐÂY, một lần: từ đây xuống chỉ có `undefined` hoặc một đường dẫn đã qua
+  // danh sách trang khách được vào — `?next=//evil.example` biến mất.
+  const next = safeNextPath(typeof nextParam === "string" ? nextParam : undefined) ?? undefined;
+
+  // Đã đăng nhập mà mở form auth → vào thẳng đích (`next` hoặc /exams).
+  if (user && authMode) redirect(postAuthPath(next));
 
   // Ba đề đầu của kệ Nổi nhất (F-001) + kệ lời giải cộng đồng mới nhất (F-041)
   // — GUARD bằng `user` CẢ HAI: RPC `exam_hot_counts` và
@@ -150,7 +156,12 @@ export default async function Home({
                 cụm "Đề nổi nhất", nét ở đó mờ hơn. Ẩn khi form đăng nhập đang mở. */}
             {authMode === null && <HeroGrid />}
             <div className="flex flex-col gap-6">
-              <HomeStage auth={authMode} signedIn={user !== null} verifyEmail={verifyEmail} />
+              <HomeStage
+                auth={authMode}
+                signedIn={user !== null}
+                verifyEmail={verifyEmail}
+                next={next}
+              />
 
               {/* Ba câu nói rõ sản phẩm làm gì, cho khách. Không đánh số: đây
                   không phải một trình tự. `.motion-hero-item` nối tiếp lead

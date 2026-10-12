@@ -363,3 +363,44 @@ describe("Home (app/page.tsx) — guarded hot-exams call site, real composition 
     expect((progress[0].props as { totalCompleted: number }).totalCompleted).toBe(0);
   });
 });
+
+// =============================================================================
+// `?next=` — đăng nhập xong về đúng trang khách đang xem (brief 20261012 T7/D4)
+// =============================================================================
+describe("Home (app/page.tsx) — ?next= của form đăng nhập", () => {
+  it("khách + ?auth=signin&next=/history: HomeStage nhận next='/history'", async () => {
+    getCurrentUserProfileMock.mockResolvedValue(null);
+    mockSupabaseBoundary({});
+
+    const element = await Home({
+      searchParams: Promise.resolve({ auth: "signin", next: "/history" }),
+    });
+
+    expect(findAllByProp(element, "next", "/history")).toHaveLength(1);
+  });
+
+  it("khách + next là đích ngoài/lạ: bị bỏ ở server, HomeStage không nhận next", async () => {
+    getCurrentUserProfileMock.mockResolvedValue(null);
+    mockSupabaseBoundary({});
+
+    for (const evil of ["//evil.example", "https://evil.example", "/profile", "javascript:alert(1)"]) {
+      const element = await Home({
+        searchParams: Promise.resolve({ auth: "signin", next: evil }),
+      });
+      expect(findAllByProp(element, "next", evil), evil).toHaveLength(0);
+    }
+  });
+
+  it("đã đăng nhập mà mở form auth: redirect tới next hợp lệ, còn lại /exams", async () => {
+    getCurrentUserProfileMock.mockResolvedValue(SIGNED_IN_USER);
+    mockSupabaseBoundary({});
+
+    await expect(
+      Home({ searchParams: Promise.resolve({ auth: "signin", next: "/me/dashboard" }) })
+    ).rejects.toMatchObject({ digest: expect.stringContaining("/me/dashboard") });
+
+    await expect(
+      Home({ searchParams: Promise.resolve({ auth: "signin", next: "//evil.example" }) })
+    ).rejects.toMatchObject({ digest: expect.stringMatching(/NEXT_REDIRECT;[a-z]+;\/exams;/) });
+  });
+});

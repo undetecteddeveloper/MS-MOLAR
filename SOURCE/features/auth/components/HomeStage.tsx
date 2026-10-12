@@ -22,11 +22,14 @@ export function HomeStage({
   auth,
   signedIn,
   verifyEmail = "",
+  next,
 }: {
   auth: AuthMode;
   signedIn: boolean;
   /** Email điền sẵn cho `?auth=verify` (từ `?email=`). */
   verifyEmail?: string;
+  /** Trang quay về sau đăng nhập (`?next=`), đã qua `safeNextPath` ở server. */
+  next?: string;
 }) {
   const showAuth = auth !== null;
 
@@ -103,6 +106,7 @@ export function HomeStage({
           key={auth ?? "signin"}
           initialMode={auth ?? "signin"}
           initialEmail={verifyEmail}
+          next={next}
         />
       </section>
     </div>

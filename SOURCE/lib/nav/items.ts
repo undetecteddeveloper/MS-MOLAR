@@ -23,6 +23,14 @@ export type NavItem = {
    * `lib/supabase/middleware.ts`). Ghim bằng máy ở `__tests__/items.test.ts`
    * — hai danh sách lệch nhau thì test đỏ, không phải người đi rà.
    *
+   * Từ 2026-10-12 khách VÀO ĐƯỢC bốn đích này để xem (`lib/auth/guestPaths.ts`,
+   * brief 20261012): proxy không còn 307 chúng, mà dựng thật một trang "cần
+   * đăng nhập" (Kho đề thì hiện đề). Cờ này CỐ Ý giữ nguyên nghĩa "không
+   * prefetch cho khách" và không đổi tên: lý do đã đổi — không còn là một 307
+   * bỏ đi, mà là bốn lượt render thật (Kho đề đọc DB) cho một khách có thể
+   * không bao giờ bấm — nhưng kết luận (khách không prefetch) thì giữ. Muốn bật
+   * lại prefetch cho khách thì đo trước, đừng đoán.
+   *
    * Dùng để TẮT PREFETCH cho khách chưa đăng nhập (đo prod 2026-08-27):
    * `<Link>` của Next prefetch mọi đích trong vùng nhìn thấy, nên với khách,
    * mỗi đích có `guarded` sinh ra một 307 từ proxy rồi trình duyệt ĐI THEO

@@ -26,9 +26,13 @@ import { Input, Label } from "@/components/ui/input";
 export function VerifyCodeForm({
   initialEmail,
   onChangeEmail,
+  next,
 }: {
   initialEmail: string;
   onChangeEmail: () => void;
+  /** Trang khách đang xem trước khi đăng ký — đã chuẩn hoá ở server; mã đúng thì
+   *  về đó thay vì `/exams` (brief 20261012 T7). */
+  next?: string;
 }) {
   const [email, setEmail] = useState(initialEmail);
   // Có email từ bước đăng ký nghĩa là mail vừa được gửi → bắt đầu đã ở trong
@@ -65,6 +69,7 @@ export function VerifyCodeForm({
       </p>
 
       <form action={verifyAction} className="flex flex-col gap-4">
+        {next ? <input type="hidden" name="next" value={next} /> : null}
         {initialEmail ? (
           <input type="hidden" name="email" value={initialEmail} />
         ) : (

@@ -39,6 +39,14 @@ const MAX_NEXT_LENGTH = 512;
 /** Đích mặc định sau đăng nhập khi không có `next` hợp lệ — hành vi cũ. */
 export const DEFAULT_POST_AUTH_PATH = "/exams";
 
+/** Cookie mang `next` qua vòng OAuth (Google/Facebook). Không dùng query của
+ *  `redirectTo`: danh sách redirect cho phép của Supabase không đọc được từ
+ *  repo, và `?next=/exams` hiện có chỉ chứng minh đúng MỘT giá trị khớp. Cookie
+ *  httpOnly, sống ngắn; `/auth/callback` đọc, kiểm lại bằng `safeNextPath`, rồi
+ *  xoá. */
+export const POST_AUTH_COOKIE = "ms-molar-post-auth";
+export const POST_AUTH_COOKIE_MAX_AGE_SECONDS = 10 * 60;
+
 /** `pathname` (không query) có phải trang khách được xem không. */
 export function isGuestReadablePath(pathname: string): boolean {
   return (

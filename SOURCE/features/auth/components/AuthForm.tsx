@@ -29,10 +29,15 @@ type Mode = "signin" | "signup" | "verify";
 export function AuthForm({
   initialMode = "signin",
   initialEmail = "",
+  next,
 }: {
   initialMode?: Mode;
   /** Email điền sẵn cho view "verify" (từ `?email=` sau khi đăng ký). */
   initialEmail?: string;
+  /** Trang khách đang xem trước khi bấm đăng nhập (`?next=`, đã chuẩn hoá ở
+   *  server bằng `safeNextPath`). Đi kèm mọi form dưới đây để đăng nhập xong về
+   *  đúng trang đó thay vì `/exams` (brief 20261012 T7). */
+  next?: string;
 }) {
   const [mode, setMode] = useState<Mode>(initialMode);
   // View reset mật khẩu — đè lên form sign in/up; tab nào bấm cũng thoát reset.
@@ -87,7 +92,11 @@ export function AuthForm({
 
       <AutoHeightPanel measureKey={resetOpen ? "reset" : mode}>
         {isVerify ? (
-          <VerifyCodeForm initialEmail={initialEmail} onChangeEmail={() => setMode("signup")} />
+          <VerifyCodeForm
+            initialEmail={initialEmail}
+            onChangeEmail={() => setMode("signup")}
+            next={next}
+          />
         ) : resetOpen ? (
           <div className="animate-in fade-in slide-in-from-right-3 flex flex-col gap-4 duration-300 motion-reduce:animate-none">
             <p className="text-muted-foreground text-sm leading-relaxed">{t("auth.resetIntro")}</p>
@@ -119,6 +128,7 @@ export function AuthForm({
         ) : (
           <div className="flex flex-col gap-5">
             <form action={formAction} className="flex flex-col gap-4">
+              {next ? <input type="hidden" name="next" value={next} /> : null}
               {/* Key theo mode → field animate khi chuyển tab; "Tên hiển thị"
                   xuất hiện/ẩn tự nhiên theo remount. */}
               <div
@@ -181,6 +191,7 @@ export function AuthForm({
             {/* OAuth THẬT: MỘT form chung, mỗi nút là submit kèm name="provider"
                 → signInWithOAuth đọc provider từ formData. */}
             <form action={oauthAction} className="border-border flex flex-col gap-3 border-t pt-4">
+              {next ? <input type="hidden" name="next" value={next} /> : null}
               <div className="flex items-center justify-between gap-3">
                 <span className="text-muted-foreground text-sm">
                   {isSignup ? t("auth.orSignUpWith") : t("auth.orSignInWith")}

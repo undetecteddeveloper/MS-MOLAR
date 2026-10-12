@@ -18,6 +18,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { SESSION_COOKIE_OPTIONS } from "@/lib/supabase/cookieOptions";
+import { DEFAULT_POST_AUTH_PATH, POST_AUTH_COOKIE, postAuthPath } from "@/lib/auth/guestPaths";
 import {
   RECOVERY_COOKIE,
   RECOVERY_COOKIE_MAX_AGE_SECONDS,
@@ -49,7 +50,16 @@ export async function GET(request: Request) {
         });
         return NextResponse.redirect(`${origin}${RECOVERY_PATH}`);
       }
-      return NextResponse.redirect(`${origin}${next}`);
+      // Đích OAuth do người dùng chọn trước khi bấm Google/Facebook (cookie do
+      // `signInWithOAuth` đặt, brief 20261012 T7). Đọc rồi XOÁ ngay — dùng một
+      // lần. Kiểm lại bằng `postAuthPath`: cookie là đầu vào, không phải sự thật.
+      // Chỉ áp khi `next` của link là mặc định `/exams`: link khôi phục mật
+      // khẩu đã đi nhánh `recovery` ở trên và không bao giờ tới đây.
+      const cookieStore = await cookies();
+      const stored = cookieStore.get(POST_AUTH_COOKIE)?.value;
+      cookieStore.set(POST_AUTH_COOKIE, "", { path: "/", maxAge: 0 });
+      const destination = next === DEFAULT_POST_AUTH_PATH ? postAuthPath(stored) : next;
+      return NextResponse.redirect(`${origin}${destination}`);
     }
     console.warn("[auth/callback] exchangeCodeForSession:", error.message);
   }
