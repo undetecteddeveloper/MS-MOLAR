@@ -48,4 +48,4 @@ Hôm nay khách bấm Kho đề / Thống kê / Lịch sử / Đăng đề bị 
 ## Ghi chú thực hiện (2026-10-12)
 - Danh sách trang khách + `safeNextPath` + `authHref` nằm ở `lib/auth/guestPaths.ts` (không phải `nextPath.ts` như dự kiến).
 - Khách bỏ qua `?skill=`: `skill_nodes`/`questions` không đọc được với anon, một URL tự gõ không được thành lỗi 500.
-- Task 3 (áp DEV), 7 (thử đăng nhập có `next`) và 8 (đo giao diện): xong 2026-10-12 sau khi người dùng Restore project dev — số đo ở PROGRESS.md. Task 9 (PROD) chưa làm, chờ người dùng.
+- Task 3 (áp DEV), 7 (thử đăng nhập có `next`) và 8 (đo giao diện): xong 2026-10-12 sau khi người dùng Restore project dev — số đo ở PROGRESS.md. Task 9 (PROD): DB đã áp 2026-10-12 13:35 UTC sau khi người dùng đồng ý (vân tay `b7a082a92dac`, đọc lại bằng truy vấn thật); code chưa lên main.
