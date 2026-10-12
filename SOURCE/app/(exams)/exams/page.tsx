@@ -78,8 +78,19 @@ export default async function ExamsPage({ searchParams }: { searchParams: Search
   // Cắt về trần TRƯỚC khi đưa đi bất cứ đâu — chip hiển thị, bộ lọc, link phân
   // trang đều nhận cùng một chuỗi; chuẩn hoá thật nằm trong fetchExamRows.
   const q = sp.q?.trim() ? sp.q.trim().slice(0, SEARCH_MAX_LENGTH) : undefined;
+  // `getCurrentUser()` đứng TRƯỚC mọi lượt đọc từ 2026-10-12 vì khách chưa đăng
+  // nhập nay vào được trang này: hai lượt đọc cá nhân (lượt làm, điểm) phải biết
+  // ai đang xem, và bộ lọc dạng bài dưới đây chỉ dành cho người đã đăng nhập.
+  // Không tốn thêm: hàm đã cache theo request và layout đã gọi nó trước khi trang
+  // render.
+  const user = await getCurrentUser();
+  const viewer: ExamViewer = user ? "member" : "guest";
+
   // Dị dạng → coi như không lọc dạng bài (khoá thô vẫn đưa trang xuống lưới phẳng).
-  const skill = parseSkillParam(sp.skill);
+  // Khách: bỏ qua hẳn — `?skill=` chỉ sinh ra từ thẻ gợi ý ở Thống kê (cần đăng
+  // nhập), và dạng bài + nhãn nằm trên `skill_nodes`/`questions` mà khách không
+  // đọc được; một URL tự gõ không được biến thành lỗi 500.
+  const skill = user ? parseSkillParam(sp.skill) : undefined;
 
   // ADR-0015: `listExamsRanked` tự sở hữu lượt đọc `exam_attempts` và trả luôn
   // tập id đã nộp, nên băng xếp hạng "đã làm" và nút Chấm điểm dùng CHUNG một
@@ -92,14 +103,6 @@ export default async function ExamsPage({ searchParams }: { searchParams: Search
   // unused slot of the pair always resolves to `null`, contributing 0 network
   // calls; `listExamFacets()`/`getCurrentUser()` are unconditional, so they run
   // on BOTH branches (the chip row renders on the shelves view too, AC-033).
-  //
-  // `getCurrentUser()` đứng TRƯỚC `Promise.all` từ 2026-10-12 vì khách chưa đăng
-  // nhập nay vào được trang này và hai lượt đọc cá nhân (lượt làm, điểm) phải
-  // biết ai đang xem. Không tốn thêm: hàm đã cache theo request và layout đã
-  // gọi nó trước khi trang render.
-  const user = await getCurrentUser();
-  const viewer: ExamViewer = user ? "member" : "guest";
-
   const [shelves, ranked, facets, skillLabel] = await Promise.all([
     showShelves ? listExamShelves(viewer) : null,
     showShelves

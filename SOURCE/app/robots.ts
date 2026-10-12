@@ -12,6 +12,13 @@ import { SITE_URL } from "@/lib/siteUrl";
 // chúng chỉ cần KHÔNG bị dính một luật disallow nào. Mọi route còn lại nằm sau
 // đăng nhập.
 //
+// 2026-10-12: khách nay VÀO ĐƯỢC /exams, /exams/{id}, /history, /me/dashboard,
+// /upload để xem (lib/auth/guestPaths.ts) — nhưng người dùng chọn KHÔNG đưa chúng
+// lên Google (brief 20261012 D3), nên danh sách disallow dưới đây giữ nguyên và
+// cả năm đường vẫn nằm trong đó (`/exams` phủ cả `/exams/{id}`, `/me` phủ
+// `/me/dashboard`). Muốn đưa Kho đề lên Google là một quyết định MỚI: gỡ
+// `/exams` khỏi đây và thêm vào sitemap.ts.
+//
 // Danh sách disallow phải bám theo PUBLIC_PATHS (lib/supabase/middleware.ts):
 // route nào KHÔNG công khai mà thiếu ở đây thì crawler vẫn bò vào rồi ăn
 // redirect `/?auth=signin` — chính lãng phí mà file này sinh ra để chặn.

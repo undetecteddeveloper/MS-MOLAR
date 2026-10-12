@@ -196,6 +196,25 @@ describe("ExamsPage — khách chưa đăng nhập được xem Kho đề (brief
 });
 
 describe("ExamsPage — ?skill= (nút Tìm đề của thẻ gợi ý dạng bài yếu, brief 20261003 AC-05/06/07)", () => {
+  // Thẻ gợi ý nằm ở Thống kê, tức là của người đã đăng nhập; khách thì `?skill=`
+  // bị bỏ qua (xem ca cuối khối).
+  beforeEach(() => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1" });
+  });
+
+  it("khách: ?skill= bị bỏ qua — không lọc, không đọc nhãn, trang vẫn dựng", async () => {
+    getCurrentUserMock.mockResolvedValue(null);
+
+    const { container } = await renderServerTree(
+      <ExamsPage searchParams={Promise.resolve({ skill: "ham-so-bac-hai" })} />
+    );
+
+    expect(listExamsRankedMock).toHaveBeenCalledTimes(1);
+    expect(listExamsRankedMock.mock.calls[0][0].skill).toBeUndefined();
+    expect(getSkillLabelMock).not.toHaveBeenCalled();
+    expect(container.textContent).not.toContain("Dạng bài:");
+  });
+
   it("skill hợp lệ: chuyển nguyên id vào bộ lọc của listExamsRanked, đọc nhãn một lần, hiện chip có nhãn", async () => {
     getSkillLabelMock.mockResolvedValue("Hàm số bậc hai");
 
