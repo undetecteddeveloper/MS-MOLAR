@@ -12,6 +12,7 @@ import {
   type ExamLevel,
   type SortDirection,
 } from "@/features/exams/queries";
+import type { ExamViewer } from "@/features/exams/queries/attempts";
 import { listExamShelves } from "@/features/exams/queries/shelves";
 import { ExamBrowser } from "@/features/exams/components/ExamBrowser";
 import { ExamFilters } from "@/features/exams/components/ExamFilters";
@@ -91,16 +92,24 @@ export default async function ExamsPage({ searchParams }: { searchParams: Search
   // unused slot of the pair always resolves to `null`, contributing 0 network
   // calls; `listExamFacets()`/`getCurrentUser()` are unconditional, so they run
   // on BOTH branches (the chip row renders on the shelves view too, AC-033).
-  const [shelves, ranked, facets, user, skillLabel] = await Promise.all([
-    showShelves ? listExamShelves() : null,
+  //
+  // `getCurrentUser()` đứng TRƯỚC `Promise.all` từ 2026-10-12 vì khách chưa đăng
+  // nhập nay vào được trang này và hai lượt đọc cá nhân (lượt làm, điểm) phải
+  // biết ai đang xem. Không tốn thêm: hàm đã cache theo request và layout đã
+  // gọi nó trước khi trang render.
+  const user = await getCurrentUser();
+  const viewer: ExamViewer = user ? "member" : "guest";
+
+  const [shelves, ranked, facets, skillLabel] = await Promise.all([
+    showShelves ? listExamShelves(viewer) : null,
     showShelves
       ? null
       : listExamsRanked(
           { subject, grade, school, schoolYear: year, semester, sort, level, dir, q, skill },
-          Number.isFinite(page) ? page : 1
+          Number.isFinite(page) ? page : 1,
+          viewer
         ),
     listExamFacets(),
-    getCurrentUser(),
     // Nhãn cho chip "Dạng bài: …"; chỉ đọc khi có `?skill=` (0 lượt gọi thêm còn lại).
     skill ? getSkillLabel(skill) : null,
   ]);

@@ -57,7 +57,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   getExamMock.mockResolvedValue(EXAM);
   hasReportedMock.mockResolvedValue(false);
-  getCurrentUserMock.mockResolvedValue(null);
+  // Người đã đăng nhập: chuỗi `from` → `source` của P6-T1 là của người LÀM BÀI.
+  // Từ 2026-10-12 khách chỉ thấy liên kết đăng nhập thay cho nút — xem khối
+  // "khách" ở cuối file.
+  getCurrentUserMock.mockResolvedValue({ id: "user-1" });
 });
 
 // =============================================================================
@@ -156,5 +159,59 @@ describe("ExamDetailPage — searchParams.from thread thành source prop cho Sta
       examId: "exam-1",
       source: "totally-bogus",
     });
+  });
+});
+
+// =============================================================================
+// Khách chưa đăng nhập xem được trang đề (brief 20261012 D1)
+// =============================================================================
+describe("ExamDetailPage — khách chưa đăng nhập", () => {
+  async function renderAsGuest(searchParams: { from?: string } = {}) {
+    getCurrentUserMock.mockResolvedValue(null);
+    return renderServerTree(
+      await ExamDetailPage({
+        params: Promise.resolve({ id: "exam-1" }),
+        searchParams: Promise.resolve(searchParams),
+      })
+    );
+  }
+
+  it("thấy thông tin đề, nhưng KHÔNG có nút Làm bài (không Server Action)", async () => {
+    const { container } = await renderAsGuest();
+
+    expect(container.textContent).toContain("Đề kiểm tra Hóa học");
+    expect(startAttemptButtonMock).not.toHaveBeenCalled();
+    expect(container.querySelector("form")).toBeNull();
+  });
+
+  it("có liên kết 'Đăng nhập để làm bài' mang next về đúng trang đề", async () => {
+    const { container } = await renderAsGuest();
+
+    const link = Array.from(container.querySelectorAll("a")).find((a) =>
+      a.textContent?.includes("Đăng nhập để làm bài")
+    );
+    expect(link?.getAttribute("href")).toBe("/?auth=signin&next=%2Fexams%2Fexam-1");
+  });
+
+  it("?from=hot được giữ trong next; giá trị lạ bị bỏ (không đưa vào URL đăng nhập)", async () => {
+    const hot = await renderAsGuest({ from: "hot" });
+    expect(
+      Array.from(hot.container.querySelectorAll("a")).find((a) =>
+        a.textContent?.includes("Đăng nhập để làm bài")
+      )?.getAttribute("href")
+    ).toBe("/?auth=signin&next=%2Fexams%2Fexam-1%3Ffrom%3Dhot");
+
+    const bogus = await renderAsGuest({ from: "x;drop table" });
+    expect(
+      Array.from(bogus.container.querySelectorAll("a")).find((a) =>
+        a.textContent?.includes("Đăng nhập để làm bài")
+      )?.getAttribute("href")
+    ).toBe("/?auth=signin&next=%2Fexams%2Fexam-1");
+  });
+
+  it("không có kênh báo cáo đề cho khách", async () => {
+    const { container } = await renderAsGuest();
+    expect(hasReportedMock).not.toHaveBeenCalled();
+    expect(container.textContent).not.toMatch(/báo cáo/i);
   });
 });

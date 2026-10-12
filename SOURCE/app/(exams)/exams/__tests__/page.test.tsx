@@ -165,6 +165,36 @@ describe("ExamsPage — listExamFacets()/getCurrentUser() run on BOTH branches (
   });
 });
 
+describe("ExamsPage — khách chưa đăng nhập được xem Kho đề (brief 20261012 T5)", () => {
+  it("khách: tầng truy vấn nhận viewer 'guest' ở cả nhánh kệ lẫn nhánh lưới", async () => {
+    getCurrentUserMock.mockResolvedValue(null);
+
+    await renderServerTree(<ExamsPage searchParams={Promise.resolve({})} />);
+    expect(listExamShelvesMock).toHaveBeenCalledWith("guest");
+
+    await renderServerTree(<ExamsPage searchParams={Promise.resolve({ sort: "newest" })} />);
+    expect(listExamsRankedMock.mock.calls[0][2]).toBe("guest");
+  });
+
+  it("người đã đăng nhập: viewer 'member' (hành vi cũ)", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "u1" });
+
+    await renderServerTree(<ExamsPage searchParams={Promise.resolve({})} />);
+    expect(listExamShelvesMock).toHaveBeenCalledWith("member");
+
+    await renderServerTree(<ExamsPage searchParams={Promise.resolve({ sort: "newest" })} />);
+    expect(listExamsRankedMock.mock.calls[0][2]).toBe("member");
+  });
+
+  it("khách vẫn thấy các kệ đề (kệ không bị ẩn theo đăng nhập)", async () => {
+    getCurrentUserMock.mockResolvedValue(null);
+
+    const { container } = await renderServerTree(<ExamsPage searchParams={Promise.resolve({})} />);
+
+    expect(shelfSections(container).length).toBeGreaterThan(0);
+  });
+});
+
 describe("ExamsPage — ?skill= (nút Tìm đề của thẻ gợi ý dạng bài yếu, brief 20261003 AC-05/06/07)", () => {
   it("skill hợp lệ: chuyển nguyên id vào bộ lọc của listExamsRanked, đọc nhãn một lần, hiện chip có nhãn", async () => {
     getSkillLabelMock.mockResolvedValue("Hàm số bậc hai");

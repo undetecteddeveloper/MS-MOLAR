@@ -21,7 +21,13 @@ import { paginateExams } from "@/lib/exams/paginate";
 import type { Exam } from "@/types/exam";
 import { toExam, type ExamRow } from "./rows";
 import { fetchExamRows, type ExamFilters } from "./catalogue";
-import { readMyAttemptRows, submittedExamIdsOf, toShelfAttempts } from "./attempts";
+import {
+  readMyAttemptRows,
+  submittedExamIdsOf,
+  toShelfAttempts,
+  type AttemptRow,
+  type ExamViewer,
+} from "./attempts";
 import { readHotCounts } from "./hotCounts";
 
 /**
@@ -100,9 +106,13 @@ export interface RankedExamList {
  */
 export async function listExamsRanked(
   filters?: ExamFilters,
-  page = 1
+  page = 1,
+  viewer: ExamViewer = "member"
 ): Promise<RankedExamList> {
   const supabase = await createClient();
+  // Khách: bỏ hai lượt đọc của riêng người dùng (xem `ExamViewer`). Xếp hạng
+  // rơi về cold start — không tín hiệu lớp/môn yếu, chỉ còn độ mới.
+  const isGuest = viewer === "guest";
   // Đồng hồ đọc ĐÚNG MỘT LẦN mỗi lượt gọi (ADR-0021 D4) — kể cả trên đường
   // không phải `?sort=hot`, cùng quy ước `shelves.ts` đã dùng cho `now`.
   const now = new Date();
@@ -117,11 +127,15 @@ export async function listExamsRanked(
   // lượt đọc — nhánh else là một Promise ĐÃ RESOLVE, 0 lượt gọi mạng thêm.
   const [rows, attemptRows, resultRows, hotCounts] = await Promise.all([
     fetchExamRows(filters),
-    readMyAttemptRows(supabase, "listExamsRanked.attempts"),
-    readBounded(
-      "listExamsRanked.results",
-      supabase.from("exam_results").select("attempt_id, total_score")
-    ) as Promise<{ attempt_id: string; total_score: number | string }[]>,
+    isGuest
+      ? Promise.resolve<AttemptRow[]>([])
+      : readMyAttemptRows(supabase, "listExamsRanked.attempts"),
+    isGuest
+      ? Promise.resolve<{ attempt_id: string; total_score: number | string }[]>([])
+      : (readBounded(
+          "listExamsRanked.results",
+          supabase.from("exam_results").select("attempt_id, total_score")
+        ) as Promise<{ attempt_id: string; total_score: number | string }[]>),
     filters?.sort === "hot"
       ? readHotCounts(supabase, "listExamsRanked.hotCounts", now)
       : Promise.resolve<Map<string, HotCounts>>(new Map()),

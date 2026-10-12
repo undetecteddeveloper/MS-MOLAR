@@ -12,6 +12,7 @@
 // thay thế đầu tiên — lưới 2 cột có ô trải hàng — cũng bỏ nốt: engineer
 // 2026-09-06 chỉ ra hai chỗ hổng của nó. Xem chú thích tại <dl> bên dưới.
 
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getExam } from "@/features/exams/queries";
 import { hasReported } from "@/features/authoring/queries";
@@ -19,12 +20,15 @@ import { StartAttemptButton } from "@/features/exams/components/StartAttemptButt
 import { ReportExam } from "@/features/exams/components/ReportExam";
 import { AuthorByline } from "@/components/shared/AuthorByline";
 import { DifficultyBadge } from "@/components/rating/DifficultyBadge";
+import { authHref } from "@/lib/auth/guestPaths";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { t } from "@/lib/copy";
+import { cn } from "@/lib/utils";
 import { subjectLabel } from "@/lib/ugc/subjects";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
 export default async function ExamDetailPage({
@@ -48,6 +52,9 @@ export default async function ExamDetailPage({
   const user = await getCurrentUser();
   const alreadyReported = user ? await hasReported(id) : false;
   const questionCount = exam.questionIds.length;
+  // Đích quay về sau đăng nhập của khách. `from` là chuỗi thô do người gõ URL —
+  // chỉ giữ nếu là một tên kệ trông hợp lệ; còn lại bỏ, không đưa vào `next`.
+  const guestNextPath = `/exams/${id}${from && /^[A-Za-z0-9_-]{1,32}$/.test(from) ? `?from=${from}` : ""}`;
 
   return (
     <PageContainer
@@ -127,13 +134,26 @@ export default async function ExamDetailPage({
               {t("exams.beforeStartTitle")}
             </h2>
             <p className="text-sm leading-relaxed">
-              {t("exams.beforeStartBody", {
+              {t(user ? "exams.beforeStartBody" : "exams.beforeStartBodyGuest", {
                 minutes: exam.durationMinutes,
                 count: questionCount,
               })}
             </p>
           </div>
-          <StartAttemptButton examId={exam.id} source={from} />
+          {user ? (
+            <StartAttemptButton examId={exam.id} source={from} />
+          ) : (
+            // Khách xem được trang đề (brief 20261012 D1) nhưng chưa làm bài
+            // được: liên kết thường tới form đăng nhập, mang `next` về đúng
+            // trang này. KHÔNG phải Server Action — proxy chặn POST của khách.
+            <Link
+              href={authHref("signin", guestNextPath)}
+              prefetch={false}
+              className={cn(buttonVariants({ size: "lg" }), "w-full")}
+            >
+              {t("exams.startGuest")}
+            </Link>
+          )}
         </Card>
       </div>
 

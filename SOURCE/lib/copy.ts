@@ -195,6 +195,10 @@ export const copy = {
   "exams.beforeStartTitle": "Trước khi bắt đầu",
   "exams.beforeStartBody":
     "Bạn có {minutes} phút cho {count} câu. Đồng hồ chạy ngay khi bạn bấm Làm bài, xong sớm thì nộp sớm.",
+  // Khách chưa đăng nhập xem được trang đề nhưng chưa làm bài được (2026-10-12).
+  "exams.startGuest": "Đăng nhập để làm bài",
+  "exams.beforeStartBodyGuest":
+    "Bạn có {minutes} phút cho {count} câu. Đăng nhập rồi bấm Làm bài để bắt đầu — đồng hồ chỉ chạy từ lúc đó.",
   // Tìm đề theo tên (ADR-0020).
   "exams.searchChip": "Tìm: “{query}”",
   "exams.searchChipRemove": "Bỏ từ khoá “{query}”",
@@ -342,6 +346,15 @@ export const copy = {
   "search.viewAll": "Xem tất cả kết quả cho “{query}”",
   "search.resultsAnnouncement": "{count} gợi ý. Dùng phím mũi tên để chọn, Enter để mở.",
   "search.hitMeta": "{subject}, lớp {grade}",
+
+  // --- Khách chưa đăng nhập: trang xem được, dùng cần tài khoản (2026-10-12) --
+  "guest.history.title": "Đăng nhập để xem lịch sử làm bài",
+  "guest.history.body": "Mỗi bài bạn nộp được lưu cùng điểm và ngày nộp để bạn xem lại.",
+  "guest.analytics.title": "Đăng nhập để xem thống kê",
+  "guest.analytics.body":
+    "Thống kê theo môn, thời gian luyện và dạng bài còn yếu được tính từ các bài bạn đã nộp.",
+  "guest.upload.title": "Đăng nhập để tải đề lên",
+  "guest.upload.body": "Bạn cần có tài khoản để tải đề lên và quản lý các đề của mình.",
 
   // --- Lịch sử ------------------------------------------------------------
   "history.title": "Lịch sử",

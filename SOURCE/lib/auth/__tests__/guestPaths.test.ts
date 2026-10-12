@@ -4,6 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  authHref,
   DEFAULT_POST_AUTH_PATH,
   GUEST_READABLE_EXACT_PATHS,
   isGuestReadablePath,
@@ -79,6 +80,22 @@ describe("safeNextPath", () => {
     ["quá dài", `/exams?q=${"a".repeat(600)}`],
   ] as const)("từ chối: %s", (_name, raw) => {
     expect(safeNextPath(raw)).toBeNull();
+  });
+});
+
+describe("authHref", () => {
+  it("next hợp lệ → mã hoá vào ?next=", () => {
+    expect(authHref("signin", "/history")).toBe("/?auth=signin&next=%2Fhistory");
+    expect(authHref("signup", "/exams/exam-toan-10?from=hot")).toBe(
+      "/?auth=signup&next=%2Fexams%2Fexam-toan-10%3Ffrom%3Dhot"
+    );
+  });
+
+  it("next lạ, thiếu → bỏ hẳn, không dựng liên kết trang chủ phải từ chối", () => {
+    expect(authHref("signin")).toBe("/?auth=signin");
+    expect(authHref("signin", null)).toBe("/?auth=signin");
+    expect(authHref("signup", "//evil.example")).toBe("/?auth=signup");
+    expect(authHref("signin", "/profile")).toBe("/?auth=signin");
   });
 });
 

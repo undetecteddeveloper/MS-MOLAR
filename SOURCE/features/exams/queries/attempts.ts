@@ -72,6 +72,13 @@ function schoolOfAttempt(row: AttemptRow): string | null {
 }
 
 /**
+ * Ai đang xem Kho đề. `"guest"` = chưa đăng nhập (2026-10-12): bỏ mọi lượt đọc
+ * dữ liệu cá nhân (lượt làm, điểm) thay vì để RLS trả 0 dòng. Mặc định
+ * `"member"` giữ nguyên hành vi và ngân sách lượt đọc cũ của mọi nơi gọi.
+ */
+export type ExamViewer = "member" | "guest";
+
+/**
  * Một lượt đọc `exam_attempts` ĐÃ NỘP của chính người gọi (RLS lo phần "của
  * ai") — dùng chung bởi `listExamsRanked` và `listExamShelves`/`listHotExams`
  * (P3-T2), nên select string và điều kiện lọc chỉ khai đúng MỘT lần.

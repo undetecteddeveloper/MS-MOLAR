@@ -39,7 +39,13 @@ import {
 import { readBounded } from "@/lib/supabase/boundedRead";
 import { createClient } from "@/lib/supabase/server";
 import type { Exam } from "@/types/exam";
-import { readMyAttemptRows, submittedExamIdsOf, toShelfAttempts } from "./attempts";
+import {
+  readMyAttemptRows,
+  submittedExamIdsOf,
+  toShelfAttempts,
+  type AttemptRow,
+  type ExamViewer,
+} from "./attempts";
 import { fetchExamRows } from "./catalogue";
 import { readHotCounts } from "./hotCounts";
 import { toExam, type ExamRow } from "./rows";
@@ -126,17 +132,26 @@ function examsFromIds(rows: readonly ExamRow[], ids: readonly string[]): Exam[] 
  * ngân sách 4, kiểm bằng đếm `from()`+`rpc()` cộng lại): catalogue, lượt làm
  * đã nộp, điểm số (cho tín hiệu điểm-yếu-theo-môn), và cửa sổ đếm cross-user.
  */
-export async function listExamShelves(): Promise<ExamShelves> {
+export async function listExamShelves(viewer: ExamViewer = "member"): Promise<ExamShelves> {
   const supabase = await createClient();
   const now = new Date();
+  const isGuest = viewer === "guest";
 
+  // Khách (2026-10-12, brief guest-browse T5): hai lượt đọc của riêng người
+  // dùng bị bỏ HẲN thay vì để RLS trả 0 dòng — không phụ thuộc quyền bảng của
+  // anon, và bớt hai round-trip. Hệ quả tự nhiên của cold start: kệ "Cần
+  // luyện" là null, không có huy hiệu "đã làm". Kệ Nổi nhất và Khám phá vẫn có.
   const [rows, attemptRows, resultRows, hotCounts] = await Promise.all([
     fetchExamRows(),
-    readMyAttemptRows(supabase, "listExamShelves.attempts"),
-    readBounded(
-      "listExamShelves.results",
-      supabase.from("exam_results").select("attempt_id, total_score")
-    ) as Promise<{ attempt_id: string; total_score: number | string }[]>,
+    isGuest
+      ? Promise.resolve<AttemptRow[]>([])
+      : readMyAttemptRows(supabase, "listExamShelves.attempts"),
+    isGuest
+      ? Promise.resolve<{ attempt_id: string; total_score: number | string }[]>([])
+      : (readBounded(
+          "listExamShelves.results",
+          supabase.from("exam_results").select("attempt_id, total_score")
+        ) as Promise<{ attempt_id: string; total_score: number | string }[]>),
     readHotCounts(supabase, "listExamShelves.hotCounts", now),
   ]);
 

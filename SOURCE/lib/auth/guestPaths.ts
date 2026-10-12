@@ -69,3 +69,13 @@ export function safeNextPath(raw: string | null | undefined): string | null {
 export function postAuthPath(raw: string | null | undefined): string {
   return safeNextPath(raw) ?? DEFAULT_POST_AUTH_PATH;
 }
+
+/**
+ * Liên kết mở form đăng nhập / đăng ký trên trang chủ, kèm `next` để quay lại
+ * trang khách đang xem. `next` không hợp lệ bị BỎ (không đưa vào URL), nên
+ * không bao giờ dựng ra một liên kết mà trang chủ phải từ chối.
+ */
+export function authHref(mode: "signin" | "signup", next?: string | null): string {
+  const safe = safeNextPath(next);
+  return safe ? `/?auth=${mode}&next=${encodeURIComponent(safe)}` : `/?auth=${mode}`;
+}

@@ -18,8 +18,8 @@
 // đúng danh sách đang hiện. `filterHistoryEntries` vẫn hiểu `examId` (hàm thuần,
 // có test) nhưng trang này không đọc tham số đó nữa.
 
-import { redirect } from "next/navigation";
 import { getCurrentUserProfile } from "@/lib/auth/getCurrentUser";
+import { LoginRequired } from "@/components/shared/LoginRequired";
 import { t } from "@/lib/copy";
 import { listMyHistory } from "@/features/history/queries";
 import { filterHistoryEntries, type HistoryEntryFilters } from "@/lib/history/filterEntries";
@@ -56,7 +56,26 @@ function parseDate(raw: string | undefined): string | undefined {
 
 export default async function HistoryPage({ searchParams }: { searchParams: SearchParams }) {
   const user = await getCurrentUserProfile();
-  if (!user) redirect("/?auth=signin");
+  // Khách vào được trang (proxy cho GET qua, brief 20261012) nhưng chưa có gì để
+  // xem: dựng khung + thẻ "cần đăng nhập", KHÔNG redirect. Vẫn đứng TRƯỚC mọi
+  // lượt đọc dữ liệu (AC-016: không hàng lượt làm nào được fetch cho khách).
+  if (!user) {
+    return (
+      <PageContainer
+        as="main"
+        size="default"
+        padding="none"
+        className="flex flex-col gap-5 px-4 py-6 sm:px-6 sm:py-8"
+      >
+        <PageHeader title={t("history.title")} description={t("history.subtitle")} />
+        <LoginRequired
+          title={t("guest.history.title")}
+          body={t("guest.history.body")}
+          nextPath="/history"
+        />
+      </PageContainer>
+    );
+  }
 
   const sp = await searchParams;
   const entries = await listMyHistory();

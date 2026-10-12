@@ -15,8 +15,8 @@
 // 20rem và dính theo cuộn; thứ tự DOM (thống kê trước, gợi ý sau) trùng thứ tự
 // đọc trái → phải nên không cần `order-*`.
 
-import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
+import { LoginRequired } from "@/components/shared/LoginRequired";
 import { t } from "@/lib/copy";
 import { getAnalyticsByRange } from "@/features/analytics/queries";
 import { AnalyticsDashboard } from "@/features/analytics/components/AnalyticsDashboard";
@@ -26,7 +26,25 @@ import { PageHeader } from "@/components/layout/PageHeader";
 
 export default async function DashboardPage() {
   const user = await getCurrentUser();
-  if (!user) redirect("/?auth=signin");
+  // Khách vào được trang (brief 20261012) nhưng thống kê là của riêng người
+  // dùng: khung + thẻ "cần đăng nhập", không redirect, không đọc dữ liệu.
+  if (!user) {
+    return (
+      <PageContainer
+        as="main"
+        size="full"
+        padding="none"
+        className="flex flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8"
+      >
+        <PageHeader title={t("analytics.title")} description={t("analytics.subtitle")} />
+        <LoginRequired
+          title={t("guest.analytics.title")}
+          body={t("guest.analytics.body")}
+          nextPath="/me/dashboard"
+        />
+      </PageContainer>
+    );
+  }
 
   // MỘT lệnh đọc nuôi cả ba thẻ biểu đồ lẫn thẻ gợi ý: gợi ý tính từ chính bảng
   // kê "Kết quả theo dạng bài" (toàn thời gian) nên hai thẻ không thể lệch số.

@@ -3,8 +3,8 @@
 // câu dẫn dựng ở đây bằng PageHeader chuẩn (theme "Sân trường", 2026-09-09) —
 // bản trước giấu h1 (sr-only), nay hiện rõ như mọi trang khác.
 
-import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
+import { LoginRequired } from "@/components/shared/LoginRequired";
 import { t } from "@/lib/copy";
 import { UploadForm } from "@/features/authoring/components/UploadForm";
 import { PageContainer } from "@/components/layout/PageContainer";
@@ -23,7 +23,26 @@ export const maxDuration = 300;
 
 export default async function UploadPage() {
   const user = await getCurrentUser();
-  if (!user) redirect("/?auth=signin");
+  // Khách vào được trang (brief 20261012) nhưng không có form để dùng: khung +
+  // thẻ "cần đăng nhập", KHÔNG dựng UploadForm. Server Action là POST nên proxy
+  // vẫn đá mọi lượt gọi của khách về form đăng nhập (lib/auth/guestPaths.ts).
+  if (!user) {
+    return (
+      <PageContainer
+        as="main"
+        size="default"
+        padding="none"
+        className="flex flex-col gap-5 px-4 py-6 sm:px-6 sm:py-8"
+      >
+        <PageHeader title={t("upload.title")} description={t("upload.intro")} />
+        <LoginRequired
+          title={t("guest.upload.title")}
+          body={t("guest.upload.body")}
+          nextPath="/upload"
+        />
+      </PageContainer>
+    );
+  }
 
   return (
     <PageContainer
