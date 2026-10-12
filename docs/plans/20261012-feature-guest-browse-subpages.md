@@ -48,4 +48,4 @@ Hôm nay khách bấm Kho đề / Thống kê / Lịch sử / Đăng đề bị 
 ## Ghi chú thực hiện (2026-10-12)
 - Danh sách trang khách + `safeNextPath` + `authHref` nằm ở `lib/auth/guestPaths.ts` (không phải `nextPath.ts` như dự kiến).
 - Khách bỏ qua `?skill=`: `skill_nodes`/`questions` không đọc được với anon, một URL tự gõ không được thành lỗi 500.
-- Task 3 (áp DEV) và 7–8 phần đo giao diện: CHƯA LÀM — dev Supabase đang tạm dừng.
+- Task 3 (áp DEV), 7 (thử đăng nhập có `next`) và 8 (đo giao diện): xong 2026-10-12 sau khi người dùng Restore project dev — số đo ở PROGRESS.md. Task 9 (PROD) chưa làm, chờ người dùng.
