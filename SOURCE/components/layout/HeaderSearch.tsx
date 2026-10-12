@@ -38,7 +38,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { t } from "@/lib/copy";
-import { isMaxwellQuery, MAXWELL_PATH } from "@/lib/search/easterEgg";
+import { isMaxwellQuery, MAXWELL_PATH, rememberMaxwellOrigin } from "@/lib/search/easterEgg";
 import { SEARCH_MAX_LENGTH, toSearchTerm } from "@/lib/search/normalize";
 import { subjectLabel } from "@/lib/ugc/subjects";
 import { cn } from "@/lib/utils";
@@ -150,13 +150,21 @@ function HeaderSearchInner() {
     router.push(href);
   }
 
+  // Trang ẩn: ghi lại trang đang đứng để nút mũi tên ở đó về đúng chỗ
+  // (lib/search/easterEgg.ts — không dựa vào `history.length`).
+  function goMaxwell() {
+    const search = searchParams.toString();
+    rememberMaxwellOrigin(search ? `${pathname}?${search}` : pathname);
+    go(MAXWELL_PATH);
+  }
+
   function choose(index: number) {
     if (term === null) return;
     const hit = hits[index];
     // Dòng "Xem tất cả kết quả" (không phải một đề cụ thể) với từ khoá của trang
     // ẩn → trang ẩn. Một đề người dùng CHỦ ĐỘNG chọn thì luôn mở đúng đề đó.
     if (!hit && isMaxwellQuery(value)) {
-      go(MAXWELL_PATH);
+      goMaxwell();
       return;
     }
     go(hit ? `/exams/${hit.id}` : examsHref(value));
@@ -168,7 +176,11 @@ function HeaderSearchInner() {
       return;
     }
     if (term === null) return;
-    go(isMaxwellQuery(value) ? MAXWELL_PATH : examsHref(value));
+    if (isMaxwellQuery(value)) {
+      goMaxwell();
+      return;
+    }
+    go(examsHref(value));
   }
 
   function onKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {

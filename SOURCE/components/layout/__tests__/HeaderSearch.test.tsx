@@ -225,6 +225,37 @@ describe("HeaderSearch — từ khoá trang ẩn", () => {
     }
   );
 
+  it("ghi lại trang đang đứng (kèm bộ lọc) để nút mũi tên về đúng chỗ", async () => {
+    pathname = "/exams";
+    search = "subject=Math&page=2";
+    window.sessionStorage.clear();
+    mockFetch();
+    render(<HeaderSearch />);
+    const input = desktopInput();
+    fireEvent.change(input, { target: { value: "maxwell" } });
+    await screen.findByRole("listbox");
+
+    fireEvent.submit(input.closest("form") as HTMLFormElement);
+
+    expect(window.sessionStorage.getItem("ms-molar-maxwell-origin")).toBe(
+      "/exams?subject=Math&page=2"
+    );
+    expect(push).toHaveBeenCalledWith("/maxwell");
+  });
+
+  it("tìm đề thường thì KHÔNG ghi dấu (không để lại trạng thái thừa)", async () => {
+    window.sessionStorage.clear();
+    mockFetch();
+    render(<HeaderSearch />);
+    const input = desktopInput();
+    fireEvent.change(input, { target: { value: "toan" } });
+    await screen.findByRole("listbox");
+
+    fireEvent.submit(input.closest("form") as HTMLFormElement);
+
+    expect(window.sessionStorage.getItem("ms-molar-maxwell-origin")).toBeNull();
+  });
+
   it("bấm dòng cuối \"Xem tất cả kết quả\" với từ khoá trang ẩn → /maxwell", async () => {
     mockFetch([]);
     render(<HeaderSearch />);

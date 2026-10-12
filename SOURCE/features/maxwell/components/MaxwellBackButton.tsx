@@ -1,27 +1,35 @@
 "use client";
 
 // Nút mũi tên của trang ẩn Maxwell — về ĐÚNG trang người dùng đang ở trước khi
-// vào đây (brief T5). Đó chính là hành vi nút Back của trình duyệt, nên dùng
-// `router.back()`: giữ cả vị trí cuộn và bộ lọc của trang trước.
+// vào đây (brief T5).
 //
-// Không có lịch sử để lùi (mở thẳng đường link ở tab mới, hoặc ứng dụng chat mở
-// link trong cửa sổ riêng) thì rơi về Kho đề, đích mặc định của cả site — không
-// bao giờ là một nút không làm gì.
+// Ô tìm ghi lại trang đang đứng vào sessionStorage ngay trước khi sang /maxwell
+// (lib/search/easterEgg.ts). Có dấu → `router.back()`: đó chính là nút Back của
+// trình duyệt, giữ cả vị trí cuộn và bộ lọc của trang trước. KHÔNG có dấu (mở
+// thẳng đường link, tab mới, ứng dụng chat mở link trong cửa sổ riêng) → Kho đề,
+// đích mặc định của cả site; không dùng `history.length` vì trình duyệt mới đã
+// có sẵn một mục about:blank / "Tab mới" (xem easterEgg.ts) — và không bao giờ
+// là một nút không làm gì.
 
 import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { DEFAULT_POST_AUTH_PATH } from "@/lib/auth/guestPaths";
 import { t } from "@/lib/copy";
+import { readMaxwellOrigin } from "@/lib/search/easterEgg";
 
 export function MaxwellBackButton() {
   const router = useRouter();
 
   function goBack() {
-    if (window.history.length > 1) {
+    const origin = readMaxwellOrigin();
+    if (origin === null) {
+      router.push(DEFAULT_POST_AUTH_PATH);
+    } else if (window.history.length > 1) {
       router.back();
     } else {
-      router.push(DEFAULT_POST_AUTH_PATH);
+      // Có dấu nhưng không còn mục nào để lùi (tab nhân đôi chép sessionStorage).
+      router.push(origin);
     }
   }
 
