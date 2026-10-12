@@ -618,12 +618,43 @@ async function main() {
       ? `exam_hot_counts KHÔNG gọi được bằng service_role: ${hcAdmin.error.code ?? ""} ${hcAdmin.error.message} — thiếu \`grant execute ... to service_role\` ở §20c`
       : "exam_hot_counts gọi được bằng service_role"
   );
-  const hcAnon = (await anonClient.rpc("exam_hot_counts", HOT_COUNTS_ARGS)).error?.code ?? null;
+  // §29 (2026-10-12): khách vào /exams nên anon được gọi hàm này — số lượt nộp
+  // theo id đề đã published, không danh tính. Đảo vế probe cũ ("anon 42501").
+  const hcAnon = await anonClient.rpc("exam_hot_counts", HOT_COUNTS_ARGS);
   assert(
-    hcAnon === "42501",
-    hcAnon === "42501"
-      ? "exam_hot_counts: anon bị từ chối (42501) — EXECUTE chỉ authenticated/service_role"
-      : `exam_hot_counts: anon KHÔNG bị từ chối (mã ${describeCode(hcAnon)}) — thiếu \`revoke all on function public.exam_hot_counts(timestamptz, timestamptz, int) from public, anon\` ở §20c`
+    !hcAnon.error && Array.isArray(hcAnon.data),
+    hcAnon.error
+      ? `exam_hot_counts: anon KHÔNG gọi được (${hcAnon.error.code ?? ""} ${hcAnon.error.message}) — thiếu \`grant execute on function public.exam_hot_counts(timestamptz, timestamptz, int) to anon\` ở §29`
+      : "exam_hot_counts: anon gọi được (§29 — khách xem kệ Nổi nhất)"
+  );
+
+  // §29 — khách đọc được đề ĐÃ ĐĂNG qua view độ khó, và KHÔNG đọc được gì khác.
+  // Hai vế: (a) view không 42501 (thiếu GRANT bảng → khách nhận lỗi thay vì
+  // danh sách), (b) bảng `exams` qua anon không bao giờ trả hàng chưa published
+  // (policy anon chỉ có đúng một vị từ).
+  const guestView = await anonClient
+    .from("exams_with_difficulty")
+    .select("id")
+    .eq("status", "published")
+    .limit(1);
+  assert(
+    !guestView.error,
+    guestView.error
+      ? `exams_with_difficulty: anon không đọc được (${guestView.error.code ?? ""} ${guestView.error.message}) — thiếu §29 (grant select + policy exams_select_published_anon)`
+      : "exams_with_difficulty: anon đọc được đề đã published"
+  );
+  const guestNonPublished = await anonClient
+    .from("exams")
+    .select("id")
+    .neq("status", "published")
+    .limit(1);
+  assert(
+    !guestNonPublished.error && (guestNonPublished.data ?? []).length === 0,
+    guestNonPublished.error
+      ? `exams: anon đọc lỗi (${guestNonPublished.error.code ?? ""} ${guestNonPublished.error.message})`
+      : (guestNonPublished.data ?? []).length === 0
+        ? "exams: anon không thấy đề chưa published (RLS)"
+        : "exams: anon THẤY đề chưa published — policy exams_select_published_anon sai vị từ"
   );
   }
 

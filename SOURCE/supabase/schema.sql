@@ -4872,6 +4872,47 @@ revoke all on function public.community_my_solutions() from public, anon;
 grant execute on function public.community_my_solutions() to authenticated;
 
 -- ----------------------------------------------------------------------------
+-- 29. Khách CHƯA đăng nhập đọc được Kho đề (2026-10-12,
+--     docs/plans/20261012-feature-guest-browse-subpages.md T4).
+--
+--     Sản phẩm: khách vào /exams và /exams/{id} xem đề như thường (chỉ xem;
+--     làm bài vẫn cần tài khoản). Trước đây `exams` chỉ có policy
+--     `to authenticated`, nên khách đọc 0 dòng.
+--
+--     Cùng vị từ với `exams_select_visible` (§18b) trừ vế "tác giả xem đề của
+--     mình": khách không có auth.uid(). Published + tác giả không bị ban.
+--
+--     Hai lệnh GRANT cấp quyền BẢNG cho anon. Chúng không mở thêm gì so với
+--     mặc định của Supabase (default privileges đã cấp cho anon), mà chỉ khiến
+--     file này không phụ thuộc vào mặc định đó: view `exams_with_difficulty` là
+--     security_invoker (§12b) nên chạy dưới quyền anon, và thiếu quyền bảng thì
+--     khách nhận 42501 thay vì danh sách rỗng. RLS vẫn là cổng thật: không có
+--     policy nào khác cho anon, nên nháp / đề bị gỡ / đề của tác giả bị ban
+--     vẫn là 0 dòng.
+--
+--     KHÔNG cấp gì cho anon trên `questions` (đã có 9 cột an toàn từ §10c, và
+--     policy `to authenticated` giữ nó 0 dòng), `exam_attempts`, `exam_results`.
+--     Trang chi tiết đề của khách chỉ cần số câu (`question_ids`), không cần nội
+--     dung câu hỏi.
+--
+--     exam_hot_counts (§20c): trước đây bị thu hồi của anon với lý do "/exams
+--     không nằm trong PUBLIC_PATHS". Nay khách vào /exams và kệ "Nổi nhất" cần
+--     nó. Hàm chỉ trả số lượt nộp theo id đề đã published (không danh tính,
+--     không tham số user id) — cùng loại số `exam_rating_aggregate` đã cấp anon.
+--     `search_exams` giữ nguyên thu hồi: ô tìm đề vẫn chỉ cho người đăng nhập.
+-- ----------------------------------------------------------------------------
+grant select on public.exams to anon;
+grant select on public.exams_with_difficulty to anon;
+
+drop policy if exists "exams_select_published_anon" on public.exams;
+create policy "exams_select_published_anon" on public.exams
+  for select to anon using (
+    status = 'published' and not public.is_author_banned(author_id)
+  );
+
+grant execute on function public.exam_hot_counts(timestamptz, timestamptz, int) to anon;
+
+-- ----------------------------------------------------------------------------
 -- 17. Phiên bản schema — DB tự khai nó đang chạy bản nào (2026-08-07).
 --
 --     Vì sao có phần này (TECH-DEBT TD-005): file này được paste TAY vào SQL
@@ -4910,7 +4951,7 @@ revoke all on public.schema_version from anon, authenticated;
 -- nó — xem lib/schema/schemaFingerprint.ts).
 -- @schema-fingerprint-begin
 insert into public.schema_version (id, fingerprint)
-values (1, 'b9f0a4ee8211')
+values (1, 'b7a082a92dac')
 on conflict (id) do update
   set fingerprint = excluded.fingerprint,
       applied_at  = now();

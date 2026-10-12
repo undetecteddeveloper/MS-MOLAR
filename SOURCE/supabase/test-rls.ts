@@ -6306,13 +6306,15 @@ async function main() {
     `HS-d: đề chưa published VẮNG MẶT khỏi exam_hot_counts dù có submitted attempt (nhận: ${hsdRow ? JSON.stringify(hsdRow) : "vắng mặt (đúng)"})`,
   );
 
-  // HS-e. anon nhận 42501; authenticated nhận mảng — đúng khuôn cấp quyền
-  // search_exams mà §20c chép lại (verify-schema.ts có probe song song).
+  // HS-e. authenticated VÀ anon đều nhận mảng. Trước 2026-10-12 anon nhận 42501
+  // (đúng khuôn search_exams); §29 mở EXECUTE cho anon vì khách vào /exams xem
+  // kệ "Nổi nhất" — hàm chỉ trả số lượt nộp theo id đề published, không danh
+  // tính (verify-schema.ts có probe song song).
   const hseAuth = await userB.rpc("exam_hot_counts", HOTCOUNTS_ARGS);
   const hseAnon = await anonClient.rpc("exam_hot_counts", HOTCOUNTS_ARGS);
   assert(
-    !hseAuth.error && Array.isArray(hseAuth.data) && hseAnon.error?.code === "42501",
-    `HS-e: authenticated gọi được exam_hot_counts (mảng); anon bị từ chối 42501 (nhận: authenticated=${hseAuth.error?.code ?? "OK"}, anon=${hseAnon.error?.code ?? "KHÔNG CÓ LỖI"})`,
+    !hseAuth.error && Array.isArray(hseAuth.data) && !hseAnon.error && Array.isArray(hseAnon.data),
+    `HS-e: authenticated và anon đều gọi được exam_hot_counts (mảng) (nhận: authenticated=${hseAuth.error?.code ?? "OK"}, anon=${hseAnon.error?.code ?? "OK"})`,
   );
 
   // HS-f. Đề của tác giả bị ban phải VẮNG MẶT khỏi kết quả trong lúc ban, rồi

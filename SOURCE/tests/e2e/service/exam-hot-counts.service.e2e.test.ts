@@ -137,8 +137,10 @@
 //       constants...so a change on either side turns that case red instead of
 //       drifting");
 //   (f) GRANT BOUNDARY: an anonymous client's call to `exam_hot_counts` resolves
-//       with `error.code === "42501"`; a `service_role` client's call resolves with
-//       an array and no error (mirrors HS-e).
+//       with an array and no error since schema.sql §29 (2026-10-12: guests may
+//       browse /exams; before that it was `error.code === "42501"`); a
+//       `service_role` client's call resolves with an array and no error (mirrors
+//       HS-e).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -320,9 +322,13 @@ describe.skipIf(!HAS_LIVE_DB)(
       30_000
     );
 
-    it("anon gets 42501; service_role gets an array (HS-e, obligation f)", async () => {
+    it("anon and service_role both get an array (HS-e, obligation f; §29 2026-10-12)", async () => {
+      // §29: khách vào /exams và kệ "Nổi nhất" cần hàm này, nên EXECUTE đã mở
+      // cho anon. Hàm chỉ trả số lượt nộp theo id đề published — không danh tính.
+      // (Trước 2026-10-12 vế này khẳng định 42501.)
       const anonResult = await callHotCounts(anonClient());
-      expect(anonResult.error?.code).toBe("42501");
+      expect(anonResult.error).toBeNull();
+      expect(Array.isArray(anonResult.data)).toBe(true);
 
       const serviceResult = await callHotCounts(serviceClient());
       expect(serviceResult.error).toBeNull();
