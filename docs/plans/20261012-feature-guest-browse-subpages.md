@@ -43,4 +43,9 @@ Hôm nay khách bấm Kho đề / Thống kê / Lịch sử / Đăng đề bị 
 6. `LoginRequired` + ba trang T3 + chuỗi.
 7. Luồng `next` (T7) qua form, action, OAuth cookie, callback. Test đơn vị + một lượt Playwright trên dev (email/mật khẩu).
 8. Nav T8. Đo giao diện 3 viewport (360/768/1280): khách ở 4 trang, vùng chạm ≥44px, CLS.
-9. PROD (CHỈ khi người dùng nói có, CLAUDE.md §5): đọc `schema_version` của prod TRƯỚC — các migration §27/§28 chưa có ghi nhận đã áp lên prod, phải áp đúng thứ tự tên file.
+9. PROD (CHỈ khi người dùng nói có, CLAUDE.md §5): đọc `schema_version` của prod TRƯỚC (PROGRESS ghi prod = `b9f0a4ee8211`, tức đã có §27/§28; nếu khác, áp đúng thứ tự tên file). Vân tay đích `b7a082a92dac`.
+
+## Ghi chú thực hiện (2026-10-12)
+- Danh sách trang khách + `safeNextPath` + `authHref` nằm ở `lib/auth/guestPaths.ts` (không phải `nextPath.ts` như dự kiến).
+- Khách bỏ qua `?skill=`: `skill_nodes`/`questions` không đọc được với anon, một URL tự gõ không được thành lỗi 500.
+- Task 3 (áp DEV) và 7–8 phần đo giao diện: CHƯA LÀM — dev Supabase đang tạm dừng.
