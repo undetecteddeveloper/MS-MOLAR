@@ -22,7 +22,7 @@ Hôm nay khách bấm Kho đề / Thống kê / Lịch sử / Đăng đề bị 
 | T6 | Ô tìm đề trên header vẫn chỉ cho người đã đăng nhập. | `search_exams` thu hồi của anon (ADR-0020); mở là mặt tấn công mới, ngoài yêu cầu. Việc tiếp theo nếu cần. |
 | T7 | `next`: một hàm `safeNextPath()` duy nhất, chỉ nhận đúng năm đích của T1 (đường dẫn tương đối, không `//`, `\`, `://`). Đi qua: `?next=` trên `/?auth=signin|signup|verify`, trường ẩn của `signIn` / `signUp` / `verifySignupCode`. OAuth (Google/Facebook): truyền bằng cookie httpOnly sống 10 phút, KHÔNG qua query của `redirectTo`; `/auth/callback` đọc, kiểm lại bằng `safeNextPath`, xoá cookie. | Danh sách redirect cho phép của Supabase không đọc được từ repo; `?next=/exams` hiện chỉ chứng minh đúng một giá trị. Cookie không phụ thuộc vào nó. Open-redirect là rủi ro chính của tính năng này. |
 | T8 | `NavItem.guarded` giữ nghĩa "khách không prefetch" (đích render nặng); sửa chú thích + `items.test.ts` (không còn bằng "không có trong PUBLIC_PATHS"). | Prefetch bốn trang cho mỗi khách mở trang chủ là bốn lượt render + chạm trần anon theo IP (TD-013). |
-| T9 | Logo Google: thêm biểu tượng 192×192 (bội của 48px — điều kiện của Google) và thêm khung 48×48 vào `favicon.ico`. Nguồn duy nhất là `ms-molar-logo.png` 128px, nên phóng nhẹ. | Prod đã phát đúng logo quạ (đo 2026-10-12). `icon.png` 128px và ico 16/32px đều không phải bội của 48. Phần còn lại phụ thuộc Google quét lại — người dùng bấm "Yêu cầu lập chỉ mục" ở Search Console. |
+| T9 | Logo Google: KHÔNG đổi code. | Đo 2026-10-12: prod phát đúng logo quạ (`favicon.ico` 4765 byte khớp repo, đã có khung 16/32/48 nên đủ điều kiện bội-của-48 của Google). Ảnh chụp của người dùng cũng còn tiêu đề "About Us" tiếng Anh trong khi prod đã là "Giới thiệu" — Google chưa quét lại cả trang. Người dùng bấm "Yêu cầu lập chỉ mục" cho trang chủ ở Search Console. |
 
 ## Ngoài phạm vi
 Ô tìm đề cho khách (T6); trang chi tiết cho `/me/exams`, `/profile`; đưa Kho đề lên sitemap (D3); đổi `/about` — Google còn giữ bản tiếng Anh cũ, tự cập nhật khi quét lại.
@@ -33,10 +33,9 @@ Hôm nay khách bấm Kho đề / Thống kê / Lịch sử / Đăng đề bị 
 - `features/exams/queries/{shelves,ranking,catalogue}.ts` (nhánh khách), `app/(exams)/exams/page.tsx`, `app/(exams)/exams/[id]/page.tsx`.
 - `components/shared/LoginRequired.tsx` (mới), `app/(history)/history/page.tsx`, `app/(analytics)/me/dashboard/page.tsx`, `app/(authoring)/upload/page.tsx`, `lib/copy.ts`.
 - `lib/auth/nextPath.ts` (mới), `features/auth/actions.ts`, `app/auth/callback/route.ts`, `features/auth/components/*` (form đọc `next`).
-- `app/icon.png`, `app/favicon.ico`.
 
 ## Task (mỗi task một bước kiểm)
-1. Logo T9. Kiểm: kích thước file, `npx tsc --noEmit`.
+1. Logo T9: không có việc code (đã đo). Việc của người dùng: Search Console → Yêu cầu lập chỉ mục trang chủ.
 2. `safeNextPath` + test (đường tấn công: `//evil`, `/\evil`, `javascript:`, `%2F%2F`, đích ngoài danh sách).
 3. DB T4: schema §29 + vân tay + migration + áp DEV + probe. Kiểm: `npm run verify:schema`, `npm run test:localdb`, đọc `exams` bằng anon trên dev.
 4. Proxy T1 + test (GET qua, POST 307, `/exams/x/attempt/y` 307, `/exams-evil` 307).
