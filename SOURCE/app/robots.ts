@@ -19,6 +19,10 @@ import { SITE_URL } from "@/lib/siteUrl";
 // `/me/dashboard`). Muốn đưa Kho đề lên Google là một quyết định MỚI: gỡ
 // `/exams` khỏi đây và thêm vào sitemap.ts.
 //
+// 2026-10-12: `/maxwell` (trang ẩn, khách có link xem được — guestPaths.ts) CỐ Ý
+// KHÔNG liệt kê ở đây: robots.txt là file công khai, ghi vào là chỉ đường cho
+// người tò mò. Trang tự khai `noindex` trong metadata và không có trong sitemap.
+//
 // Danh sách disallow phải bám theo PUBLIC_PATHS (lib/supabase/middleware.ts):
 // route nào KHÔNG công khai mà thiếu ở đây thì crawler vẫn bò vào rồi ăn
 // redirect `/?auth=signin` — chính lãng phí mà file này sinh ra để chặn.

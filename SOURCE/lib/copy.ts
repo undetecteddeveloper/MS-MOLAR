@@ -1301,6 +1301,17 @@ export const copy = {
   "time.hoursAgo": "{count} giờ trước",
   "time.yesterday": "Hôm qua",
   "time.daysAgo": "{count} ngày trước",
+
+  // --- Trang ẩn Maxwell (2026-10-12) --------------------------------------
+  // Mở từ ô tìm đề bằng từ khoá "maxwell" / "cat" / "mèo". Dòng ghi công là
+  // yêu cầu của giấy phép CC BY 4.0 của mô hình — không bỏ.
+  "maxwell.title": "Chúc mừng bạn đã tìm ra Maxwell!!!",
+  "maxwell.back": "Quay lại trang trước",
+  "maxwell.sceneLabel": "Mô hình 3D chú mèo Maxwell đang xoay và nhấp nhô dưới ánh đèn",
+  "maxwell.loading": "Đang gọi Maxwell…",
+  "maxwell.unsupported": "Thiết bị của bạn chưa hiển thị được mô hình 3D, nhưng Maxwell vẫn ở đây.",
+  "maxwell.creditLead": "Mô hình 3D",
+  "maxwell.creditBy": "của",
 } satisfies Record<string, string>;
 
 export type Dictionary = typeof copy;

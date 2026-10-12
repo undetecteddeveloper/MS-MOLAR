@@ -22,6 +22,9 @@ export const GUEST_READABLE_EXACT_PATHS = [
   "/history",
   "/me/dashboard",
   "/upload",
+  // Trang ẩn Maxwell (2026-10-12): không có dữ liệu, không có Server Action —
+  // khách có đường link thì xem được, giống mọi trang trong danh sách này.
+  "/maxwell",
 ] as const;
 
 /** `/exams/{id}` — đúng MỘT đoạn sau `/exams/`, id đề là `text` (chữ, số, gạch).

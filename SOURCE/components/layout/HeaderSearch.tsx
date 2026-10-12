@@ -14,7 +14,9 @@
 //
 // Gợi ý khi gõ: debounce 250ms, từ 2 ký tự sau chuẩn hoá, gọi
 // `GET /api/exams/search`, tối đa 6 dòng + dòng "Xem tất cả kết quả" dẫn tới
-// Kho đề đã lọc (`/exams?q=`). Enter không chọn dòng nào → cũng tới Kho đề.
+// Kho đề đã lọc (`/exams?q=`). Enter không chọn dòng nào → cũng tới Kho đề —
+// trừ khi từ khoá là đúng một từ của trang ẩn (lib/search/easterEgg.ts): khi
+// đó cả Enter lẫn dòng "Xem tất cả" mở `/maxwell`.
 // Mọi lượt fetch cũ bị huỷ (AbortController) khi từ khoá đổi, và kết quả chỉ
 // được hiện khi nó thuộc ĐÚNG từ khoá đang gõ (`result.term === term`) —
 // không có chuyện gõ nhanh mà danh sách của từ khoá trước nhảy lên sau.
@@ -36,6 +38,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { t } from "@/lib/copy";
+import { isMaxwellQuery, MAXWELL_PATH } from "@/lib/search/easterEgg";
 import { SEARCH_MAX_LENGTH, toSearchTerm } from "@/lib/search/normalize";
 import { subjectLabel } from "@/lib/ugc/subjects";
 import { cn } from "@/lib/utils";
@@ -150,6 +153,12 @@ function HeaderSearchInner() {
   function choose(index: number) {
     if (term === null) return;
     const hit = hits[index];
+    // Dòng "Xem tất cả kết quả" (không phải một đề cụ thể) với từ khoá của trang
+    // ẩn → trang ẩn. Một đề người dùng CHỦ ĐỘNG chọn thì luôn mở đúng đề đó.
+    if (!hit && isMaxwellQuery(value)) {
+      go(MAXWELL_PATH);
+      return;
+    }
     go(hit ? `/exams/${hit.id}` : examsHref(value));
   }
 
@@ -158,7 +167,8 @@ function HeaderSearchInner() {
       choose(activeIndex);
       return;
     }
-    if (term !== null) go(examsHref(value));
+    if (term === null) return;
+    go(isMaxwellQuery(value) ? MAXWELL_PATH : examsHref(value));
   }
 
   function onKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {

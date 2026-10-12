@@ -13,9 +13,22 @@ import {
 } from "../guestPaths";
 
 describe("isGuestReadablePath", () => {
-  it("nhận đúng năm đích của khách", () => {
-    expect(GUEST_READABLE_EXACT_PATHS).toEqual(["/exams", "/history", "/me/dashboard", "/upload"]);
-    for (const p of ["/exams", "/history", "/me/dashboard", "/upload", "/exams/exam-toan-10"]) {
+  it("nhận đúng các đích của khách (bốn trang con + trang ẩn Maxwell + chi tiết đề)", () => {
+    expect(GUEST_READABLE_EXACT_PATHS).toEqual([
+      "/exams",
+      "/history",
+      "/me/dashboard",
+      "/upload",
+      "/maxwell",
+    ]);
+    for (const p of [
+      "/exams",
+      "/history",
+      "/me/dashboard",
+      "/upload",
+      "/maxwell",
+      "/exams/exam-toan-10",
+    ]) {
       expect(isGuestReadablePath(p), p).toBe(true);
     }
   });
@@ -35,6 +48,9 @@ describe("isGuestReadablePath", () => {
     "/admin",
     "/upload/extra",
     "/history/extra",
+    "/maxwell/",
+    "/maxwell/extra",
+    "/maxwell-evil",
     "/exams/../admin",
     "/exams/%2e%2e",
     "/api/payments/payos/webhook",

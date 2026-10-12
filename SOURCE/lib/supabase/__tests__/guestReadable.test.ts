@@ -32,7 +32,7 @@ beforeEach(() => {
 });
 
 describe("khách chưa đăng nhập — GET các trang được xem", () => {
-  it.each(["/exams", "/exams/exam-toan-10", "/history", "/me/dashboard", "/upload"])(
+  it.each(["/exams", "/exams/exam-toan-10", "/history", "/me/dashboard", "/upload", "/maxwell"])(
     "%s đi qua, không bị đá",
     async (path) => {
       expect(await redirectTarget(path)).toBeNull();
@@ -57,6 +57,10 @@ describe("khách chưa đăng nhập — vẫn bị đá về form đăng nhập
     expect(await redirectTarget("/exams/exam-toan-10", "POST")).toBe("/?auth=signin");
   });
 
+  it("POST tới /maxwell (trang ẩn chỉ đọc, không có đường ghi)", async () => {
+    expect(await redirectTarget("/maxwell", "POST")).toBe("/?auth=signin");
+  });
+
   it.each([
     "/exams/exam-toan-10/attempt/abc",
     "/exams/exam-toan-10/rate",
@@ -67,6 +71,8 @@ describe("khách chưa đăng nhập — vẫn bị đá về form đăng nhập
     "/profile",
     "/admin",
     "/exams-evil",
+    "/maxwell/extra",
+    "/maxwell-evil",
   ])("GET %s", async (path) => {
     expect(await redirectTarget(path)).toBe("/?auth=signin");
   });

@@ -207,3 +207,58 @@ describe("HeaderSearch", () => {
     expect(screen.getAllByRole("combobox")).toHaveLength(1);
   });
 });
+
+// Trang ẩn Maxwell (brief 20261012-feature-maxwell-easter-egg D1/D2).
+describe("HeaderSearch — từ khoá trang ẩn", () => {
+  it.each(["maxwell", "Maxwell", "cat", "mèo", "cát"])(
+    "Enter với %j (chưa chọn dòng nào) → /maxwell, không phải Kho đề",
+    async (word) => {
+      mockFetch();
+      render(<HeaderSearch />);
+      const input = desktopInput();
+      fireEvent.change(input, { target: { value: word } });
+      await screen.findByRole("listbox");
+
+      fireEvent.submit(input.closest("form") as HTMLFormElement);
+      expect(push).toHaveBeenCalledTimes(1);
+      expect(push).toHaveBeenCalledWith("/maxwell");
+    }
+  );
+
+  it("bấm dòng cuối \"Xem tất cả kết quả\" với từ khoá trang ẩn → /maxwell", async () => {
+    mockFetch([]);
+    render(<HeaderSearch />);
+    fireEvent.change(desktopInput(), { target: { value: "maxwell" } });
+    const listbox = await listboxWithOptions(1);
+
+    fireEvent.click(within(listbox).getAllByRole("option")[0]);
+    expect(push).toHaveBeenCalledWith("/maxwell");
+  });
+
+  it("từ khoá trang ẩn nhưng người dùng chọn một đề cụ thể → mở đề đó", async () => {
+    // Đề có chữ "cat" trong tên: chọn chủ động thì không bị bắt đi chỗ khác.
+    mockFetch([{ id: "exam-cat-1", title: "Đề Cat 1", subject: "English", grade: 10 }]);
+    render(<HeaderSearch />);
+    const input = desktopInput();
+    fireEvent.change(input, { target: { value: "cat" } });
+    await listboxWithOptions(2);
+
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    fireEvent.submit(input.closest("form") as HTMLFormElement);
+    expect(push).toHaveBeenCalledWith("/exams/exam-cat-1");
+  });
+
+  it.each(["category", "education", "maxwell the cat"])(
+    "%j vẫn là tìm đề bình thường → Kho đề lọc theo từ khoá",
+    async (word) => {
+      mockFetch();
+      render(<HeaderSearch />);
+      const input = desktopInput();
+      fireEvent.change(input, { target: { value: word } });
+      await screen.findByRole("listbox");
+
+      fireEvent.submit(input.closest("form") as HTMLFormElement);
+      expect(push).toHaveBeenCalledWith(`/exams?q=${encodeURIComponent(word)}`);
+    }
+  );
+});
