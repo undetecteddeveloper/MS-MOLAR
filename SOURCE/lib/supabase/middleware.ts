@@ -6,6 +6,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE_OPTIONS } from "./cookieOptions";
 import { RECOVERY_COOKIE, RECOVERY_PATH, isRecoveryAllowedPath } from "@/lib/auth/recovery";
+import { isGuestReadablePath } from "@/lib/auth/guestPaths";
 
 /** Các path không yêu cầu đăng nhập. `/auth/callback` (S#23): điểm về của
  * OAuth + email link — request tới đây CHƯA có cookie session, không whitelist
@@ -159,6 +160,14 @@ export async function updateSession(request: NextRequest, cspContext?: CspContex
   const isPublic = PUBLIC_PATHS.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`),
   );
+  // Trang khách được VÀO để xem (Kho đề, Thống kê, Lịch sử, Đăng đề, chi tiết
+  // đề — lib/auth/guestPaths.ts). Chỉ GET/HEAD: Server Action là POST tới chính
+  // URL trang, nên mọi lượt GHI của khách vẫn bị đá về form đăng nhập như cũ —
+  // đó là lý do danh sách này KHÔNG nằm trong PUBLIC_PATHS (bất biến "đúng một
+  // đường ghi chưa-đăng-nhập", ADR-0017). Phần nội dung cần tài khoản do chính
+  // từng trang dựng (thẻ "cần đăng nhập"), không phải proxy.
+  const isGuestReadable =
+    (request.method === "GET" || request.method === "HEAD") && isGuestReadablePath(pathname);
   const recoveryPending = request.cookies.has(RECOVERY_COOKIE);
 
   // PHIÊN ĐANG KHÔI PHỤC MẬT KHẨU (lib/auth/recovery.ts, 2026-09-13): có cờ +
@@ -175,7 +184,7 @@ export async function updateSession(request: NextRequest, cspContext?: CspContex
 
   // Chưa đăng nhập + route cần bảo vệ → về homepage với form auth mở
   // (auth nằm trong content area của `/` từ S#17, không còn page /login riêng).
-  if (!user && !isPublic) {
+  if (!user && !isPublic && !isGuestReadable) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     url.search = "?auth=signin";
