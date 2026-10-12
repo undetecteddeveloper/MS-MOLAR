@@ -7,12 +7,13 @@
 // `poseAt(0)` khi `matchMedia("(prefers-reduced-motion: reduce)")` khớp, ở
 // createMaxwellScene.ts.
 
-/** Một vòng ≈ 9 giây: đủ chậm để nhìn rõ từng mặt, đủ nhanh để thấy đang xoay. */
-export const SPIN_RAD_PER_SEC = 0.7;
+/** Một vòng ≈ 6,9 giây. Nhanh hơn 30% so với bản đầu (0,7 rad/s, ≈ 9 giây/vòng)
+ *  theo yêu cầu người dùng 2026-10-12. */
+export const SPIN_RAD_PER_SEC = 0.91;
 /** Biên độ nhấp nhô, tính theo đơn vị cảnh (mô hình cao ≈ 1,6). */
 export const BOB_AMPLITUDE = 0.08;
-/** Chu kỳ nhấp nhô ≈ 3 giây. */
-export const BOB_RAD_PER_SEC = 2.1;
+/** Chu kỳ nhấp nhô ≈ 2,3 giây. Nhanh hơn 30% so với bản đầu (2,1 rad/s, ≈ 3 giây). */
+export const BOB_RAD_PER_SEC = 2.73;
 
 const TWO_PI = Math.PI * 2;
 
