@@ -8,6 +8,12 @@ import { t } from "@/lib/copy";
 // docs/plans/20261012-feature-maxwell-easter-egg.md). Nằm NGOÀI mọi route group
 // nên không có SiteHeader / BottomNav: nền đen, một nút mũi tên, mô hình, tiêu đề.
 //
+// Bố cục (2026-10-17): canvas phủ CẢ trang, sàn dưới bục kéo tới mép dưới và tiêu
+// đề đè lên sàn — trước đó canvas và chữ là hai vùng ngăn bởi một đường cắt ngang
+// trông không ổn. Tên + tác giả mô hình nay in trên mặt cong của bục (trong cảnh
+// 3D, features/maxwell/scene); ở đây chỉ còn dòng link nguồn + giấy phép vì CC BY
+// 4.0 bắt buộc có link, mà chữ in trong canvas thì không bấm được.
+//
 // Không vào robots.txt (file đó công khai — liệt kê ở đó là chỉ đường cho người
 // tò mò) và không vào sitemap; `noindex` ở đây là cách duy nhất báo crawler.
 export const metadata: Metadata = {
@@ -23,50 +29,42 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
+// `pointer-events-auto`: lớp chữ của MaxwellStage để cú nhấn xuyên xuống nút đá,
+// link phải tự bật lại để bấm được.
 const CREDIT_LINK =
-  "inline-flex min-h-11 items-center rounded-md px-1.5 underline underline-offset-4 hover:text-white focus-visible:ring-3 focus-visible:ring-white/50 focus-visible:outline-none";
+  "pointer-events-auto inline-flex min-h-11 items-center rounded-md px-1.5 underline underline-offset-4 hover:text-white focus-visible:ring-3 focus-visible:ring-white/50 focus-visible:outline-none";
 
 export default function MaxwellPage() {
   return (
-    <main className="relative flex min-h-dvh flex-col bg-black text-white">
+    <main className="relative min-h-dvh bg-black text-white">
       {/* Tránh tai thỏ / viền cong; luôn cách mép ít nhất 12px. */}
-      <div className="absolute top-[max(0.75rem,env(safe-area-inset-top))] left-[max(0.75rem,env(safe-area-inset-left))] z-10">
+      <div className="absolute top-[max(0.75rem,env(safe-area-inset-top))] left-[max(0.75rem,env(safe-area-inset-left))] z-20">
         <MaxwellBackButton />
       </div>
 
-      <MaxwellStage className="min-h-[44dvh] flex-1" />
+      <MaxwellStage className="min-h-dvh">
+        <div className="px-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-center">
+          <h1 className="motion-rainbow-text mx-auto max-w-[22ch] text-3xl leading-tight font-bold text-balance sm:max-w-none sm:text-4xl lg:text-5xl">
+            {t("maxwell.title")}
+          </h1>
 
-      <div className="px-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-center">
-        <h1 className="motion-rainbow-text mx-auto max-w-[22ch] text-3xl leading-tight font-bold text-balance sm:max-w-none sm:text-4xl lg:text-5xl">
-          {t("maxwell.title")}
-        </h1>
+          {/* Tên + tác giả đã ở trên bục; bản chữ cho trình đọc màn hình (canvas không đọc được). */}
+          <p className="sr-only">
+            {t("maxwell.creditLead")} {MAXWELL_CREDIT.title} {t("maxwell.creditBy")}{" "}
+            {MAXWELL_CREDIT.author}
+          </p>
 
-        {/* Hai nhóm chữ: hẹp thì xếp hai dòng "Mô hình 3D … / của … · CC BY 4.0",
-            không bao giờ đứt giữa một nhóm (chữ "của" mồ côi cuối dòng). */}
-        <p
-          data-testid="maxwell-credit"
-          className="mt-2 flex flex-wrap items-center justify-center gap-x-3 text-xs text-white/70 sm:text-sm"
-        >
-          <span className="inline-flex flex-wrap items-center justify-center gap-x-1">
-            <span>{t("maxwell.creditLead")}</span>
+          <p
+            data-testid="maxwell-credit"
+            className="mt-1 flex flex-wrap items-center justify-center gap-x-1 text-xs text-white/70 sm:text-sm"
+          >
             <a
               href={MAXWELL_CREDIT.sourceUrl}
               target="_blank"
               rel="noopener noreferrer"
               className={CREDIT_LINK}
             >
-              {MAXWELL_CREDIT.title}
-            </a>
-          </span>
-          <span className="inline-flex flex-wrap items-center justify-center gap-x-1">
-            <span>{t("maxwell.creditBy")}</span>
-            <a
-              href={MAXWELL_CREDIT.authorUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={CREDIT_LINK}
-            >
-              {MAXWELL_CREDIT.author}
+              {t("maxwell.creditSource")}
             </a>
             <span aria-hidden>·</span>
             <a
@@ -77,9 +75,9 @@ export default function MaxwellPage() {
             >
               {MAXWELL_CREDIT.licenseName}
             </a>
-          </span>
-        </p>
-      </div>
+          </p>
+        </div>
+      </MaxwellStage>
     </main>
   );
 }

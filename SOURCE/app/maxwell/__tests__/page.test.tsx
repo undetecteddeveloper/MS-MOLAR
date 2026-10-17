@@ -10,8 +10,10 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), back: vi.fn() }),
 }));
 vi.mock("@/features/maxwell/components/MaxwellStage", () => ({
-  MaxwellStage: ({ className }: { className?: string }) => (
-    <div data-testid="stage-mock" className={className} />
+  MaxwellStage: ({ className, children }: { className?: string; children?: React.ReactNode }) => (
+    <div data-testid="stage-mock" className={className}>
+      {children}
+    </div>
   ),
 }));
 
@@ -37,34 +39,38 @@ describe("MaxwellPage", () => {
     expect(buttons[0].getAttribute("aria-label")).toBe("Quay lại trang trước");
   });
 
-  it("nền đen và có khung cảnh 3D chiếm phần giữa", async () => {
+  it("nền đen; khung cảnh 3D phủ cả trang và CHỨA tiêu đề (sàn chạy xuống dưới chữ, không chia vùng)", async () => {
     const { container } = await renderServerTree(<MaxwellPage />);
 
     expect(container.querySelector("main")?.className).toContain("bg-black");
     const stage = container.querySelector("[data-testid='stage-mock']");
     expect(stage).not.toBeNull();
-    expect(stage?.className).toContain("flex-1");
+    expect(stage?.className).toContain("min-h-dvh");
+    expect(stage?.querySelector("h1")).not.toBeNull();
   });
 
-  it("ghi công CC BY 4.0: tên mô hình, tác giả, giấy phép, đều là link mở tab mới an toàn", async () => {
+  it("ghi công CC BY 4.0: tên + tác giả cho trình đọc màn hình (đã in trên bục), link nguồn và giấy phép mở tab mới an toàn", async () => {
     const { container } = await renderServerTree(<MaxwellPage />);
 
+    // Tên + tác giả in trên bục trong canvas; DOM giữ bản chữ ẩn thị giác cho trình đọc màn hình.
+    const spoken = container.querySelector("p.sr-only");
+    expect(spoken?.textContent).toBe("Mô hình 3D Maxwell the cat (Dingus) của bean (alwayshasbean)");
+
     const credit = container.querySelector("[data-testid='maxwell-credit']");
-    expect(credit?.textContent).toContain("Maxwell the cat (Dingus)");
-    expect(credit?.textContent).toContain("bean (alwayshasbean)");
-    expect(credit?.textContent).toContain("CC BY 4.0");
+    expect(credit?.textContent).toBe("Nguồn mô hình·CC BY 4.0");
+    expect(credit?.textContent).not.toContain("bean");
 
     const links = [...(credit?.querySelectorAll("a") ?? [])];
     expect(links.map((a) => a.getAttribute("href"))).toEqual([
       "https://sketchfab.com/3d-models/maxwell-the-cat-dingus-2ca7f3c1957847d6a145fc35de9046b0",
-      "https://sketchfab.com/alwayshasbean",
       "https://creativecommons.org/licenses/by/4.0/",
     ]);
     for (const a of links) {
       expect(a.getAttribute("target")).toBe("_blank");
       expect(a.getAttribute("rel")).toBe("noopener noreferrer");
-      // Vùng chạm ≥ 44px (min-h-11) kể cả cho dòng chữ nhỏ.
+      // Vùng chạm ≥ 44px (min-h-11); lớp chữ của khung cảnh cho cú nhấn xuyên qua nên link tự bật lại.
       expect(a.className).toContain("min-h-11");
+      expect(a.className).toContain("pointer-events-auto");
     }
   });
 

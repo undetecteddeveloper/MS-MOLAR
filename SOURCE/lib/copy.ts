@@ -1312,6 +1312,8 @@ export const copy = {
   "maxwell.unsupported": "Thiết bị của bạn chưa hiển thị được mô hình 3D, nhưng Maxwell vẫn ở đây.",
   "maxwell.creditLead": "Mô hình 3D",
   "maxwell.creditBy": "của",
+  // Dòng link dưới cùng (tên + tác giả đã in trên bục): "Nguồn mô hình · CC BY 4.0".
+  "maxwell.creditSource": "Nguồn mô hình",
   // Cú đá (2026-10-17): nhấn vào mô hình một lần là Maxwell bị hất văng khỏi bục.
   // Nút chỉ để bàn phím / trình đọc màn hình đá được; người nhấn chuột không thấy nó.
   "maxwell.kick": "Đá Maxwell một cú",

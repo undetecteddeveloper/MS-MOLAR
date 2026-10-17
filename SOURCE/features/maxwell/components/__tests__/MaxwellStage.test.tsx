@@ -19,6 +19,7 @@ const dispose = vi.fn();
 const kickAt = vi.fn<(x: number, y: number) => boolean>();
 const kick = vi.fn<() => boolean>();
 const isOverModel = vi.fn<(x: number, y: number) => boolean>();
+const setBottomInset = vi.fn<(pixels: number) => void>();
 let readyPromise: Promise<void>;
 let capturedOptions: Options | undefined;
 let createImpl: (host: HTMLElement, options?: Options) => FakeScene;
@@ -41,9 +42,17 @@ beforeEach(() => {
   kickAt.mockReset().mockReturnValue(true);
   kick.mockReset().mockReturnValue(true);
   isOverModel.mockReset().mockReturnValue(false);
+  setBottomInset.mockReset();
   capturedOptions = undefined;
   readyPromise = Promise.resolve();
-  createImpl = () => ({ ready: readyPromise, dispose, kickAt, kick, isOverModel });
+  createImpl = () => ({
+    ready: readyPromise,
+    dispose,
+    kickAt,
+    kick,
+    isOverModel,
+    setBottomInset,
+  });
 });
 
 afterEach(() => {
@@ -188,5 +197,60 @@ describe("MaxwellStage — cú đá", () => {
 
     fireEvent.pointerMove(button, { clientX: 1, clientY: 1 });
     expect(button.style.cursor).toBe("default");
+  });
+});
+
+describe("MaxwellStage — lớp chữ đè lên sàn", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("children nằm trong lớp chữ cho cú nhấn xuyên qua (pointer-events-none), đáy khung", () => {
+    render(
+      <MaxwellStage>
+        <h1>Tiêu đề</h1>
+      </MaxwellStage>
+    );
+
+    const overlay = screen.getByRole("heading", { name: "Tiêu đề" }).parentElement;
+    expect(overlay?.className).toContain("pointer-events-none");
+    expect(overlay?.className).toContain("mt-auto");
+  });
+
+  it("không có children thì không dựng lớp chữ", () => {
+    const { container } = render(<MaxwellStage />);
+
+    expect(container.querySelector(".pointer-events-none")).toBeNull();
+  });
+
+  it("đo chiều cao lớp chữ và báo cho cảnh để chừa chỗ ở đáy", async () => {
+    let notify: () => void = () => {};
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(callback: () => void) {
+          notify = callback;
+        }
+        observe() {}
+        disconnect() {}
+      }
+    );
+    let height = 140;
+    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(() => height);
+
+    render(
+      <MaxwellStage>
+        <h1>Tiêu đề</h1>
+      </MaxwellStage>
+    );
+    await waitFor(() => expect(sceneStatus()).toBe("ready"));
+    // Cảnh vừa tạo đã nhận chiều cao đo được từ trước.
+    expect(setBottomInset).toHaveBeenCalledWith(140);
+
+    // Chữ đổi cỡ (xoay màn hình, tiêu đề xuống dòng) → báo lại.
+    height = 96;
+    act(() => notify());
+    expect(setBottomInset).toHaveBeenLastCalledWith(96);
   });
 });

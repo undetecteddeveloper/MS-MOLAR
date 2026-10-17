@@ -19,6 +19,7 @@
 | T4 | Bục thành cột cao 0,6 trên sàn; sàn là đĩa bán kính 9 mờ dần ra mép (alphaMap), thêm vệt sáng rộng trên sàn, bóng mềm dưới chân Maxwell, và đèn phụ sáng dần trong 0,5 s SAU cú đá (cường độ 0 cho tới lúc đó). | Chỗ hạ cánh nằm ngoài chùm đèn rọi; thiếu sáng + bóng thì Maxwell chìm vào nền đen hoặc trông như lơ lửng. Đèn phụ tắt từ đầu để Maxwell trên bục trông y như bản đã duyệt. |
 | T5 | Bắt nhấn bằng một `<button>` trong suốt phủ canvas (`MaxwellStage`), không lắng nghe sự kiện trên canvas. `event.detail === 0` (Enter/Space) → `scene.kick()`; chuột/chạm → `scene.kickAt(x, y)` (raycast, trúng mô hình mới tính). Đá xong nút biến mất; nhãn khung đổi + một dòng đọc cho trình đọc màn hình. | Bàn phím và trình đọc màn hình cũng đá được (WCAG 2.1.1); nhấn trượt thì không có gì xảy ra; `touch-action: pan-y` giữ nguyên cuộn dọc trên điện thoại. |
 | T6 | Rê chuột trên mô hình đổi con trỏ thành bàn tay (raycast mỗi lần `pointermove`). | Gợi ý nhẹ cho người dùng máy tính; điện thoại không có hover. |
+| T7 | (2026-10-17, người dùng yêu cầu thêm) Canvas phủ cả trang, tiêu đề đè lên sàn; tên + tác giả in trên mặt cong của bục; dòng dưới cùng chỉ còn link nguồn + giấy phép. | Đường cắt ngang giữa canvas và chữ trông không ổn; CC BY 4.0 vẫn cần link bấm được. |
 
 ## File
 - `features/maxwell/scene/kickPhysics.ts` (+ `__tests__/kickPhysics.test.ts`) — `KickBody`, `kickLaunch`, `kickPush`.

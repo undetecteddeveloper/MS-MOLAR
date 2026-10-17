@@ -19,16 +19,24 @@
 // dấu hiệu click do bàn phím sinh ra (không có toạ độ con trỏ). Nhấn trượt mô hình
 // thì không có gì xảy ra. Đá xong là hết: nút biến mất, tải lại trang thì Maxwell về.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { t } from "@/lib/copy";
 import { cn } from "@/lib/utils";
 import type { MaxwellScene } from "../scene/createMaxwellScene";
 
 type Status = "loading" | "ready" | "unsupported";
 
-export function MaxwellStage({ className }: { className?: string }) {
+// Canvas phủ KHUNG CẢ TRANG (2026-10-17): sàn dưới bục kéo xuống tận mép dưới và
+// `children` (tiêu đề…) là lớp chữ đè lên sàn, thay vì canvas và chữ chia hai vùng
+// với một đường cắt ngang. Chữ đo chiều cao của chính nó rồi báo cho cảnh
+// (`setBottomInset`) để bục + mô hình dàn trong phần phía trên, không chui xuống
+// dưới chữ. Lớp chữ `pointer-events-none`: cú nhấn xuyên qua tới nút đá; link bên
+// trong tự bật lại `pointer-events-auto`.
+export function MaxwellStage({ className, children }: { className?: string; children?: ReactNode }) {
   const hostRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<MaxwellScene | null>(null);
+  const insetRef = useRef(0);
   const [status, setStatus] = useState<Status>("loading");
   const [kicked, setKicked] = useState(false);
 
@@ -47,6 +55,7 @@ export function MaxwellStage({ className }: { className?: string }) {
           },
         });
         sceneRef.current = scene;
+        scene.setBottomInset(insetRef.current);
         return scene.ready.then(() => {
           if (!cancelled) setStatus("ready");
         });
@@ -62,8 +71,22 @@ export function MaxwellStage({ className }: { className?: string }) {
     };
   }, []);
 
+  // Đo lớp chữ; cảnh có thể chưa tạo xong — giá trị nằm trong `insetRef` chờ sẵn.
+  useEffect(() => {
+    const overlay = overlayRef.current;
+    if (!overlay || typeof ResizeObserver === "undefined") return;
+    const apply = () => {
+      insetRef.current = overlay.offsetHeight;
+      sceneRef.current?.setBottomInset(insetRef.current);
+    };
+    apply();
+    const observer = new ResizeObserver(apply);
+    observer.observe(overlay);
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <div className={cn("relative", className)}>
+    <div className={cn("relative flex flex-col", className)}>
       <div
         ref={hostRef}
         role="img"
@@ -106,6 +129,11 @@ export function MaxwellStage({ className }: { className?: string }) {
       <p aria-live="polite" className="sr-only">
         {kicked ? t("maxwell.sceneLabelKicked") : ""}
       </p>
+      {children && (
+        <div ref={overlayRef} className="pointer-events-none relative z-10 mt-auto">
+          {children}
+        </div>
+      )}
     </div>
   );
 }

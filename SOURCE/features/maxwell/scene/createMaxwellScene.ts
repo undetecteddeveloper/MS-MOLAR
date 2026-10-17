@@ -51,6 +51,7 @@ import {
 } from "three";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { MAXWELL_CREDIT } from "../credit";
 import { fitDistance } from "./framing";
 import { KickBody, kickLaunch, kickPush, type KickWorld } from "./kickPhysics";
 import { poseAt } from "./motion";
@@ -72,6 +73,17 @@ const FLOOR_Y = -PEDESTAL_HEIGHT;
 const FLOOR_RADIUS = 9;
 const KICK_WORLD: KickWorld = { floorY: FLOOR_Y, pedestalRadius: PEDESTAL_RADIUS };
 const Y_AXIS = new Vector3(0, 1, 0);
+/**
+ * Dải ghi công trên mặt cong của bục, quay về phía camera (+z): cung rộng CREDIT_ARC
+ * rad, cao CREDIT_BAND_HEIGHT, giữa chiều cao thân. Bán kính xấp xỉ thân ở giữa dải
+ * (bục hơi loe xuống chân) — dải được dựng theo đúng độ loe nên áp sát thân.
+ */
+const CREDIT_ARC = 1.8;
+const CREDIT_BAND_HEIGHT = 0.38;
+const CREDIT_BAND_TOP = 0.08;
+const CREDIT_RADIUS = PEDESTAL_RADIUS * 1.02;
+/** Bục loe từ bán kính R ở mặt trên tới R × này ở chân. */
+const PEDESTAL_FLARE = 1.05;
 /** Đèn phụ sáng dần tới cường độ này trong chừng ấy giây sau cú đá (đơn vị candela). */
 const FILL_INTENSITY = 100;
 const FILL_RAMP_SECONDS = 0.5;
@@ -103,6 +115,11 @@ export type MaxwellScene = {
   kick: () => boolean;
   /** Toạ độ màn hình có đang nằm trên mô hình chưa bị đá không (để đổi con trỏ). */
   isOverModel: (clientX: number, clientY: number) => boolean;
+  /**
+   * Chừa `pixels` ở đáy canvas cho chữ đè lên sàn: bục + mô hình dàn trong phần còn
+   * lại phía trên, sàn vẫn kéo xuống sát mép dưới. Gọi lại mỗi khi chiều cao chữ đổi.
+   */
+  setBottomInset: (pixels: number) => void;
   dispose: () => void;
 };
 
@@ -161,6 +178,38 @@ function blobShadowTexture(): CanvasTexture | null {
     g.addColorStop(1, "rgba(0, 0, 0, 0)");
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, 64, 64);
+  });
+}
+
+/**
+ * Chữ ghi công trên mặt cong của bục: tên mô hình (đậm) + tác giả, nền trong suốt.
+ * Tỉ lệ canvas = tỉ lệ cung bục (CREDIT_ARC × bán kính) : CREDIT_BAND_HEIGHT nên chữ
+ * không bị kéo méo khi uốn quanh thân trụ. Dòng dài hơn bề ngang thì co cỡ chữ lại.
+ */
+function creditTexture(): CanvasTexture | null {
+  const width = 1024;
+  const height = Math.round((width * CREDIT_BAND_HEIGHT) / (CREDIT_ARC * CREDIT_RADIUS));
+  return gradientTexture(width, height, (ctx) => {
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const lines = [
+      { text: MAXWELL_CREDIT.title, weight: 700, size: 58, color: "rgba(240, 251, 243, 0.95)" },
+      { text: MAXWELL_CREDIT.author, weight: 500, size: 44, color: "rgba(166, 194, 176, 0.9)" },
+    ];
+    const font = (weight: number, size: number) =>
+      `${weight} ${size}px system-ui, "Segoe UI", Roboto, sans-serif`;
+    lines.forEach((line, index) => {
+      let size = line.size;
+      ctx.font = font(line.weight, size);
+      const widest = width * 0.9;
+      const measured = ctx.measureText(line.text).width;
+      if (measured > widest) {
+        size = Math.floor((size * widest) / measured);
+        ctx.font = font(line.weight, size);
+      }
+      ctx.fillStyle = line.color;
+      ctx.fillText(line.text, width / 2, height * (index === 0 ? 0.36 : 0.68));
+    });
   });
 }
 
@@ -243,12 +292,39 @@ function buildScene(
 
   // Bệ trưng bày: cột tròn, mặt trên ở y = 0, chân đứng trên sàn.
   const pedestal = new Mesh(
-    new CylinderGeometry(PEDESTAL_RADIUS, PEDESTAL_RADIUS * 1.05, PEDESTAL_HEIGHT, 72),
+    new CylinderGeometry(PEDESTAL_RADIUS, PEDESTAL_RADIUS * PEDESTAL_FLARE, PEDESTAL_HEIGHT, 72),
     new MeshStandardMaterial({ color: 0x17191c, roughness: 0.35, metalness: 0.55 })
   );
   pedestal.position.y = -PEDESTAL_HEIGHT / 2;
   pedestal.receiveShadow = true;
   scene.add(pedestal);
+
+  // Ghi công (tên mô hình + tác giả) in lên MẶT CONG của bục, phía đối diện người
+  // xem: một mảnh trụ hở hai đầu, cung cân hai bên trục +z (thetaStart âm), bán
+  // kính theo đúng độ loe của thân + 4 phần nghìn để không z-fight. Cái cần ghi
+  // đủ (nguồn, giấy phép) vẫn nằm ở dòng link nhỏ dưới cùng của trang.
+  const radiusAt = (depth: number) =>
+    PEDESTAL_RADIUS * (1 + ((PEDESTAL_FLARE - 1) * depth) / PEDESTAL_HEIGHT) + 0.004;
+  const creditBand = new Mesh(
+    new CylinderGeometry(
+      radiusAt(CREDIT_BAND_TOP),
+      radiusAt(CREDIT_BAND_TOP + CREDIT_BAND_HEIGHT),
+      CREDIT_BAND_HEIGHT,
+      48,
+      1,
+      true,
+      -CREDIT_ARC / 2,
+      CREDIT_ARC
+    ),
+    new MeshBasicMaterial({
+      map: creditTexture(),
+      transparent: true,
+      depthWrite: false,
+      toneMapped: false,
+    })
+  );
+  creditBand.position.y = -(CREDIT_BAND_TOP + CREDIT_BAND_HEIGHT / 2);
+  scene.add(creditBand);
 
   // Sàn dưới bục (người dùng chốt 2026-10-17): chỗ Maxwell rơi xuống sau cú đá.
   const floor = new Mesh(
@@ -354,11 +430,21 @@ function buildScene(
   pivot.position.y = HOVER;
   scene.add(pivot);
 
+  // Canvas phủ CẢ trang (sàn kéo dài xuống dưới tiêu đề); mô hình + bục chỉ được
+  // dàn trong phần phía trên, chừa `bottomInset` px cho chữ đè lên sàn. Khung nhìn
+  // ảo cao (height − bottomInset) có tỉ lệ đúng để `fitDistance` tính, rồi
+  // `setViewOffset` mở rộng cửa sổ hiển thị xuống dưới khung đó.
+  let bottomInset = 0;
+
   function resize() {
     const width = Math.max(container.clientWidth, 1);
     const height = Math.max(container.clientHeight, 1);
+    // Chữ che quá nửa khung thì bỏ qua phần thừa: mô hình vẫn phải thấy được.
+    const content = Math.max(height - Math.max(bottomInset, 0), height * 0.5);
     renderer.setSize(width, height, false);
-    camera.aspect = width / height;
+    camera.aspect = width / content;
+    if (content < height) camera.setViewOffset(width, content, 0, 0, width, height);
+    else camera.clearViewOffset();
     const distance = fitDistance({
       radius: FRAME_RADIUS,
       fovDeg: CAMERA_FOV,
@@ -529,6 +615,12 @@ function buildScene(
     },
     kick: () => startKick(0),
     isOverModel: (clientX, clientY) => pick(clientX, clientY) !== null,
+    setBottomInset(pixels) {
+      const next = Number.isFinite(pixels) ? Math.max(0, pixels) : 0;
+      if (next === bottomInset) return;
+      bottomInset = next;
+      resize();
+    },
     dispose,
   };
 }
