@@ -3,15 +3,25 @@
 // MaxwellStage — ba trạng thái (đang tải / sẵn sàng / không hỗ trợ) và dọn dẹp.
 // Cảnh thật được mock: WebGL không có trong jsdom.
 
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type Options = { onContextLost?: () => void };
+type FakeScene = {
+  ready: Promise<void>;
+  dispose: () => void;
+  kickAt: (x: number, y: number) => boolean;
+  kick: () => boolean;
+  isOverModel: (x: number, y: number) => boolean;
+};
 
 const dispose = vi.fn();
+const kickAt = vi.fn<(x: number, y: number) => boolean>();
+const kick = vi.fn<() => boolean>();
+const isOverModel = vi.fn<(x: number, y: number) => boolean>();
 let readyPromise: Promise<void>;
 let capturedOptions: Options | undefined;
-let createImpl: (host: HTMLElement, options?: Options) => { ready: Promise<void>; dispose: () => void };
+let createImpl: (host: HTMLElement, options?: Options) => FakeScene;
 
 vi.mock("@/features/maxwell/scene/createMaxwellScene", () => ({
   createMaxwellScene: (host: HTMLElement, options?: Options) => {
@@ -28,9 +38,12 @@ function sceneStatus(): string | null {
 
 beforeEach(() => {
   dispose.mockReset();
+  kickAt.mockReset().mockReturnValue(true);
+  kick.mockReset().mockReturnValue(true);
+  isOverModel.mockReset().mockReturnValue(false);
   capturedOptions = undefined;
   readyPromise = Promise.resolve();
-  createImpl = () => ({ ready: readyPromise, dispose });
+  createImpl = () => ({ ready: readyPromise, dispose, kickAt, kick, isOverModel });
 });
 
 afterEach(() => {
@@ -97,5 +110,83 @@ describe("MaxwellStage", () => {
     unmount();
 
     expect(dispose).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("MaxwellStage — cú đá", () => {
+  const KICK_NAME = "Đá Maxwell một cú";
+
+  async function renderReady() {
+    render(<MaxwellStage />);
+    await waitFor(() => expect(sceneStatus()).toBe("ready"));
+  }
+
+  it("chưa tải xong thì chưa có nút đá", () => {
+    readyPromise = new Promise<void>(() => {});
+    render(<MaxwellStage />);
+
+    expect(screen.queryByRole("button", { name: KICK_NAME })).toBeNull();
+  });
+
+  it("không có WebGL thì không có nút đá", async () => {
+    createImpl = () => {
+      throw new Error("WebGL không khả dụng");
+    };
+    render(<MaxwellStage />);
+
+    await waitFor(() => expect(sceneStatus()).toBe("unsupported"));
+    expect(screen.queryByRole("button", { name: KICK_NAME })).toBeNull();
+  });
+
+  it("nhấn chuột: chuyển toạ độ cho cảnh; trúng thì hết đá được và nhãn đổi", async () => {
+    await renderReady();
+    expect(screen.getByTestId("maxwell-scene").getAttribute("data-kicked")).toBe("false");
+
+    fireEvent.click(screen.getByRole("button", { name: KICK_NAME }), {
+      detail: 1,
+      clientX: 120,
+      clientY: 80,
+    });
+
+    expect(kickAt).toHaveBeenCalledExactlyOnceWith(120, 80);
+    expect(kick).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: KICK_NAME })).toBeNull();
+    const host = screen.getByTestId("maxwell-scene");
+    expect(host.getAttribute("data-kicked")).toBe("true");
+    expect(host.getAttribute("aria-label")).toBe(
+      "Maxwell vừa bị đá văng khỏi bục và đang nằm dưới sàn"
+    );
+  });
+
+  it("nhấn trượt mô hình: không có gì xảy ra, nút còn để thử lại", async () => {
+    kickAt.mockReturnValue(false);
+    await renderReady();
+
+    fireEvent.click(screen.getByRole("button", { name: KICK_NAME }), { detail: 1, clientX: 5, clientY: 5 });
+
+    expect(screen.getByRole("button", { name: KICK_NAME })).toBeTruthy();
+    expect(screen.getByTestId("maxwell-scene").getAttribute("data-kicked")).toBe("false");
+  });
+
+  it("bàn phím (Enter/Space sinh click detail=0): đá thẳng, không cần toạ độ", async () => {
+    await renderReady();
+
+    fireEvent.click(screen.getByRole("button", { name: KICK_NAME }), { detail: 0 });
+
+    expect(kick).toHaveBeenCalledTimes(1);
+    expect(kickAt).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: KICK_NAME })).toBeNull();
+  });
+
+  it("đổi con trỏ thành bàn tay khi rê trên mô hình", async () => {
+    isOverModel.mockReturnValueOnce(true).mockReturnValueOnce(false);
+    await renderReady();
+    const button = screen.getByRole("button", { name: KICK_NAME });
+
+    fireEvent.pointerMove(button, { clientX: 100, clientY: 100 });
+    expect(button.style.cursor).toBe("pointer");
+
+    fireEvent.pointerMove(button, { clientX: 1, clientY: 1 });
+    expect(button.style.cursor).toBe("default");
   });
 });
