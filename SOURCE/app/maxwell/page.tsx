@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { connection } from "next/server";
 import { MaxwellBackButton } from "@/features/maxwell/components/MaxwellBackButton";
 import { MaxwellStage } from "@/features/maxwell/components/MaxwellStage";
 import { MAXWELL_CREDIT } from "@/features/maxwell/credit";
@@ -34,7 +35,15 @@ export const viewport: Viewport = {
 const CREDIT_LINK =
   "pointer-events-auto inline-flex min-h-11 items-center rounded-md px-1.5 underline underline-offset-4 hover:text-white focus-visible:ring-3 focus-visible:ring-white/50 focus-visible:outline-none";
 
-export default function MaxwellPage() {
+// BẮT BUỘC render động: CSP của site (proxy.ts) chỉ cho script có nonce, mà Next chỉ gắn
+// nonce vào script của trang dựng THEO TỪNG REQUEST. Trang này từng là tĩnh (○ ở bảng
+// route của build) nên 17/17 thẻ script không có nonce → trình duyệt chặn script inline
+// mang dữ liệu RSC → React #412 "Connection closed" → trang không hydrate: cảnh kẹt
+// "Đang gọi Maxwell…", nút quay lại chết. Chỉ xảy ra khi TẢI THẲNG trang (F5, mở link);
+// mở qua ô tìm đề thì chạy vì lúc đó dữ liệu đi bằng fetch. Dev không bao giờ lộ lỗi
+// này (CSP dev cho 'unsafe-inline'). Xem docs "Forcing dynamic rendering" của Next.
+export default async function MaxwellPage() {
+  await connection();
   return (
     <main className="relative min-h-dvh bg-black text-white">
       {/* Tránh tai thỏ / viền cong; luôn cách mép ít nhất 12px. */}

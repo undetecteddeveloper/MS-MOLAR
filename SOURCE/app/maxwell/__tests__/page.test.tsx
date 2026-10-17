@@ -6,6 +6,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { renderServerTree } from "@/tests/helpers/renderServerTree";
 
+const connection = vi.fn(async () => {});
+vi.mock("next/server", () => ({ connection: () => connection() }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), back: vi.fn() }),
 }));
@@ -20,6 +22,18 @@ vi.mock("@/features/maxwell/components/MaxwellStage", () => ({
 import MaxwellPage, { metadata, viewport } from "@/app/maxwell/page";
 
 describe("MaxwellPage", () => {
+  // CSP của site chỉ cho script có nonce (proxy.ts). Trang dựng sẵn lúc build thì 17/17 thẻ
+  // script KHÔNG có nonce: trình duyệt chặn script inline mang dữ liệu RSC (React #412
+  // "Connection closed"), trang không hydrate — cảnh kẹt "Đang gọi Maxwell…", nút quay
+  // lại chết. Đo 2026-10-17 trên prod; mở qua ô tìm đề thì chạy (dữ liệu đi bằng fetch).
+  it("render ĐỘNG theo từng request (connection) để script nhận được nonce CSP", async () => {
+    connection.mockClear();
+
+    await renderServerTree(<MaxwellPage />);
+
+    expect(connection).toHaveBeenCalledTimes(1);
+  });
+
   it("có đúng tiêu đề, một h1 duy nhất, dùng lớp chữ cầu vồng", async () => {
     const { container } = await renderServerTree(<MaxwellPage />);
 
