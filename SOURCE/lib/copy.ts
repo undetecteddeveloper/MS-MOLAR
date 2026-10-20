@@ -59,6 +59,7 @@ export const copy = {
   "nav.history": "Lịch sử",
   "nav.upload": "Nhập đề",
   "nav.account": "Tài khoản",
+  "nav.plans": "Gói & thanh toán",
   "nav.language": "Ngôn ngữ",
   "nav.switchTo": "Chuyển sang {language}",
   "nav.primary": "Chính",
