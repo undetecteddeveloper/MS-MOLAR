@@ -17,7 +17,9 @@ const CONFIG: Record<OrderStatus, { labelKey: MessageKey; variant: BadgeVariant 
 };
 
 function isOrderStatus(value: string): value is OrderStatus {
-  return value in CONFIG;
+  // hasOwn chứ không `in`: "constructor"/"toString" thừa kế từ Object.prototype
+  // sẽ lọt qua `in` và render nhãn rỗng thay vì nhánh "không xác định".
+  return Object.hasOwn(CONFIG, value);
 }
 
 export function OrderStatusBadge({ status }: { status: string }) {
