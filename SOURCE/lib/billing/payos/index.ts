@@ -11,8 +11,17 @@ import { signRequestFields } from "./signature";
 // `expiredAt`, and the `PENDING`/`SUCCEEDED`/`CANCELLED` vocabulary belong
 // inside a single payOS adapter module. Nothing above that line … may reference
 // a payOS type."* Đó là điều biến tiêu chí rời bỏ payOS (SePay) thành một lần
-// thay adapter thay vì một lần viết lại — nên mọi chuỗi `PENDING`/`SUCCEEDED`/
+// thay adapter thay vì một lần viết lại — nên mọi chuỗi `PENDING`/`PAID`/
 // `CANCELLED`, mọi `x-client-id`, mọi `qrCode` chỉ được xuất hiện dưới đây.
+//
+// SỬA 2026-09-17 (lượt test end-to-end ĐẦU TIÊN với payOS thật): ADR-0013 và
+// bản gốc của file này đoán payOS trả `"SUCCEEDED"` cho một đơn đã trả — SAI.
+// payOS thật trả `"PAID"` (xác nhận qua payos-lib-node chính chủ,
+// `PaymentLinkStatus`). Với chuỗi cũ, MỌI đơn đã trả thật rơi vào nhánh
+// `default: "unknown"`, và `settleOrder()` báo `not_paid_yet` mãi mãi — đúng
+// triệu chứng "đã chuyển tiền, bấm kiểm tra lại vẫn báo đang chờ". Không sửa
+// gì khác: `settleOrder()` đã coi mọi giá trị khác `"paid"` (kể cả `"unknown"`)
+// là "chưa trả", nên chỉ literal này cần đổi.
 //
 // KHÔNG SDK, CỐ Ý (backend DD § Dependency verification): bề mặt dùng tới là ba
 // endpoint và một HMAC — nhỏ hơn cái giá thẩm định và ghim một dependency nằm
@@ -186,7 +195,7 @@ function toPaymentStatus(providerStatus: unknown): PaymentStatus {
   switch (String(providerStatus).trim().toUpperCase()) {
     case "PENDING":
       return "pending";
-    case "SUCCEEDED":
+    case "PAID":
       return "paid";
     case "CANCELLED":
       return "cancelled";

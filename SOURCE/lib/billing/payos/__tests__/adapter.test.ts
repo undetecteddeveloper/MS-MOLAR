@@ -57,7 +57,7 @@ const STATUS_RESPONSE_PAID = {
     amount: 39000,
     amountPaid: 39000,
     amountRemaining: 0,
-    status: "SUCCEEDED",
+    status: "PAID",
     createdAt: "2026-08-19T10:00:00+07:00",
     canceledAt: null,
     cancellationReason: null,
@@ -161,7 +161,7 @@ describe("getPaymentStatus — P-1: đúng hai thuộc tính rời khỏi biên"
   });
 
   it.each([
-    ["SUCCEEDED", "paid"],
+    ["PAID", "paid"],
     ["PENDING", "pending"],
     ["CANCELLED", "cancelled"],
     ["EXPIRED", "unknown"],
