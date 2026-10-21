@@ -17,7 +17,12 @@ afterEach(cleanup);
 
 const EXPIRES = "2099-11-30T23:59:59.000Z";
 const RESETS = "2099-10-30T23:59:59.000Z";
-const known = (used: number, limit: number): Quota => ({ state: "known", used, limit, resetsAt: RESETS });
+const known = (used: number, limit: number): Quota => ({
+  state: "known",
+  used,
+  limit,
+  resetsAt: RESETS,
+});
 const UNKNOWN: Quota = { state: "unknown" };
 
 function renderWith(value: Entitlement | null) {
@@ -102,7 +107,9 @@ describe("hạn mức", () => {
 
   it("thanh tiến độ rộng đúng phần trăm còn lại và là trang trí (aria-hidden)", () => {
     const { container } = renderWith(FREE_KNOWN);
-    const bars = Array.from(container.querySelectorAll('[aria-hidden="true"] > div')) as HTMLElement[];
+    const bars = Array.from(
+      container.querySelectorAll('[aria-hidden="true"] > div')
+    ) as HTMLElement[];
     expect(bars.map((b) => b.style.width)).toEqual(["60%", "67%"]);
   });
 

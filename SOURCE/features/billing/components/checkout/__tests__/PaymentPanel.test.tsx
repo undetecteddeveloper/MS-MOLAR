@@ -14,10 +14,7 @@ import { formatDateTime } from "@/lib/format/datetime";
 vi.mock("@/lib/billing/orderActions", () => ({ recheckOrder: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 
-import {
-  isPayable,
-  PaymentPanel,
-} from "@/features/billing/components/checkout/PaymentPanel";
+import { isPayable, PaymentPanel } from "@/features/billing/components/checkout/PaymentPanel";
 
 afterEach(cleanup);
 
@@ -75,7 +72,9 @@ describe("đơn không còn nhận tiền", () => {
 
       expect(text()).toContain("987654");
       expect(container.querySelector("button")?.textContent).toContain("Kiểm tra lại đơn này");
-      expect(container.querySelector('a[href="/profile?tab=plans"]')?.textContent).toBe("Lịch sử mua");
+      expect(container.querySelector('a[href="/profile?tab=plans"]')?.textContent).toBe(
+        "Lịch sử mua"
+      );
     }
   );
 

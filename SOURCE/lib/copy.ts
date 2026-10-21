@@ -783,6 +783,7 @@ export const copy = {
   // support.admin.* is a separate later addition, task-14's responsibility).
   // common.cancel/common.retry/common.working are REUSED, not duplicated here.
   "support.trigger.label": "Gửi phản hồi",
+  "support.trigger.moveHint": "Giữ Shift và bấm phím mũi tên để dời nút.",
   "support.dialog.title": "Gửi phản hồi",
   "support.intent.groupLabel": "Loại phản hồi",
   "support.intent.bug": "Báo lỗi",

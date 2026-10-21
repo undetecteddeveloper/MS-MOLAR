@@ -25,7 +25,10 @@ beforeEach(() => {
   mocks.createOrder.mockReset();
   mocks.push.mockReset();
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 async function click(button: HTMLElement) {
   await act(async () => {
@@ -110,7 +113,9 @@ describe("khi đã mở bán", () => {
 
   it("server ném lỗi: câu chung, không lộ nội dung, không chuyển trang", async () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    mocks.createOrder.mockRejectedValue(Object.assign(new Error("secret-key-abc"), { digest: "d-1" }));
+    mocks.createOrder.mockRejectedValue(
+      Object.assign(new Error("secret-key-abc"), { digest: "d-1" })
+    );
     render(<PurchaseCta canPurchase />);
     await click(screen.getByRole("button"));
     expect(screen.getByRole("alert").textContent).toBe(t("billing.orders.loadError"));
@@ -136,5 +141,87 @@ describe("khi chưa mở bán", () => {
     await click(screen.getByRole("button"));
     expect(mocks.createOrder).not.toHaveBeenCalled();
     expect(mocks.push).not.toHaveBeenCalled();
+  });
+});
+
+describe("bong bóng lý do khi chưa mở bán", () => {
+  const bubble = () => document.querySelector("[data-cta-bubble]");
+  const reasonText = t("billing.cta.unavailableReason");
+
+  it("mặc định KHÔNG hiện; bản chữ cho trình đọc màn hình vẫn có trong DOM", () => {
+    render(<PurchaseCta canPurchase={false} />);
+    expect(bubble()).toBeNull();
+    const button = screen.getByRole("button");
+    const reason = document.getElementById(button.getAttribute("aria-describedby") as string);
+    expect(reason?.className).toContain("sr-only");
+    expect(reason?.textContent).toBe(reasonText);
+  });
+
+  it("rê chuột vào nút → hiện; rời đi → ẩn", () => {
+    render(<PurchaseCta canPurchase={false} />);
+    const button = screen.getByRole("button");
+    fireEvent.mouseEnter(button);
+    expect(bubble()?.textContent).toBe(reasonText);
+    fireEvent.mouseLeave(button);
+    expect(bubble()).toBeNull();
+  });
+
+  it("focus bàn phím → hiện; blur → ẩn", () => {
+    render(<PurchaseCta canPurchase={false} />);
+    const button = screen.getByRole("button");
+    fireEvent.focus(button);
+    expect(bubble()).not.toBeNull();
+    fireEvent.blur(button);
+    expect(bubble()).toBeNull();
+  });
+
+  it("bấm nút (điện thoại) → hiện, KHÔNG tạo đơn, và tự tắt sau 4 giây", () => {
+    vi.useFakeTimers();
+    render(<PurchaseCta canPurchase={false} />);
+    fireEvent.click(screen.getByRole("button"));
+    expect(bubble()).not.toBeNull();
+    expect(mocks.createOrder).not.toHaveBeenCalled();
+
+    act(() => {
+      vi.advanceTimersByTime(3900);
+    });
+    expect(bubble()).not.toBeNull();
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+    expect(bubble()).toBeNull();
+  });
+
+  it("Escape tắt bong bóng dù chuột vẫn ở trên nút (WCAG 1.4.13); rời rồi vào lại thì hiện lại", () => {
+    render(<PurchaseCta canPurchase={false} />);
+    const button = screen.getByRole("button");
+    fireEvent.mouseEnter(button);
+    fireEvent.keyDown(button, { key: "Escape" });
+    expect(bubble()).toBeNull();
+
+    fireEvent.mouseLeave(button);
+    fireEvent.mouseEnter(button);
+    expect(bubble()).not.toBeNull();
+  });
+
+  it("bong bóng nổi (absolute), không đẩy layout, không chặn con trỏ, và có chuyển động pop", () => {
+    render(<PurchaseCta canPurchase={false} />);
+    fireEvent.mouseEnter(screen.getByRole("button"));
+    const el = bubble() as HTMLElement;
+    expect(el.className).toContain("absolute");
+    expect(el.className).toContain("pointer-events-none");
+    expect(el.className).toContain("motion-pop");
+    expect(el.getAttribute("aria-hidden")).toBe("true");
+  });
+
+  it("đã mở bán: rê chuột/bấm không bao giờ hiện bong bóng", async () => {
+    mocks.createOrder.mockReturnValue(new Promise(() => {}));
+    render(<PurchaseCta canPurchase />);
+    const button = screen.getByRole("button");
+    fireEvent.mouseEnter(button);
+    fireEvent.focus(button);
+    await click(button);
+    expect(bubble()).toBeNull();
+    expect(document.querySelector(".sr-only")).toBeNull();
   });
 });

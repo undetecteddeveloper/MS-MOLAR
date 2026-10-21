@@ -38,7 +38,9 @@ async function renderTab() {
 }
 
 const buy = (c: HTMLElement) =>
-  Array.from(c.querySelectorAll("button")).find((b) => b.textContent === "Mua Premium") as HTMLElement;
+  Array.from(c.querySelectorAll("button")).find(
+    (b) => b.textContent === "Mua Premium"
+  ) as HTMLElement;
 
 describe("bố cục", () => {
   it("dải gói đang dùng, thẻ mua, rồi Lịch sử mua — theo thứ tự đó", async () => {
@@ -69,7 +71,9 @@ describe("bố cục", () => {
     expect(names).toEqual(["Gói đang dùng", "Gia hạn thêm 30 ngày", "Lịch sử mua"]);
     expect(buy(container)).toBeUndefined();
     expect(
-      Array.from(container.querySelectorAll("button")).some((b) => b.textContent === "Gia hạn thêm 30 ngày")
+      Array.from(container.querySelectorAll("button")).some(
+        (b) => b.textContent === "Gia hạn thêm 30 ngày"
+      )
     ).toBe(true);
   });
 

@@ -94,3 +94,32 @@ describe("'Tiếp tục thanh toán'", () => {
     }
   );
 });
+
+describe("bố cục gọn (2026-10-21)", () => {
+  it("thẻ dùng đệm gọn và khoảng cách hẹp, không còn gap-4 + p-4 như trước", () => {
+    const { container } = renderRow();
+    const card = container.querySelector("li") as HTMLElement;
+    expect(card.className).toContain("p-3");
+    expect(card.className).toContain("gap-2");
+    expect(card.className).not.toContain("gap-4 ");
+  });
+
+  it("nút 'Kiểm tra lại đơn này' nằm trong khối căn PHẢI ở mọi cỡ", () => {
+    const { container } = renderRow();
+    const button = Array.from(container.querySelectorAll("button")).find((b) =>
+      b.textContent?.includes("Kiểm tra lại đơn này")
+    ) as HTMLElement;
+    const actions = button.closest("div[class*='justify-end']") as HTMLElement;
+    expect(actions).not.toBeNull();
+    expect(actions.className).toContain("justify-end");
+  });
+
+  it("thông tin ngày + mã đơn dùng chữ nhỏ trên điện thoại (xs), lớn dần từ sm", () => {
+    const { container } = renderRow();
+    const meta = Array.from(container.querySelectorAll("p")).find((p) =>
+      p.textContent?.includes("Mã đơn")
+    ) as HTMLElement;
+    expect(meta.className).toContain("text-xs");
+    expect(meta.className).toContain("sm:text-sm");
+  });
+});

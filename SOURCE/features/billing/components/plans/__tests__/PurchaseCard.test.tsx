@@ -78,7 +78,9 @@ describe("người Premium: thẻ gia hạn gọn", () => {
 
   it("là vùng có tên 'Gia hạn thêm 30 ngày'", () => {
     const { container } = renderCard(true, PREMIUM);
-    expect(container.querySelector("section")?.getAttribute("aria-label")).toBe("Gia hạn thêm 30 ngày");
+    expect(container.querySelector("section")?.getAttribute("aria-label")).toBe(
+      "Gia hạn thêm 30 ngày"
+    );
   });
 
   it("cờ tắt → nút gia hạn khoá kèm lý do; cờ bật → dùng được", () => {
@@ -117,21 +119,49 @@ describe("nút mua", () => {
 });
 
 describe("cặp link Điều khoản / Hoàn tiền", () => {
-  it("nằm ở hàng tiêu đề (góc trên phải), không kèm câu dẫn", () => {
+  it("KHÔNG kèm câu dẫn, và là MỘT bản duy nhất trong DOM (cỡ màn hình đổi chỗ bằng CSS)", () => {
     const { container } = renderCard(true);
-    const header = container.querySelector("h2")?.parentElement as HTMLElement;
-    expect(header.contains(container.querySelector('a[href="/terms"]'))).toBe(true);
-    expect(header.contains(container.querySelector('a[href="/refund-policy"]'))).toBe(true);
-    expect(header.className).toContain("justify-between");
+    expect(container.querySelectorAll('a[href="/terms"]')).toHaveLength(1);
+    expect(container.querySelectorAll('a[href="/refund-policy"]')).toHaveLength(1);
     expect(container.textContent).not.toContain("Trước khi mua");
   });
 
-  it("đứng TRƯỚC nút mua trong DOM (AC-039)", () => {
+  it("đứng TRƯỚC nút mua trong DOM (AC-039), dù trên điện thoại nhìn thấy nó SAU nút", () => {
     const { container } = renderCard(true);
     const terms = container.querySelector('a[href="/terms"]') as HTMLElement;
     const refund = container.querySelector('a[href="/refund-policy"]') as HTMLElement;
     const button = buy(container);
     expect(terms.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(refund.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    // Thứ tự nhìn thấy trên điện thoại: nút (order-3) rồi link (order-4), căn giữa.
+    const linksCell = terms.closest("p")?.parentElement as HTMLElement;
+    const buttonCell = button.closest("div[class*='order-']") as HTMLElement;
+    expect(buttonCell.className).toContain("order-3");
+    expect(linksCell.className).toContain("order-4");
+    expect(linksCell.className).toContain("text-center");
+  });
+
+  it("từ md: góc trên phải (cột 2, hàng 1, căn phải)", () => {
+    const { container } = renderCard(true);
+    const cell = (container.querySelector('a[href="/terms"]') as HTMLElement).closest("p")
+      ?.parentElement as HTMLElement;
+    expect(cell.className).toContain("md:col-start-2");
+    expect(cell.className).toContain("md:row-start-1");
+    expect(cell.className).toContain("md:text-right");
+  });
+});
+
+describe("thẻ gia hạn: cặp link", () => {
+  it("điện thoại: dưới nút, căn giữa; vẫn đứng trước nút trong DOM", () => {
+    const { container } = renderCard(true, PREMIUM);
+    const terms = container.querySelector('a[href="/terms"]') as HTMLElement;
+    const linksCell = terms.closest("p")?.parentElement as HTMLElement;
+    const button = renew(container);
+    const buttonCell = button.closest("div[class*='order-']") as HTMLElement;
+    expect(terms.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(buttonCell.className).toContain("order-2");
+    expect(linksCell.className).toContain("order-3");
+    expect(linksCell.className).toContain("text-center");
   });
 });

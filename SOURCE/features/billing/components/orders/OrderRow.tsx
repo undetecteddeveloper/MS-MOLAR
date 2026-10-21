@@ -22,15 +22,19 @@ export function OrderRow({ order }: { order: MyOrderRow }) {
   const canContinuePaying = order.status === "pending" && isWindowStillOpen(order.pendingUntil);
 
   return (
-    <Card as="li" className="gap-4 md:flex-row md:items-center md:justify-between">
-      <div className="flex min-w-0 flex-col gap-1">
+    <Card
+      as="li"
+      padding="compact"
+      className="gap-2 md:flex-row md:items-center md:justify-between md:gap-4"
+    >
+      <div className="flex min-w-0 flex-col gap-0.5">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="text-foreground text-lg font-semibold tabular-nums">
+          <p className="text-foreground text-base font-semibold tabular-nums">
             {t("billing.amount", { amount: formatVnd(order.amountVnd) })}
           </p>
           <OrderStatusBadge status={order.status} />
         </div>
-        <p className="text-muted-foreground text-sm">
+        <p className="text-muted-foreground text-xs leading-snug sm:text-sm">
           {t("billing.orders.createdAt")} {formatDateTime(order.createdAt)}
           <span aria-hidden> · </span>
           {t("billing.orders.orderCode")}{" "}
@@ -38,7 +42,8 @@ export function OrderRow({ order }: { order: MyOrderRow }) {
         </p>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 md:shrink-0 md:justify-end">
+      {/* Nút căn PHẢI ở mọi cỡ (điện thoại: hàng riêng dưới thông tin, sát mép phải). */}
+      <div className="flex flex-wrap items-center justify-end gap-x-2 md:shrink-0">
         {canContinuePaying && (
           <Link
             href={`/pricing/checkout?order=${order.orderCode}`}
