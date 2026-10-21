@@ -72,7 +72,7 @@ Chi tiết quy trình "Chấm thất bại" (kiểm lại báo cáo cũ có đ�
 - `bao-cao-tu-luan-dang-cham.jpg`: trạng thái **Đang chấm** ngay sau khi nộp bài tự luận (vòng xoay thay cho điểm, chưa có số).
 - `bao-cao-tu-luan-da-cham-ket-qua.jpg`: trang kết quả sau khi AI chấm xong, **2,0/10** (một câu 1 điểm, bốn câu bỏ trống, trên tổng 5 câu).
 - `bao-cao-tu-luan-da-cham-chi-tiet.jpg`: trang chi tiết, nhãn **Đã chấm — 1/1 điểm** dưới đề, kèm bài làm đã gõ.
-- 🟨 **CHƯA CÓ ảnh trạng thái "Chấm thất bại".** Trạng thái này chỉ xuất hiện khi AI hỏng, bị giới hạn tốc độ, hết ngân sách ngày hoặc câu chờ quá 10 phút; không thể ép nó xảy ra trên prod mà không gây hỏng thật. Muốn có ảnh: chụp khi nó tự xảy ra, hoặc dùng bản dev (tắt khoá Groq) và ghi rõ là ảnh dev.
+- 🟨 **CHƯA CÓ ảnh trạng thái "Chấm thất bại".** Trạng thái này chỉ xuất hiện khi AI hỏng, bị giới hạn tốc độ, hết ngân sách ngày hoặc câu chờ quá 10 phút; không thể ép nó xảy ra trên prod mà không gây hỏng thật. Hướng đã chọn: **chụp khi nó tự xảy ra trên prod**. Kiểm lúc 2026-10-21 ~21:10: chưa có sự kiện chấm thất bại nào (0/33), 0 câu ở trạng thái "thất bại" đã lưu. Có đúng 2 câu "pending" quá 10 phút (học sinh sẽ thấy "Chấm thất bại"), nhưng thuộc **một tài khoản khác** (không phải tài khoản chụp ảnh, không phải tài khoản chính của chủ dự án, không phải tài khoản `+alias`) nên không mở được để chụp. Khi cần kiểm lại, chạy: `select count(*) filter (where not success) from public.telemetry_log where event_type='essay_grade'` và đếm câu có `essayState = 'failed'` hoặc `pending` quá 10 phút; có số mới thì mở trang kết quả của lượt đó bằng đúng tài khoản sở hữu nó.
 
 ---
 
@@ -174,7 +174,7 @@ Khi dùng các số trên cần nói rõ: 671/1.289 ms chỉ là **thời gian m
 ---
 
 ## Việc còn lại để hoàn tất báo cáo
-1. Ảnh trạng thái **Chấm thất bại**: chưa có (xem mục ảnh của Chấm điểm).
+1. Ảnh trạng thái **Chấm thất bại**: chưa có; chờ nó tự xảy ra trên tài khoản mà bạn mở được (xem mục ảnh của Chấm điểm).
 2. Làm vài ca đối chiếu tính tay theo hướng dẫn ở B2 rồi điền số ca khớp.
 3. Đọc "Giới hạn" số 1 (prompt viết cho Toán) và số 9 (đáp án mẫu lệch hàng) của Chấm điểm, rồi quyết định báo cáo nói gì về Ngữ văn/Tiếng Anh và chất lượng đáp án.
 4. Hai lượt kiểm thử của tôi nằm trong dữ liệu prod và trong Lịch sử/Thống kê của tài khoản bạn (Toán 8: 2,0/10 và 1,0/10); bạn tự quyết có để lại hay không, tôi không xoá được.
