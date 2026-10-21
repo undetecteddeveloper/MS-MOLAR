@@ -76,8 +76,13 @@ export function PurchaseCta({
       >
         {t(label)}
       </Button>
+      {/* Lý do khoá nút là một bong bóng thông báo, đuôi chỉ lên nút mua: gọn hơn một
+          đoạn chữ trần và nói rõ câu này là lời của hệ thống về cái nút. */}
       {!canPurchase && (
-        <p id={reasonId} className="text-muted-foreground text-sm leading-relaxed">
+        <p
+          id={reasonId}
+          className="bg-card text-foreground relative mt-1.5 rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed before:absolute before:-top-1 before:left-1/2 before:size-2.5 before:-translate-x-1/2 before:rotate-45 before:rounded-[2px] before:bg-card"
+        >
           {t("billing.cta.unavailableReason")}
         </p>
       )}

@@ -36,7 +36,7 @@ export function PurchaseCard({ canPurchase }: { canPurchase: boolean }) {
         <p className="text-muted-foreground text-sm leading-relaxed">
           {t("billing.plan.renewBody")}
         </p>
-        <div className="flex flex-col gap-3 md:w-64 md:shrink-0 md:text-right">
+        <div className="flex flex-col gap-3 md:w-80 md:shrink-0 md:text-left">
           <LegalLinks intro={false} />
           <PurchaseCta canPurchase={canPurchase} label="billing.cta.renew" />
         </div>
