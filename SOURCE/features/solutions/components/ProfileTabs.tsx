@@ -1,6 +1,6 @@
 "use client";
 
-// ProfileTabs — ba ô "Tài khoản" / "Bài giải" / "Bình luận" ngay dưới tiêu đề trang hồ sơ
+// ProfileTabs — bốn ô "Tài khoản" / "Gói" / "Bài giải" / "Bình luận" ngay dưới tiêu đề trang hồ sơ
 // (UI Spec § Component ProfileTabs, UI-D15, AC-095). Đặt ở `features/solutions`
 // chứ không `features/profile` (B4): bấm "Bình luận" gọi `markCommentsRead()`
 // của tính năng này (frontend DD § UI Spec Deviations, đoạn "work plan already
@@ -77,6 +77,9 @@ export function ProfileTabs({ activeTab, commentCount }: ProfileTabsProps) {
     <div role="group" aria-label={t("profile.tabs.label")} className="flex flex-wrap gap-2">
       <Chip active={tab === "account"} className="h-11" onClick={() => selectTab("account")}>
         {t("profile.tabs.account")}
+      </Chip>
+      <Chip active={tab === "plans"} className="h-11" onClick={() => selectTab("plans")}>
+        {t("profile.tabs.plans")}
       </Chip>
       <Chip active={tab === "solutions"} className="h-11" onClick={() => selectTab("solutions")}>
         {t("profile.tabs.solutions")}

@@ -59,7 +59,6 @@ export const copy = {
   "nav.history": "Lịch sử",
   "nav.upload": "Nhập đề",
   "nav.account": "Tài khoản",
-  "nav.plans": "Gói & thanh toán",
   "nav.language": "Ngôn ngữ",
   "nav.switchTo": "Chuyển sang {language}",
   "nav.primary": "Chính",
@@ -851,33 +850,26 @@ export const copy = {
   // Ngữ điệu theo đúng bộ chuỗi sẵn có: xưng "bạn", câu ngắn, em-dash để ngắt
   // hai vế, kết bằng "nhé" khi nhờ người dùng làm gì, không dấu chấm than.
   // Tuyệt đối không nói "tự động gia hạn" — xem chú thích ở en.ts.
-  "billing.pricing.eyebrow": "Gói",
-  "billing.pricing.title": "Chọn gói của bạn",
-  "billing.pricing.description":
-    "Làm đề, nộp bài, xem kết quả, lịch sử và phân tích Layer 3 vẫn miễn phí cho mọi tài khoản. Gói chỉ đổi số lượt gia sư AI và số lượt tải đề lên.",
+  // Tab "Gói" trong Hồ sơ (2026-10-21): một dải "Gói đang dùng" + MỘT thẻ Premium
+  // kèm giá, chỉ cho người Miễn phí. Người Premium không thấy thẻ mua nào. Không
+  // còn thẻ Miễn phí đặt cạnh.
   "billing.plan.free.name": "Miễn phí",
-  "billing.plan.free.price": "0 đồng",
-  "billing.plan.free.period": "mãi mãi",
-  "billing.plan.free.line1": "5 lượt gia sư mỗi 30 ngày",
-  "billing.plan.free.line2": "3 lượt tải đề mỗi 30 ngày",
-  "billing.plan.free.line3": "Toàn bộ vòng lặp cốt lõi, không giới hạn",
-  "billing.plan.free.line4": "Có sẵn phân tích Layer 3",
+  "billing.plan.free.summary": "5 lượt gia sư · 3 lượt tải đề mỗi 30 ngày",
   "billing.plan.premium.name": "Premium",
+  "billing.plan.premium.summary": "500 lượt gia sư · 15 lượt tải đề mỗi 30 ngày",
   "billing.plan.premium.price": "39.000 VNĐ",
-  "billing.plan.premium.period": "cho mỗi kỳ 30 ngày, trả trước",
+  "billing.plan.premium.period": "mỗi 30 ngày, trả trước",
   "billing.plan.premium.line1": "500 lượt gia sư mỗi 30 ngày",
   "billing.plan.premium.line2": "15 lượt tải đề mỗi 30 ngày",
-  "billing.plan.premium.line3": "Một suất được bảo lưu trong ngân sách AI mỗi ngày",
-  "billing.plan.premium.line4": "Mua sớm thì số ngày còn lại được cộng dồn",
-  "billing.plan.current": "Gói bạn đang dùng",
+  "billing.plan.premium.line3": "Mua sớm được cộng dồn ngày còn lại",
+  "billing.plan.current": "Gói đang dùng",
   "billing.cta.buy": "Mua Premium",
   "billing.cta.unavailableReason":
     "Premium chưa mở bán — chúng tôi không bán một hạn mức chưa giao được. Bạn quay lại sau nhé.",
-  "billing.noAutoRenew":
-    "Gói này không tự động gia hạn. Hết 30 ngày là dừng, không trừ tiền, không lưu thẻ — muốn dùng tiếp thì bạn tự mua lại.",
+  "billing.noAutoRenew": "Không tự gia hạn, không lưu thẻ. Hết 30 ngày thì bạn tự mua lại nếu cần.",
   "billing.legal.terms": "Điều khoản dịch vụ",
   "billing.legal.refund": "Chính sách hoàn tiền",
-  "billing.legal.linkIntro": "Trước khi mua, bạn đọc giúp:",
+  "billing.legal.linkIntro": "Trước khi mua, xem:",
   "billing.terms.title": "Điều khoản dịch vụ",
   "billing.terms.eyebrow": "Pháp lý",
   "billing.terms.pending":
@@ -897,9 +889,9 @@ export const copy = {
 
   // --- S-05 /me/orders + C-09 OrderStatusBadge — xem chú thích trong en.ts --
   "billing.amount": "{amount} VNĐ",
-  "billing.orders.title": "Đơn hàng của bạn",
+  "billing.orders.title": "Lịch sử mua",
   "billing.orders.empty": "Bạn chưa đặt đơn nào.",
-  "billing.orders.emptyHint": "Đơn sẽ hiện ở đây ngay khi bạn mua một kỳ Premium.",
+  "billing.orders.emptyHint": "Đơn sẽ hiện ở đây khi bạn mua Premium.",
   "billing.orders.createdAt": "Tạo lúc",
   "billing.orders.orderCode": "Mã đơn",
   "billing.orders.continuePaying": "Tiếp tục thanh toán",
@@ -947,14 +939,14 @@ export const copy = {
 
   "billing.quota.unavailable":
     "Chưa đọc được bộ đếm lượt dùng của bạn lúc này. Việc đó không hạn chế quyền truy cập: mọi thứ vẫn chạy bình thường.",
-  "billing.orders.planLabel": "Gói hiện tại",
   "billing.orders.planPremiumUntil": "Premium · đến {date}",
   "billing.orders.planPremiumGrace": "Premium · đang ân hạn, hết hạn {date}",
-  "billing.orders.resetLabel": "Kỳ đặt lại vào",
-  "billing.orders.tutorLabel": "Lượt gia sư",
-  "billing.orders.tutorRemaining": "Còn {count}/{limit} lượt gia sư",
-  "billing.orders.uploadLabel": "Lượt tải đề",
-  "billing.orders.uploadRemaining": "Còn {count}/{limit} lượt tải đề",
+  // Bảng Hạn mức ở tab Tài khoản (2026-10-21).
+  "billing.quota.title": "Hạn mức",
+  "billing.quota.tutorLabel": "Lượt gia sư còn",
+  "billing.quota.uploadLabel": "Lượt tải đề còn",
+  "billing.quota.resetLabel": "Đặt lại vào",
+  "billing.quota.outOf": "/ {limit}",
 
   // /profile — xem chú thích tương ứng trong en.ts.
   "profile.error.sessionExpired": "Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.",
@@ -975,7 +967,7 @@ export const copy = {
   "profile.title": "Hồ sơ của bạn",
   // Giá trị mới (task 44) — bản cũ "Tài khoản này gồm những gì, và những phần
   // bạn đổi được." không còn đúng: trang nay có thêm uy tín và bình luận.
-  "profile.description": "Tài khoản, uy tín, bài giải và bình luận của bạn.",
+  "profile.description": "Tài khoản, gói, bài giải và bình luận của bạn.",
   "profile.email.label": "Email đăng ký",
   "profile.email.readOnly": "Không thể thay đổi",
   "profile.name.change": "Đổi tên",
@@ -1010,6 +1002,7 @@ export const copy = {
   // Nguyên văn UI Spec § "Chuỗi tiếng Việt cần thêm" → "Hồ sơ (S-06, profile.*)".
   "profile.tabs.label": "Mục hồ sơ",
   "profile.tabs.account": "Tài khoản",
+  "profile.tabs.plans": "Gói",
   "profile.tabs.solutions": "Bài giải",
   "profile.tabs.comments": "Bình luận",
   // Dùng khi số bình luận mới k > 0 (chip "Bình luận") — khoá đặt sẵn ở task 44

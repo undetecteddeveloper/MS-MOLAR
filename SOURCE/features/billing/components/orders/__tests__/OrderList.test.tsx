@@ -25,12 +25,15 @@ const row = (orderCode: number, status = "paid"): MyOrderRow => ({
 });
 
 describe("danh sách rỗng", () => {
-  it("hiện trạng thái rỗng kèm đường sang bảng giá, không có <ul>", () => {
+  it("hiện trạng thái rỗng, không có <ul> và không có nút sang trang khác", () => {
     const { container } = render(<OrderList orders={[]} />);
-    expect(container.querySelector("h2")?.textContent).toBe("Bạn chưa đặt đơn nào.");
-    expect(container.textContent).toContain("Đơn sẽ hiện ở đây ngay khi bạn mua một kỳ Premium.");
+    expect(container.textContent).toContain("Bạn chưa đặt đơn nào.");
+    expect(container.textContent).toContain("Đơn sẽ hiện ở đây khi bạn mua Premium.");
     expect(container.querySelector("ul")).toBeNull();
-    expect(container.querySelector('a[href="/pricing"]')?.textContent).toBe("Xem các gói");
+    // Danh sách nằm ngay dưới thẻ mua của tab Gói; không có tiêu đề riêng để
+    // khỏi chen vào thứ bậc heading của tab.
+    expect(container.querySelector("a")).toBeNull();
+    expect(container.querySelector("h1, h2, h3")).toBeNull();
   });
 });
 

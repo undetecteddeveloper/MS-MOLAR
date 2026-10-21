@@ -45,7 +45,7 @@ export function PaymentPanel({ order }: { order: CheckoutOrder }) {
         <div className="flex flex-wrap items-center gap-3">
           <RecheckOrderControl orderCode={order.orderCode} variant="row" status={order.status} />
           <Link
-            href="/me/orders"
+            href="/profile?tab=plans"
             className="text-primary decoration-primary/40 hover:decoration-primary inline-flex min-h-11 items-center text-sm font-medium underline underline-offset-4"
           >
             {t("billing.orders.title")}

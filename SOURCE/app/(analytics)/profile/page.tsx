@@ -12,7 +12,7 @@
 //
 // ProfileTabs + ReputationBlock (task 44, frontend DD v1.6 § UI Spec
 // Deviations DD-U1, UI-D15): trang là NƠI GHÉP duy nhất — nó phân tích `?tab=`
-// (whitelist, `parseProfileTab`: account / solutions / comments), server-render
+// (whitelist, `parseProfileTab`: account / plans / solutions / comments), server-render
 // CHỈ nội dung của tab đang chọn, và ở tab "account" gọi `getMyReputation()` để dựng `ReputationBlock`
 // rồi đưa xuống `ProfileCard` qua `reputationSlot`. `ProfileCard` (client,
 // `features/profile`) không được import gì từ `@/features/solutions/**` (B4)
@@ -26,6 +26,8 @@ import { getCurrentUserProfile } from "@/lib/auth/getCurrentUser";
 import { t } from "@/lib/copy";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { PlansTab } from "@/features/billing/components/plans/PlansTab";
+import { QuotaCard } from "@/features/billing/components/quota/QuotaCard";
 import { ProfileCard } from "@/features/profile/components/ProfileCard";
 import { ProfileTabs } from "@/features/solutions/components/ProfileTabs";
 import { ReputationBlock } from "@/features/solutions/components/ReputationBlock";
@@ -120,7 +122,14 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
       <PageHeader title={t("profile.title")} description={t("profile.description")} />
       <ProfileTabs activeTab={tab} commentCount={commentCount} />
       {tab === "account" ? (
-        <ProfileCard user={user} reputationSlot={reputationSlot} />
+        <>
+          {/* Hạn mức đứng ĐẦU tab (2026-10-21): thấy ngay, không phải cuộn qua
+              thẻ tài khoản. Đọc `useEntitlement()` — provider ở layout (analytics). */}
+          <QuotaCard />
+          <ProfileCard user={user} reputationSlot={reputationSlot} />
+        </>
+      ) : tab === "plans" ? (
+        <PlansTab />
       ) : tab === "solutions" ? (
         <ProfileSolutionsTab />
       ) : (

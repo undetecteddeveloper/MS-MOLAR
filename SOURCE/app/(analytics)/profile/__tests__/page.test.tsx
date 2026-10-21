@@ -29,7 +29,9 @@ const {
   markCommentsReadMock,
   profileCommentsTabMock,
   profileSolutionsTabMock,
+  plansTabMock,
 } = vi.hoisted(() => ({
+  plansTabMock: vi.fn(() => <div data-testid="plans-tab" />),
   getCurrentUserProfileMock: vi.fn(),
   getMyReputationMock: vi.fn(),
   getMyUnreadCommentCountMock: vi.fn(),
@@ -57,6 +59,11 @@ vi.mock("@/features/solutions/components/ProfileCommentsTab", () => ({
 // test riêng (`ProfileSolutionsTab.test.tsx`).
 vi.mock("@/features/solutions/components/ProfileSolutionsTab", () => ({
   ProfileSolutionsTab: profileSolutionsTabMock,
+}));
+// PlansTab (2026-10-21) là Server Component async và kéo `server-only` qua
+// `features/billing/queries`; hành vi thật có bộ test riêng (`PlansTab.test.tsx`).
+vi.mock("@/features/billing/components/plans/PlansTab", () => ({
+  PlansTab: plansTabMock,
 }));
 // ProfileCard (rendered on the account tab) imports these at module top level.
 vi.mock("@/features/auth/actions", () => ({
@@ -91,6 +98,7 @@ beforeEach(() => {
   markCommentsReadMock.mockReset();
   profileCommentsTabMock.mockClear();
   profileSolutionsTabMock.mockClear();
+  plansTabMock.mockClear();
   getCurrentUserProfileMock.mockResolvedValue(USER);
   getMyUnreadCommentCountMock.mockResolvedValue(0);
 });
@@ -225,5 +233,40 @@ describe("ProfilePage — ô 'Bài giải' render ProfileSolutionsTab (2026-10-0
     render(await ProfilePage({ searchParams: Promise.resolve({ tab: "comments" }) }));
 
     expect(profileSolutionsTabMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("ProfilePage — tab 'Gói' và bảng Hạn mức (2026-10-21)", () => {
+  it("tab=plans: render PlansTab, KHÔNG render thẻ tài khoản/Hạn mức, không đọc uy tín", async () => {
+    render(await ProfilePage({ searchParams: Promise.resolve({ tab: "plans" }) }));
+
+    expect(plansTabMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("plans-tab")).toBeTruthy();
+    expect(getMyReputationMock).not.toHaveBeenCalled();
+    expect(screen.queryByText("an.nguyen")).toBeNull();
+    expect(screen.queryByText("Hạn mức")).toBeNull();
+    // Chip "Gói" đang được chọn.
+    expect(screen.getByRole("button", { name: "Gói" }).getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("tab='account': bảng Hạn mức đứng TRÊN thẻ tài khoản, PlansTab không được gọi", async () => {
+    getMyReputationMock.mockResolvedValue({ ok: false });
+
+    const { container } = render(await ProfilePage({ searchParams: Promise.resolve({}) }));
+
+    const quota = screen.getByText("Hạn mức");
+    const account = screen.getByText("an.nguyen");
+    expect(quota.compareDocumentPosition(account) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(container.querySelectorAll("main > section").length).toBeGreaterThanOrEqual(1);
+    expect(plansTabMock).not.toHaveBeenCalled();
+  });
+
+  it("tab 'solutions' và 'comments': không có bảng Hạn mức, PlansTab không được gọi", async () => {
+    render(await ProfilePage({ searchParams: Promise.resolve({ tab: "solutions" }) }));
+    cleanup();
+    render(await ProfilePage({ searchParams: Promise.resolve({ tab: "comments" }) }));
+
+    expect(screen.queryByText("Hạn mức")).toBeNull();
+    expect(plansTabMock).not.toHaveBeenCalled();
   });
 });

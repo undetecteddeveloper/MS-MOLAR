@@ -58,7 +58,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Sea
           <p className="text-muted-foreground max-w-prose text-sm leading-relaxed">
             {t("billing.checkout.noActiveOrder")}
           </p>
-          <Link href="/pricing" className={buttonVariants({ className: "mt-3" })}>
+          <Link href="/profile?tab=plans" className={buttonVariants({ className: "mt-3" })}>
             {t("billing.quota.upgradeLink")}
           </Link>
         </Card>

@@ -91,7 +91,7 @@ describe("mã đơn trên URL", () => {
     mocks.getMyOrder.mockResolvedValue(null);
     const { container } = await renderPage("987654");
     expect(container.textContent).toContain(EMPTY);
-    expect(container.querySelector('a[href="/pricing"]')?.textContent).toBe("Xem các gói");
+    expect(container.querySelector('a[href="/profile?tab=plans"]')?.textContent).toBe("Xem các gói");
     expect(container.textContent).not.toContain("1903123456");
   });
 
@@ -126,7 +126,7 @@ describe("đơn không còn nhận tiền", () => {
       expect(container.textContent).not.toContain("1903123456");
       expect(container.textContent).not.toContain("Tôi đã chuyển khoản");
       expect(container.querySelector('a[href="/terms"]')).toBeNull();
-      expect(container.querySelector('a[href="/me/orders"]')).not.toBeNull();
+      expect(container.querySelector('a[href="/profile?tab=plans"]')).not.toBeNull();
     }
   );
 });

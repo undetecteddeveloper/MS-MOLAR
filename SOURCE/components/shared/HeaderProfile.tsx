@@ -4,8 +4,9 @@
 // (khách thấy nút "Đăng nhập" thay thế). Từ 2026-09-04 đây là ô tài khoản DUY
 // NHẤT của site (SidebarProfile của trang chủ cũ đã gỡ cùng sidebar).
 //
-// Menu năm đường: Hồ sơ → /profile, Đề của tôi → /me/exams, Gói & thanh toán →
-// /pricing, Đơn hàng của bạn → /me/orders, Đăng xuất (Server Action). Mục "Sửa tên" đã bỏ từ 2026-08-17 — /profile làm việc đó tử tế hơn.
+// Menu ba đường: Hồ sơ → /profile, Đề của tôi → /me/exams, Đăng xuất (Server
+// Action). Gói và Lịch sử mua nằm trong tab "Gói" của /profile (2026-10-21) nên
+// không có mục riêng ở đây. Mục "Sửa tên" đã bỏ từ 2026-08-17 — /profile làm việc đó tử tế hơn.
 import Link from "next/link";
 import { useState } from "react";
 import { signOut } from "@/features/auth/actions";
@@ -15,7 +16,7 @@ import { POP_EXIT_MS, usePresence } from "@/components/shared/usePresence";
 
 export type MenuUser = { displayName: string; avatarUrl: string | null };
 
-/** Một mục trong menu. Dùng chung cho cả ba mục để chúng không trôi khỏi nhau
+/** Một mục trong menu. Dùng chung cho cả các mục để chúng không trôi khỏi nhau
  *  về padding hay cỡ chữ; `tone` là chỗ DUY NHẤT chúng được phép khác nhau. */
 function itemCls(tone: "default" | "danger" = "default"): string {
   return [
@@ -93,15 +94,6 @@ export function HeaderProfile({
           </Link>
           <Link role="menuitem" href="/me/exams" onClick={close} className={itemCls()}>
             {t("common.myExams")}
-          </Link>
-          {/* Lối vào thanh toán: luôn hiện, kể cả khi Premium chưa mở bán — trang
-              /pricing tự khoá nút mua và nói lý do. Hai mục sát nhau, ngay trên
-              Đăng xuất. */}
-          <Link role="menuitem" href="/pricing" onClick={close} className={itemCls()}>
-            {t("nav.plans")}
-          </Link>
-          <Link role="menuitem" href="/me/orders" onClick={close} className={itemCls()}>
-            {t("billing.orders.title")}
           </Link>
           <form action={signOut}>
             <button role="menuitem" type="submit" className={itemCls("danger")}>

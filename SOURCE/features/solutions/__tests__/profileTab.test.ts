@@ -14,6 +14,11 @@ describe("parseProfileTab", () => {
     expect(parseProfileTab("solutions")).toBe("solutions");
   });
 
+  it("'plans' → tab gói (2026-10-21)", () => {
+    expect(parseProfileTab("plans")).toBe("plans");
+    expect(parseProfileTab("Plans")).toBe("account");
+  });
+
   it("so khớp CHÍNH XÁC: hoa/thường hay khoảng trắng đều rơi về tab tài khoản", () => {
     expect(parseProfileTab("Solutions")).toBe("account");
     expect(parseProfileTab(" solutions")).toBe("account");

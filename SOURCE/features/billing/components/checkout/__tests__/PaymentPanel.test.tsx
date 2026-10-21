@@ -75,7 +75,7 @@ describe("đơn không còn nhận tiền", () => {
 
       expect(text()).toContain("987654");
       expect(container.querySelector("button")?.textContent).toContain("Kiểm tra lại đơn này");
-      expect(container.querySelector('a[href="/me/orders"]')?.textContent).toBe("Đơn hàng của bạn");
+      expect(container.querySelector('a[href="/profile?tab=plans"]')?.textContent).toBe("Lịch sử mua");
     }
   );
 
