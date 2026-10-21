@@ -4,6 +4,7 @@
 > **Số liệu dùng dữ liệu prod**, đọc chỉ-đọc qua Composio ngày 2026-10-21 (~20:40 giờ VN) trên project `pebjdlbgbmizgfpuptjl`, đã đối chiếu tên = **MS-MOLAR-prod**. Chỉ lấy số tổng hợp, không lấy email hay id tài khoản.
 > Quy ước: **🟨 CHƯA CÓ** = ô vàng, không có số thật, không điền số ước chừng.
 > Số ở đây là của **một sản phẩm còn rất nhỏ** (21 lượt nộp, 7 tài khoản); đừng diễn giải thành độ chính xác hay độ phủ ở quy mô lớn.
+> **Hai lượt kiểm thử do tôi nộp** trên prod lúc ~20:56 ngày 2026-10-21 (đề Toán 8 Bắc Ninh, tài khoản của bạn, với sự cho phép của bạn) để chụp ảnh tự luận. Các số ở B2 (21 lượt, 7 tài khoản, 488 câu…) đọc **trước** hai lượt này; số ở B1 đã tính cả hai và có ghi riêng. Hai lượt này là bài do tôi gõ, không phải học sinh, nên không dùng làm bằng chứng về học sinh.
 
 ---
 
@@ -60,14 +61,18 @@ Chi tiết quy trình "Chấm thất bại" (kiểm lại báo cáo cũ có đ�
 4. Ngân sách/ngày dùng chung cả dự án: hết thì mọi học sinh thấy "Hôm nay hệ thống đã dùng hết lượt chấm tự động".
 5. Hệ thống **không giải thích** vì sao ra mức đó (cố ý, để không thêm một đầu ra do AI viết).
 6. Nhật ký `telemetry_log` không có cột `attempt_id` và **không lưu thời gian phản hồi**: không tính được tỉ lệ theo lượt thi, không tính được trung vị/p95 từ nhật ký. Nó đếm sự kiện vòng đời chứ không đếm request (bài bỏ trống cũng có một dòng "thành công").
-7. **Trên prod, AI mới chấm 5 bài tự luận thật có chữ và cả 5 đều ra mức 0**, không bài nào khác 0, không bài nào bị gắn "cần xem lại" (số liệu ở B1). Chưa có bằng chứng trên dữ liệu thật rằng AI phân biệt được bài tốt và bài kém.
-8. **Trạng thái cờ `ESSAY_GRADING_ENABLED` trên prod hôm nay chưa xác nhận được từ DB.** Có sự kiện chấm từ 2026-08-30 đến 2026-10-05 (cờ đã bật lại sau lần diễn tập); không có sự kiện nào sau 2026-10-05, nhưng thế chưa chứng minh cờ tắt (có thể chỉ vì chưa ai nộp bài tự luận). 🟨 Xem Vercel → Environment Variables → `ESSAY_GRADING_ENABLED` (Production).
+7. **Trước hai lượt kiểm thử, AI trên prod mới chấm 5 bài tự luận có chữ và cả 5 đều ra mức 0.** Hai bài do tôi gõ sau đó cho thấy AI phân biệt được: bài làm đủ ra mức 1, bài làm thiếu ra mức 0,5 (B1). Nhưng đó là 2 bài, cùng một câu, cùng một người viết; chưa có bài học sinh thật nào ra mức khác 0.
+8. **Trạng thái cờ `ESSAY_GRADING_ENABLED` trên prod:** có sự kiện chấm từ 2026-08-30 và cờ **đang bật** tại 2026-10-21 (hai lượt kiểm thử đã được AI chấm ngay). Không còn là ô vàng.
+9. **Đáp án mẫu có thể lệch hàng so với đề.** Ở đề Toán 8 Bắc Ninh tôi kiểm 5 câu: đáp án câu 1 khớp đề câu 1; đáp án câu 2 là lời giải của phần 2 câu 1; đáp án câu 3 là của câu 2a; đáp án câu 4 là của câu 2b; đáp án câu 5 là của câu 3a. Nếu đúng như vậy thì câu 2–5 của đề này sẽ bị chấm so với đáp án sai chỗ. Mới kiểm một đề, chưa biết lan rộng đến đâu (lỗi nằm ở bước AI đọc file đáp án khi tải đề).
 
 ### Ảnh chụp giao diện (prod, tên tài khoản đã làm mờ, ở thư mục gốc)
 - `bao-cao-cham-diem-ket-qua.jpg`: trang kết quả (4,5/10, đúng 20, sai 24, thời gian 56 giây).
 - `bao-cao-cham-diem-chi-tiet.jpg`: trang chi tiết, "20/44 đúng", câu 1 hiện đáp án đúng và câu đã chọn.
 - `bao-cao-lich-su.jpg`: Lịch sử (ảnh độ phân giải thấp hơn các ảnh còn lại).
-- 🟨 **CHƯA CÓ ảnh dòng "Tự luận" ở ba trạng thái Đang chấm / Đã chấm / Chấm thất bại.** Tài khoản này chỉ có một lượt trắc nghiệm; muốn có ảnh phải nộp một bài có câu tự luận lên prod (xem câu hỏi cuối báo cáo trả lời).
+- `bao-cao-tu-luan-dang-cham.jpg`: trạng thái **Đang chấm** ngay sau khi nộp bài tự luận (vòng xoay thay cho điểm, chưa có số).
+- `bao-cao-tu-luan-da-cham-ket-qua.jpg`: trang kết quả sau khi AI chấm xong, **2,0/10** (một câu 1 điểm, bốn câu bỏ trống, trên tổng 5 câu).
+- `bao-cao-tu-luan-da-cham-chi-tiet.jpg`: trang chi tiết, nhãn **Đã chấm — 1/1 điểm** dưới đề, kèm bài làm đã gõ.
+- 🟨 **CHƯA CÓ ảnh trạng thái "Chấm thất bại".** Trạng thái này chỉ xuất hiện khi AI hỏng, bị giới hạn tốc độ, hết ngân sách ngày hoặc câu chờ quá 10 phút; không thể ép nó xảy ra trên prod mà không gây hỏng thật. Muốn có ảnh: chụp khi nó tự xảy ra, hoặc dùng bản dev (tắt khoá Groq) và ghi rõ là ảnh dev.
 
 ---
 
@@ -141,12 +146,13 @@ Chỉ **một** thước đo quyết định "yếu": tỉ lệ đúng theo dạ
 |---|---|---|
 | Ca kiểm thử tự động | **362 ca, 362 đạt, 0 lỗi** (11 file: chấm điểm, vòng đời tự luận, bộ kiểm đầu ra, prompt, điểm gọi Groq, điều phối pass, nút Chấm lại, nhãn trạng thái) | `npx vitest run lib/essay lib/scoring components/essay features/exams/__tests__/essayActions.test.ts`, chạy 2026-10-21 20:33 |
 | Chưa tính | Bộ test tích hợp cần DB thật (`essayGrading.int.test.ts`, cổng `test:localdb`) và bộ gọi Groq thật (AC-070); không chạy trong lần đo này | — |
-| Số lượt chấm tự luận | **23 sự kiện chấm**, từ 2026-08-30 12:44 đến 2026-10-05 01:42 (UTC), trên 7 lượt thi. Trong 23: **18 bài bỏ trống** (0 điểm ngay, không gọi AI) và **5 bài có chữ** (gọi AI, mỗi bài dùng 1 lượt) | `telemetry_log` loại `essay_grade` + `per_question` của `exam_results` |
-| Tỉ lệ "chấm thất bại" | **0/23 sự kiện (0%)**; 0 lượt trùng lặp `duplicate_write`. Theo trạng thái câu: 23 câu **Đã chấm**, 2 câu **pending** (cùng 1 lượt thi 2026-08-28, trước khi bật cờ; vì quá 10 phút nên học sinh sẽ thấy "Chấm thất bại") | cùng nguồn |
+| Số lượt chấm tự luận | **33 sự kiện chấm** tính đến 2026-10-21 13:57 UTC, trên 9 lượt thi. Lúc đọc đầu tiên (trước hai lượt kiểm thử): 23 sự kiện, 7 lượt thi, từ 2026-08-30 đến 2026-10-05, gồm **18 bài bỏ trống** (0 điểm ngay, không gọi AI) và **5 bài có chữ** (gọi AI, mỗi bài 1 lượt). Hai lượt kiểm thử thêm 10 sự kiện (mỗi lượt 1 bài có chữ + 4 bài trống) | `telemetry_log` loại `essay_grade` + `per_question` của `exam_results` |
+| Tỉ lệ "chấm thất bại" | **0/33 sự kiện (0%)**; 0 lượt trùng lặp `duplicate_write`. Theo trạng thái câu (đọc lần đầu): 23 câu **Đã chấm**, 2 câu **pending** (cùng 1 lượt thi 2026-08-28, trước khi bật cờ; vì quá 10 phút nên học sinh sẽ thấy "Chấm thất bại"); 10 câu của hai lượt kiểm thử đều **Đã chấm** | cùng nguồn |
+| Thời gian từ lúc nộp đến lúc có mức điểm (đo trên prod, **2 mẫu**) | **2,1 giây** (nộp 13:56:46,6 → chấm xong 13:56:48,7) và **1,3 giây** (13:57:51,6 → 13:57:52,9) cho câu có gọi AI. Đây là thời gian thật học sinh chờ, gồm xếp hàng và ghi DB; **n = 2 nên không đủ tính trung vị/p95** | `essayGradedAt` trừ `created_at` trong `per_question` |
 | Thời gian phản hồi trung vị | 🟨 **CHƯA CÓ từ nhật ký** (nhật ký không lưu thời gian). Phép đo riêng: **671 ms** (n = 18 lượt gọi Groq thật, 2026-08-30) | commit `32fdb70` |
 | Thời gian phản hồi p95 | 🟨 **CHƯA CÓ từ nhật ký.** Phép đo riêng: **1.289 ms** (cùng n = 18, max cũng 1.289 ms) | commit `32fdb70` |
-| Phân bố mức điểm AI đã cho | **5/5 bài có chữ ra mức 0**, 0/5 bị gắn "cần xem lại"; 18/18 bài trống ra mức 0 (đúng thiết kế) | `per_question` trên prod |
-| So điểm AI với giáo viên | 🟨 **CHƯA CÓ trên bài thật** (chưa có điểm giáo viên cho bài nào, và 5 bài thật đều ra 0 nên chưa kiểm được độ phân biệt). Chỉ có 4 ca viết tay có mức tham chiếu của người: **4/4 khớp đúng mức**, 0 ca lệch ±1 | commit `32fdb70` |
+| Phân bố mức điểm AI đã cho (7 bài có chữ) | 5 bài đầu: **cả 5 mức 0**. Hai bài kiểm thử của tôi: bài **làm đủ** câu 1a, 1b, 1c đúng như đáp án mẫu → **mức 1**; bài **làm thiếu** (chỉ 1a, 1b) → **mức 0,5**. 0/7 bị gắn "cần xem lại". 26/26 bài trống ra mức 0 (đúng thiết kế) | `per_question` trên prod |
+| So điểm AI với giáo viên | 🟨 **CHƯA CÓ trên bài thật** (chưa có điểm giáo viên cho bài học sinh nào). Hai bài tôi gõ: bài làm đủ khớp đáp án mẫu được mức 1; bài làm thiếu một phần được mức 0,5. Hướng điểm hợp lý, nhưng tôi không đặt mức kỳ vọng trước khi nộp và tôi không phải giáo viên, nên **không tính là "n bài khớp"**. Ngoài ra có 4 ca viết tay có mức tham chiếu của người: **4/4 khớp đúng mức**, 0 ca lệch ±1 | commit `32fdb70` và hai lượt kiểm thử |
 | Thử chống tiêm lệnh | 7/7 bài có chèn lệnh cho **cùng mức** với bản sạch, 0 bài bị nâng điểm (chấm 2 lần trên Groq thật, 2026-08-30) | commit `32fdb70` |
 
 Khi dùng các số trên cần nói rõ: 671/1.289 ms chỉ là **thời gian một lượt gọi Groq**, không phải thời gian học sinh chờ thấy điểm. 4/4 và 7/7 là bài **viết tay để thử**, mẫu quá nhỏ để nói độ chính xác. "0 thất bại" đếm sự kiện chấm đã hoàn tất; số lượt chấm thất bại không có trong nhật ký (xem giới hạn 6) ngoài 2 câu pending ở trên.
@@ -168,7 +174,7 @@ Khi dùng các số trên cần nói rõ: 671/1.289 ms chỉ là **thời gian m
 ---
 
 ## Việc còn lại để hoàn tất báo cáo
-1. **Ảnh dòng "Tự luận" ở ba trạng thái** (Đang chấm / Đã chấm / Chấm thất bại): đang chờ bạn quyết có nộp một bài tự luận lên prod hay không.
-2. Xác nhận cờ `ESSAY_GRADING_ENABLED` trên prod (Vercel → Environment Variables).
-3. Làm vài ca đối chiếu tính tay theo hướng dẫn ở B2 rồi điền số ca khớp.
-4. Đọc "Giới hạn" số 1 của Chấm điểm và quyết định báo cáo nói gì về Ngữ văn/Tiếng Anh.
+1. Ảnh trạng thái **Chấm thất bại**: chưa có (xem mục ảnh của Chấm điểm).
+2. Làm vài ca đối chiếu tính tay theo hướng dẫn ở B2 rồi điền số ca khớp.
+3. Đọc "Giới hạn" số 1 (prompt viết cho Toán) và số 9 (đáp án mẫu lệch hàng) của Chấm điểm, rồi quyết định báo cáo nói gì về Ngữ văn/Tiếng Anh và chất lượng đáp án.
+4. Hai lượt kiểm thử của tôi nằm trong dữ liệu prod và trong Lịch sử/Thống kê của tài khoản bạn (Toán 8: 2,0/10 và 1,0/10); bạn tự quyết có để lại hay không, tôi không xoá được.
