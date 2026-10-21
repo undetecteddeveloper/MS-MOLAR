@@ -49,7 +49,7 @@ describe("bố cục", () => {
     expect(names).toEqual(["Gói đang dùng", "Premium", "Lịch sử mua"]);
   });
 
-  it("người Premium: không có thẻ mua, chỉ còn dải gói và Lịch sử mua", async () => {
+  it("người Premium: dải gói, thẻ gia hạn gọn (nút 'Gia hạn thêm 30 ngày'), rồi Lịch sử mua", async () => {
     const { container } = render(
       <EntitlementProvider
         value={{
@@ -66,8 +66,11 @@ describe("bố cục", () => {
     const names = Array.from(container.querySelectorAll("section")).map(
       (s) => s.getAttribute("aria-label") ?? s.querySelector("h2")?.textContent
     );
-    expect(names).toEqual(["Gói đang dùng", "Lịch sử mua"]);
+    expect(names).toEqual(["Gói đang dùng", "Gia hạn thêm 30 ngày", "Lịch sử mua"]);
     expect(buy(container)).toBeUndefined();
+    expect(
+      Array.from(container.querySelectorAll("button")).some((b) => b.textContent === "Gia hạn thêm 30 ngày")
+    ).toBe(true);
   });
 
   it("cờ bật → nút mua dùng được; cờ tắt → khoá kèm lý do", async () => {

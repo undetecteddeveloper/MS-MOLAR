@@ -22,7 +22,14 @@ const ERROR_KEY: Record<CreateOrderError, MessageKey> = {
 
 type Phase = { kind: "idle" } | { kind: "busy" } | { kind: "failed"; key: MessageKey };
 
-export function PurchaseCta({ canPurchase }: { canPurchase: boolean }) {
+export function PurchaseCta({
+  canPurchase,
+  label = "billing.cta.buy",
+}: {
+  canPurchase: boolean;
+  /** Nhãn nút: "Mua Premium" mặc định; người đang Premium thấy "Gia hạn thêm 30 ngày". */
+  label?: MessageKey;
+}) {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   const busyRef = useRef(false);
@@ -67,7 +74,7 @@ export function PurchaseCta({ canPurchase }: { canPurchase: boolean }) {
           void startPurchase();
         }}
       >
-        {t("billing.cta.buy")}
+        {t(label)}
       </Button>
       {!canPurchase && (
         <p id={reasonId} className="text-muted-foreground text-sm leading-relaxed">

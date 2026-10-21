@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
-// PurchaseCard — thẻ Premium của tab Gói, CHỈ cho người Miễn phí. Chữ giá và số lượt
-// được ghim bằng chuỗi cố định: đây là lời lẽ bán hàng, đổi phải là quyết định có
-// chủ ý.
+// PurchaseCard — thẻ mua của tab Gói: thẻ Premium cho người Miễn phí, thẻ gia hạn
+// gọn cho người Premium. Chữ giá và số lượt được ghim bằng chuỗi cố định: đây là lời
+// lẽ bán hàng, đổi phải là quyết định có chủ ý.
 
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -28,8 +28,10 @@ function renderCard(canPurchase: boolean, value?: Entitlement) {
   return render(value ? <EntitlementProvider value={value}>{ui}</EntitlementProvider> : ui);
 }
 
-const buy = (c: HTMLElement) =>
-  Array.from(c.querySelectorAll("button")).find((b) => b.textContent === "Mua Premium") as HTMLElement;
+const buttonLabeled = (c: HTMLElement, label: string) =>
+  Array.from(c.querySelectorAll("button")).find((b) => b.textContent === label) as HTMLElement;
+const buy = (c: HTMLElement) => buttonLabeled(c, "Mua Premium");
+const renew = (c: HTMLElement) => buttonLabeled(c, "Gia hạn thêm 30 ngày");
 
 describe("người Miễn phí: thẻ Premium", () => {
   it("ghim tên, giá, kỳ hạn và ba dòng quyền lợi", () => {
@@ -58,11 +60,48 @@ describe("người Miễn phí: thẻ Premium", () => {
   });
 });
 
-describe("người Premium", () => {
-  it("không có thẻ mua nào: không còn 'Mua thêm 30 ngày', không nút mua", () => {
+describe("người Premium: thẻ gia hạn gọn", () => {
+  it("có nút 'Gia hạn thêm 30 ngày', không có nút 'Mua Premium', không còn 'Mua thêm 30 ngày'", () => {
     const { container } = renderCard(true, PREMIUM);
-    expect(container.firstChild).toBeNull();
+    expect(renew(container)).toBeTruthy();
+    expect(buy(container)).toBeUndefined();
     expect(container.textContent).not.toContain("Mua thêm 30 ngày");
+  });
+
+  it("không tiêu đề, không danh sách quyền lợi, không viền nhấn; có một dòng giá + cộng dồn", () => {
+    const { container } = renderCard(true, PREMIUM);
+    expect(container.querySelector("h2")).toBeNull();
+    expect(container.querySelector("ul")).toBeNull();
+    expect(container.querySelector("section")?.className).not.toContain("ring-primary");
+    expect(container.textContent).toContain("39.000 VNĐ, trả trước. Ngày còn lại được cộng dồn.");
+  });
+
+  it("là vùng có tên 'Gia hạn thêm 30 ngày'", () => {
+    const { container } = renderCard(true, PREMIUM);
+    expect(container.querySelector("section")?.getAttribute("aria-label")).toBe("Gia hạn thêm 30 ngày");
+  });
+
+  it("cờ tắt → nút gia hạn khoá kèm lý do; cờ bật → dùng được", () => {
+    expect(renew(renderCard(true, PREMIUM).container).getAttribute("aria-disabled")).toBe("false");
+    cleanup();
+    const { container } = renderCard(false, PREMIUM);
+    expect(renew(container).getAttribute("aria-disabled")).toBe("true");
+    expect(container.textContent).toContain("Premium chưa mở bán");
+  });
+
+  it("Điều khoản/Hoàn tiền đứng TRƯỚC nút gia hạn trong DOM (AC-039), không kèm câu dẫn", () => {
+    const { container } = renderCard(true, PREMIUM);
+    const terms = container.querySelector('a[href="/terms"]') as HTMLElement;
+    const refund = container.querySelector('a[href="/refund-policy"]') as HTMLElement;
+    const button = renew(container);
+    expect(terms.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(refund.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(container.textContent).not.toContain("Trước khi mua");
+  });
+
+  it("đang ân hạn cũng thấy nút gia hạn", () => {
+    const { container } = renderCard(true, { ...PREMIUM, inGracePeriod: true });
+    expect(renew(container)).toBeTruthy();
   });
 });
 

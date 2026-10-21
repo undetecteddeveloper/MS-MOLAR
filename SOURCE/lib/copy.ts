@@ -851,8 +851,8 @@ export const copy = {
   // hai vế, kết bằng "nhé" khi nhờ người dùng làm gì, không dấu chấm than.
   // Tuyệt đối không nói "tự động gia hạn" — xem chú thích ở en.ts.
   // Tab "Gói" trong Hồ sơ (2026-10-21): một dải "Gói đang dùng" + MỘT thẻ Premium
-  // kèm giá, chỉ cho người Miễn phí. Người Premium không thấy thẻ mua nào. Không
-  // còn thẻ Miễn phí đặt cạnh.
+  // kèm giá cho người Miễn phí; người Premium thấy một thẻ gọn chỉ có nút "Gia hạn
+  // thêm 30 ngày". Không còn thẻ Miễn phí đặt cạnh.
   "billing.plan.free.name": "Miễn phí",
   "billing.plan.free.summary": "5 lượt gia sư · 3 lượt tải đề mỗi 30 ngày",
   "billing.plan.premium.name": "Premium",
@@ -864,6 +864,8 @@ export const copy = {
   "billing.plan.premium.line3": "Mua sớm được cộng dồn ngày còn lại",
   "billing.plan.current": "Gói đang dùng",
   "billing.cta.buy": "Mua Premium",
+  "billing.cta.renew": "Gia hạn thêm 30 ngày",
+  "billing.plan.renewBody": "39.000 VNĐ, trả trước. Ngày còn lại được cộng dồn.",
   "billing.cta.unavailableReason":
     "Premium chưa mở bán — chúng tôi không bán một hạn mức chưa giao được. Bạn quay lại sau nhé.",
   "billing.noAutoRenew": "Không tự gia hạn, không lưu thẻ. Hết 30 ngày thì bạn tự mua lại nếu cần.",

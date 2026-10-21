@@ -1,8 +1,8 @@
 "use client";
 
-// Thẻ Premium của tab Gói — CHỈ cho người đang ở gói Miễn phí. Người Premium không
-// thấy thẻ này (2026-10-21, người dùng bỏ "Mua thêm 30 ngày"): với họ tab chỉ còn
-// dải gói đang dùng và Lịch sử mua.
+// Thẻ mua của tab Gói. Người Miễn phí: thẻ Premium đủ giá + quyền lợi. Người Premium
+// (kể cả đang ân hạn): thẻ gia hạn gọn với nút "Gia hạn thêm 30 ngày" (2026-10-21,
+// người dùng chốt giữ nút gia hạn và đổi nhãn; bỏ tiêu đề "Mua thêm 30 ngày").
 //
 // Cặp link Điều khoản / Hoàn tiền nằm ở GÓC TRÊN PHẢI, cùng hàng với tên gói, cho
 // khỏi để trống cột phải; hàng đó đứng trước nút mua trong DOM nên AC-039 vẫn đúng.
@@ -22,7 +22,27 @@ const PREMIUM_LINES: MessageKey[] = [
 
 export function PurchaseCard({ canPurchase }: { canPurchase: boolean }) {
   const { plan } = useEntitlement();
-  if (plan === "premium") return null;
+
+  if (plan === "premium") {
+    // Thẻ gia hạn gọn: không tiêu đề (dải "Gói đang dùng" bên trên đã nói gói nào),
+    // một dòng giá + cộng dồn, cặp link pháp lý góc trên phải rồi tới nút. Không viền
+    // nhấn — viền thuộc về dải gói đang dùng. Người đang ân hạn cũng vào nhánh này.
+    return (
+      <Card
+        as="section"
+        aria-label={t("billing.cta.renew")}
+        className="gap-3 md:flex-row md:items-center md:justify-between md:gap-8"
+      >
+        <p className="text-muted-foreground text-sm leading-relaxed">
+          {t("billing.plan.renewBody")}
+        </p>
+        <div className="flex flex-col gap-3 md:w-64 md:shrink-0 md:text-right">
+          <LegalLinks intro={false} />
+          <PurchaseCta canPurchase={canPurchase} label="billing.cta.renew" />
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Card as="section" aria-labelledby="plan-purchase-title" className="ring-primary gap-5 ring-2">
