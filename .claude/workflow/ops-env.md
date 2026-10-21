@@ -7,7 +7,7 @@ Composio MCP đăng ký THEO ĐƯỜNG DẪN trong `~/.claude.json`; đổi tên
 
 ## Git và đưa code lên main
 - Auto mode chặn mọi lệnh đụng `main` local (`checkout main`, `merge`, `fetch origin main:main`); thử biến thể vô ích. Đưa lên main: commit trên nhánh làm việc, rồi chạy RIÊNG `git push origin <nhánh>:main` (đẩy ref, không checkout); kiểm bằng `git ls-remote origin main`. Bị từ chối non-fast-forward → dừng và hỏi người dùng, không force.
-- Push vào `main` kích hoạt build prod Vercel tự động (coi chừng deploy hai lần).
+- Push vào `main` kích hoạt build prod Vercel tự động (coi chừng deploy hai lần). Deployment có thể được tạo TRỄ sau push: bình thường 4–5 giây, nhưng đo được 230 giây (2026-10-12) và 675 giây (2026-10-21, push 15:02:38 UTC → deployment 15:13:53 UTC; build chính nó 48 giây, không lỗi; `commandForIgnoringBuildStep` rỗng, GitHub không có trạng thái Vercel nào trong lúc chờ). Không phải lỗi mã hay cấu hình: chờ tới ~15 phút, tra lại `VERCEL_GET_DEPLOYMENTS` theo `sha` (đối chiếu `repoPushedAt` với `created`), KHÔNG tạo deploy tay khi chưa quá hạn đó — build tự đến sau đó sẽ chạy hai lần.
 - Giữ `git push` là lệnh đứng một mình (classifier từng chặn lệnh ghép `cat .vercel/project.json` + `git push`). Không đọc `.vercel/project.json` (chỉ `ls`).
 - Hook chặn: `git push` khi lượt nhắn gần nhất của người dùng không có ý đó; mọi lệnh CLI `supabase` và `vercel` bị chặn hẳn (dùng Composio).
 - Working copy CRLF (`core.autocrlf=true`): script vá phải chuẩn hoá needle theo EOL của file, nếu không sẽ trượt im lặng. Cây làm việc thường có thay đổi chưa commit của người dùng.
