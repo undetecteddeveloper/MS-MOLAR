@@ -74,19 +74,32 @@ export function ProfileTabs({ activeTab, commentCount }: ProfileTabsProps) {
   }
 
   return (
-    <div role="group" aria-label={t("profile.tabs.label")} className="flex flex-wrap gap-2">
-      <Chip active={tab === "account"} className="h-11" onClick={() => selectTab("account")}>
+    // MỘT hàng, không xuống dòng: ở 360px (Redmi 13C) bốn chip với đệm 14px dài hơn
+    // hàng ~15px nên "Bình luận" rớt xuống hàng hai. Đệm/khoảng cách thu lại ở màn
+    // hẹp để vừa hàng; hẹp hơn nữa (hoặc chữ hệ thống phóng to) thì cuộn ngang. `p-1 -m-1`
+    // chừa chỗ cho vòng focus, vì overflow-x làm overflow-y cũng cắt.
+    <div
+      role="group"
+      aria-label={t("profile.tabs.label")}
+      className="-m-1 flex gap-1.5 overflow-x-auto p-1 [scrollbar-width:none] sm:gap-2 [&::-webkit-scrollbar]:hidden"
+    >
+      <Chip
+        active={tab === "account"}
+        className="h-11 px-3 sm:px-3.5"
+        onClick={() => selectTab("account")}
+      >
         {t("profile.tabs.account")}
       </Chip>
-      <Chip active={tab === "plans"} className="h-11" onClick={() => selectTab("plans")}>
-        {t("profile.tabs.plans")}
-      </Chip>
-      <Chip active={tab === "solutions"} className="h-11" onClick={() => selectTab("solutions")}>
+      <Chip
+        active={tab === "solutions"}
+        className="h-11 px-3 sm:px-3.5"
+        onClick={() => selectTab("solutions")}
+      >
         {t("profile.tabs.solutions")}
       </Chip>
       <Chip
         active={tab === "comments"}
-        className="h-11"
+        className="h-11 px-3 sm:px-3.5"
         onClick={() => selectTab("comments")}
         aria-label={
           commentCount !== undefined && commentCount > 0
@@ -98,6 +111,13 @@ export function ProfileTabs({ activeTab, commentCount }: ProfileTabsProps) {
         {commentCount !== undefined && commentCount > 0 && (
           <span aria-hidden className="bg-destructive size-2 rounded-full" />
         )}
+      </Chip>
+      <Chip
+        active={tab === "plans"}
+        className="h-11 px-3 sm:px-3.5"
+        onClick={() => selectTab("plans")}
+      >
+        {t("profile.tabs.plans")}
       </Chip>
     </div>
   );

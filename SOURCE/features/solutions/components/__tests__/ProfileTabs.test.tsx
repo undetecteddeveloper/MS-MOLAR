@@ -130,12 +130,12 @@ describe("ProfileTabs — chip Bài giải (2026-10-03)", () => {
     expect(markCommentsReadMock).not.toHaveBeenCalled();
   });
 
-  it("activeTab='solutions': chỉ chip Bài giải được chọn; thứ tự chip là Tài khoản, Gói, Bài giải, Bình luận", () => {
+  it("activeTab='solutions': chỉ chip Bài giải được chọn; thứ tự chip là Tài khoản, Bài giải, Bình luận, Gói", () => {
     render(<ProfileTabs activeTab="solutions" />);
 
     const chips = screen.getAllByRole("button");
-    expect(chips.map((c) => c.textContent)).toEqual(["Tài khoản", "Gói", "Bài giải", "Bình luận"]);
-    expect(chips.map((c) => c.getAttribute("aria-pressed"))).toEqual(["false", "false", "true", "false"]);
+    expect(chips.map((c) => c.textContent)).toEqual(["Tài khoản", "Bài giải", "Bình luận", "Gói"]);
+    expect(chips.map((c) => c.getAttribute("aria-pressed"))).toEqual(["false", "true", "false", "false"]);
   });
 
   it("bấm chip Gói: đẩy ?tab=plans, chip Gói được chọn ngay, không đánh dấu bình luận đã đọc", () => {
