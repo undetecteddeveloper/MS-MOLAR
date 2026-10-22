@@ -45,6 +45,7 @@ import {
   type CheckoutOrder,
   type PaymentOrderRow,
 } from "@/lib/billing/checkoutOrder";
+import { isPaidTierEnabled } from "@/lib/billing/paidTier";
 import { createPaymentRequest, PayosCallError } from "@/lib/billing/payos";
 import { PREMIUM_PRICE_VND } from "@/lib/billing/pricing";
 import { settleOrder, type SettleResult } from "@/lib/billing/settleOrder";
@@ -65,6 +66,7 @@ import { createClient } from "@/lib/supabase/server";
  *  huống — payOS không với tới được — để hai đường không đặt hai cái tên cho một
  *  sự việc. */
 export type CreateOrderError =
+  | "not_on_sale"
   | "unauthenticated"
   | "rate_limited"
   | "provider_unavailable"
@@ -177,6 +179,11 @@ async function findReusableOrder(
  *   nhất trong repo), hoặc `{ error }` cho mỗi lối từ chối.
  */
 export async function createOrder(): Promise<CreateOrderOutcome> {
+  // Cờ bán được chốt Ở ĐÂY, không chỉ ở nút: tab mở từ lúc cờ còn bật hay một lời
+  // gọi thẳng vào Server Action đều tới được hàm này. Đứng trước mọi lượt chạm
+  // biên — kể cả bước (0), để cửa đóng không trả lại cả đơn cũ.
+  if (!isPaidTierEnabled()) return { error: "not_on_sale" };
+
   const supabase = await createClient();
   const {
     data: { user },

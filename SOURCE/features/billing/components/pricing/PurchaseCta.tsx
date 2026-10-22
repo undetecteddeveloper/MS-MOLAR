@@ -21,6 +21,7 @@ import { createOrder, type CreateOrderError } from "@/lib/billing/orderActions";
 import { t, type MessageKey } from "@/lib/copy";
 
 const ERROR_KEY: Record<CreateOrderError, MessageKey> = {
+  not_on_sale: "billing.cta.unavailableReason",
   unauthenticated: "profile.error.sessionExpired",
   rate_limited: "billing.recheck.rateLimited",
   provider_unavailable: "billing.recheck.providerUnavailable",

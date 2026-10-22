@@ -287,10 +287,13 @@ beforeEach(() => {
   givenSignedInUser(USER_ID);
   givenGuardAllows();
   installServiceRole({});
+  // Mặc định là ĐÃ MỞ BÁN: các ca dưới đây kiểm đường tạo đơn, không kiểm cổng bán.
+  vi.stubEnv("GEMINI_PAID_TIER_ENABLED", "true");
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
 });
 
 // =========================================================================
@@ -509,6 +512,24 @@ describe("createOrder — nhà cung cấp hỏng thì KHÔNG dòng nào tồn t�
 });
 
 describe("createOrder — hai cổng chạy TRƯỚC mọi thứ", () => {
+  // Nút ở client chỉ là lớp trình bày: tab mở từ lúc cờ còn bật, hoặc một lời gọi
+  // thẳng vào Server Action, vẫn tới được đây. Cờ bán phải được chốt ở máy chủ.
+  it.each([undefined, "", "false", "0"])(
+    "chưa mở bán (cờ = %j) ⇒ `not_on_sale`, chạm biên 0 lần: không đọc phiên, không trần, không payOS, không ghi",
+    async (raw) => {
+      vi.stubEnv("GEMINI_PAID_TIER_ENABLED", raw);
+      installSessionRead("reuse", { data: REUSABLE_ROW, error: null });
+      givenProviderCreates(PROVIDER_RESULT);
+
+      expect(await createOrder()).toEqual({ error: "not_on_sale" });
+      expect(getUserMock).not.toHaveBeenCalled();
+      expect(guardMock).not.toHaveBeenCalled();
+      expect(callLog).toEqual([]);
+      expect(providerCallCount()).toBe(0);
+      expect(writeCount()).toBe(0);
+    }
+  );
+
   it("chưa đăng nhập ⇒ `unauthenticated`, 0 lượt gọi nhà cung cấp, 0 lượt ghi, 0 lượt đọc", async () => {
     givenSignedInUser(null);
     installSessionRead("reuse", { data: REUSABLE_ROW, error: null });

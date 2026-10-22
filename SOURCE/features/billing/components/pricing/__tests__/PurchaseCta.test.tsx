@@ -88,6 +88,7 @@ describe("khi đã mở bán", () => {
   });
 
   it.each([
+    ["not_on_sale", "billing.cta.unavailableReason"],
     ["unauthenticated", "profile.error.sessionExpired"],
     ["rate_limited", "billing.recheck.rateLimited"],
     ["provider_unavailable", "billing.recheck.providerUnavailable"],

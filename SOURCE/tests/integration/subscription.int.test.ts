@@ -361,6 +361,10 @@ if (MISSING_CREDENTIALS.length > 0) {
 
 vi.mock("server-only", () => ({}));
 
+// `createOrder()` tự từ chối khi chưa mở bán; bộ test này kiểm đường tạo đơn nên
+// phải bật cờ (giá trị thật của môi trường không được quyết định kết quả).
+vi.stubEnv("GEMINI_PAID_TIER_ENABLED", "true");
+
 /** Adapter payOS — MOCK VÀ ĐẾM. Số lượt gọi là một trong hai khẳng định mà một
  *  phép so giá trị KHÔNG nhìn thấy (xem "Primary failure mode" ở khối INT-3). */
 const createPaymentRequestMock = vi.fn();
