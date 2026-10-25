@@ -191,7 +191,7 @@ export default function OpengraphImage() {
             background: PRIMARY,
           }}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element -- ImageResponse/Satori, không phải trang web */}
+          {/* `<img>` là bắt buộc ở đây (ImageResponse/Satori); rule no-img-element tắt cho file này ở eslint.config.mjs. */}
           <img src={logoSrc} alt="" width={300} height={300} />
         </div>
       </div>

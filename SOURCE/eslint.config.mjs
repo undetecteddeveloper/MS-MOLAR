@@ -54,6 +54,20 @@ const eslintConfig = defineConfig([
       ],
     },
   })),
+  // Ảnh chia sẻ link (app/opengraph-image.tsx) vẽ bằng ImageResponse/Satori, nơi `<img>`
+  // là bắt buộc — không phải trang web nên `@next/next/no-img-element` không áp dụng.
+  //
+  // Vì sao tắt Ở ĐÂY mà không dùng `eslint-disable-next-line` trong file: chính plugin đã
+  // miễn trừ file `app/opengraph-image*`, nhưng tính đường dẫn bằng
+  // `filename.replace(path.sep, '/')` — chỉ đổi dấu gạch chéo ngược ĐẦU TIÊN. Trên Windows
+  // miễn trừ trượt, rule vẫn báo (comment disable "có tác dụng"); trên Linux (CI) miễn trừ
+  // chạy, rule im, comment thành "Unused eslint-disable directive" và `--max-warnings 0` đỏ
+  // (đo 2026-10-21: CI đỏ trên main vì đúng một cảnh báo này, máy Windows thì xanh). Tắt rule
+  // cho riêng file này thì cả hai hệ điều hành cùng một kết quả.
+  {
+    files: ["app/opengraph-image.tsx"],
+    rules: { "@next/next/no-img-element": "off" },
+  },
 ]);
 
 export default eslintConfig;
