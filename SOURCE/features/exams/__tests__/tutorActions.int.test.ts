@@ -166,6 +166,11 @@ const ENTITLEMENT: Entitlement = {
   upload: { state: "known", used: 0, limit: 3, resetsAt: "2026-09-19T00:00:00.000Z" },
 };
 
+/** Hạn mức consumeQuota() trả sau lượt được phục vụ. Số lẻ (3/5) và một mốc
+ *  khác mọi literal khác trong file, để ca nào thấy nó trong kết quả là thấy
+ *  đúng giá trị đã đi qua action chứ không phải một mặc định trùng hợp. */
+const QUOTA_AFTER = { used: 3, limit: 5, resetsAt: "2026-11-24T02:00:00.000Z" };
+
 beforeEach(() => {
   fromMock.mockReset();
   guardMock.mockReset();
@@ -173,7 +178,7 @@ beforeEach(() => {
   consumeQuotaMock.mockReset();
   readEntitlementMock.mockReset();
   guardMock.mockResolvedValue({ ok: true, retryAfterSeconds: 0 });
-  consumeQuotaMock.mockResolvedValue({ ok: true });
+  consumeQuotaMock.mockResolvedValue({ ok: true, ...QUOTA_AFTER });
   readEntitlementMock.mockResolvedValue(ENTITLEMENT);
 });
 
@@ -210,7 +215,7 @@ describe("hintDuringAttempt() — Test 1: cổng 'lượt của mình, đang m�
     mockChain({ attempt: ATTEMPT_ROW, question: QUESTION_ROW });
     generateHintMock.mockResolvedValue(HINT_TEXT);
 
-    expect(await hintDuringAttempt(ATTEMPT_ID, Q_IN_EXAM, DRAFT)).toEqual({ hint: HINT_TEXT });
+    expect(await hintDuringAttempt(ATTEMPT_ID, Q_IN_EXAM, DRAFT)).toEqual({ hint: HINT_TEXT, quota: QUOTA_AFTER });
     expect(generateHintMock).toHaveBeenCalledTimes(1);
   });
 
@@ -251,7 +256,7 @@ describe("hintDuringAttempt() — Test 2 (AC-012/AC-013): telemetry có hình d�
     generateHintMock.mockRejectedValueOnce(new TutorCallError("gemini_unavailable", "finishReason"));
     const failure = await hintDuringAttempt(ATTEMPT_ID, Q_IN_EXAM, DRAFT);
 
-    expect(success).toEqual({ hint: HINT_TEXT });
+    expect(success).toEqual({ hint: HINT_TEXT, quota: QUOTA_AFTER });
     expect(failure).toEqual({ error: "gemini_unavailable" });
 
     expect(insertPayloads).toHaveLength(2);
@@ -297,7 +302,7 @@ describe("hintDuringAttempt() — Test 2 (AC-012/AC-013): telemetry có hình d�
 
     const result = await hintDuringAttempt(ATTEMPT_ID, Q_IN_EXAM, { evil: 1 } as unknown as string);
 
-    expect(result).toEqual({ hint: HINT_TEXT });
+    expect(result).toEqual({ hint: HINT_TEXT, quota: QUOTA_AFTER });
     expect(generateHintMock.mock.calls[0][0]).toMatchObject({ studentAnswer: "" });
   });
 });
@@ -311,7 +316,7 @@ describe("hintDuringAttempt() — câu TỰ LUẬN nay được kèm (2026-09-13
     generateHintMock.mockResolvedValue(HINT_TEXT);
 
     const draft = "Mở bài: giới thiệu tác giả…";
-    expect(await hintDuringAttempt(ATTEMPT_ID, Q_IN_EXAM, draft)).toEqual({ hint: HINT_TEXT });
+    expect(await hintDuringAttempt(ATTEMPT_ID, Q_IN_EXAM, draft)).toEqual({ hint: HINT_TEXT, quota: QUOTA_AFTER });
     expect(generateHintMock.mock.calls[0][0]).toMatchObject({
       questionType: "essay",
       studentAnswer: draft,
@@ -329,7 +334,7 @@ describe("hintDuringAttempt() — Test 3 (AC-029): câu chưa gắn skill_node_i
     });
     generateHintMock.mockResolvedValue(HINT_TEXT);
 
-    expect(await hintDuringAttempt(ATTEMPT_ID, Q_IN_EXAM, DRAFT)).toEqual({ hint: HINT_TEXT });
+    expect(await hintDuringAttempt(ATTEMPT_ID, Q_IN_EXAM, DRAFT)).toEqual({ hint: HINT_TEXT, quota: QUOTA_AFTER });
     expect(generateHintMock).toHaveBeenCalledTimes(1);
     // Khoá CHÍNH XÁC danh sách cột: một phép kiểm tra theo chuỗi con vẫn cho
     // `select("*")` đi qua, mà `*` kéo luôn ba cột đáp án vượt ranh giới SQL.
@@ -444,7 +449,7 @@ describe("hintDuringAttempt() — Test 5: hạn mức từ chối TRƯỚC Gemin
     const { insertPayloads } = mockChain({ attempt: ATTEMPT_ROW, question: QUESTION_ROW });
     generateHintMock.mockResolvedValue(HINT_TEXT);
 
-    expect(await hintDuringAttempt(ATTEMPT_ID, Q_IN_EXAM, DRAFT)).toEqual({ hint: HINT_TEXT });
+    expect(await hintDuringAttempt(ATTEMPT_ID, Q_IN_EXAM, DRAFT)).toEqual({ hint: HINT_TEXT, quota: QUOTA_AFTER });
     expect(generateHintMock).toHaveBeenCalledTimes(1);
     expect(insertPayloads).toHaveLength(1);
     expect(insertPayloads[0]).toMatchObject({ success: true, error_code: null });

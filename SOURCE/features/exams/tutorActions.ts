@@ -49,7 +49,11 @@ type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
  *  thêm mã thứ 5 chỉ ở một bên. */
 export type TutorHintError = "not_eligible" | "rate_limited" | "gemini_unavailable" | "server";
 
-export type TutorHintResult = { hint: string } | { error: TutorHintError };
+/** Hạn mức gia sư NGAY SAU lượt vừa được phục vụ — cùng hình dạng nhánh
+ *  `known` của `Quota`, để client thay thẳng vào entitlement đã cũ một lượt. */
+export type TutorQuotaAfter = { used: number; limit: number; resetsAt: string };
+
+export type TutorHintResult = { hint: string; quota: TutorQuotaAfter } | { error: TutorHintError };
 
 /** Đúng bộ cột AN TOÀN cần cho prompt. `correct_answer`/`sub_answers`/
  *  `essay_answer` không có ở đây, và cũng không thể có: §10c đã REVOKE chúng
@@ -250,7 +254,10 @@ export async function hintDuringAttempt(
   try {
     const hint = await generateHint(promptInput);
     await recordTutorInvoke(supabase, { userId, questionId, success: true });
-    return { hint };
+    return {
+      hint,
+      quota: { used: consumed.used, limit: consumed.limit, resetsAt: consumed.resetsAt },
+    };
   } catch (err) {
     // generateHint() đã phân loại sẵn thất bại của nó thành mã của
     // `telemetry_log.error_code` và đã logTutorExit() kèm metadata; ở đây chỉ

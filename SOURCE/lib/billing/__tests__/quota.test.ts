@@ -406,7 +406,7 @@ describe("consumeQuota — hai bộ đếm, hai ĐƠN VỊ (AC-020, DD I004)", (
 
     const result = await consumeQuota("tutor", USER_ID, knownEnt("free", RESETS_AT), 1);
 
-    expect(result).toEqual({ ok: true });
+    expect(result).toEqual({ ok: true, used: 1, limit: 5, resetsAt: RESETS_AT });
     expect(at(TUTOR_KEY) - before.user).toBe(1);
     expect(at(BUDGET_KEY) - before.budget).toBe(1);
   });
@@ -421,7 +421,7 @@ describe("consumeQuota — hai bộ đếm, hai ĐƠN VỊ (AC-020, DD I004)", (
 
     const result = await consumeQuota("upload", USER_ID, knownEnt("free", RESETS_AT), 3);
 
-    expect(result).toEqual({ ok: true });
+    expect(result).toEqual({ ok: true, used: 1, limit: 3, resetsAt: RESETS_AT });
     expect(at(UPLOAD_KEY) - before.user).toBe(1);
     expect(at(BUDGET_KEY) - before.budget).toBe(3);
   });
@@ -431,7 +431,7 @@ describe("consumeQuota — hai bộ đếm, hai ĐƠN VỊ (AC-020, DD I004)", (
 
     const result = await consumeQuota("upload", USER_ID, knownEnt("free", RESETS_AT), 2);
 
-    expect(result).toEqual({ ok: true });
+    expect(result).toEqual({ ok: true, used: 1, limit: 3, resetsAt: RESETS_AT });
     expect(at(UPLOAD_KEY) - before.user).toBe(1);
     expect(at(BUDGET_KEY) - before.budget).toBe(2);
   });
@@ -615,6 +615,9 @@ describe("consumeQuota — hạn mức người dùng (AC-014)", () => {
     redis.state.store.set(TUTOR_KEY, 4);
     expect(await consumeQuota("tutor", USER_ID, knownEnt("free", RESETS_AT), 1)).toEqual({
       ok: true,
+      used: 5,
+      limit: 5,
+      resetsAt: RESETS_AT,
     });
     expect(at(TUTOR_KEY)).toBe(5);
 
@@ -647,6 +650,9 @@ describe("consumeQuota — hạn mức người dùng (AC-014)", () => {
     redis.state.store.set(TUTOR_KEY, 499);
     expect(await consumeQuota("tutor", USER_ID, knownEnt("premium", RESETS_AT), 1)).toEqual({
       ok: true,
+      used: 500,
+      limit: 500,
+      resetsAt: RESETS_AT,
     });
 
     const over = await consumeQuota("tutor", USER_ID, knownEnt("premium", RESETS_AT), 1);
@@ -661,7 +667,7 @@ describe("consumeQuota — ngân sách dự án và AI_BUDGET_FREE_SHARE (AC-023
 
     const result = await consumeQuota("tutor", USER_ID, knownEnt("free", RESETS_AT), 1);
 
-    expect(result).toEqual({ ok: true });
+    expect(result).toMatchObject({ ok: true });
     expect(at(BUDGET_KEY)).toBe(10);
   });
 
@@ -683,7 +689,7 @@ describe("consumeQuota — ngân sách dự án và AI_BUDGET_FREE_SHARE (AC-023
 
     const result = await consumeQuota("tutor", USER_ID, knownEnt("premium", RESETS_AT), 1);
 
-    expect(result).toEqual({ ok: true });
+    expect(result).toMatchObject({ ok: true });
     expect(at(BUDGET_KEY)).toBe(11);
   });
 
@@ -705,7 +711,7 @@ describe("consumeQuota — ngân sách dự án và AI_BUDGET_FREE_SHARE (AC-023
 
     const result = await consumeQuota("tutor", USER_ID, knownEnt("free", RESETS_AT), 1);
 
-    expect(result).toEqual({ ok: true });
+    expect(result).toMatchObject({ ok: true });
     expect(at(BUDGET_KEY)).toBe(1);
   });
 
@@ -719,7 +725,7 @@ describe("consumeQuota — ngân sách dự án và AI_BUDGET_FREE_SHARE (AC-023
     });
 
     redis.state.store.set(BUDGET_KEY, 4);
-    expect(await consumeQuota("tutor", USER_ID, knownEnt("free", RESETS_AT), 1)).toEqual({
+    expect(await consumeQuota("tutor", USER_ID, knownEnt("free", RESETS_AT), 1)).toMatchObject({
       ok: true,
     });
   });
@@ -741,7 +747,7 @@ describe("consumeQuota — ngân sách dự án và AI_BUDGET_FREE_SHARE (AC-023
     vi.stubEnv("AI_BUDGET_FREE_SHARE", "0.25");
     redis.state.store.set(BUDGET_KEY, 5);
 
-    expect(await consumeQuota("tutor", USER_ID, knownEnt("premium", RESETS_AT), 1)).toEqual({
+    expect(await consumeQuota("tutor", USER_ID, knownEnt("premium", RESETS_AT), 1)).toMatchObject({
       ok: true,
     });
   });
@@ -780,7 +786,7 @@ describe("consumeQuota — AI_BUDGET_DAILY_LIMIT: thiếu trần KHÔNG phải t
   it("trần 1 ⇒ đúng một request mỗi ngày cho Premium; request thứ hai bị từ chối", async () => {
     vi.stubEnv("AI_BUDGET_DAILY_LIMIT", "1");
 
-    expect(await consumeQuota("tutor", USER_ID, knownEnt("premium", RESETS_AT), 1)).toEqual({
+    expect(await consumeQuota("tutor", USER_ID, knownEnt("premium", RESETS_AT), 1)).toMatchObject({
       ok: true,
     });
     expect(await consumeQuota("tutor", USER_ID, knownEnt("premium", RESETS_AT), 1)).toEqual({

@@ -29,6 +29,7 @@ import { Card } from "@/components/ui/card";
 import { useEntitlement } from "@/lib/billing/entitlement";
 import { isQuotaExhausted } from "@/lib/billing/types";
 import { t } from "@/lib/copy";
+import type { TutorQuotaAfter } from "@/features/exams/tutorActions";
 import { useTutorAction } from "./useTutorAction";
 
 // RichText nạp ĐỘNG, không import tĩnh (TD-021/TD-023). Lý do nằm ở xác suất:
@@ -55,8 +56,9 @@ export interface ExplainStepAffordanceProps {
   draftAnswer?: string;
   /** Gợi ý đã nhận cho câu này ở một lượt mount trước — có thì hiện ngay. */
   hint?: string | null;
-  /** Báo lên cha khi nhận được gợi ý, để cha giữ theo câu. */
-  onHint?: (hint: string) => void;
+  /** Báo lên cha khi nhận được gợi ý, để cha giữ theo câu — kèm hạn mức NGAY
+   *  SAU lượt này (cha báo "còn N/M lượt" và cập nhật entitlement của màn). */
+  onHint?: (hint: string, quota: TutorQuotaAfter) => void;
   /** Bảng gợi ý đang THU GỌN (chỉ còn hàng tiêu đề). Cha giữ theo câu, cùng lý
    *  do với `hint`; không truyền thì component tự giữ. */
   hintCollapsed?: boolean;

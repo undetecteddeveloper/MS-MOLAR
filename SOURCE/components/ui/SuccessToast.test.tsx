@@ -116,6 +116,40 @@ describe("SuccessToast", () => {
     expect(bubbleVisible(container)).toBe(false);
   });
 
+  it("placement mặc định: đỉnh ở mobile, đáy từ 768px", () => {
+    const { container } = render(<SuccessToast message={MESSAGE} trigger={1} />);
+    const bubble = container.querySelector("[aria-hidden='true']")!;
+    expect(bubble.className).toContain("top-[calc(3.75rem");
+    expect(bubble.className).toContain("md:bottom-6");
+  });
+
+  it("above-action-bar: ĐÁY ở mọi bề rộng, trượt từ dưới lên, icon thay được", () => {
+    const { container, rerender } = render(
+      <SuccessToast
+        message={MESSAGE}
+        trigger={0}
+        placement="above-action-bar"
+        icon={<span data-testid="icon" />}
+      />
+    );
+    const bubble = container.querySelector("[aria-hidden='true']")!;
+    expect(bubble.className).toContain("bottom-[calc(5.25rem");
+    expect(bubble.className).not.toContain("top-[calc");
+    // Lúc ẩn nằm THẤP hơn chỗ đứng (translate-y dương) để hiện là nảy LÊN.
+    expect(bubble.className).toContain("translate-y-3");
+    expect(bubble.className).not.toContain("-translate-y-3");
+
+    rerender(
+      <SuccessToast
+        message={MESSAGE}
+        trigger={1}
+        placement="above-action-bar"
+        icon={<span data-testid="icon" />}
+      />
+    );
+    expect(screen.getByTestId("icon")).toBeTruthy();
+  });
+
   it("bong bóng nhìn thấy được là aria-hidden — nội dung không bị đọc hai lần", () => {
     const { container, rerender } = render(<SuccessToast message={MESSAGE} trigger={0} />);
     rerender(<SuccessToast message={MESSAGE} trigger={1} />);

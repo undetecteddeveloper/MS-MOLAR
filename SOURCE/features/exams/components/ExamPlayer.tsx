@@ -14,11 +14,16 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Lightbulb } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { submitExam } from "@/features/exams/actions";
+import type { TutorQuotaAfter } from "@/features/exams/tutorActions";
+import { EntitlementProvider, useEntitlement } from "@/lib/billing/entitlement";
+import { isQuotaExhausted, type Entitlement } from "@/lib/billing/types";
 import { t } from "@/lib/copy";
+import { formatDate } from "@/lib/format/datetime";
 import { Button } from "@/components/ui/button";
+import { SuccessToast } from "@/components/ui/SuccessToast";
 import { ExplainStepAffordance } from "@/components/tutor/ExplainStepAffordance";
 import { ExamTimer } from "@/features/exams/components/ExamTimer";
 import { LeaveExamDialog } from "@/features/exams/components/LeaveExamDialog";
@@ -76,6 +81,28 @@ export function ExamPlayer({
   // khỏi vuốt lên xuống. Giữ ở đây cùng lý do với `hints`: quay lại một câu đã
   // thu gọn thì nó vẫn gọn, không bung ra đẩy đáp án xuống thêm lần nữa.
   const [collapsedHints, setCollapsedHints] = useState<Record<string, boolean>>({});
+  // Hạn mức gia sư sau lượt gợi ý MỚI NHẤT (AC-042; người dùng chọn 2026-10-25
+  // dòng báo nảy từ đáy "Còn 4/5 lượt gợi ý"). Entitlement của layout đọc lúc
+  // tải trang nên cũ đi một lượt sau mỗi lần bấm; số server trả kèm gợi ý thay
+  // vào, và nút gợi ý đọc bản đã thay — nhờ vậy câu kế tiếp hiện "hết lượt"
+  // ngay khi vừa tiêu lượt cuối, không đợi tải lại trang.
+  const entitlement = useEntitlement();
+  const [tutorAfter, setTutorAfter] = useState<TutorQuotaAfter | null>(null);
+  const [quotaToast, setQuotaToast] = useState(0);
+  const liveEntitlement: Entitlement = tutorAfter
+    ? { ...entitlement, tutor: { state: "known", ...tutorAfter } }
+    : entitlement;
+  // Ngày đặt lại chỉ in khi đã HẾT lượt (người dùng chọn): còn lượt thì nó
+  // không trả lời câu hỏi nào, chỉ làm câu dài gấp đôi.
+  const quotaToastMessage =
+    tutorAfter === null
+      ? ""
+      : isQuotaExhausted(liveEntitlement.tutor)
+        ? t("billing.quota.hintToastExhausted", { date: formatDate(tutorAfter.resetsAt) })
+        : t("billing.quota.hintToast", {
+            remaining: tutorAfter.limit - tutorAfter.used,
+            limit: tutorAfter.limit,
+          });
 
   // S#28: cảnh báo rời trang khi đang làm bài — chặn click nav trong app
   // (modal tuỳ biến) + refresh/đóng tab (beforeunload). Tắt khi đang submit
@@ -143,6 +170,12 @@ export function ExamPlayer({
     <div data-exam-focus className="bg-background">
       {/* S#28: modal xác nhận rời trang (mở khi guard chặn một click nav). */}
       <LeaveExamDialog open={pendingHref !== null} onCancel={cancelLeave} onLeave={confirmLeave} />
+      <SuccessToast
+        message={quotaToastMessage}
+        trigger={quotaToast}
+        placement="above-action-bar"
+        icon={<Lightbulb aria-hidden className="h-4 w-4 shrink-0 text-[color:var(--ring)]" />}
+      />
 
       {/* `full` (72rem): màn làm bài cùng bề rộng với kho đề, mép nội dung
           thẳng hàng mép navbar. Lề 16px ở mobile (như các trang (exams) khác)
@@ -317,18 +350,24 @@ export function ExamPlayer({
                  limit, hạn mức). `key` theo câu để máy trạng thái về idle khi
                  đổi câu; bản nháp đọc từ `answers` lúc bấm. */
               hintSlot={
-                <ExplainStepAffordance
-                  key={question.id}
-                  attemptId={attemptId}
-                  questionId={question.id}
-                  draftAnswer={answers[question.id] ?? ""}
-                  hint={hints[question.id] ?? null}
-                  onHint={(hint) => setHints((prev) => ({ ...prev, [question.id]: hint }))}
-                  hintCollapsed={collapsedHints[question.id] ?? false}
-                  onHintCollapsedChange={(collapsed) =>
-                    setCollapsedHints((prev) => ({ ...prev, [question.id]: collapsed }))
-                  }
-                />
+                <EntitlementProvider value={liveEntitlement}>
+                  <ExplainStepAffordance
+                    key={question.id}
+                    attemptId={attemptId}
+                    questionId={question.id}
+                    draftAnswer={answers[question.id] ?? ""}
+                    hint={hints[question.id] ?? null}
+                    onHint={(hint, quota) => {
+                      setHints((prev) => ({ ...prev, [question.id]: hint }));
+                      setTutorAfter(quota);
+                      setQuotaToast((n) => n + 1);
+                    }}
+                    hintCollapsed={collapsedHints[question.id] ?? false}
+                    onHintCollapsedChange={(collapsed) =>
+                      setCollapsedHints((prev) => ({ ...prev, [question.id]: collapsed }))
+                    }
+                  />
+                </EntitlementProvider>
               }
             />
 

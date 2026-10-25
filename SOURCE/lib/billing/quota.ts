@@ -122,9 +122,13 @@ export function periodStartEpoch(
  * file này không biết gì về telemetry, đúng như `settleOrder()` không biết gì
  * về phạm vi sở hữu: quyết định và bản ghi của quyết định thuộc về tầng đang
  * cầm ngữ cảnh.
+ *
+ * Nhánh `ok` mang số đếm NGAY SAU lượt này (giá trị `INCR` trả về), để chỗ gọi
+ * báo "còn N/M lượt" mà không cần đọc lại: entitlement đọc lúc tải trang đã cũ
+ * đúng một lượt, và đọc lại là thêm một vòng Redis cho mỗi lần bấm.
  */
 export type ConsumeResult =
-  | { ok: true }
+  | { ok: true; used: number; limit: number; resetsAt: string }
   | { ok: false; reason: "user_quota" | "project_budget" | "unavailable" };
 
 /** Khoá kỳ sống thêm một ngày sau khi kỳ kết thúc. Dôi ra chứ không khít, vì
@@ -362,7 +366,12 @@ export async function consumeQuota(
       return { ok: false, reason: "project_budget" };
     }
 
-    return { ok: true };
+    return {
+      ok: true,
+      used,
+      limit: userLimit,
+      resetsAt: new Date(periodStart + PERIOD_MS).toISOString(),
+    };
   } catch (err) {
     console.warn("[consumeQuota] bộ đếm không ghi được, từ chối:", err);
     return { ok: false, reason: "unavailable" };

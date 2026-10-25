@@ -53,6 +53,8 @@ const mockExplainStep = vi.mocked(hintDuringAttempt);
 // làm khẳng định của Test 2 hỏng chỉ dựa vào giá trị, không chỉ dựa vào số tham số.
 const ATTEMPT_ID = "attempt-fixture-111";
 const QUESTION_ID = "question-fixture-222";
+/** Hạn mức server trả kèm mỗi gợi ý (hợp đồng TutorHintResult, 2026-10-25). */
+const QUOTA_AFTER = { used: 2, limit: 5, resetsAt: "2026-11-24T02:00:00.000Z" };
 
 const IDLE_LABEL = "Gợi ý cho câu này"; // tutor.explainThisStep (en)
 const RETRY_LABEL = "Thử lại"; // common.retry (en), dùng lại theo tiền lệ LABEL_KEY của ActionButton
@@ -142,7 +144,7 @@ describe("ExplainStepAffordance", () => {
     expect(button.getAttribute("aria-disabled")).toBe("true");
     expect(button.getAttribute("aria-busy")).toBe("true");
 
-    resolveExplain({ hint: "gợi ý sau khi mở khoá" });
+    resolveExplain({ hint: "gợi ý sau khi mở khoá", quota: QUOTA_AFTER });
     // Chờ NÚT GỌI GIA SƯ biến mất, không chờ "hết sạch nút": từ 2026-09-15 bảng
     // gợi ý có một nút Ẩn/Hiện — nó không gọi gia sư, nên không phải thứ D5 cấm.
     await waitFor(() =>
@@ -183,7 +185,7 @@ describe("ExplainStepAffordance", () => {
   //   sẽ làm khẳng định này hỏng nếu bị hoán đổi (không phải, ví dụ, hai chuỗi giống nhau
   //   hay dễ nhầm).
   it("argument-order proof: explainStep called with (attemptId, questionId), never the swapped declaration order", async () => {
-    mockExplainStep.mockResolvedValue({ hint: "gợi ý bất kỳ" });
+    mockExplainStep.mockResolvedValue({ hint: "gợi ý bất kỳ", quota: QUOTA_AFTER });
 
     const { container } = render(
       <ExplainStepAffordance questionId={QUESTION_ID} attemptId={ATTEMPT_ID} />
@@ -196,6 +198,23 @@ describe("ExplainStepAffordance", () => {
     // nên thứ tự nào cũng biên dịch. Hai fixture phân biệt được khiến hoán đổi làm test hỏng.
     expect(mockExplainStep).toHaveBeenCalledWith(ATTEMPT_ID, QUESTION_ID, "");
     expect(mockExplainStep.mock.calls[0]).toEqual([ATTEMPT_ID, QUESTION_ID, ""]);
+  });
+
+  // Màn làm bài báo "Còn N/M lượt gợi ý" và chuyển câu kế sang "hết lượt" bằng
+  // ĐÚNG số server trả kèm gợi ý (ExamPlayer). Nút gợi ý là chỗ duy nhất cầm kết
+  // quả đó, nên nó phải chuyển nguyên hạn mức lên cha — rơi mất ở đây thì dòng
+  // báo không bao giờ hiện, và không test nào khác đỏ.
+  it("onHint nhận cả gợi ý lẫn hạn mức server trả kèm", async () => {
+    mockExplainStep.mockResolvedValue({ hint: "gợi ý có hạn mức", quota: QUOTA_AFTER });
+    const onHint = vi.fn();
+
+    const { container } = render(
+      <ExplainStepAffordance questionId={QUESTION_ID} attemptId={ATTEMPT_ID} onHint={onHint} />
+    );
+    fireEvent.click(within(container).getByRole("button", { name: IDLE_LABEL }));
+
+    await waitFor(() => expect(onHint).toHaveBeenCalledTimes(1));
+    expect(onHint).toHaveBeenCalledWith("gợi ý có hạn mức", QUOTA_AFTER);
   });
 
   // ===========================================================================
@@ -231,7 +250,7 @@ describe("ExplainStepAffordance", () => {
     // Nhấn mạnh Markdown là yếu tố phân biệt: RichText biến nó thành <strong>,
     // còn mọi đường plain-text cạnh tranh sẽ để lại dấu sao nguyên văn.
     const HINT = "Xem lại **định luật bảo toàn** rồi thử lại nhé.";
-    mockExplainStep.mockResolvedValue({ hint: HINT });
+    mockExplainStep.mockResolvedValue({ hint: HINT, quota: QUOTA_AFTER });
 
     const { container } = render(
       <ExplainStepAffordance questionId={QUESTION_ID} attemptId={ATTEMPT_ID} />
@@ -420,7 +439,7 @@ describe("ExplainStepAffordance", () => {
       expect(document.activeElement).toBe(rejectedButton);
 
       // busyRef không được để kẹt ở true sau một lần lỗi — thử lại vào lại trạng thái busy.
-      mockExplainStep.mockResolvedValue({ hint: "gợi ý sau khi thử lại" });
+      mockExplainStep.mockResolvedValue({ hint: "gợi ý sau khi thử lại", quota: QUOTA_AFTER });
       fireEvent.click(rejectedButton);
       await waitFor(() => expect(mockExplainStep).toHaveBeenCalledTimes(3));
     } finally {
@@ -466,7 +485,7 @@ describe("ExplainStepAffordance", () => {
   //   được kiểm bằng lượt Playwright thủ công (Integration
   //   Verification Points của frontend DD).
   it("AC-023/024/029: mount condition gated solely by hasBeenWrongTwice, never by skill_node_id presence", async () => {
-    mockExplainStep.mockResolvedValue({ hint: "gợi ý cho câu chưa gắn nhãn kỹ năng" });
+    mockExplainStep.mockResolvedValue({ hint: "gợi ý cho câu chưa gắn nhãn kỹ năng", quota: QUOTA_AFTER });
 
     // Chỉ các prop tối thiểu đã tài liệu hoá — không truyền prop có hình dạng thẻ kỹ năng.
     const { container } = render(

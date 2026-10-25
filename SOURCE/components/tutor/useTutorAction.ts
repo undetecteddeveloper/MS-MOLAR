@@ -8,7 +8,7 @@
 // typed-result mà hook này tiêu thụ (tên action đổi 2026-09-13, hợp đồng không).
 
 import { useRef, useState } from "react";
-import { hintDuringAttempt } from "@/features/exams/tutorActions";
+import { hintDuringAttempt, type TutorQuotaAfter } from "@/features/exams/tutorActions";
 
 export type TutorPhase = "idle" | "busy" | "hint-shown" | "error";
 
@@ -26,7 +26,7 @@ export interface UseTutorActionResult {
 export function useTutorAction(
   attemptId: string,
   questionId: string,
-  onHint?: (hint: string) => void
+  onHint?: (hint: string, quota: TutorQuotaAfter) => void
 ): UseTutorActionResult {
   const [phase, setPhase] = useState<TutorPhase>("idle");
   const [hint, setHint] = useState<string | null>(null);
@@ -49,7 +49,7 @@ export function useTutorAction(
       if ("hint" in result) {
         setHint(result.hint);
         setPhase("hint-shown");
-        onHint?.(result.hint);
+        onHint?.(result.hint, result.quota);
         return;
       }
       // Chỉ id + mã lỗi đóng của backend — không bao giờ log nội dung câu hỏi

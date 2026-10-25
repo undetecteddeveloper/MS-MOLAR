@@ -19,16 +19,29 @@
 // lần trigger, mới thực sự kích hoạt việc đọc thông báo; bong bóng hiển thị vẫn
 // aria-hidden để thông báo không bị đọc hai lần.
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Check } from "lucide-react";
 
 interface SuccessToastProps {
   message: string;
   trigger: number;
   durationMs?: number;
+  /** Biểu tượng trước chữ; mặc định dấu tích. */
+  icon?: ReactNode;
+  /** `"auto"`: đỉnh ở mobile, đáy từ 768px (lý do ở khối chú thích bên dưới).
+   *  `"above-action-bar"`: ĐÁY ở mọi bề rộng, ngay trên dải nút dính đáy của
+   *  màn làm bài — route đó ẩn BottomNav (`isExamFocusRoute`), nên thứ duy
+   *  nhất ở đáy là dải "Câu trước · Nộp bài · Câu sau" cao ~73px. */
+  placement?: "auto" | "above-action-bar";
 }
 
-export function SuccessToast({ message, trigger, durationMs = 3000 }: SuccessToastProps) {
+export function SuccessToast({
+  message,
+  trigger,
+  durationMs = 3000,
+  icon,
+  placement = "auto",
+}: SuccessToastProps) {
   // Trạng thái được lưu là "trigger nào ĐÃ hết hạn", không phải "đang hiện".
   // Hiện/ẩn là giá trị DẪN XUẤT lúc render, nên không cần một lượt setState để
   // bật toast lên — trước đây effect gọi `setVisible(true)` ngay trong thân nó,
@@ -62,14 +75,20 @@ export function SuccessToast({ message, trigger, durationMs = 3000 }: SuccessToa
           desktop — vật thể phải bay vào từ phía mép nó neo. */}
       <div
         aria-hidden
-        className={`pointer-events-none fixed inset-x-0 top-[calc(3.75rem+env(safe-area-inset-top,0px))] z-[70] flex justify-center px-4 transition-[opacity,translate] motion-reduce:transition-none md:top-auto md:bottom-6 ${
+        className={`pointer-events-none fixed inset-x-0 z-[70] flex justify-center px-4 transition-[opacity,translate] motion-reduce:transition-none ${
+          placement === "auto"
+            ? "top-[calc(3.75rem+env(safe-area-inset-top,0px))] md:top-auto md:bottom-6"
+            : "bottom-[calc(5.25rem+env(safe-area-inset-bottom,0px))] md:bottom-6"
+        } ${
           visible
             ? "translate-y-0 opacity-100 duration-300 [transition-timing-function:cubic-bezier(0.34,1.56,0.64,1)]"
-            : "-translate-y-3 opacity-0 duration-150 ease-out md:translate-y-3"
+            : placement === "auto"
+              ? "-translate-y-3 opacity-0 duration-150 ease-out md:translate-y-3"
+              : "translate-y-3 opacity-0 duration-150 ease-out"
         }`}
       >
         <div className="border-border bg-foreground text-background flex items-center gap-2 rounded-md border px-4 py-2.5 text-sm font-medium">
-          <Check className="h-4 w-4 shrink-0 text-[color:var(--ring)]" />
+          {icon ?? <Check className="h-4 w-4 shrink-0 text-[color:var(--ring)]" />}
           {message}
         </div>
       </div>
