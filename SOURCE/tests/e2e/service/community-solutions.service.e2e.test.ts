@@ -1,29 +1,29 @@
-// Community Solutions — SERVICE-INTEGRATION-E2E lane (task 47, P5-T8)
+// Community Solutions — LÀN SERVICE-INTEGRATION-E2E (task 47, P5-T8)
 // Design Doc: docs/design/community-solutions-backend-design.md — § Verification
 //   Strategy Early Verification Point, § Integration Verification Points, § Test
 //   Boundaries, § Data Contracts (`save_community_solution` "Save refusal
 //   carrier", `set_community_solution_status` "Missing-count carrier",
-//   `community_solutions_list` / `community_solution_detail` masking, Admin RPCs
+//   che `community_solutions_list` / `community_solution_detail`, RPC Admin
 //   "Queue row condition" / "Queue row columns")
 // PRD: docs/prd/community-solutions-prd.md (AC-002, AC-029, AC-039, AC-048,
 //   AC-075, AC-085, AC-105, M5, S5)
 // Plan: docs/plans/20260917-feature-community-solutions.md (§ P5-T8, § Open Items
 //   SK-2, Reference Contract Values #12, #13)
-// Budget: service-integration-e2e 2/2 — SE1 and SE2 only.
+// Ngân sách: service-integration-e2e 2/2 — chỉ SE1 và SE2.
 //
-// NOTHING IS MOCKED. Every RPC under test runs on a real `authenticated` session
-// (writer A, non-submitter N, reader B, the seeded admin) against the dev
-// project. The service key is used only by the fixture file, for setup/cleanup
-// and for direct read-backs that are independent of the RPC under test. TD-029:
-// no import of `@/lib/supabase/service-role` here or in the fixture file.
+// KHÔNG GÌ BỊ MOCK. Mọi RPC đang kiểm chạy trên một phiên `authenticated` thật
+// (người viết A, người không nộp N, người đọc B, admin đã gieo) trên project
+// dev. Khoá service chỉ dùng bởi file fixture, cho thiết lập/dọn dẹp
+// và cho các lượt đọc ngược trực tiếp độc lập với RPC đang kiểm. TD-029:
+// không import `@/lib/supabase/service-role` ở đây hay trong file fixture.
 //
-// Run: `npm run test:localdb` (from SOURCE/). Precondition: `npm run
-// verify:schema` green on dev — a `PGRST202` here means the DDL is missing:
-// fix the database, not the test.
+// Chạy: `npm run test:localdb` (từ SOURCE/). Điều kiện tiên quyết: `npm run
+// verify:schema` xanh trên dev — một `PGRST202` ở đây nghĩa là DDL bị thiếu:
+// sửa database, không sửa test.
 //
-// Refusals are asserted on `error.code` and `error.details` only. The message
-// is server-log context and is asserted nowhere, so moving the count or the
-// token back into the message turns SE1 red.
+// Các lần từ chối được khẳng định chỉ trên `error.code` và `error.details`. Thông điệp
+// là ngữ cảnh log của server và không được khẳng định ở đâu, nên chuyển số đếm hay token
+// trở lại vào thông điệp sẽ làm SE1 đỏ.
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -47,13 +47,13 @@ const SETUP_TIMEOUT = 180_000;
 const CASE_TIMEOUT = 60_000;
 
 // =============================================================================
-// SE1 [reserved slot] — save_community_solution -> set_community_solution_status
-//   ('publish') against real Postgres: eligibility gate, word-count gate,
-//   persisted state, whole-call rollback (AC-002, AC-029; RCV #12, #13)
+// SE1 [suất giữ chỗ] — save_community_solution -> set_community_solution_status
+//   ('publish') trên Postgres thật: cổng đủ điều kiện, cổng số từ,
+//   trạng thái được lưu, rollback cả lời gọi (AC-002, AC-029; RCV #12, #13)
 // =============================================================================
-// Primary failure mode: the R1 gate re-derived inside these two RPCs diverges
-//   from exam_answer_key()'s own gate, or a refused call writes part of its
-//   payload. Every check reads the tables directly BEFORE and AFTER the call.
+// Kiểu hỏng chính: cổng R1 được suy ra lại bên trong hai RPC này lệch khỏi
+//   cổng của chính exam_answer_key(), hoặc một lời gọi bị từ chối vẫn ghi một phần
+//   payload của nó. Mọi phép kiểm đọc thẳng các bảng TRƯỚC và SAU lời gọi.
 describe.skipIf(!HAS_LIVE_DB)("SE1 — write + publish persist on real Postgres; refusals change nothing", () => {
   const admin: SupabaseClient = adminClient();
   const GROUP = { examSlot: "se1", accountSlots: ["se1-author", "se1-writer", "se1-outsider"] };
@@ -121,8 +121,8 @@ describe.skipIf(!HAS_LIVE_DB)("SE1 — write + publish persist on real Postgres;
   }, CASE_TIMEOUT);
 
   it("(2b) publish refusal: three notes shortened below 15 words -> 23514, DETAIL exactly '3', status and every note body unchanged", async () => {
-    // Shortening is only possible while the solution is a draft (a published
-    // note may not drop below 15 words — case 2a), so unpublish first.
+    // Rút ngắn chỉ có thể khi bài giải còn là bản nháp (một ghi chú đã đăng
+    // không được tụt dưới 15 từ — ca 2a), nên bỏ đăng trước.
     const unpublished = await writer.client.rpc("set_community_solution_status", { p_exam_id: examId, p_action: "draft" });
     expect(unpublished.error).toBeNull();
     const shortened = await writer.client.rpc("save_community_solution", {
@@ -139,7 +139,7 @@ describe.skipIf(!HAS_LIVE_DB)("SE1 — write + publish persist on real Postgres;
 
     const refused = await writer.client.rpc("set_community_solution_status", { p_exam_id: examId, p_action: "publish" });
     expect(refused.error?.code).toBe("23514");
-    // Exact string equality: '3', never ' 3', '3 questions' or '+3'.
+    // So sánh chuỗi chính xác: '3', không bao giờ ' 3', '3 questions' hay '+3'.
     expect(refused.error?.details).toBe("3");
     expect(refused.data).toBeNull();
 
@@ -168,18 +168,18 @@ describe.skipIf(!HAS_LIVE_DB)("SE1 — write + publish persist on real Postgres;
 });
 
 // =============================================================================
-// SE2 [additional slot] — anonymity masking is a literal JSON null in the live
-//   RPC body; the admin queue carries the real identity (AC-039, AC-105, M5,
+// SE2 [suất bổ sung] — che ẩn danh là một JSON null nguyên văn trong thân
+//   RPC sống; hàng đợi admin mang danh tính thật (AC-039, AC-105, M5,
 //   S5, AC-075, AC-085; SK-2)
 // =============================================================================
-// SK-2 (resolved 2026-09-20): `community_solutions_list()` /
-//   `community_solution_detail()` mask by `show_profile` alone for EVERY caller,
-//   admins included (AC-062) — so the admin reads of those two functions must
-//   return the same nulls. The only admin path to the real identity is
-//   `admin_list_community_reports()`: real `author_display_name` and
-//   `author_is_anonymous_to_readers`, no `author_id`, no avatar path.
-// Primary failure mode: an edit to a masking RPC restores a raw column and
-//   leaks identity or score on an anonymous / show_score=false row.
+// SK-2 (giải quyết 2026-09-20): `community_solutions_list()` /
+//   `community_solution_detail()` che theo riêng `show_profile` cho MỌI người gọi,
+//   kể cả admin (AC-062) — nên các lượt đọc admin của hai hàm đó
+//   phải trả về cùng các null. Đường admin duy nhất tới danh tính thật là
+//   `admin_list_community_reports()`: `author_display_name` thật và
+//   `author_is_anonymous_to_readers`, không `author_id`, không đường dẫn avatar.
+// Kiểu hỏng chính: một lần sửa RPC che khôi phục một cột thô
+//   và làm rò danh tính hay điểm trên một hàng ẩn danh / show_score=false.
 const MASKED_SOLUTION_FIELDS = ["author_id", "author_display_name", "author_avatar_path", "score", "score_grading"] as const;
 const MASKED_COMMENT_FIELDS = ["author_id", "author_display_name", "author_avatar_path"] as const;
 const WRITER_DISPLAY_NAME = "CS47 Người viết thật";
@@ -232,12 +232,12 @@ describe.skipIf(!HAS_LIVE_DB)("SE2 — anonymous solution/comment masked to JSON
     adminSession = seededAdmin.client;
     ({ examId, questionIds } = await createExam(admin, "se2", author.id, 2));
 
-    // Real stored values the masked columns must hide and the admin queue must show.
+    // Giá trị thật được lưu mà các cột bị che phải giấu và hàng đợi admin phải hiện.
     await setProfile(admin, writer.id, { displayName: WRITER_DISPLAY_NAME, avatarPath: `${writer.id}/cs47-avatar.png` });
     const writerAttemptId = await submittedAttempt(admin, writer.id, examId);
     await insertResult(admin, { attemptId: writerAttemptId, userId: writer.id, questionIds, totalScore: 7.5 });
-    // Both readers need their own submitted attempt: list/detail are R1-gated for
-    // every caller, so without it the admin read would return zero rows and prove nothing.
+    // Cả hai người đọc cần lượt làm đã nộp của chính họ: list/detail bị cổng R1 chặn
+    // cho mọi người gọi, nên thiếu nó thì lượt đọc admin trả về không hàng nào và chẳng chứng minh gì.
     await submittedAttempt(admin, reader.id, examId);
     await submittedAttempt(admin, seededAdmin.id, examId);
 
@@ -262,8 +262,8 @@ describe.skipIf(!HAS_LIVE_DB)("SE2 — anonymous solution/comment masked to JSON
     if (readerComment.error) throw readerComment.error;
     readerCommentId = (readerComment.data as { comment_id: string }[])[0].comment_id;
 
-    // The writer's own non-anonymous comment under a show_profile=false solution
-    // is masked too (comment identity condition) — and is the is_solution_author=true case.
+    // Bình luận không ẩn danh của chính người viết dưới một bài giải show_profile=false
+    // cũng bị che (điều kiện danh tính bình luận) — và là ca is_solution_author=true.
     const writerComment = await writer.client.rpc("post_community_comment", {
       p_solution_id: solutionId,
       p_question_id: questionIds[0],
@@ -317,7 +317,7 @@ describe.skipIf(!HAS_LIVE_DB)("SE2 — anonymous solution/comment masked to JSON
     });
     expect(reported.error).toBeNull();
 
-    // AC-075: a report changes nothing a reader sees.
+    // AC-075: một báo cáo không đổi gì mà người đọc thấy.
     expect(await readSolution(admin, examId, writer.id)).toEqual(tableBefore);
     const readerViewAfter = await listRow(reader.client);
     expect(readerViewAfter?.status).toBe(readerViewBefore?.status);

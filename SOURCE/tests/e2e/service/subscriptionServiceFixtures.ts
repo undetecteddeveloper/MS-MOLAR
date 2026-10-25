@@ -1,145 +1,145 @@
-// Subscription (payOS prepaid period) — SERVICE-LANE fixture module. Consumed by
-// `subscription.service.e2e.test.ts`: SVC-1 (plan Task 6.1 / backend-task-29) and
-// SVC-2 (plan Task 6.2 / backend-task-30). Collected only by
-// `SOURCE/vitest.localdb.config.ts` (`npm run test:localdb`), never by `npm test`.
+// Subscription (kỳ trả trước payOS) — module fixture LÀN SERVICE. Được
+// `subscription.service.e2e.test.ts` dùng: SVC-1 (plan Task 6.1 / backend-task-29) và
+// SVC-2 (plan Task 6.2 / backend-task-30). Chỉ được `SOURCE/vitest.localdb.config.ts`
+// (`npm run test:localdb`) thu thập, không bao giờ bởi `npm test`.
 //
-// NOTHING HERE HAS BEEN RUN, AND THAT IS THE STATE THIS FILE SHIPS IN.
-//   `payment_orders`, `subscriptions` and `record_payment_settlement` do not exist
-//   on any database yet, and schema gate B (plan Task 1.3 / backend-task-11) has not
-//   run on dev. So: teardown is idempotent BY CONSTRUCTION — every step is a
-//   predicate `delete()` with no read-modify-write, and `tearDown()` is runnable
-//   before `setUp()` has ever run — which is a structural property, NOT an observed
-//   one. The two-runs-in-a-row check the task specifies is
-//   `tearDown(); setUp(); tearDown();` twice over, asserting `countFixtureRows()`
-//   returns all zeros after each teardown, and it is owed the moment gate B is green.
+// KHÔNG GÌ Ở ĐÂY ĐÃ ĐƯỢC CHẠY, VÀ ĐÓ LÀ TRẠNG THÁI FILE NÀY XUẤT XƯỞNG.
+//   `payment_orders`, `subscriptions` và `record_payment_settlement` chưa tồn tại
+//   trên database nào, và cổng schema B (plan Task 1.3 / backend-task-11) chưa
+//   chạy trên dev. Vì vậy: teardown lũy đẳng THEO CẤU TRÚC — mỗi bước là
+//   một `delete()` theo vị từ không có đọc-sửa-ghi, và `tearDown()` chạy được
+//   trước khi `setUp()` từng chạy — là thuộc tính cấu trúc, KHÔNG phải thuộc tính
+//   quan sát được. Phép kiểm hai-lần-chạy-liên-tiếp mà task chỉ định là
+//   `tearDown(); setUp(); tearDown();` hai lượt, khẳng định `countFixtureRows()`
+//   trả toàn số không sau mỗi teardown, và còn nợ ngay khi cổng B xanh.
 //
-// PRECEDENT. `SOURCE/features/exams/__tests__/recordSkillMastery.int.test.ts` (this
-//   repository's only existing service-lane test) and `SOURCE/supabase/test-rls.ts`:
-//   hand-loaded `.env.local`, a service-role `admin` client for seeding, a REAL
-//   signed-in anon client per user for anything RLS decides, a per-fixture id prefix,
-//   and cleanup that runs before AND after.
+// TIỀN LỆ. `SOURCE/features/exams/__tests__/recordSkillMastery.int.test.ts` (test làn service
+//   duy nhất sẵn có của repo này) và `SOURCE/supabase/test-rls.ts`:
+//   `.env.local` nạp bằng tay, một client `admin` service-role để gieo, một client anon
+//   đã đăng nhập THẬT cho mỗi người dùng với bất cứ thứ gì RLS quyết định, một tiền tố id theo fixture,
+//   và dọn dẹp chạy cả trước VÀ sau.
 //
-// WHAT THE `sub-svc-` PREFIX CAN AND CANNOT SCOPE — stated because a prefix that does
-//   not reach a table is the exact way a "prefixed teardown" quietly leaks.
-//   `payment_orders.order_code` is a `bigint` PRIMARY KEY and `subscriptions.user_id`
-//   is a uuid: NEITHER can carry the literal string `sub-svc-`. This is the situation
-//   `test-rls.ts` already hit with `support_tickets.id`, and it is resolved the same
-//   way — scope by the owning `user_id`. This module therefore tears down by THREE scopes,
-//   and each exists because the others miss something:
-//     1. `user_id` in this case's two fixture accounts — the ONLY scope that catches
-//        rows written by the code under test, whose `order_code` and `memo` this
-//        module never chooses (`createOrder()` mints its own).
-//     2. A reserved `order_code` BLOCK — catches rows this module seeded whose
-//        `user_id` was set to null by an account deletion (the column is
-//        `on delete set null`, deliberately: a money record outlives the account).
-//     3. The account EMAIL prefix — how a crashed earlier run's accounts are found at
-//        all, since their ids died with the process that created them.
-//   `memo` carries a `sub-svc-<caseTag>` marker and is a fourth scope, but a DETECTION
-//   one only (`countFixtureRows()`), never a delete predicate: production `createOrder()`
-//   writes its own `MSMOLAR <code>` memo, which this marker can never match, so a
-//   memo-scoped DELETE would silently miss precisely the rows scope 1 exists for.
-//   Scope 2 is exhaustive for SEEDED rows and is kept that way by a bound check:
-//   `seedPendingOrder()` REJECTS an `orderCode` outside the block, so no row this module
-//   writes can end up reachable by scope 1 alone — which is what an account deletion
-//   would then strand, since it nulls `user_id` rather than deleting the row.
+// TIỀN TỐ `sub-svc-` GIỚI HẠN ĐƯỢC VÀ KHÔNG ĐƯỢC GÌ — nêu vì một tiền tố
+//   không với tới một bảng chính là cách một "teardown có tiền tố" rò thầm lặng.
+//   `payment_orders.order_code` là `bigint` KHOÁ CHÍNH và `subscriptions.user_id`
+//   là uuid: KHÔNG cái nào mang được chuỗi literal `sub-svc-`. Đây là tình huống
+//   `test-rls.ts` đã gặp với `support_tickets.id`, và được giải quyết cùng cách
+//   — giới hạn theo `user_id` sở hữu. Module này vì vậy teardown theo BA phạm vi,
+//   và mỗi cái tồn tại vì các cái khác bỏ sót gì đó:
+//     1. `user_id` thuộc hai tài khoản fixture của ca này — phạm vi DUY NHẤT bắt được
+//        các hàng do code đang kiểm ghi, mà `order_code` và `memo` thì module này
+//        không bao giờ chọn (`createOrder()` tự sinh).
+//     2. Một KHỐI `order_code` dành riêng — bắt các hàng module này đã gieo mà
+//        `user_id` bị đặt null do xoá tài khoản (cột là
+//        `on delete set null`, cố ý: bản ghi tiền sống lâu hơn tài khoản).
+//     3. Tiền tố EMAIL của tài khoản — cách các tài khoản của một lượt chạy sập trước đó được tìm
+//        ra, vì id của chúng đã chết cùng tiến trình tạo ra chúng.
+//   `memo` mang dấu `sub-svc-<caseTag>` và là phạm vi thứ tư, nhưng chỉ để PHÁT HIỆN
+//   (`countFixtureRows()`), không bao giờ là vị từ xoá: `createOrder()` production
+//   ghi memo `MSMOLAR <code>` của riêng nó, mà dấu này không bao giờ khớp, nên một
+//   DELETE theo memo sẽ lặng lẽ bỏ sót đúng các hàng mà phạm vi 1 sinh ra để bắt.
+//   Phạm vi 2 vét cạn với hàng ĐÃ GIEO và được giữ như vậy nhờ một phép kiểm biên:
+//   `seedPendingOrder()` TỪ CHỐI một `orderCode` ngoài khối, nên không hàng nào module này
+//   ghi có thể chỉ tới được bằng phạm vi 1 — thứ mà một việc xoá tài khoản
+//   sẽ làm mắc kẹt, vì nó làm null `user_id` thay vì xoá hàng.
 //
-//   WHICH OF THE THREE SCOPES IS ACTUALLY PROVEN, and by what. Stated because the
-//   paragraph above is a normative claim, and a normative claim no test reaches is the
-//   defect shape this lane exists to catch.
-//     - Scope 2 (block) is PROVEN, by SVC-1's orphan case: it manufactures the one row
-//       shape scope 2 uniquely reaches — `user_id` NULL — and asserts the row is gone
-//       after `tearDown()`. Deleting the block delete below makes that case red.
-//     - Scope 1 (`user_id`) is UNPROVEN in the service lane, and cannot be proven there:
-//       a row reachable by scope 1 ALONE must sit outside the reserved block, and
-//       `requireCodeInBlock()` refuses to seed one. Only a case that drives production
-//       `createOrder()` — which mints its own code — can build one, and no SVC-1 case
-//       does. Deleting the `user_id` delete below therefore leaves the whole lane green.
-//     - Scope 3 (email prefix) is exercised by every `setUp()`, which tears down first.
-//   Teardown's row counts prove the UNION of scopes 1 and 2, not either one alone.
+//   PHẠM VI NÀO TRONG BA ĐƯỢC CHỨNG MINH THẬT, và bởi gì. Nêu vì
+//   đoạn trên là một khẳng định chuẩn tắc, và một khẳng định chuẩn tắc mà không test nào với tới chính là
+//   dạng lỗi mà làn này sinh ra để bắt.
+//     - Phạm vi 2 (khối) ĐƯỢC CHỨNG MINH, bởi ca mồ côi của SVC-1: nó tạo ra hình dạng hàng duy nhất
+//       mà phạm vi 2 độc nhất với tới — `user_id` NULL — và khẳng định hàng mất
+//       sau `tearDown()`. Xoá lệnh xoá theo khối bên dưới làm ca đó đỏ.
+//     - Phạm vi 1 (`user_id`) CHƯA ĐƯỢC CHỨNG MINH trong làn service, và không chứng minh được ở đó:
+//       một hàng chỉ phạm vi 1 với tới được phải nằm ngoài khối dành riêng, và
+//       `requireCodeInBlock()` từ chối gieo cái như vậy. Chỉ một ca điều khiển `createOrder()`
+//       production — thứ tự sinh mã — mới dựng được, và không ca SVC-1 nào làm.
+//       Xoá lệnh xoá `user_id` bên dưới do đó để cả làn vẫn xanh.
+//     - Phạm vi 3 (tiền tố email) được thực thi bởi mọi `setUp()`, vốn teardown trước.
+//   Số đếm hàng của teardown chứng minh HỢP của phạm vi 1 và 2, không chứng minh riêng cái nào.
 //
-// WHAT `countFixtureRows()` CAN AND CANNOT OBSERVE — stated because a leak detector that
-//   cannot fail is worse than none, since it reads as evidence.
-//     - `authUsers` is ENTAILED, not observed: `tearDown()` deletes every listed account
-//       and `deleteUser` throws on error, so a returning `listFixtureUsers()` is empty by
-//       construction. It carries NO discriminating power after a teardown that returned.
-//     - `subscriptions` is ENTAILED too, twice over: `subscriptions.user_id` is
-//       `on delete cascade`, and with no accounts left the id list is empty, so the branch
-//       is skipped and returns 0 WITHOUT QUERYING. Also no discriminating power.
-//     - `paymentOrders` is the one count that can fail for the right reason, and only
-//       because of the `memo` scope: the block and `user_id` scopes re-ask exactly the two
-//       predicates the delete just ran, so they answer 0 whether or not it worked. The
-//       `memo` scope shares no predicate with any delete.
-//   So the two-runs-in-a-row check owed once gate B is green proves fixture hygiene for
-//   `payment_orders` and, for the other two scopes, proves only that teardown did not
-//   throw. That is what those numbers are worth; reading them as more would be the hollow
-//   assertion this lane exists to avoid.
+// `countFixtureRows()` QUAN SÁT ĐƯỢC VÀ KHÔNG QUAN SÁT ĐƯỢC GÌ — nêu vì một bộ phát hiện rò mà
+//   không thể hỏng còn tệ hơn không có, vì nó đọc như bằng chứng.
+//     - `authUsers` là ĐƯỢC KÉO THEO, không quan sát: `tearDown()` xoá mọi tài khoản được liệt kê
+//       và `deleteUser` ném lỗi nếu lỗi, nên một `listFixtureUsers()` trả về là rỗng
+//       theo cấu trúc. Nó KHÔNG có sức phân biệt nào sau một teardown đã trả về.
+//     - `subscriptions` cũng được KÉO THEO, hai lần: `subscriptions.user_id` là
+//       `on delete cascade`, và khi không còn tài khoản nào thì danh sách id rỗng, nên nhánh
+//       bị bỏ qua và trả 0 MÀ KHÔNG TRUY VẤN. Cũng không có sức phân biệt.
+//     - `paymentOrders` là số đếm duy nhất có thể hỏng vì lý do đúng, và chỉ
+//       nhờ phạm vi `memo`: các phạm vi khối và `user_id` hỏi lại đúng hai
+//       vị từ mà lệnh xoá vừa chạy, nên chúng trả 0 dù có hiệu lực hay không. Phạm vi
+//       `memo` không chung vị từ nào với lệnh xoá nào.
+//   Vậy phép kiểm hai-lần-chạy-liên-tiếp còn nợ khi cổng B xanh chứng minh vệ sinh fixture cho
+//   `payment_orders` và, với hai phạm vi còn lại, chỉ chứng minh teardown không
+//   ném lỗi. Đó là giá trị của các con số ấy; đọc chúng nhiều hơn thế sẽ là
+//   khẳng định rỗng mà làn này sinh ra để tránh.
 //
-// FIXTURE ACCOUNTS ARE DELETED, unlike the two precedent files which keep theirs.
-//   Three reasons, all load-bearing here and not there: (a) the task's own success
-//   criterion counts remaining `sub-svc-` rows in the AUTH USERS table too;
-//   (b) `subscriptions` is keyed by `user_id`, so a persistent account carries its
-//   `expires_at` into the next run and SVC-1's "advanced by exactly 30 days from the
-//   pre-state" would be measured from whatever the previous run left behind;
-//   (c) `guard()` rate limits are keyed by user id in Upstash and survive across runs
-//   — the hazard `recordSkillMastery.int.test.ts` records against its own persistent
-//   account. Deletion order is orders → subscriptions → accounts, so no order is ever
-//   orphaned by the cascade it would otherwise hit.
+// TÀI KHOẢN FIXTURE BỊ XOÁ, khác với hai file tiền lệ giữ tài khoản của chúng.
+//   Ba lý do, đều chịu lực ở đây mà không ở đó: (a) tiêu chí thành công của chính task
+//   đếm cả các hàng `sub-svc-` còn lại trong bảng AUTH USERS;
+//   (b) `subscriptions` khoá theo `user_id`, nên một tài khoản bền vững mang
+//   `expires_at` của nó sang lượt chạy sau và "tiến đúng 30 ngày từ trạng thái
+//   trước" của SVC-1 sẽ bị đo từ bất cứ thứ gì lượt chạy trước để lại;
+//   (c) giới hạn tần suất của `guard()` khoá theo id người dùng ở Upstash và sống qua các lượt chạy
+//   — mối nguy mà `recordSkillMastery.int.test.ts` ghi cho tài khoản bền vững của chính nó.
+//   Thứ tự xoá là đơn → subscription → tài khoản, nên không đơn nào bị mồ côi bởi
+//   cascade mà nó lẽ ra sẽ gặp.
 //
-// TRANSCRIBED VALUES AND THEIR RECONCILIATION OWNERS. Most of what this module names
-//   still does not exist in code, so those constants remain transcriptions with NO
-//   compile-time link to the real declaration — `tsc` cannot see drift there, and
-//   saying otherwise would be the false claim the sibling fixture-e2e harness was
-//   corrected for. Owners:
-//     - `FixturePaymentStatusResult`            -> RECONCILED (backend-task-15 shipped).
-//       It is now `Awaited<ReturnType<typeof getPaymentStatus>>` — a compile-time LINK
-//       to the adapter's real return type, not a hand-copied shape. This is the one
-//       transcription whose drift was both silent and load-bearing: the two-property
-//       object IS P-1, so an adapter that grew a third property would have left this
-//       file quietly describing a boundary that no longer existed.
-//     - `FIXTURE_AMOUNT_VND`, the 30-min window -> RECONCILED (backend-task-12 shipped).
-//       Both are now IMPORTED from `lib/billing/pricing.ts`, not transcribed, so `tsc`
-//       does see drift on these two and the caveat above no longer applies to them.
-//     - `FIXTURE_PERIOD_DAYS`, every table and column name -> backend-task-09 (`schema.sql`)
-//   The column names differ from the type transcriptions in one way worth stating:
-//   they cross PostgREST as STRINGS, so no compile-time link is possible for them at
-//   all — but they are detectable at RUN time, loudly, on the first insert once gate B
-//   is green. That is a weaker guarantee than a type error and a stronger one than
-//   nothing, and it is the honest description of both.
+// GIÁ TRỊ ĐÃ CHÉP VÀ CHỦ SỞ HỮU ĐỐI CHIẾU CỦA CHÚNG. Phần lớn thứ module này nêu tên
+//   vẫn chưa tồn tại trong code, nên các hằng đó vẫn là bản chép KHÔNG CÓ liên kết
+//   lúc biên dịch với khai báo thật — `tsc` không thấy được sự lệch ở đó,
+//   và nói khác đi sẽ là khẳng định sai mà harness fixture-e2e anh em
+//   đã bị sửa. Chủ sở hữu:
+//     - `FixturePaymentStatusResult`            -> ĐÃ ĐỐI CHIẾU (backend-task-15 đã ship).
+//       Nay là `Awaited<ReturnType<typeof getPaymentStatus>>` — một LIÊN KẾT lúc biên dịch
+//       với kiểu trả về thật của adapter, không phải hình dạng chép tay. Đây là bản chép
+//       duy nhất mà sự lệch vừa im lặng vừa chịu lực: object hai-thuộc-tính
+//       CHÍNH LÀ P-1, nên một adapter mọc thêm thuộc tính thứ ba sẽ để file này
+//       lặng lẽ mô tả một ranh giới không còn tồn tại.
+//     - `FIXTURE_AMOUNT_VND`, cửa sổ 30 phút -> ĐÃ ĐỐI CHIẾU (backend-task-12 đã ship).
+//       Cả hai nay được IMPORT từ `lib/billing/pricing.ts`, không chép, nên `tsc`
+//       thấy được sự lệch ở hai cái này và lưu ý ở trên không còn áp dụng cho chúng.
+//     - `FIXTURE_PERIOD_DAYS`, mọi tên bảng và cột -> backend-task-09 (`schema.sql`)
+//   Tên cột khác với các bản chép kiểu ở một điểm đáng nêu:
+//   chúng đi qua PostgREST dưới dạng CHUỖI, nên không thể có liên kết lúc biên dịch nào cho chúng —
+//   nhưng phát hiện được lúc CHẠY, to tiếng, ở lần insert đầu khi cổng B
+//   xanh. Đó là bảo đảm yếu hơn một lỗi kiểu và mạnh hơn không có gì,
+//   và là mô tả trung thực của cả hai.
 //
-// THE ADAPTER'S RETURN SHAPE — the contradiction was INTRA-DOCUMENT, and it has been
-//   corrected at the source rather than worked around here. The backend DD required the
-//   two-property object in THREE places — § "Payer-identifying data is never stored
-//   either" (P-1, normative: *"`settleOrder()` reads only `status` and `amount`"*), the
-//   Field Propagation Map's `transactions[]` row (*"carries `status` and `amount` and
-//   nothing else"*) and the P-1 verification mechanism (*"asserted to have exactly two
-//   properties"*) — while ONE line, the signature block under § `lib/billing/payos/`,
-//   still declared the bare union `Promise<"pending"|"paid"|"cancelled"|"unknown">`. The
-//   work plan's Connection Map, backend-task-15 and backend-task-16 agree with the three,
-//   and the two-property object is the only shape under which `settleOrder()` step 3 can
-//   compare the provider's amount against the stored row, which SVC-1 exercises. Since
-//   the stale line sat in the block a backend-task-15 implementer copies from, it was
-//   corrected in the DD (v1.7) instead of being annotated here. backend-task-15 has
-//   since landed the two-property object, and this file no longer restates it: the
-//   type below is derived from the adapter's own signature, so an adapter that landed
-//   anything else is now a `tsc` error here rather than a surprise when SVC-1 runs.
+// HÌNH DẠNG TRẢ VỀ CỦA ADAPTER — mâu thuẫn là NỘI TÀI LIỆU, và đã được
+//   sửa tại nguồn thay vì lách ở đây. Backend DD đòi object hai-thuộc-tính ở
+//   BA nơi — § "Payer-identifying data is never stored
+//   either" (P-1, chuẩn tắc: *"`settleOrder()` chỉ đọc `status` và `amount`"*), dòng
+//   `transactions[]` của Field Propagation Map (*"mang `status` và `amount` và
+//   không gì khác"*) và cơ chế kiểm chứng P-1 (*"được khẳng định có đúng hai
+//   thuộc tính"*) — trong khi MỘT dòng, khối chữ ký dưới § `lib/billing/payos/`,
+//   vẫn khai báo union trần `Promise<"pending"|"paid"|"cancelled"|"unknown">`. Connection Map
+//   của work plan, backend-task-15 và backend-task-16 đồng ý với ba nơi kia,
+//   và object hai-thuộc-tính là hình dạng duy nhất mà bước 3 của `settleOrder()` có thể
+//   so số tiền của nhà cung cấp với hàng đã lưu, thứ SVC-1 thực thi. Vì
+//   dòng lỗi thời nằm trong khối mà người cài đặt backend-task-15 chép từ đó, nó được
+//   sửa trong DD (v1.7) thay vì chú thích ở đây. backend-task-15
+//   sau đó đã đáp xuống object hai-thuộc-tính, và file này không còn nhắc lại nó:
+//   kiểu bên dưới suy ra từ chữ ký của chính adapter, nên một adapter đáp xuống
+//   bất cứ thứ gì khác giờ là lỗi `tsc` ở đây thay vì một bất ngờ khi SVC-1 chạy.
 //
-// COUNTS MEASURE INVOCATION, NOT COMPLETION. Every counter is incremented BEFORE the
-//   hold gate is awaited and before any rejection is thrown, so a call that is in
-//   flight — or one that is about to fail — is already counted. SVC-1(f) asserts the
-//   count is exactly 1 against a REJECTING adapter, and SVC-2(e) asserts 0 per refusal
-//   branch; both read a number a completion-counting stub would get wrong.
+// SỐ ĐẾM ĐO LỜI GỌI, KHÔNG PHẢI HOÀN TẤT. Mọi bộ đếm được tăng TRƯỚC khi
+//   cổng giữ được await và trước mọi từ chối được ném, nên một lời gọi đang
+//   bay — hay sắp thất bại — đã được đếm. SVC-1(f) khẳng định số đếm
+//   đúng bằng 1 với một adapter REJECT, và SVC-2(e) khẳng định 0 cho mỗi nhánh từ chối;
+//   cả hai đọc một con số mà một stub đếm-hoàn-tất sẽ làm sai.
 //
-// NO SHARED MUTABLE STATE. Every fixture is created by
-//   `createSubscriptionServiceFixture()` and owns its accounts, its order-code block
-//   and its adapter stub, so two cases cannot reach each other's rows. The file's one
-//   piece of module-level state is the append-only `caseTag` / `orderCodeBlock` registry
-//   next to the constructor: no fixture behaviour ever reads it, it only throws on reuse
-//   at construction time, and it exists because the alternative was enforcing the two
-//   isolation rules by review. The other piece that cannot live here is the session
-//   holder the `vi.mock("@/lib/supabase/server")`
-//   factory reads: `vi.mock` is hoisted above imports, so the holder has to be created
-//   in the test file with `vi.hoisted` (exactly as `recordSkillMastery.int.test.ts`
-//   does) and handed in. It is an injected parameter, not a shared global:
+// KHÔNG CÓ TRẠNG THÁI KHẢ BIẾN DÙNG CHUNG. Mỗi fixture được tạo bởi
+//   `createSubscriptionServiceFixture()` và sở hữu các tài khoản, khối mã đơn
+//   và stub adapter của nó, nên hai ca không thể với tới hàng của nhau. Mảnh
+//   trạng thái cấp module duy nhất của file là registry chỉ-thêm `caseTag` / `orderCodeBlock`
+//   cạnh hàm dựng: không hành vi fixture nào đọc nó, nó chỉ ném lỗi khi dùng lại lúc
+//   dựng, và tồn tại vì phương án khác là cưỡng chế hai
+//   luật cô lập bằng review. Mảnh khác không thể sống ở đây là holder phiên
+//   mà factory `vi.mock("@/lib/supabase/server")` đọc:
+//   `vi.mock` được hoist lên trên import, nên holder phải được tạo
+//   trong file test bằng `vi.hoisted` (đúng như `recordSkillMastery.int.test.ts`
+//   làm) và truyền vào. Nó là tham số được tiêm, không phải global dùng chung:
 //
 //     const { sessionHolder } = vi.hoisted(() => ({
 //       sessionHolder: { current: null as SupabaseClient | null },
@@ -159,10 +159,10 @@ import type { getPaymentStatus } from "@/lib/billing/payos";
 
 // --- Environment ------------------------------------------------------------
 
-/** Vitest does not load `.env.local`; the precedent file loads it by hand and so does
- *  this one. Outer quotes are stripped because Next strips them when it loads the same
- *  file, so several values in it are written quoted and still work in production.
- *  Never overrides a variable already present in the environment. */
+/** Vitest không nạp `.env.local`; file tiền lệ nạp nó bằng tay và file này cũng vậy.
+ *  Dấu nháy ngoài bị gỡ vì Next gỡ chúng khi nạp cùng file đó, nên nhiều giá trị
+ *  trong đó được viết có nháy mà vẫn chạy ở production.
+ *  Không bao giờ ghi đè một biến đã có sẵn trong môi trường. */
 function loadEnvLocal(): void {
   const path = fileURLToPath(new URL("../../../.env.local", import.meta.url));
   if (!existsSync(path)) return;
@@ -185,39 +185,39 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-/** Gate for `describe.skipIf(!HAS_LIVE_DB)`, read at import time because the skip is
- *  decided at collection time. It says three environment variables are present and
- *  NOTHING MORE — in particular it does not say schema gate B is green, which is the
- *  separate, blocking precondition for running any case in this lane at all. */
+/** Cổng cho `describe.skipIf(!HAS_LIVE_DB)`, đọc lúc import vì việc bỏ qua được
+ *  quyết định lúc thu thập. Nó nói ba biến môi trường có mặt và KHÔNG GÌ HƠN — đặc biệt
+ *  nó không nói cổng schema B xanh, vốn là điều kiện tiên quyết riêng, chặn
+ *  để chạy bất kỳ ca nào trong làn này. */
 export const HAS_LIVE_DB = Boolean(SUPABASE_URL && ANON_KEY && SERVICE_ROLE_KEY);
 
-// --- Transcribed values (see the header for reconciliation owners) -----------
+// --- Giá trị đã chép (xem comment đầu file cho chủ sở hữu đối chiếu) -----------
 
-/** The lane's isolation marker. It reaches the account emails and `payment_orders.memo`;
- *  it cannot reach `order_code` or `user_id` — see the header. */
+/** Dấu cô lập của làn. Nó tới email tài khoản và `payment_orders.memo`;
+ *  nó không tới được `order_code` hay `user_id` — xem comment đầu file. */
 export const SUB_SVC_PREFIX = "sub-svc-";
 
-/** The real `PREMIUM_PRICE_VND` (AC-026), imported rather than transcribed. A price
- *  change now moves the seeded amount with it; the previous hand-copied `39_000` would
- *  have left this lane silently seeding the old price against the new code. */
+/** `PREMIUM_PRICE_VND` thật (AC-026), được import thay vì chép. Đổi giá nay
+ *  làm số tiền gieo đổi theo; `39_000` chép tay trước đây sẽ để làn này
+ *  lặng lẽ gieo giá cũ so với code mới. */
 export const FIXTURE_AMOUNT_VND = PREMIUM_PRICE_VND;
 
-/** `record_payment_settlement(p_period_days default 30)`. Transcribed — owner
- *  backend-task-09. SVC-1 computes its expected instants from this and asserts them as
- *  literals; it must never read the granted period back from the function under test. */
+/** `record_payment_settlement(p_period_days default 30)`. Chép — chủ sở hữu
+ *  backend-task-09. SVC-1 tính các thời điểm kỳ vọng từ cái này và khẳng định chúng dưới dạng
+ *  literal; nó không bao giờ được đọc lại kỳ hạn đã cấp từ hàm đang kiểm. */
 export const FIXTURE_PERIOD_DAYS = 30;
 
-/** Order codes are allocated from a reserved band far above epoch-milliseconds, which
- *  is what a real `createOrder()` derives its codes from — so a fixture code cannot
- *  collide with a real one, and the block delete in `tearDown()` cannot reach a real
- *  row. Each fixture instance owns one block of `FIXTURE_ORDER_CODE_BLOCK_SIZE`
- *  consecutive codes. */
+/** Mã đơn được cấp từ một dải dành riêng cao hơn nhiều so với epoch-mili giây, thứ mà
+ *  `createOrder()` thật suy mã của nó từ đó — nên một mã fixture không thể
+ *  va chạm với mã thật, và lệnh xoá theo khối trong `tearDown()` không thể với tới một hàng
+ *  thật. Mỗi instance fixture sở hữu một khối gồm `FIXTURE_ORDER_CODE_BLOCK_SIZE`
+ *  mã liên tiếp. */
 export const FIXTURE_ORDER_CODE_BASE = 8_000_000_000_000;
 export const FIXTURE_ORDER_CODE_BLOCK_SIZE = 1_000;
 
-/** A VietQR/EMVCo payload string, not a URL (UI-D14). Inert here — no service case
- *  reads it as a QR — but the column is `not null` and a blank value would let an
- *  "all four transfer fields survived" assertion pass against an empty row. */
+/** Một chuỗi payload VietQR/EMVCo, không phải URL (UI-D14). Vô hại ở đây — không ca service nào
+ *  đọc nó như một QR — nhưng cột là `not null` và giá trị trống sẽ cho phép một
+ *  khẳng định "cả bốn trường chuyển khoản sống sót" qua trên một hàng rỗng. */
 const FIXTURE_QR_PAYLOAD =
   "00020101021238570010A00000072701270006970436011300110012345670208QRIBFTTA53037045802VN62190815MSMOLAR17555184006304A1B2";
 const FIXTURE_ACCOUNT_NUMBER = "0011001234567";
@@ -225,17 +225,17 @@ const FIXTURE_ACCOUNT_NAME = "CONG TY TNHH MS MOLAR";
 
 const FIXTURE_PASSWORD = "sub-svc-password-123";
 
-/** Upper bound on rows read while counting leftovers. A case seeds single digits of
- *  rows, so reaching this limit means something is badly wrong — and the reported count
- *  would then be a floor rather than a total. Explicit rather than relying on
- *  PostgREST's implicit page size, which truncates silently. */
+/** Cận trên số hàng đọc khi đếm hàng còn sót. Một ca gieo cỡ một chữ số
+ *  hàng, nên chạm giới hạn này nghĩa là có gì đó rất sai — và số đếm báo cáo
+ *  khi đó là một cận dưới chứ không phải tổng. Tường minh thay vì dựa vào
+ *  kích thước trang ngầm của PostgREST, thứ cắt bớt một cách im lặng. */
 const FIXTURE_ROW_SCAN_LIMIT = 1_000;
 
-// --- Row shapes (transcribed column names — owner backend-task-09) -----------
+// --- Hình dạng hàng (tên cột đã chép — chủ sở hữu backend-task-09) -----------
 
-/** The eleven `payment_orders` columns. Rows are read with `select("*")` and this type
- *  is a view over the result, so a twelfth column added later still participates in
- *  SVC-2's byte-identity comparison instead of being projected away by the select. */
+/** Mười một cột của `payment_orders`. Các hàng được đọc bằng `select("*")` và kiểu này
+ *  là một góc nhìn trên kết quả, nên một cột thứ mười hai thêm về sau vẫn tham gia
+ *  phép so sánh giống-từng-byte của SVC-2 thay vì bị phép chiếu của select loại bỏ. */
 export interface PaymentOrderRow {
   order_code: number;
   user_id: string | null;
@@ -257,9 +257,9 @@ export interface SubscriptionRow {
   updated_at: string;
 }
 
-/** What `seedPendingOrder()` wrote, in the caller's vocabulary — returned so a case can
- *  assert against the values it asked for rather than re-reading the row it is about to
- *  make claims about. */
+/** Thứ mà `seedPendingOrder()` đã ghi, theo từ vựng của người gọi — trả về để một ca có thể
+ *  khẳng định theo các giá trị nó đã yêu cầu thay vì đọc lại hàng mà nó sắp
+ *  đưa ra khẳng định. */
 export interface SeededOrder {
   orderCode: number;
   userId: string;
@@ -270,73 +270,73 @@ export interface SeededOrder {
 }
 
 export interface SeedOrderOverrides {
-  /** Must lie inside this fixture's reserved block, and is rejected otherwise — a row
-   *  outside the block is reachable by the owning-`user_id` scope alone, so it would
-   *  survive teardown the moment its account deletion nulled that column. */
+  /** Phải nằm trong khối dành riêng của fixture này, nếu không bị từ chối — một hàng
+   *  ngoài khối chỉ tới được bằng phạm vi `user_id` sở hữu, nên nó sẽ
+   *  sống sót qua teardown ngay khi việc xoá tài khoản làm null cột đó. */
   orderCode?: number;
   amountVnd?: number;
-  /** One of the four `payment_orders.status` CHECK literals. */
+  /** Một trong bốn literal CHECK của `payment_orders.status`. */
   status?: string;
-  /** Defaults to now + the 30-minute window. Pass a past instant for the
-   *  expired-window branch. Deliberately relative to the real clock: the predicate
-   *  under test compares against Postgres `now()`, and this lane has no clock control
-   *  over the database — there is no pin here and none is claimed. */
+  /** Mặc định là bây giờ + cửa sổ 30 phút. Truyền một thời điểm quá khứ cho
+   *  nhánh cửa-sổ-đã-hết-hạn. Cố ý tương đối theo đồng hồ thật: vị từ
+   *  đang kiểm so với `now()` của Postgres, và làn này không kiểm soát đồng hồ
+   *  của database — không có ghim nào ở đây và cũng không tuyên bố có. */
   pendingUntil?: string;
 }
 
-// --- The counted payOS adapter stub -----------------------------------------
+// --- Stub adapter payOS có đếm -----------------------------------------
 
-/** `getPaymentStatus()`'s return, LINKED to the adapter rather than transcribed from
- *  it: exactly two properties, and exactly two is the point (P-1) — the adapter is
- *  where provider vocabulary stops. A third property appearing on the real return type
- *  is a compile error in every SVC case that reads this stub, which is the only thing
- *  that makes the drift visible before a settlement run. See the header.
+/** Giá trị trả về của `getPaymentStatus()`, NỐI với adapter thay vì chép từ
+ *  nó: đúng hai thuộc tính, và đúng hai là mấu chốt (P-1) — adapter là
+ *  nơi từ vựng của nhà cung cấp dừng lại. Một thuộc tính thứ ba xuất hiện trên kiểu trả về thật
+ *  là lỗi biên dịch ở mọi ca SVC đọc stub này, là thứ duy nhất
+ *  làm sự lệch nhìn thấy được trước một lượt settlement. Xem comment đầu file.
  *
- *  Type-only import: `lib/billing/payos/index.ts` carries `import "server-only"`, so
- *  pulling it in as a value would throw the moment this module loads. `import type`
- *  is erased, so the link costs nothing at run time. */
+ *  Import chỉ-kiểu: `lib/billing/payos/index.ts` mang `import "server-only"`, nên
+ *  kéo nó vào như một giá trị sẽ ném lỗi ngay khi module này nạp. `import type`
+ *  bị xoá, nên liên kết này không tốn gì lúc chạy. */
 export type FixturePaymentStatusResult = Awaited<ReturnType<typeof getPaymentStatus>>;
 
 export type PayosPaymentStatus = FixturePaymentStatusResult["status"];
 
-/** Only `getPaymentStatus` is stubbed. `createPaymentRequest` and
- *  `verifyWebhookSignature` are deliberately absent: neither SVC case reaches them
- *  (both seed their orders directly rather than going through `createOrder()`), and
- *  transcribing `createPaymentRequest`'s seven-field return would add a second
- *  undetectable-drift surface for nothing. Whoever needs them adds them. */
+/** Chỉ stub `getPaymentStatus`. `createPaymentRequest` và
+ *  `verifyWebhookSignature` cố ý vắng mặt: không ca SVC nào với tới chúng
+ *  (cả hai gieo đơn trực tiếp thay vì qua `createOrder()`), và
+ *  chép giá trị trả về bảy trường của `createPaymentRequest` sẽ thêm một bề mặt trôi lệch
+ *  không phát hiện được thứ hai mà chẳng được gì. Ai cần chúng thì thêm. */
 export interface PayosAdapterStub {
-  /** Incremented on ENTRY to `simulateGetPaymentStatus` — before the hold gate and
-   *  before any rejection. A held or failing call is already counted. */
+  /** Tăng khi VÀO `simulateGetPaymentStatus` — trước cổng giữ và
+   *  trước mọi từ chối. Một lời gọi bị giữ hay thất bại đã được đếm. */
   getPaymentStatusCallCount: number;
-  /** Order codes passed to `simulateGetPaymentStatus`, in invocation order: one call
-   *  against the wrong order is still a count of one. */
+  /** Mã đơn truyền cho `simulateGetPaymentStatus`, theo thứ tự gọi: một lời gọi
+   *  tới sai đơn vẫn là số đếm một. */
   getPaymentStatusOrderCodes: number[];
   setPaymentStatus(result: FixturePaymentStatusResult): void;
-  /** Arms a rejection for every subsequent call; `null` disarms. SVC-1(f) asserts the
-   *  invocation count is exactly 1 after one rejected call — no retry storm. */
+  /** Gắn một từ chối cho mọi lời gọi tiếp theo; `null` gỡ. SVC-1(f) khẳng định
+   *  số lần gọi đúng bằng 1 sau một lời gọi bị từ chối — không bão thử lại. */
   setPaymentStatusRejection(error: Error | null): void;
-  /** Stands in for the real `getPaymentStatus(orderCode)`. No provider is contacted and
-   *  no money moves. */
+  /** Thế chỗ `getPaymentStatus(orderCode)` thật. Không nhà cung cấp nào được liên hệ và
+   *  không tiền nào chuyển. */
   simulateGetPaymentStatus(orderCode: number): Promise<FixturePaymentStatusResult>;
-  /** Arms the hold: from the next call on, `simulateGetPaymentStatus` counts and records
-   *  as usual and then STAYS UNRESOLVED until `releaseHeldPaymentStatus()`. The arm is
-   *  not consumed by the first call, so a second concurrent call is held too — which is
-   *  what makes SVC-1's concurrent-settlement case (the one that proves the recorded
-   *  ADR-0014 two-statement deviation rather than assuming it) contend deterministically
-   *  instead of on whichever call the network happened to answer first. */
+  /** Gắn cổng giữ: từ lời gọi kế tiếp, `simulateGetPaymentStatus` đếm và ghi
+   *  như thường rồi Ở YÊN CHƯA GIẢI QUYẾT cho tới `releaseHeldPaymentStatus()`. Việc gắn
+   *  không bị lời gọi đầu tiêu thụ, nên lời gọi đồng thời thứ hai cũng bị giữ — điều
+   *  làm ca settlement đồng thời của SVC-1 (ca chứng minh độ lệch hai-câu-lệnh
+   *  ADR-0014 đã ghi chứ không giả định) tranh chấp một cách xác định
+   *  thay vì theo lời gọi nào mạng tình cờ trả lời trước. */
   holdNextPaymentStatus(): void;
-  /** Resolves every held call with the result configured AT RELEASE TIME, so a case can
-   *  hold, reconfigure, then release. Disarms the hold. */
+  /** Giải quyết mọi lời gọi bị giữ bằng kết quả được cấu hình TẠI LÚC THẢ, nên một ca có thể
+   *  giữ, cấu hình lại, rồi thả. Gỡ cổng giữ. */
   releaseHeldPaymentStatus(): void;
-  /** Back to the defaults. Releases any held call first — a leaked hold would strand the
-   *  next branch's call in flight rather than failing it. SVC-2 calls this between its
-   *  two refusal branches, because each branch asserts its own count of 0.
+  /** Về mặc định. Thả mọi lời gọi bị giữ trước — một cổng giữ bị rò sẽ giam
+   *  lời gọi của nhánh kế tiếp ở trạng thái đang bay thay vì làm nó hỏng. SVC-2 gọi cái này giữa
+   *  hai nhánh từ chối của nó, vì mỗi nhánh khẳng định số đếm 0 của riêng nó.
    *
-   *  A call held across a `reset()` RESOLVES with the restored default; it does not
-   *  reject, even if a rejection was armed when it was invoked, because the rejection is
-   *  read after the wake and `reset()` has already disarmed it. Deliberate: a stale error
-   *  surfacing inside the NEXT case is worse than a defaulted value escaping the previous
-   *  one. Its invocation was already counted on the counter `reset()` then zeroed. */
+   *  Một lời gọi bị giữ qua một `reset()` RESOLVE với mặc định đã khôi phục; nó không
+   *  reject, kể cả khi một từ chối đã được gắn lúc nó được gọi, vì từ chối được
+   *  đọc sau khi thức dậy và `reset()` đã gỡ nó. Cố ý: một lỗi cũ
+   *  nổi lên trong ca KẾ TIẾP còn tệ hơn một giá trị mặc định lọt ra khỏi ca trước.
+   *  Lời gọi của nó đã được đếm trên bộ đếm mà `reset()` sau đó đặt về 0. */
   reset(): void;
 }
 
@@ -355,9 +355,9 @@ export function createPayosAdapterStub(): PayosAdapterStub {
     getPaymentStatusCallCount: 0,
     getPaymentStatusOrderCodes: [],
     setPaymentStatus(next) {
-      // Copied, not aliased: `DEFAULT_PAYMENT_STATUS` is spread on both paths that
-      // install it, and a caller-owned object retained by identity would let a later
-      // mutation of it change what an already-configured stub answers.
+      // Sao chép, không alias: `DEFAULT_PAYMENT_STATUS` được spread trên cả hai đường
+      //  cài nó, và một object do người gọi sở hữu mà ta giữ theo danh tính sẽ để một
+      //  đột biến về sau của nó đổi thứ một stub đã cấu hình trả lời.
       result = { ...next };
     },
     setPaymentStatusRejection(error) {
@@ -366,12 +366,12 @@ export function createPayosAdapterStub(): PayosAdapterStub {
     async simulateGetPaymentStatus(orderCode) {
       stub.getPaymentStatusCallCount += 1;
       stub.getPaymentStatusOrderCodes.push(orderCode);
-      // Captured before the await: `releaseHeldPaymentStatus()` clears `heldGate`, and a
-      // call already waiting must still be woken by that same gate.
+      // Bắt trước await: `releaseHeldPaymentStatus()` xoá `heldGate`, và một
+      //  lời gọi đang chờ vẫn phải được đánh thức bởi chính cổng đó.
       const gate = heldGate;
       if (gate) await gate;
-      // Read after the await, so a rejection or result configured during the hold
-      // applies to the call that was held.
+      // Đọc sau await, để một từ chối hay kết quả được cấu hình trong lúc giữ
+      //  áp dụng cho lời gọi đã bị giữ.
       if (rejection) throw rejection;
       return result;
     },
@@ -401,30 +401,30 @@ export function createPayosAdapterStub(): PayosAdapterStub {
 
 export type FixtureUserRole = "A" | "B";
 
-/** The `vi.hoisted` object the test file's `vi.mock("@/lib/supabase/server")` factory
- *  reads. Injected rather than owned here because `vi.mock` is hoisted above imports —
- *  see the header. */
+/** Object `vi.hoisted` mà factory `vi.mock("@/lib/supabase/server")` của file test
+ *  đọc. Được tiêm vào thay vì sở hữu ở đây vì `vi.mock` được hoist lên trên import —
+ *  xem comment đầu file. */
 export interface ServiceSessionHolder {
   current: SupabaseClient | null;
 }
 
 export interface SubscriptionServiceFixtureOptions {
-  /** Distinguishes this case's accounts and memos. Lowercase letters, digits and
-   *  hyphens only, because it goes into an email local part. Must be unique within the
-   *  file — reuse throws, see the registry next to `createSubscriptionServiceFixture()`. */
+  /** Phân biệt tài khoản và memo của ca này. Chỉ chữ thường, chữ số và
+   *  dấu gạch nối, vì nó đi vào phần local của email. Phải duy nhất trong
+   *  file — dùng lại sẽ ném lỗi, xem registry cạnh `createSubscriptionServiceFixture()`. */
   caseTag: string;
-  /** 0-based; each block is `FIXTURE_ORDER_CODE_BLOCK_SIZE` codes wide. Two cases in the
-   *  same file must pass different blocks — that, together with the per-case accounts, is
-   *  what makes one case's teardown unable to reach another case's rows — and reuse
-   *  throws rather than relying on that being remembered. */
+  /** Tính từ 0; mỗi khối rộng `FIXTURE_ORDER_CODE_BLOCK_SIZE` mã. Hai ca trong cùng
+   *  file phải truyền các khối khác nhau — điều đó, cùng với các tài khoản theo từng ca, là
+   *  thứ làm teardown của ca này không thể với tới hàng của ca khác — và dùng lại
+   *  ném lỗi thay vì dựa vào việc ai đó nhớ. */
   orderCodeBlock: number;
   sessionHolder: ServiceSessionHolder;
 }
 
-/** All three must be 0 after `tearDown()`. Reported separately rather than summed: which
- *  one is non-zero says which scope leaked. Only `paymentOrders` can be non-zero after a
- *  teardown that returned — the other two are entailed by teardown's own actions, see the
- *  header's "what `countFixtureRows()` can and cannot observe". */
+/** Cả ba phải bằng 0 sau `tearDown()`. Báo cáo riêng thay vì cộng: cái nào khác 0
+ *  cho biết phạm vi nào đã rò. Chỉ `paymentOrders` mới có thể khác 0 sau một
+ *  teardown đã trả về — hai cái kia được kéo theo bởi chính các hành động của teardown, xem
+ *  mục "`countFixtureRows()` quan sát được và không quan sát được gì" ở comment đầu file. */
 export interface FixtureRowCounts {
   paymentOrders: number;
   subscriptions: number;
@@ -432,26 +432,26 @@ export interface FixtureRowCounts {
 }
 
 export interface SubscriptionServiceFixture {
-  /** The counted payOS stub this case's `vi.mock` of `@/lib/billing/payos/` routes to. */
+  /** Stub payOS có đếm mà `vi.mock` của `@/lib/billing/payos/` ở ca này định tuyến tới. */
   readonly adapter: PayosAdapterStub;
-  /** Tears down first — so a run that crashed before its own teardown cannot contaminate
-   *  this one — then creates both accounts, signs both in, and makes A the active
-   *  session. */
+  /** Teardown trước — để một lượt chạy sập trước teardown của chính nó không thể làm nhiễm lượt này
+   *  — rồi tạo cả hai tài khoản, đăng nhập cả hai, và đặt A là
+   *  phiên hoạt động. */
   setUp(): Promise<void>;
-  /** Idempotent by construction: predicate deletes only, and runnable before `setUp()`.
-   *  Also releases the adapter hold and clears the session holder. */
+  /** Lũy đẳng theo cấu trúc: chỉ xoá theo vị từ, và chạy được trước `setUp()`.
+   *  Cũng thả cổng giữ của adapter và xoá holder phiên. */
   tearDown(): Promise<void>;
   countFixtureRows(): Promise<FixtureRowCounts>;
   userId(role: FixtureUserRole): string;
-  /** The signed-in anon client for one role — RLS applies to it. This is the "two real
-   *  sessions against one database" SVC-2 requires; a mocked client would assert the
-   *  mock's `null` rather than the `orders_select_own` policy's. */
+  /** Client anon đã đăng nhập cho một vai — RLS áp dụng cho nó. Đây là "hai phiên thật
+   *  trên một database" mà SVC-2 đòi; một client bị mock sẽ khẳng định `null` của mock
+   *  chứ không phải của policy `orders_select_own`. */
   sessionFor(role: FixtureUserRole): SupabaseClient;
-  /** Points the injected holder at one role, i.e. decides who the next Server Action call
-   *  runs as. */
+  /** Trỏ holder được tiêm vào một vai, tức quyết định lời gọi Server Action kế tiếp chạy
+   *  dưới danh nghĩa ai. */
   useSession(role: FixtureUserRole): void;
-  /** The service-role client, for seeding and for reading state back past RLS. One per
-   *  fixture, so no case builds a second privileged client with its own env handling. */
+  /** Client service-role, để gieo và để đọc lại trạng thái vượt RLS. Một cái cho mỗi
+   *  fixture, để không ca nào dựng client đặc quyền thứ hai với cách xử lý env riêng. */
   admin(): SupabaseClient;
   nextOrderCode(): number;
   seedPendingOrder(role: FixtureUserRole, overrides?: SeedOrderOverrides): Promise<SeededOrder>;
@@ -465,21 +465,21 @@ export interface SubscriptionServiceFixture {
 
 const CASE_TAG_PATTERN = /^[a-z0-9-]+$/;
 
-/** The only module-level state in this file, and it is APPEND-ONLY and never read by any
- *  fixture behaviour — its sole effect is to throw at construction time, before any
- *  network call, so it cannot make one case's rows visible to another. It exists because
- *  the two isolation rules were otherwise enforced by review alone and both fail
- *  destructively and silently: two fixtures sharing a `caseTag` share an email prefix, so
- *  the second one's `setUp()` — which tears down first — DELETES THE FIRST ONE'S ACCOUNTS
- *  mid-run, and two sharing an `orderCodeBlock` delete each other's orders.
+/** Trạng thái cấp module duy nhất trong file này, và nó CHỈ-THÊM và không bao giờ được hành vi
+ *  fixture nào đọc — tác dụng duy nhất là ném lỗi lúc dựng, trước mọi
+ *  lời gọi mạng, nên nó không thể làm hàng của ca này nhìn thấy được với ca khác. Nó tồn tại vì
+ *  hai luật cô lập trước đó chỉ được cưỡng chế bằng review và cả hai đều hỏng
+ *  một cách phá huỷ và im lặng: hai fixture dùng chung `caseTag` dùng chung tiền tố email, nên
+ *  `setUp()` của cái thứ hai — vốn teardown trước — XOÁ TÀI KHOẢN CỦA CÁI THỨ NHẤT
+ *  giữa lượt chạy, và hai fixture dùng chung `orderCodeBlock` xoá đơn của nhau.
  *
- *  Scope: one module registry per test file, which is exactly where the rule bites (two
- *  cases in one file). It says nothing across files; two files may legitimately reuse a
- *  block, which is why the accounts are per-`caseTag` as well.
+ *  Phạm vi: một registry module cho mỗi file test, đúng là nơi luật có hiệu lực (hai
+ *  ca trong một file). Nó không nói gì xuyên file; hai file có thể hợp lệ dùng lại một
+ *  khối, đó là lý do tài khoản cũng theo từng `caseTag`.
  *
- *  It does forbid one legitimate-looking pattern: re-constructing the same fixture per
- *  test in `beforeEach`. Construct once at `describe` scope and call `setUp()` per test —
- *  `setUp()` is the idempotent entry point, and re-construction buys nothing. */
+ *  Nó cấm một mẫu trông-hợp-lý: dựng lại cùng fixture ở mỗi test trong `beforeEach`.
+ *  Dựng một lần ở phạm vi `describe` và gọi `setUp()` mỗi test —
+ *  `setUp()` là điểm vào lũy đẳng, và dựng lại không mang lại gì. */
 const claimedCaseTags = new Set<string>();
 const claimedOrderCodeBlocks = new Set<number>();
 
@@ -540,8 +540,8 @@ export function createSubscriptionServiceFixture(
     return adminClient;
   }
 
-  /** Every account whose email carries this case's prefix — including ones left behind by
-   *  a run that crashed before its teardown, whose ids died with that process. */
+  /** Mọi tài khoản có email mang tiền tố của ca này — kể cả những tài khoản bị bỏ lại bởi
+   *  một lượt chạy sập trước teardown của nó, mà id đã chết cùng tiến trình đó. */
   async function listFixtureUsers(): Promise<Array<{ id: string; email: string }>> {
     const list = await admin().auth.admin.listUsers({ perPage: 1000 });
     if (list.error) throw list.error;
@@ -585,17 +585,17 @@ export function createSubscriptionServiceFixture(
     return client;
   }
 
-  /** The union of every scope a leftover row could be found by — DETECTION only, wider
-   *  than the set of predicates `tearDown()` deletes by, and deliberately so. The block
-   *  and `user_id` scopes alone cannot fail after a teardown that just deleted by those
-   *  same two predicates, so they would report 0 whether or not the delete worked. The
-   *  `memo` scope shares no predicate with any delete, which is what gives the count
-   *  discriminating power: a row this module seeded but the block delete did not remove
-   *  is still marked, and still visible here.
+  /** Hợp của mọi phạm vi mà một hàng còn sót có thể được tìm thấy — chỉ để PHÁT HIỆN, rộng hơn
+   *  tập vị từ mà `tearDown()` xoá theo, và cố ý như vậy. Phạm vi khối
+   *  và `user_id` một mình không thể hỏng sau một teardown vừa xoá theo chính
+   *  hai vị từ đó, nên chúng báo 0 dù lệnh xoá có hiệu lực hay không. Phạm vi
+   *  `memo` không chung vị từ nào với lệnh xoá nào, điều tạo ra sức phân biệt cho số đếm:
+   *  một hàng module này đã gieo mà lệnh xoá theo khối không xoá
+   *  vẫn mang dấu, và vẫn nhìn thấy được ở đây.
    *
-   *  `memo like '<prefix>%'` is a prefix match, so a `caseTag` that is a prefix of another
-   *  case's tag over-reports that case's rows. Over-reporting is the safe direction for a
-   *  leak detector; under-reporting is the failure this scope exists to prevent. */
+   *  `memo like '<prefix>%'` là khớp tiền tố, nên một `caseTag` là tiền tố của tag của
+   *  ca khác sẽ báo thừa các hàng của ca đó. Báo thừa là hướng an toàn cho bộ phát hiện
+   *  rò; báo thiếu là kiểu hỏng mà phạm vi này sinh ra để ngăn. */
   async function orderCodesInScope(userIdList: string[]): Promise<Set<number>> {
     const codes = new Set<number>();
     const inBlock = await admin()
@@ -631,9 +631,9 @@ export function createSubscriptionServiceFixture(
     return codes;
   }
 
-  /** An explicit `orderCode` bypasses the allocator, so it is bounds-checked here for the
-   *  same reason the allocator refuses to run past `blockEnd`: the reserved block is the
-   *  only scope that still reaches a seeded row after its owner's account is gone. */
+  /** Một `orderCode` tường minh bỏ qua bộ cấp phát, nên nó được kiểm biên ở đây vì
+   *  cùng lý do bộ cấp phát từ chối chạy quá `blockEnd`: khối dành riêng là
+   *  phạm vi duy nhất còn với tới một hàng đã gieo sau khi tài khoản chủ của nó biến mất. */
   function requireCodeInBlock(code: number): number {
     if (!Number.isInteger(code) || code < blockStart || code >= blockEnd) {
       throw new Error(
@@ -667,8 +667,8 @@ export function createSubscriptionServiceFixture(
     const users = await listFixtureUsers();
     const ids = users.map((user) => user.id);
 
-    // Orders before accounts: `payment_orders.user_id` is `on delete set null`, so an
-    // account deleted first would leave its orders alive and unreachable by scope 1.
+    // Đơn trước tài khoản: `payment_orders.user_id` là `on delete set null`, nên một
+    //  tài khoản bị xoá trước sẽ để đơn của nó sống và không với tới được bằng phạm vi 1.
     const blockDelete = await admin()
       .from("payment_orders")
       .delete()

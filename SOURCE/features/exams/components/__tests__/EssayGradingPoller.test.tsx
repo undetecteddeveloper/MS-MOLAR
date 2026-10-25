@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
 // `EssayGradingPoller` — năm trạng thái (UI Spec § Component:
-// EssayGradingPoller): default (polling), stopped-at-cap, hidden-tab,
-// resolved, not-mounted.
+// EssayGradingPoller): mặc định (đang polling), dừng ở trần, tab ẩn,
+// đã giải quyết, không mount.
 //
 // HẠI HARNESS ĐƯỢC GHIM SẴN Ở TASK FILE, không ca nào tự bịa ra kiểu riêng:
 //   · fake timers

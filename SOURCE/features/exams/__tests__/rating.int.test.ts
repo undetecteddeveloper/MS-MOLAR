@@ -1,31 +1,31 @@
-// Rating System [integration] Test Skeleton
+// Rating System [integration] Bộ khung test
 // Design Docs: docs/design/rating-system-backend-design.md, docs/design/rating-system-frontend-design.md
 // PRD: docs/prd/rating-system-prd.md (v1.1, AC-001..AC-026)
-// Generated: 2026-07-24 | Budget Used: integration 3/3, fixture-e2e 2/3, service-integration-e2e 2/2
+// Sinh ngày: 2026-07-24 | Ngân sách đã dùng: integration 3/3, fixture-e2e 2/3, service-integration-e2e 2/2
 //
-// Test 2 converted to real vitest (backend task 4). Test 1 remains
-// skeleton-only until its own implementation task; this file stays green
-// under tsc/eslint/build for it until converted.
+// Test 2 đã chuyển thành vitest thật (backend task 4). Test 1 vẫn chỉ là
+// skeleton cho tới task cài đặt riêng của nó; file này giữ xanh
+// dưới tsc/eslint/build cho tới khi được chuyển đổi.
 //
-// Test 3 (RatingEntry — the result-page auto-open ?rate=auto dialog) was
-// removed 2026-07-27: the Result page's rating button now navigates straight
-// to the standalone /exams/[id]/rate page instead of opening a popup there,
-// so RatingEntry/the dialog/the ?rate=auto marker it tested no longer exist.
-// That's also why this file's environment reverted from jsdom back to plain
-// node and the @testing-library/react + next/navigation mocking it needed are
-// gone — nothing left in this file renders a component.
+// Test 3 (RatingEntry — dialog tự mở ?rate=auto ở trang kết quả) đã bị
+// xoá 2026-07-27: nút đánh giá của trang Kết quả giờ điều hướng thẳng
+// tới trang độc lập /exams/[id]/rate thay vì mở popup ở đó,
+// nên RatingEntry/dialog/dấu ?rate=auto mà nó test không còn tồn tại.
+// Đó cũng là lý do môi trường của file này quay lại từ jsdom về node thuần và
+// @testing-library/react + mock next/navigation nó cần đã biến mất —
+// không còn gì trong file này render một component.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { fromMock } = vi.hoisted(() => ({ fromMock: vi.fn() }));
 
-// queries.ts imports "server-only" (throws outside a Next server/react-server bundle)
-// → stub, same pattern as SOURCE/lib/ugc/__tests__/extractMeta.test.ts.
+// queries.ts import "server-only" (ném lỗi ngoài bundle server Next/react-server)
+// → stub, cùng mẫu với SOURCE/lib/ugc/__tests__/extractMeta.test.ts.
 vi.mock("server-only", () => ({}));
 
-// Mock boundary: Supabase client only (backend DD Test Boundaries) — proves JS call
-// construction; real Postgres NULL/order/range semantics are covered by Task 1's
-// spike (S1-S4) and Task 9-backend's SE2, not by this mock.
+// Ranh giới mock: chỉ client Supabase (Test Boundaries của backend DD) — chứng minh cách dựng
+// lời gọi JS; ngữ nghĩa NULL/thứ tự/khoảng của Postgres thật được phủ bởi spike của Task 1
+// (S1-S4) và SE2 của Task 9-backend, không phải bởi mock này.
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(async () => ({ from: fromMock })),
 }));
@@ -35,7 +35,7 @@ const { rateExam, getMyRating } = await import("@/features/exams/actions");
 
 type BuilderCall = { method: string; args: unknown[] };
 
-/** Chainable + awaitable fake mirroring the Supabase query-builder surface listExams uses. */
+/** Giả có thể xích chuỗi và await được, phản chiếu bề mặt query-builder Supabase mà listExams dùng. */
 function createQueryBuilder(result: { data: unknown[]; error: null }) {
   const calls: BuilderCall[] = [];
   const builder: Record<string, unknown> = {};
@@ -56,40 +56,40 @@ function createQueryBuilder(result: { data: unknown[]; error: null }) {
 }
 
 // =============================================================================
-// Test 1 — rateExam: validation gate, upsert call shape, non-leaking error mapping
+// Test 1 — rateExam: cổng kiểm tra hợp lệ, hình dạng lời gọi upsert, ánh xạ lỗi không rò rỉ
 // =============================================================================
-// AC-002: "...each accepted value is an integer in [1, 5] and a value outside that
-//   range or a non-integer is not submittable."
-// AC-012: "...their existing rating row is updated in place (no second row is created)
-//   and the new three scores replace the old ones."
-// AC-025: "...the user sees an actionable message and their entered three scores are
-//   preserved for retry."
+// AC-002: "...mỗi giá trị được chấp nhận là số nguyên trong [1, 5] và một giá trị ngoài
+//   khoảng đó hoặc không nguyên thì không gửi được."
+// AC-012: "...hàng đánh giá sẵn có của họ được cập nhật tại chỗ (không tạo hàng thứ hai)
+//   và ba điểm mới thay thế ba điểm cũ."
+// AC-025: "...người dùng thấy một thông báo hành động được và ba điểm họ đã nhập được
+//   giữ lại để thử lại."
 // ROI: 81 (BV:9 x Freq:8 + Legal:0 + Defect:9)
-// Behavior: rateExam(examId, scores) is called against a mocked Supabase client
-//   boundary -> isValidPartScore runs before any DB call -> a valid call issues one
-//   upsert keyed on (exam_id, user_id) -> a simulated DB error is mapped to a status
-//   object, never a raw/leaked error.
+// Hành vi: rateExam(examId, scores) được gọi trên ranh giới client Supabase mock
+//   -> isValidPartScore chạy trước mọi lời gọi DB -> một lời gọi hợp lệ phát một
+//   upsert khoá theo (exam_id, user_id) -> một lỗi DB giả lập được ánh xạ thành một
+//   object trạng thái, không bao giờ là lỗi thô/rò rỉ.
 // @category: core-functionality
 // @lane: integration
-// @dependency: SOURCE/features/exams/actions.ts (rateExam) + mocked Supabase client
-//   (createClient() boundary)
+// @dependency: SOURCE/features/exams/actions.ts (rateExam) + client Supabase mock
+//   (ranh giới createClient())
 // @complexity: medium
-// @real-dependency: none — the Supabase client is the sanctioned mock boundary per
-//   backend Design Doc Test Boundaries ("Supabase client inside rateExam — Yes (mock);
-//   the real write path is covered by the RLS suite"). rateExam's own validation and
-//   control flow run for real; only the network/DB call is stubbed.
-// Primary failure mode: an out-of-range or non-integer part score reaches the upsert
-//   call; OR a simulated DB error leaks raw Supabase error detail to the caller instead
-//   of the mapped { error: "server" }; OR a re-rate issues a bare INSERT instead of an
-//   upsert keyed on (exam_id, user_id).
-// Proof obligation:
-//   (a) a call with any part score non-integer or outside [1,5] resolves to
-//       { error: "invalid" } and the mocked client's upsert is never invoked (AC-002);
-//   (b) a call with three valid scores invokes upsert(..., { onConflict: "exam_id,user_id" })
-//       exactly once, with score_part1/2/3 mapped from partI/partII/partIII (AC-012);
-//   (c) a simulated Supabase error on upsert resolves to exactly { error: "server" } —
-//       assert the returned object has no other keys and does not contain the mocked
-//       error's message/code (AC-025, non-leaking mapping).
+// @real-dependency: không có — client Supabase là ranh giới mock được phê duyệt theo
+//   Test Boundaries của backend Design Doc ("Supabase client bên trong rateExam — Có (mock);
+//   đường ghi thật được phủ bởi bộ RLS"). Việc kiểm hợp lệ và luồng điều khiển của chính rateExam
+//   chạy thật; chỉ lời gọi mạng/DB bị stub.
+// Kiểu hỏng chính: một điểm phần không nguyên hoặc ngoài khoảng tới được lời gọi
+//   upsert; HOẶC một lỗi DB giả lập làm rò chi tiết lỗi Supabase thô cho người gọi thay vì
+//   { error: "server" } đã ánh xạ; HOẶC một lần đánh giá lại phát INSERT trần thay vì
+//   upsert khoá theo (exam_id, user_id).
+// Nghĩa vụ chứng minh:
+//   (a) một lời gọi có bất kỳ điểm phần không nguyên hoặc ngoài [1,5] resolve thành
+//       { error: "invalid" } và upsert của client mock không bao giờ được gọi (AC-002);
+//   (b) một lời gọi có ba điểm hợp lệ gọi upsert(..., { onConflict: "exam_id,user_id" })
+//       đúng một lần, với score_part1/2/3 ánh xạ từ partI/partII/partIII (AC-012);
+//   (c) một lỗi Supabase giả lập ở upsert resolve thành đúng { error: "server" } —
+//       khẳng định object trả về không có khoá nào khác và không chứa
+//       message/code của lỗi mock (AC-025, ánh xạ không rò rỉ).
 
 describe("rateExam — validation gate, upsert call shape, non-leaking error mapping (Test 1)", () => {
   beforeEach(() => {
@@ -103,14 +103,14 @@ describe("rateExam — validation gate, upsert call shape, non-leaking error map
   // rò rỉ giữa các case — cả file chạy trong cùng một tiến trình.
   const RATER_ID = `rater-${Math.random().toString(36).slice(2)}`;
 
-  /** Wires fromMock so the eligibility precheck (exam_attempts) finds a submitted
-   * attempt and the upsert (exam_difficulty_ratings) resolves via upsertMock.
+  /** Nối fromMock để bước kiểm trước điều kiện (exam_attempts) thấy một lượt làm
+   * đã nộp và upsert (exam_difficulty_ratings) resolve qua upsertMock.
    *
-   * 2026-08-03 (Security review Low): the precheck changed from a count-head
-   * query to `.select("user_id").limit(1).maybeSingle()`. Same single round
-   * trip, but it now also yields the rate-limit key — the alternative was an
-   * extra `auth.getUser()` network call on every rate. Eligibility semantics
-   * are unchanged: a row means eligible, null means not. */
+   * 2026-08-03 (Security review Low): bước kiểm trước đổi từ truy vấn count-head
+   * sang `.select("user_id").limit(1).maybeSingle()`. Vẫn cùng một lượt khứ hồi, nhưng nay
+   * còn cho ra khoá rate-limit — phương án khác là thêm một lời gọi mạng
+   * `auth.getUser()` ở mỗi lần đánh giá. Ngữ nghĩa đủ điều kiện không đổi:
+   * có hàng là đủ điều kiện, null là không. */
   function mockEligibleWithUpsert(upsertMock: ReturnType<typeof vi.fn>) {
     fromMock.mockImplementation((table: string) => {
       if (table === "exam_attempts") {
@@ -152,10 +152,10 @@ describe("rateExam — validation gate, upsert call shape, non-leaking error map
 
     expect(result).toEqual({});
     expect(upsertMock).toHaveBeenCalledTimes(1);
-    // Exact match (not objectContaining): proves user_id is absent from the payload
-    // (DB-defaulted to auth.uid(), never taken from input — backend DD Security
-    // Considerations). objectContaining would let a leaked client-supplied user_id
-    // pass through this assertion undetected.
+    // Khớp chính xác (không phải objectContaining): chứng minh user_id vắng trong payload
+    // (DB tự đặt mặc định auth.uid(), không bao giờ lấy từ đầu vào — backend DD Security
+    // Considerations). objectContaining sẽ để một user_id do client cung cấp bị rò
+    // lọt qua khẳng định này mà không bị phát hiện.
     expect(upsertMock).toHaveBeenCalledWith(
       { exam_id: "exam-1", score_part1: 4, score_part2: 3, score_part3: 5 },
       { onConflict: "exam_id,user_id" }
@@ -176,17 +176,16 @@ describe("rateExam — validation gate, upsert call shape, non-leaking error map
     expect(JSON.stringify(result)).not.toContain("23503");
   });
 
-  // AC-003 (backend DD Data Contracts, rateExam): eligibility precheck (exists
-  //   submitted attempt) -> else { error: "ineligible" } (UX; RLS with-check
-  //   remains the authoritative gate per ADR-0008 Decision 3 — not covered by the
-  //   skeleton's obligations (a)-(c), added for the Binding Decision compliance
-  //   check).
-  // Behavior: rateExam(examId, validScores) is called with a mocked exam_attempts
-  //   count of 0 (no submitted attempt) -> the precheck short-circuits before any
-  //   upsert call.
+  // AC-003 (backend DD Data Contracts, rateExam): bước kiểm trước điều kiện (có
+  //   lượt làm đã nộp) -> nếu không thì { error: "ineligible" } (UX; RLS with-check
+  //   vẫn là cổng có thẩm quyền theo ADR-0008 Decision 3 — không được phủ bởi
+  //   nghĩa vụ (a)-(c) của skeleton, thêm để kiểm tuân thủ Binding Decision).
+  // Hành vi: rateExam(examId, validScores) được gọi với count exam_attempts mock
+  //   bằng 0 (không có lượt làm đã nộp) -> bước kiểm trước cắt ngắn trước mọi lời gọi
+  //   upsert.
   // @category: edge-case
-  // @dependency: SOURCE/features/exams/actions.ts (rateExam) + mocked Supabase
-  //   client (createClient() boundary)
+  // @dependency: SOURCE/features/exams/actions.ts (rateExam) + client Supabase
+  //   mock (ranh giới createClient())
   it("no submitted attempt resolves to {error:'ineligible'} without invoking upsert (backend DD eligibility precheck; UX-only, RLS remains authoritative)", async () => {
     const upsertMock = vi.fn();
     fromMock.mockImplementation((table: string) => {
@@ -195,7 +194,7 @@ describe("rateExam — validation gate, upsert call shape, non-leaking error map
           select: () => ({
             eq: () => ({
               eq: () => ({
-                // No submitted attempt → maybeSingle() yields null (was count:0).
+                // Không có lượt làm đã nộp → maybeSingle() cho null (trước đây là count:0).
                 limit: () => ({
                   maybeSingle: () => Promise.resolve({ data: null, error: null }),
                 }),
@@ -217,19 +216,19 @@ describe("rateExam — validation gate, upsert call shape, non-leaking error map
   });
 });
 
-// AC-013: "...getMyRating(examId) returns their currently stored three scores (or
-//   null if none)..." — not in the skeleton's Test 1 proof obligations (a)-(c);
-//   added per this task's Proof Obligations (derived from AC-013).
-// Behavior: getMyRating(examId) is called against a mocked Supabase client
-//   boundary -> reads only the caller's own row (ratings_select_own RLS scope) ->
-//   maps score_part1/2/3 to partI/partII/partIII, or returns null if absent, or
-//   throws on infra error (Server Component boundary, consistent with getExam).
+// AC-013: "...getMyRating(examId) trả về ba điểm hiện đang lưu của họ (hoặc
+//   null nếu chưa có)..." — không nằm trong nghĩa vụ chứng minh (a)-(c) của Test 1 trong skeleton;
+//   thêm theo Proof Obligations của task này (suy ra từ AC-013).
+// Hành vi: getMyRating(examId) được gọi trên ranh giới client Supabase mock
+//   -> chỉ đọc hàng của chính người gọi (phạm vi RLS ratings_select_own) ->
+//   ánh xạ score_part1/2/3 thành partI/partII/partIII, hoặc trả null nếu vắng, hoặc
+//   ném lỗi khi hạ tầng hỏng (ranh giới Server Component, nhất quán với getExam).
 // @category: core-functionality
 // @lane: integration
-// @dependency: SOURCE/features/exams/actions.ts (getMyRating) + mocked Supabase
-//   client (createClient() boundary)
-// @real-dependency: none — same sanctioned mock boundary as rateExam; cross-user
-//   select-own isolation is proven by Task 2's RLS suite (R-u), not this test.
+// @dependency: SOURCE/features/exams/actions.ts (getMyRating) + client Supabase
+//   mock (ranh giới createClient())
+// @real-dependency: không có — cùng ranh giới mock được phê duyệt như rateExam; việc cô lập
+//   select-own giữa các người dùng được chứng minh bởi bộ RLS của Task 2 (R-u), không phải test này.
 describe("getMyRating — caller's own three stored scores, or null (Test 1 extension, AC-013)", () => {
   beforeEach(() => {
     fromMock.mockReset();
@@ -278,43 +277,42 @@ describe("getMyRating — caller's own three stored scores, or null (Test 1 exte
 });
 
 // =============================================================================
-// Test 2 — listExams: Hardest-sort and Level-filter query construction
+// Test 2 — listExams: dựng truy vấn sắp xếp Khó nhất và lọc theo Mức
 // =============================================================================
-// AC-017: "...it presents the three real buckets Easy / Medium / Hard (not the
-//   'Coming soon' symbolic panel)."
-// AC-019/AC-020: "...rated exams appear first ordered by community difficulty
-//   descending, and all below-threshold exams appear after them in a deterministic
-//   order (by created_at/id)... tie-broken by created_at/id."
-// AC-021: "...it contains only exams whose community difficulty is >= 3 ratings and
-//   falls in that bucket, and excludes below-threshold exams and exams in other
-//   buckets."
+// AC-017: "...nó trình bày ba nhóm thật Dễ / Vừa / Khó (không phải panel
+//   biểu tượng 'Sắp có')."
+// AC-019/AC-020: "...đề đã được đánh giá xuất hiện trước, xếp theo độ khó cộng đồng
+//   giảm dần, và mọi đề dưới ngưỡng xuất hiện sau chúng theo một thứ tự xác định
+//   (theo created_at/id)... phân định hoà theo created_at/id."
+// AC-021: "...nó chỉ chứa các đề có độ khó cộng đồng >= 3 lượt đánh giá và
+//   rơi vào nhóm đó, và loại các đề dưới ngưỡng và các đề ở nhóm khác."
 // ROI: 80 (BV:8 x Freq:9 + Legal:0 + Defect:8)
-// Behavior: listExams({ sort: "hardest" }) and listExams({ level: "easy"|"medium"|"hard" })
-//   are called against a mocked Supabase query-builder chain (from/select/eq/order/
-//   gte/lt); assert the exact chain calls constructed match the backend Design Doc's
-//   Data Flow spec.
+// Hành vi: listExams({ sort: "hardest" }) và listExams({ level: "easy"|"medium"|"hard" })
+//   được gọi trên chuỗi query-builder Supabase mock (from/select/eq/order/
+//   gte/lt); khẳng định chuỗi lời gọi chính xác được dựng khớp đặc tả
+//   Data Flow của backend Design Doc.
 // @category: core-functionality
 // @lane: integration
-// @dependency: SOURCE/features/exams/queries.ts (listExams) + mocked Supabase
-//   query-builder chain
+// @dependency: SOURCE/features/exams/queries.ts (listExams) + chuỗi
+//   query-builder Supabase mock
 // @complexity: medium
-// @real-dependency: none — this test proves only the JS call construction. Real
-//   Postgres NULL/order/range semantics are out of scope here and are covered by the
-//   service-integration-e2e lane (Test SE2) and the backend phase-0 spike (S1-S4).
-// Primary failure mode: sort:"hardest" omits nullsFirst:false, or omits the chained
-//   secondary .order("created_at").order("id") tie-break; OR a level bucket's .gte/.lt
-//   pair does not match [1,2.5)/[2.5,3.5)/[3.5,5]; OR the pre-existing .eq("status","published")
-//   guard is dropped when the source relation swaps to the view.
-// Proof obligation:
-//   (a) for sort:"hardest", assert .order() is called with
-//       ("avg_overall", { ascending: false, nullsFirst: false }) followed by
-//       .order("created_at") then .order("id") (AC-019/020);
-//   (b) for level:"easy"/"medium"/"hard", assert the exact .gte/.lt boundary pair per
-//       bucket ([1,2.5) / [2.5,3.5) / [3.5,5]) and that .eq("status","published") is still
-//       present in the chain (AC-017/021);
-//   (c) for sort:"newest"/"oldest" and no level filter, assert the pre-existing chain
-//       is unchanged (regression guard for AC-023 continuity — no accidental
-//       difficulty-filtering side effect on unrelated calls).
+// @real-dependency: không có — test này chỉ chứng minh cách dựng lời gọi JS. Ngữ nghĩa
+//   NULL/thứ tự/khoảng của Postgres thật nằm ngoài phạm vi ở đây và được phủ bởi làn
+//   service-integration-e2e (Test SE2) và spike phase-0 của backend (S1-S4).
+// Kiểu hỏng chính: sort:"hardest" bỏ nullsFirst:false, hoặc bỏ chốt phân định
+//   hoà .order("created_at").order("id") nối thêm; HOẶC cặp .gte/.lt của một nhóm level
+//   không khớp [1,2.5)/[2.5,3.5)/[3.5,5]; HOẶC chốt .eq("status","published") sẵn có
+//   bị bỏ khi quan hệ nguồn đổi sang view.
+// Nghĩa vụ chứng minh:
+//   (a) với sort:"hardest", khẳng định .order() được gọi với
+//       ("avg_overall", { ascending: false, nullsFirst: false }) rồi
+//       .order("created_at") rồi .order("id") (AC-019/020);
+//   (b) với level:"easy"/"medium"/"hard", khẳng định cặp biên .gte/.lt chính xác mỗi
+//       nhóm ([1,2.5) / [2.5,3.5) / [3.5,5]) và .eq("status","published") vẫn
+//       có mặt trong chuỗi (AC-017/021);
+//   (c) với sort:"newest"/"oldest" và không lọc level, khẳng định chuỗi sẵn có
+//       không đổi (chốt hồi quy cho tính liên tục của AC-023 — không có tác dụng phụ
+//       lọc-theo-độ-khó ngoài ý muốn trên các lời gọi không liên quan).
 
 describe("listExams — Hardest-sort and Level-filter query construction (Test 2)", () => {
   beforeEach(() => {
@@ -746,94 +744,94 @@ describe("listExams — q lọc theo tên qua cột title_search (ADR-0020)", ()
 });
 
 // =============================================================================
-// Kho đề theo kệ [integration] — candidate 3/3 of this feature's integration
-// budget (candidates 1-2 live in the sibling file shelves.int.test.ts)
+// Kho đề theo kệ [integration] — ứng viên 3/3 của ngân sách integration
+// của tính năng này (ứng viên 1-2 nằm trong file anh em shelves.int.test.ts)
 // =============================================================================
 // Design Docs: docs/design/exam-shelves-backend-design.md (v1.2, § Test Boundaries
-//   and Placement :619, "?sort=garbage = 3 + 0 rpc (flat grid, F-005)")
+//   and Placement :619, "?sort=garbage = 3 + 0 rpc (lưới phẳng, F-005)")
 // PRD: docs/prd/exam-shelves-prd.md (v1.2, AC-009, AC-010, AC-018, AC-034)
-// Generated: 2026-09-18 | Budget used: integration 1/3 (this file's contribution;
-//   feature total 3/3 across this file + shelves.int.test.ts)
+// Sinh ngày: 2026-09-18 | Ngân sách đã dùng: integration 1/3 (phần đóng góp của file này;
+//   tổng tính năng 3/3 qua file này + shelves.int.test.ts)
 //
-// FILE STATUS: skeleton-only (`it.todo`). This describe block is APPENDED to the
-// existing file above — none of the Rating System content above it is edited, per
-// backend DD's own instruction that "the AC-016/AC-017 cases at :319-457 pass
-// UNMODIFIED". It reuses this file's own `fromMock` / `createQueryBuilder` /
-// `mockTables`-style helpers already defined above (no re-import needed — same
-// module scope), plus `listExamsRanked` already imported at the top of this file.
-// The `sort: "hot"` codepath and the `rpc` branch inside `listExamsRanked` DO NOT
-// EXIST YET (backend DD Implementation Plan step 6) — `it.todo` avoids depending on
-// unwritten behaviour while still registering a real vitest task in this file.
+// TRẠNG THÁI FILE: chỉ skeleton (`it.todo`). Khối describe này được NỐI THÊM vào
+// file sẵn có ở trên — không nội dung Rating System nào phía trên bị sửa, theo
+// chỉ dẫn của chính backend DD rằng "các ca AC-016/AC-017 ở :319-457 qua
+// KHÔNG SỬA". Nó dùng lại các helper `fromMock` / `createQueryBuilder` /
+// kiểu `mockTables` đã định nghĩa ở trên của chính file này (không cần import lại — cùng
+// phạm vi module), cộng `listExamsRanked` đã import ở đầu file này.
+// Nhánh mã `sort: "hot"` và nhánh `rpc` trong `listExamsRanked` CHƯA TỒN TẠI
+// (backend DD Implementation Plan bước 6) — `it.todo` tránh phụ thuộc vào
+// hành vi chưa viết mà vẫn đăng ký một task vitest thật trong file này.
 //
-// AC-009: "...ordering is exactly today's SQL ordering with no personalisation, and
-//   the query-construction assertions in rating.int.test.ts:317-440 pass unmodified."
-// AC-010: "...or an unrecognised ?sort= value, when the page renders, then the flat
-//   grid renders in today's personalised order...and 0 shelves appear."
-// AC-018: "...the hot order is computed...submitted attempt count DESC, exam id ASC,
-//   where the count includes attempts by all students, not only the caller."
-// AC-034: "...the flat grid renders ordered by the same cross-user count as AC-018."
-// Backend DD Test Boundaries and Placement: "Composition budget: shelves = 4,
-//   filtered = 3 + 0 rpc, ?sort=hot = 3 + 1 rpc, ?sort=garbage = 3 + 0 rpc (flat
-//   grid, F-005)."
+// AC-009: "...thứ tự đúng bằng thứ tự SQL hôm nay, không cá nhân hoá, và
+//   các khẳng định dựng truy vấn trong rating.int.test.ts:317-440 qua không sửa."
+// AC-010: "...hoặc một giá trị ?sort= không nhận ra, khi trang render, thì lưới
+//   phẳng render theo thứ tự cá nhân hoá hôm nay...và 0 kệ xuất hiện."
+// AC-018: "...thứ tự hot được tính...số lượt làm đã nộp GIẢM DẦN, id đề TĂNG DẦN,
+//   trong đó số đếm gồm lượt làm của mọi học sinh, không chỉ người gọi."
+// AC-034: "...lưới phẳng render theo cùng số đếm xuyên người dùng như AC-018."
+// Test Boundaries and Placement của backend DD: "Ngân sách hợp thành: kệ = 4,
+//   đã lọc = 3 + 0 rpc, ?sort=hot = 3 + 1 rpc, ?sort=garbage = 3 + 0 rpc (lưới
+//   phẳng, F-005)."
 // ROI: 64 (BV:8 x Freq:7 + Legal:0 + Defect:8)
-//   BV 8 — protects Success Criteria #5 ("rating.int.test.ts:317-440 passes
-//     unmodified") and the round-trip budget the Risks table names as a standing
-//     regression surface.
-//   Freq 7 — every explicit ?sort=hot chip tap, plus every malformed/garbage ?sort=
-//     value that must still fall back to the flat-grid contract (a URL a user can
-//     hand-edit or bookmark).
-//   Defect 8 — F-005's specific failure mode (a garbage sort value accidentally
-//     matching the "hot" branch, or the hot branch firing an rpc call the budget
-//     assertion does not expect) has no visible on-screen symptom other than a
-//     silently wrong order — the same "no error, just wrong" shape as every other
-//     round-trip-budget risk in this feature.
-// Behavior: listExamsRanked({ sort: "hot" }) is called against the mocked Supabase
-//   client boundary -> exactly 3 .from(...) calls + 1 .rpc("exam_hot_counts", ...)
-//   call, and the returned exams are ordered by the mocked rpc's total_count desc,
-//   exam id asc -> listExamsRanked({ sort: "garbage-value-not-in-ExamSort" }) is
-//   called -> exactly 3 .from(...) calls and 0 .rpc(...) calls, i.e. the same
-//   budget as every other explicit-sort call already proven above.
+//   BV 8 — bảo vệ Success Criteria #5 ("rating.int.test.ts:317-440 qua
+//     không sửa") và ngân sách lượt khứ hồi mà bảng Risks gọi là bề mặt
+//     hồi quy thường trực.
+//   Freq 7 — mọi cú chạm chip ?sort=hot tường minh, cộng mọi giá trị ?sort= rác/sai
+//     dạng mà vẫn phải lùi về hợp đồng lưới phẳng (một URL mà người dùng
+//     sửa tay hoặc đánh dấu được).
+//   Defect 8 — kiểu hỏng riêng của F-005 (một giá trị sort rác vô tình
+//     khớp nhánh "hot", hoặc nhánh hot phát một lời gọi rpc mà khẳng định
+//     ngân sách không mong đợi) không có triệu chứng nhìn thấy trên màn hình nào ngoài
+//     một thứ tự sai thầm lặng — cùng dạng "không lỗi, chỉ sai" như mọi rủi ro
+//     ngân sách lượt khứ hồi khác trong tính năng này.
+// Hành vi: listExamsRanked({ sort: "hot" }) được gọi trên ranh giới client Supabase
+//   mock -> đúng 3 lời gọi .from(...) + 1 lời gọi .rpc("exam_hot_counts", ...),
+//   và các đề trả về được xếp theo total_count giảm dần của rpc mock,
+//   id đề tăng dần -> listExamsRanked({ sort: "garbage-value-not-in-ExamSort" }) được
+//   gọi -> đúng 3 lời gọi .from(...) và 0 lời gọi .rpc(...), tức cùng
+//   ngân sách như mọi lời gọi sort tường minh khác đã chứng minh ở trên.
 // @category: core-functionality
 // @lane: integration
-// @dependency: SOURCE/features/exams/queries/ranking.ts (listExamsRanked, sort==="hot"
-//   branch not yet implemented) + mocked Supabase client ({ from, rpc })
+// @dependency: SOURCE/features/exams/queries/ranking.ts (listExamsRanked, nhánh sort==="hot"
+//   chưa cài đặt) + client Supabase mock ({ from, rpc })
 // @complexity: medium
-// @real-dependency: none — same mocked-client boundary as every other describe in
-//   this file; RLS/grant correctness for exam_hot_counts is proven in the
-//   service-integration-e2e lane, not here.
-// Primary failure mode: an unrecognised ?sort= value (e.g. one a hand-edited URL or
-//   a stale bookmark supplies) is compared loosely enough that it matches the "hot"
-//   branch and fires an unwanted rpc call against a value AC-010 requires to fall
-//   through to the ordinary flat-grid path; OR the "hot" branch's Node-side order
-//   silently reverts to `.order("id")`'s DB-side order because the rpc result was
-//   never actually consulted.
-// Proof obligation — what the implemented test must assert:
-//   (a) listExamsRanked({ sort: "hot" }) issues exactly 3 .from(...) calls (the same
-//       3 tables as every other explicit-sort case above) PLUS exactly 1
-//       .rpc("exam_hot_counts", ...) call — 4 total, not 3 and not 5;
-//   (b) the returned `exams` array order matches `total_count DESC, exam id ASC`
-//       computed from the mocked rpc response — a literal expected array computed
-//       independently of the implementation, not merely "differs from .order(id)";
-//   (c) listExamsRanked({ sort: "garbage-not-a-real-value" as ExamSort }) issues
-//       exactly 3 .from(...) calls and 0 .rpc(...) calls (F-005) — the same shape as
+// @real-dependency: không có — cùng ranh giới client mock như mọi describe khác trong
+//   file này; tính đúng của RLS/grant cho exam_hot_counts được chứng minh trong
+//   làn service-integration-e2e, không phải ở đây.
+// Kiểu hỏng chính: một giá trị ?sort= không nhận ra (ví dụ do URL sửa tay hoặc
+//   một bookmark cũ cung cấp) được so sánh lỏng đến mức khớp nhánh "hot"
+//   và phát một lời gọi rpc ngoài ý muốn với giá trị mà AC-010 đòi phải rơi
+//   xuống đường lưới phẳng thông thường; HOẶC thứ tự phía Node của nhánh "hot"
+//   lặng lẽ quay về thứ tự phía DB của `.order("id")` vì kết quả rpc
+//   chưa từng thực sự được tham khảo.
+// Nghĩa vụ chứng minh — test được cài đặt phải khẳng định gì:
+//   (a) listExamsRanked({ sort: "hot" }) phát đúng 3 lời gọi .from(...) (cùng
+//       3 bảng như mọi ca sort tường minh ở trên) CỘNG đúng 1
+//       lời gọi .rpc("exam_hot_counts", ...) — tổng 4, không phải 3 và không phải 5;
+//   (b) thứ tự mảng `exams` trả về khớp `total_count DESC, exam id ASC`
+//       tính từ phản hồi rpc mock — một mảng kỳ vọng literal tính độc lập với
+//       cài đặt, không chỉ "khác `.order(id)`";
+//   (c) listExamsRanked({ sort: "garbage-not-a-real-value" as ExamSort }) phát
+//       đúng 3 lời gọi .from(...) và 0 lời gọi .rpc(...) (F-005) — cùng hình dạng như
 //       the existing "?sort tường minh thắng cá nhân hoá" case above, so a value
-//       outside the whitelist never silently reaches the hot branch;
-//   (d) REGRESSION GUARD, not a new obligation: this describe block does not modify
-//       or re-run the AC-016/AC-017 cases at the top of this file — it only adds
-//       cases; the implementer must confirm those cases still pass unmodified in the
-//       same commit that adds this block's real assertions (Success Criteria #5).
-// `createClient` itself is NEW in this candidate — this describe block's own
-// tests extend the shared mock's returned client with `rpc` for exactly the
-// ONE `createClient()` call `listExamsRanked` makes directly (ranking.ts:105);
-// `mockResolvedValueOnce` below self-reverts after that one call, re-armed
-// fresh per test in `beforeEach`. The SECOND, internal `createClient()` call
-// inside `fetchExamRows` (catalogue.ts:77) still resolves through the
-// untouched default `{ from: fromMock }` from :29-31 — that call site only
-// ever does `.from(...)`, never `.rpc(...)`, so the default is enough for it.
-// This keeps :29-31 itself byte-identical: touching the shared mock factory
-// would touch lines 1-747, and per this task's own Failure response, a
-// passing assertion that requires editing the shared region signals the fix
-// belongs in P4-T2 territory, not here.
+//       ngoài danh sách trắng không bao giờ lặng lẽ tới nhánh hot;
+//   (d) CHỐT HỒI QUY, không phải nghĩa vụ mới: khối describe này không sửa
+//       hay chạy lại các ca AC-016/AC-017 ở đầu file — nó chỉ thêm
+//       ca; người cài đặt phải xác nhận các ca đó vẫn qua không sửa trong
+//       cùng commit thêm các khẳng định thật của khối này (Success Criteria #5).
+// Chính `createClient` là MỚI trong ứng viên này — các test của khối describe này
+// mở rộng client trả về của mock dùng chung bằng `rpc` cho đúng MỘT
+// lời gọi `createClient()` mà `listExamsRanked` gọi trực tiếp (ranking.ts:105);
+// `mockResolvedValueOnce` bên dưới tự hoàn nguyên sau lời gọi đó, được nạp lại
+// mới ở mỗi test trong `beforeEach`. Lời gọi `createClient()` THỨ HAI, nội bộ
+// trong `fetchExamRows` (catalogue.ts:77) vẫn resolve qua
+// `{ from: fromMock }` mặc định không đụng từ :29-31 — chỗ gọi đó
+// chỉ làm `.from(...)`, không bao giờ `.rpc(...)`, nên mặc định là đủ cho nó.
+// Điều này giữ chính :29-31 giống từng byte: đụng vào factory mock dùng chung
+// sẽ đụng vào dòng 1-747, và theo Failure response của chính task này, một
+// khẳng định qua mà đòi sửa vùng dùng chung báo hiệu rằng cách sửa
+// thuộc về địa phận P4-T2, không phải ở đây.
 import type { ExamSort } from "@/features/exams/queries";
 const { createClient } = await import("@/lib/supabase/server");
 

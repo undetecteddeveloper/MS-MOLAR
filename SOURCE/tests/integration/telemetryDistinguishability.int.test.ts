@@ -6,7 +6,7 @@
 // Design Doc: docs/design/subscription-backend-design.md § AC-047
 // Work plan:  docs/plans/subscription-work-plan.md § Connection Map, dòng
 //             "Refusal branches → telemetry_log"
-// Task file:  docs/plans/tasks/subscription-work-plan-backend-task-27.md
+// Task file:  docs/plans/tasks/subscription-work-plan-backend-task-27.md (đã xoá, xem git log)
 //
 // =============================================================================
 // VÌ SAO CLIENT SUPABASE Ở ĐÂY LÀ THẬT, VÀ VÌ SAO ĐÓ LÀ TOÀN BỘ ĐIỂM CỦA FILE

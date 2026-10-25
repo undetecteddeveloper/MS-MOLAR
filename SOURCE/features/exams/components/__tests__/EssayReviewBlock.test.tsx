@@ -10,7 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined }) }));
 // `EssayRegradeControl` (con CLIENT của khối này) goi `useRouter()`, thu nay
-// nem "invariant expected app router to be mounted" ngoai mot cay app-router
+// Nem "invariant expected app router to be mounted" ngoài một cây app-router
 // that — khong co provider nao trong mot `renderToReadableStream` tran. Stub
 // bang dung hinh dang mot-phuong-thuc ma `OrderRow.test.tsx` da chay that.
 // BAN THAN control la THAT: chi router bi stub.

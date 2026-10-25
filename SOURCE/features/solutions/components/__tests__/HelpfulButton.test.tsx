@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
 // HelpfulButton (C-24) — frontend DD § Data Contracts "Helpful toggle
-// contract"; § Required Tests rows 1-4. Mock boundary (task file): only
-// `@/features/solutions/actions` is mocked; nothing else.
+// contract"; § Required Tests hàng 1-4. Ranh giới mock (task file): chỉ
+// `@/features/solutions/actions` bị mock; không gì khác.
 
 import { StrictMode } from "react";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";

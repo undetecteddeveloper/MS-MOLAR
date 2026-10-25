@@ -3,41 +3,40 @@
 // UI Spec: docs/design/rating-system-ui-spec.md
 // PRD: docs/prd/rating-system-prd.md (v1.1, AC-001..AC-026)
 //
-// Test FE1 (result-page rating entry) is converted below — see the FE1
-// section further down this file for its own driver interface and header
-// note. 2026-07-27: FE1 used to prove an auto-open-modal journey
-// (RatingModal/RatingModalController, later RatingEntry); the Result page's
-// rating entry now navigates straight to the standalone /exams/[id]/rate page
-// instead, so that whole dialog/auto-open surface (and the ?rate=auto marker
-// that drove it) no longer exists — FE1 was rewritten to match.
+// Test FE1 (lối vào đánh giá ở trang kết quả) được chuyển đổi bên dưới — xem mục
+// FE1 phía dưới file này để biết interface driver và ghi chú đầu mục của riêng nó. 2026-07-27: FE1 từng
+// chứng minh một hành trình modal-tự-mở (RatingModal/RatingModalController, sau là RatingEntry);
+// lối vào đánh giá của trang Kết quả nay điều hướng thẳng tới trang độc lập /exams/[id]/rate
+// thay vì đó, nên toàn bộ bề mặt dialog/tự-mở (và dấu ?rate=auto
+// điều khiển nó) không còn tồn tại — FE1 được viết lại cho khớp.
 //
-// Test FE2 is converted below into a real, driver-based script. This repo has
-// no `@playwright/test` dependency and no playwright.config.ts committed yet
-// (only the Playwright MCP browser-automation server is configured, in
-// `.mcp.json`, for interactive/manual sessions — see the frontend Design
-// Doc's Test Boundaries: "Playwright MCP / manual pass (no CI)"). Adding a new
-// npm test-framework dependency is outside this task's Target Files (would
-// touch package.json/playwright.config.ts, neither listed) and is a "new
-// external library" decision this implementer escalates rather than makes
-// unilaterally (see the task's final JSON response for the recorded
-// escalation). So this script is written against a minimal `FE2Driver`
-// interface that is a structural SUBSET of Playwright's real `Page`/`Locator`
-// API (`goto`, `url`, `getByRole`, `getByText`, `.click`, `.check`,
-// `.getAttribute`, `.first`, `.count`) — a real Playwright `Page` satisfies
-// this interface as-is, so once a harness exists this script runs unchanged
-// (either wrapped in a `@playwright/test` `test()` block, or driven directly
-// via the Playwright MCP tool). Assertions use Node's built-in
-// `node:assert/strict` (no new dependency either).
+//Test FE2 được chuyển đổi bên dưới thành một script thật dựa trên driver. Repo này không có
+// phụ thuộc `@playwright/test` và chưa commit playwright.config.ts nào
+// (chỉ máy chủ tự động hoá trình duyệt Playwright MCP được cấu hình, trong
+// `.mcp.json`, cho các phiên tương tác/thủ công — xem Test Boundaries của frontend Design
+// Doc: "Playwright MCP / lượt thủ công (không CI)"). Thêm một phụ thuộc
+// framework test npm mới nằm ngoài Target Files của task này (sẽ đụng
+// package.json/playwright.config.ts, không cái nào được liệt kê) và là một quyết định
+// "thư viện ngoài mới" mà người cài đặt này escalate thay vì tự quyết
+// (xem phản hồi JSON cuối của task cho ghi nhận escalation).
+// Nên script này được viết dựa trên một interface `FE2Driver` tối thiểu
+// là một tập CON cấu trúc của API `Page`/`Locator` thật của Playwright
+// (`goto`, `url`, `getByRole`, `getByText`, `.click`, `.check`,
+// `.getAttribute`, `.first`, `.count`) — một `Page` Playwright thật thoả
+// interface này nguyên trạng, nên khi có harness, script này chạy không đổi
+// (hoặc bọc trong một khối `test()` của `@playwright/test`, hoặc điều khiển trực tiếp
+// qua công cụ Playwright MCP). Các khẳng định dùng
+// `node:assert/strict` có sẵn của Node (cũng không phụ thuộc mới).
 //
-// Fixture-driven backend: `listExams`/`listMySubmittedExamIds`/`getCurrentUser`
-// must resolve to the fixture data below instead of live Supabase for this
-// script to run against `npm run dev`. This repo has no existing
-// request/route-mocking layer (no MSW, no test-mode query override) — wiring
-// FIXTURE_EXAMS/FIXTURE_SUBMITTED_EXAM_IDS/FIXTURE_USER into a real running
-// `/exams` page (e.g. via a test-only env flag read by `queries.ts`/
-// `getCurrentUser.ts`, or an MSW-style network intercept) is a residual
-// left for whoever stands up the Playwright harness — out of this task's
-// Target Files (queries.ts/getCurrentUser.ts are backend-owned, Task 4).
+//Backend điều khiển bằng fixture: `listExams`/`listMySubmittedExamIds`/`getCurrentUser`
+// phải resolve ra dữ liệu fixture bên dưới thay vì Supabase sống để script này
+// chạy được trên `npm run dev`. Repo này chưa có lớp
+// mock request/route nào (không MSW, không ghi đè truy vấn chế độ test) — nối
+// FIXTURE_EXAMS/FIXTURE_SUBMITTED_EXAM_IDS/FIXTURE_USER vào một trang `/exams`
+// đang chạy thật (ví dụ qua một cờ env chỉ-cho-test mà `queries.ts`/
+// `getCurrentUser.ts` đọc, hoặc chặn mạng kiểu MSW) là phần dư
+// để lại cho ai dựng harness Playwright — ngoài Target Files của task này
+// (queries.ts/getCurrentUser.ts thuộc backend, Task 4).
 
 import assert from "node:assert/strict";
 import type { Bucket } from "@/lib/rating";
@@ -48,9 +47,9 @@ export interface FE2Locator {
   click(): Promise<void>;
   check(): Promise<void>;
   isVisible(): Promise<boolean>;
-  /** Native `<input type="checkbox">` state (Newest/Oldest/Hardest quick-sort
-   *  checkboxes — ExamFilters.tsx) — checked state is a DOM property, not an
-   *  `aria-checked` attribute, so this is queried separately from getAttribute. */
+  /** Trạng thái `<input type="checkbox">` gốc (các checkbox sắp xếp nhanh Mới nhất/Cũ nhất/Khó nhất
+   *  — ExamFilters.tsx) — trạng thái checked là thuộc tính DOM, không phải
+   *  attribute `aria-checked`, nên được truy vấn riêng khỏi getAttribute. */
   isChecked(): Promise<boolean>;
   getAttribute(name: string): Promise<string | null>;
   first(): FE2Locator;
@@ -65,9 +64,9 @@ export interface FE2Driver {
   getByText(text: string | RegExp): FE2Locator;
 }
 
-// --- Fixture data -----------------------------------------------------------
-// Spans 0/1/2/>=3 ratings (AC-014/015/016) across the three buckets, plus a
-// mixed-eligibility current user (one exam submitted -> eligible; one not).
+// --- Dữ liệu fixture -----------------------------------------------------------
+// Trải 0/1/2/>=3 đánh giá (AC-014/015/016) qua ba nhóm, cộng một
+// người dùng hiện tại có đủ điều kiện hỗn hợp (một đề đã nộp -> đủ điều kiện; một đề chưa).
 
 export interface FixtureExam {
   id: string;
@@ -96,81 +95,81 @@ export const FIXTURE_EXAMS: readonly FixtureExam[] = [
   },
 ];
 
-/** Logged-in fixture user has submitted exam-hard (-> eligible) but not
- *  exam-medium (-> not-attempted). AC-026 reruns the same page logged out. */
+/** Người dùng fixture đã đăng nhập đã nộp exam-hard (-> đủ điều kiện) nhưng chưa nộp
+ *  exam-medium (-> chưa-làm). AC-026 chạy lại cùng trang khi chưa đăng nhập. */
 export const FIXTURE_SUBMITTED_EXAM_IDS = new Set(["exam-hard"]);
 export const FIXTURE_USER = { id: "user-1", email: "fixture@example.com" };
 
 // =============================================================================
-// Test FE2 — Browse: Hardest sort, Level filter, and Rate-button eligibility states
+// Test FE2 — Duyệt: sắp xếp Khó nhất, lọc theo Mức, và các trạng thái đủ điều kiện của nút Đánh giá
 // =============================================================================
-// AC-010, AC-011, AC-026 (Rate button eligible / not-attempted / logged-out states)
-// AC-014, AC-015, AC-016 (DifficultyBadge bucket+mean vs "—")
-// AC-017, AC-019, AC-020, AC-021 (Level filter real buckets; Hardest ordering)
-// code:F1 (stretched-link: card body vs RateButton independent target)
+// AC-010, AC-011, AC-026 (nút Đánh giá ở các trạng thái đủ điều kiện / chưa làm / chưa đăng nhập)
+// AC-014, AC-015, AC-016 (DifficultyBadge nhóm+trung bình so với "—")
+// AC-017, AC-019, AC-020, AC-021 (lọc Mức theo nhóm thật; thứ tự Khó nhất)
+// code:F1 (stretched-link: thân thẻ so với RateButton là hai đích độc lập)
 // ROI: 80 (BV:8 x Freq:9 + Legal:0 + Defect:8)
-// Behavior: on /exams with a fixture set of exams spanning 0/1/2/>=3 ratings and a
-//   mixed-eligibility current user (one exam eligible, one not-attempted; run once
-//   more logged out for AC-026) -> exercise the stretched-link ExamCard, the
-//   RateButton's three states, and the Hardest/Level controls.
+// Hành vi: trên /exams với một bộ đề fixture trải 0/1/2/>=3 đánh giá và một
+//   người dùng hiện tại đủ điều kiện hỗn hợp (một đề đủ điều kiện, một chưa-làm; chạy
+//   thêm một lần khi chưa đăng nhập cho AC-026) -> thao tác ExamCard
+//   stretched-link, ba trạng thái của RateButton, và các điều khiển Khó nhất/Mức.
 // @category: fixture-e2e
 // @lane: fixture-e2e
-// @dependency: full-ui (mocked backend) — listExams/listMySubmittedExamIds/
-//   getCurrentUser fixture-driven
+// @dependency: toàn UI (backend bị mock) — listExams/listMySubmittedExamIds/
+//   getCurrentUser điều khiển bằng fixture
 // @complexity: medium
-// Primary failure mode: clicking the card body no longer navigates to /exams/[id],
-//   or the RateButton's independent click target is swallowed by the stretched-link
-//   anchor (invalid interactive nesting regression, code:F1); OR checking Hardest
-//   still combines with Newest/Oldest instead of replacing them (D002 regression);
-//   OR a below-threshold exam is interleaved with rated exams instead of sinking to
-//   the bottom; OR the Level filter includes a below-threshold or wrong-bucket exam.
-// Proof obligation:
-//   (a) clicking an ExamCard's body (outside the RateButton) navigates to
-//       /exams/[id]; clicking an enabled RateButton navigates to /exams/[id]/rate
-//       independently; a disabled RateButton (not-attempted or logged-out) does not
-//       navigate and exposes its AT reason text ("Finish this exam first" /
-//       "Log in to rate") via aria-describedby (AC-010/011/026);
-//   (b) for the fixture set, DifficultyBadge shows "<Bucket> · <mean>" for every
-//       exam with >=3 ratings and literal "—" for every exam with <3 ratings, on
-//       both the ExamCard Level cell and the exam-detail Difficulty cell (AC-014/
+// Kiểu hỏng chính: bấm thân thẻ không còn điều hướng tới /exams/[id],
+//   hoặc đích bấm độc lập của RateButton bị nuốt bởi anchor stretched-link
+//   (hồi quy lồng tương tác không hợp lệ, code:F1); HOẶC chọn Khó nhất
+//   vẫn kết hợp với Mới nhất/Cũ nhất thay vì thay thế chúng (hồi quy D002);
+//   HOẶC một đề dưới ngưỡng bị xen lẫn với các đề đã đánh giá thay vì chìm xuống
+//   cuối; HOẶC bộ lọc Mức gồm một đề dưới ngưỡng hay sai nhóm.
+// Nghĩa vụ chứng minh:
+//   (a) bấm thân của một ExamCard (ngoài RateButton) điều hướng tới
+//       /exams/[id]; bấm một RateButton đang bật điều hướng tới /exams/[id]/rate
+//       độc lập; một RateButton bị tắt (chưa-làm hoặc chưa đăng nhập) không
+//       điều hướng và phơi chữ lý do cho AT ("Finish this exam first" /
+//       "Log in to rate") qua aria-describedby (AC-010/011/026);
+//   (b) với bộ fixture, DifficultyBadge hiện "<Nhóm> · <trung bình>" cho mọi
+//       đề có >=3 đánh giá và literal "—" cho mọi đề có <3 đánh giá, trên
+//       cả ô Mức của ExamCard lẫn ô Độ khó của trang chi tiết đề (AC-014/
 //       015/016);
-//   (c) checking Hardest writes ?sort=hardest, visually de-selects Newest/Oldest, and
-//       reorders the list so every below-threshold exam appears after every rated
-//       exam in the fixture's expected order (AC-019/020);
-//   (d) selecting Level=Hard shows only fixture exams with >=3 ratings whose
-//       community difficulty falls in the Hard bucket, excluding below-threshold and
-//       other-bucket exams (AC-017/021).
+//   (c) chọn Khó nhất ghi ?sort=hardest, bỏ chọn trực quan Mới nhất/Cũ nhất, và
+//       sắp xếp lại danh sách sao cho mọi đề dưới ngưỡng xuất hiện sau mọi đề
+//       đã đánh giá theo thứ tự kỳ vọng của fixture (AC-019/020);
+//   (d) chọn Mức=Khó chỉ hiện các đề fixture có >=3 đánh giá mà độ khó
+//       cộng đồng rơi vào nhóm Khó, loại các đề dưới ngưỡng và
+//       đề nhóm khác (AC-017/021).
 //
-// Implementation note: converted below into `checkXxx(driver)` functions (one per
-// lettered obligation, plus one extra for the AC-026 logged-out rerun) rather than
-// `it()` blocks — this file has no test-runner harness yet (see file header); each
-// function's own doc comment repeats its letter + AC IDs for traceability back to
-// the block above, mirroring how Test 2 (`rating.int.test.ts`) embeds
-// "(AC-xxx, obligation x)" in each `it()` title.
+// Ghi chú cài đặt: được chuyển bên dưới thành các hàm `checkXxx(driver)` (mỗi nghĩa vụ
+// đánh chữ một hàm, cộng một hàm thêm cho lượt chạy lại chưa-đăng-nhập AC-026) thay vì
+// các khối `it()` — file này chưa có harness chạy test (xem comment đầu file); comment
+// của mỗi hàm lặp lại chữ cái + ID AC của nó để truy vết về
+// khối ở trên, theo cách Test 2 (`rating.int.test.ts`) nhúng
+// "(AC-xxx, nghĩa vụ x)" vào tiêu đề mỗi `it()`.
 
-/** (a) card body -> /exams/[id]; enabled RateButton -> /exams/[id]/rate
- *  independently; disabled RateButton (not-attempted/logged-out) does not
- *  navigate and exposes its AT reason via aria-describedby (AC-010/011/026). */
+/** (a) thân thẻ -> /exams/[id]; RateButton đang bật -> /exams/[id]/rate
+ *  độc lập; RateButton bị tắt (chưa-làm/chưa-đăng-nhập) không
+ *  điều hướng và phơi lý do AT qua aria-describedby (AC-010/011/026). */
 export async function checkCardBodyAndRateButtonIndependentTargets(
   driver: FE2Driver
 ): Promise<void> {
   await driver.goto("/exams");
 
-  // Enabled RateButton (exam-hard, submitted -> eligible) navigates on its own.
+  // RateButton đã bật (exam-hard, đã nộp -> đủ điều kiện) tự điều hướng.
   const enabledRate = driver.getByRole("link", { name: "Rate →" }).first();
   await enabledRate.click();
   assert.match(driver.url(), /\/exams\/exam-hard\/rate$/);
 
-  // Card body (title link) navigates to the detail route, independent of Rate.
+  // Thân thẻ (liên kết tiêu đề) điều hướng tới route chi tiết, độc lập với Đánh giá.
   await driver.goto("/exams");
   const cardBody = driver.getByRole("link", { name: "Calculus Challenge" });
   await cardBody.click();
   assert.match(driver.url(), /\/exams\/exam-hard$/);
 
-  // Disabled RateButton — .first() resolves to exam-0-ratings (the first
-  // FIXTURE_EXAMS entry not in FIXTURE_SUBMITTED_EXAM_IDS, in DOM order), also
-  // logged-in not-attempted like exam-medium: no navigation, reason reachable
-  // via aria-describedby.
+  // RateButton bị tắt — .first() resolve ra exam-0-ratings (mục FIXTURE_EXAMS đầu tiên
+  // không có trong FIXTURE_SUBMITTED_EXAM_IDS, theo thứ tự DOM), cũng
+  // đã-đăng-nhập-chưa-làm như exam-medium: không điều hướng, lý do tới được
+  // qua aria-describedby.
   await driver.goto("/exams");
   const disabledRate = driver.getByRole("button", { name: "Rate →" }).first();
   const urlBefore = driver.url();
@@ -183,8 +182,8 @@ export async function checkCardBodyAndRateButtonIndependentTargets(
   assert.equal(await reason.isVisible(), true);
 }
 
-/** (a, AC-026) logged-out: every RateButton is disabled with reason
- *  "Log in to rate", regardless of submitted-exam-id membership. */
+/** (a, AC-026) chưa đăng nhập: mọi RateButton bị tắt với lý do
+ *  "Log in to rate", bất kể có thuộc submitted-exam-id hay không. */
 export async function checkLoggedOutRateButtonsDisabled(driver: FE2Driver): Promise<void> {
   await driver.goto("/exams");
   const disabledRate = driver.getByRole("button", { name: "Rate →" }).first();
@@ -193,9 +192,9 @@ export async function checkLoggedOutRateButtonsDisabled(driver: FE2Driver): Prom
   assert.equal(await reason.isVisible(), true);
 }
 
-/** (b) DifficultyBadge shows "<Bucket> · <mean>" for every >=3-rating exam and
- *  literal "—" for every <3-rating exam, on the ExamCard Level cell AND the
- *  exam-detail Difficulty cell (AC-014/015/016). */
+/** (b) DifficultyBadge hiện "<Nhóm> · <trung bình>" cho mọi đề >=3 đánh giá và
+ *  literal "—" cho mọi đề <3 đánh giá, trên ô Mức của ExamCard VÀ ô
+ *  Độ khó của trang chi tiết đề (AC-014/015/016). */
 export async function checkDifficultyBadgeAcrossFixtures(driver: FE2Driver): Promise<void> {
   await driver.goto("/exams");
   for (const exam of FIXTURE_EXAMS) {
@@ -209,9 +208,9 @@ export async function checkDifficultyBadgeAcrossFixtures(driver: FE2Driver): Pro
   }
 }
 
-/** (c) checking Hardest writes ?sort=hardest, de-selects Newest/Oldest, and
- *  sinks every below-threshold exam after every rated exam (AC-019/020;
- *  D002 regression guard — must NOT combine with Newest/Oldest). */
+/** (c) chọn Khó nhất ghi ?sort=hardest, bỏ chọn Mới nhất/Cũ nhất, và
+ *  làm mọi đề dưới ngưỡng chìm xuống sau mọi đề đã đánh giá (AC-019/020;
+ *  chốt hồi quy D002 — KHÔNG được kết hợp với Mới nhất/Cũ nhất). */
 export async function checkHardestSortOrdering(driver: FE2Driver): Promise<void> {
   await driver.goto("/exams");
   await driver.getByRole("checkbox", { name: "Hardest" }).check();
@@ -222,7 +221,7 @@ export async function checkHardestSortOrdering(driver: FE2Driver): Promise<void>
   assert.equal(await newest.isChecked(), false);
   assert.equal(await oldest.isChecked(), false);
 
-  // ExamCard titles render as <h3> (ExamCard.tsx) in DOM order == render order.
+  // Tiêu đề ExamCard render dạng <h3> (ExamCard.tsx) theo thứ tự DOM == thứ tự render.
   const renderedTitles = await driver.getByRole("heading", { level: 3 }).allTextContents();
   const ratedTitles = FIXTURE_EXAMS.filter((e) => e.communityDifficulty).map((e) => e.title);
   const belowThresholdTitles = FIXTURE_EXAMS.filter((e) => !e.communityDifficulty).map(
@@ -238,12 +237,12 @@ export async function checkHardestSortOrdering(driver: FE2Driver): Promise<void>
   }
 }
 
-/** (d) selecting Level=Hard shows only >=3-rating exams in the Hard bucket
- *  (AC-017/021) — excludes below-threshold and other-bucket exams. */
+/** (d) chọn Mức=Khó chỉ hiện các đề >=3 đánh giá thuộc nhóm Khó
+ *  (AC-017/021) — loại các đề dưới ngưỡng và đề nhóm khác. */
 export async function checkLevelHardFilter(driver: FE2Driver): Promise<void> {
   await driver.goto("/exams");
-  // The Level FilterRow only renders inside ExamFilters.tsx's `{open && (...)}`
-  // overlay panel — open the master "Filters" toggle first (ExamFilters.tsx:113).
+  // FilterRow của Mức chỉ render bên trong panel overlay `{open && (...)}` của ExamFilters.tsx
+  // — mở nút "Filters" tổng trước (ExamFilters.tsx:113).
   await driver.getByRole("button", { name: "Filters" }).click();
   await driver.getByRole("button", { name: "Level" }).click();
   await driver.getByRole("button", { name: "Hard" }).click();
@@ -256,8 +255,8 @@ export async function checkLevelHardFilter(driver: FE2Driver): Promise<void> {
   }
 }
 
-/** Orchestrator — runs FE2's four proof obligations against a supplied driver
- *  wired to a fixture-driven `/exams` session (see file header). */
+/** Bộ điều phối — chạy bốn nghĩa vụ chứng minh của FE2 trên một driver được cấp
+ *  nối với một phiên `/exams` điều khiển bằng fixture (xem comment đầu file). */
 export async function runFE2(driver: FE2Driver, loggedOutDriver: FE2Driver): Promise<void> {
   await checkCardBodyAndRateButtonIndependentTargets(driver);
   await checkLoggedOutRateButtonsDisabled(loggedOutDriver);
@@ -268,56 +267,56 @@ export async function runFE2(driver: FE2Driver, loggedOutDriver: FE2Driver): Pro
 
 
 // =============================================================================
-// Test FE1 — Result-page rating entry navigates directly to the Rating page
-// (2026-07-27 rewrite — replaces the old auto-open-modal journey. The Result
-// page's rating entry no longer opens a popup at all: RatingModal/
-// RatingModalController/RatingEntry, the ?rate=auto marker, and the dialog
-// they drove are all deleted. The PRD's AC-004/005 ("...auto-opens as a
-// modal...") describe that removed behavior — superseded by this product
-// decision, see result/page.tsx's own 2026-07-27 comment.)
+// Test FE1 — Lối vào đánh giá ở trang kết quả điều hướng thẳng tới trang Đánh giá
+// (viết lại 2026-07-27 — thay hành trình modal-tự-mở cũ. Lối vào đánh giá
+// của trang Kết quả không còn mở popup nào: RatingModal/
+// RatingModalController/RatingEntry, dấu ?rate=auto, và dialog mà
+// chúng điều khiển đều đã xoá. AC-004/005 của PRD ("...tự mở như một
+// modal...") mô tả hành vi đã bị gỡ đó — bị quyết định sản phẩm này thay thế,
+// xem comment 2026-07-27 của chính result/page.tsx.)
 // =============================================================================
-// AC-006: "...it shows an 'already rated' state that is editable..." — still
-//   true in spirit: the entry point's LABEL still reflects prior-rating
-//   state, it's just a plain navigation link now instead of a pre-filled
-//   dialog trigger (the /rate page itself reads the prior scores server-side
-//   — proven by rate/page.tsx's own getMyRating/mapFromMyRating call, not by
-//   this test).
-// ROI: 40 (BV:6 x Freq:6 + Legal:0 + Defect:6) — down from the old modal
-//   journey's 57 now that there's no dialog/focus-trap/aria-live surface left
-//   to prove at the browser level; what remains is a plain link + label.
-// Behavior: on the result page, the rating entry point's label reflects
-//   whether the current user already rated this exam, and clicking it
-//   navigates to /exams/[id]/rate — a real page transition, never a dialog.
+// AC-006: "...nó hiện trạng thái 'đã đánh giá' có thể sửa..." — vẫn
+//   đúng về tinh thần: NHÃN của lối vào vẫn phản ánh trạng thái
+//   đánh giá trước đó, chỉ là giờ nó là một liên kết điều hướng thường thay vì
+//   một nút mở dialog điền sẵn (bản thân trang /rate đọc các điểm trước đó phía server
+//   — được chứng minh bởi lời gọi getMyRating/mapFromMyRating của chính rate/page.tsx, không bởi
+//   test này).
+// ROI: 40 (BV:6 x Freq:6 + Legal:0 + Defect:6) — giảm từ 57 của
+//   hành trình modal cũ vì không còn bề mặt dialog/bẫy-focus/aria-live nào
+//   để chứng minh ở mức trình duyệt; còn lại là một liên kết thường + nhãn.
+// Hành vi: trên trang kết quả, nhãn của lối vào đánh giá phản ánh
+//   người dùng hiện tại đã đánh giá đề này chưa, và bấm vào nó
+//   điều hướng tới /exams/[id]/rate — một chuyển trang thật, không bao giờ là dialog.
 // @category: fixture-e2e
 // @lane: fixture-e2e
-// @dependency: full-ui (mocked backend) — getResult/getMyRating fixture-driven
-//   (same residual as FE2's header note: wiring fixture data into a real
-//   running page has no existing mock-injection layer in this repo).
+// @dependency: toàn UI (backend bị mock) — getResult/getMyRating điều khiển bằng fixture
+//   (cùng phần dư như ghi chú đầu mục của FE2: nối dữ liệu fixture vào một trang
+//   đang chạy thật chưa có lớp tiêm mock nào trong repo này).
 // @complexity: low
-// @real-dependency: none — this proves only the browser-level link/label
-//   behavior; rateExam/getMyRating's own contracts are proven by backend
-//   Task 6's tests.
-// Primary failure mode: the entry point still opens an overlay/dialog instead
-//   of navigating; OR the label doesn't reflect prior-rating state; OR the
-//   link target is wrong (e.g. still points at the exam detail page instead
-//   of the rate page).
-// Proof obligation:
-//   (1) with no prior rating, the entry point reads "Rate this exam", is a
-//       real link (not a button) targeting /exams/[id]/rate, and clicking it
-//       navigates there directly with no role="dialog" ever appearing;
-//   (2) with a prior rating, the entry point reads "Edit your rating" and
-//       targets the same /exams/[id]/rate URL (AC-006 contrast case).
+// @real-dependency: không có — chỉ chứng minh hành vi liên kết/nhãn ở mức trình duyệt;
+//   hợp đồng của chính rateExam/getMyRating được chứng minh bởi test của backend
+//   Task 6.
+// Kiểu hỏng chính: lối vào vẫn mở một overlay/dialog thay vì điều hướng;
+//   HOẶC nhãn không phản ánh trạng thái đã đánh giá trước đó; HOẶC đích liên kết
+//   sai (ví dụ vẫn trỏ vào trang chi tiết đề thay vì
+//   trang đánh giá).
+// Nghĩa vụ chứng minh:
+//   (1) khi chưa có đánh giá trước, lối vào đọc "Rate this exam", là một
+//       liên kết thật (không phải nút) nhắm /exams/[id]/rate, và bấm vào đó
+//       điều hướng tới đó trực tiếp mà không bao giờ có role="dialog" xuất hiện;
+//   (2) khi đã có đánh giá trước, lối vào đọc "Edit your rating" và
+//       nhắm cùng URL /exams/[id]/rate (ca đối chiếu AC-006).
 
-/** Fixture identifiers for this journey (distinct from FE2's eligibility
- *  fixtures; FE1 exercises the result page, not /exams). */
+/** Định danh fixture cho hành trình này (tách biệt với các fixture đủ điều kiện của FE2;
+ *  FE1 thực thi trang kết quả, không phải /exams). */
 export const FE1_EXAM_ID = "exam-fe1-fresh-submit";
 export const FE1_ATTEMPT_ID = "attempt-fe1";
 export const FE1_RESULT_PATH = `/exams/${FE1_EXAM_ID}/attempt/${FE1_ATTEMPT_ID}/result`;
 
-// --- FE1 Driver (Playwright `Page`/`Locator` structural subset) ------------
-// Much smaller than the old dialog-journey driver (no press/isFocused/reload/
-// getByTestId needed — nothing left to page through, focus-trap, or reload
-// idempotently; it's a link with a label and an href).
+// --- Driver FE1 (tập con cấu trúc của `Page`/`Locator` Playwright) ------------
+// Nhỏ hơn nhiều so với driver hành trình dialog cũ (không cần press/isFocused/reload/
+// getByTestId — không còn gì để lật trang, bẫy focus, hay tải lại
+// lũy đẳng; đó là một liên kết có nhãn và href).
 
 export interface FE1Locator {
   click(): Promise<void>;
@@ -332,9 +331,9 @@ export interface FE1Driver {
   getByRole(role: string, options?: { name?: string | RegExp }): FE1Locator;
 }
 
-/** (1) No prior rating -> entry point reads "Rate this exam", is a real link
- *  targeting /exams/[id]/rate, and clicking it navigates there directly with
- *  no role="dialog" ever appearing (AC-006 fresh case). */
+/** (1) Chưa có đánh giá trước -> lối vào đọc "Rate this exam", là một liên kết thật
+ *  nhắm /exams/[id]/rate, và bấm vào đó điều hướng tới đó trực tiếp mà
+ *  không bao giờ có role="dialog" xuất hiện (ca mới của AC-006). */
 export async function checkFreshEntryNavigatesToRatePage(driver: FE1Driver): Promise<void> {
   await driver.goto(FE1_RESULT_PATH);
 
@@ -351,8 +350,8 @@ export async function checkFreshEntryNavigatesToRatePage(driver: FE1Driver): Pro
   );
 }
 
-/** (2) A prior rating -> entry point reads "Edit your rating" and still
- *  targets the same /exams/[id]/rate URL (AC-006 contrast case). */
+/** (2) Đã có đánh giá trước -> lối vào đọc "Edit your rating" và vẫn
+ *  nhắm cùng URL /exams/[id]/rate (ca đối chiếu AC-006). */
 export async function checkRatedEntryReadsEditYourRating(driver: FE1Driver): Promise<void> {
   await driver.goto(FE1_RESULT_PATH);
 
@@ -365,9 +364,9 @@ export async function checkRatedEntryReadsEditYourRating(driver: FE1Driver): Pro
   assert.equal(await entry.getAttribute("href"), `/exams/${FE1_EXAM_ID}/rate`);
 }
 
-/** Orchestrator — runs FE1's two obligations against two driver sessions: one
- *  for a user who hasn't rated this exam yet, one for a user who already has
- *  (mirrors FE2's fresh vs. logged-out dual-driver pattern). */
+/** Bộ điều phối — chạy hai nghĩa vụ của FE1 trên hai phiên driver: một
+ *  cho người dùng chưa đánh giá đề này, một cho người đã đánh giá
+ *  (theo mẫu hai-driver mới-so-với-chưa-đăng-nhập của FE2). */
 export async function runFE1(freshDriver: FE1Driver, ratedDriver: FE1Driver): Promise<void> {
   await checkFreshEntryNavigatesToRatePage(freshDriver);
   await checkRatedEntryReadsEditYourRating(ratedDriver);

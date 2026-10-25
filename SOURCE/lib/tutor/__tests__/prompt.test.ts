@@ -1,26 +1,25 @@
 // buildTutorPrompt() [unit]
 // Design Doc: docs/design/engine1-adaptive-ai-backend-design.md (v1.0)
 // PRD: docs/prd/engine1-adaptive-ai-prd.md (v1.0, AC-018/019/020, Success
-//   Criteria #8 — "Answer key never reaches the model")
-// Generated: 2026-08-08 | Converted from skeleton: 2026-08-14 (backend task 11,
-//   Red -> Green in one commit, this repo's convention)
+//   Criteria #8 — "Khoá đáp án không bao giờ tới mô hình")
+// Sinh ngày: 2026-08-08 | Chuyển từ skeleton: 2026-08-14 (backend task 11,
+//   Red -> Green trong một commit, quy ước của repo này)
 //
-// NOT part of the integration/fixture-e2e/service-integration-e2e lane budget —
-// Design-Doc-mandated unit coverage (backend DD Implementation Path Mapping:
-// "SOURCE/lib/tutor/__tests__/prompt.test.ts", AC-018/019). Selected as this
-// task's own explicitly named top risk item: "the answer key
-// (correct_answer/sub_answers/essay_answer) reaching the tutor prompt — the
-// single most important gate per PRD Success Criteria #8" (backend DD Design
+// KHÔNG thuộc ngân sách làn integration/fixture-e2e/service-integration-e2e —
+// là độ phủ unit do Design Doc bắt buộc (Implementation Path Mapping của backend DD:
+// "SOURCE/lib/tutor/__tests__/prompt.test.ts", AC-018/019). Được chọn làm mục rủi ro
+// hàng đầu được nêu tên rõ của chính task này: "khoá đáp án
+// (correct_answer/sub_answers/essay_answer) tới được prompt của gia sư — chốt
+// quan trọng nhất theo PRD Success Criteria #8" (backend DD Design
 // Summary, biggest_risks).
 //
-// Mock boundary (backend DD Test Boundaries): buildTutorPrompt() — No, real
-//   implementation, direct pure-function unit test (pure string construction, no
-//   I/O). The containment mechanism is TWO-LAYERED and this file proves the
-//   SECOND layer: (1) TutorPromptInput's type shape structurally cannot HOLD
-//   correct_answer/sub_answers/essay_answer (a compile-time property); (2) even
-//   given a maximally-adversarial-but-type-valid input, the OUTPUT STRING must
-//   contain 0 occurrences of answer-key-shaped sentinel values (this file's own
-//   runtime property) — AC-018 requires both, not type-shape alone.
+// Ranh giới mock (Test Boundaries của backend DD): buildTutorPrompt() — Không, cài đặt
+//   thật, unit test hàm thuần trực tiếp (dựng chuỗi thuần, không I/O). Cơ chế khoanh vùng
+//   có HAI LỚP và file này chứng minh lớp THỨ HAI: (1) hình dạng kiểu của TutorPromptInput
+//   về cấu trúc không thể CHỨA correct_answer/sub_answers/essay_answer (thuộc tính lúc biên dịch);
+//   (2) kể cả với đầu vào thù địch tối đa nhưng hợp kiểu, CHUỖI ĐẦU RA phải
+//   chứa 0 lần xuất hiện của các giá trị canh có hình dạng khoá đáp án (thuộc tính
+//   lúc chạy của chính file này) — AC-018 đòi cả hai, không chỉ hình dạng kiểu.
 
 import { describe, expect, it } from "vitest";
 
@@ -118,42 +117,42 @@ function findLeaks(prompt: string, sentinels: string[], where: string): string[]
 }
 
 // =============================================================================
-// Test 1 — AC-018/019: zero answer-key occurrences across a per-questionType
-// fixture battery
+// Test 1 — AC-018/019: 0 lần xuất hiện khoá đáp án qua một bộ fixture
+// theo từng questionType
 // =============================================================================
-// AC-018: "Given any tutor invocation, when the assembled prompt payload is
-//   inspected, then it contains 0 occurrences of any correct_answer/
-//   sub_answers/essay_answer value."
-// AC-019: "Given the tutor's context assembly, it shall read only columns from
-//   the §10c safe set plus the student's own recorded answer."
+// AC-018: "Cho bất kỳ lần gọi gia sư nào, khi payload prompt đã ghép được
+//   kiểm tra, thì nó chứa 0 lần xuất hiện của bất kỳ giá trị correct_answer/
+//   sub_answers/essay_answer nào."
+// AC-019: "Cho việc ghép ngữ cảnh của gia sư, nó chỉ được đọc các cột thuộc
+//   tập an toàn §10c cộng câu trả lời đã ghi của chính học sinh."
 // ROI: 70 (BV:10 x Freq:6 + Legal:0 + Defect:10)
-// Behavior: buildTutorPrompt(input) called across a battery of TutorPromptInput
-//   fixtures, one per questionType (mcq/true_false/short_answer), each paired
-//   with a PARALLEL sentinel value representing "what the full DB row's
-//   correct_answer/sub_answers/essay_answer would have contained" — a value
-//   deliberately NEVER placed anywhere inside the TutorPromptInput fixture itself
-//   (since the type has no field to hold it) -> assert the returned prompt string
-//   contains 0 occurrences of every sentinel, for every questionType.
+// Hành vi: buildTutorPrompt(input) được gọi qua một bộ fixture TutorPromptInput,
+//   mỗi questionType một cái (mcq/true_false/short_answer), mỗi cái đi kèm
+//   một giá trị canh SONG SONG đại diện cho "thứ mà correct_answer/sub_answers/
+//   essay_answer của hàng DB đầy đủ sẽ chứa" — một giá trị cố ý KHÔNG BAO GIỜ
+//   đặt vào đâu bên trong chính fixture TutorPromptInput (vì kiểu không có trường để chứa nó)
+//   -> khẳng định chuỗi prompt trả về chứa 0 lần xuất hiện của mọi giá trị canh,
+//   với mọi questionType.
 // @category: core-functionality
 // @lane: unit
-// @dependency: none (pure string construction; no I/O)
+// @dependency: không có (dựng chuỗi thuần; không I/O)
 // @complexity: medium
 // @real-dependency: N/A
-// Primary failure mode: a future maintainer widens TutorPromptInput (or
-//   buildTutorPrompt()'s own implementation) to interpolate a field that happens
-//   to carry answer-key-shaped content — e.g. accidentally passing the FULL
-//   Question row instead of the narrowed TutorPromptInput at the call site in
-//   explainStep() — and the containment silently breaks, because nothing today
-//   asserts the OUTPUT STRING itself; the type-shape guard alone would not catch
-//   a call-site mistake that passes an over-broad object satisfying a widened type.
-// Proof obligation: for each of mcq/true_false/short_answer, construct a
-//   TutorPromptInput fixture and a distinct, greppable sentinel string standing in
-//   for that question's correct_answer/sub_answers/essay_answer (e.g.
-//   "SENTINEL-CORRECT-ANSWER-<questionType>") -> assert
-//   `prompt.includes(sentinel) === false` for every sentinel across the full
-//   battery, not merely one happy-path case. Also assert the prompt DOES contain
-//   the fixture's studentAnswer and questionContent verbatim, to prove the test
-//   is not vacuously passing against a near-empty prompt.
+// Kiểu hỏng chính: người bảo trì về sau mở rộng TutorPromptInput (hoặc cài đặt
+//   của chính buildTutorPrompt()) để nội suy một trường tình cờ mang nội dung
+//   có hình dạng khoá đáp án — ví dụ vô tình truyền CẢ hàng Question
+//   thay vì TutorPromptInput đã thu hẹp ở nơi gọi trong
+//   explainStep() — và việc khoanh vùng lặng lẽ hỏng, vì hiện không gì
+//   khẳng định CHUỖI ĐẦU RA; chỉ chốt hình dạng kiểu thì không bắt được
+//   một lỗi ở nơi gọi truyền vào một object quá rộng thoả một kiểu đã mở rộng.
+// Nghĩa vụ chứng minh: với mỗi mcq/true_false/short_answer, dựng một
+//   fixture TutorPromptInput và một chuỗi canh riêng biệt, grep được, đại diện cho
+//   correct_answer/sub_answers/essay_answer của câu đó (ví dụ
+//   "SENTINEL-CORRECT-ANSWER-<questionType>") -> khẳng định
+//   `prompt.includes(sentinel) === false` với mọi chuỗi canh qua cả
+//   bộ fixture, không chỉ một ca đường vui. Cũng khẳng định prompt CÓ chứa
+//   studentAnswer và questionContent của fixture nguyên văn, để chứng minh test
+//   không qua rỗng nghĩa trên một prompt gần như trống.
 describe("buildTutorPrompt — không có đáp án nào lọt vào prompt (AC-018/019)", () => {
   it("cho cả mcq/true_false/short_answer: 0 lần xuất hiện sentinel đáp án, kể cả khi bị truyền nguyên dòng questions", () => {
     const built = FIXTURES.map((fixture) => ({
@@ -180,32 +179,32 @@ describe("buildTutorPrompt — không có đáp án nào lọt vào prompt (AC-0
 });
 
 // =============================================================================
-// Test 2 — AC-020 (backend half): Vietnamese, Socratic, answer-withholding
-// instruction present for every questionType
+// Test 2 — AC-020 (nửa backend): có chỉ dẫn tiếng Việt, kiểu Socratic, giấu đáp án
+// cho mọi questionType
 // =============================================================================
-// AC-020: "Given a wrong-answer case, the assembled prompt shall instruct the
-//   model to respond in Vietnamese, in Socratic form, without stating the final
-//   answer — the model's actual compliance is judged manually against the fixed
-//   evaluation set (PRD Success Criteria #9), not asserted by this document's
-//   unit tests." This test asserts only the INSTRUCTION's presence in the prompt
-//   text (a necessary precondition), not the model's eventual compliance.
+// AC-020: "Cho một ca trả lời sai, prompt đã ghép phải chỉ dẫn
+//   mô hình trả lời bằng tiếng Việt, theo kiểu Socratic, không nêu đáp án
+//   cuối — việc mô hình thực sự tuân thủ được đánh giá thủ công trên bộ
+//   đánh giá cố định (PRD Success Criteria #9), không khẳng định bởi unit
+//   test của tài liệu này." Test này chỉ khẳng định SỰ CÓ MẶT của CHỈ DẪN trong
+//   văn bản prompt (một điều kiện cần), không phải việc mô hình cuối cùng tuân thủ.
 // ROI: 55 (BV:6 x Freq:6 + Legal:0 + Defect:9)
-// Behavior: buildTutorPrompt() output contains the fixed Vietnamese
-//   Socratic-style, answer-withholding instruction text (or a stable substring of
-//   it) for mcq, true_false, and short_answer inputs alike.
+// Hành vi: đầu ra buildTutorPrompt() chứa văn bản chỉ dẫn cố định
+//   kiểu Socratic, giấu đáp án bằng tiếng Việt (hoặc một chuỗi con ổn định của nó)
+//   cho đầu vào mcq, true_false và short_answer như nhau.
 // @category: core-functionality
 // @lane: unit
-// @dependency: none
+// @dependency: không có
 // @complexity: low
 // @real-dependency: N/A
-// Primary failure mode: the instruction preamble is accidentally dropped for one
-//   questionType branch only (e.g. true_false's subItems-shaped context), so that
-//   branch silently sends Gemini a bare question dump with no behavioral
-//   constraint while the other two branches remain correctly constrained.
-// Proof obligation: define the known instruction literal (or a stable, minimal
-//   substring of it) ONCE as a fixture constant, independent of the
-//   implementation file — assert it is present in buildTutorPrompt()'s output for
-//   each of the three questionType fixtures.
+// Kiểu hỏng chính: phần mở đầu chỉ dẫn vô tình bị bỏ chỉ ở một
+//   nhánh questionType (ví dụ ngữ cảnh dạng subItems của true_false), khiến
+//   nhánh đó lặng lẽ gửi cho Gemini một bãi câu hỏi trần không có ràng buộc
+//   hành vi nào trong khi hai nhánh kia vẫn bị ràng buộc đúng.
+// Nghĩa vụ chứng minh: định nghĩa literal chỉ dẫn đã biết (hoặc một chuỗi con
+//   tối thiểu ổn định của nó) MỘT LẦN làm hằng fixture, độc lập với
+//   file cài đặt — khẳng định nó có mặt trong đầu ra buildTutorPrompt() cho
+//   từng trong ba fixture questionType.
 
 /** Chép tay, CỐ Ý không import từ prompt.ts: nếu import, câu lệnh này tự động
  *  "đúng" theo mọi thay đổi của implementation và không còn chứng minh gì. */
@@ -223,32 +222,32 @@ describe("buildTutorPrompt — chỉ dẫn Socratic tiếng Việt, không nêu 
 });
 
 // =============================================================================
-// Test 3 — essay's exclusion from TutorPromptInput.questionType is structural
-// (type-level proof obligation, not a runtime assertion)
+// Test 3 — việc loại essay khỏi TutorPromptInput.questionType là cấu trúc
+// (nghĩa vụ chứng minh ở mức kiểu, không phải khẳng định lúc chạy)
 // =============================================================================
-// No standalone AC — backend DD's own stated design intent: "essay excluded from
-//   TutorPromptInput.questionType" (backend DD § Data Contracts). The ORIGINAL
-//   wording of that intent read "never scored, never wrong-twice-eligible"; after
-//   ADR-0018 the first half is false — essays ARE auto-scored, they carry a band.
-//   The exclusion stands on the SECOND half alone, and that half is the load-
-//   bearing one: wrong-twice eligibility is computed from `isCorrect`, a BINARY
-//   predicate an essay has no value for. A band is not a right/wrong answer.
-// ROI: 45 (BV:6 x Freq:4 + Legal:0 + Defect:9) — a maintainability/regression
-//   guard rather than a user-facing behavior proof.
+// Không có AC riêng — ý định thiết kế do chính backend DD nêu: "essay bị loại khỏi
+//   TutorPromptInput.questionType" (backend DD § Data Contracts). Cách viết GỐC
+//   của ý định đó là "không bao giờ chấm, không bao giờ đủ điều kiện wrong-twice"; sau
+//   ADR-0018 nửa đầu là sai — bài tự luận ĐƯỢC tự chấm, chúng mang một band.
+//   Việc loại trừ đứng vững chỉ nhờ nửa THỨ HAI, và nửa đó là nửa chịu
+//   lực: tính đủ điều kiện wrong-twice được tính từ `isCorrect`, một
+//   vị từ NHỊ PHÂN mà bài tự luận không có giá trị. Một band không phải đáp án đúng/sai.
+// ROI: 45 (BV:6 x Freq:4 + Legal:0 + Defect:9) — một chốt bảo trì/hồi quy
+//   chứ không phải bằng chứng hành vi hướng người dùng.
 // @category: edge-case
 // @lane: unit
-// @dependency: none
+// @dependency: không có
 // @complexity: low
 // @real-dependency: N/A
-// Primary failure mode: a future maintainer widens `questionType` to include
-//   `"essay"` (defeating the "essay never wrong-twice-eligible" invariant this
-//   type's shape currently enforces) with nothing in this test file flagging the
-//   change, since TS-level exclusion today has no accompanying runtime assertion.
-// Proof obligation: implementer adds a `// @ts-expect-error` fixture line
-//   attempting to construct a TutorPromptInput with `questionType: "essay"` —
-//   this line is expected to FAIL TO COMPILE today (proving the exclusion is
-//   enforced at the type level) and is the intended catch if `essay` is ever
-//   added to the union without a conscious, reviewed widening of this type.
+// Kiểu hỏng chính: người bảo trì về sau mở rộng `questionType` để gồm
+//   `"essay"` (phá bất biến "bài tự luận không bao giờ đủ điều kiện wrong-twice" mà hình dạng
+//   kiểu này hiện cưỡng chế) mà không gì trong file test này báo hiệu
+//   thay đổi đó, vì việc loại trừ ở mức TS hiện không đi kèm khẳng định lúc chạy nào.
+// Nghĩa vụ chứng minh: người cài đặt thêm một dòng fixture `// @ts-expect-error`
+//   cố dựng một TutorPromptInput với `questionType: "essay"` —
+//   dòng này được kỳ vọng KHÔNG BIÊN DỊCH được hôm nay (chứng minh việc loại trừ
+//   được cưỡng chế ở mức kiểu) và là chốt bắt nếu `essay` bị thêm vào
+//   union mà không có một lần mở rộng kiểu này có chủ đích, được review.
 // 2026-09-13: union NỚI để nhận "essay" — một quyết định có chủ đích, không
 // phải lỡ tay (engineer: gợi ý chuyển sang màn làm bài, mở cho mọi câu kể cả tự
 // luận). Ca "@ts-expect-error" cũ đã làm đúng việc của nó: nó đỏ khi union nới,

@@ -30,41 +30,41 @@ const { fromMock, guardMock, generateHintMock, consumeQuotaMock, readEntitlement
   })
 );
 
-// tutorActions.ts pulls in "server-only" transitively (supabase/server, gemini) —
-// stub it, same pattern as getResult.int.test.ts / submitExam.int.test.ts.
+// tutorActions.ts kéo theo "server-only" gián tiếp (supabase/server, gemini) —
+// stub nó, cùng mẫu với getResult.int.test.ts / submitExam.int.test.ts.
 vi.mock("server-only", () => ({}));
 
-// Mock boundary 1 — the Supabase client.
+// Ranh giới mock 1 — client Supabase.
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(async () => ({ from: fromMock })),
 }));
 
-// Mock boundary 2 — guard() only. RATE_LIMITS stays REAL: `guard()`'s parameter
-// type is `keyof typeof RATE_LIMITS`, so the `explainStep` member is proven by
-// tsc rather than by a runtime assertion here.
+// Ranh giới mock 2 — chỉ guard(). RATE_LIMITS giữ THẬT: kiểu tham số của `guard()`
+// là `keyof typeof RATE_LIMITS`, nên thành viên `explainStep` được chứng minh bởi
+// tsc chứ không bởi khẳng định lúc chạy ở đây.
 vi.mock("@/lib/security/rateLimit", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/security/rateLimit")>()),
   guard: guardMock,
 }));
 
-// Mock boundary 3 — the Gemini-facing call only. TutorCallError stays REAL so the
-// failure fixtures below are the exact error class the implementation classifies on.
+// Ranh giới mock 3 — chỉ lời gọi hướng Gemini. TutorCallError giữ THẬT nên các
+// fixture lỗi bên dưới đúng là lớp lỗi mà cài đặt dựa vào để phân loại.
 vi.mock("@/lib/tutor/callTutor", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/tutor/callTutor")>()),
   generateHint: generateHintMock,
 }));
 
-// Mock boundary 4 — consumeQuota() only. PLAN_LIMITS, quotaKey() and
-// periodStartEpoch() stay REAL: the gate under test is the CALL, not the
-// counter arithmetic (quota.test.ts owns that end to end).
+// Ranh giới mock 4 — chỉ consumeQuota(). PLAN_LIMITS, quotaKey() và
+// periodStartEpoch() giữ THẬT: cổng đang kiểm là CÁI GỌI, không phải
+// số học bộ đếm (quota.test.ts sở hữu việc đó đầu-cuối).
 vi.mock("@/lib/billing/quota", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/billing/quota")>()),
   consumeQuota: consumeQuotaMock,
 }));
 
-// Mock boundary 5 — readEntitlement(): a DATA SOURCE for the gate, not the thing
-// under test; leaving it real would route unrelated reads through `from()` and
-// make `tablesTouched` meaningless.
+// Ranh giới mock 5 — readEntitlement(): một NGUỒN DỮ LIỆU cho cổng, không phải thứ
+// đang được kiểm; để nó thật sẽ dẫn các lượt đọc không liên quan qua `from()` và
+// làm `tablesTouched` vô nghĩa.
 vi.mock("@/lib/billing/readEntitlement", () => ({ readEntitlement: readEntitlementMock }));
 
 const { TutorCallError } = await import("@/lib/tutor/callTutor");

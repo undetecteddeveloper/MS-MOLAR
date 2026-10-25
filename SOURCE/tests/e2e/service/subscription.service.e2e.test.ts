@@ -1,58 +1,57 @@
-// Subscription (payOS prepaid period) — SERVICE-INTEGRATION-E2E lane skeleton
+// Subscription (kỳ trả trước payOS) — skeleton làn SERVICE-INTEGRATION-E2E
 // Design Docs: docs/design/subscription-backend-design.md (v1.4, Test Boundaries :1121,
 //              Second verification point :1201, Third verification point :1211)
 //              docs/design/subscription-frontend-design.md (v1.2, FE-B-02 :1124)
 // UI Spec:     docs/ui-spec/subscription-ui-spec.md (v1.3)
 // PRD:         docs/prd/subscription-prd.md (v1.6)
-// Generated:   2026-08-18 | Budget used: integration 3/3, fixture-e2e 3/3, service-e2e 2/2
+// Sinh ngày:   2026-08-18 | Ngân sách đã dùng: integration 3/3, fixture-e2e 3/3, service-e2e 2/2
 //
 // =============================================================================
-// FILE STATUS — read before editing
+// TRẠNG THÁI FILE — đọc trước khi sửa
 // =============================================================================
-// SVC-1 AND SVC-2 ARE BOTH IMPLEMENTED AND EXECUTED (backend-task-29 / plan
-// Task 6.1, and backend-task-30 / plan Task 6.2); their code lives at the FOOT
-// of this file, below both reserved-slot annotation blocks, so those two
-// annotations stay adjacent and readable. The lane is complete at 2/2 cases and
-// no skeleton remains in this file.
+// SVC-1 VÀ SVC-2 ĐỀU ĐÃ ĐƯỢC CÀI ĐẶT VÀ CHẠY (backend-task-29 / plan
+// Task 6.1, và backend-task-30 / plan Task 6.2); code của chúng nằm ở CUỐI
+// file này, dưới cả hai khối chú thích suất-giữ-chỗ, để hai chú thích đó
+// ở cạnh nhau và đọc được. Làn hoàn chỉnh ở 2/2 ca và
+// không còn skeleton nào trong file này.
 //
-// WHY THIS LANE EXISTS FOR THIS FEATURE. Both cases below qualify on the
-// lane's own criterion — "data persists across a real DB write" — and neither
-// is verifiable with fixtures. SVC-1's claims (`greatest()`,
-// `on conflict do update`, the `status='pending'` guard, the row lock) and
-// SVC-2's claim (an RLS policy actually scopes a read) are properties of
-// Postgres, not of our TypeScript. The backend DD says so directly: for
-// `record_payment_settlement` the boundary mocked is "nothing — real Postgres
-// required", and for `recheckOrder` ownership it is "nothing — real Postgres,
-// two real sessions ... a mocked Supabase client would assert the mock's
-// `null`, not the policy's".
+// VÌ SAO LÀN NÀY TỒN TẠI CHO TÍNH NĂNG NÀY. Cả hai ca bên dưới đủ điều kiện theo
+// tiêu chí của chính làn — "dữ liệu bền vững qua một lượt ghi DB thật" — và không ca nào
+// kiểm chứng được bằng fixture. Các khẳng định của SVC-1 (`greatest()`,
+// `on conflict do update`, chốt `status='pending'`, khoá hàng) và
+// khẳng định của SVC-2 (một policy RLS thực sự giới hạn một lượt đọc) là thuộc tính của
+// Postgres, không phải của TypeScript của ta. Backend DD nói thẳng: với
+// `record_payment_settlement` ranh giới bị mock là "không gì — cần Postgres thật",
+// và với quyền sở hữu `recheckOrder` là "không gì — Postgres thật,
+// hai phiên thật ... một client Supabase bị mock sẽ khẳng định `null` của mock,
+// không phải của policy".
 //
-// HOW THIS FILE IS RUN — decided, not left open.
-//   `SOURCE/vitest.config.ts:19` collects lib/**, components/**, app/** only, so
-//   nothing here runs under `npm test`. That is correct and deliberate: the
-//   backend DD's Implementation Approach Phase 4 states "CI has no database, so
-//   every DB-touching assertion is an integration test run locally against dev,
-//   not a CI gate". Making this file a CI gate would turn a missing credential
-//   into a red build.
+// FILE NÀY CHẠY THẾ NÀO — đã quyết, không để mở.
+//   `SOURCE/vitest.config.ts:19` chỉ thu thập lib/**, components/**, app/**, nên
+//   không gì ở đây chạy dưới `npm test`. Điều đó đúng và có chủ đích:
+//   Implementation Approach Phase 4 của backend DD nêu "CI không có database, nên
+//   mọi khẳng định chạm DB là một integration test chạy cục bộ trên dev,
+//   không phải cổng CI". Biến file này thành cổng CI sẽ biến một thông tin đăng nhập thiếu
+//   thành một build đỏ.
 //
-//   BOTH PIECES NOW EXIST (plan Task 0.2 / backend-task-02), so this lane is
-//   invoked as `npm run test:localdb` from `SOURCE/`:
-//     1. `SOURCE/vitest.localdb.config.ts` — same `resolve.alias` as
+//   CẢ HAI MẢNH NAY ĐÃ TỒN TẠI (plan Task 0.2 / backend-task-02), nên làn này được
+//   gọi bằng `npm run test:localdb` từ `SOURCE/`:
+//     1. `SOURCE/vitest.localdb.config.ts` — cùng `resolve.alias` với
 //        vitest.config.ts, `test.environment: "node"`,
 //        `test.include: ["tests/e2e/service/**/*.test.{ts,tsx}"]`.
-//     2. `package.json` script: "test:localdb": "vitest run --config
+//     2. script `package.json`: "test:localdb": "vitest run --config
 //        vitest.localdb.config.ts".
 //
-//   PRECONDITION, blocking: schema gate B (`npm run verify:schema`, run from
-//   `SOURCE/`) must be GREEN ON DEV before this file is run at all. Running it
-//   against a database that has not received the DDL produces failures that look
-//   like implementation defects and are not — that is this repository's
-//   three-time TD-005 failure shape.
+//   ĐIỀU KIỆN TIÊN QUYẾT, chặn: cổng schema B (`npm run verify:schema`, chạy từ
+//   `SOURCE/`) phải XANH TRÊN DEV trước khi chạy file này. Chạy nó
+//   trên một database chưa nhận DDL cho ra các lỗi trông như lỗi cài đặt
+//   mà không phải — đó là hình dạng lỗi TD-005 ba lần của repo này.
 //
-// FIXTURE HYGIENE. Follow the shipped precedent in
-//   `SOURCE/features/exams/__tests__/recordSkillMastery.int.test.ts` (this repo's
-//   only existing service-lane test) and `SOURCE/supabase/test-rls.ts`: an
-//   isolated id prefix per case (e.g. "sub-svc-") for idempotent setup and
-//   teardown. Each case creates its own users and orders and deletes them in
+//VỆ SINH FIXTURE. Theo tiền lệ đã ship ở
+//   `SOURCE/features/exams/__tests__/recordSkillMastery.int.test.ts` (test làn service
+//   duy nhất sẵn có của repo này) và `SOURCE/supabase/test-rls.ts`: một
+//   tiền tố id cô lập cho mỗi ca (ví dụ "sub-svc-") để setup và
+//   teardown lũy đẳng. Mỗi ca tự tạo user và đơn của mình và xoá chúng khi
 //   teardown.
 //
 //   ĐỘC LẬP THỨ TỰ — ĐÃ ĐO, KHÔNG suy ra. Mỗi ca tự dựng tiền đề của chính nó
@@ -75,211 +74,211 @@
 //          user A/B is not set up". Phép đếm của (h) nay nằm trong `afterAll`,
 //          nơi không `it()` nào xếp sau được nữa.
 //
-//   BUILT, and it lives in `./subscriptionServiceFixtures.ts` (plan Task 0.8 /
-//   backend-task-07). SVC-1 and SVC-2 take their accounts, sessions, seeding,
-//   read-back, teardown and the COUNTED payOS stub from
+//   ĐÃ DỰNG, và nằm ở `./subscriptionServiceFixtures.ts` (plan Task 0.8 /
+//   backend-task-07). SVC-1 và SVC-2 lấy tài khoản, phiên, gieo dữ liệu,
+//   đọc lại, teardown và stub payOS CÓ ĐẾM từ
 //   `createSubscriptionServiceFixture({ caseTag, orderCodeBlock, sessionHolder })`
-//   — one instance per case, and the two cases MUST pass different
-//   `orderCodeBlock` values, which is what makes one case's teardown unable to
-//   reach the other's rows. Read that file's header before writing either case:
-//   it states what the "sub-svc-" prefix can and cannot scope (neither
-//   `payment_orders.order_code` nor `subscriptions.user_id` can carry it), why
-//   the fixture accounts are DELETED rather than reused, and which of its
-//   constants are transcriptions whose drift nothing detects yet.
+//   — một instance cho mỗi ca, và hai ca PHẢI truyền các giá trị
+//   `orderCodeBlock` khác nhau, điều làm teardown của ca này không thể
+//   với tới hàng của ca kia. Đọc comment đầu của file đó trước khi viết cả hai ca:
+//   nó nêu tiền tố "sub-svc-" giới hạn được và không giới hạn được gì (cả
+//   `payment_orders.order_code` lẫn `subscriptions.user_id` đều không mang được nó), vì sao
+//   các tài khoản fixture bị XOÁ thay vì dùng lại, và hằng nào của nó
+//   là bản chép mà sự lệch chưa có gì phát hiện.
 //
-//   The `sessionHolder` is created HERE, not there: `vi.mock` is hoisted above
-//   imports, so the holder its factory reads has to come from `vi.hoisted` in
-//   this file — the same shape `recordSkillMastery.int.test.ts` uses, extended
-//   to two sessions by `fixture.useSession("A" | "B")`.
+//   `sessionHolder` được tạo Ở ĐÂY, không phải ở đó: `vi.mock` được hoist lên trên
+//   import, nên holder mà factory của nó đọc phải đến từ `vi.hoisted` trong
+//   file này — cùng hình dạng mà `recordSkillMastery.int.test.ts` dùng, mở rộng
+//   thành hai phiên bởi `fixture.useSession("A" | "B")`.
 //
-// HARD SCOPE LIMIT. No case in this file performs real payOS money movement or
-//   opens a live payOS connection. payOS is verified at the ADAPTER boundary:
-//   `getPaymentStatus()` / `createPaymentRequest()` are stubbed and
-//   invocation-counted. The one real-money webhook verification the backend DD
-//   describes ("What real money buys") is blocked on UI Spec TBD-02 (unfinished
-//   legal content) and is deliberately NOT generated here.
+// GIỚI HẠN PHẠM VI CỨNG. Không ca nào trong file này chuyển tiền thật qua payOS
+//   hay mở kết nối payOS sống. payOS được kiểm chứng ở ranh giới ADAPTER:
+//   `getPaymentStatus()` / `createPaymentRequest()` được stub và
+//   đếm lời gọi. Lượt kiểm chứng webhook tiền thật duy nhất mà backend DD
+//   mô tả ("What real money buys") bị chặn bởi UI Spec TBD-02 (nội dung pháp lý
+//   chưa xong) và cố ý KHÔNG được sinh ở đây.
 //
 //
 // =============================================================================
-// SVC-1 — RESERVED SLOT — Settlement grants exactly one period, exactly once,
-//         and only after the provider says paid
+// SVC-1 — SUẤT GIỮ CHỖ — Settlement cấp đúng một kỳ, đúng một lần,
+//         và chỉ sau khi nhà cung cấp báo đã trả
 // =============================================================================
 // AC-035: "Cho một đơn đã thanh toán thật nhưng webhook chưa về, khi người dùng
 //          bấm kiểm tra lại, thì hệ thống hỏi payOS theo `orderCode`, thấy trạng
 //          thái đã thanh toán và CẤP QUYỀN LỢI NGAY TẠI ĐÓ, đi qua đúng khoá
 //          idempotency của AC-009." (PRD :309)
-// Also proven by the same fixture, without a second skeleton for either:
-//   AC-009 (PRD :240 — the `status='pending'` guard inside the UPDATE),
-//   AC-031 (PRD :295 — n replays grant once),
-//   AC-016 (PRD :265 — early purchase: more days, one allowance).
-// EARS: "When" (user activates re-check on a genuinely paid order) ->
-//   event-driven, with a replay branch.
+// Cũng được chứng minh bởi cùng fixture, không cần skeleton thứ hai cho cái nào:
+//   AC-009 (PRD :240 — chốt `status='pending'` bên trong UPDATE),
+//   AC-031 (PRD :295 — n lần phát lại chỉ cấp một lần),
+//   AC-016 (PRD :265 — mua sớm: thêm ngày, một suất).
+// EARS: "When" (người dùng kích hoạt kiểm tra lại trên một đơn thực sự đã trả) ->
+//   hướng sự kiện, với một nhánh phát lại.
 // ROI: 99 (BV:10 x Freq:9 + Legal:0 + Defect:9)
 //
-// RESERVED-SLOT JUSTIFICATION. FE-1 in
-//   `SOURCE/tests/e2e/fixture/subscription.fixture.e2e.test.ts` covers the
-//   user-facing purchase journey with fixtures. That journey's CORRECTNESS,
-//   however, depends on a real cross-service behaviour fixtures cannot fake:
-//   the money grant must persist across a real DB write, and the "granted once"
-//   property lives in Postgres row-locking and `on conflict do update`, not in
-//   application code. This slot is therefore reserved and emitted for that
-//   journey's real-write half.
+// BIỆN MINH SUẤT GIỮ CHỖ. FE-1 trong
+//   `SOURCE/tests/e2e/fixture/subscription.fixture.e2e.test.ts` phủ
+//   hành trình mua hướng người dùng bằng fixture. Nhưng TÍNH ĐÚNG của hành trình đó
+//   phụ thuộc vào một hành vi xuyên dịch vụ thật mà fixture không giả được:
+//   lượt cấp tiền phải bền qua một lượt ghi DB thật, và thuộc tính "cấp một lần"
+//   nằm ở khoá hàng của Postgres và `on conflict do update`, không phải ở code
+//   ứng dụng. Suất này vì vậy được giữ và phát cho nửa ghi-thật của
+//   hành trình đó.
 //
 // @category: service-integration-e2e
 // @lane: service-integration-e2e
-// @dependency: full-system (local) — recheckOrder() -> settleOrder() ->
-//   record_payment_settlement() -> payment_orders + subscriptions, on the real
-//   dev Supabase database; payOS adapter stubbed and counted
+// @dependency: toàn hệ thống (cục bộ) — recheckOrder() -> settleOrder() ->
+//   record_payment_settlement() -> payment_orders + subscriptions, trên database
+//   Supabase dev thật; adapter payOS được stub và đếm
 // @complexity: high
-// Mock boundary (backend DD Test Boundaries). For `record_payment_settlement`
-//   the table's entry reads "nothing — real Postgres required", so the write
-//   path here is real end to end. `settleOrder`'s own table entry permits
-//   mocking the payOS adapter AND `service-role.ts` when the claim under test is
-//   call ORDER; that is a different claim from this case's, so here ONLY the
-//   payOS adapter is stubbed and `service-role.ts` is left real.
+// Ranh giới mock (Test Boundaries của backend DD). Với `record_payment_settlement`
+//   mục trong bảng ghi "không gì — cần Postgres thật", nên đường ghi
+//   ở đây là thật từ đầu đến cuối. Mục bảng của chính `settleOrder` cho phép
+//   mock adapter payOS VÀ `service-role.ts` khi khẳng định đang kiểm là
+//   THỨ TỰ gọi; đó là khẳng định khác với ca này, nên ở đây CHỈ
+//   adapter payOS bị stub và `service-role.ts` để thật.
 // @real-dependency: Postgres (payment_orders, subscriptions,
-//   record_payment_settlement, its `service_role`-only EXECUTE grant), dev
-//   Supabase, one authenticated session
+//   record_payment_settlement, grant EXECUTE chỉ-`service_role` của nó), Supabase
+//   dev, một phiên authenticated
 //
-// Primary failure mode: the same order settles twice and the user is granted two
-//   periods for one payment — or, in the opposite direction, a user who pays
-//   while 10 days remain has those 10 days silently discarded because the new
-//   expiry is computed from `now()` instead of `greatest(expires_at, now())`.
-//   Both are money-visible and neither is detectable from application code: the
-//   guard that prevents them is a SQL predicate.
+// Kiểu hỏng chính: cùng một đơn settle hai lần và người dùng được cấp hai
+//   kỳ cho một lần thanh toán — hoặc, theo hướng ngược lại, một người dùng trả
+//   khi còn 10 ngày bị lặng lẽ bỏ 10 ngày đó vì hạn mới
+//   được tính từ `now()` thay vì `greatest(expires_at, now())`.
+//   Cả hai đều thấy được ở tiền và không cái nào phát hiện được từ code ứng dụng: chốt
+//   ngăn chúng là một vị từ SQL.
 //
-// Proof obligation:
-//   - Observable state BEFORE and AFTER, read back from the real tables by
-//     query, for every claim: `subscriptions.expires_at`,
+// Nghĩa vụ chứng minh:
+//   - Trạng thái quan sát được TRƯỚC và SAU, đọc lại từ các bảng thật bằng
+//     truy vấn, cho mọi khẳng định: `subscriptions.expires_at`,
 //     `payment_orders.status`, `payment_orders.settled_at`,
-//     `subscriptions.period_anchor_at`. A return-value assertion alone does not
-//     prove a row changed, and the Engine 1 Phase 3 lesson the backend DD cites
-//     is exactly this: asserting that a call happened is not asserting what
-//     passed through it.
-//   - Boundary path to traverse: the REPLAY. One settlement stays green while
-//     idempotency regresses. Call settlement n >= 2 times for one `orderCode`
-//     and assert `expires_at` advanced by exactly ONE period across all of them.
-//   - Second boundary path: the EARLY-PURCHASE branch (a user with days
-//     remaining). The zero-days-remaining path stays green while
-//     `greatest(expires_at, now())` regresses to `now()`.
-//   - Third: settlement must NEVER be reachable without a preceding
-//     `getPaymentStatus() === "paid"`. Assert the negative directly.
-//   - Only the payOS adapter may be mocked, and it must be COUNTED, because the
-//     "no write before verification" claim is a claim about call sequence.
-// Verification points / expected results / pass criteria:
-//   (a) A `pending` order for user A; stubbed `getPaymentStatus()` returns paid
-//       with a matching amount. After one `recheckOrder()`:
-//       `payment_orders.status` = `paid`; `settled_at` is set (non-null);
-//       `subscriptions.expires_at` advanced by EXACTLY 30 days from the
-//       pre-state. Compare against a hardcoded expected instant computed in the
-//       test, never read back from the implementation. (AC-035, AC-003)
-//   (b) A SECOND `recheckOrder()` for the same `orderCode` returns
-//       `{settled:false, reason:"not_pending"}`; `settled_at` is UNCHANGED
-//       (same value, not merely non-null); `expires_at` is UNCHANGED. (AC-009)
-//   (c) n >= 3 replays: `expires_at` still advanced by exactly one period in
-//       total. (AC-031)
-//   (d) Early purchase — a user whose `expires_at` is 10 days in the future
-//       settles again: the new `expires_at` is 40 days from today (10 remaining
-//       + 30 granted), and `period_anchor_at` has moved to now. More days, ONE
-//       allowance. (AC-016)
-//   (e) Negative: stubbed `getPaymentStatus()` returns not-paid => the action
-//       returns a non-settled result AND `subscriptions` has zero rows written
-//       for that user AND `payment_orders.status` is still `pending`. A row
-//       count of 0 after the call is the assertion.
-//   (f) Negative: stubbed adapter REJECTS => zero writes to either table, and
-//       the payOS adapter invocation count is exactly 1 (no retry storm).
-//   (g) `record_payment_settlement` is not executable with a user JWT: calling
-//       it as `authenticated` fails. (AC-033)
-//   (h) Teardown removes every row created under this case's fixture prefix.
-//       IMPLEMENTED IN `afterAll`, not as an `it()` — an `it()` that deletes the
-//       fixture accounts mid-describe makes every case scheduled after it fail
-//       for a reason that names neither it nor ordering. Its `paymentOrders`
-//       count proves the UNION of teardown's block and `user_id` delete scopes
-//       and neither one alone; the BLOCK scope is proven separately by (i).
-//   (i) Orphan branch, added because both halves below were unproven claims:
-//       an order whose `user_id` was nulled by an account deletion is (1) the
-//       only row shape teardown's reserved-`order_code`-block scope reaches and
-//       its `user_id` scope cannot, and (2) the input to `schema.sql`'s
-//       "settlement for order % has no beneficiary" fail-closed branch. Assert
-//       `check_violation` (23514) with zero rows written, then assert the row is
-//       gone after `tearDown()`. The `user_id` scope stays UNPROVEN in this lane
-//       — see the note on `afterAll` for why no SVC-1 case can prove it.
+//     `subscriptions.period_anchor_at`. Chỉ khẳng định giá trị trả về không
+//     chứng minh một hàng đã đổi, và bài học Engine 1 Phase 3 mà backend DD
+//     trích đúng là điều này: khẳng định một lời gọi đã xảy ra không phải là khẳng định thứ gì
+//     đã đi qua nó.
+//   - Đường ranh giới phải đi qua: PHÁT LẠI. Một lần settle vẫn xanh trong khi
+//     tính lũy đẳng hồi quy. Gọi settlement n >= 2 lần cho một `orderCode`
+//     và khẳng định `expires_at` tiến đúng MỘT kỳ qua tất cả.
+//   - Đường ranh giới thứ hai: nhánh MUA SỚM (người dùng còn ngày).
+//     Đường không-còn-ngày vẫn xanh trong khi
+//     `greatest(expires_at, now())` hồi quy về `now()`.
+//   - Thứ ba: settlement KHÔNG BAO GIỜ được với tới nếu không có `getPaymentStatus() === "paid"`
+//     đi trước. Khẳng định trực tiếp phủ định.
+//   - Chỉ adapter payOS được mock, và nó phải được ĐẾM, vì khẳng định
+//     "không ghi trước khi xác minh" là khẳng định về thứ tự gọi.
+// Điểm kiểm chứng / kết quả mong đợi / tiêu chí qua:
+//   (a) Một đơn `pending` của user A; `getPaymentStatus()` stub trả đã trả
+//       với số tiền khớp. Sau một lần `recheckOrder()`:
+//       `payment_orders.status` = `paid`; `settled_at` được đặt (khác null);
+//       `subscriptions.expires_at` tiến CHÍNH XÁC 30 ngày từ trạng thái
+//       trước. So với một thời điểm kỳ vọng hardcode tính trong
+//       test, không bao giờ đọc ngược từ cài đặt. (AC-035, AC-003)
+//   (b) Lần `recheckOrder()` THỨ HAI cho cùng `orderCode` trả
+//       `{settled:false, reason:"not_pending"}`; `settled_at` KHÔNG ĐỔI
+//       (cùng giá trị, không chỉ khác null); `expires_at` KHÔNG ĐỔI. (AC-009)
+//   (c) n >= 3 lần phát lại: `expires_at` vẫn chỉ tiến đúng một kỳ
+//       tổng cộng. (AC-031)
+//   (d) Mua sớm — một người dùng có `expires_at` còn 10 ngày
+//       trong tương lai settle lần nữa: `expires_at` mới là 40 ngày kể từ hôm nay
+//       (còn 10 + cấp 30), và `period_anchor_at` đã dịch về bây giờ. Thêm ngày,
+//       MỘT suất. (AC-016)
+//   (e) Phủ định: `getPaymentStatus()` stub trả chưa-trả => action
+//       trả kết quả chưa-settle VÀ `subscriptions` không có hàng nào được ghi
+//       cho người dùng đó VÀ `payment_orders.status` vẫn là `pending`. Số đếm
+//       hàng bằng 0 sau lời gọi chính là khẳng định.
+//   (f) Phủ định: adapter stub REJECT => không ghi nào vào cả hai bảng, và
+//       số lần gọi adapter payOS đúng bằng 1 (không bão thử lại).
+//   (g) `record_payment_settlement` không thực thi được bằng JWT người dùng: gọi
+//       nó với vai `authenticated` thì hỏng. (AC-033)
+//   (h) Teardown xoá mọi hàng tạo dưới tiền tố fixture của ca này.
+//       ĐƯỢC CÀI TRONG `afterAll`, không phải một `it()` — một `it()` xoá
+//       các tài khoản fixture giữa describe làm mọi ca xếp sau nó hỏng
+//       vì một lý do không nêu tên nó hay thứ tự. Số đếm `paymentOrders` của nó
+//       chứng minh HỢP của phạm vi xoá theo khối và theo `user_id` của teardown,
+//       không chứng minh riêng cái nào; phạm vi KHỐI được chứng minh riêng bởi (i).
+//   (i) Nhánh mồ côi, thêm vì cả hai nửa bên dưới là khẳng định chưa được chứng minh:
+//       một đơn có `user_id` bị làm null do xoá tài khoản là (1) hình dạng
+//       hàng duy nhất mà phạm vi khối-`order_code`-dành-riêng của teardown với tới được và
+//       phạm vi `user_id` của nó không với được, và (2) đầu vào của nhánh fail-closed
+//       "settlement for order % has no beneficiary" của `schema.sql`. Khẳng định
+//       `check_violation` (23514) với không hàng nào được ghi, rồi khẳng định hàng
+//       đã mất sau `tearDown()`. Phạm vi `user_id` vẫn CHƯA ĐƯỢC CHỨNG MINH trong làn này
+//       — xem ghi chú ở `afterAll` để biết vì sao không ca SVC-1 nào chứng minh được.
 //
 //
 // =============================================================================
-// SVC-2 — `recheckOrder()` is owner-scoped: a foreign order is byte-identically
-//         as invisible as a nonexistent one
+// SVC-2 — `recheckOrder()` giới hạn theo chủ sở hữu: một đơn của người khác vô hình
+//         giống hệt từng byte như một đơn không tồn tại
 // =============================================================================
-// Source: backend DD Test Boundaries, "`recheckOrder` ownership (FE-B-02)" row
-//   (:1132) — "Required negative test"; frontend DD Blocking Unresolved Item
-//   FE-B-02 (:1124), whose escalation condition is that S-05 "must not be
-//   SHIPPED to real users until this is confirmed".
-// AC context: AC-034 (PRD :302 — no bank-identifying information leaks) and the
-//   security property both DDs state as "no enumeration oracle on the action
-//   path".
-// EARS: "If-then" (caller does not own the order) -> branch coverage.
-// ROI: 65 (BV:8 x Freq:7 + Legal:0 + Defect:9) — clears the
-//   service-integration-e2e additional-slot threshold of ROI > 50.
+// Nguồn: dòng "`recheckOrder` ownership (FE-B-02)" của Test Boundaries trong backend DD
+//   (:1132) — "Required negative test"; Blocking Unresolved Item
+//   FE-B-02 của frontend DD (:1124), có điều kiện escalation là S-05 "không được
+//   SHIP cho người dùng thật cho tới khi điều này được xác nhận".
+// Ngữ cảnh AC: AC-034 (PRD :302 — không rò thông tin nhận dạng ngân hàng) và
+//   thuộc tính bảo mật mà cả hai DD nêu là "không có oracle liệt kê
+//   ở đường action".
+// EARS: "If-then" (người gọi không sở hữu đơn) -> phủ nhánh.
+// ROI: 65 (BV:8 x Freq:7 + Legal:0 + Defect:9) — vượt
+//   ngưỡng suất-bổ sung service-integration-e2e là ROI > 50.
 // @category: service-integration-e2e
 // @lane: service-integration-e2e
-// @dependency: full-system (local) — recheckOrder(), the request-scoped Supabase
-//   client, the `orders_select_own` RLS policy, payment_orders, on the real dev
-//   database; payOS adapter stubbed and counted
+// @dependency: toàn hệ thống (cục bộ) — recheckOrder(), client Supabase theo phạm vi
+//   request, policy RLS `orders_select_own`, payment_orders, trên database dev thật;
+//   adapter payOS được stub và đếm
 // @complexity: high
-// Mock boundary (backend DD Test Boundaries, `recheckOrder` ownership row):
-//   "nothing — real Postgres, two real sessions". The payOS adapter is stubbed
-//   ONLY so its invocation count can be asserted at zero; nothing on the read
-//   path is mocked.
-// @real-dependency: Postgres (payment_orders, the `orders_select_own` RLS
-//   policy), dev Supabase, TWO distinct authenticated sessions (user A and
+// Ranh giới mock (Test Boundaries của backend DD, dòng quyền sở hữu `recheckOrder`):
+//   "không gì — Postgres thật, hai phiên thật". Adapter payOS được stub
+//   CHỈ để số lần gọi của nó khẳng định được bằng không; không gì trên đường đọc
+//   bị mock.
+// @real-dependency: Postgres (payment_orders, policy RLS `orders_select_own`),
+//   Supabase dev, HAI phiên authenticated riêng biệt (user A và
 //   user B)
 //
-// Primary failure mode: `recheckOrder(orderCode)` takes an attacker-controllable
-//   bigint. If the ownership read goes through `service_role` — which the
-//   settlement WRITE legitimately must — then any signed-in user can enumerate
-//   order codes and learn which exist and which are pending versus settled: an
-//   oracle over other users' payment state, reachable from an ordinary UI
-//   control. The quieter half of the same failure: the two refusals return the
-//   same VALUE but the foreign-order branch reaches the provider first, so the
-//   two are distinguishable by latency even when they are indistinguishable by
-//   text.
+// Kiểu hỏng chính: `recheckOrder(orderCode)` nhận một bigint mà kẻ tấn công điều khiển được.
+//   Nếu lượt đọc quyền sở hữu đi qua `service_role` — thứ mà lượt GHI settlement
+//   hợp lệ phải dùng — thì bất kỳ người dùng đã đăng nhập nào cũng liệt kê được
+//   mã đơn và biết cái nào tồn tại và cái nào pending so với đã settle: một
+//   oracle trên trạng thái thanh toán của người dùng khác, với tới được từ một control UI
+//   bình thường. Nửa kín đáo hơn của cùng kiểu hỏng: hai lần từ chối trả
+//   cùng GIÁ TRỊ nhưng nhánh đơn-của-người-khác với tới nhà cung cấp trước, nên
+//   hai nhánh phân biệt được bằng độ trễ kể cả khi không phân biệt được bằng
+//   chữ.
 //
-// Proof obligation:
-//   - Two REAL sessions against ONE database. A mocked Supabase client returning
-//     `null` would assert the mock's null, not the policy's — the policy is the
-//     entire subject of this case.
-//   - The assertion is DEEP EQUALITY between the foreign-order result and the
-//     nonexistent-order result. Asserting each equals `unknown_order`
-//     independently is weaker: it passes if one branch carries an extra field.
-//   - AND zero payOS adapter invocations in BOTH branches. The backend DD is
-//     explicit that "the value alone would pass even if the foreign branch
-//     called the provider first". Both halves are required.
-//   - Include the CONTROL case (user A settles their own order) in the same run,
-//     so a globally-broken action that refuses everything cannot pass by
-//     refusing correctly for the wrong reason.
-// Verification points / expected results / pass criteria:
-//   (a) Control: user A calls `recheckOrder()` with A's own `orderCode` =>
-//       the action proceeds normally (the order is found; the outcome follows
-//       the stubbed provider status). This case must PASS, or (b) and (c) prove
-//       nothing.
-//   (b) User B calls `recheckOrder()` with A's `orderCode` =>
+// Nghĩa vụ chứng minh:
+//   - Hai phiên THẬT trên MỘT database. Một client Supabase bị mock trả về
+//     `null` sẽ khẳng định null của mock, không phải của policy — policy là
+//     toàn bộ đối tượng của ca này.
+//   - Khẳng định là BẰNG NHAU SÂU giữa kết quả đơn-của-người-khác và kết quả
+//     đơn-không-tồn-tại. Khẳng định từng cái bằng `unknown_order`
+//     riêng thì yếu hơn: nó qua nếu một nhánh mang thêm một trường.
+//   - VÀ không lời gọi adapter payOS nào ở CẢ HAI nhánh. Backend DD
+//     nói rõ rằng "chỉ giá trị thôi vẫn qua kể cả khi nhánh đơn-của-người-khác
+//     gọi nhà cung cấp trước". Cần cả hai nửa.
+//   - Gồm ca ĐỐI CHỨNG (user A settle đơn của chính mình) trong cùng lượt chạy,
+//     để một action hỏng toàn cục từ chối mọi thứ không qua được bằng
+//     việc từ chối đúng vì sai lý do.
+// Điểm kiểm chứng / kết quả mong đợi / tiêu chí qua:
+//   (a) Đối chứng: user A gọi `recheckOrder()` với `orderCode` của chính A =>
+//       action tiến hành bình thường (đơn được tìm thấy; kết quả theo
+//       trạng thái nhà cung cấp đã stub). Ca này phải QUA, nếu không (b) và (c) chẳng
+//       chứng minh gì.
+//   (b) User B gọi `recheckOrder()` với `orderCode` của A =>
 //       `{settled:false, reason:"unknown_order"}`.
-//   (c) User B calls `recheckOrder()` with a code nobody owns =>
+//   (c) User B gọi `recheckOrder()` với một mã không ai sở hữu =>
 //       `{settled:false, reason:"unknown_order"}`.
-//   (d) The results of (b) and (c) are DEEPLY EQUAL — one assertion over the
-//       whole value, no field excluded.
-//   (e) The payOS adapter recorded EXACTLY 0 invocations during (b) AND during
-//       (c). Assert the count separately for each branch, not once for both.
-//   (f) Zero writes occurred during (b) and (c): `payment_orders` for A is
-//       byte-identical before and after, and `subscriptions` has no new row for
-//       either user.
-//   (g) No log line emitted during (b) or (c) contains the `orderCode`'s owner,
-//       an amount, an account number or a memo — refusal reasons are a closed
-//       set of codes. (AC-034)
-//   (h) Teardown removes both fixture users' rows.
+//   (d) Kết quả của (b) và (c) BẰNG NHAU SÂU — một khẳng định trên
+//       cả giá trị, không loại trường nào.
+//   (e) Adapter payOS ghi ĐÚNG 0 lời gọi trong (b) VÀ trong
+//       (c). Khẳng định số đếm riêng cho từng nhánh, không phải một lần cho cả hai.
+//   (f) Không có lượt ghi nào xảy ra trong (b) và (c): `payment_orders` của A
+//       giống từng byte trước và sau, và `subscriptions` không có hàng mới cho
+//       người dùng nào.
+//   (g) Không dòng log nào phát ra trong (b) hay (c) chứa chủ sở hữu của `orderCode`,
+//       một số tiền, một số tài khoản hay một memo — lý do từ chối là một
+//       tập mã đóng. (AC-034)
+//   (h) Teardown xoá hàng của cả hai user fixture.
 
 // =============================================================================
-// SVC-1 — IMPLEMENTATION (plan Task 6.1 / backend-task-29)
+// SVC-1 — CÀI ĐẶT (plan Task 6.1 / backend-task-29)
 // =============================================================================
 // Ca chạy trên dev `hynwleaxtbtjzkvpjsug` THẬT, sau khi cổng B (`npm run
 // verify:schema`) xanh trên chính database đó. Chỉ adapter payOS bị thay;
@@ -1046,7 +1045,7 @@ describe.skipIf(!HAS_LIVE_DB)(
 );
 
 // =============================================================================
-// SVC-2 — IMPLEMENTATION (plan Task 6.2 / backend-task-30)
+// SVC-2 — CÀI ĐẶT (plan Task 6.2 / backend-task-30)
 // =============================================================================
 // CÂU HỎI CỦA CẢ KHỐI NÀY LÀ VỀ CHÍNH SÁCH, KHÔNG PHẢI VỀ TYPESCRIPT.
 //   `recheckOrder()` không so `user_id` với ai cả: nó đọc dòng đơn bằng client

@@ -1,13 +1,13 @@
-// getMyReputation() — thin-wrapper mapper unit cases (backend task 43,
-// § Implementation Steps "Red Phase"; frontend DD § Integration Point Map
-// "ProfileCard reputation insertion" boundary contract). `.rpc()` mocked at
-// the Supabase client boundary and fed a literal row shaped exactly as
-// community_reputation_summary() serializes it (SOURCE/supabase/schema.sql
+// getMyReputation() — các ca unit mapper của wrapper mỏng (backend task 43,
+// § Implementation Steps "Red Phase"; boundary contract "ProfileCard reputation
+// insertion" của frontend DD § Integration Point Map). `.rpc()` bị mock ở
+// ranh giới client Supabase và được cấp một hàng literal có hình dạng đúng như
+// community_reputation_summary() serialise (SOURCE/supabase/schema.sql
 // `returns table (total_score, published_count, helpful_count, pinned_count)`,
-// task 41) — same mocking convention as solutionReadMappers.test.ts.
+// task 41) — cùng quy ước mock với solutionReadMappers.test.ts.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// queries.ts imports "server-only" — same stub as solutionReadMappers.test.ts.
+// queries.ts import "server-only" — cùng stub với solutionReadMappers.test.ts.
 vi.mock("server-only", () => ({}));
 
 const { rpcMock } = vi.hoisted(() => ({
@@ -28,8 +28,8 @@ describe("getMyReputation", () => {
   });
 
   it("maps a successful row to camelCase, with totalScore proven from the formula rather than copied from the mock", async () => {
-    // AC-086 formula: 10 × published_count + 2 × helpful_count + 20 × pinned_count.
-    // Derived independently here, not copied from the mock's total_score below:
+    // Công thức AC-086: 10 × published_count + 2 × helpful_count + 20 × pinned_count.
+    // Suy ra độc lập ở đây, không chép từ total_score của mock bên dưới:
     // 10 * 2 + 2 * 8 + 20 * 1 = 20 + 16 + 20 = 56.
     const expectedTotalScore = 10 * 2 + 2 * 8 + 20 * 1;
     expect(expectedTotalScore).toBe(56);

@@ -445,69 +445,68 @@ afterEach(() => {
 // Also discharges: PRD AC-010, AC-013, AC-067; ADR-0018 R-12; backend DD § Cờ tính
 //   năng :2011 read site (1); § Feature-Off Window (frontend DD :1605) backend half.
 // ROI: 109 (BV:10 x Freq:10 + Legal:0 + Defect:9)
-//   BV 10 — this is the state the feature SHIPS in. AC-067 is a human gate (Groq
-//     Zero Data Retention, unverified, no account exists), and the users are
-//     minors; "flag absent => zero requests" is the privacy promise itself.
-//   Freq 10 — every single exam submission in production runs this path.
-//   Legal false — treated as product/privacy policy rather than a statutory
-//     requirement, deliberately conservative; note R-12 rates the impact "Cao".
-//   Defect 9 — the failure is silent in both directions: an accidental default of
-//     `true` leaks student prose to a third party with no ZDR guarantee, and an
-//     accidental extra key changes what every downstream surface renders.
-// Behavior: submitExam(attemptId, answers) is invoked with ESSAY_GRADING_ENABLED
-//   unset -> computeScore runs with the flag threaded through as an OPTION (never
-//   read from process.env inside the pure function, AC-013) -> the persisted
-//   ScoreResult is byte-identical to today and no after() callback is registered ->
-//   redirect still happens.
+//   BV 10 — đây là trạng thái mà tính năng XUẤT XƯỞNG. AC-067 là cổng người duyệt (Groq
+//     Zero Data Retention, chưa xác minh, chưa có tài khoản), và người dùng là
+//     trẻ vị thành niên; "cờ vắng mặt => không request nào" chính là lời hứa về quyền riêng tư.
+//   Freq 10 — mọi lượt nộp bài trên production đều chạy đường này.
+//   Legal false — coi là chính sách sản phẩm/quyền riêng tư chứ không phải
+//     yêu cầu luật định, cố ý thận trọng; lưu ý R-12 đánh giá tác động là "Cao".
+//   Defect 9 — lỗi thầm lặng ở cả hai hướng: mặc định nhầm là
+//     `true` làm rò bài viết học sinh cho bên thứ ba không có bảo đảm ZDR, và
+//     một khoá thừa nhầm làm đổi thứ mọi bề mặt phía sau render.
+// Hành vi: submitExam(attemptId, answers) được gọi với ESSAY_GRADING_ENABLED
+//   không đặt -> computeScore chạy với cờ được truyền như một TUỲ CHỌN (không bao giờ
+//   đọc từ process.env bên trong hàm thuần, AC-013) -> ScoreResult được lưu
+//   giống từng byte với hôm nay và không có callback after() nào được đăng ký ->
+//   redirect vẫn xảy ra.
 // @category: core-functionality
 // @lane: integration
-// @dependency: SOURCE/features/exams/actions.ts (submitExam) + real computeScore()
-//   + mocked Supabase client + mocked service-role operations + mocked after() +
-//   mocked redirect() + mocked global fetch
+// @dependency: SOURCE/features/exams/actions.ts (submitExam) + computeScore() thật
+//   + client Supabase mock + thao tác service-role mock + after() mock +
+//   redirect() mock + fetch toàn cục mock
 // @complexity: medium
-// @real-dependency: none
-// Primary failure mode: the flag read defaults to ON when the env var is absent
-//   (e.g. `process.env.ESSAY_GRADING_ENABLED !== "false"` instead of
-//   `=== "true"`), so a build that ships before the AC-067 gate emits essay keys
-//   and registers a grading pass that sends real student writing to Groq. The
-//   second, quieter mode: the flag is respected but `after()` is registered AFTER
-//   `redirect()` (`actions.ts:192`), which in Next means it is never registered at
-//   all — grading silently never runs once the flag IS turned on, and nothing in
-//   the flag-off state can reveal it.
-// Proof obligation — what the implemented test must assert:
-//   (a) FLAG ABSENT, exhaustive negative: with `ESSAY_GRADING_ENABLED` deleted from
-//       the environment, the per_question payload handed to the mocked
-//       `recordExamResult` toEqual an INDEPENDENTLY AUTHORED literal (not "whatever
-//       computeScore returned"), and Object.keys of every essay element contains
-//       NONE of essayState / essayEarned / essayMax / essayLowConfidence /
-//       essayAttempts / essayGradedAt. Assert on the key SET, not on
-//       `essayState === undefined` — a key present with value undefined
-//       serialises differently into jsonb.
-//       Overlap note: `computeScore.test.ts` owns the PURE half of this (the shape
-//       computeScore returns). What this lane adds is that the shape SURVIVES the
-//       call site — that `submitExam` passes the option through and persists that
-//       exact payload — which a pure-function test cannot see.
-//   (b) Zero provider calls, measured not assumed: global fetch is a counted mock;
-//       the count is exactly 0. No `api.groq.com` request is constructed even to
-//       be aborted.
-//   (c) No pass registered: the `after()` mock records 0 registrations.
-//   (d) Same three env spellings all mean OFF (fail-closed, backend DD :2015):
-//       absent, "", "TRUE" (wrong case), "1". Each yields (a)+(b)+(c). "true"
-//       with surrounding whitespace means ON (the value is trimmed) — include it
-//       as the ONE positive control so this case cannot pass by the flag read
-//       being dead code.
-//   (e) Ordering, flag ON: with the trimmed "true" control, the `after()` mock is
-//       called BEFORE the `redirect()` mock. Assert by comparing invocation order
-//       on the two spies (`mock.invocationCallOrder`), not by asserting both were
-//       called — "both were called" is true in the broken ordering too.
-//   (f) Pass failure is contained: with the flag ON and the registered callback
-//       forced to reject when invoked synchronously, `recordExamResult` and
-//       `recordSkillMastery` were still both called and the redirect still
-//       happened. This is EG-BE-033, and it is what keeps a provider outage from
-//       becoming a lost submission.
-//   Mockable boundaries and why: Supabase client / service-role / after / redirect /
-//   fetch are all external or scheduler I/O. `computeScore()` runs REAL — it is the
-//   subject of (a), and the backend DD names it explicitly as "Không — chạy thật".
+// @real-dependency: không có
+// Kiểu hỏng chính: lượt đọc cờ mặc định là BẬT khi biến env vắng mặt
+//   (ví dụ `process.env.ESSAY_GRADING_ENABLED !== "false"` thay vì
+//   `=== "true"`), nên một bản build ship trước cổng AC-067 phát khoá tự luận
+//   và đăng ký một lượt chấm gửi bài viết thật của học sinh tới Groq. Kiểu
+//   thứ hai, kín đáo hơn: cờ được tôn trọng nhưng `after()` được đăng ký SAU
+//   `redirect()` (`actions.ts:192`), mà trong Next nghĩa là không bao giờ được đăng ký
+//   — việc chấm lặng lẽ không bao giờ chạy khi cờ ĐƯỢC bật, và không gì ở
+//   trạng thái cờ tắt có thể để lộ điều đó.
+// Nghĩa vụ chứng minh — test được cài đặt phải khẳng định gì:
+//   (a) CỜ VẮNG MẶT, phủ định vét cạn: khi `ESSAY_GRADING_ENABLED` bị xoá khỏi
+//       môi trường, payload per_question trao cho `recordExamResult` mock toEqual một
+//       literal TỰ SOẠN ĐỘC LẬP (không phải "whatever computeScore trả về"), và Object.keys của
+//       mọi phần tử tự luận KHÔNG chứa essayState / essayEarned / essayMax /
+//       essayLowConfidence / essayAttempts / essayGradedAt. Khẳng định trên TẬP khoá,
+//       không phải `essayState === undefined` — khoá có mặt với giá trị undefined
+//       serialise khác vào jsonb.
+//       Ghi chú chồng lấn: `computeScore.test.ts` sở hữu nửa THUẦN của việc này (hình dạng
+//       computeScore trả về). Làn này bổ sung rằng hình dạng đó SỐNG SÓT qua
+//       nơi gọi — rằng `submitExam` truyền tuỳ chọn qua và lưu đúng
+//       payload đó — điều mà test hàm thuần không nhìn thấy.
+//   (b) Không lời gọi nhà cung cấp nào, đo chứ không giả định: fetch toàn cục là mock có đếm;
+//       số đếm đúng bằng 0. Không request `api.groq.com` nào được dựng, kể cả để
+//       bị huỷ.
+//   (c) Không lượt chấm nào được đăng ký: mock `after()` ghi 0 lần đăng ký.
+//   (d) Cùng ba cách viết env đều nghĩa là TẮT (fail-closed, backend DD :2015):
+//       vắng mặt, "", "TRUE" (sai hoa thường), "1". Mỗi cách cho (a)+(b)+(c). "true"
+//       có khoảng trắng bao quanh nghĩa là BẬT (giá trị được trim) — đưa vào
+//       làm đối chứng dương DUY NHẤT để ca này không qua được nhờ lượt đọc cờ
+//       là mã chết.
+//   (e) Thứ tự, cờ BẬT: với đối chứng "true" đã trim, mock `after()` được
+//       gọi TRƯỚC mock `redirect()`. Khẳng định bằng so sánh thứ tự gọi
+//       của hai spy (`mock.invocationCallOrder`), không phải khẳng định cả hai đều
+//       được gọi — "cả hai đều được gọi" cũng đúng trong thứ tự hỏng.
+//   (f) Lỗi lượt chấm được khoanh vùng: với cờ BẬT và callback đã đăng ký
+//       bị ép reject khi gọi đồng bộ, `recordExamResult` và
+//       `recordSkillMastery` vẫn đều được gọi và redirect vẫn xảy ra.
+//       Đây là EG-BE-033, và là thứ giữ cho sự cố nhà cung cấp không
+//       thành mất bài nộp.
+//   Ranh giới có thể mock và vì sao: client Supabase / service-role / after / redirect /
+//   fetch đều là I/O bên ngoài hoặc của bộ lập lịch. `computeScore()` chạy THẬT — nó là
+//   đối tượng kiểm của (a), và backend DD nêu rõ là "Không — chạy thật".
 describe("submitExam() — essay grading feature flag (INT-1)", () => {
   it("obligation (a): with the flag absent, the payload handed to recordExamResult equals an independently authored literal and carries none of the six essay keys", async () => {
     setFlag(undefined);
@@ -684,85 +683,83 @@ describe("submitExam() — essay grading feature flag (INT-1)", () => {
 });
 
 // =============================================================================
-// INT-2 — The two PDF exits cannot disagree: hasIncompleteEssay is identical on
-//         getResult() and listMyHistory() for the same attempt
+// INT-2 — Hai lối ra PDF không thể bất đồng: hasIncompleteEssay giống hệt trên
+//         getResult() và listMyHistory() cho cùng một lượt làm
 // =============================================================================
-// AC: EG-BE-035 — "When an attempt has at least one essay question at RS-6,
-//   hasIncompleteEssay must be true on BOTH ExamResult and MyHistoryEntry for the
-//   same attemptId; and when no question is at RS-6 it must be false on both —
-//   including for an attempt with no essay questions at all and for a row written
-//   before the feature shipped (NEVER undefined)."
-// AC: EG-BE-034 — "For the same per_question array and the same created_at,
+// AC: EG-BE-035 — "Khi một lượt làm có ít nhất một câu tự luận ở RS-6,
+//   hasIncompleteEssay phải là true trên CẢ ExamResult và MyHistoryEntry cho
+//   cùng attemptId; và khi không câu nào ở RS-6 thì phải là false trên cả hai —
+//   kể cả với lượt làm không có câu tự luận nào và với hàng ghi trước khi
+//   tính năng ship (KHÔNG BAO GIỜ undefined)."
+// AC: EG-BE-034 — "Với cùng mảng per_question và cùng created_at,
 //   hasUnresolvedEssay(...) === (summariseEssays(...)?.unresolvedCount ?? 0) > 0."
-// AC: EG-BE-031 — "When getResult() reads an exam_results row written before the
-//   feature shipped, the output must be identical to today and essaySummary must
-//   be undefined."
-// Also discharges: PRD AC-012, AC-058 (data half), O-8; frontend DD MSA-F5,
-//   CR-4, FE-AC-14 precondition; UI Spec UI-D11.
+// AC: EG-BE-031 — "Khi getResult() đọc một hàng exam_results ghi trước khi
+//   tính năng ship, đầu ra phải giống hệt hôm nay và essaySummary phải là
+//   undefined."
+// Cũng hoàn thành: PRD AC-012, AC-058 (nửa dữ liệu), O-8; frontend DD MSA-F5,
+//   CR-4, tiền điều kiện FE-AC-14; UI Spec UI-D11.
 // ROI: 81 (BV:9 x Freq:8 + Legal:0 + Defect:9)
-//   BV 9 — a PDF is a permanent artifact a student shares; two exits producing
-//     two different files for one attempt is the defect O-8 exists to prevent.
-//   Freq 8 — every /history render and every /result render evaluates both fields.
-//   Defect 9 — two call sites deriving "the same" truth by two routes is the
-//     shape F-06 already caught once in this feature's own review history.
-// Behavior: the SAME per_question fixture and the SAME created_at are fed to
-//   getResult() and to listMyHistory() through their (separately mocked) Supabase
-//   clients -> real essayLifecycle predicates run on both paths -> the two
-//   booleans are compared to each other and to independently authored literals.
+//   BV 9 — PDF là hiện vật vĩnh viễn mà học sinh chia sẻ; hai lối ra cho hai
+//     file khác nhau của cùng một lượt làm là lỗi mà O-8 sinh ra để ngăn.
+//   Freq 8 — mọi lần render /history và /result đều tính cả hai trường.
+//   Defect 9 — hai nơi gọi suy ra "cùng một sự thật" bằng hai đường là
+//     dạng mà F-06 đã bắt một lần trong lịch sử review của chính tính năng này.
+// Hành vi: CÙNG fixture per_question và CÙNG created_at được đưa vào
+//   getResult() và listMyHistory() qua các client Supabase (mock riêng) của chúng
+//   -> các vị từ essayLifecycle thật chạy trên cả hai đường -> hai boolean
+//   được so với nhau và so với các literal tự soạn độc lập.
 // @category: integration
 // @lane: integration
 // @dependency: SOURCE/features/exams/queries.ts (getResult) +
-//   SOURCE/features/history/queries.ts (listMyHistory) + real
-//   SOURCE/lib/scoring/essayLifecycle.ts + mocked Supabase client on both paths
+//   SOURCE/features/history/queries.ts (listMyHistory) + SOURCE/lib/scoring/essayLifecycle.ts
+//   thật + client Supabase mock trên cả hai đường
 // @complexity: medium
-// @real-dependency: none — the sanctioned mock boundary of getResult.int.test.ts
-//   and history.int.test.ts. What this case proves is AGREEMENT BETWEEN TWO
-//   TypeScript derivations plus the query SHAPE; it deliberately does not claim to
-//   prove Postgres semantics.
-// Primary failure mode: one read path is extended and the other is not — most
-//   likely `listMyHistory()`'s select gains `per_question` but not `created_at`
-//   (backend DD § Implementation Path Mapping, `features/history/queries.ts:64-66`), so its
-//   deadline derivation runs against a missing/`undefined` timestamp and an
-//   overdue pending question is classified as still-pending there while /result
-//   classifies it as RS-6. The student then gets a PDF with the incomplete-essay
-//   line from one button and without it from the other, for the same attempt.
-//   The second mode: either field is left `undefined` for a legacy row instead of
-//   `false`, and `undefined` is falsy — so the bug renders correctly today and
-//   surfaces the first time anything does a strict comparison.
-// Proof obligation — what the implemented test must assert:
-//   (a) AGREEMENT, the point of the case: for ONE fixture attempt id, drive both
-//       functions and assert
+// @real-dependency: không có — ranh giới mock được phê duyệt của getResult.int.test.ts
+//   và history.int.test.ts. Ca này chứng minh SỰ THỐNG NHẤT GIỮA HAI
+//   PHÉP SUY RA bằng TypeScript cộng HÌNH DẠNG truy vấn; nó cố ý không tuyên bố
+//   chứng minh ngữ nghĩa Postgres.
+// Kiểu hỏng chính: một đường đọc được mở rộng còn đường kia thì không — nhiều khả năng nhất
+//   là select của `listMyHistory()` có thêm `per_question` nhưng không có `created_at`
+//   (backend DD § Implementation Path Mapping, `features/history/queries.ts:64-66`), nên
+//   phép suy ra hạn chót của nó chạy trên timestamp thiếu/`undefined` và một câu
+//   pending quá hạn bị phân loại là còn pending ở đó trong khi /result
+//   phân loại là RS-6. Học sinh khi đó nhận PDF có dòng bài tự luận chưa hoàn tất
+//   từ một nút và không có từ nút kia, cho cùng một lượt làm.
+//   Kiểu thứ hai: một trong hai trường bị để `undefined` cho hàng cũ thay vì
+//   `false`, mà `undefined` là falsy — nên lỗi hôm nay vẫn render đúng và
+//   lộ ra lần đầu tiên có thứ gì đó so sánh nghiêm ngặt.
+// Nghĩa vụ chứng minh — test được cài đặt phải khẳng định gì:
+//   (a) THỐNG NHẤT, trọng tâm của ca: với MỘT id lượt làm fixture, chạy cả hai hàm và khẳng định
 //       `examResult.hasIncompleteEssay === historyEntry.hasIncompleteEssay`
-//       AND that the shared value equals an independently authored literal `true`.
-//       Asserting only the equality is not enough — two paths that are both wrong
-//       in the same direction are equal.
-//   (b) Fixture must contain an RS-6 element specifically: essayState "failed"
-//       with essayAttempts === ESSAY_MAX_ATTEMPTS (3), i.e. retryAvailable false.
-//       RS-4 (failed, attempts < 3) must NOT set hasIncompleteEssay — include it
-//       as a second element in the same fixture so the case distinguishes
-//       "any failure" from "unrecoverable failure".
-//   (c) NEGATIVE, three shapes, all yielding `false` on BOTH paths and all
-//       `typeof === "boolean"` (never undefined): an attempt whose essays are all
-//       graded; an attempt with no essay questions at all; a legacy row carrying
-//       no essay* key whatsoever.
-//   (d) EG-BE-034 equality, run on the SAME fixture in the same case:
+//       VÀ giá trị chung bằng một literal `true` tự soạn độc lập.
+//       Chỉ khẳng định bằng nhau là chưa đủ — hai đường cùng sai theo
+//       một hướng thì bằng nhau.
+//   (b) Fixture phải có đúng một phần tử RS-6: essayState "failed"
+//       với essayAttempts === ESSAY_MAX_ATTEMPTS (3), tức retryAvailable false.
+//       RS-4 (failed, attempts < 3) KHÔNG được đặt hasIncompleteEssay — đưa nó vào
+//       làm phần tử thứ hai trong cùng fixture để ca phân biệt được
+//       "mọi lỗi" với "lỗi không khôi phục được".
+//   (c) PHỦ ĐỊNH, ba hình dạng, đều cho `false` trên CẢ HAI đường và đều
+//       `typeof === "boolean"` (không bao giờ undefined): lượt làm mà mọi bài tự luận
+//       đã chấm; lượt làm không có câu tự luận nào; một hàng cũ không mang
+//       khoá essay* nào cả.
+//   (d) Đẳng thức EG-BE-034, chạy trên CÙNG fixture trong cùng ca:
 //       `hasUnresolvedEssay(pq, createdAt, now) === ((summariseEssays(pq, createdAt, now)?.unresolvedCount ?? 0) > 0)`
-//       for each of the fixtures in (b) and (c). This is the pin that stops the
-//       two derivations of one truth from drifting.
-//   (e) Query shape, both paths: getResult()'s select carries `created_at`
-//       (backend DD :579-581) and listMyHistory()'s embedded select carries BOTH
-//       `per_question` and `created_at` (:64-66). A missing column here is the
-//       exact mechanism of the primary failure mode and it is invisible to any
-//       assertion made on mapped output alone.
-//   (f) Legacy-row Output Comparison (EG-BE-031 / backend DD đường ống 2 and 3):
-//       for the legacy fixture, the whole ExamResult toEqual a hand-built literal
-//       of the pre-change shape, with `essaySummary === undefined` and every
-//       `PerQuestionResult.essay === undefined`; and the whole MyHistoryEntry[]
-//       toEqual a literal carrying all nine pre-existing fields plus the two new
-//       booleans as `false`, in unchanged submittedAt-descending order.
-//   Time control: `now` must be injected/frozen, never `Date.now()` — the deadline
-//   derivation (ESSAY_PENDING_DEADLINE_MS = 600_000) is time-dependent and a
-//   real clock makes this case a time bomb rather than a test.
+//       cho từng fixture ở (b) và (c). Đây là chốt chặn ngăn
+//       hai phép suy ra của một sự thật trôi lệch khỏi nhau.
+//   (e) Hình dạng truy vấn, cả hai đường: select của getResult() có `created_at`
+//       (backend DD :579-581) và select nhúng của listMyHistory() có CẢ `per_question`
+//       và `created_at` (:64-66). Thiếu một cột ở đây chính là cơ chế
+//       của kiểu hỏng chính và không khẳng định nào trên đầu ra đã ánh xạ thấy được.
+//   (f) So sánh đầu ra hàng cũ (EG-BE-031 / backend DD đường ống 2 và 3):
+//       với fixture hàng cũ, toàn bộ ExamResult toEqual một literal dựng tay của
+//       hình dạng trước khi đổi, với `essaySummary === undefined` và mọi
+//       `PerQuestionResult.essay === undefined`; và toàn bộ MyHistoryEntry[]
+//       toEqual một literal mang cả chín trường sẵn có cộng hai boolean mới
+//       là `false`, theo thứ tự submittedAt giảm dần không đổi.
+//   Kiểm soát thời gian: `now` phải được tiêm/đóng băng, không bao giờ `Date.now()` — phép
+//   suy ra hạn chót (ESSAY_PENDING_DEADLINE_MS = 600_000) phụ thuộc thời gian và một
+//   đồng hồ thật biến ca này thành quả bom hẹn giờ thay vì một test.
 
 // -----------------------------------------------------------------------------
 // Harness INT-2 / INT-3 — hai đường ĐỌC, chạy cho một lượt làm fixture.
@@ -817,17 +814,17 @@ function mcqEl(id: string, isCorrect: boolean) {
 
 interface ReadFixture {
   perQuestion: unknown[];
-  /** The three stored score columns. `getResult()` reads them straight from the
-   *  row — it does NOT recompute — so a fixture states them explicitly. */
+  /** Ba cột điểm đã lưu. `getResult()` đọc chúng thẳng từ
+   *  hàng — nó KHÔNG tính lại — nên fixture nêu chúng tường minh. */
   triple?: { totalScore: number; correct: number; total: number };
-  /** Extra attempts for the cross-attempt wrong-twice history read. */
+  /** Các lượt làm thêm cho lượt đọc lịch sử wrong-twice xuyên lượt làm. */
   historyRows?: unknown[];
   createdAt?: string;
 }
 
-/** Wires the mocked client for `getResult()`: the joined read, the cross-attempt
- *  wrong-twice read (thenable — it awaits the builder directly), and the answer-key
- *  RPC. Records every select string so INT-2(e) can assert on query SHAPE. */
+/** Nối client mock cho `getResult()`: lượt đọc có join, lượt đọc wrong-twice
+ *  xuyên lượt làm (thenable — nó await thẳng builder), và RPC khoá đáp án.
+ *  Ghi lại mọi chuỗi select để INT-2(e) khẳng định trên HÌNH DẠNG truy vấn. */
 function makeGetResultClient(fx: ReadFixture, selectArgs: string[]) {
   const triple = fx.triple ?? { totalScore: 5, correct: 1, total: 2 };
   const rpc = vi.fn(async (fn: string) => {
@@ -860,9 +857,9 @@ function makeGetResultClient(fx: ReadFixture, selectArgs: string[]) {
         },
         error: null,
       }),
-      // The wrong-twice history read awaits the builder itself. Without this it
-      // resolves to the builder object, degrades to [], and INT-3(c) would pass
-      // for a permanently dead feature.
+      // Lượt đọc lịch sử wrong-twice tự await builder. Thiếu điều này thì nó
+      //  resolve ra chính object builder, rơi về [], và INT-3(c) sẽ qua
+      //  cho một tính năng chết vĩnh viễn.
       then: (onFulfilled: (value: unknown) => unknown) =>
         Promise.resolve().then(() =>
           onFulfilled({
@@ -878,7 +875,7 @@ function makeGetResultClient(fx: ReadFixture, selectArgs: string[]) {
   return { from, rpc };
 }
 
-/** Wires the mocked client for `listMyHistory()` — one bounded, thenable read. */
+/** Nối client mock cho `listMyHistory()` — một lượt đọc có giới hạn, thenable. */
 function makeHistoryClient(fx: ReadFixture, selectArgs: string[]) {
   const triple = fx.triple ?? { totalScore: 5, correct: 1, total: 2 };
   const from = vi.fn((table: string) => {
@@ -918,8 +915,8 @@ function makeHistoryClient(fx: ReadFixture, selectArgs: string[]) {
   return { from };
 }
 
-/** ONE fixture, BOTH doors. Returns each path's output and the select strings it
- *  issued, so a case can assert on agreement, on values and on query shape. */
+/** MỘT fixture, CẢ HAI cửa. Trả về đầu ra của mỗi đường và các chuỗi select nó
+ *  đã phát ra, để một ca khẳng định được về thống nhất, về giá trị và về hình dạng truy vấn. */
 async function driveBothReadPaths(fx: ReadFixture) {
   const resultSelectArgs: string[] = [];
   const historySelectArgs: string[] = [];
@@ -947,10 +944,10 @@ describe("getResult() / listMyHistory() — hasIncompleteEssay agreement (INT-2)
     vi.useRealTimers();
   });
 
-  // The fixture (b) is built around: ONE unrecoverable essay and ONE that can
-  // still be retried. That pairing is what separates "any failure" from
-  // "unrecoverable failure" — an implementation that treats every `failed` as
-  // incomplete passes a fixture containing only the first.
+  // Fixture mà (b) xây quanh: MỘT bài tự luận không khôi phục được và MỘT bài
+  // vẫn thử lại được. Chính cặp đó phân biệt "mọi lỗi" với
+  // "lỗi không khôi phục được" — một cài đặt coi mọi `failed` là chưa hoàn tất
+  // sẽ qua một fixture chỉ có cái đầu.
   const RS6_AND_RS4: unknown[] = [
     essayEl({ questionId: "q-rs6", essayState: "failed", essayAttempts: ESSAY_MAX_ATTEMPTS }),
     essayEl({ questionId: "q-rs4", essayState: "failed", essayAttempts: 1 }),
@@ -959,14 +956,14 @@ describe("getResult() / listMyHistory() — hasIncompleteEssay agreement (INT-2)
   it("(a)+(b): one attempt, both doors — hasIncompleteEssay agrees AND equals an independently authored true; an RS-4 sibling does not cause it", async () => {
     const { examResult, historyEntry } = await driveBothReadPaths({ perQuestion: RS6_AND_RS4 });
 
-    // Agreement is necessary but NOT sufficient: two paths wrong in the same
-    // direction are equal. So the shared value is also held against a literal
-    // authored from the fixture by hand.
+    // Thống nhất là điều kiện cần nhưng KHÔNG đủ: hai đường cùng sai theo
+    // một hướng thì bằng nhau. Nên giá trị chung cũng được đối chiếu với một literal
+    // soạn tay từ fixture.
     expect(examResult.hasIncompleteEssay).toBe(historyEntry.hasIncompleteEssay);
     expect(examResult.hasIncompleteEssay).toBe(true);
 
-    // …and the RS-4 element is genuinely present and genuinely retryable, so the
-    // `true` above is attributable to q-rs6 alone.
+    // …và phần tử RS-4 thật sự có mặt và thật sự thử lại được, nên cái
+    // `true` ở trên quy được cho riêng q-rs6.
     const rs4 = examResult.result.perQuestion.find((r) => r.questionId === "q-rs4");
     expect(rs4?.essay).toEqual({
       state: "failed",
@@ -980,16 +977,16 @@ describe("getResult() / listMyHistory() — hasIncompleteEssay agreement (INT-2)
   });
 
   it("(b) negative half: an attempt whose only failed essay is RETRYABLE must NOT report hasIncompleteEssay on either path", async () => {
-    // RS-4 alone. If this returned true, the student would get the permanent
-    // "grading incomplete" PDF annotation while a retry was still available.
+    // Chỉ RS-4. Nếu cái này trả true, học sinh sẽ nhận chú thích PDF
+    // "chấm chưa hoàn tất" vĩnh viễn trong khi vẫn còn thể thử lại.
     const { examResult, historyEntry } = await driveBothReadPaths({
       perQuestion: [essayEl({ questionId: "q-rs4", essayState: "failed", essayAttempts: 1 })],
     });
 
     expect(examResult.hasIncompleteEssay).toBe(false);
     expect(historyEntry.hasIncompleteEssay).toBe(false);
-    // Still UNRESOLVED though — the two predicates are structurally exclusive,
-    // and this row is the proof that one boolean could not carry both answers.
+    // Vẫn CHƯA GIẢI QUYẾT — hai vị từ loại trừ nhau về cấu trúc,
+    // và hàng này là bằng chứng rằng một boolean không thể mang cả hai đáp án.
     expect(historyEntry.hasUnresolvedEssay).toBe(true);
   });
 
@@ -1010,9 +1007,9 @@ describe("getResult() / listMyHistory() — hasIncompleteEssay agreement (INT-2)
         perQuestion: perQuestion as unknown[],
       });
 
-      // `typeof`, not just the value: `undefined` is falsy, so the wrong version
-      // renders correctly today and only surfaces when the PDF pipeline has to
-      // decide an annotation from it.
+      // `typeof`, không chỉ giá trị: `undefined` là falsy, nên phiên bản sai
+      // hôm nay vẫn render đúng và chỉ lộ ra khi đường ống PDF phải
+      // quyết định một chú thích từ nó.
       expect(typeof examResult.hasIncompleteEssay).toBe("boolean");
       expect(typeof historyEntry.hasIncompleteEssay).toBe("boolean");
       expect(typeof historyEntry.hasUnresolvedEssay).toBe("boolean");
@@ -1022,9 +1019,9 @@ describe("getResult() / listMyHistory() — hasIncompleteEssay agreement (INT-2)
   );
 
   it("(d) EG-BE-034: history's hasUnresolvedEssay equals (result's essaySummary.unresolvedCount ?? 0) > 0, across every fixture", async () => {
-    // Deliberately compares ACROSS the two paths rather than recomputing the
-    // right-hand side locally. Two derivations of one truth drifting apart is
-    // defect F-06, and a locally recomputed control would not see it.
+    // Cố ý so sánh GIỮA hai đường thay vì tính lại vế phải ở cục bộ.
+    // Hai phép suy ra của một sự thật trôi lệch khỏi nhau là lỗi F-06, và một
+    // đối chứng tính lại cục bộ sẽ không thấy nó.
     const fixtures: unknown[][] = [
       RS6_AND_RS4,
       [essayEl()],
@@ -1040,8 +1037,8 @@ describe("getResult() / listMyHistory() — hasIncompleteEssay agreement (INT-2)
       expect(historyEntry.hasUnresolvedEssay).toBe(fromSummary);
       observed.push(historyEntry.hasUnresolvedEssay);
     }
-    // Positive AND negative control: without both, the equality above would hold
-    // for an implementation that answers the same thing every time.
+    // Đối chứng dương VÀ âm: thiếu cả hai, đẳng thức ở trên vẫn đúng
+    // với một cài đặt lúc nào cũng trả lời cùng một thứ.
     expect(observed).toContain(true);
     expect(observed).toContain(false);
   });
@@ -1058,12 +1055,12 @@ describe("getResult() / listMyHistory() — hasIncompleteEssay agreement (INT-2)
     expect(historySelect).toContain("per_question");
     expect(historySelect).toContain("created_at");
 
-    // Why this is asserted on the SELECT STRING and not on mapped output: with
-    // `created_at` missing on one path, both booleans still compute — they just
-    // compute against `undefined`. An overdue pending question is then "still
-    // pending" on that path while the other calls it RS-6, and the student gets
-    // a PDF WITH the incomplete-essay line from one button and WITHOUT it from
-    // the other, for the same attempt. No assertion on mapped output can see it.
+    // Vì sao khẳng định trên CHUỖI SELECT chứ không phải đầu ra đã ánh xạ: khi
+    // `created_at` thiếu ở một đường, cả hai boolean vẫn tính ra — chỉ là
+    // tính trên `undefined`. Một câu pending quá hạn khi đó "vẫn pending" ở đường đó
+    // trong khi đường kia gọi nó là RS-6, và học sinh nhận PDF CÓ dòng bài tự luận
+    // chưa hoàn tất từ một nút và KHÔNG CÓ từ nút kia, cho cùng một lượt làm.
+    // Không khẳng định nào trên đầu ra đã ánh xạ thấy được điều đó.
   });
 
   it("(f) legacy Output Comparison, BOTH pipelines: hand-built literals, no snapshots", async () => {
@@ -1092,8 +1089,8 @@ describe("getResult() / listMyHistory() — hasIncompleteEssay agreement (INT-2)
       overtimeSeconds: 0,
       hasIncompleteEssay: false,
     });
-    // `toEqual` treats a key holding `undefined` as absent, so the field that
-    // must be undefined is asserted separately.
+    // `toEqual` coi khoá chứa `undefined` là vắng mặt, nên trường
+    // phải là undefined được khẳng định riêng.
     expect(examResult.essaySummary).toBeUndefined();
     expect(examResult.result.perQuestion[0].essay).toBeUndefined();
 
@@ -1116,84 +1113,82 @@ describe("getResult() / listMyHistory() — hasIncompleteEssay agreement (INT-2)
 });
 
 // =============================================================================
-// INT-3 — A graded essay is still scored:false / isCorrect:false, so Layer 3 and
-//         the score triple never move because of it
+// INT-3 — Một bài tự luận đã chấm vẫn là scored:false / isCorrect:false, nên Layer 3 và
+//         bộ ba điểm không bao giờ dịch chuyển vì nó
 // =============================================================================
-// AC: EG-BE-004 — "In EVERY lifecycle state (pending, graded, failed) the stored
-//   element must keep scored: false and isCorrect: false. A graded element
-//   carrying scored: true, isCorrect: true, or MISSING the scored key, fails this
-//   criterion."
-// Also discharges: PRD AC-009 (exam_results.correct never moves because of an
-//   essay), AC-014, AC-016 (wrongTwice), AC-017 (record_skill_mastery filter),
-//   AC-011/AC-015 read-side arithmetic (EG-BE-027); ADR-0018 F1.
+// AC: EG-BE-004 — "Ở MỌI trạng thái vòng đời (pending, graded, failed) phần tử
+//   đã lưu phải giữ scored: false và isCorrect: false. Một phần tử đã chấm
+//   mang scored: true, isCorrect: true, hoặc THIẾU khoá scored, là hỏng tiêu chí này."
+// Cũng hoàn thành: PRD AC-009 (exam_results.correct không bao giờ dịch chuyển vì một
+//   bài tự luận), AC-014, AC-016 (wrongTwice), AC-017 (bộ lọc record_skill_mastery),
+//   AC-011/AC-015 số học phía đọc (EG-BE-027); ADR-0018 F1.
 // ROI: 71 (BV:9 x Freq:7 + Legal:0 + Defect:8)
-//   BV 9 — F1 is the single fact that lets this feature ship without editing
-//     `schema.sql:1354` or `wrongTwice.ts:45`. If it breaks, essay questions start
-//     feeding the mastery model and the wrong-twice set, which changes what Layer 3
-//     recommends to the student — a wrong answer to a different question entirely.
-//   Freq 7 — every result render of every attempt containing a graded essay.
-//   Defect 8 — the natural instinct when a band lands is to set scored:true, and
-//     nothing about that change looks wrong at the point it is written.
-// Behavior: a per_question fixture containing a GRADED essay element (essayState
-//   "graded", essayEarned 0.75, essayMax 1, scored false, isCorrect false) is read
-//   through getResult() at the mocked Supabase boundary -> real essayLifecycle
-//   summarises it -> the legacy score triple is untouched, the element still
-//   reports scored:false, and the real wrongTwice derivation ignores it.
+//   BV 9 — F1 là sự thật duy nhất cho phép tính năng này ship mà không sửa
+//     `schema.sql:1354` hay `wrongTwice.ts:45`. Nếu nó hỏng, câu tự luận bắt đầu
+//     nuôi mô hình mastery và tập wrong-twice, đổi thứ mà Layer 3
+//     đề xuất cho học sinh — một câu trả lời cho một câu hỏi hoàn toàn khác.
+//   Freq 7 — mọi lần render kết quả của mọi lượt làm có một bài tự luận đã chấm.
+//   Defect 8 — bản năng tự nhiên khi một band hạ cánh là đặt scored:true, và
+//     không gì ở thay đổi đó trông sai tại chỗ nó được viết.
+// Hành vi: một fixture per_question chứa phần tử tự luận ĐÃ CHẤM (essayState
+//   "graded", essayEarned 0.75, essayMax 1, scored false, isCorrect false) được đọc
+//   qua getResult() ở ranh giới Supabase mock -> essayLifecycle thật
+//   tóm tắt nó -> bộ ba điểm cũ không bị đụng, phần tử vẫn
+//   báo scored:false, và phép suy ra wrongTwice thật bỏ qua nó.
 // @category: core-functionality
 // @lane: integration
-// @dependency: SOURCE/features/exams/queries.ts (getResult) + real
-//   SOURCE/lib/scoring/essayLifecycle.ts + real SOURCE/lib/scoring/wrongTwice.ts +
-//   mocked Supabase client
+// @dependency: SOURCE/features/exams/queries.ts (getResult) + SOURCE/lib/scoring/essayLifecycle.ts
+//   thật + SOURCE/lib/scoring/wrongTwice.ts thật +
+//   client Supabase mock
 // @complexity: medium
-// @real-dependency: none IN THIS LANE — but note the split, because this case
-//   proves only the TypeScript half. `record_skill_mastery()`'s own exclusion
-//   (`coalesce((pq->>'scored')::boolean, true)`, schema.sql:1354) is a Postgres
-//   predicate; it is asserted on the real database by the existing
-//   `recordSkillMastery.int.test.ts` and by the service lane, NOT here. Saying so
-//   at the boundary is the point: a mock cannot prove a SQL filter.
-// Primary failure mode: `record_essay_grade()` or a later refactor sets
-//   `scored: true` on the element when the band lands ("it IS scored now"),
-//   whereupon `record_skill_mastery()` stops excluding the row and the essay starts
-//   contributing to skill mastery; and `computeWrongTwiceQuestionIds()`
-//   (`wrongTwice.ts:45` skips only on `row.scored === false`) starts returning
+// @real-dependency: không có TRONG LÀN NÀY — nhưng lưu ý sự phân chia, vì ca này
+//   chỉ chứng minh nửa TypeScript. Việc loại trừ riêng của `record_skill_mastery()`
+//   (`coalesce((pq->>'scored')::boolean, true)`, schema.sql:1354) là một vị từ Postgres;
+//   nó được khẳng định trên database thật bởi `recordSkillMastery.int.test.ts` sẵn có
+//   và bởi làn service, KHÔNG phải ở đây. Nói rõ ở ranh giới
+//   chính là mục đích: mock không chứng minh được một bộ lọc SQL.
+// Kiểu hỏng chính: `record_essay_grade()` hoặc một lần refactor về sau đặt
+//   `scored: true` lên phần tử khi band hạ cánh ("giờ nó ĐÃ được chấm"),
+//   khi đó `record_skill_mastery()` thôi loại hàng và bài tự luận bắt đầu
+//   đóng góp vào mastery kỹ năng; và `computeWrongTwiceQuestionIds()`
+//   (`wrongTwice.ts:45` chỉ bỏ qua khi `row.scored === false`) bắt đầu trả về
 //   essay question ids, so the tutor surfaces essay questions as "sai hai lần".
-//   The adjacent mode: the essay's band leaks into `result.correct` / `result.total`
-//   on the read path, which silently redefines what `ScoreCard`'s
-//   `wrong = total - correct` derivation means.
-// Proof obligation — what the implemented test must assert:
-//   (a) The graded element as returned by getResult() has `scored === false` and
-//       `isCorrect === false`, and the `scored` key is PRESENT (assert
-//       `"scored" in element`, not just the value — a missing key hits the
-//       `coalesce(..., true)` default in SQL and flips the filter).
-//   (b) The score triple is untouched: `result.totalScore`, `result.correct` and
-//       `result.total` toEqual independently authored literals computed from the
-//       NON-essay questions only. Use a fixture where including the essay would
-//       visibly change every one of the three (e.g. 4 MCQ, 3 correct, plus a
-//       graded essay at band 0.75) — with a fixture where the numbers coincide,
-//       this assertion proves nothing.
-//   (c) Real `computeWrongTwiceQuestionIds()` over rows containing this graded
-//       essay TWICE (two attempts, both "wrong") returns an array that does NOT
-//       contain the essay's questionId, while still containing the id of a
-//       genuinely twice-wrong MCQ in the same fixture — the positive control that
-//       stops (c) from passing because the function returned nothing at all.
-//       DEDUPLICATION, read before writing this obligation: the plain
-//       `scored: false` exclusion is ALREADY covered at unit level by
-//       `SOURCE/lib/scoring/__tests__/wrongTwice.test.ts` Test 2 (:105-140), whose
-//       fixture is already named `Q-ESSAY`. Do not restate it. What is NEW here —
-//       and the only thing justifying (c) in this lane — is that the element now
-//       ALSO carries the six new keys (essayState/essayEarned/essayMax/
-//       essayLowConfidence/essayAttempts/essayGradedAt) and arrives through the
-//       real read path rather than a hand-built unit fixture: the obligation is
-//       that the presence of those keys does not flip the predicate. If that
-//       framing is dropped, (c) is duplicate coverage and should be deleted rather
-//       than written.
-//   (d) EG-BE-027 arithmetic: `essaySummary.earned` / `.max` count the graded
-//       essay only. In a fixture with one graded (0.75), one pending and one
-//       failed essay: earned === 0.75, max === 1, gradedCount === 1 — NOT max === 3.
-//       A failed essay contributing 0 to earned and 1 to max is exactly the silent
-//       zero AC-015 forbids.
-//   (e) `essayLowConfidence: true` on the graded element changes NO number in
-//       (b) or (d) — same fixture run twice, flag flipped, numeric output toEqual.
+//   Kiểu kề cận: band của bài tự luận rò vào `result.correct` / `result.total`
+//   trên đường đọc, lặng lẽ định nghĩa lại ý nghĩa của phép suy ra
+//   `wrong = total - correct` của `ScoreCard`.
+// Nghĩa vụ chứng minh — test được cài đặt phải khẳng định gì:
+//   (a) Phần tử đã chấm do getResult() trả về có `scored === false` và
+//       `isCorrect === false`, và khoá `scored` CÓ MẶT (khẳng định
+//       `"scored" in element`, không chỉ giá trị — khoá thiếu sẽ dính mặc định
+//       `coalesce(..., true)` trong SQL và đảo bộ lọc).
+//   (b) Bộ ba điểm không bị đụng: `result.totalScore`, `result.correct` và
+//       `result.total` toEqual các literal tự soạn độc lập, tính chỉ từ các
+//       câu KHÔNG phải tự luận. Dùng fixture mà việc tính cả bài tự luận sẽ làm thay đổi
+//       thấy được cả ba (ví dụ 4 MCQ, 3 đúng, cộng một bài tự luận
+//       đã chấm ở band 0.75) — với fixture mà các con số trùng nhau, khẳng định này
+//       chẳng chứng minh gì.
+//   (c) `computeWrongTwiceQuestionIds()` thật trên các hàng chứa bài tự luận đã chấm này
+//       HAI LẦN (hai lượt làm, cả hai "sai") trả về một mảng KHÔNG
+//       chứa questionId của bài tự luận, trong khi vẫn chứa id của một MCQ thật sự
+//       sai hai lần trong cùng fixture — đối chứng dương ngăn (c)
+//       qua chỉ vì hàm không trả về gì cả.
+//       KHỬ TRÙNG LẶP, đọc trước khi viết nghĩa vụ này: việc loại trừ `scored: false`
+//       thuần ĐÃ được phủ ở mức unit bởi
+//       `SOURCE/lib/scoring/__tests__/wrongTwice.test.ts` Test 2 (:105-140), mà
+//       fixture đã tên là `Q-ESSAY`. Đừng lặp lại. Điều MỚI ở đây —
+//       và là thứ duy nhất biện minh cho (c) trong làn này — là phần tử giờ
+//       CŨNG mang sáu khoá mới (essayState/essayEarned/essayMax/
+//       essayLowConfidence/essayAttempts/essayGradedAt) và đến qua đường đọc
+//       thật thay vì một fixture unit dựng tay: nghĩa vụ là việc có mặt của các khoá đó
+//       không đảo vị từ. Nếu bỏ cách đặt vấn đề này, (c) là phủ trùng lặp và nên bị xoá thay vì
+//       viết.
+//   (d) Số học EG-BE-027: `essaySummary.earned` / `.max` chỉ đếm bài tự luận
+//       đã chấm. Trong fixture có một bài đã chấm (0.75), một pending và một
+//       failed: earned === 0.75, max === 1, gradedCount === 1 — KHÔNG phải max === 3.
+//       Một bài failed đóng góp 0 vào earned và 1 vào max chính là số 0 thầm lặng
+//       mà AC-015 cấm.
+//   (e) `essayLowConfidence: true` trên phần tử đã chấm KHÔNG đổi con số nào ở
+//       (b) hay (d) — cùng fixture chạy hai lần, lật cờ, đầu ra số toEqual.
 describe("Graded essay stays out of the score triple and Layer 3 (INT-3)", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -1204,11 +1199,11 @@ describe("Graded essay stays out of the score triple and Layer 3 (INT-3)", () =>
     vi.useRealTimers();
   });
 
-  /** 4 MCQ, 3 of them correct, plus one graded essay at band 0.75.
+  /** 4 MCQ, 3 đúng, cộng một bài tự luận đã chấm ở band 0.75.
    *
-   *  Chosen so that counting the essay would move ALL THREE numbers: the triple
-   *  would become 5 / 3.75 / 6.75 instead of 4 / 3 / 7.5. With a fixture where
-   *  the numbers coincide, obligation (b) would prove nothing. */
+   *  Chọn sao cho việc tính bài tự luận sẽ dịch chuyển CẢ BA con số: bộ ba
+   *  sẽ thành 5 / 3.75 / 6.75 thay vì 4 / 3 / 7.5. Với fixture mà
+   *  các con số trùng nhau, nghĩa vụ (b) chẳng chứng minh gì. */
   const FOUR_MCQ_AND_A_GRADED_ESSAY: unknown[] = [
     mcqEl("q1", true),
     mcqEl("q2", true),
@@ -1223,8 +1218,8 @@ describe("Graded essay stays out of the score triple and Layer 3 (INT-3)", () =>
     }),
   ];
 
-  /** The independently authored triple: 3 correct of 4 SCORED questions ⇒ 7.5.
-   *  Hand-computed from the four MCQs only — the essay is not in it. */
+  /** Bộ ba tự soạn độc lập: 3 đúng trên 4 câu CHẤM ĐIỂM ⇒ 7.5.
+   *  Tính tay chỉ từ bốn MCQ — bài tự luận không có trong đó. */
   const NON_ESSAY_TRIPLE = { totalScore: 7.5, correct: 3, total: 4 };
 
   it("(a) the graded element keeps scored:false and isCorrect:false, and the `scored` KEY is present", async () => {
@@ -1236,13 +1231,13 @@ describe("Graded essay stays out of the score triple and Layer 3 (INT-3)", () =>
     const graded = examResult.result.perQuestion.find((r) => r.questionId === "q-graded")!;
     expect(graded.scored).toBe(false);
     expect(graded.isCorrect).toBe(false);
-    // The KEY, not just the value. A missing `scored` hits SQL's
-    // `coalesce((pq->>'scored')::boolean, true)` default (schema.sql:1354) and
-    // FLIPS the mastery filter, enrolling graded essays into the mastery model.
+    // KHOÁ, không chỉ giá trị. Một `scored` thiếu sẽ dính mặc định
+    // `coalesce((pq->>'scored')::boolean, true)` của SQL (schema.sql:1354) và
+    // ĐẢO bộ lọc mastery, kéo bài tự luận đã chấm vào mô hình mastery.
     expect("scored" in graded).toBe(true);
-    // HONEST SEAM, stated where it applies: this proves the TypeScript half only.
-    // The SQL predicate itself is proven by recordSkillMastery.int.test.ts and by
-    // the service lane. A mock cannot prove a SQL filter.
+    // MỐI NỐI TRUNG THỰC, nêu đúng chỗ áp dụng: cái này chỉ chứng minh nửa TypeScript.
+    // Chính vị từ SQL được chứng minh bởi recordSkillMastery.int.test.ts và bởi
+    // làn service. Mock không chứng minh được một bộ lọc SQL.
     expect(graded.essay?.state).toBe("graded");
   });
 
@@ -1252,28 +1247,28 @@ describe("Graded essay stays out of the score triple and Layer 3 (INT-3)", () =>
       triple: NON_ESSAY_TRIPLE,
     });
 
-    // Counting the essay would make these 5 / 3.75 / 6.75 — every one of the
-    // three moves, which is what makes this fixture able to fail.
+    // Nếu tính bài tự luận thì các số này thành 5 / 3.75 / 6.75 — cả ba
+    // đều dịch chuyển, nhờ vậy fixture này mới có khả năng hỏng.
     expect(examResult.result.total).toBe(4);
     expect(examResult.result.correct).toBe(3);
     expect(examResult.result.totalScore).toBe(7.5);
-    // ScoreCard derives `wrong = total - correct`; the essay silently entering
-    // the denominator would redefine what that number means on a live surface.
+    // ScoreCard suy ra `wrong = total - correct`; bài tự luận lặng lẽ chui vào
+    // mẫu số sẽ định nghĩa lại ý nghĩa của con số đó trên một bề mặt đang chạy.
     expect(examResult.result.total - examResult.result.correct).toBe(1);
   });
 
   it("(c) the six new keys, arriving through the REAL read path, do not flip the wrong-twice predicate", async () => {
-    // FRAMING — this is what justifies the case existing at all. The plain
-    // `scored: false` exclusion is already covered at unit level by
-    // wrongTwice.test.ts Test 2 (:105-140), on a fixture already named Q-ESSAY,
-    // and restating it here would be duplicate coverage. What is NEW: the element
-    // now ALSO carries the lifecycle keys and arrives through getResult()'s real
-    // history read rather than a hand-built unit fixture.
+    // CÁCH ĐẶT VẤN ĐỀ — đây là điều biện minh cho sự tồn tại của ca này. Việc loại trừ
+    // `scored: false` thuần đã được phủ ở mức unit bởi
+    // wrongTwice.test.ts Test 2 (:105-140), trên fixture đã tên là Q-ESSAY,
+    // và lặp lại ở đây là phủ trùng lặp. Điều MỚI: phần tử
+    // giờ CŨNG mang các khoá vòng đời và đến qua lượt đọc lịch sử thật của getResult()
+    // thay vì một fixture unit dựng tay.
     const viewed: unknown[] = [
       mcqEl("q-wrong-twice", false),
       essayEl({ questionId: "q-graded", essayState: "graded", essayEarned: 0.75, essayMax: 1 }),
     ];
-    // The same two questions, wrong again on a SECOND distinct attempt.
+    // Cùng hai câu, lại sai ở lượt làm KHÁC THỨ HAI.
     const historyRows = [
       { attempt_id: READ_ATTEMPT_ID, per_question: viewed },
       { attempt_id: "attempt-earlier", per_question: viewed },
@@ -1288,10 +1283,10 @@ describe("Graded essay stays out of the score triple and Layer 3 (INT-3)", () =>
     const mcq = examResult.result.perQuestion.find((r) => r.questionId === "q-wrong-twice")!;
     const essay = examResult.result.perQuestion.find((r) => r.questionId === "q-graded")!;
 
-    // Positive control first: without it, this case would pass for a predicate
-    // that returned nothing at all.
+    // Đối chứng dương trước: thiếu nó, ca này sẽ qua với một vị từ
+    // chẳng trả về gì cả.
     expect(mcq.hasBeenWrongTwice).toBe(true);
-    // …and the essay stays out, WITH the six keys present on it.
+    // …và bài tự luận vẫn nằm ngoài, DÙ sáu khoá có mặt trên nó.
     expect(essay.hasBeenWrongTwice).toBeUndefined();
     expect(essay.essay?.state).toBe("graded");
   });
@@ -1306,9 +1301,9 @@ describe("Graded essay stays out of the score triple and Layer 3 (INT-3)", () =>
       triple: NON_ESSAY_TRIPLE,
     });
 
-    // max is 1, NOT 3. A failed essay adding 0 to earned and 1 to max is exactly
-    // the silent zero AC-015 forbids — and it looks completely reasonable at the
-    // point someone writes it.
+    // max là 1, KHÔNG phải 3. Một bài failed cộng 0 vào earned và 1 vào max chính là
+    // số 0 thầm lặng mà AC-015 cấm — và nó trông hoàn toàn hợp lý
+    // tại lúc ai đó viết ra.
     expect(examResult.essaySummary).toEqual({
       earned: 0.75,
       max: 1,
@@ -1317,8 +1312,8 @@ describe("Graded essay stays out of the score triple and Layer 3 (INT-3)", () =>
       failedCount: 1,
       unresolvedCount: 1,
     });
-    // The essay arithmetic and the score triple are separate ledgers; adding the
-    // two extra essays moved neither of the three numbers.
+    // Số học tự luận và bộ ba điểm là hai sổ riêng; thêm hai bài tự luận
+    // kia không làm dịch chuyển con số nào trong ba số.
     expect(examResult.result.total).toBe(4);
     expect(examResult.result.correct).toBe(3);
     expect(examResult.result.totalScore).toBe(7.5);
@@ -1351,7 +1346,7 @@ describe("Graded essay stays out of the score triple and Layer 3 (INT-3)", () =>
     const off = await numbersWith(false);
     const on = await numbersWith(true);
 
-    // AC-046: the flag is display-only. It must reach the view…
+    // AC-046: cờ chỉ để hiển thị. Nó phải tới được view…
     expect(on).toEqual(off);
     const { examResult } = await driveBothReadPaths({
       perQuestion: [
@@ -1366,8 +1361,8 @@ describe("Graded essay stays out of the score triple and Layer 3 (INT-3)", () =>
       ],
       triple: NON_ESSAY_TRIPLE,
     });
-    // …which is asserted here so that `on.toEqual(off)` cannot be satisfied by
-    // the flag being dropped on the floor entirely.
+    // …được khẳng định ở đây để `on.toEqual(off)` không thể thoả mãn bằng
+    // việc cờ bị bỏ rơi hoàn toàn.
     expect(examResult.result.perQuestion[0].essay?.lowConfidence).toBe(true);
   });
 });

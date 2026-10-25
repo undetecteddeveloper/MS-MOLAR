@@ -1,68 +1,66 @@
-// History — Full Journey [fixture-e2e] Driver Script
+// History — Hành trình đầy đủ [fixture-e2e] Script driver
 // Design Docs: docs/design/history-backend-design.md (v1.2), docs/design/history-frontend-design.md (v1.3)
 // UI Spec: docs/ui-spec/history-ui-spec.md (v1.1)
 // PRD: docs/prd/history-prd.md (v1.3, AC-001..AC-019)
-// Generated (skeleton): 2026-07-30 | Filled in: Task 15 (Work Plan Phase 4.3)
+// Sinh (skeleton): 2026-07-30 | Điền: Task 15 (Work Plan Phase 4.3)
 //
-// This repo has no @playwright/test dependency and no playwright.config.ts —
-// only the Playwright MCP browser-automation server is configured (`.mcp.json`)
-// for interactive/manual sessions (see the frontend Design Doc's Test
-// Boundaries: "Playwright MCP / manual pass (no CI)"). Following the exact
-// precedent SOURCE/tests/e2e/fixture/rating.fixture.e2e.test.ts already
-// established, this script is written against a minimal `HistoryDriver`
-// interface that is a structural SUBSET of Playwright's real `Page`/`Locator`
-// API (`goto`, `url`, `getByRole`, `getByText`, `.click`, `.getAttribute`,
-// `.textContent`, `.first`, `.count`, `.allTextContents`, plus
-// `waitForDownload`/`networkRequestCount` for the download/no-extra-fetch
-// obligations) — a real Playwright `Page` (extended with a thin
-// download/network-count helper) satisfies this interface, so once a harness
-// exists this script runs unchanged, either wrapped in a `@playwright/test`
-// `test()` block or driven directly via the Playwright MCP tool. Assertions
-// use Node's built-in `node:assert/strict` (no new dependency).
+// Repo này không có phụ thuộc @playwright/test và không có playwright.config.ts —
+// chỉ máy chủ tự động hoá trình duyệt Playwright MCP được cấu hình (`.mcp.json`)
+// cho các phiên tương tác/thủ công (xem Test Boundaries của frontend Design Doc:
+// "Playwright MCP / lượt thủ công (không CI)"). Theo đúng tiền lệ mà
+// SOURCE/tests/e2e/fixture/rating.fixture.e2e.test.ts đã thiết lập, script này
+// được viết dựa trên một interface `HistoryDriver` tối thiểu là một tập CON cấu trúc
+// của API `Page`/`Locator` thật của Playwright (`goto`, `url`, `getByRole`, `getByText`,
+// `.click`, `.getAttribute`, `.textContent`, `.first`, `.count`, `.allTextContents`, cộng
+// `waitForDownload`/`networkRequestCount` cho các nghĩa vụ tải xuống/không-fetch-thêm)
+// — một `Page` Playwright thật (mở rộng bằng helper đếm tải xuống/mạng mỏng)
+// thoả interface này, nên khi có harness, script này chạy không đổi, hoặc bọc trong một
+// khối `test()` của `@playwright/test` hoặc điều khiển trực tiếp qua công cụ Playwright MCP.
+// Các khẳng định dùng `node:assert/strict` có sẵn của Node (không phụ thuộc mới).
 //
-// Fixture-data residual (Task 01 gap — recorded in this task's Investigation
-// Notes): Task 01 (`history-work-plan-task-01.md`) was supposed to deliver
-// `SOURCE/tests/e2e/fixture/historyFixtureData.ts` — a separate fixture-data
-// module plus the chosen mock/override-boundary mechanism for wiring
-// `listMyHistory()`/`getResult()`/`getCurrentUser()` to fixture data against a
-// real `npm run dev` session. That file was never authored (confirmed absent
-// from both the working tree and `git log --all` at the time this task ran).
-// Rather than importing from a file that doesn't exist (out of this task's own
-// Target Files — creating a new fixture module is not listed), the four
-// fixture-data profiles (empty-list, null-user, error-throwing, valid
-// multi-row) are defined directly in this file instead, mirroring the
-// convention `rating.fixture.e2e.test.ts` already established for its own
-// FIXTURE_EXAMS/FIXTURE_SUBMITTED_EXAM_IDS/FIXTURE_USER (defined inline, not in
-// a separate module). This is a local, reversible construct: nothing here
-// depends on a nonexistent module, and if `historyFixtureData.ts` is authored
-// later, the profiles below can be swapped for an import unchanged in shape.
-// The `FixtureBackend` interface below documents the exact override-boundary
-// contract (call-count spies + reconfigurable throw/reject behavior) a real
-// harness must expose over `listMyHistory()`/`getCurrentUser()`/
-// `generateAttemptPdfFile()`; `createInMemoryFixtureBackend()` is a
-// deterministic reference implementation of that contract.
+// Phần dư dữ liệu fixture (khoảng trống Task 01 — ghi trong Investigation
+//Notes của task này): Task 01 (`history-work-plan-task-01.md`) lẽ ra phải giao
+// `SOURCE/tests/e2e/fixture/historyFixtureData.ts` — một module dữ liệu fixture riêng
+// cộng cơ chế mock/override-boundary được chọn để nối
+// `listMyHistory()`/`getResult()`/`getCurrentUser()` với dữ liệu fixture trên một
+// phiên `npm run dev` thật. File đó chưa bao giờ được viết (xác nhận vắng khỏi
+// cả cây làm việc lẫn `git log --all` lúc task này chạy).
+// Thay vì import từ một file không tồn tại (ngoài Target Files của chính task này —
+// tạo một module fixture mới không có trong danh sách), bốn hồ sơ dữ liệu
+// fixture (danh-sách-rỗng, người-dùng-null, ném-lỗi, nhiều-hàng
+// hợp lệ) được định nghĩa thẳng trong file này, theo
+// quy ước mà `rating.fixture.e2e.test.ts` đã thiết lập cho
+// FIXTURE_EXAMS/FIXTURE_SUBMITTED_EXAM_IDS/FIXTURE_USER của nó (định nghĩa nội tuyến, không ở
+// một module riêng). Đây là một cấu trúc cục bộ, đảo ngược được: không gì ở đây
+// phụ thuộc vào một module không tồn tại, và nếu `historyFixtureData.ts` được viết
+// về sau, các hồ sơ bên dưới đổi được sang một import mà hình dạng không đổi.
+// Interface `FixtureBackend` bên dưới tài liệu hoá đúng hợp đồng override-boundary
+// (spy đếm lời gọi + hành vi throw/reject cấu hình lại được) mà một harness thật phải phơi
+// trên `listMyHistory()`/`getCurrentUser()`/
+// `generateAttemptPdfFile()`; `createInMemoryFixtureBackend()` là một cài đặt tham chiếu
+// xác định của hợp đồng đó.
 //
-// Sequencing note (task file's own explicit decision, not resolved by the Work
-// Plan itself): the Work Plan's Task Dependency Diagram places this task (4.3)
-// *before* Phase 5 (nav wiring, Tasks 16/17). At the point this task runs,
-// SiteHeader's "History" nav item still has `href="#"` (confirmed:
-// SOURCE/features/exams/components/SiteHeader.tsx:27) — clicking it would not
-// navigate anywhere. Every navigation step below (including the "return to
-// History" step) uses `driver.goto("/history")` directly instead of clicking
-// the nav item. HE1 obligation (f) (nav active-highlight) is recorded as
-// expected-pending here, not silently marked passing or dropped — see
-// `checkHE1NavActiveHighlightExpectedPending` below.
+// Ghi chú trình tự (quyết định tường minh của chính task file, không do Work
+//Plan tự giải quyết): Task Dependency Diagram của Work Plan đặt task này (4.3)
+// *trước* Phase 5 (nối nav, Tasks 16/17). Tại thời điểm task này chạy,
+// mục nav "History" của SiteHeader vẫn có `href="#"` (xác nhận:
+// SOURCE/features/exams/components/SiteHeader.tsx:27) — bấm vào nó sẽ không điều hướng
+// đi đâu. Mọi bước điều hướng bên dưới (kể cả bước "quay lại
+// History") dùng `driver.goto("/history")` trực tiếp thay vì bấm
+// mục nav. Nghĩa vụ HE1 (f) (tô sáng nav đang hoạt động) được ghi là
+// đang-chờ-kỳ-vọng ở đây, không bị lặng lẽ đánh dấu là qua hay bỏ — xem
+// `checkHE1NavActiveHighlightExpectedPending` bên dưới.
 //
-// Cross-surface consistency finding (HE1 obligation (e)): the Result page's
-// `ScoreCard` (SOURCE/features/exams/components/ScoreCard.tsx) renders score
-// (`{totalScore}/10`) and completion time, but — unlike HistoryRow — never
-// renders the submitted date; `submittedAt` is used only for
-// `formatCompletionTime`'s diff calc and the PDF's own content, never as a
-// visible date string on the Result page itself. This is a fact about the
-// already-shipped Task 12 UI (ScoreCard.tsx is out of this task's Target
-// Files), not a scope reduction chosen here — so the cross-surface comparison
-// below checks the two fields both surfaces actually render (score +
-// completion time), not date.
+// Phát hiện nhất quán xuyên bề mặt (nghĩa vụ HE1 (e)): `ScoreCard` của trang Kết quả
+//(SOURCE/features/exams/components/ScoreCard.tsx) render điểm
+// (`{totalScore}/10`) và thời gian hoàn thành, nhưng — khác HistoryRow — không bao giờ
+// render ngày nộp; `submittedAt` chỉ dùng cho
+// phép tính hiệu của `formatCompletionTime` và nội dung của chính PDF, không bao giờ là
+// chuỗi ngày nhìn thấy được trên chính trang Kết quả. Đây là một sự thật về
+// UI Task 12 đã ship (ScoreCard.tsx nằm ngoài Target
+// Files của task này), không phải một thu hẹp phạm vi do ta chọn — nên phép so sánh xuyên bề mặt
+// bên dưới kiểm hai trường mà cả hai bề mặt thực sự render (điểm +
+// thời gian hoàn thành), không phải ngày.
 
 import assert from "node:assert/strict";
 import { formatCompletionTime } from "@/lib/history/format";
@@ -84,19 +82,19 @@ export interface HistoryDriver {
   url(): string;
   getByRole(role: string, options?: { name?: string | RegExp }): HistoryLocator;
   getByText(text: string | RegExp): HistoryLocator;
-  /** Structural analogue of Playwright's `page.waitForEvent("download")` —
-   *  resolves with the observed download once `action` triggers one; `null`
-   *  if none fires within the harness's own timeout. */
+  /** Tương tự cấu trúc của `page.waitForEvent("download")` của Playwright —
+   *  resolve với lượt tải xuống quan sát được khi `action` kích hoạt một cái; `null`
+   *  nếu không cái nào bắn trong timeout riêng của harness. */
   waitForDownload(action: () => Promise<void>): Promise<{ filename: string } | null>;
-  /** Cumulative count of fetch/XHR requests the harness has observed since
-   *  the current page's navigation started. */
+  /** Số đếm tích luỹ các request fetch/XHR mà harness đã quan sát từ khi
+   *  điều hướng của trang hiện tại bắt đầu. */
   networkRequestCount(): Promise<number>;
 }
 
-// --- Fixture data -----------------------------------------------------------
-// See the "Fixture-data residual" header note above — these profiles stand in
-// for Task 01's undelivered historyFixtureData.ts, matching MyHistoryEntry's
-// exact field shape (SOURCE/features/history/queries.ts).
+// --- Dữ liệu fixture -----------------------------------------------------------
+// Xem ghi chú đầu file "Phần dư dữ liệu fixture" ở trên — các hồ sơ này thế chỗ
+// historyFixtureData.ts chưa được giao của Task 01, khớp đúng hình dạng trường của MyHistoryEntry
+// (SOURCE/features/history/queries.ts).
 
 export interface FixtureHistoryEntry {
   attemptId: string;
@@ -108,8 +106,8 @@ export interface FixtureHistoryEntry {
   submittedAt: string;
 }
 
-/** Valid multi-row profile — newest-first order, spanning distinct
- *  submitted_at values (AC-001/003/004). */
+/** Hồ sơ nhiều-hàng hợp lệ — thứ tự mới-nhất-trước, trải trên các giá trị
+ *  submitted_at khác nhau (AC-001/003/004). */
 export const FIXTURE_HISTORY_VALID: readonly FixtureHistoryEntry[] = [
   {
     attemptId: "attempt-fixture-2",
@@ -134,14 +132,14 @@ export const FIXTURE_HISTORY_VALID: readonly FixtureHistoryEntry[] = [
 /** Empty-list profile (AC-002). */
 export const FIXTURE_HISTORY_EMPTY: readonly FixtureHistoryEntry[] = [];
 
-/** Logged-in fixture user (null-user profile is simply `setCurrentUser(null)`, AC-016). */
+/** Người dùng fixture đã đăng nhập (hồ sơ người-dùng-null đơn giản là `setCurrentUser(null)`, AC-016). */
 export const FIXTURE_USER = { id: "user-history-fixture-1", email: "fixture-history@example.com" };
 
-/** Documents the override-boundary contract a real harness must expose over
- *  listMyHistory()/getCurrentUser()/generateAttemptPdfFile() — call-count
- *  spies (HE2(b)/HE3(a) require observing exact call counts) plus
- *  reconfigurable throw/reject behavior (HE3(a)/(b)'s error-throwing
- *  profile). This is the same shape Task 01 was meant to hand off. */
+/** Tài liệu hoá hợp đồng override-boundary mà một harness thật phải phơi trên
+ *  listMyHistory()/getCurrentUser()/generateAttemptPdfFile() — spy đếm lời gọi
+ *  (HE2(b)/HE3(a) đòi quan sát số lần gọi chính xác) cộng hành vi
+ *  throw/reject cấu hình lại được (hồ sơ ném-lỗi của HE3(a)/(b)).
+ *  Đây là cùng hình dạng mà Task 01 lẽ ra phải bàn giao. */
 export interface FixtureBackend {
   listMyHistoryCallCount: number;
   generateAttemptPdfCallCount: number;
@@ -149,26 +147,26 @@ export interface FixtureBackend {
   setHistoryEntries(entries: readonly FixtureHistoryEntry[]): void;
   configureListMyHistoryToThrow(shouldThrow: boolean): void;
   configureGenerateAttemptPdfToReject(shouldReject: boolean): void;
-  /** Called by the real harness's request-interception layer in place of the
-   *  real getCurrentUser() call — returns the currently configured fixture user. */
+  /** Được lớp chặn request của harness thật gọi thay cho lời gọi
+   *  getCurrentUser() thật — trả về người dùng fixture đang được cấu hình. */
   simulateGetCurrentUser(): typeof FIXTURE_USER | null;
-  /** Called by the real harness's interception layer in place of the real
-   *  listMyHistory() call — increments the call-count spy, then returns the
-   *  configured entries or throws, per the currently configured profile. */
+  /** Được lớp chặn của harness thật gọi thay cho lời gọi
+   *  listMyHistory() thật — tăng spy đếm lời gọi, rồi trả về các mục
+   *  đã cấu hình hoặc ném lỗi, theo hồ sơ đang được cấu hình. */
   simulateListMyHistory(): FixtureHistoryEntry[];
-  /** Called by the real harness's interception layer in place of the real
-   *  generateAttemptPdfFile() call — increments the call-count spy, then
-   *  resolves or rejects per the currently configured profile. */
+  /** Được lớp chặn của harness thật gọi thay cho lời gọi
+   *  generateAttemptPdfFile() thật — tăng spy đếm lời gọi, rồi
+   *  resolve hoặc reject theo hồ sơ đang được cấu hình. */
   simulateGenerateAttemptPdf(): void;
 }
 
-/** Deterministic in-memory reference implementation of FixtureBackend — no
- *  real-clock timing, fixed fixture data only (Refactor Phase requirement).
- *  A real harness wires these same counters/flags to the actual
- *  listMyHistory()/getCurrentUser()/generateAttemptPdfFile() call sites (each
- *  intercepted call delegates to the matching `simulateXxx` method here,
- *  which is what actually reads the configured user/entries/throw-reject
- *  state and increments the corresponding call-count spy). */
+/** Cài đặt tham chiếu trong bộ nhớ, xác định của FixtureBackend — không có
+ *  thời gian đồng hồ thật, chỉ dữ liệu fixture cố định (yêu cầu pha Refactor).
+ *  Một harness thật nối cùng các bộ đếm/cờ này với các nơi gọi thật của
+ *  listMyHistory()/getCurrentUser()/generateAttemptPdfFile() (mỗi lời gọi bị chặn
+ *  uỷ quyền cho phương thức `simulateXxx` tương ứng ở đây,
+ *  là thứ thực sự đọc trạng thái người dùng/mục/throw-reject đã cấu hình
+ *  và tăng spy đếm lời gọi tương ứng). */
 export function createInMemoryFixtureBackend(): FixtureBackend {
   let currentUser: typeof FIXTURE_USER | null = FIXTURE_USER;
   let entries: readonly FixtureHistoryEntry[] = FIXTURE_HISTORY_VALID;
@@ -207,12 +205,12 @@ export function createInMemoryFixtureBackend(): FixtureBackend {
 }
 
 // =============================================================================
-// Obligation group HE1 (reserved fixture-e2e slot) — History list -> Save/
-// Share on a row -> View details -> Result page -> Save/Share on Result page,
-// cross-surface consistency
+// Nhóm nghĩa vụ HE1 (suất fixture-e2e giữ chỗ) — Danh sách History -> Lưu/
+// Chia sẻ trên một hàng -> Xem chi tiết -> Trang Kết quả -> Lưu/Chia sẻ trên trang Kết quả,
+// nhất quán xuyên bề mặt
 // =============================================================================
-// See file header for the full journey narrative, ROI, and ADR-scale context
-// (unchanged from the skeleton — ROI 105, ADR/PRD references there).
+// Xem comment đầu file để biết toàn bộ lời kể hành trình, ROI, và ngữ cảnh quy mô ADR
+// (không đổi so với skeleton — ROI 105, tham chiếu ADR/PRD ở đó).
 
 export interface HE1Context {
   selectedRow: { examId: string; attemptId: string };
@@ -220,10 +218,10 @@ export interface HE1Context {
   historyRowTimeText: string;
 }
 
-/** (a) AC-001/003/004 — /history renders N rows in fixture (newest-first)
- *  order, each with exam title, X/10 score, and a non-placeholder completion
- *  time (computed via the shared lib/history/format.ts formatter, not
- *  reimplemented here — Reference Contract). */
+/** (a) AC-001/003/004 — /history render N hàng theo thứ tự fixture (mới-nhất-trước),
+ *  mỗi hàng có tên đề, điểm X/10, và thời gian hoàn thành không phải
+ *  giữ chỗ (tính qua bộ định dạng dùng chung lib/history/format.ts, không
+ *  cài lại ở đây — Reference Contract). */
 export async function checkHE1RendersRowsNewestFirst(
   driver: HistoryDriver,
   backend: FixtureBackend
@@ -263,10 +261,10 @@ export async function checkHE1RendersRowsNewestFirst(
   };
 }
 
-/** (b) AC-009 — clicking Save (inside the row's ⋯ menu, front-adjust:
- *  HistoryRow now consolidates Save/Share/View details behind a single
- *  HistoryRowMenu trigger) triggers a download built only from that row's
- *  already-rendered data; no extra network call fires. */
+/** (b) AC-009 — bấm Lưu (bên trong menu ⋯ của hàng, front-adjust:
+ *  HistoryRow nay gộp Lưu/Chia sẻ/Xem chi tiết sau một
+ *  nút HistoryRowMenu duy nhất) kích hoạt một lượt tải xuống chỉ dựng từ dữ liệu
+ *  đã render sẵn của hàng đó; không request mạng thêm nào bắn. */
 export async function checkHE1SaveTriggersDownloadNoExtraFetch(
   driver: HistoryDriver
 ): Promise<void> {
@@ -286,10 +284,10 @@ export async function checkHE1SaveTriggersDownloadNoExtraFetch(
   );
 }
 
-/** (c) AC-005 — "View details" (inside the row's ⋯ menu) on a specific row
- *  navigates to that EXACT attempt's Result page, not merely any Result
- *  page. The menu closed itself after (b)'s successful Save (auto-close on
- *  success), so it is reopened here. */
+/** (c) AC-005 — "View details" (bên trong menu ⋯ của hàng) trên một hàng cụ thể
+ *  điều hướng tới trang Kết quả của ĐÚNG lượt làm đó, không phải bất kỳ
+ *  trang Kết quả nào. Menu tự đóng sau lần Lưu thành công ở (b)
+ *  (tự đóng khi thành công), nên nó được mở lại ở đây. */
 export async function checkHE1ViewDetailsNavigatesToExactAttempt(
   driver: HistoryDriver,
   ctx: HE1Context
@@ -304,9 +302,9 @@ export async function checkHE1ViewDetailsNavigatesToExactAttempt(
   assert.equal(driver.url(), expectedPath, "post-click URL must match the exact attempt clicked");
 }
 
-/** (d) AC-014 — on the landed Result page, ResultActions' Save/Share are
- *  enabled <button>s (aria-disabled="false", no native disabled attribute),
- *  with no "coming soon" text anywhere. */
+/** (d) AC-014 — trên trang Kết quả đã tới, Lưu/Chia sẻ của ResultActions là
+ *  các <button> enabled (aria-disabled="false", không thuộc tính disabled gốc),
+ *  và không có chữ "sắp có" ở bất kỳ đâu. */
 export async function checkHE1ResultActionsNoComingSoon(driver: HistoryDriver): Promise<void> {
   const saveButton = driver.getByRole("button", { name: "Save" }).first();
   const shareButton = driver.getByRole("button", { name: "Share" }).first();
@@ -326,12 +324,12 @@ export async function checkHE1ResultActionsNoComingSoon(driver: HistoryDriver): 
   assert.equal(await driver.getByText(/coming soon/i).count(), 0);
 }
 
-/** (e) Cross-surface consistency (AC-007's spirit) — the score/completion-time
- *  text the Result page's ScoreCard shows for this attempt is textually
- *  identical to what the History row showed for the same attempt. Submitted
- *  date is excluded from this comparison — ScoreCard has no date cell (see
- *  file header finding); this reflects the two surfaces' actual rendered
- *  content, not a narrowed check. */
+/** (e) Nhất quán xuyên bề mặt (tinh thần của AC-007) — chữ điểm/thời gian hoàn thành
+ *  mà ScoreCard của trang Kết quả hiện cho lượt làm này giống hệt về chữ với
+ *  thứ hàng History đã hiện cho cùng lượt làm. Ngày nộp
+ *  bị loại khỏi phép so sánh này — ScoreCard không có ô ngày (xem phát hiện
+ *  ở comment đầu file); điều này phản ánh nội dung thực sự đã render của hai bề mặt,
+ *  không phải một phép kiểm bị thu hẹp. */
 export async function checkHE1CrossSurfaceConsistency(
   driver: HistoryDriver,
   ctx: HE1Context
@@ -349,13 +347,13 @@ export async function checkHE1CrossSurfaceConsistency(
   );
 }
 
-/** (f) AC-015 — closed by Task 18 (Final QA sweep). Phase 5 (Tasks 16/17)
- *  landed: SiteHeader.tsx:27/HomeSidebar.tsx:22 both now carry
- *  `href: "/history"` (confirmed absent of any remaining `href === "#"` for
- *  the History nav item), so SiteHeader.tsx:64's `item.href !== "#"` guard no
- *  longer suppresses the active-highlight signal on `/history*` routes. This
- *  was previously "expected-pending" (Task 15, pre-Phase-5) — now asserted
- *  for real, closing that deferred obligation. */
+/** (f) AC-015 — đóng bởi Task 18 (lượt quét Final QA). Phase 5 (Tasks 16/17)
+ *  đã đáp xuống: SiteHeader.tsx:27/HomeSidebar.tsx:22 đều mang
+ *  `href: "/history"` (xác nhận không còn `href === "#"` nào cho
+ *  mục nav History), nên chốt `item.href !== "#"` của SiteHeader.tsx:64 không
+ *  còn chặn tín hiệu tô sáng đang-hoạt-động trên các route `/history*`. Cái này
+ *  trước đây là "đang-chờ-kỳ-vọng" (Task 15, trước Phase 5) — nay được khẳng định
+ *  thật, đóng nghĩa vụ bị hoãn đó. */
 export async function checkHE1NavActiveHighlight(driver: HistoryDriver): Promise<void> {
   await driver.goto("/history");
   const historyNav = driver.getByRole("link", { name: "History" });
@@ -366,8 +364,8 @@ export async function checkHE1NavActiveHighlight(driver: HistoryDriver): Promise
   );
 }
 
-/** Orchestrator — runs HE1's full journey in sequence, threading the selected
- *  row's identity across steps. */
+/** Bộ điều phối — chạy toàn bộ hành trình của HE1 tuần tự, luồn danh tính của
+ *  hàng đã chọn qua các bước. */
 export async function runHE1(driver: HistoryDriver, backend: FixtureBackend): Promise<void> {
   const ctx = await checkHE1RendersRowsNewestFirst(driver, backend); // (a)
   await checkHE1SaveTriggersDownloadNoExtraFetch(driver); // (b)
@@ -378,13 +376,13 @@ export async function runHE1(driver: HistoryDriver, backend: FixtureBackend): Pr
 }
 
 // =============================================================================
-// Obligation group HE2 — Empty state + guest access guard
+// Nhóm nghĩa vụ HE2 — Trạng thái rỗng + chốt truy cập của khách
 // =============================================================================
-// AC-002/AC-016 — see file header / skeleton comments preserved in git history
-// for full ROI and behavior narrative.
+// AC-002/AC-016 — xem comment đầu file / comment skeleton được giữ trong lịch sử git
+// để biết đầy đủ ROI và lời kể hành vi.
 
-/** (a) AC-002 — with an empty fixture, /history shows "No results yet" text
- *  and a "Browse exams" link to /exams, with zero role="alert" elements. */
+/** (a) AC-002 — với fixture rỗng, /history hiện chữ "No results yet"
+ *  và một liên kết "Browse exams" tới /exams, với không phần tử role="alert" nào. */
 export async function checkHE2EmptyStateRendersCallToAction(
   driver: HistoryDriver,
   backend: FixtureBackend
@@ -403,8 +401,8 @@ export async function checkHE2EmptyStateRendersCallToAction(
   assert.equal(await driver.getByRole("alert").count(), 0);
 }
 
-/** (b) AC-016 — with no fixture session, /history redirects to
- *  /?auth=signin before any attempt-row read fires (call-count spy stays 0). */
+/** (b) AC-016 — không có phiên fixture, /history chuyển hướng tới
+ *  /?auth=signin trước khi bất kỳ lượt đọc hàng lượt-làm nào bắn (spy đếm lời gọi vẫn 0). */
 export async function checkHE2GuestRedirectsWithZeroListReads(
   driver: HistoryDriver,
   backend: FixtureBackend
@@ -429,15 +427,15 @@ export async function runHE2(driver: HistoryDriver, backend: FixtureBackend): Pr
 }
 
 // =============================================================================
-// Obligation group HE3 — List-read error state + PDF-generation error state,
-// both retryable
+// Nhóm nghĩa vụ HE3 — Trạng thái lỗi đọc danh sách + trạng thái lỗi tạo PDF,
+// cả hai đều thử lại được
 // =============================================================================
-// AC-018/AC-019 — see file header / skeleton comments preserved in git history
-// for full ROI and behavior narrative.
+// AC-018/AC-019 — xem comment đầu file / comment skeleton được giữ trong lịch sử git
+// để biết đầy đủ ROI và lời kể hành vi.
 
-/** (a) AC-019 — a simulated list-read failure renders (history)/history/error.tsx's
- *  role="alert" + "Retry"; clicking Retry re-attempts the read (call-count
- *  spy increments by exactly 1). */
+/** (a) AC-019 — một lỗi đọc danh sách giả lập render role="alert" + "Retry" của
+ *  (history)/history/error.tsx; bấm Retry thử lại lượt đọc (spy đếm lời gọi
+ *  tăng đúng 1). */
 export async function checkHE3ListReadFailureRendersErrorAndRetries(
   driver: HistoryDriver,
   backend: FixtureBackend
@@ -453,8 +451,8 @@ export async function checkHE3ListReadFailureRendersErrorAndRetries(
   assert.equal(await alert.textContent(), "Couldn't load your history right now.");
 
   const callsBefore = backend.listMyHistoryCallCount;
-  // AC-019 says the failure is retryable — reconfigure to succeed before the
-  // click so Retry's re-attempt is observable via the call-count spy alone.
+  // AC-019 nói lỗi này thử lại được — cấu hình lại cho thành công trước
+  // cú bấm để lần thử lại của Retry quan sát được chỉ qua spy đếm lời gọi.
   backend.configureListMyHistoryToThrow(false);
   const retryButton = driver.getByRole("button", { name: "Retry" });
   await retryButton.click();
@@ -462,11 +460,11 @@ export async function checkHE3ListReadFailureRendersErrorAndRetries(
   assert.equal(backend.listMyHistoryCallCount, callsBefore + 1);
 }
 
-/** (b) AC-018 — a simulated PDF-generation failure renders role="alert"
- *  inside the row's ⋯ menu (front-adjust: HistoryRowMenu keeps the menu open
- *  on error rather than auto-closing, so the item stays reachable), stays
- *  retryable (aria-disabled="false"), and a follow-up click (fixture
- *  reconfigured to succeed) completes normally. */
+/** (b) AC-018 — một lỗi tạo PDF giả lập render role="alert"
+ *  bên trong menu ⋯ của hàng (front-adjust: HistoryRowMenu giữ menu mở
+ *  khi lỗi thay vì tự đóng, để mục vẫn tới được), vẫn
+ *  thử lại được (aria-disabled="false"), và một cú bấm tiếp theo (fixture
+ *  cấu hình lại cho thành công) hoàn tất bình thường. */
 export async function checkHE3PdfGenerationFailureRetryable(
   driver: HistoryDriver,
   backend: FixtureBackend
@@ -498,10 +496,10 @@ export async function runHE3(driver: HistoryDriver, backend: FixtureBackend): Pr
 }
 
 // =============================================================================
-// AC-007 structural tripwire cross-file half (deferred from Task 10)
+// Chốt chặn cấu trúc AC-007 nửa xuyên-file (hoãn từ Task 10)
 // =============================================================================
-// Completed as an in-process unit check inside
-// SOURCE/components/history/ActionButton.test.tsx (Task 15) rather than here —
-// its own Boundary to exercise is "in-process unit (static source-text
-// search)", not fixture-e2e, per this task's Proof Obligations. Not
-// duplicated in this file.
+// Đã hoàn tất dưới dạng kiểm tra unit trong tiến trình bên trong
+// SOURCE/components/history/ActionButton.test.tsx (Task 15) thay vì ở đây —
+// Boundary cần thực thi của chính nó là "unit trong tiến trình (tìm kiếm văn bản
+// mã nguồn tĩnh)", không phải fixture-e2e, theo Proof Obligations của task này. Không
+// lặp lại trong file này.

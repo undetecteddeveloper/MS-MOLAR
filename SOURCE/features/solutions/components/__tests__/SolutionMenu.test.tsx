@@ -1,16 +1,16 @@
 // @vitest-environment jsdom
 
-// SolutionMenu (C-25, pin-only build, task 19) — frontend DD § Required Tests
-// rows 5-8. Report item's two `iReported` states asserted HERE (same file as
-// the pin items) per task file's explicit instruction, so the field cannot be
-// dropped when task 36 lands. Mock boundary: only `@/features/solutions/actions`.
+// SolutionMenu (C-25, bản chỉ-ghim, task 19) — frontend DD § Required Tests
+// hàng 5-8. Hai trạng thái `iReported` của mục Báo cáo được khẳng định Ở ĐÂY (cùng file với
+// các mục ghim) theo chỉ dẫn tường minh của task file, để trường không
+// bị bỏ khi task 36 đáp xuống. Ranh giới mock: chỉ `@/features/solutions/actions`.
 //
-// Task 36 extends this file with the wired `ReportDialog` behind "Báo cáo bài
-// giải" (AC-073, AC-074) and the in-session flip of the seeded `iReported`
-// (frontend DD § Client State Design "Seeded-from-server state"). B4: no test
-// here imports anything from `features/exams` — `ReportDialog` is modelled on
-// `ReportExam`'s shape only, never its code (verified separately by
-// `npm run lint`, not expressible as a vitest assertion).
+// Task 36 mở rộng file này với `ReportDialog` đã nối dây đằng sau "Báo cáo bài
+// giải" (AC-073, AC-074) và việc lật trong-phiên của `iReported` đã
+// gieo sẵn (frontend DD § Client State Design "Seeded-from-server state"). B4: không test nào
+// ở đây import gì từ `features/exams` — `ReportDialog` chỉ mô phỏng
+// hình dạng của `ReportExam`, không bao giờ code của nó (được kiểm riêng bởi
+// `npm run lint`, không diễn đạt được thành khẳng định vitest).
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

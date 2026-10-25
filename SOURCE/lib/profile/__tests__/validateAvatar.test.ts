@@ -51,8 +51,8 @@ describe("checkAvatarFile — MIME set (AC-027, AC-028)", () => {
 
 describe("checkAvatarFile — MIME is decided before size", () => {
   it("reports 'invalid_type', not 'too_large', when a file is both oversized and wrongly typed", () => {
-    // Same order as checkScreenshotFile. It matters for the message the student
-    // sees: "shrink this PDF" would be advice they cannot act on.
+    // Cùng thứ tự với checkScreenshotFile. Nó quan trọng với thông báo mà học sinh
+    // thấy: "thu nhỏ PDF này" là lời khuyên mà họ không làm theo được.
     expect(
       checkAvatarFile({ type: "application/pdf", size: AVATAR_LIMITS.MAX_BYTES + 1 })
     ).toEqual({ ok: false, reason: "invalid_type" });

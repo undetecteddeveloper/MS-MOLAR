@@ -1,17 +1,17 @@
-// Cross-user avatar batch signer (task 42, P5-T3) — proves the four Proof
-// Obligations pinned in the task file (batch-per-screen shape following
-// `resolveSignedImageUrls`/`SOURCE/lib/ugc/imageUrl.ts:59-95`, adapted to the
-// `avatars` bucket; fail-closed on Storage error/per-item error/exception;
-// anonymity — masked rows never signed; `getMyCommentFeed` never signed).
+// Bộ ký avatar theo lô xuyên người dùng (task 42, P5-T3) — chứng minh bốn
+// Proof Obligations được ghim trong task file (hình dạng một-lô-mỗi-màn-hình theo
+// `resolveSignedImageUrls`/`SOURCE/lib/ugc/imageUrl.ts:59-95`, chỉnh cho bucket
+// `avatars`; fail-closed khi Storage lỗi/lỗi từng mục/exception;
+// ẩn danh — hàng bị che không bao giờ được ký; `getMyCommentFeed` không bao giờ ký).
 //
-// Mock boundary: the session client returned by `@/lib/supabase/server`
-// `createClient()` — same convention as `solutionReadMappers.test.ts` /
-// `communitySolutions.int.test.ts` — extended here with a `storage.from(...)
-// .createSignedUrls` spy so call COUNT and call ARGUMENTS (the batching
-// claim) are assertable, not just the mapped output.
+// Ranh giới mock: client phiên do `createClient()` của `@/lib/supabase/server`
+// trả về — cùng quy ước với `solutionReadMappers.test.ts` /
+// `communitySolutions.int.test.ts` — mở rộng ở đây bằng spy `storage.from(...)
+// .createSignedUrls` để SỐ LẦN gọi và THAM SỐ gọi (khẳng định gộp lô)
+// khẳng định được, không chỉ đầu ra đã ánh xạ.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// queries.ts imports "server-only" — same stub as the sibling test files.
+// queries.ts import "server-only" — cùng stub với các file test anh em.
 vi.mock("server-only", () => ({}));
 
 const { rpcMock, createSignedUrlsMock } = vi.hoisted(() => ({

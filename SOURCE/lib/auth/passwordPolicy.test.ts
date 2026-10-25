@@ -26,7 +26,7 @@ describe("validatePassword", () => {
   });
 
   it("rejects the old 6-character minimum that updatePassword used to allow", () => {
-    // Regression guard for the actual finding: 'abc123' passed before.
+    // Chốt hồi quy cho đúng phát hiện đó: 'abc123' trước đây qua được.
     expect(validatePassword("abc123")).not.toBeNull();
   });
 
@@ -55,7 +55,7 @@ describe("validatePassword", () => {
   });
 
   it("counts BYTES not characters, so accented Vietnamese hits the ceiling sooner", () => {
-    // 'ế' is 3 bytes in UTF-8 → 30 chars but 90 bytes, over the 72-byte ceiling.
+    // 'ế' là 3 byte trong UTF-8 → 30 ký tự nhưng 90 byte, vượt trần 72 byte.
     const accented = "ế".repeat(30);
     expect(accented.length).toBeLessThan(PASSWORD_MAX_BYTES);
     expect(new TextEncoder().encode(accented).length).toBeGreaterThan(PASSWORD_MAX_BYTES);

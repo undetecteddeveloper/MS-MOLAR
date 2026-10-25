@@ -1,59 +1,59 @@
-// Short-Answer Scoring [fixture-e2e] Driver Script
+// Short-Answer Scoring [fixture-e2e] Script driver
 // Design Docs: docs/design/short-answer-scoring-backend-design.md (v1.1),
 //   docs/design/short-answer-scoring-frontend-design.md (v1.0)
 // UI Spec: docs/ui-spec/short-answer-scoring-ui-spec.md (v1.0), AC-001..AC-007
-// Skeleton generated: 2026-08-02 | Converted (Work Plan Phase 1, Task 1.6 /
+// Skeleton sinh: 2026-08-02 | Chuyển đổi (Work Plan Phase 1, Task 1.6 /
 //   frontend-task-02): 2026-08-02
 //
-// This repo has no `@playwright/test` dependency and no `playwright.config.ts`
-// committed yet — only the Playwright MCP browser-automation server is
-// configured (`.mcp.json`) for interactive/manual sessions (see the frontend
-// Design Doc's Test Boundaries: "Playwright MCP / manual pass (no CI)").
-// Following the exact precedent `rating.fixture.e2e.test.ts` (FE2Driver/
-// FE2Locator) and `history.fixture.e2e.test.ts` (HistoryDriver/HistoryLocator)
-// already established, this script is written against a minimal `SADriver`/
-// `SALocator` interface that is a structural SUBSET of Playwright's real
-// `Page`/`Locator` API (`goto`/`url`/`getByRole`/`getByText`/`click`/
-// `getAttribute`/`first`/`count`, per the task's own required subset, plus
-// `nth`/`textContent` — genuine Playwright `Locator` methods too — added only
-// where a proof obligation below needs subtree scoping that the base subset
-// cannot express, mirroring how `history.fixture.e2e.test.ts` itself extended
-// FE2's subset with `waitForDownload`/`networkRequestCount` for its own
-// obligations). A real Playwright `Page`/`Locator` satisfies this interface
-// as-is, so once a harness exists this script runs unchanged.
-// Assertions use Node's built-in `node:assert/strict` (no new dependency).
+// Repo này không có phụ thuộc `@playwright/test` và chưa commit `playwright.config.ts`
+// — chỉ máy chủ tự động hoá trình duyệt Playwright MCP được
+// cấu hình (`.mcp.json`) cho các phiên tương tác/thủ công (xem Test Boundaries của
+// frontend Design Doc: "Playwright MCP / lượt thủ công (không CI)").
+// Theo đúng tiền lệ `rating.fixture.e2e.test.ts` (FE2Driver/
+// FE2Locator) và `history.fixture.e2e.test.ts` (HistoryDriver/HistoryLocator)
+// đã thiết lập, script này được viết dựa trên một interface `SADriver`/
+// `SALocator` tối thiểu là một tập CON cấu trúc của API `Page`/`Locator` thật của Playwright
+// (`goto`/`url`/`getByRole`/`getByText`/`click`/
+// `getAttribute`/`first`/`count`, theo tập con bắt buộc của chính task, cộng
+// `nth`/`textContent` — cũng là phương thức `Locator` thật của Playwright — chỉ thêm
+// ở chỗ một nghĩa vụ chứng minh bên dưới cần giới hạn cây con mà tập con
+// cơ sở không diễn đạt được, theo cách `history.fixture.e2e.test.ts` tự mở rộng
+// tập con của FE2 bằng `waitForDownload`/`networkRequestCount` cho các nghĩa vụ
+// của riêng nó). Một `Page`/`Locator` Playwright thật thoả interface này
+// nguyên trạng, nên khi có harness, script này chạy không đổi.
+// Các khẳng định dùng `node:assert/strict` có sẵn của Node (không phụ thuộc mới).
 //
-// Fixture-driven backend (task's own framing, Implementation Content line 1):
-// "backend state (attempt, questions, exam_results) is fixture-driven, not
-// live Supabase." Concretely: `getExamForPlayer()`/`submitExam()`/
-// `getResult()` must resolve against `FIXTURE_RESULT_DATA` below instead of a
-// live Supabase instance for this script to run against `npm run dev` — this
-// repo has no existing request/route-mocking layer (no MSW, no test-mode
-// query override), so wiring this fixture into a real running page is a
-// residual left for whoever stands up the Playwright harness, same class of
-// residual already flagged by `rating.fixture.e2e.test.ts`'s and
-// `history.fixture.e2e.test.ts`'s own header notes.
+// Backend điều khiển bằng fixture (cách đặt vấn đề của chính task, Implementation Content dòng 1):
+// "trạng thái backend (lượt làm, câu hỏi, exam_results) do fixture điều khiển, không phải
+// Supabase sống." Cụ thể: `getExamForPlayer()`/`submitExam()`/
+// `getResult()` phải resolve theo `FIXTURE_RESULT_DATA` bên dưới thay vì một
+// instance Supabase sống để script này chạy được trên `npm run dev` — repo này
+// chưa có lớp mock request/route nào (không MSW, không ghi đè truy vấn
+// chế độ test), nên nối fixture này vào một trang đang chạy thật là một
+// phần dư để lại cho ai dựng harness Playwright, cùng loại phần dư đã được
+// ghi cờ trong comment đầu của `rating.fixture.e2e.test.ts` và
+// `history.fixture.e2e.test.ts`.
 //
-// Driver-capability residual (specific to this journey): the `SALocator`
-// interface deliberately has no `fill`/`type` method (matching the task's
-// specified structural subset exactly). The exam player's `short_answer`
-// `<input>` (`QuestionRenderer.tsx`) therefore is not literally typed into by
-// this script. This is intentional, not an oversight: per the task's own
-// Behavior description and Failure Response guidance ("confirm whether the
-// fixture-driven backend state — simulating `computeScore()`'s output —
-// matches what a real `submitExam()` call would produce"), the design here is
-// that `FIXTURE_RESULT_DATA.result.perQuestion` IS the already-computed
-// `computeScore()` output the fixture-driven `submitExam()` override must
-// resolve to once the "Submit" button is clicked, regardless of whatever (or
-// no) value the DOM inputs hold at click time — the subject under test is the
-// scoring-output-to-render composition (backend `computeScore()` semantics x
-// frontend `page.tsx` render), not the literal browser-level text-entry
-// interaction, which carries no risk this feature introduces (the `<input>`'s
-// `onChange`/`value` wiring is unmodified by both dependency tasks). The real
-// harness's fixture-driven `submitExam()` override is what must ignore actual
-// keystroke state and return this fixture's per-question rows verbatim — that
-// wiring is the same class of residual as the fixture-injection gap already
-// noted above, not a new one this task introduces.
+// Phần dư khả năng driver (đặc thù của hành trình này): interface `SALocator`
+// cố ý không có phương thức `fill`/`type` (khớp chính xác tập con cấu trúc mà task
+// chỉ định). `<input>` `short_answer` của trình làm bài (`QuestionRenderer.tsx`)
+// vì vậy không được script này gõ vào theo nghĩa đen.
+// Đây là cố ý, không phải sơ suất: theo mô tả Behavior của chính task và hướng dẫn Failure
+// Response ("xác nhận trạng thái backend điều khiển bằng fixture — mô phỏng
+// đầu ra của `computeScore()` — khớp với thứ một lời gọi `submitExam()` thật sẽ tạo ra"),
+// thiết kế ở đây là
+// `FIXTURE_RESULT_DATA.result.perQuestion` CHÍNH LÀ đầu ra `computeScore()`
+// đã tính mà phần ghi đè `submitExam()` điều khiển bằng fixture phải
+// resolve ra khi nút "Submit" được bấm, bất kể giá trị nào (hay không giá trị nào)
+// mà các input DOM giữ tại lúc bấm — đối tượng kiểm là phép ghép
+// đầu-ra-chấm-điểm-sang-render (ngữ nghĩa `computeScore()` của backend x
+// render `page.tsx` của frontend), không phải thao tác nhập chữ ở mức trình duyệt theo nghĩa đen, vốn
+// không mang rủi ro nào mà tính năng này đưa vào (dây `onChange`/`value` của `<input>`
+// không bị cả hai task phụ thuộc đụng tới). Phần ghi đè
+// `submitExam()` điều khiển bằng fixture của harness thật là thứ phải bỏ qua trạng thái gõ phím thực tế
+// và trả về nguyên văn các hàng theo-câu-hỏi của fixture này — việc nối dây đó
+// là cùng loại phần dư với khoảng trống tiêm fixture đã
+// nêu ở trên, không phải một cái mới mà task này đưa vào.
 
 import assert from "node:assert/strict";
 
@@ -65,15 +65,15 @@ export interface SALocator {
   getAttribute(name: string): Promise<string | null>;
   textContent(): Promise<string | null>;
   first(): SALocator;
-  /** Real Playwright `Locator.nth()` — used to select a specific per-question
-   *  `<li>` card by its known fixture-order index (see FIXTURE_PER_QUESTION),
-   *  since cards carry no distinguishing `aria-label`. */
+  /** `Locator.nth()` thật của Playwright — dùng để chọn một thẻ
+   *  `<li>` theo-từng-câu cụ thể bằng chỉ số theo thứ tự fixture đã biết
+   *  (xem FIXTURE_PER_QUESTION), vì các thẻ không mang `aria-label` phân biệt nào. */
   nth(index: number): SALocator;
   count(): Promise<number>;
-  /** Real Playwright `Locator.getByText()` — scopes a text search to this
-   *  locator's own subtree, needed to disambiguate e.g. the status chip's
-   *  exact "Correct" text from the body's "Correct answer:" label within the
-   *  same card. */
+  /** `Locator.getByText()` thật của Playwright — giới hạn tìm kiếm chữ vào cây con của
+   *  chính locator này, cần để phân biệt ví dụ chữ "Correct" chính xác của chip trạng thái
+   *  với nhãn "Correct answer:" của thân trong cùng một
+   *  thẻ. */
   getByText(text: string | RegExp): SALocator;
 }
 
@@ -84,30 +84,30 @@ export interface SADriver {
   getByText(text: string | RegExp): SALocator;
 }
 
-// --- Fixture data -----------------------------------------------------------
-// 3 short_answer sub-states (correct via numeric equivalence, genuinely wrong,
-// skipped) + 1 mcq baseline (Test 1, AC-001-006) + 1 essay question
-// (Test 2, AC-007), all in one attempt — mirrors the skeleton's own Test 2
-// Behavior ("alongside the short_answer questions from Test 1").
+// --- Dữ liệu fixture -----------------------------------------------------------
+// 3 trạng thái con của short_answer (đúng nhờ tương đương số, sai thật,
+// bỏ qua) + 1 mốc mcq (Test 1, AC-001-006) + 1 câu tự luận
+// (Test 2, AC-007), tất cả trong một lượt làm — phản chiếu Behavior của chính Test 2
+// trong skeleton ("cùng với các câu short_answer từ Test 1").
 
 export type FixtureChoiceId = "A" | "B" | "C" | "D";
 
-/** Structural stand-in for `PerQuestionResult` (`SOURCE/types/result.ts`) —
- *  field names match exactly so this fixture is a faithful stand-in for
- *  `computeScore()`'s real output shape. */
+/** Vật thay thế cấu trúc cho `PerQuestionResult` (`SOURCE/types/result.ts`) —
+ *  tên trường khớp chính xác nên fixture này là vật thay thế trung thực cho
+ *  hình dạng đầu ra thật của `computeScore()`. */
 export interface FixturePerQuestionResult {
   questionId: string;
   selected?: string;
-  /** mcq-only per `PerQuestionResult`'s own contract (`types/result.ts:11-12`,
-   *  "CHỈ câu mcq" / MCQ only) — intentionally never set on the 3
-   *  short_answer rows below. Enforced by `checkSANeverPopulatesCorrectField`
+  /** chỉ-mcq theo hợp đồng của chính `PerQuestionResult` (`types/result.ts:11-12`,
+   *  "CHỈ câu mcq" / MCQ only) — cố ý không bao giờ đặt trên 3 hàng
+   *  short_answer bên dưới. Được cưỡng chế bởi `checkSANeverPopulatesCorrectField`
    *  (Reference Contract: UI Spec Decisions Record D3). */
   correct?: FixtureChoiceId;
   isCorrect: boolean;
   scored?: boolean;
 }
 
-/** Structural stand-in for `ResultQuestion` (`SOURCE/features/exams/queries.ts`). */
+/** Vật thay thế cấu trúc cho `ResultQuestion` (`SOURCE/features/exams/queries.ts`). */
 export interface FixtureResultQuestion {
   content: string;
   choices: { id: FixtureChoiceId; text: string }[];
@@ -121,11 +121,11 @@ export const SHORT_ANSWER_PLAYER_PATH = `/exams/${FIXTURE_EXAM_ID}/attempt/${FIX
 export const SHORT_ANSWER_RESULT_PATH = `${SHORT_ANSWER_PLAYER_PATH}/result`;
 export const SHORT_ANSWER_DETAIL_PATH = `${SHORT_ANSWER_RESULT_PATH}/detail`;
 
-// Question content deliberately never repeats the literal submitted/expected
-// answer text (e.g. no "1.04" inside a question's own prose) — Playwright's
-// getByText matches the deepest element containing a substring, and every
-// answer-line assertion below depends on each searched string being unique
-// to exactly one leaf element on the page.
+// Nội dung câu hỏi cố ý không bao giờ lặp lại chữ của câu trả lời đã nộp/kỳ vọng
+// nguyên văn (ví dụ không có "1.04" trong văn xuôi của chính một câu hỏi) — getByText
+// của Playwright khớp phần tử sâu nhất chứa một chuỗi con, và mọi
+// khẳng định dòng-câu-trả-lời bên dưới phụ thuộc vào việc mỗi chuỗi tìm kiếm là duy nhất
+// với đúng một phần tử lá trên trang.
 const SA_CORRECT_ID = "q-sa-correct";
 const SA_WRONG_ID = "q-sa-wrong";
 const SA_SKIPPED_ID = "q-sa-skipped";
@@ -171,9 +171,9 @@ export const FIXTURE_QUESTIONS: Record<string, FixtureResultQuestion> = {
   },
 };
 
-/** Render order == array order (`result.perQuestion.map(...)`, `page.tsx`) —
- *  index 0-2 the 3 short_answer sub-states, index 3 the mcq baseline
- *  (obligation (e)), index 4 the essay regression card (Test 2). */
+/** Thứ tự render == thứ tự mảng (`result.perQuestion.map(...)`, `page.tsx`) —
+ *  chỉ số 0-2 là 3 trạng thái con short_answer, chỉ số 3 là mốc mcq
+ *  (nghĩa vụ (e)), chỉ số 4 là thẻ hồi quy tự luận (Test 2). */
 export const FIXTURE_PER_QUESTION: FixturePerQuestionResult[] = [
   { questionId: SA_CORRECT_ID, selected: "1,04", isCorrect: true, scored: true },
   { questionId: SA_WRONG_ID, selected: "128", isCorrect: false, scored: true },
@@ -200,38 +200,38 @@ export const FIXTURE_RESULT_DATA = {
 const SHORT_ANSWER_ROW_INDEXES = { correct: 0, wrong: 1, skipped: 2, mcqBaseline: 3, essay: 4 } as const;
 
 // =============================================================================
-// Test 1 (RESERVED SLOT) — Full journey: submit an exam containing
-// short_answer questions -> view result detail -> all three scored sub-states
-// (correct / wrong / skipped) render correctly instead of the pre-feature
-// blank <ul>
+// Test 1 (SUẤT GIỮ CHỖ) — Hành trình đầy đủ: nộp một đề có các câu
+// short_answer -> xem chi tiết kết quả -> cả ba trạng thái con đã chấm
+// (đúng / sai / bỏ qua) render đúng thay vì <ul> trống
+// trước tính năng
 // =============================================================================
 // AC: AC-001, AC-002, AC-003, AC-004, AC-005, AC-006 (UI Spec).
-// ROI: 74 (BV:8 x Freq:8 + Legal:0 + Defect:10) — highest-value slot in this
-//   suite: proves the full backend-scoring x frontend-render composition for
-//   all 3 short_answer sub-states at once, guarding the exact defect this
-//   feature exists to fix (pre-feature blank <ul> for short_answer rows).
-// Behavior: submitting an exam with 3 short_answer sub-states (correct via
-//   numeric equivalence, genuinely wrong, skipped) plus an mcq baseline ->
-//   the fixture-driven scoring pipeline resolves each row's isCorrect/scored
-//   state -> the result detail page renders each row's correct/wrong/skipped
-//   text and color and the matching status chip, without ever reading
+// ROI: 74 (BV:8 x Freq:8 + Legal:0 + Defect:10) — suất giá trị cao nhất trong bộ
+//   này: chứng minh phép ghép chấm-điểm-backend x render-frontend đầy đủ cho
+//   cả 3 trạng thái con short_answer cùng lúc, canh đúng lỗi mà tính năng này
+//   sinh ra để sửa (<ul> trống trước tính năng cho các hàng short_answer).
+// Hành vi: nộp một đề với 3 trạng thái con short_answer (đúng nhờ tương
+//   đương số, sai thật, bỏ qua) cộng một mốc mcq ->
+//   đường ống chấm điểm điều khiển bằng fixture giải quyết trạng thái isCorrect/scored của mỗi hàng
+//   -> trang chi tiết kết quả render chữ đúng/sai/bỏ qua và màu của mỗi hàng
+//   cùng chip trạng thái tương ứng, mà không bao giờ đọc
 //   PerQuestionResult.correct.
 // @category: fixture-e2e
 // @lane: fixture-e2e
-// @dependency: full-ui (mocked backend / fixture-driven state) — exam player
-//   route, result summary route, result detail route (page.tsx); backend
-//   scoring pipeline (submitExam -> computeScore -> exam_results) driven by
-//   FIXTURE_RESULT_DATA, not a live Supabase instance.
+// @dependency: toàn UI (backend bị mock / trạng thái do fixture điều khiển) — route trình làm bài,
+//   route tóm tắt kết quả, route chi tiết kết quả (page.tsx); đường ống
+//   chấm điểm backend (submitExam -> computeScore -> exam_results) điều khiển bởi
+//   FIXTURE_RESULT_DATA, không phải instance Supabase sống.
 // @complexity: high
-// @real-dependency: none — fixture/mocked backend throughout.
+// @real-dependency: không có — backend fixture/mock xuyên suốt.
 
-/** Static (non-DOM) invariant check — the fixture data itself never
- *  populates `correct` for any short_answer row (obligation (d) first half:
- *  "the fixture data does not populate `correct` for any short_answer row —
- *  absence itself is part of the fixture setup, not merely an assertion").
- *  The second half of (d) — "no assertion in this test reads or depends on
- *  `PerQuestionResult.correct`" — is a static code-review guarantee: no
- *  function in this file reads `.correct` on any FIXTURE_PER_QUESTION row. */
+/** Kiểm bất biến tĩnh (không DOM) — chính dữ liệu fixture không bao giờ
+ *  điền `correct` cho bất kỳ hàng short_answer nào (nửa đầu nghĩa vụ (d):
+ *  "dữ liệu fixture không điền `correct` cho bất kỳ hàng short_answer nào —
+ *  sự vắng mặt tự nó là một phần của thiết lập fixture, không chỉ là một khẳng định").
+ *  Nửa sau của (d) — "không khẳng định nào trong test này đọc hay phụ thuộc
+ *  `PerQuestionResult.correct`" — là một bảo đảm review code tĩnh: không
+ *  hàm nào trong file này đọc `.correct` trên bất kỳ hàng FIXTURE_PER_QUESTION nào. */
 export function checkSANeverPopulatesCorrectField(): void {
   const shortAnswerRows = [
     FIXTURE_PER_QUESTION[SHORT_ANSWER_ROW_INDEXES.correct],
@@ -247,9 +247,9 @@ export function checkSANeverPopulatesCorrectField(): void {
   }
 }
 
-/** Drives the multi-step journey (exam player -> submit -> result summary ->
- *  "View details" -> result detail) and returns the per-question `<li>`
- *  locator collection for the sub-state checks below. */
+/** Điều khiển hành trình nhiều bước (trình làm bài -> nộp -> tóm tắt kết quả ->
+ *  "View details" -> chi tiết kết quả) và trả về bộ locator `<li>`
+ *  theo-từng-câu cho các phép kiểm trạng thái con bên dưới. */
 async function navigateToResultDetail(driver: SADriver): Promise<SALocator> {
   await driver.goto(SHORT_ANSWER_PLAYER_PATH);
 
@@ -274,8 +274,8 @@ async function navigateToResultDetail(driver: SADriver): Promise<SALocator> {
   return questionCards;
 }
 
-/** (a) scored-correct sub-state — "Your answer" fern, "Correct answer" fern,
- *  status chip "Correct" (AC-001, AC-002, AC-003, AC-006). */
+/** (a) trạng thái con chấm-đúng — "Your answer" fern, "Correct answer" fern,
+ *  chip trạng thái "Correct" (AC-001, AC-002, AC-003, AC-006). */
 async function checkSA1ScoredCorrect(cards: SALocator): Promise<void> {
   const card = cards.nth(SHORT_ANSWER_ROW_INDEXES.correct);
 
@@ -298,8 +298,8 @@ async function checkSA1ScoredCorrect(cards: SALocator): Promise<void> {
   );
 }
 
-/** (b) scored-wrong sub-state — "Your answer" destructive, "Correct answer"
- *  stays fern, status chip "Wrong" (AC-001, AC-002, AC-004, AC-006). */
+/** (b) trạng thái con chấm-sai — "Your answer" destructive, "Correct answer"
+ *  vẫn fern, chip trạng thái "Wrong" (AC-001, AC-002, AC-004, AC-006). */
 async function checkSA1ScoredWrong(cards: SALocator): Promise<void> {
   const card = cards.nth(SHORT_ANSWER_ROW_INDEXES.wrong);
 
@@ -322,8 +322,8 @@ async function checkSA1ScoredWrong(cards: SALocator): Promise<void> {
   );
 }
 
-/** (c) scored-skipped sub-state — "Your answer" renders literal
- *  "— skipped —" in muted, "Correct answer" stays fern, status chip
+/** (c) trạng thái con chấm-bỏ-qua — "Your answer" render literal
+ *  "— skipped —" ở màu muted, "Correct answer" vẫn fern, chip trạng thái
  *  "Skipped" (AC-001, AC-002, AC-005, AC-006). */
 async function checkSA1ScoredSkipped(cards: SALocator): Promise<void> {
   const card = cards.nth(SHORT_ANSWER_ROW_INDEXES.skipped);
@@ -347,10 +347,10 @@ async function checkSA1ScoredSkipped(cards: SALocator): Promise<void> {
   );
 }
 
-/** (e) status chip zero-change confirmation — the chip's text/color for a
- *  short_answer row matches the identical rule already used for the mcq
- *  baseline in the same result set (no questionType-specific chip logic
- *  exists or is needed) (AC-006). */
+/** (e) xác nhận không-đổi của chip trạng thái — chữ/màu của chip cho một
+ *  hàng short_answer khớp quy tắc y hệt đã dùng cho mốc mcq
+ *  trong cùng bộ kết quả (không có logic chip riêng theo questionType
+ *  nào tồn tại hay cần thiết) (AC-006). */
 async function checkSA1StatusChipMatchesMcqBaselineConvention(cards: SALocator): Promise<void> {
   const correctCard = cards.nth(SHORT_ANSWER_ROW_INDEXES.correct);
   const mcqCard = cards.nth(SHORT_ANSWER_ROW_INDEXES.mcqBaseline);
@@ -366,8 +366,8 @@ async function checkSA1StatusChipMatchesMcqBaselineConvention(cards: SALocator):
   );
 }
 
-/** Orchestrator — Test 1 (AC-001-006): the full journey, then all 5 proof
- *  obligations (a)-(e). */
+/** Bộ điều phối — Test 1 (AC-001-006): hành trình đầy đủ, rồi cả 5 nghĩa vụ
+ *  chứng minh (a)-(e). */
 export async function runSA1ShortAnswerSubStatesRenderCorrectly(driver: SADriver): Promise<void> {
   checkSANeverPopulatesCorrectField(); // (d), static half
   const cards = await navigateToResultDetail(driver);
@@ -375,33 +375,33 @@ export async function runSA1ShortAnswerSubStatesRenderCorrectly(driver: SADriver
   await checkSA1ScoredWrong(cards); // (b)
   await checkSA1ScoredSkipped(cards); // (c)
   await checkSA1StatusChipMatchesMcqBaselineConvention(cards); // (e)
-  // (d), DOM half: no call above reads `.correct` on any FIXTURE_PER_QUESTION
-  // row — verified by code inspection of this function and its callees.
+  // (d), nửa DOM: không lời gọi nào ở trên đọc `.correct` trên bất kỳ hàng
+  //  FIXTURE_PER_QUESTION nào — kiểm chứng bằng đọc code của hàm này và các hàm nó gọi.
 }
 
 // =============================================================================
-// Test 2 (additional slot, ROI 37) — essay regression: an essay question's
-// result detail card renders byte-for-byte unchanged (not-scored branch)
+// Test 2 (suất bổ sung, ROI 37) — hồi quy tự luận: thẻ chi tiết kết quả của một câu tự luận
+// render giống từng byte không đổi (nhánh không-chấm)
 // =============================================================================
 // AC: AC-007 (UI Spec / frontend DD).
-// ROI: 37 (BV:5 x Freq:6 + Legal:0 + Defect:7) — regression guard only (essay
-//   never enters the new branch); lower value than Test 1 since it protects
-//   against an accidental diff to a neighboring branch, not a new feature path.
-// Behavior: submitting the same fixture attempt's essay question (alongside
-//   the short_answer questions from Test 1) -> the essay row stays
-//   scored:false and never enters the new short_answer sub-branch -> its
-//   result detail card renders the pre-existing not-scored branch unchanged
-//   (muted "Not auto-scored" chip, "Stored answer:" label, no correctness
-//   color-coding on the status chip or the "Your answer" value).
+// ROI: 37 (BV:5 x Freq:6 + Legal:0 + Defect:7) — chỉ là chốt hồi quy (tự luận
+//   không bao giờ vào nhánh mới); giá trị thấp hơn Test 1 vì nó bảo vệ
+//   khỏi một thay đổi vô tình ở nhánh lân cận, không phải một đường tính năng mới.
+// Hành vi: nộp câu tự luận của cùng lượt làm fixture (cùng với
+//   các câu short_answer từ Test 1) -> hàng tự luận vẫn là
+//   scored:false và không bao giờ vào nhánh con short_answer mới -> thẻ
+//   chi tiết kết quả của nó render nhánh không-chấm sẵn có không đổi
+//   (chip "Not auto-scored" muted, nhãn "Stored answer:", không tô màu đúng-sai
+//   trên chip trạng thái hay giá trị "Your answer").
 // @category: edge-case
 // @lane: fixture-e2e
-// @dependency: full-ui (mocked backend / fixture-driven state) — result
-//   detail route (page.tsx), not-scored branch only.
+// @dependency: toàn UI (backend bị mock / trạng thái do fixture điều khiển) — route
+//   chi tiết kết quả (page.tsx), chỉ nhánh không-chấm.
 // @complexity: medium
-// @real-dependency: none — same fixture-driven boundary as Test 1.
+// @real-dependency: không có — cùng ranh giới điều khiển bằng fixture như Test 1.
 
-/** (a) The essay question's card shows the "Not auto-scored" chip in muted
- *  color — unchanged from pre-feature behavior. */
+/** (a) Thẻ của câu tự luận hiện chip "Not auto-scored" ở màu muted
+ *  — không đổi so với hành vi trước tính năng. */
 async function checkSA2EssayChipUnchanged(essayCard: SALocator): Promise<void> {
   const chip = essayCard.getByText(/^Not auto-scored$/);
   assert.equal(await chip.isVisible(), true, "essay card must show the 'Not auto-scored' chip");
@@ -411,9 +411,9 @@ async function checkSA2EssayChipUnchanged(essayCard: SALocator): Promise<void> {
   );
 }
 
-/** (b) The essay question's second text line reads "Stored answer:" (not
- *  "Correct answer:" — exclusive to the new scored short_answer sub-branch,
- *  UI Spec Decision D2). */
+/** (b) Dòng chữ thứ hai của câu tự luận đọc "Stored answer:" (không phải
+ *  "Correct answer:" — dành riêng cho nhánh con short_answer đã chấm mới,
+ *  Quyết định D2 của UI Spec). */
 async function checkSA2EssayUsesStoredAnswerLabel(essayCard: SALocator): Promise<void> {
   const storedAnswerLabel = essayCard.getByText("Stored answer:");
   assert.ok(
@@ -429,23 +429,23 @@ async function checkSA2EssayUsesStoredAnswerLabel(essayCard: SALocator): Promise
   );
 }
 
-/** (c) Neither element that would carry *correctness* color-coding if the
- *  essay question incorrectly fell into the scored branch — the status/eyebrow
- *  chip and the "Your answer" value span — is fern (#4F7942) or destructive
- *  colored on the essay card.
+/** (c) Không phần tử nào trong hai phần tử mà sẽ mang tô màu *đúng-sai* nếu
+ *  câu tự luận vô tình rơi vào nhánh đã chấm — chip trạng thái/eyebrow
+ *  và span giá trị "Your answer" — có màu fern (#4F7942) hay destructive
+ *  trên thẻ tự luận.
  *
- *  Deliberately NOT a whole-subtree "zero fern-classed element anywhere" scan:
- *  page.tsx's unchanged not-scored branch (`page.tsx:103-114`, confirmed via
- *  `git show 9887bbe`, pre-existing/untouched by this feature) unconditionally
- *  renders the "Stored answer:" value in a fern-classed span
- *  (`text-[#4F7942]`) for EVERY not-scored question type (true_false AND
- *  essay) — that span is not correctness color-coding (its color is not
- *  conditioned on `isCorrect`/`isScored`), so a whole-subtree scan would fail
- *  even against the correct, unregressed implementation. This narrows to the
- *  two elements whose color IS correctness-conditioned in the scored branch
- *  (the status chip's `status.cls` and the short_answer sub-branch's "Your
- *  answer" `status.cls`-colored span) and asserts neither carries that coding
- *  on the essay card. */
+ *  Cố ý KHÔNG phải phép quét cả cây con "không phần tử nào mang class fern ở bất kỳ đâu":
+ *  nhánh không-chấm không đổi của page.tsx (`page.tsx:103-114`, xác nhận qua
+ *  `git show 9887bbe`, có sẵn/không bị tính năng này đụng) vô điều kiện
+ *  render giá trị "Stored answer:" trong một span mang class fern
+ *  (`text-[#4F7942]`) cho MỌI loại câu hỏi không-chấm (true_false VÀ
+ *  essay) — span đó không phải tô màu đúng-sai (màu của nó không bị điều kiện hoá bởi
+ *  `isCorrect`/`isScored`), nên một phép quét cả cây con sẽ hỏng ngay cả với
+ *  cài đặt đúng, không hồi quy. Điều này thu hẹp vào hai phần tử mà màu
+ *  BỊ điều kiện hoá theo đúng-sai ở nhánh đã chấm
+ *  (`status.cls` của chip trạng thái và span "Your answer" tô bằng `status.cls`
+ *  của nhánh con short_answer) và khẳng định cả hai không mang cách tô đó
+ *  trên thẻ tự luận. */
 async function checkSA2EssayCardHasNoCorrectnessColorClass(essayCard: SALocator): Promise<void> {
   const statusChip = essayCard.getByText(/^Not auto-scored$/);
   const statusChipClass = (await statusChip.getAttribute("class")) ?? "";
@@ -454,11 +454,11 @@ async function checkSA2EssayCardHasNoCorrectnessColorClass(essayCard: SALocator)
     "essay card's status/eyebrow chip must carry no correctness color (fern/destructive)"
   );
 
-  // page.tsx's not-scored branch renders the student input via `studentInput
-  // || "— skipped —"`; the essay fixture row's `selected` is undefined, so
-  // this resolves to the literal "— skipped —" text, in a `text-foreground`
-  // span (never `status.cls`) — unlike the scored short_answer sub-branch's
-  // "Your answer" span, whose color IS `status.cls`-driven.
+  // Nhánh không-chấm của page.tsx render đầu vào của học sinh qua `studentInput
+  // || "— skipped —"`; `selected` của hàng fixture tự luận là undefined, nên
+  // cái này resolve ra literal "— skipped —", trong một span
+  // `text-foreground` (không bao giờ `status.cls`) — khác span "Your answer" của
+  // nhánh con short_answer đã chấm, có màu do `status.cls` quyết định.
   const yourAnswerValue = essayCard.getByText("— skipped —");
   const yourAnswerClass = (await yourAnswerValue.getAttribute("class")) ?? "";
   assert.ok(
@@ -467,9 +467,9 @@ async function checkSA2EssayCardHasNoCorrectnessColorClass(essayCard: SALocator)
   );
 }
 
-/** Orchestrator — Test 2 (AC-007): independently re-drives the same journey
- *  (test independence — does not depend on Test 1 having already run), then
- *  all 3 proof obligations (a)-(c) against the essay question's card only. */
+/** Bộ điều phối — Test 2 (AC-007): chạy lại độc lập cùng hành trình
+ *  (độc lập test — không phụ thuộc Test 1 đã chạy trước), rồi cả 3 nghĩa vụ
+ *  chứng minh (a)-(c) chỉ trên thẻ của câu tự luận. */
 export async function runSA2EssayRegressionRendersUnchanged(driver: SADriver): Promise<void> {
   const cards = await navigateToResultDetail(driver);
   const essayCard = cards.nth(SHORT_ANSWER_ROW_INDEXES.essay);
@@ -479,8 +479,8 @@ export async function runSA2EssayRegressionRendersUnchanged(driver: SADriver): P
   await checkSA2EssayCardHasNoCorrectnessColorClass(essayCard); // (c)
 }
 
-/** Top-level orchestrator — runs both fixture-e2e tests in this file against
- *  a supplied driver wired to the fixture-driven backend (see file header). */
+/** Bộ điều phối cấp cao nhất — chạy cả hai test fixture-e2e trong file này trên
+ *  một driver được cấp nối với backend điều khiển bằng fixture (xem comment đầu file). */
 export async function runShortAnswerScoringFixtureE2E(driver: SADriver): Promise<void> {
   await runSA1ShortAnswerSubStatesRenderCorrectly(driver);
   await runSA2EssayRegressionRendersUnchanged(driver);

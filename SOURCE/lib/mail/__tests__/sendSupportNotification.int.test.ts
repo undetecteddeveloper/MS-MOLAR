@@ -1,18 +1,18 @@
 // User Support System v1 — sendSupportNotification / composeSupportNotificationSubject
-//   [integration] — filled in from the skeleton (2026-08-13, task-05).
+//   [integration] — điền từ skeleton (2026-08-13, task-05).
 // Design Doc: docs/design/support-system-backend-design.md (v1.2, Data Contracts
 //   §sendSupportNotification)
 // PRD: docs/prd/support-system-prd.md (v1.2, D10, R16, AC-043, AC-044, AC-045, AC-046,
 //   metric 14)
 //
-// SMTP transport mocked (no live Gmail account/credential in CI); real
-// SOURCE/lib/copy.ts t() used, NOT mocked —
-// a mocked translate function would defeat the point of proving locale-invariance.
+// Transport SMTP bị mock (không có tài khoản/thông tin đăng nhập Gmail sống trong CI);
+// SOURCE/lib/copy.ts t() thật được dùng, KHÔNG mock —
+// một hàm dịch bị mock sẽ phá mục đích chứng minh tính bất biến theo locale.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// sendSupportNotification.ts imports "server-only" (throws outside a Next
-// server/react-server bundle) — mirrors submitExam.int.test.ts's precedent.
+// sendSupportNotification.ts import "server-only" (ném lỗi ngoài bundle
+// server Next/react-server) — theo tiền lệ submitExam.int.test.ts.
 vi.mock("server-only", () => ({}));
 
 import {

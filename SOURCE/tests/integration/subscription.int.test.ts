@@ -1,55 +1,54 @@
-// Subscription (payOS prepaid period) — INTEGRATION lane test skeleton
+// Subscription (kỳ trả trước payOS) — skeleton test làn INTEGRATION
 // Design Docs: docs/design/subscription-backend-design.md (v1.4, Test Boundaries :1121)
 //              docs/design/subscription-frontend-design.md (v1.2, Test Boundaries :1018)
 // UI Spec:     docs/ui-spec/subscription-ui-spec.md (v1.3)
 // PRD:         docs/prd/subscription-prd.md (v1.6)
-// Generated:   2026-08-18 | Budget used: integration 3/3, fixture-e2e 3/3, service-e2e 2/2
+// Sinh ngày:   2026-08-18 | Ngân sách đã dùng: integration 3/3, fixture-e2e 3/3, service-e2e 2/2
 //
 // =============================================================================
-// FILE STATUS — read before editing
+// TRẠNG THÁI FILE — đọc trước khi sửa
 // =============================================================================
-// This file is a SKELETON: comments only, no imports, no describe/it, no
-// assertions. Nothing it names exists yet (lib/billing/checkoutOrder.ts,
-// createOrder(), getMyOrder(), quota.ts). The implementing task adds the
-// imports, the runner blocks and the assertions in the SAME commit as the
-// implementation, so Red -> Green happens inside one task.
+// File này là một SKELETON: chỉ có comment, không import, không describe/it, không
+// khẳng định. Chưa gì nó nêu tên tồn tại (lib/billing/checkoutOrder.ts,
+// createOrder(), getMyOrder(), quota.ts). Task cài đặt thêm các
+// import, khối runner và khẳng định trong CÙNG commit với phần
+// cài đặt, để Red -> Green xảy ra bên trong một task.
 //
-// PLACEMENT AND HOW THIS FILE IS RUN — decided, not left open.
-//   `SOURCE/vitest.config.ts:19` collects only lib/**, components/**, app/**.
-//   `SOURCE/tests/**` is deliberately outside that glob, which is why the
-//   shipped fixture-e2e scripts live there. This file is placed here for one
-//   verified reason: cases INT-2 and INT-3 require the REAL dev Supabase
-//   database, and the backend DD's Implementation Approach Phase 4 states
-//   "CI has no database, so every DB-touching assertion is an integration test
-//   run locally against dev, not a CI gate". Putting them under lib/** would
-//   make `npm test` red in CI for a missing credential, not for a defect.
+// VỊ TRÍ VÀ CÁCH CHẠY FILE NÀY — đã quyết, không để mở.
+//   `SOURCE/vitest.config.ts:19` chỉ thu thập lib/**, components/**, app/**.
+//   `SOURCE/tests/**` cố ý nằm ngoài glob đó, đó là lý do các script fixture-e2e
+//   đã ship nằm ở đó. File này được đặt ở đây vì một lý do đã xác minh: các ca INT-2 và
+//   INT-3 đòi database Supabase dev THẬT, và Implementation Approach Phase 4
+//   của backend DD nêu "CI không có database, nên mọi khẳng định chạm DB là một integration test
+//   chạy cục bộ trên dev, không phải cổng CI". Đặt chúng dưới lib/** sẽ
+//   làm `npm test` đỏ trong CI vì thiếu thông tin đăng nhập, không phải vì lỗi.
 //
-//   The implementing task MUST add, in the same commit:
-//     1. `SOURCE/vitest.integration.config.ts` — same `resolve.alias` as
+//  Task cài đặt PHẢI thêm, trong cùng commit:
+//     1. `SOURCE/vitest.integration.config.ts` — cùng `resolve.alias` với
 //        vitest.config.ts, `test.environment: "node"`,
 //        `test.include: ["tests/integration/**/*.test.{ts,tsx}"]`.
-//     2. `package.json` script: "test:integration": "vitest run --config
+//     2. script `package.json`: "test:integration": "vitest run --config
 //        vitest.integration.config.ts".
-//   `npm test` stays untouched and stays green; `npm run test:integration` is
-//   run locally against dev after schema gate B has passed on dev
-//   (backend DD Early verification point, gate B).
+//   `npm test` không đổi và vẫn xanh; `npm run test:integration` được
+//   chạy cục bộ trên dev sau khi cổng schema B qua trên dev
+//   (Early verification point của backend DD, cổng B).
 //
-//   Case INT-1 mocks Redis and the Supabase client and is therefore CI-safe on
-//   its own. It is kept in this file for lane cohesion. Promoting it into the
-//   CI gate is a separate decision and is NOT part of this skeleton's scope.
+//  Ca INT-1 mock Redis và client Supabase nên tự nó an toàn với CI.
+//   Nó được giữ trong file này cho gắn kết làn. Đưa nó vào
+//   cổng CI là một quyết định riêng và KHÔNG thuộc phạm vi của skeleton này.
 //
-// EXECUTION ORDER inside this file: INT-1, INT-2, INT-3. INT-2 and INT-3 each
-// create their own order rows under their own fixture user and delete them in
-// teardown; neither reads the other's rows, so the order is for readability,
-// not dependency. No case may reuse another case's orderCode.
+//THỨ TỰ THỰC THI trong file này: INT-1, INT-2, INT-3. INT-2 và INT-3 mỗi cái
+//   tạo hàng đơn riêng dưới user fixture riêng và xoá chúng khi
+//   teardown; không cái nào đọc hàng của cái kia, nên thứ tự là để dễ đọc,
+//   không phải phụ thuộc. Không ca nào được dùng lại orderCode của ca khác.
 //
-// FROZEN CONTRACT: `SOURCE/lib/billing/types.ts` is frozen (its own header says
-// so). No case here may assume any change to Plan / Quota / Entitlement /
-// FREE_FALLBACK / isQuotaExhausted.
+//HỢP ĐỒNG ĐÓNG BĂNG: `SOURCE/lib/billing/types.ts` bị đóng băng (comment đầu của chính nó
+//   nói vậy). Không ca nào ở đây được giả định bất kỳ thay đổi nào với Plan / Quota / Entitlement /
+//   FREE_FALLBACK / isQuotaExhausted.
 //
-// HARD SCOPE LIMIT: no case in this file performs real payOS money movement or
-// opens a live payOS connection. payOS is verified at the adapter boundary only
-// (a mocked `createPaymentRequest` / `getPaymentStatus`, invocation-counted).
+//GIỚI HẠN PHẠM VI CỨNG: không ca nào trong file này chuyển tiền thật qua payOS
+//   hay mở kết nối payOS sống. payOS chỉ được kiểm chứng ở ranh giới adapter
+//   (`createPaymentRequest` / `getPaymentStatus` bị mock, có đếm lời gọi).
 //
 //
 // =============================================================================
@@ -74,81 +73,78 @@
 //
 //
 // =============================================================================
-// INT-2 — `toCheckoutOrder()` is the single mapper: createOrder() and
-//         getMyOrder() return deeply equal values for one order
+// INT-2 — `toCheckoutOrder()` là bộ ánh xạ duy nhất: createOrder() và
+//         getMyOrder() trả về các giá trị bằng nhau sâu cho một đơn
 // =============================================================================
-// Source: backend DD I010 (Test Boundaries `toCheckoutOrder()` row, :1139) and
-//   Third verification point item "I010 — the two mappings agree" (:1218).
-//   Escalation E-02 records that `features/billing/queries.ts` keeps its location,
-//   signature and `import "server-only"`; only its mapping step becomes
+// Nguồn: backend DD I010 (dòng `toCheckoutOrder()` của Test Boundaries, :1139) và
+//   mục "I010 — hai phép ánh xạ khớp nhau" của Third verification point (:1218).
+//   Escalation E-02 ghi rằng `features/billing/queries.ts` giữ vị trí, chữ ký
+//   và `import "server-only"` của nó; chỉ bước ánh xạ của nó trở thành
 //   `toCheckoutOrder(row)`.
-// AC touched (supply half): AC-028 (PRD :290 — account number, amount and
-//   transfer memo must be available as TEXT beside the QR) and AC-027's deadline
-//   text (PRD :287).
-// EARS: (none) -> basic functionality / contract test.
+// AC bị chạm tới (nửa cung cấp): AC-028 (PRD :290 — số tài khoản, số tiền và
+//   nội dung chuyển khoản phải có dưới dạng CHỮ cạnh mã QR) và chữ hạn chót của
+//   AC-027 (PRD :287).
+// EARS: (không) -> chức năng cơ bản / test hợp đồng.
 // ROI: 81 (BV:9 x Freq:8 + Legal:0 + Defect:9)
-// Behavior: one order is created -> read back cold through the request-scoped
-//   client -> both paths map through the one exported `toCheckoutOrder(row)` in
-//   `SOURCE/lib/billing/checkoutOrder.ts` -> the two `CheckoutOrder` values are
-//   deeply equal.
+// Hành vi: một đơn được tạo -> đọc lại nguội qua client theo phạm vi request
+//   -> cả hai đường ánh xạ qua một `toCheckoutOrder(row)` được export trong
+//   `SOURCE/lib/billing/checkoutOrder.ts` -> hai giá trị `CheckoutOrder`
+//   bằng nhau sâu.
 // @category: integration
 // @lane: integration
 // @dependency: lib/billing/checkoutOrder.ts (toCheckoutOrder),
 //   createOrder(), features/billing/queries.ts (getMyOrder),
-//   Supabase request-scoped client, payment_orders
+//   client Supabase theo phạm vi request, payment_orders
 // @complexity: medium
-// Mock boundary (backend DD Test Boundaries, `toCheckoutOrder()` row):
-//   "nothing — real Postgres, one order". The payOS adapter is mocked ONLY to
-//   supply the four transfer values at creation; it is not on the read path.
-// @real-dependency: Postgres (payment_orders, orders_select_own RLS), dev
-//   Supabase, one authenticated session
+// Ranh giới mock (Test Boundaries của backend DD, dòng `toCheckoutOrder()`):
+//   "không gì — Postgres thật, một đơn". Adapter payOS được mock CHỈ để
+//   cấp bốn giá trị chuyển khoản lúc tạo; nó không nằm trên đường đọc.
+// @real-dependency: Postgres (payment_orders, RLS orders_select_own), Supabase
+//   dev, một phiên authenticated
 //
-// Primary failure mode: the two paths agree field-by-field on every field a
-//   reviewer thinks to spot-check while `pendingUntil` differs in STRING form —
-//   PostgREST returns `…+00:00`, `Date.prototype.toISOString()` returns `…Z`.
-//   Same instant, different string. That string is the deadline text AC-027
-//   observes on screen, so the user is shown one deadline immediately after
-//   purchase and a differently-formatted one after a reload. A second, quieter
-//   form of the same failure: someone adds a ninth field to one path only.
+// Kiểu hỏng chính: hai đường khớp nhau từng trường ở mọi trường mà một
+//   reviewer nghĩ tới để kiểm điểm trong khi `pendingUntil` khác nhau ở dạng CHUỖI —
+//   PostgREST trả `…+00:00`, `Date.prototype.toISOString()` trả `…Z`.
+//   Cùng một thời điểm, chuỗi khác nhau. Chuỗi đó là chữ hạn chót mà AC-027
+//   quan sát trên màn hình, nên người dùng được hiện một hạn chót ngay sau
+//   khi mua và một hạn chót định dạng khác sau khi tải lại. Một dạng kín đáo hơn
+//   của cùng kiểu hỏng: ai đó thêm một trường thứ chín vào chỉ một đường.
 //
-// Proof obligation:
-//   - The assertion MUST be deep equality over the whole `CheckoutOrder` value,
-//     not a field-by-field spot check. A spot check passes through both failure
-//     forms above; that is the entire reason the backend DD names deep equality
-//     specifically.
-//   - Boundary path to traverse: the COLD read. Call `getMyOrder(orderCode)` in
-//     a session that has NOT called `createOrder()` — an in-memory value carried
-//     over from the create call would make the comparison compare a value with
-//     itself.
-//   - `SOURCE/lib/billing/types.ts` is frozen: assert against the shipped
-//     `CheckoutOrder` shape, do not widen it to make the test pass.
-//   - Only the payOS adapter may be mocked, and only for the create step,
-//     because its four returned values must be pinned as literals.
-// Verification points / expected results / pass criteria:
-//   (a) `createOrder()` for a fresh fixture user returns a `CheckoutOrder`;
-//       capture it.
-//   (b) In a fresh request-scoped client with no prior `createOrder()` call,
-//       `getMyOrder(orderCode)` returns a `CheckoutOrder`.
-//       This is also backend DD FE-B-01's cold read: all eight fields come back.
-//   (c) The two values are DEEPLY EQUAL. Pass criterion: a single deep-equality
-//       assertion over the whole object, with no field excluded and no
-//       normalisation applied to either side before comparing.
-//   (d) `pendingUntil` is compared as a raw string, byte for byte. Assert it
-//       additionally equals the literal string form the implementation commits
-//       to, so a future change of serialization form fails here rather than on
-//       the payment screen.
-//   (e) `qrPayload`, `accountNumber`, `accountName`, `memo` on BOTH values are
-//       byte-identical to what the mocked `createPaymentRequest()` returned —
-//       stored as offered, never recomputed (frontend DD Risk R-11).
-//   (f) Exactly one exported mapper exists: `toCheckoutOrder` is imported from
-//       `SOURCE/lib/billing/checkoutOrder.ts` by both paths, and
-//       `features/billing/queries.ts` declares no inline camelCase mapping of its
-//       own for this row.
+// Nghĩa vụ chứng minh:
+//   - Khẳng định PHẢI là bằng nhau sâu trên toàn bộ giá trị `CheckoutOrder`,
+//     không phải kiểm điểm từng trường. Kiểm điểm lọt qua cả hai dạng hỏng
+//     ở trên; đó là toàn bộ lý do backend DD nêu đích danh bằng nhau sâu.
+//   - Đường ranh giới phải đi qua: lượt đọc NGUỘI. Gọi `getMyOrder(orderCode)` trong
+//     một phiên CHƯA gọi `createOrder()` — một giá trị trong bộ nhớ mang từ
+//     lời gọi tạo sang sẽ khiến phép so sánh so một giá trị với chính nó.
+//   - `SOURCE/lib/billing/types.ts` bị đóng băng: khẳng định theo hình dạng
+//     `CheckoutOrder` đã ship, đừng mở rộng nó để test qua.
+//   - Chỉ adapter payOS được mock, và chỉ cho bước tạo,
+//     vì bốn giá trị nó trả phải được ghim dưới dạng literal.
+// Điểm kiểm chứng / kết quả mong đợi / tiêu chí qua:
+//   (a) `createOrder()` cho một user fixture mới trả về một `CheckoutOrder`;
+//       bắt lấy nó.
+//   (b) Trong một client theo phạm vi request mới, không có lời gọi `createOrder()` trước,
+//       `getMyOrder(orderCode)` trả về một `CheckoutOrder`.
+//       Đây cũng là lượt đọc nguội FE-B-01 của backend DD: cả tám trường đều trả về.
+//   (c) Hai giá trị BẰNG NHAU SÂU. Tiêu chí qua: một khẳng định bằng-nhau-sâu
+//       duy nhất trên cả object, không loại trường nào và không chuẩn hoá
+//       nào áp lên hai phía trước khi so.
+//   (d) `pendingUntil` được so dưới dạng chuỗi thô, từng byte. Khẳng định thêm nó
+//       bằng dạng chuỗi literal mà cài đặt cam kết, để một thay đổi
+//       dạng serialize về sau hỏng ở đây thay vì ở màn hình thanh toán.
+//   (e) `qrPayload`, `accountNumber`, `accountName`, `memo` trên CẢ HAI giá trị
+//       giống từng byte với thứ `createPaymentRequest()` mock đã trả —
+//       lưu như được đưa, không bao giờ tính lại (Risk R-11 của frontend DD).
+//   (f) Tồn tại đúng một bộ ánh xạ được export: `toCheckoutOrder` được import từ
+//       `SOURCE/lib/billing/checkoutOrder.ts` bởi cả hai đường, và
+//       `features/billing/queries.ts` không khai báo phép ánh xạ camelCase nội tuyến
+//       nào của riêng nó cho hàng này.
 //
 //
 // =============================================================================
-// INT-3 — One live order per user: a second purchase inside the 30-minute
-//         window reuses the same order; after the window a new one is minted
+//INT-3 — Mỗi người dùng một đơn sống: lần mua thứ hai trong cửa sổ 30 phút
+//        dùng lại cùng đơn; sau cửa sổ thì một đơn mới được tạo
 // =============================================================================
 // AC-026: "Cho một lần khởi tạo đơn, khi hoàn tất, thì tồn tại đúng MỘT bản ghi
 //          đơn với `orderCode` duy nhất, số tiền 39000, và trạng thái chờ."
@@ -158,144 +154,142 @@
 //          `orderCode`, cùng số tiền, cùng mã QR — chứ KHÔNG tạo `orderCode`
 //          mới. Sau thao tác, một truy vấn đếm đơn chờ của người dùng đó trả về
 //          đúng 1." (PRD :287)
-// EARS: "While" (a live pending order exists) + "If-then" (window elapsed) ->
-//   state-condition test with both branches of the window predicate.
+// EARS: "While" (có một đơn pending sống) + "If-then" (cửa sổ đã hết) ->
+//   test điều kiện-trạng-thái với cả hai nhánh của vị từ cửa sổ.
 // ROI: 72 (BV:9 x Freq:7 + Legal:0 + Defect:9)
 //
-// ONE SKELETON FOR TWO ACs — recorded so it is not read as an omission.
-//   AC-026 and AC-027 are one behaviour of `createOrder()`: "a user has at most
-//   one live order, and the second activation lands on it". AC-026 is the
-//   first-activation state of that invariant and AC-027 is its second-activation
-//   state; the backend DD's Third verification point already writes AC-027's
-//   assertion (a) as `count(*) pending = 1`, which is AC-026's assertion. They
-//   share one fixture, one act sequence and one primary failure mode, so they
-//   are one test. Neither AC receives a second skeleton anywhere in this
-//   generation.
+// MỘT SKELETON CHO HAI AC — ghi lại để không bị đọc như một sơ suất.
+//   AC-026 và AC-027 là một hành vi của `createOrder()`: "một người dùng có tối đa
+//   một đơn sống, và lần kích hoạt thứ hai đáp xuống nó". AC-026 là
+//   trạng thái kích hoạt-lần-đầu của bất biến đó và AC-027 là trạng thái
+//   kích hoạt-lần-hai; Third verification point của backend DD đã viết
+//   khẳng định (a) của AC-027 là `count(*) pending = 1`, chính là khẳng định của AC-026.
+//   Chúng dùng chung một fixture, một chuỗi tác động và một kiểu hỏng chính, nên
+//   là một test. Không AC nào nhận skeleton thứ hai ở bất kỳ đâu trong đợt
+//   sinh này.
 //
-// Behavior: user activates purchase -> exactly one pending row at 39000 ->
-//   activates again inside 30 min -> the SAME row is returned and the provider
-//   is not called again -> activates again after the window -> a new orderCode
-//   is minted AND the provider IS called.
+// Hành vi: người dùng kích hoạt mua -> đúng một hàng pending ở 39000 ->
+//   kích hoạt lần nữa trong 30 phút -> CÙNG hàng đó được trả về và nhà cung cấp
+//   không bị gọi lại -> kích hoạt lần nữa sau cửa sổ -> một orderCode mới
+//   được tạo VÀ nhà cung cấp ĐƯỢC gọi.
 // @category: core-functionality
 // @lane: integration
-// @dependency: createOrder() step (0), payment_orders, PREMIUM_PRICE_VND
-//   (lib/billing/pricing.ts), payOS adapter (createPaymentRequest)
+// @dependency: bước (0) của createOrder(), payment_orders, PREMIUM_PRICE_VND
+//   (lib/billing/pricing.ts), adapter payOS (createPaymentRequest)
 // @complexity: high
-// Mock boundary (backend DD Test Boundaries, `createOrder` step (0) row): the
-//   payOS adapter is mocked AND COUNTED — "counted, not just stubbed". The
-//   database is real.
-// @real-dependency: Postgres (payment_orders), dev Supabase, one authenticated
-//   session
+// Ranh giới mock (Test Boundaries của backend DD, dòng bước (0) của `createOrder`): adapter
+//   payOS bị mock VÀ ĐẾM — "đếm, không chỉ stub". Database là thật.
+// @real-dependency: Postgres (payment_orders), Supabase dev, một phiên
+//   authenticated
 //
-// Primary failure mode: the naive implementation. It re-calls the provider,
-//   discards the result, and returns the existing row. That passes a count-of-1
-//   assertion AND an equal-orderCode assertion while still (i) spending money on
-//   a second provider request and (ii) leaving a second live payOS link
-//   pointing at the same order, and (iii) restarting the 30-minute deadline the
-//   user is reading off the screen. The second failure mode is the opposite
-//   over-correction: the reuse predicate degenerates to "any pending row,
-//   forever", so a user whose order expired can never start a new purchase.
+//Kiểu hỏng chính: cài đặt ngây thơ. Nó gọi lại nhà cung cấp,
+//   bỏ kết quả, và trả hàng sẵn có. Cái đó qua khẳng định số-đếm-1 VÀ khẳng định
+//   orderCode-bằng-nhau trong khi vẫn (i) tiêu tiền cho một request nhà cung cấp thứ
+//   hai và (ii) để lại một liên kết payOS sống thứ hai
+//   trỏ vào cùng đơn, và (iii) khởi động lại hạn chót 30 phút mà
+//   người dùng đang đọc trên màn hình. Kiểu hỏng thứ hai là sửa
+//   quá tay ngược lại: vị từ dùng lại thoái hoá thành "bất kỳ hàng pending nào,
+//   mãi mãi", nên người dùng có đơn đã hết hạn không bao giờ bắt đầu được lần mua mới.
 //
-// Proof obligation:
-//   - Two of the four sub-claims are INVISIBLE to a value-only assertion. The
-//     adapter invocation count and the byte-identity of `pendingUntil` must both
-//     be asserted, or the naive implementation ships green.
-//   - Boundary path to traverse: the WINDOW-ELAPSED branch. The main path (two
-//     rapid clicks) stays green while the expiry half regresses, so the third
-//     activation past `pending_until` is a required part of this test, not an
-//     optional extra.
-//   - Observable state before/after: the pending-order COUNT for this user, read
-//     from the real table by query, before the first activation (0) and after
-//     each activation.
-//   - Only the payOS adapter may be mocked — the reuse predicate is decided from
-//     a real row's real `pending_until` against the clock, which is precisely
-//     what a mocked client would stop proving.
-// Verification points / expected results / pass criteria:
-//   (a) After the FIRST `createOrder()`:
+//Nghĩa vụ chứng minh:
+//   - Hai trong bốn khẳng định con là VÔ HÌNH với khẳng định chỉ-giá-trị. Số lần
+//     gọi adapter và tính giống-từng-byte của `pendingUntil` đều phải
+//     được khẳng định, nếu không cài đặt ngây thơ ship xanh.
+//   - Đường ranh giới phải đi qua: nhánh CỬA-SỔ-ĐÃ-HẾT. Đường chính (hai cú bấm
+//     nhanh) vẫn xanh trong khi nửa hết hạn hồi quy, nên lần kích hoạt thứ ba
+//     quá `pending_until` là một phần bắt buộc của test này, không phải
+//     phần thêm tuỳ chọn.
+//   - Trạng thái quan sát được trước/sau: SỐ ĐƠN pending của người dùng này, đọc
+//     từ bảng thật bằng truy vấn, trước lần kích hoạt đầu (0) và sau
+//     mỗi lần kích hoạt.
+//   - Chỉ adapter payOS được mock — vị từ dùng lại được quyết định từ
+//     `pending_until` thật của một hàng thật so với đồng hồ, chính là
+//     thứ mà một client bị mock sẽ thôi chứng minh.
+// Điểm kiểm chứng / kết quả mong đợi / tiêu chí qua:
+//   (a) Sau `createOrder()` ĐẦU TIÊN:
 //       `select count(*) from payment_orders where user_id = A and status =
-//       'pending'` is EXACTLY 1; the row's `amount` is the literal 39000; its
-//       `order_code` is unique; its status is `pending`. (AC-026)
-//   (b) After a SECOND `createOrder()` with no wait: the same count query
-//       returns EXACTLY 1. (AC-027, the PRD's own stated check)
-//   (c) The two returned `orderCode`s are EQUAL.
-//   (d) `createPaymentRequest` was invoked EXACTLY ONCE across both calls.
-//       Assert the invocation count, not "it was called".
-//   (e) `pendingUntil` is BYTE-IDENTICAL between the two returns — the reuse
-//       path must not restart the window.
-//   (f) `qrPayload` and `amount` are identical between the two returns (AC-027's
+//       'pending'` là CHÍNH XÁC 1; `amount` của hàng là literal 39000; `order_code`
+//       của nó là duy nhất; trạng thái của nó là `pending`. (AC-026)
+//   (b) Sau `createOrder()` THỨ HAI không chờ: cùng truy vấn đếm
+//       trả CHÍNH XÁC 1. (AC-027, phép kiểm do chính PRD nêu)
+//   (c) Hai `orderCode` trả về BẰNG NHAU.
+//   (d) `createPaymentRequest` được gọi CHÍNH XÁC MỘT LẦN qua cả hai lời gọi.
+//       Khẳng định số lần gọi, không phải "nó đã được gọi".
+//   (e) `pendingUntil` GIỐNG TỪNG BYTE giữa hai giá trị trả về — đường dùng lại
+//       không được khởi động lại cửa sổ.
+//   (f) `qrPayload` và `amount` giống nhau giữa hai giá trị trả về (AC-027
 //       "cùng mã QR, cùng số tiền").
-//   (g) Then advance past the window — write a row whose `pending_until` is in
-//       the past rather than sleeping 30 minutes — and call `createOrder()` a
-//       THIRD time: a NEW `orderCode` is returned (not equal to (c)'s) AND
-//       `createPaymentRequest`'s cumulative invocation count is now EXACTLY 2.
-//   (h) Teardown deletes every row created under this case's fixture user, so
-//       the case passes when run twice in a row and when run in isolation.
+//   (g) Rồi đẩy qua cửa sổ — ghi một hàng có `pending_until` ở quá khứ
+//       thay vì ngủ 30 phút — và gọi `createOrder()` lần THỨ BA:
+//       một `orderCode` MỚI được trả về (không bằng của (c)) VÀ số lần gọi
+//       tích luỹ của `createPaymentRequest` giờ là CHÍNH XÁC 2.
+//   (h) Teardown xoá mọi hàng tạo dưới user fixture của ca này, để
+//       ca qua được khi chạy hai lần liên tiếp và khi chạy riêng lẻ.
 //
 //
 // =============================================================================
-// INT-3 — IMPLEMENTATION (plan Task 3.4, the commit that adds createOrder()'s
-//         step (0) reuse branch)
+// INT-3 — CÀI ĐẶT (plan Task 3.4, commit thêm nhánh dùng lại bước (0) của
+//         createOrder())
 // =============================================================================
-// INT-1 and INT-2 above stay comment-only; they are filled by plan Tasks 5.3 and
-// 3.5 respectively. A file carrying at least one real suite no longer trips
-// vitest's "No test suite found", so this lane goes from exit 1 to exit 0 with
-// this commit. That transition is the deliverable, not a side effect.
+// INT-1 và INT-2 ở trên vẫn chỉ có comment; chúng được điền bởi plan Tasks 5.3 và
+// 3.5 tương ứng. Một file mang ít nhất một suite thật không còn dính
+// "No test suite found" của vitest, nên làn này chuyển từ thoát mã 1 sang thoát mã 0 với
+// commit này. Chuyển đổi đó là sản phẩm bàn giao, không phải tác dụng phụ.
 //
-// WHAT IS MOCKED, AND WHY IT DOES NOT WEAKEN THE PROOF — exactly two things:
-//   1. `createPaymentRequest` of the payOS adapter. It is an external PAID
-//      service, and the backend DD's Test Boundaries row for `createOrder`
-//      step (0) says "counted, not just stubbed". `getPaymentStatus` is
-//      replaced too, with a throwing stub, so that a regression which reaches
-//      the provider from this path fails loudly instead of hitting the network.
-//   2. `createClient` of `@/lib/supabase/server`, which exists only to build a
-//      client from request COOKIES via `next/headers` (unavailable outside a
-//      Next request). It is replaced by a REAL `@supabase/supabase-js` client
-//      holding a REAL session for the fixture account — the same JWT and the
-//      same RLS-bound identity production uses.
-//   Postgres is NOT mocked. The reuse predicate is decided from a real row's
-//   real `pending_until` against the clock, which is exactly what a mocked
-//   client would stop proving.
+// CÁI GÌ BỊ MOCK, VÀ VÌ SAO KHÔNG LÀM YẾU BẰNG CHỨNG — đúng hai thứ:
+//   1. `createPaymentRequest` của adapter payOS. Đó là một dịch vụ ngoài TRẢ PHÍ,
+//      và dòng Test Boundaries của backend DD cho bước (0) của `createOrder`
+//      nói "đếm, không chỉ stub". `getPaymentStatus` cũng được
+//      thay, bằng một stub ném lỗi, để một hồi quy với tới
+//      nhà cung cấp từ đường này hỏng to thay vì chạm mạng.
+//   2. `createClient` của `@/lib/supabase/server`, vốn chỉ tồn tại để dựng một
+//      client từ COOKIE của request qua `next/headers` (không có ngoài một request
+//      Next). Nó được thay bằng một client `@supabase/supabase-js` THẬT
+//      giữ một phiên THẬT cho tài khoản fixture — cùng JWT và
+//      cùng danh tính bị ràng buộc RLS mà production dùng.
+//   Postgres KHÔNG bị mock. Vị từ dùng lại được quyết định từ `pending_until`
+//   thật của một hàng thật so với đồng hồ, chính là thứ một client
+//   bị mock sẽ thôi chứng minh.
 //
-// WHY MISSING CREDENTIALS FAIL THIS LANE INSTEAD OF SKIPPING IT: the backend
-//   DD's Implementation Approach Phase 4 states "CI has no database", and this
-//   lane honours that exclusion by living outside the CI gate entirely, not by
-//   degrading when credentials are absent. `.github/workflows/ci.yml` runs
-//   `npm run lint`, `npx tsc --noEmit`, `npm test` and `npx next build`; it
-//   never runs `npm run test:integration`, and `vitest.config.ts` collects
-//   lib/**, components/**, app/** only, so `tests/**` is unreachable from CI by
-//   two independent routes. The only thing that can invoke this config is a
-//   developer at a keyboard, for whom an absent credential is an operator
-//   error — a broken run, not a documented exclusion. Skipping it silently is
-//   worse than useless: the reporter summary did say "skipped", but the two
-//   things a caller actually acts on did not — the EXIT STATUS was 0, exactly
-//   as for eight real passes, and no warning accompanied it, because vitest
-//   suppresses module-scope console output for a file whose only suite is
-//   skipped. A renamed .env.local therefore certified the same green as
-//   working code. The guard below THROWS AT MODULE SCOPE, i.e. at COLLECTION
-//   time, whenever a credential is absent: the lane exits non-zero and names
-//   the missing variables. Collection is the only placement that holds for
-//   EVERY invocation. A guard registered as a test case is itself a test case,
-//   so vitest's test-name filter removes it: `-t "…"`, ordinary single-case
-//   iteration, gave `Tests 9 skipped (9)` and exit 0 with a credential absent,
-//   and a stray `.only` defeats it the same way. Measured with the throw in
-//   place — same filter, credential absent: `Test Files 1 failed (1)`, exit 1,
-//   message naming the variable; same filter, credentials present: `1 passed |
-//   7 skipped`, exit 0, so the green path is untouched. No named case is kept
-//   beside the throw: both would fire on the same condition, and a collection
-//   failure discards the file's registered tasks (measured `(0 test)` /
-//   `Tests no tests`), so such a case could never run.
+// VÌ SAO THIẾU THÔNG TIN ĐĂNG NHẬP LÀM LÀN NÀY HỎNG THAY VÌ BỎ QUA: Implementation
+//   Approach Phase 4 của backend DD nêu "CI không có database", và làn này
+//   tôn trọng ngoại lệ đó bằng cách nằm hoàn toàn ngoài cổng CI, không bằng
+//   cách suy giảm khi thiếu thông tin đăng nhập. `.github/workflows/ci.yml` chạy
+//   `npm run lint`, `npx tsc --noEmit`, `npm test` và `npx next build`;
+//   nó không bao giờ chạy `npm run test:integration`, và `vitest.config.ts` chỉ thu thập
+//   lib/**, components/**, app/**, nên `tests/**` không với tới được từ CI bằng
+//   hai đường độc lập. Thứ duy nhất có thể gọi config này là một lập trình viên
+//   ngồi trước bàn phím, với họ thông tin đăng nhập vắng mặt là một
+//   lỗi của người vận hành — một lượt chạy hỏng, không phải một ngoại lệ đã tài liệu hoá. Bỏ qua
+//   im lặng còn tệ hơn vô dụng: tóm tắt của reporter có nói "skipped", nhưng hai
+//   thứ mà người gọi thực sự dựa vào thì không — MÃ THOÁT là 0, y như
+//   tám lần qua thật, và không cảnh báo nào đi kèm, vì vitest
+//   nén output console ở cấp module của một file mà suite duy nhất bị bỏ qua. Một
+//   .env.local bị đổi tên do đó được chứng nhận xanh y hệt code
+//   chạy được. Chốt bên dưới NÉM LỖI Ở CẤP MODULE, tức lúc THU THẬP,
+//   bất cứ khi nào một thông tin đăng nhập vắng mặt: làn thoát mã khác không và nêu tên
+//   các biến thiếu. Thu thập là vị trí duy nhất đúng với MỌI lần gọi.
+//   Một chốt đăng ký như một ca test thì chính nó là một ca test, nên
+//   bộ lọc tên test của vitest loại nó đi: `-t "…"`, vòng lặp một ca thông thường,
+//   cho `Tests 9 skipped (9)` và thoát mã 0 khi thiếu thông tin đăng nhập,
+//   và một `.only` lạc cũng vô hiệu nó theo cách tương tự. Đã đo với lệnh ném lỗi
+//   tại chỗ — cùng bộ lọc, thiếu thông tin đăng nhập: `Test Files 1 failed (1)`, thoát mã 1,
+//   thông báo nêu tên biến; cùng bộ lọc, có thông tin đăng nhập: `1 passed |
+//   7 skipped`, thoát mã 0, nên đường xanh không bị đụng. Không ca nào được đặt tên
+//   được giữ cạnh lệnh ném: cả hai sẽ bắn cùng một điều kiện, và một lỗi thu thập
+//   loại bỏ các task đã đăng ký của file (đo được `(0 test)` /
+//   `Tests no tests`), nên một ca như vậy không bao giờ chạy được.
 //
-// WHY THE SHARED RATE-LIMIT STORE IS SWITCHED OFF FOR THIS FILE: `guard()` still
-//   runs — the in-RAM sliding window is real and the action still passes through
-//   it — but the AUTHORITATIVE Upstash counter survives across runs, and this
-//   case spends three `createOrder` allowances per run against a ceiling of 15
-//   per hour. Left on, a mutation-testing session would exhaust the ceiling and
-//   the case would fail for an unrelated reason. The shared store has its own
-//   coverage in `lib/security/rateLimitStore.test.ts`; nothing INT-3 claims is
-//   about it.
+// VÌ SAO KHO GIỚI HẠN TẦN SUẤT DÙNG CHUNG BỊ TẮT CHO FILE NÀY: `guard()` vẫn
+//   chạy — cửa sổ trượt trong RAM là thật và action vẫn đi qua nó — nhưng
+//   bộ đếm Upstash CÓ THẨM QUYỀN sống qua các lượt chạy, và ca này tiêu ba suất
+//   `createOrder` mỗi lượt trên trần 15 mỗi giờ. Để bật, một phiên mutation-testing
+//   sẽ làm cạn trần và ca sẽ hỏng vì một lý do không liên quan.
+//   Kho dùng chung có độ phủ riêng trong `lib/security/rateLimitStore.test.ts`; không gì INT-3
+//   khẳng định liên quan tới nó.
 //
-// DEV DATABASE ONLY. Credentials come from `SOURCE/.env.local`
-//   (ref `hynwleaxtbtjzkvpjsug`). `SOURCE/.env.local.prod-backup` is never read.
+//CHỈ DATABASE DEV. Thông tin đăng nhập đến từ `SOURCE/.env.local`
+//   (ref `hynwleaxtbtjzkvpjsug`). `SOURCE/.env.local.prod-backup` không bao giờ được đọc.
 
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -446,8 +440,8 @@ async function signedInClient(email: string, password: string): Promise<Supabase
 // Xem con trỏ ở đầu file để biết lý do và bước bật lại.
 
 // =============================================================================
-// INT-2 — IMPLEMENTATION (plan Task 3.5, the commit that changes getMyOrder()'s
-//         mapping step to `toCheckoutOrder(row)` — CL-01)
+// INT-2 — CÀI ĐẶT (plan Task 3.5, commit đổi bước ánh xạ của getMyOrder()
+//         sang `toCheckoutOrder(row)` — CL-01)
 // =============================================================================
 // Đọc khối chú thích INT-2 ở đầu file trước: sáu nghĩa vụ (a)…(f) nằm ở đó,
 // nguyên văn, và các ca dưới đây mang đúng nhãn ấy.

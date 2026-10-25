@@ -1,30 +1,30 @@
-// Telemetry-write payload builder [unit] (AC-013)
+// Bộ dựng payload ghi telemetry [unit] (AC-013)
 // Design Doc: docs/design/engine1-adaptive-ai-backend-design.md (v1.0)
 // PRD: docs/prd/engine1-adaptive-ai-prd.md (v1.0, AC-013, Success Criteria #13
-//   "Telemetry never carries answer-key material")
-// Generated: 2026-08-08 | Converted from skeleton: 2026-08-14 (backend task 12,
-//   Red -> Green in one commit, this repo's convention)
+//   "Telemetry không bao giờ mang vật liệu khoá đáp án")
+// Sinh ngày: 2026-08-08 | Chuyển từ skeleton: 2026-08-14 (backend task 12,
+//   Red -> Green trong một commit, quy ước của repo này)
 //
-// NOT part of the integration/fixture-e2e/service-integration-e2e lane budget —
-// Design-Doc-mandated unit coverage (backend DD Implementation Path Mapping:
-// "SOURCE/lib/tutor/__tests__/telemetry.test.ts", AC-013). Selected as one of
-// this task's explicitly named highest-risk gaps ("the telemetry containment").
+// KHÔNG thuộc ngân sách làn integration/fixture-e2e/service-integration-e2e —
+// là độ phủ unit do Design Doc bắt buộc (Implementation Path Mapping của backend DD:
+// "SOURCE/lib/tutor/__tests__/telemetry.test.ts", AC-013). Được chọn là một trong
+// các khoảng trống rủi ro cao nhất được nêu rõ của task này ("khoanh vùng telemetry").
 //
-// Implementer note: the backend DD's Implementation Path Mapping does not name a
-// standalone exported "payload builder" function distinct from explainStep()'s /
-// getSkillRecommendation()'s own inline insert-call construction — per this
-// document's own precedent ("matching AC-018's own 'unit test on the builder,
-// not just an integration check' precedent"), extract the telemetry insert
-// payload construction into its own small, pure, unit-testable function (e.g.
-// `buildTelemetryPayload(...)` in SOURCE/lib/tutor/telemetry.ts or co-located
-// with callTutor.ts) so this file can unit-test it in isolation from the
-// Supabase call itself — mirroring buildTutorPrompt()'s own pure-function shape.
+// Ghi chú cho người cài đặt: Implementation Path Mapping của backend DD không nêu tên
+// một hàm "payload builder" được export riêng biệt khác với phần dựng lời gọi insert
+// nội tuyến của explainStep() / getSkillRecommendation() — theo tiền lệ của
+// chính tài liệu này ("khớp tiền lệ của AC-018 là 'unit test trên bộ dựng,
+// không chỉ kiểm integration'"), tách phần dựng payload insert telemetry
+// thành một hàm nhỏ, thuần, unit test được riêng (ví dụ
+// `buildTelemetryPayload(...)` trong SOURCE/lib/tutor/telemetry.ts hoặc đặt cùng chỗ
+// với callTutor.ts) để file này unit test nó tách biệt khỏi
+// chính lời gọi Supabase — theo hình dạng hàm thuần của buildTutorPrompt().
 //
-// Mock boundary (backend DD Test Boundaries / Mock Boundary Decisions, applied
-//   here to the payload-construction step specifically): No I/O — pure
-//   payload-construction function; the actual DB insert call is a SEPARATE
-//   concern exercised by tutorActions.int.test.ts / getSkillRecommendation.int.test.ts
-//   (mocked Supabase boundary) at the integration level.
+// Ranh giới mock (Test Boundaries / Mock Boundary Decisions của backend DD, áp dụng
+//   ở đây riêng cho bước dựng payload): Không I/O — hàm dựng payload
+//   thuần; lời gọi insert DB thật là một MỐI QUAN TÂM RIÊNG được
+//   tutorActions.int.test.ts / getSkillRecommendation.int.test.ts
+//   (ranh giới Supabase mock) phủ ở mức integration.
 
 import { describe, expect, it } from "vitest";
 
@@ -194,42 +194,41 @@ function findLeaks(payload: TelemetryLogInsert, sentinels: string[], where: stri
 }
 
 // =============================================================================
-// Test 1 — AC-013: 0 occurrences of answer-key material in the constructed
-// telemetry_log insert payload, across a fixture battery including simulated
-// error paths
+// Test 1 — AC-013: 0 lần xuất hiện vật liệu khoá đáp án trong payload insert
+// telemetry_log đã dựng, qua một bộ fixture gồm cả các đường lỗi giả lập
 // =============================================================================
-// AC-013: "Given any telemetry_log row, it shall contain no answer-key material
-//   — asserted by a unit test on the telemetry-write payload builder, not by the
-//   schema's column-shape exclusion alone."
+// AC-013: "Cho bất kỳ hàng telemetry_log nào, nó không được chứa vật liệu khoá đáp án
+//   — khẳng định bởi một unit test trên bộ dựng payload ghi telemetry, không chỉ bởi
+//   việc loại trừ hình dạng cột của schema."
 // ROI: 69 (BV:10 x Freq:6 + Legal:0 + Defect:9)
-// Behavior: the telemetry payload builder is invoked across a battery of fixture
-//   inputs — success/failure outcomes, both event_type values
-//   ('tutor_invoke'/'adaptive_route'), and a simulated caught Error whose
-//   .message field contains a sentinel answer-key-shaped string (mirroring
-//   prompt.test.ts's sentinel technique) — assert the constructed insert payload
-//   object has 0 occurrences of the sentinel in ANY field, for every fixture in
-//   the battery.
+// Hành vi: bộ dựng payload telemetry được gọi qua một bộ fixture đầu vào —
+//   kết quả thành công/thất bại, cả hai giá trị event_type
+//   ('tutor_invoke'/'adaptive_route'), và một Error bị bắt giả lập mà
+//   trường .message chứa một chuỗi canh có hình dạng khoá đáp án (theo
+//   kỹ thuật canh của prompt.test.ts) — khẳng định object payload insert đã dựng
+//   có 0 lần xuất hiện chuỗi canh ở BẤT KỲ trường nào, với mọi fixture trong
+//   bộ.
 // @category: core-functionality
 // @lane: unit
-// @dependency: none (pure payload-construction function; no I/O)
+// @dependency: không có (hàm dựng payload thuần; không I/O)
 // @complexity: medium
 // @real-dependency: N/A
-// Primary failure mode: a future maintainer routes a caught exception's
-//   `err.message` (which could echo attacker-influenced UGC question content, per
-//   Security Considerations) into `error_code` or any other telemetry column
-//   instead of the constrained closed enum — reopening exactly the leak path
-//   the schema's own CHECK constraint (`error_code in (...)`) and this unit test
-//   both exist to prevent, per the schema's stated design intent ("Mã có cấu
+// Kiểu hỏng chính: người bảo trì về sau chuyển `err.message` của một exception bị bắt
+//   (có thể vọng lại nội dung câu hỏi UGC do kẻ tấn công ảnh hưởng, theo
+//   Security Considerations) vào `error_code` hoặc bất kỳ cột telemetry nào khác
+//   thay vì enum đóng có ràng buộc — mở lại đúng đường rò mà
+//   ràng buộc CHECK của chính schema (`error_code in (...)`) và unit test này
+//   đều sinh ra để ngăn, theo ý định thiết kế đã nêu của schema ("Mã có cấu
 //   trúc, KHÔNG BAO GIỜ free-text/exception message").
-// Proof obligation: for each fixture (success/failure x tutor_invoke/adaptive_route),
-//   assert every field of the constructed payload is either a structurally-safe
-//   value (uuid, boolean, timestamp, or a closed enum member) or, for the one
-//   string-shaped field capable of holding free text (error_code), assert it is
-//   STRICTLY one of the named literals of the CHECK constraint (R13 widened it
-//   to six) and never the raw simulated Error's .message —
-//   over a fixture battery that includes a simulated Error whose .message
-//   contains the sentinel string, proving that string never reaches the payload
-//   under any exercised code path.
+// Nghĩa vụ chứng minh: với mỗi fixture (thành công/thất bại x tutor_invoke/adaptive_route),
+//   khẳng định mọi trường của payload đã dựng hoặc là giá trị an toàn về cấu trúc
+//   (uuid, boolean, timestamp, hay thành viên enum đóng) hoặc, với trường
+//   dạng chuỗi duy nhất có thể chứa chữ tự do (error_code), khẳng định nó
+//   CHẶT CHẼ là một trong các literal được nêu tên của ràng buộc CHECK (R13 mở rộng nó
+//   thành sáu) và không bao giờ là .message thô của Error giả lập —
+//   qua một bộ fixture gồm một Error giả lập mà .message
+//   chứa chuỗi canh, chứng minh chuỗi đó không bao giờ tới payload
+//   ở bất kỳ đường mã nào được kích hoạt.
 describe("buildTelemetryPayload — telemetry không bao giờ mang theo đáp án (AC-013)", () => {
   it("trên cả dàn success/failure x tutor_invoke/adaptive_route: 0 lần xuất hiện sentinel, error_code luôn nằm trong enum §19", () => {
     const built = FIXTURES.map((fixture) => ({ fixture, payload: buildTelemetryPayload(fixture.event) }));

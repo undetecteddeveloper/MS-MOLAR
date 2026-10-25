@@ -15,9 +15,9 @@ import type { SolutionAuthorCardHeader } from "@/features/solutions/components/S
 const { toggleHelpfulMock, setPinMock, postCommentMock, deleteCommentMock } = vi.hoisted(() => ({
   toggleHelpfulMock: vi.fn(),
   setPinMock: vi.fn(),
-  // task 28 — CommentSheet/CommentItem (mounted via the `?comments=1` deep
-  // link tests below) import postComment/deleteComment from this same
-  // module; neither is exercised by the pre-existing tests in this file.
+  // task 28 — CommentSheet/CommentItem (mount qua các test deep link
+  // `?comments=1` bên dưới) import postComment/deleteComment từ chính
+  // module này; các test sẵn có trong file này không kích hoạt cái nào.
   postCommentMock: vi.fn(),
   deleteCommentMock: vi.fn(),
 }));
@@ -293,8 +293,8 @@ describe("SolutionViewScreen — liên kết sâu ?q=k (AC-061)", () => {
   });
 });
 
-// ═══ Task 28 mount — CommentSheet wired from the row callback and from the
-// parsed `?comments=1` flag (Required Tests #7, #11) ═══
+// ═══ Task 28 mount — CommentSheet được nối từ callback của hàng và từ cờ
+// `?comments=1` đã phân tích (Required Tests #7, #11) ═══
 
 describe("SolutionViewScreen — mount CommentSheet (task 28, Required Test #11)", () => {
   it("?comments=1 + ?q=2: mở sẵn CommentSheet của đúng câu 2 (AC-068)", async () => {

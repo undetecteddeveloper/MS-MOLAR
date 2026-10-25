@@ -1,7 +1,7 @@
-// SOURCE/lib/rating — frontend-form additions (Task 7, frontend DD § Rating-form
-// State Management + Data-Fetching Plan). Literal-fixture vitest, node env, no I/O
-// (Red Phase — written before PART_META/readoutModel/rateErrorMessage/
-// mapFromMyRating exist, per Implementation Steps).
+// SOURCE/lib/rating — phần bổ sung cho form phía frontend (Task 7, frontend DD § Rating-form
+// State Management + Data-Fetching Plan). Vitest literal-fixture, môi trường node, không I/O
+// (Red Phase — viết trước khi PART_META/readoutModel/rateErrorMessage/
+// mapFromMyRating tồn tại, theo Implementation Steps).
 
 import { describe, expect, it } from "vitest";
 import { PART_IDS, PART_META, mapFromMyRating, rateErrorMessage, readoutModel } from "../index";

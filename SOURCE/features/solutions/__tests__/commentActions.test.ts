@@ -1,17 +1,17 @@
 // postComment / deleteComment / markCommentsRead / getMyCommentFeed —
-// Server Action call-shape + error mapping unit tests (backend task 26; plan
+// unit test hình dạng lời gọi + ánh xạ lỗi của Server Action (backend task 26; plan
 // § P3-T2; backend DD § Integration Verification Points "Task ownership").
 //
-// Mock boundary (same convention as helpfulPinActions.test.ts): the Supabase
-// SESSION client AND `guard()` are both mocked here. `community_solution_comments`
-// has RLS on with zero policies and zero grants (U1) — the ONLY write path is
-// the two SECURITY DEFINER RPCs, so neither postComment nor deleteComment may
-// ever call `.from("community_solution_comments")` (Required Test #11).
+// Ranh giới mock (cùng quy ước với helpfulPinActions.test.ts): client phiên Supabase
+// VÀ `guard()` đều bị mock ở đây. `community_solution_comments`
+// bật RLS với không policy nào và không grant nào (U1) — đường ghi DUY NHẤT là
+// hai RPC SECURITY DEFINER, nên cả postComment lẫn deleteComment đều không được
+// gọi `.from("community_solution_comments")` (Required Test #11).
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// queries.ts imports "server-only" — same stub as writerActions.test.ts /
+// queries.ts import "server-only" — cùng stub với writerActions.test.ts /
 // helpfulPinActions.test.ts.
 vi.mock("server-only", () => ({}));
 
@@ -63,8 +63,8 @@ beforeEach(() => {
   updateMock.mockReset();
   eqMock.mockReset();
 
-  // update("...").eq("id", user.id) chain, matching auth/actions.ts's
-  // updateProfile precedent — resolves to { error: null } by default.
+  // chuỗi update("...").eq("id", user.id), theo tiền lệ updateProfile của
+  // auth/actions.ts — mặc định resolve thành { error: null }.
   eqMock.mockResolvedValue({ error: null });
   updateMock.mockReturnValue({ eq: eqMock });
   fromMock.mockReturnValue({ update: updateMock });
@@ -188,12 +188,12 @@ describe("postComment — Required test list rows 1-6, 9", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const body = "Đây là một nội dung bình luận không được phép rò rỉ vào log server";
 
-    // rate-limited: no RPC at all.
+    // bị giới hạn tần suất: không có RPC nào cả.
     mockUser(freshUserId());
     guardMock.mockResolvedValueOnce({ ok: false, retryAfterSeconds: 30 });
     await postComment("solution-6a", "q1", body, false);
 
-    // empty: no RPC at all.
+    // rỗng: không có RPC nào cả.
     mockUser(freshUserId());
     allowGuard();
     await postComment("solution-6b", "q1", "   ", false);
@@ -282,7 +282,7 @@ describe("markCommentsRead — Required test list row 10", () => {
   it("row 10: mocked update reporting zero changed rows -> the same success shape as a one-row update (no error)", async () => {
     mockUser(freshUserId());
     allowGuard();
-    eqMock.mockResolvedValueOnce({ error: null }); // zero-row update — PostgREST still reports no error.
+    eqMock.mockResolvedValueOnce({ error: null }); // update không hàng nào — PostgREST vẫn báo không lỗi.
 
     const result = await markCommentsRead();
 

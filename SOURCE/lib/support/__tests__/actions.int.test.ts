@@ -1,13 +1,13 @@
 // User Support System v1 — submitSupportTicket [integration]
 // Design Doc: docs/design/support-system-backend-design.md (v1.2, Data Contracts
-//   §submitSupportTicket, Data Flow steps 1-9)
-// PRD: docs/prd/support-system-prd.md (v1.2, AC-002 server half, AC-004, AC-008..AC-011,
+//   §submitSupportTicket, Data Flow bước 1-9)
+// PRD: docs/prd/support-system-prd.md (v1.2, AC-002 nửa server, AC-004, AC-008..AC-011,
 //   AC-018, AC-019, AC-028, AC-031, AC-032, metric 5, metric 7, metric 10)
 //
-// Mocked Supabase client + mocked next/server after(), per backend DD Test Boundaries.
-// The real RLS-enforced insert/Storage-write path and cross-student isolation are
-// proven by SOURCE/supabase/test-rls.ts (ST-a..ST-e), not here — this file proves only
-// the JS call construction and control flow.
+// Client Supabase mock + next/server after() mock, theo Test Boundaries của backend DD.
+// Đường chèn/ghi Storage thật bị cưỡng chế bởi RLS và việc cô lập giữa các học sinh được
+// chứng minh bởi SOURCE/supabase/test-rls.ts (ST-a..ST-e), không phải ở đây — file này chỉ chứng minh
+// cách dựng lời gọi JS và luồng điều khiển.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -253,8 +253,8 @@ describe("Group 4 — fire-and-forget mail (D5, AC-031/AC-032): highest-value pr
     expect(result).toEqual({ ok: true, shortRef: TICKET_ID.slice(0, 8) });
     expect(afterMock).toHaveBeenCalledTimes(1);
     expect(afterMock.mock.calls[0][0]).toBeTypeOf("function");
-    // sendSupportNotification only runs when the captured after() callback is
-    // invoked — proven not to have been called just from submitSupportTicket resolving.
+    // sendSupportNotification chỉ chạy khi callback after() bắt được
+    // được gọi — chứng minh nó chưa được gọi chỉ từ việc submitSupportTicket resolve.
     expect(sendSupportNotificationMock).not.toHaveBeenCalled();
   });
 
@@ -318,9 +318,9 @@ describe("Storage upload failure (unavailable boundary, AC-012)", () => {
 
     expect(result).toEqual({ error: "server" });
     expect(insertMock).not.toHaveBeenCalled();
-    // Upload failed, so there is no uploaded object path to clean up — remove()
-    // is only attempted when the failure happens AFTER a successful upload
-    // (the insert-failure branch below), not here.
+    // Tải lên thất bại, nên không có đường dẫn object đã tải lên để dọn — remove()
+    // chỉ được thử khi lỗi xảy ra SAU một lần tải lên thành công
+    // (nhánh chèn-thất-bại bên dưới), không phải ở đây.
     expect(removeMock).not.toHaveBeenCalled();
   });
 

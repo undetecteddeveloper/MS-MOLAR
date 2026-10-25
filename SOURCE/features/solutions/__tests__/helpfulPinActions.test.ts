@@ -1,18 +1,17 @@
-// toggleHelpful / setPin — Server Action call-shape + error mapping unit
-// tests (backend task 15; plan § P2-T3; backend DD § Integration Verification
+// toggleHelpful / setPin — unit test hình dạng lời gọi + ánh xạ lỗi của Server Action
+// (backend task 15; plan § P2-T3; backend DD § Integration Verification
 // Points "Pin atomicity" -> "The target argument").
 //
-// Mock boundary (task file Red Phase instruction, deliberately different from
-// writerActions.test.ts's real-guard()-with-fake-timers approach): the
-// Supabase SESSION client AND `guard()` are both mocked here. Every case
-// asserts on the mocked client's method log (RPC names + argument objects),
-// never on a typed wrapper -- rpcMock is one shared vi.fn() for every
-// .rpc(...) call, so rpcMock.mock.calls is the ordered [name, args] log.
+// Ranh giới mock (chỉ dẫn Red Phase của task file, cố ý khác cách
+// guard()-thật-với-fake-timers của writerActions.test.ts): client Supabase PHIÊN
+// VÀ `guard()` đều bị mock ở đây. Mọi ca khẳng định trên nhật ký phương thức của client mock
+// (tên RPC + object tham số), không bao giờ trên wrapper có kiểu -- rpcMock là một vi.fn() dùng chung cho mọi
+// lời gọi .rpc(...), nên rpcMock.mock.calls là nhật ký [name, args] có thứ tự.
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// queries.ts imports "server-only" -- same stub as writerActions.test.ts /
+// queries.ts import "server-only" -- cùng stub với writerActions.test.ts /
 // communitySolutions.int.test.ts.
 vi.mock("server-only", () => ({}));
 
@@ -149,13 +148,13 @@ describe("toggleHelpful — Required test list rows 1-7", () => {
   });
 
   it("row 7: toggleHelpful/setPin's own source contains no .from(\"community_solution_helpfuls\") and no \"23505\" literal", () => {
-    // Scoped to the two functions this task adds (same slicing pattern as
-    // row 13 below) rather than the whole module: SILENT_RPC_ERROR_CODES
-    // upstream in this file legitimately carries "23505" for saveSolution/
-    // setSolutionStatus per the backend DD's binding § Logging and
-    // Monitoring rule (task 04) — that is not this task's code to touch, and
-    // removing it would contradict a decision already implemented and
-    // verified in a prior task (escalated to the engineer 2026-09-25, kept).
+    // Giới hạn trong hai hàm mà task này thêm (cùng cách cắt lát với
+    // hàng 13 bên dưới) thay vì cả module: SILENT_RPC_ERROR_CODES
+    // ở phía trên trong file này hợp lệ mang "23505" cho saveSolution/
+    // setSolutionStatus theo luật ràng buộc § Logging and
+    // Monitoring của backend DD (task 04) — đó không phải code của task này để đụng, và
+    // gỡ nó sẽ mâu thuẫn với một quyết định đã được cài đặt và
+    // kiểm chứng trong một task trước (đã escalate lên kỹ sư 2026-09-25, giữ nguyên).
     const source = readFileSync(ACTIONS_SOURCE_PATH, "utf8");
     const newActionsSource = source.slice(source.indexOf("export async function toggleHelpful"));
 

@@ -1,6 +1,6 @@
-// Community Solutions — comment feed: feed columns, feed unread cursor,
-// ordering stability, AC-091 exclusion proof on real seeded data, AC-048/
-// AC-047 (feed part). Test task 27 (migration task 25, backend DD v1.9 §
+// Community Solutions — feed bình luận: cột feed, con trỏ chưa-đọc của feed,
+// độ ổn định thứ tự, bằng chứng loại trừ AC-091 trên dữ liệu gieo thật, AC-048/
+// AC-047 (phần feed). Test task 27 (migration task 25, backend DD v1.9 §
 // Integration Verification Points "Feed columns" / "Feed unread cursor" /
 // "AC-048 note condition" / "AC-047 current question"). Làn SERVICE (Postgres
 // dev THẬT, không mock) — `describe.skipIf(!HAS_LIVE_DB)`, cùng tiền lệ

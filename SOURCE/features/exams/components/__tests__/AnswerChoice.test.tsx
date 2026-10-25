@@ -7,7 +7,7 @@
 // đối chiếu theo chữ cái. Một badge aria-hidden sẽ trông đúng và đọc sai.
 //
 // @category: core-functionality
-// @dependency: none — real AnswerChoice + real RichText, no mocks
+// @dependency: không có — AnswerChoice thật + RichText thật, không mock
 //   (TD-023: RichText nay chạy Ở SERVER qua `renderQuestionNodes`, nên test
 //   gọi đúng hàm đó để dựng nhãn — vẫn là RichText thật, chỉ khác nơi gọi.
 //   Dựng node giả ở đây sẽ bỏ lọt đúng thứ test này canh: LaTeX trong nhãn.)

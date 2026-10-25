@@ -508,8 +508,8 @@ describe("settleOrder — hình dạng hợp đồng", () => {
 
     await settleOrder(ORDER_CODE);
 
-    // ADR-0014 Decision 1: "No caller can pass an amount, a status, or a user id
-    // into it — only an `orderCode`".
+    // ADR-0014 Decision 1: "Không bên gọi nào được truyền vào một số tiền, một trạng thái, hay một id người dùng
+    // vào đó — chỉ một `orderCode`".
     expect(settleOrder.length).toBe(1);
     expect(rpcMock).toHaveBeenCalledWith("record_payment_settlement", {
       p_order_code: ORDER_CODE,

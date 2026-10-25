@@ -39,8 +39,8 @@ const {
   }),
   toggleHelpfulMock: vi.fn(),
   setPinMock: vi.fn(),
-  // task 28 — page.tsx now also reads the viewer's own profile to build the
-  // optimistic identity CommentSheet needs; not exercised by these tests.
+  // task 28 — page.tsx giờ còn đọc hồ sơ riêng của người xem để dựng
+  // danh tính lạc quan mà CommentSheet cần; các test này không kích hoạt phần đó.
   postCommentMock: vi.fn(),
   deleteCommentMock: vi.fn(),
   getCurrentUserProfileMock: vi.fn(),

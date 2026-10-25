@@ -144,7 +144,7 @@ export const RATE_LIMITS = {
   // đang dùng nằm ở free tier: quotaId
   // `GenerateRequestsPerDayPerProjectPerModel-FreeTier` — 20 request/NGÀY cho
   // CẢ PROJECT, không phải 20 cho mỗi người (đọc thẳng từ thân phản hồi 429; xem
-  // docs/plans/tasks/engine1-adaptive-ai-work-plan-phase6-completion.md mục Q-1).
+  // docs/plans/tasks/engine1-adaptive-ai-work-plan-phase6-completion.md mục Q-1; file đã xoá, xem git log).
   // Cùng key đó còn phục vụ trích xuất PDF ở lib/ugc/gemini.ts, nên gia sư thậm
   // chí không được trọn 20.
   //

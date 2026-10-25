@@ -1,16 +1,16 @@
-// reportSolution / reportComment — Server Action call-shape + error mapping
-// unit tests (backend task 33; plan § P4-T2; backend DD § Integration
-// Verification Points "Task ownership": the report actions' unit tests
-// belong to this task).
+// reportSolution / reportComment — unit test hình dạng lời gọi + ánh xạ lỗi của Server Action
+// (backend task 33; plan § P4-T2; backend DD § Integration
+// Verification Points "Task ownership": unit test của các action báo cáo
+// thuộc task này).
 //
-// Mock boundary (same convention as commentActions.test.ts /
-// helpfulPinActions.test.ts): the Supabase SESSION client AND `guard()` are
-// both mocked here. `community_content_reports` has RLS on with zero
-// policies and zero grants (U1) — the ONLY write path is the two SECURITY
-// DEFINER RPCs, so neither action may ever call
-// `.from("community_content_reports")` (Required Test #11). A repeat report
-// is a SUCCESS the RPC reports as `already_reported: true` — there is no
-// `23505` path anywhere in this module (U1).
+// Ranh giới mock (cùng quy ước với commentActions.test.ts /
+// helpfulPinActions.test.ts): client Supabase PHIÊN VÀ `guard()`
+// đều bị mock ở đây. `community_content_reports` bật RLS với không
+// policy nào và không grant nào (U1) — đường ghi DUY NHẤT là hai RPC SECURITY
+// DEFINER, nên không action nào được gọi
+// `.from("community_content_reports")` (Required Test #11). Một báo cáo lặp lại
+// là THÀNH CÔNG mà RPC báo là `already_reported: true` — không có
+// đường `23505` nào trong module này (U1).
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -257,12 +257,12 @@ describe("no reason leakage — Required test list row 9", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const reason = "Đây là một lý do báo cáo không được phép rò rỉ vào log server";
 
-    // rate-limited: no RPC at all.
+    // bị giới hạn tần suất: không có RPC nào cả.
     mockUser(freshUserId());
     guardMock.mockResolvedValueOnce({ ok: false, retryAfterSeconds: 30 });
     await reportSolution("solution-9a", reason);
 
-    // empty: no RPC at all.
+    // rỗng: không có RPC nào cả.
     mockUser(freshUserId());
     allowGuard();
     await reportSolution("solution-9b", "   ");
@@ -285,7 +285,7 @@ describe("no reason leakage — Required test list row 9", () => {
     rpcMock.mockResolvedValueOnce({ data: null, error: { code: "08006", message: reason } });
     await reportSolution("solution-9e", reason);
 
-    // reportComment branch, same 5 sub-cases.
+    // nhánh reportComment, cùng 5 ca con.
     mockUser(freshUserId());
     guardMock.mockResolvedValueOnce({ ok: false, retryAfterSeconds: 30 });
     await reportComment("comment-9a", reason);
@@ -353,12 +353,12 @@ describe("module source — Required test list row 11", () => {
 
     expect(source).not.toContain('.from("community_content_reports")');
 
-    // Scoped to the code this task adds (task 33's report actions section),
-    // same convention as commentActions.test.ts row 11's error.message slice.
-    // Pre-existing "23505" occurs earlier in the module in
-    // SILENT_RPC_ERROR_CODES (saveSolution/setSolutionStatus, task 04) — a
-    // defensive, unrelated-domain entry predating this task, not a
-    // duplicate-report branch; U1 forbids only a report-specific 23505 path.
+    // Giới hạn trong code mà task này thêm (phần action báo cáo của task 33),
+    // cùng quy ước với phép cắt error.message của hàng 11 trong commentActions.test.ts.
+    // "23505" có sẵn xuất hiện sớm hơn trong module ở
+    // SILENT_RPC_ERROR_CODES (saveSolution/setSolutionStatus, task 04) — một mục
+    // phòng thủ, thuộc miền không liên quan, có trước task này, không phải một
+    // nhánh báo-cáo-trùng; U1 chỉ cấm một đường 23505 riêng cho báo cáo.
     const reportSection = source.slice(source.indexOf("export async function reportSolution"));
     expect(reportSection).not.toContain("23505");
     expect(reportSection).not.toMatch(/error\.message/);

@@ -1,19 +1,19 @@
-// countUnreadComments / getMyUnreadCommentCount — shared unread-count formula
-// (decomposer resolution R6, backend task 26; backend DD § Data Contracts
+// countUnreadComments / getMyUnreadCommentCount — công thức đếm chưa đọc dùng chung
+// (quyết định của decomposer R6, backend task 26; backend DD § Data Contracts
 // "community_my_comment_feed" New-comment rule; Reference Contract Value #23;
 // Proof Obligation "Failure Mode #7, shared-state dependency").
 //
-// countUnreadComments is pure — a row counts as new IFF isUnread && examVisible
-// (never isUnread alone: an S8 exam-not-visible comment must not count as new
-// even though it is technically unread).
+// countUnreadComments là hàm thuần — một hàng được tính là mới KHI VÀ CHỈ KHI isUnread && examVisible
+// (không bao giờ chỉ isUnread: một bình luận ở đề không hiển thị S8 không được tính là mới
+// dù về kỹ thuật nó chưa đọc).
 //
-// getMyUnreadCommentCount exploits the feed's own guarantee that unread rows
-// form a PREFIX of the newest-first list (is_unread does not depend on
-// exam_visible) — it fetches pages sequentially and stops at the first page
-// that is not full or that contains a read row.
+// getMyUnreadCommentCount khai thác bảo đảm của chính feed rằng các hàng chưa đọc
+// tạo thành một TIỀN TỐ của danh sách mới-nhất-trước (is_unread không phụ thuộc
+// exam_visible) — nó lấy các trang tuần tự và dừng ở trang đầu tiên
+// không đầy hoặc có chứa một hàng đã đọc.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// queries.ts imports "server-only" — same stub as the other solutions tests.
+// queries.ts import "server-only" — cùng stub với các test solutions khác.
 vi.mock("server-only", () => ({}));
 
 const { rpcMock } = vi.hoisted(() => ({ rpcMock: vi.fn() }));
@@ -78,9 +78,9 @@ describe("countUnreadComments — Required test list rows 14-15", () => {
   });
 });
 
-/** Builds one RPC feed page: `unreadCount` unread rows (exam-visible unless
- *  named in `notExamVisibleIdx`) followed by `readCount` read rows, newest
- *  first — matching the feed's own ordering guarantee. */
+/** Dựng một trang feed RPC: `unreadCount` hàng chưa đọc (hiển thị-đề trừ khi
+ *  được nêu trong `notExamVisibleIdx`) theo sau là `readCount` hàng đã đọc, mới
+ *  nhất trước — khớp bảo đảm thứ tự của chính feed. */
 function feedPage(opts: { unreadCount: number; notExamVisibleIdx?: number[]; readCount: number }) {
   const notExamVisible = new Set(opts.notExamVisibleIdx ?? []);
   const rows = [];
@@ -117,9 +117,9 @@ function feedPage(opts: { unreadCount: number; notExamVisibleIdx?: number[]; rea
 
 describe("getMyUnreadCommentCount — Required test list row 16 / Proof Obligation Failure Mode #7", () => {
   it("row 16: 45 unread rows (3 with examVisible: false) + 5 read rows across pages of 20 -> count = 42; .rpc called exactly 3 times", async () => {
-    // Page 1: 20 unread (all exam-visible), full and no read row -> continue.
-    // Page 2: 20 unread (3 not exam-visible), full and no read row -> continue.
-    // Page 3: remaining 5 unread + 5 read = 10 rows, not full -> stop.
+    // Trang 1: 20 chưa đọc (đều hiển thị-đề), đầy và không có hàng đã đọc -> tiếp tục.
+    // Trang 2: 20 chưa đọc (3 không hiển thị-đề), đầy và không có hàng đã đọc -> tiếp tục.
+    // Trang 3: 5 chưa đọc còn lại + 5 đã đọc = 10 hàng, không đầy -> dừng.
     rpcMock.mockResolvedValueOnce({ data: feedPage({ unreadCount: 20, readCount: 0 }), error: null });
     rpcMock.mockResolvedValueOnce({
       data: feedPage({ unreadCount: 20, notExamVisibleIdx: [0, 1, 2], readCount: 0 }),
@@ -138,7 +138,7 @@ describe("getMyUnreadCommentCount — Required test list row 16 / Proof Obligati
   });
 
   it("stops at the first page containing a read row even when that page is full", async () => {
-    // Page 1: full page, mixed unread/read (a full page but not all-unread) -> stop after page 1.
+    // Trang 1: trang đầy, lẫn chưa đọc/đã đọc (đầy nhưng không toàn chưa đọc) -> dừng sau trang 1.
     rpcMock.mockResolvedValueOnce({
       data: feedPage({ unreadCount: 15, readCount: 5 }),
       error: null,

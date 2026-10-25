@@ -38,8 +38,8 @@ describe("deriveInitials", () => {
   });
 
   it("takes a Vietnamese precomposed character whole and uppercases it", () => {
-    // Đ (U+0110) and Ứ (U+1EE8) are single code points; Array.from keeps them
-    // intact rather than splitting anything, and toUpperCase maps đ → Đ.
+    // Đ (U+0110) và Ứ (U+1EE8) là các code point đơn; Array.from giữ chúng
+    // nguyên vẹn thay vì tách gì cả, và toUpperCase ánh xạ đ → Đ.
     expect(deriveInitials("đức.ứng")).toBe("ĐỨ");
   });
 

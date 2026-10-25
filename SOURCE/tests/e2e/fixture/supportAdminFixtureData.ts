@@ -1,19 +1,19 @@
-// User Support System v1 — admin-triage fixture data + override-boundary
-// mechanism, reusing task-07's SupportDriver pattern (supportFixtureData.ts).
-// Consumed by support-admin-triage.fixture.e2e.test.ts (task-15).
+// User Support System v1 — dữ liệu fixture admin-triage + cơ chế
+// override-boundary, dùng lại mẫu SupportDriver của task-07 (supportFixtureData.ts).
+// Được support-admin-triage.fixture.e2e.test.ts (task-15) tiêu thụ.
 //
-// Same documented residual as supportFixtureData.ts: this repo has no MSW/
-// mock-injection layer, so wiring listSupportTickets/changeTicketStatusAction/
-// addTicketNoteAction fixture data into a real running page is a residual for
-// whoever stands up the Playwright harness — the frontend DD's own Mock
-// Boundary Decision ("Yes (module boundary)") names the same test-only
-// module-boundary override point this file documents.
+// Cùng phần dư đã tài liệu hoá như supportFixtureData.ts: repo này không có lớp MSW/
+// tiêm mock, nên nối dữ liệu fixture listSupportTickets/changeTicketStatusAction/
+// addTicketNoteAction vào một trang đang chạy thật là phần dư cho
+// ai dựng harness Playwright — Mock Boundary Decision của chính frontend DD
+// ("Yes (module boundary)") nêu cùng điểm ghi đè ở ranh giới module chỉ-cho-test
+// mà file này tài liệu hoá.
 //
-// TicketWithNotes here is task-13's transcribed contract shape
-// (support-system-backend-design.md's listSupportTickets return type) — to be
-// reconciled against the real exported type from service-role.ts once task-13
-// exists (a tsc compile error is the expected, safe failure mode on drift,
-// per the frontend DD's own R-F2 note).
+// TicketWithNotes ở đây là hình dạng hợp đồng đã chép của task-13
+// (kiểu trả về listSupportTickets của support-system-backend-design.md) — sẽ
+// được đối chiếu với kiểu export thật từ service-role.ts khi task-13
+// tồn tại (lỗi biên dịch tsc là chế độ hỏng an toàn, dự kiến khi lệch,
+// theo ghi chú R-F2 của chính frontend DD).
 
 import type { TicketIntent, TicketStatus } from "@/lib/support/types";
 import type { SupportDriver } from "./supportFixtureData";
@@ -41,12 +41,12 @@ export interface FixtureTicketWithNotes {
   notes: FixtureTicketNote[];
 }
 
-// Multi-status set, most-recent-first (AC-041 expects created_at desc from
-// the real backend — this fixture is already in that order so a driver-level
-// "no reorder happened" check can compare directly against array order).
-// Ticket A carries notify_failed=true (AC-022/AC-032 collapsed-row flag,
-// visible without expanding) and one internal note; B/C exercise the other
-// two statuses; D has no notes (empty-state check, AC-027 contrast).
+// Bộ nhiều-trạng-thái, mới-nhất-trước (AC-041 kỳ vọng created_at giảm dần từ
+// backend thật — fixture này đã theo thứ tự đó nên một phép kiểm "không có
+// sắp xếp lại" ở mức driver so sánh trực tiếp được với thứ tự mảng).
+// Ticket A mang notify_failed=true (cờ hàng thu gọn AC-022/AC-032,
+// nhìn thấy không cần mở rộng) và một ghi chú nội bộ; B/C thao tác hai
+// trạng thái còn lại; D không có ghi chú (kiểm trạng thái rỗng, đối chiếu AC-027).
 export const FIXTURE_ADMIN_TICKETS: readonly FixtureTicketWithNotes[] = [
   {
     id: "ticket-a-notify-failed",
@@ -129,7 +129,7 @@ export const FIXTURE_NOTE_ADD_SUCCESS = { info: "Note saved." };
 export const FIXTURE_STATUS_CHANGE_ERROR = { error: "Couldn't update status. Please try again." };
 export const FIXTURE_NOTE_ADD_ERROR = { error: "Couldn't save the note. Please try again." };
 
-/** Structural subset re-exported for task-15's driver script — identical
- *  interface to the student-facing SupportDriver (same Playwright-subset
- *  convention), imported here under its own name for admin-page clarity. */
+/** Tập con cấu trúc được export lại cho script driver của task-15 — cùng
+ *  interface với SupportDriver hướng học sinh (cùng quy ước tập-con-Playwright),
+ *  import ở đây dưới tên riêng cho rõ ở trang admin. */
 export type { SupportDriver as SupportAdminDriver };

@@ -12,102 +12,102 @@
 // PRD:         docs/prd/essay-auto-scoring-prd.md (v1.2, AC-012, AC-023, AC-057,
 //                AC-058, AC-064, AC-067)
 // ADR:         docs/adr/ADR-0018-essay-async-grade-write.md (Accepted; Amendment
-//                to ADR-0010 — the three surfaces that must respect a moving score)
-// Generated:   2026-08-29 | Budget used: integration 3/3, fixture-e2e 3/3, service-e2e 2/2
+//                to ADR-0010 — ba bề mặt phải tôn trọng một điểm số đang dịch chuyển)
+// Sinh ngày:   2026-08-29 | Ngân sách đã dùng: integration 3/3, fixture-e2e 3/3, service-e2e 2/2
 //
 // =============================================================================
-// FILE STATUS — read before editing
+// TRẠNG THÁI FILE — đọc trước khi sửa
 // =============================================================================
-// ALL THREE CASES BELOW ARE SKELETONS (`it.todo`). Nothing here renders anything
-// yet, and no component in this feature exists.
+// CẢ BA CA BÊN DƯỚI LÀ SKELETON (`it.todo`). Chưa có gì ở đây render bất cứ thứ gì,
+// và chưa component nào của tính năng này tồn tại.
 //
-// HOW THIS LANE RUNS: `npm run test:fixture` (from `SOURCE/`), i.e.
-// `vitest run --config vitest.fixture.config.ts`. That config globs the whole
-// directory (`tests/e2e/fixture/**/*.test.{ts,tsx}`), so THIS FILE IS COLLECTED
-// FROM THE MOMENT IT IS COMMITTED and needs no config edit. That is exactly why
-// the cases are `it.todo` and not bare comments: a collected file with zero tasks
-// makes vitest report "No test suite found in file" and exit 1 — which is the
-// failure mode the six DRIVER SCRIPTS in this directory are excluded by name to
-// avoid (`vitest.fixture.config.ts:45-52`). Do NOT add this file to that exclude
-// list; `it.todo` already keeps the lane green, and being excluded is how a case
-// gets written, reviewed and merged without ever executing.
+// LÀN NÀY CHẠY THẾ NÀO: `npm run test:fixture` (từ `SOURCE/`), tức
+// `vitest run --config vitest.fixture.config.ts`. Config đó glob cả thư mục
+// (`tests/e2e/fixture/**/*.test.{ts,tsx}`), nên FILE NÀY ĐƯỢC THU THẬP
+// TỪ LÚC ĐƯỢC COMMIT và không cần sửa config. Đó chính xác là lý do
+// các ca là `it.todo` chứ không phải comment trần: một file được thu thập mà không có task nào
+// làm vitest báo "No test suite found in file" và thoát mã 1 — kiểu hỏng mà
+// sáu DRIVER SCRIPT trong thư mục này bị loại đích danh để tránh
+// (`vitest.fixture.config.ts:45-52`). ĐỪNG thêm file này vào danh sách loại đó;
+// `it.todo` đã giữ làn xanh, và bị loại là cách một ca được
+// viết, review và merge mà không bao giờ chạy.
 //
-// WHY THIS LANE AND NOT A PLAYWRIGHT DRIVER SCRIPT. The six shipped siblings here
-// (`history.`, `rating.`, `short-answer-scoring.`, three `support-*.`) are written
-// against a structural subset of Playwright's API and NOTHING EXECUTES THEM — the
-// repo has no `@playwright/test` and no `playwright.config.ts`. The one case shape
-// in this directory that actually runs is `subscription.fixture.e2e.test.ts`: an
-// IN-PROCESS render of the REAL route tree (RootLayout -> route-group layout ->
-// page), with only the action module and the data sources stubbed, real
-// dictionaries, no MSW, no database, no network. All three cases below take that
-// shape. It is the only shape in this repo that can discharge the claims below,
-// because every one of them is a claim about what the PAGE composes — not about
-// what a component renders when handed props by a test.
-//
-// -----------------------------------------------------------------------------
-// MOCK BOUNDARY — stated once, applies to all three cases
-// -----------------------------------------------------------------------------
-// Frontend DD § Mock Boundary Decisions (:2136) is the authority:
-//   MOCKED  — `next/navigation` (`useRouter().refresh`), so refreshes are COUNTED
-//             exactly (precedent `RecheckOrderControl.test.tsx:55`);
-//             `retryEssayGrading()` Server Action; `lib/pdf/generateAttemptPdf`
-//             (jsPDF + html2canvas do not run in jsdom); the two data sources the
-//             page/row read (`getResult()`, `listMyHistory()`), stubbed to return
-//             hand-built `ExamResult` / `MyHistoryEntry[]` fixtures.
-//   STUBBED — `document.visibilityState` via `Object.defineProperty`.
-//   REAL    — `deriveEssayView()`, `summariseEssays()`, `isEssayIncomplete()`;
-//             `useT()`/`getTranslate()` and BOTH dictionaries (so cases assert the
-//             right KEY resolved to the right string, not "some string");
-//             `EssayLifecycleBadge`; the layouts, providers and formatters.
-//   ZERO PROVIDER CALLS — grading ships DISABLED behind the AC-067 human gate
-//             (Groq Zero Data Retention) and NO GROQ ACCOUNT EXISTS. No case in
-//             this file has a network boundary at all: the band is a FIXTURE VALUE
-//             in the stubbed `ExamResult`. FE2E-1 additionally asserts the count of
-//             `router.refresh()` calls is zero, which is the client-side half of
-//             "flag off => nothing is set in motion".
-// @real-dependency: none. This lane needs no database and no credentials.
+// VÌ SAO LÀN NÀY MÀ KHÔNG PHẢI SCRIPT DRIVER PLAYWRIGHT. Sáu anh em đã ship ở đây
+// (`history.`, `rating.`, `short-answer-scoring.`, ba `support-*.`) được viết
+// theo một tập con cấu trúc của API Playwright và KHÔNG GÌ CHẠY CHÚNG — repo
+// không có `@playwright/test` và không có `playwright.config.ts`. Hình dạng ca duy nhất
+// trong thư mục này thực sự chạy là `subscription.fixture.e2e.test.ts`: một lần
+// render TRONG TIẾN TRÌNH của cây route THẬT (RootLayout -> layout nhóm route ->
+// page), chỉ stub module action và các nguồn dữ liệu, từ điển thật,
+// không MSW, không database, không mạng. Cả ba ca bên dưới theo hình dạng đó.
+// Đó là hình dạng duy nhất trong repo này đủ sức hoàn thành các khẳng định bên dưới,
+// vì mỗi cái đều là khẳng định về thứ TRANG ghép nên — không phải về
+// thứ một component render khi test trao props cho nó.
 //
 // -----------------------------------------------------------------------------
-// TWO HAZARDS THAT MAKE A GREEN CASE MEANINGLESS — read before writing assertions
+// RANH GIỚI MOCK — nêu một lần, áp dụng cho cả ba ca
 // -----------------------------------------------------------------------------
-// (1) EMPTY-TREE VACUOUS PASS. `render(await Component())` returns an EMPTY TREE
-//     when the awaited server component has an async child, and every
-//     `expect(queryBy…).toBeNull()` written against it PASSES AGAINST NOTHING.
-//     `EssayScoreLine` and `EssayReviewBlock` are both async AND have an async
-//     child (`EssayLifecycleBadge`), so they land squarely in it. Any case
-//     rendering either MUST use `renderServerTree()` AND carry at least one
-//     POSITIVE assertion (`getByText`/`getByRole` that succeeds), so an empty tree
-//     is always red. Frontend DD § Early Verification Point makes this a rule for
-//     the whole slice, not advice.
-//     PATH CORRECTION, verified in the tree on 2026-08-29: the helper is at
+// Frontend DD § Mock Boundary Decisions (:2136) là thẩm quyền:
+//   MOCK    — `next/navigation` (`useRouter().refresh`), để các lần refresh được ĐẾM
+//             chính xác (tiền lệ `RecheckOrderControl.test.tsx:55`);
+//             Server Action `retryEssayGrading()`; `lib/pdf/generateAttemptPdf`
+//             (jsPDF + html2canvas không chạy trong jsdom); hai nguồn dữ liệu mà
+//             trang/hàng đọc (`getResult()`, `listMyHistory()`), stub để trả về
+//             các fixture `ExamResult` / `MyHistoryEntry[]` dựng tay.
+//   STUB    — `document.visibilityState` qua `Object.defineProperty`.
+//   THẬT    — `deriveEssayView()`, `summariseEssays()`, `isEssayIncomplete()`;
+//             `useT()`/`getTranslate()` và CẢ HAI từ điển (để các ca khẳng định
+//             đúng KHOÁ được phân giải ra đúng chuỗi, không phải "một chuỗi nào đó");
+//             `EssayLifecycleBadge`; các layout, provider và bộ định dạng.
+//   KHÔNG LỜI GỌI NHÀ CUNG CẤP — việc chấm xuất xưởng Ở TRẠNG THÁI TẮT sau cổng người duyệt AC-067
+//             (Groq Zero Data Retention) và CHƯA CÓ TÀI KHOẢN GROQ. Không ca nào trong
+//             file này có ranh giới mạng: band là một GIÁ TRỊ FIXTURE
+//             trong `ExamResult` đã stub. FE2E-1 còn khẳng định số lần gọi
+//             `router.refresh()` bằng không, là nửa phía-client của
+//             "cờ tắt => không gì được đặt chuyển động".
+// @real-dependency: không có. Làn này không cần database hay thông tin đăng nhập.
+//
+// -----------------------------------------------------------------------------
+// HAI MỐI NGUY KHIẾN MỘT CA XANH VÔ NGHĨA — đọc trước khi viết khẳng định
+// -----------------------------------------------------------------------------
+// (1) QUA RỖNG TRÊN CÂY TRỐNG. `render(await Component())` trả về một CÂY TRỐNG
+//     khi server component được await có con async, và mọi
+//     `expect(queryBy…).toBeNull()` viết trên nó QUA TRÊN HƯ KHÔNG.
+//     `EssayScoreLine` và `EssayReviewBlock` đều async VÀ có con async
+//     (`EssayLifecycleBadge`), nên rơi thẳng vào đó. Mọi ca render
+//     một trong hai PHẢI dùng `renderServerTree()` VÀ mang ít nhất một
+//     khẳng định DƯƠNG (`getByText`/`getByRole` thành công), để cây trống
+//     luôn đỏ. Early Verification Point của frontend DD biến đây thành luật cho
+//     cả lát cắt, không chỉ lời khuyên.
+//     SỬA ĐƯỜNG DẪN, đã kiểm trong cây ngày 2026-08-29: helper nằm ở
 //     `SOURCE/app/(billing)/me/orders/__tests__/renderServerTree.tsx`.
-//     `SOURCE/lib/test/renderServerTree.tsx` DOES NOT EXIST — frontend DD :2158
-//     names it as the destination on the THIRD consumer, and this slice is the
-//     second. Import from the existing path, or move the helper and update the
-//     orders test in the same commit; do not import a path that is not there.
-// (2) FAKE-TIMER / REAL-TIMER COLLISION IN ONE FILE. FE2E-2 requires
-//     `vi.useFakeTimers()` (the poller is a nested-setTimeout loop; frontend DD
-//     :2160 pins the harness and forbids `waitFor` there). FE2E-3 must NOT use
-//     fake timers. Scope the fake clock to FE2E-2's own `describe` with
+//     `SOURCE/lib/test/renderServerTree.tsx` KHÔNG TỒN TẠI — frontend DD :2158
+//     nêu nó là đích đến ở người dùng THỨ BA, và lát cắt này là
+//     thứ hai. Import từ đường dẫn sẵn có, hoặc chuyển helper và cập nhật
+//     test orders trong cùng commit; đừng import một đường dẫn không có.
+// (2) VA CHẠM FAKE-TIMER / REAL-TIMER TRONG MỘT FILE. FE2E-2 đòi
+//     `vi.useFakeTimers()` (poller là vòng lặp setTimeout lồng nhau; frontend DD
+//     :2160 ghim harness và cấm `waitFor` ở đó). FE2E-3 KHÔNG được dùng
+//     fake timer. Giới hạn đồng hồ giả vào `describe` riêng của FE2E-2 với
 //     `beforeEach(() => vi.useFakeTimers())` / `afterEach(() => { cleanup();
-//     vi.useRealTimers(); })` — a file-level fake clock would hang FE2E-3's menu
-//     interactions.
+//     vi.useRealTimers(); })` — một đồng hồ giả cấp file sẽ treo các tương tác
+//     menu của FE2E-3.
 //
 // -----------------------------------------------------------------------------
-// SELECTION — why these three
+// CHỌN LỌC — vì sao ba cái này
 // -----------------------------------------------------------------------------
-//   FE2E-1  108  feature-off byte-for-byte across S-01 + S-02  <- selected (rank 1)
-//   FE2E-2   81  last essay resolves: announcement + unblock    <- selected, RESERVED
-//                 (highest-ROI user-facing multi-step journey)
-//   FE2E-3   72  PDF guard at BOTH exits, one attempt           <- selected (rank 3)
-//   (F-4)    40  RS-6 retry control aria-disabled + click no-op <- NOT selected here;
-//                 PUSHED DOWN to the component lane
-//                 (`EssayRegradeControl.test.tsx`, `npm test`), which proves the
-//                 whole aria-disabled idiom more cheaply. The ONE part a component
-//                 test cannot prove — the control survives a `router.refresh()`
-//                 without unmounting — is folded into FE2E-2 obligation (f).
-//   (F-5)    64  RS-0..RS-6 render matrix on /result/detail     <- NOT selected;
-//                 it is one component's state x display table, owned by the
+//   FE2E-1  108  tính-năng-tắt giống từng byte qua S-01 + S-02  <- được chọn (hạng 1)
+//   FE2E-2   81  bài tự luận cuối được giải quyết: thông báo + bỏ chặn  <- được chọn, GIỮ CHỖ
+//                 (hành trình nhiều bước hướng người dùng có ROI cao nhất)
+//   FE2E-3   72  chốt PDF ở CẢ HAI lối ra, một lượt làm       <- được chọn (hạng 3)
+//   (F-4)    40  nút thử lại RS-6 aria-disabled + click no-op <- KHÔNG chọn ở đây;
+//                 ĐẨY XUỐNG làn component
+//                 (`EssayRegradeControl.test.tsx`, `npm test`), nơi chứng minh
+//                 cả thành ngữ aria-disabled rẻ hơn. MỘT phần mà một test component
+//                 không chứng minh được — control sống sót qua một `router.refresh()`
+//                 mà không unmount — được gộp vào nghĩa vụ (f) của FE2E-2.
+//   (F-5)    64  ma trận render RS-0..RS-6 trên /result/detail     <- KHÔNG chọn;
+//                 đó là bảng trạng thái x hiển thị của một component, thuộc về
 //                 component lane per frontend DD § Phân tầng.
 
 import { createElement } from "react";
@@ -115,14 +115,14 @@ import { act, cleanup, fireEvent, render, screen, within } from "@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // =============================================================================
-// MOCK BOUNDARY — data sources and the action module ONLY
+// RANH GIỚI MOCK — CHỈ các nguồn dữ liệu và module action
 // =============================================================================
-// Real: every dictionary, every component, both route layouts, the whole
-// component tree. Stubbed: what reaches out of the process (Supabase reads, the
-// PDF pipeline, the router) plus the framework shims jsdom has no answer for.
+// Thật: mọi từ điển, mọi component, cả hai layout route, toàn bộ
+// cây component. Stub: thứ với ra ngoài tiến trình (lượt đọc Supabase, đường ống
+// PDF, router) cộng các shim framework mà jsdom không có câu trả lời.
 //
-// The point of this lane is that a defect in the WIRING between two real
-// components is visible. Mocking a component would hide exactly that.
+// Điểm của làn này là một lỗi ở DÂY NỐI giữa hai component thật nhìn thấy được.
+// Mock một component sẽ giấu chính điều đó.
 
 const {
   getResultMock,
@@ -141,11 +141,11 @@ const {
   listMyHistoryMock: vi.fn(),
   refreshMock: vi.fn(),
   generatePdfMock: vi.fn(),
-  // Task 08 — SolutionEntryCard's one additional query on /result. Whole-
-  // module mock per this file's own convention (UI Spec :164, frontend DD
-  // "Fixture lane's getResult/getMyRating mock factory" row): any export the
-  // page imports from a mocked module resolves to `undefined` and throws
-  // unless added here in the SAME change as the page import.
+  // Task 08 — một truy vấn bổ sung của SolutionEntryCard trên /result. Mock cả
+  // module theo quy ước của chính file này (UI Spec :164, dòng frontend DD
+  // "Fixture lane's getResult/getMyRating mock factory"): mọi export mà trang
+  // import từ một module bị mock đều resolve thành `undefined` và ném lỗi
+  // trừ khi được thêm vào đây trong CÙNG thay đổi với import của trang.
   getResultCardSummaryMock: vi.fn(),
 }));
 
@@ -156,7 +156,7 @@ vi.mock("next/headers", () => ({
 // `next/font/google` la mot compiler transform; goi nhu mot ham thuong thi no
 // nem. Tra ve dung ten CSS-variable ma tung call site hoi giu nguyen duong ma
 // that cua root layout (phep noi suy `className`). Ba font, dung nhu
-// `subscription.fixture.e2e.test.ts` da chay that.
+// `subscription.fixture.e2e.test.ts` đã chạy thật.
 vi.mock("next/font/google", () => {
   const font = (options: { variable?: string }) => ({
     variable: options.variable ?? "",
@@ -183,14 +183,14 @@ vi.mock("@/lib/billing/readEntitlement", () => ({ readEntitlement: readEntitleme
 vi.mock("@/features/exams/queries", () => ({ getResult: getResultMock }));
 vi.mock("@/features/exams/actions", () => ({ getMyRating: getMyRatingMock }));
 vi.mock("@/features/history/queries", () => ({ listMyHistory: listMyHistoryMock }));
-// Task 08 — SolutionEntryCard's sole data source (result/page.tsx's single
-// added query, AC-012). `renderResultRoute()` defaults this to `null` so the
-// four essay describes above stay byte-for-byte unaffected (no card, no new
-// node) unless a task-08 case below overrides it per-render.
+// Task 08 — nguồn dữ liệu duy nhất của SolutionEntryCard (truy vấn bổ sung duy nhất của
+// result/page.tsx, AC-012). `renderResultRoute()` mặc định cái này là `null` để
+// bốn describe tự luận ở trên giữ nguyên giống từng byte (không thẻ, không node mới)
+// trừ khi một ca task-08 bên dưới ghi đè theo từng lần render.
 vi.mock("@/features/solutions/queries", () => ({
   getResultCardSummary: getResultCardSummaryMock,
 }));
-// The PDF pipeline is the one thing whose ABSENCE of a call is the assertion.
+// Đường ống PDF là thứ duy nhất mà SỰ VẮNG MẶT của một lời gọi chính là khẳng định.
 vi.mock("@/lib/pdf/generateAttemptPdf", () => ({
   generateAttemptPdfFile: generatePdfMock,
   downloadPdfFile: vi.fn(),
@@ -235,10 +235,10 @@ const FREE_ENTITLEMENT = {
   ? never
   : Awaited<ReturnType<typeof import("@/lib/billing/readEntitlement").readEntitlement>>;
 
-/** A legacy attempt: NO element carries a lifecycle key, so `summariseEssays()`
- *  returns `undefined` and the whole essay surface must stay absent. This is the
- *  shipped state — the feature flag is off — and AC-012 says the page must be
- *  byte-for-byte what it was before this feature existed. */
+/** Một lượt làm cũ: KHÔNG phần tử nào mang khoá vòng đời, nên `summariseEssays()`
+ *  trả về `undefined` và cả bề mặt tự luận phải vắng mặt. Đây là trạng thái
+ *  đã ship — cờ tính năng tắt — và AC-012 nói trang phải giống từng byte
+ *  như trước khi tính năng này tồn tại. */
 function legacyResult(): ExamResult {
   return {
     examId: EXAM_ID,
@@ -277,7 +277,7 @@ function legacyResult(): ExamResult {
   };
 }
 
-/** The same attempt WITH the feature live and one essay still being scored. */
+/** Cùng lượt làm đó KHI tính năng đang chạy và một bài tự luận vẫn đang được chấm. */
 function pendingResult(): ExamResult {
   const base = legacyResult();
   return {
@@ -310,7 +310,7 @@ function pendingResult(): ExamResult {
   };
 }
 
-/** The same attempt once the band has landed. */
+/** Cùng lượt làm đó khi band đã hạ cánh. */
 function resolvedResult(): ExamResult {
   const base = legacyResult();
   return {
@@ -372,10 +372,10 @@ function cardSummary(over: Partial<ResultCardSummary> = {}): ResultCardSummary {
   };
 }
 
-/** `RootLayout -> (exams)/layout -> /result`, composed the way production
- *  composes it. Nothing here supplies `EntitlementProvider` — it is reached
- *  only because the route-group layout mounts it, which is the one thing a
- *  provider-wrapped unit test can never prove.
+/** `RootLayout -> (exams)/layout -> /result`, ghép đúng như production
+ *  ghép. Không gì ở đây cấp `EntitlementProvider` — nó chỉ tới được
+ *  vì layout nhóm route mount nó, là điều duy nhất mà một unit test bọc provider
+ *  không bao giờ chứng minh được.
  *
  *  ═══ VI SAO `renderServerTree()` CHU KHONG `render()` ═══
  *
@@ -389,7 +389,7 @@ function cardSummary(over: Partial<ResultCardSummary> = {}): ResultCardSummary {
  *
  *  Da do: cung mot cay, qua `render()` cho 0 ky tu; qua `renderServerTree()`
  *  cho mot cay that. */
-// `cardSummary` mac dinh `null` — 0 dong that (khong du dieu kien), giu FE2E-
+// `cardSummary` mặc định `null` — 0 dòng thật (không đủ điều kiện), giữ FE2E-
 // 1..4 o tren byte-for-byte (SolutionEntryCard khong render gi). Cac ca cua
 // task 08 truyen gia tri rieng qua tham so nay, KHONG set mock truoc/sau lan
 // goi ham nay — tranh dua thu tu voi dong ben duoi.
@@ -427,81 +427,81 @@ async function renderDetailRoute(result: ExamResult) {
   );
 }
 
-/** Every element carrying a native `disabled` attribute. FE-AC-21 says there
- *  must never be one, in any state. */
+/** Mọi phần tử mang thuộc tính `disabled` gốc. FE-AC-21 nói
+ *  không bao giờ được có cái nào, ở bất kỳ trạng thái nào. */
 function disabledNodes(root: HTMLElement): Element[] {
   return Array.from(root.querySelectorAll("[disabled]"));
 }
 
 // =============================================================================
-// FE2E-1 — The shipped state: flag off, four surfaces byte-for-byte as today
+// FE2E-1 — Trạng thái đã ship: cờ tắt, bốn bề mặt giống từng byte như hôm nay
 // =============================================================================
-// AC: FE-AC-14 — "When NO element of the attempt carries the essayState key, the
-//   result page MUST NOT insert any new node: no EssayScoreLine, no running
-//   poller, no change to ScoreCard." (AC-012)
-// AC: FE-AC-13 — "When a per_question element does not carry essayState (legacy
-//   row, feature off, or a question with no model answer), the question card MUST
+// AC: FE-AC-14 — "Khi KHÔNG phần tử nào của lượt làm mang khoá essayState,
+//   trang kết quả KHÔNG ĐƯỢC chèn node mới nào: không EssayScoreLine, không
+//   poller đang chạy, không đổi ScoreCard." (AC-012)
+// AC: FE-AC-13 — "Khi một phần tử per_question không mang essayState (hàng
+//   cũ, tính năng tắt, hoặc câu không có đáp án mẫu), thẻ câu hỏi PHẢI
 //   render BYTE-FOR-BYTE as before this change: 'Bạn trả lời:' / 'Đáp án đã lưu:' /
-//   the result.notAutoScored label." (AC-012/AC-018)
-// Also discharges: PRD AC-067; UI Spec Golden States 7, 8, 10; frontend DD
-//   § Feature-Off Window (S-01, S-02, PDF file) and its testable promise F-09:
-//   "poller does not mount, schedules no timer, calls router.refresh() zero times";
+//   nhãn result.notAutoScored." (AC-012/AC-018)
+// Cũng hoàn thành: PRD AC-067; UI Spec Golden States 7, 8, 10; frontend DD
+//   § Feature-Off Window (S-01, S-02, file PDF) và lời hứa kiểm thử được F-09 của nó:
+//   "poller không mount, không lập lịch timer nào, gọi router.refresh() không lần nào";
 //   frontend DD § Output Comparison column "tính năng tắt".
 // ROI: 108 (BV:10 x Freq:10 + Legal:0 + Defect:8)
-//   BV 10 — this is the state the feature SHIPS in, and it may ship in it for a
-//     long time: AC-067 is a human gate on a Groq account that does not exist yet.
-//     Everything else in this file describes a state no user has reached.
-//   Freq 10 — every student opening any result page, today and for the whole
-//     feature-off window.
-//   Defect 8 — a regression here is a regression to a SHIPPED, working page,
-//     caused by a feature that is supposed to be switched off. It is also the one
-//     defect class a reviewer is least likely to look for.
-// Behavior: the real route tree for /result and /result/detail is composed with a
-//   stubbed `getResult()` returning a LEGACY ExamResult (no essay* keys anywhere,
-//   `essaySummary === undefined`, every `PerQuestionResult.essay === undefined`) ->
-//   the page renders -> no essay node exists, no timer is scheduled, and the essay
-//   card is the unchanged not-auto-scored branch.
+//   BV 10 — đây là trạng thái mà tính năng XUẤT XƯỞNG, và nó có thể ở đó rất
+//     lâu: AC-067 là cổng người duyệt trên một tài khoản Groq chưa tồn tại.
+//     Mọi thứ khác trong file này mô tả một trạng thái chưa người dùng nào tới.
+//   Freq 10 — mọi học sinh mở bất kỳ trang kết quả nào, hôm nay và suốt
+//     cửa sổ tính-năng-tắt.
+//   Defect 8 — một hồi quy ở đây là hồi quy một trang ĐÃ SHIP, đang chạy,
+//     do một tính năng đáng lẽ đang tắt. Đó cũng là lớp lỗi duy nhất
+//     mà người review ít có khả năng tìm nhất.
+// Hành vi: cây route thật cho /result và /result/detail được ghép với một
+//   `getResult()` stub trả về ExamResult CŨ (không khoá essay* nào ở đâu cả,
+//   `essaySummary === undefined`, mọi `PerQuestionResult.essay === undefined`) ->
+//   trang render -> không node tự luận nào tồn tại, không timer nào được lập lịch, và thẻ
+//   tự luận là nhánh không-tự-chấm không đổi.
 // @category: fixture-e2e
 // @lane: fixture-e2e
-// @dependency: full-UI in-process (RootLayout -> (exams) layout -> result/page.tsx
-//   and result/detail/page.tsx), mocked backend (getResult stub), mocked
-//   next/navigation, mocked generateAttemptPdf
+// @dependency: toàn UI trong tiến trình (RootLayout -> layout (exams) -> result/page.tsx
+//   và result/detail/page.tsx), backend bị mock (stub getResult), mock
+//   next/navigation, mock generateAttemptPdf
 // @complexity: medium
-// @real-dependency: none
-// Primary failure mode: `EssayGradingPoller` is mounted unconditionally (or on a
-//   predicate that is true for `undefined`), so every legacy result page in
-//   production starts a `router.refresh()` loop that re-renders the page 30 times
-//   for no reason — invisible on screen, expensive in RSC requests, and reported by
-//   nobody because nothing looks wrong. The second mode: `EssayScoreLine` returns
-//   an empty fragment rather than `null`, inserting a node into the `gap-5` column
-//   and shifting the vertical rhythm of a shipped page.
-// Proof obligation — what the implemented test must assert:
-//   (a) POSITIVE FIRST (hazard 1): assert the page actually rendered — the
-//       ScoreCard's score text and the essay card's `result.notAutoScored` string
-//       are both found by `getByText`. Every negative assertion below is only
-//       meaningful after this one passes.
-//   (b) No essay node: none of the badge strings resolved from the REAL dictionary
+// @real-dependency: không có
+// Kiểu hỏng chính: `EssayGradingPoller` được mount vô điều kiện (hoặc theo một vị từ
+//   đúng với `undefined`), nên mọi trang kết quả cũ trên
+//   production bắt đầu một vòng lặp `router.refresh()` render lại trang 30 lần
+//   vô cớ — vô hình trên màn hình, tốn kém ở các request RSC, và không ai
+//   báo vì không gì trông sai. Kiểu thứ hai: `EssayScoreLine` trả về
+//   một fragment rỗng thay vì `null`, chèn một node vào cột `gap-5`
+//   và làm lệch nhịp dọc của một trang đã ship.
+// Nghĩa vụ chứng minh — test được cài đặt phải khẳng định gì:
+//   (a) DƯƠNG TRƯỚC (mối nguy 1): khẳng định trang thực sự đã render — chữ điểm của
+//       ScoreCard và chuỗi `result.notAutoScored` của thẻ tự luận
+//       đều tìm được bằng `getByText`. Mọi khẳng định phủ định bên dưới chỉ
+//       có ý nghĩa sau khi cái này qua.
+//   (b) Không node tự luận: không chuỗi huy hiệu nào phân giải từ từ điển THẬT
 //       (`result.essay.state.pending` = "Đang chấm", `.graded` = "Đã chấm",
 //       `.failed` = "Chấm thất bại") and none of `result.essay.label`,
-//       `result.essay.points`, `result.essay.denominator` appear anywhere in the
-//       container. Assert on the resolved strings via the real dictionary, not on
-//       component names or test ids.
-//   (c) Zero timers, zero refreshes — the three-part promise F-09 states as
-//       testable: `vi.getTimerCount()` is 0 immediately after render, advancing the
-//       clock by 200_000 ms schedules nothing, and the counted `refresh` mock has
-//       been called 0 times. (This is the one place FE2E-1 needs a fake clock; keep
-//       it inside this describe.)
-//   (d) The essay card is the UNCHANGED shared branch: "Bạn trả lời:" and
+//       `result.essay.points`, `result.essay.denominator` xuất hiện ở bất kỳ đâu trong
+//       container. Khẳng định trên các chuỗi đã phân giải qua từ điển thật, không phải trên
+//       tên component hay test id.
+//   (c) Không timer, không refresh — lời hứa ba phần mà F-09 nêu là
+//       kiểm thử được: `vi.getTimerCount()` bằng 0 ngay sau khi render, đẩy
+//       đồng hồ 200_000 ms không lập lịch gì, và mock `refresh` được đếm
+//       đã được gọi 0 lần. (Đây là chỗ duy nhất FE2E-1 cần đồng hồ giả; giữ
+//       nó trong describe này.)
+//   (d) Thẻ tự luận là nhánh dùng chung KHÔNG ĐỔI: "Bạn trả lời:" và
 //       "Đáp án đã lưu:" are both present, `result.notAutoScored` is present, and
-//       NO correct/incorrect chip is rendered on it.
-//   (e) PDF controls are open, not blocked: both PDF controls carry
-//       `aria-disabled="false"` and the sr-only reason element they point at does
-//       NOT contain `result.essay.pdfBlocked`.
-//   (f) ScoreCard 0-diff (ADR-0018 Amendment, UI-D3): the ScoreCard subtree's
-//       rendered text is toEqual an independently authored literal — score to one
+//       KHÔNG chip đúng/sai nào được render trên nó.
+//   (e) Control PDF mở, không bị chặn: cả hai control PDF mang
+//       `aria-disabled="false"` và phần tử lý do sr-only mà chúng trỏ tới
+//       KHÔNG chứa `result.essay.pdfBlocked`.
+//   (f) ScoreCard 0-diff (ADR-0018 Amendment, UI-D3): chữ đã render của cây con ScoreCard
+//       toEqual một literal tự soạn độc lập — điểm tới một
 //       decimal + "/10", "Đúng" = correct, "Sai" = total - correct — computed from
-//       the fixture by hand. `ScoreCard.tsx` is declared a 0-diff zone; this is the
-//       automated half of that declaration.
+//       fixture bằng tay. `ScoreCard.tsx` được khai báo là vùng 0-diff; đây là
+//       nửa tự động của lời khai báo đó.
 describe("Feature off — /result and /result/detail render as today (FE2E-1)", () => {
   // Dong ho GIA duoc pham vi hoa vao RIENG describe nay — KHONG BAO GIO o muc
   // file. FE2E-3 ben duoi tuong tac voi menu va se TREO duoi mot dong ho gia.
@@ -565,95 +565,94 @@ describe("Feature off — /result and /result/detail render as today (FE2E-1)", 
 });
 
 // =============================================================================
-// FE2E-2 — RESERVED SLOT (journey). The render where the LAST essay resolves:
-//          the aria-live region is still mounted, and the PDF controls unblock
-//          in place without moving focus
+// FE2E-2 — SUẤT GIỮ CHỖ (hành trình). Lần render mà bài tự luận CUỐI được giải quyết:
+//          vùng aria-live vẫn được mount, và các control PDF được bỏ chặn
+//          tại chỗ mà không chuyển focus
 // =============================================================================
-// AC: FE-AC-16 — "When the number of unresolved questions DECREASES between two
-//   renders, the poller's aria-live='polite' region MUST receive exactly one
-//   sentence; when it does not decrease, that region MUST be empty." (AC-023)
-// AC: PRD AC-023 — the landing band is announced, and focus is neither stolen nor
-//   lost.
-// AC: FE-AC-05 — "When every essay question is resolved, both Save and Share
-//   (S-01) and both PDF items in the ⋯ menu (S-03) MUST carry aria-disabled='false'
-//   and one click MUST call generateAttemptPdfFile exactly once." (AC-058)
-// Also discharges: frontend DD F-05 (the mount predicate is
-//   `essaySummary !== undefined`, NOT `pendingCount > 0`), the poller cases P-1/P-6,
-//   the three aria-live cases, UI-D5's "never removed from the tree" rule.
+// AC: FE-AC-16 — "Khi số câu chưa giải quyết GIẢM giữa hai lần render, vùng
+//   aria-live='polite' của poller PHẢI nhận đúng một câu; khi nó không
+//   giảm, vùng đó PHẢI rỗng." (AC-023)
+// AC: PRD AC-023 — band hạ cánh được thông báo, và focus không bị cướp cũng không
+//   bị mất.
+// AC: FE-AC-05 — "Khi mọi câu tự luận đã được giải quyết, cả Lưu và Chia sẻ
+//   (S-01) và cả hai mục PDF trong menu ⋯ (S-03) PHẢI mang aria-disabled='false'
+//   và một cú bấm PHẢI gọi generateAttemptPdfFile đúng một lần." (AC-058)
+// Cũng hoàn thành: frontend DD F-05 (vị từ mount là
+//   `essaySummary !== undefined`, KHÔNG phải `pendingCount > 0`), các ca poller P-1/P-6,
+//   ba ca aria-live, luật "không bao giờ bị gỡ khỏi cây" của UI-D5.
 // ROI: 81 (BV:9 x Freq:8 + Legal:0 + Defect:9)
-//   BV 9 — this is the feature's whole promise to a student who cannot see the
-//     screen: the score arrived. If the region is unmounted on the render that
-//     resolves the last essay, the announcement has nowhere to land and is never
-//     read; the visual user is unaffected, so nothing reports it.
-//   Freq 8 — every graded attempt passes through this exact transition once.
-//   Defect 9 — the UI Spec's own first formulation of the mount predicate
-//     (`pendingCount > 0`) CAUSES this defect; it was caught in review (F-05) and
-//     corrected. A test written against the natural-looking predicate is how it
-//     comes back.
-//   RESERVED-SLOT JUSTIFICATION: highest-ROI user-facing multi-step journey in the
-//   feature — /result renders with pending essays, state carries across a
-//   router.refresh() boundary, and the journey has a completion point (all essays
-//   resolved, PDF unblocked). Emitted regardless of threshold; it also clears it.
-//   WHY IT IS NOT service-integration-e2e: nothing here needs a real DB write, a
-//   real event or a real external call. The band's arrival is modelled by the
-//   stubbed `getResult()` returning a DIFFERENT fixture on the second call — which
-//   is also the only way to hit the transition deterministically.
-// Behavior: the real /result route tree renders with `essaySummary.pendingCount`
-//   = 1 -> the fake clock advances one poll interval -> the counted `refresh` mock
-//   fires and the stubbed `getResult()` now returns the all-resolved fixture ->
-//   the page re-renders IN PLACE -> the still-mounted aria-live region receives
-//   `result.essay.announceAllDone`, and the PDF controls flip to unblocked without
-//   any control being unmounted.
+//   BV 9 — đây là toàn bộ lời hứa của tính năng với học sinh không nhìn thấy
+//     màn hình: điểm đã đến. Nếu vùng bị unmount ở lần render giải quyết bài tự luận cuối,
+//     thông báo không có chỗ đáp xuống và không bao giờ được đọc; người dùng nhìn thấy
+//     không bị ảnh hưởng, nên không ai báo.
+//   Freq 8 — mọi lượt làm đã chấm đi qua đúng chuyển đổi này một lần.
+//   Defect 9 — cách phát biểu đầu tiên của chính UI Spec về vị từ mount
+//     (`pendingCount > 0`) GÂY RA lỗi này; nó được bắt ở review (F-05) và
+//     sửa. Một test viết theo vị từ trông-tự-nhiên là cách nó quay lại.
+//   BIỆN MINH SUẤT GIỮ CHỖ: hành trình nhiều bước hướng người dùng có ROI cao nhất
+//   của tính năng — /result render với các bài tự luận pending, trạng thái được mang qua một
+//   ranh giới router.refresh(), và hành trình có một điểm hoàn tất (mọi bài tự luận
+//   đã giải quyết, PDF được bỏ chặn). Được phát bất kể ngưỡng; nó cũng vượt ngưỡng.
+//   VÌ SAO KHÔNG PHẢI service-integration-e2e: không gì ở đây cần một lượt ghi DB thật, một
+//   sự kiện thật hay một lời gọi ngoài thật. Việc band đến được mô hình hoá bằng
+//   `getResult()` stub trả về một fixture KHÁC ở lần gọi thứ hai — cũng là
+//   cách duy nhất chạm chuyển đổi một cách xác định.
+// Hành vi: cây route /result thật render với `essaySummary.pendingCount`
+//   = 1 -> đồng hồ giả đẩy một khoảng poll -> mock `refresh` được đếm
+//   bắn và `getResult()` stub giờ trả về fixture đã-giải-quyết-hết ->
+//   trang render lại TẠI CHỖ -> vùng aria-live vẫn đang mount nhận
+//   `result.essay.announceAllDone`, và các control PDF lật sang không bị chặn mà
+//   không control nào bị unmount.
 // @category: fixture-e2e
 // @lane: fixture-e2e
-// @dependency: full-UI in-process (result/page.tsx composing EssayScoreLine +
-//   EssayGradingPoller), mocked next/navigation (counted refresh), mocked
-//   getResult (two-phase fixture), mocked generateAttemptPdf, fake timers
+// @dependency: toàn UI trong tiến trình (result/page.tsx ghép EssayScoreLine +
+//   EssayGradingPoller), mock next/navigation (refresh có đếm), mock
+//   getResult (fixture hai pha), mock generateAttemptPdf, fake timer
 // @complexity: high
-// @real-dependency: none
-// Primary failure mode: the poller's mount condition is written as
-//   `pendingCount > 0` (the shape the UI Spec first published), so on the render
-//   where the last essay resolves the component unmounts, the `aria-live` region
-//   leaves the DOM in the same commit as the sentence would have been inserted,
-//   and the completion is never announced. A test that renders the resolved state
-//   DIRECTLY passes — the region is absent in both the correct and the broken
-//   implementation at that instant; only the TRANSITION distinguishes them, which
-//   is why this case must drive the page through the transition rather than assert
-//   on the end state.
-// Proof obligation — what the implemented test must assert:
-//   (a) BEFORE: with pendingCount 1, the aria-live region exists
-//       (`container.querySelector('[aria-live="polite"]')` is non-null) and is
-//       EMPTY. Assert emptiness on textContent, not on absence of the node.
-//   (b) TRANSITION, driven not asserted-around: advance exactly one interval inside
-//       `act()` (frontend DD :2160 — nested setTimeout means each tick needs its
-//       own advance; a single long advance leaves React no commit point), let the
-//       second `getResult()` fixture render.
-//   (c) AFTER: the SAME aria-live node is still in the document (compare node
-//       identity with the reference captured in (a) — a remount that happens to
-//       re-add an equivalent node is the defect, and a selector-based re-query
-//       cannot tell the two apart), and its textContent now equals
+// @real-dependency: không có
+// Kiểu hỏng chính: điều kiện mount của poller bị viết là
+//   `pendingCount > 0` (dạng mà UI Spec công bố đầu tiên), nên ở lần render
+//   mà bài tự luận cuối được giải quyết, component bị unmount, vùng `aria-live`
+//   rời DOM trong cùng commit mà câu thông báo lẽ ra được chèn,
+//   và việc hoàn tất không bao giờ được thông báo. Một test render trạng thái đã giải quyết
+//   TRỰC TIẾP vẫn qua — vùng vắng mặt ở cả cài đặt đúng lẫn hỏng tại thời điểm đó;
+//   chỉ CHUYỂN ĐỔI mới phân biệt được chúng, đó là
+//   lý do ca này phải đẩy trang qua chuyển đổi thay vì khẳng định
+//   trạng thái cuối.
+// Nghĩa vụ chứng minh — test được cài đặt phải khẳng định gì:
+//   (a) TRƯỚC: với pendingCount 1, vùng aria-live tồn tại
+//       (`container.querySelector('[aria-live="polite"]')` khác null) và RỖNG.
+//       Khẳng định rỗng trên textContent, không phải trên việc vắng node.
+//   (b) CHUYỂN ĐỔI, được điều khiển chứ không khẳng định vòng quanh: đẩy đúng một khoảng trong
+//       `act()` (frontend DD :2160 — setTimeout lồng nhau nghĩa là mỗi tick cần
+//       lần đẩy riêng; một lần đẩy dài để React không có điểm commit), để
+//       fixture `getResult()` thứ hai render.
+//   (c) SAU: CHÍNH node aria-live đó vẫn còn trong tài liệu (so sánh danh tính node
+//       với tham chiếu bắt ở (a) — một lần remount tình cờ thêm lại một node tương đương
+//       chính là lỗi, và truy vấn lại theo selector không thể
+//       phân biệt hai trường hợp), và textContent của nó giờ bằng
 //       `result.essay.announceAllDone` = "Đã chấm xong toàn bộ câu tự luận."
-//       resolved through the REAL dictionary.
-//   (d) NEGATIVE CONTROL in the same case: a refresh where pendingCount does NOT
-//       decrease leaves the region empty. Without this, (c) passes for an
-//       implementation that announces on every tick — which is the AC-023 defect
-//       from the other direction (a screen reader interrupting on every poll).
-//   (e) UNBLOCK IN PLACE: after the transition both PDF controls carry
-//       `aria-disabled="false"`, and one click calls the mocked
-//       `generateAttemptPdfFile` EXACTLY ONCE (not "at least once" — the dogpile
-//       guard is the reason for the exact count).
-//   (f) NO CONTROL WAS UNMOUNTED across the transition (this is the folded-in part
-//       of the pushed-down F-4, and the automatable half of AB-5/R-F3): capture
-//       the DOM nodes of the PDF control and of any retry control before the
-//       refresh and assert the same node objects are still connected
-//       (`node.isConnected === true`) afterwards. RECORDED LIMIT, state it at the
-//       assertion: jsdom has no real `router.refresh()` and no painted focus ring,
-//       so this proves the NECESSARY condition (nothing was unmounted) and not the
-//       SUFFICIENT one (focus actually survived in a browser). The sufficient half
-//       stays with the manual browser pass; do not let this case's name claim it.
-//   Determinism: fake timers only, no `waitFor` anywhere in this describe
-//   (`waitFor` + fake timers is the standing hang in this repo), all clock movement
-//   through `vi.advanceTimersByTime` inside `act()`.
+//       đã phân giải qua từ điển THẬT.
+//   (d) ĐỐI CHỨNG ÂM trong cùng ca: một lần refresh mà pendingCount KHÔNG
+//       giảm để vùng rỗng. Thiếu cái này, (c) qua với một cài đặt
+//       thông báo ở mỗi tick — chính là lỗi AC-023 theo hướng
+//       ngược lại (trình đọc màn hình bị ngắt ở mỗi lần poll).
+//   (e) BỎ CHẶN TẠI CHỖ: sau chuyển đổi cả hai control PDF mang
+//       `aria-disabled="false"`, và một cú bấm gọi `generateAttemptPdfFile` mock
+//       ĐÚNG MỘT LẦN (không phải "ít nhất một lần" — chốt chống dồn dập
+//       là lý do cần số đếm chính xác).
+//   (f) KHÔNG CONTROL NÀO BỊ UNMOUNT qua chuyển đổi (đây là phần gộp vào của
+//       F-4 bị đẩy xuống, và là nửa tự động hoá được của AB-5/R-F3): bắt
+//       các node DOM của control PDF và của bất kỳ control thử lại nào trước
+//       refresh và khẳng định cùng các object node đó vẫn còn nối vào
+//       (`node.isConnected === true`) sau đó. GIỚI HẠN ĐÃ GHI, nêu tại chỗ
+//       khẳng định: jsdom không có `router.refresh()` thật và không có vòng focus được vẽ,
+//       nên điều này chứng minh điều kiện CẦN (không gì bị unmount) chứ không phải
+//       điều kiện ĐỦ (focus thực sự sống sót trong trình duyệt). Nửa đủ
+//       thuộc về lượt kiểm trình duyệt thủ công; đừng để tên ca này tuyên bố nó.
+//   Tính xác định: chỉ fake timer, không `waitFor` ở bất kỳ đâu trong describe này
+//   (`waitFor` + fake timer là chỗ treo thường trực trong repo này), mọi chuyển động đồng hồ
+//   qua `vi.advanceTimersByTime` trong `act()`.
 describe("Last essay resolves — announcement lands and PDF unblocks in place (FE2E-2)", () => {
   // Dong ho GIA, pham vi hoa vao RIENG describe nay — cau truc do do Task F-C3
   // dung san, va task nay THEM mot describe vao do chu khong phai gioi thieu no.
@@ -678,7 +677,7 @@ describe("Last essay resolves — announcement lands and PDF unblocks in place (
     // chuyen tiep ay.
     //
     // Vay ca nay chung minh dieu kien CAN — khong co gi bi unmount qua buoc
-    // chuyen tiep — chu KHONG chung minh dieu kien DU (focus that su song sot
+    // chuyển tiếp — chứ KHÔNG chứng minh điều kiện ĐỦ (focus thật sự sống sót
     // trong mot trinh duyet that). Nua DU nam o luot kiem tay bang trinh duyet
     // (FE-OQ-4 / IV-4 / R-F3).
 
@@ -908,60 +907,59 @@ describe("PDF export guard — both exits agree for one attempt (FE2E-3)", () =>
 });
 
 // =============================================================================
-// FE2E-4 — A graded card does NOT print "not auto-scored" above its own band
+// FE2E-4 — Một thẻ đã chấm KHÔNG in "chưa tự chấm" phía trên band của chính nó
 // =============================================================================
-// AC: FE-AC-03 — "When an essay question is `graded`, that question's card on the
-//   detail page MUST show EssayLifecycleBadge reading 'Da cham', the score
-//   `{band} / 1 diem`, the student's answer and the model answer; and MUST NOT
-//   show the string `result.notAutoScored`." (AC-053)
-// AC: FE-AC-13 — the counterpart that must NOT regress: an element with no
-//   lifecycle key still renders the label, byte-for-byte as before (AC-012/018).
+// AC: FE-AC-03 — "Khi một câu tự luận là `graded`, thẻ của câu đó trên trang
+//   chi tiết PHẢI hiện EssayLifecycleBadge đọc 'Da cham', điểm
+//   `{band} / 1 diem`, câu trả lời của học sinh và đáp án mẫu; và KHÔNG ĐƯỢC
+//   hiện chuỗi `result.notAutoScored`." (AC-053)
+// AC: FE-AC-13 — đối ứng KHÔNG ĐƯỢC hồi quy: một phần tử không có khoá
+//   vòng đời vẫn render nhãn, giống từng byte như trước (AC-012/018).
 //
-// WHY THIS CASE EXISTS, AND WHY IT DID NOT BEFORE.
-//   The frontend DD predicted this defect in as many words: `r.scored === false`
-//   is PERMANENTLY true for an essay in all seven render states (RS-0..RS-6), so
-//   a branch keyed on it "still runs and still renders something -- it just
-//   prints the `result.notAutoScored` label next to a score that was just
-//   graded", and it closed with "no crash, no warning, and no existing test
-//   catches it". That last clause was exactly right. FE2E-1(f) renders
-//   `/result/detail`, but only ever with `legacyResult()` -- the one fixture for
-//   which the label is CORRECT. No case rendered the detail route with a graded
-//   essay, so the contradiction had no test that could see it.
+// VÌ SAO CA NÀY TỒN TẠI, VÀ VÌ SAO TRƯỚC ĐÂY KHÔNG CÓ.
+//   Frontend DD đã dự đoán đúng lỗi này bằng từng ấy chữ: `r.scored === false`
+//   là VĨNH VIỄN true với một bài tự luận ở cả bảy trạng thái render (RS-0..RS-6), nên
+//   một nhánh khoá theo nó "vẫn chạy và vẫn render thứ gì đó -- chỉ là nó
+//   in nhãn `result.notAutoScored` cạnh một điểm vừa được chấm", và
+//   kết luận "không crash, không cảnh báo, và không test sẵn có nào bắt được". Mệnh đề cuối
+//   hoàn toàn đúng. FE2E-1(f) render `/result/detail`, nhưng chỉ với
+//   `legacyResult()` -- fixture duy nhất mà nhãn ĐÚNG. Không ca nào render
+//   route chi tiết với một bài tự luận đã chấm, nên sự mâu thuẫn không có test nào nhìn thấy.
 //
-//   It was found by the L1 dev run on 2026-08-30, on a real graded attempt: the
-//   card read "Not auto-scored" in its header and "Scored - 1 / 1 point" three
-//   lines below. Unit tests could not have found it either -- EssayReviewBlock's
-//   own tests render the block in isolation, and the label lives in the PAGE
-//   that wraps it. Only the composed route shows both at once.
+//  Nó được phát hiện bởi lượt chạy dev L1 ngày 2026-08-30, trên một lượt làm đã chấm thật: thẻ
+//   ghi "Not auto-scored" ở tiêu đề và "Scored - 1 / 1 point" ba
+//   dòng bên dưới. Unit test cũng không thể tìm ra -- test của chính EssayReviewBlock
+//   render khối đó khi cô lập, còn nhãn nằm ở TRANG bọc quanh nó. Chỉ
+//   route đã ghép mới hiện cả hai cùng lúc.
 //
-// ROI: 90 (BV:10 x Freq:9 + Legal:0 + Defect:0 -- defect already realised)
-//   BV 10 -- the card contradicts itself about the single fact the student came
-//     to the page for: whether this answer was scored.
-//   Freq 9 -- every graded essay card, every attempt, for every student.
+//ROI: 90 (BV:10 x Freq:9 + Legal:0 + Defect:0 -- lỗi đã thành hiện thực)
+//   BV 10 -- thẻ tự mâu thuẫn về sự thật duy nhất mà học sinh tới
+//     trang để biết: bài trả lời này đã được chấm hay chưa.
+//   Freq 9 -- mọi thẻ tự luận đã chấm, mọi lượt làm, của mọi học sinh.
 // @lane: fixture-e2e
-// @dependency: full-UI in-process (RootLayout -> (exams) layout ->
-//   result/detail/page.tsx), mocked backend (getResult stub)
+// @dependency: toàn UI trong tiến trình (RootLayout -> layout (exams) ->
+//   result/detail/page.tsx), backend bị mock (stub getResult)
 // @complexity: low
-// @real-dependency: none
+// @real-dependency: không có
 describe("A graded essay card does not also claim to be unscored (FE2E-4)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it("omits result.notAutoScored on a graded card while still showing the band, and keeps printing it on a card with no lifecycle key", async () => {
-    // --- The graded card: band present, contradiction absent.
+    // --- Thẻ đã chấm: có band, không có mâu thuẫn.
     const graded = await renderDetailRoute(resolvedResult());
 
-    // Positive assertion FIRST. This tree contains async server components, so a
-    // silently empty render would make every negative assertion below pass
-    // against nothing -- the AB-2/AB-3 hazard this file already documents.
+    // Khẳng định dương TRƯỚC. Cây này chứa các async server component, nên một
+    // lần render rỗng lặng lẽ sẽ làm mọi khẳng định phủ định bên dưới qua
+    // trên hư không -- mối nguy AB-2/AB-3 mà file này đã ghi.
     expect(graded.container.textContent).toContain(DICT["result.essay.state.graded"]);
 
-    // The defect itself.
+    // Chính lỗi đó.
     expect(graded.container.textContent).not.toContain(DICT["result.notAutoScored"]);
 
-    // --- The counterpart, in the SAME case so neither can be fixed by breaking
-    //     the other: no lifecycle key => the label is still correct, and stays.
+    // --- Đối ứng, trong CÙNG ca để không cái nào sửa được bằng cách phá
+    //     cái kia: không có khoá vòng đời => nhãn vẫn đúng, và vẫn ở nguyên.
     const legacy = await renderDetailRoute(legacyResult());
     expect(legacy.container.textContent).toContain(DICT["result.notAutoScored"]);
     expect(legacy.container.textContent).not.toContain(DICT["result.essay.state.graded"]);
@@ -969,25 +967,25 @@ describe("A graded essay card does not also claim to be unscored (FE2E-4)", () =
 });
 
 // =============================================================================
-// Task 08 — SolutionEntryCard entry point on /result
+// Task 08 — điểm vào SolutionEntryCard trên /result
 //   (Frontend Early Verification Point)
 // =============================================================================
-// AC: PRD AC-010 (Reference Contract Value #1) — exactly one of four labels
-//   per `myStatus`; AC-110 — the one-time hard-deleted-reason line via
-//   ModerationReasonBanner; AC-012 — at most one additional query per render.
-// Also discharges: frontend DD § Data Contracts `ResultCardSummary` "Zero
-//   rows" (null -> no card, no placeholder) and § Test Boundaries "Zero-row
+// AC: PRD AC-010 (Reference Contract Value #1) — đúng một trong bốn nhãn
+//   cho mỗi `myStatus`; AC-110 — dòng lý do hiện một lần cho bài bị xoá cứng qua
+//   ModerationReasonBanner; AC-012 — tối đa một truy vấn bổ sung cho mỗi lần render.
+// Cũng hoàn thành: frontend DD § Data Contracts `ResultCardSummary` "Zero
+//   rows" (null -> không thẻ, không chỗ giữ chỗ) và § Test Boundaries "Zero-row
 //   read branches"; backend DD § State Transitions/System Invariants
-//   (`viewed_at` monotonic — the reason text comes from exactly one call, no
-//   client-side cache or second read).
-// Proof Obligations (task file, verbatim claims): label-per-status;
-//   zero-row-null-case; at-most-one-query-per-render call count.
+//   (`viewed_at` đơn điệu — chữ lý do đến từ đúng một lời gọi, không cache phía
+//   client hay lượt đọc thứ hai).
+// Proof Obligations (task file, nguyên văn các khẳng định): nhãn-theo-trạng-thái;
+//   ca-null-không-hàng; số-đếm-tối-đa-một-truy-vấn-mỗi-lần-render.
 // @lane: fixture-e2e
-// @dependency: full-UI in-process (RootLayout -> (exams) layout ->
-//   result/page.tsx composing SolutionEntryCard), mocked getResultCardSummary
-//   at the features/solutions/queries module boundary only — page, card and
-//   banner render for real (mirrors this file's existing mock-boundary rule).
-// @real-dependency: none
+// @dependency: toàn UI trong tiến trình (RootLayout -> layout (exams) ->
+//   result/page.tsx ghép SolutionEntryCard), mock getResultCardSummary
+//   chỉ ở ranh giới module features/solutions/queries — trang, thẻ và
+//   banner render thật (theo luật ranh giới mock sẵn có của file này).
+// @real-dependency: không có
 describe("SolutionEntryCard — result-page entry point (task 08)", () => {
   const REASON = "Vi phạm quy định cộng đồng.";
 
@@ -1009,8 +1007,8 @@ describe("SolutionEntryCard — result-page entry point (task 08)", () => {
         cardSummary({ myStatus: myStatus as SolutionStatus | null })
       );
 
-      // POSITIVE FIRST (hazard 1, this file's own rule): the card itself
-      // rendered, not an empty tree.
+      // DƯƠNG TRƯỚC (mối nguy 1, luật riêng của file này): chính thẻ
+      // đã render, không phải một cây trống.
       expect(container.textContent).toContain(DICT["solutions.eyebrow"]);
 
       expect(
@@ -1026,10 +1024,10 @@ describe("SolutionEntryCard — result-page entry point (task 08)", () => {
       cardSummary({ myStatus: null, unseenDeletionReason: REASON })
     );
 
-    // The route-group layout already carries its own `role="status"` region
-    // (unrelated to this feature — same caveat this file's FE2E-1 records for
-    // `[aria-live="polite"]`), so filter by the reason text rather than
-    // assuming the banner is the only `[role="status"]` node on the page.
+    // Layout nhóm route đã mang vùng `role="status"` của riêng nó
+    // (không liên quan tính năng này — cùng lưu ý mà FE2E-1 của file này ghi cho
+    // `[aria-live="polite"]`), nên lọc theo chữ lý do thay vì
+    // giả định banner là node `[role="status"]` duy nhất trên trang.
     const reasonBanners = Array.from(
       container.querySelectorAll('[role="status"]')
     ).filter((el) => el.textContent?.includes(REASON));
@@ -1041,10 +1039,10 @@ describe("SolutionEntryCard — result-page entry point (task 08)", () => {
   });
 
   it("renders no SolutionEntryCard and no placeholder when getResultCardSummary resolves null (zero rows), while the rest of the result page still renders", async () => {
-    // Default cardSummaryValue is `null` — the zero-row / not-eligible branch.
+    // cardSummaryValue mặc định là `null` — nhánh không-hàng / không-đủ-điều-kiện.
     const { container } = await renderResultRoute(legacyResult());
 
-    // POSITIVE FIRST: the rest of the page is real (hazard 1).
+    // DƯƠNG TRƯỚC: phần còn lại của trang là thật (mối nguy 1).
     expect(container.textContent).toContain(DICT["result.nextTitle"]);
 
     expect(container.textContent).not.toContain(DICT["solutions.eyebrow"]);

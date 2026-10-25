@@ -1,4 +1,4 @@
-// rateLimit — unit tests (Security review 2026-08-03, Low).
+// rateLimit — unit test (Security review 2026-08-03, Low).
 // Dùng đồng hồ giả để kiểm hành vi cửa sổ trượt mà không phải chờ thật.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -50,7 +50,7 @@ describe("checkRateLimit", () => {
     checkRateLimit("k", 2, 1000); // t=600
     expect(checkRateLimit("k", 2, 1000).ok).toBe(false);
 
-    // t=1001: only the t=0 call has left the window → exactly one slot back.
+    // t=1001: chỉ lời gọi t=0 đã rời cửa sổ → đúng một suất được trả lại.
     vi.advanceTimersByTime(401);
     expect(checkRateLimit("k", 2, 1000).ok).toBe(true);
     expect(checkRateLimit("k", 2, 1000).ok).toBe(false);

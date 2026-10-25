@@ -8,8 +8,8 @@
 // null → redirect; route guard attemptId) sống ở
 // app/(exams)/exams/[id]/attempt/[attemptId]/solution/__tests__/page.test.tsx.
 //
-// Mock boundary (task 10 binding): `@/features/solutions/{queries,actions}`
-// mocked at the module boundary; `lib/solutions/countWords.ts` chạy THẬT
+// Ranh giới mock (ràng buộc task 10): `@/features/solutions/{queries,actions}`
+// bị mock ở ranh giới module; `lib/solutions/countWords.ts` chạy THẬT
 // (chính là "same countWords() the server uses" mà § Note-authoring contract
 // đòi) — không mock nó.
 

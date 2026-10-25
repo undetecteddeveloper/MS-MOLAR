@@ -1,11 +1,11 @@
-// aggregateAttemptsByRange [unit] — pure reducer, no I/O, no mocks needed.
+// aggregateAttemptsByRange [unit] — bộ rút gọn thuần, không I/O, không cần mock.
 // Design Doc: docs/design/analytics-layer3-data-logic-design.md
 // § Acceptance Criteria (AC-01..AC-13), § Aggregation Algorithm.
 // 2026-09-06: thêm `seconds` (thời gian làm bài cộng dồn theo môn) cho vòng
 // tròn "Thời gian luyện theo môn" — docs/design/ui-refactor-san-truong-design.md §3.
 //
-// `now` is fixed and injected (never read from the system clock) so range
-// boundaries are deterministic across runs.
+// `now` được cố định và tiêm vào (không bao giờ đọc từ đồng hồ hệ thống) để
+// các biên khoảng thời gian xác định giữa các lần chạy.
 
 import { describe, expect, it } from "vitest";
 import { aggregateAttemptsByRange, type AttemptRow } from "../aggregateAttempts";
@@ -191,11 +191,11 @@ describe("aggregateAttemptsByRange", () => {
 
   it("seconds: one attempt never counts more than the exam's duration — an attempt left open for days is capped, no cap when duration is null/0", () => {
     const rows = [
-      // 15-minute exam left open for three days before submitting → 15 minutes.
+      // Đề 15 phút để mở ba ngày rồi mới nộp → 15 phút.
       row({ subject: "Math", startedAt: daysAgo(4), durationMinutes: 15 }),
-      // 45-minute exam finished in 20 minutes → the real 20 minutes.
+      // Đề 45 phút làm xong trong 20 phút → đúng 20 phút thật.
       row({ subject: "Math", startedAt: minutesBefore(DEFAULT_SUBMITTED, 20), durationMinutes: 45 }),
-      // No duration known → raw elapsed time.
+      // Không biết thời lượng → thời gian trôi qua thô.
       row({ subject: "Physics", startedAt: minutesBefore(DEFAULT_SUBMITTED, 200), durationMinutes: null }),
       row({ subject: "Chemistry", startedAt: minutesBefore(DEFAULT_SUBMITTED, 200), durationMinutes: 0 }),
     ];

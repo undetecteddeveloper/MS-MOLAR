@@ -3,12 +3,12 @@
 // CommentSheet — UI Spec § Component: CommentSheet; frontend DD § Main
 // Components/§ Comment-authoring contract. Required Tests (task 28): #1 (send
 // generic), #4 (lockedAnonymous, hàng lạc quan Ẩn danh), #8 (dirty-close
-// DD-U5, Reference Contract Value #24), #9 (rate limit), #10 (empty body).
-// Required Test #12 (task 28) originally asserted NO report control here —
-// task 28's own file pinned that as a task-37 placeholder ("task 37 adds
-// 'Báo cáo'"); task 37 supersedes it below with the actual rendered branch,
-// proven at the `CommentItem` unit level and re-checked here because
-// `CommentSheet` mounts real `CommentItem` rows.
+// DD-U5, Reference Contract Value #24), #9 (giới hạn tần suất), #10 (thân rỗng).
+// Required Test #12 (task 28) ban đầu khẳng định KHÔNG có control báo cáo ở đây —
+// chính file của task 28 ghim đó là chỗ giữ chỗ của task 37 ("task 37 thêm
+// 'Báo cáo'"); task 37 thay thế nó bên dưới bằng nhánh thực sự được render,
+// chứng minh ở mức unit của `CommentItem` và kiểm lại ở đây vì
+// `CommentSheet` mount các hàng `CommentItem` thật.
 //
 // Mock boundary: `@/features/solutions/actions` mocked ở module boundary
 // (postComment/deleteComment/reportComment) — `identity.ts` và `RichText`

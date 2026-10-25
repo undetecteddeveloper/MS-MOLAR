@@ -3,7 +3,7 @@
 //   (§ lib/essay/prompt.ts — bốn tính chất bố cục; § EG-BE-017; § R-06/R-10)
 // ADR: docs/adr/ADR-0005-multi-part-national-exam-format.md (§ Decision —
 //   `essay_answer` là ground truth của câu tự luận)
-// Task: docs/plans/tasks/essay-auto-scoring-task-H3.md
+// Task: docs/plans/tasks/essay-auto-scoring-task-H3.md (đã xoá, xem git log)
 //
 // PHẠM VI CHỨNG MINH — đọc trước khi tin file này nhiều hơn mức nó đáng: nó
 // chứng minh VỊ TRÍ và SỰ TRUNG HOÀ (bài làm nằm trọn trong vùng dữ liệu, sau

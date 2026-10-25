@@ -1,152 +1,148 @@
-// getResult() Extension [integration] Test Skeleton
+// Bộ khung test integration cho phần mở rộng getResult() [integration]
 // Design Doc: docs/design/history-backend-design.md (v1.2)
 // PRD: docs/prd/history-prd.md (v1.3, AC-009)
-// Generated: 2026-07-30 | Budget Used: integration 3/3 (this file is slot 3 of 3
-//   by ROI rank — see SOURCE/features/history/__tests__/history.int.test.ts's header
-//   for the full feature-level budget accounting)
+// Sinh ngày: 2026-07-30 | Ngân sách đã dùng: integration 3/3 (file này là suất 3 trong 3
+//   theo xếp hạng ROI — xem comment đầu SOURCE/features/history/__tests__/history.int.test.ts
+//   để biết kế toán ngân sách cấp tính năng đầy đủ)
 //
-// Converted from skeleton (history backend Task 1.1): getResult()'s extension
-// (exam_attempts select gaining "started_at, submitted_at"; ExamResult type
-// gaining startedAt/submittedAt) is implemented alongside these tests, TDD
-// Red -> Green in one commit.
+// Đã chuyển từ skeleton (history backend Task 1.1): phần mở rộng của getResult()
+// (select exam_attempts có thêm "started_at, submitted_at"; kiểu ExamResult
+// có thêm startedAt/submittedAt) được cài đặt cùng các test này,
+// TDD Red -> Green trong một commit.
 //
-// Mock boundary: same sanctioned boundary as history.int.test.ts/rating.int.test.ts
-// — the Supabase client only (backend DD Test Boundaries: "Supabase client inside
-// listMyHistory()/getResult() — Yes (mock)").
+// Ranh giới mock: cùng ranh giới được phê duyệt với history.int.test.ts/rating.int.test.ts
+// — chỉ client Supabase (Test Boundaries của backend DD: "Supabase client bên trong
+// listMyHistory()/getResult() — Có (mock)").
 
 // =============================================================================
-// Test 2 — getResult(): additive select extension, byte-identical
-// pre-existing output, correctly-mapped new fields, null-submittedAt path
+// Test 2 — getResult(): phần mở rộng select mang tính cộng thêm, đầu ra sẵn có
+// giống từng byte, các trường mới ánh xạ đúng, đường submittedAt null
 // =============================================================================
-// AC-009: "Given a History row or the Result page, when Save/Share is
-//   triggered, then all PDF-required data (score, exam title, startedAt/
-//   submittedAt) is already present in the data the page/row already
-//   loaded... with no additional backend round trip." (getResult()'s half:
-//   startedAt/submittedAt must be present on the SAME call already made for
-//   examId/examTitle/result/questions — no second query is ever issued.)
-// Regression risk R-2 (backend DD Risks and Mitigation table): "getResult()'s
-//   extension regresses either of its 2 existing consumers if not strictly
-//   additive." Both result/page.tsx and result/detail/page.tsx are existing,
-//   already-shipped, live-traffic consumers of getResult()'s current output —
-//   this is the only automated proof that this feature does not break them.
-// ROI: 80 (BV:9 x Freq:8 + Legal:0 + Defect:8) — getResult() already backs 2
-//   shipped pages; a non-additive regression here breaks the existing Result
-//   page for every user viewing any past attempt, not merely the new History
-//   surface — elevated above a typical "new read" ROI specifically because of
-//   this backward-compatibility blast radius.
-// Behavior: getResult(attemptId) is called against a mocked Supabase client
-//   boundary -> the exam_attempts select gains started_at/submitted_at
-//   alongside the existing exam_id -> asserts every pre-existing field's value
-//   and null-ness is byte-identical to the pre-change shape (Output
-//   Comparison) and the 2 new fields are correctly mapped from the mocked
-//   snake_case columns, including the reachable null-submittedAt race-window
-//   case (a direct hit on the attempt's URL before submitExam's status-update
-//   step completes).
+// AC-009: "Cho một hàng History hoặc trang Kết quả, khi Lưu/Chia sẻ được
+//   kích hoạt, thì mọi dữ liệu PDF cần (điểm, tên đề, startedAt/
+//   submittedAt) đã có sẵn trong dữ liệu mà trang/hàng đã
+//   tải... không thêm lượt khứ hồi backend nào." (nửa của getResult():
+//   startedAt/submittedAt phải có mặt trên CHÍNH lời gọi đã thực hiện cho
+//   examId/examTitle/result/questions — không bao giờ phát truy vấn thứ hai.)
+// Rủi ro hồi quy R-2 (bảng Risks and Mitigation của backend DD): "phần mở rộng của getResult()
+//   làm hồi quy một trong 2 nơi tiêu thụ sẵn có nếu không thuần cộng thêm."
+//   Cả result/page.tsx lẫn result/detail/page.tsx đều là nơi tiêu thụ đã ship,
+//   đang có lưu lượng thật của đầu ra hiện tại của getResult() —
+//   đây là bằng chứng tự động duy nhất rằng tính năng này không phá chúng.
+// ROI: 80 (BV:9 x Freq:8 + Legal:0 + Defect:8) — getResult() đã nuôi 2
+//   trang đã ship; một hồi quy không thuần cộng thêm ở đây phá trang Kết quả
+//   hiện có cho mọi người dùng xem bất kỳ lượt làm cũ nào, không chỉ bề mặt
+//   History mới — nâng cao hơn ROI "lượt đọc mới" thông thường chính vì
+//   bán kính ảnh hưởng về tương thích ngược này.
+// Hành vi: getResult(attemptId) được gọi trên ranh giới client Supabase mock
+//   -> select exam_attempts có thêm started_at/submitted_at
+//   bên cạnh exam_id sẵn có -> khẳng định giá trị và tính null của mọi trường sẵn có
+//   giống từng byte với hình dạng trước khi đổi (So sánh đầu ra) và 2 trường mới
+//   được ánh xạ đúng từ các cột snake_case mock, kể cả ca
+//   submittedAt null có thể xảy ra trong cửa sổ race (truy cập thẳng URL của lượt làm
+//   trước khi bước cập nhật trạng thái của submitExam hoàn tất).
 // @category: core-functionality
 // @lane: integration
-// @dependency: SOURCE/features/exams/queries.ts (getResult) + mocked Supabase
-//   client (createClient() boundary)
+// @dependency: SOURCE/features/exams/queries.ts (getResult) + client Supabase
+//   mock (ranh giới createClient())
 // @complexity: low
-// @real-dependency: none — same sanctioned mock boundary as
-//   history.int.test.ts; this test proves JS call-construction/mapping
-//   correctness only, not real-Postgres semantics (none are newly introduced
-//   by this additive change).
-// Primary failure mode: the exam_attempts select silently drops or misnames
-//   one of the 2 new columns (e.g. selects "started_at" but not
-//   "submitted_at"); OR the extension inadvertently changes a pre-existing
-//   field's value or null-ness (examId, examTitle, result.totalScore/correct/
-//   total/perQuestion/topicBreakdown, or questions); OR a null submitted_at is
-//   coerced to an empty string or omitted from the returned object instead of
-//   staying exactly `null` on ExamResult.submittedAt.
-// Round-trip collapse (2026-08-03 perf pass): getResult() previously issued 4
-//   sequential round trips (exam_results -> exam_attempts -> exams_with_difficulty
-//   via getExam() -> questions, measured ~816ms). The first 3 are now a single
-//   PostgREST request embedding exam_attempts and, through it, the
-//   exams_with_difficulty view (~385ms, verified output-identical against the old
-//   chain on the real DB). Obligations (a)-(c) below are unchanged in substance;
-//   (a)'s columns simply moved into the embed, and (d)/(e) were added because the
-//   collapse gave this function two new responsibilities of its own: carrying
-//   getExam()'s published-visibility guard, and staying collapsed.
-// Proof obligation:
-//   (a) Additive extension (query shape) — the exam_results select embeds
-//       exam_attempts!inner(...) and that projection still carries both
-//       started_at and submitted_at (dropping either still breaks AC-009).
-//   (b) Output Comparison — with a fixture attempt/result/exam/questions row
-//       set, the returned ExamResult's pre-existing sub-object
-//       { examId, examTitle, result, questions } is toEqual an independently
-//       authored literal fixture value (not merely "whatever the mock
-//       returned unchanged" — per testing-principles' "Literal Expected
-//       Values", the expected value must be computed independently of the
-//       implementation so a real regression would be caught); startedAt is a
-//       non-empty string equal to the fixture's started_at; submittedAt
-//       equals the fixture's submitted_at (non-null case).
-//   (c) Null-submittedAt path — with a mocked exam_attempts row where
-//       submitted_at is null, ExamResult.submittedAt === null exactly (not
-//       coerced to "" and not omitted as a missing key from the returned
-//       object).
-//   (d) Visibility guard survived the collapse — the join applies
-//       .eq("exam_attempts.exams_with_difficulty.status", "published"), the guard
-//       previously owned by getExam(). Without it an unpublished/withdrawn exam's
-//       result would become readable: a visibility regression, not a perf one.
-//   (e) Round-trip no-regression guard — the collapsed join must never be
-//       re-split into SEQUENTIAL round trips. Engine 1 added a second
-//       exam_results read (the cross-attempt wrong-twice history) issued inside
-//       the same Promise.all, so a call count alone can no longer tell
-//       "parallel" apart from "re-split": the obligation is therefore proven by
-//       holding BOTH reads open on their own gates and asserting both were
-//       issued while NEITHER had resolved. Holding only one open would make the
-//       guard directional — the opposite sequential ordering would stay green.
-//       Re-splitting would undo the optimization while every output assertion
-//       still passed.
-//   (f) hasBeenWrongTwice end-to-end (Engine 1 backend task 09) — the flag is
-//       computed from the cross-attempt history and applied only to scored,
-//       incorrect rows, and the history read is UNSCOPED (no .eq() narrowing it
-//       to one exam/attempt). Obligations (a)-(e) all pass with the history
-//       mapped to nothing, i.e. with the feature permanently dead; this is the
-//       only one that fails. It needs a thenable fake builder, because the
-//       history read awaits the builder directly rather than .maybeSingle().
-//   (g) Additive-enrichment degradation — a failing history read must NOT reject
-//       getResult(). The joined read stays fail-loud (no row means no page), but
-//       this one is display gating: on error it logs and yields an EMPTY history,
-//       so no row can be flagged. UI Spec § D1 / AC-024 defines false and absent
-//       as the same fail-closed state ("Absent/false = affordance does not
-//       render"), so the mapping formula is applied unchanged and needs no
-//       "history unavailable" mode of its own.
-//       Without this, a transient failure of a feature the page shipped without
-//       would break the whole already-live result-detail page.
-// Verification points / expected results / pass criteria:
-//   - Obligation (a): the exam_attempts mock's recorded .select() call
-//     argument equals the exact literal string
+// @real-dependency: không có — cùng ranh giới mock được phê duyệt như
+//   history.int.test.ts; test này chỉ chứng minh tính đúng của cách dựng lời gọi/ánh xạ JS,
+//   không chứng minh ngữ nghĩa Postgres thật (không cái nào mới được đưa vào
+//   bởi thay đổi cộng thêm này).
+// Kiểu hỏng chính: select exam_attempts lặng lẽ bỏ hoặc gọi sai tên
+//   một trong 2 cột mới (ví dụ select "started_at" mà không có
+//   "submitted_at"); HOẶC phần mở rộng vô tình đổi giá trị hoặc tính null của một
+//   trường sẵn có (examId, examTitle, result.totalScore/correct/
+//   total/perQuestion/topicBreakdown, hay questions); HOẶC submitted_at null bị
+//   ép thành chuỗi rỗng hoặc bị bỏ khỏi object trả về thay vì
+//   giữ đúng `null` trên ExamResult.submittedAt.
+// Gộp lượt khứ hồi (đợt hiệu năng 2026-08-03): getResult() trước đây phát 4
+//   lượt khứ hồi tuần tự (exam_results -> exam_attempts -> exams_with_difficulty
+//   qua getExam() -> questions, đo ~816ms). 3 lượt đầu giờ là một request
+//   PostgREST duy nhất nhúng exam_attempts và, qua nó, view
+//   exams_with_difficulty (~385ms, đã kiểm đầu ra giống hệt chuỗi cũ trên DB thật).
+//   Các nghĩa vụ (a)-(c) bên dưới không đổi về bản chất; các cột của
+//   (a) chỉ chuyển vào phần nhúng, và (d)/(e) được thêm vì việc gộp
+//   trao cho hàm này hai trách nhiệm mới của riêng nó: mang chốt hiển thị-đã-đăng
+//   của getExam(), và giữ nguyên trạng thái đã gộp.
+// Nghĩa vụ chứng minh:
+//   (a) Phần mở rộng cộng thêm (hình dạng truy vấn) — select exam_results nhúng
+//       exam_attempts!inner(...) và phép chiếu đó vẫn mang cả
+//       started_at lẫn submitted_at (bỏ cột nào cũng vẫn phá AC-009).
+//   (b) So sánh đầu ra — với một bộ hàng fixture attempt/result/exam/questions,
+//       sub-object sẵn có của ExamResult trả về
+//       { examId, examTitle, result, questions } toEqual một giá trị fixture literal
+//       tự soạn độc lập (không chỉ "whatever mock trả về không đổi" — theo
+//       "Literal Expected Values" của testing-principles, giá trị kỳ vọng phải được tính
+//       độc lập với cài đặt để một hồi quy thật bị bắt); startedAt là
+//       chuỗi không rỗng bằng started_at của fixture; submittedAt
+//       bằng submitted_at của fixture (ca không null).
+//   (c) Đường submittedAt null — với hàng exam_attempts mock mà
+//       submitted_at là null, ExamResult.submittedAt === null đúng như vậy (không bị
+//       ép thành "" và không bị bỏ như một khoá thiếu khỏi object
+//       trả về).
+//   (d) Chốt hiển thị sống sót sau khi gộp — join áp dụng
+//       .eq("exam_attempts.exams_with_difficulty.status", "published"), chốt
+//       trước đây thuộc getExam(). Thiếu nó, kết quả của một đề chưa đăng/đã rút
+//       sẽ đọc được: hồi quy về khả năng hiển thị, không phải về hiệu năng.
+//   (e) Chốt không hồi quy lượt khứ hồi — join đã gộp không bao giờ được
+//       tách lại thành các lượt khứ hồi TUẦN TỰ. Engine 1 thêm lượt đọc exam_results
+//       thứ hai (lịch sử wrong-twice xuyên lượt làm) phát trong cùng
+//       Promise.all, nên chỉ đếm số lời gọi không còn phân biệt được
+//       "song song" với "tách lại": nghĩa vụ vì vậy được chứng minh bằng cách
+//       giữ mở CẢ HAI lượt đọc trên cổng riêng của chúng và khẳng định cả hai đã
+//       được phát trong khi CHƯA cái nào resolve. Chỉ giữ mở một lượt sẽ làm
+//       chốt chặn có hướng — thứ tự tuần tự ngược lại vẫn xanh.
+//       Tách lại sẽ huỷ tối ưu hoá trong khi mọi khẳng định đầu ra
+//       vẫn qua.
+//   (f) hasBeenWrongTwice đầu-cuối (Engine 1 backend task 09) — cờ được
+//       tính từ lịch sử xuyên lượt làm và chỉ áp lên các hàng đã chấm,
+//       sai, và lượt đọc lịch sử KHÔNG có phạm vi (không .eq() nào thu hẹp nó
+//       về một đề/lượt làm). Các nghĩa vụ (a)-(e) đều qua khi lịch sử
+//       ánh xạ ra không gì, tức khi tính năng chết vĩnh viễn; đây là
+//       nghĩa vụ duy nhất hỏng. Nó cần một builder giả thenable, vì lượt đọc lịch sử
+//       await trực tiếp builder chứ không qua .maybeSingle().
+//   (g) Suy giảm của phần làm giàu cộng thêm — một lượt đọc lịch sử lỗi KHÔNG được reject
+//       getResult(). Lượt đọc join vẫn fail-loud (không có hàng nghĩa là không có trang), nhưng
+//       lượt này là chặn hiển thị: khi lỗi nó ghi log và trả lịch sử RỖNG,
+//       nên không hàng nào bị gắn cờ. UI Spec § D1 / AC-024 định nghĩa false và vắng mặt
+//       là cùng một trạng thái fail-closed ("Absent/false = affordance không
+//       render"), nên công thức ánh xạ được áp dụng không đổi và không cần
+//       chế độ "lịch sử không khả dụng" riêng.
+//       Thiếu điều này, một sự cố thoáng qua của một tính năng mà trang đã ship mà không có nó
+//       sẽ phá cả trang chi tiết kết quả đang chạy.
+// Điểm kiểm chứng / kết quả mong đợi / tiêu chí qua:
+//   - Nghĩa vụ (a): tham số lời gọi .select() được ghi lại của mock exam_attempts
+//     bằng đúng chuỗi literal
 //     "exam_id, started_at, submitted_at".
-//   - Obligation (b): `toEqual` on the extracted
-//     { examId, examTitle, result, questions } sub-object against a literal
-//     expected fixture object authored independently of the mock's return
-//     value; startedAt is a non-empty string matching the fixture's
-//     started_at; submittedAt (string case) equals the fixture's
-//     submitted_at.
-//   - Obligation (c): ExamResult.submittedAt === null (strict equality); the
-//     key "submittedAt" is present on the returned object
+//   - Nghĩa vụ (b): `toEqual` trên sub-object
+//     { examId, examTitle, result, questions } đã trích so với một object fixture
+//     kỳ vọng literal tự soạn độc lập với giá trị trả về của mock;
+//     startedAt là chuỗi không rỗng khớp started_at của fixture;
+//     submittedAt (ca chuỗi) bằng submitted_at của fixture.
+//   - Nghĩa vụ (c): ExamResult.submittedAt === null (bằng nghiêm ngặt); khoá
+//     "submittedAt" có mặt trên object trả về
 //     (Object.prototype.hasOwnProperty.call(result, "submittedAt") === true),
-//     not silently absent.
+//     không bị vắng mặt một cách lặng lẽ.
 
-// Answer-key lockdown (2026-08-03, Security review Critical #1): round trip 2 is
-// now supabase.rpc("exam_answer_key") instead of .from("questions") —
-// sub_answers/essay_answer are REVOKEd from the `authenticated` role, so the
-// SECURITY DEFINER function (schema.sql §10a) is the only path that still yields
-// them, and only to the exam's author or someone who has already submitted an
-// attempt on it. Obligation (e) counts that trip as the .rpc() rather than as a
-// second .from().
+// Khoá đáp án (2026-08-03, Security review Critical #1): lượt khứ hồi thứ 2 giờ là
+// supabase.rpc("exam_answer_key") thay vì .from("questions") —
+// sub_answers/essay_answer bị REVOKE khỏi role `authenticated`, nên hàm
+// SECURITY DEFINER (schema.sql §10a) là đường duy nhất còn trả chúng,
+// và chỉ cho tác giả của đề hoặc người đã nộp một lượt làm trên đề đó.
+// Nghĩa vụ (e) đếm lượt đó là .rpc() chứ không phải một .from() thứ hai.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { fromMock, rpcMock } = vi.hoisted(() => ({ fromMock: vi.fn(), rpcMock: vi.fn() }));
 
-// queries.ts imports "server-only" (throws outside a Next server/react-server bundle)
-// → stub, same pattern as rating.int.test.ts.
+// queries.ts import "server-only" (ném lỗi ngoài bundle server Next/react-server)
+// → stub, cùng mẫu với rating.int.test.ts.
 vi.mock("server-only", () => ({}));
 
-// Mock boundary: Supabase client only (backend DD Test Boundaries) — proves JS call
-// construction; no real-Postgres semantics are newly introduced by this additive change.
+// Ranh giới mock: chỉ client Supabase (Test Boundaries của backend DD) — chứng minh cách dựng
+// lời gọi JS; thay đổi cộng thêm này không đưa vào ngữ nghĩa Postgres thật nào mới.
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(async () => ({ from: fromMock, rpc: rpcMock })),
 }));
@@ -155,7 +151,7 @@ const { getResult } = await import("@/features/exams/queries");
 
 const ATTEMPT_ID = "attempt-1";
 
-// exam_results row (DB shape, snake_case) — feeds ScoreResult; untouched by this task.
+// hàng exam_results (dạng DB, snake_case) — nuôi ScoreResult; task này không đụng.
 const RESULT_ROW = {
   total_score: 8.5,
   correct: 4,
@@ -164,8 +160,8 @@ const RESULT_ROW = {
   topic_breakdown: [{ topic: "Algebra", correct: 1, total: 1 }],
 };
 
-// Embedded exams_with_difficulty projection — getResult() selects only id/title
-// through the join, because those are the only two fields it surfaces.
+// Phép chiếu exams_with_difficulty nhúng — getResult() chỉ select id/title
+// qua join, vì đó là hai trường duy nhất nó đưa ra.
 const EMBEDDED_EXAM = { id: "exam-1", title: "Sample Exam" };
 
 // questions row (DB shape).
@@ -183,10 +179,10 @@ const QUESTION_ROWS = [
   },
 ];
 
-// Independently-authored expected fixture for getResult()'s PRE-EXISTING output
-// shape ({ examId, examTitle, result, questions }) — computed by hand from
-// RESULT_ROW/EXAM_ROW/QUESTION_ROWS above, not copied from the implementation
-// (testing-principles' "Literal Expected Values").
+// Fixture kỳ vọng tự soạn độc lập cho hình dạng đầu ra SẴN CÓ của getResult()
+// ({ examId, examTitle, result, questions }) — tính tay từ
+// RESULT_ROW/EXAM_ROW/QUESTION_ROWS ở trên, không chép từ cài đặt
+// ("Literal Expected Values" của testing-principles).
 const EXPECTED_PRE_EXISTING_OUTPUT = {
   examId: "exam-1",
   examTitle: "Sample Exam",
@@ -212,10 +208,10 @@ const EXPECTED_PRE_EXISTING_OUTPUT = {
   },
 };
 
-/** Wires fromMock for getResult()'s call chain, now 2 round trips instead of 4:
- * exam_results (with exam_attempts -> exams_with_difficulty embedded in the same
- * request) -> questions. `attemptRow` drives the extension under test
- * (started_at/submitted_at); the returned mocks/recorders back obligations
+/** Nối fromMock cho chuỗi gọi của getResult(), giờ là 2 lượt khứ hồi thay vì 4:
+ * exam_results (với exam_attempts -> exams_with_difficulty nhúng trong cùng
+ * request) -> questions. `attemptRow` điều khiển phần mở rộng đang kiểm
+ * (started_at/submitted_at); các mock/recorder trả về nuôi các nghĩa vụ
  * (a)/(d)/(e). */
 function mockGetResultChain(attemptRow: {
   started_at: string;
@@ -273,14 +269,14 @@ describe("getResult() — additive select extension, byte-identical pre-existing
 
     await getResult(ATTEMPT_ID);
 
-    // The 2 columns are now requested through the embed rather than a separate
-    // exam_attempts round trip, but dropping either still breaks AC-009 — so the
-    // obligation is unchanged in substance, only in where the columns appear.
+    // 2 cột giờ được yêu cầu qua phần nhúng thay vì một lượt khứ hồi
+    // exam_attempts riêng, nhưng bỏ cột nào cũng vẫn phá AC-009 — nên
+    // nghĩa vụ không đổi về bản chất, chỉ đổi ở chỗ các cột xuất hiện.
     //
-    // The join is located by its SHAPE, not by call index: two exam_results reads
-    // now share this recorder (the join and the cross-attempt history read), and
-    // swapping the two entries inside getResult()'s Promise.all is behaviour-
-    // identical yet would flip the index and fail this obligation spuriously.
+    // Join được định vị theo HÌNH DẠNG của nó, không theo chỉ số lời gọi: hai lượt đọc exam_results
+    // giờ dùng chung recorder này (join và lượt đọc lịch sử xuyên lượt làm), và
+    // đổi chỗ hai mục trong Promise.all của getResult() có hành vi
+    // y hệt nhưng sẽ lật chỉ số và làm nghĩa vụ này hỏng giả.
     const selectArgs = examResultsSelectMock.mock.calls.map(([arg]) => arg as string);
     const joinSelectArg = selectArgs.find((arg) => arg.includes("exam_attempts!inner("));
     expect(joinSelectArg).toBeDefined();
@@ -296,18 +292,18 @@ describe("getResult() — additive select extension, byte-identical pre-existing
 
     await getResult(ATTEMPT_ID);
 
-    // Collapsing the getExam() call into this join moved its
-    // .eq("status","published") guard here. Losing it would surface results for
-    // an unpublished/withdrawn exam — a visibility regression, not a perf one.
+    // Gộp lời gọi getExam() vào join này đã chuyển chốt
+    // .eq("status","published") của nó về đây. Mất nó thì sẽ lộ kết quả của
+    // một đề chưa đăng/đã rút — hồi quy về khả năng hiển thị, không phải về hiệu năng.
     expect(eqCalls).toContainEqual(["attempt_id", ATTEMPT_ID]);
     expect(eqCalls).toContainEqual(["exam_attempts.exams_with_difficulty.status", "published"]);
   });
 
   it("obligation (e): the joined read and the cross-attempt history read are both in flight before EITHER resolves, and the answer key still costs exactly one further round trip (no-regression guard on the round-trip collapse)", async () => {
-    // Deliberately NOT mockGetResultChain: this obligation needs BOTH exam_results
-    // reads held open mid-flight, which that shared helper cannot express. Holding
-    // only one open makes the guard directional — the opposite sequential ordering
-    // (history first, then join) would stay green.
+    // Cố ý KHÔNG dùng mockGetResultChain: nghĩa vụ này cần giữ mở CẢ HAI lượt đọc exam_results
+    // giữa chừng, điều mà helper dùng chung kia không diễn đạt được. Chỉ giữ
+    // mở một lượt làm chốt chặn có hướng: thứ tự tuần tự ngược lại
+    // (lịch sử trước, rồi join) vẫn xanh.
     let joinSettled = false;
     let historySettled = false;
     let releaseJoin!: () => void;
@@ -330,7 +326,7 @@ describe("getResult() — additive select extension, byte-identical pre-existing
         select: () => builder,
         eq: () => builder,
         limit: () => builder,
-        // The joined read completes through maybeSingle()...
+        // Lượt đọc join hoàn tất qua maybeSingle()...
         maybeSingle: async () => {
           await joinGate;
           joinSettled = true;
@@ -346,8 +342,8 @@ describe("getResult() — additive select extension, byte-identical pre-existing
             error: null,
           };
         },
-        // ...the history read awaits the builder itself (PostgREST builders are
-        // thenable), so its trip completes here instead.
+        // ...lượt đọc lịch sử tự await builder (builder PostgREST là
+        // thenable), nên lượt khứ hồi của nó hoàn tất ở đây.
         then: (onFulfilled: (value: unknown) => unknown) =>
           historyGate.then(() => {
             historySettled = true;
@@ -358,22 +354,22 @@ describe("getResult() — additive select extension, byte-identical pre-existing
     });
 
     const pending = getResult(ATTEMPT_ID);
-    // A macrotask boundary drains every pending microtask, so by this point the
-    // implementation has issued every read it is going to issue before either
-    // gate opens. Deterministic, not a race.
+    // Một ranh giới macrotask xả mọi microtask đang chờ, nên đến đây
+    // cài đặt đã phát mọi lượt đọc nó sẽ phát trước khi cổng nào mở. Xác
+    // định, không phải race.
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    // Was 4 SEQUENTIAL round trips (exam_results -> exam_attempts -> exams_with_
-    // difficulty -> questions, ~816ms measured); the embed collapses the first 3
-    // into one (~385ms). A future edit that re-splits them would silently undo
-    // that without failing any output assertion.
+    // Từng là 4 lượt khứ hồi TUẦN TỰ (exam_results -> exam_attempts -> exams_with_
+    // difficulty -> questions, đo ~816ms); phần nhúng gộp 3 lượt đầu
+    // thành một (~385ms). Một lần sửa sau này tách lại sẽ lặng lẽ huỷ
+    // điều đó mà không làm hỏng khẳng định đầu ra nào.
     //
-    // Engine 1 added a 2nd exam_results read (the cross-attempt history) inside
-    // the SAME Promise.all, so counting .from() calls no longer distinguishes
-    // "parallel" from "re-split". The property guarded instead is symmetric:
-    // both reads are already issued while NEITHER has resolved. Either sequential
-    // ordering — join-then-history or history-then-join — leaves exactly one call
-    // recorded here and fails.
+    // Engine 1 thêm lượt đọc exam_results thứ 2 (lịch sử xuyên lượt làm) trong
+    // CÙNG Promise.all, nên đếm lời gọi .from() không còn phân biệt được
+    // "song song" với "tách lại". Thuộc tính được canh thay vào đó là đối xứng:
+    // cả hai lượt đọc đã được phát trong khi CHƯA cái nào resolve. Cả hai thứ tự
+    // tuần tự — join-rồi-lịch-sử hay lịch-sử-rồi-join — đều để lại đúng một lời gọi
+    // được ghi ở đây và làm hỏng.
     expect(fromMock.mock.calls.map(([table]) => table)).toEqual(["exam_results", "exam_results"]);
     expect({ joinSettled, historySettled }).toEqual({ joinSettled: false, historySettled: false });
 
@@ -381,13 +377,13 @@ describe("getResult() — additive select extension, byte-identical pre-existing
     releaseHistory();
     await pending;
 
-    // What is NOT guarded by this obligation: the cost of the parallel reads
-    // themselves (a 3rd parallel exam_results read would still pass the check
-    // above once added to this literal), nor what the history read returns —
-    // that is obligation (f)'s job. What IS guarded: nothing becomes sequential,
-    // and the answer key still costs exactly one further trip, keyed off the exam
-    // the join already resolved (no extra lookup) — it became an RPC when the
-    // answer columns were locked down (Critical #1).
+    // Điều nghĩa vụ này KHÔNG canh: chi phí của chính các lượt đọc song song
+    // (lượt đọc exam_results song song thứ 3 vẫn qua phép kiểm ở trên
+    // khi được thêm vào literal này), cũng như lượt đọc lịch sử trả về gì —
+    // đó là việc của nghĩa vụ (f). Điều ĐƯỢC canh: không gì trở nên tuần tự,
+    // và khoá đáp án vẫn tốn đúng một lượt nữa, dựa vào đề
+    // mà join đã giải quyết (không tra cứu thêm) — nó thành RPC khi
+    // các cột đáp án bị khoá (Critical #1).
     expect(fromMock.mock.calls.map(([table]) => table)).toEqual(["exam_results", "exam_results"]);
     expect(rpcMock).toHaveBeenCalledTimes(1);
     expect(rpcMock).toHaveBeenCalledWith("exam_answer_key", { p_exam_id: "exam-1" });
@@ -411,17 +407,17 @@ describe("getResult() — additive select extension, byte-identical pre-existing
   });
 
   it("obligation (f): hasBeenWrongTwice is computed from the UNSCOPED cross-attempt history and applied only to scored, incorrect rows", async () => {
-    // The attempt being viewed — the three branches of the gating formula
-    // (scored+wrong / correct / unscored), authored by hand.
+    // Lượt làm đang xem — ba nhánh của công thức chặn
+    // (chấm-và-sai / đúng / không chấm), soạn tay.
     const viewedPerQuestion = [
       { questionId: "q-wrong-twice", selected: "A", isCorrect: false, scored: true },
       { questionId: "q-correct", selected: "B", isCorrect: true, scored: true },
       { questionId: "q-essay", selected: "bài làm", isCorrect: false, scored: false },
     ];
-    // This user's FULL exam_results history, i.e. what the unscoped read returns.
-    // q-wrong-twice: scored-wrong on 2 DISTINCT attempts        -> eligible.
-    // q-essay:       wrong on those same 2 attempts but scored:false -> never eligible.
-    // q-correct:     correct throughout                          -> not eligible.
+    // Lịch sử exam_results ĐẦY ĐỦ của người dùng này, tức thứ lượt đọc không phạm vi trả về.
+    // q-wrong-twice: chấm-sai ở 2 lượt làm KHÁC NHAU                  -> đủ điều kiện.
+    // q-essay:       sai ở đúng 2 lượt làm đó nhưng scored:false      -> không bao giờ đủ điều kiện.
+    // q-correct:     đúng suốt                                       -> không đủ điều kiện.
     const historyRows = [
       { attempt_id: "attempt-1", per_question: viewedPerQuestion },
       {
@@ -468,11 +464,11 @@ describe("getResult() — additive select extension, byte-identical pre-existing
           },
           error: null,
         }),
-        // PostgREST query builders are THENABLE and the history read awaits the
-        // builder directly (no .maybeSingle()). Without this, `await builder`
-        // yields the builder object, data/error destructure to undefined, the
-        // history degrades to [] — and mapping it to nothing would pass every
-        // other obligation in this file while the feature is permanently dead.
+        // Builder truy vấn PostgREST là THENABLE và lượt đọc lịch sử await trực tiếp
+        // builder (không có .maybeSingle()). Thiếu điều này, `await builder`
+        // cho ra chính object builder, data/error destructure ra undefined, lịch sử
+        // rơi về [] — và ánh xạ nó ra không gì sẽ qua mọi nghĩa vụ
+        // khác trong file này trong khi tính năng chết vĩnh viễn.
         then: (onFulfilled: (value: unknown) => unknown) =>
           Promise.resolve().then(() => onFulfilled({ data: historyRows, error: null })),
       };
@@ -484,8 +480,8 @@ describe("getResult() — additive select extension, byte-identical pre-existing
     expect(result).not.toBeNull();
     const [wrongTwiceRow, correctRow, essayRow] = result!.result.perQuestion;
 
-    // Scored + currently wrong + wrong on >=2 distinct attempts -> true, with every
-    // pre-existing field of the row carried through untouched.
+    // Đã chấm + hiện đang sai + sai ở >=2 lượt làm khác nhau -> true, với mọi
+    // trường sẵn có của hàng được mang qua không đụng tới.
     expect(wrongTwiceRow).toEqual({
       questionId: "q-wrong-twice",
       selected: "A",
@@ -493,28 +489,28 @@ describe("getResult() — additive select extension, byte-identical pre-existing
       scored: true,
       hasBeenWrongTwice: true,
     });
-    // The flag is meaningless for a correct row and for an unscored row: undefined,
-    // not false (UI Spec D1's rule, applied consumer-side by getResult()).
+    // Cờ vô nghĩa với hàng đúng và hàng không chấm: undefined,
+    // không phải false (luật của UI Spec D1, áp phía người tiêu dùng bởi getResult()).
     expect(correctRow.questionId).toBe("q-correct");
     expect(correctRow.hasBeenWrongTwice).toBeUndefined();
     expect(essayRow.questionId).toBe("q-essay");
     expect(essayRow.hasBeenWrongTwice).toBeUndefined();
 
-    // The history read must span ALL of the user's attempts. RLS (results_select_own)
-    // already scopes it to the caller, so any .eq() here would narrow it further —
-    // that is where the real per-exam/per-attempt scoping failure mode lives, and it
-    // is unrepresentable in computeWrongTwiceQuestionIds() itself (its input type
-    // carries no exam identity at all).
+    // Lượt đọc lịch sử phải trải trên MỌI lượt làm của người dùng. RLS (results_select_own)
+    // đã giới hạn nó theo người gọi, nên mọi .eq() ở đây sẽ thu hẹp thêm —
+    // đó là chỗ kiểu hỏng giới-hạn-theo-đề/theo-lượt-làm thật sự nằm, và
+    // nó không biểu diễn được trong chính computeWrongTwiceQuestionIds() (kiểu đầu vào của nó
+    // không mang danh tính đề nào cả).
     expect(historyEqCalls).toEqual([]);
-    // attempt_id is what makes "2 DISTINCT attempts" countable; dropping it would
-    // collapse every row into a single anonymous attempt.
+    // attempt_id là thứ làm "2 lượt làm KHÁC NHAU" đếm được; bỏ nó sẽ
+    // gộp mọi hàng thành một lượt làm vô danh.
     expect(historySelectArg).toContain("attempt_id");
     expect(historySelectArg).toContain("per_question");
   });
 
   it("obligation (g): a failing history read degrades to no flag instead of rejecting the whole page", async () => {
-    // Same viewed attempt as (f) — its first row WOULD be hasBeenWrongTwice:true
-    // if the history read had succeeded, so this fixture isolates the degradation.
+    // Cùng lượt làm đang xem như (f) — hàng đầu tiên của nó SẼ là hasBeenWrongTwice:true
+    // nếu lượt đọc lịch sử thành công, nên fixture này cô lập sự suy giảm.
     const viewedPerQuestion = [
       { questionId: "q-wrong-twice", selected: "A", isCorrect: false, scored: true },
       { questionId: "q-correct", selected: "B", isCorrect: true, scored: true },
@@ -532,8 +528,8 @@ describe("getResult() — additive select extension, byte-identical pre-existing
         select: () => builder,
         eq: () => builder,
         limit: () => builder,
-        // The joined read still succeeds: the page's core data is fine, which is
-        // exactly the situation in which rejecting would be the wrong behaviour.
+        // Lượt đọc join vẫn thành công: dữ liệu lõi của trang ổn, đúng là
+        // tình huống mà reject sẽ là hành vi sai.
         maybeSingle: async () => ({
           data: {
             ...RESULT_ROW,
@@ -556,25 +552,25 @@ describe("getResult() — additive select extension, byte-identical pre-existing
 
     const result = await getResult(ATTEMPT_ID);
 
-    // Resolves rather than rejecting — the already-shipped result-detail page
-    // keeps working when only this additive enrichment fails.
+    // Resolve chứ không reject — trang chi tiết kết quả đã ship tiếp tục
+    // chạy khi chỉ phần làm giàu cộng thêm này lỗi.
     expect(result).not.toBeNull();
     expect(result!.examId).toBe("exam-1");
     expect(result!.examTitle).toBe("Sample Exam");
     expect(result!.result.totalScore).toBe(8.5);
-    // Fail-closed per UI Spec § D1 / AC-024, which treats false and absent
-    // identically ("hasBeenWrongTwice false or absent -> shall not render").
-    // The degraded history is an EMPTY history, so the Reference Contract's
-    // formula is applied unchanged and a scored+wrong row yields false — not
-    // undefined. Forcing undefined here would mean teaching the mapping to tell
-    // "history unavailable" apart from "history empty": a new mode for zero
-    // observable difference. The property that matters is that it is never true.
+    // Fail-closed theo UI Spec § D1 / AC-024, coi false và vắng mặt
+    // như nhau ("hasBeenWrongTwice false hoặc vắng -> không render").
+    // Lịch sử suy giảm là lịch sử RỖNG, nên công thức của Reference Contract
+    // được áp dụng không đổi và một hàng đã chấm+sai cho ra false — không phải
+    // undefined. Ép undefined ở đây nghĩa là dạy phép ánh xạ phân biệt
+    // "lịch sử không khả dụng" với "lịch sử rỗng": một chế độ mới cho không
+    // khác biệt quan sát được nào. Thuộc tính quan trọng là nó không bao giờ là true.
     expect(result!.result.perQuestion[0].questionId).toBe("q-wrong-twice");
     expect(result!.result.perQuestion[0].hasBeenWrongTwice).toBe(false);
-    // The correct row is still gated out entirely.
+    // Hàng đúng vẫn bị chặn hoàn toàn.
     expect(result!.result.perQuestion[1].hasBeenWrongTwice).toBeUndefined();
 
-    // The degradation is logged, not swallowed — and the log carries no row content.
+    // Sự suy giảm được ghi log, không bị nuốt — và log không mang nội dung hàng nào.
     expect(warnSpy).toHaveBeenCalledTimes(1);
     expect(JSON.stringify(warnSpy.mock.calls[0])).toContain("57014");
     expect(JSON.stringify(warnSpy.mock.calls[0])).not.toContain("q-wrong-twice");
@@ -597,37 +593,37 @@ describe("getResult() — additive select extension, byte-identical pre-existing
 });
 
 // =============================================================================
-// Test 3 — getResult(): created_at in the select, and the three derived essay
-//          fields attached at read time (ADR-0018, Task B2.1)
+// Test 3 — getResult(): created_at trong select, và ba trường tự luận suy ra
+//          được gắn lúc đọc (ADR-0018, Task B2.1)
 // =============================================================================
-// AC: EG-BE-023 (deadline boundary, EXCLUSIVE `>`), EG-BE-024/025 (missing key
-//   is silent; an unrecognised value warns exactly once and never carries the
-//   student's writing), EG-BE-026 (`retryAvailable` is a boolean and no attempt
-//   count crosses to the client), EG-BE-027 (only `graded` contributes to earned
-//   AND max), EG-BE-031/AC-012 (a row written before the feature ships reads out
-//   identically to today).
+// AC: EG-BE-023 (biên hạn chót, LOẠI TRỪ `>`), EG-BE-024/025 (khoá thiếu
+//   là im lặng; giá trị không nhận ra cảnh báo đúng một lần và không bao giờ mang
+//   bài viết của học sinh), EG-BE-026 (`retryAvailable` là boolean và không có số lần
+//   thử nào chuyển sang client), EG-BE-027 (chỉ `graded` đóng góp vào earned
+//   VÀ max), EG-BE-031/AC-012 (hàng ghi trước khi tính năng ship đọc ra
+//   giống hệt hôm nay).
 // @lane: integration
-// @dependency: SOURCE/features/exams/queries.ts (getResult) + REAL
-//   SOURCE/lib/scoring/essayLifecycle.ts + mocked Supabase client
-// @real-dependency: none — the same sanctioned createClient() boundary as Test 2.
+// @dependency: SOURCE/features/exams/queries.ts (getResult) + SOURCE/lib/scoring/essayLifecycle.ts
+//   THẬT + client Supabase mock
+// @real-dependency: không có — cùng ranh giới createClient() được phê duyệt như Test 2.
 //
-// WHAT THIS FILE ADDS OVER essayLifecycle's own unit tests, which is the only
-// thing that justifies the cases being here: H1 proves the derivations. This
-// proves the QUERY LAYER feeds them correctly — that `created_at` is actually
-// requested, that the value handed to `deriveEssayView` is `exam_results`'s own
-// timestamp and not the attempt's, and that one frozen `now` is shared by all
-// three attachments. None of that is visible to a pure-function test.
+// FILE NÀY BỔ SUNG GÌ SO VỚI unit test của chính essayLifecycle, thứ duy nhất
+// biện minh cho việc các ca nằm ở đây: H1 chứng minh các phép suy ra. File này
+// chứng minh TẦNG TRUY VẤN cấp chúng đúng — rằng `created_at` thực sự được
+// yêu cầu, rằng giá trị trao cho `deriveEssayView` là timestamp của chính `exam_results`
+// chứ không phải của lượt làm, và một `now` đóng băng được cả
+// ba lần gắn dùng chung. Không điều nào trong đó nhìn thấy được bởi test hàm thuần.
 //
-// TIME IS FROZEN, never read from the real clock: the deadline is 600 000 ms and
-// the boundary is exclusive, so a real clock turns the three cases below into
-// three time bombs — green today, red on an afternoon nobody touched them.
+// THỜI GIAN ĐƯỢC ĐÓNG BĂNG, không bao giờ đọc từ đồng hồ thật: hạn chót là 600 000 ms và
+// biên là loại trừ, nên đồng hồ thật biến ba ca bên dưới thành
+// ba quả bom hẹn giờ — xanh hôm nay, đỏ vào một buổi chiều không ai đụng tới.
 
 const ESSAY_NOW = new Date("2026-08-29T12:00:00.000Z");
 const DEADLINE_MS = 600_000;
 
-/** created_at values expressed as an offset from the frozen `now`, so the
- *  relationship each case is about is visible at the call site rather than
- *  hidden inside two ISO strings the reader has to subtract. */
+/** các giá trị created_at biểu diễn như độ lệch so với `now` đóng băng, để
+ *  quan hệ mà mỗi ca nói tới nhìn thấy được ngay ở nơi gọi thay vì
+ *  ẩn trong hai chuỗi ISO mà người đọc phải tự trừ. */
 function createdAtBefore(ms: number): string {
   return new Date(ESSAY_NOW.getTime() - ms).toISOString();
 }
@@ -636,8 +632,8 @@ const ESSAY_EXAM = { id: "exam-essay", title: "Đề có câu tự luận", subj
 const ESSAY_STARTED_AT = "2026-08-29T11:00:00.000Z";
 const ESSAY_SUBMITTED_AT = "2026-08-29T11:50:00.000Z";
 
-/** A stored `per_question` element with no `essay*` key at all — the legacy /
- *  feature-off shape, byte-identical to what `computeScore()` emits today. */
+/** Một phần tử `per_question` đã lưu không có khoá `essay*` nào cả — hình dạng
+ *  cũ / tính-năng-tắt, giống từng byte với thứ `computeScore()` phát ra hôm nay. */
 const LEGACY_ELEMENT = {
   questionId: "q-essay",
   selected: "Bài làm của học sinh, không bao giờ được vào log.",
@@ -657,10 +653,10 @@ function pendingElement(overrides: Record<string, unknown> = {}) {
   };
 }
 
-/** Wires the mocked client for getResult()'s two round trips with an essay-shaped
- *  result row. Deliberately a separate helper from `mockGetResultChain`: this one
- *  drives `per_question` and `created_at`, which that one does not express, and
- *  widening the shared helper would make Test 2's fixtures depend on this task. */
+/** Nối client mock cho hai lượt khứ hồi của getResult() với một hàng kết quả dạng tự luận.
+ *  Cố ý là helper riêng, khác `mockGetResultChain`: cái này
+ *  điều khiển `per_question` và `created_at` mà cái kia không diễn đạt được, và
+ *  mở rộng helper dùng chung sẽ làm fixture của Test 2 phụ thuộc vào task này. */
 function mockEssayResultChain(perQuestion: unknown[], createdAt: string) {
   rpcMock.mockImplementation(async (fn: string) => {
     if (fn === "exam_answer_key") return { data: [], error: null };
@@ -723,15 +719,15 @@ describe("getResult() — created_at in the select and the three derived essay f
 
     await getResult(ATTEMPT_ID);
 
-    // Located by shape, not by index — two exam_results reads share this recorder.
+    // Định vị theo hình dạng, không theo chỉ số — hai lượt đọc exam_results dùng chung recorder này.
     const joinSelectArg = selectArgs.find((arg) => arg.includes("exam_attempts!inner("));
     expect(joinSelectArg).toBeDefined();
     expect(joinSelectArg).toContain("created_at");
-    // NOT satisfied by the attempt's timestamps: the deadline is measured from
-    // when the RESULT row was written, and the two differ by however long
-    // record_exam_result() took. A select carrying only submitted_at would pass
-    // any assertion made on the mapped output, because the mock hands back
-    // whatever it is asked for.
+    // KHÔNG được thoả bởi timestamp của lượt làm: hạn chót đo từ lúc hàng
+    // KẾT QUẢ được ghi, và hai mốc lệch nhau bằng khoảng thời gian
+    // record_exam_result() chạy. Một select chỉ mang submitted_at sẽ qua
+    // mọi khẳng định trên đầu ra đã ánh xạ, vì mock trả về
+    // bất cứ thứ gì nó được yêu cầu.
     expect(joinSelectArg).toMatch(/(^|,\s*)created_at(\s*,|,|$)/);
   });
 
@@ -746,10 +742,10 @@ describe("getResult() — created_at in the select and the three derived essay f
 
       const result = await getResult(ATTEMPT_ID);
 
-      // The middle case is the one that matters. `>=` instead of `>` flips it and
-      // nothing else in the suite would notice: an attempt read at exactly the
-      // deadline would be told its grading failed while a writer could still be
-      // alive.
+      // Ca giữa là ca quan trọng. `>=` thay vì `>` đảo nó và
+      // không gì khác trong bộ test nhận ra: một lượt làm đọc đúng vào
+      // hạn chót sẽ bị báo là chấm hỏng trong khi một writer vẫn có thể
+      // còn sống.
       expect(result!.result.perQuestion[0].essay?.state).toBe(expected);
     },
   );
@@ -760,8 +756,8 @@ describe("getResult() — created_at in the select and the three derived essay f
     const result = await getResult(ATTEMPT_ID);
 
     expect(result!.result.perQuestion[0].essay).toBeUndefined();
-    // A warning per legacy question per render would turn every old result page
-    // into a log flood, and the deadline being long past must not change that.
+    // Một cảnh báo cho mỗi câu cũ mỗi lần render sẽ biến mọi trang kết quả cũ
+    // thành lũ log, và việc hạn chót đã qua lâu không được đổi điều đó.
     expect(warnSpy).not.toHaveBeenCalled();
   });
 
@@ -776,9 +772,9 @@ describe("getResult() — created_at in the select and the three derived essay f
     expect(result!.result.perQuestion[0].essay).toBeUndefined();
     expect(warnSpy).toHaveBeenCalledTimes(1);
 
-    // AC-056: the student's answer is UGC and never reaches a server log. Assert
-    // on the serialised payload rather than on the object's shape — the failure
-    // this guards is prose arriving through some field nobody thought about.
+    // AC-056: câu trả lời của học sinh là UGC và không bao giờ vào log server. Khẳng định
+    // trên payload đã serialise chứ không phải hình dạng object — kiểu hỏng
+    // mà nó canh là bài viết đến qua một trường mà không ai nghĩ tới.
     const logged = JSON.stringify(warnSpy.mock.calls[0]);
     expect(logged).toContain("q-essay");
     expect(logged).toContain("in_review");
@@ -786,9 +782,9 @@ describe("getResult() — created_at in the select and the three derived essay f
   });
 
   it("EG-BE-025 second half: a mixed row warns once for the bad element and the summary counts only the derivable ones", async () => {
-    // The filtering that keeps the warning count at one must not also drop a
-    // GOOD element from the aggregates. This is the case that separates
-    // "warned once" from "warned once because it stopped looking".
+    // Bộ lọc giữ số cảnh báo ở mức một không được đồng thời bỏ một
+    // phần tử TỐT khỏi các số tổng hợp. Đây là ca phân biệt
+    // "cảnh báo một lần" với "cảnh báo một lần vì nó thôi nhìn".
     mockEssayResultChain(
       [
         pendingElement({
@@ -828,9 +824,9 @@ describe("getResult() — created_at in the select and the three derived essay f
 
     expect(typeof view.retryAvailable).toBe("boolean");
     expect(view.retryAvailable).toBe(true);
-    // Exhaustive key set, not "essayAttempts is absent": AC-044 forbids the
-    // COUNT reaching the client, and a count renamed on the way out would pass
-    // any assertion that only checks the old name.
+    // Tập khoá vét cạn, không phải "essayAttempts vắng mặt": AC-044 cấm SỐ ĐẾM
+    // tới client, và một số đếm bị đổi tên trên đường ra sẽ qua
+    // mọi khẳng định chỉ kiểm tên cũ.
     expect(Object.keys(view).sort()).toEqual([
       "earned",
       "lowConfidence",
@@ -863,9 +859,9 @@ describe("getResult() — created_at in the select and the three derived essay f
 
     const result = await getResult(ATTEMPT_ID);
 
-    // Independently authored: 1 graded question ⇒ max is 1, NOT 3. A failed essay
-    // adding 0 to earned and 1 to max is the silent zero AC-015 forbids, and it
-    // would look entirely reasonable at the point someone wrote it.
+    // Tự soạn độc lập: 1 câu đã chấm ⇒ max là 1, KHÔNG phải 3. Một bài failed
+    // cộng 0 vào earned và 1 vào max là số 0 thầm lặng mà AC-015 cấm, và nó
+    // trông hoàn toàn hợp lý tại lúc ai đó viết ra.
     expect(result!.essaySummary).toEqual({
       earned: 0.75,
       max: 1,
@@ -874,7 +870,7 @@ describe("getResult() — created_at in the select and the three derived essay f
       failedCount: 1,
       unresolvedCount: 1,
     });
-    // RS-6 = failed AND out of retries. q-exhausted is the only one.
+    // RS-6 = failed VÀ hết lượt thử. q-exhausted là câu duy nhất.
     expect(result!.hasIncompleteEssay).toBe(true);
   });
 
@@ -883,10 +879,10 @@ describe("getResult() — created_at in the select and the three derived essay f
 
     const result = await getResult(ATTEMPT_ID);
 
-    // Hand-built from the mocked row above, in the shape getResult() returned
-    // BEFORE this task — plus the one required new field. This is AC-012's
-    // sharpest edge: if an old row grows a populated field, "no backfill" broke
-    // on the READ path, where it is much harder to see than on the write path.
+    // Dựng tay từ hàng mock ở trên, theo hình dạng getResult() trả về
+    // TRƯỚC task này — cộng một trường mới bắt buộc. Đây là mép sắc nhất của AC-012:
+    // nếu một hàng cũ mọc ra một trường có giá trị, "không backfill" đã vỡ
+    // trên đường ĐỌC, nơi khó thấy hơn nhiều so với đường ghi.
     expect(result).toEqual({
       examId: "exam-essay",
       examTitle: "Đề có câu tự luận",
@@ -912,13 +908,13 @@ describe("getResult() — created_at in the select and the three derived essay f
       hasIncompleteEssay: false,
     });
 
-    // `toEqual` treats a key holding `undefined` as absent, so the two fields
-    // that must be ABSENT-OR-UNDEFINED are asserted on their own rather than
-    // being trusted to the comparison above.
+    // `toEqual` coi khoá chứa `undefined` là vắng mặt, nên hai trường
+    // phải VẮNG-HOẶC-UNDEFINED được khẳng định riêng thay vì
+    // được tin vào phép so sánh ở trên.
     expect(result!.essaySummary).toBeUndefined();
     expect(result!.result.perQuestion.every((r) => r.essay === undefined)).toBe(true);
-    // Required, always computable — a PDF annotation cannot be decided by an
-    // `undefined`, so the type being `boolean` is only half the guarantee.
+    // Bắt buộc, luôn tính được — một chú thích PDF không thể được quyết định bởi một
+    // `undefined`, nên kiểu là `boolean` mới chỉ là nửa bảo đảm.
     expect(typeof result!.hasIncompleteEssay).toBe("boolean");
   });
 });

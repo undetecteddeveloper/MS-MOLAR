@@ -161,8 +161,8 @@ export async function setProfile(
   userId: string,
   profile: { displayName: string; avatarPath: string },
 ): Promise<void> {
-  // `.single()`: an update matching zero rows must fail here, otherwise the
-  // masked columns would be null for lack of a value and prove nothing.
+  // `.single()`: một lệnh update khớp không hàng nào phải hỏng ở đây, nếu không các
+  // cột bị che sẽ null vì thiếu giá trị và chẳng chứng minh gì.
   const res = await admin
     .from("user_profiles")
     .update({ display_name: profile.displayName, avatar_url: profile.avatarPath })

@@ -49,8 +49,8 @@ describe("DISPLAY_NAME_RE", () => {
   });
 
   it("is not sticky or global — repeated tests of the same string agree", () => {
-    // A /g or /y regex advances lastIndex between calls; this one is used on
-    // every submission, so a stateful flag would make the rule intermittent.
+    // Regex /g hoặc /y làm lastIndex tiến lên giữa các lần gọi; cái này được dùng ở
+    // mỗi lần gửi, nên một cờ có trạng thái sẽ làm luật chập chờn.
     expect(DISPLAY_NAME_RE.test("Nguyễn")).toBe(DISPLAY_NAME_RE.test("Nguyễn"));
   });
 });

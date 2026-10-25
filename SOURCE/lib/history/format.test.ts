@@ -1,7 +1,7 @@
-// format — unit tests for the shared History/PDF formatters (Work Plan Phase 2
-// Task 2.2). Single source of truth consumed identically by generateAttemptPdf.ts
-// (Task 09), result/page.tsx's ScoreCard usage (Task 12), and HistoryRow (Task 13)
-// — see docs/design/history-frontend-design.md § Data Contracts.
+// format — unit test cho các bộ định dạng History/PDF dùng chung (Work Plan Phase 2
+// Task 2.2). Nguồn sự thật duy nhất được generateAttemptPdf.ts (Task 09),
+// phần dùng ScoreCard của result/page.tsx (Task 12), và HistoryRow (Task 13) dùng giống hệt nhau
+// — xem docs/design/history-frontend-design.md § Data Contracts.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -167,7 +167,7 @@ describe("buildPdfFilename", () => {
   });
 
   it("truncation does not leave a trailing hyphen when the cut lands on a separator run", () => {
-    // 59 'a's + a run of non-alphanumeric chars that collapses right at the 60-char cut.
+    // 59 chữ 'a' + một dãy ký tự không phải chữ-số gập đúng ở mốc cắt 60 ký tự.
     const title = `${"a".repeat(59)}   more text here`;
     const result = buildPdfFilename(title, "2026-07-15T09:00:00.000Z");
     const slug = result.replace(/_\d{8}\.pdf$/, "");

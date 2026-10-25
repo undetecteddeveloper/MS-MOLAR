@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
-// SolutionAuthorCard (C-23) — frontend DD § Required Tests rows 9-11. Mock
-// boundary: only `@/features/solutions/actions` (consumed transitively by
-// `HelpfulButton`/`SolutionMenu`); `lib/solutions/identity.ts` stays real.
+// SolutionAuthorCard (C-23) — frontend DD § Required Tests hàng 9-11. Ranh giới
+// mock: chỉ `@/features/solutions/actions` (được `HelpfulButton`/`SolutionMenu`
+// dùng gián tiếp); `lib/solutions/identity.ts` giữ thật.
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

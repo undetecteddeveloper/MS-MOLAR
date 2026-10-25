@@ -2,95 +2,92 @@
 // Design Docs: docs/design/essay-auto-scoring-backend-design.md (v1.3, § Nhóm 3
 //                — hai hàm đặc quyền :1584, § Test Boundaries :2181,
 //                § Integration Verification Points :2201)
-// UI Spec:     docs/ui-spec/essay-auto-scoring-ui-spec.md (v1.3) — no UI in this lane
+// UI Spec:     docs/ui-spec/essay-auto-scoring-ui-spec.md (v1.3) — không UI trong làn này
 // PRD:         docs/prd/essay-auto-scoring-prd.md (v1.2, AC-009, AC-045, AC-062,
 //                AC-063, AC-064)
 // ADR:         docs/adr/ADR-0018-essay-async-grade-write.md (Accepted; D1, D1b, D3,
-//                D4; Implementation Guidance #6 and #7 mandate exactly these two
-//                cases, in exactly this shape)
-// Generated:   2026-08-29 | Budget used: integration 3/3, fixture-e2e 3/3, service-e2e 2/2
+//                D4; Implementation Guidance #6 và #7 quy định đúng hai
+//                ca này, đúng hình dạng này)
+// Sinh ngày:   2026-08-29 | Ngân sách đã dùng: integration 3/3, fixture-e2e 3/3, service-e2e 2/2
 //
 // =============================================================================
-// FILE STATUS — read before editing
+// TRẠNG THÁI FILE — đọc trước khi sửa
 // =============================================================================
-// BOTH CASES ARE SKELETONS (`it.todo`), and they describe a database that DOES NOT
-// EXIST YET. Nothing in this feature has been applied to any database:
-// `claim_essay_grading_attempt()` and `record_essay_grade()` have not been written,
-// no DDL has been run on dev or prod, and the schema fingerprint is still
-// `29931beeb950`. These are therefore descriptions of the assertions to write, not
-// assertions parked behind a flag.
+// CẢ HAI CA LÀ SKELETON (`it.todo`), và chúng mô tả một database CHƯA TỒN TẠI.
+// Chưa gì của tính năng này được áp lên database nào:
+// `claim_essay_grading_attempt()` và `record_essay_grade()` chưa được viết,
+// chưa DDL nào chạy trên dev hay prod, và vân tay schema vẫn là
+// `29931beeb950`. Vì vậy đây là mô tả các khẳng định cần viết, không phải
+// khẳng định đậu sau một cờ.
 //
-// HOW THIS LANE RUNS: `npm run test:localdb` (from `SOURCE/`), i.e.
-// `vitest run --config vitest.localdb.config.ts`, which globs
-// `tests/e2e/service/**/*.test.{ts,tsx}`. It is deliberately OUT of the `npm test`
-// CI gate because it needs a real Supabase dev database — a missing credential
-// would turn CI red for the environment rather than for a defect. The file is
-// collected by that config from the moment it is committed; `it.todo` is what keeps
-// `npm run test:localdb` from reporting "No test suite found in file" and exiting 1
-// while the cases are unwritten.
+// LÀN NÀY CHẠY THẾ NÀO: `npm run test:localdb` (từ `SOURCE/`), tức
+// `vitest run --config vitest.localdb.config.ts`, glob
+// `tests/e2e/service/**/*.test.{ts,tsx}`. Nó cố ý NẰM NGOÀI cổng CI `npm test`
+// vì cần một database Supabase dev thật — thiếu thông tin đăng nhập sẽ
+// làm CI đỏ vì môi trường chứ không vì một lỗi. File được config đó thu thập
+// từ lúc được commit; `it.todo` là thứ giữ cho
+// `npm run test:localdb` không báo "No test suite found in file" và thoát mã 1
+// khi các ca chưa được viết.
 //
-// PRECONDITION, BLOCKING — do not run this file before all three hold:
-//   1. The two functions and their grant block exist in `SOURCE/supabase/schema.sql`
-//      (new section after §11, cross-referenced from it — ADR-0018 Implementation
+// ĐIỀU KIỆN TIÊN QUYẾT, CHẶN — đừng chạy file này trước khi cả ba điều sau đúng:
+//   1. Hai hàm và khối grant của chúng tồn tại trong `SOURCE/supabase/schema.sql`
+//      (mục mới sau §11, tham chiếu chéo từ đó — ADR-0018 Implementation
 //      Guidance #1).
-//   2. The DDL has been APPLIED TO DEV, and `npm run verify:schema` is GREEN on
-//      dev — including the two new grant assertions and the ESSAY_MAX_ATTEMPTS pin.
-//   3. Phase 3.5 has been observed for prod: compare prod
-//      `schema_version.fingerprint` against the new literal, get the engineer's
-//      confirmation BEFORE applying, and verify afterwards BY REAL QUERY, not by a
-//      "success" message.
-//   Running this file against a database that has not received the DDL produces
-//   `PGRST202` failures that look exactly like implementation defects and are not.
-//   That is TD-005's failure shape, which has already fired FOUR times in this
-//   repository. If this file is red and precondition 2 is not green on dev: FIX THE
-//   DATABASE, DO NOT FIX THE TEST.
+//   2. DDL đã được ÁP LÊN DEV, và `npm run verify:schema` XANH
+//      trên dev — gồm hai khẳng định grant mới và chốt ESSAY_MAX_ATTEMPTS.
+//   3. Phase 3.5 đã được quan sát cho prod: so sánh `schema_version.fingerprint` của prod
+//      với literal mới, lấy xác nhận của kỹ sư TRƯỚC khi áp, và kiểm sau đó BẰNG
+//      truy vấn thật, không phải bằng thông báo "success".
+//   Chạy file này trên một database chưa nhận DDL cho ra các lỗi
+//   `PGRST202` trông y hệt lỗi cài đặt mà không phải.
+//   Đó là hình dạng lỗi của TD-005, đã bắn BỐN lần trong repo này. Nếu file này đỏ và
+//   điều kiện 2 chưa xanh trên dev: SỬA DATABASE, ĐỪNG SỬA TEST.
 //
 // -----------------------------------------------------------------------------
-// PLACEMENT — an open question the engineer should settle, not a decision made here
+//VỊ TRÍ — một câu hỏi mở để kỹ sư chốt, không phải quyết định đã đưa ra ở đây
 // -----------------------------------------------------------------------------
-// The backend Design Doc assigns these exact proofs to `SOURCE/supabase/test-rls.ts`
-// § Part 10, cases EG-a..EG-e (:2201). It does not mention
-// `SOURCE/tests/e2e/service/**`, `vitest.localdb.config.ts` or
-// `npm run test:localdb` anywhere — although that lane exists, is committed, and
-// its own config comment states its purpose in the same words the Design Doc uses
-// ("properties of real Postgres that a mocked Supabase client cannot prove").
-// `test-rls.ts` has no npm script and is run by hand with `npx tsx`.
-// This skeleton is placed in the runnable lane because that is the one a CI-adjacent
-// command executes and a reviewer can re-run. THE OBLIGATIONS BELOW ARE THE SAME
-// EITHER WAY: SVC-1 = EG-c + EG-d, SVC-2 = EG-a + EG-b + EG-e. If the engineer
-// prefers the Design Doc's placement, move the obligations into `test-rls.ts`
-// Part 10 VERBATIM and DELETE this file — do not fill both, or the two homes drift
-// and the duplicate becomes the one nobody runs.
+// Backend Design Doc giao đúng các bằng chứng này cho `SOURCE/supabase/test-rls.ts`
+// § Part 10, các ca EG-a..EG-e (:2201). Nó không nhắc tới
+// `SOURCE/tests/e2e/service/**`, `vitest.localdb.config.ts` hay
+// `npm run test:localdb` ở đâu cả — dù làn đó tồn tại, đã được commit, và
+// comment config của chính nó nêu mục đích bằng cùng lời mà Design Doc dùng
+// ("thuộc tính của Postgres thật mà một client Supabase bị mock không chứng minh được").
+// `test-rls.ts` không có npm script và được chạy tay bằng `npx tsx`.
+// Skeleton này đặt ở làn chạy được vì đó là làn mà một lệnh gần-CI thực thi
+// và một reviewer chạy lại được. CÁC NGHĨA VỤ BÊN DƯỚI LÀ NHƯ NHAU Ở CẢ HAI NƠI: SVC-1 = EG-c + EG-d,
+// SVC-2 = EG-a + EG-b + EG-e. Nếu kỹ sư muốn vị trí của Design Doc,
+// chuyển các nghĩa vụ vào `test-rls.ts` Part 10 NGUYÊN VĂN và XOÁ file này — đừng
+// điền cả hai, kẻo hai nơi trôi lệch và bản trùng lặp thành bản không ai chạy.
 //
 // -----------------------------------------------------------------------------
-// MOCK BOUNDARY
-// -----------------------------------------------------------------------------
-// NOTHING IS MOCKED IN THIS FILE. That is the entire reason the lane exists:
+// RANH GIỚI MOCK
+//-----------------------------------------------------------------------------
+// KHÔNG GÌ BỊ MOCK TRONG FILE NÀY. Đó là toàn bộ lý do làn tồn tại:
 // backend DD § Mock Boundary Decisions marks the two SQL functions "KHÔNG — Postgres
-// thật", because a mock cannot prove (a) that `jsonb_agg` without `order by`
-// shuffles the array, (b) that `where … <> 'graded'` matches ZERO ROWS rather than
-// raising, or (c) that the `revoke`/`grant` pair was actually applied to the
-// database. All three are the subject here.
-// @real-dependency: real Postgres (Supabase dev), real `service_role` key, real
-//   student JWTs for the negative cases.
-// ZERO PROVIDER CALLS: neither case contacts Groq, and neither can. Grading ships
-//   DISABLED behind the AC-067 human gate (Zero Data Retention) and no Groq account
-//   exists; these two SQL functions have no network reach by construction. Note the
-//   seam honestly: SVC-2 proves the CLAIM REFUSES; it does not by itself prove "with
-//   zero provider calls", because no provider is reachable from SQL. The
-//   zero-call half of AC-064 belongs to the orchestrator case (`gradeEssays`
-//   claim -> budget -> provider -> settle ordering), which is the top UNSELECTED
-//   integration candidate (ROI 57) — see the generation report. Do not let SVC-2's
-//   name imply it discharges that half.
+// thật", vì một mock không chứng minh được (a) `jsonb_agg` không có
+// `order by` xáo trộn mảng, (b) `where … <> 'graded'` khớp KHÔNG HÀNG NÀO chứ không
+// ném lỗi, hay (c) cặp `revoke`/`grant` đã thực sự được áp lên
+// database. Cả ba là đối tượng ở đây.
+// @real-dependency: Postgres thật (Supabase dev), khoá `service_role` thật, JWT
+//   học sinh thật cho các ca phủ định.
+// KHÔNG LỜI GỌI NHÀ CUNG CẤP: không ca nào liên hệ Groq, và cũng không thể. Việc chấm xuất xưởng
+//   Ở TRẠNG THÁI TẮT sau cổng người duyệt AC-067 (Zero Data Retention) và không tài khoản
+//   Groq nào tồn tại; hai hàm SQL này không với tới mạng theo cấu trúc. Lưu ý
+//   mối nối một cách trung thực: SVC-2 chứng minh việc CLAIM TỪ CHỐI; bản thân nó không
+//   chứng minh "với không lời gọi nhà cung cấp nào", vì không nhà cung cấp nào với tới được từ
+//   SQL. Nửa không-lời-gọi của AC-064 thuộc ca điều phối (`gradeEssays`
+//   claim -> ngân sách -> nhà cung cấp -> thứ tự settle), là ứng viên integration
+//   KHÔNG ĐƯỢC CHỌN hàng đầu (ROI 57) — xem báo cáo sinh test. Đừng để tên SVC-2
+//   ngụ ý rằng nó hoàn thành nửa đó.
 //
-// FIXTURE HYGIENE — follow `SOURCE/supabase/test-rls.ts` Part 7 (:133-153) and
-// `recordSkillMastery.int.test.ts`: an isolated id prefix per case ("eg-svc-"),
-// idempotent setup and teardown, each case creating its own user + exam + attempt +
-// exam_results row and deleting them afterwards. Order independence must be
-// MEASURED, not assumed: run the file under `--sequence.shuffle.tests` with several
-// seeds and run each case alone with `-t` before claiming it. The shipped claim in
-// `subscription.service.e2e.test.ts` was once written from assumption and was wrong
-// in the most dangerous direction — it read as a guarantee.
+// VỆ SINH FIXTURE — theo `SOURCE/supabase/test-rls.ts` Part 7 (:133-153) và
+// `recordSkillMastery.int.test.ts`: một tiền tố id cô lập cho mỗi ca ("eg-svc-"),
+// setup và teardown lũy đẳng, mỗi ca tự tạo user + đề + lượt làm +
+// hàng exam_results của mình và xoá chúng sau đó. Tính độc lập thứ tự phải
+// ĐƯỢC ĐO, không giả định: chạy file dưới `--sequence.shuffle.tests` với vài
+// seed và chạy riêng từng ca bằng `-t` trước khi tuyên bố nó. Khẳng định đã ship trong
+// `subscription.service.e2e.test.ts` từng được viết từ giả định và sai
+// theo hướng nguy hiểm nhất — nó đọc như một bảo đảm.
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -111,94 +108,92 @@ import { ESSAY_MAX_ATTEMPTS } from "@/lib/scoring/essayLifecycle";
 const admin: SupabaseClient = HAS_LIVE_DB ? adminClient() : (undefined as never);
 
 // =============================================================================
-// SVC-1 — RESERVED SLOT. The settle write: array order survives, and the second
-//         band for one pair is refused as a VALUE, not an exception
+// SVC-1 — SUẤT GIỮ CHỖ. Lượt ghi settle: thứ tự mảng sống sót, và band thứ hai
+//         cho một cặp bị từ chối như một GIÁ TRỊ, không phải một exception
 // =============================================================================
-// AC: EG-BE-005 — "When record_essay_grade() runs on an attempt with three essay
-//   questions and writes the band for the SECOND, the system must leave the
-//   per_question array with an UNCHANGED questionId sequence."
-// AC: EG-BE-006 — "When record_essay_grade() is called a second time for an
-//   (attempt_id, question_id) pair that is already graded, the system must return
-//   false (0 rows affected), must NOT raise, and the stored band must equal exactly
-//   the first write."
-// AC: EG-BE-007 — "When record_essay_grade() is called on an element in `failed`,
-//   the system must be able to write (failed -> graded and failed -> failed are both
-//   legal); `graded` is absorbing."
-// AC: EG-BE-009 — "Both functions must not take a user_id parameter and must not
-//   mention total_score, correct, total, topic_breakdown or overtime_seconds
-//   anywhere in the function body."
-// Also discharges: PRD AC-009, AC-062, AC-063; ADR-0018 D1b, D3, and its
-//   Implementation Guidance #6 and #7 (which prescribe this case's exact shape);
-//   backend DD Integration Verification Points EG-c and EG-d; risk R-01.
+// AC: EG-BE-005 — "Khi record_essay_grade() chạy trên một lượt làm có ba câu tự luận
+//   và ghi band cho câu THỨ HAI, hệ thống phải để mảng per_question với
+//   dãy questionId KHÔNG ĐỔI."
+// AC: EG-BE-006 — "Khi record_essay_grade() được gọi lần thứ hai cho một cặp
+//   (attempt_id, question_id) đã chấm, hệ thống phải trả false (0 hàng bị ảnh hưởng),
+//   KHÔNG được ném lỗi, và band đã lưu phải bằng đúng lần ghi đầu."
+// AC: EG-BE-007 — "Khi record_essay_grade() được gọi trên một phần tử ở `failed`,
+//   hệ thống phải ghi được (failed -> graded và failed -> failed đều hợp lệ);
+//   `graded` là trạng thái hấp thụ."
+// AC: EG-BE-009 — "Cả hai hàm không được nhận tham số user_id và không được nhắc tới
+//   total_score, correct, total, topic_breakdown hay overtime_seconds
+//   ở bất kỳ đâu trong thân hàm."
+// Cũng hoàn thành: PRD AC-009, AC-062, AC-063; ADR-0018 D1b, D3, và
+//   Implementation Guidance #6 và #7 (quy định đúng hình dạng ca này);
+//   backend DD Integration Verification Points EG-c và EG-d; rủi ro R-01.
 // ROI: 100 (BV:10 x Freq:9 + Legal:0 + Defect:10)
-//   BV 10 — R-01 is rated "Cao": a missing `order by ord` reorders EVERY question
-//     on the review page the first time any essay is graded. The student sees their
-//     answers attached to the wrong questions. Nothing about the band looks wrong.
-//   Freq 9 — every graded essay in the system executes this statement.
-//   Defect 10 — `order by ord` reads like decoration inside a `jsonb_agg`, and
-//     Postgres is FREE to return a different order without it, so the defect is
-//     both easy to omit and non-deterministic to reproduce. ADR-0018 wrote the case
-//     shape down precisely because "the band landed" passes while the page shuffles.
-//   RESERVED-SLOT JUSTIFICATION: the journey's correctness depends on a real DB
-//   write — data persisted through `jsonb_agg` in real Postgres, and a `WHERE`
-//   predicate matching zero rows rather than raising. Neither is expressible with
-//   fixtures: a mocked client would assert the mock's own return value.
-// Behavior: seed one submitted attempt whose exam_results.per_question holds three
-//   essay elements in a known order (plus non-essay elements around them) -> call
-//   record_essay_grade() as service_role for the MIDDLE essay -> read the row back
-//   by real query -> the full questionId sequence is unchanged and only the target
-//   element's keys moved -> call it a second time for the same pair with a
-//   DIFFERENT band -> it returns false and changes nothing.
+//   BV 10 — R-01 được đánh giá "Cao": thiếu `order by ord` làm xáo trộn MỌI câu
+//     trên trang review lần đầu tiên bất kỳ bài tự luận nào được chấm. Học sinh thấy
+//     câu trả lời của mình gắn vào sai câu hỏi. Không gì ở band trông sai.
+//   Freq 9 — mọi bài tự luận đã chấm trong hệ thống đều thực thi câu lệnh này.
+//   Defect 10 — `order by ord` đọc như đồ trang trí bên trong `jsonb_agg`, và
+//     Postgres TỰ DO trả về thứ tự khác khi thiếu nó, nên lỗi vừa
+//     dễ bỏ sót vừa không xác định để tái hiện. ADR-0018 viết hình dạng ca ra chính vì
+//     "band đã hạ cánh" thì qua trong khi trang bị xáo trộn.
+//   BIỆN MINH SUẤT GIỮ CHỖ: tính đúng của hành trình phụ thuộc một lượt ghi DB thật
+//   — dữ liệu lưu bền qua `jsonb_agg` trong Postgres thật, và một vị từ `WHERE`
+//   khớp không hàng nào thay vì ném lỗi. Không cái nào diễn đạt được bằng fixture:
+//   một client bị mock sẽ khẳng định chính giá trị trả về của mock.
+// Hành vi: gieo một lượt làm đã nộp mà exam_results.per_question giữ ba
+//   phần tử tự luận theo thứ tự đã biết (cộng các phần tử không phải tự luận xen quanh) -> gọi
+//   record_essay_grade() bằng service_role cho bài tự luận Ở GIỮA -> đọc lại hàng
+//   bằng truy vấn thật -> toàn bộ dãy questionId không đổi và chỉ các khoá
+//   của phần tử đích dịch chuyển -> gọi lần hai cho cùng cặp với một band
+//   KHÁC -> nó trả false và không đổi gì.
 // @category: service-integration-e2e
 // @lane: service-integration-e2e
-// @dependency: full-system (real Supabase dev Postgres, real service_role client,
-//   real schema.sql functions)
+// @dependency: toàn hệ thống (Postgres dev Supabase thật, client service_role thật,
+//   hàm schema.sql thật)
 // @complexity: high
-// @real-dependency: real Postgres — nothing mocked
-// Primary failure mode: the update rebuilds `per_question` with
-//   `jsonb_agg(...)` and no `order by ord`, so the array comes back in an
-//   unspecified order; the band is correct, the test that only checks the band is
-//   green, and every question on /result/detail is now paired with the wrong
-//   answer text. The second mode: first-write-wins is implemented as a read-then-
-//   write in TypeScript or as a RAISE inside the function, so a duplicate settle
-//   either overwrites a band (losing the first, authoritative one) or surfaces to
-//   the student as an error — when AC-062 requires it to be an ordinary,
-//   never-displayed outcome routed to telemetry.
-// Proof obligation — what the implemented test must assert:
-//   (a) FULL SEQUENCE, not the band: after settling the SECOND of three essays,
-//       `per_question.map(e => e.questionId)` toEqual the independently authored
-//       literal array captured BEFORE the write, element for element, including the
-//       non-essay elements. Asserting "the second element is still the second
-//       element" is not enough — assert the whole sequence. This is the assertion
-//       whose absence ADR-0018 Implementation Guidance #6 names explicitly.
-//   (b) ELEMENT SCOPE: every OTHER element in the array is byte-identical to its
-//       pre-write value (deep equality against the captured literal), and the target
-//       element differs ONLY in essayState / essayEarned / essayMax /
-//       essayLowConfidence / essayGradedAt. `essayAttempts` must NOT be touched by
-//       the settle — it belongs to the claim (D4).
-//   (c) COLUMN SCOPE: `total_score`, `correct`, `total`, `topic_breakdown` and
-//       `overtime_seconds` on the row are unchanged after the write (read back and
-//       compare to the seeded literals). This is AC-009 proven against the database
-//       rather than against the function's source text.
-//   (d) DUPLICATE SETTLE IS A VALUE: a second call for the same
-//       (attempt_id, question_id) with a DIFFERENT band returns FALSE / zero rows —
-//       assert the RETURN VALUE, and assert the call did not throw (wrap so a raise
-//       fails the case with a message that says "raised instead of returning
-//       false"). Then read the row back: the stored band equals the FIRST write, and
-//       `essayState` is still `graded`.
-//   (e) `failed` IS NOT ABSORBING: settle an element to `failed`, then settle the
-//       same pair to `graded` — the second call returns TRUE and the band lands.
-//       Then settle it again -> false. This distinguishes "the predicate blocks
-//       everything" from "the predicate blocks only `graded`", which (d) alone
-//       cannot.
-//   (f) NOT-SUBMITTED REFUSAL (EG-BE-008 settle half): calling settle for an attempt
-//       that is not `submitted` raises `check_violation` — assert the SQLSTATE, not
-//       the message text.
-//   (g) SOURCE-TEXT SCAN (EG-BE-009): read `SOURCE/supabase/schema.sql`, isolate the
-//       two function bodies, and assert neither contains `user_id` as a parameter
-//       nor any of the five forbidden column names. Cheap, and it is the only
-//       assertion that keeps a later "just add a user_id param" from compiling
-//       past review.
+// @real-dependency: Postgres thật — không gì bị mock
+// Kiểu hỏng chính: update dựng lại `per_question` bằng
+//   `jsonb_agg(...)` không có `order by ord`, nên mảng trả về theo thứ tự
+//   không xác định; band đúng, test chỉ kiểm band thì
+//   xanh, và mọi câu trên /result/detail giờ được ghép với sai
+//   chữ đáp án. Kiểu thứ hai: first-write-wins được cài như read-then-
+//   write trong TypeScript hoặc như RAISE trong hàm, nên một settle trùng
+//   hoặc ghi đè một band (mất band đầu, band có thẩm quyền) hoặc lộ ra cho học sinh
+//   như một lỗi — trong khi AC-062 đòi nó là một kết quả bình thường,
+//   không bao giờ hiển thị, định tuyến vào telemetry.
+// Nghĩa vụ chứng minh — test được cài đặt phải khẳng định gì:
+//   (a) TOÀN BỘ DÃY, không phải band: sau khi settle câu THỨ HAI trong ba câu tự luận,
+//       `per_question.map(e => e.questionId)` toEqual mảng literal tự soạn độc lập
+//       bắt TRƯỚC lượt ghi, từng phần tử, gồm cả các phần tử không phải tự luận.
+//       Khẳng định "phần tử thứ hai vẫn là phần tử thứ hai" là chưa đủ — khẳng định
+//       cả dãy. Đây là khẳng định mà sự vắng mặt của nó được ADR-0018 Implementation
+//       Guidance #6 nêu tên rõ.
+//   (b) PHẠM VI PHẦN TỬ: mọi phần tử KHÁC trong mảng giống từng byte với giá trị trước khi ghi
+//       (so sánh sâu với literal đã bắt), và phần tử đích chỉ khác ở
+//       essayState / essayEarned / essayMax /
+//       essayLowConfidence / essayGradedAt. `essayAttempts` KHÔNG được settle đụng tới
+//       — nó thuộc về claim (D4).
+//   (c) PHẠM VI CỘT: `total_score`, `correct`, `total`, `topic_breakdown` và
+//       `overtime_seconds` trên hàng không đổi sau lượt ghi (đọc lại và
+//       so với các literal đã gieo). Đây là AC-009 được chứng minh trên database
+//       thay vì trên văn bản nguồn của hàm.
+//   (d) SETTLE TRÙNG LÀ MỘT GIÁ TRỊ: lời gọi thứ hai cho cùng
+//       (attempt_id, question_id) với một band KHÁC trả FALSE / không hàng —
+//       khẳng định GIÁ TRỊ TRẢ VỀ, và khẳng định lời gọi không ném lỗi (bọc để một lỗi ném ra
+//       làm ca hỏng với thông báo nói "raised instead of returning
+//       false"). Rồi đọc lại hàng: band đã lưu bằng lần ghi ĐẦU, và
+//       `essayState` vẫn là `graded`.
+//   (e) `failed` KHÔNG PHẢI hấp thụ: settle một phần tử sang `failed`, rồi settle
+//       cùng cặp sang `graded` — lời gọi thứ hai trả TRUE và band hạ cánh.
+//       Rồi settle lần nữa -> false. Điều này phân biệt "vị từ chặn
+//       mọi thứ" với "vị từ chỉ chặn `graded`", mà (d) một mình
+//       không làm được.
+//   (f) TỪ CHỐI KHI CHƯA NỘP (EG-BE-008 nửa settle): gọi settle cho một lượt làm
+//       không phải `submitted` ném `check_violation` — khẳng định SQLSTATE, không phải
+//       chữ thông báo.
+//   (g) QUÉT VĂN BẢN NGUỒN (EG-BE-009): đọc `SOURCE/supabase/schema.sql`, tách
+//       hai thân hàm, và khẳng định không cái nào chứa `user_id` làm tham số
+//       hay bất kỳ trong năm tên cột bị cấm. Rẻ, và là khẳng định duy nhất
+//       ngăn một lần "cứ thêm tham số user_id" qua được review.
 describe.skipIf(!HAS_LIVE_DB)(
   "record_essay_grade() on real Postgres — array order and first-write-wins (SVC-1)",
   () => {
@@ -312,105 +307,105 @@ describe.skipIf(!HAS_LIVE_DB)(
 );
 
 // =============================================================================
-// SVC-2 — The retry cap is spent at CLAIM time: three claims that never settle
-//         still exhaust it, and neither function is reachable by a student
+// SVC-2 — Trần thử lại bị tiêu ở lúc CLAIM: ba claim không bao giờ settle
+//         vẫn làm cạn nó, và học sinh không với tới được hàm nào
 // =============================================================================
-// AC: EG-BE-010 — "When claim_essay_grading_attempt() succeeds, the element's
-//   essayAttempts must increase by exactly 1, and must NEVER be decremented by any
-//   statement in the repo."
-// AC: EG-BE-011 — "When essayAttempts already equals ESSAY_MAX_ATTEMPTS,
-//   claim_essay_grading_attempt() must return claimed = false, reason = 'exhausted'
-//   and must not lead to any provider request."
-// AC: EG-BE-012 — "When the element is graded, claim_essay_grading_attempt() must
-//   return claimed = false, reason = 'already_graded'."
-// AC: EG-BE-008 (claim half) — "If p_attempt_id points at an attempt that does not
-//   exist or is not submitted, claim_essay_grading_attempt() must return one row
-//   with claimed = false, reason = 'not_submitted'."
-// AC: EG-BE-013 — "With a student's JWT, .rpc() to BOTH functions must return
-//   42501, and a direct UPDATE public.exam_results must be refused at the
-//   privilege layer."
-// Also discharges: PRD AC-045, AC-063, AC-064; ADR-0018 D4 and its containment list;
+// AC: EG-BE-010 — "Khi claim_essay_grading_attempt() thành công, essayAttempts
+//   của phần tử phải tăng đúng 1, và KHÔNG BAO GIỜ bị giảm bởi bất kỳ câu lệnh nào
+//   trong repo."
+// AC: EG-BE-011 — "Khi essayAttempts đã bằng ESSAY_MAX_ATTEMPTS,
+//   claim_essay_grading_attempt() phải trả claimed = false, reason = 'exhausted'
+//   và không được dẫn tới request nhà cung cấp nào."
+// AC: EG-BE-012 — "Khi phần tử đã chấm, claim_essay_grading_attempt() phải
+//   trả claimed = false, reason = 'already_graded'."
+// AC: EG-BE-008 (nửa claim) — "Nếu p_attempt_id trỏ vào một lượt làm không
+//   tồn tại hoặc chưa nộp, claim_essay_grading_attempt() phải trả một hàng
+//   với claimed = false, reason = 'not_submitted'."
+// AC: EG-BE-013 — "Với JWT của học sinh, .rpc() tới CẢ HAI hàm phải trả
+//   42501, và một UPDATE public.exam_results trực tiếp phải bị từ chối ở tầng
+//   đặc quyền."
+// Cũng hoàn thành: PRD AC-045, AC-063, AC-064; ADR-0018 D4 và danh sách khoanh vùng của nó;
 //   backend DD Integration Verification Points EG-a, EG-b, EG-e.
 // ROI: 63 (BV:9 x Freq:6 + Legal:0 + Defect:9)
-//   BV 9 — the cap is the only thing standing between a systematically-failing
-//     grade and an unbounded retry button on a single unmetered project budget
-//     (PRD R-j). It is also a security boundary: these two functions are the first
-//     writers ever allowed to mutate `exam_results` after insert.
-//   Freq 6 — the cap is reached only on repeatedly failing questions, but the claim
-//     path itself runs on every grading attempt of every essay.
-//   Defect 9 — D4 is counter-intuitive by design. The natural implementation
-//     increments the counter on the SETTLE write, which is correct-looking and
-//     wrong exactly where it matters: by F3, an abandoned pass writes NOTHING, so a
-//     settle-time counter never records the interrupted attempts, the stored count
-//     stays below three, and the cap fails precisely in the failure mode
-//     (a student watching a stuck "đang chấm" and clicking retry) that it exists
-//     to handle.
-//   SECOND SLOT: ROI 63 > 50, the service-lane threshold. Selected as the one
-//   additional case beyond the reserved slot.
-// Behavior: seed one submitted attempt with a pending essay at essayAttempts 0 ->
-//   call claim three times as service_role, NEVER settling in between (simulating
-//   three passes cut off by the platform) -> each returns claimed = true with an
-//   incrementing count -> the fourth returns claimed = false, reason 'exhausted' ->
-//   then prove neither function is callable by a student JWT.
+//   BV 9 — trần là thứ duy nhất đứng giữa một lượt chấm thất bại có hệ thống
+//     và một nút thử lại không giới hạn trên một ngân sách dự án đơn lẻ không đo đếm
+//     (PRD R-j). Nó cũng là một ranh giới bảo mật: hai hàm này là
+//     bộ ghi đầu tiên từng được phép đổi `exam_results` sau khi insert.
+//   Freq 6 — chỉ chạm trần ở các câu hỏng lặp lại, nhưng chính đường claim
+//     chạy ở mỗi lượt chấm của mọi bài tự luận.
+//   Defect 9 — D4 phản trực giác theo thiết kế. Cài đặt tự nhiên
+//     tăng bộ đếm ở lượt ghi SETTLE, trông đúng và
+//     sai đúng chỗ quan trọng: theo F3, một lượt chấm bị bỏ dở ghi KHÔNG GÌ, nên một
+//     bộ đếm lúc settle không bao giờ ghi các lần thử bị gián đoạn, số đếm lưu
+//     vẫn dưới ba, và trần hỏng đúng ở kiểu hỏng
+//     (học sinh nhìn "đang chấm" bị kẹt và bấm thử lại) mà nó sinh ra
+//     để xử lý.
+//   SUẤT THỨ HAI: ROI 63 > 50, ngưỡng của làn service. Được chọn là ca bổ sung
+//   duy nhất ngoài suất giữ chỗ.
+// Hành vi: gieo một lượt làm đã nộp với một bài tự luận pending ở essayAttempts 0 ->
+//   gọi claim ba lần bằng service_role, KHÔNG BAO GIỜ settle ở giữa (mô phỏng
+//   ba lượt chấm bị nền tảng cắt) -> mỗi lần trả claimed = true với số đếm
+//   tăng dần -> lần thứ tư trả claimed = false, reason 'exhausted' ->
+//   rồi chứng minh học sinh không gọi được hàm nào bằng JWT.
 // @category: service-integration-e2e
 // @lane: service-integration-e2e
-// @dependency: full-system (real Supabase dev Postgres, real service_role client,
-//   two real authenticated student sessions)
+// @dependency: toàn hệ thống (Postgres dev Supabase thật, client service_role thật,
+//   hai phiên học sinh authenticated thật)
 // @complexity: high
-// @real-dependency: real Postgres — nothing mocked
-// Primary failure mode: the attempt counter is incremented by the SETTLE rather
-//   than by the CLAIM, so three interrupted passes cost nothing, the fourth,
-//   fifth and Nth claims all succeed, and each one reserves a fresh Groq budget
-//   block for the shared, unmetered project budget. The security variant: the
-//   functions are created without the `revoke ... from public, anon, authenticated`
-//   half of the grant block (revoking from `public` alone leaves them callable by
-//   students, per the §10b note on Supabase default privileges), so a student can
-//   call the settle function directly and write their own band.
-// Proof obligation — what the implemented test must assert:
-//   (a) COUNTER MOVES ON CLAIM, WITHOUT ANY SETTLE: three consecutive claims with
-//       NO settle between them return claimed = true and a returned count of 1, 2,
-//       3 in order; read the row back after each and assert the STORED
-//       `essayAttempts` equals the returned count. Asserting the return value alone
-//       would pass for a function that computes the number and never persists it.
-//   (b) FOURTH CLAIM REFUSED: claimed = false and reason === 'exhausted' exactly
-//       (assert the literal reason string — 'exhausted', 'already_graded',
-//       'not_submitted' are three different branches and a single generic refusal
-//       collapses them), and the stored `essayAttempts` is STILL 3 — the refused
-//       claim must not increment.
-//   (c) CAP VALUE IS PINNED, NOT ASSUMED: the number of successful claims equals
-//       `ESSAY_MAX_ATTEMPTS` imported from `lib/scoring/essayLifecycle.ts` (3), not
-//       a literal 3 typed into this file. This is the one unavoidable double
-//       declaration in the design (TS constant vs SQL literal, because ADR-0018
-//       fixed the function's two-parameter signature); `verify:schema` carries the
-//       pin gate, and this case must not become a third, independent copy.
-//   (d) NO DECREMENT PATH (EG-BE-010, second half): scan `SOURCE/supabase/schema.sql`
-//       and `SOURCE/lib/**` and assert no statement decrements `essayAttempts`. A
-//       "refund on failure" is the change a future session will reach for first,
-//       and it silently reopens the unbounded-retry hole.
-//   (e) ALREADY-GRADED CLAIM: on an element in `graded`, claim returns
-//       claimed = false, reason === 'already_graded', and `essayAttempts` does not
-//       move (AC-063: a retry on a question that already has a band is a no-op).
-//   (f) NOT-SUBMITTED CLAIM: on an attempt that is not `submitted`, claim returns
-//       ONE ROW with claimed = false, reason === 'not_submitted' — a returned row,
-//       not an empty result set and not a raise (the settle's not-submitted branch
-//       raises `check_violation` instead; the asymmetry is deliberate and both
-//       halves must be pinned, the settle half in SVC-1(f)).
-//   (g) STUDENT JWT IS REFUSED ON BOTH (EG-BE-013): with a real authenticated
-//       student session, `.rpc()` to `claim_essay_grading_attempt` and to
-//       `record_essay_grade` each fail with code `42501`. DISTINGUISH THE CODES
-//       explicitly, following the `MM-b` template (`test-rls.ts:1652-1671`):
-//       `PGRST202` means the schema was never applied (precondition 2 failed, not a
-//       security finding), and any other code means the `revoke` is missing or
-//       partial. A case that asserts only "it failed" reports a green security
-//       property on an unapplied database.
-//   (h) OWNERSHIP IS DERIVED IN SQL: with `service_role` — the identity that CAN
-//       call the functions — a claim naming student B's attempt still behaves
-//       correctly with NO user_id passed, because there is no user_id parameter to
-//       pass (SVC-1(g) proves the parameter's absence; this proves the function
-//       still resolves ownership from the attempt row rather than trusting a
-//       caller-supplied identity).
-//       Note the direct-UPDATE half of EG-BE-013 is ALREADY covered by the shipped
-//       `S-b` case (`test-rls.ts:1314-1320`); do not duplicate it here.
+// @real-dependency: Postgres thật — không gì bị mock
+// Kiểu hỏng chính: bộ đếm lượt thử được tăng bởi SETTLE thay vì
+//   bởi CLAIM, nên ba lượt chấm bị gián đoạn không tốn gì, claim thứ tư,
+//   thứ năm và thứ N đều thành công, và mỗi cái giữ một khối ngân sách Groq mới
+//   của ngân sách dự án dùng chung, không đo đếm. Biến thể bảo mật: các
+//   hàm được tạo mà thiếu nửa `revoke ... from public, anon, authenticated`
+//   của khối grant (chỉ revoke khỏi `public` vẫn để học sinh gọi được,
+//   theo ghi chú §10b về default privileges của Supabase), nên học sinh có thể
+//   gọi thẳng hàm settle và tự ghi band của mình.
+// Nghĩa vụ chứng minh — test được cài đặt phải khẳng định gì:
+//   (a) BỘ ĐẾM DỊCH CHUYỂN Ở CLAIM, KHÔNG CẦN SETTLE NÀO: ba claim liên tiếp
+//       KHÔNG có settle ở giữa trả claimed = true và số đếm trả về là 1, 2,
+//       3 theo thứ tự; đọc lại hàng sau mỗi lần và khẳng định `essayAttempts`
+//       ĐÃ LƯU bằng số đếm trả về. Chỉ khẳng định giá trị trả về
+//       sẽ qua với một hàm tính ra số mà không bao giờ lưu.
+//   (b) CLAIM THỨ TƯ BỊ TỪ CHỐI: claimed = false và reason === 'exhausted' chính xác
+//       (khẳng định đúng chuỗi lý do literal — 'exhausted', 'already_graded',
+//       'not_submitted' là ba nhánh khác nhau và một lần từ chối chung duy nhất
+//       gộp chúng), và `essayAttempts` đã lưu VẪN là 3 — claim bị từ chối
+//       không được tăng.
+//   (c) GIÁ TRỊ TRẦN ĐƯỢC GHIM, KHÔNG GIẢ ĐỊNH: số claim thành công bằng
+//       `ESSAY_MAX_ATTEMPTS` import từ `lib/scoring/essayLifecycle.ts` (3), không phải
+//       literal 3 gõ vào file này. Đây là lần khai báo đôi không tránh được duy nhất
+//       trong thiết kế (hằng TS so với literal SQL, vì ADR-0018 đã
+//       cố định chữ ký hai tham số của hàm); `verify:schema` mang chốt ghim,
+//       và ca này không được thành bản sao độc lập thứ ba.
+//   (d) KHÔNG ĐƯỜNG GIẢM (EG-BE-010, nửa sau): quét `SOURCE/supabase/schema.sql`
+//       và `SOURCE/lib/**` và khẳng định không câu lệnh nào giảm `essayAttempts`. Một
+//       "hoàn lượt khi thất bại" là thay đổi mà một phiên về sau sẽ với tới đầu tiên,
+//       và nó lặng lẽ mở lại lỗ hổng thử lại không giới hạn.
+//   (e) CLAIM CỦA PHẦN TỬ ĐÃ CHẤM: trên một phần tử ở `graded`, claim trả
+//       claimed = false, reason === 'already_graded', và `essayAttempts` không
+//       dịch chuyển (AC-063: thử lại trên một câu đã có band là no-op).
+//   (f) CLAIM CHƯA NỘP: trên một lượt làm không phải `submitted`, claim trả
+//       MỘT HÀNG với claimed = false, reason === 'not_submitted' — một hàng trả về,
+//       không phải tập kết quả rỗng và không phải một lỗi ném ra (nhánh chưa-nộp của settle
+//       ném `check_violation`; sự bất đối xứng này là cố ý và cả hai
+//       nửa phải được ghim, nửa settle ở SVC-1(f)).
+//   (g) JWT HỌC SINH BỊ TỪ CHỐI Ở CẢ HAI (EG-BE-013): với một phiên học sinh
+//       authenticated thật, `.rpc()` tới `claim_essay_grading_attempt` và tới
+//       `record_essay_grade` đều hỏng với mã `42501`. PHÂN BIỆT CÁC MÃ
+//       tường minh, theo mẫu `MM-b` (`test-rls.ts:1652-1671`):
+//       `PGRST202` nghĩa là schema chưa bao giờ được áp (điều kiện tiên quyết 2 hỏng, không phải
+//       một phát hiện bảo mật), và bất kỳ mã nào khác nghĩa là `revoke` thiếu hoặc
+//       không đầy đủ. Một ca chỉ khẳng định "nó hỏng" báo một thuộc tính bảo mật xanh
+//       trên một database chưa áp.
+//   (h) QUYỀN SỞ HỮU ĐƯỢC SUY RA TRONG SQL: với `service_role` — danh tính mà CÓ THỂ
+//       gọi các hàm — một claim gọi tên lượt làm của học sinh B vẫn hành xử
+//       đúng mà KHÔNG truyền user_id, vì không có tham số user_id nào để
+//       truyền (SVC-1(g) chứng minh tham số vắng mặt; cái này chứng minh hàm
+//       vẫn phân giải quyền sở hữu từ hàng lượt làm thay vì tin một danh tính
+//       do người gọi cung cấp).
+//       Lưu ý nửa UPDATE-trực-tiếp của EG-BE-013 ĐÃ được phủ bởi ca `S-b` đã ship
+//       (`test-rls.ts:1314-1320`); đừng lặp lại ở đây.
 describe.skipIf(!HAS_LIVE_DB)(
   "claim_essay_grading_attempt() on real Postgres — claim-time cap and grants (SVC-2)",
   () => {

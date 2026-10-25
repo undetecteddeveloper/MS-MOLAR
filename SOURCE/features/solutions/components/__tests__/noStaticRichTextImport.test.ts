@@ -1,25 +1,25 @@
-// noStaticRichTextImport.test.ts — permanent source-level guard for the M12
-// bundle-budget claim (frontend DD § Risks and Mitigation, verbatim: "`RichText`
-// gets statically imported from a `features/solutions` client file, silently
-// re-adding ~122 KB gzip with no automated gate to catch it"). Task 48 (P5-T9).
+// noStaticRichTextImport.test.ts — chốt chặn vĩnh viễn ở mức mã nguồn cho khẳng định
+// ngân sách bundle M12 (frontend DD § Risks and Mitigation, nguyên văn: "`RichText`
+// bị import tĩnh từ một file client của `features/solutions`, lặng lẽ thêm lại ~122 KB gzip
+// mà không cổng tự động nào bắt"). Task 48 (P5-T9).
 //
-// Rule: any file under `features/solutions/` carrying the literal `"use client"`
-// directive must never statically `import { RichText } from
-// "@/components/shared/RichText"` — only the `dynamic(() => import(...))`
-// pattern is allowed (precedent: `features/authoring/components/
-// QuestionEditor.tsx:78-85`; followed inside this feature by
-// `FormulaPreview.tsx:28-34` and `CommentItem.tsx:53-60`). Server Components
-// (e.g. `SolutionNoteBlock.tsx`, `writerQuestionNodes.tsx`,
-// `CommentNotificationCard.tsx`) are exempt — they carry no `"use client"`
-// directive, so they ship zero client JS regardless of what they import
+// Luật: mọi file dưới `features/solutions/` mang directive literal `"use client"`
+// không bao giờ được import tĩnh `import { RichText } from
+// "@/components/shared/RichText"` — chỉ cho phép mẫu `dynamic(() => import(...))`
+// (tiền lệ: `features/authoring/components/
+// QuestionEditor.tsx:78-85`; được theo trong tính năng này bởi
+// `FormulaPreview.tsx:28-34` và `CommentItem.tsx:53-60`). Server Component
+// (ví dụ `SolutionNoteBlock.tsx`, `writerQuestionNodes.tsx`,
+// `CommentNotificationCard.tsx`) được miễn — chúng không mang directive
+// `"use client"`, nên chúng ship 0 JS phía client bất kể import gì
 // (TD-021/ADR-0002).
 //
-// `SolutionNoteBlock.test.tsx` already carries an equivalent scan (added as a
-// companion to that file's render tests). This file is the dedicated,
-// TDD-provable guard the task explicitly asks for: it exposes the detection
-// logic as a plain function so the Red phase can point it at IN-TEST fixture
-// strings (not real files) before the Green phase asserts the real tree is
-// clean.
+// `SolutionNoteBlock.test.tsx` đã mang một phép quét tương đương (thêm như
+// bạn đồng hành của các test render của file đó). File này là chốt chặn chuyên dụng,
+// chứng minh được bằng TDD mà task đòi tường minh: nó phơi logic
+// phát hiện dưới dạng một hàm thường để pha Red có thể trỏ nó vào các chuỗi fixture
+// TRONG TEST (không phải file thật) trước khi pha Green khẳng định cây thật
+// sạch.
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";

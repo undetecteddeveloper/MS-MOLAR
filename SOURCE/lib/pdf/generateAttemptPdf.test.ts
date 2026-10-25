@@ -1,19 +1,19 @@
 // @vitest-environment jsdom
 
-// generateAttemptPdf — unit tests for the single shared PDF-generation module
-// (Work Plan Phase 2 Task 2.4, AC-007). Binding Decisions (ADR-0009 §
+// generateAttemptPdf — unit test cho module tạo PDF dùng chung duy nhất
+// (Work Plan Phase 2 Task 2.4, AC-007). Quyết định ràng buộc (ADR-0009 §
 // Implementation Guidance, history-work-plan-task-09.md):
-//  - placement: jspdf/html2canvas/react-dom/react-dom/client dynamically
-//    imported only inside generateAttemptPdfFile's async body.
-//  - data_flow: exactly one doc.output("blob") call site, shared by Save/Share.
-//  - dependency_direction: exactly one exported PDF-generation entry point.
-//  - persistence: zero network/fetch calls, no server-side module touched.
-// Reference Contract: File.name equals buildPdfFilename's real (unmocked)
-// output — no independent filename logic duplicated in this module.
-// Mock boundary: jsPDF/html2canvas/react-dom/react-dom/client are mocked
-// (determinism, no real canvas rasterization in this suite, per frontend DD
-// Test Boundaries); buildPdfFilename/formatSubmittedDate/formatCompletionTime
-// and AttemptPdfTemplate are real (Task 07/08's already-tested contracts).
+//  - placement: jspdf/html2canvas/react-dom/react-dom/client chỉ được import
+//    động bên trong thân async của generateAttemptPdfFile.
+//  - data_flow: đúng một điểm gọi doc.output("blob"), dùng chung cho Lưu/Chia sẻ.
+//  - dependency_direction: đúng một điểm vào tạo-PDF được export.
+//  - persistence: không lời gọi mạng/fetch nào, không module phía server nào bị chạm.
+// Reference Contract: File.name bằng đầu ra thật (không mock) của buildPdfFilename
+// — không nhân bản logic tên file độc lập trong module này.
+// Ranh giới mock: jsPDF/html2canvas/react-dom/react-dom/client bị mock
+// (tính xác định, không raster hoá canvas thật trong bộ test này, theo Test
+// Boundaries của frontend DD); buildPdfFilename/formatSubmittedDate/formatCompletionTime
+// và AttemptPdfTemplate là thật (hợp đồng đã được test của Task 07/08).
 
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";

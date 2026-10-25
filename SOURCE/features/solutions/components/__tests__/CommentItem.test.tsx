@@ -1,16 +1,16 @@
 // @vitest-environment jsdom
 
 // CommentItem — UI Spec § Component: CommentItem; frontend DD § Main
-// Components. Required Tests (task 28): #2 (delete generic, DD-U3), #3
-// (masked own row, AC-105/S4), #6 (hidden own comment, S19/UI-D19).
+// Components. Required Tests (task 28): #2 (xoá chung, DD-U3), #3
+// (hàng của chính mình bị che, AC-105/S4), #6 (bình luận của chính mình bị ẩn, S19/UI-D19).
 // Required Tests (task 37, frontend DD v1.6 § Test Boundaries "Already-reported
-// tests → Task 37"): report affordance + `ReportDialog` wiring (comment
-// variant) — items 1-8 below, in the order the task file lists them.
+// tests → Task 37"): nút báo cáo + dây nối `ReportDialog` (biến thể
+// bình luận) — các mục 1-8 bên dưới, theo thứ tự task file liệt kê.
 //
-// Mock boundary: `@/features/solutions/actions` mocked at the module boundary
-// (`deleteComment`, `reportComment` — this file never calls `postComment` or
-// `reportSolution`); `ReportDialog` (task 36) renders for real, `identity.ts`
-// and `RichText` stay real (task 28 binding instruction, unchanged by task 37).
+// Ranh giới mock: `@/features/solutions/actions` được mock ở ranh giới module
+// (`deleteComment`, `reportComment` — file này không bao giờ gọi `postComment` hay
+// `reportSolution`); `ReportDialog` (task 36) render thật, `identity.ts`
+// và `RichText` giữ thật (chỉ dẫn ràng buộc của task 28, task 37 không đổi).
 
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

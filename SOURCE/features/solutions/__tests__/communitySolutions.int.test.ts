@@ -1,52 +1,52 @@
-// Community Solutions [integration] Test Skeleton
+// Community Solutions [integration] Bộ khung test
 // Design Docs: docs/design/community-solutions-backend-design.md (v1.1),
 //   docs/design/community-solutions-frontend-design.md (v1.1)
 // UI Spec: docs/ui-spec/community-solutions-ui-spec.md
 // PRD: docs/prd/community-solutions-prd.md (v1.3)
-// Generated: 2026-09-17 | Budget Used: integration 3/3, fixture-e2e 3/3, service-integration-e2e 2/1-2
+// Sinh ngày: 2026-09-17 | Ngân sách đã dùng: integration 3/3, fixture-e2e 3/3, service-integration-e2e 2/1-2
 //
-// SKELETON ONLY — comment-based design intent. No imports, no describe/it, no
-// assertions yet, by design (testing-principles skill: a committed skeleton
-// must stay green under tsc/eslint/build before the referenced modules exist).
-// features/solutions/** does not exist yet; this feature's migration is NOT
-// yet applied to dev (hynwleaxtbtjzkvpjsug) — this is still the design phase.
-// The implementing task adds real imports + vitest runner blocks + assertions
-// alongside features/solutions/actions.ts / queries.ts / adminActions.ts, in
-// the same commit (Red -> Green in one task), per this repo's rating.int.test.ts
-// precedent (SOURCE/features/exams/__tests__/rating.int.test.ts).
+// CHỈ LÀ SKELETON — ý định thiết kế dạng comment. Chưa có import, describe/it,
+// khẳng định, theo thiết kế (skill testing-principles: một skeleton đã commit
+// phải giữ xanh dưới tsc/eslint/build trước khi các module được tham chiếu tồn tại).
+// features/solutions/** chưa tồn tại; migration của tính năng này CHƯA
+// được áp lên dev (hynwleaxtbtjzkvpjsug) — vẫn là giai đoạn thiết kế.
+// Task cài đặt thêm import thật + khối runner vitest + khẳng định
+// cạnh features/solutions/actions.ts / queries.ts / adminActions.ts, trong
+// cùng commit (Red -> Green trong một task), theo tiền lệ rating.int.test.ts của repo này
+// (SOURCE/features/exams/__tests__/rating.int.test.ts).
 //
-// Mock boundary (backend DD § Test Boundaries, Mock Boundary Decisions table):
-// the Supabase SESSION client (.rpc/.from calls returned by
-// @/lib/supabase/server createClient()) is the only sanctioned mock in this
-// file — mirrors rating.int.test.ts's existing vi.mock("@/lib/supabase/server")
-// convention. Real Postgres RLS/RPC/masking correctness is explicitly NOT
-// provable with a mock ("no mock can verify that... masking case when
-// expressions actually evaluate to null in the live response" — backend DD
-// § Data Layer Testing Strategy); that proof lives in this feature's
-// service-integration-e2e file, not here. This file proves Server Action /
-// query-wrapper business logic, call construction, and error mapping only.
+// Ranh giới mock (backend DD § Test Boundaries, bảng Mock Boundary Decisions):
+// client Supabase PHIÊN (các lời gọi .rpc/.from do
+// createClient() của @/lib/supabase/server trả về) là mock được phê duyệt duy nhất trong
+// file này — theo quy ước vi.mock("@/lib/supabase/server") sẵn có của rating.int.test.ts.
+// Tính đúng của RLS/RPC/che Postgres thật rõ ràng KHÔNG
+// chứng minh được bằng mock ("không mock nào xác minh được rằng... các biểu thức case
+// when che thực sự cho ra null trong phản hồi sống" — backend DD
+// § Data Layer Testing Strategy); bằng chứng đó nằm trong file
+// service-integration-e2e của tính năng này, không phải ở đây. File này chỉ chứng minh logic nghiệp vụ
+// Server Action / lớp bọc truy vấn, cách dựng lời gọi, và ánh xạ lỗi.
 
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// queries.ts and lib/auth/admin.ts import "server-only" (throws outside a
-// Next server/react-server bundle) — same stub as rating.int.test.ts /
+// queries.ts và lib/auth/admin.ts import "server-only" (ném lỗi ngoài
+// bundle server Next/react-server) — cùng stub với rating.int.test.ts /
 // getResult.int.test.ts.
 vi.mock("server-only", () => ({}));
 
 const { getUserMock, rpcMock, fromMock, isAdminUserIdMock, createSignedUrlsMock } = vi.hoisted(() => ({
   getUserMock: vi.fn(),
   rpcMock: vi.fn(),
-  // Test 1 (b): a spy, so "zero .from(...) calls" is an assertion on a
-  // recorded call log rather than on a TypeError from a missing method.
+  // Test 1 (b): một spy, để "không lời gọi .from(...) nào" là khẳng định trên
+  // nhật ký lời gọi được ghi thay vì trên một TypeError do thiếu phương thức.
   fromMock: vi.fn(),
   isAdminUserIdMock: vi.fn(),
-  // Test 3 (task 42 integration handoff, see task 14's Investigation Notes):
-  // listSolutions/getSolutionDetail now batch-sign every named row's
-  // author_avatar_path before toAuthorIdentity. Echoes a deterministic signed
-  // value per path — the batching/fail-closed Storage contract itself is
-  // proven in features/solutions/__tests__/avatarSigner.test.ts (task 42).
+  // Test 3 (bàn giao tích hợp task 42, xem Investigation Notes của task 14):
+  // listSolutions/getSolutionDetail giờ ký theo lô author_avatar_path của mọi hàng
+  // có tên trước toAuthorIdentity. Phản hồi một giá trị đã ký xác định cho mỗi
+  // đường dẫn — chính hợp đồng gộp lô/fail-closed của Storage được chứng minh trong
+  // features/solutions/__tests__/avatarSigner.test.ts (task 42).
   createSignedUrlsMock: vi.fn(async (paths: string[]) => ({
     data: paths.map((path) => ({ path, signedUrl: `signed:${path}`, error: null })),
     error: null,
@@ -62,11 +62,11 @@ vi.mock("@/lib/supabase/server", () => ({
   })),
 }));
 
-// adminActions.ts's app-layer pre-check (Test 1 + the admin rows below).
+// phép kiểm trước ở tầng app của adminActions.ts (Test 1 + các hàng admin bên dưới).
 vi.mock("@/lib/auth/admin", () => ({ isAdminUserId: isAdminUserIdMock }));
 
-// adminActions.ts revalidates /admin after an accepted moderation; outside a
-// Next request the real revalidatePath has no store to write to.
+// adminActions.ts revalidate /admin sau khi một kiểm duyệt được chấp nhận; ngoài
+// một request Next, revalidatePath thật không có store để ghi.
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 const { saveSolution, setSolutionStatus } = await import("@/features/solutions/actions");
@@ -78,64 +78,64 @@ const ADMIN_ACTIONS_SOURCE_PATH = fileURLToPath(new URL("../adminActions.ts", im
 const ADMIN_ACTION_ERROR_KEY = "admin.solutions.actionError";
 
 // =============================================================================
-// Test 1 — adminActions.ts: admin moderation never touches service-role.ts;
-//   moderation writes flow only through session-client RPC calls
-//   (TD-029 boundary — required by the orchestration prompt to have >=1
-//   skeleton proving this boundary, not only stated in documentation)
+// Test 1 — adminActions.ts: kiểm duyệt admin không bao giờ chạm service-role.ts;
+//   các lượt ghi kiểm duyệt chỉ đi qua lời gọi RPC của client phiên
+//   (ranh giới TD-029 — prompt điều phối yêu cầu có >=1
+//   skeleton chứng minh ranh giới này, không chỉ nêu trong tài liệu)
 // =============================================================================
-// AC: "The system shall implement every admin moderation write as a
-//   SECURITY DEFINER function granted to authenticated, and shall add zero
-//   exported functions and zero direct table writers to
+// AC: "Hệ thống phải cài đặt mọi lượt ghi kiểm duyệt của admin dưới dạng một
+//   hàm SECURITY DEFINER được cấp cho authenticated, và phải thêm không
+//   hàm export nào và không bộ ghi bảng trực tiếp nào vào
 //   SOURCE/lib/supabase/service-role.ts." (PRD NFR Bảo mật, M9; backend DD
 //   § Agreement Checklist Non-Scope: "SOURCE/lib/supabase/service-role.ts —
-//   zero exported functions added, zero direct writers added")
+//   không thêm hàm export nào, không thêm bộ ghi trực tiếp nào")
 // ROI: 59 (BV:8 x Freq:5 + Legal:10 + Defect:9)
-// Behavior: moderateSolutionAction / moderateCommentAction
-//   (features/solutions/adminActions.ts) are invoked against a mocked
-//   session Supabase client -> each call issues exactly one
+// Hành vi: moderateSolutionAction / moderateCommentAction
+//   (features/solutions/adminActions.ts) được gọi trên client Supabase phiên
+//   mock -> mỗi lời gọi phát đúng một
 //   .rpc("admin_moderate_community_solution" | "admin_moderate_community_comment",
-//   {...}) on the SESSION client -> the module under test imports nothing
-//   from "@/lib/supabase/service-role".
+//   {...}) trên client PHIÊN -> module đang kiểm không import gì
+//   từ "@/lib/supabase/service-role".
 // @category: core-functionality
 // @lane: integration
 // @dependency: features/solutions/adminActions.ts (moderateSolutionAction,
-//   moderateCommentAction) + mocked session Supabase client
+//   moderateCommentAction) + client Supabase phiên mock
 // @complexity: low
-// @real-dependency: none — the session client is the sanctioned mock
-//   boundary here; the real is_admin_user() DB-layer rejection for a
-//   non-admin caller is proven in the service-integration-e2e file's
-//   admin-facing case (Test SE2's admin-vs-non-admin read), not here.
-// Primary failure mode: a future edit routes admin moderation through
-//   lib/supabase/service-role.ts (a 14th exported operation or a 5th direct
-//   writer), silently reopening the frozen surface TD-029/ADR-0019 forbids.
-// Proof obligation: (a) static-import check — features/solutions/adminActions.ts
-//   contains zero imports of "@/lib/supabase/service-role"; (b) call-pattern
-//   assertion — the mocked session client's .rpc() is called with exactly
+// @real-dependency: không có — client phiên là ranh giới mock được phê duyệt
+//   ở đây; việc DB từ chối is_admin_user() thật với người gọi
+//   không phải admin được chứng minh trong ca hướng-admin của file service-integration-e2e
+//   (lượt đọc admin-so-với-không-admin của Test SE2), không phải ở đây.
+// Kiểu hỏng chính: một lần sửa sau này định tuyến kiểm duyệt admin qua
+//   lib/supabase/service-role.ts (thao tác export thứ 14 hoặc bộ ghi
+//   trực tiếp thứ 5), lặng lẽ mở lại bề mặt đóng băng mà TD-029/ADR-0019 cấm.
+// Nghĩa vụ chứng minh: (a) kiểm import tĩnh — features/solutions/adminActions.ts
+//   không chứa import "@/lib/supabase/service-role" nào; (b) khẳng định mẫu lời gọi
+//   — .rpc() của client phiên mock được gọi với đúng
 //   "admin_moderate_community_solution" / "admin_moderate_community_comment",
-//   never a direct .from("community_solutions").update(...) write; (c) note
-//   that SOURCE/lib/supabase/__tests__/serviceRoleSurface.test.ts (13
-//   exports / 4 direct writers, unmodified) is the complementary repo-wide
-//   proof this test does not duplicate — that file proves "the whole repo
-//   didn't grow," this file proves "this feature's own code never reaches
-//   for it."
-// Verification points / expected results / pass criteria:
-//   - moderateSolutionAction(id, "hide", reason) -> mocked client .rpc called
-//     exactly once with "admin_moderate_community_solution"; zero calls to
-//     .from("community_solutions")
-//   - moderateCommentAction(id, "hide", reason) -> same shape, RPC name
+//   không bao giờ là lượt ghi .from("community_solutions").update(...) trực tiếp; (c) ghi chú
+//   rằng SOURCE/lib/supabase/__tests__/serviceRoleSurface.test.ts (13
+//   export / 4 bộ ghi trực tiếp, không sửa) là bằng chứng bổ sung toàn repo
+//   mà test này không lặp lại — file đó chứng minh "cả repo
+//   không phình ra," file này chứng minh "code của chính tính năng này không bao giờ
+//   với tới nó."
+// Điểm kiểm chứng / kết quả mong đợi / tiêu chí qua:
+//   - moderateSolutionAction(id, "hide", reason) -> .rpc của client mock được gọi
+//     đúng một lần với "admin_moderate_community_solution"; không lời gọi
+//     .from("community_solutions") nào
+//   - moderateCommentAction(id, "hide", reason) -> cùng hình dạng, tên RPC
 //     "admin_moderate_community_comment"
-//   - static check: zero occurrences of a "service-role" import path anywhere
-//     in features/solutions/adminActions.ts's source
-//   - pass criteria: all three checks hold; the test fails if any admin
-//     write path bypasses the RPC or imports service-role.ts
-// SK-1 (plan § Open Items, resolved 2026-09-20): the declared signature is
-//   (prevState, formData), so the call above is made with a FormData carrying
-//   the id, "hide" and the reason — no positional-argument overload exists.
+//   - kiểm tĩnh: không có chỗ nào một đường import "service-role" xuất hiện
+//     trong nguồn của features/solutions/adminActions.ts
+//   - tiêu chí qua: cả ba phép kiểm đều đúng; test hỏng nếu bất kỳ đường ghi admin nào
+//     bỏ qua RPC hoặc import service-role.ts
+// SK-1 (plan § Open Items, giải quyết 2026-09-20): chữ ký đã khai báo là
+//   (prevState, formData), nên lời gọi ở trên được thực hiện với một FormData mang
+//   id, "hide" và lý do — không có overload tham số vị trí nào.
 
 let adminUidCounter = 0;
-/** A fresh admin id per test: the real guard() keeps a per-user in-memory
- *  counter, so reusing one id across many moderation calls could trip the
- *  30/hour limit and turn an unrelated assertion red. */
+/** Một id admin mới cho mỗi test: guard() thật giữ một bộ đếm trong bộ nhớ
+ *  theo từng người dùng, nên dùng lại một id qua nhiều lời gọi kiểm duyệt có thể chạm
+ *  giới hạn 30/giờ và làm một khẳng định không liên quan đỏ. */
 function signInFreshAdmin() {
   adminUidCounter += 1;
   const id = `admin-actions-admin-${adminUidCounter}`;
@@ -363,7 +363,7 @@ describe("adminActions.ts — Required test list rows 4-8 (validation, admin pre
   });
 });
 
-/** A queue row in the RPC's snake_case shape (migration task 32), unmasked (S5). */
+/** Một hàng hàng-đợi ở dạng snake_case của RPC (migration task 32), không che (S5). */
 function queueRow(overrides: Record<string, unknown> = {}) {
   return {
     id: "solution-q1",
@@ -585,54 +585,54 @@ describe("listCommunityReports / getSolutionNotesForAdmin — Required test list
 });
 
 // =============================================================================
-// Test 2 — saveSolution / setSolutionStatus: word-count validation gate runs
-//   before any DB call; a word-count rejection maps to a non-leaking,
-//   AC-029-specific error, and never clears the caller's unsaved note text
+// Test 2 — saveSolution / setSolutionStatus: cổng kiểm số từ chạy
+//   trước mọi lời gọi DB; một từ chối do số từ ánh xạ thành lỗi không rò rỉ,
+//   riêng của AC-029, và không bao giờ xoá chữ ghi chú chưa lưu của người gọi
 // =============================================================================
-// AC: "...if status = 'published', reject any note whose word count
-//   (count_words()) drops below 15 for a question that is still current (S1)
-//   — whole call rolls back, nothing partially saved" (backend DD § Data
-//   Flow, "Writer saves a draft" step 3); § Error Handling table row 1
+// AC: "...nếu status = 'published', từ chối mọi ghi chú có số từ
+//   (count_words()) tụt dưới 15 cho một câu hỏi vẫn còn hiện hành (S1)
+//   — cả lời gọi rollback, không có gì được lưu một phần" (backend DD § Data
+//   Flow, "Writer saves a draft" bước 3); § Error Handling bảng hàng 1
 //   (errcode 23514 -> AC-029's "nêu số câu chưa đạt" message; "note text is
-//   never lost (client-side draft state independent of the server
-//   response)").
+//   không bao giờ mất (state nháp phía client độc lập với phản hồi
+//   của server)").
 // ROI: 81 (BV:9 x Freq:8 + Legal:0 + Defect:9)
-// Behavior: setSolutionStatus(examId, "publish") is called against a mocked
-//   session Supabase client returning a simulated 23514 (check-violation)
-//   response -> the Server Action maps it to the exact AC-029 copy.ts key,
-//   never a raw Postgres error string/code -> a second, unrelated simulated
-//   error (e.g. a generic network failure) maps to the distinct generic
-//   "Thao tác thất bại" message, proving the mapping is error-code-specific
-//   -> no code path in either branch clears/resets the caller-supplied note
-//   text.
+// Hành vi: setSolutionStatus(examId, "publish") được gọi trên client Supabase
+//   phiên mock trả về một phản hồi 23514 (vi phạm check) giả lập
+//   -> Server Action ánh xạ nó sang đúng khoá copy.ts của AC-029,
+//   không bao giờ là chuỗi/mã lỗi Postgres thô -> một lỗi giả lập thứ hai không liên quan
+//   (ví dụ rớt mạng chung) ánh xạ sang thông báo chung riêng biệt
+//   "Thao tác thất bại", chứng minh phép ánh xạ đặc thù theo mã lỗi
+//   -> không đường mã nào ở cả hai nhánh xoá/đặt lại chữ ghi chú
+//   do người gọi cung cấp.
 // @category: core-functionality
 // @lane: integration
 // @dependency: features/solutions/actions.ts (setSolutionStatus, saveSolution)
-//   + mocked session Supabase client
+//   + client Supabase phiên mock
 // @complexity: medium
-// @real-dependency: none — session client mocked; the real count_words() SQL
-//   evaluation and the "whole call rolls back" transactional guarantee are
-//   proven in service-integration-e2e (Test SE1, mirroring backend DD's own
-//   Early Verification Point).
-// Primary failure mode: a 9-word note is allowed to publish because the
-//   server's 23514 response is swallowed or mis-mapped to a generic message
-//   instead of the AC-029 "chưa đạt" wording, or the caller's typed note text
-//   is cleared on the failed-publish branch (violating "note text is never
-//   lost").
-// Proof obligation: assert the mapped result object for the simulated 23514
-//   case carries the AC-029 message key/copy — not the raw Postgres
-//   error code/string; assert the simulated infra-error case carries a
-//   different, generic message key; assert neither failure branch's return
-//   value or side effect references clearing/resetting the note text
-//   parameter passed into the action.
-// Verification points / expected results / pass criteria:
-//   - simulated 23514 -> Server Action result carries the AC-029 message key
-//   - simulated generic/infra error -> generic message key, distinct from
-//     the 23514 case
-//   - the note text argument passed into saveSolution/setSolutionStatus is
-//     never touched by any "clear"/"reset" code path in either failure branch
-//   - pass criteria: both error branches map to distinct, correct copy keys
-//     with no assertion depending on a real DB roundtrip
+// @real-dependency: không có — client phiên bị mock; việc đánh giá SQL count_words() thật
+//   và bảo đảm giao dịch "cả lời gọi rollback" được chứng minh trong
+//   service-integration-e2e (Test SE1, theo Early Verification Point của chính
+//   backend DD).
+// Kiểu hỏng chính: một ghi chú 9 từ được phép đăng vì phản hồi 23514
+//   của server bị nuốt hoặc ánh xạ nhầm sang thông báo chung
+//   thay vì chữ "chưa đạt" của AC-029, hoặc chữ ghi chú người gọi gõ
+//   bị xoá ở nhánh đăng-thất-bại (vi phạm "chữ ghi chú không bao giờ
+//   mất").
+// Nghĩa vụ chứng minh: khẳng định object kết quả đã ánh xạ cho ca 23514 giả lập
+//   mang khoá/chữ thông báo của AC-029 — không phải mã/chuỗi lỗi
+//   Postgres thô; khẳng định ca lỗi hạ tầng giả lập mang một
+//   khoá thông báo chung, khác; khẳng định giá trị trả về hay tác dụng phụ của
+//   cả hai nhánh lỗi đều không tham chiếu việc xoá/đặt lại tham số chữ ghi chú
+//   truyền vào action.
+// Điểm kiểm chứng / kết quả mong đợi / tiêu chí qua:
+//   - 23514 giả lập -> kết quả Server Action mang khoá thông báo AC-029
+//   - lỗi chung/hạ tầng giả lập -> khoá thông báo chung, khác với
+//     ca 23514
+//   - tham số chữ ghi chú truyền vào saveSolution/setSolutionStatus
+//     không bao giờ bị đường mã "xoá"/"đặt lại" nào đụng tới ở cả hai nhánh lỗi
+//   - tiêu chí qua: cả hai nhánh lỗi ánh xạ sang các khoá copy riêng biệt, đúng
+//     mà không khẳng định nào phụ thuộc một lượt khứ hồi DB thật
 
 describe("saveSolution / setSolutionStatus — word-count validation gate, non-leaking error mapping, note text preserved (Test 2)", () => {
   const CALLER_ID = "writer-test2-caller";
@@ -672,9 +672,9 @@ describe("saveSolution / setSolutionStatus — word-count validation gate, non-l
     rpcMock.mockResolvedValue({ data: null, error: { code: "23514", details: "below_word_count" } });
     const saveResult = await saveSolution("exam-1", patch);
     expect(saveResult).toEqual({ ok: false, error: { code: "belowWordCount" } });
-    // The action's own result carries no note text, and the patch object the
-    // caller built is untouched on the failed branch — nothing here clears or
-    // resets it (the reducer holding the draft text lives in frontend task 11).
+    // Kết quả của chính action không mang chữ ghi chú nào, và object bản vá mà
+    // người gọi dựng không bị đụng ở nhánh thất bại — không gì ở đây xoá hay
+    // đặt lại nó (reducer giữ chữ nháp nằm ở frontend task 11).
     expect(patch.notes[0].body).toBe(originalNote);
     expect(JSON.stringify(saveResult)).not.toContain(originalNote);
 
@@ -686,57 +686,56 @@ describe("saveSolution / setSolutionStatus — word-count validation gate, non-l
 });
 
 // =============================================================================
-// Test 3 — listSolutions / getSolutionDetail: reads route only through the
-//   masking RPCs, never a raw table select; the TS mapper never backfills an
-//   identity/score field the RPC row does not carry
+// Test 3 — listSolutions / getSolutionDetail: lượt đọc chỉ đi qua các RPC che,
+//   không bao giờ select bảng thô; mapper TS không bao giờ điền bù một trường
+//   danh tính/điểm mà hàng RPC không mang
 // =============================================================================
-// AC: "...routing every public read through masking SECURITY DEFINER
-//   functions, verified by an integration test enumerating returned field
-//   names" (backend DD § Design Summary, biggest_risks row 1); "one
-//   designated mapper is the only place null-to-absent normalization
-//   happens" (frontend DD § Design Summary, main_constraints).
+// AC: "...định tuyến mọi lượt đọc công khai qua các hàm SECURITY DEFINER che,
+//   được xác minh bằng một integration test liệt kê tên các trường trả về"
+//   (backend DD § Design Summary, biggest_risks hàng 1); "một mapper được chỉ định
+//   là nơi duy nhất xảy ra chuẩn hoá null-sang-vắng"
+//   (frontend DD § Design Summary, main_constraints).
 // ROI: 88 (BV:9 x Freq:9 + Legal:0 + Defect:7)
-// Behavior: listSolutions(examId) / getSolutionDetail(solutionId)
-//   (features/solutions/queries.ts) are called against a mocked session
-//   Supabase client -> exactly one .rpc call is made per function
-//   ("community_solutions_list" / "community_solution_detail"), never
-//   .from("community_solutions").select(...) -> when the mocked RPC row's
-//   author_id / author_display_name / author_avatar_path are null (masked
-//   shape), the mapped TS object has no displayName/avatarUrl/authorId key
-//   at all for that row (absent, not present-with-null) -> when the mocked
-//   row is not masked, the mapped object carries the fixture's own values
-//   unchanged.
+// Hành vi: listSolutions(examId) / getSolutionDetail(solutionId)
+//   (features/solutions/queries.ts) được gọi trên client Supabase phiên
+//   mock -> đúng một lời gọi .rpc cho mỗi hàm
+//   ("community_solutions_list" / "community_solution_detail"), không bao giờ
+//   .from("community_solutions").select(...) -> khi author_id /
+//   author_display_name / author_avatar_path của hàng RPC mock là null (dạng đã che),
+//   object TS đã ánh xạ hoàn toàn không có khoá displayName/avatarUrl/authorId
+//   cho hàng đó (vắng, không phải có-với-null) -> khi hàng mock
+//   không bị che, object đã ánh xạ mang nguyên giá trị của chính fixture.
 // @category: core-functionality
 // @lane: integration
 // @dependency: features/solutions/queries.ts (listSolutions,
-//   getSolutionDetail) + mocked session Supabase client
+//   getSolutionDetail) + client Supabase phiên mock
 // @complexity: medium
-// @real-dependency: none — session client mocked with a hand-built row
-//   fixture matching the RPC's documented masked shape; whether the REAL RPC
-//   actually produces that shape (SQL `case when` masking) is proven only in
-//   service-integration-e2e (Test SE2, the null-value assertion against a
-//   live call) — this test cannot and does not claim to prove that.
-// Primary failure mode: a future change to queries.ts reads
-//   .from("community_solutions") directly (bypassing the masking RPC) for a
-//   "quick" list query, or the TS mapper reads row.author_display_name
-//   without checking for null and forwards a stray/placeholder value instead
-//   of omitting the field — reintroducing the identity-leak risk both design
-//   docs name as this feature's top risk, at the mapping layer this time.
-// Proof obligation: (a) call-pattern assertion — the mocked client's method
-//   log contains exactly one .rpc(name, ...) call per query function under
-//   test, and zero .from("community_solutions" | "community_solution_notes")
-//   calls; (b) field-enumeration assertion on the mapped result —
-//   Object.keys() of the mapped row for a masked fixture must NOT include
-//   "displayName" / "avatarUrl" / "authorId" (matching the AuthorIdentity
-//   discriminated union's {kind:"anonymous"} branch), and MUST include them,
-//   with the fixture's own unmodified values, for a non-masked fixture row.
-// Verification points / expected results / pass criteria:
-//   - listSolutions() -> exactly one .rpc("community_solutions_list", { p_exam_id })
-//   - getSolutionDetail() -> exactly one .rpc("community_solution_detail", { p_solution_id })
-//   - masked fixture row -> mapped object has no identity keys present
-//   - non-masked fixture row -> mapped object has identity keys equal to the
-//     fixture's own values (no transformation drift)
-//   - pass criteria: all four assertions hold within the same test run
+// @real-dependency: không có — client phiên bị mock với một fixture hàng dựng tay
+//   khớp dạng che đã tài liệu hoá của RPC; việc RPC THẬT có thực sự tạo ra
+//   dạng đó hay không (che bằng `case when` SQL) chỉ được chứng minh trong
+//   service-integration-e2e (Test SE2, khẳng định giá trị null trên một lời gọi
+//   sống) — test này không thể và không tuyên bố chứng minh điều đó.
+// Kiểu hỏng chính: một thay đổi về sau ở queries.ts đọc thẳng
+//   .from("community_solutions") (bỏ qua RPC che) cho một truy vấn danh sách
+//   "nhanh", hoặc mapper TS đọc row.author_display_name
+//   mà không kiểm null và chuyển tiếp một giá trị lạc/giữ chỗ thay vì
+//   bỏ trường — tái mở rủi ro rò danh tính mà cả hai tài liệu thiết kế gọi là rủi ro hàng đầu
+//   của tính năng này, lần này ở tầng ánh xạ.
+// Nghĩa vụ chứng minh: (a) khẳng định mẫu lời gọi — nhật ký phương thức của
+//   client mock chứa đúng một lời gọi .rpc(name, ...) cho mỗi hàm truy vấn
+//   đang kiểm, và không lời gọi .from("community_solutions" | "community_solution_notes")
+//   nào; (b) khẳng định liệt kê trường trên kết quả đã ánh xạ —
+//   Object.keys() của hàng đã ánh xạ cho fixture đã che KHÔNG được chứa
+//   "displayName" / "avatarUrl" / "authorId" (khớp nhánh {kind:"anonymous"} của
+//   union phân biệt AuthorIdentity), và PHẢI chứa chúng,
+//   với giá trị nguyên của chính fixture, cho hàng fixture không che.
+// Điểm kiểm chứng / kết quả mong đợi / tiêu chí qua:
+//   - listSolutions() -> đúng một .rpc("community_solutions_list", { p_exam_id })
+//   - getSolutionDetail() -> đúng một .rpc("community_solution_detail", { p_solution_id })
+//   - hàng fixture đã che -> object đã ánh xạ không có khoá danh tính nào
+//   - hàng fixture không che -> object đã ánh xạ có khoá danh tính bằng
+//     giá trị của chính fixture (không trôi do biến đổi)
+//   - tiêu chí qua: cả bốn khẳng định đúng trong cùng một lượt chạy test
 
 describe("listSolutions / getSolutionDetail — reads route only through the masking RPCs, mapper never backfills identity (Test 3)", () => {
   beforeEach(() => {

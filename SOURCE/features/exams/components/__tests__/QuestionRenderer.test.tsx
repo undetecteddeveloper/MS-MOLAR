@@ -1,37 +1,36 @@
 // @vitest-environment jsdom
 
-// Short-Answer Scoring — QuestionRenderer footnote copy fix [integration]
+// Short-Answer Scoring — sửa chữ chú thích cuối bài của QuestionRenderer [integration]
 // Design Doc: docs/design/short-answer-scoring-frontend-design.md (v1.0)
 // UI Spec: docs/ui-spec/short-answer-scoring-ui-spec.md (v1.0), AC-008/AC-009
 //
-// Regression guard for the exact boundary AC-009 exists to protect:
-// QuestionRenderer is a client component with fully prop-driven rendering
-// (no I/O), rendered here via RTL/jsdom, matching RichText's test suite
-// `// @vitest-environment jsdom` docblock convention.
+// Chốt hồi quy cho đúng ranh giới mà AC-009 sinh ra để bảo vệ:
+// QuestionRenderer là client component render hoàn toàn theo prop
+// (không I/O), render ở đây qua RTL/jsdom, theo quy ước docblock
+// `// @vitest-environment jsdom` của bộ test RichText.
 //
-// AC: AC-008 — the short_answer footnote renders the new "auto-scored after
-//   you submit" copy exactly, with no trace of the pre-change "not
-//   auto-scored yet" wording.
-// AC: AC-009 (guard) — the true_false and essay footnotes stay byte-identical
-//   to their pre-change strings, and the short_answer <input>'s maxLength/
-//   placeholder/onChange->onSelectAnswer wiring stays unaffected by the
-//   copy-only change.
-// Behavior: rendering QuestionRenderer (real component, no mocks) with a
-//   short_answer/true_false/essay PublicQuestion fixture -> the component's
-//   footnote branch resolves per questionType -> the rendered footnote text
-//   and the short_answer <input>'s attributes/onChange callback match the
-//   independently-authored literal expected values (new copy for
-//   short_answer; byte-identical pre-change copy for true_false/essay).
+// AC: AC-008 — chú thích short_answer render chữ mới "tự chấm sau khi
+//   bạn nộp bài" đúng nguyên văn, không còn dấu vết chữ cũ
+//   "chưa tự chấm".
+// AC: AC-009 (chốt) — chú thích true_false và essay giữ giống từng byte
+//   chuỗi trước khi đổi, và dây nối maxLength/placeholder/onChange->onSelectAnswer
+//   của <input> short_answer không bị ảnh hưởng bởi
+//   thay đổi chỉ-chữ.
+// Hành vi: render QuestionRenderer (component thật, không mock) với một fixture
+//   PublicQuestion short_answer/true_false/essay -> nhánh chú thích
+//   của component phân giải theo questionType -> chữ chú thích đã render
+//   và thuộc tính/callback onChange của <input> short_answer khớp
+//   các giá trị kỳ vọng literal tự soạn độc lập (chữ mới cho
+//   short_answer; chữ trước khi đổi giống từng byte cho true_false/essay).
 // @category: core-functionality
 // @lane: integration
-// @dependency: none — renders the real QuestionRenderer component, no mocks
+// @dependency: không có — render component QuestionRenderer thật, không mock
 // @complexity: low
-// ROI: 57 (BV:7 x Freq:7 + Legal:0 + Defect:8) — guards a user-facing
-//   footnote copy string across 3 question-type branches in one shared
-//   component file, closing the frontend DD's own named "no automated test
-//   exists" gap; not the highest-value slot in the suite since it is
-//   prop-driven UI text, not a scoring-correctness or data-integrity
-//   boundary.
+// ROI: 57 (BV:7 x Freq:7 + Legal:0 + Defect:8) — canh một chuỗi chữ chú thích
+//   hiển thị cho người dùng qua 3 nhánh loại câu hỏi trong một file component
+//   dùng chung, đóng khoảng trống "không có test tự động nào" do chính
+//   frontend DD nêu; không phải suất giá trị cao nhất trong bộ vì nó là
+//   chữ UI theo prop, không phải ranh giới đúng-sai của chấm điểm hay toàn vẹn dữ liệu.
 
 import { fireEvent, render, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
@@ -42,8 +41,8 @@ import { QuestionRenderer } from "@/features/exams/components/QuestionRenderer";
 // khi cặp server/client ngoài đời đã lệch nhau.
 import { renderQuestionNodes } from "@/features/exams/components/questionNodes";
 
-// Fixtures — minimal literal PublicQuestion per questionType, authored
-// independently of QuestionRenderer.tsx's own rendered output.
+// Fixtures — PublicQuestion literal tối thiểu cho từng questionType, tự soạn
+// độc lập với đầu ra render của chính QuestionRenderer.tsx.
 const SHORT_ANSWER_QUESTION: PublicQuestion = {
   id: "q-short-answer",
   content: "Tính giá trị của biểu thức.",

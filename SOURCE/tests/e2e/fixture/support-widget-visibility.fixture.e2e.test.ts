@@ -1,28 +1,28 @@
-// User Support System v1 — Widget Visibility & Layout Guard [fixture-e2e]
+// User Support System v1 — Chốt hiển thị & bố cục của widget [fixture-e2e]
 // Design Docs: docs/design/support-system-frontend-design.md (v1.2, Verification
-//   Strategy item (1))
+//   Strategy mục (1))
 // UI Spec: docs/ui-spec/support-system-ui-spec.md (v1.1, Layout Constraints,
 //   Accessibility Requirements)
 // PRD: docs/prd/support-system-prd.md (v1.2, AC-003, AC-005, AC-006, metric 8,
 //   metric 9, D1)
 //
-// Driver-based script written against the same structural-subset-of-Playwright
-// `SupportDriver` interface this repo's rating.fixture.e2e.test.ts/
-// history.fixture.e2e.test.ts already establish (see supportFixtureData.ts for
-// the interface + the documented fixture-backend wiring residual, matching
-// this repo's existing convention: no MSW/mock-injection layer exists, so
-// live-wiring `getCurrentUser` into a real running page happens whenever a
-// Playwright harness is stood up — the check functions below run unchanged
-// once that harness exists, either as `@playwright/test` `test()` blocks or
-// driven directly via Playwright MCP).
+// Script dựa trên driver viết theo cùng interface `SupportDriver` tập-con-cấu-trúc-của-Playwright
+// mà rating.fixture.e2e.test.ts/
+// history.fixture.e2e.test.ts của repo này đã thiết lập (xem supportFixtureData.ts cho
+// interface + phần dư nối dây backend-fixture đã tài liệu hoá, theo
+// quy ước sẵn có của repo này: không có lớp MSW/tiêm mock, nên
+// nối `getCurrentUser` sống vào một trang đang chạy thật xảy ra khi nào một
+// harness Playwright được dựng — các hàm kiểm bên dưới chạy không đổi
+// khi harness đó có, hoặc dưới dạng khối `test()` của `@playwright/test` hoặc
+// điều khiển trực tiếp qua Playwright MCP).
 //
-// Obligation C's zero-BottomNav-intersection claim has additionally been
-// spot-verified for real against the live dev server (task-09 completion
-// pass, 2026-08-13): SupportWidgetTrigger at a 360px viewport on a real
-// mounted route showed zero visual overlap with BottomNav in a live
-// screenshot. That was a one-off manual confirmation, not a substitute for
-// this script running under a real harness — recorded here as corroborating
-// evidence, not as closing this task's own residual.
+// Khẳng định không-giao-cắt-BottomNav của Nghĩa vụ C còn được
+// kiểm điểm thật trên dev server sống (lượt hoàn tất task-09, 2026-08-13):
+// SupportWidgetTrigger ở viewport 360px trên một route mount thật
+// cho thấy không chồng lấn trực quan nào với BottomNav trong một ảnh chụp sống.
+// Đó là một xác nhận thủ công một lần, không thay thế việc
+// script này chạy dưới một harness thật — ghi ở đây như bằng chứng củng cố,
+// không phải để đóng phần dư của chính task này.
 
 import assert from "node:assert/strict";
 import type { SupportDriver } from "./supportFixtureData";
@@ -31,10 +31,10 @@ import { FIXTURE_ATTEMPT_ROUTE, FIXTURE_MOUNTED_ROUTE } from "./supportFixtureDa
 const SUPPORT_TRIGGER_NAME = /Send feedback|Gửi phản hồi/i;
 
 // =============================================================================
-// Obligation A — no widget when logged out (AC-003)
+// Nghĩa vụ A — không widget khi chưa đăng nhập (AC-003)
 // =============================================================================
-/** (a) logged-out session on a normal mounted route -> zero matches for the
- *  widget trigger's role/accessible name — not one invisible match. */
+/** (a) phiên chưa đăng nhập trên một route mount bình thường -> không khớp nào với
+ *  role/tên truy cập được của nút kích hoạt widget — không phải một khớp vô hình. */
 export async function checkNoWidgetWhenLoggedOut(loggedOutDriver: SupportDriver): Promise<void> {
   await loggedOutDriver.goto(FIXTURE_MOUNTED_ROUTE);
   const count = await loggedOutDriver.getByRole("button", { name: SUPPORT_TRIGGER_NAME }).count();
@@ -42,27 +42,27 @@ export async function checkNoWidgetWhenLoggedOut(loggedOutDriver: SupportDriver)
 }
 
 // =============================================================================
-// Obligation B — no widget on the exam-attempt route, regardless of auth
-//   (AC-005, D1) — genuinely absent, not CSS-hidden
+// Nghĩa vụ B — không widget ở route làm bài, bất kể đăng nhập
+//   (AC-005, D1) — thực sự vắng mặt, không phải bị CSS ẩn
 // =============================================================================
-/** (a) logged-in on the attempt route -> zero accessible-role matches. */
+/** (a) đã đăng nhập ở route làm bài -> không khớp role truy cập được nào. */
 export async function checkNoWidgetOnAttemptRouteLoggedIn(loggedInDriver: SupportDriver): Promise<void> {
   await loggedInDriver.goto(FIXTURE_ATTEMPT_ROUTE);
   const count = await loggedInDriver.getByRole("button", { name: SUPPORT_TRIGGER_NAME }).count();
   assert.equal(count, 0, "SupportWidget must be absent on the attempt route even when logged in (AC-005)");
 }
 
-/** (b) same route, raw DOM query (not accessibility-tree-only) -> zero nodes —
- *  rules out a display:none/aria-hidden node an accessible-name query alone
- *  might also report as absent without proving no node exists at all. */
+/** (b) cùng route, truy vấn DOM thô (không chỉ cây truy cập) -> không node nào —
+ *  loại trừ một node display:none/aria-hidden mà một truy vấn tên truy cập được
+ *  đơn thuần cũng có thể báo là vắng mà không chứng minh được hoàn toàn không có node. */
 export async function checkNoWidgetOnAttemptRouteRawDom(loggedInDriver: SupportDriver): Promise<void> {
   await loggedInDriver.goto(FIXTURE_ATTEMPT_ROUTE);
   const count = await loggedInDriver.querySelectorCount('[aria-label="Send feedback"], [aria-label="Gửi phản hồi"]');
   assert.equal(count, 0, "no support-widget DOM node may exist on the attempt route (AC-005)");
 }
 
-/** (c) same route, logged OUT -> also zero matches (D1's exclusion holds
- *  independent of AC-003's own separate reason for absence). */
+/** (c) cùng route, chưa đăng nhập -> cũng không khớp nào (việc loại trừ của D1 đứng vững
+ *  độc lập với lý do vắng mặt riêng của AC-003). */
 export async function checkNoWidgetOnAttemptRouteLoggedOut(loggedOutDriver: SupportDriver): Promise<void> {
   await loggedOutDriver.goto(FIXTURE_ATTEMPT_ROUTE);
   const count = await loggedOutDriver.getByRole("button", { name: SUPPORT_TRIGGER_NAME }).count();
@@ -70,8 +70,8 @@ export async function checkNoWidgetOnAttemptRouteLoggedOut(loggedOutDriver: Supp
 }
 
 // =============================================================================
-// Obligation C — 360px viewport: zero bounding-box intersection with
-//   `BottomNav` (AC-006, narrowed per PRD v1.2 review — BottomNav only)
+// Nghĩa vụ C — viewport 360px: không giao cắt hộp bao nào với
+//   `BottomNav` (AC-006, thu hẹp theo review PRD v1.2 — chỉ BottomNav)
 // =============================================================================
 function rectsIntersect(
   a: { x: number; y: number; width: number; height: number },
@@ -84,8 +84,8 @@ function rectsIntersect(
   return !(aRight <= b.x || bRight <= a.x || aBottom <= b.y || bBottom <= a.y);
 }
 
-/** (a) at 360px width, the trigger's rect and BottomNav's rect have zero
- *  area overlap on both axes. */
+/** (a) ở chiều rộng 360px, hình chữ nhật của nút kích hoạt và của BottomNav không có
+ *  diện tích chồng lấn trên cả hai trục. */
 export async function checkTriggerClearsBottomNavAt360px(driver: SupportDriver): Promise<void> {
   await driver.setViewportSize({ width: 360, height: 800 });
   await driver.goto(FIXTURE_MOUNTED_ROUTE);
@@ -106,30 +106,30 @@ export async function checkTriggerClearsBottomNavAt360px(driver: SupportDriver):
   );
 }
 
-/** (b) the trigger's resting bottom offset incorporates
- *  env(safe-area-inset-bottom) rather than a hardcoded pixel value —
- *  asserted via the computed style referencing the CSS env() function. */
+/** (b) độ lệch đáy nghỉ của nút kích hoạt gồm
+ *  env(safe-area-inset-bottom) thay vì một giá trị pixel hardcode —
+ *  khẳng định qua style tính được tham chiếu hàm CSS env(). */
 export async function checkTriggerRespectsSafeAreaInset(driver: SupportDriver): Promise<void> {
   await driver.setViewportSize({ width: 360, height: 800 });
   await driver.goto(FIXTURE_MOUNTED_ROUTE);
 
   const trigger = driver.getByRole("button", { name: SUPPORT_TRIGGER_NAME }).first();
   const bottomStyle = await trigger.getAttribute("data-computed-bottom");
-  // Real harness: read via page.evaluate(el => getComputedStyle(el).bottom) or
-  // the source class string — this structural driver exposes it as an
-  // attribute for the check to stay within SupportDriver's Playwright-subset
-  // interface. SupportWidgetTrigger.tsx's className embeds
-  // `bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom,0px)+1rem)]`
-  // literally, satisfying this by construction (structural guarantee, not a
-  // manually tuned offset) — see that file for the source of truth.
+  // Harness thật: đọc qua page.evaluate(el => getComputedStyle(el).bottom) hoặc
+  // chuỗi class nguồn — driver cấu trúc này phơi nó dưới dạng một
+  // attribute để phép kiểm ở trong interface tập-con-Playwright của SupportDriver.
+  // className của SupportWidgetTrigger.tsx nhúng literal
+  // `bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom,0px)+1rem)]`,
+  // thoả điều này theo cấu trúc (bảo đảm cấu trúc, không phải một độ lệch
+  // chỉnh tay) — xem file đó để biết nguồn sự thật.
   assert.ok(
     bottomStyle === null || bottomStyle.includes("env("),
     "trigger's bottom offset must reference env(safe-area-inset-bottom), not a hardcoded pixel value"
   );
 }
 
-/** Orchestrator — runs all three obligations against the supplied driver
- *  sessions (mirrors FE2's fresh/logged-out dual-driver pattern). */
+/** Bộ điều phối — chạy cả ba nghĩa vụ trên các phiên driver được cấp
+ *  (theo mẫu hai-driver mới/chưa-đăng-nhập của FE2). */
 export async function runSupportWidgetVisibilityChecks(
   loggedInDriver: SupportDriver,
   loggedOutDriver: SupportDriver

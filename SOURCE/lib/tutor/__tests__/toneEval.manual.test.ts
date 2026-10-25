@@ -14,7 +14,7 @@
 // không phải một bản chép lại — điều kiện tiên quyết để verdict có nghĩa.
 //
 // CÁCH CHẤM (bảng verdict ghi trong docs/plans/tasks/
-// engine1-adaptive-ai-work-plan-phase5-completion.md):
+// engine1-adaptive-ai-work-plan-phase5-completion.md; file đã xoá, xem git log):
 //   - Tiếng Việt: Y/N          — ngưỡng đạt 10/10
 //   - Đúng lối Socratic: Y/N   — ngưỡng đạt 10/10 (dẫn dắt bằng câu hỏi)
 //   - Nêu đáp án cuối: Y/N     — ngưỡng đạt 0/10

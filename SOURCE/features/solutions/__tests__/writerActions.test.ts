@@ -1,17 +1,17 @@
 // saveSolution / setSolutionStatus / getMySolutionForWriter / getResultCardSummary
-// — Server Action error mapping + query mapper unit tests (backend task 04).
+// — unit test ánh xạ lỗi Server Action + mapper truy vấn (backend task 04).
 //
-// Mock boundary (backend DD § Test Boundaries; skeleton communitySolutions.int
-// .test.ts's own Mock Boundary Decision, mirrored here): the Supabase SESSION
-// client (.rpc/auth.getUser returned by @/lib/supabase/server createClient())
-// is the only sanctioned mock. guard()/checkRateLimit() run for REAL — the
-// rate-limited row exhausts the real in-memory counter directly, under frozen
-// fake timers, so the seconds value is byte-comparable (Boundary Context
-// roundtrip check), never guessed or mocked.
+// Ranh giới mock (backend DD § Test Boundaries; Mock Boundary Decision của chính skeleton
+// communitySolutions.int.test.ts, phản chiếu ở đây): client Supabase PHIÊN
+// (.rpc/auth.getUser do createClient() của @/lib/supabase/server trả về)
+// là mock được phê duyệt duy nhất. guard()/checkRateLimit() chạy THẬT — hàng
+// bị-giới-hạn-tần-suất làm cạn bộ đếm trong bộ nhớ thật trực tiếp, dưới fake timer
+// đóng băng, nên giá trị giây so sánh từng byte được (kiểm khứ hồi
+// Boundary Context), không bao giờ đoán hay mock.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// queries.ts imports "server-only" (throws outside a Next server/react-server
-// bundle) — same stub as rating.int.test.ts / getResult.int.test.ts.
+// queries.ts import "server-only" (ném lỗi ngoài bundle server Next/react-server)
+// — cùng stub với rating.int.test.ts / getResult.int.test.ts.
 vi.mock("server-only", () => ({}));
 
 const { getUserMock, rpcMock } = vi.hoisted(() => ({

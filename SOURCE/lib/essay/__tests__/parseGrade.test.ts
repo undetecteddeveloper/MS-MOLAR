@@ -3,7 +3,7 @@
 //   (§ lib/essay/parseGrade.ts, § EG-BE-014/EG-BE-015, § R-06/R-10)
 // ADR: docs/adr/ADR-0018-essay-async-grade-write.md (§ Decision 2 — tập band
 //   khai MỘT LẦN, trong TypeScript)
-// Task: docs/plans/tasks/essay-auto-scoring-task-H3.md
+// Task: docs/plans/tasks/essay-auto-scoring-task-H3.md (đã xoá, xem git log)
 //
 // KHÔNG nằm trong ngân sách làn integration/fixture/service-e2e: đây là unit
 // test của một hàm THUẦN, và là nghĩa vụ chứng minh mà backend DD gọi tên đích

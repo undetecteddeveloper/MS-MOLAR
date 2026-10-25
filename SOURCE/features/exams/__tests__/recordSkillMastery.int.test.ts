@@ -1,77 +1,75 @@
-// recordSkillMastery() end-to-end via submitExam() [service-integration-e2e]
+// recordSkillMastery() đầu-cuối qua submitExam() [service-integration-e2e]
 // Design Doc: docs/design/engine1-adaptive-ai-backend-design.md (v1.0)
 // ADR: docs/adr/ADR-0011-mastery-write-trust-boundary.md (Accepted)
 // PRD: docs/prd/engine1-adaptive-ai-prd.md (v1.0, AC-009/010/011)
 //
-// LANE MAPPING NOTE (project-convention adaptation — read before implementing):
-//   this repo has no automated Playwright/browser E2E harness in CI (Playwright
-//   MCP is agent-driven MANUAL verification only, per PROJECT_OVERVIEW.md §6 and
-//   both companion Design Docs' own Quality Assurance Mechanisms tables). Per this
-//   generation task's explicit instruction, this feature's "service-integration-e2e"
-//   lane (full-system verification against real cross-service behavior — here, a
-//   real Postgres write with GROUP BY/FILTER/JOIN/ON CONFLICT semantics a mock
-//   cannot prove, not a browser journey) maps onto this project's own established
-//   convention: an *.int.test.ts file that runs against a REAL dev Supabase
-//   instance, rather than the mocked-Supabase-client-boundary convention that the
-//   SAME ".int.test.ts" filename suffix ordinarily denotes elsewhere in this repo.
-//   DO NOT use getResult.int.test.ts / rating.int.test.ts / submitExam.int.test.ts
-//   / tutorActions.int.test.ts / getSkillRecommendation.int.test.ts as this file's
-//   mocking precedent — all five of those mock @/lib/supabase/server's
-//   createClient(). This file's qualifying criterion is the skill's own: "data
-//   persists across a real DB write" — the exact backend DD Mock Boundary
-//   Decisions statement that record_skill_mastery()'s "GROUP BY/FILTER/
-//   ON CONFLICT logic, and the FK join against questions.skill_node_id... cannot
-//   be meaningfully mocked; requires a real Postgres instance."
-// ROI (justifying this selected service-integration-e2e slot): 81
-//   (BV:9 x Freq:8 + Legal:0 + Defect:9) — clears the >50 threshold by a wide
-//   margin; also the backend DD's Design Summary's own biggest_risks #1 item
-//   ("A forged mastery write re-opens exactly the hole ADR-0010 closed for
-//   scores, if the trust boundary is even slightly wrong").
-// Second service-integration-e2e slot: intentionally left unfilled — no other
-//   candidate in this feature requires real-Postgres/cross-service verification
-//   at this ROI tier; the RLS table-level isolation cases (user_skill_mastery,
-//   telemetry_log) are a separate, manually-run deliverable tracked in
-//   SOURCE/supabase/test-rls.ts (see this generation run's report), not folded
-//   into this file's budget.
+// GHI CHÚ ÁNH XẠ LÀN (thích nghi theo quy ước dự án — đọc trước khi cài đặt):
+//   repo này không có harness E2E Playwright/trình duyệt tự động trong CI (Playwright
+//   MCP chỉ là kiểm chứng THỦ CÔNG do agent điều khiển, theo PROJECT_OVERVIEW.md §6 và
+//   bảng Quality Assurance Mechanisms của cả hai Design Doc đồng hành). Theo chỉ dẫn
+//   tường minh của tác vụ sinh này, làn "service-integration-e2e" của tính năng này
+//   (kiểm chứng toàn hệ thống trên hành vi liên dịch vụ thật — ở đây là
+//   một lượt ghi Postgres thật với ngữ nghĩa GROUP BY/FILTER/JOIN/ON CONFLICT mà một mock
+//   không chứng minh được, không phải hành trình trình duyệt) ánh xạ vào quy ước
+//   riêng đã thiết lập của dự án: một file *.int.test.ts chạy trên một instance
+//   Supabase dev THẬT, thay vì quy ước client-Supabase-mock mà
+//   CHÍNH hậu tố ".int.test.ts" đó thường biểu thị ở nơi khác trong repo này.
+//   ĐỪNG dùng getResult.int.test.ts / rating.int.test.ts / submitExam.int.test.ts
+//   / tutorActions.int.test.ts / getSkillRecommendation.int.test.ts làm tiền lệ mock cho file này —
+//   cả năm file đó đều mock createClient() của @/lib/supabase/server. Tiêu chí đủ điều kiện
+//   của file này là của chính skill: "dữ liệu bền vững qua một lượt ghi DB thật" — đúng
+//   phát biểu Mock Boundary Decisions của backend DD rằng logic "GROUP BY/FILTER/
+//   ON CONFLICT của record_skill_mastery(), và phép join FK với questions.skill_node_id... không thể
+//   mock có ý nghĩa; cần một instance Postgres thật."
+// ROI (biện minh cho suất service-integration-e2e được chọn này): 81
+//   (BV:9 x Freq:8 + Legal:0 + Defect:9) — vượt ngưỡng >50 với biên lớn;
+//   cũng là mục biggest_risks #1 trong Design Summary của chính backend DD
+//   ("Một lượt ghi mastery giả mạo mở lại đúng lỗ hổng mà ADR-0010 đã đóng cho
+//   điểm số, nếu ranh giới tin cậy sai dù chỉ một chút").
+// Suất service-integration-e2e thứ hai: cố ý để trống — không ứng viên nào khác trong tính năng này
+//   cần kiểm chứng Postgres thật/liên dịch vụ ở mức ROI này; các ca cô lập
+//   RLS mức bảng (user_skill_mastery, telemetry_log) là một sản phẩm bàn giao chạy thủ công
+//   riêng, được theo dõi trong SOURCE/supabase/test-rls.ts (xem báo cáo của lượt sinh này),
+//   không gộp vào ngân sách của file này.
 //
-// Test data approach (backend DD § Data Layer Testing Strategy): seeds a minimal
-//   exam/questions/skill_nodes fixture directly via a service-role client, then
-//   submits through the REAL submitExam() Server Action path (not a direct RPC
-//   call — proves the integration point INSIDE submitExam(), not merely
-//   record_skill_mastery() in isolation), then reads back user_skill_mastery via
-//   a real Postgres client. Requires a real dev Supabase instance + .env.local —
+// Cách tiếp cận dữ liệu test (backend DD § Data Layer Testing Strategy): gieo một fixture
+//  exam/questions/skill_nodes tối thiểu trực tiếp qua client service-role, rồi
+//   nộp qua đường Server Action submitExam() THẬT (không phải lời gọi RPC trực tiếp
+//   — chứng minh điểm tích hợp BÊN TRONG submitExam(), không chỉ
+//   record_skill_mastery() đứng riêng), rồi đọc lại user_skill_mastery qua
+//   một client Postgres thật. Cần một instance Supabase dev thật + .env.local —
 //   same precondition class as SOURCE/supabase/test-rls.ts's own header ("Tiền
 //   đề: schema.sql (bản có UGC v2.0 + Engine 1 §9b/§18/§19) + seed đã chạy").
-//   Fixture id prefix convention: reuse this repo's existing "rls-"-style
-//   isolated-prefix pattern (e.g. "mastery-int-" prefix) for idempotent
-//   setup/cleanup, mirroring test-rls.ts's own fixture-prefix convention.
+//   Quy ước tiền tố id fixture: dùng lại mẫu tiền tố cô lập kiểu "rls-" sẵn có của repo này
+//   (ví dụ tiền tố "mastery-int-") để setup/cleanup lũy đẳng,
+//   theo quy ước tiền tố fixture của chính test-rls.ts.
 //
 // ---------------------------------------------------------------------------
-// IMPLEMENTATION NOTES (backend-task-10, the run that converted the skeleton)
+// GHI CHÚ CÀI ĐẶT (backend-task-10, lượt chuyển skeleton thành test thật)
 //
-// WHAT IS MOCKED, AND WHY IT DOES NOT WEAKEN THE PROOF: exactly one thing —
-//   @/lib/supabase/server's createClient(), which exists only to build a client
-//   from the request COOKIES via next/headers (unavailable outside a Next
-//   request). It is replaced by a REAL @supabase/supabase-js client holding a
-//   REAL student session (anon key + signInWithPassword), i.e. the same JWT and
-//   the same RLS-bound identity production uses. Nothing about Postgres is
-//   mocked: RLS, claim_attempt_answer_key(), record_exam_result(),
-//   record_skill_mastery() and the user_skill_mastery table are all the real
-//   ones. "server-only" is stubbed for the same reason the four sibling files
-//   stub it (it throws outside a Next server bundle).
+// CÁI GÌ BỊ MOCK, VÀ VÌ SAO KHÔNG LÀM YẾU BẰNG CHỨNG: đúng một thứ —
+//   createClient() của @/lib/supabase/server, vốn chỉ tồn tại để dựng một client
+//   từ COOKIE của request qua next/headers (không có ngoài một request
+//   Next). Nó được thay bằng một client @supabase/supabase-js THẬT giữ một
+//   phiên học sinh THẬT (anon key + signInWithPassword), tức cùng JWT và
+//   cùng danh tính bị ràng buộc RLS mà production dùng. Không gì của Postgres
+//   bị mock: RLS, claim_attempt_answer_key(), record_exam_result(),
+//   record_skill_mastery() và bảng user_skill_mastery đều là hàng thật.
+//   "server-only" được stub vì cùng lý do bốn file anh em
+//   stub nó (nó ném lỗi ngoài bundle server Next).
 //
-// WHY IT SKIPS INSTEAD OF FAILING WITHOUT .env.local: .github/workflows/ci.yml
-//   runs `npm test` with NO Supabase credentials, and the Work Plan states this
-//   file "requires the live dev DB and is run explicitly as part of Task 10, not
-//   the generic staged gate". Hard-failing there would turn a documented
-//   exclusion into a broken merge gate. The skip is loud (console.warn) and
-//   narrow: it triggers only when all three keys are genuinely absent.
+// VÌ SAO NÓ BỎ QUA THAY VÌ HỎNG KHI THIẾU .env.local: .github/workflows/ci.yml
+//   chạy `npm test` KHÔNG có thông tin đăng nhập Supabase, và Work Plan nêu
+//   file này "cần dev DB sống và được chạy tường minh như một phần của Task 10, không
+//   phải cổng staged chung". Hỏng cứng ở đó sẽ biến một ngoại lệ đã tài liệu hoá
+//   thành cổng merge hỏng. Việc bỏ qua có tiếng (console.warn) và hẹp:
+//   nó chỉ kích hoạt khi cả ba khoá thật sự vắng mặt.
 //
-// RATE LIMIT: submitExam() is guarded at 30/hour per user (rateLimit.ts) and the
-//   authoritative counter lives in Upstash, so it survives across runs. This file
-//   spends exactly ONE submission per run; a long mutation-testing session on the
-//   same fixture account can still exhaust it, in which case submitExam() throws
-//   "Too many submissions" — a loud, self-explanatory failure, not a silent one.
+// RATE LIMIT: submitExam() được chặn ở 30/giờ cho mỗi người dùng (rateLimit.ts) và
+//   bộ đếm có thẩm quyền nằm ở Upstash, nên sống qua các lần chạy. File này
+//   tiêu đúng MỘT lượt nộp mỗi lần chạy; một phiên mutation-testing dài
+//   trên cùng tài khoản fixture vẫn có thể làm cạn nó, khi đó submitExam() ném
+//   "Too many submissions" — một lỗi to, tự giải thích, không phải thầm lặng.
 // ---------------------------------------------------------------------------
 
 import { existsSync, readFileSync } from "node:fs";
@@ -114,8 +112,8 @@ if (!HAS_LIVE_DB) {
   );
 }
 
-// actions.ts imports "server-only" (throws outside a Next server/react-server
-// bundle) → stub, same pattern as the four sibling *.int.test.ts files.
+// actions.ts import "server-only" (ném lỗi ngoài bundle server Next/react-server)
+// → stub, cùng mẫu với bốn file *.int.test.ts anh em.
 vi.mock("server-only", () => ({}));
 
 // Chỉ thay ĐƯỜNG LẤY SESSION (next/headers cookies), không thay Postgres: giá
@@ -323,37 +321,37 @@ describe.skipIf(!HAS_LIVE_DB)(
     }, 60_000);
 
     // =========================================================================
-    // Test 1 — AC-009/AC-010: user_skill_mastery rows arithmetically match the
-    // attempt's per-question correctness; untagged/unscored questions contribute
-    // nothing and cause no error
+    // Test 1 — AC-009/AC-010: các hàng user_skill_mastery khớp số học với tính đúng
+    // sai từng câu của lượt làm; câu chưa gắn thẻ/chưa chấm không đóng góp
+    // gì và không gây lỗi
     // =========================================================================
-    // AC-009: "When a student submits a Math exam containing skill-tagged
-    //   questions, the system shall update user_skill_mastery for each touched
-    //   skill node from that attempt's per-question correctness."
-    // AC-010: "Given a submitted exam contains questions with a NULL skill_node_id,
-    //   when mastery is updated, then those questions contribute nothing and cause
-    //   no error."
-    // ROI: 81 (see header)
+    // AC-009: "Khi một học sinh nộp đề Toán có các câu đã gắn thẻ kỹ năng,
+    //   hệ thống phải cập nhật user_skill_mastery cho từng node kỹ năng bị chạm
+    //   tới từ tính đúng sai từng câu của lượt làm đó."
+    // AC-010: "Cho một đề đã nộp có các câu với skill_node_id NULL,
+    //   khi mastery được cập nhật, thì các câu đó không đóng góp gì và không gây
+    //   lỗi."
+    // ROI: 81 (xem đầu file)
     // @category: core-functionality
     // @lane: service-integration-e2e
-    // @dependency: full-system (real submitExam() -> real record_exam_result() +
-    //   real record_skill_mastery() SQL function -> real Postgres
-    //   user_skill_mastery table)
+    // @dependency: toàn hệ thống (submitExam() thật -> record_exam_result() thật +
+    //   hàm SQL record_skill_mastery() thật -> bảng Postgres thật
+    //   user_skill_mastery)
     // @complexity: high
-    // @real-dependency: schema.sql §18's record_skill_mastery() SQL function, the
-    //   user_skill_mastery table, questions.skill_node_id column, and submitExam()'s
-    //   real integration point (its step-7 call to recordSkillMastery() after the
-    //   existing score write) — none of these may be mocked; per testing-principles'
-    //   "Mock Limitations for Data Layer," GROUP BY/FILTER/JOIN/ON CONFLICT
-    //   correctness cannot be proven by a mock.
-    // Primary failure mode: the SQL function's WHERE/JOIN silently drops or
-    //   double-counts a row — e.g. the `coalesce((pq->>'scored')::boolean, true)`
-    //   default is inverted, wrongly excluding undefined-scored rows that should
-    //   count as scored; OR the NULL-skill_node_id question is not filtered out by
-    //   the INNER JOIN and produces a spurious mastery row for a non-existent skill;
-    //   OR the `on conflict ... do update` accumulation ADDS instead of correctly
-    //   accumulating total_count on a re-run, silently double-counting on any retry
-    //   or duplicate submitExam() invocation.
+    // @real-dependency: hàm SQL record_skill_mastery() của schema.sql §18, bảng
+    //   user_skill_mastery, cột questions.skill_node_id, và điểm tích hợp thật của
+    //   submitExam() (lời gọi bước 7 tới recordSkillMastery() sau lượt ghi điểm
+    //   sẵn có) — không cái nào được mock; theo "Mock Limitations for Data Layer" của
+    //   testing-principles, tính đúng của GROUP BY/FILTER/JOIN/ON CONFLICT
+    //   không chứng minh được bằng mock.
+    // Kiểu hỏng chính: WHERE/JOIN của hàm SQL lặng lẽ bỏ hoặc đếm đôi một hàng
+    //   — ví dụ mặc định `coalesce((pq->>'scored')::boolean, true)` bị
+    //   đảo, loại nhầm các hàng chưa xác định scored mà đáng ra phải
+    //   tính là đã chấm; HOẶC câu có skill_node_id NULL không bị INNER JOIN lọc ra
+    //   và sinh một hàng mastery thừa cho một kỹ năng không tồn tại;
+    //   HOẶC phép cộng dồn `on conflict ... do update` CỘNG thay vì cộng dồn đúng
+    //   total_count ở lần chạy lại, đếm đôi lặng lẽ khi thử lại bất kỳ
+    //   hay gọi trùng submitExam().
     it("nghĩa vụ (a)-(d): sau một lời gọi submitExam() thật, mastery khớp đúng số học của fixture, câu không gắn kỹ năng không sinh dòng nào, và chính submitExam() vẫn redirect thành công", async () => {
       // (d) trước: nếu submitExam() ném lỗi thật thì mọi assertion dưới đây vô
       // nghĩa, và AC-010 nửa "causes no error" chính là điều này.
@@ -395,27 +393,26 @@ describe.skipIf(!HAS_LIVE_DB)(
     });
 
     // =========================================================================
-    // Test 2 — AC-011: trust boundary — a student's own JWT cannot call
-    // record_skill_mastery() directly (mirrors ADR-0010's mechanism for score writes)
+    // Test 2 — AC-011: ranh giới tin cậy — JWT của chính học sinh không gọi được
+    // record_skill_mastery() trực tiếp (theo cơ chế ADR-0010 cho lượt ghi điểm)
     // =========================================================================
-    // AC-011: "Given the mastery write path, it shall respect the same trust
-    //   boundary as score writing — resolved by ADR-0011."
-    // ROI: 81 (see header — this IS the Design Summary's own top-named risk)
+    // AC-011: "Cho đường ghi mastery, nó phải tôn trọng cùng ranh giới
+    //   tin cậy như ghi điểm — được giải quyết bởi ADR-0011."
+    // ROI: 81 (xem đầu file — đây CHÍNH LÀ rủi ro được nêu hàng đầu của Design Summary)
     // @category: core-functionality
     // @lane: service-integration-e2e
-    // @dependency: full-system (real Postgres function-level GRANT/REVOKE
-    //   enforcement — cannot be simulated by a mock)
+    // @dependency: toàn hệ thống (cưỡng chế GRANT/REVOKE mức hàm của Postgres thật
+    //   — không thể mô phỏng bằng mock)
     // @complexity: medium
-    // @real-dependency: the `revoke all on function
+    // @real-dependency: câu lệnh `revoke all on function
     //   public.record_skill_mastery(uuid, jsonb) from public, anon, authenticated`
-    //   statement (§18) — a real Postgres privilege check.
-    // Primary failure mode: the revoke statement is missing, mistyped (wrong
-    //   function signature/overload — Supabase's default-privileges pitfall this
-    //   project has already been bitten by once, per schema.sql:732-739's incident
-    //   note), or landed against a stale DB because the §17 fingerprint procedure
-    //   wasn't followed after a manual apply — silently leaving the mastery write
-    //   callable by any authenticated student's own JWT, reopening exactly the hole
-    //   ADR-0010 closed for scores.
+    //   (§18) — một phép kiểm quyền Postgres thật.
+    // Kiểu hỏng chính: câu revoke bị thiếu, gõ sai (sai chữ ký/overload của hàm
+    //   — cái bẫy default-privileges của Supabase mà dự án này đã dính một lần,
+    //   theo ghi chú sự cố ở schema.sql:732-739), hoặc áp lên một DB cũ vì quy trình vân tay §17
+    //   không được làm theo sau một lần áp tay — lặng lẽ để lượt ghi mastery
+    //   gọi được bằng JWT của bất kỳ học sinh đã xác thực nào, mở lại đúng lỗ hổng
+    //   mà ADR-0010 đã đóng cho điểm số.
     it("JWT học sinh gọi thẳng record_skill_mastery() bị chặn ở tầng QUYỀN, và không có dòng mastery nào đổi", async () => {
       const before = await readMasteryRows();
 

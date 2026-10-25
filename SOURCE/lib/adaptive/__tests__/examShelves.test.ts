@@ -1,5 +1,5 @@
-// "The ladder" [unit] — PRD exam-shelves v1.1, ADR-0021 D2/D4
-// AC-013/015/018-025/029/030/048/051, AC-006 (cut-to-10)
+// "Cái thang" [unit] — PRD exam-shelves v1.1, ADR-0021 D2/D4
+// AC-013/015/018-025/029/030/048/051, AC-006 (cắt còn 10)
 // PRD: docs/prd/exam-shelves-prd.md (v1.1)
 // Design Doc: docs/design/exam-shelves-backend-design.md § "The ladder"
 // ADR: docs/adr/ADR-0021-cross-user-hot-aggregate-and-attempt-source.md

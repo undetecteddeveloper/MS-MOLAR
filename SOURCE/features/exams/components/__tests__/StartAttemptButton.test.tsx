@@ -35,59 +35,57 @@ beforeEach(() => {
 afterEach(cleanup);
 
 // =============================================================================
-// P6-T1 — StartAttemptButton → startAttempt (the `source` → bound-argument hop)
+// P6-T1 — StartAttemptButton → startAttempt (chặng `source` → tham số đã bind)
 // =============================================================================
-// AC-040: "Given an attempt started from an exam page reached with ?from=, when
-//   startAttempt inserts the exam_attempts row, then that row persists exactly
-//   one of practice, hot, explore, none." (this file proves the second of the
-//   two hops the raw value must survive unmodified — the first is
-//   app/(exams)/exams/[id]/__tests__/page.test.tsx's job)
-// AC-041: "Given a missing, empty, unknown or forged ?from= value, when the
-//   attempt row is written, then it stores none — 0 errors, 0 rejected attempt
-//   starts." (the absent-`source` and `totally-bogus` cases below prove this
-//   hop does 0 filtering of its own, so toAttemptSource stays the single
-//   normalisation point AC-041 describes)
+// AC-040: "Cho một lượt làm bắt đầu từ trang đề được mở với ?from=, khi
+//   startAttempt chèn hàng exam_attempts, thì hàng đó lưu đúng
+//   một trong practice, hot, explore, none." (file này chứng minh chặng thứ hai trong
+//   hai chặng mà giá trị thô phải đi qua không bị sửa — chặng đầu là việc của
+//   app/(exams)/exams/[id]/__tests__/page.test.tsx)
+// AC-041: "Cho một giá trị ?from= thiếu, rỗng, lạ hoặc giả mạo, khi
+//   hàng lượt làm được ghi, thì nó lưu none — 0 lỗi, 0 lượt bắt đầu bị từ chối."
+//   (các ca `source` vắng mặt và `totally-bogus` bên dưới chứng minh chặng
+//   này tự nó lọc 0 lần, nên toAttemptSource vẫn là điểm
+//   chuẩn hoá duy nhất mà AC-041 mô tả)
 // ROI: 73 (BV:8 x Freq:8 + Legal:0 + Defect:9)
-//   BV 8 — the sole remaining wiring gap in the attribution chain every earlier
-//     phase (P1-T5's whitelist, P2-T2's producer, P5-T1's shelf cards) was
-//     built to feed; without it every attempt start silently records 'none'.
-//   Freq 8 — every attempt started from this button, i.e. every "Làm bài"
-//     submission on the exam detail page.
-//   Defect 9 — the failure mode is the LAST hop before the DB write and is
-//     completely silent (this repo's only `<form action={boundFn}>` server
-//     action, so there is no prior automated coverage of this exact bind
-//     pattern): a hardcoded/dropped `source` argument produces a working,
-//     redirecting "Làm bài" button with no visible symptom, only a wrong
-//     exam_attempts.source value discovered later, if ever.
-// Behavior: StartAttemptButton({ examId, source }) is rendered (no async child,
-//   so `render(await StartAttemptButton(props))` applies, not renderServerTree)
-//   against a mocked `startAttempt` -> the form is submitted (React 19 client-
-//   side form-action interception) -> the mocked `startAttempt` is called with
-//   (examId, source, FormData) where `source` is EXACTLY the prop value,
-//   untouched, for a valid shelf value, for an absent `source` prop, and for an
-//   unrecognised/forged value.
+//   BV 8 — chỗ nối còn thiếu duy nhất trong chuỗi quy kết mà mọi phase trước
+//     (danh sách trắng của P1-T5, bên sản xuất của P2-T2, thẻ kệ của P5-T1) được
+//     dựng để cấp dữ liệu; thiếu nó thì mọi lượt bắt đầu đều lặng lẽ ghi 'none'.
+//   Freq 8 — mọi lượt làm bắt đầu từ nút này, tức mọi lượt gửi
+//     "Làm bài" trên trang chi tiết đề.
+//   Defect 9 — kiểu hỏng là chặng CUỐI trước khi ghi DB và hoàn toàn thầm lặng
+//     (đây là `<form action={boundFn}>` server action duy nhất của repo này, nên
+//     chưa có độ phủ tự động nào cho đúng mẫu bind này): tham số `source` bị hardcode/bỏ
+//     tạo ra một nút "Làm bài" chạy được, có redirect, không có triệu chứng nhìn thấy, chỉ có
+//     giá trị exam_attempts.source sai được phát hiện về sau, nếu có.
+// Hành vi: StartAttemptButton({ examId, source }) được render (không có con async,
+//   nên áp dụng `render(await StartAttemptButton(props))`, không phải renderServerTree)
+//   trên `startAttempt` mock -> form được gửi (chặn form-action phía client của
+//   React 19) -> `startAttempt` mock được gọi với
+//   (examId, source, FormData) trong đó `source` là ĐÚNG giá trị prop,
+//   không bị đụng tới, với giá trị kệ hợp lệ, với prop `source` vắng mặt, và với
+//   giá trị lạ/giả mạo.
 // @category: core-functionality
 // @lane: integration
-// @dependency: features/exams/components/StartAttemptButton.tsx + mocked
+// @dependency: features/exams/components/StartAttemptButton.tsx + mock
 //   features/exams/actions.ts (startAttempt)
 // @complexity: low
-// @real-dependency: none — `startAttempt` is the sanctioned mock boundary here
-//   (same reasoning as rating.int.test.ts's Supabase-client boundary): its own
-//   toAttemptSource normalisation is proven by
-//   lib/exams/__tests__/attemptSource.test.ts, a pure unit test outside this
-//   file's job.
-// Primary failure mode: `source` stays hardcoded to `undefined` (the pre-P6-T1
-//   placeholder this task replaced), or the component adds its own ad-hoc
-//   whitelist/validation on `source` before binding it, creating a second
-//   normalisation point that can silently disagree with `toAttemptSource`'s
-//   rules inside `startAttempt`.
-// Proof obligation:
-//   (a) source='hot' -> startAttempt is called with ('exam-1', 'hot', FormData);
-//   (b) source absent -> startAttempt is called with ('exam-2', undefined,
-//       FormData) — not a default like 'none', that mapping is startAttempt's
-//       own job via toAttemptSource;
-//   (c) source='totally-bogus' -> startAttempt receives 'totally-bogus'
-//       verbatim, proving 0 filtering happens at this hop.
+// @real-dependency: không có — `startAttempt` là ranh giới mock được phê duyệt ở đây
+//   (cùng lập luận với ranh giới client Supabase của rating.int.test.ts): việc chuẩn hoá
+//   toAttemptSource của chính nó được chứng minh bởi
+//   lib/exams/__tests__/attemptSource.test.ts, một unit test thuần ngoài việc
+//   của file này.
+// Kiểu hỏng chính: `source` bị hardcode `undefined` (chỗ giữ chỗ trước P6-T1
+//   mà task này thay thế), hoặc component tự thêm danh sách trắng/kiểm hợp lệ ad-hoc
+//   cho `source` trước khi bind, tạo ra điểm chuẩn hoá thứ hai
+//   có thể lặng lẽ bất đồng với luật của `toAttemptSource` bên trong `startAttempt`.
+// Nghĩa vụ chứng minh:
+//   (a) source='hot' -> startAttempt được gọi với ('exam-1', 'hot', FormData);
+//   (b) source vắng -> startAttempt được gọi với ('exam-2', undefined,
+//       FormData) — không phải mặc định như 'none', việc ánh xạ đó là việc
+//       của chính startAttempt qua toAttemptSource;
+//   (c) source='totally-bogus' -> startAttempt nhận 'totally-bogus'
+//       nguyên văn, chứng minh chặng này lọc 0 lần.
 describe("StartAttemptButton — source prop bind vào startAttempt(examId, source) (P6-T1)", () => {
   it("obligation (a): source='hot': submit form gọi startAttempt('exam-1', 'hot', FormData)", async () => {
     const { container } = render(await StartAttemptButton({ examId: "exam-1", source: "hot" }));

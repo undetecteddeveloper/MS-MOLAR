@@ -1,60 +1,59 @@
-// Rating System [service-integration-e2e] Test Skeleton
-// Design Doc: docs/design/rating-system-backend-design.md (Test Boundaries — RLS suite
+// Rating System [service-integration-e2e] Bộ khung test
+// Design Doc: docs/design/rating-system-backend-design.md (Test Boundaries — bộ RLS
 //   R-p..R-u; Phase-0 Verification Spike S1-S4)
 // PRD: docs/prd/rating-system-prd.md (v1.1, AC-001..AC-026, Quantitative Metrics 1,2,4,5,6,7)
-// Generated: 2026-07-24 | Budget Used: integration 3/3, fixture-e2e 2/3, service-integration-e2e 2/2
+// Sinh ngày: 2026-07-24 | Ngân sách đã dùng: integration 3/3, fixture-e2e 2/3, service-integration-e2e 2/2
 //
-// Skeleton only — comments describing what the implementer must write. No imports, no
-// executable assertions yet. The backend Design Doc already specifies the exact case
-// table for these behaviors (R-p..R-u) as an extension of the existing
-// SOURCE/supabase/test-rls.ts harness (assert-based script run via
-// `cd SOURCE && npx tsx supabase/test-rls.ts`, real local Supabase, service-role setup
-// + signed-in anon clients per user — see ensureUser/signInAs in that file). The
-// PREFERRED implementation is to append these cases directly into test-rls.ts
-// following its existing pattern (mirroring R-i/R-j/R-k at :429-473), so there is a
-// single source of RLS truth. This file originally recorded two
-// service-integration-e2e-lane candidates selected by ROI for traceability; Test SE1
-// (R-p..R-t eligibility gate + upsert) has been ported into test-rls.ts (R-p..R-u, the
-// select-own confinement obligation added there as (f)) and removed from here to avoid
-// double-asserting the same behavior. Test SE2 remains reserved below for a future task.
+// Chỉ là skeleton — comment mô tả những gì người cài đặt phải viết. Chưa có import, chưa có
+// khẳng định thực thi. Backend Design Doc đã đặc tả đúng bảng ca cho các hành vi này
+// (R-p..R-u) như phần mở rộng của harness SOURCE/supabase/test-rls.ts sẵn có (script dựa
+// trên assert chạy bằng `cd SOURCE && npx tsx supabase/test-rls.ts`, Supabase cục bộ thật,
+// thiết lập service-role + client anon đã đăng nhập cho từng người dùng — xem ensureUser/signInAs
+// trong file đó). Cách cài đặt ƯA DÙNG là nối thẳng các ca này vào test-rls.ts
+// theo mẫu sẵn có của nó (theo R-i/R-j/R-k ở :429-473), để chỉ có một
+// nguồn sự thật RLS. File này ban đầu ghi hai ứng viên làn
+// service-integration-e2e chọn theo ROI để truy vết; Test SE1
+// (R-p..R-t cổng đủ điều kiện + upsert) đã được chuyển vào test-rls.ts (R-p..R-u, nghĩa vụ
+// giới hạn select-own được thêm ở đó là (f)) và bỏ khỏi đây để tránh
+// khẳng định đôi cùng một hành vi. Test SE2 vẫn được giữ chỗ bên dưới cho một task về sau.
 
 // =============================================================================
-// Test SE2 [additional slot, ROI > 50] — IMPLEMENTED (Task 9 backend)
-//   Community-difficulty aggregate: threshold, bucket, Hardest order, Level filter
-//   against the real exams_with_difficulty view (or its RPC fallback)
+// Test SE2 [suất bổ sung, ROI > 50] — ĐÃ CÀI ĐẶT (Task 9 backend)
+//   Tổng hợp độ khó cộng đồng: ngưỡng, nhóm, thứ tự Khó nhất, lọc theo Mức
+//   trên view exams_with_difficulty thật (hoặc phương án dự phòng RPC của nó)
 // =============================================================================
-// AC-014, AC-015, AC-016, AC-018 (bucket + mean vs null-below-3; boundary buckets)
-// AC-019, AC-020 (Hardest: rated exams ordered avg_overall desc, below-threshold
-//   sunk last, deterministic created_at/id tie-break)
-// AC-021 (Level filter excludes below-threshold and other-bucket rows)
-// AC-022, AC-023 (PRD metrics 5, 6, 7): no denormalized exams write, no trigger,
-//   existing below-threshold exams unaffected
-// Mirrors backend Design Doc Phase-0 Verification Spike checks S1-S4, turned into a
-// persistent regression test (the spike itself is a one-time blocking gate; this test
-// keeps proving the same capability on every run once the mechanism is adopted).
-// ROI: 72 (BV:9 x Freq:7 + Legal:0 + Defect:9) — above the service-integration-e2e
-//   ROI > 50 threshold: this is real Postgres NULL/order/range semantics that a
-//   mocked query builder (integration Test 2) cannot prove.
+// AC-014, AC-015, AC-016, AC-018 (nhóm + trung bình so với null-dưới-3; nhóm biên)
+// AC-019, AC-020 (Khó nhất: đề đã đánh giá xếp avg_overall giảm dần, đề dưới ngưỡng
+//   chìm xuống cuối, phân định hoà xác định theo created_at/id)
+// AC-021 (lọc theo Mức loại các hàng dưới ngưỡng và hàng nhóm khác)
+// AC-022, AC-023 (metric PRD 5, 6, 7): không ghi exams phi chuẩn hoá, không trigger,
+//   các đề dưới ngưỡng sẵn có không bị ảnh hưởng
+// Phản chiếu các phép kiểm S1-S4 của Phase-0 Verification Spike trong backend Design Doc, biến thành
+// một test hồi quy bền vững (bản thân spike là cổng chặn một lần; test này
+// tiếp tục chứng minh cùng khả năng ở mỗi lần chạy khi cơ chế đã được chọn).
+// ROI: 72 (BV:9 x Freq:7 + Legal:0 + Defect:9) — trên ngưỡng service-integration-e2e
+//   ROI > 50: đây là ngữ nghĩa NULL/thứ tự/khoảng thật của Postgres mà một query
+//   builder bị mock (Test 2 integration) không chứng minh được.
 //
-// Run: cd SOURCE && npx tsx supabase/__tests__/rating.rls.service.e2e.test.ts
-// (real local Supabase — same .env.local + service_role/anon pattern as
-// supabase/test-rls.ts. NOT collected by `npm test` — vitest.config.ts only includes
-// lib/**, components/**, app/**, matching this project's existing convention of
-// running RLS/e2e harnesses as standalone tsx scripts, not vitest suites.)
+// Chạy: cd SOURCE && npx tsx supabase/__tests__/rating.rls.service.e2e.test.ts
+// (Supabase cục bộ thật — cùng mẫu .env.local + service_role/anon như
+// supabase/test-rls.ts. KHÔNG bị `npm test` thu thập — vitest.config.ts chỉ gồm
+// lib/**, components/**, app/**, theo quy ước sẵn có của dự án này là
+// chạy các harness RLS/e2e như script tsx đứng riêng, không phải bộ vitest.)
 //
-// Setup uses the service_role client to write exam_difficulty_ratings rows directly
-// (bypassing RLS) — the insert/update-own RLS write path (eligibility gate) is already
-// proven by test-rls.ts R-p..R-u; this file's scope is the READ side: the view's
-// aggregate/threshold/order/filter correctness, which mocks cannot prove (Mock Boundary
-// Decisions table, backend DD).
+// Thiết lập dùng client service_role để ghi trực tiếp các hàng exam_difficulty_ratings
+// (bỏ qua RLS) — đường ghi chèn/cập nhật-của-chính RLS (cổng đủ điều kiện) đã được
+// chứng minh bởi test-rls.ts R-p..R-u; phạm vi của file này là phía ĐỌC: tính đúng của
+// tổng hợp/ngưỡng/thứ tự/lọc của view, mà mock không chứng minh được (bảng Mock Boundary
+// Decisions, backend DD).
 //
-// "No trigger fires" (proof (d)) is corroborated two ways: (1) static source
-// inspection — grepping schema.sql for `trigger` finds exactly one trigger
-// (`on_auth_user_created` on `auth.users`, unrelated to exams/exam_difficulty_ratings);
-// (2) the dynamic check below that the `exams` base-table row is byte-identical
-// before/after the 3rd-rating insert. PostgREST only exposes the `public` schema, so a
-// live `pg_trigger` catalog query is not reachable from this client — the static
-// grep is the available substitute (recorded in Investigation Notes).
+// "Không trigger nào chạy" (bằng chứng (d)) được củng cố theo hai cách: (1) kiểm tra
+// mã nguồn tĩnh — grep schema.sql tìm `trigger` thấy đúng một trigger
+// (`on_auth_user_created` trên `auth.users`, không liên quan exams/exam_difficulty_ratings);
+// (2) phép kiểm động bên dưới rằng hàng bảng gốc `exams` giống từng byte
+// trước/sau lần chèn đánh giá thứ 3. PostgREST chỉ phơi schema `public`, nên một
+// truy vấn catalog `pg_trigger` sống không với tới được từ client này — grep tĩnh
+// là vật thay thế khả dụng (ghi trong Investigation Notes).
 
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -119,20 +118,20 @@ async function signInAs(url: string, anon: string, email: string): Promise<Supab
   return client;
 }
 
-// --- Fixture ids (prefixed for idempotent setup/cleanup, mirrors test-rls.ts) -----
+// --- Id fixture (có tiền tố để setup/cleanup lũy đẳng, theo test-rls.ts) -----
 
 const ZERO_ID = "se2-null-a"; // 0 ratings — below threshold
-const ONE_ID = "se2-null-b"; // 1 rating — below threshold; same created_at as ZERO_ID
-//   (tie-break-by-id proof among below-threshold rows, AC-019/020)
-const FLIP_ID = "se2-flip"; // 2 ratings initially -> 3rd rating inserted mid-test (AC-022)
+const ONE_ID = "se2-null-b"; // 1 đánh giá — dưới ngưỡng; cùng created_at với ZERO_ID
+//   (bằng chứng phân định hoà theo id giữa các hàng dưới ngưỡng, AC-019/020)
+const FLIP_ID = "se2-flip"; // ban đầu 2 đánh giá -> đánh giá thứ 3 được chèn giữa test (AC-022)
 const MEAN_1_0_ID = "se2-mean-01"; // avg 1.0 — Easy, minimum boundary
-const MEAN_3_9_ID = "se2-mean-02"; // avg 3.9 — Easy, just below the Medium boundary
+const MEAN_3_9_ID = "se2-mean-02"; // tb 3.9 — Dễ, ngay dưới biên Vừa
 const MEAN_4_0_ID = "se2-mean-03"; // avg 4.0 — Medium, minimum boundary
-const MEAN_6_9_ID = "se2-mean-04"; // avg 6.9 — Medium, just below the Hard boundary
+const MEAN_6_9_ID = "se2-mean-04"; // tb 6.9 — Vừa, ngay dưới biên Khó
 const MEAN_7_0_ID = "se2-mean-05"; // avg 7.0 — Hard, minimum boundary
 const MEAN_10_0_ID = "se2-mean-06"; // avg 10.0 — Hard, maximum boundary
-const TIE_A_ID = "se2-tie-a"; // avg 5.0 — tied with TIE_B_ID, same created_at
-const TIE_B_ID = "se2-tie-b"; //   (tie-break-by-id proof among tied-mean rows)
+const TIE_A_ID = "se2-tie-a"; // tb 5.0 — hoà với TIE_B_ID, cùng created_at
+const TIE_B_ID = "se2-tie-b"; //   (bằng chứng phân định hoà theo id giữa các hàng cùng trung bình)
 
 const ALL_FIXTURE_IDS = [
   ZERO_ID,
@@ -148,9 +147,9 @@ const ALL_FIXTURE_IDS = [
   TIE_B_ID,
 ];
 
-// Expected Hardest-sort order (avg_overall desc, nulls-last, created_at/id tie-break) —
-// computed independently of the implementation, per testing-principles "literal
-// expected values" (AC-019/020).
+// Thứ tự sắp Khó nhất kỳ vọng (avg_overall giảm dần, null cuối, phân định hoà created_at/id) —
+// tính độc lập với cài đặt, theo "literal expected values" của testing-principles
+// (AC-019/020).
 const EXPECTED_HARDEST_ORDER = [
   MEAN_10_0_ID,
   MEAN_7_0_ID,
@@ -227,9 +226,9 @@ async function main() {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  // 10 rater accounts — the exact minimum count for which a whole-number sum of
-  // integer [1,10] part-scores can average to the terminating decimals 3.9/6.9
-  // (avg_overall = S/(3N); N must be a multiple of 10 for S/(3N) to equal k.9 exactly).
+  // 10 tài khoản người đánh giá — số lượng tối thiểu chính xác để tổng nguyên của
+  // các điểm phần nguyên [1,10] có thể cho trung bình là các số thập phân hữu hạn 3.9/6.9
+  // (avg_overall = S/(3N); N phải là bội của 10 để S/(3N) bằng đúng k.9).
   const RATER_EMAILS = Array.from(
     { length: 10 },
     (_, i) => `smithnguyen247+se2rater${i + 1}@gmail.com`
@@ -243,9 +242,9 @@ async function main() {
   console.log("\nSE2 — setup fixture (service_role)…");
   await cleanupFixtures(admin);
 
-  // Fixture-dependent body wrapped in try/finally: any thrown error from setup or
-  // one of the proof-obligation reads below must still run cleanup, otherwise a
-  // mid-test failure leaks live-DB se2-* rows (main().catch() only logs and exits).
+  // Thân phụ thuộc fixture được bọc try/finally: mọi lỗi ném ra từ thiết lập hay
+  // từ một lượt đọc nghĩa-vụ-chứng-minh bên dưới vẫn phải chạy cleanup, nếu không một
+  // lỗi giữa chừng làm rò các hàng se2-* trên DB sống (main().catch() chỉ ghi log và thoát).
   try {
     await runFixtureDependentChecks(admin, reader, raterIds, authorId);
   } finally {
@@ -266,9 +265,9 @@ async function runFixtureDependentChecks(
 ) {
   await setupExams(admin, authorId);
 
-  // MEAN_1_0 / MEAN_4_0 / MEAN_7_0 / MEAN_10_0 / TIE_A / TIE_B: 3 raters, identical
-  // scores per exam → each rater's own overall equals the target exactly (no
-  // repeating fraction), so the community avg_overall is exact.
+  // MEAN_1_0 / MEAN_4_0 / MEAN_7_0 / MEAN_10_0 / TIE_A / TIE_B: 3 người đánh giá, điểm
+  // giống hệt nhau cho mỗi đề → overall của mỗi người đúng bằng mục tiêu (không
+  // có phân số lặp), nên avg_overall cộng đồng là chính xác.
   await insertRatings(
     admin,
     MEAN_1_0_ID,
@@ -316,12 +315,12 @@ async function runFixtureDependentChecks(
   }));
   await insertRatings(admin, MEAN_6_9_ID, mean69Entries);
 
-  // ONE_ID: 1 rating (below threshold — content irrelevant).
+  // ONE_ID: 1 đánh giá (dưới ngưỡng — nội dung không quan trọng).
   await insertRatings(admin, ONE_ID, [{ userId: raterIds[0], scores: [5, 5, 5] }]);
 
-  // FLIP_ID: 2 ratings initially (below threshold); 3rd rating inserted later in
-  // the test to flip it to a { bucket, mean } (AC-022). Overalls 5, 7, 9 (after the
-  // 3rd) average to an exact 7.0 (Hard) with no repeating fraction.
+  // FLIP_ID: ban đầu 2 đánh giá (dưới ngưỡng); đánh giá thứ 3 được chèn về sau trong
+  // test để lật nó thành { bucket, mean } (AC-022). Overall 5, 7, 9 (sau
+  // lần thứ 3) có trung bình đúng 7.0 (Khó) không có phân số lặp.
   await insertRatings(admin, FLIP_ID, [
     { userId: raterIds[0], scores: [5, 5, 5] },
     { userId: raterIds[1], scores: [7, 7, 7] },
@@ -441,10 +440,10 @@ async function runFixtureDependentChecks(
     JSON.stringify(examBefore) === JSON.stringify(examAfter),
     "(d) row `exams` KHÔNG đổi (không có write/denormalize sau khi thêm rating thứ 3, AC-022)"
   );
-  // Static evidence (source inspection, recorded here since PostgREST does not expose
-  // pg_catalog to this client): grepping schema.sql for "trigger" finds exactly one
-  // trigger (`on_auth_user_created` on `auth.users`) — none on `exams` or
-  // `exam_difficulty_ratings`. No trigger fires on the rating write path.
+  // Bằng chứng tĩnh (kiểm tra mã nguồn, ghi ở đây vì PostgREST không phơi
+  // pg_catalog cho client này): grep schema.sql tìm "trigger" thấy đúng một
+  // trigger (`on_auth_user_created` trên `auth.users`) — không có trên `exams` hay
+  // `exam_difficulty_ratings`. Không trigger nào chạy trên đường ghi đánh giá.
 
   const { data: flipAfterData, error: flipAfterErr } = await reader
     .from("exams_with_difficulty")

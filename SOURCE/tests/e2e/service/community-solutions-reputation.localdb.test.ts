@@ -1,5 +1,5 @@
-// Community Solutions — `community_reputation_summary()` (task 41, P5-T2; the
-// task tests its OWN migration — backend DD v1.9 § Integration Verification
+// Community Solutions — `community_reputation_summary()` (task 41, P5-T2;
+// task kiểm migration CỦA CHÍNH nó — backend DD v1.9 § Integration Verification
 // Points "Reputation fixed vector", binding "Task ownership"). Làn SERVICE
 // (Postgres dev THẬT, không mock) — `describe.skipIf(!HAS_LIVE_DB)`, cùng tiền
 // lệ `community-solutions-list-order.localdb.test.ts` (task 16).

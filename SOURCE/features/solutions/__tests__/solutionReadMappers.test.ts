@@ -1,25 +1,25 @@
-// listSolutions / getSolutionDetail — mapper unit cases (backend task 14,
-// § Required test list; frontend DD v1.6 § Test Boundaries "Mapper rule
-// tests"). `.rpc()` mocked at the Supabase client boundary and fed literal
-// rows shaped exactly as community_solutions_list / community_solution_detail
-// actually serialize them (SOURCE/supabase/schema.sql `returns table` /
-// `jsonb_build_object` column lists) — every declared key present, masked
-// values `null`.
+// listSolutions / getSolutionDetail — các ca unit mapper (backend task 14,
+// § Required test list; "Mapper rule tests" của frontend DD v1.6 § Test Boundaries).
+// `.rpc()` bị mock ở ranh giới client Supabase và được cấp các hàng literal
+// có hình dạng đúng như community_solutions_list / community_solution_detail
+// thực sự serialise (danh sách cột `returns table` /
+// `jsonb_build_object` của SOURCE/supabase/schema.sql) — mọi khoá đã khai báo đều có mặt,
+// giá trị đã che là `null`.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// queries.ts imports "server-only" — same stub as writerActions.test.ts /
+// queries.ts import "server-only" — cùng stub với writerActions.test.ts /
 // communitySolutions.int.test.ts.
 vi.mock("server-only", () => ({}));
 
 const { rpcMock, createSignedUrlsMock } = vi.hoisted(() => ({
   rpcMock: vi.fn(),
   createSignedUrlsMock: vi.fn(async (paths: string[]) =>
-    // Task 42 integration handoff (see task 14's Investigation Notes): every
-    // named row's author_avatar_path is now signed in one Storage call
-    // before toAuthorIdentity. This mapper-test file only cares about the
-    // mapping shape, so the mock just echoes a deterministic signed value per
-    // path (task 42's own avatarSigner.test.ts proves the batching/fail-closed
-    // Storage contract itself).
+    // Bàn giao tích hợp task 42 (xem Investigation Notes của task 14): author_avatar_path của
+    // mọi hàng có tên giờ được ký trong một lời gọi Storage
+    // trước toAuthorIdentity. File test mapper này chỉ quan tâm
+    // hình dạng ánh xạ, nên mock chỉ phản hồi một giá trị đã ký xác định cho mỗi
+    // đường dẫn (avatarSigner.test.ts riêng của task 42 chứng minh chính hợp đồng
+    // gộp lô/fail-closed của Storage).
     ({ data: paths.map((path) => ({ path, signedUrl: `signed:${path}`, error: null })), error: null })
   ),
 }));

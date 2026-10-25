@@ -1,23 +1,23 @@
-// Test helper — render a tree of ASYNC SERVER COMPONENTS to real DOM nodes.
-// Not a test file (vitest.config.ts collects `*.test.tsx` only).
+// Test helper — render một cây ASYNC SERVER COMPONENT thành các node DOM thật.
+// Không phải file test (vitest.config.ts chỉ thu thập `*.test.tsx`).
 //
-// WHY THIS EXISTS. The repo's precedent for an async server component is
-// `render(await Component(props))` (SkillRecommendationCard.test.tsx:9-16), and
-// it works only while the awaited component has NO async child: React 19's
-// CLIENT renderer refuses an async component ("<OrderRow> is an async Client
-// Component"), suspends, and hands back an EMPTY tree — a test written against
-// it fails for the wrong reason, or worse, passes a `not.toContain` assertion
-// against nothing at all. C-07 renders C-08, so the precedent runs out here.
+// VÌ SAO NÓ TỒN TẠI. Tiền lệ của repo cho một async server component là
+// `render(await Component(props))` (SkillRecommendationCard.test.tsx:9-16), và
+// nó chỉ chạy khi component được await KHÔNG có con async: renderer CLIENT của React 19
+// từ chối một component async ("<OrderRow> is an async Client
+// Component"), treo, và trả về một cây RỖNG — một test viết dựa trên
+// nó hỏng vì lý do sai, hoặc tệ hơn, qua một khẳng định `not.toContain`
+// trên hư không. C-07 render C-08, nên tiền lệ hết đường ở đây.
 //
-// The server renderer does support them. `renderToReadableStream` resolves the
-// whole tree — including the client children (C-09, `next/link`) — and the HTML
-// is parsed back into DOM nodes, so the assertions stay DOM assertions
-// (classes, hrefs, textContent, element counts) rather than string matching.
+// Renderer server hỗ trợ chúng. `renderToReadableStream` giải quyết
+// cả cây — kể cả các con client (C-09, `next/link`) — và HTML
+// được phân tích ngược thành node DOM, nên các khẳng định vẫn là khẳng định DOM
+// (class, href, textContent, số phần tử) thay vì khớp chuỗi.
 //
-// The container is detached from `document`, so nothing needs cleaning up
-// between cases. Interactivity (focus, click) is NOT available here — the two
-// boundary-file cases that need it use @testing-library/react, which is
-// correct for them: `error.tsx` and `loading.tsx` are synchronous.
+// Container tách khỏi `document`, nên không cần dọn
+// giữa các ca. Tương tác (focus, click) KHÔNG khả dụng ở đây — hai ca
+// của file ranh giới cần nó dùng @testing-library/react, là
+// đúng cho chúng: `error.tsx` và `loading.tsx` là đồng bộ.
 
 import type { ReactNode } from "react";
 import { renderToReadableStream } from "react-dom/server.browser";

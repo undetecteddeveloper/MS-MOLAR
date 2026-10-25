@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-// `ExamCard` — containment proof (AC-043, UI Spec § Component: ExamCard
+// `ExamCard` — bằng chứng chứa trong (AC-043, UI Spec § Component: ExamCard
 // (shelf-aware props); Design Doc § ExamCard extension and the containment
 // proof (AC-043)).
 //

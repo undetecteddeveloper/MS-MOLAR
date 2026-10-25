@@ -1,145 +1,142 @@
 // exam_hot_counts() — Kho đề theo kệ [service-integration-e2e] Test Skeleton
 // Design Doc: docs/design/exam-shelves-backend-design.md (v1.2, § The SQL objects
 //               :210-296, § Test Boundaries and Placement :609-633 "test-rls.ts
-//               Phần 10 — what proves the aggregate leaks no identities", row for
-//               this exact file at :620)
+//               Phần 10 — thứ chứng minh aggregate không rò danh tính nào", dòng cho
+//               đúng file này ở :620)
 // ADR:        docs/adr/ADR-0021-cross-user-hot-aggregate-and-attempt-source.md
-//               (D1 aggregate shape + security argument, D6 what the DDL leaves
-//               alone)
+//               (D1 hình dạng aggregate + lập luận bảo mật, D6 điều DDL để yên)
 // PRD:        docs/prd/exam-shelves-prd.md (v1.2, AC-018, AC-025, AC-027, AC-028)
-// Generated:  2026-09-18 | Budget used: service-integration-e2e 1/2 (1 reserved
-//               slot; 2nd slot intentionally left unfilled — the backend DD names
-//               no second service-e2e file for this feature, and no further
-//               candidate here needs a live Postgres to be provable)
+// Sinh ngày:  2026-09-18 | Ngân sách đã dùng: service-integration-e2e 1/2 (1 giữ chỗ
+//               suất 2 cố ý để trống — backend DD không nêu file service-e2e thứ hai
+//               nào cho tính năng này, và không ứng viên nào khác ở đây cần Postgres
+//               sống để chứng minh được)
 //
+//=============================================================================
+// TRẠNG THÁI FILE — đọc trước khi sửa
 // =============================================================================
-// FILE STATUS — read before editing
-// =============================================================================
-// IMPLEMENTED (P8-T4). All 6 proof obligations below are real `it` cases; the
-// `describe` is wrapped in `describe.skipIf(!HAS_LIVE_DB)`, importing
-// `HAS_LIVE_DB` from `./examHotCountsFixtures` (P8-T3) — the exact shape
-// `exam-search.service.e2e.test.ts:31` already uses. `public.exam_hot_counts()`
-// must exist on the target database (backend DD's Migration Procedure,
-// schema.sql §20c) before this file is run; `HAS_LIVE_DB` only guards for
-// missing credentials, never for the migration having landed — a red run on a
-// database that has not received the DDL looks like a code defect and is not
-// (`vitest.localdb.config.ts`'s own header states the schema-gate precondition
-// in capital letters).
+// ĐÃ CÀI ĐẶT (P8-T4). Cả 6 nghĩa vụ chứng minh bên dưới là các ca `it` thật;
+// `describe` được bọc trong `describe.skipIf(!HAS_LIVE_DB)`, import
+// `HAS_LIVE_DB` từ `./examHotCountsFixtures` (P8-T3) — đúng hình dạng mà
+// `exam-search.service.e2e.test.ts:31` đã dùng. `public.exam_hot_counts()`
+// phải tồn tại trên database đích (Migration Procedure của backend DD,
+// schema.sql §20c) trước khi chạy file này; `HAS_LIVE_DB` chỉ canh
+// việc thiếu thông tin đăng nhập, không bao giờ canh việc migration đã đáp xuống — một lượt chạy đỏ
+// trên database chưa nhận DDL trông như lỗi code mà không phải
+// (comment đầu của `vitest.localdb.config.ts` nêu điều kiện tiên quyết cổng schema
+// bằng chữ in hoa).
 //
-// HOW THIS LANE RUNS: `npm run test:localdb` (from `SOURCE/`), i.e.
-// `vitest run --config vitest.localdb.config.ts`, which globs the WHOLE directory
-// `tests/e2e/service/**/*.test.{ts,tsx}` with NO exclude list — every file here is
-// collected unconditionally. This lane is MANUAL / opt-in — it is deliberately
-// NOT part of `npm test` or the default CI gate (`vitest.localdb.config.ts`'s own
+//LÀN NÀY CHẠY THẾ NÀO: `npm run test:localdb` (từ `SOURCE/`), tức
+// `vitest run --config vitest.localdb.config.ts`, glob TOÀN BỘ thư mục
+// `tests/e2e/service/**/*.test.{ts,tsx}` KHÔNG có danh sách loại — mọi file ở đây
+// được thu thập vô điều kiện. Làn này chạy THỦ CÔNG / tự chọn — cố ý
+// KHÔNG thuộc `npm test` hay cổng CI mặc định (chính
 // header: "CHẠY TAY tại máy dev — cố ý tách khỏi npm test").
 //
-// FIXTURES MODULE: `SOURCE/tests/e2e/service/examHotCountsFixtures.ts` (P8-T3) —
-// re-exports `HAS_LIVE_DB`/`adminClient`/`anonClient` from
-// `essayGradeWriteFixtures.ts`, adds its own `serviceClient()`, the `HC_PREFIX`
-// isolation prefix, and `setUp`/`tearDown`. `setUp` seeds two real users (A =
-// always the RPC caller, never banned; B = submitter and the author who gets
-// banned/unbanned) and four exams (`published`, `unpublished`, `bannedAuthor`,
-// `hourBoundary`) with `exam_attempts` rows shaped for obligations (a)-(f) below
-// — see that file's own header for exactly what each exam id proves and why A
-// is never reused for the banned-author role.
+// MODULE FIXTURE: `SOURCE/tests/e2e/service/examHotCountsFixtures.ts` (P8-T3) —
+// export lại `HAS_LIVE_DB`/`adminClient`/`anonClient` từ
+// `essayGradeWriteFixtures.ts`, thêm `serviceClient()` riêng, tiền tố cô lập
+// `HC_PREFIX`, và `setUp`/`tearDown`. `setUp` gieo hai user thật (A =
+// luôn là người gọi RPC, không bao giờ bị cấm; B = người nộp và tác giả bị
+// cấm/bỏ cấm) và bốn đề (`published`, `unpublished`, `bannedAuthor`,
+// `hourBoundary`) với các hàng `exam_attempts` có hình dạng cho các nghĩa vụ (a)-(f) bên dưới
+// — xem comment đầu của chính file đó để biết từng id đề chứng minh gì và vì sao A
+// không bao giờ được dùng lại cho vai tác giả bị cấm.
 //
 // -----------------------------------------------------------------------------
-// MOCK BOUNDARY — the opposite of every other lane in this generation round
+// RANH GIỚI MOCK — ngược lại với mọi làn khác trong đợt sinh này
 // -----------------------------------------------------------------------------
-// NOTHING IS MOCKED. Backend DD Test Boundaries states this as a hard rule, not a
-// preference: "the function's behaviour, grants, predicates and RLS isolation are
-// never mocked — only real Postgres proves that a definer function counts another
-// user's rows, that anon is refused, or that a grant landed." Every assertion
-// below runs against the real dev Postgres instance (ref `hynwleaxtbtjzkvpjsug`),
-// through real `SupabaseClient`s carrying real JWTs for two real seeded users.
+// KHÔNG GÌ BỊ MOCK. Test Boundaries của backend DD nêu đây là luật cứng, không phải
+// sở thích: "hành vi, grant, vị từ và cô lập RLS của hàm
+// không bao giờ bị mock — chỉ Postgres thật mới chứng minh được rằng một hàm definer đếm hàng của
+// người dùng khác, rằng anon bị từ chối, hay rằng một grant đã đáp xuống." Mọi khẳng định
+// bên dưới chạy trên instance Postgres dev thật (ref `hynwleaxtbtjzkvpjsug`),
+// qua các `SupabaseClient` thật mang JWT thật của hai user đã gieo thật.
 // @real-dependency: Postgres (dev), `exam_attempts`, `exams`, `exam_hot_counts()`
-//   and its grants/revokes — none of this is mocked; that is the entire point of
-//   this lane existing separately from `shelves.int.test.ts`.
+//   và các grant/revoke của nó — không cái nào bị mock; đó là toàn bộ ý nghĩa
+//   của việc làn này tồn tại tách khỏi `shelves.int.test.ts`.
 //
 // -----------------------------------------------------------------------------
-// WHY THIS IS THE RESERVED SLOT, NOT an ROI>50 opportunistic pick
+// VÌ SAO ĐÂY LÀ SUẤT GIỮ CHỖ, KHÔNG PHẢI một lựa chọn cơ hội ROI>50
 // -----------------------------------------------------------------------------
-// Per the reserved-slot rule: a service-integration-e2e slot is reserved when the
-// journey's correctness depends on real cross-service/cross-boundary behaviour
-// that fixture-e2e (mocked backend) cannot verify. A `security definer` function
-// crossing another user's `exam_attempts` RLS boundary is EXACTLY that class of
-// claim — a mocked `{ from, rpc }` client can assert "the code calls rpc() with
-// these arguments" but can never prove that the object it calls (a) actually
-// bypasses RLS, (b) actually excludes `anon`, or (c) actually excludes an
-// unpublished/banned-author exam once real Postgres evaluates its predicates.
+// Theo luật suất-giữ-chỗ: một suất service-integration-e2e được giữ khi tính đúng của
+// hành trình phụ thuộc hành vi xuyên dịch vụ/xuyên ranh giới thật mà
+// fixture-e2e (backend bị mock) không kiểm chứng được. Một hàm `security definer`
+// vượt qua ranh giới RLS `exam_attempts` của người dùng khác CHÍNH LÀ lớp khẳng định đó
+// — một client `{ from, rpc }` bị mock có thể khẳng định "code gọi rpc() với
+// các tham số này" nhưng không bao giờ chứng minh được đối tượng nó gọi (a) thực sự
+// bỏ qua RLS, (b) thực sự loại `anon`, hay (c) thực sự loại một đề
+// chưa đăng/tác giả bị cấm khi Postgres thật đánh giá các vị từ của nó.
 // ROI: 110 (BV:10 x Freq:10 + Legal:0 + Defect:10)
-//   BV 10 — a leak here is a real privacy incident (another student's identity or
-//     activity crossing a boundary the PRD/ADR both state must stay aggregate-only),
-//     not a UX regression.
-//   Freq 10 — this ONE RPC underlies every hot-shelf render, every ?sort=hot flat
-//     grid, and every home-block render, for every signed-in user — the highest
-//     call frequency of any new surface this feature adds.
-//   Defect 10 — maximal: no lane other than this one and the manual `test-rls.ts`
-//     suite can detect an RLS-bypass or grant defect at all; a mocked test cannot
-//     fail this way even when the real function is broken.
-// Behavior: two real, distinct, seeded student users (A, B) exist on dev, each
-//   with their own `exam_attempts` rows -> A's authenticated client calls
-//   `exam_hot_counts(...)` -> the returned row for an exam ONLY B submitted has
-//   `total_count >= 1`, proving the aggregate crosses users through a real JWT ->
-//   the returned row's key set is exactly the four declared columns, proving no
-//   identity/timestamp/score column leaked -> rows for an in_progress attempt, an
-//   unpublished exam and a banned author's exam are each absent -> the window
-//   boundaries snap to the HOUR server-side, not to the caller's raw argument ->
-//   `p_max_rows` clamps against the imported `LIST_ROW_CEILING`/`POSTGREST_MAX_ROWS`
-//   constants, not hand-copied literals -> anon gets 42501; service_role gets an
-//   array.
+//   BV 10 — một lần rò ở đây là sự cố quyền riêng tư thật (danh tính hay hoạt động của học sinh
+//     khác vượt qua một ranh giới mà PRD/ADR đều nêu phải chỉ là aggregate),
+//     không phải hồi quy UX.
+//   Freq 10 — MỘT RPC này nằm dưới mọi lần render kệ hot, mọi lưới phẳng ?sort=hot,
+//     và mọi lần render khối trang chủ, cho mọi người dùng đã đăng nhập — tần suất gọi
+//     cao nhất trong mọi bề mặt mới mà tính năng này thêm.
+//   Defect 10 — tối đa: không làn nào khác ngoài làn này và bộ `test-rls.ts` thủ công
+//     phát hiện được một lỗi bỏ-qua-RLS hay grant; một test bị mock không thể
+//     hỏng kiểu này kể cả khi hàm thật hỏng.
+// Hành vi: hai user học sinh thật, khác nhau, đã gieo (A, B) tồn tại trên dev, mỗi người
+//   có các hàng `exam_attempts` riêng -> client authenticated của A gọi
+//   `exam_hot_counts(...)` -> hàng trả về cho một đề CHỈ B nộp
+//   có `total_count >= 1`, chứng minh aggregate vượt người dùng qua JWT thật ->
+//   tập khoá của hàng trả về đúng là bốn cột đã khai báo, chứng minh không cột
+//   danh tính/timestamp/điểm nào rò -> các hàng cho một lượt in_progress, một
+//   đề chưa đăng và một đề của tác giả bị cấm đều vắng -> các biên cửa sổ
+//   được căn theo GIỜ phía server, không theo tham số thô của người gọi ->
+//   `p_max_rows` kẹp theo các hằng `LIST_ROW_CEILING`/`POSTGREST_MAX_ROWS` đã import,
+//   không phải literal chép tay -> anon nhận 42501; service_role nhận một
+//   mảng.
 // @category: core-functionality
 // @lane: service-integration-e2e
-// @dependency: full-system (real dev Postgres, real Supabase Auth, real RLS,
+// @dependency: toàn hệ thống (Postgres dev thật, Supabase Auth thật, RLS thật,
 //   `public.exam_hot_counts()`) + `examHotCountsFixtures.ts`
 // @complexity: high
 // @real-dependency: Postgres (dev, ref hynwleaxtbtjzkvpjsug), exam_attempts, exams,
-//   exam_hot_counts() — see Mock Boundary above; nothing in this file may be mocked
-// Primary failure mode: the function is deployed without `security definer` (or the
-//   grant to `authenticated` is missing/misconfigured), so A's call to
-//   `exam_hot_counts` returns 0 rows / a permission error instead of counting B's
-//   real submission — the exact failure the backend DD's own Verification Strategy
-//   names as "the single assumption the whole feature rests on...checkable in one
-//   query", now automated instead of only checked once by hand on dev. The second,
-//   subtler failure mode: the returned row carries an extra column (e.g. a
-//   `submitted_at` or `user_id` the `returns table` signature was widened to
-//   include by mistake) — HS-c is written precisely because "asserting values alone
-//   would pass while a column leaked."
-// Proof obligation — what the implemented test must assert:
-//   (a) HS-b (cross-user proof): with only user B having a submitted attempt on a
-//       given exam, user A's authenticated `.rpc("exam_hot_counts", {...})` call
-//       returns a row for that exam id with `total_count >= 1` — a mocked client
-//       could never fail this way even when the real grant is broken, which is the
-//       entire justification for this lane existing;
-//   (b) HS-c (the leak proof): for at least one returned row,
-//       `Object.keys(row).sort()` is exactly
-//       `["exam_id", "recent_count", "total_count", "wide_count"]` — no `user_id`,
-//       `submitted_at`, `id` or `total_score` — assert the KEY SET, not just that
-//       expected values are present, per the backend DD's own explicit warning;
-//   (c) an `in_progress` (not `submitted`) attempt contributes 0 to every count for
-//       its exam; an exam whose `exams.status <> 'published'` is absent from the
-//       result set entirely, even though it has qualifying submitted attempts; an
-//       exam whose author is banned (`auth.admin.updateUserById(..., {
-//       ban_duration })`) is absent, then present again once the ban is lifted
-//       (mirrors `test-rls.ts` HS-d/HS-f, automated here for CI-adjacent coverage);
-//   (d) HOUR-SNAPPED WINDOW BOUNDARIES: seed one attempt 1 second before
-//       `date_trunc('hour', p_since_recent)` and one attempt 1 second after it —
-//       assert the first is EXCLUDED from `recent_count` and the second is
-//       INCLUDED, proving the boundary snaps server-side to the hour of the
-//       caller-supplied argument, not to the raw argument itself (the mechanism
-//       that stops a JWT holder from bisecting the time axis to localise another
-//       student's submission to the second);
-//   (e) `p_max_rows` clamp is asserted against the IMPORTED `LIST_ROW_CEILING` /
-//       `POSTGREST_MAX_ROWS` constants from `@/lib/supabase/boundedRead`, not
-//       against hand-copied literals (501/1000) — a change on either side of that
-//       equality must turn this obligation red, per the backend DD's own
-//       instruction ("the service e2e clamp case asserts against the imported
-//       constants...so a change on either side turns that case red instead of
-//       drifting");
-//   (f) GRANT BOUNDARY: an anonymous client's call to `exam_hot_counts` resolves
-//       with an array and no error since schema.sql §29 (2026-10-12: guests may
-//       browse /exams; before that it was `error.code === "42501"`); a
-//       `service_role` client's call resolves with an array and no error (mirrors
+//   exam_hot_counts() — xem Mock Boundary ở trên; không gì trong file này được mock
+// Kiểu hỏng chính: hàm được triển khai không có `security definer` (hoặc
+//   grant cho `authenticated` thiếu/sai cấu hình), nên lời gọi `exam_hot_counts` của A
+//   trả 0 hàng / lỗi quyền thay vì đếm lượt nộp thật của B — đúng kiểu hỏng mà
+//   Verification Strategy của chính backend DD gọi là "giả định duy nhất mà cả tính năng dựa vào...
+//   kiểm được bằng một truy vấn", nay được tự động hoá thay vì chỉ
+//   kiểm một lần bằng tay trên dev. Kiểu hỏng thứ hai, tinh vi hơn: hàng trả về mang thêm một cột (ví dụ
+//   một `submitted_at` hay `user_id` mà chữ ký `returns table` bị mở rộng
+//   gồm nhầm) — HS-c được viết chính vì "chỉ khẳng định giá trị
+//   sẽ qua trong khi một cột đã rò."
+// Nghĩa vụ chứng minh — test được cài đặt phải khẳng định gì:
+//   (a) HS-b (bằng chứng xuyên người dùng): chỉ user B có lượt đã nộp trên một
+//       đề cho trước, lời gọi `.rpc("exam_hot_counts", {...})` authenticated của user A
+//       trả một hàng cho id đề đó với `total_count >= 1` — một client bị mock
+//       không bao giờ hỏng kiểu này kể cả khi grant thật hỏng, đó là
+//       toàn bộ biện minh cho việc làn này tồn tại;
+//   (b) HS-c (bằng chứng rò): với ít nhất một hàng trả về,
+//       `Object.keys(row).sort()` đúng là
+//       `["exam_id", "recent_count", "total_count", "wide_count"]` — không `user_id`,
+//       `submitted_at`, `id` hay `total_score` — khẳng định TẬP KHOÁ, không chỉ rằng
+//       các giá trị kỳ vọng có mặt, theo cảnh báo tường minh của chính backend DD;
+//   (c) một lượt `in_progress` (không phải `submitted`) đóng góp 0 vào mọi số đếm của
+//       đề; một đề có `exams.status <> 'published'` vắng hoàn toàn khỏi
+//       tập kết quả, dù nó có lượt đã nộp đủ điều kiện; một đề mà tác giả bị cấm
+//       (`auth.admin.updateUserById(..., {
+//       ban_duration })`) vắng, rồi có mặt lại khi lệnh cấm được gỡ
+//       (phản chiếu HS-d/HS-f của `test-rls.ts`, tự động hoá ở đây cho độ phủ gần-CI);
+//   (d) BIÊN CỬA SỔ CĂN THEO GIỜ: gieo một lượt 1 giây trước
+//       `date_trunc('hour', p_since_recent)` và một lượt 1 giây sau nó —
+//       khẳng định lượt đầu BỊ LOẠI khỏi `recent_count` và lượt sau
+//       ĐƯỢC TÍNH, chứng minh biên được căn phía server theo giờ của
+//       tham số do người gọi cấp, không theo chính tham số thô (cơ chế
+//       ngăn một người giữ JWT chia đôi trục thời gian để xác định vị trí lượt nộp
+//       của học sinh khác tới từng giây);
+//   (e) kẹp `p_max_rows` được khẳng định theo các hằng `LIST_ROW_CEILING` /
+//       `POSTGREST_MAX_ROWS` ĐÃ IMPORT từ `@/lib/supabase/boundedRead`, không
+//       theo literal chép tay (501/1000) — một thay đổi ở bất kỳ phía nào của đẳng thức đó
+//       phải làm nghĩa vụ này đỏ, theo chỉ dẫn của chính backend DD
+//       ("ca kẹp của service e2e khẳng định theo các hằng đã import...để một thay đổi ở
+//       bất kỳ phía nào làm ca đó đỏ thay vì trôi lệch");
+//   (f) BIÊN GRANT: lời gọi `exam_hot_counts` của một client ẩn danh resolve
+//       ra một mảng không lỗi từ schema.sql §29 (2026-10-12: khách duyệt được /exams;
+//       trước đó là `error.code === "42501"`); lời gọi của một client
+//       `service_role` resolve ra một mảng không lỗi (phản chiếu
 //       HS-e).
 
 import type { SupabaseClient } from "@supabase/supabase-js";

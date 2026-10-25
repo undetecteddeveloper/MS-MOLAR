@@ -1,32 +1,32 @@
-// User Support System v1 — Student Ticket Submission Journey [fixture-e2e]
-// (RESERVED SLOT — user-facing multi-step journey)
+// User Support System v1 — Hành trình gửi ticket của học sinh [fixture-e2e]
+// (SUẤT GIỮ CHỖ — hành trình nhiều bước hướng người dùng)
 // Design Docs: docs/design/support-system-backend-design.md (v1.2, Data Contracts
 //   §submitSupportTicket), docs/design/support-system-frontend-design.md (v1.2,
-//   `SupportWidgetDialog` phase state machine)
+//   máy trạng thái pha của `SupportWidgetDialog`)
 // UI Spec: docs/ui-spec/support-system-ui-spec.md (v1.1, Component: SupportWidgetDialog,
 //   IntentSelector, MessageField, ScreenshotAttachment)
-// PRD: docs/prd/support-system-prd.md (v1.2, AC-001, AC-002 UI half, AC-008..AC-011,
+// PRD: docs/prd/support-system-prd.md (v1.2, AC-001, AC-002 nửa UI, AC-008..AC-011,
 //   AC-020, AC-039, AC-040, AC-049, Use Cases 1-5)
 //
-// Driver-based script against the same SupportDriver structural-subset-of-
-// Playwright interface as the sibling widget-visibility fixture-e2e file and
-// this repo's rating.fixture.e2e.test.ts/history.fixture.e2e.test.ts
-// precedent. Fixture-driven backend: submitSupportTicket resolves to the
-// fixture responses in supportFixtureData.ts (task-07) instead of a live
-// Server Action — wiring that override boundary into a real running page
-// remains the same documented residual those sibling files record (no MSW/
-// mock-injection layer in this repo). These check functions run unchanged
-// once a harness exists.
+// Script dựa trên driver theo cùng interface SupportDriver tập-con-cấu-trúc-của-
+// Playwright như file fixture-e2e widget-visibility anh em và theo
+// tiền lệ rating.fixture.e2e.test.ts/history.fixture.e2e.test.ts của repo này.
+// Backend điều khiển bằng fixture: submitSupportTicket resolve ra các phản hồi
+// fixture trong supportFixtureData.ts (task-07) thay vì một Server Action
+// sống — nối ranh giới ghi đè đó vào một trang đang chạy thật vẫn là cùng
+// phần dư đã tài liệu hoá mà các file anh em ghi (không có lớp MSW/
+// tiêm mock trong repo này). Các hàm kiểm này chạy không đổi
+// khi có harness.
 //
-// The individual sub-behaviors this journey chains together (non-optimistic
-// rendering, rate-limited/timeout field preservation, exactly-3-intents,
-// single-screenshot replace-not-append) are ALSO independently proven by
+// Các hành vi con riêng lẻ mà hành trình này nối chuỗi (render không lạc quan,
+// giữ trường khi bị giới hạn tần suất/timeout, đúng-3-ý-định,
+// một-ảnh-chụp-thay-thế-chứ-không-nối-thêm) CŨNG được chứng minh độc lập bởi
 // SOURCE/components/support/__tests__/{SupportWidgetDialog,IntentSelector,
-// ScreenshotAttachment}.test.tsx (task-09, real RTL/jsdom component tests,
-// mocked submitSupportTicket at the module boundary) — those tests exercise
-// the same claims today, in CI, without a browser harness. This file proves
-// the same claims chained into one continuous user journey, at the L1 target
-// this task's Operation Verification Methods name.
+// ScreenshotAttachment}.test.tsx (task-09, test component RTL/jsdom thật,
+// submitSupportTicket bị mock ở ranh giới module) — các test đó thực thi
+// cùng các khẳng định ngay hôm nay, trong CI, không cần harness trình duyệt. File này chứng minh
+// cùng các khẳng định được nối thành một hành trình người dùng liên tục, ở mục tiêu L1
+// mà Operation Verification Methods của task này nêu tên.
 
 import assert from "node:assert/strict";
 import type { SupportDriver, SupportLocator } from "./supportFixtureData";
@@ -45,24 +45,24 @@ async function openWidget(driver: SupportDriver): Promise<void> {
   await driver.getByRole("button", { name: TRIGGER_NAME }).click();
 }
 
-/** (a) exactly three intent options, exact Vietnamese labels, no fourth option
- *  reachable anywhere in the dialog's rendered markup (AC-001). */
+/** (a) đúng ba lựa chọn ý định, nhãn tiếng Việt chính xác, không lựa chọn thứ tư nào
+ *  với tới được ở bất kỳ đâu trong markup đã render của dialog (AC-001). */
 export async function checkExactlyThreeIntents(driver: SupportDriver): Promise<void> {
   await openWidget(driver);
   for (const intent of FIXTURE_INTENTS) {
     const count = await driver.getByRole("radio", { name: FIXTURE_INTENT_LABELS[intent] }).count();
     assert.equal(count, 1, `intent option "${FIXTURE_INTENT_LABELS[intent]}" must render exactly once`);
   }
-  // No fourth option: total radio count in the group equals exactly 3.
+  // Không lựa chọn thứ tư: tổng số radio trong nhóm bằng đúng 3.
   const anyIntentLocator = driver.getByRole("radio", { name: FIXTURE_INTENT_LABELS.bug });
   assert.equal(await anyIntentLocator.count(), 1, "no fourth intent option may exist (AC-001)");
 }
 
-/** (b) for each intent, a fixture success response transitions to the
- *  acknowledgement sub-state showing the fixture shortRef verbatim, observed
- *  to happen only AFTER the fixture promise resolves — never optimistically
- *  (AC-040, AC-049). The form view must still be visible immediately after
- *  the click, before the (deliberately delayed-by-one-tick) fixture settles. */
+/** (b) với mỗi ý định, một phản hồi thành công của fixture chuyển sang trạng thái con
+ *  xác nhận hiện shortRef của fixture nguyên văn, quan sát thấy xảy ra
+ *  chỉ SAU KHI promise của fixture resolve — không bao giờ lạc quan
+ *  (AC-040, AC-049). Màn hình form vẫn phải thấy được ngay sau
+ *  cú bấm, trước khi fixture (cố ý trễ một tick) settle. */
 export async function checkNonOptimisticSuccessPerIntent(
   driver: SupportDriver,
   intent: (typeof FIXTURE_INTENTS)[number]
@@ -74,40 +74,40 @@ export async function checkNonOptimisticSuccessPerIntent(
   const submit = driver.getByRole("button", { name: /^Send$|Sending|Gửi/ });
   await submit.click();
 
-  // Immediately after the click, the fixture's success promise has not
-  // resolved yet (the harness's fixture profile is expected to settle on a
-  // microtask/macrotask boundary, not synchronously) — the dialog must still
-  // show the form, not the acknowledgement, at this instant.
+  // Ngay sau cú bấm, promise thành công của fixture chưa resolve
+  // (hồ sơ fixture của harness được kỳ vọng settle ở ranh giới
+  // microtask/macrotask, không đồng bộ) — dialog lúc này vẫn phải
+  // hiện form, không phải xác nhận.
   assert.equal(
     await driver.getByRole("status").count(),
     0,
     "acknowledgement must not appear before the fixture promise resolves (AC-040)"
   );
 
-  // After awaiting settlement, the acknowledgement replaces the form and
-  // shows the fixture's shortRef verbatim.
+  // Sau khi await việc settle, xác nhận thay thế form và
+  // hiện shortRef của fixture nguyên văn.
   const ack = driver.getByText(new RegExp(FIXTURE_SHORT_REF));
   assert.equal(await ack.count() > 0, true, "acknowledgement must show the fixture shortRef verbatim (AC-049)");
 }
 
-/** (c) attaching a screenshot then attaching a second one before submitting
- *  results in exactly ONE attachment surviving to submission — never two
- *  (AC-011, UI half). */
+/** (c) đính kèm một ảnh chụp rồi đính kèm ảnh thứ hai trước khi gửi
+ *  cho ra đúng MỘT đính kèm còn lại tới lúc gửi — không bao giờ hai
+ *  (AC-011, nửa UI). */
 export async function checkSingleScreenshotSurvivesReplace(driver: SupportDriver): Promise<void> {
   await openWidget(driver);
   const fileInput = driver.getByLabelText(/Attach a screenshot|Đính kèm ảnh/);
   await fileInput.setInputFiles("fixture-first.png");
   await fileInput.setInputFiles("fixture-second.png");
 
-  // Exactly one attachment indicator (filename/remove control) exists —
-  // never two stacked side by side.
+  // Có đúng một chỉ báo đính kèm (tên file/nút xoá) — không bao giờ
+  // hai cái xếp cạnh nhau.
   const removeControls = driver.getByRole("button", { name: /Remove image|Xoá ảnh/ });
   assert.equal(await removeControls.count(), 1, "exactly one attachment must survive replace (AC-011)");
 }
 
-/** (d) a rate-limited refusal returns the dialog to the form view with the
- *  previously-typed intent selection and message text both still present,
- *  exactly as typed (AC-020). */
+/** (d) một lần từ chối do giới hạn tần suất đưa dialog về màn hình form với
+ *  ý định đã chọn trước đó và chữ tin nhắn đã gõ đều vẫn còn,
+ *  đúng như đã gõ (AC-020). */
 export async function checkRateLimitedPreservesInput(driver: SupportDriver): Promise<void> {
   await openWidget(driver);
   await driver.getByRole("radio", { name: FIXTURE_INTENT_LABELS.suggestion }).click();
@@ -135,17 +135,17 @@ export async function checkRateLimitedPreservesInput(driver: SupportDriver): Pro
   );
 }
 
-/** (e) a submission that never resolves within the client's ~20s timeout
- *  window surfaces the retryable timeout error with intent/message/
- *  screenshot selection all still present (AC-039). */
+/** (e) một lần gửi không bao giờ resolve trong cửa sổ timeout ~20s của
+ *  client làm hiện lỗi timeout thử lại được, với lựa chọn ý định/tin nhắn/
+ *  ảnh chụp đều vẫn còn (AC-039). */
 export async function checkTimeoutPreservesInput(driver: SupportDriver): Promise<void> {
   await openWidget(driver);
   await driver.getByRole("radio", { name: FIXTURE_INTENT_LABELS.question }).click();
   await driver.getByLabelText(/Message|Nội dung/).fill("Still here after a timeout");
 
   await driver.getByRole("button", { name: /^Send$|Sending|Gửi/ }).click();
-  // Real harness: advance past the client's ~20s timeout window (fake timers
-  // in a Playwright context, or a test-scaled constant) before asserting.
+  // Harness thật: đẩy qua cửa sổ timeout ~20s của client (fake timer
+  // trong ngữ cảnh Playwright, hoặc một hằng co theo tỉ lệ cho test) trước khi khẳng định.
 
   assert.equal(
     await driver.getByText(/network|mạng/i).count() > 0,
@@ -159,7 +159,7 @@ export async function checkTimeoutPreservesInput(driver: SupportDriver): Promise
   );
 }
 
-/** Orchestrator — runs the full reserved-slot journey's five obligations. */
+/** Bộ điều phối — chạy năm nghĩa vụ của hành trình suất-giữ-chỗ đầy đủ. */
 export async function runSupportTicketSubmissionJourney(driver: SupportDriver): Promise<void> {
   await checkExactlyThreeIntents(driver);
   for (const intent of FIXTURE_INTENTS) {
@@ -170,7 +170,7 @@ export async function runSupportTicketSubmissionJourney(driver: SupportDriver): 
   await checkTimeoutPreservesInput(driver);
 }
 
-// Re-exported for driver implementers — see SupportLocator's own doc comment
-// in supportFixtureData.ts for the exact structural subset a real Playwright
-// Locator satisfies as-is.
+// Export lại cho người cài đặt driver — xem doc comment của chính SupportLocator
+// trong supportFixtureData.ts cho đúng tập con cấu trúc mà một Locator
+// Playwright thật thoả nguyên trạng.
 export type { SupportLocator };

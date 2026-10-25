@@ -2,104 +2,103 @@
 // Design Docs: docs/design/exam-shelves-backend-design.md (v1.2, § Query layer,
 //                § Test Boundaries and Placement :613-618, § Verification Strategy)
 //              docs/design/exam-shelves-frontend-design.md (v1.0, § Data contracts —
-//                consumer of listExamShelves()/listHotExams(), not the producer)
+//                bên tiêu thụ listExamShelves()/listHotExams(), không phải bên sản xuất)
 // PRD:         docs/prd/exam-shelves-prd.md (v1.2, AC-001, AC-002, AC-006, AC-013,
 //                AC-024, AC-027, AC-028, AC-036-AC-038, AC-051)
 // ADR:         docs/adr/ADR-0021-cross-user-hot-aggregate-and-attempt-source.md
-//              (D1 aggregate shape, D3 budget), ADR-0015 (Decision 6, round-trip budget)
-// Generated:   2026-09-18 | Budget used: integration 2/3 (feature total 3/3 — see
-//                the 3rd candidate appended to rating.int.test.ts)
+//              (D1 hình dạng aggregate, D3 ngân sách), ADR-0015 (Decision 6, ngân sách lượt khứ hồi)
+// Sinh ngày:   2026-09-18 | Ngân sách đã dùng: integration 2/3 (tổng tính năng 3/3 — xem
+//                ứng viên thứ 3 nối thêm vào rating.int.test.ts)
 //
 // =============================================================================
-// FILE STATUS — read before editing
+// TRẠNG THÁI FILE — đọc trước khi sửa
 // =============================================================================
-// Both candidates converted to real vitest (P3-T2, `features/exams/queries/shelves.ts`
-// landed in the same commit) — same "skeleton → real test in the implementing task's
-// commit" convention `rating.int.test.ts`'s own header uses. The paragraph below is
-// preserved as written at generation time; its rationale for why this file imported
-// nothing is now historical, not current status.
+// Cả hai ứng viên đã chuyển thành vitest thật (P3-T2, `features/exams/queries/shelves.ts`
+// đã đáp xuống cùng commit) — cùng quy ước "skeleton → test thật trong
+// commit của task cài đặt" mà comment đầu của chính `rating.int.test.ts` dùng. Đoạn bên dưới
+// được giữ như đã viết lúc sinh; lý do vì sao file này không import gì
+// nay là lịch sử, không phải trạng thái hiện tại.
 //
-// `features/exams/queries/shelves.ts`, `hotCounts.ts` and `attempts.ts` DID NOT EXIST YET
-// at generation time (backend DD Implementation Path Mapping — all three rows said
-// "New"). Nothing here imported them: an import of a not-yet-existing module would fail
-// `tsc --noEmit`/`eslint`/`build` the moment this skeleton was committed, and this file
-// had to stay green under all three gates until the implementing task added the imports,
-// the mocks and the assertions in the same commit that added `shelves.ts` (Red→Green in
-// one task, per the backend DD's Vertical Slice plan, step 5 — "the integration point").
+// `features/exams/queries/shelves.ts`, `hotCounts.ts` và `attempts.ts` CHƯA TỒN TẠI
+// lúc sinh (Implementation Path Mapping của backend DD — cả ba dòng đều ghi
+// "New"). Không gì ở đây import chúng: import một module chưa tồn tại sẽ làm hỏng
+// `tsc --noEmit`/`eslint`/`build` ngay khi skeleton này được commit, và file này
+// phải giữ xanh dưới cả ba cổng cho tới khi task cài đặt thêm các import,
+// mock và khẳng định trong cùng commit thêm `shelves.ts` (Red→Green trong
+// một task, theo Vertical Slice plan của backend DD, bước 5 — "điểm tích hợp").
 //
-// HOW THIS LANE RUNS: default `npx vitest run` (`vitest.config.ts:26` collects
-// `features/**/*.test.{ts,tsx}`), environment `node` (no DOM needed — this file proves
-// call shape and object shape, never rendered markup). A collected file with zero test
-// tasks makes vitest report "No test suite found in file" and exit 1 (measured fact,
-// `vitest.fixture.config.ts` header — the same runner behaviour applies to this lane),
-// so each candidate below carries at least one real `it.todo(...)`, never a bare comment.
+// LÀN NÀY CHẠY THẾ NÀO: mặc định `npx vitest run` (`vitest.config.ts:26` thu thập
+// `features/**/*.test.{ts,tsx}`), môi trường `node` (không cần DOM — file này chứng minh
+// hình dạng lời gọi và hình dạng object, không bao giờ markup đã render). Một file được thu thập mà không có
+// task test nào làm vitest báo "No test suite found in file" và thoát mã 1 (sự kiện đã đo,
+// comment đầu `vitest.fixture.config.ts` — cùng hành vi runner áp dụng cho làn này),
+// nên mỗi ứng viên bên dưới mang ít nhất một `it.todo(...)` thật, không bao giờ là comment trần.
 //
 // -----------------------------------------------------------------------------
-// MOCK BOUNDARY — stated once, applies to both candidates (backend DD § Test
-// Boundaries and Placement, verbatim decision)
+// RANH GIỚI MOCK — nêu một lần, áp dụng cho cả hai ứng viên (backend DD § Test
+// Boundaries and Placement, quyết định nguyên văn)
 // -----------------------------------------------------------------------------
-// MOCKED — the Supabase client boundary only, as `{ from, rpc }` with a PER-TABLE
-//   builder map (same technique as `rating.int.test.ts`'s `mockTables()` helper,
-//   :555-563): a SHARED builder would serve `exams_with_difficulty` rows as
-//   `exam_attempts` rows and this file would stay green while measuring the wrong
-//   thing. `server-only` is stubbed the same way `rating.int.test.ts:24` does it.
-// REAL — every pure `lib/adaptive` helper this composition calls into
+// MOCK — chỉ ranh giới client Supabase, dạng `{ from, rpc }` với một bản đồ builder
+//   THEO TỪNG BẢNG (cùng kỹ thuật với helper `mockTables()` của `rating.int.test.ts`,
+//   :555-563): một builder DÙNG CHUNG sẽ phục vụ các hàng `exams_with_difficulty` như
+//   hàng `exam_attempts` và file này vẫn xanh trong khi đo sai thứ.
+//   `server-only` được stub như `rating.int.test.ts:24` làm.
+// THẬT — mọi helper `lib/adaptive` thuần mà phép ghép này gọi tới
 //   (`rankExamIds`, `pickHotShelf`, `pickWeakestSubject`, `pickDominantGrade`,
-//   `pickExploreShelf`) — this file does NOT re-mock the ladder or the ranking
-//   weights; it proves the QUERY LAYER wires them correctly, not that they are
-//   individually correct. The exhaustive ladder-boundary matrix (rung order,
-//   `HOT_SHELF_MIN_CARDS` widening at 4/5/6 qualifying exams, tie-breaks) is
-//   proven by `SOURCE/lib/adaptive/__tests__/examShelves.test.ts` (pure unit, CI
-//   lane) — named by the backend DD, outside this file's job and outside this
-//   agent's Integration/E2E scope (see hand-off report).
-// NEVER MOCKED, NOT PROVEN HERE — RLS isolation, the `exam_hot_counts()` grant,
-//   and whether the definer function actually crosses another user's row are
-//   explicitly EXCLUDED from this mocked lane by the backend DD: "the function's
-//   behaviour, grants, predicates and RLS isolation are never mocked — only real
-//   Postgres proves [it]". That proof lives in
+//   `pickExploreShelf`) — file này KHÔNG mock lại cái thang hay các trọng số xếp hạng;
+//   nó chứng minh TẦNG TRUY VẤN nối chúng đúng, không phải rằng chúng
+//   từng cái đúng. Ma trận biên đầy đủ của cái thang (thứ tự bậc,
+//   mở rộng `HOT_SHELF_MIN_CARDS` ở 4/5/6 đề đủ điều kiện, phân định hoà) được
+//   chứng minh bởi `SOURCE/lib/adaptive/__tests__/examShelves.test.ts` (unit thuần, làn
+//   CI) — do backend DD nêu, ngoài việc của file này và ngoài phạm vi Integration/E2E
+//   của agent này (xem báo cáo bàn giao).
+// KHÔNG BAO GIỜ MOCK, KHÔNG CHỨNG MINH Ở ĐÂY — cô lập RLS, grant của `exam_hot_counts()`,
+//   và việc hàm definer có thực sự vượt qua hàng của người dùng khác hay không
+//   bị backend DD LOẠI RÕ khỏi làn mock này: "hành vi, grant, vị từ và cô lập RLS
+//   của hàm không bao giờ bị mock — chỉ Postgres thật mới chứng minh [nó]". Bằng chứng đó nằm ở
 //   `SOURCE/tests/e2e/service/exam-hot-counts.service.e2e.test.ts` (service-e2e,
-//   this same generation round) and `supabase/test-rls.ts` Phần 10 (manual).
-// @real-dependency: none — this file's `@lane: integration` candidates are fully
-//   mocked-Supabase-client tests. Do not add a live Postgres connection here.
+//   cùng đợt sinh này) và `supabase/test-rls.ts` Phần 10 (thủ công).
+// @real-dependency: không có — các ứng viên `@lane: integration` của file này là test
+//   client-Supabase-mock hoàn toàn. Đừng thêm kết nối Postgres sống vào đây.
 //
+//-----------------------------------------------------------------------------
+// CHỌN LỌC — vì sao hai cái này, và vì sao cái thứ ba chuyển sang rating.int.test.ts
 // -----------------------------------------------------------------------------
-// SELECTION — why these two, and why a third moved to rating.int.test.ts
-// -----------------------------------------------------------------------------
-//   Candidate 1   90  composition budget & concurrency + RPC argument shape
-//   Candidate 2   99  null-shelf structural rule (AC-051) + F-001 guarded home fetch
-//                      + listHotExams() shape (submittedExamIds regression guard)
-//   (3rd slot)    64  ?sort=hot / ?sort=garbage composition budget (F-005) — SAME
-//                      integration budget, but appended to the EXISTING
-//                      `rating.int.test.ts` because that is the file both Design
-//                      Docs already assign it to (backend DD Implementation Path
-//                      Mapping: "Changed (tests) | rating.int.test.ts … | Budget
-//                      assertions + rpc in the mock").
-//   NOT SELECTED (pushed down, out of this agent's Integration/E2E scope):
-//     - ExamCard containment (AC-043) — `ExamCard.snapshot.test.tsx`, Component
-//       lane (`npx vitest run`, NOT `.int.test.tsx` named), frontend DD's own
-//       "Proof file" section, not this agent's 3-lane output.
-//     - Ribbon-count / tile-placement per shelf (AC-026/032) at the single-
-//       component level — `ExamShelf.test.tsx`, Component lane. The PAGE-LEVEL
-//       instance of the same claim ("exactly 1 ribbon page-wide") is covered by
-//       the fixture-e2e reserved-slot candidate instead (this generation round).
-//     - Ladder rung order + HOT_SHELF_MIN_CARDS threshold (AC-019-AC-023) — pure
-//       unit, `lib/adaptive/__tests__/examShelves.test.ts`, CI lane.
-//     - Attempt-source whitelist mapping (AC-040/AC-041) — pure unit,
-//       `lib/exams/__tests__/attemptSource.test.ts`, CI lane, plus the real-CHECK
-//       proof HS-g in `supabase/test-rls.ts` (manual).
+//   Ứng viên 1    90  ngân sách hợp thành & đồng thời + hình dạng tham số RPC
+//   Ứng viên 2    99  luật cấu trúc kệ-null (AC-051) + lượt lấy trang chủ có cổng F-001
+//                      + hình dạng listHotExams() (chốt hồi quy submittedExamIds)
+//   (suất thứ 3)  64  ngân sách hợp thành ?sort=hot / ?sort=garbage (F-005) — CÙNG
+//                      ngân sách integration, nhưng nối thêm vào file
+//                      `rating.int.test.ts` SẴN CÓ vì đó là file mà cả hai Design
+//                      Doc đã giao cho nó (Implementation Path Mapping của backend DD:
+//                      "Changed (tests) | rating.int.test.ts … | Khẳng định ngân sách
+//                      + rpc trong mock").
+//   KHÔNG ĐƯỢC CHỌN (đẩy xuống, ngoài phạm vi Integration/E2E của agent này):
+//     - Chứa trong ExamCard (AC-043) — `ExamCard.snapshot.test.tsx`, làn
+//       Component (`npx vitest run`, KHÔNG đặt tên `.int.test.tsx`), mục "Proof file"
+//       của chính frontend DD, không phải đầu ra 3 làn của agent này.
+//     - Số ruy băng / vị trí ô theo từng kệ (AC-026/032) ở mức một
+//       component đơn — `ExamShelf.test.tsx`, làn Component. Phiên bản MỨC TRANG
+//       của cùng khẳng định ("đúng 1 ruy băng cả trang") được phủ bởi
+//       ứng viên suất-dành-riêng fixture-e2e (đợt sinh này).
+//     - Thứ tự bậc thang + ngưỡng HOT_SHELF_MIN_CARDS (AC-019-AC-023) — unit
+//       thuần, `lib/adaptive/__tests__/examShelves.test.ts`, làn CI.
+//     - Ánh xạ danh sách trắng nguồn lượt làm (AC-040/AC-041) — unit thuần,
+//       `lib/exams/__tests__/attemptSource.test.ts`, làn CI, cộng bằng chứng CHECK thật
+//       HS-g trong `supabase/test-rls.ts` (thủ công).
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { fromMock, rpcMock } = vi.hoisted(() => ({ fromMock: vi.fn(), rpcMock: vi.fn() }));
 
-// shelves.ts (and its attempts.ts/hotCounts.ts/catalogue.ts dependencies) import
-// "server-only" (throws outside a Next server/react-server bundle) → stub, same
-// pattern as rating.int.test.ts:24.
+// shelves.ts (và các phụ thuộc attempts.ts/hotCounts.ts/catalogue.ts) import
+// "server-only" (ném lỗi ngoài bundle server Next/react-server) → stub, cùng
+// mẫu với rating.int.test.ts:24.
 vi.mock("server-only", () => ({}));
 
-// Mock boundary: Supabase client only ({ from, rpc }), per the file-level Mock
-// Boundary note above — proves JS call construction and object shape, never real
-// Postgres/RLS/grant behaviour.
+// Ranh giới mock: chỉ client Supabase ({ from, rpc }), theo ghi chú Mock
+// Boundary cấp file ở trên — chứng minh cách dựng lời gọi JS và hình dạng object, không bao giờ
+// hành vi Postgres/RLS/grant thật.
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(async () => ({ from: fromMock, rpc: rpcMock })),
 }));
@@ -210,58 +209,58 @@ function mockBoundary(fixtures: TableFixtures) {
 }
 
 // =============================================================================
-// Candidate 1 — Composition budget & concurrency + RPC argument shape
+// Ứng viên 1 — Ngân sách hợp thành & đồng thời + hình dạng tham số RPC
 // =============================================================================
-// AC-006: "...the cut happens after ranking in Node, never as a DB .limit()/.range()
-//   on the candidate query (ADR-0015 kill criterion (a))."
-// AC-028: "...the aggregate read...is bounded (an explicit row cap in the same style
-//   as readBounded), never an unbounded select over exam_attempts."
-// Backend DD Data Flow: "[rows, attemptRows, resultRows, hotRows] = await
-//   Promise.all([...])   # 4 concurrent, one batch"; Risks table: "A future read
-//   added to /exams slips past the budget | Medium | Medium | The assertion counts
-//   from() + rpc() with one case per surface; a new read makes it red."
+// AC-006: "...việc cắt xảy ra sau khi xếp hạng ở Node, không bao giờ là .limit()/.range()
+//   của DB trên truy vấn ứng viên (tiêu chí huỷ (a) của ADR-0015)."
+// AC-028: "...lượt đọc aggregate...có giới hạn (một trần số hàng tường minh cùng phong cách
+//   với readBounded), không bao giờ là select không giới hạn trên exam_attempts."
+// Data Flow của backend DD: "[rows, attemptRows, resultRows, hotRows] = await
+//   Promise.all([...])   # 4 đồng thời, một lô"; bảng Risks: "Một lượt đọc tương lai
+//   thêm vào /exams vượt ngân sách | Medium | Medium | Khẳng định đếm
+//   from() + rpc() với một ca cho mỗi bề mặt; một lượt đọc mới làm nó đỏ."
 // ROI: 90 (BV:9 x Freq:9 + Legal:0 + Defect:9)
-//   BV 9 — protects the round-trip budget ADR-0015/ADR-0021 both spend a whole
-//     Decision on; a silent regression here re-serialises the site's busiest page.
-//   Freq 9 — every bare /exams render by a signed-in student (the shelves branch,
-//     i.e. the new default view).
-//   Defect 9 — the specific failure mode (an `await` accidentally inserted between
-//     two of the four reads) produces NO visible symptom on screen, only added
-//     latency nobody attributes to this composition — exactly the class of bug
+//   BV 9 — bảo vệ ngân sách lượt khứ hồi mà ADR-0015/ADR-0021 đều dành cả một
+//     Decision cho; một hồi quy thầm lặng ở đây tuần tự hoá lại trang bận nhất của site.
+//   Freq 9 — mọi lần render /exams trần của học sinh đã đăng nhập (nhánh kệ,
+//     tức chế độ xem mặc định mới).
+//   Defect 9 — kiểu hỏng cụ thể (một `await` vô tình chèn giữa
+//     hai trong bốn lượt đọc) KHÔNG có triệu chứng nhìn thấy nào trên màn hình, chỉ là
+//     độ trễ tăng thêm mà không ai quy cho phép ghép này — đúng loại lỗi mà
 //     `rating.int.test.ts`'s existing "ba lượt đọc chạy SONG SONG" case (:676-706)
-//     already defends against for the 3-read composition; this is its 4-read sibling.
-// Behavior: listExamShelves() is called against a mocked Supabase client boundary
-//   ({ from, rpc }, per-table builder map) -> it issues exactly 4 boundary calls
-//   (exams_with_difficulty, exam_attempts, exam_results, rpc exam_hot_counts) in ONE
-//   Promise.all with no await between them -> the rpc call's arguments match the
-//   imported LIST_ROW_CEILING, not a hand-copied literal.
+//     đã phòng thủ cho phép ghép 3 lượt đọc; đây là anh em 4 lượt đọc của nó.
+// Hành vi: listExamShelves() được gọi trên ranh giới client Supabase mock
+//   ({ from, rpc }, bản đồ builder theo bảng) -> nó phát đúng 4 lời gọi ranh giới
+//   (exams_with_difficulty, exam_attempts, exam_results, rpc exam_hot_counts) trong MỘT
+//   Promise.all, không có await giữa chúng -> tham số của lời gọi rpc khớp với
+//   LIST_ROW_CEILING được import, không phải literal chép tay.
 // @category: core-functionality
 // @lane: integration
-// @dependency: features/exams/queries/shelves.ts (listExamShelves, not yet created)
-//   + features/exams/queries/hotCounts.ts (readHotCounts, hotWindows) + mocked
-//   Supabase client ({ from, rpc })
+// @dependency: features/exams/queries/shelves.ts (listExamShelves, chưa tạo)
+//   + features/exams/queries/hotCounts.ts (readHotCounts, hotWindows) + client
+//   Supabase mock ({ from, rpc })
 // @complexity: high
-// @real-dependency: none (see file-level Mock Boundary note)
-// Primary failure mode: a future edit inserts a 5th read, or turns the 4 concurrent
-//   calls sequential by awaiting one before firing the next, or the rpc call passes
-//   a hand-copied row-cap literal (e.g. 501) instead of the imported
-//   `LIST_ROW_CEILING + 1`, so the decoy-row tripwire (`boundedRead.ts`) and the SQL
-//   `limit least(greatest(coalesce(p_max_rows,500),1),1000)` silently drift apart.
-// Proof obligation — what the implemented test must assert:
-//   (a) exactly 4 distinct boundary calls are issued: 3 `.from(...)` calls naming
-//       `exams_with_difficulty`, `exam_attempts`, `exam_results`, and 1 `.rpc(...)`
-//       call naming `exam_hot_counts` — assert the exact set, not `>= 4`;
-//   (b) all 4 are issued BEFORE any of them settle — reuse the deferred-resolution
-//       gate technique already proven in this file's sibling
-//       (`rating.int.test.ts:676-706`: capture call order, yield two microtasks,
-//       assert the full call list is already issued, THEN resolve);
-//   (c) the rpc call's third argument is `LIST_ROW_CEILING + 1` (imported from
-//       `@/lib/supabase/boundedRead`), not a literal `501` — a literal passes today
-//       and silently stops tracking the constant if either side is later tuned;
-//   (d) `readBounded`'s label for the rpc call at this call site is exactly
-//       `"listExamShelves.hotCounts"` (backend DD Query layer comment on the call
-//       site) — a mismatched label makes a future truncation log point at the wrong
-//       composition when `console.error` fires.
+// @real-dependency: không có (xem ghi chú Mock Boundary cấp file)
+// Kiểu hỏng chính: một lần sửa sau này chèn lượt đọc thứ 5, hoặc biến 4 lời gọi
+//   đồng thời thành tuần tự bằng cách await cái này trước khi bắn cái kế, hoặc lời gọi rpc truyền
+//   một literal trần số hàng chép tay (ví dụ 501) thay vì
+//   `LIST_ROW_CEILING + 1` được import, nên chốt chặn hàng-mồi (`boundedRead.ts`) và `limit
+//   least(greatest(coalesce(p_max_rows,500),1),1000)` của SQL lặng lẽ lệch khỏi nhau.
+// Nghĩa vụ chứng minh — test được cài đặt phải khẳng định gì:
+//   (a) đúng 4 lời gọi ranh giới riêng biệt được phát: 3 lời gọi `.from(...)` gọi tên
+//       `exams_with_difficulty`, `exam_attempts`, `exam_results`, và 1 lời gọi `.rpc(...)`
+//       gọi tên `exam_hot_counts` — khẳng định đúng tập, không phải `>= 4`;
+//   (b) cả 4 được phát TRƯỚC KHI bất kỳ cái nào settle — dùng lại kỹ thuật cổng
+//       resolve-hoãn đã chứng minh ở file anh em của file này
+//       (`rating.int.test.ts:676-706`: ghi thứ tự gọi, nhường hai microtask,
+//       khẳng định toàn bộ danh sách gọi đã được phát, RỒI mới resolve);
+//   (c) tham số thứ ba của lời gọi rpc là `LIST_ROW_CEILING + 1` (import từ
+//       `@/lib/supabase/boundedRead`), không phải literal `501` — một literal qua hôm nay
+//       và lặng lẽ thôi bám theo hằng nếu một trong hai phía sau này được chỉnh;
+//   (d) nhãn `readBounded` cho lời gọi rpc tại chỗ gọi này đúng là
+//       `"listExamShelves.hotCounts"` (comment Query layer của backend DD tại
+//       chỗ gọi) — nhãn sai khiến một log cắt bớt về sau trỏ nhầm phép ghép
+//       khi `console.error` bắn.
 describe("listExamShelves() — composition budget, concurrency, RPC argument shape (AC-006, AC-028)", () => {
   beforeEach(() => {
     fromMock.mockReset();
@@ -329,70 +328,70 @@ describe("listExamShelves() — composition budget, concurrency, RPC argument sh
 });
 
 // =============================================================================
-// Candidate 2 — Null-shelf structural rule + guarded home fetch (F-001) +
-//                listHotExams() shape
+// Ứng viên 2 — Luật cấu trúc kệ-null + lượt lấy trang chủ có cổng (F-001) +
+//                hình dạng listHotExams()
 // =============================================================================
-// AC-051: "Given any shelf, when its own selection yields 0 cards, then that shelf
-//   is absent from the page entirely — 0 headers, 0 subtitles, 0 placeholders...
-//   AC-013 and AC-024 are two named instances of this rule, not its definition."
-// AC-024: "Given a site with 0 submitted attempts in total...the hot selection
-//   yields 0 cards at every rung, so the shelf is absent under AC-051 and the home
-//   hot block is absent under AC-038."
-// AC-038: "Given a site with 0 submitted attempts, when / renders for a signed-in
-//   visitor, then the block is absent (AC-024) and the page renders with 0 errors."
-// Backend DD Integration Point I5: "an unguarded call returns 42501 and surfaces an
-//   error page instead of the signed-out hero. An anonymous visitor therefore
-//   issues 0 RPC calls" (F-001). Frontend DD Assumed Behaviors: "listHotExams(limit)
-//   returns { exams, submittedExamIds }, not bare Exam[]" (O-1/R-1).
+// AC-051: "Cho một kệ bất kỳ, khi lựa chọn riêng của nó cho 0 thẻ, thì kệ đó
+//   vắng hoàn toàn khỏi trang — 0 tiêu đề, 0 phụ đề, 0 chỗ giữ chỗ...
+//   AC-013 và AC-024 là hai ví dụ được đặt tên của luật này, không phải định nghĩa của nó."
+// AC-024: "Cho một site có 0 lượt làm đã nộp tổng cộng...lựa chọn hot
+//   cho 0 thẻ ở mọi bậc, nên kệ vắng theo AC-051 và khối hot
+//   trang chủ vắng theo AC-038."
+// AC-038: "Cho một site có 0 lượt làm đã nộp, khi / render cho khách
+//   đã đăng nhập, thì khối vắng (AC-024) và trang render với 0 lỗi."
+// Integration Point I5 của backend DD: "một lời gọi không có cổng trả 42501 và hiện một
+//   trang lỗi thay vì hero khi chưa đăng nhập. Một khách ẩn danh vì vậy
+//   phát 0 lời gọi RPC" (F-001). Assumed Behaviors của frontend DD: "listHotExams(limit)
+//   trả về { exams, submittedExamIds }, không phải Exam[] trần" (O-1/R-1).
 // ROI: 99 (BV:10 x Freq:9 + Legal:0 + Defect:9)
-//   BV 10 — F-001 protects the ONE public route in the app (`/`) from a thrown
-//     42501 replacing the signed-out hero with an error page; this is the highest
-//     possible blast radius (every anonymous visitor, forever, until noticed).
-//   Freq 9 — every anonymous landing on `/`, which given `/exams` requires sign-in
-//     (AC-014), is effectively every first-time visitor to the site.
-//   Defect 9 — the failure mode is silent until an anonymous user actually hits it
-//     in production (no unit test of `listHotExams` alone can catch it, because the
-//     guard lives at the CALL SITE, not inside the function); Security Considerations
-//     names this exact mechanism ("anon has no EXECUTE...42501...readBounded rethrows
-//     -> error page on the landing page").
-// Behavior: (i) listExamShelves() is called with fixture data producing 0 ids for one
-//   shelf -> that key in the returned ExamShelves object is exactly null, not {exams:
-//   []}; (ii) listHotExams(limit) is called against the mocked boundary -> exactly 3
-//   calls (no exam_results read), and the returned submittedExamIds set is populated
-//   from the same attempt read; (iii) the home-fetch call site (app/page.tsx's `user ?
-//   await listHotExams(...) : null` guard) is invoked with a null user -> the mocked
-//   Supabase client records 0 calls of any kind.
+//   BV 10 — F-001 bảo vệ route CÔNG KHAI DUY NHẤT của app (`/`) khỏi một 42501 bị ném
+//     thay hero chưa-đăng-nhập bằng trang lỗi; đây là bán kính ảnh hưởng
+//     cao nhất có thể (mọi khách ẩn danh, mãi mãi, cho tới khi bị phát hiện).
+//   Freq 9 — mọi lần khách ẩn danh vào `/`, mà vì `/exams` đòi đăng nhập
+//     (AC-014), thực tế là mọi khách lần đầu của site.
+//   Defect 9 — kiểu hỏng thầm lặng cho tới khi một khách ẩn danh thật sự gặp nó
+//     trên production (không unit test nào của riêng `listHotExams` bắt được, vì
+//     cổng nằm ở NƠI GỌI, không nằm trong hàm); Security Considerations
+//     nêu đúng cơ chế này ("anon không có EXECUTE...42501...readBounded ném lại
+//     -> trang lỗi ở trang landing").
+// Hành vi: (i) listExamShelves() được gọi với dữ liệu fixture cho 0 id của một
+//   kệ -> khoá đó trong object ExamShelves trả về đúng là null, không phải {exams:
+//   []}; (ii) listHotExams(limit) được gọi trên ranh giới mock -> đúng 3
+//   lời gọi (không có lượt đọc exam_results), và tập submittedExamIds trả về được điền
+//   từ cùng lượt đọc attempt; (iii) nơi gọi lấy-trang-chủ (cổng `user ?
+//   await listHotExams(...) : null` của app/page.tsx) được gọi với user null -> client
+//   Supabase mock ghi 0 lời gọi thuộc bất kỳ loại nào.
 // @category: core-functionality
 // @lane: integration
 // @dependency: features/exams/queries/shelves.ts (listExamShelves, listHotExams) +
-//   app/page.tsx (Home, for the F-001 guard) + mocked Supabase client
+//   app/page.tsx (Home, cho cổng F-001) + client Supabase mock
 // @complexity: medium
-// @real-dependency: none (see file-level Mock Boundary note)
-// Primary failure mode: (i) a 0-card shelf serialises as `{ exams: [] }` instead of
-//   `null`, so the page-level `data && <ExamShelf .../>` narrowing in the frontend DD
-//   renders an empty-but-present shelf instead of omitting it; (ii) `listHotExams`
-//   is refactored to return a bare `Exam[]`, silently flipping every already-
-//   submitted exam's rate button from eligible to not-attempted on the home block
-//   (frontend DD Assumed Behaviors, "confirmed by cross-layer verification"); (iii)
-//   the `user ?` guard at the `app/page.tsx` call site is dropped or inverted, so an
-//   anonymous visitor's request reaches `listHotExams` and throws 42501.
-// Proof obligation — what the implemented test must assert:
-//   (a) with fixture data yielding 0 candidate ids for the practice shelf (no scored
-//       representative attempts, AC-013) AND separately for the hot shelf (0 site-
-//       wide submitted attempts, AC-024), the corresponding `ExamShelves` key is
-//       `null` via `Object.is`/`toBeNull()` — not an empty-array object, not a
-//       missing key (`"practice" in shelves` must still be `true`);
-//   (b) `listHotExams(limit)` issues exactly 3 boundary calls (not 4 — no
-//       `exam_results` read, since no prior score is needed) and the returned
-//       `submittedExamIds` is a non-empty `Set` for a fixture with at least one
-//       submitted attempt, sourced from the SAME attempt read the hot composition
-//       issued (not a second independent read);
-//   (c) invoking the guarded home-fetch composition with a mocked `getCurrentUser`/
-//       `getCurrentUserProfile` resolving to `null` results in the mocked Supabase
-//       client recording ZERO `.from(...)` and ZERO `.rpc(...)` calls of any kind —
-//       assert on the mock's total call count, not only on the absence of the rpc
-//       call, so a stray `exam_attempts` read introduced elsewhere in the same
-//       composition is also caught.
+// @real-dependency: không có (xem ghi chú Mock Boundary cấp file)
+// Kiểu hỏng chính: (i) một kệ 0 thẻ serialise thành `{ exams: [] }` thay vì
+//   `null`, nên phép thu hẹp `data && <ExamShelf .../>` cấp trang trong frontend DD
+//   render một kệ rỗng-nhưng-có-mặt thay vì bỏ nó; (ii) `listHotExams`
+//   bị refactor trả về `Exam[]` trần, lặng lẽ lật nút đánh giá của mọi đề đã
+//   nộp từ đủ-điều-kiện sang chưa-làm trên khối trang chủ
+//   (Assumed Behaviors của frontend DD, "đã xác nhận bằng kiểm chứng xuyên tầng"); (iii)
+//   cổng `user ?` ở nơi gọi `app/page.tsx` bị bỏ hoặc đảo, nên request của
+//   khách ẩn danh tới được `listHotExams` và ném 42501.
+// Nghĩa vụ chứng minh — test được cài đặt phải khẳng định gì:
+//   (a) với dữ liệu fixture cho 0 id ứng viên của kệ luyện tập (không có lượt làm
+//       đại diện đã chấm, AC-013) VÀ riêng cho kệ hot (0 lượt làm đã nộp toàn
+//       site, AC-024), khoá `ExamShelves` tương ứng là
+//       `null` qua `Object.is`/`toBeNull()` — không phải object mảng rỗng, không phải khoá
+//       thiếu (`"practice" in shelves` vẫn phải là `true`);
+//   (b) `listHotExams(limit)` phát đúng 3 lời gọi ranh giới (không phải 4 — không có
+//       lượt đọc `exam_results`, vì không cần điểm trước) và `submittedExamIds`
+//       trả về là một `Set` không rỗng cho fixture có ít nhất một lượt làm đã nộp,
+//       lấy từ CHÍNH lượt đọc attempt mà phép ghép hot đã phát (không phải
+//       lượt đọc độc lập thứ hai);
+//   (c) gọi phép ghép lấy-trang-chủ có cổng với `getCurrentUser`/
+//       `getCurrentUserProfile` mock resolve thành `null` làm client Supabase mock
+//       ghi KHÔNG lời gọi `.from(...)` và KHÔNG lời gọi `.rpc(...)` nào — khẳng định
+//       trên tổng số lời gọi của mock, không chỉ trên việc vắng lời gọi
+//       rpc, để một lượt đọc `exam_attempts` lạc đưa vào ở nơi khác trong cùng
+//       phép ghép cũng bị bắt.
 describe("listExamShelves() / listHotExams() — 0-card shelf is null, and the guarded home fetch issues 0 calls for an anonymous visitor (AC-051, AC-024, AC-038, F-001)", () => {
   beforeEach(() => {
     fromMock.mockReset();
@@ -525,12 +524,12 @@ describe("listExamShelves() / listHotExams() — 0-card shelf is null, and the g
     expect(shelves.hot?.exams.map((e) => e.id)).toEqual(["a2", "a3"]);
   });
 
-  // AC-049/D13 (additional obligation beyond the skeleton's own text — see this
-  // task's Proof Obligations): "an exam that qualifies for BOTH the weakest-
-  // subject pool AND a qualifying hot count appears in BOTH practice.exams and
-  // hot.exams of the SAME listExamShelves() result" — closes the gap the plan
-  // review identified (shelves are not mutually exclusive, unlike Khám phá's
-  // dedup against the other two).
+  // AC-049/D13 (nghĩa vụ bổ sung ngoài văn bản riêng của skeleton — xem Proof
+  // Obligations của task này): "một đề đủ điều kiện cho CẢ nhóm môn-yếu-nhất
+  // VÀ một số đếm hot đủ điều kiện xuất hiện ở CẢ practice.exams và
+  // hot.exams của CÙNG kết quả listExamShelves()" — đóng khoảng trống mà việc
+  // review kế hoạch đã chỉ ra (các kệ không loại trừ lẫn nhau, khác với việc Khám phá khử trùng
+  // với hai kệ kia).
   it("AC-049/D13: an exam qualifying for both practice and hot appears in BOTH shelves of the same listExamShelves() result (cross-shelf overlap is allowed, not deduped)", async () => {
     mockBoundary({
       exams_with_difficulty: [examRow("ex-overlap", 10, "Toán", "2026-01-01T00:00:00.000Z")],

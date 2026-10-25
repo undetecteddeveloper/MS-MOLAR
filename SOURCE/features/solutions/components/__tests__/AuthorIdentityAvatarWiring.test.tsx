@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-// Task 46 (P5-T7) — verification + wiring pass: `SolutionCard` (task 17),
+// Task 46 (P5-T7) — lượt kiểm chứng + nối dây: `SolutionCard` (task 17),
 // `SolutionAuthorCard` (task 19) và `CommentItem` (task 28) phải truyền
 // `item.author`/`solution.author`/`comment.author` THẲNG qua `AuthorIdentity`
 // → `Avatar`, không điều kiện self/non-self, không prop phụ nào có thể làm

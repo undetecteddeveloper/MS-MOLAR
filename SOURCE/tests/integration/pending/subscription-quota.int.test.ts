@@ -116,8 +116,8 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 
 // =============================================================================
-// INT-1 — The quota gate short-circuits Gemini emission and counts operations,
-//         not rows
+// INT-1 — Cổng hạn mức cắt ngắn việc phát lời gọi Gemini và đếm thao tác,
+//         không đếm hàng
 // =============================================================================
 // AC-018: "Cho một lượt gọi bị chặn vì hạn mức, khi rà, thì 0 lần gọi adapter
 //          Gemini xảy ra." (PRD :270 — gate placed ahead of the branch)
@@ -125,71 +125,72 @@ vi.mock("@/lib/supabase/server", () => ({
 //          đếm trong Redis chứ không đếm số dòng." (PRD :271)
 // AC-017: "Cho check LIMITS.MAX_UPLOADS_PER_DAY tại actions.ts:337, khi feature
 //          này ship, thì nó bị XOÁ, không phải để lại song song." (PRD :269)
-// EARS: (none / If-then) -> basic functionality + branch coverage.
+// EARS: (không / If-then) -> chức năng cơ bản + phủ nhánh.
 // ROI: 89 (BV:9 x Freq:9 + Legal:0 + Defect:8)
-// Behavior: user activates tutor/upload -> consumeQuota() decides at the action
-//   -> on refusal the Gemini adapter is never reached; on grant exactly one
-//   upload allowance is consumed in BOTH branches (rerunExamId set and unset).
+// Hành vi: người dùng kích hoạt gia sư/tải đề -> consumeQuota() quyết định ở action
+//   -> khi từ chối, adapter Gemini không bao giờ được với tới; khi cấp, đúng một
+//   suất tải lên được tiêu ở CẢ HAI nhánh (rerunExamId có đặt và không đặt).
 // @category: core-functionality
 // @lane: integration
 // @dependency: features/authoring/actions.ts, features/exams/tutorActions.ts,
-//   lib/billing/quota.ts (consumeQuota), lib/ugc/gemini.ts (emit chokepoint),
+//   lib/billing/quota.ts (consumeQuota), lib/ugc/gemini.ts (điểm nghẽn phát),
 //   lib/billing/readEntitlement.ts
-//   CORRECTED (was `features/exams/actions.ts`): `extractAndAssemble` — the
-//   function AC-017/018/019 talk about — lives in `features/authoring/actions.ts`.
-//   `features/exams/actions.ts` never mentioned `MAX_UPLOADS_PER_DAY`, so an
-//   absence assertion written against it would have been permanently green.
+//   ĐÃ SỬA (trước là `features/exams/actions.ts`): `extractAndAssemble` — hàm
+//   mà AC-017/018/019 nói tới — nằm ở `features/authoring/actions.ts`.
+//   `features/exams/actions.ts` chưa bao giờ nhắc tới `MAX_UPLOADS_PER_DAY`, nên một
+//   khẳng định vắng mặt viết trên nó sẽ xanh vĩnh viễn.
 // @complexity: high
-// Mock boundary (backend DD Test Boundaries, `consumeQuota` row): Redis is
-//   MOCKED — "fail-closed on unavailability is the claim". The Gemini adapter
-//   is MOCKED AND INVOCATION-COUNTED. Everything between the action entry point
-//   and those two boundaries is REAL (no mocking of quota.ts, no mocking of the
-//   action itself) — mocking an internal module here would assert the mock.
-// @real-dependency: none (both boundaries of this case are marked "mocked" in
-//   the backend DD's Mock Boundary Decisions table)
+// Ranh giới mock (Test Boundaries của backend DD, dòng `consumeQuota`): Redis bị
+//   MOCK — "fail-closed khi không khả dụng là khẳng định". Adapter Gemini
+//   bị MOCK VÀ ĐẾM LỜI GỌI. Mọi thứ giữa điểm vào action và
+//   hai ranh giới đó là THẬT (không mock quota.ts, không mock chính
+//   action) — mock một module nội bộ ở đây sẽ khẳng định chính mock.
+// @real-dependency: không có (cả hai ranh giới của ca này đều được đánh dấu "mocked" trong
+//   bảng Mock Boundary Decisions của backend DD)
 //
-// Primary failure mode: a refused call still reaches Gemini (the gate is placed
-//   after the branch, or the refusal path falls through), so a user who is out
-//   of allowance still spends supplier budget; and/or the re-run upload branch
-//   consumes zero allowance because the deleted row-count check was replaced by
-//   something that still counts rows created rather than operations performed.
+// Kiểu hỏng chính: một lời gọi bị từ chối vẫn với tới Gemini (cổng đặt
+//   sau nhánh, hoặc đường từ chối rơi xuyên), nên một người dùng hết
+//   suất vẫn tiêu ngân sách nhà cung cấp; và/hoặc nhánh tải lại-chạy
+//   tiêu không suất nào vì phép kiểm đếm hàng đã xoá được thay bằng
+//   thứ vẫn đếm hàng được tạo thay vì thao tác đã thực hiện.
 //
-// Proof obligation:
-//   - Traverse the REFUSAL branch, not only the happy path. The main path stays
-//     green through this regression: an ungated Gemini call succeeds and returns
-//     a valid answer, so only the refusal branch exposes it.
-//   - Observable state before/after for the counting claim: read the mocked
-//     Redis counter for `quota:upload:{userId}:{periodStart}` BEFORE and AFTER
-//     each upload, and assert the DELTA against a HARDCODED literal 1 — never a
-//     value read back from the code under test (backend DD, `consumeQuota`
-//     counting-unit row: "Expected values are hardcoded, never read back").
-//   - The Gemini adapter is the only boundary that may be counted as a proxy for
-//     "no emission"; assert the count, not merely that a rejection was returned.
-// Verification points / expected results / pass criteria:
-//   (a) Free user whose tutor allowance is exhausted activates the tutor action
-//       => the action resolves with reason `user_quota`, AND the Gemini adapter
-//       mock has EXACTLY 0 invocations. (AC-018)
-//   (b) Same user, upload action, `rerunExamId` UNSET => resolves successfully,
-//       `quota:upload:{user}:{period}` delta is EXACTLY 1. (AC-019, the
-//       "expected non-difference" of the backend DD's output comparison)
-//   (c) Same user, upload action, `rerunExamId` SET (the re-run branch) =>
-//       resolves successfully, `quota:upload:{user}:{period}` delta is EXACTLY 1.
-//       This is the backend DD's stated "expected difference": the deleted
-//       row-count check counted rows created and a re-run creates none, so this
-//       assertion fails against the OLD behaviour. (AC-017 + AC-019)
-//   (d) `SOURCE/features/authoring/actions.ts` contains no surviving reference to
-//       `LIMITS.MAX_UPLOADS_PER_DAY` — an absence assertion, so the old check
-//       cannot be left running in parallel with the new gate. (AC-017)
-//       CORRECTED (was `features/exams/actions.ts`): `extractAndAssemble` lives
-//       in layer4, and `features/exams/actions.ts` never mentioned
-//       `MAX_UPLOADS_PER_DAY` — the assertion as written would have been
-//       permanently green while observing nothing. The implementation below
-//       reads layer4 and opens with two PRESENCE assertions so that "string not
-//       found" and "read the wrong file" cannot read identically.
-//   (e) Redis unavailable (the mock throws) => the action refuses, and the
-//       Gemini adapter mock has EXACTLY 0 invocations. Fail-CLOSED. (AC-024's
-//       shape as it applies at this gate; the standalone AC-024 unit case is not
-//       duplicated here)
+// Nghĩa vụ chứng minh:
+//   - Đi qua nhánh TỪ CHỐI, không chỉ đường vui. Đường chính vẫn
+//     xanh qua hồi quy này: một lời gọi Gemini không cổng thành công và trả về
+//     đáp án hợp lệ, nên chỉ nhánh từ chối mới để lộ nó.
+//   - Trạng thái quan sát được trước/sau cho khẳng định đếm: đọc bộ đếm
+//     Redis mock `quota:upload:{userId}:{periodStart}` TRƯỚC và SAU
+//     mỗi lần tải lên, và khẳng định HIỆU SỐ so với literal 1 HARDCODE — không bao giờ
+//     một giá trị đọc ngược từ code đang kiểm (backend DD, dòng đơn-vị-đếm
+//     của `consumeQuota`: "Giá trị kỳ vọng được hardcode, không bao giờ đọc ngược").
+//   - Adapter Gemini là ranh giới duy nhất được đếm làm đại diện cho
+//     "không phát lời gọi"; khẳng định số đếm, không chỉ rằng một lần từ chối
+//     đã được trả về.
+// Điểm kiểm chứng / kết quả mong đợi / tiêu chí qua:
+//   (a) Người dùng Free hết suất gia sư kích hoạt action gia sư
+//       => action resolve với lý do `user_quota`, VÀ mock adapter Gemini
+//       có ĐÚNG 0 lời gọi. (AC-018)
+//   (b) Cùng người dùng, action tải lên, `rerunExamId` KHÔNG ĐẶT => resolve thành công,
+//       hiệu số `quota:upload:{user}:{period}` là CHÍNH XÁC 1. (AC-019, "khác biệt
+//       không mong đợi" trong so sánh đầu ra của backend DD)
+//   (c) Cùng người dùng, action tải lên, `rerunExamId` ĐÃ ĐẶT (nhánh chạy lại) =>
+//       resolve thành công, hiệu số `quota:upload:{user}:{period}` là CHÍNH XÁC 1.
+//       Đây là "khác biệt kỳ vọng" mà backend DD nêu: phép kiểm đếm hàng
+//       đã xoá đếm hàng được tạo và một lượt chạy lại không tạo hàng nào, nên khẳng định này
+//       hỏng với hành vi CŨ. (AC-017 + AC-019)
+//   (d) `SOURCE/features/authoring/actions.ts` không còn tham chiếu nào tới
+//       `LIMITS.MAX_UPLOADS_PER_DAY` — một khẳng định vắng mặt, để phép kiểm cũ
+//       không thể bị để chạy song song với cổng mới. (AC-017)
+//       ĐÃ SỬA (trước là `features/exams/actions.ts`): `extractAndAssemble` nằm
+//       ở layer4, và `features/exams/actions.ts` chưa bao giờ nhắc tới
+//       `MAX_UPLOADS_PER_DAY` — khẳng định như đã viết sẽ xanh
+//       vĩnh viễn trong khi chẳng quan sát gì. Cài đặt bên dưới
+//       đọc layer4 và mở bằng hai khẳng định CÓ MẶT để "không thấy chuỗi"
+//       và "đọc sai file" không thể đọc giống nhau.
+//   (e) Redis không khả dụng (mock ném lỗi) => action từ chối, và mock adapter
+//       Gemini có ĐÚNG 0 lời gọi. Fail-CLOSED. (hình dạng của AC-024
+//       khi áp dụng ở cổng này; ca unit AC-024 đứng riêng không được
+//       lặp lại ở đây)
 
 // =============================================================================
 // INT-1 — IMPLEMENTATION (plan Task 5.4, commit đặt cổng hạn mức lên đường
