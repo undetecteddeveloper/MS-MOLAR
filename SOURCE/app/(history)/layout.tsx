@@ -1,7 +1,7 @@
-// Layout route group (history) — khung chung cho History (backend Design Doc
-// history-backend-design.md v1.2, § Auth Guard and Layout). Structurally
-// identical to (analytics)/(authoring) layout.tsx — nullable user, SiteHeader only,
-// NO redirect (the guard lives in history/page.tsx instead, see AC-016).
+// Layout của nhóm route (history) — khung chung cho History (backend Design Doc
+// history-backend-design.md v1.2, § Auth Guard and Layout). Cấu trúc giống hệt
+// layout.tsx của (analytics)/(authoring) — user có thể null, chỉ có SiteHeader,
+// KHÔNG redirect (cổng kiểm nằm ở history/page.tsx, xem AC-016).
 //
 // Khung dùng chung: components/layout/AppShell.tsx (B1, 2026-09-03) — header,
 // SkipLink, BottomNav, SupportWidget đều ở đó.

@@ -16,15 +16,15 @@ const mockUsePathname = vi.fn(() => "/exams");
 vi.mock("next/navigation", () => ({
   usePathname: () => mockUsePathname(),
 }));
-// SupportWidget renders SupportWidgetDialog, which imports submitSupportTicket
-// (lib/support/actions.ts) — a "use server" module that transitively imports
-// "server-only" (lib/i18n/server.ts, lib/supabase/service-role.ts). This test
-// only exercises SupportWidget's own render guard, not submission logic, so
-// the action is mocked away rather than pulled in unmocked.
+// SupportWidget render SupportWidgetDialog, nơi import submitSupportTicket
+// (lib/support/actions.ts) — một module "use server" kéo theo
+// "server-only" (lib/i18n/server.ts, lib/supabase/service-role.ts). Test này
+// chỉ kiểm cổng render của chính SupportWidget, không kiểm logic gửi, nên
+// action được mock đi thay vì kéo vào không mock.
 vi.mock("@/lib/support/actions", () => ({ submitSupportTicket: vi.fn() }));
 
-// avatarUrl: CurrentUserProfile gained it with /profile (ADR-0016). SupportWidget
-// never reads it; it is here only because the fixture must satisfy the type.
+// avatarUrl: CurrentUserProfile có thêm nó cùng /profile (ADR-0016). SupportWidget
+// không bao giờ đọc nó; nó có mặt ở đây chỉ vì fixture phải thoả kiểu.
 const FIXTURE_USER = {
   id: "u1",
   email: "a@example.com",

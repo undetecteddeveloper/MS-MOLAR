@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 
-// AttemptPdfTemplate — Binding Decisions (history-work-plan-task-08.md):
-//  - ADR-0009 (§ Implementation Guidance): this component's styles must resolve
-//    exclusively to plain hex/rgb(a) — no components/ui/button.tsx composition,
-//    no Tailwind slash-opacity/color-mix utility, anywhere in this subtree.
-// Proof Obligations (AC-006, AC-008): guard test proves the styling constraint
-// at the jsdom/inline-style level via a real render (no mock boundary) plus a
-// source-text inspection for `className`; full html2canvas rasterization proof
-// is Task 11's Early Verification Point, not this test's.
+// AttemptPdfTemplate — Quyết định ràng buộc (history-work-plan-task-08.md):
+//  - ADR-0009 (§ Implementation Guidance): style của component này chỉ được phân giải
+//    thành hex/rgb(a) thuần — không ghép components/ui/button.tsx,
+//    không dùng tiện ích slash-opacity/color-mix của Tailwind, ở bất kỳ đâu trong cây con này.
+// Nghĩa vụ chứng minh (AC-006, AC-008): test chốt chặn chứng minh ràng buộc style
+// ở mức inline-style của jsdom qua một lần render thật (không có ranh giới mock) cộng
+// kiểm tra văn bản nguồn tìm `className`; bằng chứng raster hoá html2canvas đầy đủ
+// là Early Verification Point của Task 11, không phải của test này.
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -43,7 +43,7 @@ describe("AttemptPdfTemplate", () => {
     expect(container.textContent).toContain("Nguyen Phat");
     expect(container.textContent).toContain("12/07/2026");
     expect(container.textContent).toContain("09:00");
-    // correct=8, total=10 → wrong=2, computed internally (not a caller prop).
+    // correct=8, total=10 → wrong=2, tính nội bộ (không phải prop của nơi gọi).
     expect(container.textContent).toContain("8");
     expect(container.textContent).toContain("2");
   });
@@ -56,29 +56,29 @@ describe("AttemptPdfTemplate", () => {
   it("plain-hex/rgb guard (ADR-0009): rendered inline styles never resolve through oklch()/color-mix(), and the source has zero className attributes", () => {
     const { container } = render(<AttemptPdfTemplate {...BASE_PROPS} hasIncompleteEssay={false} />);
 
-    // Real-render inline-style output — no mock boundary (per Proof Obligations).
+    // Đầu ra inline-style của lần render thật — không có ranh giới mock (theo Proof Obligations).
     const renderedHtml = container.innerHTML;
     expect(renderedHtml).not.toContain("oklch(");
     expect(renderedHtml).not.toContain("color-mix(");
 
-    // Source-text inspection — the component must never carry a `className`
-    // attribute (Tailwind class or otherwise) anywhere in its subtree. Matches
-    // only the JSX attribute form (`className=`), not the word appearing in
-    // this file's own prose comments documenting the constraint.
+    // Kiểm tra văn bản nguồn — component không bao giờ được mang thuộc tính `className`
+    // (lớp Tailwind hay khác) ở bất kỳ đâu trong cây con. Chỉ khớp
+    // dạng thuộc tính JSX (`className=`), không khớp từ đó xuất hiện trong
+    // các comment văn xuôi của chính file này mô tả ràng buộc.
     expect(SOURCE_TEXT).not.toMatch(/className=/);
 
-    // ADR-0009's confirmed-unsafe pattern from components/ui/button.tsx must
-    // never be imported into or reproduced within this component.
+    // Mẫu đã xác nhận không an toàn của ADR-0009 từ components/ui/button.tsx không bao giờ
+    // được import vào hay tái tạo bên trong component này.
     expect(SOURCE_TEXT).not.toMatch(/from ["']@\/components\/ui\/button["']/);
     expect(SOURCE_TEXT).not.toContain("color-mix(");
     expect(SOURCE_TEXT).not.toContain("oklch(");
   });
 
   it("structural AC-006 guard: AttemptPdfTemplateProps has no field capable of carrying per-question content", () => {
-    // Fixed, exhaustive key list mirroring the frontend DD's Data Contract
-    // (`docs/design/history-frontend-design.md` § Data Contracts). A future
-    // prop addition (e.g. `questions`/`answers`) changes this set and fails
-    // this assertion, forcing a conscious review against AC-006.
+    // Danh sách khoá cố định, đầy đủ, phản chiếu Data Contract của frontend DD
+    // (`docs/design/history-frontend-design.md` § Data Contracts). Việc thêm
+    // prop về sau (ví dụ `questions`/`answers`) đổi tập này và làm khẳng định hỏng,
+    // buộc phải xem xét có chủ đích đối chiếu với AC-006.
     const props: AttemptPdfTemplateProps = BASE_PROPS;
     expect(Object.keys(props).sort()).toEqual(
       [

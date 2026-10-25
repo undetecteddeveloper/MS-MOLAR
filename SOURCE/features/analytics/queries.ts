@@ -1,7 +1,7 @@
-// (analytics) route group — Analytics read (docs/design/analytics-layer3-data-logic-design.md
-// § getAnalyticsByRange). Server-only, mirrors features/exams/queries.ts's/(history)/queries.ts's
-// snake_case DB → camelCase mapping + throw-on-infrastructure-error convention.
-// RLS scopes the read to auth.uid() — no explicit user_id predicate needed
+// Nhóm route (analytics) — đọc Analytics (docs/design/analytics-layer3-data-logic-design.md
+// § getAnalyticsByRange). Chỉ chạy ở server, theo mẫu features/exams/queries.ts / (history)/queries.ts:
+// ánh xạ snake_case DB → camelCase + quy ước ném lỗi khi hạ tầng hỏng.
+// RLS giới hạn lượt đọc theo auth.uid() — không cần điều kiện user_id tường minh
 // (results_select_own/attempts_select_own, supabase/schema.sql).
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
@@ -29,9 +29,9 @@ import type { SkillRecommendation } from "@/types/adaptive";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
-// PostgREST embedded shape: exam_results -> exam_attempts (!inner, to-one) ->
-// exams (!inner, to-one). Both FKs are many-to-one, so each embed is an
-// object, not an array.
+// Dạng nhúng của PostgREST: exam_results -> exam_attempts (!inner, to-one) ->
+// exams (!inner, to-one). Cả hai FK đều many-to-one, nên mỗi phần nhúng là
+// một object, không phải mảng.
 type EmbeddedRow = {
   correct: number;
   total: number;

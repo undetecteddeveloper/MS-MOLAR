@@ -1,4 +1,4 @@
-// Logic Layer 4 — UGC Exam Upload v2.2: Server Actions (Task 4.1 + M4/M5).
+// Logic Layer 4 — Đăng đề UGC v2.2: Server Actions (Task 4.1 + M4/M5).
 // Design Doc §Data Contracts — extractAndAssemble / saveExam / publishExam /
 // deleteExam / reportExam.
 //

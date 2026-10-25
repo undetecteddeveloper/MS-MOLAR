@@ -1,15 +1,15 @@
 // @vitest-environment jsdom
 
-// LaTeX delimiter normalisation — RichText renders \(…\) and \[…\] as math.
+// Chuẩn hoá dấu phân cách LaTeX — RichText render \(…\) và \[…\] thành công thức toán.
 //
 // Vì sao test này tồn tại: remark-math CHỈ nhận $…$ / $$…$$. Với \(…\), markdown
 // coi "\(" là escape của "(" nên công thức tụt xuống văn bản thường — KHÔNG lỗi,
 // KHÔNG cảnh báo, chỉ mất công thức. Đó là hình dạng im lặng nên phải có test
 // canh, không thể trông vào việc nhìn thấy lúc review.
 //
-// Behavior: RichText(text) -> normalizeMathDelimiters -> remark-math -> KaTeX.
+// Hành vi: RichText(text) -> normalizeMathDelimiters -> remark-math -> KaTeX.
 // @category: core-functionality
-// @dependency: none — real RichText, no mocks
+// @dependency: không có — RichText thật, không mock
 
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";

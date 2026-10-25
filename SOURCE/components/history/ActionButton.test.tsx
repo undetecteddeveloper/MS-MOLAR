@@ -1,38 +1,36 @@
 // @vitest-environment jsdom
 
-// ActionButton [integration] — the shared Save/Share atom, a 4-phase state
-// machine (idle/busy/error/fallback-confirmed) consumed identically by
-// HistoryRow and ResultActions (AC-007's single-implementation requirement).
+// ActionButton [integration] — nguyên tử Lưu/Chia sẻ dùng chung, một máy trạng thái
+// 4 pha (idle/busy/error/fallback-confirmed) được HistoryRow và ResultActions
+// dùng giống hệt nhau (yêu cầu một-bản-cài-đặt của AC-007).
 // Design Doc: docs/design/history-frontend-design.md (v1.3) § ActionButton —
 //   Deep Dive, § State Transitions, § Data Contracts.
-// UI Spec: docs/ui-spec/history-ui-spec.md (v1.1 — D1/D2/D4, ActionButton
-//   state x display matrix + interaction table).
+// UI Spec: docs/ui-spec/history-ui-spec.md (v1.1 — D1/D2/D4, ma trận trạng thái x hiển thị
+//   của ActionButton + bảng tương tác).
 // PRD: docs/prd/history-prd.md (v1.3, AC-007/009/010/011/012/013/018)
 //
-// Mock boundary (frontend DD Test Boundaries): generateAttemptPdfFile,
-// downloadPdfFile, canShareFile (SOURCE/lib/pdf/generateAttemptPdf.ts) are ALL
-// mocked here — this file isolates ActionButton's own state-machine/click-
-// guard/DOM-shape logic from the real PDF pipeline (that pipeline's own
-// call-construction/control-flow, including its URL.createObjectURL /
-// revokeObjectURL call order, is already proven separately by
+// Ranh giới mock (Test Boundaries của frontend DD): generateAttemptPdfFile,
+// downloadPdfFile, canShareFile (SOURCE/lib/pdf/generateAttemptPdf.ts) ĐỀU
+// bị mock ở đây — file này cô lập logic máy-trạng-thái/chặn-click/hình-dạng-DOM của
+// chính ActionButton khỏi đường ống PDF thật (luồng điều khiển/cách dựng lời gọi của
+// đường ống đó, kể cả thứ tự gọi URL.createObjectURL /
+// revokeObjectURL, đã được chứng minh riêng bởi
 // generateAttemptPdf.test.ts — Task 09). navigator.share/navigator.canShare
-// are also mocked (jsdom does not implement the Web Share API) — the only way
-// to deterministically drive the 3-branch Share decision (native share /
-// canShareFile-false fallback / user-cancelled AbortError) without a real
-// browser.
+// cũng bị mock (jsdom không cài Web Share API) — cách duy nhất để điều khiển
+// xác định nhánh Chia sẻ 3 hướng (chia sẻ gốc / canShareFile-false dự phòng /
+// người dùng huỷ AbortError) mà không cần trình duyệt thật.
 //
-// This repo's vitest.config.ts wires no `@testing-library/jest-dom` setup
-// file (no `test.setupFiles`), so `expect(...).toHaveAttribute(...)`-style
-// jest-dom matchers are unavailable here — assertions below read raw DOM
-// properties/attributes directly (same convention as
+//vitest.config.ts của repo này không nối file setup `@testing-library/jest-dom`
+// nào (không có `test.setupFiles`), nên các matcher kiểu jest-dom như
+// `expect(...).toHaveAttribute(...)` không dùng được ở đây — các khẳng định bên dưới
+// đọc thẳng thuộc tính/attribute DOM thô (cùng quy ước với
 // AttemptPdfTemplate.test.tsx/DifficultyBadge.test.tsx).
 //
-// render() also does not auto-cleanup between tests in this file (no
-// `test.globals`, so @testing-library/react's afterEach-based auto-cleanup
-// never registers — same convention as
-// DifficultyBadge.test.tsx/QuestionFigure.test.tsx) — every query below is
-// scoped to its own render()'s returned `container` via `within`, never the
-// global `screen`.
+//render() cũng không tự cleanup giữa các test trong file này (không có
+// `test.globals`, nên auto-cleanup dựa trên afterEach của @testing-library/react
+// không bao giờ được đăng ký — cùng quy ước với
+// DifficultyBadge.test.tsx/QuestionFigure.test.tsx) — mọi truy vấn bên dưới được giới hạn trong
+// `container` do chính render() đó trả về qua `within`, không bao giờ dùng `screen` toàn cục.
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -74,7 +72,7 @@ function mockFile(): File {
   return new File(["pdf-bytes"], "mock-exam.pdf", { type: "application/pdf" });
 }
 
-/** Direct children of the render root that are NOT the always-present sr-only reason span. */
+/** Con trực tiếp của gốc render KHÔNG phải span lý do sr-only luôn có mặt. */
 function inFlowChildren(container: HTMLElement): Element[] {
   return Array.from(container.children).filter(
     (el) => !(el.getAttribute("class") ?? "").split(/\s+/).includes("sr-only")
@@ -108,8 +106,8 @@ describe("ActionButton", () => {
     const { container } = render(<ActionButton action="save" pdfInput={PDF_INPUT} idPrefix="a" blockedReason={null} />);
     const button = within(container).getByRole("button", { name: "Lưu" });
 
-    fireEvent.click(button); // idle -> busy (busyRef true, synchronously, before the promise settles)
-    fireEvent.click(button); // rapid second click, still busy — must be a no-op
+    fireEvent.click(button); // idle -> busy (busyRef true, đồng bộ, trước khi promise hoàn tất)
+    fireEvent.click(button); // bấm lần hai quá nhanh, vẫn đang bận — phải là no-op
 
     expect(mockGenerate).toHaveBeenCalledTimes(1);
     expect(button.getAttribute("aria-disabled")).toBe("true");
@@ -117,7 +115,7 @@ describe("ActionButton", () => {
 
     resolveGenerate(mockFile());
     await waitFor(() => expect(button.getAttribute("aria-busy")).toBe("false"));
-    expect(mockGenerate).toHaveBeenCalledTimes(1); // still 1 after the busy window closes
+    expect(mockGenerate).toHaveBeenCalledTimes(1); // vẫn là 1 sau khi cửa sổ bận đóng
   });
 
   it("(b) AC-011: Share success calls navigator.share with the exact resolved File and returns to idle", async () => {
@@ -162,11 +160,11 @@ describe("ActionButton", () => {
     expect(status.textContent).toBe("Đã tải về — trình duyệt này không hỗ trợ chia sẻ.");
     expect(status.getAttribute("aria-live")).toBe("polite");
 
-    // Persists through a no-op re-render (no auto-dismiss timer, D1).
+    // Tồn tại qua một lần render lại no-op (không có bộ đếm tự tắt, D1).
     rerender(<ActionButton action="share" pdfInput={PDF_INPUT} idPrefix="c" blockedReason={null} />);
     expect(within(container).getByRole("status")).not.toBeNull();
 
-    // Clears only on the next Save/Share activation on this same instance.
+    // Chỉ xoá ở lần kích hoạt Lưu/Chia sẻ kế tiếp trên chính instance này.
     mockGenerate.mockResolvedValue(file);
     fireEvent.click(button);
     expect(within(container).queryByRole("status")).toBeNull();
@@ -203,7 +201,7 @@ describe("ActionButton", () => {
     expect(button.getAttribute("aria-disabled")).toBe("false");
     expect(button.getAttribute("aria-busy")).toBe("false");
 
-    // Retry — busyRef must not be left stuck true after the failure.
+    // Thử lại — busyRef không được để kẹt ở true sau lỗi.
     const file = mockFile();
     mockGenerate.mockResolvedValueOnce(file);
     fireEvent.click(button);
@@ -318,17 +316,16 @@ describe("ActionButton", () => {
     }
   });
 
-  // (g, cross-file half) AC-007 structural tripwire — updated for the
-  // front-adjust ⋯-menu consolidation: HistoryRow.tsx no longer renders
-  // ActionButton directly (it now renders HistoryRowMenu, components/history/
-  // HistoryRowMenu.tsx), but both call sites still share exactly ONE
-  // PDF-generation entry point — usePdfAction (components/history/usePdfAction.ts), which
-  // is the sole importer of generateAttemptPdfFile. The tripwire this
-  // obligation guards against — "a second, parallel PDF-generation import
-  // path forms across call sites" — is checked directly: neither UI call site
-  // (ActionButton.tsx, HistoryRowMenu.tsx) may import generateAttemptPdfFile
-  // itself, both must import usePdfAction from the identical specifier, and
-  // HistoryRow.tsx must route through HistoryRowMenu (not ActionButton).
+  // (g, nửa xuyên-file) Chốt chặn cấu trúc của AC-007 — cập nhật cho
+  // việc gộp menu ⋯ của front-adjust: HistoryRow.tsx không còn render
+  // ActionButton trực tiếp (giờ nó render HistoryRowMenu, components/history/
+  // HistoryRowMenu.tsx), nhưng cả hai nơi gọi vẫn dùng chung đúng MỘT
+  // điểm vào tạo PDF — usePdfAction (components/history/usePdfAction.ts), là
+  // nơi duy nhất import generateAttemptPdfFile. Chốt chặn mà nghĩa vụ này
+  // canh giữ — "một đường import tạo-PDF thứ hai, song song hình thành giữa các nơi gọi" —
+  // được kiểm trực tiếp: không nơi gọi UI nào (ActionButton.tsx, HistoryRowMenu.tsx) được
+  // import chính generateAttemptPdfFile, cả hai phải import usePdfAction từ cùng một
+  // specifier, và HistoryRow.tsx phải đi qua HistoryRowMenu (không phải ActionButton).
   it("(g cross-file) ActionButton.tsx and HistoryRowMenu.tsx never import generateAttemptPdfFile directly — both route through the identical shared usePdfAction specifier", () => {
     const actionButtonSource = readFileSync(
       join(process.cwd(), "components/history/ActionButton.tsx"),
@@ -346,8 +343,8 @@ describe("ActionButton", () => {
     const importsGenerateAttemptPdfFileDirectly = (source: string) =>
       /import\s*\{[^}]*\bgenerateAttemptPdfFile\b[^}]*\}\s*from/.test(source);
 
-    // Primary failure mode: a second, parallel PDF-generation import path
-    // forming at either UI call site instead of going through usePdfAction.
+    // Kiểu hỏng chính: một đường import tạo-PDF thứ hai, song song hình
+    // thành ở một trong hai nơi gọi UI thay vì đi qua usePdfAction.
     expect(importsGenerateAttemptPdfFileDirectly(actionButtonSource)).toBe(false);
     expect(importsGenerateAttemptPdfFileDirectly(historyRowMenuSource)).toBe(false);
 

@@ -1,10 +1,10 @@
-// filterHistoryEntries — pure predicate applying HistoryFilters' selected
-// criteria to an already-fetched MyHistoryEntry[] (front-adjust). Kept
-// separate from queries.ts: filtering a user's own bounded history array
-// in-memory avoids adding 4 more conditional WHERE-clause branches across
-// listMyHistory()'s 3 sequential Supabase calls for no real cost benefit —
-// RLS already scopes the read to auth.uid(), so the unfiltered fetch is
-// small per-user.
+// filterHistoryEntries — vị từ thuần áp các tiêu chí đã chọn của HistoryFilters
+// lên MyHistoryEntry[] đã lấy về sẵn (front-adjust). Tách riêng khỏi
+// queries.ts: lọc mảng lịch sử có giới hạn của chính người dùng ngay trong
+// bộ nhớ tránh phải thêm 4 nhánh điều kiện WHERE vào 3 lượt gọi Supabase
+// tuần tự của listMyHistory() mà không được lợi gì đáng kể — RLS đã giới hạn
+// lượt đọc theo auth.uid(), nên lượt lấy không lọc
+// vốn nhỏ theo từng người dùng.
 import type { MyHistoryEntry } from "@/features/history/queries";
 
 export interface HistoryEntryFilters {
@@ -12,9 +12,9 @@ export interface HistoryEntryFilters {
   examId?: string;
   scoreMin?: number;
   scoreMax?: number;
-  /** ISO date (YYYY-MM-DD), inclusive lower bound on submittedAt's date portion. */
+  /** Ngày ISO (YYYY-MM-DD), cận dưới gồm cả mốc, áp lên phần ngày của submittedAt. */
   dateFrom?: string;
-  /** ISO date (YYYY-MM-DD), inclusive upper bound on submittedAt's date portion. */
+  /** Ngày ISO (YYYY-MM-DD), cận trên gồm cả mốc, áp lên phần ngày của submittedAt. */
   dateTo?: string;
 }
 
@@ -28,8 +28,8 @@ export function filterHistoryEntries(
     if (filters.scoreMin !== undefined && entry.totalScore < filters.scoreMin) return false;
     if (filters.scoreMax !== undefined && entry.totalScore > filters.scoreMax) return false;
 
-    // ISO 8601 timestamps sort/compare correctly as plain strings; slicing to
-    // the date portion is enough for inclusive day-level bounds.
+    // Mốc thời gian ISO 8601 sắp xếp/so sánh đúng khi coi như chuỗi thường; cắt lấy
+    // phần ngày là đủ cho cận theo ngày gồm cả mốc.
     const submittedDate = entry.submittedAt.slice(0, 10);
     if (filters.dateFrom !== undefined && submittedDate < filters.dateFrom) return false;
     if (filters.dateTo !== undefined && submittedDate > filters.dateTo) return false;

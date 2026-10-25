@@ -25,8 +25,8 @@ import { PageContainer } from "@/components/layout/PageContainer";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SEARCH_MAX_LENGTH } from "@/lib/search/normalize";
 
-// DOM order (AC-003) — the array order IS the render order; a `null` shelf
-// drops out via the `data && (...)` narrowing below, never leaving a gap
+// Thứ tự DOM (AC-003) — thứ tự trong mảng CHÍNH LÀ thứ tự render; một kệ `null`
+// tự rơi ra nhờ phép thu hẹp `data && (...)` bên dưới, không bao giờ để lại khoảng trống
 // (AC-051).
 const SHELF_ORDER = ["practice", "hot", "explore"] as const;
 
@@ -48,16 +48,16 @@ type SearchParams = Promise<{
 
 export default async function ExamsPage({ searchParams }: { searchParams: SearchParams }) {
   const sp = await searchParams;
-  // Branch predicate (AC-001/AC-008/AC-010) — reads RAW key presence on `sp`,
-  // BEFORE any normalisation below: a normalised local is `undefined` for both
-  // "absent" and "present but garbage" (`?sort=garbage`, `?page=abc`), so only
-  // the raw key can tell the two apart (Boundary Context, work plan Connection
+  // Điều kiện rẽ nhánh (AC-001/AC-008/AC-010) — đọc sự có mặt của khoá THÔ trên `sp`,
+  // TRƯỚC mọi bước chuẩn hoá bên dưới: biến cục bộ đã chuẩn hoá là `undefined` cho cả
+  // "vắng mặt" lẫn "có mặt nhưng rác" (`?sort=garbage`, `?page=abc`), nên chỉ
+  // khoá thô mới phân biệt được hai ca (Boundary Context, work plan Connection
   // Map).
   const showShelves = !hasBrowseParam(sp);
-  // `ExamFilters` renders on BOTH branches (chip row visible on the shelves
-  // view too, AC-033), so this normalisation block stays unconditional — only
-  // the `ranked`-only derivations below (destructure + `gridKey`) move into
-  // the grid branch.
+  // `ExamFilters` render ở CẢ HAI nhánh (hàng chip cũng hiện ở chế độ kệ,
+  // AC-033), nên khối chuẩn hoá này giữ vô điều kiện — chỉ các phép suy ra
+  // dành riêng cho `ranked` bên dưới (destructure + `gridKey`) mới chuyển vào
+  // nhánh lưới.
   const subject = sp.subject || undefined;
   const grade = sp.grade ? Number(sp.grade) : undefined;
   const school = sp.school || undefined;
@@ -96,13 +96,13 @@ export default async function ExamsPage({ searchParams }: { searchParams: Search
   // tập id đã nộp, nên băng xếp hạng "đã làm" và nút Chấm điểm dùng CHUNG một
   // giá trị, không thể lệch nhau.
   //
-  // 4 array slots, not 3 — `shelves`/`ranked` are two independent nullable
-  // members rather than one slot typed as their union, so `strict: true` can
-  // narrow `shelves !== null` below without a type assertion (frontend DD §
-  // Data flow "Four array slots"). Exactly 3 READS still fire per branch: the
-  // unused slot of the pair always resolves to `null`, contributing 0 network
-  // calls; `listExamFacets()`/`getCurrentUser()` are unconditional, so they run
-  // on BOTH branches (the chip row renders on the shelves view too, AC-033).
+  // 4 ô trong mảng, không phải 3 — `shelves`/`ranked` là hai thành viên nullable
+  // độc lập thay vì một ô mang kiểu hợp của chúng, để `strict: true` thu hẹp được
+  // `shelves !== null` bên dưới mà không cần ép kiểu (frontend DD §
+  // Data flow "Four array slots"). Vẫn đúng 3 lượt ĐỌC chạy ở mỗi nhánh: ô
+  // không dùng của cặp luôn trả về `null`, đóng góp 0 lượt gọi mạng;
+  // `listExamFacets()`/`getCurrentUser()` chạy vô điều kiện, nên chạy ở
+  // CẢ HAI nhánh (hàng chip cũng hiện ở chế độ kệ, AC-033).
   const [shelves, ranked, facets, skillLabel] = await Promise.all([
     showShelves ? listExamShelves(viewer) : null,
     showShelves

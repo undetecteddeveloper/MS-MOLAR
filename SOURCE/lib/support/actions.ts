@@ -1,4 +1,4 @@
-// User Support System v1 (PRD support-system-prd.md v1.2, ADR-0012, Design Doc
+// Hệ thống hỗ trợ người dùng v1 (PRD support-system-prd.md v1.2, ADR-0012, Design Doc
 // support-system-backend-design.md v1.2 §Data Contracts/Data Flow) —
 // submitSupportTicket: Server Action duy nhất mà widget gọi để tạo ticket.
 "use server";

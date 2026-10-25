@@ -3,9 +3,9 @@
 // Chúng ở CHUNG một file vì cùng một lý do: mỗi con số phải có ĐÚNG MỘT lời
 // khai. Với `ORDER_PENDING_WINDOW_MS` đó không phải sở thích về phong cách mà
 // là một ràng buộc đã ghi thành văn — ADR-0013 § Implementation Guidance:
-// *"Keep the pending-order window and the provider's `expiredAt` the same
-// number, set from one shared constant. Two clocks that disagree produce a QR
-// code that one side considers live and the other considers dead"*. Một QR mà
+// *"Giữ cửa sổ đơn chờ và `expiredAt` của nhà cung cấp là cùng một
+// con số, đặt từ một hằng dùng chung. Hai chiếc đồng hồ lệch nhau sinh ra một mã QR
+// mà một bên coi là còn sống còn bên kia coi là đã chết"*. Một QR mà
 // ta tưởng đã chết còn payOS tưởng còn sống là một lần chuyển khoản không có
 // đơn nào nhận.
 

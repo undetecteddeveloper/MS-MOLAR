@@ -1,4 +1,4 @@
-// Layout route group (billing) — UI Spec UI-D7.
+// Layout của nhóm route (billing) — UI Spec UI-D7.
 //
 // Khung giống hệt (exams)/layout.tsx, cộng thêm EntitlementProvider. Hai route
 // nằm dưới đây: /terms và /about (CÔNG KHAI). Các trang billing đã gỡ khỏi giao diện 2026-09-04.

@@ -1,4 +1,4 @@
-// UGC Exam Upload v2.0 — validate input S-01 (Task 4.1, AC-003/005/006).
+// Đăng đề UGC v2.0 — kiểm đầu vào S-01 (Task 4.1, AC-003/005/006).
 //
 // THUẦN (không I/O) để unit-test được: metadata form + thuộc tính file.
 // Reject TRƯỚC mọi lời gọi AI (Design Doc §extractAndAssemble Validation).

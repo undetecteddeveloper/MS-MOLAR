@@ -1,15 +1,15 @@
 // @vitest-environment jsdom
 
-// AdminPage (`app/(admin)/admin/page.tsx`) — composition of the new
+// AdminPage (`app/(admin)/admin/page.tsx`) — ghép của phần mới
 // "Bài giải bị báo cáo" section (overview R7 / B4 wiring rule, frontend DD
-// § Minimal Surface Alternatives Element 11). Plan § P4-T7 Proof Obligation:
-// AC-085 (non-admin → `notFound()`, existing gate unchanged).
+// § Minimal Surface Alternatives Element 11). Nghĩa vụ chứng minh Plan § P4-T7:
+// AC-085 (không phải admin → `notFound()`, cổng sẵn có không đổi).
 //
-// Pattern: call the async Server Component directly, no Next runtime (same as
-// `SolutionsListPage.test.tsx`). Mock boundary: `@/features/solutions/adminActions`
-// (the four functions the page imports), the existing exam-moderation data
-// source (`listReportedExams`) and its `ModerationRow` action module, the
-// auth helpers, and `next/navigation`'s `notFound`.
+// Mẫu: gọi trực tiếp Server Component async, không có runtime Next (giống
+// `SolutionsListPage.test.tsx`). Ranh giới mock: `@/features/solutions/adminActions`
+// (bốn hàm mà trang import), nguồn dữ liệu kiểm duyệt đề sẵn có
+// (`listReportedExams`) cùng module action `ModerationRow` của nó, các hàm
+// trợ giúp auth, và `notFound` của `next/navigation`.
 
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

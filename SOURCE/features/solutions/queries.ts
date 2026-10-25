@@ -718,13 +718,13 @@ export async function getMyCommentFeed(page: number): Promise<CommentFeedItem[]>
  * (mới hơn... không, CŨ hơn, vì thứ tự giảm dần) đã đọc hoặc không tồn tại.
  */
 // ----------------------------------------------------------------------------
-// community_reputation_summary (task 41) — the caller's OWN reputation, for
-// ReputationBlock (task 44). Deliberately does NOT follow the throw-on-error
-// convention every other function in this file uses: the frontend DD's
-// "ProfileCard reputation insertion" boundary contract requires a RETURNED
-// failure result on RPC error (page renders no block, no log at this layer —
-// only an unrelated thrown exception is the page's console.error case,
-// frontend DD § Data Flow), not an exception from this function.
+// community_reputation_summary (task 41) — uy tín CỦA CHÍNH người gọi, cho
+// ReputationBlock (task 44). CỐ Ý KHÔNG theo quy ước ném lỗi
+// mà mọi hàm khác trong file này dùng: boundary contract
+// "ProfileCard reputation insertion" của frontend DD đòi TRẢ VỀ một
+// kết quả thất bại khi RPC lỗi (trang không render khối, không log ở tầng này —
+// chỉ một exception ném ra không liên quan mới là ca console.error của trang,
+// frontend DD § Data Flow), chứ không phải ném exception từ hàm này.
 
 export interface ReputationSummary {
   totalScore: number;
@@ -744,7 +744,7 @@ interface RawReputationRow {
 
 function mapReputationRow(row: RawReputationRow): ReputationSummary {
   return {
-    // AC-086: the RPC computes this fresh every call; no recomputation here.
+    // AC-086: RPC tính mới ở mỗi lần gọi; không tính lại ở đây.
     totalScore: row.total_score,
     publishedCount: row.published_count,
     helpfulCount: row.helpful_count,
@@ -764,9 +764,9 @@ export async function getMyReputation(): Promise<ReputationResult> {
   if (error) return { ok: false };
 
   const rows = (data ?? []) as RawReputationRow[];
-  // Contract guarantee (schema.sql: aggregate with no group by): always
-  // exactly one row, all-zero fields when the caller has 0 published
-  // solutions (AC-090) — never zero rows. Defensive fallback kept minimal.
+  // Cam kết của contract (schema.sql: aggregate không có group by): luôn
+  // đúng một hàng, mọi trường bằng 0 khi người gọi có 0 bài giải đã đăng
+  // (AC-090) — không bao giờ không có hàng nào. Giữ phương án dự phòng ở mức tối thiểu.
   const row = rows[0];
   if (!row) return { ok: false };
 

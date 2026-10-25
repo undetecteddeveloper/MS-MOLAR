@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-// SolutionEditorPage — writer load `null` → redirect (row 1, AC-002/AC-004,
+// SolutionEditorPage — writer load `null` → redirect (hàng 1, AC-002/AC-004,
 // S11) và route guard trên `attemptId` (row 10, Boundary Context: server
 // không bao giờ tin URL một mình). Khuôn theo `(exams)/__tests__/layout.test.tsx`:
 // gọi thẳng hàm async của Server Component, KHÔNG qua Next runtime thật.
@@ -23,12 +23,12 @@ const { getMySolutionForWriterMock, redirectMock } = vi.hoisted(() => ({
 vi.mock("@/features/solutions/queries", () => ({
   getMySolutionForWriter: getMySolutionForWriterMock,
 }));
-// `SolutionEditorScreen` (rendered on the non-redirect branch) imports
-// `saveSolution`/`setSolutionStatus` at the module top level; the real
-// `actions.ts` pulls in `@/lib/security/rateLimit` → `@/lib/billing/paidTier`
-// → the real `server-only` package, which throws under jsdom regardless of
-// this file's own mocks. Neither action is ever called by these tests (no
-// save/publish interaction), so a bare stub is enough.
+// `SolutionEditorScreen` (render ở nhánh không redirect) import
+// `saveSolution`/`setSolutionStatus` ở cấp cao nhất của module; `actions.ts`
+// thật kéo theo `@/lib/security/rateLimit` → `@/lib/billing/paidTier`
+// → package `server-only` thật, thứ ném lỗi dưới jsdom bất kể
+// mock của chính file này. Không action nào được gọi trong các test này (không có
+// tương tác lưu/đăng), nên một stub trần là đủ.
 // Bảng câu hỏi chia mục theo phần: trang gọi `getExam` + `getQuestionPartNumbers`.
 vi.mock("@/features/exams/queries", () => ({
   getExam: vi.fn().mockResolvedValue({ parts: [] }),

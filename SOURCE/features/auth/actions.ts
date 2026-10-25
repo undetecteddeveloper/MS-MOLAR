@@ -1,5 +1,5 @@
 // Logic Layer 1 — Auth Server Actions (GĐ 2 M2.4; S#23 hoàn thiện auth module:
-// signup hardening + OAuth Google/Facebook + password reset).
+// siết đăng ký + OAuth Google/Facebook + đặt lại mật khẩu).
 // Xem ARCHITECTURE.md (gốc repo).
 "use server";
 

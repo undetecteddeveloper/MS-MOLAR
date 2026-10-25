@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// No I18nProvider wrapping → useT() renders the "en" default strings.
+// Không bọc I18nProvider → useT() render các chuỗi mặc định "en".
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -26,7 +26,7 @@ describe("MessageField", () => {
     render(<MessageField value="already typed" onChange={() => {}} error={null} disabled={true} />);
     const textarea = screen.getByLabelText("Nội dung") as HTMLTextAreaElement;
     expect(textarea.value).toBe("already typed");
-    expect(textarea.disabled).toBe(false); // native disabled would break focus/AT discoverability
+    expect(textarea.disabled).toBe(false); // `disabled` gốc sẽ làm mất khả năng focus/khám phá bằng công nghệ hỗ trợ
     expect(textarea.readOnly).toBe(true);
   });
 

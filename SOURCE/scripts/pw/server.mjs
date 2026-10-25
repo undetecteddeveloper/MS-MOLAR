@@ -129,7 +129,7 @@ const handlers = {
     return { messages };
   },
   async resize({ width, height }) {
-    // CLI args arrive as strings (argv text) — setViewportSize rejects non-integers.
+    // Tham số CLI đến dưới dạng chuỗi (văn bản argv) — setViewportSize từ chối số không nguyên.
     await page.setViewportSize({ width: Number(width), height: Number(height) });
     return { ok: true };
   },

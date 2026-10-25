@@ -1,4 +1,4 @@
-// Data model — Exam (Layer 2 Core Loop).
+// Mô hình dữ liệu — Exam (Layer 2 Core Loop).
 // Contract giữ vào production (xem PROJECT_ROADMAP.md M1.1).
 
 import type { CommunityDifficulty } from "@/lib/rating";

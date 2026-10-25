@@ -18,8 +18,8 @@
 //      thành một ràng buộc của CSDL chứ không phải một quy ước.
 //
 // KHÔNG CÓ CON SỐ CỬA SỔ NÀO TRONG FILE NÀY, và sự vắng mặt ấy là cố ý.
-// ADR-0013 § Implementation Guidance: *"Keep the pending-order window and the
-// provider's `expiredAt` the same number, set from one shared constant"*. Adapter
+// ADR-0013 § Implementation Guidance: *"Giữ cửa sổ đơn chờ và `expiredAt` của
+// nhà cung cấp là cùng một con số, đặt từ một hằng dùng chung"*. Adapter
 // tính mốc ấy từ `ORDER_PENDING_WINDOW_MS` và TRẢ LẠI nó; bước (3) ghi thẳng giá
 // trị được trả về xuống `pending_until`. Tự tính lại ở đây — dù bằng đúng hằng
 // đó — là dựng cái đồng hồ thứ hai, và hai đồng hồ lệch nhau đẻ ra một QR mà bên

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-// Task 3.1 (Gate B) — seeded-regression fixtures (ADR-0002).
+// Task 3.1 (Gate B) — fixture hồi quy gieo sẵn (ADR-0002).
 //
 // Snapshot được TẠO TRƯỚC khi harden RichText (baseline = pipeline chưa có
 // rehype-sanitize), sau đó harden và chạy lại: snapshot PHẢI giữ nguyên —

@@ -772,16 +772,16 @@ export const copy = {
   "ugcError.fieldRequired": "một trường bắt buộc",
   "ugcError.fieldGeneric": "một trường",
 
-  // User Support System v1 — sendSupportNotification subject only (NOT the
-  // support.* widget block, that's a separate later addition). Deliberately
-  // NOT prefixed "support." to avoid colliding with that block's key set.
+  // User Support System v1 — chỉ subject của sendSupportNotification (KHÔNG phải khối
+  // widget support.*, đó là phần bổ sung riêng về sau). CỐ Ý
+  // KHÔNG đặt tiền tố "support." để tránh va chạm với bộ khoá của khối đó.
   "mail.ticketIntent.bug": "báo lỗi",
   "mail.ticketIntent.suggestion": "góp ý",
   "mail.ticketIntent.question": "câu hỏi",
 
-  // User Support System v1 — support.* widget block (student-facing only;
-  // support.admin.* is a separate later addition, task-14's responsibility).
-  // common.cancel/common.retry/common.working are REUSED, not duplicated here.
+  // User Support System v1 — khối widget support.* (chỉ dành cho học sinh;
+  // support.admin.* là phần bổ sung riêng về sau, thuộc trách nhiệm task-14).
+  // common.cancel/common.retry/common.working được DÙNG LẠI, không nhân đôi ở đây.
   "support.trigger.label": "Gửi phản hồi",
   "support.trigger.moveHint": "Giữ Shift và bấm phím mũi tên để dời nút.",
   "support.dialog.title": "Gửi phản hồi",

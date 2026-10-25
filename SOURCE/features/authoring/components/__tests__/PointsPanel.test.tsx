@@ -14,7 +14,7 @@
 // và chỉ lộ ra trên đề nhiều phần.
 //
 // @category: core-functionality
-// @dependency: none — real PointsPanel, no mocks
+// @dependency: không có — PointsPanel thật, không mock
 
 // Không có auto-cleanup của RTL trong cấu hình vitest này → truy vấn bó trong
 // `container`, không dùng `screen`, VÀ gỡ tay sau mỗi ca (afterEach dưới).

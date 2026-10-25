@@ -1,20 +1,20 @@
-// Backend-flow latency benchmark — measures raw Supabase query round-trip time
-// for each layer's core read/write paths, using a real signed-in test-account
-// session (so RLS is actually evaluated, same as production) via plain
-// @supabase/supabase-js — NOT the Next.js server client (createClient() from
-// lib/supabase/server.ts needs next/headers' cookies(), unavailable outside a
-// request). Query chains below are copied verbatim from each layer's
-// queries.ts/actions.ts so the numbers reflect the real backend flow, not an
-// approximation.
+// Benchmark độ trễ luồng backend — đo thời gian khứ hồi thô của truy vấn Supabase
+// cho các đường đọc/ghi lõi của từng layer, dùng phiên tài khoản test thật đã
+// đăng nhập (để RLS thật sự được đánh giá, giống production) qua
+// @supabase/supabase-js thuần — KHÔNG phải client server của Next.js (createClient() từ
+// lib/supabase/server.ts cần cookies() của next/headers, không có ngoài
+// một request). Các chuỗi truy vấn bên dưới được chép nguyên văn từ queries.ts/actions.ts của
+// từng layer để số liệu phản ánh luồng backend thật, không phải
+// bản xấp xỉ.
 //
-// ⚠ These are COPIES, not imports — they drift silently when a layer's query
-// changes. Update them in the same commit as any query edit, or this script
-// will confidently report the latency of code that no longer exists.
+// ⚠ Đây là BẢN SAO, không phải import — chúng trôi lệch trong im lặng khi truy vấn của một layer
+// đổi. Cập nhật chúng trong cùng commit với mọi thay đổi truy vấn, nếu không script này
+// sẽ tự tin báo độ trễ của đoạn code không còn tồn tại.
 //
-// Scope (per engineer decision, 2026-08-02): DB/Supabase round-trip only, not
-// end-to-end HTTP/Next.js render time. Layer 4's extractAndAssemble() (Gemini
-// AI call) is EXCLUDED — that latency is network+LLM-inference bound, a
-// different optimization space (see ADR-0006), not a query/index problem.
+// Phạm vi (theo quyết định của kỹ sư, 2026-08-02): chỉ khứ hồi DB/Supabase, không phải
+// thời gian render HTTP/Next.js đầu-cuối. extractAndAssemble() của Layer 4 (lời gọi AI Gemini)
+// BỊ LOẠI — độ trễ đó bị chi phối bởi mạng + suy luận LLM, một
+// không gian tối ưu khác (xem ADR-0006), không phải vấn đề truy vấn/index.
 //
 // Cách chạy:  cd SOURCE && npx tsx scripts/perf-layers.ts
 
@@ -38,7 +38,7 @@ function loadEnv(): Record<string, string> {
 const PASSWORD = "rls-test-password-123";
 const EMAIL_A = "smithnguyen247+rlstesta@gmail.com";
 const ITERATIONS = 8;
-const WARMUP = 1; // first call often pays connection-setup cost; excluded from stats
+const WARMUP = 1; // lần gọi đầu thường phải trả chi phí dựng kết nối; loại khỏi thống kê
 
 type Stat = { label: string; layer: string; n: number; minMs: number; medMs: number; avgMs: number; maxMs: number; note?: string };
 const results: Stat[] = [];
@@ -117,7 +117,7 @@ function printReport() {
   console.log("=".repeat(96) + "\n");
 }
 
-// --- Layer-specific query chains (copied from each layer's queries.ts) -----
+// --- Các chuỗi truy vấn riêng của từng layer (chép từ queries.ts của mỗi layer) -----
 
 // 2026-08-16: thêm `created_at` cho khớp bản gốc ở features/exams/queries.ts sau khi
 // ADR-0015 nới cột này cho tín hiệu mới-cũ. Đây đúng là kiểu trôi lệch mà header
@@ -284,13 +284,13 @@ async function main() {
   const userId = signInData.user.id;
   console.log(`OK — user id ${userId}\n`);
 
-  // Layer 1: Auth latency itself (GoTrue service, separate subsystem from Postgres/PostgREST)
+  // Layer 1: độ trễ của chính Auth (dịch vụ GoTrue, hệ con tách biệt khỏi Postgres/PostgREST)
   await bench("Layer1 (Auth)", "signInWithPassword", async () => {
     const { error } = await supabase.auth.signInWithPassword({ email: EMAIL_A, password: PASSWORD });
     if (error) throw error;
   });
 
-  // Discover real ids to test against (dynamic — do not hardcode against fake-data/seed state)
+  // Tìm id thật để kiểm thử (động — không hardcode theo trạng thái fake-data/seed)
   const { data: publishedExams } = await supabase
     .from("exams_with_difficulty")
     .select("id")
@@ -331,7 +331,7 @@ async function main() {
   // Layer 3 (Analytics)
   await bench("Layer3 (Analytics)", "getAnalyticsByRange", () => getAnalyticsByRange(supabase));
 
-  // Layer 4 (UGC upload) — pure queries only, extractAndAssemble (Gemini) excluded
+  // Layer 4 (UGC upload) — chỉ các truy vấn thuần, loại trừ extractAndAssemble (Gemini)
   await bench("Layer4 (UGC)", "listMyExams", () => listMyExams(supabase, userId));
   if (authoredExamId) {
     await bench("Layer4 (UGC)", "getMyExam", () => getMyExam(supabase, authoredExamId, userId));

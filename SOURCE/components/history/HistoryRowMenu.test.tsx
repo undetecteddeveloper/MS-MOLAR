@@ -1,29 +1,29 @@
 // @vitest-environment jsdom
 
-// HistoryRowMenu [integration] — front-adjust: the consolidated ⋯ menu that
-// replaces HistoryRow's previous 3 separate controls (2x ActionButton +
+// HistoryRowMenu [integration] — front-adjust: menu ⋯ gộp thay thế
+// 3 điều khiển riêng trước đây của HistoryRow (2x ActionButton +
 // "Xem chi tiết" Link). Save/Share still route through usePdfAction
-// (components/history/usePdfAction.ts) — the same hook ActionButton.tsx uses — so this
-// file focuses on the NEW behavior this component adds on top of that
-// already-proven state machine (ActionButton.test.tsx covers busy/error/
-// fallback/AC-010 exhaustively): trigger/menu open-close, per-item rendering,
-// auto-close-on-success, stays-open-on-error/fallback, and the View details
-// link.
+// (components/history/usePdfAction.ts) — cùng hook mà ActionButton.tsx dùng — nên file này
+// tập trung vào hành vi MỚI mà component này thêm lên trên máy trạng thái
+// đã được chứng minh đó (ActionButton.test.tsx phủ đầy đủ busy/error/
+// fallback/AC-010): mở-đóng nút kích hoạt/menu, render từng mục,
+// tự đóng khi thành công, giữ mở khi lỗi/dự phòng, và link
+// Xem chi tiết.
 //
-// Mock boundary + conventions identical to ActionButton.test.tsx: mocks
-// generateAttemptPdfFile/downloadPdfFile/canShareFile + navigator.share, no
-// jest-dom matchers. Trigger-button assertions still scope via `within
-// (container)` (unaffected, never portaled) — but the `role="menu"` panel
-// itself is rendered via `createPortal(..., document.body)` since 2026-08-09
-// (HistoryRowMenu.tsx: bottom-sheet/BottomNav clipping fix, see that file's
-// header comment), so it is no longer a descendant of `container` and must
-// be queried via `screen` (document.body-scoped) instead. This file DOES now
-// call `cleanup()` per test (unlike the rest of the suite) specifically
-// because `screen` queries the whole document — without it, an unclosed
-// menu left mounted by one test would leak into the next test's `screen`
-// query and break `getByRole`'s single-match assumption. `within(container)`
-// elsewhere in the codebase never needed this because it was never
-// document-scoped to begin with.
+// Ranh giới mock + quy ước giống ActionButton.test.tsx: mock
+// generateAttemptPdfFile/downloadPdfFile/canShareFile + navigator.share, không dùng
+// matcher jest-dom. Khẳng định về nút kích hoạt vẫn giới hạn qua `within
+// (container)` (không ảnh hưởng, không bao giờ portal) — nhưng chính panel `role="menu"`
+// được render qua `createPortal(..., document.body)` từ 2026-08-09
+// (HistoryRowMenu.tsx: sửa lỗi bị cắt bởi bottom-sheet/BottomNav, xem comment đầu của file đó),
+// nên nó không còn là con cháu của `container` và phải
+// được truy vấn qua `screen` (phạm vi document.body). File này GIỜ có
+// gọi `cleanup()` ở mỗi test (khác phần còn lại của bộ test) chính vì
+// `screen` truy vấn cả tài liệu — thiếu nó, một menu chưa đóng
+// còn mount từ test này sẽ rò sang truy vấn `screen` của test kế
+// và phá giả định chỉ-một-kết-quả của `getByRole`. `within(container)`
+// ở nơi khác trong codebase chưa bao giờ cần vì nó chưa từng
+// bị gắn với phạm vi tài liệu.
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -85,7 +85,7 @@ beforeEach(() => {
 afterEach(() => {
   // @ts-expect-error — test-only cleanup of the stubbed Web Share API surface
   delete window.navigator.share;
-  cleanup(); // unmounts (incl. the portaled menu) — see file header comment
+  cleanup(); // unmount (kể cả menu portal) — xem comment đầu file
 });
 
 describe("HistoryRowMenu", () => {
@@ -168,7 +168,7 @@ describe("HistoryRowMenu", () => {
     expect(alert.textContent).toBe("Không tạo được file PDF. Thử lại nhé.");
     expect(screen.getByRole("menu")).not.toBeNull(); // stays open
 
-    // Retry succeeds and then auto-closes.
+    // Thử lại thành công rồi tự đóng.
     const file = mockFile();
     mockGenerate.mockResolvedValueOnce(file);
     fireEvent.click(screen.getByRole("menuitem", { name: /Lưu/ }));

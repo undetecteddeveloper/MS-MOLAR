@@ -1,17 +1,17 @@
 // /profile — avatar file check. Pure, no I/O, mirroring
-// lib/support/validateScreenshot.ts including its decision order.
+// lib/support/validateScreenshot.ts, kể cả thứ tự quyết định của nó.
 //
-// The parameter is STRUCTURAL rather than `File` so the same function runs in
-// the browser (pre-flight, before a byte is uploaded) and in the Server Action
-// (the actual enforcement point — a crafted request never touches the browser).
+// Tham số mang kiểu CẤU TRÚC thay vì `File` để cùng một hàm chạy được ở
+// trình duyệt (kiểm trước, khi chưa tải lên byte nào) và ở Server Action
+// (điểm cưỡng chế thật — một request tự chế không bao giờ đi qua trình duyệt).
 //
-// MIME is checked BEFORE size, same as checkScreenshotFile. The order is
-// visible to the user: telling someone their 5MB PDF is "too large" invites
-// them to shrink a file that would be refused at any size.
+// MIME được kiểm TRƯỚC kích thước, giống checkScreenshotFile. Thứ tự này
+// người dùng nhìn thấy được: báo ai đó rằng file PDF 5MB của họ "quá lớn" là mời
+// họ thu nhỏ một file mà kích thước nào cũng bị từ chối.
 //
-// MIME here is the browser-supplied string. There is no magic-byte sniffing
-// anywhere in this repository and this module does not introduce it; the
-// bucket's own allowedMimeTypes is the second layer (ADR-0016).
+// MIME ở đây là chuỗi do trình duyệt cung cấp. Không nơi nào trong repo này
+// dò magic-byte và module này không đưa việc đó vào; allowedMimeTypes
+// của chính bucket là lớp thứ hai (ADR-0016).
 
 import { AVATAR_LIMITS } from "./limits";
 

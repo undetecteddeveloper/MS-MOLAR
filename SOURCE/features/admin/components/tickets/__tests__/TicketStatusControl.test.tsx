@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
-// TicketStatusControl — statusFormAction adapter must forward the exact
-// (ticketId, status) pair extracted from FormData to changeTicketStatusAction
-// (Boundary Context roundtrip check, AC-023).
+// TicketStatusControl — adapter statusFormAction phải chuyển đúng
+// cặp (ticketId, status) rút ra từ FormData cho changeTicketStatusAction
+// (kiểm khứ hồi Boundary Context, AC-023).
 
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

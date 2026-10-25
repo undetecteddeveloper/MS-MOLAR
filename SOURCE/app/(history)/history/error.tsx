@@ -1,10 +1,10 @@
 "use client";
 
-// Error boundary for /history — Next.js App Router error.tsx convention
-// (this repo's first use, D7/AC-019). role="alert" receives focus on render
-// (UI Spec Accessibility Definition: "assertive; receives focus on render").
-// "Thử lại" is wired directly to `reset()`, which re-runs the failed server
-// render (re-attempting listMyHistory()).
+// Error boundary cho /history — quy ước error.tsx của Next.js App Router
+// (lần đầu repo này dùng, D7/AC-019). role="alert" nhận focus khi render
+// (UI Spec Accessibility Definition: "assertive; nhận focus khi render").
+// "Thử lại" nối thẳng vào `reset()`, hàm chạy lại lượt render server
+// bị lỗi (thử lại listMyHistory()).
 //
 // Theme "Sân trường" (2026-09-07): khối đỏ nhạt bo 18px (cùng `bg-destructive/10`
 // với nút Rời khỏi ở màn làm bài), nút Thử lại là viên thuốc TRẮNG (`plain` —

@@ -150,7 +150,7 @@ const HISTORY_EXAM_ID = "rls-history-h-a";
 // giả định nó đã tồn tại, và mượn node thật thì cleanup sẽ xoá nhầm nội dung.
 const MASTERY_SKILL_ID = "rls-skill-mastery";
 
-// Fixture User Support System v1 (backend Design Doc §Test Boundaries, schema.sql
+// Fixture Hệ thống hỗ trợ người dùng v1 (backend Design Doc §Test Boundaries, schema.sql
 // User Support System section, cases ST-a…ST-e) — setup/cleanup idempotent như 4
 // fixture trên. `support_tickets.id` là uuid (không có text PK cố định để đặt
 // prefix như các fixture khác) nên cleanup dọn theo user_id sở hữu (2 tài khoản
@@ -229,8 +229,8 @@ function findHotCountsRow(rows: unknown, examId: string): HotCountsRow | undefin
 }
 
 // Fixture Community Solutions (backend Design Doc v1.9 § Integration
-// Verification Points, task-ownership binding: migration task 03 tested here,
-// task 05 — Early Verification Point of the whole work plan). Một đề published
+// Verification Points, ràng buộc sở hữu task: migration task 03 được kiểm ở đây,
+// task 05 — Early Verification Point của cả work plan). Một đề published
 // duy nhất, 5 câu, tác giả = User A (cùng quy ước "tác giả = A" dùng lại ở
 // Rating/History phía trên — A vừa là tác giả vừa là người nộp bài, RLS không
 // cấm điều đó). Dùng LẠI đúng exam/solution fixture xuyên suốt mọi case dưới
@@ -1966,7 +1966,7 @@ async function main() {
 
   // ==========================================================================
   // Phần 7 — Engine 1 Adaptive AI (Mastery + Telemetry), cases MM-a/MM-b/TL-a/
-  // TL-b — REQUIRED, BLOCKING. Backend Design Doc §Test Boundaries + schema.sql
+  // TL-b — BẮT BUỘC, CHẶN. Backend Design Doc §Test Boundaries + schema.sql
   // §18/§19 + ADR-0011.
   //
   // Vì sao phải chạy trên Postgres thật: cả 4 case đều là ranh giới QUYỀN, chỉ
@@ -2094,11 +2094,11 @@ async function main() {
 
   // ==========================================================================
   // Phần 8 — User Support System v1 (support_tickets + support_ticket_notes +
-  // support-screenshots), cases ST-a…ST-e — REQUIRED, BLOCKING (backend Design
-  // Doc §Test Boundaries — RLS suite ST-a…ST-d; ST-e plan-added, closes document
-  // review finding I001, AC-013). Work Plan Task 03 — this IS the Early
-  // Verification Point, backend: no code in lib/support/ may be built on top of
-  // this authorization layer before all five cases below are green.
+  // support-screenshots), các ca ST-a…ST-e — BẮT BUỘC, CHẶN (backend Design
+  // Doc §Test Boundaries — RLS suite ST-a…ST-d; ST-e do plan thêm, đóng
+  // phát hiện review tài liệu I001, AC-013). Work Plan Task 03 — đây CHÍNH LÀ
+  // Early Verification Point, backend: không code nào trong lib/support/ được xây trên
+  // lớp phân quyền này trước khi cả năm ca bên dưới xanh.
   //
   // Vì sao phải chạy trên Postgres thật: cả 5 case đều là ranh giới QUYỀN, chỉ
   // tồn tại trong DB — RLS policy `support_tickets_select_own`, `revoke all`
@@ -2231,8 +2231,8 @@ async function main() {
   );
 
   // -------------------------------------------------------------------------
-  // Storage checks — bucket `avatars` (profile-and-about-prd.md AC-031/AC-032,
-  // ADR-0016), cases AV-a…AV-d. REQUIRED, BLOCKING.
+  // Kiểm tra Storage — bucket `avatars` (profile-and-about-prd.md AC-031/AC-032,
+  // ADR-0016), các ca AV-a…AV-d. BẮT BUỘC, CHẶN.
   //
   // VÌ SAO PHẢI Ở ĐÂY chứ không phải trong vitest: các test integration của
   // tính năng này mock TOÀN BỘ Supabase client, nên chúng chứng minh được thứ
@@ -2330,8 +2330,8 @@ async function main() {
 
   // ==========================================================================
   // Phần 9 — Subscription (payment_orders + subscriptions +
-  // record_payment_settlement), cases PO-a…PO-f / SB-a…SB-g / PS-a/PS-b —
-  // REQUIRED, BLOCKING. Backend Design Doc §Security Considerations + ADR-0014
+  // record_payment_settlement), các ca PO-a…PO-f / SB-a…SB-g / PS-a/PS-b —
+  // BẮT BUỘC, CHẶN. Backend Design Doc §Security Considerations + ADR-0014
   // §Implementation Guidance + khối SUBSCRIPTION của schema.sql.
   //
   // Vì sao phải chạy trên Postgres thật: cả ba nhóm đều là ranh giới QUYỀN chỉ
@@ -5304,7 +5304,7 @@ async function main() {
         () => userB.rpc("admin_get_community_solution_notes", { p_solution_id: SOL_M }),
         refusedNotAdmin("admin_get_community_solution_notes"),
       );
-      // RED-phase discrimination proof (task file § Implementation Steps, Red
+      // Bằng chứng phân biệt ở pha RED (task file § Implementation Steps, Red
       // Phase): trước khi chốt, đã tạm đổi `userB` → `adminSession` ở lời gọi
       // ngay dưới đây, chạy lại toàn bộ test-rls.ts và xác nhận assertion này
       // chuyển ĐỎ (phiên admin thật thì ẩn được SOL_M: không lỗi, trạng thái

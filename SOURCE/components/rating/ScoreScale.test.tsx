@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
-// ScoreScale — roving tabindex, Arrow/Home/End/Space/Enter, aria-checked, no
-// out-of-range value representable (AC-002/024). Harness owns the value state
-// (parent-controlled component, matching ScoreScaleProps.value/onChange).
+// ScoreScale — roving tabindex, Arrow/Home/End/Space/Enter, aria-checked, không
+// có giá trị ngoài khoảng nào biểu diễn được (AC-002/024). Harness sở hữu state giá trị
+// (component do cha điều khiển, khớp ScoreScaleProps.value/onChange).
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";

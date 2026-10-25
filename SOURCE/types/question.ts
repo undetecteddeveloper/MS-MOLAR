@@ -1,4 +1,4 @@
-// Data model — Question (Layer 2 Core Loop).
+// Mô hình dữ liệu — Question (Layer 2 Core Loop).
 // Contract giữ vào production (xem PROJECT_ROADMAP.md M1.1).
 
 /** Nhãn của một lựa chọn đáp án. Trắc nghiệm 4 lựa chọn A–D. */

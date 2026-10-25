@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-// Task 3.1 (Gate B) — XSS fixtures (ADR-0002).
+// Task 3.1 (Gate B) — fixture XSS (ADR-0002).
 //
 // Mỗi vector render ở CẢ HAI chỗ nội dung không tin cậy xuất hiện: stem (block)
 // và choice (inline). Mỗi case khẳng định 4 điều: không <script>/<iframe>/<style>,

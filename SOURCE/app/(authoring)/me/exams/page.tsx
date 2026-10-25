@@ -1,4 +1,4 @@
-// S-02 My exams — /me/exams (UGC v2.0, Task 6.3). Server Component.
+// S-02 Đề của tôi — /me/exams (UGC v2.0, Task 6.3). Server Component.
 // Guard: chưa đăng nhập → /?auth=signin (AC-002). Băng ?published=1 (D13).
 // Theme "Sân trường" (2026-09-09): PageHeader chuẩn với nút "Tải một đề lên"
 // ở hàng tiêu đề — bản trước giấu h1 và để nút lơ lửng căn phải.

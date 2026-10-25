@@ -1,23 +1,23 @@
-// countUnreadComments — the shared unread-count formula (decomposer resolution
+// countUnreadComments — công thức đếm chưa đọc dùng chung (quyết định của decomposer
 // R6, backend task 26; backend DD § Data Contracts "community_my_comment_feed"
 // New-comment rule, Reference Contract Value #23): "one formula, two call
-// sites", consumed by task 29 (per-exam list-card badge) and task 45 (profile
-// chip). Neither badge task re-implements this rule.
+// sites", được task 29 (huy hiệu trên thẻ danh sách từng đề) và task 45 (chip hồ sơ)
+// dùng. Không task huy hiệu nào cài lại quy tắc này.
 //
-// A row counts as new IF AND ONLY IF isUnread && examVisible — never isUnread
-// alone. The feed's own row set already excludes the viewer's own comments,
-// draft/hidden solutions (S7) and admin-hidden comments (S19); this filter
-// applies the remaining S8 exclusion (exam not published, or its author
-// banned) to the COUNT while the row still appears in the feed list (AC-098):
-// an S8 exam-not-visible comment is technically unread but must not count as
-// new.
+// Một hàng được tính là mới KHI VÀ CHỈ KHI isUnread && examVisible — không bao giờ chỉ
+// isUnread. Tập hàng của feed vốn đã loại bình luận của chính người xem,
+// bài giải nháp/ẩn (S7) và bình luận bị admin ẩn (S19); bộ lọc này
+// áp phần loại trừ S8 còn lại (đề chưa published, hoặc tác giả của nó
+// bị cấm) vào phép ĐẾM trong khi hàng vẫn hiện trong danh sách feed (AC-098):
+// một bình luận ở đề S8 không hiển thị về kỹ thuật là chưa đọc nhưng không được tính
+// là mới.
 //
-// Pure: no I/O, no imports — this module sits below every feature that
-// consumes it (same convention as lib/solutions/identity.ts).
+// Thuần: không I/O, không import — module này nằm dưới mọi tính năng
+// dùng nó (cùng quy ước với lib/solutions/identity.ts).
 
-/** The subset of `CommentFeedItem` (features/solutions/queries.ts) this
- *  formula needs — kept structural rather than importing the full type, so
- *  this module stays free of any dependency. */
+/** Phần con của `CommentFeedItem` (features/solutions/queries.ts) mà công thức
+ * này cần — giữ ở dạng cấu trúc thay vì import cả kiểu đầy đủ, để
+ * module này không phụ thuộc vào gì cả. */
 export interface UnreadCommentRow {
   solutionId: string;
   isUnread: boolean;
@@ -25,8 +25,8 @@ export interface UnreadCommentRow {
 }
 
 /**
- * Counts the rows that count as "new" (AC-091, AC-092): `isUnread &&
- * examVisible`, optionally restricted to one solution's rows (the per-exam
+ * Đếm các hàng được tính là "mới" (AC-091, AC-092): `isUnread &&
+ * examVisible`, có thể giới hạn trong các hàng của một bài giải (cách đếm theo từng đề
  * "k bình luận mới" use, task 29).
  */
 export function countUnreadComments(

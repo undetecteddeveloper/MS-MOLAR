@@ -22,7 +22,7 @@
 // Dùng cho nội dung câu hỏi và lựa chọn đáp án (Layer 2), tái dùng được cho layer khác.
 //
 // HARDENED cho nội dung KHÔNG TIN CẬY (UGC v2.0, ADR-0002 / Task 3.1 — Gate B):
-// Pipeline: remark-gfm + remark-math → rehype-katex (KATEX_SAFE_OPTIONS)
+// Chuỗi xử lý: remark-gfm + remark-math → rehype-katex (KATEX_SAFE_OPTIONS)
 //           → rehype-sanitize (SANITIZE_SCHEMA) — sanitize chạy CUỐI để backstop
 //           cả output của KaTeX (advisory GHSA-64fm-8hw2-v72w, GHSA-cvr6-37gx-v8wc,
 //           CVE-2025-23207).

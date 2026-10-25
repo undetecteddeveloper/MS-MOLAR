@@ -3,7 +3,7 @@
 // ScreenshotAttachment — thay thế, không cộng dồn (AC-011); pre-validate
 // bằng checkScreenshotFile thật (task-04), không mock — chứng minh nó dùng
 // đúng LIMITS chung, không chép riêng.
-// No I18nProvider wrapping → useT() renders the "en" default strings.
+// Không bọc I18nProvider → useT() render các chuỗi mặc định "en".
 
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
@@ -51,9 +51,9 @@ describe("ScreenshotAttachment", () => {
     input.dispatchEvent(new Event("change", { bubbles: true }));
 
     rerender(<ScreenshotAttachment file={firstFile} error={null} onSelect={onSelect} disabled={false} />);
-    // With a file attached, the control swaps to the thumbnail+remove view —
-    // there is exactly one slot, so the file input isn't reachable without
-    // removing first. Exercise the remove control, then re-select.
+    // Khi đã đính kèm file, control chuyển sang dạng thumbnail+nút xoá —
+    // chỉ có đúng một ô, nên không với tới input file được nếu chưa
+    // xoá trước. Thao tác nút xoá, rồi chọn lại.
     screen.getByText("Xoá ảnh").click();
     expect(onSelect).toHaveBeenLastCalledWith(null, null);
 
@@ -63,7 +63,7 @@ describe("ScreenshotAttachment", () => {
     Object.defineProperty(input, "files", { value: [secondFile] });
     input.dispatchEvent(new Event("change", { bubbles: true }));
     expect(onSelect).toHaveBeenLastCalledWith(secondFile, null);
-    // Never called with two files at once — the API shape itself (single File | null) enforces this.
+    // Không bao giờ được gọi với hai file cùng lúc — chính hình dạng API (một File | null) buộc điều đó.
   });
 
   it("an oversized file is rejected client-side: onSelect(null, 'too_large'), same LIMITS as the server", () => {

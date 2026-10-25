@@ -2,14 +2,14 @@
 
 // ReportedSolutionsSection — UI Spec § Component: ReportedSolutionsSection
 // (C-37); PRD R17. Proof Obligations #1 (AC-109: no "Bỏ qua", part = solution
-// status), #3 (AC-107 / Failure Mode #8: hidden comments stay inside their row
-// in both parts; a hard-deleted row leaves both parts), #6 (Reference Contract
-// Value #26: a hidden row with 0 reports is still queued) and the author-shape
-// DOM check (no avatar rendered on /admin).
+// status), #3 (AC-107 / Failure Mode #8: bình luận bị ẩn vẫn nằm trong hàng của nó
+// ở cả hai phần; hàng bị xoá cứng rời khỏi cả hai phần), #6 (Reference Contract
+// Value #26: một hàng bị ẩn với 0 báo cáo vẫn nằm trong hàng đợi) và kiểm tra
+// DOM hình dạng tác giả (không render avatar ở /admin).
 //
-// Mock boundary: `@/features/solutions/adminActions` mocked at the module
-// boundary; the mocked Server Actions are passed as props exactly as
-// `app/(admin)/admin/page.tsx` passes the real ones (B4).
+// Ranh giới mock: `@/features/solutions/adminActions` được mock ở ranh giới
+// module; các Server Action mock được truyền làm prop đúng như
+// `app/(admin)/admin/page.tsx` truyền cái thật (B4).
 
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";

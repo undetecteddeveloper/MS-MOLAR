@@ -1,4 +1,4 @@
-// User Support System v1 (ADR-0012) — Gmail SMTP + App Password via
+// User Support System v1 (ADR-0012) — Gmail SMTP + App Password qua
 // nodemailer, gọi DUY NHẤT từ bên trong after()-scheduled callback của
 // submitSupportTicket, sau khi INSERT ticket đã thành công (D5). Node-only,
 // KHÔNG "use client", KHÔNG export Edge runtime — import "server-only" chặn
@@ -70,11 +70,11 @@ function buildBody(ticket: SupportTicketMailPayload, shortRef: string): string {
 /**
  * KHÔNG BAO GIỜ throw/reject ra khỏi hàm này — mọi lỗi nội bộ (auth, timeout,
  * network, env chưa cấu hình) đều bị bắt và trả về { ok: false, error }
- * (ADR-0012: "wrap the entire send in a single try/catch"). Thiếu
+ * (ADR-0012: "bọc toàn bộ lượt gửi trong một try/catch duy nhất"). Thiếu
  * SUPPORT_SMTP_USER/SUPPORT_SMTP_APP_PASSWORD/SUPPORT_NOTIFY_EMAIL được coi
  * là một lần gửi thất bại BÌNH THƯỜNG, không phải lỗi ném ra — build với env
  * placeholder (CI) không được chết lúc import, mirror
- * checkSchemaVersion.ts's degrade-on-missing-env.
+ * chế độ suy giảm khi thiếu env của checkSchemaVersion.ts.
  */
 export async function sendSupportNotification(params: {
   ticket: SupportTicketMailPayload;

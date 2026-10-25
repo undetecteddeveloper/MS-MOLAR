@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
-// TicketQueueRow — collapsed summary always visible; NotificationFailureFlag
-// visible WITHOUT expanding (AC-022 UI half, AC-032); expand reveals
-// TicketDetailPanel; collapse state is local, not persisted.
+// TicketQueueRow — tóm tắt thu gọn luôn hiện; NotificationFailureFlag
+// hiện KHÔNG cần mở rộng (AC-022 nửa UI, AC-032); mở rộng hé lộ
+// TicketDetailPanel; trạng thái thu gọn là cục bộ, không lưu bền.
 
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -38,7 +38,7 @@ function fixtureTicket(overrides: Partial<TicketWithNotes> = {}): TicketWithNote
 describe("TicketQueueRow", () => {
   it("collapsed by default: TicketDetailPanel is not rendered", () => {
     render(<TicketQueueRow ticket={fixtureTicket()} />);
-    expect(screen.queryByRole("combobox")).toBeNull(); // TicketStatusControl's <select> only exists when expanded
+    expect(screen.queryByRole("combobox")).toBeNull(); // <select> của TicketStatusControl chỉ tồn tại khi đã mở rộng
   });
 
   it("notify_failed flag is visible in the collapsed row WITHOUT expanding (AC-022, AC-032)", () => {

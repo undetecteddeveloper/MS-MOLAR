@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-// InternalNotesPanel — noteFormAction adapter must forward the exact
-// (ticketId, noteText) pair to addTicketNoteAction (AC-027); empty state.
+// InternalNotesPanel — adapter noteFormAction phải chuyển đúng
+// cặp (ticketId, noteText) cho addTicketNoteAction (AC-027); trạng thái rỗng.
 
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

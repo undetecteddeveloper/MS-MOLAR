@@ -1,4 +1,4 @@
-// Verify schema drift (Security review 2026-08-03, TECH-DEBT TD-001/TD-005).
+// Kiểm trôi lệch schema (Đánh giá bảo mật 2026-08-03, TECH-DEBT TD-001/TD-005).
 //
 // schema.sql là nguồn chân lý duy nhất, áp lên DB bằng tay — trên dev có QUY
 // TRÌNH migration từ 2026-08-31 (schema:plan → file migration → CLI apply, xem

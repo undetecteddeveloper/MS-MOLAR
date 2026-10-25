@@ -1,4 +1,4 @@
-// User Support System v1 — /admin/tickets Server Actions.
+// Hệ thống hỗ trợ người dùng v1 — Server Actions của /admin/tickets.
 // Mirrors features/admin/actions.ts's moderateExamAction convention: mỗi
 // action tự kiểm quyền LẠI, không tin trang page.tsx đã kiểm — Server Action
 // là endpoint HTTP độc lập, gọi thẳng được mà không qua trang nào.

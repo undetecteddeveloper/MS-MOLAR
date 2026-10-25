@@ -55,7 +55,7 @@ const entries = sizes.map((s, i) => {
   e.writeUInt8(0, 2); // số màu palette (0 = truecolor)
   e.writeUInt8(0, 3); // reserved
   e.writeUInt16LE(1, 4); // color planes
-  e.writeUInt16LE(32, 6); // bits per pixel
+  e.writeUInt16LE(32, 6); // bit trên mỗi điểm ảnh
   e.writeUInt32LE(pngs[i].length, 8);
   e.writeUInt32LE(offset, 12);
   offset += pngs[i].length;

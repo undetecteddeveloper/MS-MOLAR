@@ -1,4 +1,4 @@
-// S-03 Review & edit — /me/exams/[id] (UGC v2.0, Task 6.4). Server Component.
+// S-03 Xem lại và sửa — /me/exams/[id] (UGC v2.0, Task 6.4). Server Component.
 // Guard: chưa đăng nhập → /?auth=signin; không phải của mình / không tồn tại →
 // /me/exams (getMyExam trả null qua RLS + author check).
 

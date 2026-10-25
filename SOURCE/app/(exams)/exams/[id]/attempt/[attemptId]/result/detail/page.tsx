@@ -36,8 +36,8 @@ import { EssayGradingPoller } from "@/features/exams/components/EssayGradingPoll
  *  PHAI khai O DAY, khong khai duoc trong file `"use server"`: `maxDuration` la
  *  cau hinh ROUTE SEGMENT (`layout.tsx | page.tsx | route.ts`), va mot file
  *  `"use server"` khong phai route segment — no chi duoc export ham async.
- *  Tai lieu Next.js 16 kem trong repo noi thang dieu do
- *  (`node_modules/next/dist/docs/.../route-segment-config/maxDuration.md`), va
+ *  Tài liệu Next.js 16 kèm trong repo nói thẳng điều đó
+ *  (`node_modules/next/dist/docs/.../route-segment-config/maxDuration.md`), và
  *  `tutorActions.ts:16-31` da ghi lai ca lap luan lan ket luan.
  *
  *  300 chu khong phai mot con so vua khit: no bang MAC DINH cua fluid compute,

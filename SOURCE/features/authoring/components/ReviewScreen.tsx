@@ -1,6 +1,6 @@
 "use client";
 
-// ReviewScreen — container S-03 review & edit (UI Spec §ReviewScreen / Task 6.4
+// ReviewScreen — container S-03 xem lại và sửa (UI Spec §ReviewScreen / Task 6.4
 // + v2.2 M7). Giữ bản sao AssembledExam sửa được; validate LIVE bằng
 // validateAssembledExam + validateMetaForPublish (thuần, client-safe) để
 // bật/tắt Publish + đổ ExtractionErrorPanel. Save → saveExam (persist nháp/đề

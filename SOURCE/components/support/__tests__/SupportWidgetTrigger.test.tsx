@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// No I18nProvider wrapping → useT() renders the "en" default strings.
+// Không bọc I18nProvider → useT() render các chuỗi mặc định "en".
 
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -76,12 +76,11 @@ describe("SupportWidgetTrigger", () => {
     expect(button.getAttribute("style")).toBeNull();
   });
 
-  // UI-D28: the trigger (z-45) hides while a FilterSheet (`data-filter-sheet`)
-  // or an OverlaySheet (`data-app-overlay`) is open. jsdom does not build
-  // Tailwind's CSS, so `display: none` cannot be measured here; what can be
-  // proven is that the `:has()` variant class for each marker sits on the
-  // button — without that class Tailwind emits no rule and the trigger stays
-  // visible over the overlay.
+  // UI-D28: nút kích hoạt (z-45) ẩn đi khi một FilterSheet (`data-filter-sheet`)
+  // hoặc OverlaySheet (`data-app-overlay`) đang mở. jsdom không dựng CSS của
+  // Tailwind, nên không đo được `display: none` ở đây; thứ chứng minh được
+  // là lớp biến thể `:has()` của từng marker nằm trên nút — thiếu lớp đó thì Tailwind
+  // không sinh quy tắc nào và nút kích hoạt vẫn hiện đè lên overlay.
   it.each([
     ["data-filter-sheet", "FilterSheet"],
     ["data-app-overlay", "OverlaySheet"],

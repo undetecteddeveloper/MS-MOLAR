@@ -65,7 +65,7 @@ vi.mock("@/features/solutions/components/ProfileSolutionsTab", () => ({
 vi.mock("@/features/billing/components/plans/PlansTab", () => ({
   PlansTab: plansTabMock,
 }));
-// ProfileCard (rendered on the account tab) imports these at module top level.
+// ProfileCard (hiển thị ở tab tài khoản) import những thứ này ở cấp cao nhất của module.
 vi.mock("@/features/auth/actions", () => ({
   changeAvatar: vi.fn(),
   changePassword: vi.fn(),

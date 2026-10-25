@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 // IntentSelector — đúng 3 lựa chọn, không có lựa chọn thứ 4 (AC-001).
-// No I18nProvider wrapping → useT() renders the "en" default strings.
+// Không bọc I18nProvider → useT() render các chuỗi mặc định "en".
 
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";

@@ -1,15 +1,15 @@
 // /profile — initials for the avatar fallback (Design Doc §Backend contracts).
 //
-// The dot is the ONLY separator worth handling: a display name must match
-// DISPLAY_NAME_RE (letters and dots), so a space cannot occur in a stored name.
-// Splitting on whitespace as well would be dead code pretending to be defensive.
+// Dấu chấm là dấu phân tách DUY NHẤT đáng xử lý: tên hiển thị phải khớp
+// DISPLAY_NAME_RE (chữ cái và dấu chấm), nên khoảng trắng không thể xuất hiện trong tên đã lưu.
+// Tách thêm theo khoảng trắng sẽ là mã chết giả vờ phòng thủ.
 //
-// Never throws and never returns undefined — the caller renders this instead of
-// an image, and an exception on that path turns "no photo" into "no page"
+// Không bao giờ ném lỗi và không bao giờ trả về undefined — nơi gọi render cái này thay cho
+// ảnh, và một exception trên đường đó biến "không có ảnh" thành "không có trang"
 // (PRD AC-033b, AC-040).
 
-/** First letter of each of the first two dot-separated segments, uppercased.
- *  One segment yields one character; nothing usable yields `""`. */
+/** Chữ cái đầu của mỗi đoạn trong hai đoạn đầu tách bằng dấu chấm, viết hoa.
+ *  Một đoạn cho một ký tự; không có gì dùng được thì trả `""`. */
 export function deriveInitials(displayName: string): string {
   return displayName
     .split(".")
@@ -20,10 +20,10 @@ export function deriveInitials(displayName: string): string {
     .toUpperCase();
 }
 
-/** `Array.from` rather than `[0]`: index access returns a UTF-16 code unit, so
- *  a character outside the BMP would be cut in half into an unrenderable half
- *  surrogate. Vietnamese precomposed letters (Đ, Ứ) are inside the BMP today,
- *  which is exactly why the wrong version of this line would look correct. */
+/** `Array.from` thay vì `[0]`: truy cập chỉ mục trả về một code unit UTF-16, nên
+ *  ký tự ngoài BMP sẽ bị cắt đôi thành nửa surrogate không hiển thị được.
+ *  Chữ tiếng Việt dựng sẵn (Đ, Ứ) hiện đều nằm trong BMP,
+ *  chính vì vậy mà phiên bản sai của dòng này trông vẫn đúng. */
 function firstCharacter(segment: string): string {
   return Array.from(segment)[0] ?? "";
 }

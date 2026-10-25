@@ -1,44 +1,42 @@
-// app/page.tsx — Home: guarded hot-exams fetch (F-001) (P7-T1)
+// app/page.tsx — Trang chủ: lấy kệ hot có cổng bảo vệ (F-001) (P7-T1)
 // Design Docs: docs/design/exam-shelves-backend-design.md (§ Integration Point I5)
 //              docs/design/exam-shelves-frontend-design.md (§ Home block AC-036–AC-038)
 // PRD:         docs/prd/exam-shelves-prd.md (AC-036–AC-038)
-// Task:        docs/plans/tasks/exam-shelves-task-P7-T1.md — binding Completion Criterion
+// Task:        docs/plans/tasks/exam-shelves-task-P7-T1.md — Completion Criterion ràng buộc
 //
-// CLOSES A P3-T2 RESIDUAL. `features/exams/__tests__/shelves.int.test.ts`'s own
-// "guard PATTERN" case proves only that the ternary `user ? await listHotExams(...) :
-// null` is syntactically correct when evaluated against a hand-declared literal
-// `currentUser: null` — that literal can never take the truthy branch, so the case
-// cannot fail regardless of what THIS file's real call site (`app/page.tsx`) does.
-// This file closes that gap: it imports the REAL `Home` export and invokes it
-// directly (a plain function call, not JSX) with a MOCKED user-lookup
-// (`getCurrentUserProfile`) and a MOCKED Supabase client boundary
-// (`@/lib/supabase/server`'s `createClient`) — the real `listHotExams` (and its
-// real `fetchExamRows`/`readMyAttemptRows`/`readHotCounts` dependencies) run
-// UNMOCKED, so a dropped/inverted guard at the real call site would show up here
-// as a non-zero `fromMock`/`rpcMock` call count.
+// ĐÓNG MỘT PHẦN DƯ CỦA P3-T2. Ca "guard PATTERN" của `features/exams/__tests__/shelves.int.test.ts`
+// chỉ chứng minh rằng biểu thức ba ngôi `user ? await listHotExams(...) :
+// null` đúng cú pháp khi đánh giá với `currentUser: null` khai báo tay —
+// literal đó không bao giờ rẽ vào nhánh truthy, nên ca đó không thể hỏng bất kể
+// điểm gọi thật (`app/page.tsx`) của FILE NÀY làm gì.
+// File này đóng khoảng trống đó: nó import export `Home` THẬT và gọi
+// trực tiếp (gọi hàm thường, không phải JSX) với một tra cứu user MOCK
+// (`getCurrentUserProfile`) và một ranh giới client Supabase MOCK
+// (`createClient` của `@/lib/supabase/server`) — `listHotExams` thật (cùng các
+// phụ thuộc thật `fetchExamRows`/`readMyAttemptRows`/`readHotCounts`) chạy
+// KHÔNG mock, nên một cổng bị rơi/đảo ngược ở điểm gọi thật sẽ hiện ở đây
+// dưới dạng số lần gọi `fromMock`/`rpcMock` khác 0.
 //
-// WHY A PLAIN FUNCTION CALL, NOT A RENDER. `Home`'s own function body — the part
-// that contains the guarded `const hot = user ? await listHotExams(...) : null;`
-// expression this file must exercise — completes entirely BEFORE any child
-// component (`SiteHeader`, `ExamBrowser`, `TechStack`, …) is ever invoked: JSX
-// child elements are un-executed descriptors (`{type, props}`) until a renderer
-// walks the tree. Calling `await Home(props)` directly and inspecting the
-// returned element tree as plain data therefore exercises the exact real
-// expression under test without needing to stand up every child component's own
-// environment (next/navigation hooks, HeaderSearch, SupportWidget's chat
-// script, …) — none of that is this task's Reference Contract. `renderServerTree`
-// (the exams-page precedent, `app/(exams)/exams/__tests__/page.test.tsx`) is the
-// right tool when the claim is about rendered DOM; the claims here (call counts,
-// JSX-tree shape) do not need DOM.
+// VÌ SAO GỌI HÀM THƯỜNG, KHÔNG RENDER. Thân hàm của chính `Home` — phần
+// chứa biểu thức có cổng `const hot = user ? await listHotExams(...) : null;`
+// mà file này phải kích hoạt — chạy xong hoàn toàn TRƯỚC khi bất kỳ component con
+// nào (`SiteHeader`, `ExamBrowser`, `TechStack`, …) được gọi: các phần tử JSX con
+// là descriptor chưa thực thi (`{type, props}`) cho tới khi một renderer
+// duyệt cây. Gọi thẳng `await Home(props)` rồi xem cây phần tử trả về như dữ liệu thuần
+// do đó kích hoạt đúng biểu thức thật đang được kiểm mà không cần dựng
+// môi trường riêng của từng component con (hook next/navigation, HeaderSearch,
+// script chat của SupportWidget, …) — không thứ nào trong đó thuộc Reference Contract của task này.
+// `renderServerTree` (tiền lệ trang exams, `app/(exams)/exams/__tests__/page.test.tsx`)
+// là công cụ đúng khi khẳng định nói về DOM đã render; các khẳng định ở đây (số lần gọi,
+// hình dạng cây JSX) không cần DOM.
 //
-// MOCK BOUNDARY: `server-only` stubbed (real `shelves.ts`/`catalogue.ts`/
-// `attempts.ts`/`hotCounts.ts` all import it, same as `shelves.int.test.ts:98`);
-// `next/headers` stubbed (`Home` awaits it directly); `getCurrentUserProfile`
-// mocked (the "user-lookup" the task file names); `@/lib/supabase/server`'s
-// `createClient` mocked as `{ from, rpc }` (the SAME technique
-// `shelves.int.test.ts` uses for `listExamShelves`/`listHotExams` themselves) —
-// everything downstream of the client boundary, incl. `listHotExams` itself, is
-// REAL.
+//RANH GIỚI MOCK: `server-only` được stub (`shelves.ts`/`catalogue.ts`/
+// `attempts.ts`/`hotCounts.ts` thật đều import nó, như `shelves.int.test.ts:98`);
+// `next/headers` được stub (`Home` await nó trực tiếp); `getCurrentUserProfile`
+// được mock ("tra cứu user" mà task file nêu); `createClient` của `@/lib/supabase/server`
+// được mock thành `{ from, rpc }` (CHÍNH kỹ thuật mà
+// `shelves.int.test.ts` dùng cho `listExamShelves`/`listHotExams` ) —
+// mọi thứ nằm sau ranh giới client, kể cả chính `listHotExams`, là THẬT.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactElement, ReactNode } from "react";
@@ -68,10 +66,10 @@ import { ExamBrowser } from "@/features/exams/components/ExamBrowser";
 import { LatestSolutionsSpotlight } from "@/features/home/components/LatestSolutionsSpotlight";
 import { PersonalProgressStrip } from "@/features/home/components/PersonalProgressStrip";
 
-// --- React-element tree helpers ----------------------------------------------
-// `Home(...)` returns an UN-RENDERED element tree (plain {type, props} objects,
-// per the file header note above) — these walk that tree as data, never calling
-// into a component function.
+// --- Hàm phụ trợ cho cây phần tử React ----------------------------------------------
+// `Home(...)` trả về một cây phần tử CHƯA RENDER (các object {type, props} thuần,
+// theo ghi chú đầu file ở trên) — các hàm này duyệt cây đó như dữ liệu, không bao giờ
+// gọi vào một hàm component.
 
 function isReactElement(node: unknown): node is ReactElement {
   return (
@@ -126,9 +124,8 @@ function countText(root: ReactNode, text: string): number {
   return count;
 }
 
-// --- Fixture builders (same raw shapes as
-//     features/exams/__tests__/shelves.int.test.ts, this file's query-layer
-//     sibling) -----------------------------------------------------------------
+// --- Hàm dựng fixture (cùng hình dạng thô với
+//     features/exams/__tests__/shelves.int.test.ts, file anh em ở tầng truy vấn) -----
 
 function examRow(id: string, grade: number, subject: string, createdAt: string) {
   return {
@@ -234,7 +231,7 @@ beforeEach(() => {
 describe("Home (app/page.tsx) — guarded hot-exams call site, real composition (P7-T1 binding Completion Criterion)", () => {
   it("anonymous visitor (getCurrentUserProfile resolves null): the mocked Supabase client records 0 .from(...) and 0 .rpc(...) calls of any kind, and the hot section is absent (F-001, Reference Contract row 2)", async () => {
     getCurrentUserProfileMock.mockResolvedValue(null);
-    mockSupabaseBoundary({}); // wired but must never be reached
+    mockSupabaseBoundary({}); // đã nối dây nhưng không bao giờ được chạm tới
 
     const element = await Home({ searchParams: Promise.resolve({}) });
 
@@ -253,8 +250,8 @@ describe("Home (app/page.tsx) — guarded hot-exams call site, real composition 
 
     const element = await Home({ searchParams: Promise.resolve({}) });
 
-    // Differs from the anonymous case above: the fetch DOES fire for a signed-in
-    // visitor — the absence comes from an empty result, never from skipping the call.
+    // Khác ca ẩn danh ở trên: lượt lấy dữ liệu CÓ chạy cho khách đã đăng nhập —
+    // việc không thấy gì đến từ kết quả rỗng, chứ không phải bỏ qua lời gọi.
     // 2 lượt .rpc(): exam_hot_counts (F-001) + community_solutions_latest_for_home
     // (F-041) — cả hai chạy song song trong CÙNG một Promise.all khi có `user`.
     expect(fromMock).toHaveBeenCalled();

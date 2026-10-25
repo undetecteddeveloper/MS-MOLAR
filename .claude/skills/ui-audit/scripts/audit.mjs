@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// Usage: node audit.mjs <url> [--out=./ui-audit-output]
-// Measures CLS, long tasks, console errors, failed requests at 3 viewports.
-// Clicks/hovers interactive elements and flags any layout shift caused by interaction.
+// Cách dùng: node audit.mjs <url> [--out=./ui-audit-output]
+// Đo CLS, tác vụ dài, lỗi console, request thất bại ở 3 khung nhìn.
+// Bấm/rê chuột lên các phần tử tương tác và báo mọi lần layout dịch chuyển do tương tác gây ra.
 
 import { chromium } from 'playwright';
 import fs from 'fs';
@@ -113,7 +113,7 @@ for (const vp of viewports) {
         interactions.push({ element: c, new_shift_count: after - before, screenshot: shotPath });
       }
     } catch (e) {
-      // ignore individual element failures, continue auditing others
+      // bỏ qua lỗi của từng phần tử riêng lẻ, tiếp tục kiểm các phần tử khác
     }
   }
 

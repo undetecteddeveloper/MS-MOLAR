@@ -1,16 +1,16 @@
 // @vitest-environment jsdom
 
 // ReportedSolutionRow — UI Spec § Component: ReportedSolutionRow (C-38);
-// frontend DD § Test Boundaries (task 38): anonymous row (S5/AC-081), plain-text
-// report reasons, busy state (`aria-disabled`, never native `disabled`),
+// frontend DD § Test Boundaries (task 38): hàng ẩn danh (S5/AC-081), lý do báo cáo
+// dạng chữ thuần, trạng thái bận (`aria-disabled`, không bao giờ `disabled` gốc),
 // "Admin notes `<details>` tests" (Reference Contract Value #16 / Element 11),
-// "Admin refusal tests" (solution half), and Proof Obligation #2 (AC-082 /
-// AC-106: reason required + confirm step with the exact consequence line).
+// "Admin refusal tests" (nửa bài giải), và Proof Obligation #2 (AC-082 /
+// AC-106: bắt buộc có lý do + bước xác nhận kèm đúng dòng nêu hệ quả).
 //
-// Mock boundary: `@/features/solutions/adminActions` mocked at the module
-// boundary; the mocked Server Actions are passed as props exactly as
-// `app/(admin)/admin/page.tsx` passes the real ones (B4). `ConfirmDialog`
-// renders for real.
+// Ranh giới mock: `@/features/solutions/adminActions` được mock ở ranh giới
+// module; các Server Action mock được truyền làm prop đúng như
+// `app/(admin)/admin/page.tsx` truyền cái thật (B4). `ConfirmDialog`
+// render thật.
 
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

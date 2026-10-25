@@ -1,4 +1,4 @@
-// UGC Exam Upload v2.1 — shared types cho pipeline extract → assemble → persist.
+// Đăng đề UGC v2.1 — kiểu dùng chung cho pipeline trích xuất → ghép → lưu.
 // Design Doc §AI Extraction & Assembly (ADR-0004) + §v2.1 Amendment (ADR-0005
 // format đề quốc gia nhiều PHẦN; ADR-0006 bbox native Gemini). Các shape này là
 // dạng TRƯỚC-persistence, không mang field DB-only.

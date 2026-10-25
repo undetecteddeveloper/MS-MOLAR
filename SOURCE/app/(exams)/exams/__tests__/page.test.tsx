@@ -1,30 +1,30 @@
 // @vitest-environment jsdom
 
-// app/(exams)/exams/page.tsx — showShelves branch predicate wiring (P5-T1,
-// the plan's own highest-blast-radius integration point).
+// app/(exams)/exams/page.tsx — nối dây điều kiện rẽ nhánh showShelves (P5-T1,
+// điểm tích hợp có bán kính ảnh hưởng lớn nhất của chính kế hoạch).
 //
-// MOCK BOUNDARY (mirrors frontend DD § Test Plan's declaration, the same one
-// `exam-shelves.fixture.e2e.test.ts` states): data layer only — `listExamShelves`,
-// `listExamsRanked`, `listExamFacets`, `getCurrentUser` are mocked; every rendered
-// component (`ExamShelf`, `ExamBrowser`, `ExamCard`, `ExamFilters`) is real.
-// `hasBrowseParam`/`BROWSE_PARAM_KEYS` are imported for real too — the branch
-// predicate under test is the SAME code the page calls, not a hand-copied
-// re-implementation of the ten-key list.
+// RANH GIỚI MOCK (theo khai báo Test Plan của frontend DD, cùng khai báo mà
+// `exam-shelves.fixture.e2e.test.ts` nêu): chỉ tầng dữ liệu — `listExamShelves`,
+// `listExamsRanked`, `listExamFacets`, `getCurrentUser` bị mock; mọi component
+// được render (`ExamShelf`, `ExamBrowser`, `ExamCard`, `ExamFilters`) là thật.
+// `hasBrowseParam`/`BROWSE_PARAM_KEYS` cũng được import thật — điều kiện rẽ nhánh
+// đang được kiểm CHÍNH LÀ đoạn code mà trang gọi, không phải bản chép tay
+// cài lại danh sách mười khoá.
 //
-// SCOPE — what this file does NOT try to prove. The exhaustive, table-driven
-// fixture-e2e proof of every AC-008 param plus the cold-start (AC-051) journey
-// belongs to P5-T2 (`tests/e2e/fixture/exam-shelves.fixture.e2e.test.ts`,
-// pre-committed skeleton — ribbon count, chip count, tile placement, card-count
-// parity are its job). This file's own job (task file Boundary Context / Proof
-// Obligations): prove `showShelves` is wired from the RAW `sp` for bare /exams
-// and for each of the 10 `BROWSE_PARAM_KEYS` individually, prove
-// `listExamFacets()`/`getCurrentUser()` run on BOTH branches, and prove
-// `SHELF_ORDER`'s DOM order incl. the AC-051 null-shelf omission.
+// PHẠM VI — những gì file này KHÔNG cố chứng minh. Bằng chứng fixture-e2e đầy đủ,
+// dạng bảng, cho mọi tham số AC-008 cộng hành trình cold-start (AC-051)
+// thuộc P5-T2 (`tests/e2e/fixture/exam-shelves.fixture.e2e.test.ts`,
+// skeleton đã commit trước — số ruy băng, số chip, vị trí ô, độ khớp
+// số thẻ là việc của nó). Việc của chính file này (Boundary Context / Proof
+// Obligations trong task file): chứng minh `showShelves` được nối từ `sp` THÔ cho /exams
+// trần và cho từng trong 10 `BROWSE_PARAM_KEYS`, chứng minh
+// `listExamFacets()`/`getCurrentUser()` chạy ở CẢ HAI nhánh, và chứng minh thứ tự DOM
+// của `SHELF_ORDER` kể cả việc bỏ kệ null theo AC-051.
 //
-// `renderServerTree`, not `render(await ExamsPage(...))`: `ExamsPage` is async and
-// renders `ExamShelf`/`ExamBrowser`/`ExamCard` (all async; `ExamCard`'s own child
-// `AuthorByline` is async too) — same empty-tree hazard documented in
-// `ExamShelf.test.tsx` and the fixture skeleton's own header comment.
+// `renderServerTree`, không dùng `render(await ExamsPage(...))`: `ExamsPage` là async và
+// render `ExamShelf`/`ExamBrowser`/`ExamCard` (đều async; con `AuthorByline` của chính
+// `ExamCard` cũng async) — cùng mối nguy cây rỗng đã ghi trong
+// `ExamShelf.test.tsx` và comment đầu của skeleton fixture.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderServerTree } from "@/tests/helpers/renderServerTree";
@@ -33,8 +33,8 @@ import type { Exam } from "@/types/exam";
 
 vi.mock("server-only", () => ({}));
 
-// `ExamFilters` (client component, renders on BOTH branches) reads these three
-// hooks at mount — same boundary `ExamFilters.test.tsx`/`layout.test.tsx` mock.
+// `ExamFilters` (client component, render ở CẢ HAI nhánh) đọc ba hook này
+// khi mount — cùng ranh giới mà `ExamFilters.test.tsx`/`layout.test.tsx` mock.
 vi.mock("next/navigation", () => ({
   usePathname: () => "/exams",
   useSearchParams: () => new URLSearchParams(),

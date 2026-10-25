@@ -152,9 +152,9 @@ export function solutionEditorReducer(state: EditorState, action: EditorAction):
         ...state,
         saving: false,
         status: action.status,
-        // Server-DERIVED — the first successful save is what creates the row
-        // (`save_community_solution`'s upsert); this is the only place client
-        // state learns the id it must later use for "Xem bài giải" (AC-030).
+        // Server-DERIVED — lần lưu thành công đầu tiên là thứ tạo ra hàng
+        // (upsert của `save_community_solution`); đây là nơi duy nhất state phía client
+        // biết được id mà sau này nó phải dùng cho "Xem bài giải" (AC-030).
         solutionId: action.solutionId,
         toastKey: "solutions.toast.saved",
         toastTrigger: state.toastTrigger + 1,
@@ -216,10 +216,10 @@ export function solutionEditorReducer(state: EditorState, action: EditorAction):
       return {
         ...state,
         activeNote: null,
-        // Same reason as SAVE_DRAFT_SUCCESS above — a note saved from a fresh
-        // (solutionId: null) writer state is equally the first write that
-        // creates the row; without this the publish bar's "Xem bài giải" link
-        // stays pointed at "#" forever for anyone who never used "Lưu nháp".
+        // Cùng lý do với SAVE_DRAFT_SUCCESS ở trên — ghi chú lưu từ trạng thái writer mới
+        // (solutionId: null) cũng là lần ghi đầu tiên
+        // tạo ra hàng; thiếu cái này thì liên kết "Xem bài giải" trên thanh đăng
+        // vẫn trỏ vào "#" mãi mãi với bất kỳ ai chưa từng dùng "Lưu nháp".
         solutionId: action.solutionId,
         toastKey: "solutions.toast.saved",
         toastTrigger: state.toastTrigger + 1,

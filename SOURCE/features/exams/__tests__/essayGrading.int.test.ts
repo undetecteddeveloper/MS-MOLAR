@@ -6,99 +6,99 @@
 // UI Spec:     docs/ui-spec/essay-auto-scoring-ui-spec.md (v1.3)
 // PRD:         docs/prd/essay-auto-scoring-prd.md (v1.2, AC-001..AC-072)
 // ADR:         docs/adr/ADR-0018-essay-async-grade-write.md (Accepted, D1..D6)
-// Generated:   2026-08-29 | Budget used: integration 3/3, fixture-e2e 3/3, service-e2e 2/2
+// Sinh ngày:   2026-08-29 | Ngân sách đã dùng: integration 3/3, fixture-e2e 3/3, service-e2e 2/2
 //
 // =============================================================================
-// FILE STATUS — read before editing
+// TRẠNG THÁI FILE — đọc trước khi sửa
 // =============================================================================
-// ALL THREE CASES ARE NOW CONVERTED. This file no longer contains a skeleton:
-//   INT-1 — Task B1.6 (11 executing cases)
-//   INT-2 — Task B2.4 (7 executing cases)
-//   INT-3 — Task B2.4 (5 executing cases)
-// Integration lane resolution for this feature: 3/3. Unresolved `it.todo`: 0.
+// CẢ BA CA ĐÃ ĐƯỢC CHUYỂN ĐỔI. File này không còn là skeleton:
+//   INT-1 — Task B1.6 (11 ca thực thi)
+//   INT-2 — Task B2.4 (7 ca thực thi)
+//   INT-3 — Task B2.4 (5 ca thực thi)
+// Kết quả cho làn integration của tính năng này: 3/3. `it.todo` chưa giải quyết: 0.
 //
-// The paragraph that used to stand here said "nothing executes an assertion yet"
-// and explained why every case was `it.todo`. It is kept below in one line rather
-// than deleted, because the REASON still governs anyone adding a case: this file
-// is collected by `SOURCE/vitest.config.ts:19` (`app/**/*.test.{ts,tsx}`), so a
-// file with zero collected tasks makes vitest report "No test suite found in
-// file" and exit 1 — a red CI caused by the shape of a skeleton rather than by a
-// defect. `it.todo` is collected, reports as todo, and keeps the gate green.
+// Đoạn từng nằm ở đây nói "chưa có gì thực thi khẳng định" và
+// giải thích vì sao mọi ca đều là `it.todo`. Nó được giữ lại dưới đây trong một dòng thay vì
+// xoá, vì LÝ DO vẫn chi phối bất kỳ ai thêm một ca: file này
+// được `SOURCE/vitest.config.ts:19` thu thập (`app/**/*.test.{ts,tsx}`), nên một
+// file không có task nào được thu thập làm vitest báo "No test suite found in
+// file" và thoát mã 1 — CI đỏ do hình dạng của một skeleton chứ không phải do
+// lỗi thật. `it.todo` được thu thập, báo là todo, và giữ cổng xanh.
 //
-// Each conversion landed IN THE SAME COMMIT as the production code it covers
-// (Red -> Green in one task), following the shipped precedent in this directory
+// Mỗi lần chuyển đổi đáp xuống TRONG CÙNG COMMIT với code production mà nó phủ
+// (Red -> Green trong một task), theo tiền lệ đã ship trong thư mục này
 // (`getResult.int.test.ts`, `submitExam.int.test.ts`, `rating.int.test.ts`).
 //
-// HOW THIS LANE RUNS: `npm test` (from `SOURCE/`). NOT `npm run test:integration`
-// — that config collects `tests/integration/**` only and needs a real Supabase dev
-// database. Every case in this file is DB-free by construction.
+// LÀN NÀY CHẠY THẾ NÀO: `npm test` (từ `SOURCE/`). KHÔNG phải `npm run test:integration`
+// — cấu hình đó chỉ thu thập `tests/integration/**` và cần một database Supabase dev
+// thật. Mọi ca trong file này không dùng DB theo cấu trúc.
 //
 // -----------------------------------------------------------------------------
-// MOCK BOUNDARY — stated once, applies to all three cases
+// RANH GIỚI MOCK — nêu một lần, áp dụng cho cả ba ca
 // -----------------------------------------------------------------------------
-// Backend DD § Mock Boundary Decisions (:2183) is the authority; this file adopts
-// it verbatim:
-//   MOCKED  — the Supabase client at the `createClient()` boundary (the sanctioned
-//             boundary of `getResult.int.test.ts` / `rating.int.test.ts` /
-//             `history.int.test.ts`); `lib/supabase/service-role.ts` operations;
-//             `after()` (replaced by a synchronous invocation, since the subject is
-//             WHAT is registered and WHEN, not how Next schedules it); Redis;
+// Backend DD § Mock Boundary Decisions (:2183) là thẩm quyền; file này áp dụng
+// nguyên văn:
+//   MOCK     — client Supabase ở ranh giới `createClient()` (ranh giới được phê duyệt
+//             của `getResult.int.test.ts` / `rating.int.test.ts` /
+//             `history.int.test.ts`); các thao tác `lib/supabase/service-role.ts`;
+//             `after()` (thay bằng lời gọi đồng bộ, vì đối tượng kiểm là
+//             CÁI GÌ được đăng ký và KHI NÀO, không phải cách Next lập lịch nó); Redis;
 //             `redirect()`.
-//   MOCKED  — `fetch` to `api.groq.com`, at the fetch boundary and no deeper.
-//             GRADING SHIPS DISABLED behind the AC-067 human gate (Zero Data
-//             Retention in the Groq console) and NO GROQ ACCOUNT EXISTS YET, so
-//             every case here runs with ZERO real provider calls. INT-1 asserts
-//             that count is zero as its own subject; INT-2/INT-3 never reach the
-//             write path at all.
-//   REAL    — `computeScore()`, `lib/scoring/essayLifecycle.ts`
+//   MOCK     — `fetch` tới `api.groq.com`, ở ranh giới fetch và không sâu hơn.
+//             VIỆC CHẤM XUẤT XƯỞNG Ở TRẠNG THÁI TẮT sau cổng người duyệt AC-067 (Zero Data
+//             Retention trong console Groq) và CHƯA CÓ TÀI KHOẢN GROQ NÀO, nên
+//             mọi ca ở đây chạy với KHÔNG lời gọi nhà cung cấp thật nào. INT-1
+//             khẳng định số đó bằng không như đối tượng kiểm riêng của nó; INT-2/INT-3 không bao giờ
+//             tới đường ghi.
+//   THẬT     — `computeScore()`, `lib/scoring/essayLifecycle.ts`
 //             (`deriveEssayView`, `summariseEssays`, `isEssayIncomplete`,
 //             `hasIncompleteEssay`, `hasUnresolvedEssay`), `lib/scoring/wrongTwice.ts`,
-//             `lib/i18n` dictionaries. These are pure and they ARE the subject;
-//             mocking them tests the wiring instead of the behaviour.
-// @real-dependency: none — no case in this file touches Postgres. The three
-//   properties a mocked client CANNOT prove (jsonb array order, the
-//   `<> 'graded'` predicate matching zero rows, the real grants) are OUT of this
-//   lane by design and live in the service lane —
+//             từ điển `lib/i18n`. Chúng thuần và CHÍNH LÀ đối tượng kiểm;
+//             mock chúng là kiểm việc nối dây thay vì hành vi.
+// @real-dependency: không có — không ca nào trong file này chạm Postgres. Ba
+//   thuộc tính mà một client mock KHÔNG chứng minh được (thứ tự mảng jsonb,
+//   vị từ `<> 'graded'` khớp không hàng nào, các grant thật) nằm NGOÀI làn này
+//   theo thiết kế và thuộc làn service —
 //   `SOURCE/tests/e2e/service/essay-grade-write.service.e2e.test.ts`.
 //
 // -----------------------------------------------------------------------------
-// WHY THESE THREE, AND WHAT WAS PUSHED DOWN
+// VÌ SAO BA CÁI NÀY, VÀ CÁI GÌ ĐÃ ĐƯỢC ĐẨY XUỐNG
 // -----------------------------------------------------------------------------
-// Ranked by ROI (BV x Freq + Legal x 10 + Defect), top 3 of 7 candidates:
-//   INT-1  109  feature-off submit path                       <- selected
-//   INT-2   81  hasIncompleteEssay agreement, both read paths <- selected
-//   INT-3   71  graded essay stays out of Layer 3             <- selected
-//   (I-E)   57  gradeEssays orchestration order (AC-072)      <- NOT selected, budget full
-//   (I-D)   49  retryEssayGrading refusal matrix (EG-BE-022)  <- NOT selected, budget full
-//   (I-F/G)  —  deriveEssayView deadline boundary (EG-BE-023),
-//               parseGrade band/boolean validation (EG-BE-014/015)
-//               <- PUSHED DOWN: pure functions with no collaborators; a unit test
-//                  proves strictly more per second here. Backend DD § Correctness
-//                  Proof Method row 1 and row 3 already assign them to the unit lane.
-// I-E and I-D are the two the engineer should swap in first if any case below is
-// judged unit-level; their annotations are preserved in the generation report.
+// Xếp theo ROI (BV x Freq + Legal x 10 + Defect), top 3 trong 7 ứng viên:
+//   INT-1  109  đường nộp bài khi tính năng tắt               <- được chọn
+//   INT-2   81  hasIncompleteEssay thống nhất ở cả hai đường đọc <- được chọn
+//   INT-3   71  bài tự luận đã chấm không rò vào Layer 3        <- được chọn
+//   (I-E)   57  thứ tự điều phối gradeEssays (AC-072)         <- KHÔNG chọn, hết ngân sách
+//   (I-D)   49  ma trận từ chối retryEssayGrading (EG-BE-022)  <- KHÔNG chọn, hết ngân sách
+//   (I-F/G)  —  biên hạn chót deriveEssayView (EG-BE-023),
+//               kiểm tra band/boolean của parseGrade (EG-BE-014/015)
+//               <- ĐẨY XUỐNG: hàm thuần không có cộng tác viên; một unit test
+//                  chứng minh nhiều hơn hẳn mỗi giây ở đây. Backend DD § Correctness
+//                  Proof Method dòng 1 và dòng 3 đã giao chúng cho làn unit.
+// I-E và I-D là hai ca mà kỹ sư nên đổi vào trước tiên nếu có ca nào bên dưới
+// bị đánh giá là mức unit; chú thích của chúng được giữ trong báo cáo sinh test.
 //
-// EXISTING COVERAGE CHECKED (dedup pass, 2026-08-29) — these already-shipped tests
-// touch this feature's surface and must NOT be restated here:
-//   `lib/scoring/__tests__/computeScore.test.ts`  — the current essay branch
-//     ({ scored:false, isCorrect:false }) and the `essay()` fixture helper.
-//   `lib/scoring/__tests__/wrongTwice.test.ts` Test 2 (:105-140) — the
-//     `scored: false` exclusion, on a fixture already named `Q-ESSAY`.
-//   `features/exams/components/__tests__/QuestionRenderer.test.tsx` — the essay
-//     footer string and the `maxLength` coupled site.
-//   `features/exams/__tests__/submitExam.int.test.ts` — the `essay_answer` key path.
-// Where a case below overlaps one of them, the overlap is called out at the
-// obligation itself with the narrower thing this lane adds.
+// ĐỘ PHỦ SẴN CÓ ĐÃ KIỂM (lượt khử trùng lặp, 2026-08-29) — các test đã ship này
+// đã chạm bề mặt của tính năng và KHÔNG được lặp lại ở đây:
+//   `lib/scoring/__tests__/computeScore.test.ts`  — nhánh tự luận hiện tại
+//     ({ scored:false, isCorrect:false }) và hàm hỗ trợ fixture `essay()`.
+//   `lib/scoring/__tests__/wrongTwice.test.ts` Test 2 (:105-140) — việc loại
+//     `scored: false`, trên một fixture đã tên là `Q-ESSAY`.
+//   `features/exams/components/__tests__/QuestionRenderer.test.tsx` — chuỗi chú thích
+//     cuối bài tự luận và vị trí ghép đôi `maxLength`.
+//   `features/exams/__tests__/submitExam.int.test.ts` — đường khoá `essay_answer`.
+// Khi một ca bên dưới chồng lên một trong số đó, phần chồng được nêu rõ
+// ngay tại nghĩa vụ, kèm điều hẹp hơn mà làn này bổ sung.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ESSAY_KEYS, ESSAY_MAX_ATTEMPTS } from "@/lib/scoring/essayLifecycle";
 
 // -----------------------------------------------------------------------------
-// INT-1 test infrastructure — the mock boundary declared in the header, wired.
-// INT-2 and INT-3 further down have their OWN harness (`driveBothReadPaths`),
-// added by Task B2.4: they drive the two READ paths, while everything here drives
-// the WRITE path. The two sets deliberately share nothing but the module mocks.
+// Hạ tầng test INT-1 — ranh giới mock khai báo ở đầu file, đã nối dây.
+// INT-2 và INT-3 phía dưới có harness RIÊNG (`driveBothReadPaths`),
+// do Task B2.4 thêm: chúng điều khiển hai đường ĐỌC, trong khi mọi thứ ở đây điều khiển
+// đường GHI. Hai bộ cố ý không chia sẻ gì ngoài các mock module.
 // -----------------------------------------------------------------------------
 
 const {
@@ -119,16 +119,16 @@ const {
   gradeEssaysForAttemptMock: vi.fn(),
 }));
 
-// actions.ts pulls in "server-only" transitively — same stub as
+// actions.ts kéo theo "server-only" — cùng stub với
 // getResult.int.test.ts / rating.int.test.ts / submitExam.int.test.ts.
 vi.mock("server-only", () => ({}));
 
-// after() is a spy that RECORDS BUT DOES NOT INVOKE by default. The subject of
-// (c) and (e) is what is registered and when; obligation (f) is the single case
-// that opts into synchronous invocation.
+// after() là một spy GHI LẠI NHƯNG KHÔNG GỌI theo mặc định. Đối tượng kiểm của
+// (c) và (e) là cái gì được đăng ký và khi nào; nghĩa vụ (f) là ca duy nhất
+// chọn gọi đồng bộ.
 vi.mock("next/server", () => ({ after: afterMock }));
 
-// redirect() is mocked, but it MUST still throw — see nextRedirectError below.
+// redirect() được mock, nhưng PHẢI vẫn ném lỗi — xem nextRedirectError bên dưới.
 vi.mock("next/navigation", () => ({ redirect: redirectMock }));
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: createClientMock }));
@@ -136,11 +136,11 @@ vi.mock("@/lib/supabase/service-role", () => ({
   recordExamResult: recordExamResultMock,
   recordSkillMastery: recordSkillMasteryMock,
 }));
-// The Redis boundary: guard() reads the shared Upstash counter.
+// Ranh giới Redis: guard() đọc bộ đếm Upstash dùng chung.
 vi.mock("@/lib/security/rateLimit", () => ({ guard: guardMock }));
-// The grading pass itself is Task B1.4's subject and has its own unit lane. Here
-// it is a stand-in whose only jobs are to be identifiable as "the thing that was
-// registered" and, in (f), to fail.
+// Bản thân lượt chấm là đối tượng kiểm của Task B1.4 và có làn unit riêng. Ở đây
+// nó là một vật thay thế mà việc duy nhất là nhận diện được là "cái đã được
+// đăng ký" và, ở (f), là hỏng.
 vi.mock("@/lib/essay/gradeEssays", () => ({
   gradeEssaysForAttempt: gradeEssaysForAttemptMock,
 }));
@@ -152,24 +152,24 @@ const EXAM_ID = "exam-int1";
 const USER_ID = "11111111-1111-1111-1111-111111111111";
 const RESULT_URL = `/exams/${EXAM_ID}/attempt/${ATTEMPT_ID}/result`;
 
-/** WHY redirect() STILL THROWS even though it is mocked.
+/** VÌ SAO redirect() VẪN ném lỗi dù đã được mock.
  *
- *  A no-op redirect spy would silently defeat obligation (e). In Next,
- *  `redirect()` raises a NEXT_REDIRECT control-flow exception, so every statement
- *  after it is unreachable — which is exactly why registering the grading pass
- *  after the redirect means never registering it at all. Mock it as a no-op and
- *  the broken ordering keeps running to the end of the function, `after()` still
- *  gets called, and the case that exists to catch that bug passes anyway. So the
- *  spy reproduces the throw, with the digest shape `submitExam.int.test.ts`
- *  already recognises. */
+ *  Một spy redirect no-op sẽ lặng lẽ vô hiệu nghĩa vụ (e). Trong Next,
+ *  `redirect()` ném một exception luồng điều khiển NEXT_REDIRECT, nên mọi câu lệnh
+ *  sau nó đều không tới được — chính vì vậy đăng ký lượt chấm
+ *  sau redirect nghĩa là không bao giờ đăng ký nó. Mock thành no-op và
+ *  thứ tự hỏng vẫn chạy tới cuối hàm, `after()` vẫn
+ *  được gọi, và ca sinh ra để bắt lỗi đó vẫn qua. Nên
+ *  spy tái hiện việc ném, với dạng digest mà `submitExam.int.test.ts`
+ *  đã nhận ra. */
 function nextRedirectError(url: string): Error {
   const err = new Error("NEXT_REDIRECT");
   (err as Error & { digest: string }).digest = `NEXT_REDIRECT;push;${url};307;`;
   return err;
 }
 
-/** Swallows exactly the expected NEXT_REDIRECT and re-throws everything else,
- *  mirroring `submitExam.int.test.ts`'s helper of the same shape. */
+/** Nuốt đúng NEXT_REDIRECT mong đợi và ném lại mọi thứ khác,
+ *  theo hàm trợ giúp cùng dạng của `submitExam.int.test.ts`. */
 async function callSubmitExam(answers: Record<string, string>) {
   try {
     await submitExam(ATTEMPT_ID, answers);
@@ -179,10 +179,10 @@ async function callSubmitExam(answers: Record<string, string>) {
   }
 }
 
-// questions rows in DB shape (snake_case), as claim_attempt_answer_key() returns
-// them. Two scored MCQs plus one essay WITH a reference answer — the essay needs
-// ground truth or the lifecycle-key branch never fires and every flag-ON case
-// below would pass vacuously.
+// các hàng questions ở dạng DB (snake_case), như claim_attempt_answer_key() trả
+// chúng. Hai MCQ chấm điểm cộng một bài tự luận CÓ đáp án tham khảo — bài tự luận cần
+// sự thật nền, nếu không nhánh khoá-vòng-đời không bao giờ chạy và mọi ca bật cờ
+// bên dưới sẽ qua rỗng.
 const QUESTION_ROWS = [
   {
     id: "q1",
@@ -231,10 +231,10 @@ const QUESTION_ROWS = [
 const QUESTION_IDS = ["q1", "q2", "q3"];
 const ANSWERS = { q1: "B", q2: "C", q3: "Bài làm của học sinh." };
 
-/** INDEPENDENTLY AUTHORED — hand-computed from QUESTION_ROWS and ANSWERS above,
- *  never captured from computeScore()'s output. q1 right, q2 wrong, so 1 of the
- *  2 scored questions is correct => 5 on the 10-point scale; the essay sits
- *  outside the denominator AND outside the topic breakdown, which is why "Văn
+/** TỰ SOẠN ĐỘC LẬP — tính tay từ QUESTION_ROWS và ANSWERS ở trên,
+ *  không bao giờ chụp từ đầu ra của computeScore(). q1 đúng, q2 sai, nên 1 trong
+ *  2 câu chấm điểm đúng => 5 trên thang 10; bài tự luận nằm ngoài mẫu số VÀ ngoài
+ *  phân tích theo chủ đề, đó là lý do "Văn
  *  học hiện thực" does not appear here at all. */
 const EXPECTED_SCORE_FLAG_OFF = {
   totalScore: 5,
@@ -278,15 +278,15 @@ const EXPECTED_SCORE_FLAG_OFF = {
   ],
 };
 
-/** The exhaustive key set of the essay element with the flag OFF. `toEqual`
- *  above cannot carry this obligation on its own: it treats a key present with
- *  value `undefined` as absent, and `undefined` vs missing is exactly the
- *  distinction that survives into jsonb. */
+/** Tập khoá đầy đủ của phần tử tự luận khi cờ TẮT. `toEqual`
+ *  ở trên không tự gánh nổi nghĩa vụ này: nó coi khoá có mặt với giá trị
+ *  `undefined` là vắng mặt, và `undefined` so với thiếu chính là
+ *  sự phân biệt còn sống sót vào jsonb. */
 const EXPECTED_ESSAY_KEYS_OFF = ["isCorrect", "questionId", "scored", "selected"];
 
-/** The same element with the flag ON: those four plus the five keys
- *  `newEssayEntry()` emits. `essayGradedAt` is deliberately NOT here — only
- *  `record_essay_grade()` ever writes it. */
+/** Cùng phần tử khi cờ BẬT: bốn khoá đó cộng năm khoá mà
+ *  `newEssayEntry()` phát ra. `essayGradedAt` cố ý KHÔNG có ở đây — chỉ
+ *  `record_essay_grade()` mới ghi nó. */
 const EXPECTED_ESSAY_KEYS_ON = [
   // B3 — hai khoá của KÊNH ĐIỂM. Câu tự luận nay có mặt trong MẪU SỐ ngay từ
   // lúc nộp (`maxPoints`) với 0 điểm đã được (`earnedPoints`);
@@ -306,10 +306,10 @@ const EXPECTED_ESSAY_KEYS_ON = [
   "selected",
 ];
 
-/** The six jsonb key literals, typed out BY HAND rather than imported, because
- *  the obligation is "none of these strings appears". Cross-checked against
- *  ESSAY_KEYS in its own case below, so the list cannot rot silently — and the
- *  key-set assertions cannot go vacuous if ESSAY_KEYS is ever emptied. */
+/** Sáu literal khoá jsonb, gõ TAY thay vì import, vì
+ *  nghĩa vụ là "không chuỗi nào trong số này xuất hiện". Đối chiếu chéo với
+ *  ESSAY_KEYS ở ca riêng của nó bên dưới, nên danh sách không thể mục nát lặng lẽ —
+ *  và các khẳng định tập-khoá không thể rỗng nghĩa nếu ESSAY_KEYS bị làm rỗng. */
 const SIX_ESSAY_KEY_LITERALS = [
   "essayAttempts",
   "essayEarned",
@@ -319,11 +319,11 @@ const SIX_ESSAY_KEY_LITERALS = [
   "essayState",
 ];
 
-/** Wires the mocked client for submitExam()'s full happy path: exam_attempts
+/** Nối client mock cho toàn bộ đường thành công của submitExam(): exam_attempts
  *  (select) -> exams (select) -> claim_attempt_answer_key (rpc) ->
- *  attempt_answers (upsert). exam_results is deliberately absent — reaching it
- *  through the student's own client is a 42501 in production, so it must throw
- *  here rather than meet a friendly mock (submitExam.int.test.ts obligation f). */
+ *  attempt_answers (upsert). exam_results cố ý vắng mặt — chạm tới nó
+ *  qua client của chính học sinh là lỗi 42501 trên production, nên nó phải ném lỗi
+ *  ở đây thay vì gặp một mock thân thiện (nghĩa vụ f của submitExam.int.test.ts). */
 function mockSubmitExamChain() {
   const attemptAnswersUpsertMock = vi.fn(async () => ({ error: null }));
 
@@ -367,20 +367,20 @@ function mockSubmitExamChain() {
   return { fromMock, rpcMock, attemptAnswersUpsertMock };
 }
 
-/** The counted fetch boundary of obligation (b).
+/** Ranh giới fetch có đếm của nghĩa vụ (b).
  *
- *  It returns a benign response rather than throwing, deliberately. A throwing
- *  stub would abort submitExam() at the stray call and fail every case in the
- *  file with a transport error, so the COUNT — the thing obligation (b) is
- *  actually about — would never be the assertion that fired. Returning a
- *  plausible response lets the run continue and lets `toHaveBeenCalledTimes(0)`
- *  be the discriminator, which is what makes (b) a measurement and not a
- *  side effect of some other failure. */
+ *  Nó trả về một phản hồi vô hại thay vì ném lỗi, có chủ đích. Một stub ném lỗi
+ *  sẽ huỷ submitExam() tại lời gọi lạc và làm hỏng mọi ca trong
+ *  file bằng lỗi truyền tải, nên SỐ ĐẾM — thứ nghĩa vụ (b) thực sự
+ *  nói tới — không bao giờ là khẳng định bị kích hoạt. Trả về một phản hồi
+ *  hợp lý cho lượt chạy tiếp tục và để `toHaveBeenCalledTimes(0)`
+ *  là yếu tố phân biệt, thứ biến (b) thành một phép đo chứ không phải tác dụng phụ
+ *  của một lỗi khác. */
 const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
 
-/** process.env is restored by hand rather than through vi.stubEnv, because
- *  obligation (d)'s first spelling is the variable being ABSENT — a state
- *  stubEnv expresses only indirectly. */
+/** process.env được khôi phục bằng tay chứ không qua vi.stubEnv, vì
+ *  cách viết đầu tiên của nghĩa vụ (d) là biến VẮNG MẶT — một trạng thái
+ *  stubEnv chỉ diễn đạt gián tiếp. */
 const ORIGINAL_FLAG = process.env.ESSAY_GRADING_ENABLED;
 
 function setFlag(value: string | undefined) {
@@ -388,17 +388,17 @@ function setFlag(value: string | undefined) {
   else process.env.ESSAY_GRADING_ENABLED = value;
 }
 
-/** The score object handed to the single recordExamResult() call. */
+/** Đối tượng điểm được trao cho lời gọi recordExamResult() duy nhất. */
 function persistedScore() {
   expect(recordExamResultMock).toHaveBeenCalledTimes(1);
   return recordExamResultMock.mock.calls[0][1];
 }
 
-/** Obligations (a), (b) and (c) together. They are asserted through one helper
- *  because (d) has to repeat all three for every env spelling, and four drifting
- *  copies of them would be worse than one shared function. */
+/** Các nghĩa vụ (a), (b) và (c) cùng nhau. Chúng được khẳng định qua một hàm trợ giúp
+ * vì (d) phải lặp cả ba cho từng cách viết env, và bốn bản sao trôi lệch của chúng
+ * còn tệ hơn một hàm dùng chung. */
 function expectShippedState() {
-  // (a) — the payload that reaches the write, not merely what computeScore returned
+  // (a) — payload tới được lượt ghi, không chỉ cái computeScore đã trả về
   expect(persistedScore()).toEqual(EXPECTED_SCORE_FLAG_OFF);
   const essayEl = persistedScore().perQuestion[2];
   expect(Object.keys(essayEl).sort()).toEqual(EXPECTED_ESSAY_KEYS_OFF);
@@ -431,17 +431,17 @@ afterEach(() => {
 });
 
 // =============================================================================
-// INT-1 — Feature-off is the SHIPPED state: no keys, no after(), zero Groq
+// INT-1 — Tắt tính năng là trạng thái ĐÃ SHIP: không khoá, không after(), không Groq
 // =============================================================================
-// AC: EG-BE-002 — "When computeScore() runs with options.essayGrading === false
-//   (the default), the system must emit the per_question element for an essay
-//   question BYTE-FOR-BYTE as today: { questionId, selected, isCorrect: false,
-//   scored: false } and NOT ONE essay* key."
-// AC: EG-BE-032 — "submitExam() must emit 0 provider requests synchronously, and
-//   the grading pass registration must sit BEFORE the redirect() call."
-// AC: EG-BE-033 — "Any failure of the grading pass must not change submitExam()'s
-//   observable outcome: the exam_results row is still written, record_skill_mastery()
-//   is still called, and the redirect still happens."
+// AC: EG-BE-002 — "Khi computeScore() chạy với options.essayGrading === false
+//   (mặc định), hệ thống phải phát phần tử per_question cho một câu tự luận
+//   TỪNG BYTE như hôm nay: { questionId, selected, isCorrect: false,
+//   scored: false } và KHÔNG MỘT khoá essay* nào."
+// AC: EG-BE-032 — "submitExam() phải phát 0 request tới nhà cung cấp một cách đồng bộ, và
+//   việc đăng ký lượt chấm phải nằm TRƯỚC lời gọi redirect()."
+// AC: EG-BE-033 — "Mọi lỗi của lượt chấm không được đổi kết quả quan sát được của submitExam():
+//   hàng exam_results vẫn được ghi, record_skill_mastery() vẫn
+//   được gọi, và redirect vẫn xảy ra."
 // Also discharges: PRD AC-010, AC-013, AC-067; ADR-0018 R-12; backend DD § Cờ tính
 //   năng :2011 read site (1); § Feature-Off Window (frontend DD :1605) backend half.
 // ROI: 109 (BV:10 x Freq:10 + Legal:0 + Defect:9)
@@ -514,27 +514,27 @@ describe("submitExam() — essay grading feature flag (INT-1)", () => {
 
     await callSubmitExam(ANSWERS);
 
-    // What this adds over computeScore.test.ts: that the shape SURVIVES the call
-    // site. The pure test proves the function returns it; only this lane can see
-    // that submitExam threads the option through and persists that exact object.
+    // Điều này bổ sung gì so với computeScore.test.ts: hình dạng đó SỐNG SÓT qua
+    // nơi gọi. Test thuần chứng minh hàm trả nó; chỉ làn này thấy được
+    // submitExam luồn tuỳ chọn qua và lưu đúng object đó.
     expect(persistedScore()).toEqual(EXPECTED_SCORE_FLAG_OFF);
 
     const essayEl = persistedScore().perQuestion[2];
-    // Key SET, not `essayState === undefined`: a key present with value undefined
-    // passes the value check and still serialises into jsonb as `"essayState": null`.
+    // Tập khoá, KHÔNG phải `essayState === undefined`: khoá có mặt với giá trị undefined
+    // qua kiểm giá trị mà vẫn serialise vào jsonb thành `"essayState": null`.
     expect(Object.keys(essayEl).sort()).toEqual(EXPECTED_ESSAY_KEYS_OFF);
     for (const key of SIX_ESSAY_KEY_LITERALS) {
       expect(Object.hasOwn(essayEl, key)).toBe(false);
     }
 
-    // The write went through the service-role path, once, for this attempt.
+    // Lượt ghi đi qua đường service-role, một lần, cho lượt làm này.
     expect(recordExamResultMock.mock.calls[0][0]).toBe(ATTEMPT_ID);
   });
 
   it("the six hand-written key literals still match ESSAY_KEYS, so the negative assertions above cannot go stale or vacuous", () => {
-    // Without this, obligation (a) has two silent failure modes: a renamed key
-    // (the hand-written list keeps testing a string nothing emits any more) and
-    // an emptied ESSAY_KEYS (nothing to leak, so nothing to catch).
+    // Thiếu cái này, nghĩa vụ (a) có hai kiểu hỏng thầm lặng: khoá bị đổi tên
+    // (danh sách viết tay vẫn kiểm một chuỗi mà không còn gì phát ra) và
+    // ESSAY_KEYS bị làm rỗng (không có gì để rò, nên không có gì để bắt).
     expect([...Object.values(ESSAY_KEYS)].sort()).toEqual(SIX_ESSAY_KEY_LITERALS);
     expect(SIX_ESSAY_KEY_LITERALS).toHaveLength(6);
   });
@@ -544,9 +544,9 @@ describe("submitExam() — essay grading feature flag (INT-1)", () => {
 
     await callSubmitExam(ANSWERS);
 
-    // Measured, not assumed. A request that is built and then aborted is still a
-    // request and still student prose leaving the process, so the count is the
-    // assertion — not "no response was used".
+    // Đo thật, không giả định. Một request đã dựng rồi bị huỷ vẫn là
+    // một request và vẫn là bài viết của học sinh rời khỏi tiến trình, nên số đếm là
+    // khẳng định — chứ không phải "không dùng response nào".
     expect(fetchMock).toHaveBeenCalledTimes(0);
     expect(fetchMock.mock.calls).toEqual([]);
   });
@@ -556,9 +556,9 @@ describe("submitExam() — essay grading feature flag (INT-1)", () => {
 
     await callSubmitExam(ANSWERS);
 
-    // A pass registered while the feature is off does nothing visible — it just
-    // keeps the invocation alive past the response, which shows up as cost and
-    // as latency, never as an error.
+    // Một lượt chấm được đăng ký khi tính năng tắt không làm gì nhìn thấy được — nó chỉ
+    // giữ lời gọi sống lâu hơn response, biểu hiện thành chi phí và
+    // độ trễ, không bao giờ thành lỗi.
     expect(afterMock).toHaveBeenCalledTimes(0);
     expect(gradeEssaysForAttemptMock).toHaveBeenCalledTimes(0);
   });
@@ -580,8 +580,8 @@ describe("submitExam() — essay grading feature flag (INT-1)", () => {
   );
 
   it("obligation (d) POSITIVE CONTROL: a trimmed \"  true  \" means ON, so the flag read cannot be dead code", async () => {
-    // Without this case every spelling above passes for an implementation whose
-    // flag read never executes at all — the whole group would be proving nothing.
+    // Thiếu ca này, mọi cách viết ở trên đều qua với một cài đặt mà lượt đọc cờ
+    // không bao giờ chạy — cả nhóm sẽ chẳng chứng minh gì.
     setFlag("  true  ");
 
     await callSubmitExam(ANSWERS);
@@ -591,34 +591,33 @@ describe("submitExam() — essay grading feature flag (INT-1)", () => {
     expect(essayEl.essayState).toBe("pending");
     expect(afterMock).toHaveBeenCalledTimes(1);
 
-    // SCOPE CHANGED BY B3 (2026-09-01). This block used to assert the score was
-    // byte-identical with the flag ON and OFF, on EG-BE-004's original reading
-    // that "emitting lifecycle keys and scoring are independent".
+    // PHẠM VI ĐÃ ĐỔI BỞI B3 (2026-09-01). Khối này từng khẳng định điểm số
+    // giống hệt từng byte khi cờ BẬT và TẮT, theo cách đọc ban đầu của EG-BE-004 rằng
+    // "phát khoá vòng đời và chấm điểm là độc lập".
     //
-    // B3 deliberately breaks HALF of that, and the half it breaks is the bug:
-    // an essay that someone is actually going to grade now occupies its share of
-    // the paper's marks from the moment of submission. Two auto-scored questions
-    // (1 correct) plus one essay worth 1 mark, not yet graded, is 1/3 of the
-    // paper — 3.33, not 5.0. Leaving it at 5.0 is precisely how a Literature
-    // attempt showed 10.0/10 on a paper worth 4.75/10.
+    // B3 cố ý phá MỘT NỬA của điều đó, và nửa bị phá chính là lỗi:
+    // một bài tự luận mà ai đó sắp chấm giờ chiếm phần điểm của nó trong
+    // đề kể từ lúc nộp. Hai câu tự chấm (1 đúng) cộng một bài tự luận 1 điểm, chưa
+    // chấm, là 1/3 đề — 3,33, không phải 5,0. Để nó ở 5,0 chính là cách một
+    // bài Ngữ văn hiện 10,0/10 trên một đề đáng 4,75/10.
     //
-    // The half that MUST still hold is the COUNT triple: `correct`/`total` keep
-    // counting auto-scored questions only, so `wrong = total − correct` on
-    // ScoreCard stays derivable (AC-057) and mastery is never fed by an essay.
+    //Nửa vẫn PHẢI giữ là bộ ba SỐ ĐẾM: `correct`/`total` chỉ tiếp tục
+    // đếm câu tự chấm, nên `wrong = total − correct` trên ScoreCard vẫn
+    // suy ra được (AC-057) và mastery không bao giờ được nuôi bởi bài tự luận.
     expect(persistedScore().totalScore).toBe(3.33);
     expect(persistedScore().correct).toBe(EXPECTED_SCORE_FLAG_OFF.correct);
     expect(persistedScore().total).toBe(EXPECTED_SCORE_FLAG_OFF.total);
     expect(persistedScore().topicBreakdown).toEqual(EXPECTED_SCORE_FLAG_OFF.topicBreakdown);
 
-    // …and the essay is in the DENOMINATOR with a zero numerator, which is the
-    // shape `record_essay_grade()` later adds the band into.
+    // …và bài tự luận nằm trong MẪU SỐ với tử số bằng không, đúng dạng
+    // mà `record_essay_grade()` về sau cộng band vào.
     expect(essayEl.maxPoints).toBe(1);
     expect(essayEl.earnedPoints).toBe(0);
 
-    // Registered with the right target set: only the essay that HAS a reference
-    // answer, carrying the student's text and the attempt it belongs to. A pass
-    // registered over the MCQs would burn provider budget on questions the
-    // lifecycle keys were never emitted for.
+    // Đăng ký với đúng tập đích: chỉ bài tự luận CÓ đáp án tham khảo,
+    // mang chữ của học sinh và lượt làm mà nó thuộc về. Một lượt chấm
+    // đăng ký trên các MCQ sẽ đốt ngân sách nhà cung cấp cho những câu mà
+    // khoá vòng đời chưa bao giờ được phát.
     const registered = afterMock.mock.calls[0][0] as () => unknown;
     registered();
     expect(gradeEssaysForAttemptMock).toHaveBeenCalledTimes(1);
@@ -640,9 +639,9 @@ describe("submitExam() — essay grading feature flag (INT-1)", () => {
 
     await callSubmitExam(ANSWERS);
 
-    // `mock.invocationCallOrder` and not "both were called": both ARE called in
-    // the broken ordering too, under a redirect that does not throw. Compare the
-    // sequence numbers, which is the only observable that distinguishes them.
+    // `mock.invocationCallOrder` chứ không phải "cả hai đều được gọi": cả hai ĐỀU được gọi
+    // trong thứ tự hỏng nữa, dưới một redirect không ném lỗi. So số thứ tự,
+    // là thứ quan sát duy nhất phân biệt được chúng.
     expect(afterMock).toHaveBeenCalledTimes(1);
     expect(redirectMock).toHaveBeenCalledTimes(1);
     expect(afterMock.mock.invocationCallOrder[0]).toBeLessThan(
@@ -655,10 +654,10 @@ describe("submitExam() — essay grading feature flag (INT-1)", () => {
     setFlag("true");
     gradeEssaysForAttemptMock.mockRejectedValue(new Error("groq is down"));
 
-    // Next owns the callback's failure handling; this mock stands in for both
-    // halves of that — it invokes synchronously (so the rejection really does
-    // happen inside submitExam's frame) and it absorbs the rejection the way the
-    // runtime would, instead of letting a test artifact become an unhandled one.
+    // Next sở hữu việc xử lý lỗi của callback; mock này đại diện cho cả hai
+    // nửa đó — nó gọi đồng bộ (để rejection thật sự xảy ra
+    // bên trong frame của submitExam) và hấp thụ rejection theo cách runtime
+    // sẽ làm, thay vì để một sản phẩm phụ của test thành unhandled rejection.
     let passRejected = false;
     afterMock.mockImplementation((task: unknown) => {
       if (typeof task !== "function") return;
@@ -671,12 +670,12 @@ describe("submitExam() — essay grading feature flag (INT-1)", () => {
     });
 
     await callSubmitExam(ANSWERS);
-    // Let the swallowed rejection settle before asserting on it.
+    // Để rejection bị nuốt lắng xuống trước khi khẳng định về nó.
     await Promise.resolve();
 
     expect(passRejected).toBe(true);
-    // The score-write path is load-bearing (ADR-0011); everything attached to it
-    // is allowed to fail. A provider outage must not cost the student the attempt.
+    // Đường ghi điểm là xương sống (ADR-0011); mọi thứ gắn vào nó
+    // được phép hỏng. Một sự cố nhà cung cấp không được làm học sinh mất lượt làm.
     expect(recordExamResultMock).toHaveBeenCalledTimes(1);
     expect(recordSkillMasteryMock).toHaveBeenCalledTimes(1);
     expect(redirectMock).toHaveBeenCalledTimes(1);
@@ -766,22 +765,22 @@ describe("submitExam() — essay grading feature flag (INT-1)", () => {
 //   real clock makes this case a time bomb rather than a test.
 
 // -----------------------------------------------------------------------------
-// INT-2 / INT-3 harness — the two READ paths, driven for one fixture attempt.
+// Harness INT-2 / INT-3 — hai đường ĐỌC, chạy cho một lượt làm fixture.
 //
-// Both `getResult()` and `listMyHistory()` build their own client through the
-// same mocked `createClient()`, so the two are driven in sequence with the mock
-// re-pointed between them. That is what lets one fixture reach both doors, which
-// is the entire subject of INT-2.
+// Cả `getResult()` và `listMyHistory()` đều dựng client riêng qua cùng
+// `createClient()` mock, nên hai hàm được chạy lần lượt với mock
+// trỏ lại giữa chúng. Đó là điều cho phép một fixture tới được cả hai cửa, chính
+// là toàn bộ đối tượng kiểm của INT-2.
 // -----------------------------------------------------------------------------
 
 const { getResult } = await import("@/features/exams/queries");
 const { listMyHistory } = await import("@/features/history/queries");
 
-/** Frozen. The deadline is 600 000 ms with an exclusive boundary, so a real clock
- *  would make every lifecycle fixture below a time bomb. */
+/** Đóng băng. Hạn chót là 600 000 ms với biên loại trừ, nên đồng hồ thật
+ *  sẽ biến mọi fixture vòng đời bên dưới thành quả bom hẹn giờ. */
 const READ_NOW = new Date("2026-08-29T12:00:00.000Z");
-/** One minute old — comfortably inside the deadline, so a `pending` element stays
- *  `pending` and the cases below are about the STORED state, not about time. */
+/** Một phút tuổi — thoải mái trong hạn chót, nên phần tử `pending` vẫn là
+ *  `pending` và các ca bên dưới nói về trạng thái ĐÃ LƯU, không phải thời gian. */
 const READ_CREATED_AT = "2026-08-29T11:59:00.000Z";
 
 const READ_ATTEMPT_ID = "attempt-read";
@@ -789,7 +788,7 @@ const READ_EXAM = { id: "exam-read", title: "Đề Văn cuối kỳ", subject: "
 const READ_STARTED_AT = "2026-08-29T11:00:00.000Z";
 const READ_SUBMITTED_AT = "2026-08-29T11:58:00.000Z";
 
-/** A stored essay element. Defaults to RS-2 (`pending`, no attempts spent). */
+/** Một phần tử tự luận đã lưu. Mặc định là RS-2 (`pending`, chưa tốn lượt nào). */
 function essayEl(overrides: Record<string, unknown> = {}) {
   return {
     questionId: "q-essay",
@@ -805,7 +804,7 @@ function essayEl(overrides: Record<string, unknown> = {}) {
   };
 }
 
-/** A stored MCQ element, exactly the shape `computeScore()` emits today. */
+/** Một phần tử MCQ đã lưu, đúng dạng mà `computeScore()` phát ra hôm nay. */
 function mcqEl(id: string, isCorrect: boolean) {
   return {
     questionId: id,

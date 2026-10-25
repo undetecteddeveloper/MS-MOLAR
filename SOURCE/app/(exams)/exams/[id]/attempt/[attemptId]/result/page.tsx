@@ -64,9 +64,9 @@ export default async function ResultPage({
   // request — không thêm round-trip nào.
   const user = await getCurrentUserProfile();
 
-  // Task 12: computed once here (no extra round trip, AC-009) and passed
-  // down to ScoreCard/ResultActions — same shared formatter/type HistoryRow
-  // (Task 13) and generateAttemptPdf.ts use, so all surfaces stay in sync.
+  // Task 12: tính một lần ở đây (không thêm lượt gọi mạng, AC-009) rồi truyền
+  // xuống ScoreCard/ResultActions — dùng chung bộ định dạng/kiểu với HistoryRow
+  // (Task 13) và generateAttemptPdf.ts, nên mọi nơi hiển thị luôn khớp nhau.
   const completionTimeLabel = formatCompletionTime(data.startedAt, data.submittedAt);
   const pdfInput: AttemptPdfData = {
     // PDF in nhãn tiếng Việt như mọi bề mặt khác (mẫu PDF không đổi, chỉ dữ

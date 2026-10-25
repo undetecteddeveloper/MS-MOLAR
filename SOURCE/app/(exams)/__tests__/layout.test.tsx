@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-// (exams)/layout.tsx — EntitlementProvider mount (backend DD D005 / I1, ADR-0013
+// (exams)/layout.tsx — gắn EntitlementProvider (backend DD D005 / I1, ADR-0013
 // § Architecture Impact, UI Spec C-01).
 //
 // VÌ SAO FILE NÀY TỒN TẠI. Không có nó thì lỗi mà task này sửa là lỗi KHÔNG AI
@@ -12,8 +12,8 @@
 // :1182): nó là thứ đầu tiên làm hệ thống QUAN SÁT ĐƯỢC.
 //
 // RANH GIỚI MOCK (backend DD Test Boundaries, dòng "Provider coverage (I1)":
-// "nothing — render the real layout tree ... a mocked provider would assert the
-// mock"):
+// "không gì cả — render cây layout thật ... một provider mock sẽ chỉ kiểm chính
+// cái mock"):
 //   · `readEntitlement()` KHÔNG bị mock — NGUỒN DỮ LIỆU của nó bị stub
 //     (`@/lib/supabase/server`, `@upstash/redis`), đúng harness mà
 //     `lib/billing/__tests__/readEntitlement.test.ts:39-56` đã dựng.
@@ -365,8 +365,8 @@ describe("Binding decision ADR-0013 — một phép tính quyền lợi, KHÔNG 
    *  phải tự biện minh — đây không phải chỗ nối thêm cho hết đỏ.
    *
    *  ADR-0013 cấm HAI BẢN CÀI ĐẶT, không cấm hai chỗ GỌI. Hại mà nó gọi tên là
-   *  "Two independent implementations of a money-adjacent predicate is the
-   *  shortest path to two different answers on the same account" — một Server
+   *  "Hai cài đặt độc lập của một vị từ liên quan đến tiền là con đường
+   *  ngắn nhất tới hai đáp án khác nhau cho cùng một tài khoản" — một Server
    *  Action gọi chính `readEntitlement()` là bản cài đặt DUY NHẤT được gọi từ
    *  một chỗ thứ hai. Hai lối thoát thay thế mới đúng là thứ đẻ ra câu trả lời
    *  thứ hai: tự suy quyền lợi bên trong `consumeQuota()`, hay nhận quyền lợi
@@ -380,8 +380,7 @@ describe("Binding decision ADR-0013 — một phép tính quyền lợi, KHÔNG 
    *  file đang bị xử là luật quá rộng, không phải một vi phạm.
    *
    *  ADR-0013 cũng tự xếp Server Action là cơ chế SẴN CÓ chứ không phải tầng
-   *  mới: "Purchase and reconciliation are Server Actions, per the existing
-   *  precedent". */
+   *  mới: "Mua hàng và đối soát là Server Action, theo tiền lệ sẵn có". */
   const SERVER_ACTION_ALLOWED = [
     // Cổng hạn mức gia sư (plan Task 5.3, backend DD I2). `consumeQuota()` cần
     // `ent.plan` cho PLAN_LIMITS/budgetCeiling và `ent[kind]` cho mốc kỳ, mà

@@ -1,10 +1,10 @@
 "use client";
 
-// usePdfAction — the shared Save/Share state machine (AC-007's single PDF
-// pipeline), extracted from ActionButton so HistoryRowMenu (front-adjust:
-// merged ⋯ menu) can drive the identical busy/error/fallback logic without a
-// second implementation. ActionButton keeps its own UI shell and now simply
-// delegates to this hook.
+// usePdfAction — máy trạng thái Lưu/Chia sẻ dùng chung (đường PDF duy nhất của AC-007),
+// tách ra từ ActionButton để HistoryRowMenu (front-adjust:
+// menu ⋯ gộp) điều khiển được cùng logic bận/lỗi/dự phòng
+// mà không cần bản cài đặt thứ hai. ActionButton giữ vỏ UI của riêng nó và giờ chỉ
+// ủy quyền cho hook này.
 import { useRef, useState } from "react";
 import { t } from "@/lib/copy";
 import {
@@ -17,9 +17,9 @@ import {
 export type PdfActionPhase = "idle" | "busy" | "error" | "fallback-confirmed";
 
 /**
- * Isolates the Share branch (canShareFile check + navigator.share +
- * AbortError handling) so run() itself never nests past 3 levels
- * (typescript-rules max-nesting guideline).
+ * Tách riêng nhánh Chia sẻ (kiểm canShareFile + navigator.share +
+ * xử lý AbortError) để chính run() không bao giờ lồng quá 3 cấp
+ * (hướng dẫn max-nesting của typescript-rules).
  */
 async function attemptShare(file: File): Promise<"shared" | "fallback"> {
   if (!canShareFile(file)) {
@@ -31,7 +31,7 @@ async function attemptShare(file: File): Promise<"shared" | "fallback"> {
     return "shared";
   } catch (shareErr) {
     if (shareErr instanceof DOMException && shareErr.name === "AbortError") {
-      return "shared"; // user cancelled — not a failure, resolves the same as a completed share
+      return "shared"; // người dùng huỷ — không phải lỗi, xử lý giống như một lần chia sẻ hoàn tất
     }
     throw shareErr;
   }
@@ -54,7 +54,7 @@ export function usePdfAction(
   blockedReason: string | null,
 ) {
   const [phase, setPhase] = useState<PdfActionPhase>("idle");
-  const busyRef = useRef(false); // synchronous guard — aria-disabled does not block the click event (D4/AC-010)
+  const busyRef = useRef(false); // chốt chặn đồng bộ — aria-disabled không chặn sự kiện click (D4/AC-010)
 
   async function run() {
     // CHẶN TRƯỚC CHỐT BẬN, và thứ tự ấy là yêu cầu chứ không phải sở thích:

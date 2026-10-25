@@ -3,21 +3,21 @@
 // app/(exams)/exams/[id]/page.tsx — ?from= chain wiring, chặng URL → page →
 // StartAttemptButton (P6-T1).
 // Design Doc: docs/design/exam-shelves-frontend-design.md § Field Propagation Map
-//   (`from` URL → `[id]/page.tsx` preserved, raw, 0 client-side validation;
-//   `source` `[id]/page.tsx` → `StartAttemptButton` preserved, prop `source?: string`)
+//   (`from` URL → `[id]/page.tsx` giữ nguyên, thô, 0 bước kiểm phía client;
+//   `source` `[id]/page.tsx` → `StartAttemptButton` giữ nguyên, prop `source?: string`)
 // Design Doc: docs/design/exam-shelves-backend-design.md § The attempt-source
 //   write path — full chain
 //
-// MOCK BOUNDARY: `getExam`, `hasReported`, `getCurrentUser` — data layer, mirrors
-// `app/(exams)/exams/__tests__/page.test.tsx`. `StartAttemptButton` is ALSO
-// mocked (capturing stub): this task's own Boundary Context names two SEPARATE
-// boundaries — URL → page (owned here) and StartAttemptButton → startAttempt
-// (owned by StartAttemptButton.test.tsx) — so this file isolates only the first
-// hop, proving the raw `from` value reaches the `source` prop unmodified.
+// RANH GIỚI MOCK: `getExam`, `hasReported`, `getCurrentUser` — tầng dữ liệu, theo mẫu
+// `app/(exams)/exams/__tests__/page.test.tsx`. `StartAttemptButton` CŨNG
+// được mock (stub ghi lại tham số): Boundary Context của chính task này nêu hai
+// ranh giới TÁCH BIỆT — URL → trang (thuộc file này) và StartAttemptButton → startAttempt
+// (thuộc StartAttemptButton.test.tsx) — nên file này chỉ cô lập
+// chặng đầu, chứng minh giá trị `from` thô tới prop `source` không bị sửa.
 //
-// `renderServerTree`, not `render(await ExamDetailPage(...))`: `AuthorByline`
-// (rendered via the page's `<AuthorByline>`) is an async Server Component child,
-// same empty-tree hazard `ExamShelf.test.tsx`/the exams-page test document.
+// `renderServerTree`, không dùng `render(await ExamDetailPage(...))`: `AuthorByline`
+// (render qua `<AuthorByline>` của trang) là con Server Component bất đồng bộ,
+// cùng mối nguy cây rỗng mà `ExamShelf.test.tsx` và test trang exams đã ghi lại.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderServerTree } from "@/tests/helpers/renderServerTree";
@@ -64,59 +64,57 @@ beforeEach(() => {
 });
 
 // =============================================================================
-// P6-T1 — URL → page → StartAttemptButton (the `from` → `source` prop hop)
+// P6-T1 — URL → trang → StartAttemptButton (chặng prop `from` → `source`)
 // =============================================================================
-// AC-039: "Given a card inside a shelf, when its link renders, then the href
-//   carries ?from=practice, ?from=hot or ?from=explore according to the shelf
-//   it sits on; given a card in the flat grid or in the home block, then the
-//   href carries 0 ?from parameter." (this file proves the CONSUMER side —
-//   the page reading that querystring back — the producer side is P2-T2's
-//   ExamCard.snapshot.test.tsx)
-// AC-040: "Given an attempt started from an exam page reached with ?from=, when
-//   startAttempt inserts the exam_attempts row, then that row persists exactly
-//   one of practice, hot, explore, none." (this file proves the first of the
-//   two hops the raw value must survive unmodified — the second is
-//   StartAttemptButton.test.tsx's job)
-// AC-041: "Given a missing, empty, unknown or forged ?from= value, when the
-//   attempt row is written, then it stores none — 0 errors, 0 rejected attempt
-//   starts." (the absent-?from= and totally-bogus cases below prove this hop
-//   does 0 filtering of its own, so AC-041's whitelist stays a single point)
+// AC-039: "Cho một thẻ nằm trong kệ, khi link của nó render, thì href
+//   mang ?from=practice, ?from=hot hoặc ?from=explore tuỳ kệ nó nằm trên;
+//   cho một thẻ trong lưới phẳng hoặc trong khối trang chủ, thì
+//   href mang 0 tham số ?from." (file này chứng minh phía TIÊU THỤ —
+//   trang đọc lại querystring đó — phía sản xuất là ExamCard.snapshot.test.tsx của P2-T2)
+// AC-040: "Cho một lượt làm bắt đầu từ trang đề được mở với ?from=, khi
+//   startAttempt chèn hàng exam_attempts, thì hàng đó lưu đúng
+//   một trong practice, hot, explore, none." (file này chứng minh chặng đầu trong
+//   hai chặng mà giá trị thô phải đi qua không bị sửa — chặng thứ hai là việc của
+//   StartAttemptButton.test.tsx)
+// AC-041: "Cho một giá trị ?from= thiếu, rỗng, lạ hoặc giả mạo, khi
+//   hàng lượt làm được ghi, thì nó lưu none — 0 lỗi, 0 lượt bắt đầu bị từ chối."
+//   (các ca vắng ?from= và hoàn toàn rác bên dưới chứng minh chặng này
+//   tự nó lọc 0 lần, nên danh sách trắng của AC-041 vẫn chỉ có một điểm)
 // ROI: 72 (BV:8 x Freq:8 + Legal:0 + Defect:8)
-//   BV 8 — the sole remaining wiring gap in the attribution chain every earlier
-//     phase (P1-T5's whitelist, P2-T2's producer, P5-T1's shelf cards) was
-//     built to feed; without it every attempt start silently records 'none'.
-//   Freq 8 — every attempt started from a shelf card, i.e. every shelf-driven
-//     conversion this feature exists to measure.
-//   Defect 8 — the failure mode is silent: a dropped or hardcoded `source` prop
-//     still renders a working "Làm bài" button with no visible symptom, only a
-//     wrong exam_attempts.source value discovered later, if ever.
-// Behavior: ExamDetailPage({ params, searchParams }) is called against a mocked
-//   data layer (getExam/hasReported/getCurrentUser) and a mocked
-//   StartAttemptButton (capturing stub) -> rendered via renderServerTree ->
-//   StartAttemptButton is called with { examId, source } where `source` is
-//   EXACTLY `searchParams.from`, untouched, for a valid shelf value, for absent
-//   ?from=, and for an unrecognised/forged value.
+//   BV 8 — chỗ nối còn thiếu duy nhất trong chuỗi quy kết mà mọi phase trước
+//     (danh sách trắng của P1-T5, bên sản xuất của P2-T2, thẻ kệ của P5-T1) được
+//     dựng để cấp dữ liệu; thiếu nó thì mọi lượt bắt đầu đều lặng lẽ ghi 'none'.
+//   Freq 8 — mọi lượt làm bắt đầu từ một thẻ kệ, tức mọi lượt chuyển đổi
+//     qua kệ mà tính năng này sinh ra để đo.
+//   Defect 8 — kiểu hỏng là thầm lặng: prop `source` bị rơi hoặc hardcode
+//     vẫn render nút "Làm bài" chạy được mà không có triệu chứng nhìn thấy, chỉ có
+//     giá trị exam_attempts.source sai được phát hiện về sau, nếu có.
+// Hành vi: ExamDetailPage({ params, searchParams }) được gọi trên một tầng
+//   dữ liệu mock (getExam/hasReported/getCurrentUser) và một
+//   StartAttemptButton mock (stub ghi lại tham số) -> render qua renderServerTree ->
+//   StartAttemptButton được gọi với { examId, source } trong đó `source` là
+//   ĐÚNG `searchParams.from`, không bị đụng tới, với giá trị kệ hợp lệ, với
+//   ?from= vắng mặt, và với giá trị lạ/giả mạo.
 // @category: core-functionality
 // @lane: integration
-// @dependency: app/(exams)/exams/[id]/page.tsx (ExamDetailPage) + mocked
-//   getExam/hasReported/getCurrentUser + mocked StartAttemptButton
+// @dependency: app/(exams)/exams/[id]/page.tsx (ExamDetailPage) + mock
+//   getExam/hasReported/getCurrentUser + mock StartAttemptButton
 // @complexity: low
-// @real-dependency: none — StartAttemptButton is mocked deliberately, per this
-//   task's own Boundary Context two-boundary split: its bind-into-startAttempt
-//   behavior is proven separately by StartAttemptButton.test.tsx, so this file
-//   isolates only the URL -> page hop instead of re-proving the second hop too.
-// Primary failure mode: the page adds its own whitelist/type-narrowing on `from`
-//   before passing it down (e.g. casting to the AttemptSource union, or
-//   defaulting unrecognised values to something other than a raw passthrough),
-//   creating a second normalisation point that can silently disagree with
-//   toAttemptSource's rules; or the prop is dropped/hardcoded, same failure as
-//   the pre-P6-T1 placeholder this task replaced.
-// Proof obligation:
-//   (a) ?from=hot -> StartAttemptButton receives { examId: exam.id, source: "hot" };
-//   (b) 0 ?from= -> StartAttemptButton receives source: undefined, not a
-//       default like "none" — that mapping is startAttempt's job, not the page's;
-//   (c) ?from=totally-bogus -> StartAttemptButton receives source:
-//       "totally-bogus" verbatim, proving 0 filtering happens at this hop.
+// @real-dependency: không có — StartAttemptButton được mock có chủ đích, theo cách chia
+//   hai ranh giới trong Boundary Context của task này: hành vi bind-vào-startAttempt của nó
+//   được chứng minh riêng bởi StartAttemptButton.test.tsx, nên file này chỉ cô lập
+//   chặng URL -> trang thay vì chứng minh lại cả chặng thứ hai.
+// Kiểu hỏng chính: trang tự thêm danh sách trắng/thu hẹp kiểu cho `from`
+//   trước khi truyền xuống (ví dụ ép sang union AttemptSource, hoặc
+//   đặt giá trị lạ về thứ gì khác ngoài truyền nguyên), tạo ra điểm
+//   chuẩn hoá thứ hai có thể lặng lẽ bất đồng với luật của toAttemptSource; hoặc
+//   prop bị rơi/hardcode, cùng kiểu hỏng với chỗ giữ chỗ trước P6-T1 mà task này thay thế.
+// Nghĩa vụ chứng minh:
+//   (a) ?from=hot -> StartAttemptButton nhận { examId: exam.id, source: "hot" };
+//   (b) 0 ?from= -> StartAttemptButton nhận source: undefined, không phải một
+//       mặc định như "none" — việc ánh xạ đó là của startAttempt, không phải của trang;
+//   (c) ?from=totally-bogus -> StartAttemptButton nhận source:
+//       "totally-bogus" nguyên văn, chứng minh chặng này lọc 0 lần.
 describe("ExamDetailPage — searchParams.from thread thành source prop cho StartAttemptButton (P6-T1, Field Propagation Map)", () => {
   it("obligation (a): ?from=hot: StartAttemptButton nhận { examId: 'exam-1', source: 'hot' }", async () => {
     await renderServerTree(

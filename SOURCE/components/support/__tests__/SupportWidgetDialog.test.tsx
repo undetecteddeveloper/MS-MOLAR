@@ -3,8 +3,8 @@
 // SupportWidgetDialog — máy trạng thái compose -> submitting -> (compose,
 // lỗi) | success, KHÔNG BAO GIỜ compose -> success thẳng (AC-040); lỗi giữ
 // nguyên intent/message/screenshot (AC-020, AC-039); no-op guard chặn double-
-// submit; timeout 20s race.
-// No I18nProvider wrapping → useT() renders the "en" default strings.
+// gửi; đua với timeout 20s.
+// Không bọc I18nProvider → useT() render các chuỗi mặc định "en".
 
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -74,7 +74,7 @@ describe("SupportWidgetDialog", () => {
       clickSubmit();
     });
 
-    // Immediately after click, still NOT success — promise hasn't resolved yet.
+    // Ngay sau khi bấm, vẫn CHƯA thành công — promise chưa resolve.
     expect(screen.queryByRole("status")).toBeNull();
     expect(screen.getByRole("dialog")).toBeDefined();
 

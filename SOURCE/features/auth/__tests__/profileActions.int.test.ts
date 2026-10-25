@@ -1,24 +1,24 @@
 // /profile — changePassword & changeAvatar Server Actions [integration]
 // Design Doc: docs/design/profile-and-about-design.md (§Backend contracts →
-//   changeAvatar steps 1-7, changePassword steps 1-6; C1 the throwaway client,
-//   C12 the logging prohibition)
+//   changeAvatar bước 1-7, changePassword bước 1-6; C1 client dùng-một-lần,
+//   C12 cấm ghi log)
 // ADR: docs/adr/ADR-0016-avatar-storage-visibility-and-read-path.md
 // PRD: docs/prd/profile-and-about-prd.md (AC-017, AC-018, AC-021, AC-022,
 //   AC-023, AC-024, AC-027..AC-031, AC-037)
 //
-// Mocked Supabase clients, per the support system's precedent
-// (lib/support/__tests__/actions.int.test.ts). What that boundary can and cannot
-// prove is worth stating, because one of these tests is the feature's early
-// verification point:
-//   - CAN prove: which client the credential check ran on, that the cookie-bound
-//     client's sign-in was never touched, the call order, and that no password
-//     value reached a logger.
-//   - CANNOT prove: that the caller's cookies survive. That is a property of the
-//     real @supabase/ssr client and belongs to a live check. The mocked proof
-//     below is the closest cheap stand-in: an implementation that regresses to
-//     the cookie-bound client fails these tests immediately.
-//   - CANNOT prove: the storage RLS policies. Those need real Postgres
-//     (supabase/test-rls.ts, ST-a..ST-e precedent).
+// Client Supabase được mock, theo tiền lệ của hệ thống hỗ trợ
+// (lib/support/__tests__/actions.int.test.ts). Ranh giới đó chứng minh được gì và không
+// chứng minh được gì cần nói rõ, vì một trong các test này là điểm
+// kiểm chứng sớm của tính năng:
+//   - CHỨNG MINH ĐƯỢC: việc kiểm thông tin đăng nhập chạy trên client nào, việc đăng nhập của
+//     client gắn cookie chưa từng bị đụng tới, thứ tự gọi, và không có giá trị mật khẩu nào
+//     tới được logger.
+//   - KHÔNG chứng minh được: cookie của người gọi còn sống sót. Đó là thuộc tính của
+//     client @supabase/ssr thật và thuộc về một lượt kiểm tra trực tiếp. Bằng chứng mock
+//     bên dưới là vật thay thế rẻ gần nhất: một cài đặt thoái lui về client
+//     gắn cookie sẽ làm các test này hỏng ngay lập tức.
+//   - KHÔNG chứng minh được: các policy RLS của storage. Chúng cần Postgres
+//     thật (supabase/test-rls.ts, tiền lệ ST-a..ST-e).
 
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 
@@ -40,8 +40,8 @@ const guardMock = vi.mocked(guard);
 
 const USER_ID = "11111111-1111-1111-1111-111111111111";
 const EMAIL = "student@example.com";
-// Deliberately distinctive strings: the AC-024 assertion greps every recorded
-// console argument for them, so a substring collision would make it pass falsely.
+// Các chuỗi cố ý đặc trưng: khẳng định AC-024 grep mọi tham số console
+// đã ghi lại để tìm chúng, nên một va chạm chuỗi con sẽ làm nó qua giả.
 const CURRENT_PASSWORD = "Zx7-current-pw-fixture";
 const NEW_PASSWORD = "Zx7-brand-new-pw-fixture";
 
@@ -128,15 +128,15 @@ function formDataOf(fields: Record<string, string | File | undefined>): FormData
   return fd;
 }
 
-/** A File whose reported size is `bytes` without allocating them — the 2MB+1
- *  boundary case would otherwise cost 2MB of heap per run for nothing. */
+/** Một File có kích thước báo cáo là `bytes` mà không cấp phát chúng — ca biên 2MB+1
+ *  nếu không sẽ tốn 2MB heap mỗi lần chạy vô ích. */
 function fileOfSize(bytes: number, type: string): File {
   const file = new File(["x"], "avatar.jpg", { type });
   Object.defineProperty(file, "size", { value: bytes });
   return file;
 }
 
-/** Every console method, so a debug line added on any of them is still caught. */
+/** Mọi phương thức console, để một dòng debug thêm vào bất kỳ phương thức nào vẫn bị bắt. */
 const CONSOLE_METHODS = ["error", "warn", "log", "info", "debug"] as const;
 type ConsoleSpy = { mock: { calls: unknown[][] } };
 let consoleSpies: ConsoleSpy[] = [];
@@ -191,9 +191,9 @@ describe("changePassword — current-password verification never touches the cal
     );
 
     expect(result).toEqual({ error: "profile.password.errorCurrentWrong" });
-    // The session-survival proof at the level a mocked test can give: the
-    // credential check ran on the throwaway client, and the cookie-writing
-    // client was never asked to establish a session.
+    // Bằng chứng giữ phiên ở mức một test mock có thể đưa ra: việc kiểm
+    // thông tin đăng nhập chạy trên client dùng-một-lần, và client ghi cookie
+    // chưa từng được yêu cầu thiết lập phiên.
     expect(probe.signInWithPassword).toHaveBeenCalledTimes(1);
     expect(session.signInWithPassword).not.toHaveBeenCalled();
     expect(session.updateUser).not.toHaveBeenCalled();
@@ -282,8 +282,8 @@ describe("changePassword — refusals are distinguishable and carry no provider 
       })
     );
 
-    // The user genuinely needs to know which of the two happened; "try again"
-    // is wrong advice for one of them.
+    // Người dùng thực sự cần biết hai việc đã xảy ra việc nào; "thử lại"
+    // là lời khuyên sai với một trong hai.
     expect(result?.error).not.toBe("profile.password.errorCurrentWrong");
     expect(result?.error).toContain("profile.error.rateLimited");
     expect(result?.error).toContain("42");
@@ -379,9 +379,9 @@ describe("changePassword — no password value ever reaches a logger (AC-024)", 
   it("logs nothing containing a password fixture on any branch, including the failing ones", async () => {
     const spies = spyOnConsole();
 
-    // Every branch that can log, driven in one test so a new logging line on any
-    // of them is caught: wrong password, rejected updateUser, failed signOut,
-    // and the success path.
+    // Mọi nhánh có thể ghi log, chạy trong một test để một dòng log mới ở bất kỳ
+    // nhánh nào đều bị bắt: sai mật khẩu, updateUser bị từ chối, signOut thất bại,
+    // và đường thành công.
     const branches: Array<() => Promise<unknown>> = [
       async () => {
         const session = makeSessionClientMock();
@@ -448,9 +448,9 @@ describe("changePassword — no password value ever reaches a logger (AC-024)", 
       expect(line).not.toContain(CURRENT_PASSWORD);
       expect(line).not.toContain(NEW_PASSWORD);
     }
-    // The assertion above is vacuous if nothing was logged at all, so pin that
-    // the failing branches did log — the test proves "logged safely", not
-    // "happened to be silent".
+    // Khẳng định ở trên rỗng nghĩa nếu không có gì được ghi log, nên ghim
+    // rằng các nhánh lỗi đã ghi log — test chứng minh "log an toàn", không
+    // phải "tình cờ im lặng".
     expect(spies.some((spy) => spy.mock.calls.length > 0)).toBe(true);
   });
 
@@ -568,8 +568,8 @@ describe("changeAvatar — object key and replacement hygiene (AC-031, U3)", () 
 
     const firstKey = (first.upload.mock.calls[0] as unknown as [string])[0];
     const secondKey = (second.upload.mock.calls[0] as unknown as [string])[0];
-    // A stable key plus a 1-hour signed URL keeps serving the OLD image under a
-    // still-valid signature after the student replaced it.
+    // Một khoá ổn định cộng URL ký 1 giờ sẽ tiếp tục phục vụ ảnh CŨ dưới một
+    // chữ ký còn hiệu lực sau khi học sinh đã thay ảnh.
     expect(secondKey).not.toBe(firstKey);
   });
 

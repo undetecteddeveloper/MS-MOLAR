@@ -14,8 +14,8 @@ import type { RateEligibility } from "@/features/exams/components/rating/RateBut
 // Component: ExamShelf; Design Doc § Data contracts). 3 kệ — Cần luyện, Nổi
 // nhất, Khám phá — cùng dùng component này; mọi khác biệt giữa chúng là MỘT
 // entry trong `SHELF` bên dưới, component đọc `SHELF`, trang gọi không ghi đè
-// được (Design Doc: "Everything that differs between the three shelves is an
-// entry; the component reads it, the page cannot override it").
+// được (Design Doc: "Mọi thứ khác nhau giữa ba kệ đều là một
+// entry; component đọc nó, trang không ghi đè được").
 //
 // `ExamShelves` (backend DD's `Contract: listExamShelves()`) giờ có thật ở
 // `features/exams/queries/shelves.ts` (P3-T2) — `ShelfData` KHÔNG còn là bản

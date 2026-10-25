@@ -1,23 +1,23 @@
 "use client";
 
-// SuccessToast — confirmation toast (Rating Page UX pass, 2026-07-27).
+// SuccessToast — toast xác nhận (đợt chỉnh UX trang Đánh giá, 2026-07-27).
 // Top-center dưới 768px, bottom-center từ 768px trở lên — lý do ở khối chú
 // thích ngay trên phần tử, đọc trước khi đổi vị trí. Replaces the old "Saved"
-// button-label state: the submit
-// button now only ever shows two states (Submit / Submitting), and this
-// toast is the sole success signal instead. Bounces up from the bottom edge
-// (slight overshoot easing) and auto-dismisses after `durationMs`. The owner
-// bumps `trigger` (any changing number) each time it wants the toast to
-// (re)appear, which also restarts the auto-dismiss timer.
+// trạng thái nhãn nút: nút gửi
+// giờ chỉ còn hai trạng thái (Gửi / Đang gửi), và toast
+// này là tín hiệu thành công duy nhất. Nảy lên từ mép dưới
+// (easing vọt nhẹ) và tự tắt sau `durationMs`. Bên sở hữu
+// tăng `trigger` (số thay đổi bất kỳ) mỗi lần muốn toast
+// hiện lại, việc này cũng khởi động lại bộ đếm tự tắt.
 //
-// Two-part markup on purpose: the visible bubble is always mounted and
-// merely toggles opacity/transform for its enter/exit animation, which means
-// its text content never actually *changes* — an aria-live region only gets
-// announced by a screen reader on a content mutation, so a region that's
+// Cấu trúc hai phần có chủ đích: bong bóng hiển thị luôn được mount và
+// chỉ bật tắt opacity/transform cho animation vào/ra, nghĩa là
+// nội dung chữ của nó thực sự không bao giờ *đổi* — vùng aria-live chỉ được
+// trình đọc màn hình đọc khi nội dung biến đổi, nên một vùng mà
 // permanently "Đã gửi đánh giá" would go unannounced after the first mount.
-// A separate sr-only region whose text flips "" -> message -> "" on each
-// trigger is what actually fires the announcement; the visible bubble stays
-// aria-hidden so the message isn't read out twice.
+// Một vùng sr-only riêng, có chữ đổi "" -> thông báo -> "" ở mỗi
+// lần trigger, mới thực sự kích hoạt việc đọc thông báo; bong bóng hiển thị vẫn
+// aria-hidden để thông báo không bị đọc hai lần.
 
 import { useEffect, useState } from "react";
 import { Check } from "lucide-react";

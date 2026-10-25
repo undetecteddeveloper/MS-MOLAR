@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-// (authoring)/layout.tsx — EntitlementProvider mount (backend DD D005 / I1, ADR-0013
+// (authoring)/layout.tsx — gắn EntitlementProvider (backend DD D005 / I1, ADR-0013
 // § Architecture Impact, UI Spec C-01).
 //
 // File song sinh với `app/(exams)/__tests__/layout.test.tsx`, và nó phải là hai

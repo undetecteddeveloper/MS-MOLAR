@@ -1,4 +1,4 @@
-// S-01 Upload — /upload (UGC v2.0, Task 6.2). Server guard → /?auth=signin
+// S-01 Đăng đề — /upload (UGC v2.0, Task 6.2). Cổng kiểm ở server → /?auth=signin
 // (AC-002). Form là client component (giữ state metadata + file); tiêu đề và
 // câu dẫn dựng ở đây bằng PageHeader chuẩn (theme "Sân trường", 2026-09-09) —
 // bản trước giấu h1 (sr-only), nay hiện rõ như mọi trang khác.
@@ -12,7 +12,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 
 // Trần thời gian cho function chạy Server Action của route này — chủ yếu là
 // `extractAndAssemble` (features/authoring/actions.ts), đường dài nhất trong app:
-// upload file → mupdf parse → extractQuestions (≤150s, FATAL_CALL_DEADLINE_MS)
+// tải file lên → mupdf đọc → extractQuestions (≤150s, FATAL_CALL_DEADLINE_MS)
 // → extractAnswers (≤150s nữa) → ghi DB.
 //
 // 300s là trần cứng của Vercel với fluid compute (bật mặc định, Hobby lẫn Pro).

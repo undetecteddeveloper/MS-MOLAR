@@ -13,7 +13,7 @@
 // (danh sách đánh số/gạch đầu dòng, heading, blockquote) vì ở ngữ cảnh inline
 // (nhãn lựa chọn, ý a–d) không có khái niệm "khối".
 // @category: core-functionality
-// @dependency: none — real RichText, no mocks
+// @dependency: không có — RichText thật, không mock
 
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";

@@ -1,6 +1,6 @@
-// (history)/history — page-level auth guard, mirrors (authoring)/upload/page.tsx.
-// Guard runs strictly BEFORE any data fetch (AC-016: zero attempt rows fetched
-// for a guest — backend Design Doc history-backend-design.md v1.2, § Auth
+// (history)/history — cổng kiểm đăng nhập cấp trang, theo mẫu (authoring)/upload/page.tsx.
+// Cổng chạy hoàn toàn TRƯỚC mọi lượt lấy dữ liệu (AC-016: không lấy hàng lượt làm
+// nào cho khách — backend Design Doc history-backend-design.md v1.2, § Auth
 // Guard and Layout).
 //
 // Bố cục theo theme "Sân trường" (2026-09-07, design plan §3 "Lịch sử"):
@@ -42,8 +42,8 @@ type SearchParams = Promise<{
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-// Unknown/out-of-range value -> undefined ("no filter applied"), matching
-// ExamsPage's own field-propagation convention for `sort`/`level`.
+// Giá trị lạ/ngoài khoảng -> undefined ("không áp bộ lọc"), khớp quy ước truyền trường
+// của chính ExamsPage cho `sort`/`level`.
 function parseScore(raw: string | undefined): number | undefined {
   if (!raw) return undefined;
   const n = Number(raw);

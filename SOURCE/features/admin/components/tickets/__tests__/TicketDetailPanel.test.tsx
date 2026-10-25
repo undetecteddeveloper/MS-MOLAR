@@ -1,18 +1,18 @@
 // @vitest-environment jsdom
 
-// TicketDetailPanel — security-critical: message/URL/user-agent render as
-// inert text (R12/AC-037/AC-038), screenshot renders exclusively via a plain
-// <img src> (AC-014, closes document review finding I002).
+// TicketDetailPanel — quan trọng về bảo mật: message/URL/user-agent render dưới dạng
+// chữ vô hại (R12/AC-037/AC-038), ảnh chụp màn hình chỉ render qua
+// <img src> thuần (AC-014, đóng phát hiện review tài liệu I002).
 
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { TicketDetailPanel } from "@/features/admin/components/tickets/TicketDetailPanel";
 import type { TicketWithNotes } from "@/lib/supabase/service-role";
 
-// TicketStatusControl/InternalNotesPanel import Server Actions from "./actions"
-// (a "use server" module transitively pulling in server-only deps) — mocked
-// away, matching this repo's established boundary for component tests whose
-// concern is rendering, not the action's own behavior (task-06/09 precedent).
+// TicketStatusControl/InternalNotesPanel import Server Action từ "./actions"
+// (một module "use server" kéo theo các phụ thuộc server-only) — được mock
+// đi, theo ranh giới đã thiết lập của repo này cho test component mà mối quan tâm
+// là render, không phải hành vi của chính action (tiền lệ task-06/09).
 vi.mock("@/features/admin/ticketActions", () => ({
   changeTicketStatusAction: vi.fn(),
   addTicketNoteAction: vi.fn(),
@@ -44,10 +44,10 @@ describe("TicketDetailPanel", () => {
     const xss = '<script>alert(1)</script><img src=x onerror="alert(2)">';
     const { container } = render(<TicketDetailPanel ticket={fixtureTicket({ message: xss })} />);
 
-    // The literal characters appear as TEXT content...
+    // Các ký tự nguyên văn xuất hiện dưới dạng nội dung TEXT...
     expect(container.textContent).toContain(xss);
-    // ...and no actual <script> element or an injected onerror-bearing <img>
-    // was created anywhere in the rendered tree.
+    // ...và không có phần tử <script> thật hay <img> mang onerror được chèn
+    // nào được tạo ở bất kỳ đâu trong cây đã render.
     expect(container.querySelector("script")).toBeNull();
     expect(container.querySelector("img[onerror]")).toBeNull();
   });

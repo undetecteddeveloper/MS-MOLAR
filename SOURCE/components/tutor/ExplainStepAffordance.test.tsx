@@ -1,38 +1,37 @@
 // @vitest-environment jsdom
 
 // ExplainStepAffordance [integration] — the "Giải thích bước này" tutor
-// affordance and, through it, useTutorAction's 4-phase state machine (no
-// separate hook test file is named by the frontend Design Doc's own
-// Implementation Path Mapping; the hook is exercised through the component it
-// drives, matching ActionButton.test.tsx's precedent of testing usePdfAction
-// through ActionButton rather than in isolation).
+// affordance và, thông qua nó, máy trạng thái 4 pha của useTutorAction (Implementation
+// Path Mapping của frontend Design Doc không nêu file test riêng cho hook; hook được
+// kiểm qua component mà nó điều khiển, theo tiền lệ của ActionButton.test.tsx là test
+// usePdfAction qua ActionButton thay vì tách riêng).
 // Design Doc: docs/design/engine1-adaptive-ai-frontend-design.md (v1.0) §
 //   State Machine Detail — useTutorAction, § Accessibility Implementation
-// UI Spec: docs/ui-spec/engine1-adaptive-ai-ui-spec.md (v1.0) — state x display
-//   matrix for ExplainStepAffordance, S-01
-// PRD: docs/prd/engine1-adaptive-ai-prd.md (v1.0, AC-018-020 UI half, AC-021,
+// UI Spec: docs/ui-spec/engine1-adaptive-ai-ui-spec.md (v1.0) — ma trận trạng thái x hiển thị
+//   của ExplainStepAffordance, S-01
+// PRD: docs/prd/engine1-adaptive-ai-prd.md (v1.0, AC-018-020 nửa UI, AC-021,
 //   AC-025, AC-026, AC-029)
 //
-// Mock boundary (frontend DD Test Boundaries — Mock Boundary Decisions):
-//   `explainStep` (imported into useTutorAction) — Yes, mock — I/O boundary
-//   (network/Gemini round trip), mirrors ActionButton.test.tsx's mocking of
-//   generateAttemptPdfFile/downloadPdfFile/canShareFile. RichText — No, real
-//   render (already covered by its own RichText.xss.test.tsx, reused unmodified
-//   here). BentoCell, Button — No, real render (pure display primitives).
-//   useT() — No, real (no-provider DEFAULT_LOCALE fallback = "en", matching
-//   ActionButton.test.tsx's convention — no I18nProvider wrapper needed).
-//   This repo's vitest.config.ts wires no @testing-library/jest-dom setup file,
-//   so jest-dom matchers (toHaveAttribute etc.) are unavailable — this file
-//   reads raw DOM properties/attributes directly, same convention as
+//Ranh giới mock (Test Boundaries của frontend DD — Mock Boundary Decisions):
+//   `explainStep` (import vào useTutorAction) — Có, mock — ranh giới I/O
+//   (khứ hồi mạng/Gemini), theo cách ActionButton.test.tsx mock
+//   generateAttemptPdfFile/downloadPdfFile/canShareFile. RichText — Không, render
+//   thật (đã được RichText.xss.test.tsx riêng phủ, dùng lại không sửa
+//   ở đây). BentoCell, Button — Không, render thật (primitive hiển thị thuần).
+//   useT() — Không, thật (không có provider thì lùi về DEFAULT_LOCALE = "en",
+//   theo quy ước của ActionButton.test.tsx — không cần bọc I18nProvider).
+//   vitest.config.ts của repo này không nối file setup @testing-library/jest-dom,
+//   nên matcher jest-dom (toHaveAttribute v.v.) không dùng được — file này
+//   đọc thẳng thuộc tính/attribute DOM thô, cùng quy ước với
 //   ActionButton.test.tsx.
-//   render() does not auto-cleanup between tests here (no `test.globals`, so
-//   @testing-library/react's afterEach-based auto-cleanup never registers) —
-//   every query below is scoped to its own render()'s returned `container` via
-//   `within`, never the global `screen` (ActionButton.test.tsx precedent).
+//   render() không tự cleanup giữa các test ở đây (không có `test.globals`, nên
+//   auto-cleanup dựa trên afterEach của @testing-library/react không bao giờ đăng ký) —
+//   mọi truy vấn bên dưới được giới hạn trong `container` do chính render() đó trả về qua
+//   `within`, không bao giờ dùng `screen` toàn cục (tiền lệ ActionButton.test.tsx).
 //
-// Generated: 2026-08-08 | Budget Used: integration 1/3 (frontend sub-budget —
-//   see backend tutorActions.int.test.ts's header for the sub-budget rationale
-//   this pairs with)
+//Sinh ngày: 2026-08-08 | Ngân sách đã dùng: integration 1/3 (ngân sách phụ của frontend —
+//   xem comment đầu backend tutorActions.int.test.ts để biết lý do chia ngân sách phụ
+//   mà file này đi cặp)
 
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -50,14 +49,14 @@ import { hintDuringAttempt } from "@/features/exams/tutorActions";
 
 const mockExplainStep = vi.mocked(hintDuringAttempt);
 
-// Deliberately NOT symmetric/interchangeable-looking — a swapped call site must
-// fail Test 2's assertion on the values alone, not merely on argument count.
+// Cố ý KHÔNG đối xứng/trông có thể hoán đổi — một nơi gọi bị hoán đổi phải
+// làm khẳng định của Test 2 hỏng chỉ dựa vào giá trị, không chỉ dựa vào số tham số.
 const ATTEMPT_ID = "attempt-fixture-111";
 const QUESTION_ID = "question-fixture-222";
 
 const IDLE_LABEL = "Gợi ý cho câu này"; // tutor.explainThisStep (en)
-const RETRY_LABEL = "Thử lại"; // common.retry (en), reused per ActionButton's LABEL_KEY precedent
-const ERROR_COPY = "Chưa lấy được gợi ý. Bạn thử lại nhé."; // tutor.error (en) — ONE generic copy for all 4 backend codes
+const RETRY_LABEL = "Thử lại"; // common.retry (en), dùng lại theo tiền lệ LABEL_KEY của ActionButton
+const ERROR_COPY = "Chưa lấy được gợi ý. Bạn thử lại nhé."; // tutor.error (en) — MỘT câu chữ chung cho cả 4 mã backend
 const HIDE_HINT_LABEL = "Ẩn gợi ý"; // tutor.hideHint — tên của nút thu gọn khi bảng đang mở
 const SHOW_HINT_LABEL = "Hiện gợi ý"; // tutor.showHint — tên của nút khi bảng đang thu gọn
 
@@ -82,36 +81,36 @@ beforeEach(() => {
 
 describe("ExplainStepAffordance", () => {
   // ===========================================================================
-  // Test 1 — AC-025: busyRef synchronous double-activation guard — a second
-  // activation while busy is a verified no-op (at most 1 explainStep() call)
+  // Test 1 — AC-025: chốt chặn kích hoạt kép đồng bộ bằng busyRef — lần kích hoạt
+  // thứ hai khi đang bận là no-op đã được kiểm chứng (tối đa 1 lần gọi explainStep())
   // ===========================================================================
-  // AC-025: "...A second activation while busy shall be a no-op (checked via
-  //   busyRef synchronously, before any React state update)."
+  // AC-025: "...Lần kích hoạt thứ hai khi đang bận phải là no-op (kiểm qua
+  //   busyRef một cách đồng bộ, trước mọi cập nhật state của React)."
   // ROI: 56 (BV:8 x Freq:6 + Legal:0 + Defect:8)
-  // Behavior: render ExplainStepAffordance with a mocked explainStep() that never
-  //   resolves (a pending Promise, held open) -> fire two rapid activations
-  //   (click, or a second click) on the button while phase==="busy" -> assert the
-  //   mocked explainStep() was called AT MOST ONCE.
+  // Hành vi: render ExplainStepAffordance với explainStep() mock không bao giờ
+  //   resolve (một Promise đang chờ, giữ mở) -> bắn hai lần kích hoạt nhanh
+  //   (click, hoặc click lần hai) lên nút khi phase==="busy" -> khẳng định
+  //   explainStep() mock được gọi TỐI ĐA MỘT LẦN.
   // @category: core-functionality
   // @lane: integration
   // @dependency: SOURCE/components/tutor/ExplainStepAffordance.tsx +
-  //   SOURCE/components/tutor/useTutorAction.ts + mocked
+  //   SOURCE/components/tutor/useTutorAction.ts + mock
   //   SOURCE/features/exams/tutorActions.ts (explainStep)
   // @complexity: medium
-  // @real-dependency: none — sanctioned mock boundary (frontend DD Mock Boundary
-  //   Decisions: explainStep is the I/O boundary; useTutorAction's own
-  //   phase/busyRef control flow runs for real, in-process).
-  // Primary failure mode: the busyRef guard is implemented as a React state check
-  //   (`phase === "busy"`) instead of a synchronous ref check, so a second click
-  //   fired in the same tick (before React's state update flushes) is NOT blocked
-  //   — firing a second explainStep() call, another Gemini round trip, another
-  //   rate-limit consumption for the same click gesture.
-  // Proof obligation: with generateHint (mocked explainStep) held pending via an
-  //   unresolved Promise, fire two activation events on the button in immediate
-  //   succession -> assert mockExplainStep.mock.calls.length === 1 (never 2),
-  //   using a literal call-count assertion, not merely "the UI still looks busy."
+  // @real-dependency: không có — ranh giới mock được phê duyệt (Mock Boundary
+  //   Decisions của frontend DD: explainStep là ranh giới I/O; luồng điều khiển
+  //   phase/busyRef của chính useTutorAction chạy thật, trong cùng tiến trình).
+  // Kiểu hỏng chính: chốt busyRef được cài như một phép kiểm state của React
+  //   (`phase === "busy"`) thay vì kiểm ref đồng bộ, nên một cú click thứ hai
+  //   bắn trong cùng tick (trước khi cập nhật state của React được flush) KHÔNG bị chặn
+  //   — gọi explainStep() lần hai, thêm một lượt khứ hồi Gemini, thêm một lần tiêu
+  //   hạn mức cho cùng một cử chỉ bấm.
+  // Nghĩa vụ chứng minh: với generateHint (explainStep mock) giữ chờ bằng một
+  //   Promise không resolve, bắn hai sự kiện kích hoạt lên nút liên tiếp ngay lập tức
+  //   -> khẳng định mockExplainStep.mock.calls.length === 1 (không bao giờ 2),
+  //   dùng khẳng định số lần gọi theo nghĩa đen, không chỉ "UI vẫn trông như đang bận."
   it("AC-025: busyRef synchronous double-activation guard — a second activation while busy is a no-op (at most 1 explainStep() call)", async () => {
-    // Held open: phase stays "busy" for the whole assertion window.
+    // Giữ mở: phase ở "busy" suốt cửa sổ khẳng định.
     let resolveExplain!: (result: TutorHintResult) => void;
     mockExplainStep.mockImplementation(
       () =>
@@ -125,20 +124,20 @@ describe("ExplainStepAffordance", () => {
     );
     const button = within(container).getByRole("button", { name: IDLE_LABEL });
 
-    // BOTH activations inside ONE act() body — this is the whole point of the
-    // test. fireEvent wraps each call in its own act(), which flushes React's
-    // state update in between, so a `phase === "busy"` guard would already read
-    // the updated phase and (wrongly) look correct. Two native clicks in a
-    // single act() body leave `phase` at its pre-render value for the second
-    // handler, so ONLY a synchronous ref check blocks it — the exact same-tick
-    // gesture AC-025 is about.
+    // CẢ HAI lần kích hoạt nằm trong MỘT thân act() — đây là toàn bộ ý nghĩa của
+    // test. fireEvent bọc mỗi lời gọi trong act() riêng, flush cập nhật state của
+    // React ở giữa, nên chốt `phase === "busy"` sẽ đã đọc được
+    // phase mới và (sai) trông như đúng. Hai cú click gốc trong
+    // một thân act() để `phase` ở giá trị trước-render cho handler thứ hai,
+    // nên CHỈ phép kiểm ref đồng bộ mới chặn được — đúng cử chỉ cùng-tick
+    // mà AC-025 nói tới.
     act(() => {
-      button.click(); // idle -> busy (busyRef set synchronously, before any state update)
-      button.click(); // rapid second activation in the same tick — must be a no-op
+      button.click(); // idle -> busy (busyRef đặt đồng bộ, trước mọi cập nhật state)
+      button.click(); // lần kích hoạt thứ hai quá nhanh trong cùng tick — phải là no-op
     });
 
-    // Literal call-count assertion, not "the UI still looks busy": a React-state
-    // guard (`phase === "busy"`) lets this second same-tick click through.
+    // Khẳng định số lần gọi theo nghĩa đen, không phải "UI vẫn trông như đang bận": một chốt
+    // state của React (`phase === "busy"`) để lọt cú click cùng-tick thứ hai này.
     expect(mockExplainStep.mock.calls.length).toBe(1);
     expect(button.getAttribute("aria-disabled")).toBe("true");
     expect(button.getAttribute("aria-busy")).toBe("true");
@@ -149,40 +148,40 @@ describe("ExplainStepAffordance", () => {
     await waitFor(() =>
       expect(within(container).queryByRole("button", { name: IDLE_LABEL })).toBeNull()
     );
-    expect(mockExplainStep.mock.calls.length).toBe(1); // still 1 after the busy window closes
+    expect(mockExplainStep.mock.calls.length).toBe(1); // vẫn là 1 sau khi cửa sổ bận đóng
   });
 
   // ===========================================================================
-  // Test 2 — argument-order proof: explainStep is called with (attemptId,
-  // questionId), never the swapped ExplainStepAffordanceProps declaration order
+  // Test 2 — chứng minh thứ tự tham số: explainStep được gọi với (attemptId,
+  // questionId), không bao giờ theo thứ tự khai báo bị hoán đổi của ExplainStepAffordanceProps
   // ===========================================================================
-  // No standalone AC number — frontend DD's own top-named Risk: "explainStep(
-  //   attemptId, questionId) vs. ExplainStepAffordanceProps' (questionId,
-  //   attemptId) declaration order — a silent argument swap since both are
-  //   strings," mitigated explicitly by "a literal-fixture unit test in
-  //   ExplainStepAffordance.test.tsx asserting toHaveBeenCalledWith(
-  //   '<attemptId-fixture>', '<questionId-fixture>') with two distinguishable
-  //   fixture values, so a swap fails the assertion."
+  // Không có số AC riêng — Rủi ro được nêu đầu tiên của chính frontend DD: "explainStep(
+  //   attemptId, questionId) so với thứ tự khai báo (questionId,
+  //   attemptId) của ExplainStepAffordanceProps — hoán đổi tham số thầm lặng vì cả hai đều
+  //   là string," được giảm thiểu tường minh bằng "một unit test dùng literal-fixture trong
+  //   ExplainStepAffordance.test.tsx khẳng định toHaveBeenCalledWith(
+  //   '<attemptId-fixture>', '<questionId-fixture>') với hai giá trị
+  //   fixture phân biệt được, để hoán đổi làm khẳng định hỏng."
   // ROI: 56 (BV:8 x Freq:6 + Legal:0 + Defect:8)
-  // Behavior: render ExplainStepAffordance with two DISTINGUISHABLE literal string
-  //   props (e.g. attemptId="attempt-fixture-111", questionId="question-fixture-222"
-  //   — deliberately NOT symmetric/interchangeable-looking) -> activate the button
-  //   -> assert the mocked explainStep was called with the arguments in the exact
-  //   order (attemptId, questionId), not (questionId, attemptId).
+  // Hành vi: render ExplainStepAffordance với hai prop string literal PHÂN BIỆT ĐƯỢC
+  //   (ví dụ attemptId="attempt-fixture-111", questionId="question-fixture-222"
+  //   — cố ý KHÔNG đối xứng/trông có thể hoán đổi) -> kích hoạt nút
+  //   -> khẳng định explainStep mock được gọi với tham số đúng thứ tự
+  //   (attemptId, questionId), không phải (questionId, attemptId).
   // @category: core-functionality
   // @lane: integration
-  // @dependency: same as Test 1
+  // @dependency: giống Test 1
   // @complexity: low
-  // @real-dependency: none
-  // Primary failure mode: useTutorAction.ts's call site swaps the two string
-  //   arguments (both plain strings, so TypeScript compiles either order without
-  //   error) — every tutor invocation silently targets the wrong
-  //   attempt/question pair, an undetectable-by-type-system regression this test
-  //   is the SOLE guard against.
-  // Proof obligation: `expect(mockExplainStep).toHaveBeenCalledWith(
-  //   "attempt-fixture-111", "question-fixture-222")` — using two fixture values
-  //   that would fail this assertion if swapped (not, e.g., two identical or
-  //   easily-confusable strings).
+  // @real-dependency: không có
+  // Kiểu hỏng chính: nơi gọi trong useTutorAction.ts hoán đổi hai tham số string
+  //   (cả hai đều là string thường, nên TypeScript biên dịch cả hai thứ tự mà
+  //   không lỗi) — mọi lần gọi gia sư thầm lặng nhắm sai cặp
+  //   lượt làm/câu hỏi, một hồi quy hệ thống kiểu không phát hiện được mà test này
+  //   là chốt chặn DUY NHẤT.
+  // Nghĩa vụ chứng minh: `expect(mockExplainStep).toHaveBeenCalledWith(
+  //   "attempt-fixture-111", "question-fixture-222")` — dùng hai giá trị fixture
+  //   sẽ làm khẳng định này hỏng nếu bị hoán đổi (không phải, ví dụ, hai chuỗi giống nhau
+  //   hay dễ nhầm).
   it("argument-order proof: explainStep called with (attemptId, questionId), never the swapped declaration order", async () => {
     mockExplainStep.mockResolvedValue({ hint: "gợi ý bất kỳ" });
 
@@ -193,44 +192,44 @@ describe("ExplainStepAffordance", () => {
 
     await waitFor(() => expect(mockExplainStep).toHaveBeenCalledTimes(1));
 
-    // The SOLE guard against a silent swap — both parameters are plain strings,
-    // so either order compiles. Two distinguishable fixtures make the swap fail.
+    // Chốt chặn DUY NHẤT trước một lần hoán đổi thầm lặng — cả hai tham số đều là string thường,
+    // nên thứ tự nào cũng biên dịch. Hai fixture phân biệt được khiến hoán đổi làm test hỏng.
     expect(mockExplainStep).toHaveBeenCalledWith(ATTEMPT_ID, QUESTION_ID, "");
     expect(mockExplainStep.mock.calls[0]).toEqual([ATTEMPT_ID, QUESTION_ID, ""]);
   });
 
   // ===========================================================================
-  // Test 3 — AC-018/019/020 UI half + D5: hint-shown state renders the hint via
-  // RichText and removes the re-invoke control for this question in this render
+  // Test 3 — AC-018/019/020 nửa UI + D5: trạng thái đã hiện gợi ý render gợi ý qua
+  // RichText và bỏ control gọi lại cho câu này trong lần render này
   // ===========================================================================
-  // AC (D5, UI half): "...no control to re-invoke the tutor shall exist in this
-  //   state for this question in this render."
+  // AC (D5, nửa UI): "...không được tồn tại control nào để gọi lại gia sư trong trạng thái
+  //   này, cho câu này, trong lần render này."
   // ROI: 50 (BV:7 x Freq:6 + Legal:0 + Defect:7)
-  // Behavior: mocked explainStep resolves { hint: "<fixture hint text>" } -> after
-  //   the state settles, the rendered container contains the hint text (rendered
-  //   through RichText, real render) and does NOT contain the "explain this step"
-  //   button/control anymore for this render.
+  // Hành vi: explainStep mock resolve { hint: "<fixture hint text>" } -> sau khi
+  //   state ổn định, container đã render chứa chữ của gợi ý (render
+  //   qua RichText, render thật) và KHÔNG còn chứa nút/control
+  //   "giải thích bước này" cho lần render này.
   // @category: core-functionality
   // @lane: integration
-  // @dependency: same as Test 1, RichText (real, unmocked)
+  // @dependency: giống Test 1, RichText (thật, không mock)
   // @complexity: medium
-  // @real-dependency: none — RichText itself is exercised for real per Mock
-  //   Boundary Decisions ("already covered by its own hardened-pipeline tests...
-  //   reused unmodified here, not re-tested" — this test only proves
-  //   ExplainStepAffordance routes the hint INTO RichText, not RichText's own
-  //   sanitize correctness).
-  // Primary failure mode: the hint is rendered through a competing plain-text/
-  //   dangerouslySetInnerHTML path instead of RichText (reopening an output-side
-  //   sanitization gap ADR-0002/D4 exist to close), or the button remains mounted
-  //   alongside the hint panel, allowing a second, redundant tutor invocation for
-  //   the same already-answered question.
-  // Proof obligation: after the mocked explainStep resolves with a fixture hint
-  //   string, assert the container's text content includes the fixture hint
-  //   string, and assert no `role="button"`-equivalent "explain this step"
-  //   control remains queryable within the same container.
+  // @real-dependency: không có — chính RichText được chạy thật theo Mock
+  //   Boundary Decisions ("đã được test của pipeline đã gia cố riêng phủ...
+  //   dùng lại không sửa ở đây, không test lại" — test này chỉ chứng minh
+  //   ExplainStepAffordance đưa gợi ý VÀO RichText, không chứng minh độ đúng sanitize
+  //   của chính RichText).
+  // Kiểu hỏng chính: gợi ý được render qua đường plain-text/
+  //   dangerouslySetInnerHTML cạnh tranh thay vì RichText (mở lại lỗ hổng sanitize
+  //   phía đầu ra mà ADR-0002/D4 sinh ra để đóng), hoặc nút vẫn mount
+  //   cạnh panel gợi ý, cho phép một lần gọi gia sư thứ hai, thừa, cho
+  //   cùng một câu đã được trả lời.
+  // Nghĩa vụ chứng minh: sau khi explainStep mock resolve với một chuỗi gợi ý fixture,
+  //   khẳng định nội dung chữ của container có chuỗi gợi ý fixture,
+  //   và khẳng định không còn control "giải thích bước này" tương đương `role="button"`
+  //   truy vấn được trong cùng container.
   it("AC-018/019/020 UI half + D5: hint-shown state renders the hint via RichText and removes the re-invoke control", async () => {
-    // Markdown emphasis is the discriminator: RichText turns it into <strong>,
-    // while any competing plain-text path would leave the literal asterisks.
+    // Nhấn mạnh Markdown là yếu tố phân biệt: RichText biến nó thành <strong>,
+    // còn mọi đường plain-text cạnh tranh sẽ để lại dấu sao nguyên văn.
     const HINT = "Xem lại **định luật bảo toàn** rồi thử lại nhé.";
     mockExplainStep.mockResolvedValue({ hint: HINT });
 
@@ -265,14 +264,14 @@ describe("ExplainStepAffordance", () => {
     expect(container.textContent).toContain("định luật bảo toàn");
     expect(container.textContent).toContain("rồi thử lại nhé.");
     expect(container.querySelector("strong")?.textContent).toBe("định luật bảo toàn");
-    expect(container.textContent).not.toContain("**"); // not a raw/plain-text render path
+    expect(container.textContent).not.toContain("**"); // không phải đường render thô/plain-text
 
-    // D5: no control to re-invoke the TUTOR exists in this state, for this
-    // question, in this render. Since 2026-09-15 exactly ONE button remains —
-    // the show/hide toggle of the hint panel. It never calls the tutor (proved
-    // in the toggle case below), so it is pinned by WHAT it is — expanded state
-    // and the "Ẩn gợi ý" name — rather than merely counted, so a re-invoke
-    // control slipping back in as "the one button" still fails here.
+    // D5: không tồn tại control nào để gọi lại GIA SƯ trong trạng thái này, cho câu
+    // này, trong lần render này. Từ 2026-09-15 còn đúng MỘT nút —
+    // nút bật/tắt của panel gợi ý. Nó không bao giờ gọi gia sư (đã chứng minh
+    // ở ca toggle bên dưới), nên được ghim theo NÓ LÀ GÌ — trạng thái mở rộng
+    // và tên "Ẩn gợi ý" — thay vì chỉ đếm, để một control gọi lại
+    // lẻn vào làm "nút duy nhất" vẫn hỏng ở đây.
     expect(within(container).queryByRole("button", { name: IDLE_LABEL })).toBeNull();
     expect(within(container).queryByRole("button", { name: RETRY_LABEL })).toBeNull();
     const buttons = container.querySelectorAll("button");
@@ -298,11 +297,11 @@ describe("ExplainStepAffordance", () => {
   // Nút Ẩn/Hiện của bảng gợi ý (engineer 2026-09-15: "để đỡ phải vuốt lên
   // xuống" — bảng gợi ý đứng giữa đề bài và khu vực trả lời).
   // ===========================================================================
-  // Primary failure modes: (1) the toggle is wired to the tutor call — every
-  //   collapse/expand silently spends a rate-limited Gemini round trip; (2) the
-  //   body is unmounted instead of hidden, so `aria-controls` points at nothing
-  //   while collapsed; (3) the parent is never told, so a collapsed hint springs
-  //   open again on returning to that question.
+  // Kiểu hỏng chính: (1) nút bật/tắt bị nối vào lời gọi gia sư — mỗi lần
+  //   thu gọn/mở rộng thầm lặng tiêu một lượt khứ hồi Gemini có giới hạn hạn mức; (2) phần
+  //   thân bị unmount thay vì ẩn, nên `aria-controls` trỏ vào hư không
+  //   khi đang thu gọn; (3) cha không được báo, nên gợi ý đã thu gọn bật
+  //   mở lại khi quay về câu đó.
   it("2026-09-15: Ẩn/Hiện thu gọn bảng gợi ý, báo trạng thái lên cha, và KHÔNG gọi gia sư", () => {
     const onCollapsedChange = vi.fn();
     const { container } = render(
@@ -351,43 +350,41 @@ describe("ExplainStepAffordance", () => {
   });
 
   // ===========================================================================
-  // Test 4 — AC-021: failure path re-labels to retry, mounts a role="alert" error
-  // paragraph, and the rest of the page (this component's own DOM) stays
-  // interactive
+  // Test 4 — AC-021: đường lỗi đổi nhãn thành thử lại, mount một đoạn lỗi role="alert",
+  // và phần còn lại của trang (DOM của chính component này) vẫn tương tác được
   // ===========================================================================
-  // AC-021: "...the button shall re-label to common.retry, and a role='alert'
-  //   paragraph reading tutor.error shall mount below it; the rest of the result
-  //   page shall remain fully interactive."
+  // AC-021: "...nút phải đổi nhãn thành common.retry, và một đoạn role='alert'
+  //   đọc tutor.error phải mount bên dưới nó; phần còn lại của trang kết quả
+  //   phải vẫn tương tác đầy đủ."
   // ROI: 50 (BV:7 x Freq:6 + Legal:0 + Defect:7)
-  // Behavior: mocked explainStep resolves { error: "gemini_unavailable" } (and,
-  //   as a second case, mocked explainStep REJECTS/throws) -> the button's
-  //   accessible label changes to the retry copy, and a `role="alert"` element
-  //   with the generic tutor.error copy mounts; the button remains enabled/
-  //   focusable (never native `disabled`) so a retry activation is possible.
+  // Hành vi: explainStep mock resolve { error: "gemini_unavailable" } (và,
+  //   ở ca thứ hai, explainStep mock REJECT/ném lỗi) -> nhãn truy cập được của nút
+  //   đổi thành chữ thử lại, và một phần tử `role="alert"`
+  //   mang câu chữ chung tutor.error được mount; nút vẫn enabled/
+  //   focus được (không bao giờ `disabled` gốc) để có thể kích hoạt thử lại.
   // @category: edge-case
   // @lane: integration
-  // @dependency: same as Test 1
+  // @dependency: giống Test 1
   // @complexity: medium
-  // @real-dependency: none
-  // Primary failure mode: the button is set to native `disabled` on error
-  //   (removing it from the tab order — the exact bug already fixed twice in this
-  //   codebase, RateButton then ActionButton, per frontend DD's own Applicable
-  //   Standards), permanently blocking a retry via keyboard; or the error
-  //   paragraph lacks `role="alert"`, so assistive technology never announces the
-  //   failure.
-  // Proof obligation: for BOTH the typed-error-resolution case and the
-  //   rejected-Promise case, assert an element with role="alert" is present and
-  //   its text content matches the generic tutor.error copy, and assert the
-  //   button element has no native `disabled` attribute/property set (still
-  //   focusable) in either failure case.
+  // @real-dependency: không có
+  // Kiểu hỏng chính: nút bị đặt `disabled` gốc khi lỗi
+  //   (loại nó khỏi thứ tự tab — đúng lỗi đã sửa hai lần trong codebase này,
+  //   RateButton rồi ActionButton, theo Applicable Standards của chính frontend DD), chặn
+  //   vĩnh viễn việc thử lại bằng bàn phím; hoặc đoạn lỗi thiếu `role="alert"`, nên công nghệ
+  //   hỗ trợ không bao giờ thông báo lỗi.
+  // Nghĩa vụ chứng minh: với CẢ ca kết quả-lỗi-có-kiểu lẫn ca
+  //   Promise-bị-reject, khẳng định có phần tử role="alert" và
+  //   nội dung chữ của nó khớp câu chữ chung tutor.error, và khẳng định
+  //   phần tử nút không có thuộc tính/property `disabled` gốc (vẫn
+  //   focus được) ở cả hai ca lỗi.
   it("AC-021: failure path re-labels to retry, mounts a role=alert error paragraph, stays interactive", async () => {
-    // The hook console.error's both failure branches by design (frontend DD §
-    // Logging and Monitoring) — silenced so the expected logs don't read as
-    // test noise.
+    // Hook cố ý console.error ở cả hai nhánh lỗi (frontend DD §
+    // Logging and Monitoring) — tắt tiếng để log dự kiến không bị đọc như
+    // nhiễu của test.
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     try {
-      // Case A — typed-error resolution (one of the 4 closed backend codes).
+      // Ca A — kết quả lỗi có kiểu (một trong 4 mã backend đóng).
       mockExplainStep.mockResolvedValue({ error: "gemini_unavailable" });
       const typed = render(
         <ExplainStepAffordance questionId={QUESTION_ID} attemptId={ATTEMPT_ID} />
@@ -395,18 +392,18 @@ describe("ExplainStepAffordance", () => {
       fireEvent.click(within(typed.container).getByRole("button", { name: IDLE_LABEL }));
 
       const typedAlert = await within(typed.container).findByRole("alert");
-      expect(typedAlert.textContent).toBe(ERROR_COPY); // ONE generic copy — never discloses which code
+      expect(typedAlert.textContent).toBe(ERROR_COPY); // MỘT câu chữ chung — không bao giờ tiết lộ mã nào
       const typedButton = within(typed.container).getByRole("button", { name: RETRY_LABEL });
-      // Never native `disabled` — the exact bug already fixed twice here
-      // (RateButton, then ActionButton); a disabled button leaves the tab order.
+      // Không bao giờ `disabled` gốc — đúng lỗi đã sửa hai lần ở đây
+      // (RateButton, rồi ActionButton); nút bị disabled rời khỏi thứ tự tab.
       expect(typedButton.hasAttribute("disabled")).toBe(false);
       expect((typedButton as HTMLButtonElement).disabled).toBe(false);
       expect(typedButton.getAttribute("aria-disabled")).toBe("false");
       expect(typedButton.getAttribute("aria-busy")).toBe("false");
       typedButton.focus();
-      expect(document.activeElement).toBe(typedButton); // still focusable => retry reachable by keyboard
+      expect(document.activeElement).toBe(typedButton); // vẫn focus được => bấm thử lại bằng bàn phím được
 
-      // Case B — the call rejects outright (network drop / Server Action throw).
+      // Ca B — lời gọi bị reject hẳn (rớt mạng / Server Action ném lỗi).
       mockExplainStep.mockRejectedValue(new Error("network blip"));
       const rejected = render(
         <ExplainStepAffordance questionId={QUESTION_ID} attemptId={ATTEMPT_ID} />
@@ -414,7 +411,7 @@ describe("ExplainStepAffordance", () => {
       fireEvent.click(within(rejected.container).getByRole("button", { name: IDLE_LABEL }));
 
       const rejectedAlert = await within(rejected.container).findByRole("alert");
-      expect(rejectedAlert.textContent).toBe(ERROR_COPY); // identical copy — both branches collapse to one message
+      expect(rejectedAlert.textContent).toBe(ERROR_COPY); // câu chữ giống hệt — cả hai nhánh gộp về một thông báo
       const rejectedButton = within(rejected.container).getByRole("button", { name: RETRY_LABEL });
       expect(rejectedButton.hasAttribute("disabled")).toBe(false);
       expect((rejectedButton as HTMLButtonElement).disabled).toBe(false);
@@ -422,7 +419,7 @@ describe("ExplainStepAffordance", () => {
       rejectedButton.focus();
       expect(document.activeElement).toBe(rejectedButton);
 
-      // busyRef must not be left stuck true after a failure — a retry re-enters busy.
+      // busyRef không được để kẹt ở true sau một lần lỗi — thử lại vào lại trạng thái busy.
       mockExplainStep.mockResolvedValue({ hint: "gợi ý sau khi thử lại" });
       fireEvent.click(rejectedButton);
       await waitFor(() => expect(mockExplainStep).toHaveBeenCalledTimes(3));
@@ -432,46 +429,46 @@ describe("ExplainStepAffordance", () => {
   });
 
   // ===========================================================================
-  // Test 5 — AC-023/024/029: mount condition is gated solely by hasBeenWrongTwice,
-  // never by skill_node_id presence (untagged questions render identically)
+  // Test 5 — AC-023/024/029: điều kiện mount chỉ do hasBeenWrongTwice quyết định,
+  // không bao giờ do có hay không skill_node_id (câu chưa gắn thẻ render y hệt)
   // ===========================================================================
-  // AC-024: "When r.hasBeenWrongTwice is false or undefined, ResultDetailPage
-  //   shall not mount ExplainStepAffordance for that question."
-  // AC-029 (UI half): "...ExplainStepAffordance shall render and function
-  //   identically — it is gated solely by hasBeenWrongTwice, never by skill-tag
-  //   presence."
+  // AC-024: "Khi r.hasBeenWrongTwice là false hoặc undefined, ResultDetailPage
+  //   không được mount ExplainStepAffordance cho câu đó."
+  // AC-029 (nửa UI): "...ExplainStepAffordance phải render và hoạt động
+  //   y hệt — nó chỉ bị quyết định bởi hasBeenWrongTwice, không bao giờ bởi việc có
+  //   thẻ kỹ năng hay không."
   // ROI: 45 (BV:6 x Freq:6 + Legal:0 + Defect:7)
-  // Behavior: this is a mount-condition proof, exercised at the ResultDetailPage
-  //   call-site level conceptually, but testable here as: ExplainStepAffordance
-  //   itself carries no internal gating logic on skill_node_id/hasBeenWrongTwice
-  //   (those fields are not part of ExplainStepAffordanceProps at all — the
-  //   gating happens at the CALLER, ResultDetailPage, per IP-1's own note that
-  //   ResultDetailPage itself has "no RTL coverage... matching the ExamCard/
-  //   ExamBrowser untested-Server-Component precedent"). This test instead proves
-  //   the COMPONENT's own behavior is independent of any skill-tag-shaped prop —
-  //   i.e. rendering ExplainStepAffordance with only {questionId, attemptId}
-  //   (its actual, minimal Props surface) functions fully, with no additional
-  //   prop required or consulted for a skill tag.
+  // Hành vi: đây là bằng chứng về điều kiện mount, về mặt khái niệm được chạy ở mức nơi gọi
+  //   ResultDetailPage, nhưng ở đây kiểm được dưới dạng: chính ExplainStepAffordance
+  //   không mang logic chặn nội bộ nào theo skill_node_id/hasBeenWrongTwice
+  //   (các trường đó hoàn toàn không thuộc ExplainStepAffordanceProps — việc
+  //   chặn xảy ra ở NƠI GỌI, ResultDetailPage, theo ghi chú của chính IP-1 rằng
+  //   ResultDetailPage "không có RTL... theo tiền lệ ExamCard/
+  //   ExamBrowser là Server Component không được test"). Thay vào đó, test này chứng minh
+  //   hành vi của chính COMPONENT độc lập với mọi prop có hình dạng thẻ kỹ năng
+  //   — tức là render ExplainStepAffordance chỉ với {questionId, attemptId}
+  //   (bề mặt Props nhỏ nhất thật của nó) vẫn chạy đầy đủ, không cần và không
+  //   tham chiếu prop bổ sung nào cho thẻ kỹ năng.
   // @category: edge-case
   // @lane: integration
-  // @dependency: same as Test 1
+  // @dependency: giống Test 1
   // @complexity: low
-  // @real-dependency: none
-  // Primary failure mode: a future maintainer widens ExplainStepAffordanceProps to
-  //   accept a skill-tag-shaped field and conditions rendering/behavior on it,
-  //   silently breaking AC-029's "needs question content, not a skill tag"
-  //   contract for untagged questions.
-  // Proof obligation: render ExplainStepAffordance with only its documented
-  //   {questionId, attemptId} props (no additional prop) and assert the idle-state
-  //   button renders and is activatable, proving no other prop is required for the
-  //   component to function — the mount/no-mount DECISION itself (AC-023/024) is
-  //   ResultDetailPage's own responsibility and is out of RTL scope per IP-1,
-  //   verified instead by the manual Playwright pass (frontend DD Integration
-  //   Verification Points).
+  // @real-dependency: không có
+  // Kiểu hỏng chính: người bảo trì về sau mở rộng ExplainStepAffordanceProps để
+  //   nhận một trường có hình dạng thẻ kỹ năng và điều kiện hoá việc render/hành vi theo nó,
+  //   thầm lặng phá hợp đồng "cần nội dung câu hỏi, không cần thẻ kỹ năng" của AC-029
+  //   với câu chưa gắn thẻ.
+  // Nghĩa vụ chứng minh: render ExplainStepAffordance chỉ với props đã tài liệu hoá
+  //   {questionId, attemptId} (không prop bổ sung) và khẳng định nút ở trạng thái idle
+  //   render ra và kích hoạt được, chứng minh component không cần prop nào khác để
+  //   hoạt động — chính QUYẾT ĐỊNH mount/không mount (AC-023/024) là
+  //   trách nhiệm của ResultDetailPage và nằm ngoài phạm vi RTL theo IP-1,
+  //   được kiểm bằng lượt Playwright thủ công (Integration
+  //   Verification Points của frontend DD).
   it("AC-023/024/029: mount condition gated solely by hasBeenWrongTwice, never by skill_node_id presence", async () => {
     mockExplainStep.mockResolvedValue({ hint: "gợi ý cho câu chưa gắn nhãn kỹ năng" });
 
-    // Only the documented, minimal props — no skill-tag-shaped prop supplied.
+    // Chỉ các prop tối thiểu đã tài liệu hoá — không truyền prop có hình dạng thẻ kỹ năng.
     const { container } = render(
       <ExplainStepAffordance questionId={QUESTION_ID} attemptId={ATTEMPT_ID} />
     );
@@ -480,17 +477,17 @@ describe("ExplainStepAffordance", () => {
     expect(button.getAttribute("aria-disabled")).toBe("false");
     expect(button.hasAttribute("disabled")).toBe(false);
 
-    fireEvent.click(button); // fully activatable with nothing but {questionId, attemptId}
+    fireEvent.click(button); // kích hoạt đầy đủ chỉ với {questionId, attemptId}
     await waitFor(() => expect(mockExplainStep).toHaveBeenCalledTimes(1));
     expect(mockExplainStep).toHaveBeenCalledWith(ATTEMPT_ID, QUESTION_ID, "");
 
-    // Structural half of AC-029: neither the component nor its hook may read a
-    // skill-tag-shaped value at all. The mount/no-mount DECISION itself
-    // (AC-023/024) is ResultDetailPage's own responsibility, out of RTL scope
-    // per IP-1 — verified by the manual Playwright pass (Phase 5 Task 18).
-    // Resolved against THIS file's own directory, not process.cwd(): the two
-    // targets are its co-located siblings either way, so the scan survives being
-    // run from the repo root instead of SOURCE/.
+    // Nửa cấu trúc của AC-029: cả component lẫn hook của nó đều không được đọc bất kỳ
+    // giá trị hình dạng thẻ kỹ năng nào. Chính QUYẾT ĐỊNH mount/không mount
+    // (AC-023/024) là trách nhiệm của ResultDetailPage, nằm ngoài phạm vi RTL
+    // theo IP-1 — được kiểm bằng lượt Playwright thủ công (Phase 5 Task 18).
+    // Phân giải theo thư mục của CHÍNH file này, không theo process.cwd(): hai
+    // đích là anh em đặt cạnh nó dù theo cách nào, nên phép quét vẫn đúng khi
+    // chạy từ gốc repo thay vì SOURCE/.
     const here = dirname(fileURLToPath(import.meta.url));
     const componentSource = readFileSync(join(here, "ExplainStepAffordance.tsx"), "utf-8");
     const hookSource = readFileSync(join(here, "useTutorAction.ts"), "utf-8");

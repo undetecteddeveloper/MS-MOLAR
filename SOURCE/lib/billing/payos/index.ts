@@ -6,10 +6,10 @@ import { signRequestFields } from "./signature";
 
 // Adapter payOS — TỪ NGỮ NHÀ CUNG CẤP DỪNG LẠI Ở THƯ MỤC NÀY.
 //
-// ADR-0013 § Architecture Impact: *"One provider boundary, and everything
-// provider-specific behind it. `orderCode`, `checksum key`, signature format,
-// `expiredAt`, and the `PENDING`/`SUCCEEDED`/`CANCELLED` vocabulary belong
-// inside a single payOS adapter module. Nothing above that line … may reference
+// ADR-0013 § Architecture Impact: *"Một ranh giới nhà cung cấp, và mọi thứ
+// đặc thù nhà cung cấp nằm sau nó. `orderCode`, `checksum key`, định dạng chữ ký,
+// `expiredAt`, và bộ từ vựng `PENDING`/`SUCCEEDED`/`CANCELLED` thuộc về
+// một module adapter payOS duy nhất. Không thứ gì phía trên đường đó … được tham chiếu
 // a payOS type."* Đó là điều biến tiêu chí rời bỏ payOS (SePay) thành một lần
 // thay adapter thay vì một lần viết lại — nên mọi chuỗi `PENDING`/`PAID`/
 // `CANCELLED`, mọi `x-client-id`, mọi `qrCode` chỉ được xuất hiện dưới đây.

@@ -48,7 +48,7 @@ import {
 } from "./internals";
 
 /**
- * S-01 → upload 1–2 file + AI extract + assemble + persist (Design Doc §Data Flow).
+ * S-01 → tải lên 1–2 file + AI trích xuất + ghép + lưu (Design Doc §Data Flow).
  * FormData: entryMode (automatic|manual — v2.2), answerSource (in-exam|separate
  * — 2026-09-13; thiếu = separate như client cũ), title, subject, grade,
  * durationMinutes, school?, schoolYear?, semester?, questionFile, answerFile

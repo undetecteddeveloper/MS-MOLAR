@@ -1,31 +1,30 @@
 "use client";
 import { t } from "@/lib/copy";
 
-// RatingRubric — shared core of the standalone Rating Page (academic-rubric
-// redesign, replaces the old RatingForm/RatingOverview/PartCard/PartDetail
-// bubble-expand stack). Renders ONE exam part at a time in a single section,
-// paginated via Prev/Next (2026-07-27 compactness pass — was all 3 rows
-// stacked at once). Matches this app's own established "paper" language
-// (ScoreCard.tsx: `rounded-xl border border-border bg-card`, `.eyebrow`
-// labels, serif tabular-nums figures) instead of the dark-sidebar demo
-// aesthetic it replaces.
+// RatingRubric — lõi dùng chung của trang Đánh giá độc lập (thiết kế lại theo rubric
+// học thuật, thay cho chồng RatingForm/RatingOverview/PartCard/PartDetail
+// bung bóng cũ). Mỗi lần render MỘT phần của đề trong một section duy nhất,
+// phân trang bằng Trước/Sau (đợt gọn lại 2026-07-27 — trước đây hiện cả 3 hàng
+// chồng lên nhau). Khớp với ngôn ngữ "giấy" vốn có của app
+// (ScoreCard.tsx: `rounded-xl border border-border bg-card`, nhãn `.eyebrow`,
+// số serif tabular-nums) thay vì thẩm mỹ sidebar tối của bản demo
+// mà nó thay thế.
 //
-// Owns the submitRating(examId, scores) call itself (rather than taking an
-// injected onSubmit) so the Server Component route (rate/page.tsx) can render
-// this Client Component with only serializable props — a plain closure
-// cannot cross the server→client boundary as a prop (Next.js requires a
-// "use server" action for that).
+// Tự sở hữu lời gọi submitRating(examId, scores) (thay vì nhận một onSubmit
+// được tiêm vào) để route Server Component (rate/page.tsx) có thể render
+// Client Component này chỉ với props tuần tự hoá được — một closure thường
+// không đi qua được ranh giới server→client làm prop (Next.js đòi một
+// action "use server" cho việc đó).
 //
-// UX pass (2026-07-27): the button only ever shows two states — "Submit
-// rating" / "Submitting…" (engineer spec: no third label state). Success is
-// instead confirmed by a bottom-center SuccessToast owned here.
+// Đợt chỉnh UX (2026-07-27): nút chỉ có hai trạng thái — "Submit
+// rating" / "Submitting…" (đặc tả của kỹ sư: không có nhãn trạng thái thứ ba). Thành công
+// được xác nhận bằng SuccessToast ở giữa đáy do component này sở hữu.
 //
-// Result-page UX pass (2026-07-27): this used to also render inside a modal
-// dialog opened from the Result page (`variant="dialog"`, via a deleted
-// RatingEntry popup component) — the Result page's rating button now
-// navigates straight here instead of opening a popup, so that variant, its
-// `onSaved` close-hook, and the toast's former per-variant conditional are
-// all gone; this is the only place RatingRubric renders.
+// Đợt chỉnh UX trang Kết quả (2026-07-27): trước đây component này còn render trong một dialog
+// modal mở từ trang Kết quả (`variant="dialog"`, qua component popup RatingEntry
+// đã xoá) — nút đánh giá của trang Kết quả giờ điều hướng thẳng tới đây thay vì mở popup, nên
+// variant đó, hook đóng `onSaved` của nó, và điều kiện theo từng variant trước đây của toast
+// đều đã bỏ; đây là nơi duy nhất RatingRubric render.
 
 import { useState } from "react";
 import {

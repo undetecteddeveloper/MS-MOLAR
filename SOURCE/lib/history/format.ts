@@ -1,8 +1,8 @@
-// Shared pure formatters for History/PDF surfaces (Work Plan Phase 2 Task 2.2).
-// Single source of truth — see docs/design/history-frontend-design.md § Data
-// Contracts (lib/history/format.ts) and § Minimal Surface Alternatives Element 2.
-// Consumed identically by generateAttemptPdf.ts (Task 09), result/page.tsx's
-// ScoreCard usage (Task 12), and HistoryRow (Task 13) — no per-caller reformatting.
+// Các bộ định dạng thuần dùng chung cho màn History/PDF (Work Plan Phase 2 Task 2.2).
+// Nguồn sự thật duy nhất — xem docs/design/history-frontend-design.md § Data
+// Contracts (lib/history/format.ts) và § Minimal Surface Alternatives Element 2.
+// Được generateAttemptPdf.ts (Task 09), phần dùng ScoreCard của result/page.tsx
+// (Task 12) và HistoryRow (Task 13) dùng giống hệt nhau — không định dạng lại theo từng nơi gọi.
 
 import { normalizeSearch } from "@/lib/search/normalize";
 
@@ -17,7 +17,7 @@ function parseDate(value: string): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-/** "DD/MM/YYYY"; never throws; "—" for null or an unparseable date. */
+/** "DD/MM/YYYY"; không bao giờ ném lỗi; "—" khi null hoặc ngày không phân tích được. */
 export function formatSubmittedDate(submittedAt: string | null): string {
   if (submittedAt === null) return EM_DASH;
   const d = parseDate(submittedAt);
@@ -25,7 +25,7 @@ export function formatSubmittedDate(submittedAt: string | null): string {
   return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()}`;
 }
 
-/** "HH:mm" (24h, local time); never throws; "—" for null or an unparseable date. */
+/** "HH:mm" (24h, giờ địa phương); không bao giờ ném lỗi; "—" khi null hoặc ngày không phân tích được. */
 export function formatSubmittedTime(submittedAt: string | null): string {
   if (submittedAt === null) return EM_DASH;
   const d = parseDate(submittedAt);
@@ -34,9 +34,9 @@ export function formatSubmittedTime(submittedAt: string | null): string {
 }
 
 /**
- * "Hh Mm" (>=60min), "Mm Ss" (>=60s, <60min), "Ss" (<60s), per UI Spec HistoryRow
- * format spec. Never throws; "—" when submittedAt is null, either timestamp is
- * unparseable, or the computed diff is negative.
+ * "Hh Mm" (>=60 phút), "Mm Ss" (>=60 giây, <60 phút), "Ss" (<60 giây), theo đặc tả định dạng
+ * HistoryRow của UI Spec. Không bao giờ ném lỗi; "—" khi submittedAt là null, một trong hai mốc thời gian
+ * không phân tích được, hoặc hiệu số tính ra là số âm.
  */
 export function formatCompletionTime(startedAt: string, submittedAt: string | null): string {
   if (submittedAt === null) return EM_DASH;
@@ -99,11 +99,11 @@ function slugify(title: string): string {
 }
 
 /**
- * "{slug}_{YYYYMMDD}.pdf" per UI Spec D2. Empty/whitespace (or purely
- * non-alphanumeric) title falls back to slug "exam"; null/unparseable
- * submittedAt falls back to the current date (this doc's own defensive
- * fallback for the narrow ExamResult race window — D2 does not define it).
- * Never throws (pure string transform).
+ * "{slug}_{YYYYMMDD}.pdf" theo UI Spec D2. Tiêu đề rỗng/toàn khoảng trắng (hoặc hoàn toàn
+ * không có chữ-số) thì lùi về slug "exam"; submittedAt null/không phân tích được
+ * thì lùi về ngày hiện tại (phương án dự phòng riêng của tài liệu này cho
+ * cửa sổ race hẹp của ExamResult — D2 không định nghĩa nó).
+ * Không bao giờ ném lỗi (phép biến đổi chuỗi thuần).
  */
 export function buildPdfFilename(examTitle: string, submittedAt: string | null): string {
   const slug = slugify(examTitle);

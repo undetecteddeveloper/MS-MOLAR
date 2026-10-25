@@ -1,25 +1,25 @@
-// User Support System v1 — admin/tickets actions + service-role reads [integration]
+// Hệ thống hỗ trợ người dùng v1 — action admin/tickets + lượt đọc service-role [integration]
 // Design Doc: docs/design/support-system-backend-design.md (v1.2, Data Contracts
 //   §changeTicketStatusAction, §addTicketNoteAction, §listSupportTickets,
 //   §changeSupportTicketStatus)
-// PRD: docs/prd/support-system-prd.md (v1.2, AC-021, AC-022 data half, AC-024,
-//   AC-027, AC-029 defensive half, AC-030, AC-047)
+// PRD: docs/prd/support-system-prd.md (v1.2, AC-021, AC-022 nửa dữ liệu, AC-024,
+//   AC-027, AC-029 nửa phòng thủ, AC-030, AC-047)
 //
-// Group 1 mocks the underlying @supabase/supabase-js client (the boundary
-// serviceRoleClient() itself constructs) — this is the one place in the repo
-// that needs to observe service-role.ts's OWN call shape, not just mock the
-// whole module away. Groups 2-3 mock @/lib/supabase/service-role wholesale,
-// mirroring submitExam.int.test.ts's precedent for testing a caller of it.
+// Nhóm 1 mock client @supabase/supabase-js bên dưới (ranh giới mà
+// serviceRoleClient() tự dựng) — đây là nơi duy nhất trong repo
+// cần quan sát hình dạng lời gọi CỦA CHÍNH service-role.ts, không chỉ mock
+// cả module đi. Nhóm 2-3 mock nguyên module @/lib/supabase/service-role,
+// theo tiền lệ submitExam.int.test.ts khi test nơi gọi nó.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
 afterEach(() => {
-  // Group 2/2b use vi.doMock per-test (their session/mock shape varies test
-  // to test); undo those registrations so Group 1/3's plain, unmocked
-  // imports of the real service-role.ts module aren't shadowed by a stale
-  // partial mock from an earlier test in this file.
+  // Nhóm 2/2b dùng vi.doMock theo từng test (hình dạng session/mock thay đổi
+  // giữa các test); huỷ các đăng ký đó để các import trần, không mock của
+  // module service-role.ts thật ở Nhóm 1/3 không bị che bởi một mock
+  // một phần cũ từ test trước trong file này.
   vi.doUnmock("@/lib/supabase/server");
   vi.doUnmock("@/lib/auth/admin");
   vi.doUnmock("@/lib/supabase/service-role");
@@ -44,14 +44,14 @@ describe("Group 1 — changeSupportTicketStatus: first-status-transition timesta
   it("both calls go through .rpc('change_support_ticket_status', ...), never .from().update(); second call's timestamp equals the first's", async () => {
     const { changeSupportTicketStatus } = await import("@/lib/supabase/service-role");
 
-    // First call: row was 'new' -> function stamps a fresh timestamp.
+    // Lần gọi đầu: hàng ở trạng thái 'new' -> hàm đóng dấu một mốc thời gian mới.
     rpcMock.mockResolvedValueOnce({
       data: [{ status: "in_progress", first_status_transition_at: "2026-08-13T10:00:00.000Z" }],
       error: null,
     });
     const first = await changeSupportTicketStatus("ticket-1", "in_progress");
 
-    // Second call: row already non-'new' -> function returns the SAME timestamp, unchanged.
+    // Lần gọi thứ hai: hàng đã không còn 'new' -> hàm trả CÙNG mốc thời gian đó, không đổi.
     rpcMock.mockResolvedValueOnce({
       data: [{ status: "resolved", first_status_transition_at: "2026-08-13T10:00:00.000Z" }],
       error: null,
@@ -82,12 +82,12 @@ describe("Group 1 — changeSupportTicketStatus: first-status-transition timesta
 describe("Group 2 — independent admin re-authorization (AC-021/AC-024), no email on status change (AC-030)", () => {
   async function importAction() {
     vi.resetModules();
-    // getTranslate() reads next/headers' cookies(), which throws outside a
-    // real request scope (no Next.js server runtime in vitest) — mocked
-    // uniformly here since every Group 2/2b test needs it regardless of its
-    // own session/service-role mock shape.
-    // revalidatePath() requires a real Next.js static-generation store on
-    // the success path — not present under vitest.
+    // getTranslate() đọc cookies() của next/headers, thứ ném lỗi ngoài phạm vi
+    // request thật (vitest không có runtime server Next.js) — mock đồng nhất
+    // ở đây vì mọi test của Nhóm 2/2b đều cần nó bất kể hình dạng mock
+    // session/service-role của riêng test.
+    // revalidatePath() đòi một static-generation store thật của Next.js ở
+    // nhánh thành công — không có dưới vitest.
     vi.doMock("next/cache", () => ({ revalidatePath: vi.fn() }));
     return import("@/features/admin/ticketActions");
   }

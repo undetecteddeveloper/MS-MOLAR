@@ -1,40 +1,38 @@
 "use client";
 
-// HistoryRowMenu — front-adjust: consolidates HistoryRow's 3 separate
-// controls (Save ActionButton, Share ActionButton, "View details" Link) into
-// a single ⋯ trigger + dropdown menu, matching HeaderProfile.tsx's dropdown
-// convention (scrim + role="menu" panel) rather than introducing a new menu
+// HistoryRowMenu — front-adjust: gộp 3 điều khiển riêng của HistoryRow
+// (ActionButton Lưu, ActionButton Chia sẻ, Link "View details") thành
+// một nút ⋯ + menu thả xuống, theo quy ước dropdown của HeaderProfile.tsx
+// (scrim + panel role="menu") thay vì đưa ra một menu mới
 // primitive. Theme "Sân trường" (2026-09-07): nút ⋯ là viên thuốc TRẮNG 36px
 // (`plain`, cỡ nút-trong-thẻ) trên thẻ surface; bảng menu cùng lớp vỏ với
 // HeaderProfile (popover trắng, viền mảnh, bo 14px, mục 44px bo 11px). Hết
 // viền-xám-chữ-nâu của theme cũ.
 //
-// Save/Share route through the same usePdfAction hook ActionButton uses
-// (AC-007 single PDF pipeline) — each has its own busyRef instance, so
-// triggering Save doesn't block Share and vice versa. Unlike ActionButton,
-// busy/error/fallback text renders as normal in-flow content inside the menu
-// item (not an absolutely-positioned overlay), so there's no D2-style
-// phantom-position risk here at all — the menu item just grows.
+// Lưu/Chia sẻ đi qua cùng hook usePdfAction mà ActionButton dùng
+// (AC-007, một đường PDF duy nhất) — mỗi nút có busyRef riêng, nên
+// kích hoạt Lưu không chặn Chia sẻ và ngược lại. Khác ActionButton,
+// chữ bận/lỗi/dự phòng render như nội dung bình thường trong luồng bên trong
+// mục menu (không phải lớp phủ định vị tuyệt đối), nên ở đây hoàn toàn không có
+// rủi ro vị trí ma kiểu D2 — mục menu chỉ việc dài ra.
 //
-// ⚠ POSITIONING (2026-08-09, real bug — same shape as ExamFilters.tsx's
-// FilterRow fix, same day): the panel used to be `position: absolute
-// top-full right-0`, anchored to THIS row, inside HistoryList's then-bounded
-// `overflow-y-auto` list sitting just above the mobile BottomNav (`fixed
-// z-40`). An `absolute` descendant's containing block is the nearest
-// POSITIONED ancestor — here, this row's own `.relative` wrapper — which was
-// INSIDE that scroll container, so the panel's paint position was subject to
-// the list's clipping box and got visually eaten by BottomNav for rows near
-// the bottom. Fix: compute the panel's position from the trigger's viewport
-// rect (`getBoundingClientRect`) and render it via `createPortal` to
-// `document.body` with `position: fixed`. The list no longer scrolls on its
-// own (2026-09-07: it paginates instead), but the portal stays as a
-// STRUCTURAL guarantee — no future ancestor change (an added `overflow`, a
-// `max-h`, a `transform` for an unrelated animation) can silently reintroduce
-// the clipping. Direction flips (opens upward) and height clamps with its own
-// `overflow-y-auto` when the trigger is close enough to the viewport edge
-// that even the flipped side doesn't have room — the panel can never render
-// partially off-screen or behind BottomNav, regardless of how tall its
-// content is or how many rows the list holds.
+// ⚠ ĐỊNH VỊ (2026-08-09, lỗi thật — cùng dạng với bản sửa FilterRow của ExamFilters.tsx,
+// cùng ngày): panel từng là `position: absolute
+// top-full right-0`, neo vào hàng NÀY, bên trong danh sách `overflow-y-auto`
+// khi đó có chiều cao giới hạn của HistoryList, nằm ngay trên BottomNav mobile (`fixed
+// z-40`). Khối chứa của một con cháu `absolute` là tổ tiên ĐƯỢC ĐỊNH VỊ
+// gần nhất — ở đây là wrapper `.relative` của chính hàng này — nằm
+// BÊN TRONG vùng cuộn đó, nên vị trí vẽ của panel bị hộp cắt của danh sách
+// chi phối và bị BottomNav che mất với các hàng gần cuối. Cách sửa: tính vị trí
+// panel từ hình chữ nhật viewport của nút kích hoạt (`getBoundingClientRect`) rồi render qua `createPortal` vào
+// `document.body` với `position: fixed`. Danh sách giờ không còn tự cuộn
+// (2026-09-07: nó phân trang thay vào đó), nhưng portal vẫn được giữ như một
+// đảm bảo CẤU TRÚC — không thay đổi tổ tiên nào trong tương lai (thêm `overflow`,
+// `max-h`, `transform` cho một animation không liên quan) có thể lặng lẽ khiến lỗi cắt xén tái diễn.
+// Hướng lật (mở lên trên) và chiều cao bị kẹp bằng `overflow-y-auto` riêng của nó khi
+// nút kích hoạt đủ gần mép viewport đến mức
+// cả phía đã lật cũng không đủ chỗ — panel không bao giờ render
+// lệch ra ngoài màn hình hay nằm sau BottomNav, bất kể nội dung cao bao nhiêu hay danh sách có bao nhiêu hàng.
 import { ArrowUpRight, Download, Loader2, MoreHorizontal, Share2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -49,7 +47,7 @@ import type { AttemptPdfData } from "@/lib/pdf/generateAttemptPdf";
 export interface HistoryRowMenuProps {
   pdfInput: AttemptPdfData;
   resultHref: string;
-  /** Accessible name suffix ("More actions for <examTitle>") — disambiguates N triggers on one page. */
+  /** Hậu tố tên truy cập được ("More actions for <examTitle>") — phân biệt N nút kích hoạt trên cùng một trang. */
   examTitle: string;
   /** Lý do KHÔNG xuất được PDF, hoặc `null`. BẮT BUỘC — xem `usePdfAction`.
    *
@@ -140,12 +138,12 @@ export function HistoryRowMenu({
   const save = usePdfAction("save", pdfInput, blockedReason);
   const share = usePdfAction("share", pdfInput, blockedReason);
 
-  // Auto-close once Save/Share completes successfully (phase settles back to
-  // idle) — error and fallback-confirmed stay open so the user can read the
-  // message / retry. Adjusted during render (React's "adjust state when a
-  // prop changes" pattern, not an effect — react-hooks/set-state-in-effect)
-  // by tracking each hook's previous phase and reacting only to an actual
-  // transition, never the initial idle render.
+  // Tự đóng khi Lưu/Chia sẻ hoàn tất thành công (pha trở về
+  // idle) — lỗi và fallback-confirmed vẫn mở để người dùng đọc
+  // thông báo / thử lại. Điều chỉnh ngay trong lúc render (mẫu "điều chỉnh state khi
+  // prop đổi" của React, không dùng effect — react-hooks/set-state-in-effect)
+  // bằng cách theo dõi pha trước đó của từng hook và chỉ phản ứng với một
+  // lần chuyển pha thật, không bao giờ với lần render idle đầu tiên.
   const [prevSavePhase, setPrevSavePhase] = useState(save.phase);
   if (save.phase !== prevSavePhase) {
     setPrevSavePhase(save.phase);

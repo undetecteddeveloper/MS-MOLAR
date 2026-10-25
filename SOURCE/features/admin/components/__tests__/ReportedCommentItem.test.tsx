@@ -3,13 +3,13 @@
 // ReportedCommentItem — UI Spec § Component: ReportedCommentItem (C-39);
 // frontend DD § Test Boundaries (task 38): "Admin hidden-comment item tests",
 // "Admin visible-reported-comment `questionNumber` test", "Admin author-shape
-// test", "Admin refusal tests" (comment half).
+// test", "Admin refusal tests" (nửa bình luận).
 //
-// Mock boundary: `@/features/solutions/adminActions` mocked at the module
-// boundary; the mocked `moderateCommentAction` is handed to the component as
-// its `onModerate` prop, exactly as `app/(admin)/admin/page.tsx` wires the
-// real one (B4 — the component itself imports nothing from features/solutions).
-// `ConfirmDialog` and `relativeTime` render for real.
+// Ranh giới mock: `@/features/solutions/adminActions` được mock ở ranh giới
+// module; `moderateCommentAction` mock được trao cho component làm
+// prop `onModerate`, đúng như `app/(admin)/admin/page.tsx` nối cái thật
+// (B4 — bản thân component không import gì từ features/solutions).
+// `ConfirmDialog` và `relativeTime` render thật.
 
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

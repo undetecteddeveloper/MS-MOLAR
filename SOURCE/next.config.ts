@@ -3,7 +3,7 @@ import { LIMITS } from "./lib/ugc/limits";
 import { buildCsp, supabaseOriginFromEnv } from "./lib/security/csp";
 
 // ---------------------------------------------------------------------------
-// Security response headers (Security review 2026-08-03, Medium #5)
+// Header phản hồi bảo mật (Đánh giá bảo mật 2026-08-03, Medium #5)
 //
 // Trước đây không có header nào. Rủi ro chính review nêu — "XSS = chiếm tài
 // khoản vì cookie session không httpOnly" — nay đã đóng ở NGUỒN

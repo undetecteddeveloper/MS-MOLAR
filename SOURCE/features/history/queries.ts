@@ -1,6 +1,6 @@
-// (history) route group — History read (backend Design Doc history-backend-design.md
-// v1.2, § Query Implementation Shape). Server-only, mirrors features/exams/queries.ts's
-// snake_case DB → camelCase mapping and throw-on-infrastructure-error convention.
+// Nhóm route (history) — đọc History (backend Design Doc history-backend-design.md
+// v1.2, § Query Implementation Shape). Chỉ chạy ở server, theo mẫu features/exams/queries.ts:
+// ánh xạ snake_case DB → camelCase và quy ước ném lỗi khi hạ tầng hỏng.
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { readBounded } from "@/lib/supabase/boundedRead";

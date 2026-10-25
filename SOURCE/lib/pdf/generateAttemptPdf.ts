@@ -1,9 +1,9 @@
-// Single shared PDF-generation implementation (AC-007, ADR-0009). See
+// Bản cài đặt tạo PDF dùng chung duy nhất (AC-007, ADR-0009). Xem
 // docs/design/history-frontend-design.md § PDF Generation Module — Deep Dive
-// and § Data Contracts. `jspdf`/`html2canvas`/`react-dom`/`react-dom/client`
-// are dynamically imported exclusively inside generateAttemptPdfFile's async
-// body (ADR-0009 § Implementation Guidance) — never at this file's top level,
-// so the heavy libraries never load until the first Save/Share click.
+// và § Data Contracts. `jspdf`/`html2canvas`/`react-dom`/`react-dom/client`
+// chỉ được import động bên trong phần thân async của generateAttemptPdfFile
+// (ADR-0009 § Implementation Guidance) — không bao giờ ở cấp cao nhất của file này,
+// nên các thư viện nặng không bao giờ tải cho tới lần bấm Lưu/Chia sẻ đầu tiên.
 import { createElement } from "react";
 import { AttemptPdfTemplate } from "@/components/pdf/AttemptPdfTemplate";
 import { buildPdfFilename, formatSubmittedDate, formatSubmittedTime } from "@/lib/history/format";
@@ -113,16 +113,16 @@ export async function generateAttemptPdfFile(data: AttemptPdfData): Promise<File
 }
 
 /**
- * Closes the gap between flushSync's synchronous DOM commit (the <img>
- * element exists) and the image bitmap actually being decoded, plus waits
- * for webfonts, before html2canvas captures the container.
+ * Lấp khoảng trống giữa lần commit DOM đồng bộ của flushSync (phần tử <img>
+ * đã tồn tại) và lúc bitmap ảnh thực sự được giải mã, đồng thời chờ
+ * webfont, trước khi html2canvas chụp container.
  *
- * `document.fonts?.ready` is guarded with optional chaining as a defensive
- * measure only: this repo's installed jsdom (^29.1.1) doesn't implement the
- * CSS Font Loading API (document.fonts is undefined there), while every
- * browser in the project's supported matrix always populates it — the guard
- * never selects a different branch in a real browser, it only prevents a
- * jsdom-only TypeError in tests.
+ * `document.fonts?.ready` được bọc optional chaining chỉ như một biện pháp
+ * phòng thủ: jsdom cài trong repo này (^29.1.1) không cài đặt
+ * CSS Font Loading API (document.fonts là undefined ở đó), trong khi mọi
+ * trình duyệt thuộc ma trận hỗ trợ của dự án đều luôn có nó — lớp bọc
+ * không bao giờ chọn nhánh khác trong trình duyệt thật, nó chỉ ngăn
+ * một TypeError chỉ xảy ra ở jsdom trong test.
  */
 async function waitForTemplateAssets(container: HTMLElement): Promise<void> {
   await (document.fonts?.ready ?? Promise.resolve()).catch(() => undefined);

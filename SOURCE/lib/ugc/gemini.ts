@@ -1,5 +1,5 @@
-// UGC Exam Upload v2.0 — Gemini client (SERVER-ONLY, ADR-0004 addendum: swap
-// Anthropic → Gemini free tier, engineer decision 2026-07-17).
+// Đăng đề UGC v2.0 — client Gemini (CHỈ Ở SERVER, phụ lục ADR-0004: đổi
+// Anthropic → Gemini bản miễn phí, quyết định của kỹ sư 2026-07-17).
 //
 // Module này (và mọi module import nó) KHÔNG BAO GIỜ được import từ client
 // component: "server-only" làm build fail ngay nếu vi phạm; check bổ sung ở

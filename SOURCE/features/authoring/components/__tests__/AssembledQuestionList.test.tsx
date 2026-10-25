@@ -13,7 +13,7 @@
 // tác giả mất nguyên lượt lưu vì một ô họ chỉ định xoá đi.
 //
 // @category: core-functionality
-// @dependency: none — real component, no mocks
+// @dependency: không có — component thật, không mock
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render } from "@testing-library/react";

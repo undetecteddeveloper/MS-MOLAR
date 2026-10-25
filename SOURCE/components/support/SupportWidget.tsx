@@ -25,11 +25,11 @@ export function SupportWidget({ user }: SupportWidgetProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
-  // UI-D7 (manual keyboard pass, 2026-08-13 finding): Escape/scrim/Cancel
-  // must return focus to the trigger, not drop it to <body> — the dialog's
-  // own panel only knows how to focus ITSELF on open, not where to send
-  // focus back to on close, so the parent (which owns both siblings) closes
-  // this loop.
+  // UI-D7 (lượt kiểm bàn phím thủ công, phát hiện 2026-08-13): Escape/scrim/Cancel
+  // phải trả focus về nút kích hoạt, không để rơi về <body> — panel
+  // của chính dialog chỉ biết focus CHÍNH NÓ khi mở, không biết gửi
+  // focus về đâu khi đóng, nên cha (sở hữu cả hai anh em) khép
+  // vòng này.
   function handleClose() {
     setOpen(false);
     document.getElementById(TRIGGER_ID)?.focus();

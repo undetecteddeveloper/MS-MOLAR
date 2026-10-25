@@ -17,7 +17,7 @@
 // nữa, đúng cái bug mà file này sinh ra để chặn.
 //
 // @category: core-functionality
-// @dependency: none — real QuestionEditor + real RichText, no mocks
+// @dependency: không có — QuestionEditor thật + RichText thật, không mock
 
 // Không có auto-cleanup của RTL trong cấu hình vitest này → truy vấn bó trong
 // `container`, không dùng `screen`.
@@ -164,18 +164,18 @@ describe("QuestionEditor — node server sẵn có so với chuỗi vừa bị s
 });
 
 // =============================================================================
-// Task E4 / OQ-5 — the author-facing essay footnote follows the flag
+// Task E4 / OQ-5 — chú thích cuối bài tự luận hướng tới tác giả đề đi theo cờ
 // =============================================================================
-// The old string ("stored, not auto-scored yet") tells the EXAM AUTHOR that
-// essays are not graded. It becomes false the moment the flag is on. Decision
-// (b) keeps BOTH strings and selects by the flag, mirroring what AC-051/UI-D8
-// already do for the player footnote -- because a single rewritten string is
-// simply false in the other direction whenever the flag is off, and the flag
-// HAS an off path: E6 keeps a kill switch, and preview need not carry the same
-// variable as production.
+// Chuỗi cũ ("stored, not auto-scored yet") nói với TÁC GIẢ ĐỀ rằng
+// bài tự luận không được chấm. Nó thành sai ngay khi cờ bật. Quyết định
+// (b) giữ CẢ HAI chuỗi và chọn theo cờ, theo đúng cách AC-051/UI-D8
+// đã làm với chú thích ở trình làm bài — vì một chuỗi viết lại duy nhất
+// sẽ sai theo hướng ngược lại mỗi khi cờ tắt, mà cờ
+// CÓ đường tắt: E6 giữ công tắc ngắt, và môi trường preview không nhất thiết
+// mang cùng biến với production.
 //
-// Both directions live in ONE case so neither can be fixed by breaking the
-// other -- an inverted ternary passes a test that only ever checks one branch.
+// Cả hai hướng nằm trong MỘT ca để không hướng nào sửa được bằng cách phá
+// hướng kia -- một biểu thức ba ngôi bị đảo vẫn qua test chỉ kiểm một nhánh.
 describe("Task E4 — essay footnote follows ESSAY_GRADING_ENABLED", () => {
   const ESSAY: AssembledQuestion = {
     part: 1,
@@ -189,9 +189,9 @@ describe("Task E4 — essay footnote follows ESSAY_GRADING_ENABLED", () => {
   const ON = "Tự luận — chấm tự động sau khi học sinh nộp bài.";
 
   it("shows the not-scored string when the flag is absent, the scored string when it is on, and never both", () => {
-    // Default (prop omitted) must be the OFF text: fail-closed, so a call site
-    // that forgets the prop shows something merely stale rather than promising
-    // the author a feature that may be switched off.
+    // Mặc định (bỏ prop) phải là chữ của trạng thái TẮT: an toàn khi hỏng (fail-closed), để nơi
+    // gọi quên prop chỉ hiện thứ lỗi thời thay vì hứa hẹn với
+    // tác giả một tính năng có thể đang tắt.
     const fallback = render(
       <QuestionEditor question={ESSAY} onChange={vi.fn()} hasError={false} />,
     );

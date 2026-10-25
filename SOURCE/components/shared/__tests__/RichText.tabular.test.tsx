@@ -10,7 +10,7 @@
 // dạng im lặng như normalizeMathDelimiters, nên cũng cần test canh.
 //
 // @category: core-functionality
-// @dependency: none — real RichText, no mocks
+// @dependency: không có — RichText thật, không mock
 
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";

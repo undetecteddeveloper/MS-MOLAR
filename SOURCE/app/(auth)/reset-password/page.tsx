@@ -1,4 +1,4 @@
-// Reset Password — /reset-password (Layer 1, S#23). Server Component.
+// Đặt lại mật khẩu — /reset-password (Layer 1, S#23). Server Component.
 // Đích của link email reset: /auth/callback?next=/reset-password đã đổi code
 // lấy RECOVERY SESSION rồi mới tới đây. Không có session (vào thẳng URL, link
 // hết hạn) → middleware đã chặn từ ngoài; guard đây là lớp thứ hai.

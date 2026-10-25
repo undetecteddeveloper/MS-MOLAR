@@ -1,43 +1,43 @@
-// Off-screen only — never shown to the user. HARD CONSTRAINT (ADR-0009): every
-// colour below must be a literal hex or rgb()/rgba() string. No Tailwind
-// className anywhere in this file, no components/ui/button.tsx import.
-// html2canvas throws or paints wrong when a style resolves through the modern
-// colour functions theme tokens use (their names are deliberately NOT written
-// here: AttemptPdfTemplate.test.tsx scans this file's text for them).
+// Chỉ ngoài màn hình — không bao giờ hiện cho người dùng. RÀNG BUỘC CỨNG (ADR-0009): mọi
+// màu bên dưới phải là chuỗi hex hoặc rgb()/rgba() dạng literal. Không dùng Tailwind
+// className ở bất cứ đâu trong file này, không import components/ui/button.tsx.
+// html2canvas ném lỗi hoặc vẽ sai khi một style phân giải qua các hàm
+// màu hiện đại mà token của theme dùng (cố ý KHÔNG viết tên chúng
+// ở đây: AttemptPdfTemplate.test.tsx quét văn bản file này để tìm chúng).
 //
-// Theme "Sân trường" (2026-09-13, engineer test on a real phone: the file still
-// carried the old cream/red "Mực & Sơn mài" look). Values are the resolved hex
-// of app/globals.css `:root`, copied by hand because tokens cannot be read
-// here: white page `#ffffff`, ink `#14291c`, muted `#4f6656`, surface tint
-// `#eef7f1` (layering by tinted fill, no borders), action green `#117a45`,
-// wrong red `#c43e2a`, hairline `#cfe3d6`, and ONE bold place — sun yellow
-// `#ffc531` as the short rule under the eyebrow. Change a token in globals.css
-// → change the twin literal here.
+// Theme "Sân trường" (2026-09-13, kỹ sư thử trên điện thoại thật: file vẫn
+// mang vẻ kem/đỏ cũ "Mực & Sơn mài"). Các giá trị là hex đã phân giải
+// của app/globals.css `:root`, chép tay vì không đọc được token
+// ở đây: trang trắng `#ffffff`, mực `#14291c`, mờ `#4f6656`, nền tô nhạt
+// `#eef7f1` (phân lớp bằng nền tô, không viền), xanh hành động `#117a45`,
+// đỏ sai `#c43e2a`, đường kẻ mảnh `#cfe3d6`, và MỘT chỗ nhấn đậm — vàng nắng
+// `#ffc531` làm đường kẻ ngắn dưới eyebrow. Đổi một token trong globals.css
+// → phải đổi literal song sinh ở đây.
 //
-// DELIBERATELY NOT FOLLOWING the dark theme (2026-09-14, "Đêm hội"). The rest
-// of the site is now dark; this file stays on the LIGHT palette above and is
-// the one place that must not be swept along. It renders onto PAPER: a dark
-// page means the printer floods a whole A4 with ink for a result sheet a
-// student prints to hand in. The values above are therefore a FROZEN copy of
-// the old light theme, not a stale one — do not "fix" them to match
-// globals.css. The rule that still binds: layering by tinted fill, no borders,
-// and the same Lexend face.
+// CỐ Ý KHÔNG theo theme tối (2026-09-14, "Đêm hội"). Phần còn lại
+// của site giờ là tối; file này vẫn ở bảng màu SÁNG ở trên và là
+// chỗ duy nhất không được cuốn theo. Nó render lên GIẤY: trang tối
+// nghĩa là máy in phủ mực cả tờ A4 cho một phiếu kết quả mà
+// học sinh in ra để nộp. Vì vậy các giá trị ở trên là bản SAO ĐÔNG CỨNG của
+// theme sáng cũ, không phải bản lỗi thời — đừng "sửa" cho khớp
+// globals.css. Quy tắc vẫn còn ràng buộc: phân lớp bằng nền tô, không viền,
+// và cùng một kiểu chữ Lexend.
 //
-// Font: the page's own Lexend via the CSS variable next/font sets on <html>
-// (`--font-lexend`, app/layout.tsx). The container is mounted under
-// document.body, so the variable is inherited and getComputedStyle — which is
-// what html2canvas reads — resolves it to the self-hosted face. A literal
-// family name ("Lexend") would NOT match next/font's hashed @font-face name.
-// The old template named two fonts the site no longer loads and fell back to
-// the system face.
+// Font: Lexend riêng của trang qua biến CSS mà next/font đặt trên <html>
+// (`--font-lexend`, app/layout.tsx). Container được mount dưới
+// document.body, nên biến được kế thừa và getComputedStyle — thứ
+// html2canvas đọc — phân giải nó ra font tự host. Tên họ font literal
+// ("Lexend") sẽ KHÔNG khớp với tên @font-face đã băm của next/font.
+// Template cũ gọi tên hai font mà site không còn tải và rơi về
+// font hệ thống.
 //
-// Centered "receipt" layout: eyebrow + sun rule, subject/title, score panel
-// (tinted), examinee/submitted row, correct/wrong cells with the same colour
-// dots as ScoreCard, total-questions line, brand footer. Every label prop is
-// optional with an English default (mirrors the old footerPrefix pattern) so
-// the template still stands alone when rendered outside the `t()` flow (unit
-// tests) — only the underlying DATA (subject/examTitle/score/examinee/
-// correct/total) is required.
+// Bố cục "biên lai" căn giữa: eyebrow + đường kẻ vàng nắng, môn/tiêu đề, bảng điểm
+// (nền tô), hàng người thi/giờ nộp, ô đúng/sai với cùng các chấm màu
+// như ScoreCard, dòng tổng số câu, chân trang thương hiệu. Mọi prop nhãn đều
+// tuỳ chọn với mặc định tiếng Anh (theo mẫu footerPrefix cũ) để
+// template vẫn đứng độc lập khi render ngoài luồng `t()` (unit
+// test) — chỉ DỮ LIỆU gốc (subject/examTitle/score/examinee/
+// correct/total) là bắt buộc.
 export interface AttemptPdfTemplateProps {
   subject: string;
   examTitle: string;

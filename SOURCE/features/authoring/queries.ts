@@ -1,4 +1,4 @@
-// Logic Layer 4 — UGC Exam Upload v2.0: Read queries (Task 4.2).
+// Logic Layer 4 — Đăng đề UGC v2.0: các truy vấn đọc (Task 4.2).
 // Design Doc §Read Queries. Server-only: Supabase server client (RLS là tầng
 // authorization). Mọi query order tường minh (không dựa thứ tự insert).
 import "server-only";

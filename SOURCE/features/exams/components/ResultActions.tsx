@@ -1,15 +1,15 @@
 // ResultActions — Save PDF + Share buttons ở màn Result (Layer 2). GĐ 3 M3.1
-// Task 12: rewired from the disabled "coming soon" placeholder onto the
-// shared ActionButton (AC-007/AC-014) — same component HistoryRow (Task 13)
-// will use, so Save/Share are now fully functional here.
+// Task 12: nối lại từ chỗ giữ chỗ "sắp có" đang bị vô hiệu sang
+// ActionButton dùng chung (AC-007/AC-014) — cùng component mà HistoryRow (Task 13)
+// sẽ dùng, nên Lưu/Chia sẻ giờ hoạt động đầy đủ ở đây.
 //
-// Renders its two buttons as siblings (no wrapping grid of its own) — the
-// caller (result/page.tsx) places them inside its own 3-column row alongside
-// "Return", so all three sit at the same height/width. ActionButton's own
-// DOM-shape fix (Task 10/11, see history-frontend-design.md § ActionButton —
-// Deep Dive) keeps this a single in-flow <button> per instance in every
-// phase (idle/busy/error/fallback-confirmed), so the grid-cols-3 cell count
-// this page depends on stays unchanged.
+// Render hai nút như anh em (không có lưới bọc riêng) — nơi gọi
+// (result/page.tsx) đặt chúng trong hàng 3 cột của chính nó cùng với
+// nút "Return", để cả ba cùng cao và rộng như nhau. Bản sửa hình dạng DOM
+// của chính ActionButton (Task 10/11, xem history-frontend-design.md § ActionButton —
+// Deep Dive) giữ cho mỗi bản chỉ có một <button> trong luồng ở mọi
+// pha (idle/busy/error/fallback-confirmed), nên số ô grid-cols-3
+// mà trang này phụ thuộc không đổi.
 import { ActionButton } from "@/components/history/ActionButton";
 import type { AttemptPdfData } from "@/lib/pdf/generateAttemptPdf";
 

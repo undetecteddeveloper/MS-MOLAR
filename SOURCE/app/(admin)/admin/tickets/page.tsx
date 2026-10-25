@@ -1,4 +1,4 @@
-// User Support System v1 — /admin/tickets (backend Design Doc v1.2).
+// Hệ thống hỗ trợ người dùng v1 — /admin/tickets (backend Design Doc v1.2).
 // Server Component: guard riêng theo allowlist (layout của nhóm chỉ dựng khung,
 // không phải cổng) + đọc batched qua listSupportTickets(), prop-drill xuống
 // TicketQueueList — Server Component prop passing, không client fetch riêng.

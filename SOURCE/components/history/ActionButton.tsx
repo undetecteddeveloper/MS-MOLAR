@@ -1,32 +1,31 @@
 "use client";
 
-// ActionButton — the single shared Save/Share atom (AC-007), consumed by
-// ResultActions (Task 12). History's own row actions now go through
-// HistoryRowMenu (front-adjust: merged ⋯ menu) instead, but both route
-// through the identical usePdfAction hook (components/history/usePdfAction.ts) — no
-// second PDF-generation call site.
+// ActionButton — nguyên tử Lưu/Chia sẻ dùng chung duy nhất (AC-007), được dùng bởi
+// ResultActions (Task 12). Các hành động trên mỗi hàng của History giờ đi qua
+// HistoryRowMenu (front-adjust: menu ⋯ gộp) thay thế, nhưng cả hai đều đi
+// qua cùng một hook usePdfAction (components/history/usePdfAction.ts) — không có
+// điểm gọi tạo PDF thứ hai.
 //
-// D4 a11y pattern (2nd application of RateButton.tsx's precedent, not yet a
-// Rule-of-Three extraction): always focusable, never native `disabled` —
-// aria-disabled + aria-describedby + Tooltip communicate busy/error/fallback
-// state instead. Because aria-disabled does not itself block the DOM click
-// event, usePdfAction's `busyRef` is the actual (synchronous) click-
-// suppression mechanism (AC-010).
+// Mẫu a11y D4 (lần áp dụng thứ 2 của tiền lệ RateButton.tsx, chưa phải đợt tách
+// theo Rule-of-Three): luôn focus được, không bao giờ `disabled` gốc —
+// thay vào đó aria-disabled + aria-describedby + Tooltip truyền đạt trạng thái
+// bận/lỗi/dự phòng. Vì aria-disabled tự nó không chặn sự kiện click của DOM,
+// `busyRef` của usePdfAction mới là cơ chế chặn click thật (đồng bộ) (AC-010).
 //
-// D2 DOM-shape fix: the error/status feedback spans, AND the sr-only
-// aria-describedby reason span, are all rendered as descendants of the
-// button (position: absolute, anchored by the button's own position:
-// relative) — never as Tooltip-level siblings of it. A prior revision left
-// the reason span as a sibling (see the frontend DD's "ActionButton phase ->
-// local DOM shape" table); that span had no positioned ancestor at all, so
-// browsers fell back to positioning it at its *hypothetical static
-// position* against the document root — inflating
-// document.documentElement.scrollHeight by one row-height per rendered
-// instance (harmless with 2 buttons on the Result page, but with 30+ rows on
+//Sửa hình dạng DOM D2: các span phản hồi lỗi/trạng thái, VÀ span lý do sr-only
+// cho aria-describedby, đều được render làm con cháu của
+// button (position: absolute, neo vào position: relative của chính
+// button) — không bao giờ là anh em cấp Tooltip của nó. Một bản trước để
+// span lý do làm anh em (xem bảng "ActionButton phase -> local DOM shape" của frontend DD);
+// span đó không có tổ tiên được định vị nào cả, nên
+// trình duyệt rơi về định vị nó ở *vị trí tĩnh giả định*
+// so với gốc tài liệu — làm phồng
+// document.documentElement.scrollHeight thêm một chiều cao hàng cho mỗi bản
+// render (vô hại với 2 nút ở trang Kết quả, nhưng với 30+ hàng trên
 // /history this produced several thousand px of invisible page height,
-// i.e. the "infinite scroll" bug). Keeping every phase-dependent node inside
-// the button's own `relative` box keeps ActionButton contributing exactly
-// one in-flow node to its parent AND never leaks layout height to the page.
+// tức lỗi "cuộn vô tận"). Giữ mọi nút phụ thuộc pha bên trong hộp `relative`
+// của chính button thì ActionButton chỉ đóng góp đúng
+// một nút trong luồng cho cha của nó VÀ không bao giờ rò chiều cao layout ra trang.
 import { Download, Loader2, Share2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { buttonVariants } from "@/components/ui/button";
@@ -45,7 +44,7 @@ const ICON = { save: Download, share: Share2 } as const;
 export interface ActionButtonProps {
   action: "save" | "share";
   pdfInput: AttemptPdfData;
-  /** Unique per rendered instance — keeps the sr-only reason span's id unique across N HistoryRow instances. */
+  /** Duy nhất cho mỗi bản render — giữ id của span lý do sr-only không trùng giữa N bản HistoryRow. */
   idPrefix: string;
   /** Lý do KHÔNG xuất được, hoặc `null` khi xuất được (ADR-0018/AC-058).
    *
@@ -75,9 +74,9 @@ export function ActionButton({ action, pdfInput, idPrefix, blockedReason }: Acti
         aria-disabled={blocked || phase === "busy" ? "true" : "false"}
         aria-busy={phase === "busy"}
         aria-describedby={reasonId}
-        // `relative` is required — it anchors every absolutely-positioned descendant below (error/status text,
-        // and the sr-only reason span) so none of them ever become extra in-flow siblings of this button, or —
-        // worse, since they'd have no positioned ancestor at all — get positioned against the document root (D2).
+        // `relative` là bắt buộc — nó neo mọi con cháu định vị tuyệt đối bên dưới (chữ lỗi/trạng thái,
+        // và span lý do sr-only) để không cái nào trở thành anh em thêm trong luồng của button này, hoặc —
+        // tệ hơn, vì chúng không có tổ tiên định vị nào cả — bị định vị so với gốc tài liệu (D2).
         // Theme "Sân trường": viên thuốc surface của primitive Button, nhãn HIỆN
         // RA cạnh icon (icon-only bắt học sinh đoán). `relative` + `w-full` giữ
         // hình dạng DOM đã mô tả ở đầu file; mọi span trạng thái vẫn là con
@@ -106,8 +105,7 @@ export function ActionButton({ action, pdfInput, idPrefix, blockedReason }: Acti
             {t("history.downloadedNoShare")}
           </span>
         )}
-        {/* Descendant of the button (not a Tooltip-level sibling, see D2 above) — aria-describedby resolves it
-            by id regardless of DOM containment, so this move has no a11y-semantics effect, only a layout one. */}
+        {/* Con cháu của button (không phải anh em cấp Tooltip, xem D2 ở trên) — aria-describedby tìm ra nó theo id bất kể DOM chứa nó thế nào, nên việc chuyển này không ảnh hưởng ngữ nghĩa a11y, chỉ ảnh hưởng layout. */}
         <span id={reasonId} className="sr-only">
           {/* Lý do BỊ CHẶN thắng lý do BẬN: khi đang bị chặn thì không có lượt
               tạo tệp nào để mà bận. */}

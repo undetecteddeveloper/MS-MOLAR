@@ -1,5 +1,5 @@
 // Supabase service-role client — DANH TÍNH ĐẶC QUYỀN, chỉ dùng server-side.
-// Security review 2026-08-03 Critical #2 (schema.sql §11).
+// Đánh giá bảo mật 2026-08-03 Critical #2 (schema.sql §11).
 //
 // ⚠ ĐỌC TRƯỚC KHI THÊM BẤT CỨ THỨ GÌ VÀO FILE NÀY ⚠
 //
@@ -104,7 +104,7 @@ export async function recordSkillMastery(
 }
 
 // ---------------------------------------------------------------------------
-// Takedown UGC (Security review Medium #7, schema.sql §14)
+// Gỡ nội dung UGC (Đánh giá bảo mật Medium #7, schema.sql §14)
 //
 // Cần service_role vì RLS cố tình không cho ai sửa đề của người khác — và
 // ADR-0001 chốt không tạo role admin trong DB, nên "quyền admin" chỉ tồn tại ở
@@ -206,7 +206,7 @@ export async function moderateExam(
 }
 
 // ---------------------------------------------------------------------------
-// User Support System v1 (ADR-0012, schema.sql — support_tickets.notify_failed)
+// Hệ thống hỗ trợ người dùng v1 (ADR-0012, schema.sql — support_tickets.notify_failed)
 //
 // Ghi cờ "gửi mail báo ticket thất bại" — CHỈ service_role ghi được cột này,
 // vì `support_tickets` không có policy update nào cho `authenticated` (không
