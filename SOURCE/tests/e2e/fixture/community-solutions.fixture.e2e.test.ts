@@ -163,6 +163,7 @@ const {
   toggleHelpfulMock,
   setPinMock,
   getExamMock,
+  getQuestionPartNumbersMock,
   isExamAuthorMock,
   generatePdfMock,
   redirectMock,
@@ -184,6 +185,9 @@ const {
   toggleHelpfulMock: vi.fn(),
   setPinMock: vi.fn(),
   getExamMock: vi.fn(),
+  // Trang bài giải gọi `getQuestionPartNumbers` để chia bảng câu hỏi theo phần; file này
+  // không khẳng định cách chia, nên một Map rỗng (không câu nào thuộc phần nào) là đủ.
+  getQuestionPartNumbersMock: vi.fn().mockResolvedValue(new Map()),
   isExamAuthorMock: vi.fn(),
   generatePdfMock: vi.fn(),
   redirectMock: vi.fn((path: string) => {
@@ -203,6 +207,7 @@ vi.mock("@/lib/auth/getCurrentUser", () => ({ getCurrentUserProfile: getProfileM
 vi.mock("@/features/exams/queries", () => ({
   getResult: getResultMock,
   getExam: getExamMock,
+  getQuestionPartNumbers: getQuestionPartNumbersMock,
   isExamAuthor: isExamAuthorMock,
 }));
 vi.mock("@/features/exams/actions", () => ({ getMyRating: getMyRatingMock }));
